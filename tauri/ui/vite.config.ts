@@ -106,6 +106,9 @@ export default defineConfig({
         // library_similar / library_stats / library_embed_folder) + the
         // library://embed-progress | embed-done events. See src/library/.
         library: resolve(projectRoot, "library.html"),
+        // Phase 62 — floating liquid-glass pill overlay window. Opened at
+        // startup by pill_window.rs when primary_surface resolves to "pill".
+        pill: resolve(projectRoot, "pill.html"),
       },
     },
   },

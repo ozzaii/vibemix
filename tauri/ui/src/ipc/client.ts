@@ -31,10 +31,8 @@
  * grep gate fails the verifier if any such call sneaks in.
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-
 import { vmxLog } from "../debug-log.js";
+import { invokeTauri, listenTauri, type UnlistenFn } from "../tauri-runtime.js";
 import type { VibemixIPCMessages as IpcMessage } from "./messages.js";
 import { parseIpcMessage } from "./validator.js";
 
@@ -94,7 +92,7 @@ export async function sendIpcRequest<TResponse extends IpcMessage = IpcMessage>(
       reject(new Error(`ipc timeout: no ${responseType} within ${timeoutMs}ms`));
     }, timeoutMs);
 
-    listen<unknown>(responseType.replace(/\./g, "-"), (event) => {
+    listenTauri<unknown>(responseType.replace(/\./g, "-"), (event) => {
       try {
         const msg = parseIpcMessage(event.payload) as TResponse;
         cleanup();
@@ -110,7 +108,7 @@ export async function sendIpcRequest<TResponse extends IpcMessage = IpcMessage>(
       .then((fn) => {
         unlisten = fn;
         // Send the request after the listener is attached.
-        invoke("forward_ipc_to_sidecar", { message: requestMessage }).catch((err) => {
+        invokeTauri("forward_ipc_to_sidecar", { message: requestMessage }).catch((err) => {
           cleanup();
           reject(new Error(`ipc invoke failed: ${String(err)}`));
         });
@@ -131,7 +129,7 @@ export async function subscribeIpc<T extends IpcMessage = IpcMessage>(
   callback: (msg: T) => void,
 ): Promise<UnlistenFn> {
   vmxLog("[vmx:ipc<]", `subscribe ${type}`);
-  return await listen<unknown>(type.replace(/\./g, "-"), (event) => {
+  return await listenTauri<unknown>(type.replace(/\./g, "-"), (event) => {
     try {
       const msg = parseIpcMessage(event.payload) as T;
       // High-frequency stream types (status.tick @1Hz, session.snapshot @up to
@@ -181,7 +179,7 @@ export async function emitIpc(
   payload: Record<string, unknown>,
 ): Promise<void> {
   vmxLog("[vmx:ipc>]", `emit ${type} (fire-and-forget)`, { payload });
-  await invoke("forward_ipc_to_sidecar", {
+  await invokeTauri("forward_ipc_to_sidecar", {
     message: { type, ts: new Date().toISOString(), payload },
   });
 }
@@ -217,7 +215,7 @@ export async function emitIpc(
  *  Caller is responsible for surfacing failure (typically `console.error`). */
 export async function revealInOS(session_dir: string): Promise<void> {
   vmxLog("[vmx:ipc>]", "invoke reveal_in_os", { sessionDir: session_dir });
-  return invoke("reveal_in_os", { sessionDir: session_dir });
+  return invokeTauri("reveal_in_os", { sessionDir: session_dir });
 }
 
 /** Open `<recordings_root>/<session_dir>/input.wav` in the OS default audio app.
@@ -227,7 +225,7 @@ export async function revealInOS(session_dir: string): Promise<void> {
  *  (LaunchServices on macOS, ShellExecute on Windows). */
 export async function openInputWav(session_dir: string): Promise<void> {
   vmxLog("[vmx:ipc>]", "invoke open_input_wav", { sessionDir: session_dir });
-  return invoke("open_input_wav", { sessionDir: session_dir });
+  return invokeTauri("open_input_wav", { sessionDir: session_dir });
 }
 
 export const _REQUEST_TIMEOUT_MS_FOR_TESTS = REQUEST_TIMEOUT_MS;

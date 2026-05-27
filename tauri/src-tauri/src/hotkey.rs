@@ -26,9 +26,7 @@ use std::sync::Mutex;
 
 use serde_json::json;
 use tauri::{AppHandle, Manager, Runtime, State, WebviewWindow};
-use tauri_plugin_global_shortcut::{
-    GlobalShortcutExt, Shortcut, ShortcutState,
-};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::ws_client::WsClientHandle;
 
@@ -117,21 +115,14 @@ pub fn register_default<R: Runtime>(app: &AppHandle<R>) {
 
 /// Register a combo. Validates, unregisters any prior combo, then
 /// registers the new one. Updates `HotkeyHandle.current` on success.
-pub fn register_combo<R: Runtime>(
-    app: &AppHandle<R>,
-    combo: &str,
-) -> Result<(), String> {
+pub fn register_combo<R: Runtime>(app: &AppHandle<R>, combo: &str) -> Result<(), String> {
     let normalised = validate_combo(combo)?;
 
     let gs = app.global_shortcut();
 
     // Drop the prior combo (if any) before registering the new one.
     if let Some(state) = app.try_state::<HotkeyHandle>() {
-        let prior = state
-            .current
-            .lock()
-            .ok()
-            .and_then(|g| g.clone());
+        let prior = state.current.lock().ok().and_then(|g| g.clone());
         if let Some(p) = prior {
             // Best-effort — if the prior never registered cleanly the
             // unregister call returns NotRegistered which we swallow.
@@ -238,9 +229,7 @@ fn chrono_now_iso() -> String {
     let hh = secs_of_day / 3600;
     let mm = (secs_of_day % 3600) / 60;
     let ss = secs_of_day % 60;
-    format!(
-        "{y:04}-{m:02}-{d:02}T{hh:02}:{mm:02}:{ss:02}.{nanos:09}Z",
-    )
+    format!("{y:04}-{m:02}-{d:02}T{hh:02}:{mm:02}:{ss:02}.{nanos:09}Z",)
 }
 
 /// Howard Hinnant's civil-from-days (public-domain). Days are signed
@@ -307,22 +296,13 @@ mod tests {
 
     #[test]
     fn validate_accepts_default_macos() {
-        assert_eq!(
-            validate_combo("cmd+shift+m").unwrap(),
-            "cmd+shift+m"
-        );
-        assert_eq!(
-            validate_combo("Cmd+Shift+M").unwrap(),
-            "cmd+shift+m"
-        );
+        assert_eq!(validate_combo("cmd+shift+m").unwrap(), "cmd+shift+m");
+        assert_eq!(validate_combo("Cmd+Shift+M").unwrap(), "cmd+shift+m");
     }
 
     #[test]
     fn validate_accepts_default_windows() {
-        assert_eq!(
-            validate_combo("ctrl+shift+m").unwrap(),
-            "ctrl+shift+m"
-        );
+        assert_eq!(validate_combo("ctrl+shift+m").unwrap(), "ctrl+shift+m");
     }
 
     #[test]

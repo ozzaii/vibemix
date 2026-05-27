@@ -126,9 +126,8 @@ mod imp {
     pub fn find_djay_window_rect() -> Option<Rect> {
         // SAFETY: Quartz returns a +1 CFArrayRef the caller releases. We
         // wrap_under_create_rule so the refcount drops at scope end.
-        let info_ref: CFArrayRef = unsafe {
-            CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID)
-        };
+        let info_ref: CFArrayRef =
+            unsafe { CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID) };
         if info_ref.is_null() {
             return None;
         }

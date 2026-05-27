@@ -2,9 +2,9 @@
  * recovery").
  *
  * Pins:
- *   - Default render shows "WARMING UP" when grounded=false, no retry.
+ *   - Default render shows "TUNING IN" when grounded=false, no retry.
  *   - After GROUNDING_FAILURE_MS elapse (failureElapsedMs >= 5000), the
- *     foot swaps to "COULDN'T REACH GEMINI" + retry button.
+ *     foot swaps to "AI SERVICE OFFLINE" + retry button.
  *   - Grounded=true clears the failure state regardless of elapsed.
  *   - Clicking retry invokes the onRetry handler.
  *   - SessionLayout's diff path crosses the 5s threshold automatically. */
@@ -53,7 +53,7 @@ describe("Cohost grounding-failure recovery (H9)", () => {
     expect(panel.querySelector(".vmx-cohost__foot-retry")).toBeNull();
   });
 
-  it("grounded=false + elapsed >= 5s → shows COULDN'T REACH GEMINI + retry", () => {
+  it("grounded=false + elapsed >= 5s → shows AI SERVICE OFFLINE + retry", () => {
     const panel = renderCohostPanel({
       status: "IDLE",
       transcript: [],
@@ -65,7 +65,7 @@ describe("Cohost grounding-failure recovery (H9)", () => {
     host().append(panel);
     const foot = panel.querySelector<HTMLElement>(".vmx-cohost__foot");
     expect(foot?.dataset.failed).toBe("true");
-    expect(foot?.textContent).toContain("COULDN'T REACH GEMINI");
+    expect(foot?.textContent).toContain("AI SERVICE OFFLINE");
     const retry = panel.querySelector<HTMLElement>(".vmx-cohost__foot-retry");
     expect(retry).toBeTruthy();
     // 2026-05-26 /impeccable critique P3: label tells the truth — the
@@ -198,11 +198,11 @@ describe("SessionLayout grounding-failure → fault state (H9)", () => {
     expect(session?.dataset.mode).toBe("fault");
     // The fault liveness label names the grounding cause.
     const fault = root.querySelector<HTMLElement>(".vmx-live__s--fault");
-    expect(fault?.textContent).toContain("gemini");
+    expect(fault?.textContent).toContain("ai service");
   });
 
   it("an IDLE co-host never faults on grounded=false (empty-screen regression guard)", () => {
-    // The recurring "empty screen / GEMINI UNREACHABLE / always broken" bug:
+    // The recurring "empty screen / AI SERVICE OFFLINE / always broken" bug:
     // a quiet idle session (no music) is ungrounded forever, and the old timer
     // flipped it to fault after 5s → blank hero. The fix: idle never faults.
     vi.useFakeTimers();
@@ -219,6 +219,46 @@ describe("SessionLayout grounding-failure → fault state (H9)", () => {
     expect(
       root.querySelector<HTMLElement>(".vmx-session")?.dataset.mode,
     ).toBe("silent");
+  });
+
+  it("screen=denied lights the badge but never faults the deck (audio-only is valid)", () => {
+    // 2026-05-26: with the new ~1Hz ipc.status.tick emitting a live screen
+    // probe, a user who denied screen recording would have flipped the whole
+    // deck to fault. Audio-only is a valid mode — screen=denied is badge-only.
+    const root = host();
+    const s = defaultState();
+    // Active + grounded so the grounding timer can't fault; only screen denied.
+    s.cohost = { ...s.cohost, status: "LISTENING", grounded: true };
+    s.status = { ...s.status, screen: "denied", livekit: "ok", gemini: "ok" };
+    const mounted = mountSessionLayout(root, s);
+    renderSessionFrame(mounted, s);
+
+    // Deck stays live (NOT fault).
+    expect(
+      root.querySelector<HTMLElement>(".vmx-session")?.dataset.mode,
+    ).not.toBe("fault");
+    // But the SCREEN status badge still reads down (honest degraded input).
+    const screenInput = root.querySelector<HTMLElement>(
+      '.vmx-statusrow__i[data-input="screen"]',
+    );
+    expect(screenInput?.dataset.down).toBe("true");
+  });
+
+  it("screen=unavailable is neutral and never faults the deck", () => {
+    const root = host();
+    const s = defaultState();
+    s.cohost = { ...s.cohost, status: "LISTENING", grounded: true };
+    s.status = { ...s.status, screen: "unavailable", livekit: "ok", gemini: "ok" };
+    const mounted = mountSessionLayout(root, s);
+    renderSessionFrame(mounted, s);
+
+    expect(
+      root.querySelector<HTMLElement>(".vmx-session")?.dataset.mode,
+    ).not.toBe("fault");
+    const screenInput = root.querySelector<HTMLElement>(
+      '.vmx-statusrow__i[data-input="screen"]',
+    );
+    expect(screenInput?.dataset.down).toBe("false");
   });
 
   it("grounded flip to true resets the timer (active co-host)", () => {

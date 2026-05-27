@@ -74,7 +74,7 @@ describe("curate — api dev fallback (no Tauri bridge)", () => {
 // public entry — mountLibrary → run() → runCurate() → renderCurate(). We mock
 // ./api.js so `libraryCurate` returns a controlled payload (including a hostile
 // title for the XSS case and a zero-track payload for the empty branch); the
-// other api fns are stubbed inert so the search auto-run on mount is a no-op.
+// other api fns are stubbed inert so mount/status work stays offline and deterministic.
 // This makes the production esc() escaping + the `vmx-lib-empty` branch real
 // coverage instead of an in-test mirror.
 
@@ -96,13 +96,28 @@ function doMockApi(): void {
       count: 0,
       export_path: null,
     })),
-    // inert stubs — mountLibrary auto-runs librarySearch + libraryStats on boot.
+    libraryChat: vi.fn(async () => ({
+      reply: "ok",
+      tool_trace: [],
+      playlist: null,
+      export_path: null,
+      seen_track_ids: [],
+      iterations: 1,
+      stop_reason: "model_done",
+    })),
+    // inert stubs — mountLibrary does a state-dependent boot run + status refresh.
     librarySearch: vi.fn(async () => ({ results: [], centered: true, corpus_size: 0 })),
     librarySimilar: vi.fn(async () => ({ results: [], centered: true, corpus_size: 0 })),
     libraryStats: vi.fn(async () => ({ indexed: 0, backend: "sqlite-vec", spent_eur: 0, failed: 0 })),
+    libraryModels: vi.fn(async () => ({
+      models: [],
+      required_ready: true,
+      all_ready: true,
+    })),
     libraryEmbedFolder: vi.fn(async () => false),
     onEmbedProgress: vi.fn(async () => () => {}),
     onEmbedDone: vi.fn(async () => () => {}),
+    onModelProgress: vi.fn(async () => () => {}),
     // DEV_FALLBACK is consumed by the ingest replay; keep the real embedLog shape.
     DEV_FALLBACK: { embedLog: [] },
   }));
@@ -111,13 +126,14 @@ function doMockApi(): void {
 /** Full library.html DOM skeleton (the ids/attrs index.ts queries). Building it
  *  here means mountLibrary wires + paints exactly as in the real window. */
 function mountSkeleton(): void {
-  document.body.dataset.mode = "search";
+  document.body.dataset.mode = "chat";
   document.body.innerHTML = `
     <div class="vmx-lib-modeswitch">
-      <button data-mode="search" aria-selected="true">Search</button>
+      <button data-mode="search" aria-selected="false">Search</button>
       <button data-mode="similar" aria-selected="false">Similar</button>
       <button data-mode="curate" aria-selected="false">Curate</button>
       <button data-mode="build" aria-selected="false">Build</button>
+      <button data-mode="chat" aria-selected="true">Viber</button>
       <button data-mode="ingest" aria-selected="false">Ingest</button>
     </div>
     <span id="vmx-lib-qlabel"></span>
@@ -125,23 +141,32 @@ function mountSkeleton(): void {
     <input id="vmx-lib-folder" value="~/Music" />
     <input id="vmx-lib-theme" />
     <textarea id="vmx-lib-brief"></textarea>
+    <textarea id="vmx-lib-chat"></textarea>
     <span id="vmx-lib-seed-name"></span>
     <button id="vmx-lib-runbtn"></button>
+    <span id="vmx-lib-center-label"></span>
     <span id="vmx-lib-echo"></span>
     <div id="vmx-lib-stat-indexed"></div>
     <div id="vmx-lib-stat-backend"></div>
     <div id="vmx-lib-stat-spent"></div>
     <div id="vmx-lib-stat-failed"></div>
+    <div id="vmx-lib-model-state"></div>
+    <button id="vmx-lib-install-models"></button>
+    <div id="vmx-lib-agent-setup" hidden><div id="vmx-lib-agent-state"></div></div>
     <p id="vmx-lib-rationale-body"></p>
     <div id="vmx-lib-rationale-meta"></div>
     <div id="vmx-lib-export" style="display: none"><div id="vmx-lib-export-path"></div></div>
     <div id="vmx-lib-results"></div>
+    <div id="vmx-lib-chat-thread"></div>
     <span id="vmx-lib-rcount"></span>
     <div id="vmx-lib-prog-n"></div>
     <div id="vmx-lib-prog-cost"></div>
     <i id="vmx-lib-progress-fill"></i>
     <div id="vmx-lib-loglist"></div>
+    <span id="vmx-lib-side-label"></span>
     <span id="vmx-lib-scope-state"></span>
+    <div id="vmx-lib-chat-tools"></div>
+    <div id="vmx-lib-chat-artifact"></div>
     <svg id="vmx-lib-scope"></svg>`;
 }
 
@@ -157,7 +182,7 @@ async function runRealCurate(payload: CurateResult): Promise<void> {
   const { mountLibrary } = await import("./index.js");
   mountSkeleton();
   mountLibrary();
-  // mountLibrary kicks a search auto-run; let it settle so it doesn't race us.
+  // mountLibrary kicks its initial state-dependent run; let it settle so it doesn't race us.
   await Promise.resolve();
   await Promise.resolve();
   // switch to curate, then drive the run button (real run → runCurate → renderCurate).
@@ -191,6 +216,26 @@ describe("curate — real renderCurate path (jsdom, via mountLibrary)", () => {
       "melodic",
     );
     expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("6 in set");
+  });
+
+  it("does not auto-run Codex curation just by opening curate mode", async () => {
+    curateMock.mockResolvedValue(DEV_FALLBACK.curate);
+    vi.resetModules();
+    doMockApi();
+    const { mountLibrary } = await import("./index.js");
+    mountSkeleton();
+    mountLibrary();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    document.querySelector<HTMLElement>('button[data-mode="curate"]')?.click();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(curateMock).not.toHaveBeenCalled();
+    expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toBe(
+      "No playlist curated yet.",
+    );
+    expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("ready");
   });
 
   it("escapes a hostile track title/meta — no raw HTML injection (real esc())", async () => {

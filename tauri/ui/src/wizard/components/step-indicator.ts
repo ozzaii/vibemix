@@ -146,6 +146,38 @@ const CSS = `
       transition: none;
     }
   }
+  @media (max-width: 720px) {
+    .cmp-step-indicator {
+      min-width: 0;
+      overflow: hidden;
+    }
+    .cmp-step-indicator__connector {
+      flex-basis: min(9vw, 34px);
+      margin-left: var(--sp-2);
+      margin-right: var(--sp-2);
+    }
+    .cmp-step-indicator__label {
+      max-width: 74px;
+      font-size: 8px;
+      letter-spacing: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+  @media (max-width: 420px) {
+    .cmp-step-indicator__connector {
+      flex-basis: 22px;
+      margin-left: 6px;
+      margin-right: 6px;
+    }
+    .cmp-step-indicator__node-wrap:not([data-state="active"]) .cmp-step-indicator__label {
+      display: none;
+    }
+    .cmp-step-indicator__node-wrap {
+      min-width: 24px;
+    }
+  }
   @keyframes cmp-step-pulse {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.6; }

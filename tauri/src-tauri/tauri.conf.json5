@@ -2,7 +2,7 @@
 //
 // LOCKED VALUES (do NOT change after Phase 11):
 //   - identifier: world.bravoh.vibemix  (D-Area-1 + entitlements.plist; permissions reset on change)
-//   - bundle.externalBin: binaries/vibemix-core  (Wave 1 build_sidecar.py output path)
+//   - bundle.resources: binaries/vibemix-core-<triple>/**/*  (PyInstaller onedir sidecar)
 //   - app.windows[0]: 960×680, decorations:false (UI-SPEC §Window Dimensions)
 //
 // Phase 18 takes over signing/notarization with the hardenedRuntime + entitlements.plist.
@@ -15,11 +15,16 @@
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:1420",
-    // tauri-cli 2.10 runs beforeDevCommand from the frontend dir (tauri/ui,
-    // inferred from frontendDist), so no `--prefix ui` — that doubled to
-    // tauri/ui/ui and ENOENT'd the launch.
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": ""
+    // tauri-cli runs beforeDevCommand from the `tauri/` directory when invoked
+    // through `cargo tauri dev`, so target the UI package explicitly. A bare
+    // `npm run dev` lets npm walk upward to a nonexistent root package.json
+    // and blocks the desktop dev loop before Rust even starts.
+    "beforeDevCommand": "npm --prefix ui run dev",
+    // Build the frontend and ensure the bundled PyInstaller sidecar is real
+    // before Tauri packages resources. Without this, a direct local
+    // `cargo tauri build` can silently ship the committed `.placeholder`
+    // sidecar directories.
+    "beforeBuildCommand": "uv run python ../scripts/dist/prepare_tauri_build.py"
   },
   "app": {
     "windows": [
@@ -43,6 +48,8 @@
         "hiddenTitle": true,
         "titleBarStyle": "Overlay",
         "center": true,
+        // Keep the full app GUI available as the safe/default control surface.
+        // The pill is an additional live overlay, not the only way to operate.
         "visible": true
       }
       // Phase 13 Plan 02 — the mascot overlay window is built at runtime
@@ -112,7 +119,8 @@
     // PyInstaller embeds its PKG archive in only the last merged slice.
     "resources": [
       "binaries/vibemix-core-aarch64-apple-darwin/**/*",
-      "binaries/vibemix-core-x86_64-apple-darwin/**/*"
+      "binaries/vibemix-core-x86_64-apple-darwin/**/*",
+      "binaries/vibemix-core-x86_64-pc-windows-msvc/**/*"
     ],
     "icon": ["icons/icon.png"],
     "macOS": {
@@ -136,9 +144,9 @@
       // `endpoints` URL template — `{{target}}` becomes `darwin`/`windows`,
       // `{{arch}}` becomes `aarch64`/`x86_64`, `{{current_version}}` becomes
       // the running app's version. The server returns 204 No Content if the
-      // running version is the latest; 200 with a
-      // `{ version, url, signature, notes, pub_date }` JSON envelope if an
-      // update is available. See docs/updater.md for the full contract.
+      // running version is the latest; 200 with a Tauri static manifest
+      // (`{ version, platforms: { "darwin-aarch64": ... } }`) if an update is
+      // available. See docs/updater.md for the full contract.
       //
       // `pubkey` — base64-encoded minisign public key. Generated 2026-05-13
       // via `npx @tauri-apps/cli signer generate -w ~/.tauri/vibemix_updater.key`.

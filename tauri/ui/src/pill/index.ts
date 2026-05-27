@@ -26,7 +26,11 @@
 
 import { renderCitationStrip, type CitationChip } from "../session/components/citation-strip.js";
 import { renderDeckChips, type DeckStateWire } from "./deck-chips.js";
-import { renderNextSuggestion, type NextSuggestionWire } from "./next-suggestion.js";
+import {
+  nextSuggestionRenderKey,
+  renderNextSuggestion,
+  type NextSuggestionWire,
+} from "./next-suggestion.js";
 import {
   applyFrame,
   initialPillState,
@@ -239,42 +243,49 @@ const STATE_LABEL: Record<PillState["mode"], string> = {
 };
 
 /** Repaint the DOM from the pill state. Idempotent; called from the rAF loop. */
-// Collapsed-hover PEEK (Phase-1b) — DEFERRED, gated OFF (code review CR-01).
-// The peek card is positioned absolutely at top:64px inside `.pill`, which is
-// `inset:0` + `overflow:hidden` on a FIXED 280×44 transparent window (see
-// pill_window.rs: `resizable(false)`, no resize-on-state by deliberate design —
-// the authors avoided window resize to dodge flicker + geometry-persist thrash).
-// While COLLAPSED the window is only 44px tall, so a 64px-offset card paints
-// below the clipped edge and is never visible. Showing it needs a window-geometry
-// decision (a taller transparent + click-through-below collapsed window, or an
-// opt-in hover resize) that must be verified live in the GUI. Until then the
-// collapsed-hover stays gated OFF — the next-track suggestion still reaches the
-// DJ via the EXPAND panel (#pill-next), its original working home. Flip this to
-// `true` once the window can host the card (then re-verify hit-testing). The pure
-// `setPeek` state + its unit tests remain live so the wiring doesn't bit-rot.
-const COLLAPSED_PEEK_ENABLED = false;
+// Collapsed-hover PEEK (Phase-1b) — live. Pointer hover opens a liquid-glass
+// drawer only when a grounded next_suggestion exists. The Tauri window is
+// resized down on hover via set_pill_height so the drawer is visible instead
+// of being clipped by the 44px collapsed overlay shell.
+const COLLAPSED_PEEK_ENABLED = true;
+
+// Demo fallback: explicit booth-only opt-in. A real wire suggestion always wins.
+// Default production behavior is honest silence: no grounded suggestion means no
+// card, not a fabricated track.
+const DEMO_NEXT_ENABLED = import.meta.env.VITE_VIBEMIX_DEMO_NEXT === "1";
+const DEMO_NEXT_SUGGESTION: NextSuggestionWire = {
+  track_id: "folder:0ef767248648506c",
+  title: "UnderCover - Balikali On Acid (Blazy & Doktor Froid Bootleg)",
+  artist: "",
+  similarity: 0.5817,
+  why: "similar vibe",
+  camelot: null,
+  bpm: null,
+};
 
 // Resize-to-content (Phase-1b): the pill window ships fixed at 280×44; the
 // expand panel grows via CSS BELOW the collapsed row and would clip against the
 // 44px shell. On expand we grow the window down to fit (set_pill_height), back
 // to 44 on collapse — so the reaction + citation + next-track never clip. These
 // mirror pill_window.rs (PILL_COLLAPSED_H / PILL_MAX_H) and pill.css (the
-// .pill__expand max-height cap). The collapsed-hover peek card stays gated OFF
-// (it needs hover-driven resize + hit-test verification, a separate pass).
+// .pill__expand max-height cap). The hover peek uses the same resize path so
+// the liquid-glass drawer can unfold below the lozenge in the real overlay.
 const PILL_COLLAPSED_H = 44;
 const PILL_EXPAND_CAP = 220; // matches .pill[data-state="expand"] .pill__expand max-height
+const PILL_PEEK_CAP = 156;
 
 function render(view: PillView, state: PillState, baseLabel: string): void {
   // data-state drives the dot pulse cadence + the expand panel visibility (CSS).
   view.root.dataset.state = state.mode;
   view.label.textContent = baseLabel;
 
-  // See COLLAPSED_PEEK_ENABLED above — gated OFF (CR-01) until the collapsed
-  // window can actually host the card. Honest silence is otherwise preserved
-  // twice over (syncPeekCard renders nothing without a grounded suggestion, and
-  // the CSS `:not(:empty)` guard hides an empty mount).
+  const effectiveNext = effectiveNextSuggestion(view);
+  const hasNext = hasRenderableSuggestion(effectiveNext);
+  const demoNext = effectiveNext === DEMO_NEXT_SUGGESTION;
+  view.root.dataset.hasNext = hasNext ? "true" : "false";
+  view.root.dataset.demoNext = demoNext ? "true" : "false";
   const peekVisible =
-    COLLAPSED_PEEK_ENABLED && state.peek && state.mode !== "expand";
+    COLLAPSED_PEEK_ENABLED && hasNext && state.peek && state.mode !== "expand";
   view.root.dataset.peek = peekVisible ? "true" : "false";
   syncPeekCard(view);
 
@@ -287,8 +298,8 @@ function render(view: PillView, state: PillState, baseLabel: string): void {
     // deck/key is unresolved (PILL-03). renderDeckChips owns the honest-null +
     // amber-only-when-resolved rendering; the pill never fabricates a key (T-62-15).
     syncDeckChips(view);
-    // Next-track suggestion card (below the deck chips). Honest silence: a null
-    // suggestion renders nothing — the pill never shows a fabricated next track.
+    // Next-track suggestion card below the deck chips. Honest silence: a null
+    // suggestion renders nothing.
     syncNextSuggestion(view);
   }
 
@@ -302,7 +313,15 @@ function render(view: PillView, state: PillState, baseLabel: string): void {
  *  otherwise. Memoised on a cheap layout key so the rAF render never forces a
  *  reflow (scrollHeight) or a redundant Tauri invoke when nothing changed. */
 function syncWindowHeight(view: PillView, state: PillState): void {
-  const key = `${state.mode}|${view.lastChipsKey}|${state.reactionText.length}`;
+  const peekOpen = view.root.dataset.peek === "true";
+  const key = [
+    state.mode,
+    peekOpen ? "peek" : "no-peek",
+    view.lastChipsKey,
+    view.lastPeekKey,
+    view.lastNextKey,
+    state.reactionText.length,
+  ].join("|");
   if (key === view.lastWindowHKey) return;
   view.lastWindowHKey = key;
   let target = PILL_COLLAPSED_H;
@@ -310,6 +329,8 @@ function syncWindowHeight(view: PillView, state: PillState): void {
     // .pill__expand reports full content height via scrollHeight even while the
     // CSS animates max-height open; clamp to the cap, add the collapsed row.
     target = PILL_COLLAPSED_H + Math.min(view.expand.scrollHeight, PILL_EXPAND_CAP);
+  } else if (peekOpen) {
+    target = PILL_COLLAPSED_H + Math.min(view.peekMount.scrollHeight, PILL_PEEK_CAP);
   }
   if (target === view.lastWindowH) return;
   view.lastWindowH = target;
@@ -389,17 +410,15 @@ function syncDeckChips(view: PillView): void {
 
 /**
  * Populate the #pill-next mount with the next-track suggestion card. Rebuilds
- * only when the suggestion changes (cheap key over track_id + why) — the rAF
- * loop calls render() every frame. Honest silence: a null suggestion clears the
- * mount and renders nothing (renderNextSuggestion returns null). Tagged
+ * only when the rendered suggestion changes, including live transition timing,
+ * while the rAF loop calls render() every frame. Honest silence: a null
+ * suggestion clears the mount and renders nothing. Tagged
  * [data-no-drag] so the card never starts a window drag.
  */
 function syncNextSuggestion(view: PillView): void {
   const mount = view.nextMount;
-  const s = view.nextSuggestion;
-  // Cheap change key — track_id (the pick) + why (key/bpm refine can change the
-  // line without the pick changing). null suggestion → empty key.
-  const key = s ? `${s.track_id}:${s.why}` : "";
+  const s = effectiveNextSuggestion(view);
+  const key = nextSuggestionRenderKey(s);
   if (key === view.lastNextKey) return;
   view.lastNextKey = key;
   mount.replaceChildren();
@@ -414,9 +433,9 @@ function syncNextSuggestion(view: PillView): void {
  * Populate the collapsed-hover #pill-peek mount with the next-track suggestion
  * card (Phase-1b). REUSES renderNextSuggestion — the SAME card the expand panel
  * shows (one source of truth, no duplicated markup). Rebuilds only when the
- * suggestion changes (cheap key over track_id + why) — the rAF loop calls
- * render() every frame. HONEST SILENCE: a null/undefined suggestion clears the
- * mount and renders nothing (renderNextSuggestion returns null) — the pill never
+ * rendered suggestion changes, including live transition timing, while the rAF
+ * loop calls render() every frame. HONEST SILENCE: a null/undefined suggestion
+ * clears the mount and renders nothing (renderNextSuggestion returns null) — the pill never
  * fabricates a "next" on hover; an empty mount stays invisible via the CSS
  * `:not(:empty)` guard. The card is tagged [data-no-drag] so hovering it never
  * starts a window drag. The mount is always present; only its visibility is
@@ -424,8 +443,8 @@ function syncNextSuggestion(view: PillView): void {
  */
 function syncPeekCard(view: PillView): void {
   const mount = view.peekMount;
-  const s = view.nextSuggestion;
-  const key = s ? `${s.track_id}:${s.why}` : "";
+  const s = effectiveNextSuggestion(view);
+  const key = nextSuggestionRenderKey(s);
   if (key === view.lastPeekKey) return;
   view.lastPeekKey = key;
   mount.replaceChildren();
@@ -434,6 +453,17 @@ function syncPeekCard(view: PillView): void {
     card.setAttribute("data-no-drag", "");
     mount.append(card);
   }
+}
+
+function effectiveNextSuggestion(view: PillView): NextSuggestionWire | null {
+  if (hasRenderableSuggestion(view.nextSuggestion)) return view.nextSuggestion;
+  return DEMO_NEXT_ENABLED ? DEMO_NEXT_SUGGESTION : null;
+}
+
+function hasRenderableSuggestion(
+  s: NextSuggestionWire | null | undefined,
+): s is NextSuggestionWire {
+  return Boolean(s?.track_id && s?.title);
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────
@@ -492,7 +522,10 @@ function boot(): void {
     lastNextKey: "",
     lastPeekKey: "",
     lastWindowHKey: "",
-    lastWindowH: PILL_COLLAPSED_H,
+    // Force the first render to send set_pill_height(44). Dev/hot reload can
+    // leave the native overlay at the prior expanded height; seeding this with
+    // 44 would skip the reset as "unchanged".
+    lastWindowH: 0,
   };
 
   let state = initialPillState(performance.now());

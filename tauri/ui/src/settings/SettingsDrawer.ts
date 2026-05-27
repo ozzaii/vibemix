@@ -78,7 +78,9 @@ const CSS = `
   .vmx-settings-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.65);
+    background:
+      linear-gradient(90deg, rgba(0, 0, 0, 0.24), rgba(0, 0, 0, 0.72)),
+      rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
     z-index: 49;
@@ -99,18 +101,47 @@ const CSS = `
     max-width: 100vw;
     z-index: 50;
     transform: translateX(100%);
-    background: var(--glass-1);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 22%),
+      repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.026) 0 1px, transparent 1px 64px),
+      linear-gradient(180deg, rgba(12, 14, 22, 0.92), rgba(3, 4, 8, 0.96) 66%, rgba(1, 2, 5, 0.98)),
+      var(--glass-1);
     backdrop-filter: var(--blur-glass);
     -webkit-backdrop-filter: var(--blur-glass);
     border-left: 1px solid var(--glass-edge);
     box-shadow:
-      inset 1px 0 0 var(--glass-top),
-      -8px 0 32px rgba(0, 0, 0, 0.55),
+      inset 1px 0 0 rgba(255, 255, 255, 0.075),
+      inset 8px 0 22px rgba(255, 138, 61, 0.025),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.78),
+      -18px 0 58px rgba(0, 0, 0, 0.64),
       -1px 0 0 rgba(255, 255, 255, 0.018);
     transition: transform 250ms ease-in-out;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+  .vmx-settings-drawer::before,
+  .vmx-settings-drawer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .vmx-settings-drawer::before {
+    background:
+      linear-gradient(90deg, rgba(255, 138, 61, 0.16), transparent 18%),
+      repeating-linear-gradient(0deg, transparent 0 11px, rgba(214, 207, 199, 0.022) 11px 12px);
+    opacity: 0.36;
+    mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 88%, transparent 100%);
+  }
+  .vmx-settings-drawer::after {
+    left: 1px;
+    right: auto;
+    width: 1px;
+    background: linear-gradient(180deg, transparent, rgba(255, 138, 61, 0.42) 44%, transparent);
+    box-shadow: 0 0 16px rgba(255, 138, 61, 0.18);
+    opacity: 0.72;
   }
   /* z-index discipline kept as a defensive baseline even after the
    * .border-anim removal (2026-05-19) so any future glass overlay in
@@ -132,7 +163,27 @@ const CSS = `
     justify-content: space-between;
     padding: 0 var(--sp-5);
     border-bottom: 1px solid var(--glass-edge);
-    background: rgba(0, 0, 0, 0.3);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+      rgba(0, 0, 0, 0.42);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.72),
+      0 10px 24px rgba(0, 0, 0, 0.22);
+  }
+  .vmx-settings-drawer__header::before {
+    content: "";
+    position: absolute;
+    left: var(--sp-5);
+    right: var(--sp-5);
+    top: 50%;
+    height: 5px;
+    transform: translateY(-50%);
+    pointer-events: none;
+    background:
+      radial-gradient(circle at left center, rgba(214, 207, 199, 0.28) 0 2px, transparent 2.5px),
+      radial-gradient(circle at right center, rgba(214, 207, 199, 0.18) 0 2px, transparent 2.5px);
+    opacity: 0.48;
   }
   /* 2026-05-19 /impeccable critique round 3: dropped heading from
    * 14px Saira 700 to 11px Saira 600 + 0.22em tracking — the drawer
@@ -164,8 +215,10 @@ const CSS = `
     width: 30px;
     height: 30px;
     border-radius: var(--rad-sm);
-    background: transparent;
-    border: 1px solid transparent;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.08)),
+      rgba(0, 0, 0, 0.32);
+    border: 1px solid rgba(255, 255, 255, 0.055);
     color: var(--silk-40);
     line-height: 1;
     cursor: pointer;
@@ -175,6 +228,9 @@ const CSS = `
     transition: color var(--motion-snap) ease-out,
                 border-color var(--motion-snap) ease-out,
                 background var(--motion-snap) ease-out;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.64);
   }
   .vmx-settings-drawer__close svg {
     width: 14px;
@@ -203,6 +259,9 @@ const CSS = `
     flex-direction: column;
     gap: var(--sp-4);
     position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 14%),
+      repeating-linear-gradient(90deg, transparent 0 31px, rgba(214, 207, 199, 0.018) 31px 32px);
   }
   .vmx-settings-drawer__body::-webkit-scrollbar { width: 6px; }
   .vmx-settings-drawer__body::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
@@ -357,6 +416,7 @@ const GENRE_OPTIONS = [
   "techno",
   "dnb",
   "trance",
+  "psytrance",
   "hip-hop",
   "edm-generic",
 ] as const;

@@ -83,7 +83,7 @@ export interface StatusTick {
     livekit: "ok" | "connecting" | "down";
     gemini: "ok" | "down";
     midi: number | null;
-    screen: "ok" | "denied";
+    screen: "ok" | "denied" | "unavailable";
   };
 }
 export interface PermissionCheck {

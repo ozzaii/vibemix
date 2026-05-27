@@ -39,9 +39,12 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { retargetClip } from "three/examples/jsm/utils/SkeletonUtils.js";
 
+import type { MoodProfile } from "./mood.js";
 import type { MascotState } from "./types.js";
 
 // ── Manifest shape (Plan 13-01 output) ────────────────────────────────────
+
+type MascotMoodName = MoodProfile["name"];
 
 /** Per-clip metadata as committed in tauri/ui/assets/mascot/manifest.json. */
 export interface ManifestAnimation {
@@ -56,6 +59,8 @@ export interface ManifestAnimation {
 export interface Manifest {
   /** Character GLB filename, relative to /assets/mascot/. */
   character: string;
+  /** Optional per-mood character variants, relative to /assets/mascot/. */
+  characters?: Partial<Record<MascotMoodName, string>>;
   animations: ManifestAnimation[];
   /** Bundle metadata (optional, ignored at runtime). */
   bundle_bytes_target?: number;
@@ -75,6 +80,8 @@ export interface LoadedClip {
 export interface LoadedAssets {
   /** Full GLTF for the character — `.scene` is added to the Three.js scene. */
   character: GLTF;
+  /** Per-mood character variants. Missing moods fall back to `character`. */
+  characters: Map<MascotMoodName, GLTF>;
   /** MascotState → {clip, timeScale} lookup. Keyed by string union; the
    *  renderer guards unknown states by throwing. */
   clips: Map<MascotState, LoadedClip>;
@@ -223,6 +230,29 @@ export async function loadMascotAssets(
   // Resolve hip bone name once (the retarget helper accepts a string name).
   const hipName = resolveHipName(character.scene);
 
+  // 3b. Load optional per-mood character variants. The default `character`
+  // remains the hype-man fallback so old manifests keep working unchanged.
+  const characters = new Map<MascotMoodName, GLTF>([["hype-man", character]]);
+  const variantEntries = Object.entries(manifest.characters ?? {}) as Array<
+    [MascotMoodName, string | undefined]
+  >;
+  for (const [mood, rel] of variantEntries) {
+    if (typeof rel !== "string" || rel.length === 0) continue;
+    const variantUrl = resolveAssetUrl(manifestUrl, rel);
+    if (variantUrl === characterUrl) {
+      characters.set(mood, character);
+      continue;
+    }
+    try {
+      characters.set(mood, await loadGlb(loader, variantUrl));
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `loadMascotAssets failed: character variant GLB load — ${mood}:${rel} — ${reason}`,
+      );
+    }
+  }
+
   // 4. Load each animation GLB, retarget its clip(s) onto the character.
   const clips = new Map<MascotState, LoadedClip>();
 
@@ -310,7 +340,7 @@ export async function loadMascotAssets(
     }
   }
 
-  return { character, clips, manifest };
+  return { character, characters, clips, manifest };
 }
 
 /**

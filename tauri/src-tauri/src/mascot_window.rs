@@ -55,9 +55,7 @@ const DEBOUNCE_MS: u64 = 200;
 /// sets `NSWindowCollectionBehaviorCanJoinAllSpaces` via the tao backend
 /// in tauri-runtime-wry 2.11. If that ever regresses, the manual ObjC
 /// override goes here (documented in 13-CONTEXT Area 2).
-pub fn create_mascot_window(
-    app: &AppHandle,
-) -> tauri::Result<Option<tauri::WebviewWindow>> {
+pub fn create_mascot_window(app: &AppHandle) -> tauri::Result<Option<tauri::WebviewWindow>> {
     let state = config::load_mascot_state(app).map_err(|e| {
         // Surface store-load failure as an io error so callers can match
         // on `tauri::Error::Io` without dragging in anyhow as a direct dep.
@@ -88,10 +86,8 @@ pub fn create_mascot_window(
     if let Some((logical_w, logical_h)) = primary_logical_size(app) {
         let (fx, fy) = (f64::from(x), f64::from(y));
         let (fw, fh) = (f64::from(width), f64::from(height));
-        let off_screen = fx > logical_w - 48.0
-            || fy > logical_h - 48.0
-            || fx + fw < 48.0
-            || fy + fh < 48.0;
+        let off_screen =
+            fx > logical_w - 48.0 || fy > logical_h - 48.0 || fx + fw < 48.0 || fy + fh < 48.0;
         if off_screen {
             x = default_x;
             y = default_y;
@@ -180,9 +176,8 @@ fn install_geometry_listener(app: AppHandle, window: tauri::WebviewWindow) {
 
         // Capture geometry NOW (so the closure runs on the OS event
         // thread; debounced save runs on Tokio).
-        let Ok(pos) = (|| -> tauri::Result<PhysicalPosition<i32>> {
-            window_position(&app)
-        })() else {
+        let Ok(pos) = (|| -> tauri::Result<PhysicalPosition<i32>> { window_position(&app) })()
+        else {
             return;
         };
         let Ok(size) = (|| -> tauri::Result<PhysicalSize<u32>> { window_size(&app) })() else {

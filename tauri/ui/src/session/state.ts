@@ -49,7 +49,7 @@ export interface StatusFlags {
   livekit: "ok" | "connecting" | "down" | null;
   gemini: "ok" | "down" | null;
   midi: number | null;
-  screen: "ok" | "denied" | null;
+  screen: "ok" | "denied" | "unavailable" | null;
 }
 
 /** Mascot personality + reaction-cadence preset (Phase 13 Area 4).

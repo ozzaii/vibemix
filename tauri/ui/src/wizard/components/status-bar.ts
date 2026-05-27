@@ -20,7 +20,7 @@ export interface StatusBarProps {
   livekit: StatusLevel;
   gemini: "ok" | "down" | null;
   midi: number | null;
-  screen: "ok" | "denied" | null;
+  screen: "ok" | "denied" | "unavailable" | null;
 }
 
 const CSS = `
@@ -96,7 +96,10 @@ const CSS = `
 
 registerStyle("cmp-status-bar", CSS);
 
-function levelToState(level: StatusLevel | "denied" | "ok" | "down" | null): string {
+function levelToState(
+  level: StatusLevel | "denied" | "unavailable" | "ok" | "down" | null,
+): string {
+  if (level === "unavailable") return "off";
   return level ?? "off";
 }
 

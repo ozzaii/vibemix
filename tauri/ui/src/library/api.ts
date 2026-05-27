@@ -7,6 +7,8 @@
  *
  *   invoke("library_search",  { query, k })       -> SearchResult
  *   invoke("library_similar", { seed,  k })       -> SearchResult   (same shape)
+ *   invoke("library_chat", { message, history })  -> LibraryChatResult
+ *   invoke("library_build_set", { brief, curve }) -> BuildSetResult
  *   invoke("library_stats")                        -> LibraryStats
  *   invoke("library_embed_folder", { path, strategy })
  *        -> kicks off a folder embed; progress arrives as Tauri events:
@@ -14,8 +16,8 @@
  *           listen("library://embed-done")      EmbedDone
  *
  * Unlike the wizard's schema-gated WS path (ipc/client.ts), the Vibe Engine
- * commands are direct Tauri commands — Rust runs the embedder + sqlite-vec
- * search in-process, so there is no JSON-schema validator on this seam.
+ * commands are direct Tauri commands. Rust owns the one-shot CLI subprocess
+ * bridge + event stream, so there is no JSON-schema validator on this seam.
  *
  * DEV FALLBACK: when `invoke()` is genuinely UNAVAILABLE (plain `vite` dev,
  * jsdom tests — `getInvoke()` returns null), every call resolves with the real
@@ -24,10 +26,11 @@
  *
  * CRITICAL (anti-slop): the fallback fires ONLY for the no-Tauri case. When
  * invoke IS available (real app) and the backend call THROWS — empty cache,
- * missing key, bad strategy — we PROPAGATE the error instead of masking it with
- * canned sample data, so the UI can show a real error state. Silently returning
- * fake 142-track data on a real failure would make a broken backend look like
- * success — exactly the AI-slop failure mode this product blocks on.
+ * missing local model, bad strategy, agent setup — we PROPAGATE the error
+ * instead of masking it with canned sample data, so the UI can show a real
+ * error state. Silently returning fake 142-track data on a real failure would
+ * make a broken backend look like success — exactly the AI-slop failure mode
+ * this product blocks on.
  */
 
 import { listen as tauriListen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -45,7 +48,7 @@ export type EmbedStrategy = "mean_excerpt" | "cue_anchored";
 export interface TrackResult {
   track_id: string;
   title: string;
-  /** Cosine score in [0,1]. Higher = closer in 1536-d vibe space. */
+  /** Cosine score in [0,1]. Higher = closer in the active vibe space. */
   score: number;
   meta: string;
 }
@@ -61,8 +64,75 @@ export interface SearchResult {
 export interface LibraryStats {
   indexed: number;
   backend: string;
+  embedding_backend?: string;
+  embedding_dim?: number;
+  clap_model_installed?: boolean;
+  clap_model_path?: string;
+  clap_model_missing?: string[];
+  agent_backend?: "codex" | string;
+  agent_ready?: boolean;
+  agent_status?: string;
+  agent_hint?: string;
   spent_eur: number;
   failed: number;
+}
+
+export type LibraryModelInstallTarget = "required" | "clap" | "cue" | "all";
+
+export interface LibraryModelAsset {
+  id: "clap" | "cue-detr" | string;
+  label: string;
+  role: string;
+  required: boolean;
+  env: string;
+  installed: boolean;
+  installable?: boolean;
+  path: string;
+  missing: string[];
+  mismatched?: string[];
+}
+
+export interface LibraryModelInstallFile {
+  rel_path: string;
+  source_rel_path?: string;
+  path: string;
+  status: "downloaded" | "skipped" | string;
+  size: number;
+  sha256: string;
+  url: string;
+}
+
+export interface LibraryModelInstallItem {
+  id: string;
+  installed: boolean;
+  path: string;
+  files: LibraryModelInstallFile[];
+  errors: string[];
+}
+
+export interface LibraryModelInstallSummary {
+  target: LibraryModelInstallTarget;
+  results: LibraryModelInstallItem[];
+  ok: boolean;
+}
+
+export interface LibraryModelProgress {
+  target: LibraryModelInstallTarget;
+  id: "clap" | "cue-detr" | string;
+  n: number;
+  total: number;
+  status: "downloading" | "downloaded" | "verified" | "error" | string;
+  rel_path: string;
+  downloaded: number;
+  size: number;
+  error?: string;
+}
+
+export interface LibraryModelsResult {
+  models: LibraryModelAsset[];
+  required_ready: boolean;
+  all_ready: boolean;
+  install?: LibraryModelInstallSummary;
 }
 
 /** One curated track row. `meta` is a short mono caption (artist, or
@@ -80,7 +150,7 @@ export interface CurateResult {
   name: string;
   /** The agent's plain-language explanation of the set it built. */
   rationale: string;
-  /** "created" | "max_iters" | "no_create" | "model_done" — why it stopped. */
+  /** Backend stop reason, e.g. "created", "model_done", "exported", or an honest failure code. */
   stop_reason: string;
   tracks: CurateTrack[];
   count: number;
@@ -98,6 +168,38 @@ export type EnergyCurve = "opener" | "peak_time" | "after_hours" | "festival";
 export interface BuildSetResult extends CurateResult {
   /** Absolute path to the exported Rekordbox XML, or `null` if none. */
   export_path: string | null;
+}
+
+/** One previous Viber chat turn, oldest first. */
+export interface LibraryChatTurn {
+  role: "you" | "viber";
+  text: string;
+}
+
+/** One grounded tool call shown by the chat surface. */
+export interface LibraryChatToolTrace {
+  name: string;
+  arg: string;
+  ok: boolean;
+}
+
+export interface LibraryChatPlaylist {
+  name: string;
+  track_ids: string[];
+  m3u_path: string;
+  json_path: string;
+  dropped_ids: string[];
+}
+
+/** Result of one conversational Viber turn (`library chat ... --json`). */
+export interface LibraryChatResult {
+  reply: string;
+  tool_trace: LibraryChatToolTrace[];
+  playlist: LibraryChatPlaylist | null;
+  export_path: string | null;
+  seen_track_ids: string[];
+  iterations: number;
+  stop_reason: string;
 }
 
 /** Per-file progress frame from `library://embed-progress`. */
@@ -168,12 +270,12 @@ const DEV_SEARCH: SearchResult = {
   centered: true,
   corpus_size: 142,
   results: [
-    { track_id: "23381471", title: "Raffertie — The Substance", score: 0.764, meta: "folder:23381471 · 1536d" },
-    { track_id: "b8d4da96", title: "ARTLUS - i like the way you kiss me (Remix)", score: 0.758, meta: "folder:b8d4da96 · 1536d" },
-    { track_id: "911ea756", title: "Quälgeist", score: 0.751, meta: "folder:911ea756 · 1536d" },
-    { track_id: "a8f148f3", title: "FLKN - I Need Acid (Original mix)", score: 0.739, meta: "folder:a8f148f3 · 1536d" },
-    { track_id: "7f9f9052", title: "Charli XCX - Guess (DJ Daddy Trance Edit)", score: 0.737, meta: "folder:7f9f9052 · 1536d" },
-    { track_id: "a0b1a41b", title: "Brutalismus 3000 - nur mein körper und die angst", score: 0.734, meta: "folder:a0b1a41b · 1536d" },
+    { track_id: "23381471", title: "Raffertie — The Substance", score: 0.764, meta: "folder:23381471 / vector" },
+    { track_id: "b8d4da96", title: "ARTLUS - i like the way you kiss me (Remix)", score: 0.758, meta: "folder:b8d4da96 / vector" },
+    { track_id: "911ea756", title: "Quälgeist", score: 0.751, meta: "folder:911ea756 / vector" },
+    { track_id: "a8f148f3", title: "FLKN - I Need Acid (Original mix)", score: 0.739, meta: "folder:a8f148f3 / vector" },
+    { track_id: "7f9f9052", title: "Charli XCX - Guess (DJ Daddy Trance Edit)", score: 0.737, meta: "folder:7f9f9052 / vector" },
+    { track_id: "a0b1a41b", title: "Brutalismus 3000 - nur mein körper und die angst", score: 0.734, meta: "folder:a0b1a41b / vector" },
   ],
 };
 
@@ -193,8 +295,48 @@ const DEV_SIMILAR: SearchResult = {
 const DEV_STATS: LibraryStats = {
   indexed: 142,
   backend: "sqlite-vec",
+  embedding_backend: "clap",
+  embedding_dim: 512,
+  clap_model_installed: true,
+  clap_model_path: "~/.cache/vibemix/clap-onnx",
+  clap_model_missing: [],
+  agent_backend: "codex",
+  agent_ready: true,
+  agent_status: "ready",
+  agent_hint: "",
   spent_eur: 0.19,
   failed: 0,
+};
+
+const DEV_MODELS: LibraryModelsResult = {
+  models: [
+    {
+      id: "clap",
+      label: "CLAP ONNX",
+      role: "library embeddings/search/similarity",
+      required: true,
+      installable: true,
+      env: "VIBEMIX_CLAP_ONNX_DIR",
+      installed: true,
+      path: "~/.cache/vibemix/clap-onnx",
+      missing: [],
+      mismatched: [],
+    },
+    {
+      id: "cue-detr",
+      label: "CUE-DETR ONNX",
+      role: "cue-anchored ingest and structural cue detection",
+      required: false,
+      installable: false,
+      env: "VIBEMIX_CUE_ONNX_PATH",
+      installed: true,
+      path: "~/.cache/vibemix/cue-detr-onnx/cuedetr.fp32.onnx",
+      missing: [],
+      mismatched: [],
+    },
+  ],
+  required_ready: true,
+  all_ready: true,
 };
 
 // A representative curate run over the same 2026-05-25 subset — the agent built
@@ -211,7 +353,7 @@ const DEV_CURATE: CurateResult = {
   rationale:
     "Opened soft and melodic, then bent the energy down into rolling, " +
     "hypnotic territory — each step tightens the groove without breaking the " +
-    "floor. Kept the BPM drift under ±4% so the blends stay seamless.",
+    "floor. Kept the BPM drift under ±4% so the blends stay clean.",
   count: 6,
   tracks: [
     { track_id: "7f9f9052", title: "7f9f9052", meta: "track 7f9f9052" },
@@ -236,7 +378,7 @@ const DEV_BUILD: BuildSetResult = {
   rationale:
     "Opened at 122 BPM with melodic, restrained energy, then climbed a step " +
     "per blend into rolling, hypnotic territory by slot 8 — peak-time arc, BPM " +
-    "drift held under ±4% so the transitions stay seamless. Each move is the " +
+    "drift held under ±4% so the transitions stay clean. Each move is the " +
     "nearest grounded neighbour in vibe space, not a guess.",
   count: 6,
   export_path: "~/Music/vibemix/Warehouse Opener.xml",
@@ -248,6 +390,19 @@ const DEV_BUILD: BuildSetResult = {
     { track_id: "a8f148f3", title: "a8f148f3", meta: "track a8f148f3" },
     { track_id: "23381471", title: "23381471", meta: "track 23381471" },
   ],
+};
+
+const DEV_CHAT: LibraryChatResult = {
+  reply:
+    "For the presentation, keep it tight: open with the pill listening, ask for a darker peak-time bridge, then show the grounded tool trace.",
+  tool_trace: [
+    { name: "search_vibe", arg: "dark peak-time bridge", ok: true },
+  ],
+  playlist: null,
+  export_path: null,
+  seen_track_ids: ["7f9f9052", "b8d4da96"],
+  iterations: 2,
+  stop_reason: "model_done",
 };
 
 /** The 8-file embed log from the subset run — replayed in dev to animate the
@@ -269,7 +424,9 @@ export const DEV_FALLBACK = {
   similar: DEV_SIMILAR,
   curate: DEV_CURATE,
   build: DEV_BUILD,
+  chat: DEV_CHAT,
   stats: DEV_STATS,
+  models: DEV_MODELS,
   embedLog: DEV_EMBED_LOG,
 } as const;
 
@@ -313,12 +470,59 @@ export async function libraryBuildSet(
   return invoke<BuildSetResult>("library_build_set", { brief, curve });
 }
 
+/** One conversational Viber turn. `history` is stateless caller-owned memory;
+ *  the bridge passes it to the Python CLI as JSON and returns ChatResult as-is. */
+export async function libraryChat(
+  message: string,
+  history: LibraryChatTurn[] = [],
+): Promise<LibraryChatResult> {
+  const invoke = await getInvoke();
+  if (!invoke) return DEV_CHAT; // no Tauri (plain vite / jsdom) → demo data
+  // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
+  return invoke<LibraryChatResult>("library_chat", { message, history });
+}
+
 /** Corpus readout for the left console. */
 export async function libraryStats(): Promise<LibraryStats> {
   const invoke = await getInvoke();
   if (!invoke) return DEV_STATS; // no Tauri (plain vite / jsdom) → demo data
   // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
   return invoke<LibraryStats>("library_stats");
+}
+
+/** Local model asset status/install seam. With `install="required"` the backend
+ *  downloads/verifies first-run required assets (currently CLAP);
+ *  `install="cue"` reports/verifies the manual CUE target until hosting exists.
+ *  Real backend errors propagate. */
+export async function libraryModels(
+  install?: LibraryModelInstallTarget,
+  force = false,
+): Promise<LibraryModelsResult> {
+  const invoke = await getInvoke();
+  if (!invoke) {
+    if (!install) return DEV_MODELS;
+    const installModels =
+      install === "cue"
+        ? DEV_MODELS.models.slice(1, 2)
+        : install === "all"
+          ? DEV_MODELS.models
+          : DEV_MODELS.models.slice(0, 1);
+    return {
+      ...DEV_MODELS,
+      install: {
+        target: install,
+        ok: true,
+        results: installModels.map((model) => ({
+          id: model.id,
+          installed: model.installed,
+          path: model.path,
+          files: [],
+          errors: [],
+        })),
+      },
+    };
+  }
+  return invoke<LibraryModelsResult>("library_models", { install, force });
 }
 
 /** Kick off a folder embed. Progress + completion arrive as Tauri events —
@@ -365,6 +569,20 @@ export async function onEmbedDone(
   try {
     return await tauriListen<EmbedDone>("library://embed-done", (e) =>
       cb(e.payload),
+    );
+  } catch {
+    return NO_UNLISTEN;
+  }
+}
+
+/** Subscribe to first-run local model install progress. No-op outside Tauri. */
+export async function onModelProgress(
+  cb: (p: LibraryModelProgress) => void,
+): Promise<UnlistenFn> {
+  try {
+    return await tauriListen<LibraryModelProgress>(
+      "library://model-progress",
+      (e) => cb(e.payload),
     );
   } catch {
     return NO_UNLISTEN;

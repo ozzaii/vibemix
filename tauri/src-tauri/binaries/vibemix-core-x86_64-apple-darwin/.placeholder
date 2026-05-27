@@ -1,0 +1,5 @@
+Placeholder for local Tauri resource-glob validation.
+
+The real x86_64 PyInstaller sidecar is produced by scripts/build_sidecar.py in
+the release matrix. Keep this file tiny and harmless so cargo checks can run
+on a checkout before the release sidecar artifact exists.

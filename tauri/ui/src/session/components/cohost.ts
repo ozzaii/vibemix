@@ -64,7 +64,7 @@ export interface CohostPanelProps {
    *  Defaults to false on existing callers via the destructure below. */
   muted?: boolean;
   /** Elapsed milliseconds since `grounded` transitioned to false. When >
-   *  5000ms the foot swaps from "WARMING UP" to "COULDN'T REACH GEMINI"
+   *  5000ms the foot swaps from "TUNING IN" to "AI SERVICE OFFLINE"
    *  + retry button so the user has a recovery path. Wave 6 closes H9
    *  "error recovery". The render-loop computes this; the cohost is
    *  presentation-only. Defaults to null. */
@@ -458,7 +458,7 @@ const CSS = `
   /* VIS-02 (43-02) — retry button keeps its existing amber inset
    * stack and additively gains --glow-faint as an outer halo on
    * hover/focus-visible. The button only renders during the H9
-   * "couldn't reach gemini" failure window so the glow reads as a
+   * "AI service offline" failure window so the glow reads as a
    * recovery affordance, not a routine hover. */
   .vmx-cohost__foot-retry:hover,
   .vmx-cohost__foot-retry:focus-visible {
@@ -811,7 +811,7 @@ function populateTranscript(
 }
 
 /** Wave 6 (H9) — threshold (ms) after which a sustained grounded=false
- *  flips the foot from "WARMING UP" to "COULDN'T REACH GEMINI" + retry.
+ *  flips the foot from "TUNING IN" to "AI SERVICE OFFLINE" + retry.
  *  Exported for the spec's fake-timer assertions. */
 export const GROUNDING_FAILURE_MS = 5000;
 
@@ -866,7 +866,7 @@ function buildFoot(
 // in a phrase a DJ would use about another DJ.
 function footLabelFor(grounded: boolean, failed: boolean): string {
   if (grounded) return "READING THE ROOM";
-  if (failed) return "COULDN'T REACH GEMINI";
+  if (failed) return "AI SERVICE OFFLINE";
   return "TUNING IN";
 }
 
@@ -875,7 +875,7 @@ function footTooltipFor(grounded: boolean, failed: boolean): string {
     return "vibemix is listening to your master output and watching your DJ window.";
   }
   if (failed) {
-    return "couldn't reach gemini. restart the cohost to reconnect.";
+    return "AI service unreachable. restart the cohost to reconnect.";
   }
   return "tuning in. initializing audio + screen capture.";
 }

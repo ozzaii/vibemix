@@ -81,9 +81,7 @@ pub fn check_on_launch_enabled(app: &AppHandle) -> bool {
     let store = match app.store(STORE_PATH) {
         Ok(s) => s,
         Err(e) => {
-            tracing::debug!(
-                "updater: store init failed ({e}); defaulting check_on_launch=true"
-            );
+            tracing::debug!("updater: store init failed ({e}); defaulting check_on_launch=true");
             return true;
         }
     };

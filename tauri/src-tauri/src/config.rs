@@ -145,8 +145,9 @@ fn load_state(app: &AppHandle) -> Result<FirstRunState, String> {
         .store(STORE_PATH)
         .map_err(|e| format!("store init failed: {e}"))?;
     match store.get(KEY_FIRST_RUN_STATE) {
-        Some(value) => serde_json::from_value(value.clone())
-            .map_err(|e| format!("decode failed: {e}")),
+        Some(value) => {
+            serde_json::from_value(value.clone()).map_err(|e| format!("decode failed: {e}"))
+        }
         None => Ok(FirstRunState::default()),
     }
 }
@@ -173,8 +174,9 @@ pub fn load_mascot_state(app: &AppHandle) -> Result<MascotWindowState, String> {
         .store(STORE_PATH)
         .map_err(|e| format!("store init failed: {e}"))?;
     match store.get(KEY_MASCOT_WINDOW) {
-        Some(value) => serde_json::from_value(value.clone())
-            .map_err(|e| format!("decode failed: {e}")),
+        Some(value) => {
+            serde_json::from_value(value.clone()).map_err(|e| format!("decode failed: {e}"))
+        }
         None => Ok(MascotWindowState::default()),
     }
 }
@@ -206,8 +208,9 @@ pub fn load_primary_surface(app: &AppHandle) -> Result<PrimarySurface, String> {
         .store(STORE_PATH)
         .map_err(|e| format!("store init failed: {e}"))?;
     match store.get(KEY_PRIMARY_SURFACE) {
-        Some(value) => serde_json::from_value(value.clone())
-            .map_err(|e| format!("decode failed: {e}")),
+        Some(value) => {
+            serde_json::from_value(value.clone()).map_err(|e| format!("decode failed: {e}"))
+        }
         None => Ok(PrimarySurface::default()),
     }
 }
@@ -238,10 +241,7 @@ pub async fn read_first_run_state(app: AppHandle) -> Result<FirstRunState, Strin
 }
 
 #[tauri::command]
-pub async fn write_first_run_state(
-    app: AppHandle,
-    state: FirstRunState,
-) -> Result<(), String> {
+pub async fn write_first_run_state(app: AppHandle, state: FirstRunState) -> Result<(), String> {
     save_state(&app, &state)
 }
 
@@ -292,10 +292,7 @@ pub async fn set_mascot_visible(app: AppHandle, visible: bool) -> Result<(), Str
 /// underneath). Drag-handle UX in Plan 13-04 owns a non-click-through
 /// zone for the user to drag the mascot even when click-through is on.
 #[tauri::command]
-pub async fn set_mascot_click_through(
-    app: AppHandle,
-    enabled: bool,
-) -> Result<(), String> {
+pub async fn set_mascot_click_through(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut state = load_mascot_state(&app)?;
     state.click_through = enabled;
     save_mascot_state(&app, &state)?;
@@ -320,9 +317,18 @@ mod tests {
         // (draggable when enabled).
         let s = MascotWindowState::default();
         assert!(!s.visible, "mascot must be hidden on first launch (opt-in)");
-        assert!(!s.click_through, "click-through must be OFF default (draggable)");
-        assert!(s.x.is_none() && s.y.is_none(), "no saved position on first launch");
-        assert!(s.width.is_none() && s.height.is_none(), "no saved size on first launch");
+        assert!(
+            !s.click_through,
+            "click-through must be OFF default (draggable)"
+        );
+        assert!(
+            s.x.is_none() && s.y.is_none(),
+            "no saved position on first launch"
+        );
+        assert!(
+            s.width.is_none() && s.height.is_none(),
+            "no saved size on first launch"
+        );
     }
 
     #[test]

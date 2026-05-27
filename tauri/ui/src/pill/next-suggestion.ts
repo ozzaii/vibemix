@@ -24,6 +24,23 @@
 
 import { registerStyle } from "../session/components/_style-registry.js";
 
+export interface NextSuggestionTransitionWire {
+  candidate_id?: string;
+  source_deck?: string | null;
+  target_deck?: string | null;
+  from_track_id?: string;
+  to_track_id?: string;
+  from_section_id?: string;
+  to_section_id?: string;
+  cue_slot?: string | null;
+  start_in_bars?: number | null;
+  score?: number | null;
+  confidence?: number | null;
+  timing_basis?: string | null;
+  risk_flags?: string[];
+  reasons?: string[];
+}
+
 /** The `next_suggestion` wire payload — mirrors
  *  `vibemix.library.next_suggestion.NextSuggestion.to_dict()`.
  *  `camelot`/`bpm` are `null` for folder-only libraries (honest-null). */
@@ -35,10 +52,12 @@ export interface NextSuggestionWire {
   why: string;
   camelot: string | null;
   bpm: number | null;
+  transition?: NextSuggestionTransitionWire | null;
 }
 
 const CSS = `
   .vmx-next-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--sp-1);
@@ -47,11 +66,23 @@ const CSS = `
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-sm);
     background: var(--glass-3);
+    overflow: hidden;
+    box-shadow:
+      inset 0 1px 0 var(--lg-spec-mid),
+      inset 0 -1px 0 var(--lg-rim-void);
+  }
+  .vmx-next-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, var(--lg-spec-lo), transparent 54%);
+    pointer-events: none;
   }
   /* The micro-label row: "next ↑" — uppercase mono, dim. The ↑ glyph is the
    * single amber accent on the card (20/80 — the actionable "do this next"
    * signal, the one place the eye is guided). */
   .vmx-next-card__label {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
@@ -69,10 +100,11 @@ const CSS = `
   /* The track title — the brightest silk ink on the card (hierarchy via tone +
    * size, NOT a second accent color). Truncates rather than wrapping the pill. */
   .vmx-next-card__title {
+    position: relative;
     font-family: var(--type-mono);
     font-size: 11px;
     line-height: 1.2;
-    color: var(--silk-90);
+    color: var(--silk);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -80,6 +112,23 @@ const CSS = `
   /* artist + "why" (similar vibe · 8a · 128) — dim mono meta, tabular for the
    * numbers. Honest-null is upstream: "similar vibe" alone when no key/bpm. */
   .vmx-next-card__meta {
+    position: relative;
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    color: var(--silk-65);
+    text-transform: lowercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .vmx-next-card__transition {
+    position: relative;
+    width: fit-content;
+    max-width: 100%;
+    padding-top: 1px;
     font-family: var(--type-mono);
     font-variant-numeric: tabular-nums;
     font-size: 10px;
@@ -114,6 +163,51 @@ export function nextMetaText(s: {
   const artist = s.artist.trim();
   const why = s.why.trim();
   return artist ? `${artist} · ${why}` : why;
+}
+
+export function nextTransitionText(
+  t: NextSuggestionTransitionWire | null | undefined,
+): string {
+  if (!t) return "";
+  const targetDeck = deckLabel(t.target_deck);
+  const cue = typeof t.cue_slot === "string" ? t.cue_slot.trim() : "";
+  const bits: string[] = [];
+  if (targetDeck) bits.push(`load ${targetDeck}`);
+  if (cue) bits.push(`cue ${cue.toUpperCase()}`);
+  if (typeof t.start_in_bars === "number" && Number.isFinite(t.start_in_bars)) {
+    const bars = Math.max(0, Math.round(t.start_in_bars));
+    if (bars === 0) bits.push("now");
+    else bits.push(`in ${bars} ${bars === 1 ? "bar" : "bars"}`);
+  }
+  return bits.join(" · ");
+}
+
+export function nextSuggestionRenderKey(
+  s: NextSuggestionWire | null | undefined,
+): string {
+  if (!s) return "";
+  const t = s.transition;
+  return [
+    s.track_id,
+    s.title,
+    s.artist,
+    s.why,
+    t?.candidate_id ?? "",
+    t?.source_deck ?? "",
+    t?.target_deck ?? "",
+    t?.from_track_id ?? "",
+    t?.to_track_id ?? "",
+    t?.from_section_id ?? "",
+    t?.to_section_id ?? "",
+    t?.cue_slot ?? "",
+    t?.start_in_bars ?? "",
+  ].join("|");
+}
+
+function deckLabel(raw: string | null | undefined): string {
+  if (typeof raw !== "string") return "";
+  const deck = raw.trim().toUpperCase();
+  return deck === "A" || deck === "B" ? deck : "";
 }
 
 /**
@@ -151,6 +245,14 @@ export function renderNextSuggestion(
   meta.className = "vmx-next-card__meta";
   meta.textContent = nextMetaText(s);
   root.append(meta);
+
+  const transitionText = nextTransitionText(s.transition);
+  if (transitionText) {
+    const transition = document.createElement("div");
+    transition.className = "vmx-next-card__transition";
+    transition.textContent = transitionText;
+    root.append(transition);
+  }
 
   return root;
 }

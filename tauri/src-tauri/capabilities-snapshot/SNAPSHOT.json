@@ -50,18 +50,6 @@
         {
           "args": [
             {
-              "validator": "^--(wizard|session|debrief)$"
-            },
-            {
-              "validator": "^\\d{8}-\\d{6}$"
-            }
-          ],
-          "name": "binaries/vibemix-core",
-          "sidecar": true
-        },
-        {
-          "args": [
-            {
               "validator": "^-NoProfile$"
             },
             {

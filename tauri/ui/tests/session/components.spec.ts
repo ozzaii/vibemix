@@ -729,6 +729,35 @@ describe("SessionLayout", () => {
     expect(root.querySelectorAll(".vmx-session__col")).toHaveLength(0);
   });
 
+  it("mounts a visible Vibe Engine rail control", () => {
+    const root = host();
+    mountSessionLayout(root);
+    const btn = root.querySelector<HTMLElement>('[data-action="vibe-engine"]');
+    expect(btn).toBeTruthy();
+    expect(btn?.dataset.primary).toBe("true");
+    expect(btn?.textContent).toBe("vibe engine");
+    expect(btn?.getAttribute("title")).toContain("Viber chat");
+  });
+
+  it("rail controls call the latest rendered handlers", () => {
+    const root = host();
+    const mounted = mountSessionLayout(root, defaultState());
+    let opened = 0;
+    let muted = 0;
+    const next = {
+      ...defaultState(),
+      cohost: { ...defaultState().cohost, onMute: () => { muted += 1; } },
+      actions: { onOpenVibeEngine: () => { opened += 1; } },
+    };
+    renderSessionFrame(mounted, next);
+
+    root.querySelector<HTMLElement>('[data-action="vibe-engine"]')?.click();
+    root.querySelector<HTMLElement>('[data-action="mute"]')?.click();
+
+    expect(opened).toBe(1);
+    expect(muted).toBe(1);
+  });
+
   it("renderSessionFrame is idempotent — same state does not duplicate nodes", () => {
     const root = host();
     const mounted = mountSessionLayout(root);

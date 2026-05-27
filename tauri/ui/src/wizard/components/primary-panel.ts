@@ -29,8 +29,33 @@ const CSS = `
    * so the controls stay; only the enclosing card is removed. */
   .cmp-primary-panel {
     position: relative;
+    padding: var(--sp-5);
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: var(--rad-md);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.026), transparent 18%),
+      repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.018) 0 1px, transparent 1px 72px),
+      linear-gradient(180deg, rgba(8, 10, 16, 0.38), rgba(2, 3, 6, 0.52));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.045),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.74),
+      0 18px 46px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+  }
+  .cmp-primary-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 10px 10px, rgba(214, 207, 199, 0.2) 0 2px, transparent 2.5px),
+      radial-gradient(circle at calc(100% - 10px) 10px, rgba(214, 207, 199, 0.12) 0 2px, transparent 2.5px),
+      linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.055), transparent);
+    opacity: 0.78;
+    mask-image: linear-gradient(180deg, black 0%, black 78%, transparent 100%);
   }
   .cmp-primary-panel__header {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -61,7 +86,13 @@ const CSS = `
   }
   .cmp-primary-panel__body {
     position: relative;
+    z-index: 2;
     padding: var(--sp-4) 0 0;
+  }
+  @media (max-width: 720px) {
+    .cmp-primary-panel {
+      padding: var(--sp-4);
+    }
   }
 `;
 

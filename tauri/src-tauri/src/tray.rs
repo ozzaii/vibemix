@@ -124,13 +124,8 @@ pub fn init_tray(app: &AppHandle) -> tauri::Result<()> {
 
 /// Build the 7-item tray menu. See module docstring for layout.
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let mood_hype = MenuItem::with_id(
-        app,
-        MENU_ID_MOOD_HYPE,
-        "Mood: Hype-man",
-        true,
-        None::<&str>,
-    )?;
+    let mood_hype =
+        MenuItem::with_id(app, MENU_ID_MOOD_HYPE, "Mood: Hype-man", true, None::<&str>)?;
     let mood_teacher = MenuItem::with_id(
         app,
         MENU_ID_MOOD_TEACHER,
@@ -138,13 +133,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         None::<&str>,
     )?;
-    let mood_coach = MenuItem::with_id(
-        app,
-        MENU_ID_MOOD_COACH,
-        "Mood: Coach",
-        true,
-        None::<&str>,
-    )?;
+    let mood_coach = MenuItem::with_id(app, MENU_ID_MOOD_COACH, "Mood: Coach", true, None::<&str>)?;
     // Cmd+Shift+M is the existing Phase 12 push-to-mute hotkey; we
     // surface the same accelerator so users discover it via the menu.
     let mute = MenuItem::with_id(
@@ -191,24 +180,12 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         None::<&str>,
     )?;
-    let settings = MenuItem::with_id(
-        app,
-        MENU_ID_SETTINGS,
-        "Settings…",
-        true,
-        None::<&str>,
-    )?;
+    let settings = MenuItem::with_id(app, MENU_ID_SETTINGS, "Settings…", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     // Cmd+Q is the OS-standard quit accelerator — the lifecycle override
     // makes sure ONLY this item kills the process (closing the main
     // window via the OS chrome hides it instead).
-    let quit = MenuItem::with_id(
-        app,
-        MENU_ID_QUIT,
-        "Quit vibemix",
-        true,
-        Some("CmdOrCtrl+Q"),
-    )?;
+    let quit = MenuItem::with_id(app, MENU_ID_QUIT, "Quit vibemix", true, Some("CmdOrCtrl+Q"))?;
 
     MenuBuilder::new(app)
         .item(&mood_hype)
@@ -711,7 +688,11 @@ mod tests {
             ("thinking", ICON_THINKING),
             ("error", ICON_ERROR),
         ] {
-            assert!(bytes.len() >= 8, "{name} icon too small ({} bytes)", bytes.len());
+            assert!(
+                bytes.len() >= 8,
+                "{name} icon too small ({} bytes)",
+                bytes.len()
+            );
             assert_eq!(
                 &bytes[..8],
                 &PNG,

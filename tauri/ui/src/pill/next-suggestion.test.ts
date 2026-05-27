@@ -10,8 +10,9 @@
  * tone, not a second color).
  *
  * Wire contract: the flat 30Hz frame carries `next_suggestion: {track_id, title,
- * artist, similarity, why, camelot, bpm}` or `null`. `camelot`/`bpm` are null
- * for folder-only libraries — the `why` already encodes that honestly.
+ * artist, similarity, why, camelot, bpm, transition?}` or `null`.
+ * `camelot`/`bpm` are null for folder-only libraries; the `why` already encodes
+ * that honestly.
  *
  * Mirrors deck-chips.test.ts: jsdom env (renderNextSuggestion → registerStyle
  * touches document.head), the `_CSS_FOR_TEST` no-hex / amber-token grep, and
@@ -21,7 +22,9 @@
 import { describe, test, expect } from "vitest";
 
 import {
+  nextSuggestionRenderKey,
   nextMetaText,
+  nextTransitionText,
   renderNextSuggestion,
   _CSS_FOR_TEST,
   type NextSuggestionWire,
@@ -50,6 +53,33 @@ describe("nextMetaText — artist · why (honest, drops empty artist)", () => {
   test("empty artist (folder track) → just the why, no dangling separator", () => {
     expect(nextMetaText({ artist: "", why: "similar vibe" })).toBe("similar vibe");
     expect(nextMetaText({ artist: "   ", why: "similar vibe" })).toBe("similar vibe");
+  });
+});
+
+describe("nextTransitionText — cue + grounded timing", () => {
+  test("cue with exact bars → compact instruction", () => {
+    expect(nextTransitionText({ cue_slot: "A", start_in_bars: 13 })).toBe(
+      "cue A · in 13 bars",
+    );
+  });
+
+  test("zero bars → now", () => {
+    expect(nextTransitionText({ cue_slot: "B", start_in_bars: 0 })).toBe("cue B · now");
+  });
+
+  test("target deck renders as the first actionable instruction", () => {
+    expect(
+      nextTransitionText({ target_deck: "B", cue_slot: "A", start_in_bars: 13 }),
+    ).toBe("load B · cue A · in 13 bars");
+  });
+
+  test("cue without timing still renders the actionable cue", () => {
+    expect(nextTransitionText({ cue_slot: "F", start_in_bars: null })).toBe("cue F");
+  });
+
+  test("no grounded transition evidence → empty string", () => {
+    expect(nextTransitionText(null)).toBe("");
+    expect(nextTransitionText({})).toBe("");
   });
 });
 
@@ -89,6 +119,34 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     expect(card.querySelector(".vmx-next-card__meta")?.textContent).toBe("similar vibe");
   });
 
+  test("set-aware transition payload renders cue and bars as its own line", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          source_deck: "A",
+          target_deck: "B",
+          from_track_id: "t0",
+          to_track_id: "t1",
+          from_section_id: "t0#s001",
+          to_section_id: "t1#s000",
+          cue_slot: "A",
+          start_in_bars: 13,
+          timing_basis: "section_playhead",
+        },
+      }),
+    )!;
+    expect(card.querySelector(".vmx-next-card__transition")?.textContent).toBe(
+      "load B · cue A · in 13 bars",
+    );
+  });
+
+  test("render key changes when the live transition countdown changes", () => {
+    const a = _sugg({ transition: { cue_slot: "A", start_in_bars: 13 } });
+    const b = _sugg({ transition: { cue_slot: "A", start_in_bars: 12 } });
+    expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
+  });
+
   test("card is tagged for assistive tech", () => {
     const card = renderNextSuggestion(_sugg())!;
     expect(card.getAttribute("aria-label")).toBe("next track suggestion");
@@ -119,6 +177,6 @@ describe("next-suggestion CSS — frontend-enforcement (token-only, 20/80 amber)
     const titleRule = _CSS_FOR_TEST.match(/\.vmx-next-card__title\s*\{[^}]*\}/);
     expect(titleRule).not.toBeNull();
     expect(titleRule![0]).not.toMatch(/var\(--amber/); // hierarchy via silk tone
-    expect(titleRule![0]).toMatch(/var\(--silk-90\)/);
+    expect(titleRule![0]).toMatch(/var\(--silk\)/);
   });
 });

@@ -8,18 +8,19 @@
  *     and the per-mode run-button label all live here as data; index.ts is the
  *     thin DOM renderer that maps this state onto the panels.
  *
- * The five modes (mocks/vibemix-library-ui.html + curate/build extensions):
+ * The modes (mocks/vibemix-library-ui.html + curate/build/chat extensions):
  *   - search   ← text vibe query → ranked tracks + scope
  *   - similar  ← seed track (id or dropped file) → nearest neighbours + scope
  *   - ingest   ← folder path + strategy → embed progress + live log
  *   - curate   ← theme → AI-curated playlist (numbered set + rationale)
  *   - build    ← brief + energy curve → set-prep co-host: discovered + sequenced
  *               set, auto-exported to Rekordbox XML (v8.2 Vibe Mix surface)
+ *   - chat     ← conversational Viber, grounded tool trace + artifacts
  */
 
 import type { EmbedStrategy } from "./api.js";
 
-export type LibraryMode = "search" | "similar" | "ingest" | "curate" | "build";
+export type LibraryMode = "search" | "similar" | "ingest" | "curate" | "build" | "chat";
 
 /** Energy-curve preset for the set-prep co-host (build mode). The EXACT wire
  *  values the agent's CLI accepts (`--curve <preset>`); the UI shows nicer
@@ -42,10 +43,12 @@ export interface LibraryState {
   brief: string;
   /** Chosen energy curve preset (build mode). */
   curve: EnergyCurve;
+  /** Current chat draft for conversational Viber mode. */
+  chatMessage: string;
 }
 
 export const initialLibraryState: LibraryState = {
-  mode: "search",
+  mode: "chat",
   query: "hard aggressive techno",
   seed: "ygmf_Remix.wav",
   folder: "~/Music",
@@ -53,6 +56,7 @@ export const initialLibraryState: LibraryState = {
   theme: "warm sunset rooftop, dusk to dark",
   brief: "warehouse opener, melodic into rolling — 90 min",
   curve: "peak_time",
+  chatMessage: "",
 };
 
 /** The left-console field label for the active mode. */
@@ -66,6 +70,8 @@ export function fieldLabel(mode: LibraryMode): string {
       return "Curate a set";
     case "build":
       return "Build a Set";
+    case "chat":
+      return "Talk to Viber";
     case "search":
     default:
       return "Vibe query";
@@ -83,6 +89,8 @@ export function runLabel(mode: LibraryMode): string {
       return "▸ Curate playlist";
     case "build":
       return "▸ Build a Set";
+    case "chat":
+      return "▸ Ask Viber";
     case "search":
     default:
       return "▸ Run search";
@@ -98,6 +106,8 @@ export function echoText(state: LibraryState): string {
       return state.theme;
     case "build":
       return state.brief;
+    case "chat":
+      return "conversation";
     default:
       return state.query;
   }
@@ -127,6 +137,10 @@ export function setTheme(state: LibraryState, theme: string): LibraryState {
 
 export function setBrief(state: LibraryState, brief: string): LibraryState {
   return { ...state, brief };
+}
+
+export function setChatMessage(state: LibraryState, chatMessage: string): LibraryState {
+  return { ...state, chatMessage };
 }
 
 export function setCurve(state: LibraryState, curve: EnergyCurve): LibraryState {

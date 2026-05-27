@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="/src/tokens.css" />
     <link rel="stylesheet" href="/src/library/library.css" />
   </head>
-  <body data-mode="search">
+  <body data-mode="chat">
     <div id="app">
       <div class="vmx-lib-app">
         <!-- titlebar -->
@@ -24,7 +24,7 @@
           </div>
           <div class="spacer"></div>
           <div class="vmx-lib-keystat">
-            <span class="led"></span>gemini-embedding-2 · 1536d · direct key
+            <span class="led"></span><span id="vmx-lib-engine-label">embedding / loading</span>
           </div>
         </div>
 
@@ -34,15 +34,16 @@
             <div class="vmx-lib-panel-hd"><span class="vmx-lib-label">Console</span></div>
             <div class="vmx-lib-panel-bd" style="display: flex; flex-direction: column">
               <div class="vmx-lib-modeswitch" role="tablist">
-                <button role="tab" aria-selected="true" data-mode="search">Search</button>
+                <button role="tab" aria-selected="false" data-mode="search">Search</button>
                 <button role="tab" aria-selected="false" data-mode="similar">Similar</button>
                 <button role="tab" aria-selected="false" data-mode="curate">Curate</button>
                 <button role="tab" aria-selected="false" data-mode="build">Build</button>
+                <button role="tab" aria-selected="true" data-mode="chat">Viber</button>
                 <button role="tab" aria-selected="false" data-mode="ingest">Ingest</button>
               </div>
 
               <!-- search / similar field -->
-              <div class="vmx-lib-field" data-for="search similar">
+              <div class="vmx-lib-field" data-for="search similar" style="display: none">
                 <span class="vmx-lib-label" id="vmx-lib-qlabel">Vibe query</span>
                 <div class="vmx-lib-qbox" data-for="search">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -106,10 +107,10 @@
               <!-- build field — the set-prep co-host: a brief + an energy
                    curve → a discovered + sequenced set, exported to Rekordbox. -->
               <div class="vmx-lib-field" data-for="build" style="display: none">
-                <span class="vmx-lib-label">Build a Set</span>
+                <span class="vmx-lib-label">Build set</span>
                 <div class="vmx-lib-qbox vmx-lib-briefbox">
                   <textarea id="vmx-lib-brief" rows="2"
-                            placeholder="describe the set… e.g. warehouse opener, melodic into rolling — 90 min"></textarea>
+                            placeholder="warehouse opener, melodic into rolling, 90 min"></textarea>
                 </div>
 
                 <!-- energy-curve preset — a segmented hardware selector. The
@@ -124,19 +125,34 @@
                 </div>
 
                 <div class="vmx-lib-chips">
-                  <span class="vmx-lib-chip" data-brief="warehouse opener, melodic into rolling — 90 min">warehouse opener</span>
-                  <span class="vmx-lib-chip" data-brief="peak-time hypnotic techno, relentless — 60 min">peak-time relentless</span>
-                  <span class="vmx-lib-chip" data-brief="after-hours dub and ambient, slow burn — 2 hrs">after-hours slow burn</span>
+                  <span class="vmx-lib-chip" data-brief="warehouse opener, melodic into rolling, 90 min">warehouse opener</span>
+                  <span class="vmx-lib-chip" data-brief="peak-time hypnotic techno, relentless, 60 min">peak-time relentless</span>
+                  <span class="vmx-lib-chip" data-brief="after-hours dub and ambient, slow burn, 2 hrs">after-hours slow burn</span>
                 </div>
               </div>
 
-              <button class="vmx-lib-run" id="vmx-lib-runbtn">▸ Run search</button>
+              <!-- chat field — conversational Viber, backed by library_chat. -->
+              <div class="vmx-lib-field" data-for="chat">
+                <span class="vmx-lib-label">Prompt</span>
+                <div class="vmx-lib-qbox vmx-lib-chatbox">
+                  <textarea id="vmx-lib-chat"
+                            rows="3"
+                            placeholder="ask for a set, a transition, a search, a quote…"></textarea>
+                </div>
+                <div class="vmx-lib-chips">
+                  <span class="vmx-lib-chip" data-chat="build me a peak-time warehouse set, dark and hypnotic">peak warehouse</span>
+                  <span class="vmx-lib-chip" data-chat="what's a clean bridge out of my current track?">bridge out</span>
+                  <span class="vmx-lib-chip" data-chat="find me something like Charli XCX but harder">harder Charli</span>
+                </div>
+              </div>
+
+              <button class="vmx-lib-run" id="vmx-lib-runbtn">▸ Ask Viber</button>
 
               <!-- corpus readout -->
               <div class="vmx-lib-corpus">
                 <div class="vmx-lib-stat">
                   <div class="k">Indexed</div>
-                  <div class="v" id="vmx-lib-stat-indexed">·<small> / 1547</small></div>
+                  <div class="v" id="vmx-lib-stat-indexed">·</div>
                 </div>
                 <div class="vmx-lib-stat">
                   <div class="k">Backend</div>
@@ -151,18 +167,41 @@
                   <div class="v" id="vmx-lib-stat-failed">·</div>
                 </div>
               </div>
+              <div class="vmx-lib-model-setup" id="vmx-lib-model-setup">
+                <div>
+                  <span class="vmx-lib-label">Models</span>
+                  <div class="state vmx-lib-mono" id="vmx-lib-model-state">checking…</div>
+                </div>
+                <button type="button" id="vmx-lib-install-models">Install Required Models</button>
+              </div>
+              <div class="vmx-lib-agent-setup" id="vmx-lib-agent-setup" hidden>
+                <span class="vmx-lib-label">Viber</span>
+                <div class="state vmx-lib-mono" id="vmx-lib-agent-state">checking…</div>
+              </div>
             </div>
           </aside>
 
           <!-- CENTER — results -->
           <section class="vmx-lib-panel">
             <div class="vmx-lib-panel-hd">
-              <span class="vmx-lib-label">Pulled</span>
-              <span class="vmx-lib-qecho">vibe · <span class="term" id="vmx-lib-echo">·</span></span>
+              <span class="vmx-lib-label" id="vmx-lib-center-label">Viber</span>
+              <span class="vmx-lib-qecho">vibe · <span class="term" id="vmx-lib-echo">conversation</span></span>
               <span class="spacer" style="flex: 1"></span>
               <span class="vmx-lib-count" id="vmx-lib-rcount">·</span>
             </div>
             <div class="vmx-lib-panel-bd">
+              <div class="vmx-lib-command-field" aria-hidden="true">
+                <div class="vmx-lib-field-orbit">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="vmx-lib-field-readout">
+                  <span>local index</span>
+                  <b>vibe field armed</b>
+                </div>
+              </div>
+
               <!-- curate rationale — the agent's plain-language read on the set
                    it built; shown only in curate mode, above the numbered set. -->
               <div class="vmx-lib-rationale" id="vmx-lib-rationale">
@@ -183,6 +222,12 @@
               </div>
 
               <div class="vmx-lib-results" id="vmx-lib-results"></div>
+              <div class="vmx-lib-chat-thread" id="vmx-lib-chat-thread" aria-live="polite">
+                <div class="vmx-lib-chat-turn" data-role="viber">
+                  <div class="who">viber</div>
+                  <div class="body">In your library. What are we chasing?</div>
+                </div>
+              </div>
 
               <!-- ingest progress -->
               <div class="vmx-lib-ingest">
@@ -201,7 +246,7 @@
           <!-- RIGHT — vibe scope -->
           <aside class="vmx-lib-panel">
             <div class="vmx-lib-panel-hd">
-              <span class="vmx-lib-label">Vibe scope</span>
+              <span class="vmx-lib-label" id="vmx-lib-side-label">Grounding</span>
               <span class="spacer" style="flex: 1"></span>
               <span class="vmx-lib-count vmx-lib-mono" id="vmx-lib-scope-state"
                     style="font-size: 10px">·</span>
@@ -216,9 +261,12 @@
                 <div class="ln"><span class="sw far"></span>Distant<span class="d">&gt; 0.60</span></div>
               </div>
               <div class="vmx-lib-scope-note">
-                Distance is <b>vibe distance</b> in 1536-d space, mean-centered so
-                the cone collapses and real separation shows. Closer rings mix cleaner.
+                <b>CLAP 512D</b> · mean centered · closer rings mix cleaner
               </div>
+            </div>
+            <div class="vmx-lib-panel-bd vmx-lib-chat-side" id="vmx-lib-chat-side">
+              <div class="vmx-lib-chat-tools" id="vmx-lib-chat-tools"></div>
+              <div class="vmx-lib-chat-artifact" id="vmx-lib-chat-artifact"></div>
             </div>
           </aside>
         </div>

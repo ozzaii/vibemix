@@ -93,7 +93,7 @@ interface WireStatusTickPayload {
   livekit: "ok" | "connecting" | "down";
   gemini: "ok" | "down";
   midi: number | null;
-  screen: "ok" | "denied";
+  screen: "ok" | "denied" | "unavailable";
 }
 
 interface WireSettingsStatePayload {
@@ -375,11 +375,20 @@ function narrowSkill(value: unknown, fallback: SkillLevel): SkillLevel {
     : fallback;
 }
 
+function applyBlurPerfPreference(lighter: boolean): void {
+  if (typeof document === "undefined") return;
+  if (lighter) document.documentElement.setAttribute("data-blur-perf", "on");
+  else document.documentElement.removeAttribute("data-blur-perf");
+}
+
 export function applySettingsState(p: WireSettingsStatePayload): void {
   // Preserve current Phase 13 fields if the sidecar hasn't sent them yet
   // (Plan 13-05 extends the sidecar payload). Defensive narrowing keeps a
   // rogue future-string from poisoning the MascotMood union.
   const current = getSessionState().settings;
+  const lighterBlur =
+    typeof p.lighter_blur === "boolean" ? p.lighter_blur : current.lighter_blur;
+  applyBlurPerfPreference(lighterBlur);
   setSessionState({
     settings: {
       voice: p.voice,
@@ -395,10 +404,7 @@ export function applySettingsState(p: WireSettingsStatePayload): void {
         typeof p.click_through === "boolean"
           ? p.click_through
           : current.click_through,
-      lighter_blur:
-        typeof p.lighter_blur === "boolean"
-          ? p.lighter_blur
-          : current.lighter_blur,
+      lighter_blur: lighterBlur,
     },
     muted: p.muted,
   });

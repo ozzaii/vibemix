@@ -60,6 +60,16 @@ function cohostMuteHandler(): void {
   });
 }
 
+/** Runtime entry to the Library/Viber window. This uses the same registered
+ * Tauri command as the tray menu, so the visible deck control and tray item
+ * focus the same single Vibe Engine window. */
+function openVibeEngineHandler(): void {
+  void invoke("open_library_window").catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.warn("[render-loop] open_library_window failed:", err);
+  });
+}
+
 /** 2026-05-26 /impeccable critique P1 — in-deck mood cycle. Advances the
  *  co-host mood HYPE → TEACH → COACH → HYPE and writes it through the same
  *  real, already-wired knob the settings drawer uses
@@ -270,7 +280,7 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       transcript: s.transcript,
       latencyMs: s.latencyMs,
       grounded: s.grounded,
-      // Wave 6 (H9) — retry handler for the "COULDN'T REACH GEMINI" foot
+      // Wave 6 (H9) — retry handler for the "AI SERVICE OFFLINE" foot
       // surface that appears after grounding has been false for >5s.
       // No dedicated ipc.cohost.reconnect exists (TODO Phase 17?); we
       // fall back to the existing crash-banner path (restart_sidecar)
@@ -286,6 +296,9 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       onOpenAllReactions: cohostOpenAllHandler,
       // "The Deck Speaks" — deck rail mute control → ipc.session.mute.
       onMute: cohostMuteHandler,
+    },
+    actions: {
+      onOpenVibeEngine: openVibeEngineHandler,
     },
     status: {
       livekit: s.status.livekit,
@@ -378,7 +391,7 @@ function sysFromStatuses(
   gemini: BridgeSessionState["status"]["gemini"],
   screen: BridgeSessionState["status"]["screen"],
 ): "ok" | "down" | "off" {
-  if (gemini === "down" || screen === "denied") return "down";
+  if (gemini === "down") return "down";
   if (gemini === "ok" && screen === "ok") return "ok";
   return "off";
 }

@@ -31,7 +31,7 @@ tauri-plugin-shell = "2.3"                                       # verified 2026
 tauri-plugin-store = "2.4"                                       # verified 2026-05-12 — config.json persistence
 tauri-plugin-fs = "2.5"                                          # verified 2026-05-12 — scoped log read for crash banner
 tauri-plugin-positioner = "2.3"                                  # verified 2026-05-12 — centre wizard window
-tauri-plugin-updater = "2.10"                                    # verified 2026-05-12 — STUBBED in Phase 11 (no real endpoints/pubkey; Phase 18 wires)
+tauri-plugin-updater = "2.10"                                    # verified 2026-05-12 — live updater plugin; release proof still requires signed/notarized artifacts
 tauri-plugin-process = "2.3"                                     # verified 2026-05-12 — exit/relaunch helpers
 tauri-plugin-global-shortcut = "2.3"                             # verified 2026-05-12 — Phase 12 push-to-mute global hotkey
 
@@ -68,11 +68,11 @@ tauri-plugin-macos-permissions = "2.3.0"
 # `objc2` dep (NSWindow → NSPanel class swizzle) was DROPPED in code review
 # (CR-01, 2026-05-22): the swizzle violated `set_class`'s subclass + no-added-
 # ivars contract, and a failure under `panic = "abort"` would SIGABRT the app.
-# The shipped focus-non-steal mechanism is the Accessory-activation-policy
-# FLOOR, which needs NO extra dep — so the direct `objc2` line is removed. (It
-# stays in Cargo.lock as a transitive tauri/wry dep; nothing in our code links
-# it directly anymore.) If a true non-activating panel is ever needed, use the
-# crates.io `objc2-app-kit` NSPanel subclass — not an in-place class swap.
+# The current floor is Tauri's `.focused(false)` builder flag only. Do not use
+# process-wide `ActivationPolicy::Accessory`: it hides/demotes the main app and
+# breaks the full runtime GUI path. If a true non-activating panel is ever
+# needed, use the crates.io `objc2-app-kit` NSPanel subclass — not an in-place
+# class swap.
 
 [dev-dependencies]
 tempfile = "3"                                                   # verified 2026-05-12 — watchdog log-tail tests

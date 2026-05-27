@@ -9,9 +9,7 @@
 //!   2. **DROP** the mascot's click-through block (the ignore-cursor-events
 //!      call) — the pill is INTERACTIVE (draggable + clickable), never
 //!      click-through. PILL-04.
-//!   3. **ADD** a `#[cfg(target_os="macos")]` focus-non-steal block after
-//!      `.build()` (the one genuinely-new native code in the phase) + a
-//!      display-change re-clamp arm in the geometry listener (Leg D).
+//!   3. **ADD** a display-change re-clamp arm in the geometry listener (Leg D).
 //!
 //! Builder flags (62-CONTEXT Area 1 + UI-SPEC):
 //!   * `transparent(true)` — the CSS `--glass-3` rgba surface paints the
@@ -33,15 +31,16 @@
 //! does not thrash `store.save()`. A `ScaleFactorChanged` arm re-clamps the
 //! pill into the visible work area when the monitor topology changes (Leg D).
 //!
-//! ## macOS focus non-steal (PILL-04, Leg A — the one net-new native code)
+//! ## macOS focus non-steal (PILL-04, Leg A)
 //!
-//! FLOOR (shipped baseline, no new dep): `.focused(false)` on the builder +
-//! `app.set_activation_policy(ActivationPolicy::Accessory)` so vibemix reads
-//! as a background/accessory app (no Dock bounce, no menubar takeover),
-//! reducing the perceived focus-theft. RESIDUAL LIMITATION (documented,
-//! KAAN-ACTION live-confirm): the first click on a non-activating *NSWindow*
-//! may still transfer key-window status — wry#637 / tauri#14102 (open, no
-//! fix as of 2.11.x). Accept for v1; surface as KAAN-ACTION.
+//! FLOOR (shipped baseline, no new dep): `.focused(false)` on the builder.
+//! Do NOT switch the app to macOS Accessory activation: that policy is
+//! process-global, so it demotes the full app window into a hidden/accessory
+//! process and breaks Dock/Cmd-Tab/System Events reachability. A 2026-05-27
+//! source-backed runtime pass reproduced that failure. RESIDUAL LIMITATION
+//! (documented, KAAN-ACTION live-confirm): the first click on a non-activating
+//! *NSWindow* may still transfer key-window status — wry#637 / tauri#14102
+//! (open, no fix as of 2.11.x). Accept for v1; keep the main app reachable.
 //!
 //! STRETCH — DROPPED (code-review CR-01, 2026-05-22). The original plan
 //! sanctioned an `objc2` `NSWindow → NSPanel` class swizzle (so the
@@ -150,9 +149,7 @@ pub fn clamp_to_work_area(x: i32, y: i32, w: u32, h: u32, area: WorkArea) -> (i3
 /// initial geometry (the call-site logs but does NOT bail setup — the main
 /// session UI must still come up even if the pill fails to build, mirroring
 /// the mascot's non-fatal discipline).
-pub fn create_pill_window(
-    app: &AppHandle,
-) -> tauri::Result<Option<tauri::WebviewWindow>> {
+pub fn create_pill_window(app: &AppHandle) -> tauri::Result<Option<tauri::WebviewWindow>> {
     let state = load_pill_state(app).unwrap_or_default();
 
     // The pill is FIXED-size: `resizable(false)` and the expand panel grows via
@@ -185,31 +182,22 @@ pub fn create_pill_window(
         }
     }
 
-    let window = WebviewWindowBuilder::new(
-        app,
-        PILL_WINDOW_LABEL,
-        WebviewUrl::App("pill.html".into()),
-    )
-    .title("vibemix")
-    .transparent(true)
-    .always_on_top(true)
-    .decorations(false)
-    .resizable(false) // DELTA vs mascot: pill is fixed-size; expand is CSS height.
-    .skip_taskbar(true)
-    .visible_on_all_workspaces(true)
-    .focused(false) // DELTA vs mascot: request non-activating (Leg A floor).
-    .inner_size(f64::from(width), f64::from(height))
-    .position(f64::from(x), f64::from(y))
-    .visible(true)
-    .build()?;
+    let window =
+        WebviewWindowBuilder::new(app, PILL_WINDOW_LABEL, WebviewUrl::App("pill.html".into()))
+            .title("vibemix")
+            .transparent(true)
+            .always_on_top(true)
+            .decorations(false)
+            .resizable(false) // DELTA vs mascot: pill is fixed-size; expand is CSS height.
+            .skip_taskbar(true)
+            .visible_on_all_workspaces(true)
+            .focused(false) // DELTA vs mascot: request non-activating (Leg A floor).
+            .inner_size(f64::from(width), f64::from(height))
+            .position(f64::from(x), f64::from(y))
+            .visible(true)
+            .build()?;
     // DELTA vs mascot: DO NOT clone the click-through block — the pill is
     // interactive (it must receive the drag mousedown + chip clicks).
-
-    // macOS focus-non-steal (Leg A). Only the Accessory-policy FLOOR ships; the
-    // NSPanel swizzle stretch was dropped (CR-01). This is reached ONLY in the
-    // Pill surface branch (main.rs), so Accessory is pill-scoped (WR-01).
-    #[cfg(target_os = "macos")]
-    apply_nonactivating(app);
 
     install_geometry_listener(app.clone(), window.clone());
 
@@ -304,10 +292,9 @@ fn install_geometry_listener(app: AppHandle, window: tauri::WebviewWindow) {
         // pull the pill back on-screen if it now lands outside.
         if let WindowEvent::ScaleFactorChanged { .. } = event {
             if let Some(area) = pill_work_area(&reclamp_window) {
-                if let (Ok(pos), Ok(size)) = (
-                    reclamp_window.outer_position(),
-                    reclamp_window.inner_size(),
-                ) {
+                if let (Ok(pos), Ok(size)) =
+                    (reclamp_window.outer_position(), reclamp_window.inner_size())
+                {
                     let sf = reclamp_window.scale_factor().unwrap_or(1.0);
                     // Convert physical → logical for the clamp math, then
                     // back to physical for set_position.
@@ -317,8 +304,7 @@ fn install_geometry_listener(app: AppHandle, window: tauri::WebviewWindow) {
                     let lh = (size.height as f64 / sf) as u32;
                     let (cx, cy) = clamp_to_work_area(lx, ly, lw, lh, area);
                     if (cx, cy) != (lx, ly) {
-                        let _ = reclamp_window
-                            .set_position(tauri::LogicalPosition::new(cx, cy));
+                        let _ = reclamp_window.set_position(tauri::LogicalPosition::new(cx, cy));
                     }
                 }
             }
@@ -409,41 +395,10 @@ fn save_pill_state(app: &AppHandle, state: &PillWindowState) -> Result<(), Strin
         .map_err(|e| format!("store init failed: {e}"))?;
     let value = serde_json::to_value(state).map_err(|e| format!("encode failed: {e}"))?;
     store.set(KEY_PILL_WINDOW, value);
-    store.save().map_err(|e| format!("store save failed: {e}"))?;
+    store
+        .save()
+        .map_err(|e| format!("store save failed: {e}"))?;
     Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// macOS focus-non-steal interop (Leg A) — #[cfg(target_os="macos")] only.
-// ---------------------------------------------------------------------------
-
-/// Apply the focus-non-steal FLOOR (Accessory activation policy). The unsound
-/// NSWindow→NSPanel swizzle STRETCH was removed (CR-01) — see the module doc.
-///
-/// WR-01 — the Accessory policy is a PROCESS-GLOBAL side effect (no Dock icon,
-/// no menubar takeover; the whole app reads as a background agent). It is
-/// therefore deliberately scoped to the PILL surface ONLY: this function is
-/// reached exclusively from `create_pill_window`, which `main.rs` calls ONLY in
-/// the `PrimarySurface::Pill` branch. The `Mascot` / `None` surfaces never call
-/// it, so the main session window keeps its default Regular policy (Dock icon +
-/// Cmd-Tab reachability) under those surfaces — the pill mode is the only one
-/// that opts the app into background-agent activation, by design (the pill mode
-/// is tray-centric, 62-RESEARCH A5).
-///
-/// KAAN-ACTION (live-confirm on the built app): whether Accessory is the right
-/// FELT choice in pill mode — i.e. whether losing the Dock icon / Cmd-Tab in
-/// pill mode is acceptable, and whether `.focused(false)` + Accessory is enough
-/// to stop first-click key-window theft (wry#637 / tauri#14102, open) — is not
-/// verifiable from code; confirm it on Kaan's Mac.
-#[cfg(target_os = "macos")]
-fn apply_nonactivating(app: &AppHandle) {
-    // FLOOR — Accessory policy (PILL-surface-scoped per the doc above). Combined
-    // with the builder's `.focused(false)`, this is the shipped PILL-04
-    // mechanism. RESIDUAL: first-click may still transfer key-window status on a
-    // plain NSWindow (wry#637 / tauri#14102, open) → KAAN-ACTION live-confirm.
-    if let Err(e) = app.set_activation_policy(tauri::ActivationPolicy::Accessory) {
-        tracing::warn!("pill: set_activation_policy(Accessory) failed: {e}");
-    }
 }
 
 #[cfg(test)]
@@ -474,7 +429,12 @@ mod tests {
     #[test]
     fn clamp_to_work_area_keeps_visible() {
         // A 1440×900 work area at origin (0,0).
-        let area = WorkArea { x: 0.0, y: 0.0, w: 1440.0, h: 900.0 };
+        let area = WorkArea {
+            x: 0.0,
+            y: 0.0,
+            w: 1440.0,
+            h: 900.0,
+        };
 
         // On-screen candidate is returned unchanged.
         let (x, y) = clamp_to_work_area(100, 80, 280, 44, area);
@@ -495,13 +455,23 @@ mod tests {
 
         // A work area offset from the screen origin (e.g. a second monitor at
         // x=1440) clamps relative to that origin.
-        let area2 = WorkArea { x: 1440.0, y: 0.0, w: 1440.0, h: 900.0 };
+        let area2 = WorkArea {
+            x: 1440.0,
+            y: 0.0,
+            w: 1440.0,
+            h: 900.0,
+        };
         let (x, y) = clamp_to_work_area(1000, 50, 280, 44, area2);
         assert_eq!((x, y), (1440, 50)); // x pulled up to the monitor origin
 
         // A window WIDER than the work area pins to the area origin (clipped
         // right, not shoved off the left).
-        let narrow = WorkArea { x: 0.0, y: 0.0, w: 200.0, h: 900.0 };
+        let narrow = WorkArea {
+            x: 0.0,
+            y: 0.0,
+            w: 200.0,
+            h: 900.0,
+        };
         let (x, _) = clamp_to_work_area(50, 80, 280, 44, narrow);
         assert_eq!(x, 0);
     }

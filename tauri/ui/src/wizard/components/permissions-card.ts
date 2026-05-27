@@ -31,12 +31,36 @@ export interface PermissionsCardProps {
 
 const CSS = `
   .cmp-perm-card {
+    position: relative;
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
     gap: var(--sp-4);
     height: 56px;
     padding: 0 var(--sp-4);
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.028), transparent 34%),
+      linear-gradient(90deg, rgba(255, 138, 61, 0.035), transparent 30%),
+      rgba(0, 0, 0, 0.2);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.7);
+  }
+  .cmp-perm-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 43px, rgba(214, 207, 199, 0.018) 43px 44px),
+      linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.06), transparent);
+    opacity: 0.7;
+    mask-image: linear-gradient(90deg, black 0%, black 88%, transparent 100%);
+  }
+  .cmp-perm-card > * {
+    position: relative;
+    z-index: 1;
   }
   .cmp-perm-card__icon {
     color: var(--silk-65);
@@ -76,6 +100,10 @@ const CSS = `
     align-items: center;
     gap: var(--sp-2);
   }
+  .cmp-perm-card__right .cmp-btn {
+    letter-spacing: 0;
+    min-width: 142px;
+  }
   .cmp-perm-card__state-readout {
     display: inline-flex;
     align-items: center;
@@ -98,6 +126,18 @@ const CSS = `
   }
   .cmp-perm-card__state-readout[data-tone="ok"]  .cmp-perm-card__led { background: var(--led-ok);    box-shadow: 0 0 6px var(--led-ok); }
   .cmp-perm-card__state-readout[data-tone="rec"] .cmp-perm-card__led { background: var(--led-fault); box-shadow: 0 0 6px var(--led-fault); }
+  @media (max-width: 720px) {
+    .cmp-perm-card {
+      grid-template-columns: auto 1fr;
+      height: auto;
+      min-height: 76px;
+      padding: var(--sp-3);
+    }
+    .cmp-perm-card__right {
+      grid-column: 1 / -1;
+      justify-content: flex-end;
+    }
+  }
 `;
 
 registerStyle("cmp-perm-card", CSS);

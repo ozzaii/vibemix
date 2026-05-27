@@ -18,8 +18,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
-mod debug_log;
 mod debrief_window;
+mod debug_log;
 mod djay_ax;
 mod hotkey;
 mod library_cmds;
@@ -102,7 +102,9 @@ fn main() {
             library_cmds::library_similar,
             library_cmds::library_curate,
             library_cmds::library_build_set,
+            library_cmds::library_chat,
             library_cmds::library_stats,
+            library_cmds::library_models,
             library_cmds::library_embed_folder,
             library_cmds::open_library_window,
         ])
@@ -132,17 +134,19 @@ fn main() {
             };
 
             let wizard_mode = config::is_first_run(&app_handle);
+            let primary_surface = config::load_primary_surface(&app_handle).unwrap_or_default();
+            if let Some(window) = app_handle.get_webview_window("main") {
+                if let Err(e) = window.show() {
+                    tracing::warn!("main window show failed: {e}");
+                }
+            }
 
             // Sidecar supervisor.
             let sidecar_app = app_handle.clone();
             let sidecar_log = log_path.clone();
             tauri::async_runtime::spawn(async move {
-                let _ = sidecar::spawn_sidecar_with_watchdog(
-                    sidecar_app,
-                    wizard_mode,
-                    sidecar_log,
-                )
-                .await;
+                let _ = sidecar::spawn_sidecar_with_watchdog(sidecar_app, wizard_mode, sidecar_log)
+                    .await;
             });
 
             // WS bus client.
@@ -171,7 +175,7 @@ fn main() {
             // session UI must still come up even if the chosen overlay fails
             // to build (e.g. an unusual multi-monitor topology). This clones
             // the Phase 13 mascot non-fatal discipline exactly (T-62-05).
-            match config::load_primary_surface(&app_handle).unwrap_or_default() {
+            match primary_surface {
                 config::PrimarySurface::Pill => {
                     match pill_window::create_pill_window(&app_handle) {
                         Ok(Some(_)) => {

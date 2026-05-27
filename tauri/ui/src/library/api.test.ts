@@ -7,11 +7,14 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import {
   DEV_FALLBACK,
   libraryBuildSet,
+  libraryChat,
   libraryEmbedFolder,
+  libraryModels,
   librarySearch,
   librarySimilar,
   libraryStats,
@@ -43,6 +46,15 @@ describe("dev fallback (no Tauri bridge)", () => {
     expect(s).toEqual({
       indexed: 142,
       backend: "sqlite-vec",
+      embedding_backend: "clap",
+      embedding_dim: 512,
+      clap_model_installed: true,
+      clap_model_path: "~/.cache/vibemix/clap-onnx",
+      clap_model_missing: [],
+      agent_backend: "codex",
+      agent_ready: true,
+      agent_status: "ready",
+      agent_hint: "",
       spent_eur: 0.19,
       failed: 0,
     });
@@ -50,6 +62,42 @@ describe("dev fallback (no Tauri bridge)", () => {
 
   it("libraryEmbedFolder returns false (no bridge → caller drives replay)", async () => {
     expect(await libraryEmbedFolder("~/Music", "cue_anchored")).toBe(false);
+  });
+
+  it("libraryModels returns the local model setup fallback", async () => {
+    const r = await libraryModels();
+    expect(r.required_ready).toBe(true);
+    expect(r.all_ready).toBe(true);
+    expect(r.models.map((m) => m.id)).toEqual(["clap", "cue-detr"]);
+    expect(r.models[0]?.installed).toBe(true);
+  });
+
+  it("libraryModels install fallback keeps the install shape", async () => {
+    const r = await libraryModels("clap");
+    expect(r.install?.target).toBe("clap");
+    expect(r.install?.ok).toBe(true);
+    expect(r.install?.results[0]?.id).toBe("clap");
+  });
+
+  it("libraryModels required install fallback returns required assets", async () => {
+    const r = await libraryModels("required");
+    expect(r.install?.target).toBe("required");
+    expect(r.install?.ok).toBe(true);
+    expect(r.install?.results.map((item) => item.id)).toEqual(["clap"]);
+  });
+
+  it("libraryModels cue install fallback keeps the cue target shape", async () => {
+    const r = await libraryModels("cue");
+    expect(r.install?.target).toBe("cue");
+    expect(r.install?.ok).toBe(true);
+    expect(r.install?.results[0]?.id).toBe("cue-detr");
+  });
+
+  it("libraryModels all install fallback returns both local model targets", async () => {
+    const r = await libraryModels("all");
+    expect(r.install?.target).toBe("all");
+    expect(r.install?.ok).toBe(true);
+    expect(r.install?.results.map((item) => item.id)).toEqual(["clap", "cue-detr"]);
   });
 
   it("exposes the captured embed log (8 entries, mixed ok/skip)", () => {
@@ -66,5 +114,26 @@ describe("dev fallback (no Tauri bridge)", () => {
     expect(r.export_path).toMatch(/\.xml$/);
     // honest meta — no fabricated human title/artist on the flat-id rows.
     expect(r.tracks[0]?.meta).toMatch(/^track /);
+  });
+
+  it("libraryChat returns the DEV_CHAT conversational sample", async () => {
+    const r = await libraryChat("what should I demo?");
+    expect(r.reply.length).toBeGreaterThan(20);
+    expect(r.tool_trace[0]?.name).toBe("search_vibe");
+    expect(r.playlist).toBeNull();
+    expect(r.stop_reason).toBe("model_done");
+    expect(DEV_FALLBACK.chat.seen_track_ids).toContain("7f9f9052");
+  });
+});
+
+describe("library entry markup", () => {
+  it("does not first-paint the stale mock corpus denominator", () => {
+    const html = readFileSync("library.html", "utf8");
+    const indexedStat = html.match(
+      /<div class="v" id="vmx-lib-stat-indexed">(?<body>.*?)<\/div>/s,
+    );
+
+    expect(indexedStat?.groups?.body).toBe("·");
+    expect(html).not.toContain("/ 1547");
   });
 });

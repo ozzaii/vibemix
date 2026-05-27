@@ -72,8 +72,8 @@ fn app_data_dir_matching_sidecar() -> Result<PathBuf, String> {
         if let Ok(appdata) = std::env::var("APPDATA") {
             return Ok(PathBuf::from(appdata).join("vibemix"));
         }
-        let userprofile = std::env::var("USERPROFILE")
-            .map_err(|_| "USERPROFILE not set".to_string())?;
+        let userprofile =
+            std::env::var("USERPROFILE").map_err(|_| "USERPROFILE not set".to_string())?;
         Ok(PathBuf::from(userprofile)
             .join("AppData")
             .join("Roaming")

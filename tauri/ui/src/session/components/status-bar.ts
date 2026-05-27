@@ -22,7 +22,7 @@ export interface StatusBarProps {
   livekit: BadgeState;
   gemini: "ok" | "down" | null;
   midi: number | null;
-  screen: "ok" | "denied" | null;
+  screen: "ok" | "denied" | "unavailable" | null;
   muted: boolean;
   hotkey: string;
   /** Called when the user clicks Recheck inside a down-badge tooltip. */
@@ -309,8 +309,8 @@ function buildBadgeSpecs(props: StatusBarProps): BadgeSpec[] {
     },
     {
       key: "screen",
-      state: props.screen ?? "off",
-      label: badgeLabel(props.screen === "denied" ? "SCREEN · DENIED" : "SCREEN", props.screen),
+      state: screenBadgeState(props.screen),
+      label: screenBadgeLabel(props.screen),
       clickable: props.screen === "denied",
     },
   ];
@@ -321,6 +321,20 @@ function badgeLabel(base: string, state: BadgeState | "denied" | null): string {
   if (state === "down") return `● ${base} · DOWN`;
   if (state === "denied") return `● ${base}`;
   return `● ${base}`;
+}
+
+function screenBadgeState(
+  screen: StatusBarProps["screen"],
+): "ok" | "down" | "off" {
+  if (screen === "ok") return "ok";
+  if (screen === "denied") return "down";
+  return "off";
+}
+
+function screenBadgeLabel(screen: StatusBarProps["screen"]): string {
+  if (screen === "denied") return "● SCREEN · DENIED";
+  if (screen === "unavailable") return "● SCREEN · OFF";
+  return "● SCREEN";
 }
 
 export function renderStatusBar(props: StatusBarProps): HTMLElement {
@@ -456,6 +470,7 @@ function titleForBadge(key: BadgeKey, state: string): string {
   if (state === "ok") return `${label} · connected`;
   if (state === "connecting") return `${label} · connecting…`;
   if (state === "denied") return `${label} · permission denied`;
+  if (key === "screen" && state === "down") return `${label} · permission denied`;
   if (state === "down") return `${label} · disconnected · click for recovery`;
   return `${label} · off`;
 }

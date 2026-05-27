@@ -63,6 +63,7 @@
   backdrop-filter: var(--lg-lens-blur);
   -webkit-backdrop-filter: var(--lg-lens-blur);
   overflow: hidden;
+  isolation: isolate;
   font-family: var(--type-display);
   color: var(--silk);
   cursor: default;
@@ -82,9 +83,10 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 56px; /* crown band — drag strip + a touch of the collapsed row */
+  height: 64px; /* crown band — drag strip + a touch of the collapsed row */
   border-radius: var(--rad-lg) var(--rad-lg) 0 0;
   background:
+    radial-gradient(120% 84% at 18% 0%, var(--lg-spec-hi), transparent 46%),
     linear-gradient(
       105deg,
       var(--lg-spec-mid) 0%,
@@ -95,11 +97,25 @@
   z-index: 0;
   mix-blend-mode: screen; /* light ADDS — reads as a catch, not a film over the face */
 }
+.pill::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: calc(var(--rad-lg) - 1px);
+  background:
+    linear-gradient(180deg, var(--lg-spec-lo), transparent 44%, var(--lg-rim-void)),
+    linear-gradient(90deg, transparent, var(--glass-edge-up) 50%, transparent);
+  opacity: 0.52;
+  pointer-events: none;
+  z-index: 0;
+}
 /* Keep the real content above the specular crown so text never sits under it.
  * (.pill__peek is position:absolute below — it gets its z-index there.) */
 .pill__drag,
 .pill__row,
-.pill__expand {
+.pill__expand,
+.pill__peek,
+.pill__notch {
   position: relative;
   z-index: 1;
 }
@@ -146,6 +162,7 @@
 .pill[data-state="listening"] .pill__dot,
 .pill[data-state="speaking"] .pill__dot {
   background: var(--amber);
+  box-shadow: var(--glow-soft);
 }
 .pill[data-state="listening"] .pill__dot {
   animation: pill-blink 1.4s ease-in-out infinite;
@@ -178,6 +195,46 @@
   justify-content: flex-end;
   min-width: 0;
   height: 16px;
+}
+
+/* ── Hover-drawer notch — the tiny "more below" signal from the liquid-glass
+ * hover mock. It appears only when a grounded next suggestion exists, and it
+ * dissolves while the hover drawer is open. Silk, never amber: the state dot
+ * remains the only resting accent. */
+.pill__notch {
+  position: absolute;
+  left: 50%;
+  top: 43px; /* bottom edge of the 44px collapsed pill */
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--silk-40), transparent);
+  box-shadow: inset 0 1px 0 var(--lg-spec-lo);
+  transform: translate(-50%, 0);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-transition) cubic-bezier(0.16, 1, 0.3, 1),
+              width var(--motion-transition) cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pill[data-has-next="true"]:not([data-state="expand"]):not([data-peek="true"]) .pill__notch {
+  opacity: 0.72;
+  animation: pill-notch-breathe 2600ms ease-in-out infinite;
+}
+.pill[data-peek="true"] .pill__notch,
+.pill[data-state="expand"] .pill__notch {
+  opacity: 0;
+  animation: none;
+}
+@keyframes pill-notch-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    width: 18px;
+  }
+  50% {
+    opacity: 0.9;
+    width: 24px;
+  }
 }
 
 /* ── Expand panel — grows DOWN on a reaction (62-UI-SPEC §States) ─────────── *
@@ -297,27 +354,35 @@
 .pill__peek {
   position: absolute;
   z-index: 1; /* above the .pill::before specular crown */
-  top: 64px; /* below the 28px drag strip + ~36px collapsed row */
-  left: var(--sp-3);
-  right: var(--sp-3);
-  padding: var(--sp-1);
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--rad-md);
-  background: var(--glass-3);
-  /* Liquid-glass: a small drawer sliding out of the pill — same floating-layer
-   * material as the lozenge (specular crown + void rim + depth drop), one
-   * shared token. The peek floats ABOVE the desktop too, so it earns the
-   * depth shadow that the old flat seam lacked. */
-  box-shadow: var(--lg-surface-shadow);
-  backdrop-filter: var(--lg-lens-blur);
-  -webkit-backdrop-filter: var(--lg-lens-blur);
+  top: 44px;
+  left: 0;
+  right: 0;
+  min-height: 0;
+  padding: 0 var(--sp-3) var(--sp-3);
+  border-top: 1px solid var(--glass-edge-up);
+  background:
+    linear-gradient(180deg, var(--glass-top), transparent 30%),
+    linear-gradient(180deg, transparent, var(--glass-3));
+  /* One continuous glass body: the root .pill owns the lens blur, background,
+   * rim light, and depth. The hover drawer is a fold inside that same glass,
+   * not a second glass card stacked on top of it. */
+  box-shadow:
+    inset 0 1px 0 var(--lg-spec-lo),
+    inset 0 -1px 0 var(--lg-rim-void);
   /* At rest: invisible + inert + nudged up, so the reveal settles DOWN into place. */
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-6px);
   pointer-events: none;
   transition:
-    opacity var(--motion-transition) ease-out,
-    transform var(--motion-transition) ease-out;
+    opacity 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pill__peek .vmx-next-card {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-1) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 /* Reveal: only when hovering (data-peek) AND a card is present. The :empty guard
  * is the CSS belt to index.ts's honest-silence (an empty mount stays invisible —
@@ -325,6 +390,7 @@
 .pill[data-peek="true"] .pill__peek:not(:empty) {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
 }
 
 /* ── Reduced-motion guard (a11y) ──────────────────────────────────────────── *
@@ -350,6 +416,10 @@
   .pill__receipt-rule {
     animation: none;
     transform: scaleX(1);
+  }
+  .pill__notch {
+    animation: none;
+    transition: none;
   }
   /* The peek card still appears on hover — it just snaps in (no fade/slide),
    * the accessible read for a motion-sensitive user. */

@@ -17,13 +17,12 @@
 //!     `resource_dir()`, cwd pinned to its parent so the bundled/.app-adjacent
 //!     `.env` loads.
 //!
-//! In BOTH arms we relay `GEMINI_API_KEY` / `OPENROUTER_API_KEY` from the
-//! parent env when present (identical to the sidecar watchdog) — the library
-//! search/similar/embed paths boot a DIRECT genai client from GEMINI_API_KEY
-//! (loaded from `.env` by the Python side, but the env relay wins when a key
-//! is exported in the launching shell). SECURITY: env relay only — no key is
-//! ever embedded (CLAUDE.md hard rule; the distribution answer is the Bravoh
-//! proxy via VIBEMIX_PROXY_JWT, which needs no key).
+//! In BOTH arms we relay the same runtime mode/auth env as the sidecar watchdog
+//! (`VIBEMIX_LLM_MODE`, direct/proxy keys/tokens, and `CODEX_HOME`) when
+//! present. Library search/similar/embed is local CLAP ONNX and keyless; the
+//! Library/Viber reasoning backend is pinned to local Codex for the desktop
+//! product path. SECURITY: env relay only — no key is ever embedded
+//! (CLAUDE.md hard rule; distribution should use the Bravoh proxy).
 //!
 //! ## CLI contract this bridge maps (verified against src/vibemix/__main__.py
 //!    + library/{search,similar,folder_ingest,budget}.py @ HEAD ac732e3):
@@ -62,10 +61,10 @@ const LIBRARY_WIDTH: f64 = 1180.0;
 const LIBRARY_HEIGHT: f64 = 760.0;
 const LIBRARY_MIN_WIDTH: f64 = 920.0;
 const LIBRARY_MIN_HEIGHT: f64 = 600.0;
+const LIBRARY_AGENT_BACKEND: &str = "codex";
+const MODEL_PROGRESS_PREFIX: &str = "VIBEMIX_MODEL_PROGRESS ";
 
-use crate::sidecar::{
-    resolve_sidecar_invocation_for_library, FORWARDED_ENV_KEYS,
-};
+use crate::sidecar::{resolve_sidecar_invocation_for_library, FORWARDED_ENV_KEYS};
 
 /// Build a `tauri_plugin_shell::process::Command` that runs `vibemix <args…>`
 /// using the SAME dev-vs-bundled resolution + env relay as the sidecar
@@ -105,8 +104,8 @@ fn build_library_command(
         cmd = cmd.args([*a]);
     }
 
-    // Env relay — GEMINI_API_KEY / OPENROUTER_API_KEY from the parent env when
-    // present and non-empty (no embedded key; CLAUDE.md hard rule).
+    // Env relay — runtime auth + Codex setup from the parent env when present
+    // and non-empty (no embedded key/token; CLAUDE.md hard rule).
     for key in FORWARDED_ENV_KEYS {
         if let Ok(val) = std::env::var(key) {
             if !val.is_empty() {
@@ -114,18 +113,83 @@ fn build_library_command(
             }
         }
     }
+    // Product path: keep Library/Viber on local Codex even if an old shell still
+    // has VIBEMIX_LIBRARY_AGENT_BACKEND=gemini in its environment.
+    cmd = cmd.env("VIBEMIX_LIBRARY_AGENT_BACKEND", LIBRARY_AGENT_BACKEND);
 
-    // Codex backend opt-in. The `--backend codex` curator path runs `codex exec`
+    // Codex backend shell allow. Any `--backend codex` app path runs `codex exec`
     // against an MCP server; an upstream Codex regression broke MCP tool-approval
     // mode, so the wrapper fails closed (`codex_mcp_blocked`) unless
     // VIBEMIX_CODEX_ALLOW_SHELL=1 is set. The desktop app is a trusted local
     // context, so we set it WHEN (and only when) the codex backend is requested.
     // Unused/harmless for every other library subcommand.
-    if library_args.iter().any(|a| *a == "codex") {
+    if library_args_request_codex_backend(library_args) {
         cmd = cmd.env("VIBEMIX_CODEX_ALLOW_SHELL", "1");
     }
 
     Ok(cmd)
+}
+
+fn library_args_request_codex_backend(library_args: &[&str]) -> bool {
+    library_args
+        .windows(2)
+        .any(|pair| pair[0] == "--backend" && pair[1] == "codex")
+}
+
+/// Viber backend for the desktop app.
+///
+/// The presentation/product path is local Codex. This intentionally ignores the
+/// old `VIBEMIX_LIBRARY_AGENT_BACKEND` override so stale shell env cannot select
+/// a legacy backend for Library chat/build/curate.
+fn library_agent_backend() -> &'static str {
+    LIBRARY_AGENT_BACKEND
+}
+
+fn chat_library_args(message: &str, history_json: Option<&str>) -> Vec<String> {
+    let backend = library_agent_backend();
+    let mut args = vec![
+        "library".to_string(),
+        "chat".to_string(),
+        message.to_string(),
+        "--backend".to_string(),
+        backend.to_string(),
+        "--json".to_string(),
+    ];
+    if let Some(h) = history_json {
+        args.push("--history".to_string());
+        args.push(h.to_string());
+    }
+    args
+}
+
+fn model_library_args(install: Option<&str>, force: bool) -> Vec<String> {
+    let mut args = vec![
+        "library".to_string(),
+        "models".to_string(),
+        "--json".to_string(),
+    ];
+    if let Some(target) = install {
+        args.push("--install".to_string());
+        args.push(target.to_string());
+    }
+    if force {
+        args.push("--force".to_string());
+    }
+    args
+}
+
+fn normalize_model_install_target(raw: Option<String>) -> Result<Option<String>, String> {
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let value = raw.trim().to_ascii_lowercase();
+    match value.as_str() {
+        "" => Ok(None),
+        "required" | "clap" | "cue" | "all" => Ok(Some(value)),
+        _ => Err(format!(
+            "invalid model install target {value:?} (expected required | clap | cue | all)"
+        )),
+    }
 }
 
 /// Run a library subcommand to completion, returning (stdout, stderr, code).
@@ -144,6 +208,7 @@ async fn run_library_to_completion(
 
     let mut stdout = String::new();
     let mut stderr = String::new();
+    let mut stderr_line_buf = String::new();
     let mut code: i32 = -1;
 
     while let Some(event) = rx.recv().await {
@@ -152,7 +217,13 @@ async fn run_library_to_completion(
                 stdout.push_str(&String::from_utf8_lossy(&b));
             }
             CommandEvent::Stderr(b) => {
-                stderr.push_str(&String::from_utf8_lossy(&b));
+                stderr_line_buf.push_str(&String::from_utf8_lossy(&b));
+                while let Some(nl) = stderr_line_buf.find('\n') {
+                    let line: String = stderr_line_buf.drain(..=nl).collect();
+                    if !dispatch_model_progress_line(app, line.trim_end()) {
+                        stderr.push_str(&line);
+                    }
+                }
             }
             CommandEvent::Terminated(payload) => {
                 code = payload.code.unwrap_or(-1);
@@ -160,23 +231,50 @@ async fn run_library_to_completion(
             _ => {}
         }
     }
+    if !stderr_line_buf.is_empty() && !dispatch_model_progress_line(app, stderr_line_buf.trim_end())
+    {
+        stderr.push_str(&stderr_line_buf);
+    }
 
     Ok((stdout, stderr, code))
+}
+
+fn parse_model_progress_line(line: &str) -> Option<Value> {
+    let raw = line.trim().strip_prefix(MODEL_PROGRESS_PREFIX)?;
+    serde_json::from_str::<Value>(raw).ok()
+}
+
+fn dispatch_model_progress_line(app: &AppHandle, line: &str) -> bool {
+    let Some(payload) = parse_model_progress_line(line) else {
+        return false;
+    };
+    let _ = app.emit("library://model-progress", payload);
+    true
 }
 
 /// Parse the stdout of a one-shot library command as JSON, surfacing a
 /// useful error (preferring the CLI's own stderr JSON `error` field) on
 /// failure. The CLI prints a JSON `{ "error": …, "results": [] }` to stderr
 /// on the "no client" / "no library cache" paths and exits 1.
-fn parse_cli_json(
-    stdout: &str,
-    stderr: &str,
-    code: i32,
-) -> Result<Value, String> {
+fn parse_cli_json(stdout: &str, stderr: &str, code: i32) -> Result<Value, String> {
     if code != 0 {
+        // Agent backends can fail in a UI-recoverable way: no Codex CLI,
+        // Codex auth required, max_iters/no_playlist, timeout, etc. Those
+        // runs still emit a structured payload with `stop_reason` so the
+        // Library window can render "No set built (reason)" plus the backend's
+        // setup hint instead of collapsing into a generic engine error. Some
+        // CLI paths print a human hint after the JSON on stderr, so parse only
+        // the first JSON value when looking for this structured terminal.
+        for stream in [stdout, stderr] {
+            if let Some(v) = parse_first_json_value(stream) {
+                if is_agent_terminal_payload(&v) {
+                    return Ok(v);
+                }
+            }
+        }
         // The CLI's failure paths emit a JSON error object to stderr; surface
         // its `error` string when parseable, else the raw stderr tail.
-        if let Ok(v) = serde_json::from_str::<Value>(stderr.trim()) {
+        if let Some(v) = parse_first_json_value(stderr) {
             if let Some(msg) = v.get("error").and_then(|e| e.as_str()) {
                 return Err(msg.to_string());
             }
@@ -186,6 +284,23 @@ fn parse_cli_json(
     }
     serde_json::from_str::<Value>(stdout.trim())
         .map_err(|e| format!("library CLI returned non-JSON stdout: {e}"))
+}
+
+fn parse_first_json_value(raw: &str) -> Option<Value> {
+    let trimmed = raw.trim_start();
+    if trimmed.is_empty() {
+        return None;
+    }
+    serde_json::Deserializer::from_str(trimmed)
+        .into_iter::<Value>()
+        .next()
+        .and_then(Result::ok)
+}
+
+fn is_agent_terminal_payload(v: &Value) -> bool {
+    v.get("stop_reason")
+        .and_then(|reason| reason.as_str())
+        .is_some_and(|reason| !reason.is_empty())
 }
 
 /// Map a raw search/similar CLI payload into the UI-facing response shape:
@@ -271,11 +386,7 @@ fn map_search_results(raw: &Value) -> Value {
 /// Runs `library search <query> --k <k> --json`, returns the normalized
 /// `{ results:[{track_id,title,score,meta}], centered, corpus_size }` shape.
 #[tauri::command]
-pub async fn library_search(
-    app: AppHandle,
-    query: String,
-    k: u32,
-) -> Result<Value, String> {
+pub async fn library_search(app: AppHandle, query: String, k: u32) -> Result<Value, String> {
     let k_str = k.to_string();
     let (stdout, stderr, code) = run_library_to_completion(
         &app,
@@ -294,17 +405,10 @@ pub async fn library_search(
 /// the contract is unambiguous if the default ever changes), returns the same
 /// normalized shape as `library_search`.
 #[tauri::command]
-pub async fn library_similar(
-    app: AppHandle,
-    seed: String,
-    k: u32,
-) -> Result<Value, String> {
+pub async fn library_similar(app: AppHandle, seed: String, k: u32) -> Result<Value, String> {
     let k_str = k.to_string();
-    let (stdout, stderr, code) = run_library_to_completion(
-        &app,
-        &["library", "similar", &seed, "--k", &k_str],
-    )
-    .await?;
+    let (stdout, stderr, code) =
+        run_library_to_completion(&app, &["library", "similar", &seed, "--k", &k_str]).await?;
     let raw = parse_cli_json(&stdout, &stderr, code)?;
     Ok(map_search_results(&raw))
 }
@@ -315,8 +419,8 @@ pub async fn library_similar(
 ///      "tracks": [ { "track_id","title","meta" } ], "count": n }`
 ///
 /// CLI contract (verified against src/vibemix/__main__.py `_cmd_library_curate`
-/// + library/agent.py `ViberAgentResult.to_dict` + library/create_playlist.py
-/// `PlaylistResult.to_dict`):
+/// + library/codex_curate.py `CodexCurateResult.to_dict`
+/// + library/create_playlist.py `PlaylistResult.to_dict`):
 ///
 ///   `{ "theme", "playlist": { "name", "track_ids":[str], "m3u_path",
 ///       "json_path", "dropped_ids":[str] } | null,
@@ -337,6 +441,8 @@ fn map_curate_result(raw: &Value) -> Value {
     let rationale = raw
         .get("rationale")
         .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .or_else(|| raw.get("error").and_then(|v| v.as_str()))
         .unwrap_or("")
         .to_string();
     let stop_reason = raw
@@ -346,8 +452,9 @@ fn map_curate_result(raw: &Value) -> Value {
         .to_string();
 
     let playlist = raw.get("playlist");
-    // `name` — the agent-chosen playlist name. The Gemini backend nests it under
-    // `playlist.name`; the Codex backend surfaces it top-level as `playlist_name`.
+    // `name` — the agent-chosen playlist name. Legacy nested payloads keep it
+    // under `playlist.name`; the Codex backend surfaces it top-level as
+    // `playlist_name`.
     // Fall back to the theme when neither names the set.
     let name = playlist
         .and_then(|p| p.get("name"))
@@ -389,8 +496,9 @@ fn map_curate_result(raw: &Value) -> Value {
             })
             .collect()
     } else {
-        // Flat id list. Gemini nests it under `playlist.track_ids`; the Codex
-        // backend surfaces it top-level as `track_ids`. Try nested, then top-level.
+        // Flat id list. Legacy nested payloads keep it under
+        // `playlist.track_ids`; the Codex backend surfaces it top-level as
+        // `track_ids`. Try nested, then top-level.
         let ids = playlist
             .and_then(|p| p.get("track_ids"))
             .or_else(|| raw.get("track_ids"))
@@ -427,20 +535,15 @@ fn map_curate_result(raw: &Value) -> Value {
 
 /// `library_curate` — theme → AI-curated playlist (one-shot, NOT interactive).
 ///
-/// Runs `library curate <theme> --backend codex --json` — the curator reasons on
-/// the user's own ChatGPT-plan Codex session (NOT Gemini), grounded through the
-/// MCP server's seen-set + library re-validation. `map_curate_result` maps the
-/// Codex JSON shape (top-level `playlist_name` / `track_ids`) into the stable UI
-/// shape `{ name, rationale, stop_reason, tracks:[{track_id,title,meta}], count }`.
-/// A backend failure (codex not installed / not logged in, no library cache, no
-/// playlist) surfaces via `parse_cli_json` as an Err — the frontend renders the
-/// real error, never fake data (anti-slop). `VIBEMIX_CODEX_ALLOW_SHELL=1` is set
-/// by `build_library_command` for the codex path.
+/// Runs `library curate <theme> --backend <selected> --json`. The packaged app
+/// defaults to local Codex for the test/demo phase. `map_curate_result` maps
+/// either backend shape into the stable UI DTO.
 #[tauri::command]
 pub async fn library_curate(app: AppHandle, theme: String) -> Result<Value, String> {
+    let backend = library_agent_backend();
     let (stdout, stderr, code) = run_library_to_completion(
         &app,
-        &["library", "curate", &theme, "--backend", "codex", "--json"],
+        &["library", "curate", &theme, "--backend", backend, "--json"],
     )
     .await?;
     let raw = parse_cli_json(&stdout, &stderr, code)?;
@@ -456,9 +559,9 @@ pub async fn library_curate(app: AppHandle, theme: String) -> Result<Value, Stri
 /// to a Rekordbox XML; the resulting `export_path` is surfaced in the mapped
 /// shape so the UI can show the "Exported → <path>" line + import hint.
 ///
-/// The agent's `build_set` returns the SAME `CurateResult.to_dict()` shape as
-/// curate (plus `export_path`), so `map_curate_result` is reused verbatim — it
-/// already tolerates `playlist: null`. A set-prep run can terminate via export
+/// The Codex wrapper returns the same curate DTO shape for curate/build-set
+/// (plus `export_path`), so `map_curate_result` is reused verbatim — it already
+/// tolerates `playlist: null`. A set-prep run can terminate via export
 /// (`stop_reason == "exported"`) rather than a created playlist, so the build
 /// flow leans on `export_path` + the rationale as the headline value; the rows
 /// (when present) are the same numbered set the curate path renders.
@@ -468,13 +571,8 @@ pub async fn library_curate(app: AppHandle, theme: String) -> Result<Value, Stri
 /// before spawn so an out-of-band value never reaches the CLI as a confusing
 /// argparse error.
 ///
-/// HONESTY (anti-slop): build-set runs the Codex backend (`--backend codex`) —
-/// set-prep reasoning on the user's own ChatGPT-plan Codex session via the MCP
-/// server, grounded through discover/sequence/export tools.
-/// `VIBEMIX_CODEX_ALLOW_SHELL=1` is set by `build_library_command` for the codex
-/// path. A backend failure (codex not installed / not logged in, no library
-/// cache, no set) surfaces via `parse_cli_json` as an Err — the frontend renders
-/// the real error, never fake data.
+/// HONESTY (anti-slop): backend errors surface via `parse_cli_json` as an Err —
+/// the frontend renders the real error, never fake data.
 #[tauri::command]
 pub async fn library_build_set(
     app: AppHandle,
@@ -488,6 +586,7 @@ pub async fn library_build_set(
             "invalid curve {curve:?} (expected opener | peak_time | after_hours | festival)"
         ));
     }
+    let backend = library_agent_backend();
     let (stdout, stderr, code) = run_library_to_completion(
         &app,
         &[
@@ -499,7 +598,7 @@ pub async fn library_build_set(
             "--export",
             "rekordbox",
             "--backend",
-            "codex",
+            backend,
             "--json",
         ],
     )
@@ -527,30 +626,26 @@ pub async fn library_chat(
         .transpose()
         .map_err(|e| format!("invalid chat history: {e}"))?;
 
-    // CODEX is the agentic engine (Kaan: "codex default, gemini no"). Passing
-    // it explicitly also trips build_library_command's `any(== "codex")` gate
-    // that sets VIBEMIX_CODEX_ALLOW_SHELL=1 — without it the codex MCP tool
-    // calls are auto-cancelled (upstream bug) and chat returns codex_mcp_blocked.
-    let mut args = vec![
-        "library", "chat", &message, "--backend", "codex", "--json",
-    ];
-    if let Some(ref h) = history_json {
-        args.push("--history");
-        args.push(h.as_str());
-    }
+    // Current test/demo default is local Codex; passing it through here also
+    // trips build_library_command's shell-allow gate for the Codex MCP path.
+    let args = chat_library_args(&message, history_json.as_deref());
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
 
-    let (stdout, stderr, code) = run_library_to_completion(&app, &args).await?;
+    let (stdout, stderr, code) = run_library_to_completion(&app, &arg_refs).await?;
     parse_cli_json(&stdout, &stderr, code)
 }
 
 /// `library_stats` — lightweight engine status for the UI header.
 ///
-/// Returns `{ indexed:n, backend:"sqlite-vec"|"numpy", spent_eur:f, failed:n }`.
+/// Returns `{ indexed:n, backend:"sqlite-vec"|"numpy", embedding_backend,
+/// embedding_dim, clap_model_installed, clap_model_path, agent_backend,
+/// agent_ready, agent_status, agent_hint, spent_eur:f, failed:n }`.
 ///
 /// Two OFFLINE CLI calls (neither makes a Gemini/network call):
-///   * `library stats --json`  → `{ indexed, backend, failed }` — the store
-///     row-count via `LibraryStore.row_count()` (added so this header no longer
-///     hardcodes `indexed:0`). `failed` has no persisted source yet → `0`.
+///   * `library stats --json`  → `{ indexed, backend, embedding_backend,
+///     embedding_dim, clap_model_*, agent_*, failed }` — the store row-count
+///     plus active embedding/model/agent setup status. `failed` has no persisted
+///     source yet → `0`.
 ///   * `library budget --json`  → `telemetry.current_cost_estimate_eur` for
 ///     `spent_eur` (the running-cost readout; stats does not carry cost).
 ///
@@ -563,19 +658,79 @@ pub async fn library_chat(
 /// whole-command failure mode — not a graceful fallback.
 #[tauri::command]
 pub async fn library_stats(app: AppHandle) -> Result<Value, String> {
-    // 1) indexed + backend + failed — from the offline `stats` subcommand.
+    let agent_backend = library_agent_backend();
+
+    // 1) indexed + backend + embedding seam + failed from the offline
+    // `stats` subcommand.
     let (s_out, s_err, s_code) =
         run_library_to_completion(&app, &["library", "stats", "--json"]).await?;
-    let (indexed, backend, failed) = match parse_cli_json(&s_out, &s_err, s_code) {
+    let (
+        indexed,
+        backend,
+        embedding_backend,
+        embedding_dim,
+        clap_model_installed,
+        clap_model_path,
+        clap_model_missing,
+        agent_ready,
+        agent_status,
+        agent_hint,
+        failed,
+    ) = match parse_cli_json(&s_out, &s_err, s_code) {
         Ok(v) => (
             v.get("indexed").and_then(|n| n.as_u64()).unwrap_or(0),
             v.get("backend")
                 .and_then(|b| b.as_str())
                 .unwrap_or("sqlite-vec")
                 .to_string(),
+            v.get("embedding_backend")
+                .and_then(|b| b.as_str())
+                .unwrap_or("clap")
+                .to_string(),
+            v.get("embedding_dim")
+                .and_then(|n| n.as_u64())
+                .unwrap_or(512),
+            v.get("clap_model_installed")
+                .and_then(|b| b.as_bool())
+                .unwrap_or(false),
+            v.get("clap_model_path")
+                .and_then(|p| p.as_str())
+                .unwrap_or("")
+                .to_string(),
+            v.get("clap_model_missing")
+                .and_then(|m| m.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(str::to_string))
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default(),
+            v.get("agent_ready")
+                .and_then(|b| b.as_bool())
+                .unwrap_or(false),
+            v.get("agent_status")
+                .and_then(|s| s.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
+            v.get("agent_hint")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
             v.get("failed").and_then(|n| n.as_u64()).unwrap_or(0),
         ),
-        Err(_) => (0, "sqlite-vec".to_string(), 0),
+        Err(_) => (
+            0,
+            "sqlite-vec".to_string(),
+            "clap".to_string(),
+            512,
+            false,
+            "".to_string(),
+            Vec::new(),
+            false,
+            "unknown".to_string(),
+            "".to_string(),
+            0,
+        ),
     };
 
     // 2) spent_eur — from the offline `budget` telemetry (stats has no cost).
@@ -593,9 +748,48 @@ pub async fn library_stats(app: AppHandle) -> Result<Value, String> {
     Ok(json!({
         "indexed": indexed,
         "backend": backend,
+        "embedding_backend": embedding_backend,
+        "embedding_dim": embedding_dim,
+        "clap_model_installed": clap_model_installed,
+        "clap_model_path": clap_model_path,
+        "clap_model_missing": clap_model_missing,
+        "agent_backend": agent_backend,
+        "agent_ready": agent_ready,
+        "agent_status": agent_status,
+        "agent_hint": agent_hint,
         "spent_eur": spent_eur,
         "failed": failed,
     }))
+}
+
+/// `library_models` — local AI model status/install seam for setup UX.
+///
+/// Status is offline (`library models --json`). Installing required assets may
+/// network via Hugging Face (`library models --install required --json`). CUE is
+/// optional and installable only when an operator-hosted ONNX URL plus verified
+/// pins are configured. Returns the CLI's JSON payload even if the install
+/// failed, so the UI can show per-file errors instead of a generic invoke
+/// failure.
+#[tauri::command]
+pub async fn library_models(
+    app: AppHandle,
+    install: Option<String>,
+    force: Option<bool>,
+) -> Result<Value, String> {
+    let install = normalize_model_install_target(install)?;
+    let mut args = model_library_args(install.as_deref(), force.unwrap_or(false));
+    if install.is_some() {
+        args.push("--progress".to_string());
+    }
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+
+    let (stdout, stderr, code) = run_library_to_completion(&app, &arg_refs).await?;
+    if code != 0 {
+        if let Ok(v) = serde_json::from_str::<Value>(stdout.trim()) {
+            return Ok(v);
+        }
+    }
+    parse_cli_json(&stdout, &stderr, code)
 }
 
 /// `open_library_window` — open the second app window hosting the vibe engine.
@@ -797,7 +991,7 @@ pub async fn library_embed_folder(
                 }
             }
             CommandEvent::Stderr(b) => {
-                // embed-folder prints diagnostics (client=direct, strategy, …)
+                // embed-folder prints diagnostics (embedder, strategy, ...)
                 // + [FATAL] errors to stderr — forward to the parent log.
                 let s = String::from_utf8_lossy(&b);
                 tracing::info!("[library embed-folder] {}", s.trim_end());
@@ -853,8 +1047,7 @@ mod tests {
 
     #[test]
     fn parses_ok_progress_line() {
-        let p = parse_embed_progress_line("[3/120] ok track.wav  ~€0.0123")
-            .expect("should parse");
+        let p = parse_embed_progress_line("[3/120] ok track.wav  ~€0.0123").expect("should parse");
         assert_eq!(p.n, 3);
         assert_eq!(p.total, 120);
         assert_eq!(p.status, "ok");
@@ -864,10 +1057,9 @@ mod tests {
 
     #[test]
     fn parses_progress_line_with_spaces_in_filename() {
-        let p = parse_embed_progress_line(
-            "[12/40] skip My Cool Track (Extended Mix).flac  ~€0.0000",
-        )
-        .expect("should parse");
+        let p =
+            parse_embed_progress_line("[12/40] skip My Cool Track (Extended Mix).flac  ~€0.0000")
+                .expect("should parse");
         assert_eq!(p.n, 12);
         assert_eq!(p.status, "skip");
         assert_eq!(p.filename, "My Cool Track (Extended Mix).flac");
@@ -876,8 +1068,8 @@ mod tests {
 
     #[test]
     fn parses_err_progress_line() {
-        let p = parse_embed_progress_line("[40/40] err broken.mp3  ~€0.0500")
-            .expect("should parse");
+        let p =
+            parse_embed_progress_line("[40/40] err broken.mp3  ~€0.0500").expect("should parse");
         assert_eq!(p.status, "err");
         assert_eq!(p.filename, "broken.mp3");
     }
@@ -998,7 +1190,7 @@ mod tests {
         // The Codex backend (`library curate --backend codex --json`) emits a
         // FLAT shape: `playlist_name` + `track_ids` at the top level (no nested
         // `playlist` object) — see CodexCurateResult.to_dict. The mapper must read
-        // both the Gemini-nested and Codex-flat shapes through one contract.
+        // both legacy nested and Codex-flat shapes through one contract.
         let raw = json!({
             "theme": "dark hypnotic peak-time",
             "stop_reason": "created",
@@ -1099,9 +1291,177 @@ mod tests {
     }
 
     #[test]
+    fn curate_result_uses_agent_error_as_visible_rationale() {
+        let raw = json!({
+            "theme": "warehouse",
+            "stop_reason": "codex_not_installed",
+            "playlist_name": null,
+            "track_ids": [],
+            "rationale": "",
+            "error": "Codex CLI not found. Install it and run codex login.",
+        });
+        let m = map_curate_result(&raw);
+        assert_eq!(m["stop_reason"], "codex_not_installed");
+        assert_eq!(
+            m["rationale"],
+            "Codex CLI not found. Install it and run codex login."
+        );
+        assert_eq!(m["count"], 0);
+    }
+
+    #[test]
+    fn app_agent_backend_is_pinned_to_codex() {
+        unsafe {
+            std::env::set_var("VIBEMIX_LIBRARY_AGENT_BACKEND", "gemini");
+        }
+        assert_eq!(library_agent_backend(), "codex");
+        unsafe {
+            std::env::remove_var("VIBEMIX_LIBRARY_AGENT_BACKEND");
+        }
+    }
+
+    #[test]
+    fn codex_shell_gate_only_fires_for_backend_arg() {
+        assert!(library_args_request_codex_backend(&[
+            "library",
+            "chat",
+            "hello",
+            "--backend",
+            "codex",
+            "--json",
+        ]));
+        assert!(library_args_request_codex_backend(&[
+            "library",
+            "build-set",
+            "brief",
+            "--backend",
+            "codex",
+            "--json",
+        ]));
+        assert!(!library_args_request_codex_backend(&[
+            "library",
+            "chat",
+            "codex",
+            "--backend",
+            "gemini",
+            "--json",
+        ]));
+        assert!(!library_args_request_codex_backend(&[
+            "library", "search", "codex",
+        ]));
+    }
+
+    #[test]
+    fn chat_library_args_pin_codex_json_and_history() {
+        let args = chat_library_args(
+            "Find 1 dark peak techno track.",
+            Some(r#"[{"role":"you","text":"first"}]"#),
+        );
+        assert_eq!(
+            args,
+            vec![
+                "library",
+                "chat",
+                "Find 1 dark peak techno track.",
+                "--backend",
+                "codex",
+                "--json",
+                "--history",
+                r#"[{"role":"you","text":"first"}]"#,
+            ]
+        );
+        let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        assert!(library_args_request_codex_backend(&refs));
+    }
+
+    #[test]
+    fn chat_library_args_omit_empty_history_flag() {
+        let args = chat_library_args("hello", None);
+        assert_eq!(
+            args,
+            vec!["library", "chat", "hello", "--backend", "codex", "--json"]
+        );
+        assert!(!args.iter().any(|arg| arg == "--history"));
+    }
+
+    #[test]
+    fn model_library_args_shape_status_install_and_force() {
+        assert_eq!(
+            model_library_args(None, false),
+            vec!["library", "models", "--json"]
+        );
+        assert_eq!(
+            model_library_args(Some("required"), false),
+            vec!["library", "models", "--json", "--install", "required"]
+        );
+        assert_eq!(
+            model_library_args(Some("cue"), true),
+            vec!["library", "models", "--json", "--install", "cue", "--force"]
+        );
+    }
+
+    #[test]
+    fn parse_model_progress_line_accepts_prefixed_json_only() {
+        let payload = parse_model_progress_line(
+            r#"VIBEMIX_MODEL_PROGRESS {"target":"required","id":"clap","n":2,"total":6,"status":"downloading","rel_path":"onnx/text_model.onnx","downloaded":1048576,"size":501513769}"#,
+        )
+        .expect("progress payload");
+
+        assert_eq!(payload["target"], "required");
+        assert_eq!(payload["id"], "clap");
+        assert_eq!(payload["n"], 2);
+        assert_eq!(payload["status"], "downloading");
+        assert!(parse_model_progress_line("plain stderr").is_none());
+    }
+
+    #[test]
+    fn model_install_target_normalizes_and_rejects_unknown() {
+        assert_eq!(normalize_model_install_target(None).unwrap(), None);
+        assert_eq!(
+            normalize_model_install_target(Some(" CLAP ".to_string())).unwrap(),
+            Some("clap".to_string())
+        );
+        assert_eq!(
+            normalize_model_install_target(Some(" required ".to_string())).unwrap(),
+            Some("required".to_string())
+        );
+        assert_eq!(
+            normalize_model_install_target(Some("all".to_string())).unwrap(),
+            Some("all".to_string())
+        );
+        assert_eq!(
+            normalize_model_install_target(Some("cue".to_string())).unwrap(),
+            Some("cue".to_string())
+        );
+        let err = normalize_model_install_target(Some("gpt".to_string()))
+            .expect_err("unknown target should fail");
+        assert!(err.contains("required | clap | cue | all"));
+    }
+
+    #[test]
     fn parse_cli_json_surfaces_stderr_error_on_failure() {
         let stderr = r#"{"error": "No library cache.", "results": []}"#;
         let err = parse_cli_json("", stderr, 1).expect_err("should be Err");
         assert_eq!(err, "No library cache.");
+    }
+
+    #[test]
+    fn parse_cli_json_returns_structured_agent_terminal_on_failure() {
+        let stderr = r#"{
+  "theme": "warehouse",
+  "stop_reason": "codex_not_installed",
+  "playlist_name": null,
+  "track_ids": [],
+  "rationale": "",
+  "error": "Codex CLI not found. Install it and run codex login."
+}
+[viber/codex] codex_not_installed: install Codex
+"#;
+        let payload = parse_cli_json("", stderr, 1).expect("agent terminal payload");
+        assert_eq!(payload["stop_reason"], "codex_not_installed");
+        assert_eq!(
+            payload["error"],
+            "Codex CLI not found. Install it and run codex login."
+        );
     }
 }

@@ -50,6 +50,7 @@ beforeEach(() => {
   _resetDrawerForTests();
   _resetSettingsUIStateForTests();
   _resetSessionStateForTests();
+  document.documentElement.removeAttribute("data-blur-perf");
   document.body.replaceChildren();
 });
 
@@ -57,10 +58,39 @@ afterEach(() => {
   _resetDrawerForTests();
   _resetSettingsUIStateForTests();
   _resetSessionStateForTests();
+  document.documentElement.removeAttribute("data-blur-perf");
   document.body.replaceChildren();
 });
 
 describe("Phase 12 — session + drawer integration", () => {
+  it("applies lighter-blur preference from settings.state without a boot request", () => {
+    applySettingsState({
+      voice: "kore",
+      mode: "hype",
+      genre: "techno",
+      output_device_id: null,
+      output_profile: "hp",
+      retention_days: 7,
+      push_to_mute_hotkey: "cmd+shift+m",
+      muted: false,
+      lighter_blur: true,
+    });
+    expect(document.documentElement.getAttribute("data-blur-perf")).toBe("on");
+
+    applySettingsState({
+      voice: "kore",
+      mode: "hype",
+      genre: "techno",
+      output_device_id: null,
+      output_profile: "hp",
+      retention_days: 7,
+      push_to_mute_hotkey: "cmd+shift+m",
+      muted: false,
+      lighter_blur: false,
+    });
+    expect(document.documentElement.getAttribute("data-blur-perf")).toBeNull();
+  });
+
   it("boots session → opens drawer → emits ipc.settings.set on rocker change → close preserves state", async () => {
     // 1. Mount the session layout.
     const host = document.createElement("div");

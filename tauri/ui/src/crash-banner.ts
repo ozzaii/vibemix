@@ -14,8 +14,7 @@
  * Rust shell is the single client.
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invokeTauri, listenTauri } from "./tauri-runtime.js";
 
 interface CrashPayload {
   restart_count: number;
@@ -52,7 +51,7 @@ export function reasonMessage(reason: string | undefined, fallback: string): str
       // speaks" cause: a bundled launch can't find its key). Mirror the
       // Python [FATAL] guidance so the UI gives the SAME actionable fix the
       // stderr banner does, instead of a generic "crashed" line.
-      return "vibemix needs a Gemini API key to talk. Add GEMINI_API_KEY to your .env (dev) or to ~/Library/Application Support/vibemix/.env (installed app), then restart.";
+      return "Live co-host direct mode needs a Gemini API key. Add GEMINI_API_KEY to your .env (dev) or to ~/Library/Application Support/vibemix/.env (installed app), then restart. Library search, chat, and set-building use local CLAP/Codex.";
     case "session-mount-failed":
       return fallback || "Session UI failed to mount.";
     case "ws-unreachable":
@@ -86,13 +85,13 @@ export function initCrashBanner(): void {
 
   bannerEls = { banner, errLine, restartBtn };
 
-  listen<CrashPayload>("sidecar-crashed", (event) => {
+  void listenTauri<CrashPayload>("sidecar-crashed", (event) => {
     const msg = reasonMessage(event.payload.reason, event.payload.last_error);
     errLine.textContent = msg;
     banner.hidden = false;
   });
 
-  listen<StatePayload>("sidecar-state", (event) => {
+  void listenTauri<StatePayload>("sidecar-state", (event) => {
     if (event.payload.state === "running") {
       banner.hidden = true;
     }
@@ -102,7 +101,7 @@ export function initCrashBanner(): void {
   // 127.0.0.1:8765 (ws_client.rs UNREACHABLE_AFTER). On "connected" the
   // sidecar is fine again · clear the banner unless a separate crash
   // event has set it for a different reason.
-  listen<string>("ws-state", (event) => {
+  void listenTauri<string>("ws-state", (event) => {
     if (event.payload === "unreachable") {
       errLine.textContent = reasonMessage("ws-unreachable", "");
       banner.hidden = false;
@@ -116,7 +115,7 @@ export function initCrashBanner(): void {
     const originalLabel = restartBtn.textContent ?? "[ Restart ]";
     restartBtn.textContent = "WORKING…";
     try {
-      await invoke("restart_sidecar");
+      await invokeTauri("restart_sidecar");
     } catch (err) {
       errLine.textContent = `restart failed: ${err}`;
     } finally {

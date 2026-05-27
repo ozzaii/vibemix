@@ -28,8 +28,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::ShellExt;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AudioConfigResult {
@@ -72,7 +72,10 @@ fn companion_dir(app: &AppHandle) -> Result<PathBuf, String> {
             return Ok(dev_path);
         }
     }
-    Err(format!("installer/companion not found at {}", candidate.display()))
+    Err(format!(
+        "installer/companion not found at {}",
+        candidate.display()
+    ))
 }
 
 /// Spawn the platform-appropriate companion fetch script.
@@ -81,10 +84,7 @@ fn companion_dir(app: &AppHandle) -> Result<PathBuf, String> {
 /// (Plan 49-03 step-driver-fetch.ts subscribes). Returns the final
 /// stdout JSON line as a String.
 #[tauri::command]
-pub async fn run_companion_fetch(
-    app: AppHandle,
-    dry_run: bool,
-) -> Result<String, String> {
+pub async fn run_companion_fetch(app: AppHandle, dry_run: bool) -> Result<String, String> {
     let companion = companion_dir(&app)?;
     let (program, args, script_path): (&str, Vec<String>, PathBuf) = if cfg!(target_os = "macos") {
         let script = companion.join("fetch_drivers.sh");
@@ -115,7 +115,10 @@ pub async fn run_companion_fetch(
     };
 
     if !script_path.exists() {
-        return Err(format!("companion script missing at {}", script_path.display()));
+        return Err(format!(
+            "companion script missing at {}",
+            script_path.display()
+        ));
     }
 
     let shell = app.shell();
@@ -131,8 +134,8 @@ pub async fn run_companion_fetch(
             CommandEvent::Stdout(bytes) => {
                 let line = String::from_utf8_lossy(&bytes).to_string();
                 // Emit each line for the wizard to consume.
-                let payload: serde_json::Value =
-                    serde_json::from_str(&line).unwrap_or_else(|_| serde_json::json!({ "raw": line.clone() }));
+                let payload: serde_json::Value = serde_json::from_str(&line)
+                    .unwrap_or_else(|_| serde_json::json!({ "raw": line.clone() }));
                 let _ = app.emit("companion.fetch.progress", payload);
                 final_line = line;
             }
@@ -158,10 +161,7 @@ pub async fn run_companion_fetch(
 
 /// Invoke audio_config.py with a single action flag.
 #[tauri::command]
-pub async fn run_audio_config(
-    app: AppHandle,
-    action: String,
-) -> Result<AudioConfigResult, String> {
+pub async fn run_audio_config(app: AppHandle, action: String) -> Result<AudioConfigResult, String> {
     let companion = companion_dir(&app)?;
     let script = companion.join("audio_config.py");
     if !script.exists() {
@@ -188,10 +188,7 @@ pub async fn run_audio_config(
 
 /// Open the OS-native audio settings panel.
 #[tauri::command]
-pub async fn open_audio_settings(
-    app: AppHandle,
-    platform: String,
-) -> Result<(), String> {
+pub async fn open_audio_settings(app: AppHandle, platform: String) -> Result<(), String> {
     let shell = app.shell();
     match platform.as_str() {
         "darwin" => {

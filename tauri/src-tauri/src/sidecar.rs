@@ -20,11 +20,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use file_rotate::{
-    compression::Compression,
-    suffix::AppendCount,
-    ContentLimit, FileRotate,
-};
+use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
@@ -35,11 +31,24 @@ const MAX_RESTARTS: u32 = 3;
 
 /// Environment keys the watchdog relays from the Tauri parent process to the
 /// spawned sidecar, IF present and non-empty (RELEASE-AUTH). SECURITY: this is
-/// an env *relay* — no key is ever embedded in the binary. The bundled
-/// distribution answer is the Bravoh proxy (VIBEMIX_LLM_MODE=proxy), which
-/// needs no key; this relay only helps the local/dev "BYO key" path so a key
-/// exported in the launching environment reaches the child.
-pub(crate) const FORWARDED_ENV_KEYS: [&str; 2] = ["GEMINI_API_KEY", "OPENROUTER_API_KEY"];
+/// an env *relay* — no key/token is ever embedded in the binary. The bundled
+/// distribution answer is the Bravoh proxy, but local/dev users may launch the
+/// Tauri shell with BYO direct/proxy credentials. Library one-shot commands
+/// share this relay for auth and Codex home/binary discovery; the
+/// Library/Viber reasoning backend is pinned to local Codex by the bridge.
+pub(crate) const FORWARDED_ENV_KEYS: [&str; 11] = [
+    "VIBEMIX_LLM_MODE",
+    "GEMINI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "VIBEMIX_PROXY_JWT",
+    "VIBEMIX_PROXY_BASE_URL",
+    "VIBEMIX_CLIENT_VERSION",
+    "CODEX_HOME",
+    "VIBEMIX_CODEX_BIN",
+    "CODEX_BIN",
+    "VIBEMIX_NODE_BIN",
+    "NODE_BIN",
+];
 
 /// Target triple of the bundled sidecar. Matches the per-triple directory
 /// name produced by scripts/build_sidecar.py.
@@ -154,8 +163,9 @@ pub async fn spawn_sidecar_with_watchdog(
                 //    adjacent .env. (The Python loader also probes
                 //    app_data_dir()/.env — the supported per-user key drop.)
                 //
-                // 2. API keys — forward GEMINI_API_KEY / OPENROUTER_API_KEY
-                //    from the Tauri parent env to the child WHEN PRESENT.
+                // 2. Runtime auth/mode — forward VIBEMIX_LLM_MODE plus
+                //    GEMINI_API_KEY / OPENROUTER_API_KEY from the Tauri
+                //    parent env to the child WHEN PRESENT.
                 //    SECURITY (CLAUDE.md): no key is embedded here — we only
                 //    relay a key that already exists in the environment (e.g.
                 //    `GEMINI_API_KEY=… open vibemix.app`, or a launchd plist).
@@ -183,12 +193,9 @@ pub async fn spawn_sidecar_with_watchdog(
                 // load_dotenv() finds the repo .env. args already include
                 // --wizard when set. We ALSO forward GEMINI_API_KEY /
                 // OPENROUTER_API_KEY if they happen to be in the dev shell's
-                // env, so a key exported in the terminal wins even if the
+                // env, so mode/auth exported in the terminal wins even if the
                 // repo .env is absent (no key embedded — env relay only).
-                let mut c = app.shell()
-                    .command(&program)
-                    .args(&args)
-                    .current_dir(&cwd);
+                let mut c = app.shell().command(&program).args(&args).current_dir(&cwd);
                 for key in FORWARDED_ENV_KEYS {
                     if let Ok(val) = std::env::var(key) {
                         if !val.is_empty() {
@@ -419,21 +426,20 @@ fn repo_root_from_manifest() -> PathBuf {
         .unwrap_or(manifest)
 }
 
-/// Resolve how to launch the `vibemix` CLI for a ONE-SHOT library subcommand
-/// (search / similar / embed-folder / budget).
+/// Resolve how to launch the `vibemix` CLI for a ONE-SHOT app command.
 ///
 /// This reuses the SAME dev-vs-bundled decision as the sidecar watchdog
-/// (`resolve_sidecar_invocation`) with `wizard_mode = false` — the library
-/// bridge never runs the wizard. The landmine-safe rule is preserved: the
+/// (`resolve_sidecar_invocation`) with `wizard_mode = false` — one-shot
+/// commands never run the wizard. The landmine-safe rule is preserved: the
 /// bundled path (`resource_dir()`) is ONLY resolved on the Bundled arm, so a
 /// `cargo tauri dev` run (where `resource_dir()` points at a non-existent
 /// bundle) never touches it.
 ///
-/// `library_cmds.rs` consumes the returned `SidecarInvocation` to construct
-/// the actual command, then appends the `library <sub> …` args + relays the
-/// `FORWARDED_ENV_KEYS`. Sharing this decision point means the dev/release
-/// split has exactly one home (this file), matching the watchdog.
-pub(crate) fn resolve_sidecar_invocation_for_library(
+/// Callers consume the returned `SidecarInvocation` to construct the actual
+/// command, then append their subcommand args + relay the `FORWARDED_ENV_KEYS`.
+/// Sharing this decision point means the dev/release split has exactly one
+/// home (this file), matching the watchdog.
+pub(crate) fn resolve_sidecar_invocation_for_command(
     app: &AppHandle,
 ) -> Result<SidecarInvocation, String> {
     let bundled = if std::env::var("VIBEMIX_DEV_SIDECAR").as_deref() == Ok("1") {
@@ -451,13 +457,21 @@ pub(crate) fn resolve_sidecar_invocation_for_library(
     ))
 }
 
+/// Back-compat alias for the library bridge.
+pub(crate) fn resolve_sidecar_invocation_for_library(
+    app: &AppHandle,
+) -> Result<SidecarInvocation, String> {
+    resolve_sidecar_invocation_for_command(app)
+}
+
 /// Resolve the bundled sidecar binary path inside the .app/.exe.
 ///
-/// Tauri's `bundle.resources` puts each pattern's match under
-/// Contents/Resources/<relative-path> (macOS) or resources/<relative-path>
-/// (Windows), preserving the directory structure. The sidecar's
-/// PyInstaller --onedir tree is therefore at:
-///     Contents/Resources/binaries/vibemix-core-<triple>/
+/// Tauri's `bundle.resources` preserves the relative directory structure under
+/// Contents/Resources (macOS). On Windows, `resource_dir()` resolves to the
+/// executable directory, so the installer stages the same `binaries/...` tree
+/// next to `vibemix.exe`. The sidecar's PyInstaller --onedir tree is therefore
+/// at:
+///     <resource_dir>/binaries/vibemix-core-<triple>/
 /// with the inner binary at:
 ///     vibemix-core-<triple>/vibemix-core-<triple>[.exe]
 /// next to its _internal/ tree (which the PyInstaller bootloader needs).
@@ -466,7 +480,11 @@ fn resolve_sidecar_path(app: &AppHandle) -> Result<PathBuf, String> {
         .path()
         .resource_dir()
         .map_err(|e| format!("resource_dir() failed: {e}"))?;
-    let exe_suffix = if cfg!(target_os = "windows") { ".exe" } else { "" };
+    let exe_suffix = if cfg!(target_os = "windows") {
+        ".exe"
+    } else {
+        ""
+    };
     let triple = sidecar_triple();
     let bin_name = format!("vibemix-core-{triple}{exe_suffix}");
     let path = resource_dir
@@ -555,7 +573,11 @@ mod tests {
         let mut f = NamedTempFile::new().unwrap();
         writeln!(f, "-> wizard boot").unwrap();
         writeln!(f, "[FATAL] ws_bus port bind failed on 127.0.0.1:8765").unwrap();
-        writeln!(f, "[FATAL] another vibemix process is already running; quit it before relaunching.").unwrap();
+        writeln!(
+            f,
+            "[FATAL] another vibemix process is already running; quit it before relaunching."
+        )
+        .unwrap();
         writeln!(f, "asyncio cleanup task <Task pending name='Task-3'>").unwrap();
         writeln!(f, "  done").unwrap();
         f.flush().unwrap();
@@ -616,8 +638,7 @@ mod tests {
         let env = fake_env(&[("VIBEMIX_DEV_SIDECAR", "1")]);
         let manifest_parent = std::path::Path::new("/repo");
 
-        let inv =
-            resolve_sidecar_invocation(None, false, manifest_parent, &env);
+        let inv = resolve_sidecar_invocation(None, false, manifest_parent, &env);
         match inv {
             SidecarInvocation::DevSource { program, args, cwd } => {
                 assert_eq!(program, "uv");
@@ -641,8 +662,7 @@ mod tests {
         ]);
         let manifest_parent = std::path::Path::new("/repo");
 
-        let inv =
-            resolve_sidecar_invocation(None, false, manifest_parent, &env);
+        let inv = resolve_sidecar_invocation(None, false, manifest_parent, &env);
         match inv {
             SidecarInvocation::DevSource { program, args, .. } => {
                 assert_eq!(program, "/path/python3");
@@ -662,8 +682,7 @@ mod tests {
         ]);
         let manifest_parent = std::path::Path::new("/repo");
 
-        let inv =
-            resolve_sidecar_invocation(None, false, manifest_parent, &env);
+        let inv = resolve_sidecar_invocation(None, false, manifest_parent, &env);
         match inv {
             SidecarInvocation::DevSource { cwd, .. } => {
                 assert_eq!(cwd, PathBuf::from("/elsewhere/dj-set-ai"));
@@ -693,22 +712,34 @@ mod tests {
         // helper still returns plain Bundled(path).
         let bundled = PathBuf::from("/app/vibemix-core");
         let rel_env = fake_env(&[]);
-        let rel = resolve_sidecar_invocation(
-            Some(bundled.clone()),
-            true,
-            manifest_parent,
-            &rel_env,
-        );
+        let rel =
+            resolve_sidecar_invocation(Some(bundled.clone()), true, manifest_parent, &rel_env);
         assert_eq!(rel, SidecarInvocation::Bundled(bundled));
     }
 
     #[test]
-    fn forwarded_env_keys_relay_gemini_and_openrouter() {
-        // RELEASE-AUTH: the watchdog relays exactly these two keys from the
-        // parent env to the spawned sidecar. Pin the set so a regression that
-        // drops GEMINI_API_KEY (the "co-host never speaks" cause) is forced to
-        // update this test. SECURITY: relay only — never an embedded value.
-        assert_eq!(FORWARDED_ENV_KEYS, ["GEMINI_API_KEY", "OPENROUTER_API_KEY"]);
+    fn forwarded_env_keys_relay_runtime_auth_and_codex_setup() {
+        // RELEASE-AUTH: the watchdog relays only parent-provided runtime auth
+        // and Codex home setup to the spawned sidecar. Pin the set so dropping
+        // direct/proxy keys breaks loudly. The Library Viber backend selector is
+        // intentionally absent: the desktop product path is local Codex.
+        // SECURITY: relay only — never an embedded value.
+        assert_eq!(
+            FORWARDED_ENV_KEYS,
+            [
+                "VIBEMIX_LLM_MODE",
+                "GEMINI_API_KEY",
+                "OPENROUTER_API_KEY",
+                "VIBEMIX_PROXY_JWT",
+                "VIBEMIX_PROXY_BASE_URL",
+                "VIBEMIX_CLIENT_VERSION",
+                "CODEX_HOME",
+                "VIBEMIX_CODEX_BIN",
+                "CODEX_BIN",
+                "VIBEMIX_NODE_BIN",
+                "NODE_BIN",
+            ]
+        );
     }
 
     #[test]

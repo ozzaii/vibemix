@@ -25,16 +25,17 @@
  * LEDs (status is silk-dim when fine, red only on a dropped input).
  *
  * The SessionState prop shape is the render-loop projection contract and is
- * UNCHANGED by this rebuild (one optional addition: cohost.onMute). Components
- * are presentation-only — NO IPC, NO timers, NO state.
+ * UNCHANGED by this rebuild except optional action callbacks. Components are
+ * presentation-only — NO IPC, NO timers, NO state.
  */
 
 import { registerStyle } from "./components/_style-registry.js";
 import { renderTitlebar, setTitlebarClock, setTitlebarPill, type PillLevel } from "./components/titlebar.js";
 import { GROUNDING_FAILURE_MS, type CohostStatus, type ReactionsByTs, type TranscriptLine } from "./components/cohost.js";
 import type { CitationChip } from "./components/citation-strip.js";
-import type { PhaseChunk } from "./components/phase-tape.js";
-import type { MidiEvent } from "./components/event-ribbon.js";
+import { renderPhaseTape, setPhaseTape, type PhaseChunk } from "./components/phase-tape.js";
+import { renderEventRibbon, setEventRibbon, type MidiEvent } from "./components/event-ribbon.js";
+import { renderDropChip } from "./components/drop-chip.js";
 import type { BadgeState } from "./components/status-bar.js";
 
 export interface SessionState {
@@ -83,11 +84,15 @@ export interface SessionState {
      *  Omitted (dev mock) → the mute control renders but is a no-op. */
     onMute?: () => void;
   };
+  actions: {
+    /** Open the Library/Viber chat + set-building window. */
+    onOpenVibeEngine?: () => void;
+  };
   status: {
     livekit: BadgeState;
     gemini: "ok" | "down" | null;
     midi: number | null;
-    screen: "ok" | "denied" | null;
+    screen: "ok" | "denied" | "unavailable" | null;
     muted: boolean;
     hotkey: string;
     errors?: Partial<Record<"livekit" | "gemini" | "midi" | "screen", string>>;
@@ -115,12 +120,21 @@ export interface Mounted {
   /** Rail persona button (tap-to-cycle mood). */
   persona: HTMLElement;
   personaValue: HTMLElement;
+  vibeEngineButton: HTMLElement;
+  muteButton: HTMLElement;
+  deckTitle: HTMLElement;
+  deckMeta: HTMLElement;
+  deckConfig: HTMLElement;
   /** Cross-fade liveness labels (always mounted; opacity toggled by mode). */
   liveFault: HTMLElement;
   ghosts: [HTMLElement, HTMLElement];
   now: HTMLElement;
   receipt: HTMLElement;
   cite: HTMLElement;
+  signalState: HTMLElement;
+  dropSlot: HTMLElement;
+  phaseTape: HTMLElement;
+  eventRibbon: HTMLElement;
   bpm: HTMLElement;
   key: HTMLElement;
   meterFill: HTMLElement;
@@ -141,6 +155,7 @@ export interface Mounted {
   lastNowTs: string | null;
   /** Chip click handler currently bound on the cite (re-bound on change). */
   citeChip: CitationChip | null;
+  dropKey: string;
 }
 
 // Calm idle hero line shown in silent mode before the co-host's first reaction
@@ -158,17 +173,84 @@ const LAYOUT_CSS = `
     height: 100vh;
     position: relative;
     overflow: hidden;
+    background-color: var(--void);
+    background:
+      radial-gradient(88% 72% at 18% 95%, rgba(255, 138, 61, 0.062), transparent 56%),
+      radial-gradient(62% 58% at 100% 18%, rgba(72, 152, 255, 0.032), transparent 60%),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.022), transparent 22%),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 28px),
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.008) 0 1px, transparent 1px 22px),
+      var(--void);
+  }
+  .vmx-session::before,
+  .vmx-session::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .vmx-session::before {
+    inset: var(--titlebar-h) 0 var(--statusbar-h);
+    background:
+      linear-gradient(90deg, rgba(255, 138, 61, 0.046), transparent 20%, transparent 80%, rgba(72, 152, 255, 0.024)),
+      linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.38) 72%, rgba(0, 0, 0, 0.66));
+    opacity: 0.92;
+  }
+  .vmx-session::after {
+    left: clamp(22px, 5vw, 76px);
+    right: clamp(22px, 5vw, 76px);
+    bottom: calc(var(--statusbar-h) + 18px);
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--amber-22), var(--silk-22), transparent);
+    box-shadow: 0 0 22px var(--amber-22);
+    opacity: 0.58;
   }
 
   /* === THE DECK — no card. Open void. Hero anchored low (mixer LCD). ==== */
-  .vmx-stage { display: grid; place-items: stretch; min-height: 0; position: relative; }
+  .vmx-stage { display: grid; place-items: stretch; min-height: 0; position: relative; z-index: 1; }
   .vmx-deck {
     position: relative;
     display: grid;
     grid-template-rows: auto 1fr auto;
     min-height: 0;
-    padding: 0 clamp(24px, 6vw, 96px);
+    padding: clamp(18px, 2.4vw, 32px) clamp(22px, 5vw, 76px);
   }
+  .vmx-deck::before,
+  .vmx-deck::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+  }
+  .vmx-deck::before {
+    inset: clamp(12px, 1.8vw, 22px) clamp(14px, 3.8vw, 62px);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-md);
+    background:
+      radial-gradient(circle at 16px 16px, rgba(255, 251, 244, 0.082) 0 1px, rgba(0, 0, 0, 0.42) 1px 4px, transparent 5px),
+      radial-gradient(circle at calc(100% - 16px) 16px, rgba(255, 251, 244, 0.060) 0 1px, rgba(0, 0, 0, 0.42) 1px 4px, transparent 5px),
+      radial-gradient(circle at 16px calc(100% - 16px), rgba(255, 251, 244, 0.052) 0 1px, rgba(0, 0, 0, 0.45) 1px 4px, transparent 5px),
+      radial-gradient(circle at calc(100% - 16px) calc(100% - 16px), rgba(255, 251, 244, 0.050) 0 1px, rgba(0, 0, 0, 0.45) 1px 4px, transparent 5px),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.030), transparent 16%, transparent 80%, rgba(0, 0, 0, 0.32)),
+      linear-gradient(90deg, rgba(255, 138, 61, 0.034), transparent 18%, transparent 84%, rgba(72, 152, 255, 0.018)),
+      rgba(4, 5, 9, 0.56);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.050),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.72),
+      inset 0 22px 48px rgba(255, 251, 244, 0.008),
+      inset 0 -36px 68px rgba(0, 0, 0, 0.34),
+      0 24px 76px -54px rgba(0, 0, 0, 0.98);
+    opacity: 0.98;
+  }
+  .vmx-deck::after {
+    inset: calc(clamp(12px, 1.8vw, 22px) + 1px) calc(clamp(14px, 3.8vw, 62px) + 1px);
+    border-radius: var(--rad-md);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 35px, rgba(214, 207, 199, 0.016) 35px 36px),
+      repeating-linear-gradient(0deg, transparent 0 28px, rgba(214, 207, 199, 0.010) 28px 29px);
+    opacity: 0.42;
+    mix-blend-mode: screen;
+  }
+  .vmx-deck > * { position: relative; z-index: 1; }
 
   /* --- top rail: persona (tap-to-cycle) · controls · liveness label --- */
   .vmx-deck__rail {
@@ -176,17 +258,47 @@ const LAYOUT_CSS = `
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-4);
-    padding: var(--sp-5) 0 var(--sp-4);
-    border-bottom: 1px solid var(--glass-edge);
+    margin: 0 clamp(0px, 1.2vw, 18px);
+    padding: 10px 12px;
+    min-height: 64px;
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.026), transparent 46%, rgba(0, 0, 0, 0.26)),
+      rgba(0, 0, 0, 0.24);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.034),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.70),
+      0 1px 0 rgba(0, 0, 0, 0.62);
+    min-width: 0;
   }
   .vmx-persona {
     appearance: none; -webkit-appearance: none;
     display: flex; align-items: baseline; gap: var(--sp-3);
-    border: 0; background: none; margin: 0; padding: 2px 0;
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.020), rgba(0, 0, 0, 0.18)),
+      rgba(0, 0, 0, 0.18);
+    margin: 0;
+    padding: 8px 10px;
+    min-width: 128px;
     cursor: pointer;
-    transition: opacity 150ms ease-out;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.028),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.64);
+    transition: opacity 150ms ease-out, border-color 150ms ease-out, box-shadow 150ms ease-out;
   }
-  .vmx-persona:hover { opacity: 0.82; }
+  .vmx-persona:hover {
+    opacity: 0.92;
+    border-color: var(--glass-edge-up);
+  }
+  .vmx-persona:active {
+    transform: translateY(1px);
+    box-shadow:
+      inset 0 2px 5px rgba(0, 0, 0, 0.62),
+      inset 0 1px 0 rgba(255, 251, 244, 0.016);
+  }
   .vmx-persona:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: var(--rad-sm); }
   .vmx-persona__k {
     font-family: var(--type-display);
@@ -199,10 +311,92 @@ const LAYOUT_CSS = `
     font-variation-settings: 'wdth' 85, 'wght' 700;
     font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--silk-65);
+    transition: color var(--motion-transition) ease-out, text-shadow var(--motion-transition) ease-out;
+  }
+  .vmx-persona[data-mood="HYPE"] .vmx-persona__v,
+  .vmx-persona[data-mood="TEACH"] .vmx-persona__v,
+  .vmx-persona[data-mood="COACH"] .vmx-persona__v {
+    color: var(--amber-pale);
+    text-shadow: 0 0 7px var(--amber-22);
+  }
+  .vmx-nowplaying {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 9px var(--sp-4) 8px;
+    text-align: center;
+    opacity: 0.88;
+    border: 1px solid rgba(214, 207, 199, 0.070);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, 0.52), rgba(255, 251, 244, 0.010) 52%, rgba(0, 0, 0, 0.48)),
+      rgba(0, 0, 0, 0.28);
+    box-shadow:
+      inset 0 2px 8px rgba(0, 0, 0, 0.72),
+      inset 0 1px 0 rgba(255, 251, 244, 0.022),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.72);
+    transition: opacity var(--motion-transition) ease-out, border-color var(--motion-transition) ease-out;
+  }
+  .vmx-deck:hover .vmx-nowplaying,
+  .vmx-deck:focus-within .vmx-nowplaying {
+    opacity: 1;
+    border-color: var(--glass-edge-up);
+  }
+  .vmx-nowplaying__eyebrow {
+    font-family: var(--type-mono);
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--silk-22);
+    line-height: 1;
+  }
+  .vmx-nowplaying__title {
+    max-width: min(42vw, 520px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--type-display);
+    font-variation-settings: 'wdth' 88, 'wght' 650;
+    font-size: 16px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--silk);
+    line-height: 1.1;
+    text-shadow: 0 0 10px rgba(255, 138, 61, 0.10);
+  }
+  .vmx-nowplaying__meta {
+    max-width: min(38vw, 480px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--silk-40);
+    line-height: 1.1;
+  }
+  .vmx-nowplaying__config {
+    max-width: min(48vw, 620px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--type-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--silk-65);
+    line-height: 1.1;
+  }
+  .vmx-nowplaying__config b {
+    color: var(--amber-pale);
+    font-weight: 500;
   }
   /* persistent low-ink at rest (reachable mid-set), full on hover/focus.
    * Real mute also bound to the push-to-mute hotkey (session-shortcuts.ts). */
-  .vmx-deck__controls { display: flex; gap: var(--sp-2); opacity: 0.32; transition: opacity 180ms ease-out; }
+  .vmx-deck__controls { display: flex; gap: var(--sp-2); opacity: 0.58; transition: opacity 180ms ease-out; }
   .vmx-deck:hover .vmx-deck__controls, .vmx-deck:focus-within .vmx-deck__controls { opacity: 1; }
   .vmx-deck__controls button {
     font-family: var(--type-display);
@@ -210,11 +404,56 @@ const LAYOUT_CSS = `
     font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
     color: var(--silk-40);
     border: 1px solid var(--glass-edge); border-radius: var(--rad-sm);
-    padding: 5px 12px; background: rgba(2, 3, 6, 0.4);
-    transition: color var(--motion-step) ease-out, border-color var(--motion-step) ease-out;
+    padding: 6px 13px;
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.024), rgba(0, 0, 0, 0.20)),
+      rgba(2, 3, 6, 0.58);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.040),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.68),
+      0 1px 0 rgba(0, 0, 0, 0.68);
+    white-space: nowrap; cursor: pointer;
+    transition: color var(--motion-step) ease-out, border-color var(--motion-step) ease-out, box-shadow var(--motion-step) ease-out, background var(--motion-step) ease-out;
   }
-  .vmx-deck__controls button:hover { color: var(--silk); border-color: var(--glass-edge-up); }
-  .vmx-deck__controls button[data-on="true"] { color: var(--amber); border-color: var(--amber-40); }
+  .vmx-deck__controls button:active {
+    transform: translateY(1px);
+    box-shadow:
+      inset 0 2px 5px rgba(0, 0, 0, 0.62),
+      inset 0 1px 0 rgba(255, 251, 244, 0.016);
+  }
+  .vmx-deck__controls button:hover {
+    color: var(--silk);
+    border-color: var(--glass-edge-up);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.038),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.70);
+  }
+  .vmx-deck__controls button[data-on="true"] {
+    color: var(--amber-pale);
+    border-color: var(--amber-40);
+    background:
+      linear-gradient(180deg, rgba(255, 138, 61, 0.11), rgba(255, 138, 61, 0.025) 58%, rgba(0, 0, 0, 0.22)),
+      rgba(2, 3, 6, 0.66);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.040),
+      inset 0 -1px 0 var(--amber-22),
+      inset 0 0 14px rgba(255, 138, 61, 0.10);
+  }
+  .vmx-deck__controls button[data-primary="true"] {
+    color: var(--amber-pale);
+    border-color: var(--amber-22);
+    background:
+      linear-gradient(180deg, rgba(255, 138, 61, 0.075), rgba(255, 138, 61, 0.018) 58%, rgba(0, 0, 0, 0.22)),
+      rgba(2, 3, 6, 0.62);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.034),
+      inset 0 -1px 0 rgba(255, 138, 61, 0.16),
+      inset 0 0 12px rgba(255, 138, 61, 0.060);
+  }
+  .vmx-deck__controls button[data-primary="true"]:hover {
+    color: var(--amber);
+    border-color: var(--amber-40);
+  }
   .vmx-live { position: relative; min-width: 168px; height: 1.2em; text-align: right; }
   .vmx-live__s {
     position: absolute; right: 0; top: 0; white-space: nowrap; opacity: 0;
@@ -240,25 +479,301 @@ const LAYOUT_CSS = `
 
   /* --- THE HERO: the co-host speaks, anchored low on void --- */
   .vmx-deck__speak {
-    display: flex; flex-direction: column; justify-content: flex-end;
-    gap: var(--sp-3); min-height: 0; padding: var(--sp-7) 0 var(--sp-6);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(348px, 0.54fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+    gap: clamp(14px, 2vw, 24px);
+    min-height: 0;
+    padding: clamp(16px, 3vh, 26px) clamp(0px, 1.2vw, 18px);
+  }
+  .vmx-voice {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: var(--sp-3);
+    min-width: 0;
+    width: auto;
+    min-height: 0;
+    padding: clamp(24px, 4vw, 48px);
+    border: 1px solid rgba(214, 207, 199, 0.075);
+    border-radius: var(--rad-sm);
+    background:
+      radial-gradient(76% 80% at 16% 100%, rgba(255, 138, 61, 0.055), transparent 58%),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 28%, rgba(0, 0, 0, 0.30)),
+      rgba(0, 0, 0, 0.23);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.034),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.72),
+      inset 0 0 42px rgba(0, 0, 0, 0.28),
+      0 1px 0 rgba(0, 0, 0, 0.70);
+    overflow: hidden;
+  }
+  .vmx-voice::before {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border: 1px solid rgba(214, 207, 199, 0.035);
+    border-radius: var(--rad-sm);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 42px, rgba(214, 207, 199, 0.010) 42px 43px),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 20%);
+    pointer-events: none;
+  }
+  .vmx-voice::after {
+    content: "";
+    position: absolute;
+    top: 22px;
+    right: 24px;
+    bottom: 22px;
+    width: min(34%, 280px);
+    background:
+      radial-gradient(circle, rgba(214, 207, 199, 0.070) 0 1px, transparent 1px 11px),
+      linear-gradient(90deg, transparent, rgba(72, 152, 255, 0.018));
+    opacity: 0.22;
+    -webkit-mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.88) 28%, rgba(0, 0, 0, 0.42));
+    mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.88) 28%, rgba(0, 0, 0, 0.42));
+    pointer-events: none;
+  }
+  .vmx-voice > * {
+    position: relative;
+    z-index: 1;
+  }
+  .vmx-signal {
+    position: relative;
+    align-self: stretch;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(112px, 1fr) minmax(78px, auto);
+    column-gap: 0;
+    row-gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    background:
+      radial-gradient(circle at 12px 12px, rgba(255, 251, 244, 0.070) 0 1px, rgba(0, 0, 0, 0.40) 1px 4px, transparent 5px),
+      radial-gradient(circle at calc(100% - 12px) 12px, rgba(255, 251, 244, 0.052) 0 1px, rgba(0, 0, 0, 0.40) 1px 4px, transparent 5px),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.026), transparent 30%, rgba(0, 0, 0, 0.28)),
+      linear-gradient(90deg, rgba(255, 138, 61, 0.028), transparent 46%, rgba(72, 152, 255, 0.016)),
+      rgba(0, 0, 0, 0.18);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.034),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.70),
+      inset 0 12px 24px rgba(255, 251, 244, 0.006),
+      inset 0 -24px 36px rgba(0, 0, 0, 0.28),
+      0 1px 0 rgba(0, 0, 0, 0.68);
+    opacity: 0.96;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .vmx-signal::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, var(--amber-22), transparent 42%, transparent 72%, var(--silk-12));
+    pointer-events: none;
+  }
+  .vmx-signal::after {
+    content: "";
+    position: absolute;
+    inset: auto 14px 10px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(72, 152, 255, 0.12), var(--amber-22), transparent);
+    opacity: 0.52;
+    pointer-events: none;
+  }
+  .vmx-signal__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    font-family: var(--type-display);
+    font-variation-settings: 'wdth' 85, 'wght' 600;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--silk-40);
+  }
+  .vmx-signal__header b {
+    color: var(--silk-65);
+    font-weight: 600;
+  }
+  .vmx-signal__drop {
+    min-height: 64px;
+    display: flex;
+    align-items: center;
+    padding: 0 0 10px;
+    border-right: 0;
+    border-bottom: 1px solid var(--glass-edge);
+    background:
+      linear-gradient(90deg, rgba(255, 138, 61, 0.025), transparent 72%),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.012), transparent 52%);
+  }
+  .vmx-signal__drop:empty::before {
+    content: "drop idle";
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--silk-22);
+    padding: 10px 0;
+  }
+  .vmx-signal .vmx-drop-chip {
+    margin-top: 0;
+    width: 100%;
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.018), transparent 42%),
+      rgba(0, 0, 0, 0.20);
+    border-color: var(--glass-edge);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.038),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.60),
+      inset 0 0 14px rgba(255, 138, 61, 0.045),
+      0 1px 0 rgba(0, 0, 0, 0.66);
+    padding: 8px 10px;
+  }
+  .vmx-signal .vmx-drop-chip__count {
+    font-size: 30px;
+  }
+  .vmx-signal .vmx-drop-chip__lbl {
+    color: var(--silk-40);
+  }
+  .vmx-signal .vmx-phase-tape {
+    margin: 0;
+    min-height: 112px;
+    height: 100%;
+    border: 1px solid rgba(214, 207, 199, 0.070);
+    border-radius: var(--rad-sm);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 17px, rgba(255, 251, 244, 0.006) 17px 18px),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 34%, rgba(0, 0, 0, 0.20)),
+      rgba(0, 0, 0, 0.16);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.030),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.62),
+      inset 0 0 16px rgba(0, 0, 0, 0.30),
+      0 1px 0 rgba(0, 0, 0, 0.60);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 24px 12px 10px;
+  }
+  .vmx-signal .vmx-phase-tape__row {
+    gap: 2px;
+    min-width: 0;
+  }
+  .vmx-signal .vmx-phase-tape::before {
+    background: transparent;
+    border-bottom-color: var(--glass-edge);
+  }
+  .vmx-signal .vmx-phase-tape::after {
+    opacity: 0.45;
+  }
+  .vmx-signal .vmx-phase-chunk {
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    min-width: 0;
+    background-color: rgba(0, 0, 0, 0.18);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.026),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.52),
+      0 1px 0 rgba(0, 0, 0, 0.58);
+  }
+  .vmx-signal .vmx-phase-chunk[data-kind="groove"] {
+    color: var(--silk-40);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.020), transparent 72%),
+      rgba(0, 0, 0, 0.20);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.026),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.52),
+      inset 0 0 0 1px var(--silk-12),
+      0 1px 0 rgba(0, 0, 0, 0.58);
+  }
+  .vmx-signal .vmx-phase-chunk[data-kind="build"] {
+    background:
+      repeating-linear-gradient(45deg, rgba(255, 138, 61, 0.12) 0 7px, rgba(255, 138, 61, 0.20) 7px 14px),
+      linear-gradient(180deg, rgba(255, 138, 61, 0.055), rgba(255, 138, 61, 0.020));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.054),
+      inset 0 -2px 0 rgba(255, 138, 61, 0.20),
+      inset 0 0 0 1px var(--amber-22),
+      inset 0 0 10px rgba(255, 138, 61, 0.12),
+      0 1px 0 rgba(0, 0, 0, 0.62);
+  }
+  .vmx-signal .vmx-phase-chunk[data-kind="build"]::after {
+    opacity: 0.72;
+    right: 5px;
+  }
+  .vmx-signal .vmx-phase-chunk[data-kind="drop-ghost"] {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    border-color: var(--amber-22);
+    background: rgba(255, 138, 61, 0.025);
+  }
+  .vmx-signal .vmx-event-ribbon {
+    min-height: 78px;
+    align-self: stretch;
+    border: 1px solid rgba(214, 207, 199, 0.065);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.014), transparent 48%),
+      rgba(0, 0, 0, 0.12);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.020),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.58);
+    padding: 12px;
+    align-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .vmx-signal .vmx-event-ribbon:empty::before {
+    content: "midi idle";
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--silk-22);
+  }
+  .vmx-signal .vmx-event-chip {
+    height: 22px;
+    padding: 0 9px;
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.014), rgba(0, 0, 0, 0.18));
+    border-color: var(--silk-12);
+    color: var(--silk-40);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.018),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.48);
+  }
+  .vmx-signal .vmx-event-chip[data-age="now"],
+  .vmx-signal .vmx-event-chip[data-age="warm"] {
+    background: rgba(255, 138, 61, 0.035);
   }
   .vmx-ghost {
     font-family: var(--type-body);
     font-variation-settings: 'wdth' 100, 'wght' 400;
-    font-size: 15px; line-height: 1.4;
+    font-size: 16px; line-height: 1.4;
     transition: color 700ms ease-out;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: min(58ch, 100%);
   }
-  .vmx-ghost--g2 { color: var(--silk-12); }
-  .vmx-ghost--g1 { color: var(--silk-22); }
+  .vmx-ghost--g2 { color: var(--silk-22); }
+  .vmx-ghost--g1 { color: var(--silk-40); }
   .vmx-claim { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); margin-top: var(--sp-2); }
   .vmx-now {
     font-family: var(--type-display);
     font-variation-settings: 'wdth' 92, 'wght' 600;
-    font-size: clamp(30px, 3.6vw, 48px); line-height: 1.04; letter-spacing: 0.003em;
-    color: var(--silk); text-wrap: balance; max-width: 22ch;
-    transition: color 700ms ease-out;
+    font-size: clamp(38px, 4.8vw, 68px); line-height: 0.98; letter-spacing: 0.003em;
+    color: var(--silk); text-wrap: balance; max-width: 17ch;
+    text-shadow:
+      0 1px 0 rgba(0, 0, 0, 0.75),
+      0 0 28px rgba(255, 251, 244, 0.10),
+      0 0 38px rgba(255, 138, 61, 0.12);
+    filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.32));
+    transition: color 700ms ease-out, text-shadow 700ms ease-out;
   }
   .vmx-now[data-arrived="true"] { animation: vmx-rise 400ms cubic-bezier(0.16, 1, 0.3, 1); }
   @keyframes vmx-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -266,22 +781,31 @@ const LAYOUT_CSS = `
   /* THE RECEIPT — rule draws L→R, cite ignites at its terminus [signature] */
   .vmx-receipt {
     display: flex; align-items: center; gap: var(--sp-3);
-    width: min(22ch, 100%); max-width: 520px;
+    width: min(44ch, 100%); max-width: 680px;
     transition: opacity 700ms ease-out;
   }
   .vmx-receipt[hidden] { display: none; }
   .vmx-receipt__rule {
     flex: 1; height: 1px;
     background: linear-gradient(90deg, var(--amber-40), var(--amber));
+    box-shadow: 0 0 10px var(--amber-22);
     transform: scaleX(0); transform-origin: left;
   }
   .vmx-receipt[data-arrived="true"] .vmx-receipt__rule { animation: vmx-draw 520ms cubic-bezier(0.22, 1, 0.36, 1) 360ms forwards; }
   .vmx-cite {
     flex: none; display: inline-flex; align-items: center; gap: 6px;
-    font-family: var(--type-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: var(--type-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
     color: var(--amber-pale); border: 1px solid var(--amber-22); border-radius: var(--rad-sm);
-    padding: 3px 8px; background: rgba(255, 138, 61, 0.04); cursor: pointer;
-    text-shadow: 0 0 6px var(--amber-22);
+    padding: 5px 10px;
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.026), transparent 44%, rgba(0, 0, 0, 0.22)),
+      rgba(255, 138, 61, 0.045);
+    cursor: pointer;
+    text-shadow: 0 0 5px var(--amber-22);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.034),
+      inset 0 -1px 0 var(--amber-22),
+      inset 0 0 12px rgba(255, 138, 61, 0.075);
   }
   .vmx-receipt[data-arrived="true"] .vmx-cite { animation: vmx-ignite 380ms cubic-bezier(0.16, 1, 0.3, 1) 900ms both; }
   .vmx-cite:hover { border-color: var(--amber-40); background: rgba(255, 138, 61, 0.09); }
@@ -296,8 +820,19 @@ const LAYOUT_CSS = `
   /* --- FOOT: one steady master readout (BPM · key · live level) --- */
   .vmx-deck__foot {
     display: grid; grid-template-columns: auto auto 1fr; align-items: center;
-    gap: clamp(24px, 4vw, 64px); padding: var(--sp-4) 0 var(--sp-5);
-    border-top: 1px solid var(--glass-edge);
+    gap: clamp(20px, 3vw, 48px);
+    margin: 0 clamp(0px, 1.2vw, 18px);
+    padding: 12px 14px;
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.018), transparent 42%),
+      linear-gradient(90deg, rgba(255, 138, 61, 0.018), transparent 38%, transparent 62%, rgba(72, 152, 255, 0.014)),
+      rgba(0, 0, 0, 0.24);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.032),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.70),
+      0 1px 0 rgba(0, 0, 0, 0.62);
   }
   .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); }
   .vmx-read__lab {
@@ -313,24 +848,46 @@ const LAYOUT_CSS = `
     color: var(--amber-pale); transition: color 700ms ease-out;
   }
   .vmx-fmeter {
-    position: relative; height: 12px; border-radius: var(--rad-sm);
+    position: relative; height: 14px; border-radius: var(--rad-sm);
     background: var(--void-1); border: 1px solid var(--glass-edge);
-    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.7); overflow: hidden;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.035),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.72),
+      inset 0 0 8px rgba(0, 0, 0, 0.78);
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .vmx-fmeter::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 11px, rgba(0, 0, 0, 0.56) 11px 13px),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.060), transparent 45%, rgba(0, 0, 0, 0.20));
+    pointer-events: none;
+    z-index: 3;
   }
   .vmx-fmeter__fill {
     position: absolute; inset: 1px; width: 0%; border-radius: 1px;
     background: linear-gradient(90deg, var(--amber-40), var(--amber-78) 80%, var(--amber));
     transition: background 700ms ease-out;
+    box-shadow: 0 0 14px var(--amber-22);
+    z-index: 1;
   }
   .vmx-fmeter__peak {
     position: absolute; top: 1px; bottom: 1px; left: 0; width: 2px;
     background: var(--amber-pale); transition: opacity 700ms ease-out;
+    box-shadow: 0 0 8px var(--amber-65);
+    z-index: 4;
   }
 
   /* === status row — silk-dim when fine; lights red on a dropped input === */
   .vmx-statusrow {
     display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-5);
-    background: rgba(0, 0, 0, 0.55); backdrop-filter: var(--blur-glass-light);
+    background:
+      linear-gradient(90deg, rgba(255, 138, 61, 0.020), transparent 38%, transparent 62%, rgba(72, 152, 255, 0.016)),
+      rgba(0, 0, 0, 0.55);
+    backdrop-filter: var(--blur-glass-light);
     -webkit-backdrop-filter: var(--blur-glass-light); border-top: 1px solid var(--glass-edge);
   }
   .vmx-statusrow__inputs {
@@ -345,6 +902,12 @@ const LAYOUT_CSS = `
   /* === SILENT + FAULT — the surface settles into listening / holds on a drop = */
   .vmx-session[data-mode="silent"] .vmx-now,
   .vmx-session[data-mode="fault"] .vmx-now { color: var(--silk-40); }
+  .vmx-session[data-mode="silent"] .vmx-now {
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75), 0 0 18px rgba(255, 251, 244, 0.035);
+  }
+  .vmx-session[data-mode="fault"] .vmx-now {
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75), 0 0 18px rgba(212, 65, 58, 0.14);
+  }
   .vmx-session[data-mode="silent"] .vmx-receipt,
   .vmx-session[data-mode="fault"] .vmx-receipt { opacity: 0; pointer-events: none; }
   .vmx-session[data-mode="silent"] .vmx-read__num,
@@ -365,6 +928,138 @@ const LAYOUT_CSS = `
     .vmx-receipt[data-arrived="true"] .vmx-cite { animation: none; }
     .vmx-session[data-mode="silent"] .vmx-fmeter__fill { animation: none; }
   }
+  @media (max-width: 780px) {
+    .vmx-titlebar__traffic { display: none; }
+    .vmx-titlebar { padding: 0 var(--sp-4); gap: var(--sp-3); }
+    .vmx-titlebar__pills { margin-left: var(--sp-3); }
+    .vmx-titlebar__clock { font-size: 16px; }
+    .vmx-deck {
+      padding: 0 var(--sp-4);
+    }
+    .vmx-deck::before,
+    .vmx-deck::after {
+      left: var(--sp-4);
+      right: var(--sp-4);
+    }
+    .vmx-deck__rail {
+      gap: var(--sp-3);
+      margin: var(--sp-4) 0 0;
+      padding: 9px;
+      align-items: flex-start;
+    }
+    .vmx-persona {
+      min-width: 0;
+      padding: 7px 8px;
+      gap: var(--sp-2);
+    }
+    .vmx-nowplaying { display: none; }
+    .vmx-live {
+      display: none;
+    }
+    .vmx-deck__controls {
+      margin-left: auto;
+      opacity: 0.9;
+    }
+    .vmx-deck__controls button {
+      padding: 6px 10px;
+      letter-spacing: 0.14em;
+    }
+    .vmx-deck__speak {
+      grid-template-columns: 1fr;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: var(--sp-5);
+      padding: var(--sp-4) 0;
+    }
+    .vmx-voice {
+      width: 100%;
+      padding: var(--sp-5) var(--sp-4);
+      min-height: 260px;
+    }
+    .vmx-signal {
+      align-self: auto;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto;
+      padding: 10px 0 8px;
+    }
+    .vmx-signal__header {
+      padding: 0 0 2px;
+    }
+    .vmx-signal__drop {
+      min-height: 52px;
+      padding: 0 0 10px;
+      border-right: 0;
+      border-bottom: 1px solid var(--glass-edge);
+    }
+    .vmx-signal .vmx-drop-chip__count {
+      font-size: 24px;
+    }
+    .vmx-signal .vmx-phase-tape {
+      min-height: 78px;
+      padding: 22px 0 8px;
+    }
+    .vmx-signal .vmx-phase-tape__row {
+      gap: 2px;
+    }
+    .vmx-signal .vmx-phase-chunk {
+      font-size: 7.5px;
+      letter-spacing: 0.10em;
+      text-overflow: clip;
+    }
+    .vmx-signal .vmx-phase-chunk[data-kind="groove"] {
+      color: transparent;
+      text-shadow: none;
+    }
+    .vmx-signal .vmx-phase-chunk[data-kind="build"] {
+      font-size: 8px;
+      letter-spacing: 0.08em;
+    }
+    .vmx-signal .vmx-phase-chunk[data-kind="build"]::after {
+      display: none;
+    }
+    .vmx-signal .vmx-phase-chunk[data-kind="drop-ghost"] {
+      font-size: 8px;
+      letter-spacing: 0;
+    }
+    .vmx-signal .vmx-event-ribbon {
+      display: none;
+    }
+    .vmx-ghost {
+      display: none;
+      font-size: 14px;
+      max-width: 100%;
+    }
+    .vmx-now {
+      font-size: clamp(28px, 9vw, 42px);
+      max-width: 12ch;
+    }
+    .vmx-receipt {
+      width: min(30ch, 100%);
+    }
+    .vmx-deck__foot {
+      grid-template-columns: auto auto;
+      gap: var(--sp-4);
+      margin: 0 0 var(--sp-4);
+      padding: 10px 12px;
+    }
+    .vmx-fmeter {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
+    .vmx-statusrow {
+      padding: 0 var(--sp-4);
+      gap: var(--sp-3);
+      overflow: hidden;
+    }
+    .vmx-statusrow__inputs {
+      flex: none;
+    }
+    .vmx-statusrow__right {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
 `;
 
 registerStyle("vmx-session", LAYOUT_CSS);
@@ -373,6 +1068,7 @@ registerStyle("vmx-session", LAYOUT_CSS);
  *  renderer uses for hot updates. */
 export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState): Mounted {
   const state = initial ?? defaultState();
+  let mountedHandle: Mounted | null = null;
 
   const root = document.createElement("div");
   root.className = "vmx-session";
@@ -411,16 +1107,38 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const personaValue = document.createElement("span");
   personaValue.className = "vmx-persona__v";
   persona.append(personaK, personaValue);
-  persona.addEventListener("click", () => state.persona.onCycleMood?.());
+  persona.addEventListener("click", () => mountedHandle?.current.persona.onCycleMood?.());
+
+  const nowPlaying = document.createElement("div");
+  nowPlaying.className = "vmx-nowplaying";
+  nowPlaying.setAttribute("aria-label", "current deck track");
+  const nowPlayingEyebrow = document.createElement("span");
+  nowPlayingEyebrow.className = "vmx-nowplaying__eyebrow";
+  nowPlayingEyebrow.textContent = "now playing";
+  const deckTitle = document.createElement("span");
+  deckTitle.className = "vmx-nowplaying__title";
+  const deckMeta = document.createElement("span");
+  deckMeta.className = "vmx-nowplaying__meta";
+  const deckConfig = document.createElement("span");
+  deckConfig.className = "vmx-nowplaying__config";
+  nowPlaying.append(nowPlayingEyebrow, deckTitle, deckMeta, deckConfig);
 
   const controls = document.createElement("div");
   controls.className = "vmx-deck__controls";
+  const vibeEngineBtn = document.createElement("button");
+  vibeEngineBtn.type = "button";
+  vibeEngineBtn.dataset.action = "vibe-engine";
+  vibeEngineBtn.dataset.primary = "true";
+  vibeEngineBtn.textContent = "vibe engine";
+  vibeEngineBtn.setAttribute("aria-label", "open vibe engine");
+  vibeEngineBtn.setAttribute("title", "open Viber chat and set builder");
+  vibeEngineBtn.addEventListener("click", () => mountedHandle?.current.actions.onOpenVibeEngine?.());
   const muteBtn = document.createElement("button");
   muteBtn.type = "button";
   muteBtn.dataset.action = "mute";
   muteBtn.textContent = "mute";
-  muteBtn.addEventListener("click", () => state.cohost.onMute?.());
-  controls.append(muteBtn);
+  muteBtn.addEventListener("click", () => mountedHandle?.current.cohost.onMute?.());
+  controls.append(vibeEngineBtn, muteBtn);
 
   const live = document.createElement("div");
   live.className = "vmx-live";
@@ -431,15 +1149,17 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   // CSS gates pointer-events so it's only clickable in fault mode.
   const liveFault = makeLiveLabel("fault", "", /* clickable */ true);
   liveFault.setAttribute("title", "restart co-host");
-  liveFault.addEventListener("click", () => state.cohost.onRetry?.());
+  liveFault.addEventListener("click", () => mountedHandle?.current.cohost.onRetry?.());
   live.append(liveLive, liveSilent, liveFault);
 
-  rail.append(persona, controls, live);
+  rail.append(persona, nowPlaying, controls, live);
   deck.append(rail);
 
   // --- speak (ghosts + claim[now + receipt])
   const speak = document.createElement("div");
   speak.className = "vmx-deck__speak";
+  const voice = document.createElement("div");
+  voice.className = "vmx-voice";
   const ghost2 = document.createElement("p");
   ghost2.className = "vmx-ghost vmx-ghost--g2";
   const ghost1 = document.createElement("p");
@@ -459,7 +1179,25 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   cite.className = "vmx-cite";
   receipt.append(rule, cite);
   claim.append(now, receipt);
-  speak.append(ghost2, ghost1, claim);
+  voice.append(ghost2, ghost1, claim);
+
+  const signal = document.createElement("aside");
+  signal.className = "vmx-signal";
+  signal.setAttribute("aria-label", "mix signal");
+  const signalHeader = document.createElement("div");
+  signalHeader.className = "vmx-signal__header";
+  const signalTitle = document.createElement("span");
+  signalTitle.textContent = "mix signal";
+  const signalState = document.createElement("b");
+  signalState.textContent = "grounded";
+  signalHeader.append(signalTitle, signalState);
+  const dropSlot = document.createElement("div");
+  dropSlot.className = "vmx-signal__drop";
+  const phaseTape = renderPhaseTape(state.phase);
+  const eventRibbon = renderEventRibbon({ events: state.events });
+  signal.append(signalHeader, dropSlot, phaseTape, eventRibbon);
+
+  speak.append(voice, signal);
   deck.append(speak);
 
   // --- foot (bpm · key · live meter)
@@ -502,11 +1240,20 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
     titlebar,
     persona,
     personaValue,
+    vibeEngineButton: vibeEngineBtn,
+    muteButton: muteBtn,
+    deckTitle,
+    deckMeta,
+    deckConfig,
     liveFault,
     ghosts: [ghost1, ghost2],
     now,
     receipt,
     cite,
+    signalState,
+    dropSlot,
+    phaseTape,
+    eventRibbon,
     bpm,
     key,
     meterFill,
@@ -519,7 +1266,9 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
     meterPk: 0,
     lastNowTs: null,
     citeChip: null,
+    dropKey: "",
   };
+  mountedHandle = mounted;
 
   // Seed the visible content from the initial state (mount = first paint).
   applyState(mounted, state, /* isMount */ true);
@@ -586,16 +1335,24 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   // --- persona (tap-to-cycle mood headline) ---
   if (isMount || prev.persona.mood !== next.persona.mood) {
     mounted.personaValue.textContent = next.persona.mood.toLowerCase();
+    mounted.persona.dataset.mood = next.persona.mood;
     mounted.persona.setAttribute(
       "aria-label",
       `co-host mood: ${next.persona.mood.toLowerCase()}. tap to cycle hype, teach, coach.`,
     );
   }
 
+  const deckTitle = next.timecode.track?.title ?? "deck idle";
+  if (mounted.deckTitle.textContent !== deckTitle) mounted.deckTitle.textContent = deckTitle;
+  const deckMeta = deckMetaLabel(next.timecode);
+  if (mounted.deckMeta.textContent !== deckMeta) mounted.deckMeta.textContent = deckMeta;
+  const deckConfig = deckConfigLabel(next);
+  if (mounted.deckConfig.innerHTML !== deckConfig) mounted.deckConfig.innerHTML = deckConfig;
+
   // --- grounding-failure timer ---
   // Only runs while the co-host is ACTIVE. At IDLE there's no music to ground
   // to, so grounded=false is EXPECTED — not a failure. Counting it at idle is
-  // what made a quiet session falsely flip to "gemini unreachable" after 5s
+  // what made a quiet session falsely flip to "AI service unreachable" after 5s
   // (fault mode → blank hero, the recurring "empty screen / always broken").
   // The clock starts once when the co-host is active+ungrounded and clears the
   // instant it grounds a reaction or returns to idle.
@@ -623,7 +1380,7 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
         ? "◂ audio input dropped"
         : downInput === "screen"
           ? "◂ screen capture lost"
-          : "◂ gemini unreachable";
+          : "◂ ai service unreachable";
     if (mounted.liveFault.textContent !== causeText) mounted.liveFault.textContent = causeText;
   }
 
@@ -668,6 +1425,23 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   }
   mounted.lastNowTs = nowTs;
 
+  // --- mix signal (phase tape, drop watch, recent controller moves) ---
+  setPhaseTape(mounted.phaseTape, next.phase);
+  setEventRibbon(mounted.eventRibbon, { events: next.events });
+  const signalText = downInput ? "fault" : next.cohost.grounded ? "grounded" : "tuning";
+  if (mounted.signalState.textContent !== signalText) mounted.signalState.textContent = signalText;
+  const bpmPeriod = next.drop.bpmPeriodMs ?? null;
+  const dropKey = `${next.drop.bars ?? "none"}|${bpmPeriod == null ? "auto" : Math.round(bpmPeriod)}`;
+  if (mounted.dropKey !== dropKey) {
+    mounted.dropSlot.replaceChildren();
+    const chipEl = renderDropChip({
+      bars: next.drop.bars,
+      bpmPeriodMs: bpmPeriod ?? undefined,
+    });
+    if (chipEl) mounted.dropSlot.append(chipEl);
+    mounted.dropKey = dropKey;
+  }
+
   // --- foot readouts ---
   const bpmText = next.timecode.bpm != null ? next.timecode.bpm.toFixed(1) : "—";
   if (mounted.bpm.textContent !== bpmText) mounted.bpm.textContent = bpmText;
@@ -688,7 +1462,7 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
 
   // --- mute control reflects state ---
   if (isMount || prev.status.muted !== next.status.muted) {
-    const muteBtn = mounted.persona.parentElement?.querySelector<HTMLElement>('[data-action="mute"]');
+    const muteBtn = mounted.muteButton;
     if (muteBtn) {
       muteBtn.dataset.on = next.status.muted ? "true" : "false";
       muteBtn.textContent = next.status.muted ? "muted" : "mute";
@@ -699,7 +1473,7 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   setInputDown(mounted.statusInputs.audio, next.status.livekit === "down");
   setInputDown(mounted.statusInputs.screen, next.status.screen === "denied");
   setInputDown(mounted.statusInputs.midi, next.status.midi === 0);
-  const rightText = `${deviceLabel(next.output.device)} · 48.0k`;
+  const rightText = `${outputLabel(next.output)} · ${next.persona.voice} · ${next.persona.genre}`;
   if (mounted.statusRight.textContent !== rightText) mounted.statusRight.textContent = rightText;
 }
 
@@ -723,14 +1497,20 @@ function fireReceipt(mounted: Mounted): void {
 
 /** Which input (if any) is in a fault state — the offending one lights red
  *  and names the cause. Grounding-failure (>5s ungrounded) reads as the
- *  audio/gemini path being down. Priority: audio (livekit) > screen > gemini
- *  grounding. Returns null when everything is fine. */
+ *  audio/gemini path being down. Priority: audio (livekit) > gemini grounding.
+ *  Returns null when everything is fine.
+ *
+ *  2026-05-26: screen=denied is NO LONGER a deck fault. Audio-only is a valid
+ *  mode (vibemix's first promise is "listens to your master output"; screen is
+ *  an enhancement that watches the DJ software). A denied screen surfaces as a
+ *  red SCREEN badge in the status row — never a blank deck. This keeps the new
+ *  ~1Hz ipc.status.tick (ws_bus.py) zero-new-fault: it emits a live screen
+ *  probe for the badge without ever flipping the hero to fault. */
 function faultInput(
   status: SessionState["status"],
   failureElapsedMs: number | null,
 ): "audio" | "screen" | "gemini" | null {
   if (status.livekit === "down") return "audio";
-  if (status.screen === "denied") return "screen";
   if (status.gemini === "down") return "gemini";
   if (failureElapsedMs != null && failureElapsedMs >= GROUNDING_FAILURE_MS) return "gemini";
   return null;
@@ -755,6 +1535,36 @@ function formatTs(s: number): string {
 function deviceLabel(device: string): string {
   if (!device || device === "AUTO") return "default out";
   return device.length > 22 ? device.slice(0, 21) + "…" : device;
+}
+
+function deckMetaLabel(timecode: SessionState["timecode"]): string {
+  const parts: string[] = [];
+  if (timecode.deck) parts.push(`deck ${timecode.deck}`);
+  if (timecode.track?.artist) parts.push(timecode.track.artist);
+  if (timecode.genre) parts.push(timecode.genre);
+  return parts.length ? parts.join(" · ") : "waiting for deck";
+}
+
+function deckConfigLabel(state: SessionState): string {
+  return [
+    `mode <b>${state.persona.mood}</b>`,
+    `skill <b>${state.persona.skill}</b>`,
+    `voice <b>${escapeHtml(state.persona.voice)}</b>`,
+    `genre <b>${escapeHtml(state.persona.genre)}</b>`,
+    `out <b>${escapeHtml(outputLabel(state.output))}</b>`,
+  ].join(" · ");
+}
+
+function outputLabel(output: SessionState["output"]): string {
+  return `${output.profile} ${deviceLabel(output.device)}`;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function clamp01(n: number): number {
@@ -783,6 +1593,7 @@ export function defaultState(): SessionState {
       latencyMs: null,
       grounded: false,
     },
+    actions: {},
     status: {
       livekit: null,
       gemini: null,

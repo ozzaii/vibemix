@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "vibemix Tauri shell webview — Phase 11 Wave 0 ships only the IPC schema gate; wizard UI lands in Waves 2-4.",
+  "description": "vibemix Tauri webview surfaces for live session, wizard, debrief, library, and Viber.",
   "scripts": {
     "codegen:ipc": "node scripts/codegen-ipc.mjs",
     "check:ipc": "npm run codegen:ipc && tsc --noEmit",

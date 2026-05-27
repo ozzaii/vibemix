@@ -18,6 +18,7 @@ import {
   METER_SEGMENTS,
   runLabel,
   setBrief,
+  setChatMessage,
   setCurve,
   setFolder,
   setMode,
@@ -27,8 +28,8 @@ import {
 } from "./state-machine.js";
 
 describe("mode switch + labels", () => {
-  it("starts in search with the techno query seeded", () => {
-    expect(initialLibraryState.mode).toBe("search");
+  it("starts in chat while keeping the techno search seed", () => {
+    expect(initialLibraryState.mode).toBe("chat");
     expect(initialLibraryState.query).toBe("hard aggressive techno");
   });
 
@@ -36,17 +37,20 @@ describe("mode switch + labels", () => {
     expect(fieldLabel("search")).toBe("Vibe query");
     expect(fieldLabel("similar")).toBe("Seed track");
     expect(fieldLabel("ingest")).toBe("Folder to embed");
+    expect(fieldLabel("chat")).toBe("Talk to Viber");
   });
 
   it("maps each mode to its run-button label", () => {
     expect(runLabel("search")).toBe("▸ Run search");
     expect(runLabel("similar")).toBe("▸ Find similar");
     expect(runLabel("ingest")).toBe("▸ Embed folder");
+    expect(runLabel("chat")).toBe("▸ Ask Viber");
   });
 
-  it("echoes the query in search, the seed in similar", () => {
+  it("echoes conversation in chat, query in search, and seed in similar", () => {
     const s = initialLibraryState;
-    expect(echoText(s)).toBe(s.query);
+    expect(echoText(s)).toBe("conversation");
+    expect(echoText(setMode(s, "search"))).toBe(s.query);
     expect(echoText(setMode(s, "similar"))).toBe(s.seed);
   });
 });
@@ -57,7 +61,7 @@ describe("transitions are immutable", () => {
     const next = setMode(s, "ingest");
     expect(next).not.toBe(s);
     expect(next.mode).toBe("ingest");
-    expect(s.mode).toBe("search");
+    expect(s.mode).toBe("chat");
   });
 
   it("setQuery / setSeed / setFolder / setStrategy update only their field", () => {
@@ -82,6 +86,15 @@ describe("transitions are immutable", () => {
     expect(s.curve).toBe("festival");
     // brief survived the curve mutation (immutable spread)
     expect(s.brief).toBe("festival mainstage");
+  });
+
+  it("setChatMessage is immutable + touches only the chat draft", () => {
+    const s = initialLibraryState;
+    const next = setChatMessage(s, "build me a dark bridge");
+    expect(next).not.toBe(s);
+    expect(next.chatMessage).toBe("build me a dark bridge");
+    expect(s.chatMessage).toBe("");
+    expect(next.query).toBe(s.query);
   });
 });
 

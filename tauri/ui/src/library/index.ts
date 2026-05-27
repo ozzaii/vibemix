@@ -6,27 +6,34 @@
  * state-machine.ts; all backend I/O goes through api.ts (typed invoke/event
  * client with a dev fallback so this window renders fully in plain `vite` dev).
  *
- * Three modes (mode switch in the left console):
+ * Six modes (mode switch in the left console):
  *   - search   text query → librarySearch → results + scope
  *   - similar  seed (drop a file or keep the current) → librarySimilar → results + scope
  *   - ingest   folder + strategy → libraryEmbedFolder → progress bar + live log + running €
+ *   - curate   theme → libraryCurate → numbered set + notes
+ *   - build    brief + curve → libraryBuildSet → ordered set + Rekordbox export
+ *   - chat     message + history → libraryChat → reply, tools, artifacts
  *
  * Wire-vs-dev: every api.ts call falls back to the real 2026-05-25 subset-run
- * sample when `invoke()` is unavailable or throws, so the surface is demoable
- * before the Rust bridge lands. The ingest replay below drives the same bar +
- * log from DEV_FALLBACK.embedLog when the bridge isn't there.
+ * sample only when `invoke()` is unavailable, so the surface is demoable before
+ * the Rust bridge lands. Real backend errors propagate and render honestly. The
+ * ingest replay below drives the same bar + log from DEV_FALLBACK.embedLog when
+ * the bridge isn't there.
  */
 
 import {
   DEV_FALLBACK,
   libraryBuildSet,
+  libraryChat,
   libraryCurate,
   libraryEmbedFolder,
+  libraryModels,
   librarySearch,
   librarySimilar,
   libraryStats,
   onEmbedDone,
   onEmbedProgress,
+  onModelProgress,
   type BuildSetResult,
   type CurateResult,
   type EmbedDone,
@@ -34,6 +41,11 @@ import {
   type EmbedStrategy,
   type EnergyCurve,
   type LibraryStats,
+  type LibraryChatResult,
+  type LibraryChatTurn,
+  type LibraryModelInstallTarget,
+  type LibraryModelProgress,
+  type LibraryModelsResult,
   type SearchResult,
 } from "./api.js";
 import { renderScope } from "./scope.js";
@@ -45,6 +57,7 @@ import {
   METER_SEGMENTS,
   runLabel,
   setBrief,
+  setChatMessage,
   setCurve,
   setFolder,
   setMode,
@@ -85,6 +98,9 @@ function esc(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+let latestStats: LibraryStats | null = null;
+let latestModels: LibraryModelsResult | null = null;
 
 function renderResults(result: SearchResult, mode: LibraryMode): void {
   const el = $("vmx-lib-results");
@@ -170,10 +186,11 @@ function clearRationale(): void {
   }
 }
 
-/** Working state while the Gemini agent builds the set (it can take several
- *  seconds). Skeleton rows + a "building" note so the surface never reads as
- *  hung — the run button merely disabling is not enough feedback (visibility of
- *  status). Replaced wholesale by renderCurate / renderError when the run lands. */
+/** Working state while the Viber agent builds the set (it can take several
+ *  seconds; current app backend is local Codex). Skeleton
+ *  rows + a "building" note so the surface never reads as hung — the run button
+ *  merely disabling is not enough feedback. Replaced wholesale by renderCurate
+ *  / renderError when the run lands. */
 function renderCurateLoading(theme: string): void {
   $("vmx-lib-rationale-body").textContent = `Building a set for "${theme}"…`;
   $("vmx-lib-rationale-meta").textContent = "viber · working";
@@ -214,7 +231,7 @@ function renderBuildSet(result: BuildSetResult): void {
   const el = $("vmx-lib-results");
   el.innerHTML = "";
   if (result.tracks.length === 0) {
-    el.innerHTML = `<div class="vmx-lib-empty">No set built (${esc(result.stop_reason)}). Add a Gemini key, embed more tracks, or refine the brief.</div>`;
+    el.innerHTML = `<div class="vmx-lib-empty">No set built (${esc(result.stop_reason)}). Check AI setup, embed more tracks, or refine the brief.</div>`;
   } else {
     result.tracks.forEach((t, i) => {
       const top = i === 0 ? " top" : "";
@@ -238,8 +255,9 @@ function renderBuildSet(result: BuildSetResult): void {
 }
 
 /** Working state while the set-prep agent discovers + sequences the set (it can
- *  take several seconds — it runs the Gemini agent tool loop). Skeleton rows +
- *  a "building" note so the surface never reads as hung. Replaced wholesale by
+ *  take several seconds — the current app default runs the local Codex MCP
+ *  tool loop). Skeleton rows + a "building" note so
+ *  the surface never reads as hung. Replaced wholesale by
  *  renderBuildSet / renderError when the run lands. */
 function renderBuildSetLoading(brief: string): void {
   $("vmx-lib-rationale-body").textContent = `Building a set for "${brief}"…`;
@@ -254,6 +272,19 @@ function renderBuildSetLoading(brief: string): void {
     );
   }
   $("vmx-lib-rcount").textContent = "building…";
+}
+
+/** Idle state for agent-backed modes. Search/similar can refresh on tab switch;
+ *  Codex-backed curate/build should wait for an explicit run or preset chip so
+ *  merely opening the mode does not start a slow tool loop. */
+function renderAgentIdle(mode: "curate" | "build"): void {
+  clearRationale();
+  $("vmx-lib-rationale-body").textContent =
+    mode === "build" ? "No set built yet." : "No playlist curated yet.";
+  $("vmx-lib-rationale-meta").textContent = "idle";
+  $("vmx-lib-results").innerHTML = "";
+  $("vmx-lib-rcount").textContent = "ready";
+  $("vmx-lib-scope-state").textContent = "ready";
 }
 
 /** Surface a REAL backend error in the results panel — honest failure, not the
@@ -272,11 +303,189 @@ function renderError(err: unknown): void {
   el.innerHTML = `<div class="vmx-lib-error"><div class="vmx-lib-error-title">engine error</div><div class="vmx-lib-error-msg">${esc(msg)}</div></div>`;
 }
 
+function embeddingLabel(stats: LibraryStats): string {
+  const backend = (stats.embedding_backend ?? "clap").toLowerCase();
+  const dim = stats.embedding_dim ?? 512;
+  const model =
+    backend === "clap"
+      ? stats.clap_model_installed === false
+        ? "CLAP missing"
+        : "CLAP ready"
+      : backend;
+  const agent = (stats.agent_backend ?? "codex").toLowerCase();
+  const agentLabel = stats.agent_ready === false
+    ? `Viber ${agent} setup`
+    : `Viber ${agent}`;
+  return `${agentLabel} / ${model} / ${dim}d / ${stats.backend}`;
+}
+
 function renderStats(stats: LibraryStats): void {
-  $("vmx-lib-stat-indexed").innerHTML = `${stats.indexed}<small> / 1547</small>`;
+  latestStats = stats;
+  $("vmx-lib-stat-indexed").textContent = String(stats.indexed);
   $("vmx-lib-stat-backend").textContent = stats.backend;
   $("vmx-lib-stat-spent").textContent = `€${stats.spent_eur.toFixed(2)}`;
   $("vmx-lib-stat-failed").textContent = String(stats.failed);
+  const engineLabelEl = document.getElementById("vmx-lib-engine-label");
+  if (engineLabelEl) engineLabelEl.textContent = embeddingLabel(stats);
+  renderAgentSetup(stats);
+  if (latestModels) renderModelSetup(latestModels);
+}
+
+function installStatusLine(models: LibraryModelsResult): string | null {
+  const install = models.install;
+  if (!install) return null;
+
+  const errors = install.results.flatMap((result) => result.errors);
+  if (!install.ok) {
+    const prefix =
+      install.target === "cue"
+        ? "Optional CUE setup unavailable"
+        : "Model setup failed";
+    return errors[0] ? `${prefix}: ${errors[0]}` : prefix;
+  }
+
+  const files = install.results.flatMap((result) => result.files);
+  const downloaded = files.filter((file) => file.status === "downloaded").length;
+  const skipped = files.filter((file) => file.status === "skipped").length;
+  const verified = downloaded + skipped;
+  const prefix =
+    install.target === "required"
+      ? "Required models ready"
+      : install.target === "cue"
+        ? "Optional CUE checked"
+        : install.target === "all"
+          ? "Local models ready"
+          : "CLAP ready";
+  if (downloaded > 0) return `${prefix}: downloaded ${downloaded}/${files.length}`;
+  if (verified > 0) return `${prefix}: verified ${verified} files`;
+  return prefix;
+}
+
+function formatModelBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}
+
+export function modelProgressStateText(progress: LibraryModelProgress): string {
+  const model = progress.id === "cue-detr" ? "CUE" : "CLAP";
+  const rel = progress.rel_path.split(/[\\/]/).pop() ?? progress.rel_path;
+  const count = `${progress.n}/${progress.total}`;
+  if (progress.status === "verified") {
+    return `${model} verified ${count} · ${rel}`;
+  }
+  if (progress.status === "downloaded") {
+    return `${model} downloaded ${count} · ${rel}`;
+  }
+  if (progress.status === "error") {
+    return `${model} setup failed ${count} · ${rel}`;
+  }
+  const loaded = formatModelBytes(progress.downloaded);
+  const total = formatModelBytes(progress.size);
+  return `${model} downloading ${count} · ${rel} · ${loaded}/${total}`;
+}
+
+export interface ModelSetupView {
+  stateText: string;
+  installTarget: LibraryModelInstallTarget | null;
+  installButtonHidden: boolean;
+  installButtonText: string;
+}
+
+export function modelInstallTargetFromDataset(
+  target: string | undefined,
+): LibraryModelInstallTarget {
+  return target === "cue" ||
+    target === "all" ||
+    target === "required" ||
+    target === "clap"
+    ? target
+    : "required";
+}
+
+export function deriveModelSetupView(
+  models: LibraryModelsResult,
+): ModelSetupView {
+  const clap = models.models.find((m) => m.id === "clap");
+  const cue = models.models.find((m) => m.id === "cue-detr");
+  const clapMismatched = (clap?.mismatched?.length ?? 0) > 0;
+  const cueMismatched = (cue?.mismatched?.length ?? 0) > 0;
+  const cueInstallable = cue?.installable === true;
+  const installErrors =
+    models.install?.results.flatMap((result) => result.errors) ?? [];
+  const hasInstallError =
+    installErrors.length > 0 || (models.install ? !models.install.ok : false);
+  const clapLabel = clap?.installed
+    ? "CLAP ready"
+    : clapMismatched
+      ? "CLAP repair"
+      : "CLAP missing";
+  const cueLabel = cue?.installed
+    ? "CUE ready"
+    : cueMismatched
+      ? cueInstallable
+        ? "CUE repair"
+        : "CUE manual repair"
+      : "CUE optional";
+  const needsClap =
+    clap?.installed === false || clapMismatched || models.required_ready === false;
+  const needsCue = cueInstallable && (cue?.installed === false || cueMismatched);
+  const installTarget: LibraryModelInstallTarget | null =
+    needsClap ? "required" : needsCue ? "cue" : null;
+  const installButtonText =
+    installTarget === "required"
+      ? hasInstallError
+        ? "Retry Required Models"
+        : "Install Required Models"
+      : installTarget === "cue"
+        ? hasInstallError
+          ? "Retry Optional CUE"
+          : cueMismatched
+            ? "Repair CUE"
+            : "Check Optional CUE"
+        : "Install Required Models";
+
+  return {
+    stateText: [clapLabel, cueLabel, installStatusLine(models)]
+      .filter(Boolean)
+      .join(" · "),
+    installTarget,
+    installButtonHidden: installTarget === null,
+    installButtonText,
+  };
+}
+
+function renderModelSetup(models: LibraryModelsResult): void {
+  latestModels = models;
+  const stateEl = $("vmx-lib-model-state");
+  const installBtn = $("vmx-lib-install-models") as HTMLButtonElement;
+  const view = deriveModelSetupView(models);
+  stateEl.textContent = view.stateText;
+  renderAgentSetup(latestStats);
+
+  if (view.installTarget) installBtn.dataset.installTarget = view.installTarget;
+  else delete installBtn.dataset.installTarget;
+  installBtn.hidden = view.installButtonHidden;
+  installBtn.disabled = false;
+  installBtn.textContent = view.installButtonText;
+}
+
+function agentSetupHint(stats: LibraryStats | null): string | null {
+  if (!stats || stats.agent_ready !== false) return null;
+  const backend = (stats.agent_backend ?? "codex").toLowerCase();
+  const status = (stats.agent_status ?? "setup_needed").replace(/_/g, " ");
+  const hint = stats.agent_hint?.trim();
+  return `Viber ${backend}: ${hint || status}`;
+}
+
+function renderAgentSetup(stats: LibraryStats | null): void {
+  const setupEl = document.getElementById("vmx-lib-agent-setup");
+  const stateEl = document.getElementById("vmx-lib-agent-state");
+  if (!setupEl || !stateEl) return;
+
+  const hint = agentSetupHint(stats);
+  setupEl.hidden = hint === null;
+  stateEl.textContent = hint ?? "";
 }
 
 function setProgress(n: number, total: number, costEur: number, note: string): void {
@@ -294,6 +503,193 @@ function appendLog(status: EmbedProgress["status"], filename: string, costEur: n
   );
 }
 
+function appendChatTurn(
+  thread: HTMLElement,
+  role: LibraryChatTurn["role"],
+  text: string,
+  pending = false,
+): HTMLElement {
+  const turn = document.createElement("div");
+  turn.className = "vmx-lib-chat-turn";
+  turn.dataset.role = role === "you" ? "you" : "viber";
+  if (pending) turn.dataset.pending = "true";
+
+  const who = document.createElement("div");
+  who.className = "who";
+  who.textContent = role === "you" ? "you" : "viber";
+
+  const body = document.createElement("div");
+  body.className = "body";
+  body.textContent = text;
+
+  turn.append(who, body);
+  thread.append(turn);
+  thread.scrollTop = thread.scrollHeight;
+  return turn;
+}
+
+function setChatTurnText(turn: HTMLElement, text: string, pending = false): void {
+  const body = turn.querySelector<HTMLElement>(".body");
+  if (body) body.textContent = text;
+  if (pending) turn.dataset.pending = "true";
+  else delete turn.dataset.pending;
+}
+
+function ensureChatIntro(thread: HTMLElement): void {
+  if (thread.childElementCount > 0) return;
+  appendChatTurn(thread, "viber", "In your library. What are we chasing?");
+}
+
+function renderChatBusy(): void {
+  const tools = $("vmx-lib-chat-tools");
+  tools.replaceChildren();
+  const row = document.createElement("div");
+  row.className = "vmx-lib-chat-tool";
+  row.dataset.ok = "true";
+  row.append(document.createElement("span"));
+  row.firstElementChild?.classList.add("gem");
+  const text = document.createElement("div");
+  const name = document.createElement("div");
+  name.className = "name";
+  name.textContent = "thinking";
+  const arg = document.createElement("div");
+  arg.className = "arg";
+  arg.textContent = "grounding turn";
+  text.append(name, arg);
+  row.append(text);
+  tools.append(row);
+  $("vmx-lib-chat-artifact").replaceChildren();
+  $("vmx-lib-scope-state").textContent = "working";
+}
+
+function renderChatSide(result: LibraryChatResult): void {
+  const tools = $("vmx-lib-chat-tools");
+  tools.replaceChildren();
+  if (result.tool_trace.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "vmx-lib-chat-empty";
+    empty.textContent = "no tools this turn";
+    tools.append(empty);
+  } else {
+    result.tool_trace.forEach((tool) => {
+      const row = document.createElement("div");
+      row.className = "vmx-lib-chat-tool";
+      row.dataset.ok = String(tool.ok);
+      const gem = document.createElement("span");
+      gem.className = "gem";
+      const text = document.createElement("div");
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = tool.name;
+      const arg = document.createElement("div");
+      arg.className = "arg";
+      arg.textContent = tool.arg || (tool.ok ? "ok" : "failed");
+      text.append(name, arg);
+      row.append(gem, text);
+      tools.append(row);
+    });
+  }
+
+  const artifact = $("vmx-lib-chat-artifact");
+  artifact.replaceChildren();
+  const card = chatArtifactCard(result);
+  if (card) artifact.append(card);
+  $("vmx-lib-scope-state").textContent = isChatSetupStop(result.stop_reason)
+    ? `setup · ${result.stop_reason}`
+    : `${result.iterations} iter · ${result.stop_reason}`;
+}
+
+function isChatSetupStop(stopReason: string): boolean {
+  return (
+    stopReason === "codex_not_installed" ||
+    stopReason === "codex_auth_required" ||
+    stopReason === "codex_mcp_blocked"
+  );
+}
+
+function chatArtifactCard(result: LibraryChatResult): HTMLElement | null {
+  const setupStop = isChatSetupStop(result.stop_reason);
+  if (
+    !setupStop &&
+    !result.playlist &&
+    !result.export_path &&
+    result.seen_track_ids.length === 0
+  ) {
+    return null;
+  }
+
+  const card = document.createElement("div");
+  card.className = "vmx-lib-chat-card";
+  const cap = document.createElement("div");
+  cap.className = "cap";
+  const led = document.createElement("span");
+  led.className = "led";
+  const label = document.createElement("span");
+  label.textContent = result.playlist
+    ? "playlist"
+    : result.export_path
+      ? "export"
+      : setupStop
+        ? "setup"
+        : "receipts";
+  cap.append(led, label);
+  card.append(cap);
+
+  if (setupStop) {
+    appendChatCardLine(card, chatSetupTitle(result.stop_reason));
+    if (result.reply) appendChatCardLine(card, result.reply);
+  }
+  if (result.playlist) {
+    appendChatCardLine(card, result.playlist.name);
+    appendChatCardLine(card, `${result.playlist.track_ids.length} tracks`);
+    if (result.playlist.m3u_path) appendChatCardLine(card, result.playlist.m3u_path);
+  }
+  if (result.export_path) appendChatCardLine(card, result.export_path);
+  if (!result.playlist && result.seen_track_ids.length > 0) {
+    appendChatCardLine(card, result.seen_track_ids.slice(0, 6).join(" · "));
+  }
+  return card;
+}
+
+function chatSetupTitle(stopReason: string): string {
+  if (stopReason === "codex_not_installed") return "Codex CLI missing";
+  if (stopReason === "codex_auth_required") return "Codex login needed";
+  if (stopReason === "codex_mcp_blocked") return "Codex MCP blocked";
+  return "Agent setup needed";
+}
+
+function appendChatCardLine(card: HTMLElement, text: string): void {
+  const line = document.createElement("div");
+  line.className = "line";
+  line.textContent = text;
+  card.append(line);
+}
+
+function renderChatError(err: unknown): void {
+  const msg =
+    err instanceof Error
+      ? err.message
+      : typeof err === "string"
+        ? err
+        : String(err);
+  const artifact = $("vmx-lib-chat-artifact");
+  artifact.replaceChildren();
+  const card = document.createElement("div");
+  card.className = "vmx-lib-chat-card";
+  const cap = document.createElement("div");
+  cap.className = "cap";
+  const led = document.createElement("span");
+  led.className = "led";
+  const label = document.createElement("span");
+  label.textContent = "engine error";
+  cap.append(led, label);
+  card.append(cap);
+  appendChatCardLine(card, msg);
+  artifact.append(card);
+  $("vmx-lib-chat-tools").replaceChildren();
+  $("vmx-lib-scope-state").textContent = "error";
+}
+
 // ── Bootstrap ───────────────────────────────────────────────────────────────
 
 export function mountLibrary(): void {
@@ -304,16 +700,21 @@ export function mountLibrary(): void {
   const folderInput = $("vmx-lib-folder") as HTMLInputElement;
   const themeInput = $("vmx-lib-theme") as HTMLInputElement;
   const briefInput = $("vmx-lib-brief") as HTMLTextAreaElement;
+  const chatInput = $("vmx-lib-chat") as HTMLTextAreaElement;
   const runBtn = $("vmx-lib-runbtn") as HTMLButtonElement;
+  const installModelsBtn = $("vmx-lib-install-models") as HTMLButtonElement;
   const echoEl = $("vmx-lib-echo");
   const qlabelEl = $("vmx-lib-qlabel");
   const seedNameEl = $("vmx-lib-seed-name");
+  const chatThread = $("vmx-lib-chat-thread");
+  const chatHistory: LibraryChatTurn[] = [];
 
   // restore initial field values from state
   qInput.value = state.query;
   folderInput.value = state.folder;
   themeInput.value = state.theme;
   briefInput.value = state.brief;
+  chatInput.value = state.chatMessage;
   seedNameEl.textContent = state.seed;
 
   function applyModeVisibility(): void {
@@ -326,12 +727,62 @@ export function mountLibrary(): void {
       el.style.display = modes.includes(state.mode) ? "" : "none";
     });
     qlabelEl.textContent = fieldLabel(state.mode);
+    $("vmx-lib-center-label").textContent =
+      state.mode === "chat"
+        ? "Viber"
+        : state.mode === "build"
+          ? "Built"
+          : state.mode === "curate"
+            ? "Curated"
+            : state.mode === "ingest"
+              ? "Embed"
+              : "Pulled";
+    $("vmx-lib-side-label").textContent =
+      state.mode === "chat" ? "Grounding" : "Vibe scope";
     runBtn.textContent = runLabel(state.mode);
     echoEl.textContent = echoText(state);
+    if (state.mode === "chat") ensureChatIntro(chatThread);
   }
 
   async function refreshStats(): Promise<void> {
     renderStats(await libraryStats());
+  }
+
+  async function refreshModels(): Promise<void> {
+    renderModelSetup(await libraryModels());
+  }
+
+  function currentInstallTarget(): LibraryModelInstallTarget {
+    return modelInstallTargetFromDataset(installModelsBtn.dataset.installTarget);
+  }
+
+  async function installLocalModels(): Promise<void> {
+    const target = currentInstallTarget();
+    installModelsBtn.disabled = true;
+    installModelsBtn.textContent = "Installing…";
+    let runningLabel = "CLAP install running";
+    if (target === "required") runningLabel = "required model setup running";
+    else if (target === "all") runningLabel = "local model setup running";
+    else if (target === "cue") runningLabel = "CUE setup check running";
+    $("vmx-lib-model-state").textContent = runningLabel;
+    try {
+      renderModelSetup(await libraryModels(target));
+      await refreshStats();
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : String(err);
+      $("vmx-lib-model-state").textContent = `install failed · ${msg}`;
+      installModelsBtn.disabled = false;
+      let retryLabel = "Retry CLAP";
+      if (target === "all") retryLabel = "Retry Local Models";
+      else if (target === "required") retryLabel = "Retry Required Models";
+      else if (target === "cue") retryLabel = "Retry Optional CUE";
+      installModelsBtn.textContent = retryLabel;
+    }
   }
 
   // ── run actions ──────────────────────────────────────────────────────────
@@ -359,6 +810,44 @@ export function mountLibrary(): void {
     echoEl.textContent = state.brief;
     renderBuildSetLoading(state.brief); // working state before the (slow) agent call
     renderBuildSet(await libraryBuildSet(state.brief, state.curve));
+  }
+
+  async function runChat(): Promise<void> {
+    state = setChatMessage(state, chatInput.value.trim());
+    if (!state.chatMessage) return;
+    const message = state.chatMessage;
+    const priorHistory = chatHistory.slice();
+
+    appendChatTurn(chatThread, "you", message);
+    chatHistory.push({ role: "you", text: message });
+    chatInput.value = "";
+    state = setChatMessage(state, "");
+    echoEl.textContent = "conversation";
+
+    const pending = appendChatTurn(chatThread, "viber", "", true);
+    renderChatBusy();
+    try {
+      const result = await libraryChat(message, priorHistory);
+      const reply = result.reply || "I came back empty.";
+      setChatTurnText(pending, reply);
+      chatHistory.push({ role: "viber", text: reply });
+      renderChatSide(result);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[vmx-lib] chat failed:", err);
+      const lastTurn = chatHistory[chatHistory.length - 1];
+      if (lastTurn?.role === "you" && lastTurn.text === message) {
+        chatHistory.pop();
+      }
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : String(err);
+      setChatTurnText(pending, `engine error: ${msg}`);
+      renderChatError(err);
+    }
   }
 
   /** Reflect the active curve onto the segmented picker's pressed state. */
@@ -411,6 +900,7 @@ export function mountLibrary(): void {
       else if (state.mode === "similar") await runSimilar();
       else if (state.mode === "curate") await runCurate();
       else if (state.mode === "build") await runBuildSet();
+      else if (state.mode === "chat") await runChat();
       else {
         await runIngest();
         return; // ingest manages its own busy lifecycle (events or replay)
@@ -438,6 +928,7 @@ export function mountLibrary(): void {
   // ── event wiring ───────────────────────────────────────────────────────────
 
   runBtn.addEventListener("click", () => void run());
+  installModelsBtn.addEventListener("click", () => void installLocalModels());
 
   qInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && state.mode === "search") void run();
@@ -457,21 +948,33 @@ export function mountLibrary(): void {
       void run();
     }
   });
+  chatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && state.mode === "chat") {
+      e.preventDefault();
+      void run();
+    }
+  });
 
   document.querySelectorAll<HTMLElement>(".vmx-lib-modeswitch button").forEach((b) => {
     b.addEventListener("click", () => {
+      const previousMode = state.mode;
       const mode = (b.dataset.mode ?? "search") as LibraryMode;
       state = setMode(state, mode);
       applyModeVisibility();
       // The set-notes block is shared by curate + build; only clear it when
       // leaving BOTH so a fresh build/curate keeps its own working state.
       if (mode !== "curate" && mode !== "build") clearRationale();
+      if ((mode === "curate" || mode === "build") && previousMode !== mode) {
+        renderAgentIdle(mode);
+      }
       if (mode === "build") syncCurvePicker();
       if (mode === "ingest") {
         // show last-known progress shape, don't auto-run
         $("vmx-lib-loglist").innerHTML = "";
         setProgress(0, DEV_FALLBACK.embedLog.length, 0, "");
-      } else {
+      } else if (mode === "chat") {
+        ensureChatIntro(chatThread);
+      } else if (mode === "search" || mode === "similar") {
         void run();
       }
     });
@@ -538,6 +1041,16 @@ export function mountLibrary(): void {
     });
   });
 
+  document.querySelectorAll<HTMLElement>("[data-chat]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      if (state.mode !== "chat") return;
+      const message = chip.dataset.chat ?? chip.textContent ?? "";
+      chatInput.value = message;
+      state = setChatMessage(state, message);
+      void run();
+    });
+  });
+
   // drop a track to seed the similar search
   void wireDropZone((path) => {
     const name = path.split(/[\\/]/).pop() ?? path;
@@ -558,10 +1071,19 @@ export function mountLibrary(): void {
     void refreshStats();
   });
 
+  // first-run CLAP/CUE model install progress from the real bridge. The final
+  // JSON still comes from libraryModels(); this only keeps the setup row alive
+  // during long downloads on a clean machine.
+  void onModelProgress((p: LibraryModelProgress) => {
+    if (!installModelsBtn.disabled) return;
+    $("vmx-lib-model-state").textContent = modelProgressStateText(p);
+  });
+
   // initial paint
   applyModeVisibility();
   syncCurvePicker();
   void refreshStats();
+  void refreshModels();
   void run();
 }
 

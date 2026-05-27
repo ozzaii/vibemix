@@ -24,7 +24,9 @@ import { initCrashBanner, reasonMessage, showFatalBanner } from "../src/crash-ba
 describe("reasonMessage", () => {
   it("gives actionable guidance for a missing API key (exit-4)", () => {
     const msg = reasonMessage("api-key-missing", "raw stderr");
+    expect(msg).toContain("Live co-host direct mode");
     expect(msg).toContain("GEMINI_API_KEY");
+    expect(msg).toContain("local CLAP/Codex");
     expect(msg.toLowerCase()).toContain("restart");
     // Must NOT fall through to the raw fallback.
     expect(msg).not.toBe("raw stderr");

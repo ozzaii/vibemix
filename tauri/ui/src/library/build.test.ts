@@ -18,7 +18,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEV_FALLBACK, libraryBuildSet } from "./api.js";
-import type { BuildSetResult } from "./api.js";
+import type {
+  BuildSetResult,
+  LibraryChatResult,
+  LibraryModelInstallTarget,
+  LibraryModelsResult,
+  LibraryStats,
+} from "./api.js";
 import {
   echoText,
   fieldLabel,
@@ -87,14 +93,176 @@ describe("build — api dev fallback (no Tauri bridge)", () => {
 // renderBuildSet is module-private in index.ts, so we exercise it through its
 // only public entry — mountLibrary → run() → runBuildSet() → renderBuildSet().
 // We mock ./api.js so libraryBuildSet returns a controlled payload; the other
-// api fns are stubbed inert so the search auto-run on mount is a no-op.
+// api fns are stubbed inert so mount/status work stays offline and deterministic.
 
 const buildMock = vi.fn<(brief: string, curve: string) => Promise<BuildSetResult>>();
+const modelsMock =
+  vi.fn<(install?: LibraryModelInstallTarget) => Promise<LibraryModelsResult>>();
+const chatMock =
+  vi.fn<(message: string, history: unknown[]) => Promise<LibraryChatResult>>();
+const statsMock = vi.fn<() => Promise<LibraryStats>>();
+
+const STATS_READY: LibraryStats = {
+  indexed: 0,
+  backend: "sqlite-vec",
+  embedding_backend: "clap",
+  embedding_dim: 512,
+  clap_model_installed: true,
+  clap_model_path: "~/.cache/vibemix/clap-onnx",
+  clap_model_missing: [],
+  agent_backend: "codex",
+  agent_ready: true,
+  agent_status: "ready",
+  agent_hint: "",
+  spent_eur: 0,
+  failed: 0,
+};
+
+const MODELS_READY: LibraryModelsResult = {
+  models: [
+    {
+      id: "clap",
+      label: "CLAP ONNX",
+      role: "library embeddings/search/similarity",
+      required: true,
+      env: "VIBEMIX_CLAP_ONNX_DIR",
+      installed: true,
+      path: "~/.cache/vibemix/clap-onnx",
+      missing: [],
+      mismatched: [],
+    },
+    {
+      id: "cue-detr",
+      label: "CUE-DETR ONNX",
+      role: "cue-anchored ingest and structural cue detection",
+      required: false,
+      env: "VIBEMIX_CUE_ONNX_PATH",
+      installed: true,
+      path: "~/.cache/vibemix/cue-detr-onnx/cuedetr.fp32.onnx",
+      missing: [],
+      mismatched: [],
+    },
+  ],
+  required_ready: true,
+  all_ready: true,
+};
+
+const MODELS_CUE_MISSING: LibraryModelsResult = {
+  ...MODELS_READY,
+  models: MODELS_READY.models.map((model) =>
+    model.id === "cue-detr"
+      ? {
+          ...model,
+          installed: false,
+          installable: true,
+          missing: ["cuedetr.fp32.onnx"],
+        }
+      : model,
+  ),
+  all_ready: false,
+};
+
+const MODELS_FRESH_MISSING: LibraryModelsResult = {
+  ...MODELS_CUE_MISSING,
+  models: MODELS_CUE_MISSING.models.map((model) =>
+    model.id === "clap"
+      ? {
+          ...model,
+          installed: false,
+          missing: ["onnx/audio_model.onnx", "onnx/text_model.onnx"],
+        }
+      : model,
+  ),
+  required_ready: false,
+  all_ready: false,
+};
+
+const MODELS_REQUIRED_INSTALL_OK: LibraryModelsResult = {
+  ...MODELS_FRESH_MISSING,
+  models: MODELS_FRESH_MISSING.models.map((model) =>
+    model.id === "clap"
+      ? {
+          ...model,
+          installed: true,
+          missing: [],
+        }
+      : model,
+  ),
+  required_ready: true,
+  install: {
+    target: "required",
+    ok: true,
+    results: [
+      {
+        id: "clap",
+        installed: true,
+        path: "~/.cache/vibemix/clap-onnx",
+        files: [
+          {
+            rel_path: "onnx/audio_model.onnx",
+            path: "~/.cache/vibemix/clap-onnx/onnx/audio_model.onnx",
+            status: "downloaded",
+            size: 281749092,
+            sha256: "sha-audio",
+            url: "https://example.test/audio_model.onnx",
+          },
+          {
+            rel_path: "onnx/text_model.onnx",
+            path: "~/.cache/vibemix/clap-onnx/onnx/text_model.onnx",
+            status: "skipped",
+            size: 501513769,
+            sha256: "sha-text",
+            url: "https://example.test/text_model.onnx",
+          },
+        ],
+        errors: [],
+      },
+    ],
+  },
+};
+
+const MODELS_CUE_INSTALL_ERROR: LibraryModelsResult = {
+  ...MODELS_CUE_MISSING,
+  install: {
+    target: "cue",
+    ok: false,
+    results: [
+      {
+        id: "cue-detr",
+        installed: false,
+        path: "~/.cache/vibemix/cue-detr-onnx/cuedetr.fp32.onnx",
+        files: [],
+        errors: ["set VIBEMIX_CUE_ONNX_PATH or place cuedetr.fp32.onnx"],
+      },
+    ],
+  },
+};
+
+const CHAT_OK: LibraryChatResult = {
+  reply: "ok",
+  tool_trace: [],
+  playlist: null,
+  export_path: null,
+  seen_track_ids: [],
+  iterations: 1,
+  stop_reason: "model_done",
+};
+
+const CHAT_CODEX_MISSING: LibraryChatResult = {
+  reply:
+    "Codex CLI not found. Install it (`npm i -g @openai/codex` or `brew install codex`) and run `codex login`.",
+  tool_trace: [],
+  playlist: null,
+  export_path: null,
+  seen_track_ids: [],
+  iterations: 0,
+  stop_reason: "codex_not_installed",
+};
 
 function doMockApi(): void {
   vi.doMock("./api.js", () => ({
     libraryBuildSet: (brief: string, curve: string) => buildMock(brief, curve),
-    // inert stubs — mountLibrary auto-runs librarySearch + libraryStats on boot.
+    // inert stubs — mountLibrary does a state-dependent boot run + status refresh.
     librarySearch: vi.fn(async () => ({ results: [], centered: true, corpus_size: 0 })),
     librarySimilar: vi.fn(async () => ({ results: [], centered: true, corpus_size: 0 })),
     libraryCurate: vi.fn(async () => ({
@@ -104,23 +272,27 @@ function doMockApi(): void {
       tracks: [],
       count: 0,
     })),
-    libraryStats: vi.fn(async () => ({ indexed: 0, backend: "sqlite-vec", spent_eur: 0, failed: 0 })),
+    libraryChat: (message: string, history: unknown[]) => chatMock(message, history),
+    libraryStats: () => statsMock(),
+    libraryModels: (install?: LibraryModelInstallTarget) => modelsMock(install),
     libraryEmbedFolder: vi.fn(async () => false),
     onEmbedProgress: vi.fn(async () => () => {}),
     onEmbedDone: vi.fn(async () => () => {}),
+    onModelProgress: vi.fn(async () => () => {}),
     DEV_FALLBACK: { embedLog: [] },
   }));
 }
 
 /** Full library.html DOM skeleton (the ids/attrs index.ts queries for build). */
 function mountSkeleton(): void {
-  document.body.dataset.mode = "search";
+  document.body.dataset.mode = "chat";
   document.body.innerHTML = `
     <div class="vmx-lib-modeswitch">
-      <button data-mode="search" aria-selected="true">Search</button>
+      <button data-mode="search" aria-selected="false">Search</button>
       <button data-mode="similar" aria-selected="false">Similar</button>
       <button data-mode="curate" aria-selected="false">Curate</button>
       <button data-mode="build" aria-selected="false">Build</button>
+      <button data-mode="chat" aria-selected="true">Viber</button>
       <button data-mode="ingest" aria-selected="false">Ingest</button>
     </div>
     <span id="vmx-lib-qlabel"></span>
@@ -128,6 +300,7 @@ function mountSkeleton(): void {
     <input id="vmx-lib-folder" value="~/Music" />
     <input id="vmx-lib-theme" />
     <textarea id="vmx-lib-brief"></textarea>
+    <textarea id="vmx-lib-chat"></textarea>
     <div class="vmx-lib-curve">
       <button class="vmx-lib-curveseg" data-curve="opener" aria-pressed="false">Opener</button>
       <button class="vmx-lib-curveseg" data-curve="peak_time" aria-pressed="true">Peak time</button>
@@ -136,23 +309,31 @@ function mountSkeleton(): void {
     </div>
     <span id="vmx-lib-seed-name"></span>
     <button id="vmx-lib-runbtn"></button>
+    <span id="vmx-lib-center-label"></span>
     <span id="vmx-lib-echo"></span>
     <div id="vmx-lib-stat-indexed"></div>
     <div id="vmx-lib-stat-backend"></div>
     <div id="vmx-lib-stat-spent"></div>
     <div id="vmx-lib-stat-failed"></div>
+    <div id="vmx-lib-model-state"></div>
+    <button id="vmx-lib-install-models"></button>
+    <div id="vmx-lib-agent-setup" hidden><div id="vmx-lib-agent-state"></div></div>
     <p id="vmx-lib-rationale-body"></p>
     <div id="vmx-lib-rationale-meta"></div>
     <div id="vmx-lib-export" style="display: none">
       <div id="vmx-lib-export-path"></div>
     </div>
     <div id="vmx-lib-results"></div>
+    <div id="vmx-lib-chat-thread"></div>
     <span id="vmx-lib-rcount"></span>
     <div id="vmx-lib-prog-n"></div>
     <div id="vmx-lib-prog-cost"></div>
     <i id="vmx-lib-progress-fill"></i>
     <div id="vmx-lib-loglist"></div>
+    <span id="vmx-lib-side-label"></span>
     <span id="vmx-lib-scope-state"></span>
+    <div id="vmx-lib-chat-tools"></div>
+    <div id="vmx-lib-chat-artifact"></div>
     <svg id="vmx-lib-scope"></svg>`;
 }
 
@@ -172,8 +353,6 @@ async function runRealBuild(
   await Promise.resolve();
   const buildBtn = document.querySelector<HTMLElement>('button[data-mode="build"]');
   buildBtn?.click();
-  // Switching INTO build auto-runs once; let it settle so `busy` clears before
-  // the explicit run below (a click while busy is a no-op by design).
   for (let i = 0; i < 6; i++) await Promise.resolve();
   if (clickCurve) {
     document
@@ -187,6 +366,12 @@ async function runRealBuild(
 describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
   beforeEach(() => {
     buildMock.mockReset();
+    modelsMock.mockReset();
+    modelsMock.mockResolvedValue(MODELS_READY);
+    chatMock.mockReset();
+    chatMock.mockResolvedValue(CHAT_OK);
+    statsMock.mockReset();
+    statsMock.mockResolvedValue(STATS_READY);
     vi.resetModules();
     document.body.innerHTML = "";
   });
@@ -222,10 +407,28 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     ).filter((s) => s.getAttribute("aria-pressed") === "true");
     expect(pressed).toHaveLength(1);
     expect(pressed[0]?.dataset.curve).toBe("after_hours");
-    // and the LAST run (after the curve was picked) passed the chosen curve.
-    // (Switching INTO build mode auto-runs once with the default curve first;
-    // the explicit run-button click after the pick is the call we assert.)
+    // and the run after the curve was picked passed the chosen curve.
     expect(buildMock).toHaveBeenLastCalledWith(expect.any(String), "after_hours");
+  });
+
+  it("does not auto-run Codex set prep just by opening build mode", async () => {
+    buildMock.mockResolvedValue(DEV_FALLBACK.build);
+    vi.resetModules();
+    doMockApi();
+    const { mountLibrary } = await import("./index.js");
+    mountSkeleton();
+    mountLibrary();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    document.querySelector<HTMLElement>('button[data-mode="build"]')?.click();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(buildMock).not.toHaveBeenCalled();
+    expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toBe(
+      "No set built yet.",
+    );
+    expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("ready");
   });
 
   it("hides the export receipt + shows the empty branch on a no-key run (max_iters)", async () => {
@@ -249,6 +452,26 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("0 in set");
   });
 
+  it("renders Codex setup terminals as a no-set state with the setup hint", async () => {
+    const setupNeeded: BuildSetResult = {
+      name: "warehouse",
+      stop_reason: "codex_not_installed",
+      rationale: "Codex CLI not found. Install it and run codex login.",
+      count: 0,
+      tracks: [],
+      export_path: null,
+    };
+    await runRealBuild(setupNeeded);
+    const results = document.getElementById("vmx-lib-results") as HTMLElement;
+    expect(results.querySelector(".vmx-lib-error")).toBeNull();
+    expect(results.querySelector(".vmx-lib-empty")?.textContent).toContain(
+      "codex_not_installed",
+    );
+    expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
+      "codex login",
+    );
+  });
+
   it("escapes a hostile rationale/title — no raw HTML injection (real esc())", async () => {
     const hostile: BuildSetResult = {
       name: "xss",
@@ -265,5 +488,120 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(results.querySelector("img")).toBeNull();
     expect(results.innerHTML).toContain("&lt;img");
     expect(results.innerHTML).not.toContain("<img src=x");
+  });
+
+  it("routes a cue-only setup through the cue model target", async () => {
+    modelsMock.mockImplementation(async (install) =>
+      install === "cue" ? MODELS_CUE_INSTALL_ERROR : MODELS_CUE_MISSING,
+    );
+    vi.resetModules();
+    doMockApi();
+    const { mountLibrary } = await import("./index.js");
+    mountSkeleton();
+    mountLibrary();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    const installBtn = document.getElementById(
+      "vmx-lib-install-models",
+    ) as HTMLButtonElement;
+    expect(installBtn.hidden).toBe(false);
+    expect(installBtn.dataset.installTarget).toBe("cue");
+    expect(installBtn.textContent).toBe("Check Optional CUE");
+
+    installBtn.click();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(modelsMock).toHaveBeenCalledWith("cue");
+    expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
+      "Optional CUE setup unavailable",
+    );
+    expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
+      "set VIBEMIX_CUE_ONNX_PATH",
+    );
+    expect(installBtn.textContent).toBe("Retry Optional CUE");
+  });
+
+  it("routes first-run setup through required models, not strict all", async () => {
+    modelsMock.mockImplementation(async (install) =>
+      install === "required" ? MODELS_REQUIRED_INSTALL_OK : MODELS_FRESH_MISSING,
+    );
+    vi.resetModules();
+    doMockApi();
+    const { mountLibrary } = await import("./index.js");
+    mountSkeleton();
+    mountLibrary();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    const installBtn = document.getElementById(
+      "vmx-lib-install-models",
+    ) as HTMLButtonElement;
+    expect(installBtn.hidden).toBe(false);
+    expect(installBtn.dataset.installTarget).toBe("required");
+    expect(installBtn.textContent).toBe("Install Required Models");
+
+    installBtn.click();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(modelsMock).toHaveBeenCalledWith("required");
+    expect(modelsMock).not.toHaveBeenCalledWith("all");
+    expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
+      "CLAP ready",
+    );
+    expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
+      "Required models ready: downloaded 1/2",
+    );
+  });
+
+  it("surfaces agent setup hints separately from model readiness", async () => {
+    statsMock.mockResolvedValue({
+      ...STATS_READY,
+      agent_ready: false,
+      agent_status: "codex_auth_required",
+      agent_hint: "Run `codex login` to connect your ChatGPT plan.",
+    });
+    vi.resetModules();
+    doMockApi();
+    const { mountLibrary } = await import("./index.js");
+    mountSkeleton();
+    mountLibrary();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    const setupText = document.getElementById("vmx-lib-model-state")?.textContent ?? "";
+    expect(setupText).toContain("CLAP ready");
+    expect(setupText).toContain("CUE ready");
+    expect(setupText).not.toContain("codex login");
+
+    const agentSetup = document.getElementById("vmx-lib-agent-setup") as HTMLElement;
+    const agentText = document.getElementById("vmx-lib-agent-state")?.textContent ?? "";
+    expect(agentSetup.hidden).toBe(false);
+    expect(agentText).toContain("Viber codex");
+    expect(agentText).toContain("codex login");
+  });
+
+  it("renders Codex setup failures as setup cards in chat mode", async () => {
+    chatMock.mockResolvedValue(CHAT_CODEX_MISSING);
+    vi.resetModules();
+    doMockApi();
+    const { mountLibrary } = await import("./index.js");
+    mountSkeleton();
+    mountLibrary();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    document.querySelector<HTMLElement>('button[data-mode="chat"]')?.click();
+    const chatInput = document.getElementById("vmx-lib-chat") as HTMLTextAreaElement;
+    chatInput.value = "are you wired?";
+    (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(chatMock).toHaveBeenCalledWith("are you wired?", []);
+    const threadText = document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
+    expect(threadText).toContain("Codex CLI not found");
+    const artifactText =
+      document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
+    expect(artifactText).toContain("Codex CLI missing");
+    expect(artifactText).toContain("codex login");
+    expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
+      "setup · codex_not_installed",
+    );
   });
 });

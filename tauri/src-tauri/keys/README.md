@@ -41,13 +41,13 @@ cat ~/.tauri/vibemix_updater.key.pub | base64 | tr -d '\n'
 | Secret | Value source |
 |--------|--------------|
 | `TAURI_UPDATER_PRIVATE_KEY` | `cat ~/.tauri/vibemix_updater.key \| base64 \| tr -d '\n'` |
-| `TAURI_UPDATER_KEY_PASSWORD` | The passphrase chosen at step 1 |
+| `TAURI_UPDATER_KEY_PASSWORD` | The passphrase chosen at step 1. It may be empty, but the secret/env var must exist so CI can pass `--password ""` deliberately. |
 
 Plan 18-05's `.github/workflows/release.yml` grep-gates the literal
 sentinel `TAURI_UPDATER_PLACEHOLDER` and refuses to build any tagged
 release while the placeholder is still in `tauri.conf.json5`. CI also
-checks that `TAURI_UPDATER_PRIVATE_KEY` + `TAURI_UPDATER_KEY_PASSWORD`
-secrets are non-empty before invoking the signer.
+checks that `TAURI_UPDATER_PRIVATE_KEY` is non-empty before invoking the
+signer. The password env var is always passed and may be intentionally empty.
 
 ## Rotating the key
 
