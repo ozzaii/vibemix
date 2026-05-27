@@ -205,9 +205,11 @@ When a backup is already visible, `later` also promotes the next grounded backup
 without emitting a positive `played_next` label or rerunning the full library
 search.
 `keep` pins the current visible candidate across live shortlist refreshes until
-the seed track changes. `timing` suppresses exact bar guidance for the current
-seed/candidate pair, so refresh can still update cue context without repeating a
-timing claim the DJ marked wrong.
+the seed track changes, unless the target deck later carries a different
+grounded candidate. Live deck reality wins over the older pin. `timing`
+suppresses exact bar guidance for the current seed/candidate pair, so refresh
+can still update cue context without repeating a timing claim the DJ marked
+wrong.
 
 In the live runtime the event is written to the current session's `events.jsonl`
 as `kind: "taste_feedback"` for local replay. Long-term taste storage appends the

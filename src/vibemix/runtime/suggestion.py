@@ -1039,18 +1039,18 @@ class SuggestionService:
                 alternatives,
                 refreshed_transitions,
             )
-            if pinned_candidate_track_id:
-                alternatives = promote_transition_alternative(
-                    alternatives,
-                    track_id=pinned_candidate_track_id,
-                )
-            elif seed.target_track_id and _alternative_has_transition(
+            if seed.target_track_id and _alternative_has_transition(
                 alternatives,
                 track_id=seed.target_track_id,
             ):
                 alternatives = promote_transition_alternative(
                     alternatives,
                     track_id=seed.target_track_id,
+                )
+            elif pinned_candidate_track_id:
+                alternatives = promote_transition_alternative(
+                    alternatives,
+                    track_id=pinned_candidate_track_id,
                 )
             candidate_track_id, candidate_vector = _apply_winning_alternative(
                 current,
