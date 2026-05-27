@@ -122,6 +122,23 @@ def test_timing_refusal_right_now_does_not_require_current_position_claim() -> N
     assert result.accepted
 
 
+def test_drop_it_now_is_timing_action_not_section_role_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "current_position", value=48.0),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="Drop it now.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
 def test_tempo_phrase_rejected_without_bpm_claim() -> None:
     envelope = _envelope(claim_summary=())
 
@@ -188,6 +205,64 @@ def test_phrase_boundary_copy_requires_phrase_claim() -> None:
 
     assert not result.accepted
     assert "missing_claim_id_for_phrase" in result.errors
+
+
+def test_role_specific_copy_requires_matching_section_role_value() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "section_role", value="intro"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="This is the main drop.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "section_role_value_mismatch:clm_ctx_001_000:drop" in result.errors
+
+
+def test_role_specific_copy_requires_section_role_not_only_boundary() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "section_boundary", value=64.0),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="The drop starts at 1:04.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_section_role:drop" in result.errors
+
+
+def test_role_specific_copy_accepts_matching_section_roles() -> None:
+    envelope = _envelope(
+        claim_summary=(
+            _claim("clm_ctx_001_000", "section_role", value="outro"),
+            _claim("clm_ctx_001_001", "section_role", value="intro"),
+        )
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="Outro into intro.",
+            cited_claim_ids=("clm_ctx_001_000", "clm_ctx_001_001"),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
 
 
 def test_cue_timestamp_copy_requires_boundary_or_position_claim() -> None:

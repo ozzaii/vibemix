@@ -33,7 +33,31 @@ _TIMESTAMP_RE = re.compile(f"{_CLOCK_TIMESTAMP_RE.pattern}|{_SECONDS_TIMESTAMP_R
 _CUE_RE = re.compile(r"\b(?:hot\s+cue|cue\s+[A-H])\b", re.I)
 _HARMONIC_RE = re.compile(r"\b(?:key|harmonic|camelot|neighboring?\s+key)\b", re.I)
 _TEMPO_RE = re.compile(r"\b(?:bpm|tempo|pitch)\b", re.I)
-_STRUCTURE_RE = re.compile(r"\b(?:drop|breakdown|build|outro|intro)\b", re.I)
+_ROLE_PATTERN_TEXTS = {
+    "intro": r"\bintro\b",
+    "outro": r"\boutro\b",
+    "breakdown": r"\bbreakdown\b",
+    "groove": r"\bgroove\b",
+    "bridge": r"\bbridge\b",
+    "drop": (
+        r"\b(?:the|main|likely|first|second|next)\s+drop\b"
+        r"|\bdrop\s+(?:section|phrase|starts?|ends?|landing|entry|cue)\b"
+        r"|\bdrop\s+(?:at|around|near|from)\s+"
+        r"|\b(?:into|from|as)\s+(?:a\s+)?drop\b"
+        r"|\bdrop\s+into\b"
+    ),
+    "build": (
+        r"\b(?:the|likely|first|second|next)\s+build\b"
+        r"|\bbuild\s+(?:section|phrase|starts?|ends?)\b"
+        r"|\bbuild\s+(?:at|around|near|from)\s+"
+        r"|\b(?:into|from|as)\s+(?:a\s+)?build\b"
+        r"|\bbuild\s+into\b"
+    ),
+}
+_ROLE_PATTERNS = {role: re.compile(pattern, re.I) for role, pattern in _ROLE_PATTERN_TEXTS.items()}
+_STRUCTURE_RE = re.compile(
+    "|".join(f"(?:{pattern})" for pattern in _ROLE_PATTERN_TEXTS.values()), re.I
+)
 _SEMANTIC_RE = re.compile(r"\b(?:texture|timbre|sonic|sound(?:s|ed)?\s+close)\b", re.I)
 _ENERGY_RE = re.compile(r"\b(?:energy|intensity|energy\s+shape)\b", re.I)
 _PHRASE_RE = re.compile(r"\b(?:phrase|downbeat|bar\s+line|boundary)\b", re.I)
@@ -151,6 +175,7 @@ def validate_decision_claims(
     _validate_cue_export_status_phrase(text, cited_rows, errors)
     _validate_action_success_phrases(text, cited_rows, errors)
     _validate_timestamp_phrases(text, cited_rows, errors)
+    _validate_section_role_phrases(text, cited_rows, errors)
 
     return (
         ClaimValidationResult("rejected", tuple(errors))
@@ -238,12 +263,54 @@ def _validate_timestamp_phrases(
         errors.append(f"timestamp_claim_value_mismatch:{claim_id}:{_format_seconds(seconds)}")
 
 
+def _validate_section_role_phrases(
+    text: str,
+    cited_rows: list[dict[str, Any]],
+    errors: list[str],
+) -> None:
+    roles = _section_roles_implied_by_text(text)
+    if not roles:
+        return
+    role_rows = [row for row in cited_rows if row.get("type") == "section_role"]
+    if not role_rows:
+        for role in roles:
+            errors.append(f"missing_claim_id_for_section_role:{role}")
+        return
+
+    cited_roles = {
+        role
+        for role in (_normalize_section_role_value(row.get("value")) for row in role_rows)
+        if role is not None
+    }
+    for role in roles:
+        if role in cited_roles:
+            continue
+        claim_id = str(role_rows[0].get("claim_id") or "unknown")
+        errors.append(f"section_role_value_mismatch:{claim_id}:{role}")
+
+
 def _claim_value_is_success(value: Any) -> bool:
     if value is True:
         return True
     if not isinstance(value, str):
         return False
     return value.strip().lower() in _SUCCESS_CLAIM_VALUES
+
+
+def _section_roles_implied_by_text(text: str) -> tuple[str, ...]:
+    roles = [role for role, pattern in _ROLE_PATTERNS.items() if pattern.search(text)]
+    return tuple(dict.fromkeys(roles))
+
+
+def _normalize_section_role_value(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    role = value.strip().lower().replace("-", "_").replace(" ", "_")
+    if role == "main_drop":
+        return "drop"
+    if role in _ROLE_PATTERNS:
+        return role
+    return None
 
 
 def _timestamp_seconds_implied_by_text(text: str) -> tuple[float, ...]:
