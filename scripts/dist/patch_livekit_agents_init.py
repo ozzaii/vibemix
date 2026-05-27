@@ -53,6 +53,29 @@ _FIX_LINES = (
     "from . import inference, ipc, llm, metrics, stt, tokenize, tts, utils, vad, voice"
 )
 
+# Second-tier patch (added 2026-05-27 late session): voice/agent_session.py:26
+# does ``from .. import cli, inference, llm, stt, tts, utils, vad`` at module
+# scope. The split-import of ``__init__.py`` (above) was supposed to make this
+# safe by binding ``cli`` first, but launchd-spawn testing showed the circular
+# still triggers FLAKILY — cli's own deep dependency chain (rich/typer/etc)
+# transitively re-enters the voice load before cli's binding completes, so the
+# parent's partial-init state catches ``from .. import cli`` half-loaded. Fix:
+# drop ``cli`` from the module-scope from-import, lazy-import it inside the
+# single function that uses it (``_create_console`` does
+# ``cli.AgentsConsole.get_instance()`` at line 678). Net effect: agent_session
+# can be loaded without any ``cli`` lookup on the partial-init parent.
+_AS_BUG_LINE = "from .. import cli, inference, llm, stt, tts, utils, vad"
+_AS_FIX_LINE = (
+    "from .. import inference, llm, stt, tts, utils, vad  "
+    "# cli lazy-imported inside _create_console (rc1 cycle break 2026-05-27 — "
+    "see scripts/dist/patch_livekit_agents_init.py)"
+)
+_AS_CALL_BUG = "c = cli.AgentsConsole.get_instance()"
+_AS_CALL_FIX = (
+    "from .. import cli as _cli  # lazy — breaks the frozen-importer cycle\n"
+    "            c = _cli.AgentsConsole.get_instance()"
+)
+
 
 def _candidate_init_paths() -> list[Path]:
     """Return possible site-packages locations of livekit/agents/__init__.py.
@@ -81,6 +104,34 @@ def _candidate_init_paths() -> list[Path]:
         if p.exists() and p not in out:
             out.append(p)
     return out
+
+
+def _candidate_agent_session_paths() -> list[Path]:
+    """Sister to ``_candidate_init_paths()`` for ``voice/agent_session.py``."""
+    out: list[Path] = []
+    for init_path in _candidate_init_paths():
+        cand = init_path.parent / "voice" / "agent_session.py"
+        if cand.exists():
+            out.append(cand)
+    return out
+
+
+def patch_agent_session(path: Path, *, dry_run: bool = False) -> bool:
+    """Apply the cli-lazy-import patch to ``voice/agent_session.py``."""
+    text = path.read_text(encoding="utf-8")
+    changed = False
+    if _AS_BUG_LINE in text:
+        text = text.replace(_AS_BUG_LINE, _AS_FIX_LINE, 1)
+        changed = True
+    if _AS_CALL_BUG in text and "from .. import cli as _cli" not in text:
+        text = text.replace(_AS_CALL_BUG, _AS_CALL_FIX, 1)
+        changed = True
+    if changed and not dry_run:
+        path.write_text(text, encoding="utf-8")
+        _purge_pycache(path)
+    elif not changed and not dry_run:
+        _purge_pycache(path)
+    return changed
 
 
 def patch_path(path: Path, *, dry_run: bool = False) -> bool:
@@ -146,10 +197,20 @@ def main(argv: list[str] | None = None) -> int:
         changed = patch_path(path, dry_run=args.dry_run)
         if changed:
             verb = "would-patch" if args.dry_run else "patched"
-            print(f"[patch_livekit_agents_init] {verb}: {path}")
+            print(f"[patch_livekit_agents_init] {verb} __init__: {path}")
             any_changed = True
         else:
-            print(f"[patch_livekit_agents_init] already-patched / no-op: {path}")
+            print(f"[patch_livekit_agents_init] already-patched / no-op __init__: {path}")
+    # Also apply the agent_session cycle-break patch (second-tier — the
+    # __init__ patch wasn't enough on its own under launchd-spawn).
+    for as_path in _candidate_agent_session_paths():
+        changed = patch_agent_session(as_path, dry_run=args.dry_run)
+        if changed:
+            verb = "would-patch" if args.dry_run else "patched"
+            print(f"[patch_livekit_agents_init] {verb} agent_session: {as_path}")
+            any_changed = True
+        else:
+            print(f"[patch_livekit_agents_init] already-patched / no-op agent_session: {as_path}")
     if any_changed and not args.dry_run:
         print("[patch_livekit_agents_init] OK — frozen bundle will now boot under any spawn context")
     return 0
