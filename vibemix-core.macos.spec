@@ -41,28 +41,142 @@ hiddenimports: list[str] = []
 binaries: list[tuple[str, str]] = []
 datas: list[tuple[str, str]] = []
 
+
+def _runtime_submodule(name: str) -> bool:
+    """Exclude package test/demo/tool trees from frozen hiddenimports."""
+    parts = name.split(".")
+    blocked = {
+        "__main__",
+        "tests",
+        "testing",
+        "doc_examples",
+        "benchmarks",
+        "benchmark",
+        "examples",
+        "scripts",
+        "tools",
+        "cli",
+        "jupyter",
+    }
+    if any(part in blocked for part in parts):
+        return False
+    if name == "vibemix.bench" or name.startswith("vibemix.bench."):
+        return False
+    if name.startswith(
+        (
+            "onnxruntime.backend",
+            "onnxruntime.capi.convert_npz_to_onnx_adapter",
+            "onnxruntime.datasets",
+            "onnxruntime.tools",
+            "onnxruntime.transformers",
+            "onnxruntime.quantization",
+        )
+    ):
+        return False
+    return not any(
+        part.startswith(("test_", "_test", "_tst"))
+        or part.endswith(("_test", "_tests", "_testutils", "_tstutils"))
+        for part in parts
+    )
+
+
+def _collect_runtime_submodules(package: str) -> list[str]:
+    return collect_submodules(package, filter=_runtime_submodule)
+
+
+def _runtime_data_file(item: tuple[str, str]) -> bool:
+    """Drop packaged test/benchmark/example data that hooks add as files."""
+    src, dest = item
+    parts = Path(dest.replace("\\", "/")).parts + Path(src.replace("\\", "/")).parts
+    blocked = {"tests", "testing", "benchmarks", "benchmark", "examples"}
+    return not any(part in blocked for part in parts)
+
+
 # Third-party deps with dynamic dispatch / plugin discovery.
 _DYNAMIC_PKGS = (
-    "scipy",
-    "scipy.signal",
     "sounddevice",
     "mido",
     "rtmidi",
     "livekit",
     "livekit.agents",
-    "livekit.plugins.google",
     "livekit.plugins.openai",
     "google.genai",
-    "google.cloud",
     "mss",
-    "PIL",
     "jsonschema",
 )
 for _pkg in _DYNAMIC_PKGS:
     try:
-        hiddenimports.extend(collect_submodules(_pkg))
+        hiddenimports.extend(_collect_runtime_submodules(_pkg))
     except Exception as exc:  # pragma: no cover — defensive
         print(f"[spec] collect_submodules({_pkg!r}) skipped: {exc}", file=sys.stderr)
+
+# VibeMix uses LiveKit's Gemini LLM + native Gemini TTS leaves only. The
+# package initializer eagerly imports Google Cloud STT/TTS; keep the frozen
+# hiddenimports to the exact leaves used by vibemix.agent._livekit_google_slim.
+hiddenimports.extend(
+    [
+        "livekit.plugins.google",
+        "livekit.plugins.google.beta",
+        "livekit.plugins.google.beta.gemini_tts",
+        "livekit.plugins.google.llm",
+        "livekit.plugins.google.log",
+        "livekit.plugins.google.models",
+        "livekit.plugins.google.tools",
+        "livekit.plugins.google.utils",
+        "livekit.plugins.google.version",
+    ]
+)
+
+# Local AI runtime deps. These are lazy-imported by the CLAP/CUE paths, so the
+# PyInstaller bytecode scan can miss native libraries or dynamic submodules.
+# The build script runs `uv run --extra ai-local ...`; this block makes sure the
+# installed runtime actually lands in the frozen sidecar without bundling
+# Transformers.
+_LOCAL_AI_SUBMODULES = (
+    "av",
+    "onnxruntime",
+    "onnxruntime.capi",
+    "tokenizers",
+)
+
+# Pillow is needed for screen JPEG capture and the DETR image preprocessor, but
+# collecting all PIL submodules pulls unused UI/tool plugins. Keep only the
+# runtime image core + JPEG/PNG plugin modules used by capture/save paths.
+_PIL_MODULES = (
+    "PIL.Image",
+    "PIL.ImageFile",
+    "PIL.ImageMode",
+    "PIL.ImageOps",
+    "PIL.JpegImagePlugin",
+    "PIL.PngImagePlugin",
+)
+hiddenimports.extend(_PIL_MODULES)
+for _pkg in _LOCAL_AI_SUBMODULES:
+    try:
+        hiddenimports.extend(_collect_runtime_submodules(_pkg))
+    except Exception as exc:  # pragma: no cover — optional local-AI dep drift
+        print(f"[spec] collect_submodules({_pkg!r}) skipped: {exc}", file=sys.stderr)
+for _pkg in ("av", "onnxruntime"):
+    try:
+        binaries.extend(collect_dynamic_libs(_pkg))
+    except Exception as exc:  # pragma: no cover — native-lib packaging drift
+        print(f"[spec] collect_dynamic_libs({_pkg!r}) skipped: {exc}", file=sys.stderr)
+
+# sqlite-vec loads its extension at runtime via sqlite_vec.loadable_path(), so
+# the vec0 native library must sit next to sqlite_vec/__init__.py in the frozen
+# bundle. If it is missing, packaged apps silently fall back to NumpyStore.
+try:
+    hiddenimports.extend(_collect_runtime_submodules("sqlite_vec"))
+    _sqlite_vec_bins = collect_dynamic_libs("sqlite_vec")
+    binaries.extend(_sqlite_vec_bins)
+    _sqlite_vec_bin_srcs = {Path(src).resolve() for src, _ in _sqlite_vec_bins}
+    datas.extend(
+        (src, dest)
+        for src, dest in collect_data_files("sqlite_vec", includes=["vec0.*"])
+        if Path(src).resolve() not in _sqlite_vec_bin_srcs
+    )
+except Exception as exc:  # pragma: no cover — native extension packaging drift
+    print(f"[spec] sqlite_vec extension collection skipped: {exc}", file=sys.stderr)
 
 # livekit ships a native FFI lib (livekit/rtc/resources/liblivekit_ffi.dylib)
 # plus non-.py resources under livekit/{rtc,agents}/resources. collect_submodules
@@ -70,11 +184,20 @@ for _pkg in _DYNAMIC_PKGS:
 # AgentSession.start() ("failed to load liblivekit_ffi.dylib ... not found when
 # the application was frozen"). collect_dynamic_libs walks the package for
 # .dylib/.so and preserves their package-relative dest paths; collect_data_files
-# picks up the header / html / license siblings the loader probes for. 2026-05-20:
-# this is what unblocks the .app's LiveKit cohost from booting at all.
+# keeps the lightweight non-demo resource siblings. 2026-05-20: this is what
+# unblocks the .app's LiveKit cohost from booting at all.
 try:
     binaries.extend(collect_dynamic_libs("livekit"))
-    datas.extend(collect_data_files("livekit", includes=["**/resources/**"]))
+    datas.extend(
+        collect_data_files(
+            "livekit",
+            includes=["**/resources/**"],
+            excludes=[
+                "**/*.ogg",  # built-in background-audio demo clips; VibeMix does not call them
+                "**/jupyter-html/**",
+            ],
+        )
+    )
 except Exception as exc:  # pragma: no cover — defensive
     print(f"[spec] livekit native-lib collection skipped: {exc}", file=sys.stderr)
 
@@ -92,7 +215,7 @@ for _pkg in (
     "vibemix.ui_bus",
 ):
     try:
-        hiddenimports.extend(collect_submodules(_pkg))
+        hiddenimports.extend(_collect_runtime_submodules(_pkg))
     except Exception as exc:  # pragma: no cover
         print(f"[spec] collect_submodules({_pkg!r}) skipped: {exc}", file=sys.stderr)
 
@@ -148,6 +271,76 @@ _GENRE_PROFILES = Path("src/vibemix/state/genre/profiles")
 if not _GENRE_PROFILES.is_dir():
     raise RuntimeError(f"vibemix-core.macos.spec: missing {_GENRE_PROFILES}")
 
+datas = [item for item in datas if _runtime_data_file(item)]
+
+_ANALYSIS_EXCLUDES = [
+    "tkinter",
+    "matplotlib",
+    "IPython",
+    "pytest",
+    "ruff",
+    "black",
+    "pyinstaller",
+    "onnxruntime.backend",
+    "onnxruntime.capi.convert_npz_to_onnx_adapter",
+    "onnxruntime.datasets",
+    "onnxruntime.tools",
+    "onnxruntime.transformers",
+    "onnxruntime.quantization",
+    "mido.scripts",
+    "numba.scripts",
+    "tokenizers.tools",
+    "telegram",
+    "telegram.ext",
+    "vibemix.bench",
+    "vibemix.bench.assemble",
+    "vibemix.bench.cell",
+    "vibemix.bench.eval",
+    "vibemix.bench.fixtures",
+    "vibemix.bench.matrix",
+    "vibemix.bench.review",
+    "vibemix.bench.run",
+    "livekit.agents.cli",
+    "livekit.agents.cli.cli",
+    "livekit.agents.cli.discover",
+    "livekit.agents.cli.log",
+    "livekit.agents.cli.proto",
+    "livekit.agents.cli.readchar",
+    "livekit.agents.cli.tcp_console",
+    "livekit.agents.cli.watcher",
+    "livekit.agents.jupyter",
+    "livekit.plugins.google.realtime",
+    "livekit.plugins.google.stt",
+    "livekit.plugins.google.tts",
+    "google.genai._test_api_client",
+    "google.cloud",
+    "google.cloud.speech",
+    "google.cloud.speech_v1",
+    "google.cloud.speech_v1p1beta1",
+    "google.cloud.speech_v2",
+    "google.cloud.texttospeech",
+    "google.cloud.texttospeech_v1",
+    "google.cloud.texttospeech_v1beta1",
+    "grpc",
+    "PIL.ImageTk",
+    "PIL._imagingtk",
+    "PIL._imagingft",
+    "PIL._imagingmorph",
+    "PIL._avif",
+    "PIL.__main__",
+    "hf_xet",
+    "hf_xet.hf_xet",
+    "jsonschema.__main__",
+    "jsonschema.cli",
+    "opentelemetry.exporter.otlp.proto.grpc",
+    "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
+    "opentelemetry.exporter.otlp.proto.grpc.exporter",
+    "opentelemetry.exporter.otlp.proto.grpc.metric_exporter",
+    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
+    "scipy",
+    "transformers",
+]
+
 # ---------------------------------------------------------------------------
 # Binaries — bundled native executables.
 # ---------------------------------------------------------------------------
@@ -184,15 +377,7 @@ a = Analysis(
     # Exclude dev / test tooling so they never accidentally land in the
     # shipping bundle. ``pyinstaller`` itself is in dev deps; explicit
     # exclude blocks recursive bundling.
-    excludes=[
-        "tkinter",
-        "matplotlib",
-        "IPython",
-        "pytest",
-        "ruff",
-        "black",
-        "pyinstaller",
-    ],
+    excludes=_ANALYSIS_EXCLUDES,
     noarchive=False,
     cipher=block_cipher,
 )
