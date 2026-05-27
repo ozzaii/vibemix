@@ -38,7 +38,9 @@ private gold-label report and private scorecard to non-null SHA-256 hashes.
 `release_promoted` entries must also bind the gate artifact to a non-null
 SHA-256 hash.
 The validator recomputes pass/fail from the measured/locked metric lines and
-rejects verdict/action pairs that disagree with those numbers.
+rejects verdict/action pairs that disagree with those numbers. It also rejects
+`release_promoted` entries that are not backed by `tier2_private_holdout_canary`
+evidence.
 
 ```text
 ### YYYY-MM-DDTHH:MM:SSZ - verdict={private_in_tolerance|private_recalibration_required|release_promoted}

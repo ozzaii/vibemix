@@ -159,6 +159,24 @@ def test_validate_release_promotion_requires_gate_report_hash(tmp_path: Path) ->
     assert "entry[1].report_hashes.gate.required" in report.errors
 
 
+def test_validate_release_promotion_requires_tier2_evidence(tmp_path: Path) -> None:
+    entry = _valid_entry().replace(
+        "### 2026-05-27T12:00:00Z - verdict=private_in_tolerance",
+        "### 2026-05-27T12:00:00Z - verdict=release_promoted",
+    )
+    entry = _replace_field(entry, "splits", "calibration=1 holdout=1 canary=1")
+    entry = _replace_field(entry, "verdict", "release_promoted")
+    entry = _replace_field(entry, "action", "PROMOTE_LOCK_WITH_PR")
+    entry = _replace_key_value(entry, "- reports:", "gate", "private:redacted")
+    entry = _replace_key_value(entry, "- report_hashes:", "gate", "sha256:" + ("a" * 64))
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].release_evidence_tier" in report.errors
+
+
 def test_validate_rejects_private_payload_marker(tmp_path: Path) -> None:
     entry = _valid_entry().replace(
         "run_id: intel_private_test",

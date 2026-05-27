@@ -122,6 +122,11 @@ def _validate_entry(entry: str, *, index: int) -> list[str]:
         errors.append(f"entry[{index}].lock")
     if fields.get("evidence_tier") not in EVIDENCE_TIERS:
         errors.append(f"entry[{index}].evidence_tier")
+    if (
+        header_verdict == "release_promoted"
+        and fields.get("evidence_tier") != "tier2_private_holdout_canary"
+    ):
+        errors.append(f"entry[{index}].release_evidence_tier")
 
     splits = _parse_key_values(fields.get("splits", ""))
     for split in ("calibration", "holdout", "canary"):
