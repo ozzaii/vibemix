@@ -33,6 +33,7 @@ DEFAULT_ALLOWED_CLAIMS: tuple[str, ...] = (
     "phrase_fit",
     "cue_operability",
     "cue_slot",
+    "current_position",
     "bars_until_event",
     "risk",
     "uncertainty",
@@ -64,13 +65,14 @@ def compile_transition_context(
     bounded = tuple(candidates[: max(0, cap)])
     exact_timing_allowed = any(candidate.start_in_bars is not None for candidate in bounded)
     candidate_payloads = tuple(_candidate_payload(candidate) for candidate in bounded)
-    claim_ledger = _claim_ledger(packet_id, bounded)
+    current_payload = _redact_current(current)
+    claim_ledger = _claim_ledger(packet_id, bounded, current=current_payload)
     return AgentContextEnvelope(
         schema_version=SCHEMA_VERSION,
         packet_id=packet_id,
         mode=mode,
         intent=intent,
-        current=_redact_current(current),
+        current=current_payload,
         candidates=candidate_payloads,
         constraints={
             "max_candidates": cap,
@@ -84,7 +86,7 @@ def compile_transition_context(
         allowed_actions=_allowed_actions(mode),
         allowed_claims=DEFAULT_ALLOWED_CLAIMS,
         forbidden_claims=DEFAULT_FORBIDDEN_CLAIMS,
-        citation_scope=_citation_scope(bounded, claim_ledger),
+        citation_scope=_citation_scope(bounded, claim_ledger, current=current_payload),
         confidence_policy={
             "live_select_floor": LIVE_SELECT_CONFIDENCE_FLOOR,
             "exact_timing_floor": EXACT_TIMING_CONFIDENCE_FLOOR,
@@ -332,8 +334,14 @@ def _allowed_actions(mode: ContextMode) -> tuple[str, ...]:
     return ("select", "hold", "suppress", "ask")
 
 
-def _claim_ledger(packet_id: str, candidates: tuple[TransitionCandidate, ...]) -> MusicClaimLedger:
+def _claim_ledger(
+    packet_id: str,
+    candidates: tuple[TransitionCandidate, ...],
+    *,
+    current: dict[str, Any],
+) -> MusicClaimLedger:
     ledger = MusicClaimLedger(packet_id)
+    _add_source_context_claims(ledger, packet_id, current)
     for candidate in candidates:
         candidate_ref = f"candidate:{candidate.candidate_id}"
         ledger.add(
@@ -512,6 +520,152 @@ def _claim_ledger(packet_id: str, candidates: tuple[TransitionCandidate, ...]) -
     return ledger
 
 
+def _add_source_context_claims(
+    ledger: MusicClaimLedger,
+    packet_id: str,
+    current: dict[str, Any],
+) -> None:
+    source_context = current.get("source_context")
+    if not isinstance(source_context, dict):
+        return
+    source_ref = f"source_context:{packet_id}"
+    playhead_confidence = _score_component(source_context, "playhead_confidence", 0.0)
+    track_id = _optional_str(source_context.get("track_id")) or "source"
+    position_s = _float_or(source_context.get("position_s"), -1.0)
+    if position_s >= 0.0:
+        ledger.add(
+            "current_position",
+            subject_id=track_id,
+            value=round(position_s, 3),
+            unit="seconds",
+            evidence_refs=(source_ref,),
+            confidence=playhead_confidence,
+            scope="live_timing",
+            allowed_phrases=("current playhead", "source position"),
+            forbidden_phrases=("perfect transport lock",),
+            reason_codes=(_source_context_reason(source_context),),
+            provenance_ref=source_ref,
+        )
+
+    current_section = _source_section_payload(source_context.get("current_section"))
+    next_section = _source_section_payload(source_context.get("next_section"))
+    for section, relation in (
+        (current_section, "current_source_section"),
+        (next_section, "next_source_section"),
+    ):
+        if section is None:
+            continue
+        section_confidence = min(
+            playhead_confidence,
+            _score_component(section, "confidence", 0.0),
+        )
+        _add_section_role_claim(
+            ledger,
+            source_ref,
+            section_id=str(section["section_id"]),
+            role=str(section["role"]),
+            confidence=section_confidence,
+        )
+        _add_section_boundary_claims(
+            ledger,
+            source_ref,
+            section_id=str(section["section_id"]),
+            role=str(section["role"]),
+            start_s=float(section["start_s"]),
+            end_s=float(section["end_s"]),
+            confidence=section_confidence,
+        )
+        if relation == "next_source_section":
+            _add_source_section_distance_claim(
+                ledger,
+                source_context,
+                source_ref,
+                section_id=str(section["section_id"]),
+                value=source_context.get("bars_to_next_section_start"),
+                confidence=section_confidence,
+                phrase="next section starts",
+            )
+        else:
+            _add_source_section_distance_claim(
+                ledger,
+                source_context,
+                source_ref,
+                section_id=str(section["section_id"]),
+                value=source_context.get("bars_to_current_section_end"),
+                confidence=section_confidence,
+                phrase="current section ends",
+            )
+
+    if bool(source_context.get("source_loop_recent")):
+        ledger.add(
+            "risk",
+            subject_id=track_id,
+            value="source_loop_recent",
+            evidence_refs=(source_ref,),
+            confidence=max(playhead_confidence, 0.78),
+            scope="live_timing",
+            allowed_phrases=("loop held", "source loop held"),
+            forbidden_phrases=("natural countdown is exact",),
+            reason_codes=("source_loop_recent",),
+            provenance_ref=source_ref,
+        )
+
+
+def _source_section_payload(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    section_id = _required_str(raw.get("section_id"))
+    role = _required_str(raw.get("role"))
+    start_s = _float_or(raw.get("start_s"), -1.0)
+    end_s = _float_or(raw.get("end_s"), -1.0)
+    if section_id is None or role is None or start_s < 0.0 or end_s < start_s:
+        return None
+    return {
+        "section_id": section_id,
+        "role": role,
+        "start_s": start_s,
+        "end_s": end_s,
+        "confidence": _score_component(raw, "confidence", 0.0),
+    }
+
+
+def _add_source_section_distance_claim(
+    ledger: MusicClaimLedger,
+    source_context: dict[str, Any],
+    source_ref: str,
+    *,
+    section_id: str,
+    value: Any,
+    confidence: float,
+    phrase: str,
+) -> None:
+    if not bool(source_context.get("lookahead_allowed", True)):
+        return
+    if confidence < EXACT_TIMING_CONFIDENCE_FLOOR:
+        return
+    bars = _optional_int(value)
+    if bars is None:
+        return
+    ledger.add(
+        "bars_until_event",
+        subject_id=section_id,
+        value=bars,
+        unit="bars",
+        evidence_refs=(source_ref, f"section:{section_id}"),
+        confidence=confidence,
+        scope="live_timing",
+        allowed_phrases=(f"{phrase} in {bars} bars", f"in {bars} bars"),
+        forbidden_phrases=("exactly guaranteed",),
+        reason_codes=("source_context",),
+        provenance_ref=source_ref,
+    )
+
+
+def _source_context_reason(source_context: dict[str, Any]) -> str:
+    reason = _optional_str(source_context.get("section_clock"))
+    return reason or "playhead"
+
+
 def _add_section_role_claim(
     ledger: MusicClaimLedger,
     candidate_ref: str,
@@ -580,29 +734,63 @@ def _format_mmss(seconds: float) -> str:
 
 
 def _citation_scope(
-    candidates: tuple[TransitionCandidate, ...], claim_ledger: MusicClaimLedger
+    candidates: tuple[TransitionCandidate, ...],
+    claim_ledger: MusicClaimLedger,
+    *,
+    current: dict[str, Any],
 ) -> dict[str, tuple[str, ...]]:
     candidate_ids = tuple(candidate.candidate_id for candidate in candidates)
+    candidate_section_ids = tuple(
+        section_id
+        for candidate in candidates
+        for section_id in (candidate.from_section_id, candidate.to_section_id)
+    )
     section_ids = tuple(
-        dict.fromkeys(
-            section_id
-            for candidate in candidates
-            for section_id in (candidate.from_section_id, candidate.to_section_id)
-        )
+        dict.fromkeys((*candidate_section_ids, *_source_context_section_ids(current)))
     )
-    track_ids = tuple(
-        dict.fromkeys(
-            track_id
-            for candidate in candidates
-            for track_id in (candidate.from_track_id, candidate.to_track_id)
-        )
+    candidate_track_ids = tuple(
+        track_id
+        for candidate in candidates
+        for track_id in (candidate.from_track_id, candidate.to_track_id)
     )
+    track_ids = tuple(dict.fromkeys((*candidate_track_ids, *_source_context_track_ids(current))))
     return {
         "candidate": candidate_ids,
         "section": section_ids,
         "track": track_ids,
         "claim": claim_ledger.claim_ids(),
     }
+
+
+def _source_context_section_ids(current: dict[str, Any]) -> tuple[str, ...]:
+    source_context = current.get("source_context")
+    if not isinstance(source_context, dict):
+        return ()
+    section_ids: list[str] = []
+    for key in ("current_section", "next_section"):
+        section = source_context.get(key)
+        if isinstance(section, dict):
+            section_id = _optional_str(section.get("section_id"))
+            if section_id:
+                section_ids.append(section_id)
+    return tuple(dict.fromkeys(section_ids))
+
+
+def _source_context_track_ids(current: dict[str, Any]) -> tuple[str, ...]:
+    source_context = current.get("source_context")
+    if not isinstance(source_context, dict):
+        return ()
+    track_ids: list[str] = []
+    track_id = _optional_str(source_context.get("track_id"))
+    if track_id:
+        track_ids.append(track_id)
+    for key in ("current_section", "next_section"):
+        section = source_context.get(key)
+        if isinstance(section, dict):
+            section_track_id = _optional_str(section.get("track_id"))
+            if section_track_id:
+                track_ids.append(section_track_id)
+    return tuple(dict.fromkeys(track_ids))
 
 
 __all__ = [

@@ -32,6 +32,8 @@ MusicClaimType = Literal[
     "current_position",
     "bars_until_event",
     "blend_suppression",
+    "risk",
+    "uncertainty",
     "taste_preference",
     "taste_fit",
     "taste_uncertain",

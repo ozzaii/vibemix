@@ -221,6 +221,32 @@ def test_compile_suggestion_context_from_live_pill_shortlist() -> None:
             "active_track_id": "t1",
             "filepath": "/Users/ozai/private.wav",
             "vector": [1.0, 0.0],
+            "source_context": {
+                "track_id": "t1",
+                "position_s": 216.0,
+                "playhead_confidence": 0.85,
+                "source_loop_recent": False,
+                "lookahead_allowed": True,
+                "section_clock": "playhead",
+                "current_section": {
+                    "section_id": "t1#s000",
+                    "track_id": "t1",
+                    "role": "groove",
+                    "confidence": 0.9,
+                    "start_s": 0.0,
+                    "end_s": 224.0,
+                },
+                "next_section": {
+                    "section_id": "t1#s001",
+                    "track_id": "t1",
+                    "role": "outro",
+                    "confidence": 0.9,
+                    "start_s": 224.0,
+                    "end_s": 300.0,
+                },
+                "bars_to_current_section_end": 4,
+                "bars_to_next_section_start": 4,
+            },
         },
         suggestion=suggestion,
     )
@@ -237,9 +263,22 @@ def test_compile_suggestion_context_from_live_pill_shortlist() -> None:
     assert envelope.candidates[0]["recommended_cue_confidence"] == 0.62
     assert "filepath" not in envelope.current
     assert "vector" not in envelope.current
+    assert envelope.current["source_context"]["current_section"]["section_id"] == "t1#s000"
+    assert "t1#s000" in envelope.citation_scope["section"]
     assert envelope.constraints["raw_vectors_included"] is False
     assert envelope.constraints["raw_audio_included"] is False
     assert envelope.constraints["strict_claim_validation"] is True
-    assert {"semantic_match", "cue_slot", "bars_until_event"} <= {
-        claim["type"] for claim in envelope.claim_summary
+    claim_types = {claim["type"] for claim in envelope.claim_summary}
+    assert {"semantic_match", "cue_slot", "bars_until_event", "current_position"} <= claim_types
+    section_roles = {
+        (claim["subject_id"], claim["value"])
+        for claim in envelope.claim_summary
+        if claim["type"] == "section_role"
     }
+    assert ("t1#s000", "groove") in section_roles
+    source_timing_claims = [
+        claim
+        for claim in envelope.claim_summary
+        if claim["type"] == "bars_until_event" and claim["subject_id"] in {"t1#s000", "t1#s001"}
+    ]
+    assert {claim["value"] for claim in source_timing_claims} == {4}

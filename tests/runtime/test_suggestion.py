@@ -639,6 +639,13 @@ def test_live_context_carries_current_and_next_source_sections():
     assert source_context["next_section"]["role"] == "outro"
     assert source_context["bars_to_current_section_end"] == 4
     assert source_context["bars_to_next_section_start"] == 4
+    claim_types = {claim["type"] for claim in envelope.claim_summary}
+    assert {"current_position", "section_role", "bars_until_event"} <= claim_types
+    assert ("s#s000", "groove") in {
+        (claim["subject_id"], claim["value"])
+        for claim in envelope.claim_summary
+        if claim["type"] == "section_role"
+    }
 
 
 def test_recent_source_loop_anchors_current_section_before_upcoming_outro():
@@ -690,6 +697,14 @@ def test_recent_source_loop_anchors_current_section_before_upcoming_outro():
     assert source_context["current_section"]["section_id"] == "s#s000"
     assert source_context["next_section"]["section_id"] == "s#s001"
     assert source_context["bars_to_next_section_start"] == 4
+    assert any(
+        claim["type"] == "risk" and claim["value"] == "source_loop_recent"
+        for claim in envelope.claim_summary
+    )
+    assert not any(
+        claim["type"] == "bars_until_event" and claim["subject_id"] in {"s#s000", "s#s001"}
+        for claim in envelope.claim_summary
+    )
 
 
 def test_refresh_from_state_updates_transition_countdown_without_reranking():

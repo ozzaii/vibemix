@@ -91,6 +91,13 @@ section the DJ is actually in and the section the engine may be preparing for.
 When a recent loop action is present, `source_context.section_clock` becomes
 `loop_hold` and `lookahead_allowed` is false.
 
+`source_context` is also promoted into the claim ledger. The context compiler
+issues `current_position`, `section_role`, `section_boundary`, and eligible
+`bars_until_event` claims for the current/next source sections. If the source
+deck was looped recently, it issues a `risk` claim instead of source-section bar
+countdown claims, so model-written copy can say "loop held" without claiming the
+natural countdown is exact.
+
 ## Wire payload
 
 The pill payload is attached as `next_suggestion`.
