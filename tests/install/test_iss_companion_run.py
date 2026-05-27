@@ -26,6 +26,12 @@ def test_files_section_copies_companion_dir():
     assert "installer\\companion" in text or "installer/companion" in text
 
 
+def test_app_payload_source_is_ci_overridable():
+    text = _read()
+    assert "#ifndef SourceDir" in text
+    assert 'Source: "{#SourceDir}\\*"' in text
+
+
 def test_run_section_invokes_fetch_drivers():
     text = _read()
     assert "fetch_drivers.ps1" in text

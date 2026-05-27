@@ -20,9 +20,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REHEARSAL_DIR = REPO_ROOT / "scripts" / "install_rehearsal"
 MAC_SH = REHEARSAL_DIR / "mac_vm_setup.sh"

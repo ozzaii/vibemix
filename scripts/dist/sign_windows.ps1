@@ -22,7 +22,7 @@
 #
 # Usage (local rehearsal):
 #   pwsh scripts/dist/sign_windows.ps1 `
-#       -MsiPath .\output\vibemix-installer.msi `
+#       -InstallerPath .\output\vibemix-installer.exe `
 #       -ApiToken $env:SIGNPATH_API_TOKEN `
 #       -OrganizationId <signpath-org-uuid> `
 #       -ProjectSlug vibemix `
@@ -30,7 +30,7 @@
 #       -ArtifactConfigSlug vibemix-binaries
 #
 # Exit codes:
-#   0 = success (signed MSI in $OutputDir)
+#   0 = success (signed installer in $OutputDir)
 #   2 = SignPathClient.exe not found on PATH
 #   3 = required parameter missing
 #   4 = SignPathClient.exe returned non-zero
@@ -41,7 +41,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $false)]
-    [string]$MsiPath,
+    [Alias("MsiPath")]
+    [string]$InstallerPath,
 
     [Parameter(Mandatory = $false)]
     [string]$ApiToken = $env:SIGNPATH_API_TOKEN,
@@ -93,8 +94,8 @@ if ($Companion) {
     exit 0
 }
 
-if ([string]::IsNullOrWhiteSpace($MsiPath)) {
-    Write-Error "sign_windows.ps1: -MsiPath required when -Companion not supplied."
+if ([string]::IsNullOrWhiteSpace($InstallerPath)) {
+    Write-Error "sign_windows.ps1: -InstallerPath required when -Companion not supplied."
     exit 3
 }
 
@@ -110,14 +111,14 @@ function Assert-Param {
     }
 }
 
-Assert-Param "MsiPath" $MsiPath
+Assert-Param "InstallerPath" $InstallerPath
 Assert-Param "ApiToken" $ApiToken
 Assert-Param "OrganizationId" $OrganizationId
 Assert-Param "ProjectSlug" $ProjectSlug
 Assert-Param "PolicySlug" $PolicySlug
 
-if (-not (Test-Path $MsiPath)) {
-    Write-Host "::error::sign_windows.ps1: MsiPath '$MsiPath' does not exist."
+if (-not (Test-Path $InstallerPath)) {
+    Write-Host "::error::sign_windows.ps1: InstallerPath '$InstallerPath' does not exist."
     exit 3
 }
 
@@ -150,7 +151,7 @@ if (-not (Test-Path $OutputDir)) {
 # The CLI handles the actual signing request, polling, and signed-artifact
 # download. We pass through stdout/stderr verbatim so Kaan can see exactly
 # what the CLI is doing.
-Write-Host "Submitting $MsiPath to SignPath for signing..."
+Write-Host "Submitting $InstallerPath to SignPath for signing..."
 
 # Mask the token from any echo paths.
 $env:SIGNPATH_API_TOKEN = $ApiToken
@@ -161,7 +162,7 @@ $env:SIGNPATH_API_TOKEN = $ApiToken
     --project-slug $ProjectSlug `
     --signing-policy-slug $PolicySlug `
     --artifact-configuration-slug $ArtifactConfigSlug `
-    --input-artifact-path $MsiPath `
+    --input-artifact-path $InstallerPath `
     --output-artifact-directory $OutputDir `
     --wait-for-completion
 

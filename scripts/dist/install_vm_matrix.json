@@ -1,51 +1,58 @@
 {
-  "_doc": "vibemix INSTALL-VM matrix — Phase 45 SHIP-04 / SHIP-05 / Phase 49. Add or remove OS rows here; install_vm_matrix.sh consumes this file at runtime so additions are data, not code.",
+  "_doc": "vibemix INSTALL-VM matrix. The timed path is the full first-install smoke: installer, required CLAP model setup, Library search, Viber chat/build-set, audio/MIDI, and first live reaction.",
   "version": 1,
-  "default_max_onboarding_ms": 60000,
-  "onboarding_ms_budget": 60000,
+  "default_max_install_ms": 600000,
+  "install_ms_budget": 600000,
+  "default_max_onboarding_ms": 600000,
+  "onboarding_ms_budget": 600000,
   "simulated_runs": {
-    "_doc": "Phase 49 — placeholder onboarding_ms per row used by --simulate mode in CI rehearsal. Real-VM execution (§INSTALL-VM-RUN Kaan-action) replaces these values at SignPath cert discharge time.",
-    "macos-12.3": { "onboarding_ms": 52000, "auto_install_attempted": true },
-    "macos-14": { "onboarding_ms": 38000, "auto_install_attempted": true },
-    "macos-15": { "onboarding_ms": 35000, "auto_install_attempted": true },
-    "windows-10": { "onboarding_ms": 48000, "auto_install_attempted": true },
-    "windows-11": { "onboarding_ms": 41000, "auto_install_attempted": true }
+    "_doc": "Placeholder full-install timings used by --simulate mode in CI rehearsal. Real-VM execution (§INSTALL-VM-RUN Kaan-action) replaces these values at release discharge time.",
+    "macos-12.3": { "install_ms": 420000, "onboarding_ms": 420000, "auto_install_attempted": true },
+    "macos-14": { "install_ms": 360000, "onboarding_ms": 360000, "auto_install_attempted": true },
+    "macos-15": { "install_ms": 340000, "onboarding_ms": 340000, "auto_install_attempted": true },
+    "windows-10": { "install_ms": 450000, "onboarding_ms": 450000, "auto_install_attempted": true },
+    "windows-11": { "install_ms": 390000, "onboarding_ms": 390000, "auto_install_attempted": true }
   },
   "rows": [
     {
       "os": "macos",
       "version": "12.3",
       "tart_image": "ghcr.io/cirruslabs/macos-monterey-base:latest",
-      "expected_steps": ["intro", "permissions", "output-device", "controller", "first-reaction"],
-      "max_onboarding_ms": 60000
+      "expected_steps": ["download-dmg", "install-app", "first-launch", "required-models", "viber-setup", "library-search", "library-chat", "build-set", "blackhole-audio-route", "midi", "mode-skill", "first-reaction"],
+      "max_install_ms": 600000,
+      "max_onboarding_ms": 600000
     },
     {
       "os": "macos",
       "version": "14",
       "tart_image": "ghcr.io/cirruslabs/macos-sonoma-base:latest",
-      "expected_steps": ["intro", "permissions", "output-device", "controller", "first-reaction"],
-      "max_onboarding_ms": 60000
+      "expected_steps": ["download-dmg", "install-app", "first-launch", "required-models", "viber-setup", "library-search", "library-chat", "build-set", "blackhole-audio-route", "midi", "mode-skill", "first-reaction"],
+      "max_install_ms": 600000,
+      "max_onboarding_ms": 600000
     },
     {
       "os": "macos",
       "version": "15",
       "tart_image": "ghcr.io/cirruslabs/macos-sequoia-base:latest",
-      "expected_steps": ["intro", "permissions", "output-device", "controller", "first-reaction"],
-      "max_onboarding_ms": 60000
+      "expected_steps": ["download-dmg", "install-app", "first-launch", "required-models", "viber-setup", "library-search", "library-chat", "build-set", "blackhole-audio-route", "midi", "mode-skill", "first-reaction"],
+      "max_install_ms": 600000,
+      "max_onboarding_ms": 600000
     },
     {
       "os": "windows",
       "version": "10",
       "tart_image": "ghcr.io/cirruslabs/windows-10-base:latest",
-      "expected_steps": ["intro", "permissions", "output-device", "controller", "first-reaction"],
-      "max_onboarding_ms": 60000
+      "expected_steps": ["download-exe", "run-installer", "first-launch", "required-models", "viber-setup", "library-search", "library-chat", "build-set", "wasapi-audio-route", "midi", "mode-skill", "first-reaction"],
+      "max_install_ms": 600000,
+      "max_onboarding_ms": 600000
     },
     {
       "os": "windows",
       "version": "11",
       "tart_image": "ghcr.io/cirruslabs/windows-11-base:latest",
-      "expected_steps": ["intro", "permissions", "output-device", "controller", "first-reaction"],
-      "max_onboarding_ms": 60000
+      "expected_steps": ["download-exe", "run-installer", "first-launch", "required-models", "viber-setup", "library-search", "library-chat", "build-set", "wasapi-audio-route", "midi", "mode-skill", "first-reaction"],
+      "max_install_ms": 600000,
+      "max_onboarding_ms": 600000
     }
   ]
 }

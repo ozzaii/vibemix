@@ -7,8 +7,8 @@ PyInstaller against ``vibemix-core.macos.spec`` or ``vibemix-core.windows.spec``
 and then copies + renames the resulting ``dist/vibemix-core/`` onedir
 into ``tauri/src-tauri/binaries/vibemix-core-<triple>/`` with the inner
 executable renamed to ``vibemix-core-<triple>{exe_suffix}`` — that's the
-exact filename Tauri's ``externalBin`` configuration expects (RESEARCH
-Pitfall 4).
+exact resource path sidecar.rs resolves from Tauri's ``bundle.resources``
+configuration (PyInstaller onedir stays intact next to ``_internal/``).
 
 CI gate: every successful build runs ``assert_no_aiza_leak`` over the
 final bundle. Any byte sequence matching ``AIza[A-Za-z0-9_-]{35}`` aborts
@@ -64,7 +64,7 @@ _CHUNK = 4 * 1024 * 1024  # 4 MiB
 # ``scripts/build_sidecar.py``.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Where Tauri's externalBin lookup expects per-triple binaries.
+# Where Tauri's bundle.resources lookup expects per-triple sidecar bundles.
 _TAURI_BINARIES_DIR = _PROJECT_ROOT / "tauri" / "src-tauri" / "binaries"
 
 
@@ -147,6 +147,8 @@ def run_pyinstaller(
     cmd = [
         "uv",
         "run",
+        "--extra",
+        "ai-local",
         "pyinstaller",
         str(spec),
         "--noconfirm",
@@ -238,7 +240,10 @@ def install_into_tauri_binaries(
         shutil.rmtree(target_dir)
     target_dir.parent.mkdir(parents=True, exist_ok=True)
 
-    shutil.copytree(onedir, target_dir)
+    # PyInstaller onedir builds can contain top-level symlinks to wheel-local
+    # native libraries (notably PyAV's FFmpeg dylibs). Preserve those links;
+    # dereferencing them duplicates tens of MB in the Tauri resource bundle.
+    shutil.copytree(onedir, target_dir, symlinks=True)
     renamed = target_dir / f"vibemix-core-{triple}{exe_suffix}"
     original = target_dir / f"vibemix-core{exe_suffix}"
     if renamed.exists():
@@ -453,7 +458,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="build_sidecar",
         description=(
             "Build the vibemix-core PyInstaller bundle + install into the "
-            "Tauri externalBin layout (vibemix-core-<triple>/)."
+            "Tauri resource layout (vibemix-core-<triple>/)."
         ),
     )
     parser.add_argument(

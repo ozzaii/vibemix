@@ -16,8 +16,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
-
 MANIFEST = Path(__file__).resolve().parents[2] / "installer" / "companion" / "driver_manifest.json"
 URL_ALLOWLIST = (
     "https://existential.audio/",

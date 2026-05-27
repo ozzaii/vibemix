@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """scripts/dist/verify_binary.py — Phase 18 Wave 1 (VERIFY-04).
 
-Post-codesign / post-MSI binary attack verification gate. Walks the
-shipped vibemix bundle (``.app`` on macOS, ``.msi`` on Windows), unpacks
-every PyInstaller archive it finds (via the in-house ``_pyinstxtractor``
-shim), and runs raw-byte scans for the canonical API-key patterns:
+Post-codesign binary attack verification gate. Walks the shipped vibemix
+bundle (``.app`` on macOS, staged directory / installer ``.exe`` on Windows),
+unpacks every PyInstaller archive it finds (via the in-house
+``_pyinstxtractor`` shim), and runs raw-byte scans for the canonical API-key
+patterns:
 
 - Google AI Studio / Gemini: ``AIza[A-Za-z0-9_-]{35}``
 - AWS access key:           ``AKIA[A-Z0-9]{16}``
@@ -26,9 +27,9 @@ threat model).
 
 This is the runtime twin of ``scripts.build_sidecar.assert_no_aiza_leak``
 (Phase 11 Wave 1). The build-time gate scans the PyInstaller ``--onedir``
-output before signing; this script scans the post-sign / post-MSI
-artifact, where the bundle shape is different (``.app`` on macOS,
-``.msi`` archive on Windows). Both are deliberately separate functions.
+output before signing; this script scans the post-sign artifact, where the
+bundle shape is different (``.app`` on macOS, staged directory or installer
+``.exe`` on Windows). Both are deliberately separate functions.
 
 CLI: ``python -m scripts.dist.verify_binary <bundle> [--report PATH]``
 """
@@ -47,7 +48,7 @@ import tempfile
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from . import _pyinstxtractor
@@ -76,7 +77,7 @@ SK_PATTERN: re.Pattern[bytes] = re.compile(rb"sk-[A-Za-z0-9_\-]{20,}")
 GENERIC_KEY_PATTERN: re.Pattern[bytes] = re.compile(rb"\b[A-Za-z0-9_\-]{39}\b")
 
 
-class Pattern(str, Enum):
+class Pattern(StrEnum):
     """Named patterns. ``.value`` matches the ``pattern`` field on
     serialized ``Hit`` records. Use a string enum so JSON serialisation
     is automatic.
@@ -524,7 +525,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="verify_binary",
         description=(
-            "Scan a vibemix bundle (.app on macOS, .msi on Windows) for "
+            "Scan a vibemix bundle (.app on macOS, staged dir/.exe on Windows) for "
             "leaked API-key strings. Exits 1 if any pattern is matched. "
             "Phase 18 Wave 1 — VERIFY-04."
         ),
@@ -532,7 +533,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "bundle",
         type=Path,
-        help="Path to the .app directory or .msi file to verify.",
+        help="Path to the .app directory, staged directory, .exe, or .msi file to verify.",
     )
     parser.add_argument(
         "--report",

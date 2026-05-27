@@ -5,9 +5,9 @@
 #
 # tart-based INSTALL-VM matrix runner. Enumerates the 5-row matrix in
 # `scripts/dist/install_vm_matrix.json` (macOS 12.3 / 14 / 15 + Windows
-# 10 / 11), walks the install wizard end-to-end in each VM, captures
-# step screenshots + the onboarding-stopwatch timing dump, and ships a
-# `--check-60s` sub-gate that fails when any VM exceeded 60s onboarding.
+# 10 / 11), walks the full first-install smoke in each VM, captures step
+# screenshots + the install timing dump, and ships a budget sub-gate that
+# fails when any VM exceeds the configured 10-minute install smoke budget.
 #
 # Dry-run default: no `tart` is invoked unless `--live` is passed; the
 # pytest suite pins this contract by stubbing `tart` on PATH and
@@ -18,13 +18,14 @@
 #   bash scripts/dist/install_vm_matrix.sh --live          # actually invoke tart
 #   bash scripts/dist/install_vm_matrix.sh --matrix PATH   # override JSON path
 #   bash scripts/dist/install_vm_matrix.sh --run-id ID     # override UTC run id
-#   bash scripts/dist/install_vm_matrix.sh --check-60s     # gate-only mode
+#   bash scripts/dist/install_vm_matrix.sh --check-install-budget  # gate-only mode
+#   bash scripts/dist/install_vm_matrix.sh --check-60s             # backwards-compatible alias
 #   bash scripts/dist/install_vm_matrix.sh --quiet         # suppress stdout chatter
 #   bash scripts/dist/install_vm_matrix.sh --help          # this message
 #
 # Exit codes:
-#   0  ok (or autonomous-degraded with WARN under --check-60s)
-#   1  gate failed (a row exceeded max_onboarding_ms OR run.json missing under --check-60s)
+#   0  ok (or autonomous-degraded with WARN under the budget check)
+#   1  gate failed (a row exceeded max_install_ms OR run.json missing under the budget check)
 #   2  CLI usage error (unknown flag, missing arg)
 #   3  external dependency missing (tart binary absent under --live)
 
@@ -36,7 +37,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MATRIX_JSON="${REPO_ROOT}/scripts/dist/install_vm_matrix.json"
 RUN_ID=""
 LIVE=0
-CHECK_60S=0
+CHECK_INSTALL_BUDGET=0
 SIMULATE=0
 QUIET=0
 RUNS_ROOT="${REPO_ROOT}/dist/install-vm-runs"
@@ -69,8 +70,8 @@ while [[ $# -gt 0 ]]; do
             LIVE=1
             shift
             ;;
-        --check-60s)
-            CHECK_60S=1
+        --check-install-budget|--check-60s)
+            CHECK_INSTALL_BUDGET=1
             shift
             ;;
         --simulate)
@@ -111,10 +112,11 @@ if [[ "$SIMULATE" -eq 1 ]]; then
     SIM_DIR="${RUNS_ROOT}/${SIM_RUN_ID}"
     mkdir -p "$SIM_DIR"
     SIM_RUN_JSON="${SIM_DIR}/run.json"
-    python3 - "$MATRIX_JSON" "$SIM_RUN_JSON" <<'PYSIM'
+    python3 - "$MATRIX_JSON" "$SIM_RUN_JSON" "$SIM_RUN_ID" <<'PYSIM'
 import json, sys
 matrix = json.load(open(sys.argv[1], encoding="utf-8"))
 sim_runs = matrix.get("simulated_runs", {})
+run_id = sys.argv[3]
 rows = []
 for name, payload in sim_runs.items():
     if name == "_doc":
@@ -124,18 +126,21 @@ for name, payload in sim_runs.items():
         "os": name.split("-")[0],
         "version": name.split("-", 1)[1] if "-" in name else "",
         "status": "ok",
-        "total_ms": payload.get("onboarding_ms", 0),
-        "onboarding_ms": payload.get("onboarding_ms", 0),
-        "max_onboarding_ms": matrix.get("onboarding_ms_budget", 60000),
-        "exceeded_max_ms": payload.get("onboarding_ms", 0) > matrix.get("onboarding_ms_budget", 60000),
+        "total_ms": payload.get("install_ms", payload.get("onboarding_ms", 0)),
+        "install_ms": payload.get("install_ms", payload.get("onboarding_ms", 0)),
+        "onboarding_ms": payload.get("install_ms", payload.get("onboarding_ms", 0)),
+        "max_install_ms": matrix.get("install_ms_budget", matrix.get("onboarding_ms_budget", 600000)),
+        "max_onboarding_ms": matrix.get("install_ms_budget", matrix.get("onboarding_ms_budget", 600000)),
+        "exceeded_max_ms": payload.get("install_ms", payload.get("onboarding_ms", 0)) > matrix.get("install_ms_budget", matrix.get("onboarding_ms_budget", 600000)),
         "auto_install_attempted": payload.get("auto_install_attempted", True),
         "simulated": True,
     })
 out = {
-    "run_id": "${SIM_RUN_ID}",
+    "run_id": run_id,
     "simulated": True,
     "rows": rows,
-    "onboarding_ms_budget": matrix.get("onboarding_ms_budget", 60000),
+    "install_ms_budget": matrix.get("install_ms_budget", matrix.get("onboarding_ms_budget", 600000)),
+    "onboarding_ms_budget": matrix.get("install_ms_budget", matrix.get("onboarding_ms_budget", 600000)),
 }
 with open(sys.argv[2], "w", encoding="utf-8") as f:
     json.dump(out, f, indent=2)
@@ -148,11 +153,11 @@ PYSIM
     log "[install-vm] simulated run written to $SIM_RUN_JSON"
 fi
 
-# --- --check-60s gate-only mode (SHIP-05) -----------------------------------
+# --- install budget gate-only mode (SHIP-05) --------------------------------
 
-if [[ "$CHECK_60S" -eq 1 ]]; then
+if [[ "$CHECK_INSTALL_BUDGET" -eq 1 ]]; then
     # Reads the most recent run.json under RUNS_ROOT and exits non-zero if any
-    # row exceeded its max_onboarding_ms; emits BLOCKED_BY=install-vm on stderr
+    # row exceeded its max_install_ms; emits BLOCKED_BY=install-vm on stderr
     # for cut_release.sh-friendly grep. Absent RUNS_ROOT → exit 1 with hint.
     # All-skipped → exit 0 with WARN (CONTEXT §INSTALL-VM autonomous-degraded
     # semantics; full discharge requires all 5 images per §SHIP-04 runbook).
@@ -160,9 +165,16 @@ if [[ "$CHECK_60S" -eq 1 ]]; then
         echo "[install-vm] no runs found — run 'install_vm_matrix.sh --live' first" >&2
         exit 1
     fi
-    LATEST_RUN_JSON=$(find "$RUNS_ROOT" -maxdepth 2 -name run.json -type f \
-        -exec stat -f '%m %N' {} \; 2>/dev/null \
-        | sort -nr | head -1 | cut -d' ' -f2-)
+    LATEST_RUN_JSON=$(python3 - "$RUNS_ROOT" <<'PYLATEST'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+run_jsons = [p for p in root.glob("*/run.json") if p.is_file()]
+if run_jsons:
+    print(max(run_jsons, key=lambda p: p.stat().st_mtime))
+PYLATEST
+)
     if [[ -z "$LATEST_RUN_JSON" || ! -f "$LATEST_RUN_JSON" ]]; then
         echo "[install-vm] no runs found — run 'install_vm_matrix.sh --live' first" >&2
         exit 1
@@ -191,7 +203,7 @@ for r in failed:
         f"BLOCKED_BY=install-vm: row {r['os']}-{r['version']} status=failed"
     )
 for r in exceeded:
-    max_ms = r.get("max_onboarding_ms", 60000)
+    max_ms = r.get("max_install_ms", r.get("max_onboarding_ms", 600000))
     blockers.append(
         f"[install-vm] BLOCKED — row {r['os']}-{r['version']} took "
         f"{r['total_ms']}ms (max: {max_ms}ms) "
@@ -205,17 +217,18 @@ if blockers:
 
 if total > 0 and len(skipped) == total:
     print(
-        "[install-vm] WARN — all rows skipped; --check-60s "
+        "[install-vm] WARN — all rows skipped; install budget check "
         "autonomous-degraded pass (full discharge requires all 5 images "
         "per §SHIP-04)"
     )
     sys.exit(0)
 
 max_observed = max((r.get("total_ms") or 0) for r in ok_rows) if ok_rows else 0
+budget_ms = max((r.get("max_install_ms") or r.get("max_onboarding_ms") or 0) for r in ok_rows) if ok_rows else data.get("install_ms_budget", 600000)
 ok_count = len(ok_rows)
 print(
-    f"[install-vm] OK — {ok_count}/{total} rows under 60000ms "
-    f"(max observed: {max_observed}ms)"
+    f"[install-vm] OK — {ok_count}/{total} rows under install budget "
+    f"{budget_ms}ms (max observed: {max_observed}ms)"
 )
 sys.exit(0)
 PYGATE
@@ -273,7 +286,7 @@ print(json.dumps(rows[$idx]))
     os=$(printf '%s' "$row_json" | python3 -c "import json,sys; print(json.load(sys.stdin)['os'])")
     ver=$(printf '%s' "$row_json" | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
     image=$(printf '%s' "$row_json" | python3 -c "import json,sys; print(json.load(sys.stdin)['tart_image'])")
-    max_ms=$(printf '%s' "$row_json" | python3 -c "import json,sys; print(json.load(sys.stdin)['max_onboarding_ms'])")
+    max_ms=$(printf '%s' "$row_json" | python3 -c "import json,sys; r=json.load(sys.stdin); print(r.get('max_install_ms', r.get('max_onboarding_ms')))")
     # Read step names as newline-separated.
     local steps_str
     steps_str=$(printf '%s' "$row_json" | python3 -c "
@@ -302,8 +315,9 @@ print('\n'.join(json.load(sys.stdin)['expected_steps']))
     if [[ "$row_status" == "ok" ]]; then
         if [[ "$LIVE" -eq 1 ]]; then
             # In live mode the actual VM run is a more elaborate dance (mount
-            # host dir, install the DMG/MSI, launch the wizard with
-            # VIBEMIX_INSTALL_VM_RUN=1). For this scaffolding we delegate to a
+            # host dir, install the DMG / Windows installer EXE, run required
+            # CLAP setup, Library search, Viber chat/build-set, then launch
+            # the wizard with VIBEMIX_INSTALL_VM_RUN=1). For this scaffolding we delegate to a
             # `tart run` invocation; the §SHIP-04 runbook documents the full
             # mount-and-walk flow Kaan executes manually. The runner records a
             # `[plan] tart run` placeholder for symmetry with dry-run output.
@@ -379,7 +393,10 @@ results.append({
     "screenshots": json.loads('''$screenshots_json'''),
     "timing_dump": json.loads('$timing_dump_field'),
     "total_ms": (None if "$total_ms" == "null" else int("$total_ms")),
+    "install_ms": (None if "$total_ms" == "null" else int("$total_ms")),
+    "onboarding_ms": (None if "$total_ms" == "null" else int("$total_ms")),
     "exceeded_max_ms": ("$exceeded_max_ms" == "true"),
+    "max_install_ms": int("$max_ms"),
     "max_onboarding_ms": int("$max_ms"),
     "skip_reason": json.loads('$skip_reason'),
 })

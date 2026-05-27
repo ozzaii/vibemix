@@ -61,10 +61,12 @@ Write-Host "[build_local] vc_redist.x64.exe ready"
 Write-Host "[build_local] === Stage 2: PyInstaller sidecar ==="
 uv sync --frozen
 uv run python scripts/build_sidecar.py --spec vibemix-core.windows.spec
-if (-not (Test-Path "dist\vibemix\vibemix.exe")) {
-    Write-Host "[build_local] FAIL: PyInstaller did not produce dist\vibemix\vibemix.exe" -ForegroundColor Red
+$sidecar = "tauri\src-tauri\binaries\vibemix-core-x86_64-pc-windows-msvc\vibemix-core-x86_64-pc-windows-msvc.exe"
+if (-not (Test-Path $sidecar)) {
+    Write-Host "[build_local] FAIL: build_sidecar.py did not install $sidecar" -ForegroundColor Red
     exit 3
 }
+Write-Host "[build_local] sidecar ready: $sidecar"
 
 Write-Host "[build_local] === Stage 3: Tauri frontend + cargo bundle ==="
 Push-Location tauri
@@ -73,11 +75,21 @@ npm run build
 Pop-Location
 
 Push-Location tauri\src-tauri
-cargo tauri build
+cargo tauri build --no-bundle
 Pop-Location
 
-Write-Host "[build_local] === Stage 4: Inno Setup compile (unsigned) ==="
-& $iscc /Sno="echo skipping local sign for `$f" installer\windows\vibemix-installer.iss
+Write-Host "[build_local] === Stage 4: Stage Windows app payload ==="
+pwsh scripts\win\stage_app_payload.ps1 -OutputDir dist\windows-app
+uv run python scripts/dist/check_windows_app_payload_ready.py `
+    dist/windows-app `
+    --triple x86_64-pc-windows-msvc `
+    --smoke version
+
+Write-Host "[build_local] === Stage 5: Inno Setup compile (unsigned) ==="
+& $iscc `
+    /Sno="echo skipping local sign for `$f" `
+    /DSourceDir=..\..\dist\windows-app `
+    installer\windows\vibemix-installer.iss
 
 $installer = "installer\windows\output\vibemix-installer.exe"
 if (-not (Test-Path $installer)) {
@@ -92,5 +104,5 @@ Write-Host "[build_local]   size:  $((Get-Item $installer).Length / 1MB | ForEac
 Write-Host ""
 Write-Host "[build_local] Next: drag $installer onto a clean Win 11 snapshot"
 Write-Host "[build_local]       (Parallels: revert to clean-postinstall snapshot first)"
-Write-Host "[build_local]       Stopwatch the full first-launch flow; target ≤60s per INSTALL-05."
-Write-Host "[build_local]       Record result in KAAN-ACTION-LEGAL.md::INSTALL-VM-RUN sign-off block."
+Write-Host "[build_local]       Stopwatch docs/install-rehearsal.md; target under 10 minutes total."
+Write-Host "[build_local]       Record each step duration in the Phase 20 rehearsal log."

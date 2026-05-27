@@ -11,11 +11,12 @@
 #   2. Phase 17 grading sheet has ≥4 rater rows in `grading-sheet.csv`
 #   3. README has no unresolved `<!-- TODO(kaan, pre-tag-v0.1.0): ... -->`
 #   4. `tauri.conf.json5` does NOT contain the placeholder pubkey sentinel
-#   5. Required GitHub secrets are configured (gh secret list)
-#   6. README Discord link is no longer the TBD placeholder
-#   7. Apple Developer ID cert is installed in local Keychain (macOS only)
+#   5. Bundled sidecar resource tree is real, executable, and not placeholder-only
+#   6. Required GitHub secrets are configured (gh secret list)
+#   7. README Discord link is no longer the TBD placeholder
+#   8. Apple Developer ID cert is installed in local Keychain (macOS only)
 #
-# Steps 5–7 are skipped gracefully when `gh` / `security` unavailable
+# Steps 6–8 are skipped gracefully when `gh` / `security` unavailable
 # (e.g. running in CI sandbox); they emit WARN instead of FAIL.
 # =============================================================================
 
@@ -39,7 +40,7 @@ echo "============================================================"
 echo
 
 # --- 1. Phase 16 ear-test signoff ----------------------------------------
-echo "[1/7] Phase 16 ear-test signed off"
+echo "[1/8] Phase 16 ear-test signed off"
 V16=".planning/phases/16-hallucination-verification-gate/16-VERIFICATION.md"
 if [[ -f "$V16" ]] && grep -q "^status: passed" "$V16" 2>/dev/null; then
   ok "$V16 exists and status: passed"
@@ -49,7 +50,7 @@ fi
 echo
 
 # --- 2. Phase 17 grading sheet has 4+ rows --------------------------------
-echo "[2/7] Phase 17 reaction-reel grading has ≥4 raters"
+echo "[2/8] Phase 17 reaction-reel grading has ≥4 raters"
 G17="benchmarks/reaction_reel/grading-sheet.csv"
 if [[ -f "$G17" ]]; then
   rows=$(($(wc -l < "$G17") - 1))  # minus header
@@ -64,7 +65,7 @@ fi
 echo
 
 # --- 3. README has no unresolved pre-tag TODOs ----------------------------
-echo "[3/7] README has no unresolved pre-tag TODOs"
+echo "[3/8] README has no unresolved pre-tag TODOs"
 if grep -q "TODO(kaan, pre-tag-v0.1.0)" README.md 2>/dev/null; then
   count=$(grep -c "TODO(kaan, pre-tag-v0.1.0)" README.md)
   no "$count unresolved pre-tag TODO marker(s) in README.md"
@@ -74,7 +75,7 @@ fi
 echo
 
 # --- 4. Tauri pubkey is not the placeholder ------------------------------
-echo "[4/7] Tauri updater pubkey is not the placeholder"
+echo "[4/8] Tauri updater pubkey is not the placeholder"
 T_CONF="tauri/src-tauri/tauri.conf.json5"
 if [[ -f "$T_CONF" ]]; then
   # Only inspect the actual pubkey JSON value, not the surrounding comments
@@ -92,19 +93,46 @@ else
 fi
 echo
 
-# --- 5. Required GitHub secrets configured -------------------------------
-echo "[5/7] Required GitHub secrets configured"
+# --- 5. Bundled sidecar resource tree ready -------------------------------
+echo "[5/8] Bundled sidecar resource tree ready"
+if command -v uv >/dev/null 2>&1; then
+  SIDECAR_CHECK=(uv run python scripts/dist/check_sidecar_bundle_ready.py --quiet)
+elif command -v python3 >/dev/null 2>&1; then
+  SIDECAR_CHECK=(python3 scripts/dist/check_sidecar_bundle_ready.py --quiet)
+elif command -v python >/dev/null 2>&1; then
+  SIDECAR_CHECK=(python scripts/dist/check_sidecar_bundle_ready.py --quiet)
+else
+  SIDECAR_CHECK=()
+fi
+
+if (( ${#SIDECAR_CHECK[@]} == 0 )); then
+  no "Python not found — cannot verify bundled sidecar resource tree"
+elif sidecar_check_out=$("${SIDECAR_CHECK[@]}" 2>&1); then
+  ok "bundled sidecar resource tree is ready"
+else
+  no "bundled sidecar resource tree is not ready"
+  printf '%s\n' "$sidecar_check_out" | sed 's/^/    /'
+fi
+echo
+
+# --- 6. Required GitHub secrets configured -------------------------------
+echo "[6/8] Required GitHub secrets configured"
 REQUIRED=(
+  APPLE_DEVELOPER_ID
   APPLE_DEVELOPER_ID_P12_BASE64
-  APPLE_DEVELOPER_ID_P12_PASSWORD
-  APPLE_ID
-  APPLE_APP_PASSWORD
+  APPLE_DEVELOPER_ID_PASSWORD
+  APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD
   APPLE_TEAM_ID
+  APPLE_API_KEY_ID
+  APPLE_API_KEY_ISSUER
+  APPLE_API_KEY_P8
   SIGNPATH_API_TOKEN
   SIGNPATH_ORGANIZATION_ID
   SIGNPATH_PROJECT_SLUG
+  SIGNPATH_SIGNING_POLICY_SLUG
+  SIGNPATH_SIGNTOOL_CMD
   TAURI_UPDATER_PRIVATE_KEY
-  TAURI_UPDATER_PRIVATE_KEY_PASSWORD
+  TAURI_UPDATER_KEY_PASSWORD
   BRAVOH_MANIFEST_UPLOAD_TOKEN
 )
 if command -v gh >/dev/null 2>&1; then
@@ -129,8 +157,8 @@ else
 fi
 echo
 
-# --- 6. Discord invite is no longer TBD ----------------------------------
-echo "[6/7] Discord invite link is real"
+# --- 7. Discord invite is no longer TBD ----------------------------------
+echo "[7/8] Discord invite link is real"
 if grep -qE "^Discord: \*\*TBD\*\*" README.md 2>/dev/null; then
   no "README still has Discord: **TBD** placeholder"
 elif grep -qE "discord\.gg/[A-Za-z0-9]+" README.md 2>/dev/null; then
@@ -140,8 +168,8 @@ else
 fi
 echo
 
-# --- 7. Apple Dev ID cert in local Keychain (macOS only) -----------------
-echo "[7/7] Apple Developer ID cert in local Keychain"
+# --- 8. Apple Dev ID cert in local Keychain (macOS only) -----------------
+echo "[8/8] Apple Developer ID cert in local Keychain"
 if [[ "$(uname -s)" == "Darwin" ]] && command -v security >/dev/null 2>&1; then
   if security find-identity -v -p codesigning 2>/dev/null | grep -q "Developer ID Application:"; then
     ident=$(security find-identity -v -p codesigning 2>/dev/null | grep -m1 "Developer ID Application:" | sed 's/.*"\(.*\)".*/\1/')

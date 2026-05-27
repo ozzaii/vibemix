@@ -175,14 +175,43 @@ mkdir -p "$OUTPUT_DIR"
 
 stage 1 "validate prerequisites (binaries, env vars, paths, identity)"
 
+# Required binaries.
+for bin in base64 codesign python3 xcrun security plutil; do
+    if ! command -v "$bin" >/dev/null 2>&1; then
+        fatal 2 "$bin not found on PATH (install Xcode Command Line Tools: xcode-select --install)"
+    fi
+done
+
+if [[ "$SKIP_DMG" -eq 0 ]]; then
+    if ! command -v create-dmg >/dev/null 2>&1; then
+        fatal 2 "create-dmg not found on PATH. Install: brew install create-dmg"
+    fi
+fi
+
 MISSING=()
 
-# Required env vars first (collect all, print all, exit 2).
-for v in APPLE_DEVELOPER_ID APPLE_TEAM_ID APPLE_API_KEY_PATH APPLE_API_KEY_ID APPLE_API_KEY_ISSUER; do
+if [[ "${CI:-}" == "true" ]]; then
+    for v in \
+        APPLE_DEVELOPER_ID_P12_BASE64 \
+        APPLE_DEVELOPER_ID_PASSWORD \
+        APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD \
+        APPLE_API_KEY_P8
+    do
+        if [[ -z "${!v:-}" ]]; then
+            MISSING+=("$v")
+        fi
+    done
+fi
+
+for v in APPLE_DEVELOPER_ID APPLE_TEAM_ID APPLE_API_KEY_ID APPLE_API_KEY_ISSUER; do
     if [[ -z "${!v:-}" ]]; then
         MISSING+=("$v")
     fi
 done
+
+if [[ "${CI:-}" != "true" && -z "${APPLE_API_KEY_PATH:-}" ]]; then
+    MISSING+=("APPLE_API_KEY_PATH")
+fi
 
 if [[ ${#MISSING[@]} -gt 0 ]]; then
     log "missing required env vars:"
@@ -193,17 +222,49 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
     exit 2
 fi
 
-# Required binaries.
-for bin in codesign xcrun security plutil; do
-    if ! command -v "$bin" >/dev/null 2>&1; then
-        fatal 2 "$bin not found on PATH (install Xcode Command Line Tools: xcode-select --install)"
-    fi
-done
+CI_TMP_DIR=""
+CI_KEYCHAIN_PATH=""
 
-if [[ "$SKIP_DMG" -eq 0 ]]; then
-    if ! command -v create-dmg >/dev/null 2>&1; then
-        fatal 2 "create-dmg not found on PATH. Install: brew install create-dmg"
+cleanup_ci_material() {
+    if [[ -n "$CI_KEYCHAIN_PATH" ]]; then
+        security delete-keychain "$CI_KEYCHAIN_PATH" >/dev/null 2>&1 || true
     fi
+    if [[ -n "$CI_TMP_DIR" ]]; then
+        rm -rf "$CI_TMP_DIR"
+    fi
+}
+
+if [[ "${CI:-}" == "true" ]]; then
+    CI_TMP_DIR=$(mktemp -d -t vibemix-macos-sign.XXXXXX)
+    CI_KEYCHAIN_PATH="$CI_TMP_DIR/vibemix-signing.keychain-db"
+    trap cleanup_ci_material EXIT INT TERM
+
+    P12_PATH="$CI_TMP_DIR/developer-id.p12"
+    APPLE_API_KEY_PATH="$CI_TMP_DIR/AuthKey.p8"
+    export APPLE_API_KEY_PATH
+
+    echo "$APPLE_DEVELOPER_ID_P12_BASE64" | base64 --decode > "$P12_PATH"
+    echo "$APPLE_API_KEY_P8" | base64 --decode > "$APPLE_API_KEY_PATH"
+
+    security create-keychain -p "$APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD" "$CI_KEYCHAIN_PATH"
+    security set-keychain-settings -lut 21600 "$CI_KEYCHAIN_PATH"
+    security unlock-keychain -p "$APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD" "$CI_KEYCHAIN_PATH"
+    security import "$P12_PATH" \
+        -k "$CI_KEYCHAIN_PATH" \
+        -P "$APPLE_DEVELOPER_ID_PASSWORD" \
+        -T /usr/bin/codesign \
+        -T /usr/bin/productsign
+    security list-keychains -d user -s "$CI_KEYCHAIN_PATH"
+    security set-key-partition-list \
+        -S apple-tool:,apple:,codesign: \
+        -s \
+        -k "$APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD" \
+        "$CI_KEYCHAIN_PATH" >/dev/null
+
+    if ! security find-identity -p codesigning -v "$CI_KEYCHAIN_PATH" | grep -F "$APPLE_DEVELOPER_ID" >/dev/null; then
+        fatal 2 "Developer ID identity not imported into CI keychain: $APPLE_DEVELOPER_ID"
+    fi
+    log "CI signing material imported into temporary keychain"
 fi
 
 # Paths.
@@ -238,6 +299,18 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     log "DRY-RUN: stopping after Stage 1; no codesign / notarytool / staple invoked"
     exit 0
 fi
+
+# ---------------------------------------------------------------------------
+# Stage 1b — Repair Tauri-flattened sidecar symlinks before signing
+# ---------------------------------------------------------------------------
+#
+# Tauri's macOS resource bundler can dereference PyInstaller's top-level dylib
+# symlinks under Contents/Resources/binaries/vibemix-core-*/_internal. Repair
+# byte-identical flattened copies before codesign seals the bundle.
+
+stage "1b" "repair packaged sidecar symlinks before codesign"
+
+python3 "$REPO_ROOT/scripts/dist/repair_macos_app_sidecar_symlinks.py" "$APP"
 
 # ---------------------------------------------------------------------------
 # Stage 2 — Pre-flight codesign every nested binary

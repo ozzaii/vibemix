@@ -68,7 +68,7 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
-__all__ = ["PyInstArchive", "TocEntry", "PYINST_MAGIC"]
+__all__ = ["PYINST_MAGIC", "PyInstArchive", "TocEntry"]
 
 _LOG = logging.getLogger(__name__)
 

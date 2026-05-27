@@ -36,7 +36,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CAP = REPO_ROOT / "tauri/src-tauri/capabilities/default.json"
 SNAPSHOT = REPO_ROOT / "tauri/src-tauri/capabilities-snapshot/SNAPSHOT.json"
