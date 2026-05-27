@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 
 from vibemix.intel.feedback import (
+    append_feedback_event,
+    feedback_event_to_row,
     feedback_privacy_errors,
     load_feedback_events,
     parse_feedback_event,
@@ -77,3 +79,30 @@ def test_load_feedback_events_jsonl(tmp_path: Path) -> None:
     )
 
     assert len(load_feedback_events(path)) == 1
+
+
+def test_append_feedback_event_writes_jsonl_only_with_consent(tmp_path: Path) -> None:
+    event = parse_feedback_event(
+        {
+            "event_id": "evt_choice_001",
+            "session_id": "s1",
+            "surface": "live_next_pill",
+            "action": "transition_labeled",
+            "label": "played_next",
+            "role_from": "outro",
+            "role_to": "groove",
+            "candidate_id": "tr_002",
+            "risk_flags": ["tempo_bridge"],
+            "score": 0.84,
+            "selected_track_id": "b",
+        }
+    )
+    path = tmp_path / "taste_feedback.jsonl"
+
+    assert append_feedback_event(path, event, profile_consent=False) is False
+    assert not path.exists()
+    assert append_feedback_event(path, event, profile_consent=True) is True
+
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert rows == [feedback_event_to_row(event, profile_consent=True)]
+    assert load_feedback_events(path)[0].label == "played_next"

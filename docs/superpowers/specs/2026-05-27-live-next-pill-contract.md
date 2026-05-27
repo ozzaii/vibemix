@@ -143,6 +143,29 @@ action. Backup rows send the existing websocket action
 `SuggestionService` promotes that visible alternative, pins it across live
 refreshes, and avoids a full library rerank.
 
+### Taste feedback
+
+Choosing a backup row is also a structured taste signal. The runtime records one
+positive `FeedbackEvent` with:
+
+- `surface`: `live_next_pill`
+- `action`: `transition_labeled`
+- `label`: `played_next`
+- the clicked rank-local `candidate_id`
+- selected/replaced track IDs
+- source/target roles and section IDs when transition evidence exists
+- cue slot, transition score, confidence, timing basis, and risk flags
+
+The event is emitted only when a non-selected visible alternative is actually
+promoted. Clicking the already-selected row or a stale/missing candidate does not
+emit feedback.
+
+In the live runtime the event is written to the current session's `events.jsonl`
+as `kind: "taste_feedback"` for local replay. Long-term taste storage appends the
+same structured row to `app_data_dir()/taste_feedback.jsonl` only when
+`profile_consent` is currently true. The row must not include raw audio, local
+paths, vectors, or prompt prose.
+
 ### `decision`
 
 `decision` is the validator-checked action packet produced after the claim ledger
@@ -202,7 +225,7 @@ action path and the next frame reflects the pinned selected candidate.
 Focused backend and UI checks used for this slice:
 
 ```bash
-uv run pytest -q tests/library/test_next_suggestion.py tests/runtime/test_suggestion.py tests/runtime/test_ws_bus.py tests/intel/test_context_compiler.py tests/intel/test_decision_runtime.py tests/intel/test_decision_validator.py
+uv run pytest -q tests/intel/test_feedback.py tests/library/test_next_suggestion.py tests/runtime/test_suggestion.py tests/runtime/test_ws_bus.py tests/intel/test_context_compiler.py tests/intel/test_decision_runtime.py tests/intel/test_decision_validator.py
 npm --prefix tauri/ui test -- next-suggestion
 npm --prefix tauri/ui test -- pill/index
 ```
@@ -224,6 +247,7 @@ warnings are not specific to the live next-pill contract.
   synthetic wire-level regression.
 - Add richer target-cue operability checks once more CUE-DETR or Rekordbox cue
   data is available.
-- Add acceptance feedback so backup choices can feed taste learning.
-- Keep improving taste learning and threshold gates so the system learns which
-  technically valid transitions the DJ actually accepts.
+- Feed the consent-gated `taste_feedback.jsonl` rows back into the live
+  transition scorer at boot instead of leaving them as stored evidence only.
+- Keep improving taste thresholds so the system learns which technically valid
+  transitions the DJ actually accepts.

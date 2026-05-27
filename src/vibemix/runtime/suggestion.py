@@ -34,9 +34,11 @@ import asyncio
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from vibemix.intel.feedback import FeedbackEvent, parse_feedback_event
 from vibemix.library.next_suggestion import (
     annotate_transition_selection,
     next_suggestion,
@@ -158,10 +160,20 @@ def resolve_live_timing(state: Any) -> LiveTimingHint:
 class SuggestionService:
     """Thread-safe holder + recompute for the pill next-suggestion."""
 
-    def __init__(self, store: Any, library: Any, *, k: int = 5) -> None:
+    def __init__(
+        self,
+        store: Any,
+        library: Any,
+        *,
+        k: int = 5,
+        feedback_sink: Callable[[FeedbackEvent], None] | None = None,
+        session_id: str | None = None,
+    ) -> None:
         self._store = store
         self._library = library
         self._k = k
+        self._feedback_sink = feedback_sink
+        self._feedback_session_id = _feedback_token(session_id or "live_session")
         self._lock = threading.Lock()
         self._played: set[str] = set()
         self._current: dict | None = None
@@ -206,6 +218,7 @@ class SuggestionService:
         """Promote a visible transition alternative without a full rerank."""
         with self._lock:
             current = dict(self._current) if self._current is not None else None
+            seed_track_id = self._seed_track_id
             candidate_vectors_by_track_id = {
                 tid: vector.copy() for tid, vector in self._candidate_vectors_by_track_id.items()
             }
@@ -218,6 +231,12 @@ class SuggestionService:
             return None
 
         alternatives = _coerce_transition_alternatives(current.get("transition_alternatives"))
+        selected_before = _matching_alternative(
+            alternatives,
+            candidate_id=candidate_id,
+            track_id=track_id,
+        )
+        previous_before = alternatives[0] if alternatives else None
         promoted = promote_transition_alternative(
             alternatives,
             candidate_id=candidate_id,
@@ -243,6 +262,14 @@ class SuggestionService:
         if state is not None:
             current["decision"] = self._safe_decision_payload_for_suggestion(state, current)
 
+        feedback_event = self._feedback_event_for_choice(
+            selected_before=selected_before,
+            selected_after=promoted[0] if promoted else None,
+            previous_before=previous_before,
+            seed_track_id=seed_track_id,
+            requested_candidate_id=candidate_id,
+            requested_track_id=track_id,
+        )
         with self._lock:
             if self._current is None:
                 return None
@@ -250,7 +277,73 @@ class SuggestionService:
             self._candidate_track_id = selected_track_id
             self._candidate_vector = selected_vector.copy() if selected_vector is not None else None
             self._pinned_candidate_track_id = selected_track_id
-            return self._current
+            result = self._current
+
+        if feedback_event is not None:
+            self._emit_feedback(feedback_event)
+        return result
+
+    def _feedback_event_for_choice(
+        self,
+        *,
+        selected_before: dict | None,
+        selected_after: dict | None,
+        previous_before: dict | None,
+        seed_track_id: str | None,
+        requested_candidate_id: str | None,
+        requested_track_id: str | None,
+    ) -> FeedbackEvent | None:
+        if self._feedback_sink is None or selected_after is None:
+            return None
+        transition = _dict_or_none(selected_after.get("transition"))
+        if transition is None and selected_before is not None:
+            transition = _dict_or_none(selected_before.get("transition"))
+        row: dict[str, Any] = {
+            "event_id": f"live_next_choice_{self._feedback_session_id}_{time.time_ns()}",
+            "session_id": self._feedback_session_id,
+            "surface": "live_next_pill",
+            "action": "transition_labeled",
+            "label": "played_next",
+            "split": "calibration",
+            "candidate_id": _str_or_none(
+                (selected_before or {}).get("candidate_id")
+                or selected_after.get("candidate_id")
+                or requested_candidate_id
+            ),
+            "selected_track_id": _str_or_none(selected_after.get("track_id") or requested_track_id),
+            "requested_candidate_id": _str_or_none(requested_candidate_id),
+            "requested_track_id": _str_or_none(requested_track_id),
+            "seed_track_id": _str_or_none(seed_track_id),
+            "replaced_candidate_id": _str_or_none((previous_before or {}).get("candidate_id")),
+            "replaced_track_id": _str_or_none((previous_before or {}).get("track_id")),
+            "promoted_candidate_id": _str_or_none(selected_after.get("candidate_id")),
+            "profile_consent": True,
+        }
+        if transition is not None:
+            row.update(
+                {
+                    "role_from": _str_or_none(transition.get("from_role")),
+                    "role_to": _str_or_none(transition.get("to_role")),
+                    "from_section_id": _str_or_none(transition.get("from_section_id")),
+                    "to_section_id": _str_or_none(transition.get("to_section_id")),
+                    "cue_slot": _str_or_none(transition.get("cue_slot")),
+                    "score": _float_or(transition.get("score"), None),
+                    "confidence": _float_or(transition.get("confidence"), None),
+                    "risk_flags": [str(flag) for flag in (transition.get("risk_flags") or ())],
+                    "source_selection": _str_or_none(transition.get("source_selection")),
+                    "timing_basis": _str_or_none(transition.get("timing_basis")),
+                }
+            )
+        return parse_feedback_event(row)
+
+    def _emit_feedback(self, event: FeedbackEvent) -> None:
+        sink = self._feedback_sink
+        if sink is None:
+            return
+        try:
+            sink(event)
+        except Exception as e:
+            logger.warning("[suggestion] feedback sink failed: %s", e)
 
     def context_for_state(
         self,
@@ -728,6 +821,24 @@ def _coerce_transition_alternatives(raw: Any) -> tuple[dict, ...]:
     return tuple(dict(item) for item in raw if isinstance(item, dict))
 
 
+def _matching_alternative(
+    alternatives: tuple[dict, ...],
+    *,
+    candidate_id: str | None,
+    track_id: str | None,
+) -> dict | None:
+    wanted_candidate_id = candidate_id.strip() if isinstance(candidate_id, str) else ""
+    wanted_track_id = track_id.strip() if isinstance(track_id, str) else ""
+    if not wanted_candidate_id and not wanted_track_id:
+        return None
+    for alternative in alternatives:
+        if wanted_candidate_id and alternative.get("candidate_id") == wanted_candidate_id:
+            return dict(alternative)
+        if wanted_track_id and alternative.get("track_id") == wanted_track_id:
+            return dict(alternative)
+    return None
+
+
 def _alternative_already_selected(
     alternatives: tuple[dict, ...],
     *,
@@ -783,6 +894,22 @@ def _float_or(raw: Any, default: float | None) -> float | None:
 
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
+
+
+def _dict_or_none(value: Any) -> dict | None:
+    return dict(value) if isinstance(value, dict) else None
+
+
+def _str_or_none(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _feedback_token(value: str) -> str:
+    token = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in value)
+    return token.strip("_") or "live_session"
 
 
 def _target_deck(source_deck: str | None, audible_deck: Any) -> str | None:

@@ -775,6 +775,36 @@ async def main() -> None:
 
     recorder.trace_sink = _recorder_trace_sink
 
+    def _live_next_feedback_sink(event) -> None:
+        """Record live pill backup choices as local, consent-gated taste rows."""
+        from vibemix.intel.feedback import append_feedback_event, feedback_event_to_row
+        from vibemix.profile import load_consent as _load_profile_consent
+
+        consent = False
+        try:
+            consent = bool(_load_profile_consent())
+        except Exception as e:
+            print(f"-> pill feedback: consent read skipped ({e})", file=sys.stderr)
+
+        try:
+            recorder.log_event(
+                "taste_feedback",
+                **feedback_event_to_row(event, profile_consent=consent),
+            )
+        except Exception as e:
+            print(f"-> pill feedback: session log skipped ({e})", file=sys.stderr)
+
+        if not consent:
+            return
+        try:
+            append_feedback_event(
+                app_data_dir() / "taste_feedback.jsonl",
+                event,
+                profile_consent=consent,
+            )
+        except Exception as e:
+            print(f"-> pill feedback: taste append skipped ({e})", file=sys.stderr)
+
     registry = BufferRegistry(
         audio=audio_buf,
         clean_audio=clean_audio_buf,
@@ -1259,7 +1289,12 @@ async def main() -> None:
             if deck_library is not None:
                 from vibemix.runtime.suggestion import SuggestionService
 
-                suggestion_service = SuggestionService(_library_store, deck_library)
+                suggestion_service = SuggestionService(
+                    _library_store,
+                    deck_library,
+                    feedback_sink=_live_next_feedback_sink,
+                    session_id=recorder.session_dir.name,
+                )
                 print("-> pill next-suggestion: armed")
         except Exception as e:
             print(f"-> grounding: disabled ({e})", file=sys.stderr)

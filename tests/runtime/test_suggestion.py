@@ -457,7 +457,13 @@ def test_choose_alternative_pins_visible_backup_without_reranking():
         key="9A",
         cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
     )
-    svc = SuggestionService(store, lib)
+    events = []
+    svc = SuggestionService(
+        store,
+        lib,
+        feedback_sink=events.append,
+        session_id="session test",
+    )
     state = MusicState()
     state.audible_deck = "A"
     state.deck_state = DeckState(
@@ -481,6 +487,19 @@ def test_choose_alternative_pins_visible_backup_without_reranking():
     assert chosen["transition_alternatives"][1]["track_id"] == "a"
     assert chosen["decision"]["action"] == "select"
     assert chosen["decision"]["candidate_id"] == "tr_001"
+    assert len(events) == 1
+    assert events[0].surface == "live_next_pill"
+    assert events[0].label == "played_next"
+    assert events[0].session_id == "session_test"
+    assert events[0].candidate_id == backup["candidate_id"]
+    assert events[0].role_pair == (
+        chosen["transition"]["from_role"],
+        chosen["transition"]["to_role"],
+    )
+    assert events[0].score == chosen["transition"]["score"]
+    assert events[0].raw["selected_track_id"] == "b"
+    assert events[0].raw["replaced_track_id"] == "a"
+    assert events[0].raw["promoted_candidate_id"] == "tr_001"
 
     refreshed = svc.refresh_from_state(state, now=10.0, min_interval_s=0.0)
 
@@ -493,6 +512,7 @@ def test_choose_alternative_pins_visible_backup_without_reranking():
 
     assert svc.choose_alternative(candidate_id="tr_missing", state=state) is None
     assert svc.current()["track_id"] == "b"
+    assert len(events) == 1
 
 
 def test_refresh_from_state_clears_stale_pick_when_seed_changes():

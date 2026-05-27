@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -78,6 +80,75 @@ def load_feedback_events(path: Path | str) -> tuple[FeedbackEvent, ...]:
     return tuple(parse_feedback_event(row) for row in rows)
 
 
+def feedback_event_to_row(
+    event: FeedbackEvent,
+    *,
+    profile_consent: bool | None = None,
+) -> dict[str, Any]:
+    """Return a JSON-safe row preserving structured extras from ``raw``."""
+    row = dict(event.raw)
+    row.update(
+        {
+            "event_id": event.event_id,
+            "session_id": event.session_id,
+            "surface": event.surface,
+            "action": event.action,
+            "split": event.split,
+            "risk_flags": list(event.risk_flags),
+            "inferred": event.inferred,
+            "profile_consent": event.profile_consent
+            if profile_consent is None
+            else bool(profile_consent),
+        }
+    )
+    optional = {
+        "label": event.label,
+        "role_from": event.role_from,
+        "role_to": event.role_to,
+        "candidate_id": event.candidate_id,
+        "score": event.score,
+    }
+    for key, value in optional.items():
+        if value is not None:
+            row[key] = value
+        else:
+            row.pop(key, None)
+    return row
+
+
+def append_feedback_event(
+    path: Path | str,
+    event: FeedbackEvent,
+    *,
+    profile_consent: bool = True,
+) -> bool:
+    """Append one consent-gated feedback row to JSONL local taste storage."""
+    if not profile_consent or not event.profile_consent:
+        return False
+
+    row = feedback_event_to_row(event, profile_consent=True)
+    errors = feedback_privacy_errors((parse_feedback_event(row),))
+    if errors:
+        raise ValueError(";".join(errors))
+
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if sys.platform != "win32":
+        try:
+            os.chmod(p.parent, 0o700)
+        except OSError:
+            pass
+    with p.open("a", encoding="utf-8") as fh:
+        json.dump(row, fh, ensure_ascii=False, sort_keys=True)
+        fh.write("\n")
+    if sys.platform != "win32":
+        try:
+            os.chmod(p, 0o600)
+        except OSError:
+            pass
+    return True
+
+
 def persistable_events(
     events: tuple[FeedbackEvent, ...], *, profile_consent: bool
 ) -> tuple[FeedbackEvent, ...]:
@@ -138,6 +209,8 @@ def _float_or_none(value: Any) -> float | None:
 
 __all__ = [
     "FeedbackEvent",
+    "append_feedback_event",
+    "feedback_event_to_row",
     "feedback_privacy_errors",
     "load_feedback_events",
     "parse_feedback_event",
