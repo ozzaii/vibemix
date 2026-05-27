@@ -32,6 +32,7 @@ from vibemix.ui_bus import (
     LibraryStalenessAction,
     LibraryStalenessNudge,
 )
+from vibemix.ui_bus import learn_messages as ui_bus_learn_messages
 from vibemix.ui_bus import messages as ui_bus_messages
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -158,16 +159,28 @@ def test_schema_version_field() -> None:
 
 
 def test_count_parity_python_vs_schema() -> None:
-    """Python wrappers ↔ schema oneOf entries — 1:1 contract."""
+    """Python wrappers ↔ schema oneOf entries — 1:1 contract.
+
+    Phase 91 Plan 01 split the Learn-envelope wrappers into a sibling
+    module (``learn_messages.py``); introspection scans both modules
+    so the invariant stays correct.
+    """
+    seen: set[type] = set()
     wrapper_count = 0
-    for attr_name in dir(ui_bus_messages):
-        obj = getattr(ui_bus_messages, attr_name)
-        if not isinstance(obj, type):
-            continue
-        if not hasattr(obj, "__dataclass_fields__"):
-            continue
-        if "type" in obj.__dataclass_fields__ and "payload" in obj.__dataclass_fields__:
-            wrapper_count += 1
+    for module in (ui_bus_messages, ui_bus_learn_messages):
+        for attr_name in dir(module):
+            obj = getattr(module, attr_name)
+            if not isinstance(obj, type):
+                continue
+            if not hasattr(obj, "__dataclass_fields__"):
+                continue
+            if (
+                "type" in obj.__dataclass_fields__
+                and "payload" in obj.__dataclass_fields__
+                and obj not in seen
+            ):
+                seen.add(obj)
+                wrapper_count += 1
     assert wrapper_count == len(_SCHEMA["oneOf"]), (
         f"Count parity broken: Python has {wrapper_count} wrappers, "
         f"schema has {len(_SCHEMA['oneOf'])} oneOf entries"

@@ -265,7 +265,7 @@ def test_recordings_events_result_accepts_empty_events_array() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_count_parity_at_64() -> None:
+def test_count_parity_at_66() -> None:
     """Phase 15 Plan 01 bumped the IPC count 27 → 34 (+7 recordings.* families);
     Phase 20-04 added SessionCitation → 35; Phase 24-02 added
     SessionOverlayHighlight → 36; Phase 25 Plan 25-03 added 3 DEBRIEF
@@ -278,21 +278,30 @@ def test_count_parity_at_64() -> None:
     ProfileConsentState, ProfileView, ProfileViewResult, ProfileRegenerate,
     ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 63. Phase
     44 Plan 44-03 adds 1 (SessionCohostReaction — LAUNCH-02 anti-slop
-    citation strip broadcast) → 64. Both sides — schema oneOf and Python
-    wrapper dataclasses — must match exactly.
+    citation strip broadcast) → 64. Phase 91 Plan 01 adds 2 (learn.*
+    envelopes — LearnControllerDetected + LearnMidiPosition; wrappers
+    live in ``learn_messages.py``, a sibling module) → 66. Both sides —
+    schema oneOf and Python wrapper dataclasses — must match exactly.
     """
+    from vibemix.ui_bus import learn_messages as ui_bus_learn_messages
     from vibemix.ui_bus import messages as ui_bus_messages
 
-    wrapper_count = sum(
-        1
-        for name in dir(ui_bus_messages)
-        if isinstance(obj := getattr(ui_bus_messages, name), type)
-        and hasattr(obj, "__dataclass_fields__")
-        and "type" in obj.__dataclass_fields__
-    )
+    seen: set[type] = set()
+    wrapper_count = 0
+    for module in (ui_bus_messages, ui_bus_learn_messages):
+        for name in dir(module):
+            obj = getattr(module, name)
+            if (
+                isinstance(obj, type)
+                and hasattr(obj, "__dataclass_fields__")
+                and "type" in obj.__dataclass_fields__
+                and obj not in seen
+            ):
+                seen.add(obj)
+                wrapper_count += 1
 
-    assert len(_SCHEMA["oneOf"]) == 64, "schema oneOf count should be 64 after Plan 44-03"
-    assert wrapper_count == 64, f"wrapper count {wrapper_count} != 64"
+    assert len(_SCHEMA["oneOf"]) == 66, "schema oneOf count should be 66 after Plan 91-01"
+    assert wrapper_count == 66, f"wrapper count {wrapper_count} != 66"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

@@ -56,6 +56,8 @@ from vibemix.ui_bus import (
     DeviceInfo,
     IpcBoot,
     IpcError,
+    LearnControllerDetected,
+    LearnMidiPosition,
     LevelPair,
     LibraryConfidence,
     LibraryImport,
@@ -101,6 +103,7 @@ from vibemix.ui_bus import (
     WizardDone,
     WizardStart,
 )
+from vibemix.ui_bus import learn_messages as ui_bus_learn_messages
 from vibemix.ui_bus import messages as ui_bus_messages
 
 # Resolve the schema relative to this script — fails loud if it moves.
@@ -478,6 +481,25 @@ def _minimal_examples() -> list[tuple[str, object]]:
         ),
         ("ProfileDelete", ProfileDelete.make()),
         ("ProfileDeleteAck", ProfileDeleteAck.make(ok=True, error=None)),
+        # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn envelopes
+        # (wrappers live in vibemix.ui_bus.learn_messages, not messages.py;
+        # the introspection in _count_wrapper_dataclasses scans both modules)
+        (
+            "LearnControllerDetected",
+            LearnControllerDetected.make(
+                connected=True,
+                controller_id="pioneer_ddj_flx4",
+                display_name="Pioneer DDJ-FLX4",
+                port_name="DDJ-FLX4 USB MIDI Input",
+            ),
+        ),
+        (
+            "LearnMidiPosition",
+            LearnMidiPosition.make(
+                controller_id="pioneer_ddj_flx4",
+                positions={"eq_hi:A": 64, "xfader": 64},
+            ),
+        ),
     ]
 
 
@@ -485,16 +507,25 @@ def _count_wrapper_dataclasses() -> int:
     """Wrapper dataclasses == dataclasses with a ``type`` field in their
     ``__dataclass_fields__``. Excludes payload-only structs (``*Payload`` /
     ``DeviceInfo`` / ``WindowInfo``) because they have no ``type`` field.
+
+    Phase 91 RENDER-01 split the Learn-envelope wrappers into a sibling
+    module (``learn_messages.py``) per the plan's modular-naming
+    decision; introspection scans both modules and de-duplicates the
+    result so a future re-export from ``messages.py`` cannot double-count.
     """
     count = 0
-    for name in dir(ui_bus_messages):
-        obj = getattr(ui_bus_messages, name)
-        if (
-            isinstance(obj, type)
-            and hasattr(obj, "__dataclass_fields__")
-            and "type" in obj.__dataclass_fields__
-        ):
-            count += 1
+    seen: set[type] = set()
+    for module in (ui_bus_messages, ui_bus_learn_messages):
+        for name in dir(module):
+            obj = getattr(module, name)
+            if (
+                isinstance(obj, type)
+                and hasattr(obj, "__dataclass_fields__")
+                and "type" in obj.__dataclass_fields__
+                and obj not in seen
+            ):
+                seen.add(obj)
+                count += 1
     return count
 
 

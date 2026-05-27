@@ -120,19 +120,28 @@ def test_count_parity_holds_after_addition():
     both 39 → 49 (+10 library.* families). Plan 29-03 grew both 49 → 55
     (+6 DEBRIEF v2.1 additive wrappers). Plan 32-04/05 grew both 55 → 63
     (+8 profile.* families). Plan 44-03 grows both 63 → 64 (+1
-    SessionCohostReaction — LAUNCH-02). The check_ipc_schema.py invariant
-    is what fails the CI build if either side regresses, so we assert it
-    here directly.
+    SessionCohostReaction — LAUNCH-02). Plan 91-01 grows both 64 → 66 (+2
+    learn.* envelopes — LearnControllerDetected + LearnMidiPosition; the
+    wrappers live in ``learn_messages.py``, a sibling module to
+    ``messages.py``). The check_ipc_schema.py invariant is what fails the
+    CI build if either side regresses, so we assert it here directly.
     """
+    from vibemix.ui_bus import learn_messages as ui_bus_learn_messages
     from vibemix.ui_bus import messages as ui_bus_messages
 
-    wrapper_count = sum(
-        1
-        for name in dir(ui_bus_messages)
-        if isinstance(obj := getattr(ui_bus_messages, name), type)
-        and hasattr(obj, "__dataclass_fields__")
-        and "type" in obj.__dataclass_fields__
-    )
+    seen: set[type] = set()
+    wrapper_count = 0
+    for module in (ui_bus_messages, ui_bus_learn_messages):
+        for name in dir(module):
+            obj = getattr(module, name)
+            if (
+                isinstance(obj, type)
+                and hasattr(obj, "__dataclass_fields__")
+                and "type" in obj.__dataclass_fields__
+                and obj not in seen
+            ):
+                seen.add(obj)
+                wrapper_count += 1
 
     schema_path = (
         Path(__file__).resolve().parents[2]
@@ -141,9 +150,9 @@ def test_count_parity_holds_after_addition():
     schema = json.loads(schema_path.read_text())
     oneof_count = len(schema["oneOf"])
 
-    assert wrapper_count == oneof_count == 64, (
+    assert wrapper_count == oneof_count == 66, (
         f"count parity violated: wrappers={wrapper_count} vs oneOf={oneof_count}; "
-        "expected both 64 after Plan 44-03"
+        "expected both 66 after Plan 91-01"
     )
 
 

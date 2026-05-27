@@ -152,6 +152,13 @@ from vibemix.ui_bus.messages import (
     WizardStart,
     WizardStartPayload,
 )
+from vibemix.ui_bus.learn_messages import (
+    # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn module envelopes.
+    LearnControllerDetected,
+    LearnControllerDetectedPayload,
+    LearnMidiPosition,
+    LearnMidiPositionPayload,
+)
 from vibemix.ui_bus.schemas.citation import SessionCitationPayload
 from vibemix.ui_bus.schemas.cohost_reaction import (
     CitationChipPayload,
@@ -293,6 +300,11 @@ __all__ = [
     "LibraryStalenessActionPayload",
     "LibraryStalenessNudge",
     "LibraryStalenessNudgePayload",
+    # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn module envelopes
+    "LearnControllerDetected",
+    "LearnControllerDetectedPayload",
+    "LearnMidiPosition",
+    "LearnMidiPositionPayload",
     # Phase 32 — long-term DJ profile (PROFILE-04/05/07)
     "ProfileConsentState",
     "ProfileConsentStatePayload",

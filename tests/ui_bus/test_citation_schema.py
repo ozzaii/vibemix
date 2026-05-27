@@ -21,6 +21,7 @@ from vibemix.ui_bus import (
     parse_message,
     validate_message,
 )
+from vibemix.ui_bus import learn_messages as ui_bus_learn_messages
 from vibemix.ui_bus import messages as ui_bus_messages
 
 _SCHEMA_PATH = (
@@ -159,13 +160,24 @@ def test_payload_struct_is_frozen_slots() -> None:
 
 
 def test_count_parity_python_vs_schema() -> None:
-    """Phase 11 W0 invariant — schema oneOf count == wrapper-class count."""
+    """Phase 11 W0 invariant — schema oneOf count == wrapper-class count.
+
+    Phase 91 Plan 01 split the Learn-envelope wrappers into a sibling
+    module (``learn_messages.py``); introspection scans both modules
+    to keep the invariant aware of every wrapper.
+    """
     oneof_count = len(_SCHEMA["oneOf"])
-    wrapper_count = sum(
-        1
-        for _, obj in inspect.getmembers(ui_bus_messages, inspect.isclass)
-        if hasattr(obj, "__dataclass_fields__") and "type" in obj.__dataclass_fields__
-    )
+    seen: set[type] = set()
+    wrapper_count = 0
+    for module in (ui_bus_messages, ui_bus_learn_messages):
+        for _, obj in inspect.getmembers(module, inspect.isclass):
+            if (
+                hasattr(obj, "__dataclass_fields__")
+                and "type" in obj.__dataclass_fields__
+                and obj not in seen
+            ):
+                seen.add(obj)
+                wrapper_count += 1
     assert oneof_count == wrapper_count, (
         f"schema/wrapper drift — {oneof_count} oneOf entries vs "
         f"{wrapper_count} wrapper classes"

@@ -26,6 +26,9 @@ import jsonschema
 import pytest
 
 from vibemix.ui_bus import (
+    # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn module envelopes.
+    LearnControllerDetected,
+    LearnMidiPosition,
     CalibrationAudioResult,
     CalibrationDeviceList,
     CalibrationListDevices,
@@ -490,6 +493,25 @@ def _make_examples() -> list[tuple[str, object]]:
         ),
         ("ProfileDelete", ProfileDelete.make()),
         ("ProfileDeleteAck", ProfileDeleteAck.make(ok=True, error=None)),
+        # Phase 91 Plan 01 — Learn module envelopes (RENDER-01/02/07).
+        # Wrappers live in ``vibemix.ui_bus.learn_messages``, re-exported
+        # via the package __init__.py to keep the import path uniform.
+        (
+            "LearnControllerDetected",
+            LearnControllerDetected.make(
+                connected=True,
+                controller_id="pioneer_ddj_flx4",
+                display_name="Pioneer DDJ-FLX4",
+                port_name="DDJ-FLX4 USB MIDI Input",
+            ),
+        ),
+        (
+            "LearnMidiPosition",
+            LearnMidiPosition.make(
+                controller_id="pioneer_ddj_flx4",
+                positions={"eq_hi:A": 64, "xfader": 64},
+            ),
+        ),
     ]
 
 
@@ -518,9 +540,10 @@ def test_example_count_matches_schema_oneof() -> None:
     ProfileConsentState, ProfileView, ProfileViewResult, ProfileRegenerate,
     ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 63.
     Phase 44 Plan 44-03 adds 1 (SessionCohostReaction — LAUNCH-02 anti-slop
-    citation strip broadcast) → 64.
+    citation strip broadcast) → 64. Phase 91 Plan 01 adds 2 (learn.*
+    envelopes — LearnControllerDetected + LearnMidiPosition) → 66.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 64
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 66
 
 
 @pytest.mark.parametrize(
@@ -542,7 +565,7 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_64() -> None:
+def test_schema_oneof_count_is_66() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
     7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35;
@@ -553,7 +576,8 @@ def test_schema_oneof_count_is_64() -> None:
     messages (set_consent/consent_state/view/view_result/regenerate/
     regenerate_result/delete/delete_ack) → 63. Phase 44 Plan 44-03 adds 1
     (SessionCohostReaction — LAUNCH-02 anti-slop citation strip
-    broadcast) → 64.
+    broadcast) → 64. Phase 91 Plan 01 adds 2 (learn.* envelopes —
+    LearnControllerDetected + LearnMidiPosition) → 66.
 
     ``definitions`` count grows alongside oneOf since every new wrapper
     adds one entry to both. ``LevelPair`` is a shared helper ref'd from
@@ -561,8 +585,8 @@ def test_schema_oneof_count_is_64() -> None:
     (so it counts in ``definitions`` but not in ``oneOf``); the skew
     between the two counts stays at 1.
     """
-    assert len(_SCHEMA["oneOf"]) == 64
-    assert len(_SCHEMA["definitions"]) == 65
+    assert len(_SCHEMA["oneOf"]) == 66
+    assert len(_SCHEMA["definitions"]) == 67
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:
