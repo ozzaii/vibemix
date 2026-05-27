@@ -55,8 +55,17 @@ def _runtime_submodule(name: str) -> bool:
         "examples",
         "scripts",
         "tools",
-        "cli",
         "jupyter",
+        # NOTE: a bare three-letter command-line-interface part name used to
+        # live here, but the livekit.agents leaf with that same name is a
+        # runtime requirement — livekit/agents/voice/agent_session.py does
+        # ``from .. import <that-name>``, and excluding the leaf made the
+        # frozen bundle boot-crash with ``ImportError: cannot import name
+        # ... from partially initialized module 'livekit.agents'`` (circular).
+        # Removed 2026-05-27 (rc1 ship-blocker fix). If a specific package's
+        # subtree ever needs to be excluded, do it by full module name in the
+        # explicit blocks below — not by part-name match. Regression-guarded
+        # by tests/dist/test_spec_blocklist_keeps_livekit_cli.py.
     }
     if any(part in blocked for part in parts):
         return False
