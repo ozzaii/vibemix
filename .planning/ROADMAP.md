@@ -48,7 +48,7 @@ has shipped the engine, agent, CLI, and GUI path; use
 
 ## Phases
 
-- [x] **Phase 83: ENERGY — Perceived-Dancefloor-Energy v1** — `library/energy.py` (reuse existing DSP + new spectral-flux term, genre-robust, content-hash cached) + `get_track_energy` tool.
+- [x] **Phase 83: ENERGY — Perceived-Dancefloor-Energy v1** — `library/energy.py` (reuse existing DSP + new spectral-flux term, genre-agnostic, content-hash cached) + `get_track_energy` tool.
 - [x] **Phase 84: DISCOVER — Pool Building (library-local)** — `library/discovery.py` (intent centroid + hard filters + MMR) + `discover_pool` tool.
 - [x] **Phase 85: SEQUENCE — Energy-Curved, Harmonically-Valid Ordering** — `library/sequencer.py` (curve presets + transition graph + beam search → 3-5 diverse paths, honest fit labels) + `sequence_set` tool.
 - [x] **Phase 86: EXPORT — One-Click to Rekordbox** — `harmonics.to_classical` + `library/export_rekordbox.py` (RekordboxXml write path: order + key/BPM/genre + memory & hot cues + beatgrid) + `export_set` tool + `library export-set` CLI.
@@ -57,7 +57,7 @@ has shipped the engine, agent, CLI, and GUI path; use
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
-| 83 | ENERGY — Perceived-Dancefloor-Energy v1 | A trustworthy 0-100 per-track energy score (genre-robust, cached) + tool | ENERGY-01, ENERGY-02, ENERGY-03 | 4 |
+| 83 | ENERGY — Perceived-Dancefloor-Energy v1 | A trustworthy 0-100 per-track energy score (genre-agnostic, cached) + tool | ENERGY-01, ENERGY-02, ENERGY-03 | 4 |
 | 84 | DISCOVER — Pool Building | An intent-centroid + filtered + MMR-diversified candidate pool from the DJ's own crate + grounded tool | DISCOVER-01, DISCOVER-02, DISCOVER-03 | 4 |
 | 85 | SEQUENCE — Energy-Curved Ordering | 3-5 diverse, energy-curved, harmonically-valid ordered sets with honest labels + tool | SEQUENCE-01, SEQUENCE-02, SEQUENCE-03 | 4 |
 | 86 | EXPORT — One-Click to Rekordbox | A Rekordbox-importable XML (order + cues + beatgrid) + tool + CLI | EXPORT-01, EXPORT-02 | 4 |
@@ -67,12 +67,12 @@ has shipped the engine, agent, CLI, and GUI path; use
 ## Phase Details
 
 ### Phase 83: ENERGY — Perceived-Dancefloor-Energy v1
-**Goal:** Give the DJ a trustworthy 0-100 perceived-dancefloor-energy score for any track in their library — one that reflects how hard a track *hits the floor*, not just how loud it is — computed offline from the local audio file, genre-robust, cached, and exposed to the agent. This is the energy axis the sequencer's curve will (optionally) ride; it is a pure-compute foundation, NON-BLOCKING for sequencing (the sequencer degrades to a BPM proxy when energy is absent).
+**Goal:** Give the DJ a trustworthy 0-100 perceived-dancefloor-energy score for any track in their library — one that reflects how hard a track *hits the floor*, not just how loud it is — computed offline from the local audio file, genre-agnostic, cached, and exposed to the agent. This is the energy axis the sequencer's curve will (optionally) ride; it is a pure-compute foundation, NON-BLOCKING for sequencing (the sequencer degrades to a BPM proxy when energy is absent).
 **Depends on:** Nothing (first v8.2 phase). Pure-compute; reuses existing DSP primitives. Parallelizable with Phase 84 (ENERGY ∥ DISCOVER are independent).
 **Requirements:** ENERGY-01, ENERGY-02, ENERGY-03
 **Success Criteria** (what must be TRUE):
   1. A DJ gets a 0-100 perceived-energy score for any decodable track, computed offline from the local file by reusing the existing hand-rolled DSP (`cue_detect.decode_to_mono` + `audio/features` band-split/onset/`energy_curve` + `crest_factor` + `sub_share`) PLUS a new ~15-LOC spectral-flux term — the single strongest perceived-arousal predictor (ENERGY-01).
-  2. The score is genre-robust — a pairwise-ranking + hypnotic-regression unit test proves a quiet hypnotic after-hours track does NOT read as low-energy and a loud-but-sparse intro does NOT read as high (fixed perceptual-window normalization with per-track clip + busy-frame aggregation, NOT corpus min-max; raw RMS demoted, flux/brightness/crest-corrected-loudness promoted) (ENERGY-02).
+  2. The score is genre-agnostic — a pairwise-ranking + hypnotic-regression unit test proves a quiet hypnotic after-hours track does NOT read as low-energy and a loud-but-sparse intro does NOT read as high (fixed perceptual-window normalization with per-track clip + busy-frame aggregation, NOT corpus min-max; raw RMS demoted, flux/brightness/crest-corrected-loudness promoted) (ENERGY-02).
   3. Scores are cached by content hash so re-runs are free, and `get_track_energy(track_id)` is exposed as a grounded agent tool in `LibraryToolset` (inherited by gemini + codex/MCP + Telegram) that returns an honest `null` when a track has no decodable audio (ENERGY-03).
   4. The whole module is offline-unit-testable on synthetic fixtures — no API key, no Gemini call, no new dep; weights live as one-line-edit constants in `audio/constants.py`.
 **Plans**: TBD

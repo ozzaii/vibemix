@@ -125,7 +125,7 @@ Each cell speaks a different vocabulary on purpose. Beginner is encouragement-he
 
 | Phase | Surface | What shipped |
 |---|---|---|
-| 83 | ENERGY | Perceived-Dancefloor-Energy v1** — `library/energy.py` (reuse existing DSP + new spectral-flux term, genre-robust, content-hash cached) + `get_track_energy` tool. |
+| 83 | ENERGY | Perceived-Dancefloor-Energy v1** — `library/energy.py` (reuse existing DSP + new spectral-flux term, genre-agnostic, content-hash cached) + `get_track_energy` tool. |
 | 84 | DISCOVER | Pool Building (library-local)** — `library/discovery.py` (intent centroid + hard filters + MMR) + `discover_pool` tool. |
 | 85 | SEQUENCE | Energy-Curved, Harmonically-Valid Ordering** — `library/sequencer.py` (curve presets + transition graph + beam search → 3-5 diverse paths, honest fit labels) + `sequence_set` tool. |
 | 86 | EXPORT | One-Click to Rekordbox** — `harmonics.to_classical` + `library/export_rekordbox.py` (RekordboxXml write path: order + key/BPM/genre + memory & hot cues + beatgrid) + `export_set` tool + `library export-set` CLI. |
