@@ -23,6 +23,7 @@
 #        - fixture/threshold provenance hashes and replay tier are present
 #        - artifact fixture-manifest hash matches the current fixture corpus
 #        - fixture-audit manifest hash agrees with scorecard provenance
+#        - artifact dataset card/version match the current fixture manifest
 #        - artifact thresholds hash matches current INTEL lock values
 #        - artifact threshold-lock hash matches the current INTEL lock
 #
@@ -169,6 +170,22 @@ from pathlib import Path
 print("sha256:" + hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
 PY
 )
+INTEL_FIXTURE_ID_LINE=$(
+  "${PYTHON_BIN}" - "${INTEL_FIXTURE_MANIFEST}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+print(f"{manifest.get('dataset_card_id', '')}\t{manifest.get('fixture_version', '')}")
+PY
+)
+INTEL_DATASET_CARD_ID=$(echo "${INTEL_FIXTURE_ID_LINE}" | awk -F'\t' '{print $1}')
+INTEL_FIXTURE_VERSION=$(echo "${INTEL_FIXTURE_ID_LINE}" | awk -F'\t' '{print $2}')
+if [ -z "${INTEL_DATASET_CARD_ID}" ] || [ -z "${INTEL_FIXTURE_VERSION}" ]; then
+  emit_err "INTEL fixture manifest missing dataset_card_id or fixture_version"
+  exit 1
+fi
 
 # --- enumerate nightly runs -----------------------------------------------
 NIGHTLY_FAIL_REASONS=()
@@ -220,6 +237,8 @@ else
         intel_status=$(jq -r \
           --arg expected_intel_lock_hash "${INTEL_THRESHOLD_LOCK_HASH}" \
           --arg expected_intel_thresholds_hash "${INTEL_THRESHOLDS_HASH}" \
+          --arg expected_dataset_card_id "${INTEL_DATASET_CARD_ID}" \
+          --arg expected_fixture_version "${INTEL_FIXTURE_VERSION}" \
           --arg expected_fixture_manifest_hash "${INTEL_FIXTURE_MANIFEST_HASH}" '
           def nonempty_object(x): (x | type == "object" and length > 0);
           def nonempty_array(x): (x | type == "array" and length > 0);
@@ -249,6 +268,14 @@ else
             "scorecard.artifact_status contains false"
           elif .stages.scorecard.provenance.replay_tier != "tier0_fixture_replay" then
             "scorecard.provenance.replay_tier=\(.stages.scorecard.provenance.replay_tier // "missing")"
+          elif .stages.scorecard.provenance.dataset_card_id != $expected_dataset_card_id then
+            "scorecard.provenance.dataset_card_id=\(.stages.scorecard.provenance.dataset_card_id // "missing")"
+          elif .stages.provenance.dataset_card_id != $expected_dataset_card_id then
+            "provenance.dataset_card_id=\(.stages.provenance.dataset_card_id // "missing")"
+          elif .stages.scorecard.provenance.fixture_version != $expected_fixture_version then
+            "scorecard.provenance.fixture_version=\(.stages.scorecard.provenance.fixture_version // "missing")"
+          elif .stages.provenance.fixture_version != $expected_fixture_version then
+            "provenance.fixture_version=\(.stages.provenance.fixture_version // "missing")"
           elif (sha256_hash(.stages.scorecard.provenance.fixture_manifest_hash // "") | not) then
             "scorecard.provenance.fixture_manifest_hash missing"
           elif .stages.scorecard.provenance.fixture_manifest_hash != $expected_fixture_manifest_hash then

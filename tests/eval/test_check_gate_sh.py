@@ -64,6 +64,10 @@ def _intel_fixture_manifest_hash() -> str:
     return "sha256:" + hashlib.sha256(INTEL_FIXTURE_MANIFEST.read_bytes()).hexdigest()
 
 
+def _intel_fixture_manifest() -> dict:
+    return json.loads(INTEL_FIXTURE_MANIFEST.read_text(encoding="utf-8"))
+
+
 def _make_threshold_lock(tmp_path: Path, **overrides: float) -> Path:
     """Write a minimal valid THRESHOLD-LOCK.md (frontmatter only)."""
     th = dict(CANONICAL_THRESHOLDS)
@@ -123,6 +127,7 @@ def _make_nightly_run(
     }
     out = run / "eval_report.json"
     out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    intel_manifest = _intel_fixture_manifest()
     intel = run / "intel_gate.json"
     intel.write_text(
         json.dumps(
@@ -161,13 +166,19 @@ def _make_nightly_run(
                             }
                         ],
                         "provenance": {
+                            "dataset_card_id": intel_manifest["dataset_card_id"],
+                            "fixture_version": intel_manifest["fixture_version"],
                             "fixture_manifest_hash": _intel_fixture_manifest_hash(),
                             "thresholds_hash": _intel_thresholds_hash(),
                             "threshold_lock_hash": _intel_threshold_lock_hash(),
                             "replay_tier": "tier0_fixture_replay",
                         },
                     },
-                    "provenance": {"valid": intel_gate_valid},
+                    "provenance": {
+                        "valid": intel_gate_valid,
+                        "dataset_card_id": intel_manifest["dataset_card_id"],
+                        "fixture_version": intel_manifest["fixture_version"],
+                    },
                 },
             },
             indent=2,
@@ -530,6 +541,42 @@ def test_intel_gate_json_stale_fixture_manifest_hash_fails(tmp_path: Path):
     assert result.returncode == 1
     assert "BLOCKED_BY=intel" in result.stderr
     assert "scorecard.provenance.fixture_manifest_hash mismatch" in result.stderr
+
+
+def test_intel_gate_json_wrong_scorecard_dataset_card_fails(tmp_path: Path):
+    """Release evidence must name the current public INTEL dataset card."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["scorecard"]["provenance"]["dataset_card_id"] = "old_dataset"
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "scorecard.provenance.dataset_card_id=old_dataset" in result.stderr
+
+
+def test_intel_gate_json_wrong_provenance_fixture_version_fails(tmp_path: Path):
+    """The provenance-validation stage must name the current fixture version."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["provenance"]["fixture_version"] = "old_fixture"
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "provenance.fixture_version=old_fixture" in result.stderr
 
 
 def test_intel_gate_json_missing_fixture_audit_manifest_hash_fails(tmp_path: Path):

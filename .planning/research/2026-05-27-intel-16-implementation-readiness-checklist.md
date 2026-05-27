@@ -619,6 +619,8 @@ done: `scripts/eval/intel_gate.py` marks cross-stage fixture-manifest
 done: `scripts/eval/intel_gate.py` marks scorecard/provenance-stage mismatches
       invalid for dataset id, fixture version, manifest hash, thresholds hash,
       replay tier, and threshold-lock hash
+done: `scripts/release/check_gate.sh` rejects INTEL artifacts whose dataset card
+      id or fixture version does not match the current fixture manifest
 pending: private-label release threshold recalibration note
 ```
 
