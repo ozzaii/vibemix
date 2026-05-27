@@ -56,6 +56,7 @@ def _snapshot(
     exact_timing: bool = True,
     blend: bool = False,
     include_candidates: bool = True,
+    prepared_target_track_id: str | None = None,
 ) -> RuntimeInputSnapshot:
     source = _section("t1#s000", "t1", "outro", "F")
     destination = _section("t2#s000", "t2", "intro", "A")
@@ -79,6 +80,7 @@ def _snapshot(
         current={
             "track_id": "t1" if current_track else None,
             "blend_suppressed": blend,
+            "prepared_target_track_id": prepared_target_track_id,
         },
         candidates=slate,
     )
@@ -140,6 +142,30 @@ def test_live_pill_drops_timing_when_playhead_is_weak() -> None:
     assert result.final_decision.timing_text is None
     assert "cue A" in result.final_decision.spoken_text
     assert "bars" not in result.final_decision.spoken_text
+
+
+def test_live_pill_suppresses_when_prepared_target_deck_disagrees() -> None:
+    result = decide(
+        "live",
+        "live_next_pill",
+        _snapshot(prepared_target_track_id="t3"),
+    )
+
+    assert result.final_decision.action == "suppress"
+    assert not result.emitted
+    assert "prepared_target_mismatch:t3" in result.trace.suppressed_reasons
+
+
+def test_live_pill_allows_candidate_loaded_on_target_deck() -> None:
+    result = decide(
+        "live",
+        "live_next_pill",
+        _snapshot(prepared_target_track_id="t2"),
+    )
+
+    assert result.final_decision.action == "select"
+    assert result.emitted
+    assert result.final_decision.candidate_id == "tr_001"
 
 
 def test_live_pill_degrades_bad_model_text_to_deterministic_copy() -> None:

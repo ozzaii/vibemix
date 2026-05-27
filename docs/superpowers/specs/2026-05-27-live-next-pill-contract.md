@@ -77,6 +77,9 @@ and stored vector cache, the pill may extend the bounded slate with that deck
 fact and transition-score it. The candidate is promoted only when it has
 grounded transition evidence, so the pill can tell the DJ how to mix the track
 they actually loaded without inventing a cue or bypassing validation.
+If a loaded target-deck track exists but the selected candidate is a different
+track, the validated live decision suppresses instead of emitting a fresh
+`select` instruction that contradicts the DJ's prepared deck.
 
 ## Wire payload
 
@@ -279,6 +282,9 @@ match, the cited claims must support those facts.
 - A track already loaded on the target deck may extend the slate only when it is
   library-resolved and present in the stored vector cache. It can become the
   selected action only after deterministic transition scoring.
+- When the target deck is prepared with a different track than the selected
+  candidate, live decisions suppress rather than instructing the DJ to load over
+  their prepared deck.
 - Semantic dimension mismatches become unknown evidence, not fabricated matches.
 - Auto-generated or low-confidence target cues remain usable context, but are
   marked with review risk and lower cue-operability confidence.

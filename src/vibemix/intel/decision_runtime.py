@@ -220,6 +220,17 @@ def _gate_envelope(envelope: AgentContextEnvelope) -> tuple[GateResult, ...]:
         gates.append(GateResult("candidate_slate", status, "no_candidates"))
     else:
         gates.append(GateResult("candidate_slate", "pass", "candidates_available"))
+        prepared_target_mismatch = _prepared_target_mismatch(envelope)
+        if prepared_target_mismatch is not None:
+            gates.append(
+                GateResult(
+                    "prepared_target",
+                    "suppress",
+                    f"prepared_target_mismatch:{prepared_target_mismatch}",
+                )
+            )
+        else:
+            gates.append(GateResult("prepared_target", "pass", "matched_or_empty"))
     return tuple(gates)
 
 
@@ -315,6 +326,25 @@ def _claim_ids_for_candidate(
         elif claim_type in section_claims and subject_id in section_ids:
             ids.append(str(row["claim_id"]))
     return tuple(ids)
+
+
+def _prepared_target_mismatch(envelope: AgentContextEnvelope) -> str | None:
+    if envelope.mode != "live":
+        return None
+    prepared = _nonempty_str(envelope.current.get("prepared_target_track_id"))
+    if prepared is None or not envelope.candidates:
+        return None
+    selected = _nonempty_str(envelope.candidates[0].get("to_track_id"))
+    if selected == prepared:
+        return None
+    return prepared
+
+
+def _nonempty_str(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    return text or None
 
 
 def _claim_types_for_ids(

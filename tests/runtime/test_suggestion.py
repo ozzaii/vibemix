@@ -758,6 +758,57 @@ def test_compute_from_state_prefers_grounded_track_loaded_on_target_deck():
     assert envelope.current["prepared_target_track_id"] == "b"
 
 
+def test_decision_suppresses_when_loaded_target_deck_track_is_not_selected():
+    from dataclasses import replace
+
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(
+        ["s", "a"],
+        [("s", 0.99), ("a", 0.92)],
+        section_vectors={
+            "s#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "a#s000": np.array([1.0, 0.0], dtype=np.float32),
+        },
+    )
+    lib = _lib(["s", "a", "b"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        bpm=120.0,
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    lib.tracks["b"] = replace(
+        lib.tracks["b"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    svc = SuggestionService(store, lib)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={
+            "A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=120.0),
+            "B": DeckTrack(title="Prepared", track_id="b", camelot="9A", bpm=120.0, confidence=1.0),
+        }
+    )
+
+    out = svc.compute_from_state(state)
+    payload = svc.decision_payload_for_state(state)
+
+    assert out is not None
+    assert out["track_id"] == "a"
+    assert payload is not None
+    assert payload["action"] == "suppress"
+    assert payload["emitted"] is False
+
+
 def test_refresh_from_state_follows_grounded_track_loaded_on_target_deck_without_reranking():
     from dataclasses import replace
 
