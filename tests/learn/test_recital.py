@@ -223,6 +223,10 @@ def test_sampling_is_deterministic_with_fixed_seed() -> None:
     """``rng=random.Random(seed)`` produces the same sample on every
     invocation. RecitalRuntime exposes ``seed`` as a constructor kwarg
     for hermetic testing; in production it defaults to the day-of-epoch.
+
+    The controller emits one prompt per advance step — start() emits
+    prompt 1, ack() advances to + emits prompt 2, etc. We drive the
+    cycle through all 5 ack()s to surface the full sampled subset.
     """
     progress_a = LearnProgress()
     progress_b = LearnProgress()
@@ -246,18 +250,27 @@ def test_sampling_is_deterministic_with_fixed_seed() -> None:
 
     rt_a.start(script=_make_script(), lesson_id="L1.16-course-1-recital")
     rt_b.start(script=_make_script(), lesson_id="L1.16-course-1-recital")
+    # Drive through all 5 prompts to surface the full sampled subset.
+    for _ in range(_RECITAL_SUBSET_SIZE):
+        rt_a.ack(lesson_id="L1.16-course-1-recital")
+        rt_b.ack(lesson_id="L1.16-course-1-recital")
 
     # The two controllers MUST emit the exact same sequence of prompt
     # tutor_speak texts (the seed pins the rng.sample result).
+    # Filter out outcome copy (the final pass/fail copy is also a
+    # tutor_speak; we're only comparing prompt copy).
+    prompt_set = {e["prompt"] for e in _RECITAL_POOL}
     prompts_a = [
         e["payload"]["text"]
         for e in emitted_a
         if e["type"] == "ipc.learn.tutor_speak"
+        and e["payload"]["text"] in prompt_set
     ]
     prompts_b = [
         e["payload"]["text"]
         for e in emitted_b
         if e["type"] == "ipc.learn.tutor_speak"
+        and e["payload"]["text"] in prompt_set
     ]
     assert prompts_a == prompts_b, (
         f"same seed must produce identical prompt sequence; "
@@ -265,7 +278,7 @@ def test_sampling_is_deterministic_with_fixed_seed() -> None:
     )
     # And exactly 5 prompts surfaced (the recital subset size).
     assert len(prompts_a) == _RECITAL_SUBSET_SIZE, (
-        f"start() must surface exactly {_RECITAL_SUBSET_SIZE} prompts; "
+        f"recital must surface exactly {_RECITAL_SUBSET_SIZE} prompts; "
         f"got {len(prompts_a)}: {prompts_a!r}"
     )
 
@@ -296,16 +309,21 @@ def test_default_seed_is_day_of_epoch(monkeypatch: pytest.MonkeyPatch) -> None:
         save_fn=MagicMock(),
     )  # no seed → derives from time
     rt.start(script=_make_script(), lesson_id="L1.16-course-1-recital")
+    # Drive all 5 prompts to surface the full sampled subset.
+    for _ in range(_RECITAL_SUBSET_SIZE):
+        rt.ack(lesson_id="L1.16-course-1-recital")
 
     # Build the expected subset manually using random.Random(fake_day).
     expected_sample = random.Random(fake_day).sample(
         _RECITAL_POOL, k=_RECITAL_SUBSET_SIZE
     )
     expected_prompts = [e["prompt"] for e in expected_sample]
+    prompt_set = {e["prompt"] for e in _RECITAL_POOL}
     actual_prompts = [
         e["payload"]["text"]
         for e in emitted
         if e["type"] == "ipc.learn.tutor_speak"
+        and e["payload"]["text"] in prompt_set
     ]
     assert actual_prompts == expected_prompts, (
         f"default seed must equal day-of-epoch ({fake_day}); "
