@@ -3164,6 +3164,28 @@ def cli_entry(argv: list[str] | None = None) -> None:
     # dispatched the same way as `library` so the legacy flag layer is untouched.
     if raw_argv and raw_argv[0] == "bench":
         sys.exit(_run_bench_cli(raw_argv[1:]))
+    # Phase 92 (LESSON-03) — `vibemix learn <sub>` dispatch. v9.0 ships ONE
+    # subcommand: `learn reset` (wipes ~/.cache/vibemix/learn-progress.json).
+    # Dispatched the same way as `library` / `bench` — short-circuits BEFORE
+    # `asyncio.run(main())` so the live runtime never starts when the CLI
+    # subcommand is invoked (T-92-04-05 mitigation: no path where reset runs
+    # concurrent with a live session). Idempotent — reset_progress is a no-op
+    # when the file is already absent.
+    if raw_argv and raw_argv[0] == "learn":
+        if len(raw_argv) >= 2 and raw_argv[1] == "reset":
+            from vibemix.learn.progress import reset_progress
+
+            reset_progress()
+            print("learn progress reset.", file=sys.stdout, flush=True)
+            sys.exit(0)
+        # Unknown `learn` subcommand — surface usage + exit 2 (argparse-style).
+        print(
+            f"vibemix learn: unknown subcommand {raw_argv[1:]!r}; "
+            "available: reset",
+            file=sys.stderr,
+            flush=True,
+        )
+        sys.exit(2)
 
     args = _parse_args(argv)
     # v8.0 LOG-04 — apply the verbose-logging switch before any dispatch so the
