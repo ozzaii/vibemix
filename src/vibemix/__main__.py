@@ -2543,6 +2543,31 @@ def _cmd_library_curate_codex(args: argparse.Namespace, lib) -> int:
     out = result.to_dict()
 
     if result.stop_reason != "created":
+        # Plan 100-04 / Decision 6: the clarification path SKIPS the JSON dump
+        # + bracket-tagged single-line hint (those don't render the 2-block
+        # question + numbered choices layout). The rich 2-block render lives
+        # in the dedicated branch below. All other non-success stop_reasons
+        # (timeout, codex_*, tool_starvation) keep the pre-100-04 print posture.
+        if result.stop_reason == "clarification_needed":
+            # Plan 100-04 / Decision 5: exit 11 — reserved range 10-19 for
+            # stop_reasons (10 = tool_starvation, 11 = clarification_needed,
+            # 12-19 = future). Plan 99-06 RESEARCH.md Pitfall 6 verified path-
+            # free vs standard Unix conventions.
+            # Decision 6 2-block stderr layout: header + question + numbered
+            # choices + re-run hint. stdout stays clean — single-turn contract
+            # (vibemix retains NO state; the user re-invokes manually with
+            # `<theme> + <chosen option>`).
+            print("[viber/codex] clarification_needed:", file=sys.stderr)
+            print(f"  {result.question or '(no question)'}", file=sys.stderr)
+            print("", file=sys.stderr)
+            for i, choice in enumerate(result.choices or [], start=1):
+                print(f"  {i}. {choice}", file=sys.stderr)
+            print("", file=sys.stderr)
+            print(
+                f'  Re-run with: library curate "{args.theme} + <chosen option>"',
+                file=sys.stderr,
+            )
+            return 11
         print(_json.dumps(out, indent=2), file=sys.stderr)
         hint = {
             "codex_not_installed": (
@@ -2558,7 +2583,7 @@ def _cmd_library_curate_codex(args: argparse.Namespace, lib) -> int:
         }.get(result.stop_reason, result.error or "no playlist created")
         print(f"[viber/codex] {result.stop_reason}: {hint}", file=sys.stderr)
         # Plan 99-06 / Decision 6: 10 = tool_starvation, 1 = other failures.
-        # 11 reserved for Phase 100 ``clarification_needed`` (forward-compat).
+        # 11 = clarification_needed handled above (Plan 100-04).
         return 10 if result.stop_reason == "tool_starvation" else 1
 
     _json.dump(out, sys.stdout, indent=2)
@@ -2595,6 +2620,24 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
     out = result.to_dict()
 
     if result.stop_reason not in ("created", "exported"):
+        # Plan 100-04 / Decision 6: clarification path renders the 2-block
+        # question + numbered choices layout BEFORE the single-line hint path.
+        # Sibling parity with _cmd_library_curate_codex above; the re-run hint
+        # uses `library build-set` and echoes args.brief (build-set takes brief,
+        # curate takes theme).
+        if result.stop_reason == "clarification_needed":
+            # Plan 100-04 / Decision 5: exit 11 (reserved range 10-19).
+            print("[viber/codex] clarification_needed:", file=sys.stderr)
+            print(f"  {result.question or '(no question)'}", file=sys.stderr)
+            print("", file=sys.stderr)
+            for i, choice in enumerate(result.choices or [], start=1):
+                print(f"  {i}. {choice}", file=sys.stderr)
+            print("", file=sys.stderr)
+            print(
+                f'  Re-run with: library build-set "{args.brief} + <chosen option>"',
+                file=sys.stderr,
+            )
+            return 11
         print(_json.dumps(out, indent=2), file=sys.stderr)
         hint = {
             "codex_not_installed": (
@@ -2609,6 +2652,7 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
         }.get(result.stop_reason, result.error or "no set created")
         print(f"[viber/codex] {result.stop_reason}: {hint}", file=sys.stderr)
         # Plan 99-06 / Decision 6: 10 = tool_starvation, 1 = other failures.
+        # 11 = clarification_needed handled above (Plan 100-04).
         return 10 if result.stop_reason == "tool_starvation" else 1
 
     _json.dump(out, sys.stdout, indent=2)
@@ -2813,27 +2857,44 @@ def _normalize_codex_curate_result(
     """Plan 99-06 / Decision 8 — Telegram ``curate_fn`` normalizer.
 
     When ``result.stop_reason == "tool_starvation"``, return the uniform
-    starvation payload Plan 99-07's ``format_reply`` will consume::
+    starvation payload Plan 99-07's ``format_reply`` consumes::
 
         {"ok": False, "stop_reason": "tool_starvation", "hint": <error string>}
+
+    When ``result.stop_reason == "clarification_needed"`` (Plan 100-04 sibling
+    extension), return the uniform clarification payload Plan 100-05's
+    ``format_reply`` branch consumes::
+
+        {"ok": False, "stop_reason": "clarification_needed",
+         "question": <str>, "choices": list[str]}
 
     For every OTHER ``stop_reason`` (``created`` / ``timeout`` / etc.), return
     ``None`` so ``curate_fn`` falls through to its existing happy-path /
     generic-error branches — pre-99-06 behavior preserved.
 
     Defensive: ``result.error`` may be ``None`` (the side-channel write loop
-    always populates it, but the dataclass default is None). The ``or ""``
-    fallback keeps the payload dict-shape stable for ``format_reply``.
-
-    Forward-compat (Phase 100): a sibling ``elif result.stop_reason ==
-    "clarification_needed"`` lands here without restructuring; ``curate_fn``
-    stays a one-line delegate.
+    always populates it, but the dataclass default is None). Similarly,
+    ``result.question`` / ``result.choices`` default to None on the cold path
+    and the Plan 100-03 wrapper's isinstance defenses may leave them None on
+    malformed payloads. The ``or ""`` / ``or []`` fallbacks keep the payload
+    dict-shape stable for ``format_reply`` — Plan 100-05 can iterate
+    ``payload["choices"]`` without None-guards.
     """
     if result.stop_reason == "tool_starvation":
         return {
             "ok": False,
             "stop_reason": "tool_starvation",
             "hint": result.error or "",
+        }
+    # Plan 100-04: sibling extension. Telegram (Plan 100-05) format_reply
+    # branches on stop_reason == "clarification_needed" and reads question +
+    # choices to render the disambiguation prompt (leak-stripped + numbered).
+    if result.stop_reason == "clarification_needed":
+        return {
+            "ok": False,
+            "stop_reason": "clarification_needed",
+            "question": result.question or "",
+            "choices": list(result.choices or []),
         }
     return None
 
