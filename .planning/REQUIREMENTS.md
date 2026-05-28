@@ -12,7 +12,7 @@
 
 - [x] **TONE-01**: A beginner opens vibemix → picks Learn → sees the verbatim 4-line iconic opening dialog ("Hello vibemix, what are you?" / "I'm the best DJ app in the world." / "If you are the best, then who the fuck am I?" / "Oh bestie, don't worry. You know why? Because I'm the beginner module of vibemix. Let's go.") — byte-equality test against `src/vibemix/learn/transcripts/course_1_anatomy/01_welcome.json` fixture, CI-red on any drift.
 - [x] **TONE-02**: Every one of the 36 lesson scripts is HAND-AUTHORED (committed to `src/vibemix/learn/transcripts/course_<N>/<lesson_id>.json`) and NEVER LLM-generated on-the-fly; static test (`tests/learn/test_scripts_are_fixtures.py`) confirms no live generative call writes a `tutor_speak` envelope's `text` field.
-- [ ] **TONE-03**: A new AI-slop blocklist `scripts/launch/check_no_tutor_slop.py` (extends `check_no_ai_slop.py`) catches ≥20 tutor-tic tokens ("Great question!" / "Today we'll be learning…" / "Awesome!" / "You crushed it!" / "Let's dive in!" / "Don't worry, you'll get the hang of it" + 14 more); CI-gated; runs against ALL `learn/transcripts/**.json` AND runtime AI interjections.
+- [x] **TONE-03**: A new AI-slop blocklist `scripts/launch/check_no_tutor_slop.py` (extends `check_no_ai_slop.py`) catches ≥20 tutor-tic tokens ("Great question!" / "Today we'll be learning…" / "Awesome!" / "You crushed it!" / "Let's dive in!" / "Don't worry, you'll get the hang of it" + 14 more); CI-gated; runs against ALL `learn/transcripts/**.json` AND runtime AI interjections. **SHIPPED P94-02 2026-05-28** (35 tokens across 4 forbidden-move categories with ≥4 each, deep-scans every JSON string descendant so future course fixtures inherit the gate automatically, multi-word preview-tic design encodes the L1.01 `Let's go.` exception in token-design instead of as a special-case skip).
 - [x] **TONE-04**: The tutor system instruction includes a hard lock forbidding the four learned moves: NO complimenting user actions · NO summarizing what just happened · NO previewing what's next · NO closing with an upbeat hook. State ONE grounded observation + ONE forward sentence the lesson script provided. Pinned by `tests/learn/test_tutor_system_instruction_lock.py`.
 
 ### RENDER — controller visualization + MIDI position mirror
@@ -151,9 +151,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TONE-01 | Phase 94 — Course 1 Anatomy (fixture lands with L1.01) | Complete |
+| TONE-01 | Phase 94 — Course 1 Anatomy (fixture L1.01 + byte-equality test) | Complete (fixture P94-01 + byte-equality test P94-02 SHIPPED 2026-05-28) |
 | TONE-02 | Phase 92 — Lesson Runtime (no-LLM-write static gate) | Complete |
-| TONE-03 | Phase 94 — Course 1 Anatomy (tutor-slop blocklist) | Pending |
+| TONE-03 | Phase 94 — Course 1 Anatomy (tutor-slop blocklist) | Complete (P94-02 SHIPPED 2026-05-28) |
 | TONE-04 | Phase 92 — Lesson Runtime (system instruction lock) | Complete |
 | RENDER-01 | Phase 91 — Controller Renderer + MIDI Mirror | Complete |
 | RENDER-02 | Phase 91 — Controller Renderer + MIDI Mirror | Complete |
