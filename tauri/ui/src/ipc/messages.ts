@@ -69,7 +69,18 @@ export type VibemixIPCMessages =
   | ProfileDelete
   | ProfileDeleteAck
   | LearnControllerDetected
-  | LearnMidiPosition;
+  | LearnMidiPosition
+  | LearnStartCourse
+  | LearnStartLesson
+  | LearnCompleteLesson
+  | LearnLessonLoaded
+  | LearnHighlight
+  | LearnAdvance
+  | LearnAck
+  | LearnTutorSpeak
+  | LearnExemplarPlay
+  | LearnExemplarStop
+  | LearnProgressState;
 
 export interface IpcBoot {
   type: "ipc.boot";
@@ -762,6 +773,137 @@ export interface LearnMidiPosition {
     controller_id: string;
     positions: {
       [k: string]: number;
+    };
+  };
+}
+export interface LearnStartCourse {
+  type: "ipc.learn.start_course";
+  ts: string;
+  payload: {
+    course_id: "course_0" | "course_1" | "course_2" | "course_3";
+    controller_id: string;
+  };
+}
+export interface LearnStartLesson {
+  type: "ipc.learn.start_lesson";
+  ts: string;
+  payload: {
+    lesson_id: string;
+    level: "fresh" | "replay";
+  };
+}
+export interface LearnCompleteLesson {
+  type: "ipc.learn.complete_lesson";
+  ts: string;
+  payload: {
+    lesson_id: string;
+    reason: "completed" | "user_skip";
+  };
+}
+export interface LearnLessonLoaded {
+  type: "ipc.learn.lesson_loaded";
+  ts: string;
+  payload: {
+    course_id: string;
+    lesson_id: string;
+    title: string;
+    controller_id: string;
+    /**
+     * @maxItems 32
+     */
+    progress_dots: {
+      lesson_id: string;
+      status: "pending" | "current" | "completed";
+    }[];
+  };
+}
+export interface LearnHighlight {
+  type: "ipc.learn.highlight";
+  ts: string;
+  payload: {
+    control_id: string;
+    deck: "" | "A" | "B" | "C" | "D";
+    cue_color: "amber" | "warning";
+    cue_shape: "pulse-ring" | "static-glow";
+    annotation: string;
+    expected_action: {
+      type: "cc" | "button";
+      control: string;
+      deck?: "" | "A" | "B" | "C" | "D";
+      direction?: "" | "up" | "down";
+      min_delta?: number;
+    };
+  };
+}
+export interface LearnAdvance {
+  type: "ipc.learn.advance";
+  ts: string;
+  payload: {
+    lesson_id: string;
+    reason: "action_matched" | "user_skip";
+  };
+}
+export interface LearnAck {
+  type: "ipc.learn.ack";
+  ts: string;
+  payload: {
+    control_id: string;
+    source: "midi" | "click";
+    value?: number;
+    direction?: "" | "up" | "down";
+  };
+}
+export interface LearnTutorSpeak {
+  type: "ipc.learn.tutor_speak";
+  ts: string;
+  payload: {
+    text: string;
+    tts_marker: string;
+    /**
+     * @maxItems 4
+     */
+    citations: [] | [string] | [string, string] | [string, string, string] | [string, string, string, string];
+    data_state: "active" | "hint";
+  };
+}
+export interface LearnExemplarPlay {
+  type: "ipc.learn.exemplar_play";
+  ts: string;
+  payload: {
+    track_id: string;
+    duration_s: number;
+    gain_db: number;
+  };
+}
+export interface LearnExemplarStop {
+  type: "ipc.learn.exemplar_stop";
+  ts: string;
+  payload: {
+    track_id: string;
+    reason: "completed" | "interrupted";
+  };
+}
+export interface LearnProgressState {
+  type: "ipc.learn.progress_state";
+  ts: string;
+  payload: {
+    action: "snapshot" | "reset" | "reset_ack";
+    was_recovered?: boolean;
+    progress?: {
+      schema_version: number;
+      courses: {
+        [k: string]: {
+          completed?: boolean;
+          completed_at?: string | null;
+        };
+      };
+      lessons: {
+        [k: string]: {
+          completed?: boolean;
+          completed_at?: string | null;
+          strikes_used?: number;
+        };
+      };
     };
   };
 }

@@ -201,6 +201,39 @@
     },
     {
       "$ref": "#/definitions/LearnMidiPosition"
+    },
+    {
+      "$ref": "#/definitions/LearnStartCourse"
+    },
+    {
+      "$ref": "#/definitions/LearnStartLesson"
+    },
+    {
+      "$ref": "#/definitions/LearnCompleteLesson"
+    },
+    {
+      "$ref": "#/definitions/LearnLessonLoaded"
+    },
+    {
+      "$ref": "#/definitions/LearnHighlight"
+    },
+    {
+      "$ref": "#/definitions/LearnAdvance"
+    },
+    {
+      "$ref": "#/definitions/LearnAck"
+    },
+    {
+      "$ref": "#/definitions/LearnTutorSpeak"
+    },
+    {
+      "$ref": "#/definitions/LearnExemplarPlay"
+    },
+    {
+      "$ref": "#/definitions/LearnExemplarStop"
+    },
+    {
+      "$ref": "#/definitions/LearnProgressState"
     }
   ],
   "definitions": {
@@ -2940,6 +2973,285 @@
             "positions": {
               "type": "object",
               "additionalProperties": {"type": "integer", "minimum": 0, "maximum": 127}
+            }
+          }
+        }
+      }
+    },
+    "LearnStartCourse": {
+      "$comment": "Shell → sidecar. User picked a course in the HUD. Phase 92 LESSON-02.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.start_course"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["course_id", "controller_id"],
+          "properties": {
+            "course_id": {"type": "string", "enum": ["course_0", "course_1", "course_2", "course_3"]},
+            "controller_id": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "LearnStartLesson": {
+      "$comment": "Shell → sidecar. User skipped into a specific lesson. Phase 92 LESSON-02.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.start_lesson"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lesson_id", "level"],
+          "properties": {
+            "lesson_id": {"type": "string", "pattern": "^L[0-9]+\\.[0-9]+-.+$"},
+            "level": {"type": "string", "enum": ["fresh", "replay"]}
+          }
+        }
+      }
+    },
+    "LearnCompleteLesson": {
+      "$comment": "Bidirectional. User skip OR system advance. Phase 92 LESSON-02 / LESSON-04.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.complete_lesson"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lesson_id", "reason"],
+          "properties": {
+            "lesson_id": {"type": "string", "pattern": "^L[0-9]+\\.[0-9]+-.+$"},
+            "reason": {"type": "string", "enum": ["completed", "user_skip"]}
+          }
+        }
+      }
+    },
+    "LearnLessonLoaded": {
+      "$comment": "Sidecar → shell. A lesson is loaded; HUD metadata. Phase 92 LESSON-02.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.lesson_loaded"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["course_id", "lesson_id", "title", "controller_id", "progress_dots"],
+          "properties": {
+            "course_id": {"type": "string", "minLength": 1},
+            "lesson_id": {"type": "string", "minLength": 1},
+            "title": {"type": "string", "minLength": 1, "maxLength": 80},
+            "controller_id": {"type": "string", "minLength": 1},
+            "progress_dots": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["lesson_id", "status"],
+                "properties": {
+                  "lesson_id": {"type": "string"},
+                  "status": {"type": "string", "enum": ["pending", "current", "completed"]}
+                }
+              },
+              "maxItems": 32
+            }
+          }
+        }
+      }
+    },
+    "LearnHighlight": {
+      "$comment": "Sidecar → shell. Glow a control on the rendered SVG. Phase 92 RENDER-04. Dual-channel cue (cue_color + cue_shape) for color-blind a11y. ≤16ms paint budget pinned by tauri/ui/tests/learn/highlight-paint.test.ts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.highlight"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["control_id", "deck", "cue_color", "cue_shape", "annotation", "expected_action"],
+          "properties": {
+            "control_id": {"type": "string", "minLength": 1},
+            "deck": {"type": "string", "enum": ["", "A", "B", "C", "D"]},
+            "cue_color": {"type": "string", "enum": ["amber", "warning"]},
+            "cue_shape": {"type": "string", "enum": ["pulse-ring", "static-glow"]},
+            "annotation": {"type": "string", "maxLength": 200},
+            "expected_action": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "control"],
+              "properties": {
+                "type": {"type": "string", "enum": ["cc", "button"]},
+                "control": {"type": "string", "minLength": 1},
+                "deck": {"type": "string", "enum": ["", "A", "B", "C", "D"]},
+                "direction": {"type": "string", "enum": ["", "up", "down"]},
+                "min_delta": {"type": "integer", "minimum": 0, "maximum": 127}
+              }
+            }
+          }
+        }
+      }
+    },
+    "LearnAdvance": {
+      "$comment": "Bidirectional. Tutor-confirms-MIDI OR user skip. Phase 92 LESSON-04.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.advance"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lesson_id", "reason"],
+          "properties": {
+            "lesson_id": {"type": "string", "minLength": 1},
+            "reason": {"type": "string", "enum": ["action_matched", "user_skip"]}
+          }
+        }
+      }
+    },
+    "LearnAck": {
+      "$comment": "Shell → sidecar. User touched physical control OR clicked SVG. Phase 92 LESSON-04. The sidecar replies with advance if action_matches.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.ack"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["control_id", "source"],
+          "properties": {
+            "control_id": {"type": "string", "minLength": 1},
+            "source": {"type": "string", "enum": ["midi", "click"]},
+            "value": {"type": "integer", "minimum": 0, "maximum": 127},
+            "direction": {"type": "string", "enum": ["", "up", "down"]}
+          }
+        }
+      }
+    },
+    "LearnTutorSpeak": {
+      "$comment": "Sidecar → shell. Tutor narration. text comes from JSON fixture (NEVER LLM-generated). citations[] is empty in P92 — P93+ populates with [exemplar:<id>] when exemplar engine ships. Phase 92 TONE-02 / LESSON-05.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.tutor_speak"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["text", "tts_marker", "citations", "data_state"],
+          "properties": {
+            "text": {"type": "string", "minLength": 1, "maxLength": 280},
+            "tts_marker": {"type": "string", "minLength": 1, "maxLength": 64},
+            "citations": {
+              "type": "array",
+              "items": {"type": "string", "pattern": "^\\[(track|exemplar|cue|ev|aud|midi|screen|mix|tend|key|recall):.+\\]$"},
+              "maxItems": 4
+            },
+            "data_state": {"type": "string", "enum": ["active", "hint"]}
+          }
+        }
+      }
+    },
+    "LearnExemplarPlay": {
+      "$comment": "Sidecar → shell. Exemplar audio playback STARTED. SHAPE ONLY in P92 — engine in P93. Phase 92 LESSON-02 (shape).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.exemplar_play"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["track_id", "duration_s", "gain_db"],
+          "properties": {
+            "track_id": {"type": "string", "minLength": 1},
+            "duration_s": {"type": "number", "minimum": 0, "maximum": 300},
+            "gain_db": {"type": "number", "minimum": -24, "maximum": 0}
+          }
+        }
+      }
+    },
+    "LearnExemplarStop": {
+      "$comment": "Sidecar → shell. Exemplar audio playback ENDED. SHAPE ONLY in P92 — engine in P93.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.exemplar_stop"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["track_id", "reason"],
+          "properties": {
+            "track_id": {"type": "string", "minLength": 1},
+            "reason": {"type": "string", "enum": ["completed", "interrupted"]}
+          }
+        }
+      }
+    },
+    "LearnProgressState": {
+      "$comment": "Bidirectional. action='snapshot' (push from sidecar) or action='reset' (request from shell) or action='reset_ack' (sidecar confirms reset). Phase 92 LESSON-03.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.progress_state"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["action"],
+          "properties": {
+            "action": {"type": "string", "enum": ["snapshot", "reset", "reset_ack"]},
+            "was_recovered": {"type": "boolean"},
+            "progress": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["schema_version", "courses", "lessons"],
+              "properties": {
+                "schema_version": {"type": "integer", "minimum": 1, "maximum": 1},
+                "courses": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "completed": {"type": "boolean"},
+                      "completed_at": {"type": ["string", "null"]}
+                    }
+                  }
+                },
+                "lessons": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "completed": {"type": "boolean"},
+                      "completed_at": {"type": ["string", "null"]},
+                      "strikes_used": {"type": "integer", "minimum": 0, "maximum": 3}
+                    }
+                  }
+                }
+              }
             }
           }
         }
