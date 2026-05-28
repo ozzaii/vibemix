@@ -261,7 +261,7 @@ _COUNT_IN_BPM_FLOOR: float = 0.8
 _COUNT_IN_PHRASE_FLOOR: float = 0.7
 
 
-def _count_in_eligible(state: "MusicState") -> bool:
+def _count_in_eligible(state: MusicState) -> bool:
     """True iff Course 3 proactive lens can use forward-looking
     count-in language this turn. False → retrospective narration only.
 
@@ -378,6 +378,50 @@ class AICoach:
                     for s, d in sorted(resolved.items())
                 ]
                 e.append("decks[" + " | ".join(parts) + "]")
+                # One Mind S1 — feed the brain the VALIDATED harmonic+tempo
+                # RELATION between the two loaded decks, not just their raw keys.
+                # Computed deterministically by the unified TrackRelation engine
+                # (S6). Closes the recon's failure case: the brain calling a key
+                # clash a "smooth harmonic mix". With the relation stated in the
+                # prompt, the brain reasons on ground truth instead of inferring
+                # compatibility from two Camelot codes itself. Grounding INPUT
+                # only — Invariant #2 deepened the RIGHT way (better evidence),
+                # never invented (Invariant #3, it's computed from trusted deck
+                # state). We deliberately do NOT route the brain's free text
+                # through the pill's decision-claim contract: that contract keys
+                # on claim-IDs, but the live brain speaks EvidenceRegistry
+                # citations, so it would mass-reject every harmonic phrase and
+                # over-strip the reaction — weakening the gate, not deepening it
+                # (see S1 KAAN-ACTION note). Lazy import keeps coach import-light;
+                # gated to >=2 resolved decks so <2 stays byte-identical (golden).
+                if len(resolved) >= 2:
+                    try:
+                        from vibemix.library.track_relation import compute_relation
+
+                        ordered = sorted(resolved.items())
+                        (sa, da), (sb, db) = ordered[0], ordered[1]
+                        rel = compute_relation(
+                            src_track_id=sa,
+                            dst_track_id=sb,
+                            cosine=0.0,
+                            src_camelot=da.camelot,
+                            dst_camelot=db.camelot,
+                            src_bpm=da.bpm if (da.bpm and da.bpm > 0) else None,
+                            dst_bpm=db.bpm if (db.bpm and db.bpm > 0) else None,
+                        )
+                        verdict = (
+                            "harmonic-clash"
+                            if rel.harmonic_clash
+                            else "harmonic-ok"
+                            if rel.harmonic_compatible
+                            else "harmonic-drift"
+                        )
+                        why = rel.why()
+                        e.append(
+                            f"blend[{why} {verdict}]" if why else f"blend[{verdict}]"
+                        )
+                    except Exception:  # pragma: no cover — grounding is best-effort
+                        pass
             else:
                 e.append("decks=unknown")
 
@@ -522,6 +566,8 @@ class AICoach:
                 e.append(
                     f"lens=count_in_eligible[next@{state.next_phrase_at:.1f}]"
                 )
+                if getattr(state, "next_phrase_cue_id", None):
+                    e.append(f"cue_anchor={state.next_phrase_cue_id}")
             else:
                 e.append("lens=retrospective_only")
 

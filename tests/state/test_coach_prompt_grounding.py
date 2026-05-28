@@ -93,3 +93,59 @@ def test_grounded_baseline_unchanged_by_deck_state():
     assert "bpm=128" in line
     assert "deck=none" in line  # the EXISTING audible_deck field, not deck_state
     assert "decks[" not in line
+
+
+# --- One Mind S1 — validated blend relation between two loaded decks -------
+
+
+def _two_deck_state(*, a_camelot: str, b_camelot: str, a_bpm: float, b_bpm: float):
+    return DeckState(
+        decks={
+            "A": DeckTrack(
+                title="OutA", key="x", camelot=a_camelot, bpm=a_bpm,
+                confidence=0.8, source="rekordbox_xml",
+            ),
+            "B": DeckTrack(
+                title="InB", key="y", camelot=b_camelot, bpm=b_bpm,
+                confidence=0.8, source="rekordbox_xml",
+            ),
+        },
+        updated_at=12.5,
+    )
+
+
+def test_s1_two_resolved_decks_emit_compatible_blend_relation():
+    """With two loaded decks resolved, the prompt states the VALIDATED relation
+    (Camelot arrow + BPM delta + harmonic verdict) — the brain no longer has to
+    infer compatibility from two bare keys."""
+    populated = _grounded_state()
+    populated.deck_state = _two_deck_state(
+        a_camelot="8A", b_camelot="9A", a_bpm=128.0, b_bpm=130.0
+    )
+    line = AICoach.evidence_line(populated)
+    assert "blend[8A→9A, +2 BPM harmonic-ok]" in line
+
+
+def test_s1_clashing_decks_flagged_harmonic_clash():
+    """A real Camelot clash is stated as such — closes the 'brain calls a clash
+    a smooth mix' failure deterministically."""
+    populated = _grounded_state()
+    populated.deck_state = _two_deck_state(
+        a_camelot="8A", b_camelot="3A", a_bpm=128.0, b_bpm=128.0
+    )
+    line = AICoach.evidence_line(populated)
+    assert "harmonic-clash" in line
+    assert "blend[8A→3A, same BPM harmonic-clash]" in line
+
+
+def test_s1_single_deck_emits_no_blend_relation():
+    """One resolved deck → no blend token (needs a pair). Byte-identical to the
+    existing single-deck deck block."""
+    populated = _grounded_state()
+    populated.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Strobe", key="Am", camelot="8A",
+                              bpm=128.0, confidence=0.8, source="rekordbox_xml")},
+        updated_at=12.5,
+    )
+    line = AICoach.evidence_line(populated)
+    assert "blend[" not in line
