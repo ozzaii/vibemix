@@ -1757,6 +1757,14 @@ async def main() -> None:
             deck_poll_task,
             parent_watch_task,
             midi_watcher_task,
+            # WR-01 fix (P92 REVIEW): lesson_tick_task was missing from
+            # the cleanup list — tick_loop checks stop_event each second
+            # so it exits eventually, but the main coroutine never
+            # awaited it. asyncio could shut down the loop mid-
+            # `await asyncio.sleep(1.0)` and emit the "Task was destroyed
+            # but it is pending" warning. Include it here so the shutdown
+            # is clean.
+            lesson_tick_task,
         ]
         for t in cleanup_tasks:
             t.cancel()
