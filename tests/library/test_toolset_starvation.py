@@ -503,6 +503,80 @@ def test_terminal_idempotence_after_starvation(
     )
 
 
+# ---------------------------------------------------------------------------
+# Plan 99-04 Task 1 — cross-process side-channel write at threshold-trip.
+#
+# These two tests pin Decision 4 propagation Channel A (RESEARCH.md
+# § Stop-Reason Propagation Channel): when env var
+# ``VIBEMIX_STOP_REASON_FILE`` is set, the threshold-trip block writes the
+# ``stop_reason`` payload as JSON to that path so the parent-process
+# wrapper (codex_curate.curate_with_codex / build_set_with_codex) can read
+# it after the Codex CLI subprocess exits. When the env var is ABSENT, the
+# file write is a silent no-op — the in-process ``self.stop_reason`` write
+# from Plan 99-03 still happens (no regression for direct unit-test usage).
+#
+# The write must ride the same first-write-wins guard as the in-process
+# payload write (Plan 99-03), so a single trip produces exactly one file.
+# ---------------------------------------------------------------------------
+
+
+def test_side_channel_writes_when_env_set(
+    toolset: LibraryToolset, monkeypatch, tmp_path
+) -> None:
+    """Env var set → threshold-trip writes ``stop_reason`` payload to the path.
+
+    The JSON content must equal ``toolset.stop_reason`` (modulo dict ordering).
+    Pins Channel A: the side-channel file is the cross-process seam the
+    wrapper reads after the Codex CLI subprocess exits.
+    """
+    import json
+
+    sr_path = tmp_path / "sr.json"
+    monkeypatch.setenv("VIBEMIX_STOP_REASON_FILE", str(sr_path))
+    _stub_empty_search(monkeypatch)
+
+    for _ in range(3):
+        toolset.dispatch("search_vibe", {"query": "narrow theme"})
+
+    assert toolset.stop_reason is not None, (
+        "in-process trip should still fire — Plan 99-03 contract."
+    )
+    assert sr_path.exists(), (
+        f"side-channel file must be written to env-var path; "
+        f"path={sr_path!r} does not exist after the trip."
+    )
+    parsed = json.loads(sr_path.read_text(encoding="utf-8"))
+    assert parsed == toolset.stop_reason, (
+        f"side-channel JSON must equal toolset.stop_reason; "
+        f"file={parsed!r}, toolset={toolset.stop_reason!r}"
+    )
+
+
+def test_side_channel_noop_when_env_absent(
+    toolset: LibraryToolset, monkeypatch, tmp_path
+) -> None:
+    """Env var absent → no file write; in-process trip still fires (no regression).
+
+    Pins the graceful no-op behavior: direct CLI usage / unit tests without
+    the env var must keep working. ``tmp_path`` stays empty after the trip.
+    """
+    monkeypatch.delenv("VIBEMIX_STOP_REASON_FILE", raising=False)
+    _stub_empty_search(monkeypatch)
+
+    for _ in range(3):
+        toolset.dispatch("search_vibe", {"query": "narrow theme"})
+
+    assert toolset.stop_reason is not None, (
+        "env-absent path must still trip in-process — Plan 99-03 contract."
+    )
+    # tmp_path was never named in the env var; no file should land in it.
+    leftover = list(tmp_path.iterdir())
+    assert leftover == [], (
+        f"env-absent must be a silent no-op for the file write; "
+        f"got leftover files: {leftover!r}"
+    )
+
+
 def test_starvation_short_circuits_subsequent_dispatch(
     toolset: LibraryToolset, monkeypatch
 ) -> None:
