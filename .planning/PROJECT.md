@@ -10,11 +10,22 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: *None — run `/gsd:new-milestone` when ready*
+## Current Milestone: v11.0 "Earned"
 
-The v10.0 "12-Factor Hardening" milestone shipped 2026-05-28 (audit PASSED · 21/21 REQs · 0 gaps · 0 tech debt). See below for the latest shipped summary; the full archive lives at `.planning/milestones/v10.0-ROADMAP.md` + `.planning/milestones/v10.0-REQUIREMENTS.md` + `.planning/v10.0-MILESTONE-AUDIT.md`.
+**Goal:** Turn the v9.0 Lesson One module into a DJ skill-tree where ~6 real DJ competencies each level up through a two-stage, evidence-grounded mastery bar — lessons fill a skill to "Competent", and only a real, cited live demonstration in an actual set unlocks "Mastered". Nothing is given; every notch is earned. A small, contained gamification layer that adds the felt reward of progression without growing the product surface.
 
-Two parallel handoffs remain in flight on this working tree (`live-tuning-or-brain`): the LiveKit-upgrade handoff (`src/vibemix/__main__.py:1353` `turn_handling` + livekit-agents 1.5.8→1.5.14) and the frontend wiring handoff (`tauri/ui/*` rocker visual-sync, status-tick, pill hover-peek). Both are owned by separate sessions and remain disjoint from v10.0's library-subtree island.
+**Target features:**
+- **Skill-tree mastery model** — ~6 skills (Deck Control, Beatmatching, EQ Mixing, Harmonic Mixing, Transitions, Phrasing & Performance) mapped onto the existing 36 lessons / 3 courses; each a two-stage bar.
+- **Competent stage (Learn-grounded)** — bars fill from lessons weighted by quality (recital pass + first-try / 0-strikes > click-through); reaching Competent requires passing that skill's recital honest-score gate.
+- **Mastered stage (Live-grounded)** — the Competent→Mastered segment unlocks only when the live co-host detects the user performing that skill in a real set, grounded in EvidenceRegistry events that resolve a valid citation (no cited event → no credit).
+- **Persistence + migration** — a `skills` block on `learn-progress.json` (schema v1→v2 with deterministic back-fill); a new pure-logic `learn/skill_tree.py` as sole writer; never touches `profile.json` (privacy contract).
+- **Surface + celebration** — skill-tree panel + quiet Competent-fill + a single rare earned grounded co-host vocal on a live "Mastered" unlock (exact surface + celebration resolved in this milestone's UI phase, per Kaan).
+
+**Key context:** Anti-bloat is the explicit constraint ("small gamification without overwhelming the software") — ZERO new AI provider / ws port / IPC envelope family / heavy dep / lesson content; NO streaks / leaderboards / social / cohort (deferred to Bravoh per the v9.0 defer list); single-user local only. All four cardinal invariants hold by ADDITIVE design (skill_tree.py never writes MusicState — AST gate; every live "Mastered" credit requires a resolvable citation; trust-the-audio — live credit only from real detected+cited events; one socket — `learn.*` rides `:8765`). Island = `src/vibemix/learn/` (+ learn-progress schema + learn IPC) — disjoint from the concurrent One Mind (`src/vibemix/**` minus learn), tozpembe shell (`tauri/`), frontend-wiring (`tauri/ui/*`), and LiveKit-upgrade (`__main__.py`/agent) sessions; the UI phase coordinates `tauri/ui` disjointness when it lands. Builds directly on v9.0 (`LearnProgress`, `RecitalRuntime` honest-score gates) + the live `EvidenceRegistry` + existing event taxonomy (MIX_MOVE / LAYER_ARRIVAL / harmonic / EQ-band MIDI / beatmatch — no new detectors). Mode: `gsd-autonomous fully` / default-YES; human-only blockers (ear-pass on the grounded "Mastered" vocal tone, real-hardware live-"Mastered" verify on Kaan's FLX4) park as KAAN-ACTION.
+
+The v10.0 "12-Factor Hardening" milestone shipped 2026-05-28 (audit PASSED · 21/21 REQs · 0 gaps · 0 tech debt) — see "Latest Shipped Milestone" below.
+
+Two parallel handoffs remain in flight on this working tree (`live-tuning-or-brain`): the LiveKit-upgrade handoff (`src/vibemix/__main__.py:1353` `turn_handling` + livekit-agents 1.5.8→1.5.14) and the frontend wiring handoff (`tauri/ui/*` rocker visual-sync, status-tick, pill hover-peek). Both are owned by separate sessions and remain disjoint from this milestone's `src/vibemix/learn/` island.
 
 KAAN-ACTION queue parked for public-ship discharge (4 v10.0 items + the existing v4.0 SHIP / v9.0 ear-pass / legal-disclaimer queue). See `.planning/STATE.md` § Deferred Items.
 
