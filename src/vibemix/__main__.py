@@ -3320,10 +3320,46 @@ def cli_entry(argv: list[str] | None = None) -> None:
             reset_progress()
             print("learn progress reset.", file=sys.stdout, flush=True)
             sys.exit(0)
+        # Phase 93 (EXEMPLAR-01..05) — `vibemix learn exemplar <band>` dev-loop
+        # surface. Dispatches `ExemplarFinder.find(band, k=1)` and prints the
+        # 4-line `track:/path:/score:/why:` block when a pick resolves
+        # (library OR packaged fallback); exits 1 ("honest null") when both
+        # library and bank are empty; exits 2 on unknown bands (T-93-06-01:
+        # band allow-list check BEFORE any SQL/file operation). Same
+        # short-circuit semantics as `learn reset` — the live runtime never
+        # starts when the CLI subcommand is invoked.
+        if len(raw_argv) >= 3 and raw_argv[1] == "exemplar":
+            band = raw_argv[2]
+            if band not in ("sub", "low", "mid", "high"):
+                print(
+                    f"vibemix learn exemplar: unknown band {band!r}; "
+                    "must be one of sub/low/mid/high",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                sys.exit(2)
+            from vibemix.learn.exemplar import ExemplarFinder
+
+            finder = ExemplarFinder()
+            result = finder.find(band, k=1)
+            if not result:
+                print(
+                    f"learn exemplar {band}: no library track passed the floor; "
+                    "no packaged fallback found either.",
+                    file=sys.stdout,
+                    flush=True,
+                )
+                sys.exit(1)
+            pick = result[0]
+            print(f"track: {pick.track_id}", file=sys.stdout)
+            print(f"path:  {pick.file_path}", file=sys.stdout)
+            print(f"score: {band}_share={pick.band_score:.3f}", file=sys.stdout)
+            print(f"why:   {pick.reason}", file=sys.stdout)
+            sys.exit(0)
         # Unknown `learn` subcommand — surface usage + exit 2 (argparse-style).
         print(
             f"vibemix learn: unknown subcommand {raw_argv[1:]!r}; "
-            "available: reset",
+            "available: reset, exemplar <sub|low|mid|high>",
             file=sys.stderr,
             flush=True,
         )
