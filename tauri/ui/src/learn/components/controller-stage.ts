@@ -310,4 +310,126 @@ export class ControllerStage {
   get currentControllerId(): string | null {
     return this.mountedControllerId;
   }
+
+  /** Phase 92 RENDER-04 — instance wrapper around the `applyHighlight`
+   *  module-level function. Mirrors the `applyPositionFrame` instance
+   *  method's relationship to the function-level export. */
+  applyHighlight(payload: HighlightPayload): void {
+    applyHighlight(this.el, payload);
+  }
+
+  /** Phase 92 — clears the active highlight from this stage. */
+  clearHighlight(): void {
+    clearHighlight(this.el);
+  }
+}
+
+/**
+ * Phase 92 (RENDER-04) — paints a highlight on the target
+ * `<g data-control-id>` group by swapping the `data-cue-color` +
+ * `data-cue-shape` attributes. The CSS-variable cascade (P91 scaffolded
+ * in `learn.css` lines 142-143) does the actual paint via
+ * `currentColor → var(--learn-highlight)` for the color channel and via
+ * the `<g class="cue-shape">::before` pseudo-element for the pulse-ring
+ * animation.
+ *
+ * Wire convention (matches P91 SVG `data-control-id` naming):
+ *   - When `payload.deck` is set (A/B/C/D): selector targets
+ *     `<g data-control-id="<control_id>:<deck>">` (per-deck controls —
+ *     play/cue/sync/loop/hotcue/eq/vol/tempo/jog/filter).
+ *   - When `payload.deck` is empty string: selector targets the bare
+ *     `<g data-control-id="<control_id>">` (master-section controls —
+ *     filter_fx, tap_tempo, xfader).
+ *
+ * Single-active invariant: only ONE control on the stage carries
+ * `[data-cue-color]` at a time. Calling `applyHighlight` clears any
+ * prior cue attributes BEFORE setting the new ones — the
+ * `highlight-paint.test.ts` "clears any prior highlight before painting
+ * new one" assertion pins this contract.
+ *
+ * Unknown control_id: console.warn + return (no throw, never crashes
+ * the webview — T-92-05-02 mitigation).
+ *
+ * Performance budget: ≤16 ms P95 paint, pinned by
+ * `tauri/ui/tests/learn/highlight-paint.test.ts` (240 samples). In jsdom
+ * the paint is pure attribute swap so the measured P95 lands far under
+ * the budget (the P91 transform-only path measured 0.66 ms in the same
+ * harness).
+ */
+export interface HighlightPayload {
+  control_id: string;
+  deck: string;
+  cue_color: "amber" | "warning";
+  cue_shape: "pulse-ring" | "static-glow";
+  annotation?: string;
+  expected_action?: object;
+}
+
+export function applyHighlight(
+  stage: HTMLElement,
+  payload: HighlightPayload,
+): void {
+  // Clear any prior highlight (single-active invariant). Walk both
+  // attribute keys defensively — they're set together, but the prior-
+  // highlight assertion in highlight-paint.test.ts counts groups by
+  // `[data-cue-color]` so the color attr is the canonical lit marker.
+  stage.querySelectorAll<SVGGElement>("[data-cue-color]").forEach((g) => {
+    g.removeAttribute("data-cue-color");
+    g.removeAttribute("data-cue-shape");
+    // Also drop the optional hint-intensify class so a prior hint state
+    // doesn't bleed into the new highlight target.
+    g.classList.remove("hint-active");
+  });
+  // Resolve target id — bare control_id for master section, "<field>:<deck>"
+  // for per-deck controls. Matches the SVG authoring convention from P91.
+  const targetId = payload.deck
+    ? `${payload.control_id}:${payload.deck}`
+    : payload.control_id;
+  const target = stage.querySelector<SVGGElement>(
+    `[data-control-id="${targetId}"]`,
+  );
+  if (!target) {
+    // eslint-disable-next-line no-console
+    console.warn(`[learn] highlight: control_id "${targetId}" not found`);
+    return;
+  }
+  target.setAttribute("data-cue-color", payload.cue_color);
+  target.setAttribute("data-cue-shape", payload.cue_shape);
+}
+
+/**
+ * Phase 92 — clear the active highlight (single-active invariant).
+ * Called on `ipc.learn.advance` when the runtime confirms the user
+ * matched the expected action; the next highlight (if any) lands via
+ * a fresh `ipc.learn.highlight` envelope.
+ */
+export function clearHighlight(stage: HTMLElement): void {
+  stage.querySelectorAll<SVGGElement>("[data-cue-color]").forEach((g) => {
+    g.removeAttribute("data-cue-color");
+    g.removeAttribute("data-cue-shape");
+    g.classList.remove("hint-active");
+  });
+}
+
+/**
+ * Phase 92 — toggle the `.hint-active` class on the currently-lit
+ * `<g data-control-id>` group. Driven by the tutor-dock's
+ * `data-state="hint"` transition. The CSS keyframe swap in `learn.css`
+ * (the `learnPulseRingIntense` 600ms animation) replaces the calm
+ * 1400ms breathing pulse with a snappier amplitude — a secondary
+ * a11y channel signaling "the system is more actively guiding you now"
+ * that a user perceives via peripheral vision while reading the
+ * dock copy (UI-SPEC §Motion line 306).
+ *
+ * If no group is lit, this is a silent no-op (the next highlight
+ * envelope picks up the hint-intensity via the data-state attribute
+ * on the dock root — the class toggle here is for the active highlight).
+ */
+export function setHighlightHintIntensity(
+  stage: HTMLElement,
+  hintActive: boolean,
+): void {
+  const target = stage.querySelector<SVGGElement>("[data-cue-color]");
+  if (!target) return;
+  target.classList.toggle("hint-active", hintActive);
 }

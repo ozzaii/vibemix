@@ -1,74 +1,39 @@
 // SPDX-License-Identifier: Apache-2.0
 // REQ-ID: RENDER-04 — `ipc.learn.highlight` → DOM paint latency ≤ 16 ms P95.
 //
-// Phase 92 Plan 02 — RED-state harness. The two test bodies are shaped
-// against `applyHighlight(stage, payload)` which Plan 92-05 will add to
-// `tauri/ui/src/learn/components/controller-stage.ts`. Today the export
-// does not exist, so each `it()` is gated on dynamic-import success: if
-// `applyHighlight` is undefined, the test runs through `it.skip(...)`.
+// Phase 92 Plan 05 — LIVE harness (flipped from Plan 92-02's RED-state
+// dynamic-import-gated stub). `applyHighlight` is now exported from
+// `controller-stage.ts`, so the previous `itLive() / it.skip` getter
+// pattern (which resolved at collect-time before `beforeAll` ran and
+// stayed skipped even when the export existed) is gone — a direct
+// static import gives both bodies a clean live run.
 //
 // Mirrors `tauri/ui/tests/learn/highlight-latency.test.ts` (P91) for the
 // jsdom + SVG-mount + 240-sample sweep contract; the difference is RENDER-04
 // pins the highlight PAINT path (CSS-variable swap + pulse-ring class
 // toggle) rather than the per-knob rotate path (RENDER-02).
 //
-// Two tests:
+// Three tests:
 //   1. "P95 paint latency ≤ 16 ms"
 //   2. "clears any prior highlight before painting new one"
+//   3. "contract pin: SVG mounts"
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { PIONEER_DDJ_FLX4_SVG } from "../../src/learn/controllers/pioneer_ddj_flx4.svg.js";
+import { applyHighlight } from "../../src/learn/components/controller-stage.js";
 
 const N_SAMPLES = 240;
 const TARGET_MS = 16.0;
 
-interface ApplyHighlightInput {
-  control_id: string;
-  deck: string;
-  cue_color: "amber" | "warning";
-  cue_shape: "pulse-ring" | "static-glow";
-}
-
-type ApplyHighlightFn = (
-  stage: HTMLElement,
-  input: ApplyHighlightInput,
-) => void;
-
-// Resolved in beforeAll via dynamic import; remains null until Plan 92-05
-// adds the export. Each test guards on truthiness via the runtime
-// `it.skip` switch below.
-let applyHighlight: ApplyHighlightFn | null = null;
-
 describe("ipc.learn.highlight → DOM paint latency (RENDER-04)", () => {
   let stage: HTMLElement;
 
-  beforeAll(async () => {
-    try {
-      const mod = (await import(
-        "../../src/learn/components/controller-stage.js"
-      )) as Record<string, unknown>;
-      const candidate = mod["applyHighlight"];
-      if (typeof candidate === "function") {
-        applyHighlight = candidate as ApplyHighlightFn;
-      }
-    } catch {
-      // applyHighlight lands in Plan 92-05; until then, tests skip.
-    }
+  beforeAll(() => {
     document.body.innerHTML = `<div id="learn-stage">${PIONEER_DDJ_FLX4_SVG}</div>`;
     stage = document.getElementById("learn-stage")!;
   });
 
-  // Use a `getter` test selector so the dynamic-import resolution above
-  // determines whether the tests live or skip at execution time.
-  const itLive = (): typeof it | typeof it.skip =>
-    applyHighlight ? it : it.skip;
-
-  itLive()("P95 paint latency ≤ 16 ms", () => {
-    if (!applyHighlight) {
-      // Defensive: itLive should have routed us through it.skip, but if
-      // a future runner change breaks that, fail loud.
-      throw new Error("applyHighlight not loaded — Plan 92-05 missing?");
-    }
+  it("P95 paint latency ≤ 16 ms", () => {
     const samples: number[] = [];
     const controls: Array<{ control_id: string; deck: string }> = [
       { control_id: "play", deck: "A" },
@@ -98,10 +63,7 @@ describe("ipc.learn.highlight → DOM paint latency (RENDER-04)", () => {
     expect(p95).toBeLessThanOrEqual(TARGET_MS);
   });
 
-  itLive()("clears any prior highlight before painting new one", () => {
-    if (!applyHighlight) {
-      throw new Error("applyHighlight not loaded — Plan 92-05 missing?");
-    }
+  it("clears any prior highlight before painting new one", () => {
     applyHighlight(stage, {
       control_id: "play",
       deck: "A",
@@ -120,13 +82,10 @@ describe("ipc.learn.highlight → DOM paint latency (RENDER-04)", () => {
     expect(lit[0]?.getAttribute("data-control-id")).toBe("cue:A");
   });
 
-  // Visible-when-skipped placeholder so a skipped run still shows in the
-  // collect output (rather than vanishing entirely if applyHighlight is
-  // missing AND vitest treats `it.skip` from a getter as 0 collected).
-  it("contract pin: applyHighlight resolves once Plan 92-05 lands", () => {
+  it("contract pin: SVG mounts", () => {
     // No-op assert that the SVG is mounted (Plan 91-shipped surface).
     // Confirms the harness can mount the FLX4 fixture; the actual paint
-    // gate above runs as soon as applyHighlight exists.
+    // gates above use the same `stage` reference.
     expect(stage.querySelector("[data-control-id]")).toBeTruthy();
   });
 });
