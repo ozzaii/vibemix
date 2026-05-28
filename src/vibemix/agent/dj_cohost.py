@@ -408,6 +408,35 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
         lens = read_shared_lens(load_config())
     except Exception:  # pragma: no cover — guard: any read fail = cold path
         lens = None
+
+    # One Mind S2 — taste → persona overlay tags. Lazy + guarded exactly like
+    # the lens read above: load the consent-gated taste model and project it to
+    # prompt-safe style tags. Any failure (no consent, no file, parse error) =
+    # empty tuple = cold path with no overlay (byte-identical to today). This
+    # runs on EVERY agent (re)build, so a mood-swap rebuild keeps the overlay
+    # too. The projection is privacy-validated + allowlisted upstream; matrix's
+    # _render_taste_overlay filters again (defense in depth) and maps only fixed
+    # phrases (anti-injection). Read-only — never writes MusicState (Inv #1).
+    taste_tags: tuple[str, ...] = ()
+    try:
+        from vibemix.intel.profile_projection import project_profile
+        from vibemix.intel.taste_model import load_taste_model
+        from vibemix.profile import load_consent as _load_consent
+        from vibemix.runtime.config_store import app_data_dir
+
+        _consent = bool(_load_consent())
+        if _consent:
+            _model = load_taste_model(
+                app_data_dir() / "taste_feedback.jsonl", profile_consent=_consent
+            )
+            taste_tags = tuple(
+                project_profile(_model, consent=_consent).get(
+                    "transition_style_tags", ()
+                )
+            )
+    except Exception:  # pragma: no cover — any read fail = no overlay
+        taste_tags = ()
+
     # CR-02: validate the persisted value against the lens enum BEFORE
     # subscripting. An unknown/foreign value (e.g. a stray mood name) falls
     # through to the cold path instead of raising a raw KeyError.
@@ -416,12 +445,16 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
 
         if lens in LENS_TO_MODE_MOOD:
             mode, lens_mood = LENS_TO_MODE_MOOD[lens]
-            return build_system_instruction(skill, mode, lens_mood)
+            return build_system_instruction(
+                skill, mode, lens_mood, taste_persona_tags=taste_tags
+            )
 
     mode = os.environ.get(ENV_MODE, DEFAULT_MODE)
     if mood is None:
         mood = os.environ.get(ENV_MOOD, DEFAULT_MOOD)
-    return build_system_instruction(skill, mode, mood)
+    return build_system_instruction(
+        skill, mode, mood, taste_persona_tags=taste_tags
+    )
 
 
 class DJCoHostAgent(Agent):

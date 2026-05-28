@@ -21,6 +21,13 @@ real DJ sessions; it's load-bearing IP per CLAUDE.md). The v4 prompt already
 carries the equivalent semantics in different phrasing — bans are enforced
 post-hoc by ``filter_for_slop`` during streaming.
 
+Phrase-source provenance: the ``NEGATIVE_PHRASES`` tuple imported below now
+includes a curated subset of ``hardikpandya/stop-slop`` (MIT). Structural
+rules from that skill (no em dashes, no Wh- starters, no binary contrasts)
+are *not* enforced in these cells — they belong to the author-side skill at
+``.claude/skills/stop-slop/`` and would conflict with the v4-byte-identity
+invariant on HYPE_INTERMEDIATE.
+
 Dispatcher:
     build_system_instruction(skill="intermediate", mode="hype") -> str
     skill ∈ {"beginner", "intermediate", "pro"} (case-insensitive)
@@ -760,6 +767,45 @@ def _psy_tripper_overlay_enabled() -> bool:
     return os.environ.get("VIBEMIX_PROMPT_OVERLAY", "").strip().lower() == "psy_tripper_tr"
 
 
+# One Mind S2 — taste → persona overlay. Maps each ALLOWLISTED transition-style
+# tag (produced by ``intel.profile_projection.project_profile``, itself prompt-
+# safe + privacy-validated) to a FIXED coaching phrase. Anti-injection mirrors
+# the MOOD_PERSONAS discipline (T-13-05-06): only allowlisted KEYS resolve to
+# fixed prose — no raw value from disk / the taste model ever enters the prompt.
+# The keys here ARE the allowlist, so matrix.py stays self-contained (no import
+# from intel). The overlay is task-framing ONLY — never an audio DSL tag, never
+# a citation source — and is explicitly subordinate to the live audio
+# (Invariant #3: never invent a move to match a taste tag).
+TASTE_PERSONA_TAG_PHRASES: dict[str, str] = {
+    "long_phrase_blends": "they favor long, patient phrase-aligned blends — give the cut room, don't rush it",
+    "energy_lifts": "they tend to lift energy across transitions (build into the drop) — they like the climb",
+    "energy_holds": "they often hold energy steady rather than spike it — respect a flat, locked groove",
+    "vocal_avoidant": "they steer clear of vocal-over-vocal clashes — flag a vocal collision risk early",
+    "tooly_intros": "they like tool / groove intros to mix into — tool-heavy incomings land well for them",
+    "breakdown_resets": "they use breakdowns to reset energy — treat a breakdown landing as a feature, not a lull",
+}
+
+
+def _render_taste_overlay(taste_persona_tags: tuple[str, ...] | list[str]) -> str:
+    """Render the taste→persona overlay from allowlisted tags. Empty if none
+    resolve (defense-in-depth filter; a foreign tag is silently dropped)."""
+    phrases = [
+        TASTE_PERSONA_TAG_PHRASES[t]
+        for t in taste_persona_tags
+        if t in TASTE_PERSONA_TAG_PHRASES
+    ]
+    if not phrases:
+        return ""
+    body = "\n".join(f"- {p}." for p in phrases)
+    return (
+        "\n\n--- THIS DJ'S REVEALED TASTE (learned from their own past moves) ---\n"
+        f"{body}\n"
+        "This is context about their style, not a script. Never invent or force "
+        "a move to match it — only lean on it when the live audio already "
+        "supports the call."
+    )
+
+
 def build_system_instruction(
     skill: str = "intermediate",
     mode: str = "hype",
@@ -768,6 +814,7 @@ def build_system_instruction(
     include_citation_grammar: bool = True,
     include_listening_fallback: bool = True,
     include_tag_dsl: bool = True,
+    taste_persona_tags: tuple[str, ...] | list[str] | None = None,
 ) -> str:
     """Return the prompt cell body for ``(skill, mode)`` rendered with ``mood``.
 
@@ -891,6 +938,14 @@ def build_system_instruction(
         # language, and genre instructions for every live session.
         if _psy_tripper_overlay_enabled():
             body = body + _PSY_TRIPPER_TR_OVERLAY
+
+    # One Mind S2 — taste→persona overlay, appended LAST so it reads as the
+    # closing "and here's who this DJ is" context. Kwarg-gated: default None /
+    # empty appends nothing, so the v4-byte-identity invariant + every existing
+    # matrix test (which never pass this kwarg) stay byte-identical. Fixed
+    # allowlisted phrases only (see TASTE_PERSONA_TAG_PHRASES).
+    if taste_persona_tags:
+        body = body + _render_taste_overlay(taste_persona_tags)
 
     return body
 
