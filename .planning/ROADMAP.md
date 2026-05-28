@@ -63,7 +63,7 @@ If a phase doesn't pass → defer to HARDEN-FUTURE or out of scope.
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
-| 99 | HARDEN-RETRY — Viber Tool-Retry Policy | 1/8 | In Progress|  |
+| 99 | HARDEN-RETRY — Viber Tool-Retry Policy | 2/8 | In Progress|  |
 | 100 | HARDEN-CLARIFY — Viber RequestClarification | Ambiguous theme triggers a grounded `request_clarification` MCP tool call; CLI + Telegram render numbered choices; caller re-invokes with resolved theme | HARDEN-CLARIFY-01..07 (7) | 5 |
 | 101 | HARDEN-CONTRACT — Prompt Composition Doc | A new contributor reads ONE doc and knows exactly what enters the live prompt per event type — every file:line reference grep-resolves on current source | HARDEN-CONTRACT-01..07 (7) | 4 |
 
@@ -85,7 +85,7 @@ If a phase doesn't pass → defer to HARDEN-FUTURE or out of scope.
 **Plans:** 8 plans
 Plans:
 - [x] 99-01-PLAN.md — scaffolding: TOOL_STARVATION_THRESHOLD constant + per-instance counter + stop_reason attribute (no behavior change)
-- [ ] 99-02-PLAN.md — counter increment/reset wiring in dispatch() + _is_empty_or_error helper + concurrency acid test (no terminal action yet)
+- [x] 99-02-PLAN.md — counter increment/reset wiring in dispatch() + _is_empty_or_error helper + concurrency acid test (no terminal action yet)
 - [ ] 99-03-PLAN.md — threshold-trip detection + deterministic 3-case hint generator + terminal short-circuit in dispatch()
 - [ ] 99-04-PLAN.md — side-channel propagation: VIBEMIX_STOP_REASON_FILE env var + tempfile + wrapper-side propagation in curate_with_codex + build_set_with_codex
 - [ ] 99-05-PLAN.md — Invariant #2 gate: tests/repo/test_no_seen_relaxation.py AST/grep gate + create_playlist short-circuit scenario test

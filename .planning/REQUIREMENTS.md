@@ -18,7 +18,7 @@ Today Viber silently degrades on empty/error tool sequences. Codex's MCP harness
 - [ ] **HARDEN-RETRY-03**: The `tool_starvation` payload carries an actionable user-facing hint identifying the most likely root cause: empty library / no matches for theme / specific tool starving (e.g. "library has 0 tracks — run `library ingest` first" / "no tracks matched 'uplifting 200 BPM ambient' — try a different theme or broaden BPM").
 - [ ] **HARDEN-RETRY-04**: CLI `library curate` and `library build-set` exit with non-zero status on `stop_reason="tool_starvation"`, distinct from successful "no playlist found" cases.
 - [x] **HARDEN-RETRY-05**: Cardinal Invariant #2 holds — the error counter is additive telemetry on `LibraryToolset`, never relaxes the `seen` grounding gate or the `create_playlist` library re-validation. Counter writes are confined to handler-entry / handler-exit sites; no other code reads or mutates it.
-- [ ] **HARDEN-RETRY-06**: Failing-then-passing tests cover: zero-track library scenario, narrow theme with zero vibe-search hits, dispatch-error path (tool crash → counter increments), counter reset on successful tool call, interaction with `create_playlist` (a starvation termination MUST short-circuit before a partial-playlist write).
+- [x] **HARDEN-RETRY-06**: Failing-then-passing tests cover: zero-track library scenario, narrow theme with zero vibe-search hits, dispatch-error path (tool crash → counter increments), counter reset on successful tool call, interaction with `create_playlist` (a starvation termination MUST short-circuit before a partial-playlist write).
 - [ ] **HARDEN-RETRY-07**: `codex_curate.curate_with_codex` and `build_set_with_codex` parse `stop_reason="tool_starvation"` from MCP tool output and propagate it to `CodexCurateResult` / `CodexBuildSetResult` so callers (CLI + Telegram + GUI) see a uniform terminal stop_reason regardless of whether starvation originated inside the toolset or after the Codex harness exited.
 
 ### HARDEN-CLARIFY — Viber RequestClarification (Factor 7)
@@ -79,7 +79,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HARDEN-RETRY-03 | Phase 99 | Pending |
 | HARDEN-RETRY-04 | Phase 99 | Pending |
 | HARDEN-RETRY-05 | Phase 99 | Complete |
-| HARDEN-RETRY-06 | Phase 99 | Pending |
+| HARDEN-RETRY-06 | Phase 99 | Complete |
 | HARDEN-RETRY-07 | Phase 99 | Pending |
 | HARDEN-CLARIFY-01 | Phase 100 | Pending |
 | HARDEN-CLARIFY-02 | Phase 100 | Pending |
