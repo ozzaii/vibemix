@@ -73,6 +73,44 @@ recursive) is an Invariant #1 single-writer-analog violation: the
 starvation state is bleeding out of the four files designated to own it.
 The gate's failure message names the offending path exactly.
 
+## Phase 100 carry-over
+
+Plan 100-06 ships a sibling AST gate at
+`tests/library/test_request_clarification_no_track_surface.py` that pins
+the structural-safety property of the `request_clarification` handler
+shipped in Plan 100-01 — no track_id surface, no grounding-state
+mutation, single-trip semantics. The whitelist below
+(`STOP_REASON_WHITELIST`) is UNCHANGED between Phase 99 and Phase 100
+because Plan 100-03 added `clarification_needed` references inside the
+same four whitelisted files (toolset.py, codex_curate.py, __main__.py,
+telegram_bridge.py). A future plan that adds `clarification_needed`
+references OUTSIDE these four files still trips Gate 3 below — the
+whitelist gate is reason-agnostic.
+
+`BASELINE_SEEN_ADD_COUNT` stays at 2 post-Phase 100. Plan 100-06's AST
+gate has an explicit `test_baseline_seen_add_count_unchanged_post_phase_100`
+test that mirrors this constant from outside `tests/repo/` — two-layer
+defense: the tests/repo gate (Phase 99) and the tests/library gate
+(Phase 100). A future PR that bumps the count must update BOTH constants
+and explicitly justify the Cardinal Invariant #2 modification.
+
+The `request_clarification` handler shipped by Plan 100-01 writes to
+`self.stop_reason` once (the disambiguation terminal payload) and routes
+through the same Phase 99 side-channel writer at `toolset.py:_write_side_channel`.
+That extra write site is INSIDE `toolset.py` (the owner file), so it does
+not affect Gate 3's whitelist — `toolset.py` is and stays the single
+writer of `stop_reason`.
+
+## Phase 100 + `_consecutive_empties` independence
+
+Plan 100-06's AST gate
+(`test_request_clarification_no_consecutive_empties_touch`) STRUCTURALLY
+proves the clarification handler does not touch the starvation counter.
+That's a sibling to Gate 2 below (which scopes `_consecutive_empties`
+to `toolset.py` only): together they pin Decision 4 from CONTEXT.md —
+the clarification terminal path reuses `self.stop_reason` as the
+propagation seam without coupling to the starvation counter.
+
 Run with: `PYTHONPATH=src python3 -m pytest tests/repo/test_no_seen_relaxation.py -q`
 """
 from __future__ import annotations
@@ -302,4 +340,61 @@ def test_stop_reason_writes_confined_to_toolset() -> None:
         f"route through a whitelisted file, or expand "
         f"STOP_REASON_WHITELIST in this gate (with PR justification + "
         f"docstring update naming the authorizing plan)."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Gate 4 — Phase 100 carry-over: request_clarification handler two-file pattern
+# ---------------------------------------------------------------------------
+
+
+# Allowed locations of `def request_clarification(` in `src/vibemix/`. The
+# two-file pattern matches `search_vibe`, `find_similar`, etc.: the bound
+# method lives in `toolset.py` and the FastMCP exposure wrapper lives in
+# `mcp_server.py`. Plan 100-01 shipped the toolset.py handler; Plan 100-02
+# shipped the mcp_server.py wrapper. Any THIRD definition is a duplication
+# bug — the dispatch table is the single point of routing.
+REQUEST_CLARIFICATION_DEF_ALLOWED: frozenset[str] = frozenset({
+    "src/vibemix/library/toolset.py",
+    "src/vibemix/library/mcp_server.py",
+})
+
+
+def test_request_clarification_handler_two_file_pattern() -> None:
+    """`def request_clarification(` may appear ONLY in the two whitelisted
+    source files (toolset.py = handler, mcp_server.py = FastMCP exposure).
+
+    Why this gate exists: Plan 100-01 + Plan 100-02 land the handler and
+    its FastMCP exposure, mirroring the search_vibe / find_similar /
+    get_track_features two-file pattern. A future PR that copy-pastes the
+    handler into a third file (e.g. agent/dj_cohost.py, runtime/wizard.py)
+    breaks the single-dispatch-table contract — the clarification flow is
+    owned by LibraryToolset, period.
+
+    The behavioral pin (handler wired into the dispatch table) lives in
+    Plan 100-01's tests/library/test_toolset_clarification.py. The FastMCP
+    registration pin lives in Plan 100-02's
+    tests/library/test_mcp_server_clarification.py. This gate is the
+    structural complement: no third definition is allowed.
+    """
+    hits = _find_src_files_with("def request_clarification(")
+    offenders = hits - REQUEST_CLARIFICATION_DEF_ALLOWED
+    assert not offenders, (
+        f"`def request_clarification(` appeared in non-whitelisted source "
+        f"files. Allowed: {sorted(REQUEST_CLARIFICATION_DEF_ALLOWED)} "
+        f"(handler in toolset.py + FastMCP exposure in mcp_server.py — "
+        f"mirrors the search_vibe two-file pattern). Found in: "
+        f"{sorted(hits)}. Offending files: {sorted(offenders)}. The "
+        f"clarification flow is owned by LibraryToolset; duplicating the "
+        f"definition elsewhere breaks the single-dispatch-table contract. "
+        f"If you need to expose it via a new wrapper (e.g. WebSocket bridge), "
+        f"add the new file to REQUEST_CLARIFICATION_DEF_ALLOWED with a "
+        f"docstring update naming the authorizing plan."
+    )
+    # Sanity: the handler MUST exist in toolset.py at minimum (Plan 100-01).
+    assert "src/vibemix/library/toolset.py" in hits, (
+        "Plan 100-01's request_clarification handler is missing from "
+        "src/vibemix/library/toolset.py. Either the handler was removed "
+        "(Cardinal Invariant #2 violation — drop the clarification flow) "
+        "or its name changed. Update this gate's lookup."
     )
