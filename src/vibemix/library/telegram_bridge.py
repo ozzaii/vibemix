@@ -111,6 +111,21 @@ def format_reply(norm: dict[str, Any]) -> str:
     by ``artist - title`` (NO filesystem paths — the M3U lives on the user's
     machine, not in the chat).
     """
+    # Plan 99-07: the starvation branch sits BEFORE the generic error branch
+    # so the generic `if not norm.get("ok")` block (which also matches the
+    # starvation payload's ok=False) doesn't shadow it. Phase 100 adds
+    # `clarification_needed` as a sibling branch in the same slot.
+    if norm.get("stop_reason") == "tool_starvation":
+        # Fallback only — Plan 99-03's toolset case dispatch always populates
+        # 'hint' for cases A/B/C, so this fallback string is STRUCTURALLY
+        # UNREACHABLE in production (kept defensive against future drift).
+        hint = (
+            norm.get("hint")
+            or norm.get("error")
+            or "no playlist — tool starvation, no hint available"
+        )
+        return strip_leaks(f"⚠️ {hint}")
+
     if not norm.get("ok"):
         err = norm.get("error") or "no playlist could be built"
         return strip_leaks(f"⚠️ {err}")
