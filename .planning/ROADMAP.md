@@ -76,7 +76,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
-| 91 | Controller Renderer + MIDI Mirror | 6/7 | In Progress|  |
+| 91 | Controller Renderer + MIDI Mirror | 7/7 | Complete   | 2026-05-27 |
 | 92 | Lesson Runtime + AI Highlight Contract | A "hello world" 1-step lesson runs end-to-end: AI says "press play deck A", highlight glows on the rendered control, user presses physical button → lesson advances | TONE-02, TONE-04, LESSON-01, LESSON-02, LESSON-03, LESSON-04, LESSON-05, LESSON-06, RENDER-04 (9) | 4 |
 | 93 | Exemplar Engine + `[exemplar:]` Evidence Source | DSP-band exemplar engine picks strongest-band track from user's library; falls back to packaged CC-BY bank when empty; plays through dedicated `ExemplarPlayer`; `[exemplar:<id>]` resolves via 4-site mirror | EXEMPLAR-01, EXEMPLAR-02, EXEMPLAR-03, EXEMPLAR-04, EXEMPLAR-05 (5) | 4 |
 | 94 | Course 1 — Anatomy (L1.01–L1.16) | Beginner opens Learn, sees verbatim 4-line opening dialog, walks through 16 hand-authored anatomy lessons culminating in EQ-as-Tutor demo using library exemplars | TONE-01, TONE-03, CURR-1.01..1.16 (18) | 5 |
@@ -106,7 +106,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 - [x] 91-04-PLAN.md — Rust shell `learn_window.rs` + `main.rs` registration (Wave 2)
 - [x] 91-05-PLAN.md — Webview entry + FLX4 SVG + generic fallback + ARIA lookup + 5 components (Wave 3) — bfa01b80 → 71d218cd 2026-05-28; latency P95 **0.66ms** (target 50ms, red guardrail 80ms); §LEARN-LATENCY-CONTINGENCY parked
 - [x] 91-06-PLAN.md — 9 remaining controller SVGs + extended `_aria-labels.ts` + `controller-stage.ts` allowlist (Wave 4)
-- [ ] 91-07-PLAN.md — Kaan FLX4 ear-pass checkpoint (live verification per `feedback_verify_live_app_not_just_tests`) (Wave 5)
+- [x] 91-07-PLAN.md — Kaan FLX4 ear-pass checkpoint (live verification per `feedback_verify_live_app_not_just_tests`) (Wave 5)
 **UI hint**: yes
 
 ### Phase 92: Lesson Runtime + AI Highlight Contract
@@ -118,7 +118,15 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
   2. Twelve new IPC envelopes in the `ipc.learn.*` namespace (start_course / start_lesson / complete_lesson / lesson_loaded / highlight / midi_position / advance / ack / tutor_speak / exemplar_play / exemplar_stop / progress_state) ride existing `127.0.0.1:8765` ws_bus through `IpcRouterBus` — all `additionalProperties: false`; ajv validator regenerated via `cd tauri/ui && npm run codegen:ipc`; Python dataclass mirrors in `src/vibemix/ui_bus/learn_messages.py`; **`tests/learn/test_no_new_ws_port.py` static gate greps `learn/` for `websockets.serve` (zero allowed — Invariant #4 binding)**. Highlight paints in ≤16 ms of receiving `ipc.learn.highlight` (CSS-variable swap, no full SVG re-render) — pinned by `tauri/ui/tests/learn/highlight-paint.test.ts`. **LESSON-02 + RENDER-04.**
   3. Lesson advancement requires the user to perform the expected MIDI action (CC drop ≥30% of range OR button press matching `expected_action.control` + `direction`); a 3-strike progressive hint surface guides the user; an "I got it" override skip is always available (motor-impaired-safe — no time-pressure); anti-speedrun min-dwell ≥45s prevents click-through gaming. Lesson progress persists between sessions in atomic JSON at `~/.cache/vibemix/learn-progress.json` (schema-versioned; corruption → nuke + emit fresh empty + one-line toast); reset CLI `vibemix learn reset` + "Reset Learn Progress" button in existing settings drawer. **LESSON-03 + LESSON-04.**
   4. The tutor persona reuses `MOOD_PERSONAS["teacher"]` from `prompts/matrix.py:53-66` (v8.1 LENS-03 — NO new lens); the lesson runtime composes `build_tutor_system_instruction(course_id, lesson_id, controller_id)` = `COURSE_FRAMES[course_id]` + `controller_frame` + `CURRICULUM[lesson_id].system_instruction_addendum` (≤200 chars) + base tutor lens system instruction. All AI dialog flows through Gemini Flash via `vibemix.llm.model_router.resolve("standard")` (zero hardcoded model literals; CI grep-gated). **Tutor system instruction lock pinned by `tests/learn/test_tutor_system_instruction_lock.py` — forbids the four learned moves (NO complimenting · NO summarizing · NO previewing · NO upbeat hook closer)**. Static fixture gate `tests/learn/test_scripts_are_fixtures.py` confirms no live generative call writes a `tutor_speak` envelope's `text` field — all 36 scripts hand-authored JSON. **TONE-02 + TONE-04 + LESSON-05 + LESSON-06.**
-**Plans**: TBD
+**Plans:** 7 plans
+- [ ] 92-01-PLAN.md — Foundation: pyproject.toml + uv sync + learn_tutor route + messages.schema.json +11 envelopes + codegen:ipc + Python dataclasses + 6 count-parity test files (Wave 1)
+- [ ] 92-02-PLAN.md — Test scaffolding: 10 Python + 8 TS test files (Nyquist-compliant; gated-skip pattern with named-Plan dependencies) (Wave 2)
+- [ ] 92-03-PLAN.md — Python backend core: state.py + runtime.py + curriculum.py + prompts.py + hello_world JSON fixture (Wave 2)
+- [ ] 92-04-PLAN.md — Progress persistence + `vibemix learn reset` CLI + __main__.main() LessonRuntime wiring (Wave 3)
+- [ ] 92-05-PLAN.md — Lesson UI: hud.ts + tutor-dock.ts + skip-button.ts + applyHighlight on controller-stage + 11 envelope handlers in learn-window.ts (Wave 4)
+- [ ] 92-06-PLAN.md — Settings drawer LearnGroup (Reset Learn Progress row + destructive confirm dialog) (Wave 4)
+- [ ] 92-07-PLAN.md — Kaan FLX4 ear-pass checkpoint (live verification per feedback_verify_live_app_not_just_tests) (Wave 5)
+**UI hint**: yes
 
 ### Phase 93: Exemplar Engine + `[exemplar:]` Evidence Source
 **Goal:** DSP-band exemplar engine picks the strongest-band track from the DJ's CLAP-embedded library for each EQ lesson (low/mid/high), with a compressed-kick guard (Pearson r > 0.8 → exclude) and an honest-null fallback to a packaged ~3–5 MB CC-BY exemplar bank when the library is empty. Audio plays through a dedicated `ExemplarPlayer` on a second `sd.OutputStream` to a user-picked headphone device. The `[exemplar:<track_id>]` evidence source lands atomically across 4 schema-mirror sites. **NO UI yet — just engine + CLI test.**
