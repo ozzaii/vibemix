@@ -71,6 +71,9 @@
       "$ref": "#/definitions/SessionCitation"
     },
     {
+      "$ref": "#/definitions/SessionSetMode"
+    },
+    {
       "$ref": "#/definitions/SettingsSet"
     },
     {
@@ -1255,6 +1258,43 @@
             },
             "bypass_active": {
               "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "SessionSetMode": {
+      "$comment": "Phase 97 (ONBOARD-01) \u2014 Shell \u2192 sidecar. User picked a mode in the picker on the main session window. The shell flips data-active locally (optimistic repaint per CLAUDE.md rule) BEFORE this envelope is sent; the sidecar persists via ConfigStore.extra under 'session.mode' so the next launch boots into the last-picked mode. No ack is emitted \u2014 the optimistic repaint is authoritative; ipc.settings.state may surface the mode on its next snapshot so cold-boot reads disk.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "ts",
+        "payload"
+      ],
+      "properties": {
+        "type": {
+          "const": "ipc.session.set_mode"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "cohost",
+                "learn",
+                "build",
+                "debrief"
+              ]
             }
           }
         }

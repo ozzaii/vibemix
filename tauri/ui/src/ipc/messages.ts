@@ -26,6 +26,7 @@ export type VibemixIPCMessages =
   | SessionSnapshot
   | SessionMute
   | SessionCitation
+  | SessionSetMode
   | SettingsSet
   | SettingsGet
   | SettingsState
@@ -285,6 +286,13 @@ export interface SessionCitation {
     stripped_rate_15s: number;
     last_unverified_response: string | null;
     bypass_active: boolean;
+  };
+}
+export interface SessionSetMode {
+  type: "ipc.session.set_mode";
+  ts: string;
+  payload: {
+    mode: "cohost" | "learn" | "build" | "debrief";
   };
 }
 export interface SettingsSet {
