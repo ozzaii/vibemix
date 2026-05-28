@@ -196,6 +196,18 @@ function mountLearnWindow(root: HTMLElement): {
   mountEmptyState(stageEl);
   status.setMirrorStatus("waiting");
 
+  // Phase 97 / ONBOARD-02 — first-launch tutor announce-by-name. On the
+  // FIRST controller-connect event of this app run, the aria-live region
+  // speaks the verbatim greeting "I see your <controller name> — let's
+  // go." This is the SECOND permitted "let's go." exception in the
+  // v9.0 slop blocklist (the first was L1.01's iconic closer; the
+  // blocklist uses multi-word tokens like 'now let's' so the bare
+  // 'let's go.' here does NOT trip). Subsequent re-connects fall back
+  // to the standard "<name> connected." text — the greeting is
+  // first-launch only so a user who unplugs and re-plugs mid-session
+  // doesn't hear "let's go" on every cycle.
+  let hasAnnouncedFirstController = false;
+
   // ipc.learn.controller_detected handler — mounts/clears the SVG.
   window.addEventListener("ipc.learn.controller_detected", (ev: Event) => {
     const detail = (ev as CustomEvent<ControllerDetectedPayload>).detail;
@@ -203,7 +215,14 @@ function mountLearnWindow(root: HTMLElement): {
     if (detail.connected) {
       titlebar.setControllerName(detail.display_name);
       status.setMirrorStatus("live", detail.display_name);
-      sr.textContent = `${detail.display_name} connected.`;
+      // First-launch greeting (verbatim) — second permitted "let's go."
+      // exception in v9.0. The em-dash matches the iconic dialog precedent.
+      if (!hasAnnouncedFirstController) {
+        sr.textContent = `I see your ${detail.display_name} — let's go.`;
+        hasAnnouncedFirstController = true;
+      } else {
+        sr.textContent = `${detail.display_name} connected.`;
+      }
       // Async dynamic-import; the empty-state stays visible until the
       // SVG body lands. `render` is idempotent (no-op when controller_id
       // unchanged — T-91-05-03).
