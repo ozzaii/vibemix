@@ -155,7 +155,24 @@ SKILL_MANIFEST: dict[str, SkillSpec] = {
 # (curriculum does not import this module today; the lazy import keeps it that
 # way regardless of future refactors).
 def _assert_manifest_matches_curriculum() -> None:
+    from dataclasses import fields
+
     from vibemix.learn.curriculum import CURRICULUM
+    from vibemix.learn.progress import LearnProgress
+
+    # Every manifest GATE name must be a real boolean field on LearnProgress.
+    # ``compute`` reads the gate via ``getattr(progress, spec.gate, False)``
+    # with a False fallback, so a typo'd gate (e.g. ``course_99_unlocked``)
+    # would silently pin its skill to "locked" forever — a far quieter failure
+    # than the lesson-id drift below. Fail loud at import instead, matching the
+    # lesson-id anti-drift posture (a gate typo is no different from a lesson
+    # typo; both must fail at module load, not silently at runtime).
+    progress_fields = {f.name for f in fields(LearnProgress)}
+    for skill_id, spec in SKILL_MANIFEST.items():
+        assert spec.gate in progress_fields, (
+            f"SKILL_MANIFEST drift: {skill_id} gate {spec.gate!r} is not a "
+            "LearnProgress field (typo'd gates pin the skill locked forever)"
+        )
 
     for skill_id, spec in SKILL_MANIFEST.items():
         for lesson_id in spec.lesson_ids:

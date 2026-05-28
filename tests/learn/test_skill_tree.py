@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import copy
 
+import pytest
+
 from vibemix.learn.curriculum import CURRICULUM
 from vibemix.learn.progress import LearnProgress
 from vibemix.learn.skill_tree import (
@@ -105,6 +107,35 @@ def test_manifest_gates_are_recital_unlock_flags() -> None:
         assert hasattr(fresh, spec.gate), (
             f"{skill_id} gate {spec.gate!r} is not a LearnProgress attribute"
         )
+
+
+def test_import_time_assertion_catches_typod_gate() -> None:
+    """IN-03: a typo'd gate must fail LOUD at the import-time anti-drift check
+    (``_assert_manifest_matches_curriculum``) exactly like a lesson-id typo —
+    not fail silent at runtime by pinning the skill locked forever via
+    ``getattr(progress, gate, False)``'s False fallback."""
+    from vibemix.learn.skill_tree import (
+        SkillSpec,
+        _assert_manifest_matches_curriculum,
+    )
+
+    good = dict(SKILL_MANIFEST)
+    # Swap in a gate that is NOT a LearnProgress field.
+    bad_spec = SkillSpec(
+        lesson_ids=SKILL_MANIFEST["deck_control"].lesson_ids,
+        gate="course_99_unlocked",
+    )
+    patched = {**good, "deck_control": bad_spec}
+
+    import vibemix.learn.skill_tree as mod
+
+    original = mod.SKILL_MANIFEST
+    try:
+        mod.SKILL_MANIFEST = patched
+        with pytest.raises(AssertionError, match="course_99_unlocked"):
+            _assert_manifest_matches_curriculum()
+    finally:
+        mod.SKILL_MANIFEST = original
 
 
 # ---------------------------------------------------------------------------
