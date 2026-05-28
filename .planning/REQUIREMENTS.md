@@ -14,8 +14,8 @@ Background: derived from the today-2026-05-28 audit of vibemix against [humanlay
 Today Viber silently degrades on empty/error tool sequences. Codex's MCP harness retries internally but vibemix has no consecutive_errors counter or terminal `stop_reason` for tool starvation, so a curation run on an empty library returns "no playlist" with no diagnosis.
 
 - [x] **HARDEN-RETRY-01**: `LibraryToolset` tracks consecutive empty `search_vibe` results and tool-error responses across one curation run via an additive per-instance counter (mirrors `seen` set lifetime).
-- [ ] **HARDEN-RETRY-02**: After N consecutive empty/error tool calls (N tunable module constant; default 3 — chosen for fast feedback on real failure modes without false-firing on a single missed search), the toolset surfaces a terminal `stop_reason="tool_starvation"` payload via a dedicated dispatch path or attribute readable by `codex_curate`.
-- [ ] **HARDEN-RETRY-03**: The `tool_starvation` payload carries an actionable user-facing hint identifying the most likely root cause: empty library / no matches for theme / specific tool starving (e.g. "library has 0 tracks — run `library ingest` first" / "no tracks matched 'uplifting 200 BPM ambient' — try a different theme or broaden BPM").
+- [x] **HARDEN-RETRY-02**: After N consecutive empty/error tool calls (N tunable module constant; default 3 — chosen for fast feedback on real failure modes without false-firing on a single missed search), the toolset surfaces a terminal `stop_reason="tool_starvation"` payload via a dedicated dispatch path or attribute readable by `codex_curate`.
+- [x] **HARDEN-RETRY-03**: The `tool_starvation` payload carries an actionable user-facing hint identifying the most likely root cause: empty library / no matches for theme / specific tool starving (e.g. "library has 0 tracks — run `library ingest` first" / "no tracks matched 'uplifting 200 BPM ambient' — try a different theme or broaden BPM").
 - [ ] **HARDEN-RETRY-04**: CLI `library curate` and `library build-set` exit with non-zero status on `stop_reason="tool_starvation"`, distinct from successful "no playlist found" cases.
 - [x] **HARDEN-RETRY-05**: Cardinal Invariant #2 holds — the error counter is additive telemetry on `LibraryToolset`, never relaxes the `seen` grounding gate or the `create_playlist` library re-validation. Counter writes are confined to handler-entry / handler-exit sites; no other code reads or mutates it.
 - [x] **HARDEN-RETRY-06**: Failing-then-passing tests cover: zero-track library scenario, narrow theme with zero vibe-search hits, dispatch-error path (tool crash → counter increments), counter reset on successful tool call, interaction with `create_playlist` (a starvation termination MUST short-circuit before a partial-playlist write).
@@ -75,8 +75,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | HARDEN-RETRY-01 | Phase 99 | Complete |
-| HARDEN-RETRY-02 | Phase 99 | Pending |
-| HARDEN-RETRY-03 | Phase 99 | Pending |
+| HARDEN-RETRY-02 | Phase 99 | Complete |
+| HARDEN-RETRY-03 | Phase 99 | Complete |
 | HARDEN-RETRY-04 | Phase 99 | Pending |
 | HARDEN-RETRY-05 | Phase 99 | Complete |
 | HARDEN-RETRY-06 | Phase 99 | Complete |

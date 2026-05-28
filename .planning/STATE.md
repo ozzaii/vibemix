@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v10.0
 milestone_name: 12-Factor Hardening
 status: executing
-last_updated: "2026-05-28T12:55:23.503Z"
+last_updated: "2026-05-28T13:06:37.205Z"
 last_activity: 2026-05-28
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 8
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -18,7 +18,7 @@ progress:
 ## Current Position
 
 Phase: 99 (HARDEN-RETRY — Viber Tool-Retry Policy (Factor 9)) — EXECUTING
-Plan: 3 of 8
+Plan: 4 of 8
 Status: Ready to execute
 Last activity: 2026-05-28
 
@@ -114,10 +114,10 @@ v10.0 island is disjoint from all three. Commit by named paths only, never `git 
 ## Next Action
 
 ```
-/gsd:plan-phase 99
+/gsd:execute-phase 99   # continue with Plan 99-04 (cross-process side-channel)
 ```
 
-Phase 99 = HARDEN-RETRY — Viber Tool-Retry Policy (Factor 9 closure). Files: `src/vibemix/library/toolset.py` + `src/vibemix/library/codex_curate.py` + CLI dispatch lines in `src/vibemix/__main__.py`. Tests under `tests/library/` only. HIGHEST ROI — go first.
+Phase 99 = HARDEN-RETRY — Viber Tool-Retry Policy (Factor 9 closure). Plans 99-01, 99-02, 99-03 SHIPPED on `live-tuning-or-brain` (commits `a0eea8b8` / `4a9b4d12` / `e7b9f5b3` / `569acd1f` / `e4c8b8d3` / `a9bcab5f` / `fecf9a3e`). 99-03 closed the in-process side of Factor 9: `LibraryToolset.dispatch()` now writes `self.stop_reason` on threshold trip (3 consecutive empty `search_vibe` / handler errors) with a deterministic three-case hint, and short-circuits subsequent dispatch calls into an idempotent terminal echo. **Next: Plan 99-04** (cross-process side-channel — `VIBEMIX_STOP_REASON_FILE` env var + best-effort write, signposted at `library/toolset.py:1134`).
 
 ## Operator Next Steps
 
