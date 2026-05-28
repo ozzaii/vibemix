@@ -193,7 +193,54 @@ def test_idle_to_completed_with_skip(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 3: WR-02 (P92 REVIEW) — invalid lesson_id is a silent no-op
+# Test 3: WR-03 (P92 REVIEW) — empty controller_id defers lesson_loaded emit
+# ---------------------------------------------------------------------------
+
+
+def test_empty_controller_id_defers_lesson_loaded_emit() -> None:
+    """WR-03 (P92 REVIEW) regression. The lesson_loaded schema requires
+    ``controller_id: {minLength: 1}``. When no controller is bound yet
+    (first-run flow, controller unplugged mid-load), the runtime
+    previously emitted with controller_id="" → schema validation
+    rejected the envelope → broad except caught the failure → HUD never
+    mounted → webview waited forever.
+
+    Post-fix: the on_enter_loaded callback bails BEFORE the emit when
+    controller_id is empty/None. The lesson_loaded envelope is deferred
+    until a controller is bound. The webview's empty-state surface
+    stays visible (the expected first-run UX).
+    """
+    runtime, ipc_router = _make_runtime()
+    # Load WITHOUT a controller_id — empty-string fallback would have
+    # been emitted before the fix.
+    runtime.send(
+        "load",
+        lesson_id="L0.00-press-play",
+        course_id="course_0",
+        controller_id="",
+    )
+    emitted = _emitted_envelope_types(ipc_router)
+    assert "ipc.learn.lesson_loaded" not in emitted, (
+        "WR-03 fix missing — lesson_loaded was emitted with empty "
+        f"controller_id (schema-invalid). emitted={emitted!r}"
+    )
+
+    # Now provide a real controller_id — emit fires.
+    runtime2, ipc_router2 = _make_runtime()
+    runtime2.send(
+        "load",
+        lesson_id="L0.00-press-play",
+        course_id="course_0",
+        controller_id="pioneer_ddj_flx4",
+    )
+    emitted_clean = _emitted_envelope_types(ipc_router2)
+    assert "ipc.learn.lesson_loaded" in emitted_clean, (
+        "lesson_loaded should emit when a real controller is bound"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 4: WR-02 (P92 REVIEW) — invalid lesson_id is a silent no-op
 # ---------------------------------------------------------------------------
 
 

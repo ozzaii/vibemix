@@ -377,6 +377,22 @@ class LessonRuntime(StateMachine):
                 file=sys.stderr,
             )
             return
+        # WR-03 fix (P92 REVIEW): the lesson_loaded schema requires
+        # ``controller_id: {minLength: 1}`` — an empty-string fallback
+        # made the envelope fail validation, which the broad except
+        # caught, leaving the HUD un-mounted with only a bracket-
+        # tagged stderr line as the only signal. When no controller is
+        # bound yet (first-run flow, controller unplugged mid-load),
+        # defer the lesson_loaded emit — the webview's empty-state stays
+        # visible. The expected pattern is: user plugs controller →
+        # MidiMirror.bind_profile fires → port_watcher callback
+        # re-drives the runtime via send("load", ...).
+        controller_id = self._learn.current_controller_id
+        if not controller_id:
+            # Cannot emit a schema-valid lesson_loaded without a real
+            # controller id. The webview stays in empty-state until the
+            # controller_detected envelope wakes it up.
+            return
         # Emit the HUD-mount envelope. Progress dots come from the
         # progress store; tests mock it (returning a MagicMock that
         # iterates to empty tuple — schema-acceptable empty array).
@@ -387,7 +403,7 @@ class LessonRuntime(StateMachine):
                 course_id=self._learn.current_course_id or "",
                 lesson_id=lesson_id,
                 title=lesson.title,
-                controller_id=self._learn.current_controller_id or "",
+                controller_id=controller_id,
                 progress_dots=dots,
             ).to_dict()
             self._ipc.emit(envelope)
