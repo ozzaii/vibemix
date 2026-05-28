@@ -53,6 +53,28 @@ def build_toolset() -> Any:
     server still starts; ``search_vibe`` then honestly returns no candidates
     (better than refusing to boot — the failure is visible in tool output).
     """
+    # Phase 99 HARDEN-RETRY Plan 99-04 Task 5 — B1 Option A env-var
+    # propagation probe. Logs whether the stop-reason env var (see the
+    # ``os.environ.get`` call below) crossed both process boundaries
+    # (wrapper → Codex CLI subprocess → this MCP child).
+    # If the log shows a real temp-dir path: Channel A is healthy end-to-end
+    # for real Codex runs. If it shows <absent>: Codex CLI stripped the env
+    # var when spawning the MCP child, and the side-channel write inside the
+    # toolset silently no-ops — fix lands as HARDEN-FUTURE (Codex MCP harness
+    # config / `passthrough_env` knob / Codex CLI version bump / direct
+    # mcp_servers.<name>.env override). Plan 99-08's
+    # §HARDEN-PHASE-A-ENV-PROPAGATION-VERIFY checkpoint observes the FIRST
+    # real Codex run output. Local `import os` (not module-top) keeps the
+    # edit surface to this one function — sys is already imported up top.
+    import os
+
+    print(
+        f"[viber-mcp] VIBEMIX_STOP_REASON_FILE="
+        f"{os.environ.get('VIBEMIX_STOP_REASON_FILE', '<absent>')}",
+        file=sys.stderr,
+        flush=True,
+    )
+
     # .env is not auto-loaded in a bare subprocess — load it like __main__ does.
     try:
         from dotenv import load_dotenv
