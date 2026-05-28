@@ -54,7 +54,13 @@ COURSE_FRAMES: dict[str, str] = {
         "library. The user has no DJ vocabulary yet; ground every "
         "observation in what their hands and ears are doing right now."
     ),
-    # P95 adds course_2 (transitions: blends, EQ swap, filter, fade).
+    "course_2_transitions": (
+        "Course 2 walks the user through beatmatching (ear and sync) then "
+        "the five canonical transitions: long blend, eq swap, bassline "
+        "swap, filter fade, echo-out. Add hot cues, the camelot wheel, "
+        "phrase matching, and train-wreck diagnosis. Ground every "
+        "observation in what the two decks are doing right now."
+    ),
     # P96 adds course_3 (play mode: free-form jam with grounded reactions).
 }
 
@@ -290,5 +296,154 @@ CURRICULUM: dict[str, LessonMeta] = {
         ),
         transcript_path="course_1_anatomy/16_course_1_recital.json",
     ),
-    # P95 adds L2.01..L2.14, P96 adds L3.01..L3.07.
+    # ------------------------------------------------------------------
+    # P95 — Course 2 (Transitions): 14 lessons L2.01..L2.14.
+    # Every addendum is byte-equal to the corresponding fixture's
+    # ``system_instruction_addendum`` field. Titles are lowercase + period-
+    # free per UI-SPEC. Mirror of the P94 Course 1 extension pattern.
+    # ------------------------------------------------------------------
+    "L2.01": LessonMeta(
+        title="beatmatching by ear",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "BEATMATCH EAR ADDENDUM: Sync stays off. The user lines up "
+            "deck B's tempo against deck A by listening for the drift "
+            "between the two kicks. State the drift direction, never the "
+            "percentage."
+        ),
+        transcript_path="course_2_transitions/01_beatmatching_ear.json",
+    ),
+    "L2.02": LessonMeta(
+        title="beatmatching with sync",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "BEATMATCH SYNC ADDENDUM: Sync is the modern fast-path — "
+            "press it and the BPMs match. Frame it as a tool, not a "
+            "shortcut. The ear-version still matters for hardware without "
+            "sync."
+        ),
+        transcript_path="course_2_transitions/02_beatmatching_sync.json",
+    ),
+    "L2.03": LessonMeta(
+        title="long blend",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "LONG BLEND ADDENDUM: A 32-bar crossfader fade from deck a to "
+            "deck b. State the bar count. Do not narrate the EQ swap — "
+            "that is the next lesson."
+        ),
+        transcript_path="course_2_transitions/03_long_blend.json",
+    ),
+    "L2.04": LessonMeta(
+        title="eq swap",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "EQ SWAP ADDENDUM: Crossfade with EQs, not the crossfader. "
+            "Cut deck a's lows as you raise deck b's lows. Frame it as a "
+            "band-by-band hand-off."
+        ),
+        transcript_path="course_2_transitions/04_eq_swap.json",
+    ),
+    "L2.05": LessonMeta(
+        title="bassline swap",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "BASSLINE SWAP ADDENDUM: The kick belongs to one deck at a "
+            "time. Cut deck a's lows then raise deck b's lows on the "
+            "beat-1 of a phrase. Two basslines stacking is the train "
+            "wreck this lesson prevents."
+        ),
+        transcript_path="course_2_transitions/05_bassline_swap.json",
+    ),
+    "L2.06": LessonMeta(
+        title="filter fade",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "FILTER FADE ADDENDUM: The color filter sweeps both extremes. "
+            "Pulling left thins to high-pass; pushing right narrows to "
+            "low-pass. The filter sounds like rising water."
+        ),
+        transcript_path="course_2_transitions/06_filter_fade.json",
+    ),
+    "L2.07": LessonMeta(
+        title="echo-out",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "ECHO-OUT ADDENDUM: The echo-out is a bail. Hit echo on deck "
+            "a, kill its channel, deck b takes over. Frame it as a safety "
+            "net, not a featured move."
+        ),
+        transcript_path="course_2_transitions/07_echo_out.json",
+    ),
+    "L2.08": LessonMeta(
+        title="drop swap",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "DROP SWAP ADDENDUM: A hard crossfader cut at the drop of "
+            "deck b. Time it to the bar — early or late kills the drop."
+        ),
+        transcript_path="course_2_transitions/08_drop_swap.json",
+    ),
+    "L2.09": LessonMeta(
+        title="loop transition",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "LOOP TRANSITION ADDENDUM: A loop on deck a buys time while "
+            "deck b enters. Loop in, crossfade across, loop out. State "
+            "the bar length of the loop."
+        ),
+        transcript_path="course_2_transitions/09_loop_transition.json",
+    ),
+    "L2.10": LessonMeta(
+        title="hot cues and memory cues",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "HOT CUES ADDENDUM: Hot cues are jump points. If the user "
+            "has rekordbox cues, use them; otherwise frame cue 2 as the "
+            "breakdown entry. Do not narrate scratching."
+        ),
+        transcript_path="course_2_transitions/10_hot_cues_memory_cues.json",
+    ),
+    "L2.11": LessonMeta(
+        title="camelot wheel",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "CAMELOT WHEEL ADDENDUM: The camelot wheel labels keys 1a "
+            "through 12a (minor) and 1b through 12b (major). Compatible "
+            "neighbors are same-number-different-letter, plus or minus "
+            "one number same letter."
+        ),
+        transcript_path="course_2_transitions/11_camelot_wheel.json",
+    ),
+    "L2.12": LessonMeta(
+        title="phrase matching",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "PHRASE MATCHING ADDENDUM: A phrase is four bars. Bringing "
+            "deck b in on deck a's phrase-one keeps the structure intact. "
+            "Frame it as bars, not seconds."
+        ),
+        transcript_path="course_2_transitions/12_phrase_matching.json",
+    ),
+    "L2.13": LessonMeta(
+        title="diagnosing a train wreck",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "TRAIN WRECK ADDENDUM: A train wreck has three named causes "
+            "— off-phrase, off-key, off-bpm. State the cause you hear; "
+            "do not soften it. Listening-only lesson."
+        ),
+        transcript_path="course_2_transitions/13_diagnosing_train_wreck.json",
+    ),
+    "L2.14": LessonMeta(
+        title="course 2 recital",
+        course_id="course_2_transitions",
+        system_instruction_addendum=(
+            "COURSE 2 RECITAL ADDENDUM: Five transitions drawn from "
+            "prior lessons. At least three different transition types "
+            "are required to pass. State the score honestly."
+        ),
+        transcript_path="course_2_transitions/14_course_2_recital.json",
+    ),
+    # P96 adds L3.01..L3.07.
 }
