@@ -3,25 +3,28 @@ gsd_state_version: 1.0
 milestone: v9.0
 milestone_name: Lesson One
 status: completed
-last_updated: "2026-05-28T07:21:48.243Z"
+last_updated: "2026-05-28T09:35:57.749Z"
 last_activity: 2026-05-28
 progress:
   total_phases: 14
-  completed_phases: 4
-  total_plans: 24
-  completed_plans: 25
-  percent: 29
+  completed_phases: 7
+  total_plans: 35
+  completed_plans: 36
+  percent: 50
 ---
 
 # vibemix — State
 
 ## Current Position
 
+Phase: 98 (Live Audit + Ear-Pass + rc1 Regression Smoke) — SHIPPED 2026-05-28 (engineering-complete; 98-01 + 98-02 + 98-03 all SHIPPED — see git log 0fde85af → ce095fec → 24439d5b → 3acb50f6 → c2b4e049 → dddfefa1 → e943fbcf; AUDIT-02 v9.0-MILESTONE-AUDIT.md doc + AUDIT-04 scripts/smoke/sidecar_bundle_smoke.sh 10-check rc1 regression smoke + AUDIT-01 §LEARN-FULL-MILESTONE-EAR-PASS / §LEARN-EAR-COURSE-{1,2,3} parks + AUDIT-03 §LEARN-LEGAL-DISCLAIMER park; v9.0 milestone PASS engineering-complete; public-ship gated on KAAN-ACTION queue discharge)
+Phase: 97 (Onboarding + Tone Locks + Mode Picker) — SHIPPED 2026-05-28 (4 plans; mode picker / Hercules MK2 / wizard headphone + disclaimer + progress list)
+Phase: 96 (Course 3 — Play Mode + proactive tutor lens) — SHIPPED 2026-05-28 (4 plans; [cue:] 4-site atomic mirror + 6 lesson fixtures + EXEMPLAR-06 active-session guard + test_no_speculative_phrase AST gate before Gemini wiring)
 Phase: 95 (Course 2 — Transitions: L2.01..L2.14) — SHIPPED 2026-05-28 (combined-plan execution — see `.planning/phases/95-course-2-transitions/95-SUMMARY.md`; 14 hand-authored Course 2 fixtures + curriculum.py COURSE_FRAMES + 14 CURRICULUM entries + LearnProgress.course_3_unlocked field + LearnProgressState schema mirror + RecitalRuntime extended for Course 2 mode with pool-shape detection + 3-distinct-transition-type variety floor as anti-grind gate; 69 new tests at 190/3 in tests/learn/ — see commits c740fd90 → 617b663b → d8f0f5f7 → 2a8e9bd9 → fd6e6981)
-Phase: 94 (Course 1 — Anatomy: L1.01..L1.16) — EXECUTING (94-01 + 94-02 + 94-03 SHIPPED — see git log; ready for 94-04 polish / KAAN-ACTION surfacing)
+Phase: 94 (Course 1 — Anatomy: L1.01..L1.16) — SHIPPED 2026-05-28 (94-01..94-04 all SHIPPED; 16 hand-authored fixtures + TONE-01 byte-equality + TONE-03 tutor-slop blocklist + ExemplarLessonController L1.14 + RecitalRuntime L1.16)
 Phase: 93 (Exemplar Engine + [exemplar:] Evidence Source) — SHIPPED 2026-05-28 (all 6 plans complete; engineering-complete)
 Phase: 92 (Lesson Runtime + AI Highlight Contract) — SHIPPED 2026-05-28 (92-01..92-06 SHIPPED — see git log; LessonRuntime FSM, IPC envelopes, controller renderer highlight contract, progress persistence, learn-window UI surfaces, settings drawer LearnGroup all green at 1029 passed / 2 skipped / 15 todo)
-Status: P95 SHIPPED — combined-plan executed; CURR-2.01..CURR-2.14 all flipped complete. Ready for P96 (Course 3 — Play Mode + proactive tutor lens, requires course_3_unlocked gate which is now wired).
+Status: **P98 SHIPPED — v9.0 "Lesson One" milestone PASS engineering-complete (68/72 REQ-IDs).** Public-ship gated on KAAN-ACTION queue discharge: §LEARN-FULL-MILESTONE-EAR-PASS (Kaan walks 3 courses + records ≥90 min) + §LEARN-LEGAL-DISCLAIMER (Francesco/lawyer sight-check) + §LEARN-EAR-COURSE-{1,2,3} sub-items + §LEARN-CUE-DECISION ratification.
 Last activity: 2026-05-28
 
 ## Milestone Reference
