@@ -42,7 +42,7 @@
 - [x] **EXEMPLAR-03**: When the user's library is empty or below confidence threshold (≤3 tracks pass the band-share floor), the system falls back to a ~3-5 MB packaged CC-BY exemplar bank at `assets/learn/band_exemplars/{sub,low,mid,high}/*` (4 tracks, instrumental, no vocals, ≤60 s each) — honest-null reasoning surfaced as `"Your library doesn't have a great example of this — listen to this one we packaged"`. Empty-library path verified by `tests/learn/test_exemplar_packaged_fallback.py`.
 - [x] **EXEMPLAR-04**: Exemplar audio plays through a dedicated `src/vibemix/learn/audio_cue.py::ExemplarPlayer` (NEW) on a SECOND `sd.OutputStream` to a user-picked headphone device — NOT reusing `audio.buffers.PlaybackQueue` (which is mic-gated at `audio/buffers.py:195` and would mute the user during exemplar playback). Stereo float32 @ track sample rate via PyAV/FFmpeg decode. Default-safe playback gain: -12 dB (or -18 dB if master deck audio > -6 dBFS — defer until quiet). Device picker added to existing wizard; persists as `learn.headphone_device_index` on existing `ipc.settings.set` envelope.
 - [x] **EXEMPLAR-05**: AI claims about exemplar tracks resolve via a NEW `[exemplar:<track_id>]` evidence source — added atomically to the 4 schema-mirror sites in a single commit (mirrors v6 `[recall:]` precedent exactly): `state/evidence_registry.py:111` (`EVIDENCE_SOURCES` frozenset) · `state/evidence_registry.py:137` (`_SOURCE_ALT` regex) · `prompts/matrix.py` (`CITATION_GRAMMAR_BLOCK`) · `agent/dj_cohost.py` (`_build_citation_strip`). Pinned by `tests/learn/test_exemplar_citation_schema_mirror.py` (4-site lock test) + `tests/learn/test_exemplar_grounding_e2e.py` (fabricated `[exemplar:bogus]` strips whole turn — Invariant #2 binding).
-- [ ] **EXEMPLAR-06**: Course 3 active-session guard: NEVER play tutor exemplar audio while the user is mid-set (`MusicState.audible_deck != none` AND `state.session_active`). Course 3 = verbal coaching only; exemplar playback restricted to "between sets" lessons. Pinned by `tests/learn/test_course3_no_exemplar_during_live.py`.
+- [x] **EXEMPLAR-06**: Course 3 active-session guard: NEVER play tutor exemplar audio while the user is mid-set (`MusicState.audible_deck != none` AND `state.session_active`). Course 3 = verbal coaching only; exemplar playback restricted to "between sets" lessons. Pinned by `tests/learn/test_course3_no_exemplar_during_live.py`.
 
 ### CURR-1 — Course 1: Anatomy of a Deck (16 lessons)
 
@@ -82,12 +82,12 @@
 
 ### CURR-3 — Course 3: Play Mode (live coaching, 6 lessons)
 
-- [ ] **CURR-3.01**: First 5-Minute Mix — user plays freely with proactive tutor lens active; AI suggests one move per minute, grounded.
-- [ ] **CURR-3.02**: First 15-Minute Set — uses v8.2 Build-a-Set engine to prepare a sequenced pool; user plays the set with AI coaching.
-- [ ] **CURR-3.03**: Reading The Room — AI walks user through reading energy curve mid-set + adjusting next track accordingly.
-- [ ] **CURR-3.04**: First 30-Minute Set Capstone — proactive co-pilot mode through a full 30-minute set; AI gives count-ins ("breakdown in 16 beats — get ready") only when grounded on `[cue:<anchor_id>]` evidence.
-- [ ] **CURR-3.05**: Recovery Drills — AI synthetically introduces a train-wreck during user's set (one drill: an unexpected key clash; another: a misaligned phrase); user practices the bail-out via echo-out / filter fade / cut.
-- [ ] **CURR-3.06**: DJ Profile Graduation — user reviews their accumulated DJ-profile insights from the v8.1 long-term profile + lesson completion summary in the v2.1 debrief surface (port 8766).
+- [x] **CURR-3.01**: First 5-Minute Mix — user plays freely with proactive tutor lens active; AI suggests one move per minute, grounded.
+- [x] **CURR-3.02**: First 15-Minute Set — uses v8.2 Build-a-Set engine to prepare a sequenced pool; user plays the set with AI coaching.
+- [x] **CURR-3.03**: Reading The Room — AI walks user through reading energy curve mid-set + adjusting next track accordingly.
+- [x] **CURR-3.04**: First 30-Minute Set Capstone — proactive co-pilot mode through a full 30-minute set; AI gives count-ins ("breakdown in 16 beats — get ready") only when grounded on `[cue:<anchor_id>]` evidence.
+- [x] **CURR-3.05**: Recovery Drills — AI synthetically introduces a train-wreck during user's set (one drill: an unexpected key clash; another: a misaligned phrase); user practices the bail-out via echo-out / filter fade / cut.
+- [x] **CURR-3.06**: DJ Profile Graduation — user reviews their accumulated DJ-profile insights from the v8.1 long-term profile + lesson completion summary in the v2.1 debrief surface (port 8766).
 - [x] **CURR-3.07**: Course 3 proactive tutor lens — when active, the tutor narrates upcoming structure ("breakdown in 16 beats") IF AND ONLY IF grounded on `[cue:<anchor_id>]` evidence (NEW evidence source added via the 4-site mirror pattern à la EXEMPLAR-05); when `bpm_confidence < 0.8` OR `phrase_position_confidence < 0.7` OR `MusicState.next_phrase_at` is None, the tutor downgrades to retrospective-only narration ("that was a breakdown — see how the bass dropped out"). Pinned by `tests/learn/test_no_speculative_phrase.py` (AST gate landed BEFORE Gemini wiring) + `tests/learn/test_course3_uses_existing_coach.py` (every tutor-narration prompt built by `state/coach.py:AICoach.build_prompt`).
 
 ### ONBOARD — onboarding, hardware-aware, mode picker
@@ -174,7 +174,7 @@
 | EXEMPLAR-03 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Complete |
 | EXEMPLAR-04 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Complete |
 | EXEMPLAR-05 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Complete |
-| EXEMPLAR-06 | Phase 96 — Course 3 Play Mode (active-session guard) | Pending |
+| EXEMPLAR-06 | Phase 96 — Course 3 Play Mode (active-session guard) | Complete |
 | CURR-1.01 .. 1.16 | Phase 94 — Course 1 Anatomy | Complete (P94-01 SHIPPED 2026-05-28 — 16 hand-authored fixtures + curriculum.py extension) |
 | CURR-2.01 .. 2.14 | Phase 95 — Course 2 Transitions | Complete (P95 SHIPPED 2026-05-28 — 14 hand-authored fixtures + curriculum.py extension + course_3_unlocked field + RecitalRuntime Course 2 mode with 3-distinct-transition-type variety floor; commits c740fd90 → fd6e6981) |
 | CURR-3.01 .. 3.07 | Phase 96 — Course 3 Play Mode | Pending |
