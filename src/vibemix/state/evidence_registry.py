@@ -87,9 +87,9 @@ DEFAULT_MIN_REFRESH_INTERVAL_S: float = 30.0
 # Locked grammar surface                                                       #
 # --------------------------------------------------------------------------- #
 
-#: The 10 EBNF source identifiers — 7 locked in 18-CONTEXT.md §EBNF Grammar
+#: The 11 EBNF source identifiers — 7 locked in 18-CONTEXT.md §EBNF Grammar
 #: plus ``key`` added Phase 59 (DECK-03), ``recall`` added Phase 65 (RECALL-01),
-#: ``exemplar`` added Phase 93 (EXEMPLAR-05).
+#: ``exemplar`` added Phase 93 (EXEMPLAR-05), ``cue`` added Phase 96 (CURR-3.07).
 #: ``ev`` = event-detector fire; ``aud`` = audio feature (RMS/BPM/bands);
 #: ``midi`` = controller move; ``track`` = nowplaying-cli track id;
 #: ``screen`` = djay screen-capture region; ``mix`` = derived mix state
@@ -114,11 +114,20 @@ DEFAULT_MIN_REFRESH_INTERVAL_S: float = 30.0
 #: ``key``/``track``/``recall``). The ExemplarFinder writes
 #: ``("exemplar", track_id, t_session)`` BEFORE the LLM emits the cite so
 #: unregistered ids strip the turn (Plan 93-04 wiring).
+#: ``cue`` = CueAnchor / phrase-boundary reference, body ``<anchor_id>``
+#: (e.g. ``phrase_boundary@45.2`` or ``drop@180.0``) — Phase 96
+#: (CURR-3.07). Existence-only retrieval-time source that makes a
+#: fabricated ``[cue:<id>]`` uncitable-by-construction: it joins the
+#: linter's EXISTENCE-ONLY set purely by being IN this frozenset and
+#: ABSENT from ``citation_linter.py::_TIME_KEYED_SOURCES`` (mirrors
+#: ``key``/``track``/``recall``/``exemplar``). state/refresh.py writes
+#: ``("cue", anchor_id, t_session)`` BEFORE the LLM emits the cite so
+#: unregistered ids strip the turn (Plan 96-03 wiring).
 #: SCHEMA-MIRROR: this frozenset is the source-of-truth — keep ``_SOURCE_ALT``,
 #: the EBNF docstring, ``prompts/matrix.py::CITATION_GRAMMAR_BLOCK`` and
 #: ``agent/dj_cohost.py::_build_citation_strip`` in lock-step.
 EVIDENCE_SOURCES: frozenset[str] = frozenset(
-    {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key", "recall", "exemplar"}
+    {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key", "recall", "exemplar", "cue"}
 )
 
 
@@ -148,11 +157,21 @@ EVIDENCE_SOURCES: frozenset[str] = frozenset(
 # ``exemplar:_packaged:low:track_03`` body has no whitespace/comma/bracket and
 # the inner colon(s) survive as the track_id body (same posture as recall/key).
 #
+# ``cue`` (Phase 96 / CURR-3.07) is the same silent-poisoning-hole pair
+# situation as ``recall``/``exemplar``: it MUST join this alternation in the
+# SAME commit it joins EVIDENCE_SOURCES — otherwise a fabricated
+# ``[cue:<id>]`` is never matched by parse_citations, never stripped, and
+# rides through un-validated. ``_INNER_ATOM`` stays UNCHANGED — a
+# ``cue:phrase_boundary@45.2`` body has no whitespace/comma/bracket and the
+# inner colon(s) survive as the anchor_id body (same posture as
+# recall/key/exemplar).
+#
 # ASYMMETRY (intentional, do NOT "fix"): ``memory/ingest.py``'s copy of this
-# alternation stays at 8 sources — both ``recall`` and ``exemplar`` are
-# RETRIEVAL-time, never ingest-time (a stored past reaction never cited recall
-# or exemplar itself), so the ingest-time extractor must not whitelist them.
-_SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend|key|recall|exemplar"
+# alternation stays at 8 sources — ``recall``, ``exemplar``, AND ``cue`` are
+# RETRIEVAL-time, never ingest-time (a stored past reaction never cited
+# recall / exemplar / cue itself; cue is sampled from CueAnchor at narration
+# time), so the ingest-time extractor must not whitelist them.
+_SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend|key|recall|exemplar|cue"
 _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 
 #: Compiled regex matching the LOCKED EBNF grammar:
@@ -160,7 +179,7 @@ _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 #:   citation := '[' atom ( ',' atom )* ']'
 #:   atom     := source ':' body
 #:   source   := 'ev' | 'aud' | 'midi' | 'track' | 'screen' | 'mix' | 'tend'
-#:             | 'key' | 'recall' | 'exemplar'
+#:             | 'key' | 'recall' | 'exemplar' | 'cue'
 #:   body     := one-or-more chars excluding whitespace, ']', ','
 #:   key-body := <deck> ':' <camelot>   # e.g. "A:8A" — deck ∈ {A,B,C,D},
 #:                                       # camelot ∈ 1A..12B (Phase 59 DECK-03)
@@ -170,8 +189,11 @@ _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 #:                                        # or "_packaged:low:track_03" — full
 #:                                        # body survives parse_citations (no
 #:                                        # whitespace/comma/bracket; P93)
+#:   cue-body := <anchor_id>             # e.g. "phrase_boundary@45.2" or
+#:                                        # "drop@180.0" — full body survives
+#:                                        # parse_citations (Phase 96 CURR-3.07)
 #:
-#: Matches the 10 single-citation forms + the comma-joined multi-citation
+#: Matches the 11 single-citation forms + the comma-joined multi-citation
 #: form in one pass. Empty ``[]`` is rejected (body requires at least one
 #: char). Whitespace inside brackets is rejected.
 EVIDENCE_CITATION_RE: re.Pattern[str] = re.compile(

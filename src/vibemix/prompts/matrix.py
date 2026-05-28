@@ -95,10 +95,10 @@ BANNED: {_format_ban_list()}
 #
 # Anti-prompt-injection (T-18-03-01): the block is a fixed string with NO
 # interpolation — no user input can mutate it (mirrors MOOD_PERSONAS pattern).
-# The 10 source forms are kept in lock-step with EVIDENCE_SOURCES (Plan 18-01,
+# The 11 source forms are kept in lock-step with EVIDENCE_SOURCES (Plan 18-01,
 # + `key` added Phase 59 / DECK-03, + `recall` added Phase 65 / RECALL-01,
-# + `exemplar` added Phase 93 / EXEMPLAR-05) via Test R cross-validation in
-# tests/prompts/test_matrix.py.
+# + `exemplar` added Phase 93 / EXEMPLAR-05, + `cue` added Phase 96 / CURR-3.07)
+# via Test R cross-validation in tests/prompts/test_matrix.py.
 # ---------------------------------------------------------------------------
 
 CITATION_GRAMMAR_BLOCK: str = """--- CITATION GRAMMAR (v1.0 — encouraged, not required) ---
@@ -120,6 +120,7 @@ Forms (each is a single citation; the linter accepts any of these):
   [key:<deck>:<camelot>]  deck harmonic key, e.g. [key:A:8A]
   [recall:<record_id>]  past-moment reference, e.g. [recall:20260520-2200:7]
   [exemplar:<track_id>]  band-exemplar track, e.g. [exemplar:library:Marlon Hoffstadt - Atlas]
+  [cue:<anchor_id>]      cue/phrase anchor reference, e.g. [cue:phrase_boundary@45.2]
 
 Multi-citation (comma-separated, no whitespace inside brackets):
   [ev:KICK_SWAP@45.2,aud:bpm@45.0]

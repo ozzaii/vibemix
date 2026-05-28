@@ -65,10 +65,13 @@ def test_site_4_citation_strip_allow_list_includes_exemplar() -> None:
     pins the source-of-truth membership.
     """
     src = (_REPO / "src" / "vibemix" / "agent" / "dj_cohost.py").read_text()
-    # The allow-list tuple at line ~255 — match the FULL tuple shape
-    # ("ev", "mix", "midi", "key", "recall", "exemplar")
+    # The allow-list tuple at line ~271 — match a tuple shape that
+    # carries `exemplar` (Phase 93). The full tuple is open-ended (Phase 96
+    # adds `cue` as the seventh entry; future plans may add more). Verify
+    # `exemplar` lives inside a tuple that starts with `"ev"` and follows
+    # the locked source order.
     pattern = re.compile(
-        r'if source not in\s*\(\s*("ev"\s*,\s*"mix"\s*,\s*"midi"\s*,\s*"key"\s*,\s*"recall"\s*,\s*"exemplar"\s*)\)',
+        r'if source not in\s*\(\s*"ev"\s*,\s*"mix"\s*,\s*"midi"\s*,\s*"key"\s*,\s*"recall"\s*,\s*"exemplar"',
         re.MULTILINE,
     )
     assert pattern.search(src) is not None, (

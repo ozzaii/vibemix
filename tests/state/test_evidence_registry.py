@@ -208,24 +208,25 @@ def test_evidence_10_regex_rejects_empty_GROUND02_DLOCKED() -> None:
 # Test 11 — EVIDENCE_SOURCES constant — GROUND-02
 # --------------------------------------------------------------------------- #
 def test_evidence_11_sources_constant_locked_GROUND02() -> None:
-    """EVIDENCE_SOURCES is a frozenset of exactly the 10 source identifiers.
+    """EVIDENCE_SOURCES is a frozenset of exactly the 11 source identifiers.
 
     Phase 59 (DECK-03) added the dedicated ``key`` harmonic source to the
     original 7 CONTEXT.md sources. Phase 65 (RECALL-01) added ``recall`` —
-    the past-session callback source. Phase 93 (EXEMPLAR-05) adds
-    ``exemplar`` — the band-exemplar reference source that makes a
-    fabricated ``[exemplar:<id>]`` uncitable-by-construction (existence-only,
-    mirrors ``recall``/``key``/``track``).
+    the past-session callback source. Phase 93 (EXEMPLAR-05) added
+    ``exemplar`` — the band-exemplar reference source. Phase 96
+    (CURR-3.07) adds ``cue`` — the CueAnchor / phrase-boundary reference
+    that grounds Course 3 proactive count-ins (existence-only, mirrors
+    ``recall``/``exemplar``/``key``/``track``).
 
     The frozenset is the schema-mirror source-of-truth — the regex
     alternation, EBNF docstring, prompt grammar block and citation-strip
-    whitelist all carry ``exemplar`` in lock-step. (Adding it here but
+    whitelist all carry ``cue`` in lock-step. (Adding it here but
     NOT to ``_SOURCE_ALT`` would be the silent poisoning hole the
     milestone exists to prevent.)
     """
     assert isinstance(EVIDENCE_SOURCES, frozenset)
     assert EVIDENCE_SOURCES == frozenset(
-        {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key", "recall", "exemplar"}
+        {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key", "recall", "exemplar", "cue"}
     )
 
 

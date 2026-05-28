@@ -263,7 +263,15 @@ def _build_citation_strip(
         # continue`` guard with strip == [] (defense in depth at two tiers:
         # the Phase 20 CitationLinter strips the WHOLE turn upstream, and
         # this gate drops the chip downstream).
-        if source not in ("ev", "mix", "midi", "key", "recall", "exemplar"):
+        # Phase 96 (CURR-3.07) — ``cue`` added as the seventh allow-list
+        # entry. state/refresh.py registers ``("cue", anchor_id, t_session)``
+        # BEFORE the LLM emits the cite so a grounded ``[cue:<id>]``
+        # resolves like any other source and an unregistered (fabricated)
+        # ``[cue:<unregistered>]`` falls through the existing
+        # ``if not timestamps: continue`` guard with strip == [] (same
+        # final state as the linter whole-turn strip — defense in depth
+        # at two tiers).
+        if source not in ("ev", "mix", "midi", "key", "recall", "exemplar", "cue"):
             continue
         # Registry lookup uses the body verbatim (KEY@t form). Drop the
         # chip when the registry has no matching observation — closes
@@ -312,6 +320,18 @@ def _build_citation_strip(
             # word trivially matches the locked verb-format regex
             # ``^[a-z]+( [a-z]+){0,2}$``.
             verb = "exemplar"
+        elif source == "cue":
+            # Phase 96 (CURR-3.07) — mirrors the ``exemplar`` / ``recall`` /
+            # ``key`` precedents above for opaque/structured bodies. The
+            # ``cue`` body shape is ``<anchor_id>`` (e.g.
+            # ``phrase_boundary@45.2`` or ``drop@180.0``). The full anchor_id
+            # rides in ``event_id`` for the click→tutor-context deep-link.
+            # The chip verb is a fixed letters-only ``"cue"`` label —
+            # deriving a verb from an anchor-id string would leak
+            # detector-internal values to the UI surface. A single lowercase
+            # word trivially matches the locked verb-format regex
+            # ``^[a-z]+( [a-z]+){0,2}$``.
+            verb = "cue"
         else:
             # Body shape is ``KEY@t`` for ev/aud/midi/mix; partition on "@"
             # so a missing "@" (defensive: future grammar drift) falls back

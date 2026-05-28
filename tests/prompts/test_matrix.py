@@ -428,20 +428,19 @@ def test_prompt_01_coach_mode_includes_feedback_bias(skill: str) -> None:
 
 
 def test_o_citation_grammar_block_contains_eight_source_forms_and_multi_cite() -> None:
-    """Test O — GROUND-02: CITATION_GRAMMAR_BLOCK enumerates all 9 EBNF source
+    """Test O — GROUND-02: CITATION_GRAMMAR_BLOCK enumerates all 11 EBNF source
     forms as literal substrings + the multi-citation form + the v1.0 fail-open
     phrase 'encouraged, not required'. Locks the prompt-side grammar surface.
 
     Phase 59 (DECK-03) added the `[key:` deck-harmonic form. Phase 65 (RECALL-01)
-    adds the `[recall:` past-session form (touchpoint #3 of the schema-mirror
-    sites), in lock-step with EVIDENCE_SOURCES.
-
-    RED until Plan 65-02 adds the `[recall:` form — the grammar block must teach
-    Gemini the only valid recall citation shape.
+    added the `[recall:` past-session form. Phase 93 (EXEMPLAR-05) added
+    `[exemplar:`. Phase 96 (CURR-3.07) adds `[cue:` — the CueAnchor /
+    phrase-boundary reference that grounds Course 3 proactive count-ins.
     """
     from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
 
-    # 9 single-citation forms (GROUND-02 lock + DECK-03 `key` + RECALL-01 `recall`)
+    # 11 single-citation forms (GROUND-02 lock + DECK-03 `key` + RECALL-01
+    # `recall` + EXEMPLAR-05 `exemplar` + CURR-3.07 `cue`)
     for prefix in (
         "[ev:",
         "[aud:",
@@ -452,6 +451,8 @@ def test_o_citation_grammar_block_contains_eight_source_forms_and_multi_cite() -
         "[tend:",
         "[key:",
         "[recall:",
+        "[exemplar:",
+        "[cue:",
     ):
         assert prefix in CITATION_GRAMMAR_BLOCK, f"missing source form {prefix!r}"
 
