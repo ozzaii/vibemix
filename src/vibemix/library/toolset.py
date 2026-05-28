@@ -995,6 +995,24 @@ class LibraryToolset:
 
     # -- dispatch (hard per-tool timeout; never raises) --------------------- #
 
+    def _is_empty_or_error(self, name: str, result: dict[str, Any]) -> bool:
+        """Phase 99 HARDEN-RETRY Decision 2: identify counter-incrementing returns.
+
+        True if ``result`` is an error dict OR an empty ``search_vibe`` result.
+        Other handlers' empty returns (e.g. ``discover_pool`` with an empty pool)
+        do NOT count — Decision 2 locked only ``search_vibe`` for the empty-list
+        trigger; everything else counts only via the ``{"error": ...}`` path.
+
+        This predicate is the SINGLE source of truth for empty/error detection
+        and is consulted exactly once per ``dispatch()`` call. Plan 99-03 reuses
+        it from the same call site for the threshold-trip wiring.
+        """
+        if isinstance(result, dict) and result.get("error") is not None:
+            return True
+        if name == "search_vibe":
+            return not result.get("results")
+        return False
+
     def dispatch(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         handlers: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
             "search_vibe": self.search_vibe,
@@ -1022,11 +1040,28 @@ class LibraryToolset:
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
             fut = ex.submit(handler, args)
             try:
-                return fut.result(timeout=TOOL_CALL_TIMEOUT_S)
+                result = fut.result(timeout=TOOL_CALL_TIMEOUT_S)
             except concurrent.futures.TimeoutError:
-                return {"error": f"tool {name!r} timed out"}
+                result = {"error": f"tool {name!r} timed out"}
             except Exception as e:
-                return {"error": f"tool {name!r} crashed: {type(e).__name__}"}
+                result = {"error": f"tool {name!r} crashed: {type(e).__name__}"}
+
+        # ─── PHASE 99 HOOK (Plan 99-02 — counter telemetry, no terminal) ───
+        # Counter writes confined to the dispatch-calling thread (NEVER the
+        # ThreadPoolExecutor worker thread that ran ``handler``). Safe by
+        # construction: the worker has been joined via ``fut.result()`` /
+        # the surrounding ``with ThreadPoolExecutor`` block exited before
+        # this point. The serialization guarantee is the same one
+        # documented at toolset.py:407-411 for the lazy ``_genre_lookup``.
+        # Plan 99-03 will extend this block with the threshold trip +
+        # the ``stop_reason`` payload write. ``return result`` below is
+        # byte-equivalent to pre-plan behavior.
+        if self._is_empty_or_error(name, result):
+            self._consecutive_empties += 1
+        else:
+            self._consecutive_empties = 0
+
+        return result
 
     def _resolve_source_section(
         self, source_section_id: Any, source_track_id: Any
