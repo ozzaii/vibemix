@@ -107,7 +107,15 @@ Plans:
   3. The Telegram bridge's `format_reply` renders the clarification as a chat message with numbered choices that survives the existing `strip_leaks` pass (no file paths, no library-cache paths leak). The existing playlist-template branch is byte-identical (no regression). Tested under `tests/library/test_telegram_clarification_branch.py` with fakes.
   4. `request_clarification` has NO `track_id` surface — the tool signature accepts only `question: str` and `choices: list[str]`, returns only the terminal payload. Static `tests/library/test_request_clarification_no_track_surface.py` AST gate proves the handler never accepts a track reference. Invariant #2 (citation-grounding) holds by structural impossibility — a clarification cannot fabricate a track reference.
   5. `codex_curate.curate_with_codex` and `build_set_with_codex` both propagate `stop_reason="clarification_needed"` + the question + choices payload uniformly to the result dataclass. Caller code (CLI + Telegram + future GUI) reads the same shape regardless of which entry path invoked Codex.
-**Plans:** TBD (executor decomposition — likely 3-4 plans: tool handler + args validation · FastMCP exposure + docstring · codex_curate parse-branch + result dataclass extension · CLI + Telegram bridge surfaces)
+**Plans:** 7 plans
+Plans:
+- [ ] 100-01-PLAN.md — request_clarification handler + MIN/MAX choices + dispatch entry (HARDEN-CLARIFY-01)
+- [ ] 100-02-PLAN.md — FastMCP @mcp.tool() exposure + teaching docstring (HARDEN-CLARIFY-02)
+- [ ] 100-03-PLAN.md — CodexCurateResult.question/choices + wrapper elif clarification branches (HARDEN-CLARIFY-03, HARDEN-CLARIFY-07)
+- [ ] 100-04-PLAN.md — CLI exit code 11 + 2-block stderr render + normalizer extension (HARDEN-CLARIFY-04, HARDEN-CLARIFY-06)
+- [ ] 100-05-PLAN.md — telegram_bridge format_reply clarification_needed branch with strip_leaks (HARDEN-CLARIFY-05)
+- [ ] 100-06-PLAN.md — AST gate proving no track_id surface + single-turn structural pin (HARDEN-CLARIFY-06, HARDEN-CLARIFY-07)
+- [ ] 100-07-PLAN.md — end-to-end integration seal + REQ coverage 7/7 + KAAN-ACTION surface (HARDEN-CLARIFY-07)
 **Cardinal invariants:** #1 N/A direct (no `MusicState` writes; clarification handler is stateless); #2 holds — `request_clarification` has no `track_id` surface, structurally citation-safe (AST-gated); #3 N/A (live co-host untouched); #4 N/A (no new ws traffic — MCP STDIO + Telegram long-poll + CLI are existing transports).
 **Honest-green discipline:** failing-then-passing tests under `tests/library/` for every contract (args-validation 0/1/6+ rejected · 2-5 accepted · CLI formatting + distinct exit code · Telegram `format_reply` branch with leak-strip + numbered choices · `codex_curate` propagation · no-track-surface AST gate). No live Codex calls — controlled-fixture harness drives the dispatch path.
 **KAAN-ACTION (parked at phase close):** **§HARDEN-PHASE-B-CLARIFICATION-TONE** — ear-pass on Codex's actual clarification prompts in the wild (theme-ambiguity test corpus). Do the LLM's question framings stay on-brand vs sound like a robot survey? Anti-slop release gate.
