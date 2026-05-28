@@ -2526,11 +2526,53 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_ingest.set_defaults(func=_cmd_library_ingest)
 
 
+def _library_model_gap_hint(exc, *, status_loader=None):
+    """Map a CLAP-model / ONNX-dep gap to an actionable install hint, else None.
+
+    The new-user case: an empty ``~/.cache/vibemix/`` and they run ``library
+    search`` / ``similar`` / ``ingest`` / ``embed-folder`` → the embedder raises
+    a bare ``FileNotFoundError`` (model files absent) or ``ImportError``
+    (onnxruntime/tokenizers not installed), which the CLI dumped as a raw Python
+    traceback. This returns a friendly install hint for exactly those two cases
+    and ``None`` for anything else (a user-supplied missing file, a real bug) so
+    the caller re-raises rather than masking it.
+    """
+    is_dep_gap = isinstance(exc, (ImportError, ModuleNotFoundError)) and any(
+        tok in str(exc).lower() for tok in ("onnxruntime", "tokenizers", "onnx")
+    )
+    is_model_gap = False
+    if isinstance(exc, FileNotFoundError):
+        try:
+            if status_loader is None:
+                from vibemix.library.clap_engine import onnx_model_status as status_loader
+            is_model_gap = not bool(status_loader().get("installed", False))
+        except Exception:
+            is_model_gap = False
+    if not (is_dep_gap or is_model_gap):
+        return None
+    return (
+        "vibemix: the local CLAP model isn't installed yet — the library "
+        "search / similar / ingest / embed-folder commands need it.\n"
+        "Install it with:\n"
+        "  uv run python -m vibemix library models --install clap"
+    )
+
+
 def _run_library_cli(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="vibemix library")
     _build_library_subparsers(parser)
     args = parser.parse_args(argv)
-    return int(args.func(args) or 0)
+    try:
+        return int(args.func(args) or 0)
+    except (FileNotFoundError, ImportError, ModuleNotFoundError) as e:
+        # New-user model/dep gap → actionable hint instead of a raw traceback.
+        # Unrelated errors re-raise (we never mask a real failure).
+        hint = _library_model_gap_hint(e)
+        if hint is None:
+            raise
+        print(hint, file=sys.stderr, flush=True)
+        print(f"(detail: {e})", file=sys.stderr, flush=True)
+        return 2
 
 
 # =============================================================================
