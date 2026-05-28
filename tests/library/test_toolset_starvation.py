@@ -612,3 +612,162 @@ def test_starvation_short_circuits_subsequent_dispatch(
         f"got {echo!r}. If the result is a crash dict, the short-circuit "
         f"lives BELOW handler dispatch — move it to the top of dispatch()."
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan 99-05 Task 1 — Invariant #2 (citation grounding) protection.
+#
+# The load-bearing test: a ``tool_starvation`` termination structurally
+# short-circuits the ``create_playlist`` handler BEFORE its library
+# re-validation in ``library/create_playlist.py`` runs. No partial playlist
+# write happens; no M3U lands on disk; no ``self.created`` is set.
+#
+# This is REQUIREMENTS.md HARDEN-RETRY-06 contract:
+#   "starvation MUST short-circuit before partial-playlist write"
+#
+# Why this is the regression-pin for Cardinal Invariant #2:
+# ``create_playlist`` is the single validated write on the curation surface.
+# Its two-gate grounding (seen-set check + library re-validation) is the
+# anti-hallucination spine for Viber. If a starved run somehow reached the
+# library re-validation, it could in principle write a partial playlist
+# under the ``tool_starvation`` error path — corrupting the "one validated
+# write" contract. The top-of-``dispatch()`` short-circuit (Plan 99-03,
+# toolset.py:1115-1116) guarantees this is structurally impossible: the
+# handler-map dispatch (toolset.py:1118-1137) is never reached after a trip,
+# so ``self.create_playlist`` is never invoked, so the
+# ``vibemix.library.create_playlist.create_playlist`` library re-validation
+# is never reached.
+#
+# This test proves that property by monkeypatching the module-level
+# ``create_playlist`` binding to a sentinel that raises if called — if the
+# short-circuit ever regresses, the sentinel fires and the test fails with
+# a precise error pointing at the bug. (99-03's
+# ``test_starvation_short_circuits_subsequent_dispatch`` covers the dispatch
+# seam; this test pins the specific Invariant-#2-critical handler.)
+# ---------------------------------------------------------------------------
+
+
+def test_starvation_short_circuits_create_playlist(
+    toolset: LibraryToolset, monkeypatch
+) -> None:
+    """REQ HARDEN-RETRY-06 + Cardinal Invariant #2: a starved run CANNOT
+    reach the ``create_playlist`` library re-validation.
+
+    Scenario:
+      * Pre-load ``toolset.seen`` with two real fixture track ids so the
+        seen-set gate (grounding gate #1 in ``create_playlist`` handler)
+        WOULD pass on its own.
+      * Manually set ``toolset.stop_reason`` to a well-formed starvation
+        payload (bypasses the threshold trip — this test exercises the
+        short-circuit, not the trip; trip is pinned by 99-03 tests above).
+      * Monkeypatch ``vibemix.library.toolset.create_playlist`` (the
+        module-bound import of ``library/create_playlist.py``'s
+        ``create_playlist`` function) to a sentinel that raises
+        ``RuntimeError`` if invoked. If the short-circuit holds, the
+        sentinel NEVER fires.
+      * Call ``dispatch("create_playlist", ...)``.
+
+    Asserts:
+      * Return value is the terminal echo
+        ``{"error": "tool_starvation", "stop_reason": <copy>}``.
+      * The sentinel was NOT called — library re-validation skipped.
+      * ``toolset.created is None`` — no PlaylistResult ever ran.
+      * ``toolset.stop_reason`` unchanged (idempotent — short-circuit
+        returns a SHALLOW COPY, so tampering with the echo's payload must
+        not corrupt internal state).
+
+    Plan 99-03's ``test_starvation_short_circuits_subsequent_dispatch``
+    pins the same property at the dispatch seam; THIS test pins it for
+    the specific Invariant-#2-critical ``create_playlist`` path so any
+    future PR that drifts the short-circuit out from under
+    ``create_playlist`` (e.g. by routing ``create_playlist`` through a
+    new "always-run" handler-map slot) trips this gate at PR time.
+    """
+    # Pre-condition: seen-set populated with REAL fixture ids — would let
+    # a non-starved create_playlist call pass grounding gate #1.
+    toolset.seen.update({"t000", "t001"})
+
+    # Manually set stop_reason to a well-formed payload — bypass the trip,
+    # exercise the short-circuit directly. ``dict()`` copy so the test's
+    # local payload is decoupled from the toolset attribute (we assert on
+    # the toolset's internal payload below).
+    starvation_payload = {
+        "reason": "tool_starvation",
+        "hint": "test setup — short-circuit acid test",
+        "tool": "search_vibe",
+        "consecutive": 3,
+    }
+    toolset.stop_reason = dict(starvation_payload)
+    snapshot = dict(toolset.stop_reason)
+
+    # Sentinel: if the library re-validation EVER runs after a starvation
+    # trip, this raises and the test fails with a precise message. The
+    # module-bound name ``tool_mod.create_playlist`` is the SAME callable
+    # the handler invokes at toolset.py:459 (``result = create_playlist(
+    # self._library, name, track_ids)``); monkeypatching the module attr
+    # is the right seam — see tool_mod's ``from vibemix.library.
+    # create_playlist import ... create_playlist`` at toolset.py:41.
+    sentinel_called = {"flag": False}
+
+    def sentinel_create_playlist(*args, **kwargs):  # pragma: no cover
+        sentinel_called["flag"] = True
+        raise RuntimeError(
+            "library re-validation create_playlist() ran after a "
+            "tool_starvation trip — Invariant #2 (citation grounding) "
+            "regression. The top-of-dispatch short-circuit at "
+            "toolset.py:1115 must catch this BEFORE the handler-map "
+            "dispatch is reached."
+        )
+
+    monkeypatch.setattr(tool_mod, "create_playlist", sentinel_create_playlist)
+
+    # Pre-condition: no PlaylistResult yet.
+    assert toolset.created is None, (
+        f"test pre-condition violated: toolset.created should be None "
+        f"on a fresh fixture; got {toolset.created!r}"
+    )
+
+    # Act: dispatch create_playlist with grounded ids. If the short-circuit
+    # holds, this returns the terminal echo WITHOUT invoking the handler.
+    out = toolset.dispatch(
+        "create_playlist",
+        {"name": "starvation-acid-test", "track_ids": ["t000", "t001"]},
+    )
+
+    # Assert 1: terminal echo, NOT a created-playlist dict, NOT a crash dict.
+    assert out == {
+        "error": "tool_starvation",
+        "stop_reason": snapshot,
+    }, (
+        f"create_playlist dispatched on a starved toolset must return the "
+        f"terminal echo {{'error': 'tool_starvation', 'stop_reason': "
+        f"<copy>}}; got {out!r}. If it's a 'created': True dict, the "
+        f"short-circuit regressed — partial playlist would have been "
+        f"written (Invariant #2 leak)."
+    )
+
+    # Assert 2: the sentinel was NEVER called — library re-validation skipped.
+    assert sentinel_called["flag"] is False, (
+        "sentinel create_playlist() was invoked — library re-validation "
+        "ran AFTER a tool_starvation trip. This means the short-circuit "
+        "at toolset.py:1115 is missing, broken, or below the handler "
+        "dispatch. REQ HARDEN-RETRY-06 violated."
+    )
+
+    # Assert 3: no PlaylistResult ever populated — no partial write surfaced.
+    assert toolset.created is None, (
+        f"toolset.created must remain None after a short-circuited "
+        f"create_playlist call (no handler ran, so self.created = result "
+        f"at toolset.py:463 never executed); got {toolset.created!r}."
+    )
+
+    # Assert 4: shallow-copy isolation. Mutating the echo's payload must
+    # NOT corrupt the toolset's internal stop_reason (matches the
+    # mutation-isolation contract pinned by
+    # test_terminal_idempotence_after_starvation above).
+    out["stop_reason"]["reason"] = "tampered_by_caller"
+    assert toolset.stop_reason["reason"] == "tool_starvation", (
+        f"echo['stop_reason'] must be a shallow copy — caller mutation "
+        f"must not corrupt internal payload. Got: "
+        f"{toolset.stop_reason['reason']!r}"
+    )
