@@ -224,6 +224,10 @@ class CodexCurateResult:
 # timeout            — outer wall-clock kill
 # empty_output       — codex produced nothing parseable
 # no_playlist        — output had no track_ids surviving library validation
+# tool_starvation    — Plan 99-04 propagation: the MCP-side toolset hit the
+#                      TOOL_STARVATION_THRESHOLD (3 consecutive empty/error
+#                      tool returns) and wrote stop_reason.json to the env-var
+#                      path; the wrapper short-circuits with the hint as error.
 # error              — any other non-zero exit / failure
 
 
@@ -450,6 +454,11 @@ def curate_with_codex(
     with tempfile.TemporaryDirectory(prefix="viber-codex-") as td:
         schema_path = str(Path(td) / "schema.json")
         out_path = str(Path(td) / "out.json")
+        # Plan 99-04: side-channel file the MCP-side LibraryToolset writes on
+        # threshold-trip. Allocated INSIDE the TemporaryDirectory `with` block
+        # (Pitfall 4): the temp dir is cleaned up at `with` exit, so the read
+        # MUST happen before this block ends or the file disappears.
+        stop_reason_path = str(Path(td) / "stop_reason.json")
         Path(schema_path).write_text(json.dumps(_OUTPUT_SCHEMA), encoding="utf-8")
 
         argv = build_argv(
@@ -462,13 +471,21 @@ def curate_with_codex(
             bypass_sandbox=allow_shell,
         )
 
+        # Plan 99-04: inject the side-channel path on the subprocess env arg
+        # (NOT os.environ — test isolation, the wrapper never mutates the
+        # parent process's env). Codex CLI passes env to its MCP children;
+        # build_toolset() in mcp_server logs presence/absence at boot
+        # (Plan 99-04 Task 5, B1 Option A probe).
+        env = build_subprocess_env(codex)
+        env["VIBEMIX_STOP_REASON_FILE"] = stop_reason_path
+
         try:
             proc = _runner(
                 argv,
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,
-                env=build_subprocess_env(codex),
+                env=env,
                 # `codex exec` reads extra instructions from stdin when it's
                 # piped/inherited; a non-TTY child stdin makes it block/err with
                 # "Reading additional input from stdin...". DEVNULL = the prompt
@@ -503,6 +520,34 @@ def curate_with_codex(
                 stop_reason="error",
                 error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
             )
+
+        # Plan 99-04: Channel A side-channel SHORT-CIRCUIT — runs BEFORE the
+        # out.json parse so a tool_starvation trip on the MCP side wins over
+        # any (likely-stale) out.json content. Phase 100 forward-compat: the
+        # branch reads ``payload.get("reason") == "tool_starvation"`` so a
+        # sibling ``elif payload.get("reason") == "clarification_needed":``
+        # drops in without refactoring. The fallback string is structurally
+        # UNREACHABLE in production — Plan 99-03's _build_starvation_payload
+        # always seeds 'hint' for cases A/B/C; the fallback is defensive only.
+        if Path(stop_reason_path).exists():
+            try:
+                payload = json.loads(
+                    Path(stop_reason_path).read_text(encoding="utf-8")
+                )
+                if (
+                    isinstance(payload, dict)
+                    and payload.get("reason") == "tool_starvation"
+                ):
+                    return CodexCurateResult(
+                        theme=theme,
+                        stop_reason="tool_starvation",
+                        error=str(
+                            payload.get("hint")
+                            or "no playlist — tool starvation, no hint available"
+                        ),
+                    )
+            except (OSError, json.JSONDecodeError):
+                pass  # fall through to existing parse logic
 
         # Parse the schema-enforced final message.
         try:
@@ -729,6 +774,9 @@ def build_set_with_codex(
     with tempfile.TemporaryDirectory(prefix="viber-codex-set-") as td:
         schema_path = str(Path(td) / "schema.json")
         out_path = str(Path(td) / "out.json")
+        # Plan 99-04: parallel propagation for set-prep. Same Pitfall-4
+        # discipline as curate_with_codex — read INSIDE the `with` block.
+        stop_reason_path = str(Path(td) / "stop_reason.json")
         Path(schema_path).write_text(json.dumps(_BUILD_SET_SCHEMA), encoding="utf-8")
 
         argv = build_argv(
@@ -747,13 +795,19 @@ def build_set_with_codex(
             bypass_sandbox=allow_shell,
         )
 
+        # Plan 99-04: inject side-channel path on subprocess env (uniform
+        # with curate_with_codex; see that wrapper's comment for the test-
+        # isolation rationale).
+        env = build_subprocess_env(codex)
+        env["VIBEMIX_STOP_REASON_FILE"] = stop_reason_path
+
         try:
             proc = _runner(
                 argv,
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,
-                env=build_subprocess_env(codex),
+                env=env,
                 stdin=subprocess.DEVNULL,
             )
         except FileNotFoundError:
@@ -783,6 +837,32 @@ def build_set_with_codex(
                 stop_reason="error",
                 error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
             )
+
+        # Plan 99-04: Channel A side-channel SHORT-CIRCUIT (parallel of
+        # curate_with_codex). Phase 100 forward-compat: branch on
+        # ``payload.get("reason") == "tool_starvation"`` so the sibling
+        # ``clarification_needed`` extension lands cleanly. Fallback string
+        # is structurally UNREACHABLE in production (Plan 99-03's
+        # _build_starvation_payload always seeds 'hint').
+        if Path(stop_reason_path).exists():
+            try:
+                payload = json.loads(
+                    Path(stop_reason_path).read_text(encoding="utf-8")
+                )
+                if (
+                    isinstance(payload, dict)
+                    and payload.get("reason") == "tool_starvation"
+                ):
+                    return CodexCurateResult(
+                        theme=brief,
+                        stop_reason="tool_starvation",
+                        error=str(
+                            payload.get("hint")
+                            or "no playlist — tool starvation, no hint available"
+                        ),
+                    )
+            except (OSError, json.JSONDecodeError):
+                pass  # fall through to existing parse logic
 
         try:
             raw = Path(out_path).read_text(encoding="utf-8").strip()
