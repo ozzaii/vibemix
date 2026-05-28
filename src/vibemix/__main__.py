@@ -1600,6 +1600,37 @@ async def main() -> None:
     )
     print("-> lesson_runtime wired", file=sys.stderr)
 
+    # CR-01 fix (P92 REVIEW) — register the 5 inbound ipc.learn.* handlers
+    # onto the bus so frontend envelopes actually reach the FSM. Before
+    # this wiring, IpcRouterBus.dispatch returned False for every learn
+    # type (no registered handler) and the FSM stayed parked in idle —
+    # the "press play" demo could never start. The handler module lives
+    # at vibemix.learn.ipc_handlers; we only register when ipc_router is
+    # truthy (the SessionLoop wiring above succeeded). Without ipc_router
+    # the live boot already degrades gracefully (the sync adapter no-ops
+    # emit), and there is no socket to dispatch from anyway.
+    if ipc_router is not None:
+        try:
+            from vibemix.learn.ipc_handlers import register_learn_handlers
+
+            register_learn_handlers(
+                ipc_router=ipc_router,
+                lesson_runtime=lesson_runtime,
+                midi_mirror=midi_mirror,
+                progress=_learn_progress,
+                ipc_adapter=_lesson_ipc_adapter,
+            )
+            print(
+                "-> learn IPC handlers wired (5 types: start_course/"
+                "start_lesson/ack/complete_lesson/progress_state)",
+                file=sys.stderr,
+            )
+        except Exception as _learn_handlers_exc:  # pragma: no cover — defensive
+            print(
+                f"-> learn IPC handlers NOT wired: {_learn_handlers_exc!r}",
+                file=sys.stderr,
+            )
+
     # If the progress file was corrupt, surface a one-line toast via
     # progress_state. Wrapped in try/except so a boot-time emit failure
     # never crashes the app (T-92-04-08).
