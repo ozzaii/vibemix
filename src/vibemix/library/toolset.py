@@ -1084,8 +1084,13 @@ class LibraryToolset:
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(payload, f)
-        except OSError:
-            # Best-effort — never wedge dispatch on FS issues.
+        except (OSError, TypeError, ValueError):
+            # Best-effort — never wedge dispatch on FS / encoding /
+            # serialization issues. The in-process ``self.stop_reason`` is the
+            # authoritative surface; this file is observability + propagation
+            # only, so an over-broad catch here is safer than letting an
+            # unexpected exception escape into the dispatch return path.
+            # (UnicodeEncodeError ⊂ UnicodeError ⊂ ValueError.)
             return
 
     def _is_empty_or_error(self, name: str, result: dict[str, Any]) -> bool:
