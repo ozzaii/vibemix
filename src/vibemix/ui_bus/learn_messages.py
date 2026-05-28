@@ -1,20 +1,36 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 91 — ipc.learn.* envelope dataclasses.
+"""ipc.learn.* envelope dataclasses (Phase 91 + Phase 92).
 
-Two envelopes land in P91:
+Phase 91 (2 envelopes):
   - LearnControllerDetected (sidecar→shell, single-fire per plug)
   - LearnMidiPosition       (sidecar→shell, 30 Hz delta-suppressed)
 
-Mirrors of ``messages.schema.json::LearnControllerDetected`` +
-``messages.schema.json::LearnMidiPosition``. Validation by the shared
-``_VALIDATOR`` already loaded in :mod:`vibemix.ui_bus.messages` — we re-use,
-not re-instantiate (Draft-07 ref-resolver is cached internally; compiling
-twice would double the import cost for zero gain).
+Phase 92 (11 envelopes — lesson runtime + AI highlight contract):
+  - LearnStartCourse        (shell→sidecar)
+  - LearnStartLesson        (shell→sidecar)
+  - LearnCompleteLesson     (bidirectional)
+  - LearnLessonLoaded       (sidecar→shell)
+  - LearnHighlight          (sidecar→shell — dual-channel cue paint)
+  - LearnAdvance            (bidirectional)
+  - LearnAck                (shell→sidecar)
+  - LearnTutorSpeak         (sidecar→shell — narration; text from fixture)
+  - LearnExemplarPlay       (sidecar→shell — shape only; engine in P93)
+  - LearnExemplarStop       (sidecar→shell — shape only)
+  - LearnProgressState      (bidirectional — snapshot/reset/reset_ack)
+
+Mirrors of the corresponding entries in ``messages.schema.json``.
+Validation by the shared ``_VALIDATOR`` already loaded in
+:mod:`vibemix.ui_bus.messages` — we re-use, not re-instantiate (Draft-07
+ref-resolver is cached internally; compiling twice would double the
+import cost for zero gain).
 
 Convention parity with :mod:`vibemix.ui_bus.messages`:
 
 * ``@dataclass(frozen=True, slots=True)`` everywhere (hashable wrappers,
-  no per-instance ``__dict__``).
+  no per-instance ``__dict__``). For payload fields that the JSON Schema
+  declares as arrays-of-objects, we use ``tuple[<NestedDataclass>, ...]``
+  so the wrapper stays hashable while ``_serialize`` (via ``asdict`` +
+  ``_tuples_to_lists``) round-trips it back to a JSON array.
 * Each top-level envelope has a ``.make(*, ...)`` keyword-only factory
   that stamps ``ts`` via :func:`vibemix.ui_bus.messages._now_iso`.
 * ``.to_json()`` delegates to :func:`vibemix.ui_bus.messages._serialize`
@@ -24,14 +40,13 @@ Convention parity with :mod:`vibemix.ui_bus.messages`:
   that prefer a plain dict over a JSON string (matches the
   ``SessionOverlayHighlight.to_dict()`` pattern in messages.py).
 
-Phase 91 RENDER-01 / RENDER-02 / RENDER-07. Plan 03 (Python backend
-mirror service) consumes both wrappers; Plan 02 lands their unit tests
-under TDD.
+REQ-IDs: Phase 91 — RENDER-01 / RENDER-02 / RENDER-07; Phase 92 —
+TONE-02 / TONE-04 / LESSON-01..LESSON-06 / RENDER-04.
 """
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from vibemix.ui_bus.messages import _now_iso, _serialize
@@ -151,4 +166,617 @@ class LearnMidiPosition:
     def to_dict(self) -> dict:
         """Convenience: serialize + reparse to a plain dict for ipc_bus.emit
         callers that prefer not to JSON-roundtrip themselves."""
+        return json.loads(self.to_json())
+
+
+# ---------------------------------------------------------------------------
+# Phase 92 — 11 lesson-runtime envelopes
+# ---------------------------------------------------------------------------
+
+
+# -- ipc.learn.start_course -------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnStartCoursePayload:
+    """Payload of ``ipc.learn.start_course``. User picked a course in the HUD."""
+
+    course_id: Literal["course_0", "course_1", "course_2", "course_3"]
+    controller_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class LearnStartCourse:
+    """``ipc.learn.start_course`` envelope wrapper (shell → sidecar)."""
+
+    type: Literal["ipc.learn.start_course"]
+    ts: str
+    payload: LearnStartCoursePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        course_id: str,
+        controller_id: str,
+    ) -> LearnStartCourse:
+        return cls(
+            type="ipc.learn.start_course",
+            ts=_now_iso(),
+            payload=LearnStartCoursePayload(
+                course_id=course_id,  # type: ignore[arg-type]
+                controller_id=controller_id,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.start_lesson -------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnStartLessonPayload:
+    """Payload of ``ipc.learn.start_lesson``. User skipped into a specific lesson.
+
+    ``level="fresh"`` loads a clean slate; ``"replay"`` starts the lesson at
+    completed-but-revisit mode (skip-button immediate availability).
+    """
+
+    lesson_id: str  # pattern ^L[0-9]+\.[0-9]+-.+$
+    level: Literal["fresh", "replay"]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnStartLesson:
+    """``ipc.learn.start_lesson`` envelope wrapper (shell → sidecar)."""
+
+    type: Literal["ipc.learn.start_lesson"]
+    ts: str
+    payload: LearnStartLessonPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        lesson_id: str,
+        level: str,
+    ) -> LearnStartLesson:
+        return cls(
+            type="ipc.learn.start_lesson",
+            ts=_now_iso(),
+            payload=LearnStartLessonPayload(
+                lesson_id=lesson_id,
+                level=level,  # type: ignore[arg-type]
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.complete_lesson ----------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnCompleteLessonPayload:
+    """Payload of ``ipc.learn.complete_lesson``. Bidirectional: shell emits
+    on user-skip; sidecar emits on system-advance."""
+
+    lesson_id: str  # pattern ^L[0-9]+\.[0-9]+-.+$
+    reason: Literal["completed", "user_skip"]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnCompleteLesson:
+    """``ipc.learn.complete_lesson`` envelope wrapper (bidirectional)."""
+
+    type: Literal["ipc.learn.complete_lesson"]
+    ts: str
+    payload: LearnCompleteLessonPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        lesson_id: str,
+        reason: str,
+    ) -> LearnCompleteLesson:
+        return cls(
+            type="ipc.learn.complete_lesson",
+            ts=_now_iso(),
+            payload=LearnCompleteLessonPayload(
+                lesson_id=lesson_id,
+                reason=reason,  # type: ignore[arg-type]
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.lesson_loaded ------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnProgressDot:
+    """Single HUD progress-dot entry. Mirrors the schema's
+    ``LearnLessonLoaded.payload.progress_dots[].properties`` shape."""
+
+    lesson_id: str
+    status: Literal["pending", "current", "completed"]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnLessonLoadedPayload:
+    """Payload of ``ipc.learn.lesson_loaded``. Sidecar emits when a lesson
+    starts loading; carries HUD metadata + per-lesson progress dots
+    (maxItems 32 enforced schema-side)."""
+
+    course_id: str
+    lesson_id: str
+    title: str  # ≤80 chars
+    controller_id: str
+    progress_dots: tuple[LearnProgressDot, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnLessonLoaded:
+    """``ipc.learn.lesson_loaded`` envelope wrapper (sidecar → shell)."""
+
+    type: Literal["ipc.learn.lesson_loaded"]
+    ts: str
+    payload: LearnLessonLoadedPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        course_id: str,
+        lesson_id: str,
+        title: str,
+        controller_id: str,
+        progress_dots: tuple[LearnProgressDot, ...] | list[dict] | tuple[dict, ...],
+    ) -> LearnLessonLoaded:
+        # Accept either pre-built LearnProgressDot tuples OR raw dicts (the
+        # JSON-fixture-loaded path); normalise to a tuple of LearnProgressDot.
+        dots: tuple[LearnProgressDot, ...]
+        if progress_dots and isinstance(progress_dots[0], dict):  # type: ignore[index]
+            dots = tuple(
+                LearnProgressDot(
+                    lesson_id=d["lesson_id"],
+                    status=d["status"],  # type: ignore[arg-type]
+                )
+                for d in progress_dots  # type: ignore[union-attr]
+            )
+        else:
+            dots = tuple(progress_dots)  # type: ignore[arg-type]
+        return cls(
+            type="ipc.learn.lesson_loaded",
+            ts=_now_iso(),
+            payload=LearnLessonLoadedPayload(
+                course_id=course_id,
+                lesson_id=lesson_id,
+                title=title,
+                controller_id=controller_id,
+                progress_dots=dots,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.highlight ----------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnExpectedAction:
+    """Nested ``expected_action`` object inside ``LearnHighlight.payload``.
+
+    The schema marks ``deck`` / ``direction`` / ``min_delta`` as optional;
+    we model defaults so the dataclass stays ergonomic while ``_serialize``
+    drops nothing (the schema's ``additionalProperties: false`` would reject
+    spurious keys, so we ALWAYS emit all four — empty-string sentinels are
+    the schema-allowed "absent" value for the enum fields)."""
+
+    type: Literal["cc", "button"]
+    control: str
+    deck: Literal["", "A", "B", "C", "D"] = ""
+    direction: Literal["", "up", "down"] = ""
+    min_delta: int = 0  # 0..127; 0 means "no minimum delta requirement"
+
+
+@dataclass(frozen=True, slots=True)
+class LearnHighlightPayload:
+    """Payload of ``ipc.learn.highlight``. Dual-channel cue (color + shape)
+    for color-blind a11y; ≤16 ms paint budget pinned by
+    ``tauri/ui/tests/learn/highlight-paint.test.ts``."""
+
+    control_id: str
+    deck: Literal["", "A", "B", "C", "D"]
+    cue_color: Literal["amber", "warning"]
+    cue_shape: Literal["pulse-ring", "static-glow"]
+    annotation: str  # ≤200 chars
+    expected_action: LearnExpectedAction
+
+
+@dataclass(frozen=True, slots=True)
+class LearnHighlight:
+    """``ipc.learn.highlight`` envelope wrapper (sidecar → shell)."""
+
+    type: Literal["ipc.learn.highlight"]
+    ts: str
+    payload: LearnHighlightPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        control_id: str,
+        deck: str,
+        cue_color: str,
+        cue_shape: str,
+        annotation: str = "",
+        expected_action: LearnExpectedAction | dict,
+    ) -> LearnHighlight:
+        # Accept dataclass OR raw dict (the JSON-fixture-loaded path).
+        ea: LearnExpectedAction
+        if isinstance(expected_action, dict):
+            ea = LearnExpectedAction(
+                type=expected_action["type"],  # type: ignore[arg-type]
+                control=expected_action["control"],
+                deck=expected_action.get("deck", ""),  # type: ignore[arg-type]
+                direction=expected_action.get("direction", ""),  # type: ignore[arg-type]
+                min_delta=int(expected_action.get("min_delta", 0)),
+            )
+        else:
+            ea = expected_action
+        return cls(
+            type="ipc.learn.highlight",
+            ts=_now_iso(),
+            payload=LearnHighlightPayload(
+                control_id=control_id,
+                deck=deck,  # type: ignore[arg-type]
+                cue_color=cue_color,  # type: ignore[arg-type]
+                cue_shape=cue_shape,  # type: ignore[arg-type]
+                annotation=annotation,
+                expected_action=ea,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.advance ------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnAdvancePayload:
+    """Payload of ``ipc.learn.advance``. Bidirectional: shell emits on
+    user-initiated skip; sidecar emits on MIDI-matched advance."""
+
+    lesson_id: str
+    reason: Literal["action_matched", "user_skip"]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnAdvance:
+    """``ipc.learn.advance`` envelope wrapper (bidirectional)."""
+
+    type: Literal["ipc.learn.advance"]
+    ts: str
+    payload: LearnAdvancePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        lesson_id: str,
+        reason: str,
+    ) -> LearnAdvance:
+        return cls(
+            type="ipc.learn.advance",
+            ts=_now_iso(),
+            payload=LearnAdvancePayload(
+                lesson_id=lesson_id,
+                reason=reason,  # type: ignore[arg-type]
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.ack ----------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnAckPayload:
+    """Payload of ``ipc.learn.ack``. User touched a physical control (source
+    = "midi") or clicked a control in the rendered SVG (source = "click").
+    ``value`` is the MIDI CC value 0..127; ``direction`` distinguishes
+    encoder turns when relevant."""
+
+    control_id: str
+    source: Literal["midi", "click"]
+    # Schema marks these optional; we keep dataclass-side defaults so call
+    # sites stay ergonomic. The schema's additionalProperties: false ensures
+    # only declared fields land on the wire.
+    value: int = 0
+    direction: Literal["", "up", "down"] = ""
+
+
+@dataclass(frozen=True, slots=True)
+class LearnAck:
+    """``ipc.learn.ack`` envelope wrapper (shell → sidecar)."""
+
+    type: Literal["ipc.learn.ack"]
+    ts: str
+    payload: LearnAckPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        control_id: str,
+        source: str,
+        value: int = 0,
+        direction: str = "",
+    ) -> LearnAck:
+        return cls(
+            type="ipc.learn.ack",
+            ts=_now_iso(),
+            payload=LearnAckPayload(
+                control_id=control_id,
+                source=source,  # type: ignore[arg-type]
+                value=int(value),
+                direction=direction,  # type: ignore[arg-type]
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.tutor_speak --------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnTutorSpeakPayload:
+    """Payload of ``ipc.learn.tutor_speak``. Narration from the AI tutor.
+
+    The ``text`` ALWAYS comes from a JSON fixture (anti-slop invariant —
+    NEVER LLM-generated at runtime). ``citations[]`` is empty in P92;
+    P93+ populates with ``[exemplar:<id>]`` entries; P96+ may add
+    ``[cue:<anchor_id>]``. Schema regex already pre-allows both sources.
+    """
+
+    text: str  # 1..280 chars
+    tts_marker: str  # 1..64 chars
+    # tuple of citation tokens, each matching ^\[(track|exemplar|cue|ev|
+    # aud|midi|screen|mix|tend|key|recall):.+\]$ — maxItems 4 schema-side.
+    citations: tuple[str, ...]
+    data_state: Literal["active", "hint"]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnTutorSpeak:
+    """``ipc.learn.tutor_speak`` envelope wrapper (sidecar → shell)."""
+
+    type: Literal["ipc.learn.tutor_speak"]
+    ts: str
+    payload: LearnTutorSpeakPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        text: str,
+        tts_marker: str,
+        citations: tuple[str, ...] | list[str] = (),
+        data_state: str = "active",
+    ) -> LearnTutorSpeak:
+        return cls(
+            type="ipc.learn.tutor_speak",
+            ts=_now_iso(),
+            payload=LearnTutorSpeakPayload(
+                text=text,
+                tts_marker=tts_marker,
+                citations=tuple(citations),
+                data_state=data_state,  # type: ignore[arg-type]
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.exemplar_play ------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnExemplarPlayPayload:
+    """Payload of ``ipc.learn.exemplar_play``. SHAPE ONLY in P92 — the audio
+    engine that actually plays the exemplar ships in P93."""
+
+    track_id: str
+    duration_s: float  # 0..300
+    gain_db: float  # -24..0
+
+
+@dataclass(frozen=True, slots=True)
+class LearnExemplarPlay:
+    """``ipc.learn.exemplar_play`` envelope wrapper (sidecar → shell)."""
+
+    type: Literal["ipc.learn.exemplar_play"]
+    ts: str
+    payload: LearnExemplarPlayPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        track_id: str,
+        duration_s: float,
+        gain_db: float,
+    ) -> LearnExemplarPlay:
+        return cls(
+            type="ipc.learn.exemplar_play",
+            ts=_now_iso(),
+            payload=LearnExemplarPlayPayload(
+                track_id=track_id,
+                duration_s=float(duration_s),
+                gain_db=float(gain_db),
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.exemplar_stop ------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnExemplarStopPayload:
+    """Payload of ``ipc.learn.exemplar_stop``. SHAPE ONLY in P92."""
+
+    track_id: str
+    reason: Literal["completed", "interrupted"]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnExemplarStop:
+    """``ipc.learn.exemplar_stop`` envelope wrapper (sidecar → shell)."""
+
+    type: Literal["ipc.learn.exemplar_stop"]
+    ts: str
+    payload: LearnExemplarStopPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        track_id: str,
+        reason: str,
+    ) -> LearnExemplarStop:
+        return cls(
+            type="ipc.learn.exemplar_stop",
+            ts=_now_iso(),
+            payload=LearnExemplarStopPayload(
+                track_id=track_id,
+                reason=reason,  # type: ignore[arg-type]
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.progress_state -----------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnProgressStatePayload:
+    """Payload of ``ipc.learn.progress_state``.
+
+    Tri-mode envelope:
+      * ``action="snapshot"`` — sidecar pushes the current persisted state.
+      * ``action="reset"``    — shell requests a wipe (settings drawer button).
+      * ``action="reset_ack"`` — sidecar confirms wipe complete.
+
+    ``progress`` carries the schema-versioned payload; we model it as a plain
+    dict because the schema permits arbitrary string keys under both
+    ``courses`` and ``lessons`` (course_id / lesson_id are the dict keys,
+    not enum-bounded fields). Schema-side ``additionalProperties: false``
+    on the inner objects ensures only declared per-row fields land on the
+    wire. ``was_recovered`` flags a corruption-recovery snapshot (the file
+    was nuked + re-emit-empty).
+    """
+
+    action: Literal["snapshot", "reset", "reset_ack"]
+    # Optional fields — defaults keep the dataclass ergonomic; the schema
+    # allows them to be absent. We always emit ``was_recovered`` (default
+    # False) but only emit ``progress`` when it is materially present.
+    was_recovered: bool = False
+    progress: dict | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LearnProgressState:
+    """``ipc.learn.progress_state`` envelope wrapper (bidirectional)."""
+
+    type: Literal["ipc.learn.progress_state"]
+    ts: str
+    payload: LearnProgressStatePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        action: str,
+        was_recovered: bool = False,
+        progress: dict | None = None,
+    ) -> LearnProgressState:
+        return cls(
+            type="ipc.learn.progress_state",
+            ts=_now_iso(),
+            payload=LearnProgressStatePayload(
+                action=action,  # type: ignore[arg-type]
+                was_recovered=bool(was_recovered),
+                progress=progress,
+            ),
+        )
+
+    def to_json(self) -> str:
+        # The schema marks ``progress`` as optional and only allows
+        # ``type: "object"`` (no null union); reset / reset_ack envelopes
+        # omit ``progress`` entirely. We strip ``progress`` from the wire
+        # payload when it is None — mirrors the SessionMute.to_json
+        # pattern in messages.py (file:line src/vibemix/ui_bus/
+        # messages.py:864-870) that drops None payload fields before
+        # validating.
+        from dataclasses import asdict
+
+        from vibemix.ui_bus.messages import _tuples_to_lists, _validate
+
+        d = _tuples_to_lists(asdict(self))
+        d["payload"] = {k: v for k, v in d["payload"].items() if v is not None}
+        _validate(d)
+        return json.dumps(d, separators=(",", ":"))
+
+    def to_dict(self) -> dict:
         return json.loads(self.to_json())
