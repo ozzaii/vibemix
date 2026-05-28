@@ -169,8 +169,8 @@
 | LESSON-04 | Phase 92 — Lesson Runtime + Highlight Contract | Complete |
 | LESSON-05 | Phase 92 — Lesson Runtime + Highlight Contract | Complete |
 | LESSON-06 | Phase 92 — Lesson Runtime + Highlight Contract | Complete (P92-01 — learn_tutor route) |
-| EXEMPLAR-01 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Pending |
-| EXEMPLAR-02 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Pending |
+| EXEMPLAR-01 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Partial (P93-02 — band_share_store + compute_band_shares + persistence layer SHIPPED; ranker `ExemplarFinder.find()` awaits 93-03) |
+| EXEMPLAR-02 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Partial (P93-02 — `_kick_correlation` + 0.8 threshold gate SHIPPED with spectral-leakage fix; full `ExemplarFinder.find()` rank+exclude awaits 93-03) |
 | EXEMPLAR-03 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Pending |
 | EXEMPLAR-04 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Pending |
 | EXEMPLAR-05 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Pending |
