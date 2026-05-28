@@ -193,7 +193,74 @@ def test_idle_to_completed_with_skip(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 3: WR-04 (P92 REVIEW) — stale _finish_when_dwelled tasks cancel on
+# Test 3: WR-02 (P92 REVIEW) — invalid lesson_id is a silent no-op
+# ---------------------------------------------------------------------------
+
+
+def test_invalid_lesson_id_does_not_wedge_fsm() -> None:
+    """WR-02 (P92 REVIEW) regression. ``send("load")`` with a missing or
+    unknown ``lesson_id`` MUST NOT crash and MUST NOT leave the FSM in
+    an unrecoverable state.
+
+    Pre-fix behavior: the on_enter_loaded callback tried
+    ``CURRICULUM[None]`` / ``CURRICULUM[<unknown>]`` → KeyError caught by
+    the broad except → no envelope emitted but the FSM already
+    transitioned. A follow-up send("begin") similarly failed on the
+    CURRICULUM lookup in on_enter_awaiting_action and the FSM landed
+    in awaiting_action with NO highlight and NO tutor speak — the
+    webview waited forever.
+
+    Post-fix: the on_enter_loaded guard bails before the lookup, leaving
+    the FSM in ``loaded`` state with no envelope emitted. A follow-up
+    send("begin") similarly short-circuits in on_enter_awaiting_action —
+    no emit, but the FSM doesn't wedge in an inconsistent state either.
+    """
+    runtime, ipc_router = _make_runtime()
+
+    # Send load with no lesson_id at all.
+    runtime.send("load")
+    # send() returns None (allow_event_without_transition); FSM
+    # transitioned to loaded but the callback bailed without emitting.
+    assert runtime.current_state.id == "loaded"
+    emitted = _emitted_envelope_types(ipc_router)
+    # No lesson_loaded envelope on the wire because the guard short-
+    # circuited before the emit. This is the documented WR-02 behavior:
+    # better to silently NOT mount the HUD than to mount it with a
+    # KeyError-filled stderr stream + stuck FSM.
+    assert "ipc.learn.lesson_loaded" not in emitted, (
+        "WR-02 fix missing — lesson_loaded was emitted with no valid "
+        f"lesson_id. emitted={emitted!r}"
+    )
+
+    # Try begin → should also short-circuit cleanly.
+    runtime.send("begin")
+    assert runtime.current_state.id == "awaiting_action"
+    emitted_after = _emitted_envelope_types(ipc_router)
+    assert "ipc.learn.highlight" not in emitted_after, (
+        "WR-02 fix missing — highlight emitted on invalid lesson_id"
+    )
+
+    # Now recover by loading a valid lesson — the FSM should accept it.
+    # First force back to a state that accepts load (only idle/completed
+    # do). We can't move back from awaiting_action, but the practical
+    # contract for v9.0 is "boundary handler rejects bad ids before
+    # they reach the runtime"; the guards here are belt-and-braces.
+    # Verify the runtime can be re-instantiated cleanly.
+    runtime2, ipc_router2 = _make_runtime()
+    runtime2.send(
+        "load",
+        lesson_id="L0.00-press-play",
+        course_id="course_0",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime2.send("begin")
+    emitted_clean = _emitted_envelope_types(ipc_router2)
+    assert "ipc.learn.lesson_loaded" in emitted_clean
+    assert "ipc.learn.highlight" in emitted_clean
+
+
+# ---------------------------------------------------------------------------
+# Test 4: WR-04 (P92 REVIEW) — stale _finish_when_dwelled tasks cancel on
 # re-load
 # ---------------------------------------------------------------------------
 

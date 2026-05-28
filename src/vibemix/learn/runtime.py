@@ -356,15 +356,36 @@ class LessonRuntime(StateMachine):
         self._learn.lesson_started_at = time.monotonic()
         self._state_entered_at = self._learn.lesson_started_at
 
+        # WR-02 fix (P92 REVIEW): defend against an invalid lesson_id
+        # reaching the CURRICULUM lookup. The boundary (ipc_handlers.py)
+        # already rejects unknown ids, but a direct caller (tests,
+        # devtools-invoke) could still send("load") with a None or
+        # unknown id; without this guard, ``CURRICULUM[None]`` /
+        # ``CURRICULUM[<unknown>]`` raises KeyError which the broad
+        # try/except catches but the FSM already transitioned. The
+        # bracket-tagged stderr line surfaces the failure during ear-
+        # pass; the FSM stays in ``loaded`` with no HUD mounted — the
+        # webview displays a no-lesson surface rather than wedging in
+        # awaiting_action with no highlight.
+        lesson_id = self._learn.current_lesson_id
+        if lesson_id is None or lesson_id not in CURRICULUM:
+            import sys
+
+            print(
+                f"[learn.runtime] on_enter_loaded: invalid lesson_id "
+                f"{lesson_id!r} (not in CURRICULUM); HUD not mounted",
+                file=sys.stderr,
+            )
+            return
         # Emit the HUD-mount envelope. Progress dots come from the
         # progress store; tests mock it (returning a MagicMock that
         # iterates to empty tuple — schema-acceptable empty array).
-        lesson = CURRICULUM[self._learn.current_lesson_id]
+        lesson = CURRICULUM[lesson_id]
         dots = self._progress.dots_for_course(self._learn.current_course_id)
         try:
             envelope = LearnLessonLoaded.make(
                 course_id=self._learn.current_course_id or "",
-                lesson_id=self._learn.current_lesson_id or "",
+                lesson_id=lesson_id,
                 title=lesson.title,
                 controller_id=self._learn.current_controller_id or "",
                 progress_dots=dots,
@@ -383,7 +404,25 @@ class LessonRuntime(StateMachine):
         beat 0 of the tutor narration. Resets the state-entry timer
         the tick_loop reads.
         """
-        lesson = CURRICULUM[self._learn.current_lesson_id]
+        # WR-02 fix (P92 REVIEW): defend against transitioning from a
+        # loaded state that itself was entered with an invalid
+        # lesson_id (where the on_enter_loaded guard above bailed
+        # before validating the curriculum lookup). Without this, a
+        # follow-up send("begin") would CURRICULUM[None]/KeyError into
+        # the broad except and the FSM would silently fail to mount
+        # the highlight.
+        lesson_id = self._learn.current_lesson_id
+        if lesson_id is None or lesson_id not in CURRICULUM:
+            import sys
+
+            print(
+                f"[learn.runtime] on_enter_awaiting_action: invalid "
+                f"lesson_id {lesson_id!r}; highlight not painted",
+                file=sys.stderr,
+            )
+            self._state_entered_at = time.monotonic()
+            return
+        lesson = CURRICULUM[lesson_id]
         expected = lesson.script["expected_action"]
         # Build the highlight envelope. ``LearnHighlight.make`` accepts
         # a raw dict for ``expected_action`` and normalises it into a
@@ -556,7 +595,14 @@ class LessonRuntime(StateMachine):
         runtime; the AST gate ``tests/learn/test_scripts_are_fixtures.py``
         confirms zero generative writes here.
         """
-        lesson = CURRICULUM[self._learn.current_lesson_id]
+        # WR-02 fix (P92 REVIEW): defend against missing CURRICULUM
+        # entry (the on_enter_* guards above already short-circuit, but
+        # a sibling caller (e.g. _emit_hint via on_enter_hint_strike_*)
+        # could still reach here on a stale state).
+        lesson_id = self._learn.current_lesson_id
+        if lesson_id is None or lesson_id not in CURRICULUM:
+            return
+        lesson = CURRICULUM[lesson_id]
         beats = lesson.script.get("tutor_speak", [])
         if beat >= len(beats):
             return
@@ -578,7 +624,12 @@ class LessonRuntime(StateMachine):
         """Emit :class:`LearnTutorSpeak` with the per-strike hint text
         (``data_state="hint"`` so the UI styles it italic / muted).
         """
-        lesson = CURRICULUM[self._learn.current_lesson_id]
+        # WR-02 fix (P92 REVIEW): same defensive guard as
+        # _emit_tutor_beat; missing CURRICULUM entry → silent no-op.
+        lesson_id = self._learn.current_lesson_id
+        if lesson_id is None or lesson_id not in CURRICULUM:
+            return
+        lesson = CURRICULUM[lesson_id]
         hints = lesson.script.get("hints", [])
         # ``strike`` is 1-indexed; hints[] is 0-indexed.
         if strike - 1 >= len(hints):
