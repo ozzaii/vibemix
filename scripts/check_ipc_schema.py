@@ -56,8 +56,20 @@ from vibemix.ui_bus import (
     DeviceInfo,
     IpcBoot,
     IpcError,
+    LearnAck,
+    LearnAdvance,
+    LearnCompleteLesson,
     LearnControllerDetected,
+    LearnExemplarPlay,
+    LearnExemplarStop,
+    LearnHighlight,
+    LearnLessonLoaded,
     LearnMidiPosition,
+    LearnProgressDot,
+    LearnProgressState,
+    LearnStartCourse,
+    LearnStartLesson,
+    LearnTutorSpeak,
     LevelPair,
     LibraryConfidence,
     LibraryImport,
@@ -500,13 +512,147 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 positions={"eq_hi:A": 64, "xfader": 64},
             ),
         ),
+        # Phase 92 Plan 92-01 — 11 lesson-runtime envelopes.
+        (
+            "LearnStartCourse",
+            LearnStartCourse.make(
+                course_id="course_0",
+                controller_id="pioneer_ddj_flx4",
+            ),
+        ),
+        (
+            "LearnStartLesson",
+            LearnStartLesson.make(
+                lesson_id="L0.00-press-play",
+                level="fresh",
+            ),
+        ),
+        (
+            "LearnCompleteLesson",
+            LearnCompleteLesson.make(
+                lesson_id="L0.00-press-play",
+                reason="completed",
+            ),
+        ),
+        (
+            "LearnLessonLoaded",
+            LearnLessonLoaded.make(
+                course_id="course_0",
+                lesson_id="L0.00-press-play",
+                title="press play",
+                controller_id="pioneer_ddj_flx4",
+                progress_dots=(
+                    LearnProgressDot(
+                        lesson_id="L0.00-press-play",
+                        status="current",
+                    ),
+                ),
+            ),
+        ),
+        (
+            "LearnHighlight",
+            LearnHighlight.make(
+                control_id="play",
+                deck="A",
+                cue_color="amber",
+                cue_shape="pulse-ring",
+                annotation="press play",
+                expected_action={
+                    "type": "button",
+                    "control": "play",
+                    "deck": "A",
+                    "direction": "down",
+                },
+            ),
+        ),
+        (
+            "LearnAdvance",
+            LearnAdvance.make(
+                lesson_id="L0.00-press-play",
+                reason="action_matched",
+            ),
+        ),
+        (
+            "LearnAck",
+            LearnAck.make(
+                control_id="play:A",
+                source="midi",
+                value=127,
+                direction="down",
+            ),
+        ),
+        (
+            "LearnTutorSpeak",
+            LearnTutorSpeak.make(
+                text="find deck A play button",
+                tts_marker="L000.beat0",
+                citations=(),
+                data_state="active",
+            ),
+        ),
+        (
+            "LearnExemplarPlay",
+            LearnExemplarPlay.make(
+                track_id="track_0001",
+                duration_s=30.0,
+                gain_db=-12.0,
+            ),
+        ),
+        (
+            "LearnExemplarStop",
+            LearnExemplarStop.make(
+                track_id="track_0001",
+                reason="completed",
+            ),
+        ),
+        (
+            "LearnProgressState",
+            LearnProgressState.make(
+                action="snapshot",
+                progress={
+                    "schema_version": 1,
+                    "courses": {},
+                    "lessons": {},
+                },
+            ),
+        ),
     ]
 
 
+def _is_envelope_type_field(type_field) -> bool:  # type: ignore[no-untyped-def]
+    """Return True iff ``type_field`` is the envelope-discriminator field
+    (``type: Literal["ipc.xxx.yyy"]``). False for nested-object types like
+    ``LearnExpectedAction.type: Literal["cc", "button"]`` which use ``type``
+    as a sub-domain discriminator (RESEARCH.md Pitfall 7 — heuristic collision).
+
+    Implementation: introspect the dataclass field's annotation; the
+    canonical ``ipc.*`` literal namespace is the only valid envelope
+    discriminator. Anything else (``cc``/``button``, etc.) is a nested
+    dataclass that happens to share the ``type`` field name.
+    """
+    # Phase 92 fix: type_field.type can be a string forward-ref (when
+    # ``from __future__ import annotations`` is active) OR a typing object.
+    # In both cases the substring ``"ipc.`` is the load-bearing marker.
+    raw = getattr(type_field, "type", None)
+    if raw is None:
+        return False
+    # Stringified form (forward-ref): the annotation source is the raw string
+    # like ``Literal["ipc.learn.start_course"]`` — substring match is robust.
+    if isinstance(raw, str):
+        return '"ipc.' in raw or "'ipc." in raw
+    # Typing-object form: stringify and check the same substring.
+    return '"ipc.' in repr(raw) or "'ipc." in repr(raw)
+
+
 def _count_wrapper_dataclasses() -> int:
-    """Wrapper dataclasses == dataclasses with a ``type`` field in their
-    ``__dataclass_fields__``. Excludes payload-only structs (``*Payload`` /
-    ``DeviceInfo`` / ``WindowInfo``) because they have no ``type`` field.
+    """Wrapper dataclasses == dataclasses with a ``type`` field whose
+    annotation is ``Literal["ipc.<domain>.<verb>"]`` (the envelope-
+    discriminator literal). Excludes payload-only structs (``*Payload`` /
+    ``DeviceInfo`` / ``WindowInfo``) because they have no ``type`` field,
+    AND excludes nested dataclasses that re-use the ``type`` field name
+    for a sub-domain discriminator (e.g. ``LearnExpectedAction.type:
+    Literal["cc", "button"]`` lives inside ``LearnHighlight.payload`` but
+    is not itself a top-level envelope — RESEARCH.md Pitfall 7).
 
     Phase 91 RENDER-01 split the Learn-envelope wrappers into a sibling
     module (``learn_messages.py``) per the plan's modular-naming
@@ -522,6 +668,7 @@ def _count_wrapper_dataclasses() -> int:
                 isinstance(obj, type)
                 and hasattr(obj, "__dataclass_fields__")
                 and "type" in obj.__dataclass_fields__
+                and _is_envelope_type_field(obj.__dataclass_fields__["type"])
                 and obj not in seen
             ):
                 seen.add(obj)

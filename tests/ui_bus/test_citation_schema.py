@@ -164,8 +164,21 @@ def test_count_parity_python_vs_schema() -> None:
 
     Phase 91 Plan 01 split the Learn-envelope wrappers into a sibling
     module (``learn_messages.py``); introspection scans both modules
-    to keep the invariant aware of every wrapper.
+    to keep the invariant aware of every wrapper. Phase 92 Plan 92-01
+    adds nested dataclasses like ``LearnExpectedAction`` that re-use
+    the ``type`` field name for a sub-domain discriminator
+    (``Literal["cc", "button"]``); the predicate below filters on the
+    ``type`` field annotation starting with ``Literal["ipc.`` to avoid
+    counting them as top-level envelopes.
     """
+    def _is_envelope_type_field(type_field) -> bool:
+        raw = getattr(type_field, "type", None)
+        if raw is None:
+            return False
+        if isinstance(raw, str):
+            return '"ipc.' in raw or "'ipc." in raw
+        return '"ipc.' in repr(raw) or "'ipc." in repr(raw)
+
     oneof_count = len(_SCHEMA["oneOf"])
     seen: set[type] = set()
     wrapper_count = 0
@@ -174,6 +187,7 @@ def test_count_parity_python_vs_schema() -> None:
             if (
                 hasattr(obj, "__dataclass_fields__")
                 and "type" in obj.__dataclass_fields__
+                and _is_envelope_type_field(obj.__dataclass_fields__["type"])
                 and obj not in seen
             ):
                 seen.add(obj)

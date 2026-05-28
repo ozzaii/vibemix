@@ -265,7 +265,7 @@ def test_recordings_events_result_accepts_empty_events_array() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_count_parity_at_66() -> None:
+def test_count_parity_at_77() -> None:
     """Phase 15 Plan 01 bumped the IPC count 27 → 34 (+7 recordings.* families);
     Phase 20-04 added SessionCitation → 35; Phase 24-02 added
     SessionOverlayHighlight → 36; Phase 25 Plan 25-03 added 3 DEBRIEF
@@ -280,11 +280,31 @@ def test_count_parity_at_66() -> None:
     44 Plan 44-03 adds 1 (SessionCohostReaction — LAUNCH-02 anti-slop
     citation strip broadcast) → 64. Phase 91 Plan 01 adds 2 (learn.*
     envelopes — LearnControllerDetected + LearnMidiPosition; wrappers
-    live in ``learn_messages.py``, a sibling module) → 66. Both sides —
-    schema oneOf and Python wrapper dataclasses — must match exactly.
+    live in ``learn_messages.py``, a sibling module) → 66. Phase 92 Plan
+    92-01 adds 11 (learn.* lesson-runtime envelopes — LearnStartCourse /
+    LearnStartLesson / LearnCompleteLesson / LearnLessonLoaded /
+    LearnHighlight / LearnAdvance / LearnAck / LearnTutorSpeak /
+    LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 77.
+    Both sides — schema oneOf and Python wrapper dataclasses — must match
+    exactly.
+
+    The introspection MUST filter on the ``type`` field's annotation
+    starting with ``Literal["ipc.`` — nested dataclasses like
+    ``LearnExpectedAction`` re-use the ``type`` field name for a sub-domain
+    discriminator (``Literal["cc", "button"]``) and would otherwise
+    false-positive the count (see scripts/check_ipc_schema.py
+    ``_is_envelope_type_field`` for the canonical predicate).
     """
     from vibemix.ui_bus import learn_messages as ui_bus_learn_messages
     from vibemix.ui_bus import messages as ui_bus_messages
+
+    def _is_envelope_type_field(type_field) -> bool:
+        raw = getattr(type_field, "type", None)
+        if raw is None:
+            return False
+        if isinstance(raw, str):
+            return '"ipc.' in raw or "'ipc." in raw
+        return '"ipc.' in repr(raw) or "'ipc." in repr(raw)
 
     seen: set[type] = set()
     wrapper_count = 0
@@ -295,13 +315,14 @@ def test_count_parity_at_66() -> None:
                 isinstance(obj, type)
                 and hasattr(obj, "__dataclass_fields__")
                 and "type" in obj.__dataclass_fields__
+                and _is_envelope_type_field(obj.__dataclass_fields__["type"])
                 and obj not in seen
             ):
                 seen.add(obj)
                 wrapper_count += 1
 
-    assert len(_SCHEMA["oneOf"]) == 66, "schema oneOf count should be 66 after Plan 91-01"
-    assert wrapper_count == 66, f"wrapper count {wrapper_count} != 66"
+    assert len(_SCHEMA["oneOf"]) == 77, "schema oneOf count should be 77 after Plan 92-01"
+    assert wrapper_count == 77, f"wrapper count {wrapper_count} != 77"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

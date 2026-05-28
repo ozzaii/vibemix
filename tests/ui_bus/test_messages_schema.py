@@ -29,6 +29,20 @@ from vibemix.ui_bus import (
     # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn module envelopes.
     LearnControllerDetected,
     LearnMidiPosition,
+    # Phase 92 LESSON-01..LESSON-06 / TONE-02 / TONE-04 / RENDER-04 — Learn
+    # lesson-runtime envelopes + AI highlight contract.
+    LearnAck,
+    LearnAdvance,
+    LearnCompleteLesson,
+    LearnExemplarPlay,
+    LearnExemplarStop,
+    LearnHighlight,
+    LearnLessonLoaded,
+    LearnProgressDot,
+    LearnProgressState,
+    LearnStartCourse,
+    LearnStartLesson,
+    LearnTutorSpeak,
     CalibrationAudioResult,
     CalibrationDeviceList,
     CalibrationListDevices,
@@ -512,6 +526,110 @@ def _make_examples() -> list[tuple[str, object]]:
                 positions={"eq_hi:A": 64, "xfader": 64},
             ),
         ),
+        # Phase 92 Plan 92-01 — 11 lesson-runtime envelopes.
+        (
+            "LearnStartCourse",
+            LearnStartCourse.make(
+                course_id="course_0",
+                controller_id="pioneer_ddj_flx4",
+            ),
+        ),
+        (
+            "LearnStartLesson",
+            LearnStartLesson.make(
+                lesson_id="L0.00-press-play",
+                level="fresh",
+            ),
+        ),
+        (
+            "LearnCompleteLesson",
+            LearnCompleteLesson.make(
+                lesson_id="L0.00-press-play",
+                reason="completed",
+            ),
+        ),
+        (
+            "LearnLessonLoaded",
+            LearnLessonLoaded.make(
+                course_id="course_0",
+                lesson_id="L0.00-press-play",
+                title="press play",
+                controller_id="pioneer_ddj_flx4",
+                progress_dots=(
+                    LearnProgressDot(
+                        lesson_id="L0.00-press-play",
+                        status="current",
+                    ),
+                ),
+            ),
+        ),
+        (
+            "LearnHighlight",
+            LearnHighlight.make(
+                control_id="play",
+                deck="A",
+                cue_color="amber",
+                cue_shape="pulse-ring",
+                annotation="press play",
+                expected_action={
+                    "type": "button",
+                    "control": "play",
+                    "deck": "A",
+                    "direction": "down",
+                },
+            ),
+        ),
+        (
+            "LearnAdvance",
+            LearnAdvance.make(
+                lesson_id="L0.00-press-play",
+                reason="action_matched",
+            ),
+        ),
+        (
+            "LearnAck",
+            LearnAck.make(
+                control_id="play:A",
+                source="midi",
+                value=127,
+                direction="down",
+            ),
+        ),
+        (
+            "LearnTutorSpeak",
+            LearnTutorSpeak.make(
+                text="find deck A play button",
+                tts_marker="L000.beat0",
+                citations=(),
+                data_state="active",
+            ),
+        ),
+        (
+            "LearnExemplarPlay",
+            LearnExemplarPlay.make(
+                track_id="track_0001",
+                duration_s=30.0,
+                gain_db=-12.0,
+            ),
+        ),
+        (
+            "LearnExemplarStop",
+            LearnExemplarStop.make(
+                track_id="track_0001",
+                reason="completed",
+            ),
+        ),
+        (
+            "LearnProgressState",
+            LearnProgressState.make(
+                action="snapshot",
+                progress={
+                    "schema_version": 1,
+                    "courses": {},
+                    "lessons": {},
+                },
+            ),
+        ),
     ]
 
 
@@ -542,8 +660,13 @@ def test_example_count_matches_schema_oneof() -> None:
     Phase 44 Plan 44-03 adds 1 (SessionCohostReaction — LAUNCH-02 anti-slop
     citation strip broadcast) → 64. Phase 91 Plan 01 adds 2 (learn.*
     envelopes — LearnControllerDetected + LearnMidiPosition) → 66.
+    Phase 92 Plan 92-01 adds 11 (learn.* lesson-runtime envelopes —
+    LearnStartCourse / LearnStartLesson / LearnCompleteLesson /
+    LearnLessonLoaded / LearnHighlight / LearnAdvance / LearnAck /
+    LearnTutorSpeak / LearnExemplarPlay / LearnExemplarStop /
+    LearnProgressState) → 77.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 66
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 77
 
 
 @pytest.mark.parametrize(
@@ -565,7 +688,7 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_66() -> None:
+def test_schema_oneof_count_is_77() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
     7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35;
@@ -577,7 +700,11 @@ def test_schema_oneof_count_is_66() -> None:
     regenerate_result/delete/delete_ack) → 63. Phase 44 Plan 44-03 adds 1
     (SessionCohostReaction — LAUNCH-02 anti-slop citation strip
     broadcast) → 64. Phase 91 Plan 01 adds 2 (learn.* envelopes —
-    LearnControllerDetected + LearnMidiPosition) → 66.
+    LearnControllerDetected + LearnMidiPosition) → 66. Phase 92 Plan 92-01
+    adds 11 (learn.* lesson-runtime envelopes — LearnStartCourse /
+    LearnStartLesson / LearnCompleteLesson / LearnLessonLoaded /
+    LearnHighlight / LearnAdvance / LearnAck / LearnTutorSpeak /
+    LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 77.
 
     ``definitions`` count grows alongside oneOf since every new wrapper
     adds one entry to both. ``LevelPair`` is a shared helper ref'd from
@@ -585,8 +712,8 @@ def test_schema_oneof_count_is_66() -> None:
     (so it counts in ``definitions`` but not in ``oneOf``); the skew
     between the two counts stays at 1.
     """
-    assert len(_SCHEMA["oneOf"]) == 66
-    assert len(_SCHEMA["definitions"]) == 67
+    assert len(_SCHEMA["oneOf"]) == 77
+    assert len(_SCHEMA["definitions"]) == 78
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

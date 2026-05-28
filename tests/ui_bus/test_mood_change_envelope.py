@@ -123,11 +123,28 @@ def test_count_parity_holds_after_addition():
     SessionCohostReaction — LAUNCH-02). Plan 91-01 grows both 64 → 66 (+2
     learn.* envelopes — LearnControllerDetected + LearnMidiPosition; the
     wrappers live in ``learn_messages.py``, a sibling module to
-    ``messages.py``). The check_ipc_schema.py invariant is what fails the
-    CI build if either side regresses, so we assert it here directly.
+    ``messages.py``). Plan 92-01 grows both 66 → 77 (+11 learn.* lesson-
+    runtime envelopes — LearnStartCourse / LearnStartLesson /
+    LearnCompleteLesson / LearnLessonLoaded / LearnHighlight /
+    LearnAdvance / LearnAck / LearnTutorSpeak / LearnExemplarPlay /
+    LearnExemplarStop / LearnProgressState). The check_ipc_schema.py
+    invariant is what fails the CI build if either side regresses, so we
+    assert it here directly. Introspection must filter on the ``type``
+    field annotation starting with ``Literal["ipc.`` so nested
+    dataclasses like ``LearnExpectedAction`` (whose ``type`` is the cc /
+    button sub-discriminator inside ``LearnHighlight.payload``) don't
+    false-positive the count.
     """
     from vibemix.ui_bus import learn_messages as ui_bus_learn_messages
     from vibemix.ui_bus import messages as ui_bus_messages
+
+    def _is_envelope_type_field(type_field) -> bool:
+        raw = getattr(type_field, "type", None)
+        if raw is None:
+            return False
+        if isinstance(raw, str):
+            return '"ipc.' in raw or "'ipc." in raw
+        return '"ipc.' in repr(raw) or "'ipc." in repr(raw)
 
     seen: set[type] = set()
     wrapper_count = 0
@@ -138,6 +155,7 @@ def test_count_parity_holds_after_addition():
                 isinstance(obj, type)
                 and hasattr(obj, "__dataclass_fields__")
                 and "type" in obj.__dataclass_fields__
+                and _is_envelope_type_field(obj.__dataclass_fields__["type"])
                 and obj not in seen
             ):
                 seen.add(obj)
@@ -150,9 +168,9 @@ def test_count_parity_holds_after_addition():
     schema = json.loads(schema_path.read_text())
     oneof_count = len(schema["oneOf"])
 
-    assert wrapper_count == oneof_count == 66, (
+    assert wrapper_count == oneof_count == 77, (
         f"count parity violated: wrappers={wrapper_count} vs oneOf={oneof_count}; "
-        "expected both 66 after Plan 91-01"
+        "expected both 77 after Plan 92-01"
     )
 
 
