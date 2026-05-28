@@ -41,6 +41,13 @@ builder of the envelope dicts.
 """
 from __future__ import annotations
 
+from vibemix.learn.band_share_store import (
+    BAND_SHARE_TABLE,
+    init_schema,
+    open_default_db,
+    top_for_band,
+)
+from vibemix.learn.band_share_store import upsert as upsert_band_shares
 from vibemix.learn.curriculum import COURSE_FRAMES, CURRICULUM, LessonMeta
 from vibemix.learn.midi_mirror import MidiMirror
 from vibemix.learn.progress import (
@@ -56,6 +63,7 @@ from vibemix.learn.runtime import LessonRuntime
 from vibemix.learn.state import LearnState
 
 __all__ = [
+    "BAND_SHARE_TABLE",
     "COURSE_FRAMES",
     "CURRICULUM",
     "LearnProgress",
@@ -65,8 +73,12 @@ __all__ = [
     "MidiMirror",
     "SCHEMA_VERSION",
     "build_tutor_system_instruction",
+    "init_schema",
     "load_progress",
+    "open_default_db",
     "progress_path",
     "reset_progress",
     "save_progress",
+    "top_for_band",
+    "upsert_band_shares",
 ]
