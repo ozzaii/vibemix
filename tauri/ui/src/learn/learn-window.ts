@@ -57,6 +57,14 @@ import {
   LessonSkipButton,
   type LessonSkipHandle,
 } from "./lesson/skip-button.js";
+import {
+  renderProgressList,
+  type ProgressListHandle,
+} from "./lesson/progress-list.js";
+import {
+  buildProgressEntries,
+  CURRICULUM_META,
+} from "./lesson/curriculum-meta.js";
 import { emitIpc } from "../ipc/client.js";
 
 interface ControllerDetectedPayload {
@@ -65,6 +73,19 @@ interface ControllerDetectedPayload {
   display_name: string;
   port_name: string;
 }
+
+/**
+ * Phase 97 / ONBOARD-07 + RENDER-08 — Trademark disclaimer copy (verbatim).
+ *
+ * Required to be present in two surfaces: the app's Learn-window footer
+ * (this constant) AND the repo README's Trademarks section. The
+ * `tests/learn/test_disclaimer_present.py` source-scan asserts both.
+ * Do not paraphrase — the wording is the legal posture for nominative
+ * fair use of the controller names + Pioneer / Hercules / Numark
+ * trademarks the rendered SVGs reference.
+ */
+export const TRADEMARK_DISCLAIMER =
+  "Visual representation for instructional use. DDJ-FLX4, XDJ-RX3, etc. are trademarks of AlphaTheta / Pioneer DJ. Inpulse is a trademark of Hercules. Numark is a trademark of inMusic Brands. vibemix is not affiliated with or endorsed by these manufacturers.";
 
 interface MidiPositionPayload {
   controller_id: string;
@@ -178,8 +199,10 @@ function mountLearnWindow(root: HTMLElement): {
   root.innerHTML = `
     <div id="learn-titlebar"></div>
     <div id="learn-stage" class="learn-stage"></div>
+    <aside id="learn-progress-list-host" class="learn-progress-list-host" data-visible="true"></aside>
     <div id="learn-status-bar"></div>
     <div id="learn-sr-announcement" class="learn-sr-announcement" aria-live="polite" aria-atomic="true"></div>
+    <footer id="learn-footer" class="learn-footer"></footer>
   `;
 
   const titlebar = new LearnTitlebar(
@@ -195,6 +218,44 @@ function mountLearnWindow(root: HTMLElement): {
   // First paint: empty state until ipc.learn.controller_detected lands.
   mountEmptyState(stageEl);
   status.setMirrorStatus("waiting");
+
+  // Phase 97 / ONBOARD-05 — Lesson progress list.
+  // Mounts as a sibling section under the stage; hides itself once a
+  // lesson is loaded (HUD takes over the surface). Clicks emit
+  // ipc.learn.start_lesson with the canonical slug-suffixed lesson_id
+  // matching the schema regex ^L[0-9]+\.[0-9]+-.+$. The component carries
+  // a `setStatus(lesson_id, status)` updater the progress_state handler
+  // calls to keep dot states current.
+  const progressListHost = root.querySelector(
+    "#learn-progress-list-host",
+  ) as HTMLElement;
+  let controllerDetected = false; // flipped by controller_detected handler
+  const progressList: ProgressListHandle = renderProgressList({
+    lessons: buildProgressEntries(null), // initial = all empty
+    showNoControllerHint: !controllerDetected,
+    onPickLesson: (lesson_id, level) => {
+      // Fire-and-forget ipc.learn.start_lesson. The runtime FSM picks
+      // up the lesson and emits lesson_loaded → highlight → tutor_speak
+      // back to the renderer; lesson-mode class flips on, and the
+      // progress-list host hides itself.
+      void emitIpc("ipc.learn.start_lesson", {
+        lesson_id,
+        level,
+      }).catch((err: unknown) => {
+        // eslint-disable-next-line no-console
+        console.warn("[learn] start_lesson emit failed:", err);
+      });
+    },
+  });
+  progressListHost.appendChild(progressList);
+
+  // Phase 97 / ONBOARD-07 + RENDER-08 — disclaimer footer.
+  // The verbatim copy lives in a module-level constant so the
+  // tests/learn/test_disclaimer_present.py source-scanner finds it
+  // deterministically (the test asserts the fragment appears in some
+  // .ts file under tauri/ui/src/learn/).
+  const footer = root.querySelector("#learn-footer") as HTMLElement;
+  footer.textContent = TRADEMARK_DISCLAIMER;
 
   // Phase 97 / ONBOARD-02 — first-launch tutor announce-by-name. On the
   // FIRST controller-connect event of this app run, the aria-live region
@@ -301,6 +362,12 @@ function mountLearnWindow(root: HTMLElement): {
     // Flip the lesson-mode class so the grid extends to host the HUD + dock.
     root.classList.add("lesson-mode");
 
+    // Phase 97 / ONBOARD-05 — hide the progress list once a lesson is
+    // active; the HUD takes over the surface. Visibility flag is a
+    // data-attribute so CSS controls display (avoids a layout shift on
+    // re-show after complete_lesson).
+    progressListHost.dataset.visible = "false";
+
     // Mount or refresh the HUD between titlebar + stage.
     if (lessonHud) {
       lessonHud.update(payload);
@@ -377,7 +444,8 @@ function mountLearnWindow(root: HTMLElement): {
 
   // ipc.learn.complete_lesson → no paint here; the runtime will follow up
   // with progress_state(snapshot) to refresh dot state. We track the
-  // lesson-end so the ack-emit listener stops firing.
+  // lesson-end so the ack-emit listener stops firing. Phase 97 also
+  // re-shows the progress list so the user can pick another lesson.
   window.addEventListener("ipc.learn.complete_lesson", (ev: Event) => {
     const payload = (ev as CustomEvent<CompleteLessonPayload>).detail;
     if (!payload) return;
@@ -389,6 +457,13 @@ function mountLearnWindow(root: HTMLElement): {
     if (tutorDock) tutorDock.hide();
     clearHighlight(stageEl);
     lastPositions = {};
+    // Phase 97 / ONBOARD-05 — surface the progress list again.
+    progressListHost.dataset.visible = "true";
+    // If we have a completed lesson_id, flip its dot to "completed"
+    // locally; the next progress_state(snapshot) re-confirms.
+    if (payload.lesson_id && payload.reason === "completed") {
+      progressList.setStatus(payload.lesson_id, "completed");
+    }
   });
 
   // ipc.learn.progress_state → refresh HUD dots; surface recovery / reset
@@ -401,11 +476,16 @@ function mountLearnWindow(root: HTMLElement): {
     } else if (payload.was_recovered) {
       showLearnToast("learn progress restored.");
     }
-    // Snapshot path: defer to a future plan that decides how to derive
-    // a HUD dot list from the multi-lesson progress payload. For P92's
-    // 1-lesson hello-world, the HUD dots are set on lesson_loaded and
-    // updated locally on complete_lesson — no snapshot-derived re-paint
-    // is needed here.
+    // Phase 97 / ONBOARD-05 — snapshot path now drives the progress-list
+    // dot states. For each entry in CURRICULUM_META, look up the new
+    // status from payload.progress.lessons and update the dot in place
+    // via the component's setStatus helper.
+    if (payload.action === "snapshot" && payload.progress) {
+      const entries = buildProgressEntries(payload.progress);
+      for (const entry of entries) {
+        progressList.setStatus(entry.lesson_id, entry.status);
+      }
+    }
   });
 
   // ipc.learn.exemplar_play / exemplar_stop → log-only in P92 (P93 lands

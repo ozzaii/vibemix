@@ -683,3 +683,129 @@
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Phase 97 / ONBOARD-05 — Lesson progress-list (vmx-progress-list).
+ *
+ * Renders the 36-lesson curriculum grouped by course (Anatomy / Transitions
+ * / Play-Mode). Per-lesson row = dot + title + lesson_id-head. Dots:
+ *   empty       → transparent + silk-22 outline
+ *   in-progress → silk-40 solid
+ *   completed   → amber solid + faint glow
+ *
+ * Mounts into the learn-window when no lesson is currently active (HUD-
+ * collapsed state). Empty-state hint "no controller? plug one in" pops as
+ * a dashed banner above the list when no controller is detected.
+ * ------------------------------------------------------------------------- */
+
+.vmx-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  max-height: 100%;
+  overflow-y: auto;
+}
+.vmx-progress-list__no-controller {
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 100, "wght" 400;
+  font-size: 13px;
+  color: var(--silk-40);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px dashed var(--silk-22);
+  border-radius: var(--rad-sm);
+  text-align: center;
+}
+.vmx-progress-list__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.vmx-progress-list__group-label {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--silk-65);
+  margin: 0;
+  padding-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--silk-22);
+}
+.vmx-progress-list__lesson {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--rad-sm);
+  color: var(--silk-65);
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 100, "wght" 400;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-snap) ease-out,
+              border-color var(--motion-snap) ease-out,
+              color var(--motion-snap) ease-out,
+              box-shadow var(--motion-snap) ease-out;
+}
+.vmx-progress-list__lesson:hover,
+.vmx-progress-list__lesson:focus-visible {
+  background: var(--glass-3);
+  border-color: var(--glass-edge);
+  color: var(--silk);
+  outline: none;
+  box-shadow: var(--glow-faint);
+}
+.vmx-progress-list__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.vmx-progress-list__dot[data-status="empty"] {
+  background: transparent;
+  border: 1px solid var(--silk-22);
+}
+.vmx-progress-list__dot[data-status="in-progress"] {
+  background: var(--silk-40);
+}
+.vmx-progress-list__dot[data-status="completed"] {
+  background: var(--amber);
+  box-shadow: 0 0 4px var(--amber-40);
+}
+.vmx-progress-list__lesson-id {
+  font-family: var(--type-mono);
+  font-size: 11px;
+  color: var(--silk-22);
+  letter-spacing: 0.04em;
+}
+
+/* Progress-list host (sibling of the stage). Visible when no lesson is
+ * active; hidden via data-visible="false" once a lesson loads. The HUD
+ * + tutor-dock take over the surface during a lesson. */
+.learn-progress-list-host {
+  display: block;
+  max-height: 50vh;
+  overflow: hidden;
+  border-top: 1px solid var(--silk-22);
+  background: var(--void);
+}
+.learn-progress-list-host[data-visible="false"] {
+  display: none;
+}
+
+/* Phase 97 / ONBOARD-07 + RENDER-08 — trademark disclaimer footer. */
+.learn-footer {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  color: var(--silk-40);
+  line-height: 1.5;
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--silk-22);
+  text-align: center;
+}
