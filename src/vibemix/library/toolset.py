@@ -75,6 +75,15 @@ TOOL_CALL_TIMEOUT_S = 30.0
 TOOL_STARVATION_THRESHOLD: int = 3
 
 
+# Phase 100 HARDEN-CLARIFY (Decision 2, locked): choices-length bounds for
+# the Factor-7 request_clarification tool. 0/1 = no real disambiguation;
+# 6+ = choice paralysis (Hick's law / 5±2 cognitive bound). Module
+# constants so KAAN-ACTION §HARDEN-PHASE-B-CLARIFICATION-TONE can tune on
+# funded-key ear-pass without code edits to the handler body.
+MIN_CHOICES: int = 2
+MAX_CHOICES: int = 5
+
+
 class _EmbeddingProvider(Protocol):
     def embed_query(self, query: str) -> Any: ...
 
@@ -1053,6 +1062,169 @@ class LibraryToolset:
             "consecutive": self._consecutive_empties,
         }
 
+    def _build_clarification_payload(
+        self, question: str, choices: list[str]
+    ) -> dict[str, Any]:
+        """Phase 100 HARDEN-CLARIFY Decision 3: discriminated-union payload.
+
+        Sibling of ``_build_starvation_payload`` (Plan 99-03). The wrapper
+        side-channel writer (``_write_side_channel``, Plan 99-04) is REUSED
+        UNCHANGED — its forward-compat docstring (line ~1096) authorizes the
+        sibling extension by ``reason`` discriminator. Wrappers that read
+        the side-channel file branch on ``payload.get("reason")`` and add
+        an ``elif "clarification_needed":`` arm without restructuring the
+        existing ``tool_starvation`` branch.
+
+        Payload shape (locked by Plan 100-01 tests):
+          * ``reason`` — discriminator, always the literal
+            ``"clarification_needed"`` (NEVER LLM-generated).
+          * ``question`` — the LLM-supplied clarification prompt (string,
+            validated non-empty by the handler).
+          * ``choices`` — list of 2-5 non-empty strings, defensively copied
+            via ``list(choices)`` so caller-side mutation cannot corrupt
+            the in-process ``stop_reason`` attr (mirrors the
+            ``dict(self.stop_reason)`` shallow-copy posture in the
+            dispatch-top terminal short-circuit at line ~1143).
+          * ``tool`` — the literal ``"request_clarification"`` so
+            downstream surfaces can disambiguate which handler tripped
+            this terminal stop (mirrors the ``tool`` field
+            ``_build_starvation_payload`` carries).
+
+        Security/grounding note: ``question`` + ``choices`` originate from
+        Codex's tool-call args (LLM reasoning over the user's theme), not
+        arbitrary user input. Downstream surfaces (CLI stderr + Telegram
+        ``format_reply``) defensively apply ``strip_leaks`` for any
+        FS-path leak; Plan 100-01 only writes the in-process attr + the
+        side-channel JSON.
+        """
+        return {
+            "reason": "clarification_needed",
+            "question": question,
+            "choices": list(choices),
+            "tool": "request_clarification",
+        }
+
+    def request_clarification(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Phase 100 HARDEN-CLARIFY Plan 100-01: Factor-7 clarification tool.
+
+        Codex calls this when the user's theme is materially ambiguous and
+        a single sensible default cannot be picked (e.g. "uplifting" —
+        bedroom-headphones or peak-time-club? 80 BPM ambient or 130 BPM
+        driving?). Instead of silently picking one heuristic, the LLM
+        emits 2-5 specific choices that bound the disambiguation space.
+
+        Decision 1 (signature): ``(self, args: dict)`` mirrors every other
+        handler in this class — keeps the ``dispatch()`` contract uniform
+        (one ``args`` dict in, one ``dict`` out, table-driven look-up at
+        toolset.py:1145-1163).
+
+        Decision 2 (length bounds): ``MIN_CHOICES <= len(choices) <=
+        MAX_CHOICES``. Module constants for KAAN-ACTION tunability.
+
+        Decision 3 (payload shape): on valid args, writes the
+        discriminated-union clarification payload (built by the private
+        helper above) to ``self.stop_reason``. The side-channel writer
+        (``_write_side_channel``) is REUSED unchanged from Plan 99-04 —
+        the writer is discriminator-agnostic and writes any payload that
+        carries a ``reason`` key.
+
+        Decision 4 (terminal semantics): writing ``self.stop_reason``
+        trips the dispatch-top short-circuit at line ~1142. Every
+        subsequent ``dispatch()`` call returns the terminal echo
+        WITHOUT invoking any handler — single-turn semantic. The run
+        ENDS at clarification; the wrapper (CLI / Telegram) renders the
+        question + choices, the user composes a new theme, and Codex is
+        restarted for the next run. This is Phase 99's terminal pattern
+        sibling-extended — no new control flow.
+
+        Decision 8 (test posture): unit-tested directly against the
+        toolset via ``tests/library/test_toolset_clarification.py``
+        (Plan 100-01 RED → GREEN).
+
+        Rejection contract: invalid args return
+        ``{"error": "...", "rejected": True}`` and DO NOT write
+        ``self.stop_reason`` — the run CONTINUES so Codex can retry
+        with corrected args. This is distinct from Phase 99's
+        threshold-trip path, which IS terminal by design.
+
+        Cardinal Invariant #2 (citation grounding): no track_id surface.
+        Body reads ONLY ``args.get("question")`` and
+        ``args.get("choices")`` — never ``args.get("track_id")`` /
+        ``args.get("trackId")`` / etc. The handler MUST NOT touch
+        ``self.seen`` / ``self.seen_sections`` / ``self.issued_*``.
+        Plan 100-06 ships the AST gate at
+        ``tests/library/test_request_clarification_no_track_surface.py``;
+        the behavioral pin lives in Plan 100-01's test file
+        (``test_no_track_id_surface_on_accept`` +
+        ``test_handler_does_not_read_track_id_from_args``).
+
+        Known cosmetic: Phase 99's dispatch-top short-circuit returns
+        ``{"error": "tool_starvation", "stop_reason": ...}`` — the
+        literal ``"error"`` value is ``"tool_starvation"`` regardless of
+        which terminal reason fired. Wave 3-4 wrappers (Plan 100-03 /
+        100-04) read ``payload.get("reason")`` from the inner
+        ``stop_reason`` dict, NEVER the outer ``"error"`` key, so the
+        cosmetic does not leak into user-visible surfaces. Out of scope
+        for Plan 100-01.
+        """
+        question = args.get("question")
+        choices = args.get("choices")
+
+        # Validate question: must be a non-empty (after .strip()) str.
+        if not isinstance(question, str) or not question.strip():
+            return {
+                "error": (
+                    "request_clarification: 'question' must be a "
+                    "non-empty string"
+                ),
+                "rejected": True,
+            }
+
+        # Validate choices: must be a list (NOT tuple/dict/str/...) of
+        # MIN_CHOICES..MAX_CHOICES non-empty strings.
+        if not isinstance(choices, list):
+            return {
+                "error": (
+                    f"request_clarification: 'choices' must be a list of "
+                    f"{MIN_CHOICES}-{MAX_CHOICES} non-empty strings"
+                ),
+                "rejected": True,
+            }
+        if len(choices) < MIN_CHOICES or len(choices) > MAX_CHOICES:
+            return {
+                "error": (
+                    f"request_clarification: 'choices' must contain "
+                    f"{MIN_CHOICES}-{MAX_CHOICES} entries; got "
+                    f"{len(choices)}"
+                ),
+                "rejected": True,
+            }
+        for choice in choices:
+            if not isinstance(choice, str) or not choice.strip():
+                return {
+                    "error": (
+                        "request_clarification: every entry in 'choices' "
+                        "must be a non-empty string"
+                    ),
+                    "rejected": True,
+                }
+
+        # Valid args. Write the terminal payload (sibling of Phase 99's
+        # threshold-trip write at line ~1203) and ride the same side-
+        # channel writer Plan 99-04 wired. The dispatch-top short-circuit
+        # at line ~1142 turns every subsequent dispatch() call into an
+        # idempotent terminal echo by construction — no new control flow.
+        self.stop_reason = self._build_clarification_payload(question, choices)
+        self._write_side_channel(self.stop_reason)
+        # Return the payload to Codex so it sees its own tool call
+        # succeeded; the dispatch-top short-circuit on the NEXT call is
+        # what actually terminates the run.
+        return {
+            "clarification_needed": True,
+            "question": question,
+            "choices": list(choices),
+        }
+
     def _write_side_channel(self, payload: dict[str, Any]) -> None:
         """Phase 99 HARDEN-RETRY Plan 99-04: Channel A cross-process write.
 
@@ -1139,6 +1311,7 @@ class LibraryToolset:
             "web_search": self.web_search,
             "fetch_url": self.fetch_url,
             "quote_moment": self.quote_moment,
+            "request_clarification": self.request_clarification,
             "retrieve_dj_knowledge": self.retrieve_dj_knowledge,
             "export_cues": self.export_cues,
         }
@@ -1319,4 +1492,10 @@ def _float_arg(raw: Any, *, default: float) -> float:
         return default
 
 
-__all__ = ["TOOL_CALL_TIMEOUT_S", "TOOL_STARVATION_THRESHOLD", "LibraryToolset"]
+__all__ = [
+    "TOOL_CALL_TIMEOUT_S",
+    "TOOL_STARVATION_THRESHOLD",
+    "MIN_CHOICES",
+    "MAX_CHOICES",
+    "LibraryToolset",
+]
