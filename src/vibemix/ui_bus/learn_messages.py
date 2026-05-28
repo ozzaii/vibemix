@@ -396,6 +396,16 @@ class LearnExpectedAction:
     type: Literal["cc", "button"]
     control: str
     deck: Literal["", "A", "B", "C", "D"] = ""
+    # WR-05 (P92 REVIEW) convention — the empty-string sentinel is the
+    # documented "no direction" value for CC controls. The TS-generated
+    # type, the Python dataclass, and the JSON Schema (enum
+    # ["", "up", "down"]) all agree on this convention. CC payloads
+    # carry direction="" not because direction data is missing but
+    # because the field is meaningless for a CC delta-match check
+    # (the runtime's action_matches predicate ignores direction when
+    # expected_type == "cc"). Do NOT change to Optional — every wire
+    # frame carries the field explicitly to satisfy
+    # additionalProperties: false.
     direction: Literal["", "up", "down"] = ""
     min_delta: int = 0  # 0..127; 0 means "no minimum delta requirement"
 
