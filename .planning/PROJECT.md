@@ -10,6 +10,37 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
+## Current Milestone: v10.0 "12-Factor Hardening"
+
+**Status:** Planning 2026-05-28. `gsd-autonomous fully` · all-opus · default-YES on grey-area. 3 phases (P99-P101). Scope intentionally narrow + library-subtree-disjoint from the two active handoffs (LiveKit-upgrade in `__main__.py`, frontend wiring in `tauri/ui/`).
+
+**Goal:** Close three concrete partial-pass items from the [humanlayer/12-factor-agents](https://github.com/humanlayer/12-factor-agents) audit (this-session). vibemix already scores 5 strong-pass + 2 pass + 3 partial + 2 N/A on the 12 factors — the live co-host's streaming pipeline is fundamentally NOT a tool-call loop and stays that way (Factor 10 — don't force the wrong abstraction). This milestone closes the three partials on the **Viber** side + writes the prompt-composition contract for the live side. No architecture rewrite.
+
+**Three phases (each atomic; each ships with failing-then-passing tests on every code touch):**
+
+1. **Factor 9 → Viber tool-retry policy** (HIGHEST ROI). `library/codex_curate.py` + `library/toolset.py`. Today Viber silently degrades on empty/error tool sequences (Codex's MCP harness retries internally but vibemix has no consecutive_errors counter or terminal stop_reason for tool starvation). Add per-curation-run error counter; after N consecutive empty `search_vibe` / errored tool calls, emit terminal `stop_reason="tool_starvation"` with an actionable user hint ("library too small / theme too narrow / no matching tracks"). **Acid test:** Codex backend on an intentionally empty library (no Rekordbox cache) currently returns "no playlist" with no diagnosis; after this phase it returns honest "tool_starvation: library has 0 tracks — run `library ingest` first" with a non-zero exit on the CLI. **Cardinal Invariant #2 holds:** error counter is additive telemetry, never relaxes the seen-set validation.
+
+2. **Factor 7 → Viber RequestClarification tool** (NEW grounded MCP tool). `library/toolset.py` (new handler) + `library/mcp_server.py` (FastMCP exposure) + `library/codex_curate.py` (parse-branch on `stop_reason="clarification_needed"`) + `library/telegram_bridge.py` (`format_reply` branch). When Codex sees an ambiguous theme ("uplifting" — for whom? bedroom-headphones or peak-time-club? 80 BPM ambient or 130 BPM driving?), instead of silently picking one heuristic, it calls `request_clarification(question: str, choices: list[str])` which terminates the run with `stop_reason="clarification_needed"`. CLI prints the question + numbered choices; Telegram bridge replies with the formatted prompt; caller re-runs with the resolved theme. **Locks:** question text is the LLM's free text, choices are 2-5 strings, no nested structure. Single-turn — vibemix does NOT keep state across the clarification (Codex restart with augmented theme is the resolution).
+
+3. **Factor 3 → `docs/PROMPT-COMPOSITION.md`** (audit doc, no code touch). A single-page contract enumerating exactly what enters the live co-host prompt per event type. Columns: EventType / Evidence-line fields populated / Citation sources allowed / Recall-fragment shape / Diet-mode-eligible. Cross-referenced to `coach.py:794 build_prompt` + `evidence_registry.py:129 EVIDENCE_SOURCES` + `audio/constants.py MIN_EVENT_GAP_PER_TYPE`. Today this is reverse-engineered each time someone touches the prompt path; the doc becomes the contract. New mood/lens contributors read this before editing.
+
+**Constraints (locked, encoded in every phase):**
+- **Honest green** — every Phase A/B change ships with failing-then-passing tests. Phase C is doc-only (verified by `grep`-able file:line references resolving).
+- **Disjoint from active handoffs.** Phases touch ONLY `src/vibemix/library/` (+ `docs/PROMPT-COMPOSITION.md`). NOT `src/vibemix/agent/`, NOT `src/vibemix/__main__.py`, NOT `tauri/ui/`, NOT `src/vibemix/intel/`. The LiveKit-upgrade handoff (`__main__.py:1353` `turn_handling` override) and the frontend wiring handoff (`tauri/ui/*`) run on parallel sessions on the same working tree — `feedback_concurrent_sessions_one_tree` enforces surgical commits, never `git add -A`.
+- **All four cardinal invariants hold by ADDITIVE design.** Phase A's counter is additive telemetry on the existing `LibraryToolset` per-run state (Invariant #1 single-writer holds — counter writes confined to the toolset instance). Phase B's `request_clarification` is a NEW tool but Invariant #2 grounding gate is structurally untouched (the new tool returns a terminal status, never accepts a track_id). Phase C is read-only.
+- **`gsd-autonomous fully`** — default-YES on every grey-area; blockers (Kaan's ear-pass on the `tool_starvation` message and the LLM's clarification-prompt tone) ride forward to KAAN-ACTION; only privacy hard rule + destructive risk pause.
+- **No research phase needed.** Scope is three narrow code/doc tasks against well-understood existing patterns (Codex MCP harness, FastMCP tool exposure, EvidenceRegistry citation grammar). The audit doc above IS the research equivalent.
+
+**KAAN-ACTION queue (parked at milestone close):**
+- **§HARDEN-PHASE-A-EAR-PASS** — ear-pass on the `tool_starvation` user-facing message. Does it sound like a real friend telling you the library is empty, or like generic error text? Anti-slop release gate carries forward.
+- **§HARDEN-PHASE-B-CLARIFICATION-TONE** — ear-pass on Codex's actual clarification prompts in the wild (theme-ambiguity test corpus). Do the LLM's question framings stay on-brand vs sound like a robot survey?
+
+**Background:** today's audit verdict was 5 strong-pass + 2 pass + 3 partial + 2 N/A on the 12 factors. The anti-slop tezimiz (`EvidenceRegistry` + citation grammar + linter) is **stricter** than 12-factor-agents' own Factor 3 example — these three phases close the partials without forcing wrong-abstraction.
+
+**Open alongside:** v0.1.0-rc1 (signed-release ship work — Kaan ear-pass + signed-release decision parked); the LiveKit-upgrade handoff (`__main__.py:1353` `turn_handling` + livekit-agents 1.5.8→1.5.14 bump — not committed yet, separate session); the frontend wiring handoff (`tauri/ui/*` rocker visual-sync, status-tick, pill hover-peek — separate session); v9.0 KAAN-ACTION queue (3-course ear-pass + Francesco/lawyer legal sight-check).
+
+---
+
 ## Latest Shipped Milestone: v9.0 "Lesson One"
 
 **Status:** Shipped 2026-05-28. `gsd-autonomous fully` · all-opus agents · default-YES on every scope question. 8 phases (P91-P98) · 26 plans · 68/72 REQ-IDs engineering-complete (94%); KAAN-ACTION queue parked for public ship (§LEARN-FULL-MILESTONE-EAR-PASS + §LEARN-LEGAL-DISCLAIMER). Audit PASSED: `.planning/milestones/v9.0-MILESTONE-AUDIT.md`.
