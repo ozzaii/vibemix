@@ -24,11 +24,20 @@ as ``§EXEMPLAR-KICK-GUARD-EAR`` KAAN-ACTION (do NOT silently retune).
 """
 from __future__ import annotations
 
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from vibemix.audio.buffers import AudioBuffer
 from vibemix.audio.features import snapshot_features
+from vibemix.learn.band_share_store import open_default_db, top_for_band
 from vibemix.library.audio_decode import load_audio_mono
+
+if TYPE_CHECKING:
+    from vibemix.state.evidence_registry import EvidenceRegistry
 
 # 48 kHz is the standard ingest sample rate; matches the existing CLAP
 # embed pipeline. ``snapshot_features`` reads ``buf._sr`` directly so the
@@ -215,4 +224,295 @@ def _kick_correlation(samples: np.ndarray, sr: int) -> float:
     return r
 
 
-__all__ = ["compute_band_shares"]
+# --------------------------------------------------------------------------- #
+# Plan 93-04 — ExemplarFinder ranker + packaged-fallback bank                  #
+# --------------------------------------------------------------------------- #
+
+
+# Plan 93-04 — minimum number of library tracks that must pass the band floor
+# before we trust library results. Below this, fall back to the packaged
+# CC-BY bank with the honest-null reason. Locked per CONTEXT.md §Honest-null
+# fallback ("≤3 tracks" → strictly less than 3 = floor of 3).
+_LIBRARY_FLOOR: int = 3
+
+# Plan 93-02 ships this threshold via ``band_share_store.top_for_band(...,
+# max_kick_corr=0.8)``; keep the constant local to ``exemplar.py`` so a future
+# §EXEMPLAR-KICK-GUARD-EAR ear-pass tunes one place (the ranking layer caller
+# passes this through to the store-level filter).
+# NOTE: distinct module-level binding from ``_KICK_GUARD_R = 0.8`` above
+# (that name is the per-track Pearson r threshold; this one is the ranker's
+# call-time argument). Same VALUE today, different semantic role — keep
+# both so the ear-pass tuning can move them independently if needed.
+_KICK_GUARD_R_FILTER: float = 0.8
+
+# Honest-null fallback copy — CONSTANT, NOT live-generated (byte-equality
+# guarantee per CONTEXT.md). Plan 93-01 + Plan 93-04 tests assert this
+# string verbatim. TONE-02 binding: the AI never paraphrases this; the
+# engine surfaces it.
+_HONEST_NULL_REASON: str = (
+    "Your library doesn't have a great example of this — "
+    "listen to this one we packaged"
+)
+
+
+def _packaged_bank_dir() -> Path:
+    """Return the path to the bundled CC-BY exemplar bank.
+
+    Resolves via :mod:`importlib.resources` so both layouts work:
+
+    * **Development** — running from ``src/vibemix/learn/assets/band_exemplars``.
+    * **Wheel / PyInstaller** — installed under the same package namespace.
+
+    The dev-time ``Path(__file__).parent / "assets" / "band_exemplars"``
+    fallback is the safety net for any environment where
+    ``importlib.resources.files()`` cannot resolve the namespace package
+    (rare, but seen on some PyInstaller configurations that strip ``__init__``).
+    """
+    try:
+        from importlib.resources import files
+
+        return Path(str(files("vibemix.learn.assets.band_exemplars")))
+    except Exception:
+        return Path(__file__).parent / "assets" / "band_exemplars"
+
+
+def _fallback_for_band(band: str) -> tuple[str, str, str] | None:
+    """Return ``(synthetic_track_id, file_path, honest-null reason)`` or None.
+
+    Sorts files alphabetically inside the band's subdir (deterministic — the
+    SAME band+bank always picks the SAME track for the same install).
+    Returns ``None`` when the bank directory is missing or empty (e.g. when
+    §EXEMPLAR-BANK-SOURCING has not yet populated the bank — the engine then
+    surfaces ``[]`` to the caller, the degraded-install contract).
+
+    Synthetic track_id shape: ``_packaged:<band>:<file_stem>`` — the
+    ``_packaged:`` prefix is a RESERVED namespace that library track_ids
+    never use (folder_ingest + Rekordbox derive ids from filenames /
+    UUIDs, never from the ``_packaged:`` prefix). STRIDE T-93-04-04
+    accept disposition.
+    """
+    bank_dir = _packaged_bank_dir() / band
+    if not bank_dir.exists():
+        return None
+    files = sorted(bank_dir.glob("*.mp3")) + sorted(bank_dir.glob("*.ogg"))
+    if not files:
+        return None
+    path = files[0]
+    synthetic_id = f"_packaged:{band}:{path.stem}"
+    return (synthetic_id, str(path), _HONEST_NULL_REASON)
+
+
+@dataclass
+class ExemplarPick:
+    """One ranked exemplar pick — library-side or packaged-fallback.
+
+    Fields:
+        track_id: Real Rekordbox / folder-ingest id (``library`` reason)
+            OR synthetic ``_packaged:<band>:<stem>`` (``packaged`` reason).
+        file_path: Filesystem path to the audio. May be ``""`` for a
+            library pick whose original file is unresolvable (the
+            ingest-side decided the id was good; the file might have
+            moved). ExemplarPlayer downstream handles missing-file
+            gracefully.
+        band_score: The track's ``band_share`` scalar for the picked
+            band — top-of-distribution for library picks; ``0.0`` for
+            packaged-fallback picks (no library score to assign).
+        reason: Free-form human reason. For packaged picks this is the
+            verbatim ``_HONEST_NULL_REASON`` constant; for library picks
+            it embeds the band name.
+    """
+
+    track_id: str
+    file_path: str
+    band_score: float
+    reason: str
+
+
+class ExemplarFinder:
+    """Picks band-exemplar tracks for EQ lessons.
+
+    Pure-compute over the side-car ``band_shares`` table (Plan 93-02); falls
+    back to the packaged CC-BY bank when the library has < ``_LIBRARY_FLOOR``
+    tracks passing the kick-guard floor.
+
+    Invariant #2 binding. ``registry.write("exemplar", track_id, t_session)``
+    runs BEFORE :meth:`find` returns so the AI's later
+    ``[exemplar:<track_id>]`` citation resolves via
+    :meth:`EvidenceRegistry.has` during linter validation. A fabricated
+    ``[exemplar:bogus]`` strips the whole turn because no
+    ``("exemplar", "bogus", _)`` write ever happened.
+
+    Note: as of Plan 93-04 the ``EVIDENCE_SOURCES`` frozenset still has 9
+    sources (Plan 93-05 lands ``"exemplar"`` via the 4-site mirror); the
+    registry's v1.0 permissive contract makes this write succeed today
+    (see ``evidence_registry.py:170-181`` — "any string source / key is
+    accepted").
+    """
+
+    def __init__(self, *, registry: "EvidenceRegistry | None" = None) -> None:
+        self._registry = registry
+        # Memoize the library lookup so multiple find() calls per session
+        # don't re-instantiate / re-load the cache. None means "not loaded
+        # yet"; a sentinel object would also work but we re-use None to
+        # mean "no library available" too (the library path tolerates that).
+        self._library_loaded: bool = False
+        self._library = None
+
+    def _load_library(self):
+        """Load the Rekordbox library cache once per finder instance.
+
+        Returns a library-like object (with a ``.tracks`` mapping) or
+        ``None`` when no library is available. Defensive against:
+        * monkeypatched ``try_load_cache`` lambda (test path) — returns
+          the lib directly OR None.
+        * Real instance-method ``try_load_cache(self)`` — instantiate the
+          class, call the bound method, return self if it loaded.
+        * Any exception during library import / cache load — None.
+        """
+        if self._library_loaded:
+            return self._library
+        self._library_loaded = True
+        try:
+            from vibemix.library.rekordbox import RekordboxLibrary
+            # Test-monkeypatch path: ``try_load_cache`` is replaced with a
+            # no-arg callable (e.g. ``lambda: None`` or ``classmethod(lambda
+            # cls: FakeLib())``). Call the class attribute with no args.
+            try:
+                result = RekordboxLibrary.try_load_cache()
+                if result is None:
+                    # Test path explicitly said "no library" — honor it.
+                    self._library = None
+                    return None
+                # Truthy result that has the ``.tracks`` mapping IS the lib.
+                if hasattr(result, "tracks"):
+                    self._library = result
+                    return result
+                # Fall through — result was truthy but not a lib (e.g. True
+                # from a bound-method probe). Drop to the production path.
+            except TypeError:
+                # Production path: ``try_load_cache`` is an instance method
+                # that needs ``self``; the bare class-level call raised
+                # TypeError. Instantiate + call.
+                pass
+            # Production path: real RekordboxLibrary instance.
+            lib = RekordboxLibrary()
+            if lib.try_load_cache():
+                self._library = lib
+                return lib
+        except Exception:
+            # Any failure (import error, cache corruption, etc.) → no library.
+            pass
+        self._library = None
+        return None
+
+    def _resolve_library_path(self, lib, track_id: str) -> str:
+        """Map ``track_id`` → filesystem path via the library cache.
+
+        Returns ``""`` (empty string) when the library is absent OR when
+        the track_id is not in the library's ``tracks`` mapping OR the
+        entry has no ``.path`` attribute. Empty string lets the ExemplarPick
+        construct cleanly; the downstream player is responsible for
+        gracefully handling un-resolvable paths (e.g. file moved since
+        ingest).
+        """
+        if lib is None:
+            return ""
+        tracks_map = getattr(lib, "tracks", None)
+        if not isinstance(tracks_map, dict):
+            return ""
+        entry = tracks_map.get(track_id)
+        if entry is None:
+            return ""
+        path = getattr(entry, "path", None)
+        if not isinstance(path, str):
+            return ""
+        return path
+
+    def find(
+        self,
+        band: str,
+        k: int = 1,
+        t_session: float | None = None,
+    ) -> list[ExemplarPick]:
+        """Pick up to ``k`` exemplar tracks for ``band``.
+
+        Library path is tried first; if ≥ ``_LIBRARY_FLOOR`` rows pass the
+        ``band_share_store.top_for_band(..., max_kick_corr=0.8)`` filter,
+        the top-K library rows are returned. Otherwise the packaged
+        CC-BY bank fallback fires with the honest-null reason. If BOTH
+        library and bank are empty, returns ``[]`` (degraded-install
+        contract from RESEARCH §Code Example 1).
+
+        For every returned pick, the engine calls
+        ``registry.write("exemplar", track_id, t_session)`` BEFORE
+        returning — the Invariant #2 binding that makes a fabricated
+        ``[exemplar:<id>]`` uncitable-by-construction once Plan 93-05
+        lands the 4-site mirror.
+
+        ``t_session`` defaults to ``time.time()`` so callers that don't
+        track a session-relative clock still get a sane registry write
+        timestamp.
+        """
+        if t_session is None:
+            t_session = time.time()
+
+        # Library path — best-effort. open_default_db() opens
+        # ``library-clap.db``; if the DB or the band_shares table is
+        # absent, top_for_band returns []. We absorb any error so an
+        # un-ingested install never crashes the engine.
+        try:
+            with open_default_db() as conn:
+                rows = top_for_band(
+                    conn, band,
+                    k=max(k, _LIBRARY_FLOOR),
+                    max_kick_corr=_KICK_GUARD_R_FILTER,
+                )
+        except Exception:
+            rows = []
+
+        picks: list[ExemplarPick] = []
+        if len(rows) >= _LIBRARY_FLOOR:
+            # Library has enough rows — return library picks. Resolve
+            # file_path via the Rekordbox cache when possible; empty
+            # string when not (file_path resolution is best-effort, the
+            # library row itself is the contract).
+            lib = self._load_library()
+            for track_id, score, _kick in rows[:k]:
+                file_path = self._resolve_library_path(lib, track_id)
+                if self._registry is not None:
+                    self._registry.write("exemplar", track_id, t_session)
+                picks.append(
+                    ExemplarPick(
+                        track_id=track_id,
+                        file_path=file_path,
+                        band_score=score,
+                        reason=f"from your library — strongest {band}-band track",
+                    )
+                )
+
+        if picks:
+            return picks
+
+        # Packaged-fallback path — fires when library has 0 OR < floor rows.
+        fb = _fallback_for_band(band)
+        if fb is None:
+            # Degraded install — neither library nor bank has anything to say.
+            return []
+        synthetic_id, file_path, reason = fb
+        if self._registry is not None:
+            self._registry.write("exemplar", synthetic_id, t_session)
+        return [
+            ExemplarPick(
+                track_id=synthetic_id,
+                file_path=file_path,
+                band_score=0.0,
+                reason=reason,
+            )
+        ]
+
+
+__all__ = [
+    "ExemplarFinder",
+    "ExemplarPick",
+    "compute_band_shares",
+]

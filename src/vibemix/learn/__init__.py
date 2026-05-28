@@ -50,7 +50,7 @@ from vibemix.learn.band_share_store import (
 )
 from vibemix.learn.band_share_store import upsert as upsert_band_shares
 from vibemix.learn.curriculum import COURSE_FRAMES, CURRICULUM, LessonMeta
-from vibemix.learn.exemplar import compute_band_shares
+from vibemix.learn.exemplar import ExemplarFinder, ExemplarPick, compute_band_shares
 from vibemix.learn.midi_mirror import MidiMirror
 from vibemix.learn.progress import (
     SCHEMA_VERSION,
@@ -69,6 +69,8 @@ __all__ = [
     "BAND_SHARE_TABLE",
     "COURSE_FRAMES",
     "CURRICULUM",
+    "ExemplarFinder",
+    "ExemplarPick",
     "ExemplarPlayer",
     "LearnProgress",
     "LearnState",
