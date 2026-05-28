@@ -65,20 +65,20 @@
 
 ### CURR-2 — Course 2: Transitions (14 lessons)
 
-- [ ] **CURR-2.01**: Beatmatching By Ear (manual) — AI gates progression on user pitch-shifting deck B to match deck A's BPM within ±0.5%; canonical sync-OFF.
-- [ ] **CURR-2.02**: Beatmatching With Sync — modern consensus side-by-side teaching (per Features research §FEATURES — DJ Shortee / Mixcloud / SpinStart / DJ Mentors agree sync IS a tool, not gatekeeping).
-- [ ] **CURR-2.03**: Long Blend — 32-bar fade with crossfader; AI count-in at -8 bars.
-- [ ] **CURR-2.04**: EQ Swap — bring up incoming deck mids + highs, kill outgoing deck mids + highs; reverse for sub-bass.
-- [ ] **CURR-2.05**: Bassline / Kick Swap — kill outgoing deck low EQ, bring up incoming deck low EQ on the beat-1 of next phrase.
-- [ ] **CURR-2.06**: Filter Fade — sweep filter HPF on outgoing deck through the transition.
-- [ ] **CURR-2.07**: Echo-Out (the bail-out transition for beginners with no beatmatching ability — taught early as safety net per Features research).
-- [ ] **CURR-2.08**: Drop Swap — cut outgoing deck on the drop of incoming deck.
-- [ ] **CURR-2.09**: Loop Transition — loop outgoing deck 16 bars while incoming deck enters.
-- [ ] **CURR-2.10**: Hot Cues & Memory Cues — pre-set cue points on a track in user's library; AI demonstrates entering on cue 2 (the breakdown). Fallback path for users without rekordbox-imported cues: "set your own cue in vibemix" UI add.
-- [ ] **CURR-2.11**: Camelot Wheel — harmonic-key matching using existing `harmonics.py` Camelot table; AI walks user through finding compatible neighbors.
-- [ ] **CURR-2.12**: Phrase Matching — align deck B's phrase start with deck A's phrase start; AI counts in.
-- [ ] **CURR-2.13**: Diagnosing a Train Wreck — AI plays a deliberately misaligned mix; user identifies the issue (off-phrase, off-key, off-BPM).
-- [ ] **CURR-2.14**: Course 2 Recital — user performs a 5-track 10-minute mix using ≥3 different transition types; unlocks Course 3.
+- [x] **CURR-2.01**: Beatmatching By Ear (manual) — AI gates progression on user pitch-shifting deck B to match deck A's BPM within ±0.5%; canonical sync-OFF.
+- [x] **CURR-2.02**: Beatmatching With Sync — modern consensus side-by-side teaching (per Features research §FEATURES — DJ Shortee / Mixcloud / SpinStart / DJ Mentors agree sync IS a tool, not gatekeeping).
+- [x] **CURR-2.03**: Long Blend — 32-bar fade with crossfader; AI count-in at -8 bars.
+- [x] **CURR-2.04**: EQ Swap — bring up incoming deck mids + highs, kill outgoing deck mids + highs; reverse for sub-bass.
+- [x] **CURR-2.05**: Bassline / Kick Swap — kill outgoing deck low EQ, bring up incoming deck low EQ on the beat-1 of next phrase.
+- [x] **CURR-2.06**: Filter Fade — sweep filter HPF on outgoing deck through the transition.
+- [x] **CURR-2.07**: Echo-Out (the bail-out transition for beginners with no beatmatching ability — taught early as safety net per Features research).
+- [x] **CURR-2.08**: Drop Swap — cut outgoing deck on the drop of incoming deck.
+- [x] **CURR-2.09**: Loop Transition — loop outgoing deck 16 bars while incoming deck enters.
+- [x] **CURR-2.10**: Hot Cues & Memory Cues — pre-set cue points on a track in user's library; AI demonstrates entering on cue 2 (the breakdown). Fallback path for users without rekordbox-imported cues: "set your own cue in vibemix" UI add.
+- [x] **CURR-2.11**: Camelot Wheel — harmonic-key matching using existing `harmonics.py` Camelot table; AI walks user through finding compatible neighbors.
+- [x] **CURR-2.12**: Phrase Matching — align deck B's phrase start with deck A's phrase start; AI counts in.
+- [x] **CURR-2.13**: Diagnosing a Train Wreck — AI plays a deliberately misaligned mix; user identifies the issue (off-phrase, off-key, off-BPM).
+- [x] **CURR-2.14**: Course 2 Recital — user performs a 5-track 10-minute mix using ≥3 different transition types; unlocks Course 3.
 
 ### CURR-3 — Course 3: Play Mode (live coaching, 6 lessons)
 
@@ -176,7 +176,7 @@
 | EXEMPLAR-05 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Complete |
 | EXEMPLAR-06 | Phase 96 — Course 3 Play Mode (active-session guard) | Pending |
 | CURR-1.01 .. 1.16 | Phase 94 — Course 1 Anatomy | Complete (P94-01 SHIPPED 2026-05-28 — 16 hand-authored fixtures + curriculum.py extension) |
-| CURR-2.01 .. 2.14 | Phase 95 — Course 2 Transitions | Pending |
+| CURR-2.01 .. 2.14 | Phase 95 — Course 2 Transitions | Complete (P95 SHIPPED 2026-05-28 — 14 hand-authored fixtures + curriculum.py extension + course_3_unlocked field + RecitalRuntime Course 2 mode with 3-distinct-transition-type variety floor; commits c740fd90 → fd6e6981) |
 | CURR-3.01 .. 3.07 | Phase 96 — Course 3 Play Mode | Pending |
 | ONBOARD-01 | Phase 97 — Onboarding + Tone Locks + Mode Picker | Pending |
 | ONBOARD-02 | Phase 97 — Onboarding + Tone Locks + Mode Picker | Pending |

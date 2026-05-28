@@ -69,7 +69,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 - [ ] **Phase 92: Lesson Runtime + AI Highlight Contract** — "Hello world" 1-step lesson; the 4 cardinal-invariant pins land here; 12 `ipc.learn.*` envelopes wired.
 - [x] **Phase 93: Exemplar Engine + `[exemplar:]` Evidence Source** — DSP-band engine + 4-site schema mirror + `ExemplarPlayer` + packaged fallback. NO UI yet — just engine + CLI test. **SHIPPED 2026-05-28** (all 6 plans complete; EXEMPLAR-01..05 all checked).
 - [ ] **Phase 94: Course 1 — Anatomy (L1.01–L1.16)** — Beginner completes anatomy walkthrough. Verbatim opening dialog byte-equality test + tutor-slop blocklist v2 + tutor system instruction lock land here. **2 of 4 plans complete** (94-01 16 fixtures + curriculum extension SHIPPED 2026-05-28; 94-02 TONE-01 byte-equality + TONE-03 slop blocklist gates SHIPPED 2026-05-28).
-- [ ] **Phase 95: Course 2 — Transitions (L2.01–L2.14)** — User learns 5 canonical transitions + harmonic mixing. Exemplar wiring throughout (depends P93 + P94).
+- [x] **Phase 95: Course 2 — Transitions (L2.01–L2.14)** — SHIPPED 2026-05-28 (combined-plan execution; 14 fixtures + curriculum.py extension + course_3_unlocked field + RecitalRuntime Course 2 mode with 3-distinct-transition-type variety floor; 69 new tests at 190/3 in tests/learn/; commits c740fd90 → 617b663b → d8f0f5f7 → 2a8e9bd9 → fd6e6981; CURR-2.01..CURR-2.14 all complete).
 - [ ] **Phase 96: Course 3 — Play Mode (L3.01–L3.06) + tutor lens proactive integration** — User plays real set with proactive tutor mode active. `test_no_speculative_phrase` AST gate lands BEFORE Gemini wiring. `[cue:<anchor_id>]` evidence source added via 4-site mirror.
 - [ ] **Phase 97: Onboarding + Verbatim Tone Locks + Mode Picker** — Stranger opens app, picks Learn, sees "Oh bestie" opening, advances through L1.1 seamlessly. Mode picker on main window. Hercules MK2 detection. Disclaimer copy.
 - [ ] **Phase 98: Live Audit + Ear-Pass Hand-Off + rc1 Regression Smoke** — Kaan-walk recording: full 3-course run on real FLX4 → `.planning/milestones/v9.0-MILESTONE-AUDIT.md`. rc1 standalone sidecar smoke MUST PASS unregressed.
@@ -79,7 +79,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 | 91 | Controller Renderer + MIDI Mirror | 7/7 | Complete   | 2026-05-27 |
 | 92 | Lesson Runtime + AI Highlight Contract | 7/7 | Complete   | 2026-05-28 |
 | 93 | Exemplar Engine + `[exemplar:]` Evidence Source | 6/6 | Complete   | 2026-05-28 |
-| 94 | Course 1 — Anatomy (L1.01–L1.16) | 3/4 | In Progress|  |
+| 94 | Course 1 — Anatomy (L1.01–L1.16) | 4/4 | Complete   | 2026-05-28 |
 | 95 | Course 2 — Transitions (L2.01–L2.14) | User learns beatmatching (ear + sync) + 5 canonical transitions (long blend, EQ swap, kick swap, filter fade, echo-out, drop swap, loop) + harmonic mixing via Camelot wheel | CURR-2.01..2.14 (14) | 4 |
 | 96 | Course 3 — Play Mode (L3.01–L3.07) + tutor lens proactive integration | User plays real 30-min set with proactive tutor mode active; count-ins grounded on `[cue:]` evidence ONLY; recovery drills + DJ profile graduation | EXEMPLAR-06, CURR-3.01..3.07 (8) | 5 |
 | 97 | Onboarding + Verbatim Tone Locks + Mode Picker | Stranger opens app, picks Learn from mode picker, first-launch MIDI probe detects controller, sees verbatim opening, advances seamlessly; disclaimer copy ships | RENDER-08, ONBOARD-01..07 (8) | 4 |
@@ -159,7 +159,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 - [x] 94-01-PLAN.md — 16 hand-authored JSON lesson fixtures + curriculum.py extension (COURSE_FRAMES + 16 CURRICULUM entries) (Wave 1) — SHIPPED 2026-05-28 (eda18aea, e00718e4)
 - [x] 94-02-PLAN.md — `scripts/launch/check_no_tutor_slop.py` ≥20-token blocklist + byte-equality gate on iconic 4-line opening dialog (TONE-01 + TONE-03) (Wave 1)
 - [x] 94-03-PLAN.md — L1.14 ExemplarLessonController (EQ-as-Tutor with [exemplar:] citation) + L1.16 RecitalRuntime (5-prompt deterministic gate, course_2_unlocked persistence) + LessonRuntime observer seam (Wave 2)
-- [ ] 94-04-PLAN.md — §LEARN-EAR-COURSE-1 KAAN-ACTION ride-forward (non-blocking per gsd-autonomous fully) (Wave 3)
+- [x] 94-04-PLAN.md — §LEARN-EAR-COURSE-1 KAAN-ACTION ride-forward (non-blocking per gsd-autonomous fully) (Wave 3)
 **UI hint**: yes
 
 ### Phase 95: Course 2 — Transitions (L2.01–L2.14)
@@ -171,7 +171,9 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
   2. User performs all 5 canonical transitions on their controller in canonical order: Long Blend (CURR-2.03, 32-bar fade with crossfader, AI count-in at -8 bars) · EQ Swap (CURR-2.04) · Bassline/Kick Swap (CURR-2.05, kill outgoing low EQ + bring up incoming low EQ on beat-1 of next phrase) · Filter Fade (CURR-2.06) · Echo-Out (CURR-2.07, the bail-out for beginners with no beatmatching) · Drop Swap (CURR-2.08) · Loop Transition (CURR-2.09). Each performed live with AI count-in on two tracks from the user's library matched by Camelot + BPM ±6%. **CURR-2.03..2.09.**
   3. Hot Cues & Memory Cues (CURR-2.10) — AI demonstrates entering on cue 2 (the breakdown); fallback for users without rekordbox-imported cues = "set your own cue in vibemix" UI. Camelot Wheel (CURR-2.11) — harmonic-key matching using existing `harmonics.py` Camelot table; AI walks user through finding compatible neighbors. Phrase Matching (CURR-2.12) — align deck B's phrase start with deck A's phrase start, AI counts in. Diagnosing a Train Wreck (CURR-2.13) — AI plays deliberately misaligned mix; user identifies the issue (off-phrase / off-key / off-BPM). **CURR-2.10..2.13.**
   4. Course 2 Recital (CURR-2.14) — user performs a 5-track 10-minute mix using ≥3 different transition types; honest grading against the L2.x protocol; unlocks Course 3. **CURR-2.14.**
-**Plans**: TBD
+**Plans**: 1 combined-plan execution (no separate PLAN.md files; see `.planning/phases/95-course-2-transitions/95-SUMMARY.md`)
+- [x] Combined plan (Tasks 1+2+3a+3b+4) — SHIPPED 2026-05-28; commits c740fd90 (14 fixtures) → 617b663b (curriculum.py extension) → d8f0f5f7 (course_3_unlocked field + schema mirror) → 2a8e9bd9 (RecitalRuntime Course 2 mode extension) → fd6e6981 (2 new test files; 69 cases)
+**UI hint**: yes
 
 ### Phase 96: Course 3 — Play Mode (L3.01–L3.06) + tutor lens proactive integration
 **Goal:** The user plays a real 30-minute set with proactive tutor mode active; the AI gives count-ins ("breakdown in 16 beats — get ready to bring in track 2") **only when grounded on `[cue:<anchor_id>]` evidence**, downgrading to retrospective-only narration ("that was a breakdown — see how the bass dropped out") when confidence thresholds fail. **`test_no_speculative_phrase.py` AST gate lands BEFORE any Gemini wiring.** Active-session guard: NEVER play tutor exemplar audio while user is mid-set.
