@@ -78,7 +78,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 |---|-------|------|---------|----------|
 | 91 | Controller Renderer + MIDI Mirror | 7/7 | Complete   | 2026-05-27 |
 | 92 | Lesson Runtime + AI Highlight Contract | 7/7 | Complete   | 2026-05-28 |
-| 93 | Exemplar Engine + `[exemplar:]` Evidence Source | DSP-band exemplar engine picks strongest-band track from user's library; falls back to packaged CC-BY bank when empty; plays through dedicated `ExemplarPlayer`; `[exemplar:<id>]` resolves via 4-site mirror | EXEMPLAR-01, EXEMPLAR-02, EXEMPLAR-03, EXEMPLAR-04, EXEMPLAR-05 (5) | 4 |
+| 93 | Exemplar Engine + `[exemplar:]` Evidence Source | 3/6 | In Progress|  |
 | 94 | Course 1 — Anatomy (L1.01–L1.16) | Beginner opens Learn, sees verbatim 4-line opening dialog, walks through 16 hand-authored anatomy lessons culminating in EQ-as-Tutor demo using library exemplars | TONE-01, TONE-03, CURR-1.01..1.16 (18) | 5 |
 | 95 | Course 2 — Transitions (L2.01–L2.14) | User learns beatmatching (ear + sync) + 5 canonical transitions (long blend, EQ swap, kick swap, filter fade, echo-out, drop swap, loop) + harmonic mixing via Camelot wheel | CURR-2.01..2.14 (14) | 4 |
 | 96 | Course 3 — Play Mode (L3.01–L3.07) + tutor lens proactive integration | User plays real 30-min set with proactive tutor mode active; count-ins grounded on `[cue:]` evidence ONLY; recovery drills + DJ profile graduation | EXEMPLAR-06, CURR-3.01..3.07 (8) | 5 |
@@ -140,7 +140,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 **Plans:** 6 plans
 - [x] 93-01-PLAN.md — Test scaffolding: 11 RED-state stubs across tests/learn/ + tests/ipc/ (Nyquist-compliant gated-skip pattern) (Wave 1) — SHIPPED 2026-05-28 (`563a39c3 → 73600a83`)
 - [x] 93-02-PLAN.md — Side-car band_shares store + compute_band_shares + _kick_correlation pure-compute primitives (Wave 2) — SHIPPED 2026-05-28 (`2daf7eb3 → 9e8b6b74`); 3 RED stubs flipped GREEN (test_band_share_store 5/5, test_compute_band_shares 3/3, test_exemplar_kick_guard 4/4); 4 Rule-1/Rule-3 deviations auto-fixed (spectral-leakage gate + revised synthetic fixtures + tolerance + wav helper)
-- [ ] 93-03-PLAN.md — ExemplarPlayer + load_audio_stereo + learn.headphone_device_index settings persistence + codegen:ipc (Wave 2)
+- [x] 93-03-PLAN.md — ExemplarPlayer + load_audio_stereo + learn.headphone_device_index settings persistence + codegen:ipc (Wave 2) — SHIPPED 2026-05-28 (`824d05e0 → c8bbb280`); 3 RED stubs flipped GREEN (test_exemplar_player 7/7, test_load_audio_stereo 3/3, test_settings_set_envelope_learn_field 3/3); 4 Rule-1 deviations auto-fixed (PyAV `flt` → `fltp` planar + getattr fallback for state.audio_rms/rms + docstring paraphrase for PlaybackQueue grep gate + Rule-1 test path fix on SettingsState.payload.properties). EXEMPLAR-04 marked complete; wizard UI deferred to Plan 97 (§LEARN-AUDIO-ROUTING-WIZARD-DISCHARGE).
 - [ ] 93-04-PLAN.md — ExemplarFinder + ExemplarPick + packaged CC-BY bank scaffold + NOTICE.md (Wave 3)
 - [ ] 93-05-PLAN.md — Atomic 4-site `[exemplar:]` mirror across evidence_registry + matrix + dj_cohost; sites 1+2 atomic + sites 3 + 4 sequential commits (Wave 4)
 - [ ] 93-06-PLAN.md — folder_ingest.compute_band_shares opt-in + `vibemix learn exemplar <band>` CLI + phase-smoke (Wave 5)
