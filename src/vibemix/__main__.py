@@ -1192,12 +1192,19 @@ async def main() -> None:
     # embedding client; when DEFAULT-OFF, startup performs zero recall/model
     # setup and agent behavior stays byte-identical.
     recall_svc = None
-    recall_enabled = os.environ.get("VIBEMIX_RECALL_ENABLED", "0").strip().lower() not in (
-        "0",
-        "off",
-        "false",
-        "",
-    )
+    # One Mind S4 — env > persisted config (mirror of the W5 llm_mode resolve).
+    # VIBEMIX_RECALL_ENABLED wins when set; otherwise the persisted
+    # ConfigStore.recall_enabled drives it so a future UI toggle survives
+    # relaunch. Default stays OFF (config default False + env unset) — flipping
+    # the shipped default ON is KAAN-ACTION (recall-feel ear-pass).
+    _recall_env = os.environ.get("VIBEMIX_RECALL_ENABLED")
+    if _recall_env is not None:
+        recall_enabled = _recall_env.strip().lower() not in ("0", "off", "false", "")
+    else:
+        try:
+            recall_enabled = bool(load_config().recall_enabled)
+        except Exception:
+            recall_enabled = False
     # Phase 80 Plan 02 — GROUND-01: secondary-ear framing flag, default OFF.
     # When OFF the reaction request is byte-identical to the v8.0 baseline (the
     # Part-1 audio still feeds, no new framing). When ON the prompt names the

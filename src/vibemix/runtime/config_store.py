@@ -94,6 +94,9 @@ _PHASE12_FIELDS: tuple[str, ...] = (
     # "direct" — the packaged-default flip to "proxy" is KAAN-ACTION, gated on
     # the Bravoh /register + /health + /v1 endpoints being live.
     "llm_mode",
+    # One Mind S4 — persisted cross-session recall toggle. Default OFF;
+    # explicit-opt-in only (see ConfigStore.recall_enabled docstring).
+    "recall_enabled",
 )
 _PHASE11_FIELDS: tuple[str, ...] = (
     "first_run_completed",
@@ -187,6 +190,13 @@ class ConfigStore:
     # env var overrides this at boot; otherwise main() reads this persisted value.
     # The packaged-default flip to "proxy" is KAAN-ACTION (Bravoh endpoints live).
     llm_mode: str = "direct"
+    # One Mind S4 — cross-session memory recall. Default False (OFF). The full
+    # recall loop (ingest → memory.db → grounded retrieval) is built + invariant-
+    # safe, but reads past-session memory, so it stays explicit-opt-in (same
+    # dark-pattern discipline as telemetry_consent: garbage on disk → OFF, never
+    # coerced True). VIBEMIX_RECALL_ENABLED env overrides; otherwise main() reads
+    # this. Flipping the default ON is KAAN-ACTION (recall-feel ear-pass).
+    recall_enabled: bool = False
 
     # Phase 11 fields (preserved verbatim — sidecar reads only, Rust writes)
     first_run_completed: bool | None = None
@@ -246,6 +256,10 @@ class ConfigStore:
             # gets the same guard. Garbage on disk → silent default OFF;
             # never coerce to True even when the disk value is truthy.
             "bravoh_waitlist_opt_in",
+            # One Mind S4 — recall_enabled gets the same dark-pattern guard.
+            # A corrupt/foreign on-disk value never silently enables reading
+            # past-session memory; explicit opt-in only.
+            "recall_enabled",
         ):
             if _bool_field in kwargs and not isinstance(kwargs[_bool_field], bool):
                 kwargs.pop(_bool_field, None)
