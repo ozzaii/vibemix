@@ -64,6 +64,19 @@ export type MascotMood = "hype-man" | "teacher" | "coach";
  *  the write surface. Mirrors the wire enum the sidecar persists. */
 export type SkillLevel = "beginner" | "intermediate" | "pro";
 
+/** Phase 97 / ONBOARD-01 — top-level vibemix mode.
+ *
+ *   cohost  — live co-host (the v4-era hype/coach surface; default).
+ *   learn   — beginner module (v9.0 "Lesson One"); Learn window owns the surface.
+ *   build   — Library / set builder (v8.2 "Set Builder" mode).
+ *   debrief — post-session review window.
+ *
+ * The picker writes locally via setSessionState({ mode }) then fires the
+ * `ipc.session.set_mode` envelope. The sidecar persists via ConfigStore.extra
+ * under "session.mode" so the next launch boots into the last-picked mode.
+ * Mirrors the optimistic-repaint pattern the rocker uses for mood/skill. */
+export type SessionMode = "cohost" | "learn" | "build" | "debrief";
+
 export interface SettingsView {
   voice: string;
   mode: "hype" | "coach";
@@ -140,6 +153,13 @@ export interface SessionState {
    *  tick seeds it (proxy for session start = window-open). The mock
    *  pre-seeds an offset so the dev demo reads mid-set. */
   sessionStartMs?: number | null;
+  /** Phase 97 / ONBOARD-01 — top-level mode (cohost/learn/build/debrief).
+   *  Default "cohost" — the v4-era live co-host surface. The mode picker
+   *  on the main window writes this locally (optimistic repaint) then
+   *  fires `ipc.session.set_mode`. Optional on the type so older snapshots
+   *  / mock states that omit it still type-check; render-loop defaults to
+   *  "cohost" when undefined. */
+  mode?: SessionMode;
 }
 
 export const TRANSCRIPT_RING_CAP = 200;
@@ -194,6 +214,7 @@ function makeDefault(): SessionState {
     clockText: "00:00:00",
     elapsedText: "00:00:00",
     sessionStartMs: null,
+    mode: "cohost",
   };
 }
 
