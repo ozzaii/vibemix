@@ -33,6 +33,7 @@ const KNOWN_CONTROLLERS = new Set<string>([
   "pioneer_xdj_rx3",
   "numark_party_mix_live",
   "hercules_inpulse_300",
+  "hercules_inpulse_300_mk2",
   "hercules_inpulse_500",
 ]);
 
@@ -82,6 +83,18 @@ async function loadControllerSvg(controllerId: string): Promise<string> {
       return m.PIONEER_DDJ_400_SVG ?? "";
     }
     case "hercules_inpulse_300": {
+      const m = (await import(
+        "../controllers/hercules_inpulse_300.svg.js"
+      )) as ControllerSvgModule;
+      return m.HERCULES_INPULSE_300_SVG ?? "";
+    }
+    case "hercules_inpulse_300_mk2": {
+      // Phase 97 / ONBOARD-03 — the MK2 reuses the legacy 300 SVG asset.
+      // The two units are visually near-identical per Hercules product
+      // photos (the MK2 refresh is internal — improved jog-touch
+      // capacitance + firmware, not a new faceplate). §LEARN-MK2-DETECTION
+      // ear-pass on real MK2 hardware (P98) will validate whether a
+      // distinct SVG is needed; if yes, swap the import target here.
       const m = (await import(
         "../controllers/hercules_inpulse_300.svg.js"
       )) as ControllerSvgModule;

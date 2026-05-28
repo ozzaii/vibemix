@@ -87,9 +87,10 @@ def test_list_profiles_includes_flx4():
     names = list_profiles()
     assert names == sorted(names), "list_profiles() must return sorted names"
     assert "pioneer_ddj_flx4" in names
-    # Wave 2 ships the full 10-controller library (CONTEXT.md §Locked Decisions).
-    # Per-controller pins live in tests/midi/test_profiles_all_controllers.py.
-    assert len(names) == 10
+    # Wave 2 shipped 10 controllers; Phase 97 / ONBOARD-03 added the Hercules
+    # Inpulse 300 MK2 sibling (11th profile). Per-controller pins live in
+    # tests/midi/test_profiles_all_controllers.py.
+    assert len(names) == 11
 
 
 # ---------- Schema validator: required-field + range checks ----------

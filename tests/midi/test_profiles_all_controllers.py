@@ -33,8 +33,14 @@ from vibemix.midi import (
 )
 
 # Sorted (alphabetic) — must match list_profiles() output exactly.
+# Phase 97 / ONBOARD-03 — Hercules Inpulse 300 MK2 sibling profile added
+# (11th controller). The MK2 is the current-gen unit; the legacy 300 stays
+# alongside. Disambiguation in registry.py::find_mapping is longest-hint-
+# wins so the MK2 port resolves to the MK2 profile (verified in
+# tests/midi/test_hercules_300_mk2_disambiguation.py).
 _ALL_CONTROLLER_IDS = [
     "hercules_inpulse_300",
+    "hercules_inpulse_300_mk2",
     "hercules_inpulse_500",
     "numark_party_mix_live",
     "pioneer_ddj_1000",
@@ -48,6 +54,7 @@ _ALL_CONTROLLER_IDS = [
 
 _TWO_DECK_IDS = {
     "hercules_inpulse_300",
+    "hercules_inpulse_300_mk2",
     "hercules_inpulse_500",
     "numark_party_mix_live",
     "pioneer_ddj_400",
@@ -66,8 +73,11 @@ _FOUR_DECK_IDS = {
 # ---------- Registry-level pins ----------
 
 
-def test_list_profiles_returns_10_entries():
-    """All 10 controllers must ship — Phase 9 Wave 2 closes the controller library."""
+def test_list_profiles_returns_11_entries():
+    """All 11 controllers must ship — Phase 9 Wave 2 closed the controller library
+    at 10; Phase 97 / ONBOARD-03 added the Hercules Inpulse 300 MK2 sibling
+    (11th profile) so the v9.0 onboarding can disambiguate the current-gen
+    Hercules unit from the legacy 300 by USB iSerialNumber (Pitfalls §P3)."""
     assert list_profiles() == _ALL_CONTROLLER_IDS
 
 
