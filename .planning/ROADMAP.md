@@ -82,7 +82,16 @@ If a phase doesn't pass → defer to HARDEN-FUTURE or out of scope.
   3. The CLI exit code for `stop_reason="tool_starvation"` is distinct from a successful "no playlist found" case (which today exits 0 with an empty playlist). Scripts piping `library curate` output can distinguish "tool-starved" from "ran successfully, no match".
   4. Counter writes are confined to `LibraryToolset` handler-entry / handler-exit sites (single-writer analog of Invariant #1): a static `tests/library/test_toolset_counter_single_writer.py` AST gate proves no other module mutates `_consecutive_errors`. A `tool_starvation` termination short-circuits BEFORE any `create_playlist` library re-validation runs — never writes a partial playlist (HARDEN-RETRY-06 contract). Invariant #2 (`seen`-set grounding) is structurally untouched.
   5. `codex_curate.curate_with_codex` and `build_set_with_codex` both surface `stop_reason="tool_starvation"` uniformly to callers (CLI + Telegram + future GUI), regardless of whether the starvation originated INSIDE the toolset dispatch (a single empty search call) or AFTER the Codex MCP harness exited (multi-call run that drained the counter). Tested under `tests/library/test_codex_curate_propagates_stop_reason.py` with both injection sites.
-**Plans:** TBD (executor decomposition — likely 3-4 plans: counter + dispatch hooks · stop_reason payload seam + invariant gate · codex_curate parse-branch · CLI exit-code wiring + e2e contract test)
+**Plans:** 8 plans
+Plans:
+- [ ] 99-01-PLAN.md — scaffolding: TOOL_STARVATION_THRESHOLD constant + per-instance counter + stop_reason attribute (no behavior change)
+- [ ] 99-02-PLAN.md — counter increment/reset wiring in dispatch() + _is_empty_or_error helper + concurrency acid test (no terminal action yet)
+- [ ] 99-03-PLAN.md — threshold-trip detection + deterministic 3-case hint generator + terminal short-circuit in dispatch()
+- [ ] 99-04-PLAN.md — side-channel propagation: VIBEMIX_STOP_REASON_FILE env var + tempfile + wrapper-side propagation in curate_with_codex + build_set_with_codex
+- [ ] 99-05-PLAN.md — Invariant #2 gate: tests/repo/test_no_seen_relaxation.py AST/grep gate + create_playlist short-circuit scenario test
+- [ ] 99-06-PLAN.md — CLI exit codes: __main__.py:2545-2556 (curate) + :2591-2602 (build-set) + Telegram curate_fn normalizer
+- [ ] 99-07-PLAN.md — Telegram bridge format_reply tool_starvation branch (renders hint via strip_leaks)
+- [ ] 99-08-PLAN.md — integration seal: uniform propagation tests + KAAN-ACTION checkpoint surfacing §HARDEN-PHASE-A-EAR-PASS
 **Cardinal invariants:** #1 N/A direct, additive-counter analog confined to `LibraryToolset` instance (single-writer pinned by AST gate); #2 holds — counter is additive telemetry, never relaxes the `seen` grounding gate or `create_playlist` re-validation; #3 N/A (live co-host untouched); #4 N/A (no new ws traffic).
 **Honest-green discipline:** failing-then-passing tests under `tests/library/` for every contract (zero-track library / narrow-theme zero-match / dispatch-error path / counter reset on successful tool call / `create_playlist` short-circuit / `codex_curate` propagation from both origins). No live API calls — fakes for the Codex MCP harness.
 **KAAN-ACTION (parked at phase close):** **§HARDEN-PHASE-A-EAR-PASS** — ear-pass on the `tool_starvation` user-facing message. Does it sound like a real friend telling you the library is empty, or like generic error text? Anti-slop release gate carries forward.
