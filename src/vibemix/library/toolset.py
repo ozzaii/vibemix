@@ -31,7 +31,9 @@ a recoverable message instead of wedging the caller's loop.
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import logging
+import os
 from collections.abc import Callable
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, Literal, Protocol
@@ -1048,6 +1050,41 @@ class LibraryToolset:
             "consecutive": self._consecutive_empties,
         }
 
+    def _write_side_channel(self, payload: dict[str, Any]) -> None:
+        """Phase 99 HARDEN-RETRY Plan 99-04: Channel A cross-process write.
+
+        If the side-channel env var (see ``os.environ.get`` call below)
+        is set, write ``payload`` as JSON to that path so the parent-process
+        wrapper
+        (``codex_curate.curate_with_codex`` / ``build_set_with_codex``) can
+        read it after the Codex CLI subprocess exits. RESEARCH.md
+        § Stop-Reason Propagation Channel locked this as Channel A — the
+        load-bearing seam that bypasses the LLM entirely.
+
+        If the env var is ABSENT or empty, this is a silent no-op — direct
+        CLI usage and unit tests without the env var keep working with only
+        the in-process ``stop_reason`` write from Plan 99-03 (no
+        regression).
+
+        Best-effort write: an FS issue (read-only fs, permission denied,
+        bad path) catches the ``OSError`` and returns silently. Never wedge
+        ``dispatch()`` on a side-channel failure — the in-process payload
+        is the authoritative surface; the file is observability/propagation.
+
+        Forward-compat (Phase 100): the payload's ``reason`` field is the
+        discriminator. Phase 100 will reuse the same file with
+        ``reason="clarification_needed"``; this writer is unchanged.
+        """
+        path = os.environ.get("VIBEMIX_STOP_REASON_FILE")
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(payload, f)
+        except OSError:
+            # Best-effort — never wedge dispatch on FS issues.
+            return
+
     def _is_empty_or_error(self, name: str, result: dict[str, Any]) -> bool:
         """Phase 99 HARDEN-RETRY Decision 2: identify counter-incrementing returns.
 
@@ -1129,9 +1166,9 @@ class LibraryToolset:
             # serialization at 407-411 prevents the race in the first
             # place). After this assignment, the short-circuit at the top
             # of ``dispatch()`` returns the terminal echo on every
-            # subsequent call.
-            #
-            # Side-channel write lands in Plan 99-04.
+            # subsequent call. Plan 99-04: the side-channel write rides
+            # the same first-write-wins guard, so the file lands exactly
+            # once (env-var-conditional, silent no-op when absent).
             if (
                 self._consecutive_empties >= TOOL_STARVATION_THRESHOLD
                 and self.stop_reason is None
@@ -1139,6 +1176,7 @@ class LibraryToolset:
                 self.stop_reason = self._build_starvation_payload(
                     last_tool=name, args=args
                 )
+                self._write_side_channel(self.stop_reason)
         else:
             self._consecutive_empties = 0
 
