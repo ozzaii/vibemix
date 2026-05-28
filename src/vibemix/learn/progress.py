@@ -42,11 +42,25 @@ Threat model bindings:
     silently ``unlink`` + fresh empty + ``was_corrupt=True`` flag for the
     caller to surface a one-line toast.
   * T-92-04-03 (Tampering: schema version drift) — mitigated by
-    :meth:`LearnProgress.from_dict` returning fresh ``cls()`` when
-    ``schema_version != SCHEMA_VERSION``. Future migrations land in a
-    v2-to-v1 explicit upgrader (not in v9.0).
+    :meth:`LearnProgress.from_dict`. As of Phase 102 (v11.0) a
+    ``schema_version == 1`` file is routed through the explicit
+    :func:`_migrate_v1_to_v2` upgrader (seeds the live-portion ``skills``
+    block, preserves all lesson history). Any OTHER version
+    (``schema_version`` > 2 / garbage / absent) still hits the
+    fresh-empty wipe seam. The migration is idempotent — keyed strictly
+    on ``schema_version == 1`` — so a v2 file already holding Phase-103
+    live data loads untouched (no clobber of ``live_proof_count``).
 
-REQ-ID: LESSON-03 (progress persistence + corruption recovery + reset CLI).
+Phase 102 (v11.0 "Earned"): ``SCHEMA_VERSION`` bumps 1→2. A new
+``skills`` live-portion block carries, per skill, the count of grounded
+live demos, a mastered flag, and the first-mastered timestamp. ONLY the
+live-portion is stored here — the learn-portion (lesson fill + competent
+bool) is DERIVED by ``skill_tree.SkillTree.compute`` on every load, so
+there is zero dual-write drift. Phase 103 writes the live-portion; Phase
+102 seeds it with safe defaults (count 0, mastered False, ts None).
+
+REQ-ID: LESSON-03 (progress persistence + corruption recovery + reset CLI);
+DATA-01/02/03 (Phase 102 skills block + v1→v2 migration + reset).
 """
 from __future__ import annotations
 
@@ -54,12 +68,68 @@ import json
 import os
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+SCHEMA_VERSION = 2
 
-SCHEMA_VERSION = 1
+# The 6 REQ-locked DJ skills, in CONTEXT GA1 order. The live-portion
+# ``skills`` block on ``learn-progress.json`` is keyed by these ids; the
+# learn-portion (lesson fill + competent bool) is NEVER stored here — it is
+# DERIVED by ``skill_tree.SkillTree.compute`` from the lesson/recital history.
+_SKILL_IDS: tuple[str, ...] = (
+    "deck_control",
+    "beatmatching",
+    "eq_mixing",
+    "harmonic_mixing",
+    "transitions",
+    "phrasing_performance",
+)
+
+
+def _fresh_skills_block() -> dict[str, dict[str, Any]]:
+    """Live-portion defaults for all 6 skills (Phase 103 fills these).
+
+    Returns a fresh nested dict on every call (used as the dataclass
+    ``default_factory`` for :attr:`LearnProgress.skills` and the seed for
+    both the v1→v2 migration and corrupt-recovery). A shared mutable default
+    would leak Phase-103 ``live_proof_count`` writes across instances — hence
+    a factory, not a module constant.
+
+    Stores ONLY the live-portion (count / mastered / first_mastered_at). It
+    deliberately carries NO ``learn_fill`` / ``competent`` keys — those are
+    DERIVED by the engine on every load (storing them would re-introduce the
+    dual-write drift this split exists to avoid).
+    """
+    return {
+        sid: {
+            "live_proof_count": 0,
+            "mastered": False,
+            "first_mastered_at": None,
+        }
+        for sid in _SKILL_IDS
+    }
+
+
+def _migrate_v1_to_v2(raw: dict[str, Any]) -> dict[str, Any]:
+    """Upgrade a ``schema_version == 1`` dict to v2 (DATA-02).
+
+    Seeds the live-portion ``skills`` block with safe defaults for all 6
+    skills and bumps ``schema_version`` to 2, while preserving the v1
+    lesson/course history verbatim (the deterministic learn-history
+    back-fill — the learn-portion is recomputed by the engine, never
+    stored). Returns a COPY; the caller's ``raw`` is left untouched.
+
+    NOT a wipe: a v1 file with real lesson rows migrates in place rather
+    than nuking the user's progress (RESEARCH finding #1). Routed ONLY on
+    ``schema_version == 1`` so it can never re-run on a v2 file and clobber
+    Phase-103 live data (idempotency — Pitfall 5).
+    """
+    upgraded = dict(raw)
+    upgraded["schema_version"] = 2
+    upgraded["skills"] = _fresh_skills_block()
+    return upgraded
 
 
 def progress_path() -> Path:
@@ -68,6 +138,9 @@ def progress_path() -> Path:
     Module-level FUNCTION (not constant) so tests can monkeypatch via
     ``monkeypatch.setattr("vibemix.learn.progress.progress_path", ...)``.
     """
+    override = os.environ.get("VIBEMIX_LEARN_PROGRESS_PATH")
+    if override:
+        return Path(override).expanduser()
     return Path.home() / ".cache" / "vibemix" / "learn-progress.json"
 
 
@@ -97,6 +170,17 @@ class LearnProgress:
     # (forward-compat). When Course 3 lands in P96, this is the gate the
     # HUD reads to unlock the play-mode lesson selector.
     course_3_unlocked: bool = False
+    # Phase 102 (DATA-01): the live-portion skill ledger. Per skill id
+    # ``{"live_proof_count": int, "mastered": bool, "first_mastered_at":
+    # str | None}``. STORED here (it cannot be recomputed — Phase 103
+    # writes it from grounded live demos); the learn-portion (fill +
+    # competent bool) is DERIVED by ``skill_tree.SkillTree.compute`` and is
+    # never persisted. ``default_factory=_fresh_skills_block`` seeds the
+    # 6-skill defaults on a fresh object — which is also the corrupt-recovery
+    # seed (``load_progress`` returns ``LearnProgress()`` on garbage bytes).
+    skills: dict[str, dict[str, Any]] = field(
+        default_factory=_fresh_skills_block
+    )
 
     def mark_completed(
         self,
@@ -117,12 +201,50 @@ class LearnProgress:
         # ISO-8601 UTC timestamp with seconds precision (``Z`` suffix
         # marker = UTC; matches the timestamp shape elsewhere in the
         # project, e.g. ``recordings/storage.py``).
-        iso = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        iso = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.lessons[lesson_id] = {
             "completed": True,
             "completed_at": iso,
             "strikes_used": int(strikes_used),
         }
+
+    def mark_started(self, course_id: str, lesson_id: str) -> None:
+        """Record that a lesson attempt has begun.
+
+        This intentionally uses only the existing schema-v1 row fields so
+        progress snapshots stay wire-compatible with older Learn windows:
+        an incomplete row is ``completed=False`` + ``completed_at=None``.
+        Completed rows are left completed so replaying a lesson never erases
+        prior progress.
+        """
+        self.courses.setdefault(course_id, {})
+        existing = self.lessons.get(lesson_id)
+        if isinstance(existing, dict) and existing.get("completed") is True:
+            return
+        strikes = 0
+        if isinstance(existing, dict):
+            try:
+                strikes = max(0, min(3, int(existing.get("strikes_used", 0))))
+            except (TypeError, ValueError):
+                strikes = 0
+        self.lessons[lesson_id] = {
+            "completed": False,
+            "completed_at": None,
+            "strikes_used": strikes,
+        }
+
+    def mark_hint_strike(
+        self,
+        course_id: str,
+        lesson_id: str,
+        strikes_used: int,
+    ) -> None:
+        """Persist the latest hint strike for an unfinished attempt."""
+        self.mark_started(course_id, lesson_id)
+        row = self.lessons.get(lesson_id)
+        if not isinstance(row, dict) or row.get("completed") is True:
+            return
+        row["strikes_used"] = max(0, min(3, int(strikes_used)))
 
     def snapshot(self) -> dict[str, Any]:
         """Alias of :meth:`to_dict` — the name the runtime + envelope
@@ -131,13 +253,16 @@ class LearnProgress:
         return self.to_dict()
 
     def dots_for_course(
-        self, course_id: str | None
+        self,
+        course_id: str | None,
+        *,
+        current_lesson_id: str | None = None,
     ) -> tuple[dict[str, str], ...]:
         """Derive the ``LearnLessonLoaded.payload.progress_dots`` array
-        from completed-lesson status.
+        from curriculum order + completed/current lesson status.
 
         Returns a tuple of dicts shaped
-        ``{"lesson_id": <id>, "status": "pending" | "completed"}``;
+        ``{"lesson_id": <id>, "status": "pending" | "current" | "completed"}``;
         :meth:`vibemix.ui_bus.learn_messages.LearnLessonLoaded.make`
         accepts this raw-dict form and normalises it into
         :class:`LearnProgressDot` tuples.
@@ -150,17 +275,18 @@ class LearnProgress:
         silently skipped — they cannot be displayed anyway. ``None``
         course_id returns an empty tuple (no course loaded).
 
-        For v9.0 ("Lesson One") only ``course_0`` ships with the
-        hello-world single-lesson curriculum; the filter is a no-op
-        because every lesson belongs to ``course_0``. CR-03 (P92 REVIEW)
-        regression — when P94 lands Course 1 (16 lessons) the unfiltered
-        walk would have returned 30+ dots, busting the HUD.
+        Course 1-3 now ship as a real 36-lesson curriculum, so this
+        must render every lesson in the active course, not only completed
+        rows from the persisted progress dict. Otherwise a fresh lesson
+        opens with ``OF 0`` in the HUD and no visible current/pending
+        progression.
 
         Rule 2 (auto-add missing critical functionality): the
         :class:`LessonRuntime`'s ``on_enter_loaded`` callback calls
-        ``progress_store.dots_for_course(course_id)`` (runtime.py:346).
-        Without this method the call would throw ``AttributeError`` and
-        the defensive try/except would spam stderr on every lesson load.
+        ``progress_store.dots_for_course(course_id, current_lesson_id=...)``
+        (runtime.py). Without this method the call would throw
+        ``AttributeError`` and the defensive try/except would spam
+        stderr on every lesson load.
         """
         if course_id is None:
             return ()
@@ -172,20 +298,17 @@ class LearnProgress:
         from vibemix.learn.curriculum import CURRICULUM
 
         dots: list[dict[str, str]] = []
-        for lesson_id, entry in self.lessons.items():
-            meta = CURRICULUM.get(lesson_id)
-            if meta is None:
-                # Lesson id is not in the current CURRICULUM; cannot be
-                # attributed to a course → silently skip. This preserves
-                # forward-compat with progress rows from a prior
-                # CURRICULUM (e.g. test/debug rows that drift out of the
-                # ship table); the HUD doesn't paint dots for unknown
-                # lessons anyway.
-                continue
+        for lesson_id, meta in CURRICULUM.items():
             if meta.course_id != course_id:
                 continue
-            if entry.get("completed") is True:
-                dots.append({"lesson_id": lesson_id, "status": "completed"})
+            completed = self.lessons.get(lesson_id, {}).get("completed") is True
+            if lesson_id == current_lesson_id:
+                status = "current"
+            elif completed:
+                status = "completed"
+            else:
+                status = "pending"
+            dots.append({"lesson_id": lesson_id, "status": status})
         return tuple(dots)
 
     def to_dict(self) -> dict[str, Any]:
@@ -196,16 +319,28 @@ class LearnProgress:
             "lessons": self.lessons,
             "course_2_unlocked": self.course_2_unlocked,
             "course_3_unlocked": self.course_3_unlocked,
+            "skills": self.skills,
         }
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> LearnProgress:
         """Build from a raw dict (the JSON-decoded file contents).
 
-        Returns fresh ``cls()`` if ``raw`` isn't a dict OR if
-        ``raw["schema_version"] != SCHEMA_VERSION`` — the migration seam.
-        Future v2 schemas land an explicit ``_migrate_v2_to_v1`` upgrader
-        instead of attempting a garbled merge here.
+        Migration routing (DATA-02):
+
+          * ``raw`` not a dict → fresh ``cls()``.
+          * ``schema_version == 1`` → routed through
+            :func:`_migrate_v1_to_v2` (seed the live-portion ``skills``
+            block, preserve lesson history) then loaded as v2 — NOT the
+            wipe seam.
+          * ``schema_version`` is any OTHER value (> 2 / garbage / absent)
+            → fresh ``cls()`` (the wipe seam preserved for forward-incompat
+            files).
+          * ``schema_version == 2`` → loaded as-is. The ``skills`` block is
+            read with an ``isinstance`` guard; a missing or non-dict block
+            falls back to the seeded defaults. Because migration is keyed
+            strictly on ``schema_version == 1``, a v2 file already carrying
+            Phase-103 live data loads UNTOUCHED (idempotency — Pitfall 5).
 
         Plan 94-03: ``course_2_unlocked`` reads with a safe default
         (False) — legacy schema_version=1 JSON predating the field loads
@@ -217,14 +352,22 @@ class LearnProgress:
         """
         if not isinstance(raw, dict):
             return cls()
-        if raw.get("schema_version") != SCHEMA_VERSION:
-            return cls()
+        version = raw.get("schema_version")
+        if version == 1:
+            raw = _migrate_v1_to_v2(raw)  # migrate v1 in place, don't wipe
+        elif version != SCHEMA_VERSION:
+            return cls()  # v3+/garbage/absent → fresh empty (wipe seam)
+        skills = raw.get("skills")
+        if not isinstance(skills, dict):
+            # Missing or corrupt block → seed defaults. Idempotent on v2.
+            skills = _fresh_skills_block()
         return cls(
             schema_version=SCHEMA_VERSION,
             courses=raw.get("courses", {}) or {},
             lessons=raw.get("lessons", {}) or {},
             course_2_unlocked=bool(raw.get("course_2_unlocked", False)),
             course_3_unlocked=bool(raw.get("course_3_unlocked", False)),
+            skills=skills,
         )
 
 
@@ -234,12 +377,17 @@ def load_progress() -> tuple[LearnProgress, bool]:
     Returns ``(progress, was_corrupt)``:
 
       * ``was_corrupt=False`` on missing file → ``(LearnProgress(), False)``.
-      * ``was_corrupt=False`` on schema-version mismatch → fresh empty;
-        the migration seam, NOT corruption.
+      * ``was_corrupt=False`` on a ``schema_version == 1`` file → migrated
+        in place to v2 (lesson history preserved, ``skills`` block seeded);
+        NOT corruption.
+      * ``was_corrupt=False`` on a forward-incompatible version
+        (``schema_version`` > 2 / garbage) → fresh empty; the wipe seam,
+        NOT corruption. The fresh ``LearnProgress()`` carries a seeded
+        empty v2 ``skills`` block (via ``default_factory``).
       * ``was_corrupt=True`` ONLY when ``OSError | json.JSONDecodeError``
         fires; the corrupt file is ``unlink``ed silently and a fresh
-        empty is returned. The caller emits a one-line
-        ``LearnProgressState { was_recovered: True }`` toast.
+        empty (with a seeded v2 skills block) is returned. The caller emits
+        a one-line ``LearnProgressState { was_recovered: True }`` toast.
     """
     p = progress_path()
     if not p.exists():
