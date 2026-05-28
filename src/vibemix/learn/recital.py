@@ -1,19 +1,40 @@
 # SPDX-License-Identifier: Apache-2.0
-"""RecitalRuntime — drives the L1.16 Course 1 Recital gate.
+"""RecitalRuntime — drives Recital lessons (Course 1 + Course 2 gates).
 
-Phase 94 Plan 03 (CURR-1.16 binding).
+Phase 94 Plan 03 (CURR-1.16 binding — Course 1 unlock gate).
+Phase 95          (CURR-2.14 binding — Course 2 unlock gate).
 
 Architecture
 ============
 
-This controller is an OBSERVER of :class:`LessonRuntime` for the L1.16
-lesson. It reads ``recital_pool`` (≥5 entries) + ``recital_outcomes``
+This controller is an OBSERVER of :class:`LessonRuntime` for recital
+lessons. It reads ``recital_pool`` (≥5 entries) + ``recital_outcomes``
 from the active lesson's script, samples
 ``_RECITAL_SUBSET_SIZE = 5`` entries deterministically using a daily-
 rotating seed, drives each prompt, scores correctness honestly (no
-partial-credit), and on a 5/5 pass flips
-:class:`LearnProgress.course_2_unlocked` to ``True`` + calls
-``save_progress`` (the Course 2 unlock gate).
+partial-credit), and on a pass flips the appropriate
+:class:`LearnProgress.course_N_unlocked` to ``True`` + calls
+``save_progress`` (the course-N unlock gate).
+
+Course detection
+================
+
+The recital lesson script declares its course implicitly via the pool
+entries' shape:
+
+* **Course 1 mode (L1.16)** — pool entries carry only ``prompt`` +
+  ``expected_action``. Pass criteria: ``score >= 5``. Unlock target:
+  ``course_2_unlocked``. Outcome copy uses ``{score}`` substitution.
+* **Course 2 mode (L2.14)** — pool entries also carry
+  ``transition_type``. Pass criteria: ``score >= 5`` AND
+  ``len(distinct transition_types performed) >= 3``. Unlock target:
+  ``course_3_unlocked``. Outcome copy uses ``{score}`` AND ``{types}``
+  substitution.
+
+Mode detection happens at ``start()`` time by inspecting the first pool
+entry's keys — no explicit course-id flag in the fixture. Future
+courses (C4+) can extend the predicate without breaking the C1/C2
+contracts.
 
 The controller NEVER writes :class:`LearnState`. Invariant #1
 (single-writer) stays bound to ``LessonRuntime`` alone; the AST gate
@@ -88,9 +109,20 @@ from vibemix.ui_bus.learn_messages import (
 # Constants
 # ---------------------------------------------------------------------------
 
-# CURR-1.16 lock — recital surfaces EXACTLY 5 prompts. Locked here as a
-# module-level constant so the AST tests can grep it.
+# CURR-1.16 / CURR-2.14 lock — recital surfaces EXACTLY 5 prompts.
+# Locked here as a module-level constant so the AST tests can grep it.
 _RECITAL_SUBSET_SIZE: int = 5
+
+# CURR-2.14 lock — Course 2 recital requires at least this many DISTINCT
+# transition types across the 5 correctly-performed prompts to award the
+# unlock. The 5 sampled prompts may include duplicates of the same
+# transition_type (pool size = 7; deterministic sample may pick e.g.
+# {long_blend, eq_swap, eq_swap, filter_fade, drop_swap} — that scores
+# 5/5 by count but only 4 distinct types). The Course 2 product
+# constraint is "the user has demonstrated genuine variety", so the
+# distinct-type floor is the gate that prevents grinding the same
+# transition five times.
+_COURSE_2_DISTINCT_TYPES_REQUIRED: int = 3
 
 # CC delta floor — mirrors runtime.py and exemplar_lesson.py.
 _CC_DEFAULT_MIN_DELTA: int = 38
@@ -205,6 +237,15 @@ class RecitalRuntime:
         # Flag: has the recital been finalised? Prevents double-emit
         # if .ack() is somehow called past the last prompt.
         self._finalised: bool = False
+        # Course detection — derived at .start() from the first pool
+        # entry. "course_1" if entries lack ``transition_type``;
+        # "course_2" if every entry carries one. Used by _finalize()
+        # to pick the unlock field + outcome-copy template.
+        self._mode: str = "course_1"
+        # Course 2 only: the set of distinct ``transition_type`` values
+        # the user has correctly performed. Populated in ack() when in
+        # course_2 mode; ignored otherwise.
+        self._seen_transition_types: set[str] = set()
 
     # ------------------------------------------------------------------
     # Public API
@@ -219,6 +260,13 @@ class RecitalRuntime:
         """Begin the recital. Samples 5 entries from ``recital_pool``
         deterministically; emits the first prompt as tutor_speak +
         highlight.
+
+        Course detection (Plan 95): if any pool entry carries a
+        ``transition_type`` field, switch to ``course_2`` mode — pass
+        requires score>=5 AND >=3 distinct transition types; unlock
+        target is ``course_3_unlocked``; outcome copy supports the
+        ``{types}`` placeholder in addition to ``{score}``. Otherwise
+        the controller stays in ``course_1`` mode (L1.16 contract).
         """
         pool = script.get("recital_pool")
         self._outcomes = dict(script.get("recital_outcomes") or {})
@@ -231,6 +279,18 @@ class RecitalRuntime:
             )
             return
 
+        # Detect course mode by inspecting pool entries. If ANY entry
+        # carries ``transition_type``, this is a Course 2 recital. We
+        # use "any" rather than "all" so a mixed-shape fixture (legacy
+        # entry + new entries) still routes through the Course 2 path
+        # and the distinct-types floor catches the legacy entry as
+        # "no type recorded" — defensive on fixture drift.
+        has_transition_type = any(
+            isinstance(entry, dict) and "transition_type" in entry
+            for entry in pool
+        )
+        self._mode = "course_2" if has_transition_type else "course_1"
+
         seed = (
             self._seed
             if self._seed is not None
@@ -240,6 +300,7 @@ class RecitalRuntime:
         self._sampled = rng.sample(pool, k=_RECITAL_SUBSET_SIZE)
         self._active_idx = -1
         self._score = 0
+        self._seen_transition_types = set()
         self._finalised = False
         self._advance(lesson_id=lesson_id)
 
@@ -268,9 +329,24 @@ class RecitalRuntime:
         Honest grading: ack() is the ONLY path that increments score.
         Non-matching MIDI never reaches here (the runtime's hook only
         forwards when ``.matches()`` returns True).
+
+        Course 2 mode (Plan 95): the active prompt's
+        ``transition_type`` (if present) is recorded in
+        ``self._seen_transition_types`` — this is the set the finalizer
+        compares against ``_COURSE_2_DISTINCT_TYPES_REQUIRED`` to gate
+        the unlock. Course 1 mode ignores transition_type entirely.
         """
         if self._finalised:
             return
+        # Record the transition_type BEFORE advancing the index — the
+        # current ``self._active_idx`` still points at the prompt the
+        # user just satisfied. Only meaningful in course_2 mode (the
+        # set goes unread in course_1).
+        if 0 <= self._active_idx < len(self._sampled):
+            entry = self._sampled[self._active_idx]
+            ttype = entry.get("transition_type") if isinstance(entry, dict) else None
+            if isinstance(ttype, str) and ttype:
+                self._seen_transition_types.add(ttype)
         self._score += 1
         self._emit_advance(lesson_id=lesson_id, reason="action_matched")
         self._advance(lesson_id=lesson_id)
@@ -305,6 +381,8 @@ class RecitalRuntime:
         self._active_idx = -1
         self._score = 0
         self._outcomes = {}
+        self._mode = "course_1"
+        self._seen_transition_types = set()
         # Leave _finalised = True so subsequent ack()/skip_remaining()
         # are no-ops if the runtime's hooks fire after stop().
         self._finalised = True
@@ -321,11 +399,14 @@ class RecitalRuntime:
             return
         entry = self._sampled[self._active_idx]
 
-        # Emit prompt text as tutor_speak.
+        # Emit prompt text as tutor_speak. Course-aware tts_marker
+        # prefix so TTS caching / log scraping can distinguish C1 vs
+        # C2 recital beats.
+        tts_prefix = "L214" if self._mode == "course_2" else "L116"
         try:
             envelope = LearnTutorSpeak.make(
                 text=str(entry.get("prompt", "")).strip(),
-                tts_marker=f"L116.recital{self._active_idx + 1}",
+                tts_marker=f"{tts_prefix}.recital{self._active_idx + 1}",
                 citations=(),
                 data_state="active",
             ).to_dict()
@@ -357,17 +438,63 @@ class RecitalRuntime:
                 )
 
     def _finalize(self, *, lesson_id: str) -> None:
-        """Surface pass/fail copy + persist unlock on 5/5 + emit
+        """Surface pass/fail copy + persist unlock on pass + emit
         complete_lesson. Idempotent — guarded by self._finalised.
+
+        Pass criteria differ by mode (Plan 95):
+
+        * Course 1 (L1.16): ``score >= 5``. Unlock target:
+          ``course_2_unlocked``.
+        * Course 2 (L2.14): ``score >= 5`` AND
+          ``len(seen_transition_types) >= 3``. Unlock target:
+          ``course_3_unlocked``. Distinct-type floor is the anti-grind
+          gate — a user who hits the same transition 5 times in a row
+          scores 5 by count but fails the variety floor.
+
+        Outcome-copy substitution mirrors the mode:
+
+        * Course 1 fail: ``{score}`` substituted.
+        * Course 2 pass: ``{types}`` substituted (in case the fixture
+          author wants to surface the count). Course 2 fail:
+          ``{score}`` AND ``{types}`` substituted.
         """
         if self._finalised:
             return
         self._finalised = True
 
-        passed = self._score >= _RECITAL_SUBSET_SIZE
+        # Score floor (both modes).
+        score_passed = self._score >= _RECITAL_SUBSET_SIZE
+        n_types = len(self._seen_transition_types)
+        # Course-2-only variety floor; in course_1 the floor is
+        # vacuously satisfied (no transition_type field to count).
+        if self._mode == "course_2":
+            variety_passed = n_types >= _COURSE_2_DISTINCT_TYPES_REQUIRED
+        else:
+            variety_passed = True
+        passed = score_passed and variety_passed
+
+        # Pick the unlock field + default copy by mode.
+        if self._mode == "course_2":
+            unlock_field = "course_3_unlocked"
+            default_pass = "5 of 5. course 3 unlocked."
+            default_fail = (
+                "{score} of 5 with {types} different transition types. "
+                "replay when you're ready."
+            )
+            tts_pass_marker = "L214.outcome_pass"
+            tts_fail_marker = "L214.outcome_fail"
+        else:
+            unlock_field = "course_2_unlocked"
+            default_pass = "5 of 5. course 2 unlocked."
+            default_fail = "{score} of 5. replay when you're ready."
+            tts_pass_marker = "L116.outcome_pass"
+            tts_fail_marker = "L116.outcome_fail"
+
         if passed:
-            # Flip the unlock bit + persist atomically.
-            self._progress.course_2_unlocked = True
+            # Flip the unlock bit on the SHIPPED progress dataclass
+            # field (course_2_unlocked or course_3_unlocked) +
+            # persist atomically.
+            setattr(self._progress, unlock_field, True)
             try:
                 self._save(self._progress)
             except Exception as exc:  # pragma: no cover — defensive
@@ -376,14 +503,14 @@ class RecitalRuntime:
                     file=sys.stderr,
                 )
 
-            # Surface pass copy.
-            pass_copy = str(
-                self._outcomes.get(
-                    "pass", "5 of 5. course 2 unlocked."
-                )
-            )
+            # Surface pass copy — both {score} and {types} substituted
+            # so a fixture author can use either placeholder.
+            pass_template = str(self._outcomes.get("pass", default_pass))
+            pass_copy = pass_template.replace(
+                "{score}", str(self._score)
+            ).replace("{types}", str(n_types))
             self._emit_outcome_speak(
-                text=pass_copy, tts_marker="L116.outcome_pass"
+                text=pass_copy, tts_marker=tts_pass_marker
             )
             # Repaint the lesson dots + signal unlock to the shell.
             try:
@@ -405,15 +532,16 @@ class RecitalRuntime:
                 lesson_id=lesson_id, schema_reason="completed"
             )
         else:
-            # Fail copy with {score} substituted.
-            fail_template = str(
-                self._outcomes.get(
-                    "fail", "{score} of 5. replay when you're ready."
-                )
-            )
-            fail_copy = fail_template.replace("{score}", str(self._score))
+            # Fail copy with {score} + {types} substituted. Both
+            # placeholders are replaced even when the fixture author
+            # only uses one — extra-placeholder substitutions are
+            # no-ops on a template lacking the placeholder.
+            fail_template = str(self._outcomes.get("fail", default_fail))
+            fail_copy = fail_template.replace(
+                "{score}", str(self._score)
+            ).replace("{types}", str(n_types))
             self._emit_outcome_speak(
-                text=fail_copy, tts_marker="L116.outcome_fail"
+                text=fail_copy, tts_marker=tts_fail_marker
             )
             # The runtime's on_enter_completed will fire its own
             # complete_lesson with reason="user_skip" (because
@@ -480,5 +608,6 @@ class RecitalRuntime:
 
 __all__ = [
     "RecitalRuntime",
+    "_COURSE_2_DISTINCT_TYPES_REQUIRED",
     "_RECITAL_SUBSET_SIZE",
 ]
