@@ -64,7 +64,7 @@ If a phase doesn't pass → defer to HARDEN-FUTURE or out of scope.
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
 | 99 | HARDEN-RETRY — Viber Tool-Retry Policy | 8/8 | Complete   | 2026-05-28 |
-| 100 | HARDEN-CLARIFY — Viber RequestClarification | 6/7 | In Progress|  |
+| 100 | HARDEN-CLARIFY — Viber RequestClarification | 7/7 | Complete   | 2026-05-28 |
 | 101 | HARDEN-CONTRACT — Prompt Composition Doc | A new contributor reads ONE doc and knows exactly what enters the live prompt per event type — every file:line reference grep-resolves on current source | HARDEN-CONTRACT-01..07 (7) | 4 |
 
 **Dependency spine:** `P99 → P100`, with `P101` independent (parallelizable but listed sequentially so its grep verification sees the post-hardening tool surface). `P99` ships the shared `stop_reason` payload seam that `P100` extends with a sibling reason (`clarification_needed`).
@@ -115,7 +115,7 @@ Plans:
 - [x] 100-04-PLAN.md — CLI exit code 11 + 2-block stderr render + normalizer extension (HARDEN-CLARIFY-04, HARDEN-CLARIFY-06)
 - [x] 100-05-PLAN.md — telegram_bridge format_reply clarification_needed branch with strip_leaks (HARDEN-CLARIFY-05)
 - [x] 100-06-PLAN.md — AST gate proving no track_id surface + single-turn structural pin (HARDEN-CLARIFY-06, HARDEN-CLARIFY-07)
-- [ ] 100-07-PLAN.md — end-to-end integration seal + REQ coverage 7/7 + KAAN-ACTION surface (HARDEN-CLARIFY-07)
+- [x] 100-07-PLAN.md — end-to-end integration seal + REQ coverage 7/7 + KAAN-ACTION surface (HARDEN-CLARIFY-07)
 **Cardinal invariants:** #1 N/A direct (no `MusicState` writes; clarification handler is stateless); #2 holds — `request_clarification` has no `track_id` surface, structurally citation-safe (AST-gated); #3 N/A (live co-host untouched); #4 N/A (no new ws traffic — MCP STDIO + Telegram long-poll + CLI are existing transports).
 **Honest-green discipline:** failing-then-passing tests under `tests/library/` for every contract (args-validation 0/1/6+ rejected · 2-5 accepted · CLI formatting + distinct exit code · Telegram `format_reply` branch with leak-strip + numbered choices · `codex_curate` propagation · no-track-surface AST gate). No live Codex calls — controlled-fixture harness drives the dispatch path.
 **KAAN-ACTION (parked at phase close):** **§HARDEN-PHASE-B-CLARIFICATION-TONE** — ear-pass on Codex's actual clarification prompts in the wild (theme-ambiguity test corpus). Do the LLM's question framings stay on-brand vs sound like a robot survey? Anti-slop release gate.
