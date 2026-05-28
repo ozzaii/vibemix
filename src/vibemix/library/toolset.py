@@ -995,6 +995,59 @@ class LibraryToolset:
 
     # -- dispatch (hard per-tool timeout; never raises) --------------------- #
 
+    def _build_starvation_payload(
+        self, last_tool: str, args: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Phase 99 HARDEN-RETRY Decision 5: deterministic three-case hint.
+
+        Built from the toolset's view of the world at threshold-trip time —
+        NEVER LLM-generated (the hint must reflect REAL counter state, never
+        invented text; this extends Cardinal Invariant #3 "trust the audio"
+        to the curation surface).
+
+        Three named cases, evaluated in order:
+          A. Zero-track library — ``self._library.tracks`` is empty/falsy →
+             the user has not run ``library ingest`` yet.
+          B. No theme match — library has tracks AND the last tool was
+             ``search_vibe`` (so the threshold tripped on empty results from
+             a too-narrow theme).
+          C. Tool error — last tool was NOT ``search_vibe``; threshold tripped
+             on repeated ``{"error": ...}`` responses from some other handler.
+
+        Hint copy is SEEDED per D-05; KAAN-ACTION
+        §HARDEN-PHASE-A-EAR-PASS (parked at milestone close) polishes wording.
+        Tests pin substring structure ("library has 0 tracks", "no tracks
+        matched", "kept failing"), not full-string equality — ear-pass tolerant.
+
+        T-99-02 (security): the ``theme`` user input (Case B) is interpolated
+        into an f-string ONLY — never ``exec`` / ``eval``. Output destinations
+        are stderr (CLI) + ``strip_leaks`` (Telegram, scrubs FS paths).
+        """
+        # Case A: zero-track library — user has not ingested anything yet.
+        if not self._library.tracks:
+            hint = "library has 0 tracks — run `library ingest` first"
+        # Case B: library non-empty AND last tool was search_vibe →
+        # theme was too narrow.
+        elif last_tool == "search_vibe":
+            theme = args.get("query", "")
+            hint = (
+                f"no tracks matched '{theme}' — try a broader theme or "
+                f"different BPM range"
+            )
+        # Case C: library non-empty AND last tool was NOT search_vibe →
+        # a non-discovery handler kept erroring out.
+        else:
+            hint = (
+                f"tool '{last_tool}' kept failing — try again or check "
+                f"codex installation"
+            )
+        return {
+            "reason": "tool_starvation",
+            "hint": hint,
+            "tool": last_tool,
+            "consecutive": self._consecutive_empties,
+        }
+
     def _is_empty_or_error(self, name: str, result: dict[str, Any]) -> bool:
         """Phase 99 HARDEN-RETRY Decision 2: identify counter-incrementing returns.
 
@@ -1014,6 +1067,17 @@ class LibraryToolset:
         return False
 
     def dispatch(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        # ─── PHASE 99 HOOK (Plan 99-03 — terminal short-circuit) ─────────
+        # Once the threshold has tripped (the ``stop_reason`` attr is set),
+        # the run is TERMINAL. Every subsequent ``dispatch()`` call returns
+        # the same idempotent terminal echo WITHOUT invoking any handler —
+        # which is why the counter freezes at threshold (the ``else``
+        # counter-reset branch below is unreachable after a trip). The
+        # shallow copy prevents callers from mutating the internal payload
+        # (RESEARCH.md Open Q2).
+        if self.stop_reason is not None:
+            return {"error": "tool_starvation", "stop_reason": dict(self.stop_reason)}
+
         handlers: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
             "search_vibe": self.search_vibe,
             "get_track_features": self.get_track_features,
@@ -1058,6 +1122,23 @@ class LibraryToolset:
         # byte-equivalent to pre-plan behavior.
         if self._is_empty_or_error(name, result):
             self._consecutive_empties += 1
+            # ─── PHASE 99 HOOK (Plan 99-03 — threshold trip, terminal write) ─
+            # First-write-wins: the ``stop_reason is None`` guard makes
+            # the payload write idempotent under any conceivable racy path
+            # (T-99-03 mitigation, though the dispatch-calling-thread
+            # serialization at 407-411 prevents the race in the first
+            # place). After this assignment, the short-circuit at the top
+            # of ``dispatch()`` returns the terminal echo on every
+            # subsequent call.
+            #
+            # Side-channel write lands in Plan 99-04.
+            if (
+                self._consecutive_empties >= TOOL_STARVATION_THRESHOLD
+                and self.stop_reason is None
+            ):
+                self.stop_reason = self._build_starvation_payload(
+                    last_tool=name, args=args
+                )
         else:
             self._consecutive_empties = 0
 
