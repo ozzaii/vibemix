@@ -31,14 +31,12 @@ from pathlib import Path
 
 import pytest
 
-try:
-    from vibemix.learn.exemplar import ExemplarFinder, _packaged_bank_dir  # Plan 93-04
-except ImportError:
-    pytest.skip(
-        "tests/learn/test_exemplar_packaged_fallback.py awaiting Plan 93-04 — "
-        "packaged CC-BY bank scaffold + _packaged_bank_dir resolver.",
-        allow_module_level=True,
-    )
+# Plan 93-04 — module-level skip lifted; ExemplarFinder + _packaged_bank_dir
+# now ship in src/vibemix/learn/exemplar.py + the bank scaffold lives at
+# src/vibemix/learn/assets/band_exemplars/. The per-test inner skip guards
+# stay in place — they fire gracefully when CC-BY audio assets aren't yet
+# populated (the §EXEMPLAR-BANK-SOURCING KAAN-ACTION).
+from vibemix.learn.exemplar import ExemplarFinder, _packaged_bank_dir
 
 
 def test_empty_library_falls_back_to_packaged_bank(tmp_path, monkeypatch):

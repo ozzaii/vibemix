@@ -24,15 +24,11 @@ from __future__ import annotations
 
 import pytest
 
-try:
-    from vibemix.learn.exemplar import ExemplarFinder, ExemplarPick  # Plan 93-03
-    from vibemix.state.evidence_registry import EvidenceRegistry
-except ImportError:
-    pytest.skip(
-        "tests/learn/test_exemplar_finder.py awaiting Plan 93-03 — "
-        "ExemplarFinder.find() in src/vibemix/learn/exemplar.py.",
-        allow_module_level=True,
-    )
+# Plan 93-04 — module-level skip lifted; ExemplarFinder + ExemplarPick now ship
+# in src/vibemix/learn/exemplar.py. Direct imports replace the Plan 93-01
+# try/except guard. EvidenceRegistry imports unchanged (Phase 18 stable).
+from vibemix.learn.exemplar import ExemplarFinder, ExemplarPick
+from vibemix.state.evidence_registry import EvidenceRegistry
 
 
 def test_find_returns_top_k_from_library_when_floor_met(
