@@ -116,6 +116,39 @@ class LearnProgress:
         ``LearnProgressState`` envelope payload."""
         return self.to_dict()
 
+    def dots_for_course(
+        self, course_id: str | None
+    ) -> tuple[dict[str, str], ...]:
+        """Derive the ``LearnLessonLoaded.payload.progress_dots`` array
+        from completed-lesson status.
+
+        Returns a tuple of dicts shaped
+        ``{"lesson_id": <id>, "status": "pending" | "completed"}``;
+        :meth:`vibemix.ui_bus.learn_messages.LearnLessonLoaded.make`
+        accepts this raw-dict form and normalises it into
+        :class:`LearnProgressDot` tuples.
+
+        For v9.0 ("Lesson One") only ``course_0`` ships with the
+        hello-world single-lesson curriculum; this method walks
+        ``self.lessons`` and reports anything marked completed. Empty
+        tuple when nothing is completed yet — schema-valid (the
+        ``progress_dots`` array has no ``minItems`` constraint).
+
+        Rule 2 (auto-add missing critical functionality): the
+        :class:`LessonRuntime`'s ``on_enter_loaded`` callback calls
+        ``progress_store.dots_for_course(course_id)`` (runtime.py:346).
+        Without this method the call would throw ``AttributeError`` and
+        the defensive try/except would spam stderr on every lesson load.
+        """
+        del course_id  # currently unused — v9.0 ships ``course_0`` only;
+        #                future plans extend this filter when multi-course
+        #                lookup needs to distinguish per-course progress.
+        dots: list[dict[str, str]] = []
+        for lesson_id, entry in self.lessons.items():
+            if entry.get("completed") is True:
+                dots.append({"lesson_id": lesson_id, "status": "completed"})
+        return tuple(dots)
+
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a plain dict — the JSON-file shape."""
         return {

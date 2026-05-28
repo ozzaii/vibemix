@@ -186,10 +186,27 @@ async def test_30hz_cadence_holds_under_lesson_runtime_tick_loop(mocker) -> None
     tick_counter = {"n": 0}
 
     async def fast_sleep(_s):
-        tick_counter["n"] += 1
-        if tick_counter["n"] >= 100:
-            stop_event.set()
-            release_handler.set()
+        # ``mocker.patch("vibemix.runtime.ws_bus.asyncio.sleep", ...)``
+        # patches the asyncio.sleep ATTRIBUTE on the asyncio module —
+        # which is shared across the whole process. Both ws_broadcast
+        # (using ``asyncio.sleep(1/30)`` ≈ 0.033) and LessonRuntime
+        # tick_loop (using ``asyncio.sleep(1.0)``) hit this same wrapper.
+        # If we counted BOTH against the same 100-tick budget, tick_loop
+        # would steal half the budget from the mascot path and the
+        # cadence assertion would false-fire.
+        #
+        # The fix: distinguish by sleep duration. The mascot path sleeps
+        # at the 30 Hz rate (~0.033 s); the tick_loop sleeps at 1 Hz
+        # (1.0 s). Only the SHORT sleeps count toward the mascot-cadence
+        # budget. Long sleeps still yield cooperatively (via
+        # _REAL_SLEEP(0) below) so the assertion accurately measures
+        # mascot frame-emit rate independent of how often tick_loop
+        # wakes.
+        if _s < 0.1:
+            tick_counter["n"] += 1
+            if tick_counter["n"] >= 100:
+                stop_event.set()
+                release_handler.set()
         await _REAL_SLEEP(0)
 
     mocker.patch(

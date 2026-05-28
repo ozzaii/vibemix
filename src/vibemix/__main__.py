@@ -1521,6 +1521,103 @@ async def main() -> None:
         _session_ipc = None
         print(f"-> session IPC handlers NOT wired: {_e!r}", file=sys.stderr)
 
+    # Phase 92 (LESSON-01/03/04) — wire LessonRuntime alongside MidiMirror.
+    # P91 already shipped MidiMirror (read-only 30 Hz controller-position
+    # snapshotter); P92 ships the FSM that drives the lesson lifecycle on
+    # top. The runtime emits ipc.learn.* envelopes via the same
+    # ipc_router instance SessionLoop registered handlers on above (One
+    # Socket invariant #4 preserved — no second ws listener).
+    #
+    # Boot sequence:
+    #   1. load_progress() reads ~/.cache/vibemix/learn-progress.json. On
+    #      corruption (was_corrupt=True) the file is silently nuked +
+    #      fresh empty is returned; we surface a one-line toast envelope
+    #      to the webview so the user knows their progress was reset.
+    #   2. Instantiate LessonRuntime with the loaded progress as the
+    #      progress_store; LearnState is the single-writer dataclass
+    #      (Invariant #1 binding).
+    #   3. asyncio.create_task(lesson_runtime.tick_loop(stop_event)) so
+    #      the 30 s strike-escalation timer + 45 s min-dwell gate runs
+    #      alongside ws_broadcast's 30 Hz tick (Pitfall 6 mitigation —
+    #      tick_loop callbacks are sync emits, no file I/O).
+    #
+    # Defensive: when ipc_router is None (the SessionLoop wiring above
+    # failed) we still wire LessonRuntime so the FSM exists; emit calls
+    # become no-ops via the sync-adapter's None branch. The live app
+    # boots cleanly even when SessionLoop wiring degrades.
+    from vibemix.learn.progress import load_progress as _load_progress
+    from vibemix.learn.runtime import LessonRuntime
+    from vibemix.learn.state import LearnState
+    from vibemix.ui_bus.learn_messages import LearnProgressState
+
+    class _LessonRuntimeIpcAdapter:
+        """Sync→async bridge for LessonRuntime emits.
+
+        LessonRuntime's on_enter_<state> callbacks call
+        ``self._ipc.emit(envelope_dict)`` synchronously, but
+        IpcRouterBus.emit is a coroutine. This adapter schedules the
+        coroutine as a fire-and-forget asyncio task when a loop is
+        running; when no loop is running (e.g. boot-time toasts emitted
+        synchronously before asyncio.create_task fires) the coroutine
+        is silently dropped. The webview eventually re-queries progress
+        via ipc.learn.progress_state and gets the same data anyway.
+        """
+
+        def __init__(self, ipc_router_inst: Any) -> None:
+            self._router = ipc_router_inst
+
+        def emit(self, msg: dict) -> None:
+            if self._router is None:
+                return
+            try:
+                _loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # No running loop — drop the emit. T-92-04-08 mitigation
+                # (boot-time emit before the asyncio loop is ready).
+                return
+            try:
+                _t = _loop.create_task(self._router.emit(msg))
+                # Strong-ref the task so the loop doesn't garbage-collect
+                # it mid-flight (mirrors the _background_tasks pattern
+                # used by the SessionLoop boot-ingest block above).
+                _background_tasks.add(_t)
+                _t.add_done_callback(_background_tasks.discard)
+            except Exception as _emit_exc:  # pragma: no cover — defensive
+                print(
+                    f"[learn boot] ipc emit failed: {_emit_exc!r}",
+                    file=sys.stderr,
+                )
+
+    _learn_state = LearnState()
+    _learn_progress, _learn_was_recovered = _load_progress()
+    _lesson_ipc_adapter = _LessonRuntimeIpcAdapter(ipc_router)
+    lesson_runtime = LessonRuntime(
+        learn_state=_learn_state,
+        midi_mirror=midi_mirror,
+        controller_state=midi_macos.controller_state,
+        ipc_router=_lesson_ipc_adapter,
+        progress_store=_learn_progress,
+    )
+    print("-> lesson_runtime wired", file=sys.stderr)
+
+    # If the progress file was corrupt, surface a one-line toast via
+    # progress_state. Wrapped in try/except so a boot-time emit failure
+    # never crashes the app (T-92-04-08).
+    if _learn_was_recovered:
+        try:
+            _lesson_ipc_adapter.emit(
+                LearnProgressState.make(
+                    action="snapshot",
+                    was_recovered=True,
+                    progress=_learn_progress.snapshot(),
+                ).to_dict()
+            )
+        except Exception as _toast_exc:  # pragma: no cover — defensive
+            print(
+                f"[learn boot] progress recovery toast emit failed: {_toast_exc!r}",
+                file=sys.stderr,
+            )
+
     # --- Asyncio tasks (6) ---
     ws_task = asyncio.create_task(
         ws_broadcast(
@@ -1537,6 +1634,12 @@ async def main() -> None:
             midi_mirror=midi_mirror,
         )
     )
+    # Phase 92 (LESSON-01) — drive LessonRuntime's 1 Hz tick_loop
+    # alongside ws_broadcast's 30 Hz tick. The two coroutines share the
+    # same asyncio event loop; the tick_loop coroutine is the strike-
+    # escalation timer (Pitfall 6 mitigation pinned by
+    # tests/runtime/test_ws_broadcast_30hz_under_lesson_load.py).
+    lesson_tick_task = asyncio.create_task(lesson_runtime.tick_loop(stop_event))
     diag_task = asyncio.create_task(diag_loop(levels, state, stop_event, tracer=tracer))
     screen_task = asyncio.create_task(screen_macos.run_capture_loop(state, stop_event))
     track_task = asyncio.create_task(track_macos.run_poll_loop(stop_event))
