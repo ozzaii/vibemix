@@ -205,6 +205,14 @@ class LessonRuntime(StateMachine):
         # ``on_enter_advancing`` fires, so the advance envelope's
         # ``reason`` field carries the right token.
         self._last_was_match: bool = False
+        # WR-04 fix (P92 REVIEW): track the in-flight _finish_when_dwelled
+        # task so re-load can cancel it. Without this, a post-completion
+        # replay can have a stale finish task wake up ~45 s later and
+        # silently no-op via allow_event_without_transition — the task
+        # itself is a single coroutine but the strong-ref pattern via
+        # bare ``asyncio.create_task`` drops the handle, so long-lived
+        # sessions with multiple lesson replays slowly leak coroutines.
+        self._finish_task: asyncio.Task | None = None
         super().__init__()
 
     # ------------------------------------------------------------------
@@ -327,6 +335,15 @@ class LessonRuntime(StateMachine):
         ``current_lesson_id``, ``current_controller_id``,
         ``current_beat_index``, ``strike_count``, ``lesson_started_at``.
         """
+        # WR-04 fix (P92 REVIEW): cancel any in-flight finish task from a
+        # prior lesson. The completed→loaded transition is the replay
+        # flow; without this, the prior lesson's _finish_when_dwelled
+        # would wake up post-load and fire send("finish") into the new
+        # lesson's awaiting_action (silent no-op via
+        # allow_event_without_transition, but a leaked coroutine).
+        if self._finish_task is not None and not self._finish_task.done():
+            self._finish_task.cancel()
+            self._finish_task = None
         # Update LearnState — Invariant #1 binding (sole writer).
         if lesson_id is not None:
             self._learn.current_lesson_id = lesson_id
@@ -441,7 +458,17 @@ class LessonRuntime(StateMachine):
             # remains in ``advancing`` which satisfies the contract.
             pass
         else:
-            asyncio.create_task(self._finish_when_dwelled())
+            # WR-04 fix (P92 REVIEW): cancel any stale finish task from
+            # a prior advancing→completed cycle BEFORE scheduling the
+            # new one. Replay flows (completed→loaded→awaiting_action→
+            # advancing) would otherwise stack a finish task per cycle;
+            # each old task wakes up post-stale-deadline and silently
+            # no-ops, but the leaked coroutine references accumulate.
+            if self._finish_task is not None and not self._finish_task.done():
+                self._finish_task.cancel()
+            self._finish_task = asyncio.create_task(
+                self._finish_when_dwelled()
+            )
 
     async def _finish_when_dwelled(self) -> None:
         """Wait for the remaining min-dwell window + ~0.7 s UI settle,

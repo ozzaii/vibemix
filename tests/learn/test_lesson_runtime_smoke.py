@@ -190,3 +190,139 @@ def test_idle_to_completed_with_skip(monkeypatch: pytest.MonkeyPatch) -> None:
         "min-dwell guard failed — skip at t+46s should advance the "
         f"runtime, but state is now {runtime.current_state.id!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 3: WR-04 (P92 REVIEW) — stale _finish_when_dwelled tasks cancel on
+# re-load
+# ---------------------------------------------------------------------------
+
+
+def test_finish_task_cancelled_on_reload(monkeypatch: pytest.MonkeyPatch) -> None:
+    """WR-04 (P92 REVIEW) regression. Without cancellation, a replay
+    flow stacks one orphan _finish_when_dwelled task per cycle. The
+    tasks all silently no-op via allow_event_without_transition (no
+    state damage), but the coroutine references accumulate.
+
+    With the fix:
+
+      * on_enter_advancing stores the new task on self._finish_task,
+        cancelling any prior in-flight task FIRST.
+      * on_enter_loaded (the replay-flow entry point) also cancels
+        any leftover in-flight task.
+
+    Test path:
+
+      1. Run an event loop so on_enter_advancing actually schedules a
+         finish task (the smoke test path runs synchronously and the
+         scheduling falls back to no-op).
+      2. Drive to advancing — finish task scheduled.
+      3. Re-load — first finish task cancelled, _finish_task reset.
+      4. Drive to advancing again — new finish task scheduled, distinct
+         from the first.
+    """
+    import asyncio
+    import time
+
+    base = 1_700_000_000.0
+    fake_now = {"t": base}
+
+    def fake_monotonic() -> float:
+        return fake_now["t"]
+
+    monkeypatch.setattr(time, "monotonic", fake_monotonic)
+
+    async def run_lifecycle() -> None:
+        runtime, _ipc = _make_runtime()
+        runtime.send(
+            "load",
+            lesson_id="L0.00-press-play",
+            course_id="course_0",
+            controller_id="pioneer_ddj_flx4",
+        )
+        runtime.send("begin")
+        runtime.send(
+            "ack_action",
+            midi={
+                "type": "button",
+                "control": "play",
+                "deck": "A",
+                "direction": "down",
+            },
+        )
+        # The matching ack advances to ``advancing``; on_enter_advancing
+        # scheduled a _finish_when_dwelled task because an event loop is
+        # running.
+        first_task = runtime._finish_task
+        assert first_task is not None, (
+            "on_enter_advancing must store the scheduled finish task "
+            "on self._finish_task (WR-04 fix); got None"
+        )
+        assert not first_task.done(), (
+            "fresh finish task should be pending"
+        )
+
+        # Force the FSM out of advancing into completed (the
+        # _finish_when_dwelled task would do this after a 45 s sleep —
+        # we drive it manually so the test isn't gated on wall-clock).
+        # ``load`` only fires from idle/completed; we must reach
+        # completed before re-loading. The send("finish") here mirrors
+        # what the finish coroutine would have done.
+        runtime.send("finish")
+        assert runtime.current_state.id == "completed", (
+            f"expected completed, got {runtime.current_state.id!r}"
+        )
+
+        # Re-load to simulate a post-completion replay BEFORE the
+        # original finish task naturally fires. WR-04 fix: this MUST
+        # cancel the in-flight task and reset _finish_task to None.
+        runtime.send(
+            "load",
+            lesson_id="L0.00-press-play",
+            course_id="course_0",
+            controller_id="pioneer_ddj_flx4",
+        )
+        # The cancellation is synchronous; the task is marked cancelled
+        # but the actual coroutine doesn't observe it until the next
+        # await point. Yield once so the cancellation propagates.
+        await asyncio.sleep(0)
+
+        assert first_task.cancelled() or first_task.done(), (
+            "WR-04 fix missing — first finish task was not cancelled "
+            "on re-load. The runtime would have leaked the coroutine "
+            "until its natural 45 s wakeup."
+        )
+        assert runtime._finish_task is None, (
+            "on_enter_loaded must clear self._finish_task after "
+            "cancellation"
+        )
+
+        # Drive through the lifecycle again — a fresh finish task is
+        # scheduled.
+        runtime.send("begin")
+        runtime.send(
+            "ack_action",
+            midi={
+                "type": "button",
+                "control": "play",
+                "deck": "A",
+                "direction": "down",
+            },
+        )
+        second_task = runtime._finish_task
+        assert second_task is not None and second_task is not first_task, (
+            "second cycle should schedule a NEW finish task distinct "
+            "from the first"
+        )
+
+        # Tear down — cancel the live task so the test event loop closes
+        # cleanly without a "Task was destroyed but it is pending"
+        # warning.
+        if second_task is not None and not second_task.done():
+            second_task.cancel()
+            try:
+                await second_task
+            except (asyncio.CancelledError, Exception):
+                pass
+
+    asyncio.run(run_lifecycle())
