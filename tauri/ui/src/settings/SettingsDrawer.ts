@@ -63,6 +63,7 @@ import {
 } from "./components/retention-slider.js";
 import { renderConfirmDialog } from "./components/confirm-dialog.js";
 import { HelpGroup } from "./components/help-group.js";
+import { LearnGroup } from "./components/learn-group.js";
 import { MascotGroup } from "./components/mascot-group.js";
 import { PerformanceGroup } from "./components/performance-group.js";
 import {
@@ -86,7 +87,7 @@ const CSS = `
     z-index: 49;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 200ms ease-out;
+    transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .vmx-settings-backdrop[data-open="true"] {
     opacity: 1;
@@ -97,25 +98,26 @@ const CSS = `
     top: 0;
     right: 0;
     bottom: 0;
-    width: 400px;
+    width: clamp(420px, 31vw, 456px);
     max-width: 100vw;
     z-index: 50;
     transform: translateX(100%);
+    font-family: var(--type-body);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 22%),
-      repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.026) 0 1px, transparent 1px 64px),
-      linear-gradient(180deg, rgba(12, 14, 22, 0.92), rgba(3, 4, 8, 0.96) 66%, rgba(1, 2, 5, 0.98)),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.030), transparent 18%),
+      linear-gradient(90deg, rgba(255, 138, 61, 0.026), transparent 18%),
+      linear-gradient(180deg, rgba(12, 14, 22, 0.94), rgba(3, 4, 8, 0.97) 66%, rgba(1, 2, 5, 0.98)),
       var(--glass-1);
     backdrop-filter: var(--blur-glass);
     -webkit-backdrop-filter: var(--blur-glass);
-    border-left: 1px solid var(--glass-edge);
+    border-left: 1px solid var(--glass-edge-up);
     box-shadow:
-      inset 1px 0 0 rgba(255, 255, 255, 0.075),
-      inset 8px 0 22px rgba(255, 138, 61, 0.025),
+      inset 1px 0 0 rgba(255, 251, 244, 0.080),
+      inset 10px 0 22px rgba(255, 138, 61, 0.018),
       inset 0 -1px 0 rgba(0, 0, 0, 0.78),
-      -18px 0 58px rgba(0, 0, 0, 0.64),
-      -1px 0 0 rgba(255, 255, 255, 0.018);
-    transition: transform 250ms ease-in-out;
+      -18px 0 54px rgba(0, 0, 0, 0.68),
+      -1px 0 0 rgba(255, 251, 244, 0.020);
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -130,9 +132,9 @@ const CSS = `
   }
   .vmx-settings-drawer::before {
     background:
-      linear-gradient(90deg, rgba(255, 138, 61, 0.16), transparent 18%),
-      repeating-linear-gradient(0deg, transparent 0 11px, rgba(214, 207, 199, 0.022) 11px 12px);
-    opacity: 0.36;
+      linear-gradient(90deg, rgba(255, 138, 61, 0.075), transparent 18%),
+      linear-gradient(180deg, rgba(214, 207, 199, 0.030), transparent 22%);
+    opacity: 0.18;
     mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 88%, transparent 100%);
   }
   .vmx-settings-drawer::after {
@@ -141,7 +143,7 @@ const CSS = `
     width: 1px;
     background: linear-gradient(180deg, transparent, rgba(255, 138, 61, 0.42) 44%, transparent);
     box-shadow: 0 0 16px rgba(255, 138, 61, 0.18);
-    opacity: 0.72;
+    opacity: 0.58;
   }
   /* z-index discipline kept as a defensive baseline even after the
    * .border-anim removal (2026-05-19) so any future glass overlay in
@@ -156,7 +158,7 @@ const CSS = `
   }
   .vmx-settings-drawer__header {
     position: relative;
-    height: 52px;
+    height: 56px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -164,8 +166,8 @@ const CSS = `
     padding: 0 var(--sp-5);
     border-bottom: 1px solid var(--glass-edge);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
-      rgba(0, 0, 0, 0.42);
+      linear-gradient(180deg, rgba(255, 251, 244, 0.030), transparent),
+      rgba(0, 0, 0, 0.48);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.05),
       inset 0 -1px 0 rgba(0, 0, 0, 0.72),
@@ -183,7 +185,7 @@ const CSS = `
     background:
       radial-gradient(circle at left center, rgba(214, 207, 199, 0.28) 0 2px, transparent 2.5px),
       radial-gradient(circle at right center, rgba(214, 207, 199, 0.18) 0 2px, transparent 2.5px);
-    opacity: 0.48;
+    opacity: 0;
   }
   /* 2026-05-19 /impeccable critique round 3: dropped heading from
    * 14px Saira 700 to 11px Saira 600 + 0.22em tracking — the drawer
@@ -197,10 +199,10 @@ const CSS = `
     gap: 8px;
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 11px;
-    letter-spacing: 0.22em;
+    font-size: 14px;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--silk-65);
+    color: var(--silk);
     line-height: 1;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
@@ -219,7 +221,7 @@ const CSS = `
       linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.08)),
       rgba(0, 0, 0, 0.32);
     border: 1px solid rgba(255, 255, 255, 0.055);
-    color: var(--silk-40);
+    color: var(--silk-65);
     line-height: 1;
     cursor: pointer;
     display: inline-flex;
@@ -254,14 +256,13 @@ const CSS = `
   .vmx-settings-drawer__body {
     flex: 1;
     overflow-y: auto;
-    padding: var(--sp-5);
+    padding: 28px var(--sp-5) 30px;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: 0;
     position: relative;
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 14%),
-      repeating-linear-gradient(90deg, transparent 0 31px, rgba(214, 207, 199, 0.018) 31px 32px);
+      linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 16%);
   }
   .vmx-settings-drawer__body::-webkit-scrollbar { width: 6px; }
   .vmx-settings-drawer__body::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
@@ -347,7 +348,9 @@ const CSS = `
   .vmx-settings-drawer [role="button"]:not([aria-disabled="true"]):focus-visible,
   .vmx-settings-drawer [data-interactive]:hover,
   .vmx-settings-drawer [data-interactive]:focus-visible {
-    box-shadow: var(--glow-faint);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.040),
+      var(--glow-faint);
   }
   /* P1-b finding #3 — DEMOTE the blanket glow, reserve a brighter signal for
    * the ACTIVE control. The faint-glow-on-everything-hovered rule above is the
@@ -369,19 +372,19 @@ const CSS = `
    * by construction (it's not motion). The "soft" radii mirror --glow-soft. */
   .vmx-settings-drawer .vmx-rocker__seg[data-active="true"],
   .vmx-settings-drawer .vmx-picker[data-open="true"] .vmx-picker__row {
-    filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 12px currentColor);
+    filter: none;
   }
   .vmx-settings-drawer__modal-slot {
     position: relative;
     z-index: 60;
   }
   .vmx-settings-drawer__label {
-    font-family: var(--type-display);
+    font-family: var(--type-body);
     font-variation-settings: "wdth" 85, "wght" 500;
     font-size: 10px;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: var(--silk-40);
+    color: var(--silk-65);
     line-height: 1;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
@@ -732,10 +735,10 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   outputBody.append(
     renderPicker({
       label: "DEVICE",
-      value: settings.output_device_id ?? "auto",
+      value: settings.output_device_id ?? "default",
       autoPill: !settings.output_device_id,
       options: [
-        { id: "auto", label: "auto" },
+        { id: "auto", label: "default" },
         // Real device list is populated by the sidecar at boot and lives
         // off ipc.settings.state; the picker here lets the user fall
         // back to "auto" or pick a known id. v1 ships with a "auto"
@@ -904,10 +907,19 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     }),
   );
 
+  // --- LEARN (Phase 92 — LESSON-03) ----------------------------------------
+  // "Reset Learn Progress" row. Per UI-SPEC §Component Inventory the LEARN
+  // group sits between RECORDING and MASCOT; with PROFILE + CALIBRATION
+  // already occupying that span (Phases 32 + 12), LearnGroup joins the
+  // data-user-sensitive cluster just before MASCOT — the closest available
+  // slot honoring the spec's "before MASCOT" half. Click → destructive
+  // confirm → ipc.learn.progress_state { action: "reset" }.
+  body.append(LearnGroup());
+
   // --- MASCOT (Phase 13-03) -------------------------------------------------
   // Appended per Plan 13-03 §Task 2; per Plan 14-04 the new PERFORMANCE
   // group sits AFTER MASCOT. Final order: PERSONA / OUTPUT / HOTKEY /
-  // RECORDING / CALIBRATION / MASCOT / PERFORMANCE.
+  // RECORDING / CALIBRATION / LEARN / MASCOT / PERFORMANCE.
   body.append(MascotGroup());
 
   // --- PERFORMANCE (Phase 14-04) -------------------------------------------
