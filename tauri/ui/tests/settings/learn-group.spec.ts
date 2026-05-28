@@ -122,4 +122,45 @@ describe("LearnGroup settings drawer row (LESSON-03)", () => {
     // implementation in this test to invoke onCancel instead of onConfirm;
     // assert emitIpcMock NOT called.
   );
+
+  it("CR-04 — onConfirm renders a local session toast (optimistic)", async () => {
+    // The Learn window's reset_ack toast lives on a different surface; a
+    // user clicking reset in the Session-window settings drawer would
+    // otherwise never see confirmation in the window they're standing on.
+    // CLAUDE.md optimistic-repaint rule: fire the toast LOCALLY on click,
+    // not on the round-trip ack.
+    const importer = (path: string): Promise<unknown> =>
+      import(/* @vite-ignore */ path);
+    let LearnGroupModule: Record<string, unknown> | null = null;
+    try {
+      LearnGroupModule = (await importer(
+        "../../src/settings/components/learn-group.js",
+      )) as Record<string, unknown>;
+    } catch {
+      LearnGroupModule = null;
+    }
+    if (!LearnGroupModule || typeof LearnGroupModule.LearnGroup !== "function") {
+      return;
+    }
+    const LearnGroupFn = LearnGroupModule.LearnGroup as () => HTMLElement;
+    const group = LearnGroupFn();
+    document.body.append(group);
+
+    const resetRow = group.querySelector(
+      ".vmx-settings-row--destructive",
+    ) as HTMLElement | null;
+    resetRow!.click();
+
+    // The mock renderConfirmDialog auto-fires onConfirm synchronously
+    // (see beforeEach setup). After the click, the local optimistic
+    // toast must be in the DOM with the expected copy.
+    const toast = document.body.querySelector(
+      ".vmx-learn-group__toast",
+    ) as HTMLElement | null;
+    expect(toast, "CR-04 local toast missing after reset confirm").not.toBeNull();
+    expect(toast!.textContent).toBe("learn progress reset.");
+    // a11y polite role for screen readers.
+    expect(toast!.getAttribute("role")).toBe("alert");
+    expect(toast!.getAttribute("aria-live")).toBe("polite");
+  });
 });

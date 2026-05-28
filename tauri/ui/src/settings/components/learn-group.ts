@@ -36,10 +36,13 @@
 // Optimistic-repaint rule (CLAUDE.md: "Frontend settings controls must
 // repaint OPTIMISTICALLY"): the destructive confirm dialog IS the immediate
 // repaint — clicking the row opens it synchronously. The dialog's onConfirm
-// fires `emitIpc` (fire-and-forget) + dismisses the dialog locally; the
-// sidecar's `reset_ack` round-trip arrives at the Learn window (separate
-// surface) as a toast. The settings drawer never waits silently for the IPC
-// echo.
+// fires `emitIpc` (fire-and-forget) + dismisses the dialog locally + shows
+// a SESSION-window toast confirming the reset (CR-04 fix — the Learn
+// window's reset_ack toast is on a separate surface, so a user clicking
+// reset in Settings would otherwise never see confirmation in the window
+// they're standing on; the Learn window still surfaces its own toast on
+// reset_ack when it's open, but the Session-window toast is the primary
+// feedback channel for the drawer click).
 //
 // Frontend-enforcement compliance (CDJ Whisper v5 contract):
 //   - NO new design tokens; the destructive look is owned by
@@ -63,6 +66,33 @@ const CSS = `
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+  }
+  /* Session-window toast for "learn progress reset." (CR-04 fix).
+   * Mirrors the Learn window's .learn-toast styling so the surface
+   * feels identical across windows; sits near the top-center over
+   * whatever surface owns the click. z-index high enough to clear
+   * the drawer + any open dialog. The drawer dialog is dismissed
+   * BEFORE this toast renders so they never overlap. */
+  .vmx-learn-group__toast {
+    position: fixed;
+    top: var(--sp-5);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9000;
+    padding: var(--sp-3) var(--sp-5);
+    background:
+      linear-gradient(180deg, rgba(18, 20, 28, 0.88), rgba(4, 5, 9, 0.82)),
+      rgba(0, 0, 0, 0.55);
+    backdrop-filter: var(--blur-glass-light);
+    -webkit-backdrop-filter: var(--blur-glass-light);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-md);
+    font-family: var(--type-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--silk);
+    pointer-events: none;
   }
   /* Destructive row — mirrors recording-row's delete-button pattern (silk-65
    * at rest, --led-fault on hover) but rendered as a full row instead of a
@@ -209,12 +239,14 @@ function openResetConfirm(): void {
     variant: "danger",
     onConfirm: () => {
       // Optimistic dismiss FIRST — close the dialog locally before the
-      // round-trip resolves. The sidecar's reset_ack arrives at the
-      // separate Learn-window surface as a toast (Plan 92-05's
-      // showLearnToast("learn progress reset.")). The settings drawer
-      // never waits silently for the echo (CLAUDE.md optimistic-repaint
-      // rule).
+      // round-trip resolves. CR-04 fix: ALSO render a session-window
+      // toast right here so the user sees confirmation in the window
+      // they clicked from. The Learn window still surfaces its own
+      // showLearnToast on reset_ack when it's open; the session toast
+      // is the primary feedback for the drawer click. CLAUDE.md
+      // optimistic-repaint rule — never wait on the round-trip.
       dismiss();
+      showSessionLearnResetToast();
       void emitIpcReset();
     },
     onCancel: () => {
@@ -235,4 +267,25 @@ async function emitIpcReset(): Promise<void> {
     // eslint-disable-next-line no-console
     console.warn("[learn-group] reset emitIpc failed:", err);
   }
+}
+
+/** CR-04 fix — render a local, transient toast in the Session window
+ *  acknowledging the reset. Mirrors the Learn window's showLearnToast
+ *  shape (one-line, 3s auto-dismiss) so the surface feels identical
+ *  across windows. Optimistic: fires on the click, NOT on the round-trip
+ *  ack (per CLAUDE.md "settings controls must repaint OPTIMISTICALLY").
+ *
+ *  No-op when document is undefined (vitest jsdom always supplies it,
+ *  but the guard matches the showLearnToast pattern in learn-window.ts
+ *  for symmetry).
+ */
+function showSessionLearnResetToast(): void {
+  if (typeof document === "undefined") return;
+  const t = document.createElement("div");
+  t.className = "vmx-learn-group__toast";
+  t.setAttribute("role", "alert");
+  t.setAttribute("aria-live", "polite");
+  t.textContent = "learn progress reset.";
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
 }
