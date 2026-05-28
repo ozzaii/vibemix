@@ -213,6 +213,13 @@ class CodexCurateResult:
     # Set-prep only: the Rekordbox XML path written by the export_set MCP tool
     # during a `build_set_with_codex` run. None for plain curation.
     export_path: str | None = None
+    # Phase 100 HARDEN-CLARIFY-03: populated when the MCP-side toolset's
+    # request_clarification handler trips (stop_reason="clarification_needed").
+    # Defaults preserve the cold path — every non-clarification result keeps
+    # question + choices as None. CLI (Plan 100-04) + Telegram (Plan 100-05)
+    # read these fields to render the disambiguation prompt to the user.
+    question: str | None = None
+    choices: list[str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -228,6 +235,12 @@ class CodexCurateResult:
 #                      TOOL_STARVATION_THRESHOLD (3 consecutive empty/error
 #                      tool returns) and wrote stop_reason.json to the env-var
 #                      path; the wrapper short-circuits with the hint as error.
+# clarification_needed — Plan 100-03 propagation: the MCP-side toolset's
+#                        request_clarification handler validated args + wrote
+#                        stop_reason.json with reason="clarification_needed"
+#                        + question + choices. The wrapper short-circuits
+#                        with those fields populated; CLI prints + exits 11,
+#                        Telegram renders numbered choices.
 # error              — any other non-zero exit / failure
 
 
@@ -546,6 +559,29 @@ def curate_with_codex(
                             or "no playlist — tool starvation, no hint available"
                         ),
                     )
+                # Plan 100-03: sibling extension of the tool_starvation branch.
+                # Same side-channel file, same wrapper-side read, same short-
+                # circuit posture. Question + choices propagate to CLI (exit
+                # 11 in Plan 100-04) + Telegram (Plan 100-05) via the new
+                # CodexCurateResult fields. Defensive isinstance checks fall
+                # back to None on malformed shape — structurally unreachable
+                # in production (Plan 100-01's _build_clarification_payload
+                # always populates both fields with the right shape, pinned
+                # by Plan 100-01's tests).
+                if (
+                    isinstance(payload, dict)
+                    and payload.get("reason") == "clarification_needed"
+                ):
+                    q = payload.get("question")
+                    cs = payload.get("choices")
+                    return CodexCurateResult(
+                        theme=theme,
+                        stop_reason="clarification_needed",
+                        question=str(q) if isinstance(q, str) else None,
+                        choices=(
+                            [str(c) for c in cs] if isinstance(cs, list) else None
+                        ),
+                    )
             except (OSError, json.JSONDecodeError):
                 pass  # fall through to existing parse logic
 
@@ -859,6 +895,24 @@ def build_set_with_codex(
                         error=str(
                             payload.get("hint")
                             or "no playlist — tool starvation, no hint available"
+                        ),
+                    )
+                # Plan 100-03: parallel of the curate_with_codex sibling
+                # branch. Uniform propagation across both wrappers — the
+                # set-prep code path also surfaces clarification_needed via
+                # the same dataclass shape (theme=brief substitution).
+                if (
+                    isinstance(payload, dict)
+                    and payload.get("reason") == "clarification_needed"
+                ):
+                    q = payload.get("question")
+                    cs = payload.get("choices")
+                    return CodexCurateResult(
+                        theme=brief,
+                        stop_reason="clarification_needed",
+                        question=str(q) if isinstance(q, str) else None,
+                        choices=(
+                            [str(c) for c in cs] if isinstance(cs, list) else None
                         ),
                     )
             except (OSError, json.JSONDecodeError):
