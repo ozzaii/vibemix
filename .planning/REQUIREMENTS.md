@@ -27,11 +27,11 @@ Today on an ambiguous theme ("uplifting" — for whom? bedroom-headphones or pea
 
 - [x] **HARDEN-CLARIFY-01**: New `request_clarification(question: str, choices: list[str])` handler in `LibraryToolset`, callable from the dispatch table. Validates that `choices` length is 2-5 (rejects 0/1 — no real disambiguation; rejects 6+ — choice paralysis).
 - [x] **HARDEN-CLARIFY-02**: MCP server (`library/mcp_server.py`) exposes `request_clarification` via FastMCP with explicit Python signature `(question: str, choices: list[str]) -> dict`. Tool docstring teaches Codex when to call it ("when the user theme is materially ambiguous and a single sensible default cannot be picked").
-- [ ] **HARDEN-CLARIFY-03**: Calling `request_clarification` terminates the toolset run with `stop_reason="clarification_needed"` and surfaces the question + choices payload via the same readable seam as `tool_starvation` (HARDEN-RETRY-02 — these two stop_reasons are siblings).
+- [x] **HARDEN-CLARIFY-03**: Calling `request_clarification` terminates the toolset run with `stop_reason="clarification_needed"` and surfaces the question + choices payload via the same readable seam as `tool_starvation` (HARDEN-RETRY-02 — these two stop_reasons are siblings).
 - [ ] **HARDEN-CLARIFY-04**: CLI `library curate` / `library build-set` print the formatted clarification (question + numbered choices) on `stop_reason="clarification_needed"` and exit with a distinct non-zero code separate from `tool_starvation`, so scripts can distinguish "need user input" from "library starved".
 - [ ] **HARDEN-CLARIFY-05**: Telegram bridge's `format_reply` adds a branch that renders the clarification as a chat message with numbered choices; the existing playlist-template branch is unchanged.
 - [ ] **HARDEN-CLARIFY-06**: Single-turn semantics — the caller is responsible for re-invoking curation with the augmented theme (e.g. CLI prints "Re-run with: `library curate \"<theme> + <chosen option>\"`"). vibemix does NOT retain state across the clarification cycle. Codex is fully restarted on the next run.
-- [ ] **HARDEN-CLARIFY-07**: Failing-then-passing tests cover: tool handler args validation (0/1/6+ choices rejected), 2-5 choices accepted, CLI output formatting (numbered prefix, distinct exit code), Telegram `format_reply` branch (numbered choices, no path leakage via existing `strip_leaks`), `codex_curate` propagates `stop_reason="clarification_needed"` to the result dataclass.
+- [x] **HARDEN-CLARIFY-07**: Failing-then-passing tests cover: tool handler args validation (0/1/6+ choices rejected), 2-5 choices accepted, CLI output formatting (numbered prefix, distinct exit code), Telegram `format_reply` branch (numbered choices, no path leakage via existing `strip_leaks`), `codex_curate` propagates `stop_reason="clarification_needed"` to the result dataclass.
 
 ### HARDEN-CONTRACT — Prompt Composition Contract (Factor 3)
 
@@ -83,11 +83,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HARDEN-RETRY-07 | Phase 99 | Complete |
 | HARDEN-CLARIFY-01 | Phase 100 | Complete |
 | HARDEN-CLARIFY-02 | Phase 100 | Complete |
-| HARDEN-CLARIFY-03 | Phase 100 | Pending |
+| HARDEN-CLARIFY-03 | Phase 100 | Complete |
 | HARDEN-CLARIFY-04 | Phase 100 | Pending |
 | HARDEN-CLARIFY-05 | Phase 100 | Pending |
 | HARDEN-CLARIFY-06 | Phase 100 | Pending |
-| HARDEN-CLARIFY-07 | Phase 100 | Pending |
+| HARDEN-CLARIFY-07 | Phase 100 | Complete |
 | HARDEN-CONTRACT-01 | Phase 101 | Pending |
 | HARDEN-CONTRACT-02 | Phase 101 | Pending |
 | HARDEN-CONTRACT-03 | Phase 101 | Pending |

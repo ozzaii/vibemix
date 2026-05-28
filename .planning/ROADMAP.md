@@ -64,7 +64,7 @@ If a phase doesn't pass → defer to HARDEN-FUTURE or out of scope.
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
 | 99 | HARDEN-RETRY — Viber Tool-Retry Policy | 8/8 | Complete   | 2026-05-28 |
-| 100 | HARDEN-CLARIFY — Viber RequestClarification | 2/7 | In Progress|  |
+| 100 | HARDEN-CLARIFY — Viber RequestClarification | 3/7 | In Progress|  |
 | 101 | HARDEN-CONTRACT — Prompt Composition Doc | A new contributor reads ONE doc and knows exactly what enters the live prompt per event type — every file:line reference grep-resolves on current source | HARDEN-CONTRACT-01..07 (7) | 4 |
 
 **Dependency spine:** `P99 → P100`, with `P101` independent (parallelizable but listed sequentially so its grep verification sees the post-hardening tool surface). `P99` ships the shared `stop_reason` payload seam that `P100` extends with a sibling reason (`clarification_needed`).
@@ -111,7 +111,7 @@ Plans:
 Plans:
 - [x] 100-01-PLAN.md — request_clarification handler + MIN/MAX choices + dispatch entry (HARDEN-CLARIFY-01)
 - [x] 100-02-PLAN.md — FastMCP @mcp.tool() exposure + teaching docstring (HARDEN-CLARIFY-02)
-- [ ] 100-03-PLAN.md — CodexCurateResult.question/choices + wrapper elif clarification branches (HARDEN-CLARIFY-03, HARDEN-CLARIFY-07)
+- [x] 100-03-PLAN.md — CodexCurateResult.question/choices + wrapper elif clarification branches (HARDEN-CLARIFY-03, HARDEN-CLARIFY-07)
 - [ ] 100-04-PLAN.md — CLI exit code 11 + 2-block stderr render + normalizer extension (HARDEN-CLARIFY-04, HARDEN-CLARIFY-06)
 - [ ] 100-05-PLAN.md — telegram_bridge format_reply clarification_needed branch with strip_leaks (HARDEN-CLARIFY-05)
 - [ ] 100-06-PLAN.md — AST gate proving no track_id surface + single-turn structural pin (HARDEN-CLARIFY-06, HARDEN-CLARIFY-07)
