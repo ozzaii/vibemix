@@ -100,6 +100,8 @@
 - [ ] **ONBOARD-06**: Empty-state copy ("no controller? plug one in") + keyboard-nav for users browsing the curriculum without hardware (hardware-free "Explore" mode for Course 1 anatomy DEFERRED to v9.1 per anti-creep acid test).
 - [ ] **ONBOARD-07**: LEGAL disclaimer copy visible in app footer + repo README — *"Visual representation for instructional use. DDJ-FLX4, XDJ-RX3, etc. are trademarks of AlphaTheta / Pioneer DJ. Inpulse is a trademark of Hercules. Numark is a trademark of inMusic Brands. vibemix is not affiliated with or endorsed by these manufacturers."*
 
+> **`§LEARN-ONBOARD-EAR-PASS` (P98 ear-pass — Phase 97 ride-forward):** A stranger opens vibemix on a fresh-install Mac → sees the 4-mode picker (cohost / learn / build / debrief) → picks Learn → plugs FLX4 (or 300 MK2) → tutor announces by name with "let's go." closer → L1.01 verbatim dialog plays through → the lesson progress list shows the next 35 lessons (Course 1 / 2 / 3) with empty dots → no AI-slop language anywhere → disclaimer footer visible. ALL FIVE bullets must pass real-stranger ear; cannot be self-verified.
+
 ### AUDIT — milestone close-out + ear-pass + regression smoke
 
 - [ ] **AUDIT-01**: A Kaan-walk recording (screencast + audio) captures the full 3-course run on real FLX4 hardware end-to-end; saved to `docs/learn/2026-XX-kaan-walk.webm`; one item per course (Course 1 anatomy / Course 2 transitions / Course 3 live coaching) — 3 sessions, ≥90 minutes total. Surfaced as `§LEARN-EAR-COURSE-1/2/3` KAAN-ACTION (cannot be self-verified — Kaan's ear is the gate).

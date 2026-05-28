@@ -117,6 +117,7 @@ If a phase doesn't pass → defer to v9.x or Bravoh.
 - `§LEARN-OVERNIGHT-DISCIPLINE` — One-page overnight-run handoff doc
 - `§LEARN-LATENCY-CONTINGENCY` — If P91 measures >80 ms P95, Rust-direct `midir` amendment
 - `§LEARN-MK2-DETECTION` — Hercules Inpulse 300 vs 300-MK2 live-verify
+- `§LEARN-ONBOARD-EAR-PASS` — P98 stranger-walk on real FLX4 (P97 ride-forward)
 - `§LEARN-FIRMWARE-VARIANTS` — DDJ-FLX4 v1.07 variant detection
 - `§LEARN-OFFLINE-TONE-PATH` — Codex tutor parity deferred to v9.x
 - `§LEARN-LOCALIZATION-IT-TR` — en-only v9.0; v9.1 drops `tr.py`/`it.py`
