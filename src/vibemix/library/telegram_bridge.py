@@ -126,6 +126,22 @@ def format_reply(norm: dict[str, Any]) -> str:
         )
         return strip_leaks(f"⚠️ {hint}")
 
+    # Plan 100-05 HARDEN-CLARIFY-05: clarification_needed branch — sibling of
+    # the tool_starvation branch above. Renders the question + numbered choices
+    # as a multi-line message. Insertion order load-bearing: BEFORE the generic
+    # `if not norm.get("ok")` branch, because the clarification payload also
+    # carries ok=False and would otherwise be shadowed (the same insertion-order
+    # discipline Phase 99 Plan 99-07 documented for tool_starvation).
+    # Single-turn semantic (CONTEXT.md Decision 7): no inline-keyboard buttons —
+    # the user reads the choices and re-composes the next theme manually.
+    if norm.get("stop_reason") == "clarification_needed":
+        question = norm.get("question") or "(no question)"
+        choices = norm.get("choices") or []
+        lines = [f"❓ {question}"]
+        for i, choice in enumerate(choices, start=1):
+            lines.append(f"{i}. {choice}")
+        return strip_leaks("\n".join(lines))
+
     if not norm.get("ok"):
         err = norm.get("error") or "no playlist could be built"
         return strip_leaks(f"⚠️ {err}")
