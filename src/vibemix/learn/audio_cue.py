@@ -110,10 +110,13 @@ class ExemplarPlayer:
     Stereo float32 @ track sample rate; PyAV/FFmpeg decode via
     ``library/audio_decode.load_audio_stereo``.
 
-    Course 3 active-session guard (P96 wires; P93 scaffolds):
-    ``can_play()`` returns ``False`` when the user is mid-set; P93 always
-    returns ``True`` so Plan 96's diff is one line, not a constructor
-    reshape.
+    Course 3 active-session guard (P96-03 wires; P93 scaffolded):
+    ``can_play()`` returns ``False`` when ``state.session_active`` is
+    ``True`` AND ``state.audible_deck`` is not ``"none"`` — exemplar
+    playback during a live set would step on the user's mix (EXEMPLAR-06
+    binding). Default cold-state (session_active=False) keeps the guard
+    permissive — existing P93/P94/P95 fixtures use default MusicState
+    so their tests stay green.
     """
 
     def __init__(self, device_index: int, *, state: "MusicState | Any") -> None:
@@ -138,23 +141,35 @@ class ExemplarPlayer:
         self._on_stop: Callable[[], None] | None = None
 
     def can_play(self) -> bool:
-        """Active-session guard SCAFFOLDING.
+        """Active-session guard — EXEMPLAR-06 binding (Plan 96-03).
 
-        Reads ``state.session_active`` and ``state.audible_deck`` so the P96
-        diff is one line, not a reshape. In P93 the scaffold always returns
-        ``True`` — Plan P96 (EXEMPLAR-06) lands the real guard:
-        ``return not (state.session_active and state.audible_deck != "none")``.
+        Refuses playback while the user is mid-set. BOTH conditions must
+        hold to refuse:
+
+          - ``state.session_active`` is ``True`` (Course 3 lesson runtime
+            has flipped the lens onset on the audible-deck pathway), AND
+          - ``state.audible_deck`` is anything other than ``"none"`` (a
+            deck is actively producing sound; non-silent live mix).
+
+        A lesson-marked session with silent decks (between-track gap)
+        still permits playback — exemplar audio is fine between songs.
+        Outside any Course 3 lesson, the lens is off and ``can_play``
+        returns ``True`` regardless of ``audible_deck``.
+
+        Plan 96-01 (Phase 96) added ``session_active: bool = False`` to
+        MusicState; the default-False makes existing P93/P94/P95
+        ExemplarLessonController tests stay green (their fixtures use
+        default-cold MusicState instances).
+
+        The getattr-with-default pattern preserves P93's contract that a
+        ``state`` arg whose object does not expose either field gets a
+        safe default (False / "none") and the guard permits playback —
+        a test stub that does not need the guard logic should not be
+        forced to expose every MusicState field.
         """
-        # Touch the seam attributes so static analysers + IDEs see the
-        # contract; P93 ignores the result. P96 replaces the return body.
-        _session_active = getattr(self._state, "session_active", False)
-        _audible_deck = getattr(self._state, "audible_deck", "none")
-        # Reference the locals so linters don't flag them; they document
-        # the seam that P96 will activate.
-        _ = (_session_active, _audible_deck)
-        # P93 scaffolding: always allow. P96 lands the real guard:
-        #   return not (state.session_active and state.audible_deck != "none")
-        return True
+        session_active = bool(getattr(self._state, "session_active", False))
+        audible_deck = getattr(self._state, "audible_deck", "none")
+        return not (session_active and audible_deck != "none")
 
     def _read_master_rms(self) -> float:
         """Read the master-deck RMS from the bound ``MusicState``.

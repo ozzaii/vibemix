@@ -84,8 +84,14 @@ def test_exemplar_player_opens_own_output_stream(
     )
 
     # Build a MusicState stub with the audio_rms attribute the gain helper reads.
+    # P96-03 added the active-session guard to can_play() that reads
+    # session_active + audible_deck; default MagicMock attrs are truthy
+    # which would trip the guard and short-circuit play(). Explicitly set
+    # both fields to the cold-path values so the guard permits playback.
     state_stub = MagicMock(name="MusicState_stub")
     state_stub.audio_rms = 0.0
+    state_stub.session_active = False  # cold path → can_play=True
+    state_stub.audible_deck = "none"
 
     player = ExemplarPlayer(device_index=2, state=state_stub)
     player.play("/tmp/synthetic.wav")
@@ -120,15 +126,25 @@ def test_exemplar_player_does_not_touch_playback_queue() -> None:
     )
 
 
-def test_can_play_scaffold_returns_true_in_p93() -> None:
-    """``ExemplarPlayer.can_play()`` returns ``True`` in P93 — the active-
-    session guard is SCAFFOLDING only. P96 wires the real check against
-    ``state.session_active`` + ``state.audible_deck``."""
+def test_can_play_returns_true_when_lens_off_cold_state() -> None:
+    """``ExemplarPlayer.can_play()`` returns ``True`` on the cold-state
+    path (session_active=False) regardless of audible_deck.
+
+    P93 shipped this as scaffolding returning True unconditionally;
+    Plan 96-03 (EXEMPLAR-06) replaced the body with the real guard
+    ``return not (session_active and audible_deck != "none")``. The
+    cold path (lens off) still returns True so existing P93/P94/P95
+    fixtures with default MusicState stay green. The full truth-table
+    coverage lives in tests/learn/test_course3_no_exemplar_during_live.py.
+    """
     state_stub = MagicMock(name="MusicState_stub")
     state_stub.audio_rms = 0.0
+    state_stub.session_active = False  # lens off → cold path
+    state_stub.audible_deck = "none"
     player = ExemplarPlayer(device_index=0, state=state_stub)
     assert player.can_play() is True, (
-        "P93 can_play() must return True — P96 lands the real guard"
+        "cold-path can_play() must return True; P96 guard kept the "
+        "lens-off branch permissive."
     )
 
 
