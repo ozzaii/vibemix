@@ -848,3 +848,313 @@ def test_clarification_side_channel_propagation_with_real_writer(
     assert res.question == question
     assert res.choices == choices
     assert res.track_ids == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 100 HARDEN-CLARIFY-07 — integration seal (end-to-end uniform propagation)
+#
+# The Plan 100-03 propagation tests above stop at ``CodexCurateResult.to_dict()``.
+# Plan 100-07 extends the seal to the USER-VISIBLE surfaces — the CLI exit code
+# + 2-block stderr render (Plan 100-04) and the Telegram ``format_reply`` chat
+# render (Plan 100-05). The chain is:
+#
+#   toolset.request_clarification (REAL handler — Plan 100-01)
+#     -> _build_clarification_payload (REAL helper — Plan 100-01)
+#       -> side-channel JSON written through _write_side_channel (REAL — 99-04 reused)
+#         -> curate_with_codex / build_set_with_codex wrapper read (REAL — 100-03)
+#           -> CodexCurateResult(stop_reason="clarification_needed", question, choices)
+#             -> [CLI leg]      _cmd_library_curate_codex: rc=11 + 2-block stderr render
+#             -> [Telegram leg] _normalize_codex_curate_result -> format_reply render
+#
+# Codex CLI is the ONLY mocked boundary (via ``_runner_with_side_channel``) —
+# every link inside vibemix runs REAL implementations. Same posture as
+# Phase 99 Plan 99-08's seal block above.
+#
+# Forward-compat: future stop_reasons (12 = user_canceled, 13 = ..., ...) drop
+# in by sibling-elif additions in (a) toolset handler (b) _build_<reason>_payload
+# (c) wrapper elif (d) CLI elif (e) format_reply elif (f) normalizer if. No
+# refactoring of existing code — discriminated-union pattern locked across
+# Phases 99 + 100.
+# ---------------------------------------------------------------------------
+
+
+from unittest.mock import patch as _patch  # noqa: E402
+
+
+def test_clarification_full_chain_to_cli_curate(capsys):
+    """SEAL: REAL toolset payload -> REAL wrapper -> CLI _cmd_library_curate_codex.
+
+    Pins HARDEN-CLARIFY-07 uniform propagation across the CLI surface. The
+    seal MUST exercise:
+      * REAL ``_build_clarification_payload`` (Plan 100-01) — not a hardcoded dict.
+      * REAL ``curate_with_codex`` side-channel-read elif branch (Plan 100-03).
+      * REAL ``_cmd_library_curate_codex`` clarification dispatch + 2-block
+        stderr render + exit 11 (Plan 100-04).
+
+    Codex CLI is the ONLY mocked boundary (``_runner_with_side_channel``).
+    Drift in ANY layer fails this test LOUDLY with a precise substring diff —
+    the test is the regression-pin for the full CLI chain.
+    """
+    import argparse
+    import vibemix.__main__ as _main
+
+    empty_lib = _empty_library()
+    question = "What BPM range?"
+    choices = ["slow (90-110)", "fast (130-140)", "mixed"]
+
+    # REAL payload — generator output is what the wrapper consumes.
+    real_payload = _make_real_clarification_payload(empty_lib, question, choices)
+    assert real_payload["reason"] == "clarification_needed", (
+        f"generator pre-check: real payload must have "
+        f'reason="clarification_needed"; got {real_payload.get("reason")!r}'
+    )
+
+    # REAL wrapper read via side-channel.
+    runner = _runner_with_side_channel(
+        side_channel_payload=real_payload,
+        out_payload=None,
+    )
+    result = curate_with_codex(
+        "ambiguous theme",
+        empty_lib,
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+    # Pre-check: result carries the expected dataclass shape before we hand it
+    # to the CLI handler. If this fails, the seal is broken at the wrapper
+    # layer (Plan 100-03 drift) — fix Plan 100-03, not this test.
+    assert result.stop_reason == "clarification_needed", (
+        f"wrapper pre-check: stop_reason must be clarification_needed; "
+        f"got {result.stop_reason!r}"
+    )
+    assert result.question == question
+    assert result.choices == choices
+
+    # CLI dispatch leg: REAL _cmd_library_curate_codex receives the result via
+    # a patched module-attr (the handler does a function-local
+    # `from vibemix.library.codex_curate import curate_with_codex`, so we patch
+    # the SOURCE module attr — matches the pattern in test_cli_exit_codes.py).
+    args = argparse.Namespace(theme="ambiguous theme", name=None)
+    lib_sentinel = object()
+    with _patch(
+        "vibemix.library.codex_curate.curate_with_codex",
+        return_value=result,
+    ):
+        rc = _main._cmd_library_curate_codex(args, lib_sentinel)
+
+    captured = capsys.readouterr()
+    # Exit 11 — reserved range 10-19 (Plan 99-06 + 100-04).
+    assert rc == 11, (
+        f"expected exit 11 on clarification_needed across full CLI chain; "
+        f"got rc={rc!r}; stderr={captured.err!r}"
+    )
+    # 2-block stderr render (Plan 100-04 / Decision 6).
+    assert "clarification_needed" in captured.err, (
+        f"stderr must carry clarification_needed discriminator; got {captured.err!r}"
+    )
+    assert "What BPM range?" in captured.err, (
+        f"question substring must propagate through full chain to stderr; "
+        f"got {captured.err!r}"
+    )
+    for choice in ["slow (90-110)", "fast (130-140)", "mixed"]:
+        assert choice in captured.err, (
+            f"choice substring '{choice}' must propagate through full chain "
+            f"to stderr; got {captured.err!r}"
+        )
+    # Re-run hint (single-turn closure — vibemix retains NO state).
+    assert "Re-run with:" in captured.err, (
+        f"re-run hint (single-turn closure) must surface; got {captured.err!r}"
+    )
+    assert "library curate" in captured.err, (
+        f"re-run hint must echo 'library curate' command form; "
+        f"got {captured.err!r}"
+    )
+    # stdout stays clean on the clarification path (Decision 6).
+    assert captured.out == "", (
+        f"stdout must be clean on clarification_needed (Decision 6 — non-success "
+        f"path goes to stderr only); got {captured.out!r}"
+    )
+
+
+def test_clarification_full_chain_to_telegram():
+    """SEAL: REAL toolset payload -> REAL wrapper -> normalizer -> format_reply.
+
+    Pins HARDEN-CLARIFY-07 uniform propagation across the Telegram surface.
+    The seal MUST exercise:
+      * REAL ``_build_clarification_payload`` (Plan 100-01) — not a hardcoded dict.
+      * REAL ``curate_with_codex`` side-channel-read elif branch (Plan 100-03).
+      * REAL ``_normalize_codex_curate_result`` clarification dict shape
+        (Plan 100-04 contract bridge).
+      * REAL ``format_reply`` clarification branch + numbered choices +
+        leak-strip defense (Plan 100-05).
+
+    Includes a leak-strip regression-pin: a malicious-shaped payload with an
+    FS path in the question MUST be scrubbed by ``strip_leaks`` before chat
+    render — T-100-05-01 mitigation pin at the integration boundary.
+    """
+    from vibemix.__main__ import _normalize_codex_curate_result
+    from vibemix.library.telegram_bridge import format_reply
+
+    empty_lib = _empty_library()
+    question = "What BPM range?"
+    choices = ["slow (90-110)", "fast (130-140)", "mixed"]
+
+    # REAL chain: generator -> side-channel -> wrapper.
+    real_payload = _make_real_clarification_payload(empty_lib, question, choices)
+    runner = _runner_with_side_channel(
+        side_channel_payload=real_payload,
+        out_payload=None,
+    )
+    result = curate_with_codex(
+        "ambiguous theme",
+        empty_lib,
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    # Normalizer leg (Plan 100-04 contract bridge).
+    norm = _normalize_codex_curate_result(result)
+    assert norm == {
+        "ok": False,
+        "stop_reason": "clarification_needed",
+        "question": question,
+        "choices": choices,
+    }, (
+        f"_normalize_codex_curate_result must emit the Plan 100-05 contract "
+        f"shape; got {norm!r}"
+    )
+
+    # Telegram render leg (Plan 100-05).
+    rendered = format_reply(norm)
+    assert isinstance(rendered, str) and rendered, (
+        f"format_reply must return a non-empty string; got {rendered!r}"
+    )
+    assert question in rendered, (
+        f"format_reply must surface the question; got {rendered!r}"
+    )
+    for choice in choices:
+        assert choice in rendered, (
+            f"format_reply must surface each choice; missing '{choice}' "
+            f"in {rendered!r}"
+        )
+    # Distinguishing glyph: NOT the ⚠️ used by error/starvation branches —
+    # Plan 100-05 chose a separate glyph (currently ❓) so a sighted user can
+    # distinguish "needs user input" from "error" at a glance. Test accepts
+    # any non-⚠️ leading glyph (the exact glyph is executor-latitude per
+    # Plan 100-05 Decision; ear-pass refinements stay free).
+    assert not rendered.startswith("⚠️"), (
+        f"clarification render must use a distinguishing leading glyph (not ⚠️) "
+        f"to differentiate from error/starvation branches; got {rendered!r}"
+    )
+
+    # Leak-strip defense (T-100-05-01 at the integration boundary): a malicious
+    # payload with an FS path in the question MUST be scrubbed before chat
+    # render. Use a direct-construction norm to inject the leak — proves the
+    # defense holds at the format_reply layer regardless of upstream payload
+    # provenance.
+    malicious_norm = {
+        "ok": False,
+        "stop_reason": "clarification_needed",
+        "question": "Library at /Users/ozai/.cache/vibemix — pick context?",
+        "choices": ["a", "b"],
+    }
+    scrubbed = format_reply(malicious_norm)
+    assert "/Users/ozai" not in scrubbed, (
+        f"strip_leaks must scrub FS paths from clarification render; "
+        f"got {scrubbed!r}"
+    )
+    assert "[path]" in scrubbed, (
+        f"strip_leaks must replace scrubbed paths with [path] marker; "
+        f"got {scrubbed!r}"
+    )
+    # The non-path portion of the question must survive scrubbing.
+    assert "pick context?" in scrubbed, (
+        f"non-path question text must survive strip_leaks; got {scrubbed!r}"
+    )
+
+
+def test_clarification_build_set_path_seal(capsys):
+    """SEAL: build_set_with_codex sibling parity through the CLI surface.
+
+    Same chain as ``test_clarification_full_chain_to_cli_curate`` but via the
+    set-prep wrapper. Pins:
+      * ``build_set_with_codex`` propagates the SAME clarification payload as
+        ``curate_with_codex`` (uniform across both wrappers — Plan 100-03).
+      * ``_cmd_library_build_set_codex`` exit 11 + 2-block stderr render
+        (Plan 100-04 sibling).
+      * Re-run hint uses ``library build-set`` (NOT ``library curate``) —
+        the brief is echoed in place of the theme.
+    """
+    import argparse
+    import vibemix.__main__ as _main
+
+    lib = _RekordboxLibrary()
+    lib.tracks = {f"t{i:03d}": _track(f"t{i:03d}") for i in range(5)}
+
+    question = "Which energy curve?"
+    choices = ["slow-build", "peak-time", "wave"]
+    real_payload = _make_real_clarification_payload(lib, question, choices)
+
+    runner = _runner_with_side_channel(
+        side_channel_payload=real_payload,
+        out_payload=None,
+    )
+    result = build_set_with_codex(
+        "ambiguous brief",
+        lib,
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+    # Pre-check: build-set wrapper carries the same clarification dataclass
+    # shape as the curate wrapper — proves uniform propagation across both
+    # wrappers (Plan 100-03 contract).
+    assert isinstance(result, CodexCurateResult), (
+        f"build_set_with_codex must return CodexCurateResult; "
+        f"got {type(result).__name__}"
+    )
+    assert result.stop_reason == "clarification_needed"
+    assert result.question == question
+    assert result.choices == choices
+
+    # CLI dispatch leg — build-set sibling.
+    args = argparse.Namespace(
+        brief="peak-time 60 min",
+        curve=None,
+        name=None,
+        n_slots=None,
+        export=None,
+    )
+    lib_sentinel = object()
+    with _patch(
+        "vibemix.library.codex_curate.build_set_with_codex",
+        return_value=result,
+    ):
+        rc = _main._cmd_library_build_set_codex(args, lib_sentinel)
+
+    captured = capsys.readouterr()
+    assert rc == 11, (
+        f"expected exit 11 on clarification_needed across build-set CLI chain; "
+        f"got rc={rc!r}; stderr={captured.err!r}"
+    )
+    assert "clarification_needed" in captured.err
+    assert question in captured.err
+    for choice in choices:
+        assert choice in captured.err, (
+            f"choice substring '{choice}' must propagate through build-set CLI; "
+            f"got {captured.err!r}"
+        )
+    # Re-run hint must use the build-set command form, NOT the curate form.
+    assert "Re-run with:" in captured.err
+    assert "library build-set" in captured.err, (
+        f"build-set re-run hint must echo 'library build-set' command form "
+        f"(NOT 'library curate'); got {captured.err!r}"
+    )
+    # The brief is echoed in the re-run hint (the user typed it, no PII leak).
+    assert "peak-time 60 min" in captured.err, (
+        f"brief must be echoed in build-set re-run hint; got {captured.err!r}"
+    )
+    # stdout stays clean on the clarification path (Decision 6).
+    assert captured.out == ""
