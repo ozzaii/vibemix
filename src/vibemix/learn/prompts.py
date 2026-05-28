@@ -120,6 +120,14 @@ def _controller_frame(controller_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+# allow-tutor-prompt-without-coach: this composes the SESSION-LEVEL system
+# instruction (persona scaffold + course frame + controller frame + lesson
+# addendum + 4-forbidden-moves lock). It is NOT a per-turn prompt builder;
+# per-turn prompt composition routes through state.coach.AICoach.build_prompt
+# at the call site (P96-03's proactive lens consumes AICoach.evidence_line
+# +AICoach.task_for_event). This function reuses the v8.1 LENS-03 teacher
+# persona via build_system_instruction() — the reuse-existing-coach
+# binding is satisfied at the persona seam, not at this composer.
 def build_tutor_system_instruction(
     *,
     course_id: str,
