@@ -41,6 +41,7 @@ builder of the envelope dicts.
 """
 from __future__ import annotations
 
+from vibemix.learn.audio_cue import ExemplarPlayer
 from vibemix.learn.band_share_store import (
     BAND_SHARE_TABLE,
     init_schema,
@@ -67,6 +68,7 @@ __all__ = [
     "BAND_SHARE_TABLE",
     "COURSE_FRAMES",
     "CURRICULUM",
+    "ExemplarPlayer",
     "LearnProgress",
     "LearnState",
     "LessonMeta",

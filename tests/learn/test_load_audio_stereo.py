@@ -20,6 +20,8 @@ Downstream plan that flips this skip: **Plan 93-03**.
 """
 from __future__ import annotations
 
+import math
+import wave
 from pathlib import Path
 
 import numpy as np
@@ -36,8 +38,25 @@ except ImportError:
 
 
 def _write_synthetic_wav(path: Path, sample_rate: int, duration_s: float) -> Path:
-    """Write a 1-channel synthetic 60 Hz sine WAV. Plan 93-03 implementer
-    can swap this for a real PyAV writer or scipy.io.wavfile.write helper."""
+    """Write a 1-channel (mono) 60 Hz sine wave WAV to ``path``.
+
+    Stdlib :mod:`wave` write path — mirrors the pattern at
+    ``tests/library/test_audio_decode.py::_write_stereo_wav``. Mono on
+    purpose so the test exercises the mono → stereo upmix branch of
+    :func:`load_audio_stereo` (the contract under test). PyAV decodes
+    WAV via FFmpeg the same way it decodes mp3 / m4a / flac, so this
+    stdlib-only fixture covers the production codec path.
+    """
+    n = int(sample_rate * duration_s)
+    with wave.open(str(path), "wb") as fh:
+        fh.setnchannels(1)
+        fh.setsampwidth(2)
+        fh.setframerate(sample_rate)
+        frames = bytearray()
+        for i in range(n):
+            val = int(0.4 * 32767 * math.sin(2 * math.pi * 60 * i / sample_rate))
+            frames.extend(val.to_bytes(2, "little", signed=True))
+        fh.writeframes(bytes(frames))
     return path
 
 
