@@ -74,32 +74,33 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HARDEN-RETRY-01 | Pending | Pending |
-| HARDEN-RETRY-02 | Pending | Pending |
-| HARDEN-RETRY-03 | Pending | Pending |
-| HARDEN-RETRY-04 | Pending | Pending |
-| HARDEN-RETRY-05 | Pending | Pending |
-| HARDEN-RETRY-06 | Pending | Pending |
-| HARDEN-RETRY-07 | Pending | Pending |
-| HARDEN-CLARIFY-01 | Pending | Pending |
-| HARDEN-CLARIFY-02 | Pending | Pending |
-| HARDEN-CLARIFY-03 | Pending | Pending |
-| HARDEN-CLARIFY-04 | Pending | Pending |
-| HARDEN-CLARIFY-05 | Pending | Pending |
-| HARDEN-CLARIFY-06 | Pending | Pending |
-| HARDEN-CLARIFY-07 | Pending | Pending |
-| HARDEN-CONTRACT-01 | Pending | Pending |
-| HARDEN-CONTRACT-02 | Pending | Pending |
-| HARDEN-CONTRACT-03 | Pending | Pending |
-| HARDEN-CONTRACT-04 | Pending | Pending |
-| HARDEN-CONTRACT-05 | Pending | Pending |
-| HARDEN-CONTRACT-06 | Pending | Pending |
-| HARDEN-CONTRACT-07 | Pending | Pending |
+| HARDEN-RETRY-01 | Phase 99 | Pending |
+| HARDEN-RETRY-02 | Phase 99 | Pending |
+| HARDEN-RETRY-03 | Phase 99 | Pending |
+| HARDEN-RETRY-04 | Phase 99 | Pending |
+| HARDEN-RETRY-05 | Phase 99 | Pending |
+| HARDEN-RETRY-06 | Phase 99 | Pending |
+| HARDEN-RETRY-07 | Phase 99 | Pending |
+| HARDEN-CLARIFY-01 | Phase 100 | Pending |
+| HARDEN-CLARIFY-02 | Phase 100 | Pending |
+| HARDEN-CLARIFY-03 | Phase 100 | Pending |
+| HARDEN-CLARIFY-04 | Phase 100 | Pending |
+| HARDEN-CLARIFY-05 | Phase 100 | Pending |
+| HARDEN-CLARIFY-06 | Phase 100 | Pending |
+| HARDEN-CLARIFY-07 | Phase 100 | Pending |
+| HARDEN-CONTRACT-01 | Phase 101 | Pending |
+| HARDEN-CONTRACT-02 | Phase 101 | Pending |
+| HARDEN-CONTRACT-03 | Phase 101 | Pending |
+| HARDEN-CONTRACT-04 | Phase 101 | Pending |
+| HARDEN-CONTRACT-05 | Phase 101 | Pending |
+| HARDEN-CONTRACT-06 | Phase 101 | Pending |
+| HARDEN-CONTRACT-07 | Phase 101 | Pending |
 
 **Coverage:**
 - v10.0 requirements: 21 total
-- Mapped to phases: 0 (roadmapper will assign)
-- Unmapped: 21 — will be assigned in Step 10 of new-milestone workflow
+- Mapped to phases: 21 (100% — assigned 2026-05-28 by gsd-roadmapper)
+- Unmapped: 0
+- Distribution: HARDEN-RETRY-01..07 → Phase 99 (7) · HARDEN-CLARIFY-01..07 → Phase 100 (7) · HARDEN-CONTRACT-01..07 → Phase 101 (7)
 
 ---
 *Requirements defined: 2026-05-28*
