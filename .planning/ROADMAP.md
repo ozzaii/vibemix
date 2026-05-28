@@ -77,7 +77,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
 | 91 | Controller Renderer + MIDI Mirror | 7/7 | Complete   | 2026-05-27 |
-| 92 | Lesson Runtime + AI Highlight Contract | 5/7 | In Progress|  |
+| 92 | Lesson Runtime + AI Highlight Contract | 6/7 | In Progress|  |
 | 93 | Exemplar Engine + `[exemplar:]` Evidence Source | DSP-band exemplar engine picks strongest-band track from user's library; falls back to packaged CC-BY bank when empty; plays through dedicated `ExemplarPlayer`; `[exemplar:<id>]` resolves via 4-site mirror | EXEMPLAR-01, EXEMPLAR-02, EXEMPLAR-03, EXEMPLAR-04, EXEMPLAR-05 (5) | 4 |
 | 94 | Course 1 — Anatomy (L1.01–L1.16) | Beginner opens Learn, sees verbatim 4-line opening dialog, walks through 16 hand-authored anatomy lessons culminating in EQ-as-Tutor demo using library exemplars | TONE-01, TONE-03, CURR-1.01..1.16 (18) | 5 |
 | 95 | Course 2 — Transitions (L2.01–L2.14) | User learns beatmatching (ear + sync) + 5 canonical transitions (long blend, EQ swap, kick swap, filter fade, echo-out, drop swap, loop) + harmonic mixing via Camelot wheel | CURR-2.01..2.14 (14) | 4 |
@@ -124,7 +124,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 - [x] 92-03-PLAN.md — Python backend core: state.py + runtime.py + curriculum.py + prompts.py + hello_world JSON fixture (Wave 2)
 - [x] 92-04-PLAN.md — Progress persistence + `vibemix learn reset` CLI + __main__.main() LessonRuntime wiring (Wave 3)
 - [x] 92-05-PLAN.md — Lesson UI: hud.ts + tutor-dock.ts + skip-button.ts + applyHighlight on controller-stage + 11 envelope handlers in learn-window.ts (Wave 4)
-- [ ] 92-06-PLAN.md — Settings drawer LearnGroup (Reset Learn Progress row + destructive confirm dialog) (Wave 4)
+- [x] 92-06-PLAN.md — Settings drawer LearnGroup (Reset Learn Progress row + destructive confirm dialog) (Wave 4)
 - [ ] 92-07-PLAN.md — Kaan FLX4 ear-pass checkpoint (live verification per feedback_verify_live_app_not_just_tests) (Wave 5)
 **UI hint**: yes
 
