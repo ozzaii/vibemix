@@ -2551,9 +2551,15 @@ def _cmd_library_curate_codex(args: argparse.Namespace, lib) -> int:
             ),
             "codex_auth_required": "Run `codex login` to connect your ChatGPT plan.",
             "timeout": "Codex took too long — try a narrower theme.",
+            # Plan 99-06 / Decision 6: exit 10 carries the propagated hint
+            # from Plan 99-04's side-channel; result.error already holds the
+            # _build_starvation_payload "hint" string.
+            "tool_starvation": result.error or "no playlist (tool starvation)",
         }.get(result.stop_reason, result.error or "no playlist created")
         print(f"[viber/codex] {result.stop_reason}: {hint}", file=sys.stderr)
-        return 1
+        # Plan 99-06 / Decision 6: 10 = tool_starvation, 1 = other failures.
+        # 11 reserved for Phase 100 ``clarification_needed`` (forward-compat).
+        return 10 if result.stop_reason == "tool_starvation" else 1
 
     _json.dump(out, sys.stdout, indent=2)
     sys.stdout.write("\n")
@@ -2597,9 +2603,13 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
             ),
             "codex_auth_required": "Run `codex login` to connect your ChatGPT plan.",
             "timeout": "Codex took too long — try a narrower brief.",
+            # Plan 99-06 / Decision 6: same side-channel propagation surface
+            # as curate above; result.error carries the hint.
+            "tool_starvation": result.error or "no set (tool starvation)",
         }.get(result.stop_reason, result.error or "no set created")
         print(f"[viber/codex] {result.stop_reason}: {hint}", file=sys.stderr)
-        return 1
+        # Plan 99-06 / Decision 6: 10 = tool_starvation, 1 = other failures.
+        return 10 if result.stop_reason == "tool_starvation" else 1
 
     _json.dump(out, sys.stdout, indent=2)
     sys.stdout.write("\n")
@@ -2797,6 +2807,37 @@ def _cmd_library_export_set(args: argparse.Namespace) -> int:
     return 0
 
 
+def _normalize_codex_curate_result(
+    result: CodexCurateResult,
+) -> dict | None:
+    """Plan 99-06 / Decision 8 — Telegram ``curate_fn`` normalizer.
+
+    When ``result.stop_reason == "tool_starvation"``, return the uniform
+    starvation payload Plan 99-07's ``format_reply`` will consume::
+
+        {"ok": False, "stop_reason": "tool_starvation", "hint": <error string>}
+
+    For every OTHER ``stop_reason`` (``created`` / ``timeout`` / etc.), return
+    ``None`` so ``curate_fn`` falls through to its existing happy-path /
+    generic-error branches — pre-99-06 behavior preserved.
+
+    Defensive: ``result.error`` may be ``None`` (the side-channel write loop
+    always populates it, but the dataclass default is None). The ``or ""``
+    fallback keeps the payload dict-shape stable for ``format_reply``.
+
+    Forward-compat (Phase 100): a sibling ``elif result.stop_reason ==
+    "clarification_needed"`` lands here without restructuring; ``curate_fn``
+    stays a one-line delegate.
+    """
+    if result.stop_reason == "tool_starvation":
+        return {
+            "ok": False,
+            "stop_reason": "tool_starvation",
+            "hint": result.error or "",
+        }
+    return None
+
+
 def _cmd_library_telegram(args: argparse.Namespace) -> int:
     """Run the Telegram mobile surface — curate playlists from your phone.
 
@@ -2836,6 +2877,12 @@ def _cmd_library_telegram(args: argparse.Namespace) -> int:
 
     def curate_fn(theme: str) -> dict:
         result = curate_with_codex(theme, lib)
+        # Plan 99-06 / Decision 8: starvation gets the normalized payload
+        # Plan 99-07's format_reply will branch on. Non-starvation falls
+        # through to the existing happy-path / generic-error branches.
+        normalized = _normalize_codex_curate_result(result)
+        if normalized is not None:
+            return normalized
         if result.playlist_name is None or not result.track_ids:
             return {
                 "ok": False,
