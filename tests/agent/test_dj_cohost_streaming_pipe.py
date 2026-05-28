@@ -268,31 +268,38 @@ def test_citation_failure_after_head_emits_cancel(mocker, tmp_path) -> None:
     assert pad_args[0] == b"\x00" * len(pad_args[0])
 
 
-def test_citation_failure_no_head_emitted_full_suppress(mocker, tmp_path) -> None:
-    """Short response that never hits a boundary; the head never
-    emitted; full text fails citation linter → standard strip path; no
-    silence-pad needed (nothing to cancel)."""
+def test_citation_failure_after_short_response_emits_cancel(mocker, tmp_path) -> None:
+    """Short single-chunk response with a citation that misses the
+    registry. The chunk-by-chunk pipe yields the head immediately
+    (clean prefix → speed-gate passes; balanced brackets → safe yield),
+    then the post-stream citation linter fails on the unresolved
+    ``[ev:MISS@0.1]`` and a silence-pad cancel fires because the head
+    is already in-flight to TTS.
+    """
     registry = EvidenceRegistry()
     agent, gen, recorder, state, _, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
-    # Single short chunk, no terminal punctuation → no head emit.
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
         return_value=_async_iter(["wow [ev:MISS@0.1] yeah"])
     )
     ev = Event(type="HEARTBEAT", state=state, extra={})
     agent.set_next_event(ev)
     chunks = _drive(agent)
-    # Strip path — no chunks yielded, no streaming_cancel event (no head
-    # to cancel), citation_strip fires per pre-existing pipeline.
-    assert chunks == []
+    # Head WAS emitted speculatively — the chunk-by-chunk yield no
+    # longer waits for a sentence boundary, so short responses also
+    # stream.
+    assert chunks == ["wow [ev:MISS@0.1] yeah"]
     kinds = [k for k, _ in recorder.events]
+    # Citation linter still fails on the missing registry entry.
     assert "citation_strip" in kinds
-    assert "streaming_cancel" not in kinds
-    # The strip path may push ack PCM via playback — but never the
-    # silence-pad. We only verify streaming_cancel is absent.
+    # Silence-pad cancel fires because head was in-flight.
+    assert "streaming_cancel" in kinds
+    cancel_idx = kinds.index("streaming_cancel")
+    assert recorder.events[cancel_idx][1]["reason"] == "citation_failure"
+    playback.push.assert_called()
 
 
 def test_citation_pass_no_head_yields_after_stream(mocker, tmp_path) -> None:
@@ -355,6 +362,61 @@ def test_per_turn_meter_resets(mocker, tmp_path) -> None:
         _drive(agent)
     kinds = [k for k, _ in recorder.events]
     assert kinds.count("llm_to_tts_delta_ms") == 2
+
+
+def test_single_sentence_single_chunk_streams_immediately(mocker, tmp_path) -> None:
+    """Regression: the previous sentence-boundary pipe deferred forever on
+    a single-sentence single-chunk response (the trailing ``.`` has no
+    following whitespace at end-of-stream → ``find_sentence_end`` returns
+    ``None`` → fall through to post-stream batched emit, losing the
+    streaming feel).
+
+    Chunk-by-chunk yield: the clean ``"[excited]"`` opener clears the
+    speed-gate AND brackets close before the terminal ``.``, so the
+    whole chunk yields immediately as ``chunks[0]``."""
+    agent, gen, recorder, state = _build_agent_legacy(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            ["[excited] That kick is absolutely brutal — pure warehouse pressure."]
+        )
+    )
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    chunks = _drive(agent)
+    assert chunks == [
+        "[excited] That kick is absolutely brutal — pure warehouse pressure."
+    ]
+    kinds = [k for k, _ in recorder.events]
+    # llm_to_tts meter records the first-yield delta (head_yielded=True path).
+    assert "llm_to_tts_delta_ms" in kinds
+
+
+def test_partial_citation_clipped_at_bracket_open(mocker, tmp_path) -> None:
+    """Bracket-balance gate: a chunk that ends inside an unclosed
+    ``[ev:...]`` MUST NOT yield the bare ``[ev:`` fragment to TTS. The
+    yield is clipped at the last balanced position; the closing bracket
+    chunk releases the rest."""
+    agent, gen, _, state = _build_agent_legacy(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                "kick is pure brutal [ev:kick@2.5",
+                "] and the bassline rolls.",
+            ]
+        )
+    )
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    chunks = _drive(agent)
+    # First yield clipped before the open bracket.
+    assert chunks[0] == "kick is pure brutal "
+    # Citation arrives intact in a later yield.
+    assert "[ev:kick@2.5]" in "".join(chunks[1:])
+    assert "".join(chunks) == "kick is pure brutal [ev:kick@2.5] and the bassline rolls."
 
 
 def test_pitfall_1_citation_period_no_premature_yield(mocker, tmp_path) -> None:

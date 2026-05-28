@@ -54,7 +54,7 @@ from typing import Protocol
 
 import jsonschema
 
-from vibemix.runtime.config_store import ConfigStore, load_config
+from vibemix.runtime.config_store import ConfigStore, load_config, save_config
 from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.recordings_index import RecordingsIndex, run_retention_sweep
 from vibemix.runtime.settings import SettingsApplier
@@ -257,6 +257,12 @@ class SessionLoop:
         shape, no handler.
         """
         self.bus.register_handler("ipc.session.mute", self._on_session_mute)
+        # Phase 97 / ONBOARD-01 — top-level mode picker (cohost/learn/build/debrief).
+        # Persists via ConfigStore.extra so the next launch boots into the
+        # last-picked mode. Distinct from ``ipc.settings.set { field: 'mode' }``
+        # which carries the hype/coach persona axis — same word, different
+        # semantic layer (top-level surface vs persona attribute).
+        self.bus.register_handler("ipc.session.set_mode", self._on_session_set_mode)
         self.bus.register_handler("ipc.settings.set", self._on_settings_set)
         self.bus.register_handler("ipc.settings.get", self._on_settings_get)
         self.bus.register_handler("ipc.status.recheck", self._on_status_recheck)
@@ -322,6 +328,61 @@ class SessionLoop:
                 log.warning("playback_queue.clear() raised: %s", e)
         ack = SessionMute.make_ack(muted=self.muted)
         await self.bus.emit(json.loads(ack.to_json()))
+
+    # Phase 97 / ONBOARD-01 — top-level mode picker (cohost/learn/build/debrief).
+    # Mirrors the mood/click_through/skill persistence pattern: writes to
+    # ``ConfigStore.extra["session.mode"]`` so the field travels alongside
+    # other UI-state fields without a config-store schema bump. Emits an
+    # ``ipc.settings.state`` echo on success (the renderer's mount-time read
+    # path) — failure emits ``ipc.error`` with the apply reason.
+    _VALID_SESSION_MODES: tuple[str, ...] = ("cohost", "learn", "build", "debrief")
+
+    async def _on_session_set_mode(self, msg: dict) -> None:
+        """Handle ``ipc.session.set_mode { mode: <4-enum> }``.
+
+        Validates the mode against the locked 4-enum set, persists via
+        ConfigStore.extra under ``session.mode``, and emits a fresh
+        settings.state so the cold-boot read path picks the new mode up.
+        Rejection emits ipc.error (renderer surfaces a soft toast) — the
+        shell's optimistic repaint stays lit either way because the user
+        already saw their click land; the wire round-trip is purely
+        persistence.
+        """
+        payload = msg.get("payload", {})
+        mode = payload.get("mode")
+        if mode not in self._VALID_SESSION_MODES:
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason=(
+                            "session.set_mode rejected: mode must be one of "
+                            f"{self._VALID_SESSION_MODES}, got {mode!r}"
+                        ),
+                        original_type="ipc.session.set_mode",
+                    ).to_json()
+                )
+            )
+            return
+        # Persist to ConfigStore.extra. The save_config call mirrors the
+        # _apply_skill / _apply_click_through pattern — same JSON file,
+        # same flush discipline.
+        try:
+            self.config_store.extra["session.mode"] = mode
+            save_config(self.config_store)
+        except Exception as exc:
+            log.exception("session.set_mode persist failed for mode=%r", mode)
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason=f"session.set_mode persist failed: {type(exc).__name__}",
+                        original_type="ipc.session.set_mode",
+                    ).to_json()
+                )
+            )
+            return
+        # Emit fresh settings.state so the cold-boot path (and anything
+        # subscribed to settings.state) picks the new mode up.
+        await self._emit_settings_state()
 
     async def _on_settings_set(self, msg: dict) -> None:
         """Dispatch ``ipc.settings.set`` via the SettingsApplier.

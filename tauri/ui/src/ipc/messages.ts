@@ -337,6 +337,7 @@ export interface SettingsState {
     click_through?: boolean | null;
     skill?: ("beginner" | "intermediate" | "pro") | null;
     "learn.headphone_device_index"?: number | null;
+    "session.mode"?: ("cohost" | "learn" | "build" | "debrief") | null;
   };
 }
 export interface StatusRecheck {

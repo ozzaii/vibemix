@@ -30,12 +30,12 @@
  */
 
 import { registerStyle } from "./components/_style-registry.js";
+import { renderModePicker, setModePickerActive, type ModePickerMode } from "./components/mode-picker.js";
 import { renderTitlebar, setTitlebarClock, setTitlebarPill, type PillLevel } from "./components/titlebar.js";
 import { GROUNDING_FAILURE_MS, type CohostStatus, type ReactionsByTs, type TranscriptLine } from "./components/cohost.js";
 import type { CitationChip } from "./components/citation-strip.js";
-import { renderPhaseTape, setPhaseTape, type PhaseChunk } from "./components/phase-tape.js";
-import { renderEventRibbon, setEventRibbon, type MidiEvent } from "./components/event-ribbon.js";
-import { renderDropChip } from "./components/drop-chip.js";
+import { type PhaseChunk } from "./components/phase-tape.js";
+import { type MidiEvent } from "./components/event-ribbon.js";
 import type { BadgeState } from "./components/status-bar.js";
 
 export interface SessionState {
@@ -112,29 +112,32 @@ export interface SessionState {
     device: string;
     profile: "HP" | "SPK";
   };
+  /** Phase 97 / ONBOARD-01 — top-level mode (cohost/learn/build/debrief).
+   *  Optional on the layout-side type so existing tests / mocks that omit
+   *  it still type-check. mountSessionLayout defaults to "cohost". */
+  mode?: ModePickerMode;
+  /** Phase 97 / ONBOARD-01 — click handler fired by the mode picker.
+   *  Render-loop wires it to modeChangeHandler (setSessionState +
+   *  ipc.session.set_mode). Omitted (dev mock) → click is a no-op. */
+  onModeChange?: (mode: ModePickerMode) => void;
 }
 
 export interface Mounted {
   root: HTMLElement;
   titlebar: HTMLElement;
+  /** Phase 97 / ONBOARD-01 — 4-mode picker row between titlebar and stage. */
+  modePicker: HTMLElement;
   /** Rail persona button (tap-to-cycle mood). */
   persona: HTMLElement;
   personaValue: HTMLElement;
   vibeEngineButton: HTMLElement;
   muteButton: HTMLElement;
-  deckTitle: HTMLElement;
-  deckMeta: HTMLElement;
-  deckConfig: HTMLElement;
   /** Cross-fade liveness labels (always mounted; opacity toggled by mode). */
   liveFault: HTMLElement;
   ghosts: [HTMLElement, HTMLElement];
   now: HTMLElement;
   receipt: HTMLElement;
   cite: HTMLElement;
-  signalState: HTMLElement;
-  dropSlot: HTMLElement;
-  phaseTape: HTMLElement;
-  eventRibbon: HTMLElement;
   bpm: HTMLElement;
   key: HTMLElement;
   meterFill: HTMLElement;
@@ -155,7 +158,6 @@ export interface Mounted {
   lastNowTs: string | null;
   /** Chip click handler currently bound on the cite (re-bound on change). */
   citeChip: CitationChip | null;
-  dropKey: string;
 }
 
 // Calm idle hero line shown in silent mode before the co-host's first reaction
@@ -169,42 +171,27 @@ const METER_CEIL = 86;
 const LAYOUT_CSS = `
   .vmx-session {
     display: grid;
-    grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
+    grid-template-rows: var(--titlebar-h) auto 1fr var(--statusbar-h);
     height: 100vh;
     position: relative;
     overflow: hidden;
     background-color: var(--void);
-    background:
-      radial-gradient(88% 72% at 18% 95%, rgba(255, 138, 61, 0.062), transparent 56%),
-      radial-gradient(62% 58% at 100% 18%, rgba(72, 152, 255, 0.032), transparent 60%),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.022), transparent 22%),
-      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 28px),
-      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.008) 0 1px, transparent 1px 22px),
-      var(--void);
   }
-  .vmx-session::before,
-  .vmx-session::after {
-    content: "";
-    position: absolute;
-    pointer-events: none;
-    z-index: 0;
+  /* Phase 97 / ONBOARD-01 — mode picker bar between titlebar and stage.
+   * Sized by content (height: 34px from the picker itself + 12px padding
+   * either side). Sits flush against the titlebar with a faint --silk-22
+   * hairline below to separate the navigation layer from the deck stage. */
+  .vmx-modebar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-2) clamp(22px, 5vw, 76px);
+    border-bottom: 1px solid var(--silk-22);
+    background-color: var(--void);
+    position: relative;
+    z-index: 1;
   }
-  .vmx-session::before {
-    inset: var(--titlebar-h) 0 var(--statusbar-h);
-    background:
-      linear-gradient(90deg, rgba(255, 138, 61, 0.046), transparent 20%, transparent 80%, rgba(72, 152, 255, 0.024)),
-      linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.38) 72%, rgba(0, 0, 0, 0.66));
-    opacity: 0.92;
-  }
-  .vmx-session::after {
-    left: clamp(22px, 5vw, 76px);
-    right: clamp(22px, 5vw, 76px);
-    bottom: calc(var(--statusbar-h) + 18px);
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--amber-22), var(--silk-22), transparent);
-    box-shadow: 0 0 22px var(--amber-22);
-    opacity: 0.58;
-  }
+  .vmx-modebar .vmx-mode-picker { max-width: 480px; }
 
   /* === THE DECK — no card. Open void. Hero anchored low (mixer LCD). ==== */
   .vmx-stage { display: grid; place-items: stretch; min-height: 0; position: relative; z-index: 1; }
@@ -214,41 +201,6 @@ const LAYOUT_CSS = `
     grid-template-rows: auto 1fr auto;
     min-height: 0;
     padding: clamp(18px, 2.4vw, 32px) clamp(22px, 5vw, 76px);
-  }
-  .vmx-deck::before,
-  .vmx-deck::after {
-    content: "";
-    position: absolute;
-    pointer-events: none;
-  }
-  .vmx-deck::before {
-    inset: clamp(12px, 1.8vw, 22px) clamp(14px, 3.8vw, 62px);
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--rad-md);
-    background:
-      radial-gradient(circle at 16px 16px, rgba(255, 251, 244, 0.082) 0 1px, rgba(0, 0, 0, 0.42) 1px 4px, transparent 5px),
-      radial-gradient(circle at calc(100% - 16px) 16px, rgba(255, 251, 244, 0.060) 0 1px, rgba(0, 0, 0, 0.42) 1px 4px, transparent 5px),
-      radial-gradient(circle at 16px calc(100% - 16px), rgba(255, 251, 244, 0.052) 0 1px, rgba(0, 0, 0, 0.45) 1px 4px, transparent 5px),
-      radial-gradient(circle at calc(100% - 16px) calc(100% - 16px), rgba(255, 251, 244, 0.050) 0 1px, rgba(0, 0, 0, 0.45) 1px 4px, transparent 5px),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.030), transparent 16%, transparent 80%, rgba(0, 0, 0, 0.32)),
-      linear-gradient(90deg, rgba(255, 138, 61, 0.034), transparent 18%, transparent 84%, rgba(72, 152, 255, 0.018)),
-      rgba(4, 5, 9, 0.56);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.050),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.72),
-      inset 0 22px 48px rgba(255, 251, 244, 0.008),
-      inset 0 -36px 68px rgba(0, 0, 0, 0.34),
-      0 24px 76px -54px rgba(0, 0, 0, 0.98);
-    opacity: 0.98;
-  }
-  .vmx-deck::after {
-    inset: calc(clamp(12px, 1.8vw, 22px) + 1px) calc(clamp(14px, 3.8vw, 62px) + 1px);
-    border-radius: var(--rad-md);
-    background:
-      repeating-linear-gradient(90deg, transparent 0 35px, rgba(214, 207, 199, 0.016) 35px 36px),
-      repeating-linear-gradient(0deg, transparent 0 28px, rgba(214, 207, 199, 0.010) 28px 29px);
-    opacity: 0.42;
-    mix-blend-mode: screen;
   }
   .vmx-deck > * { position: relative; z-index: 1; }
 
@@ -318,81 +270,6 @@ const LAYOUT_CSS = `
   .vmx-persona[data-mood="COACH"] .vmx-persona__v {
     color: var(--amber-pale);
     text-shadow: 0 0 7px var(--amber-22);
-  }
-  .vmx-nowplaying {
-    min-width: 0;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 3px;
-    padding: 9px var(--sp-4) 8px;
-    text-align: center;
-    opacity: 0.88;
-    border: 1px solid rgba(214, 207, 199, 0.070);
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(0, 0, 0, 0.52), rgba(255, 251, 244, 0.010) 52%, rgba(0, 0, 0, 0.48)),
-      rgba(0, 0, 0, 0.28);
-    box-shadow:
-      inset 0 2px 8px rgba(0, 0, 0, 0.72),
-      inset 0 1px 0 rgba(255, 251, 244, 0.022),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.72);
-    transition: opacity var(--motion-transition) ease-out, border-color var(--motion-transition) ease-out;
-  }
-  .vmx-deck:hover .vmx-nowplaying,
-  .vmx-deck:focus-within .vmx-nowplaying {
-    opacity: 1;
-    border-color: var(--glass-edge-up);
-  }
-  .vmx-nowplaying__eyebrow {
-    font-family: var(--type-mono);
-    font-size: 9px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--silk-22);
-    line-height: 1;
-  }
-  .vmx-nowplaying__title {
-    max-width: min(42vw, 520px);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--type-display);
-    font-variation-settings: 'wdth' 88, 'wght' 650;
-    font-size: 16px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--silk);
-    line-height: 1.1;
-    text-shadow: 0 0 10px rgba(255, 138, 61, 0.10);
-  }
-  .vmx-nowplaying__meta {
-    max-width: min(38vw, 480px);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--type-mono);
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    color: var(--silk-40);
-    line-height: 1.1;
-  }
-  .vmx-nowplaying__config {
-    max-width: min(48vw, 620px);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--type-mono);
-    font-size: 9.5px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--silk-65);
-    line-height: 1.1;
-  }
-  .vmx-nowplaying__config b {
-    color: var(--amber-pale);
-    font-weight: 500;
   }
   /* persistent low-ink at rest (reachable mid-set), full on hover/focus.
    * Real mute also bound to the push-to-mute hotkey (session-shortcuts.ts). */
@@ -480,10 +357,9 @@ const LAYOUT_CSS = `
   /* --- THE HERO: the co-host speaks, anchored low on void --- */
   .vmx-deck__speak {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(348px, 0.54fr);
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     align-items: stretch;
-    gap: clamp(14px, 2vw, 24px);
     min-height: 0;
     padding: clamp(16px, 3vh, 26px) clamp(0px, 1.2vw, 18px);
   }
@@ -540,219 +416,6 @@ const LAYOUT_CSS = `
     position: relative;
     z-index: 1;
   }
-  .vmx-signal {
-    position: relative;
-    align-self: stretch;
-    min-width: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(112px, 1fr) minmax(78px, auto);
-    column-gap: 0;
-    row-gap: 10px;
-    padding: 14px;
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--rad-sm);
-    background:
-      radial-gradient(circle at 12px 12px, rgba(255, 251, 244, 0.070) 0 1px, rgba(0, 0, 0, 0.40) 1px 4px, transparent 5px),
-      radial-gradient(circle at calc(100% - 12px) 12px, rgba(255, 251, 244, 0.052) 0 1px, rgba(0, 0, 0, 0.40) 1px 4px, transparent 5px),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.026), transparent 30%, rgba(0, 0, 0, 0.28)),
-      linear-gradient(90deg, rgba(255, 138, 61, 0.028), transparent 46%, rgba(72, 152, 255, 0.016)),
-      rgba(0, 0, 0, 0.18);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.034),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.70),
-      inset 0 12px 24px rgba(255, 251, 244, 0.006),
-      inset 0 -24px 36px rgba(0, 0, 0, 0.28),
-      0 1px 0 rgba(0, 0, 0, 0.68);
-    opacity: 0.96;
-    overflow: hidden;
-    isolation: isolate;
-  }
-  .vmx-signal::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: -1px;
-    height: 1px;
-    background: linear-gradient(90deg, var(--amber-22), transparent 42%, transparent 72%, var(--silk-12));
-    pointer-events: none;
-  }
-  .vmx-signal::after {
-    content: "";
-    position: absolute;
-    inset: auto 14px 10px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(72, 152, 255, 0.12), var(--amber-22), transparent);
-    opacity: 0.52;
-    pointer-events: none;
-  }
-  .vmx-signal__header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    font-family: var(--type-display);
-    font-variation-settings: 'wdth' 85, 'wght' 600;
-    font-size: 9px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--silk-40);
-  }
-  .vmx-signal__header b {
-    color: var(--silk-65);
-    font-weight: 600;
-  }
-  .vmx-signal__drop {
-    min-height: 64px;
-    display: flex;
-    align-items: center;
-    padding: 0 0 10px;
-    border-right: 0;
-    border-bottom: 1px solid var(--glass-edge);
-    background:
-      linear-gradient(90deg, rgba(255, 138, 61, 0.025), transparent 72%),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.012), transparent 52%);
-  }
-  .vmx-signal__drop:empty::before {
-    content: "drop idle";
-    font-family: var(--type-mono);
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--silk-22);
-    padding: 10px 0;
-  }
-  .vmx-signal .vmx-drop-chip {
-    margin-top: 0;
-    width: 100%;
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.018), transparent 42%),
-      rgba(0, 0, 0, 0.20);
-    border-color: var(--glass-edge);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.038),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.60),
-      inset 0 0 14px rgba(255, 138, 61, 0.045),
-      0 1px 0 rgba(0, 0, 0, 0.66);
-    padding: 8px 10px;
-  }
-  .vmx-signal .vmx-drop-chip__count {
-    font-size: 30px;
-  }
-  .vmx-signal .vmx-drop-chip__lbl {
-    color: var(--silk-40);
-  }
-  .vmx-signal .vmx-phase-tape {
-    margin: 0;
-    min-height: 112px;
-    height: 100%;
-    border: 1px solid rgba(214, 207, 199, 0.070);
-    border-radius: var(--rad-sm);
-    background:
-      repeating-linear-gradient(90deg, transparent 0 17px, rgba(255, 251, 244, 0.006) 17px 18px),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 34%, rgba(0, 0, 0, 0.20)),
-      rgba(0, 0, 0, 0.16);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.030),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.62),
-      inset 0 0 16px rgba(0, 0, 0, 0.30),
-      0 1px 0 rgba(0, 0, 0, 0.60);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    padding: 24px 12px 10px;
-  }
-  .vmx-signal .vmx-phase-tape__row {
-    gap: 2px;
-    min-width: 0;
-  }
-  .vmx-signal .vmx-phase-tape::before {
-    background: transparent;
-    border-bottom-color: var(--glass-edge);
-  }
-  .vmx-signal .vmx-phase-tape::after {
-    opacity: 0.45;
-  }
-  .vmx-signal .vmx-phase-chunk {
-    font-size: 8.5px;
-    letter-spacing: 0.16em;
-    min-width: 0;
-    background-color: rgba(0, 0, 0, 0.18);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.026),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.52),
-      0 1px 0 rgba(0, 0, 0, 0.58);
-  }
-  .vmx-signal .vmx-phase-chunk[data-kind="groove"] {
-    color: var(--silk-40);
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.020), transparent 72%),
-      rgba(0, 0, 0, 0.20);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.026),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.52),
-      inset 0 0 0 1px var(--silk-12),
-      0 1px 0 rgba(0, 0, 0, 0.58);
-  }
-  .vmx-signal .vmx-phase-chunk[data-kind="build"] {
-    background:
-      repeating-linear-gradient(45deg, rgba(255, 138, 61, 0.12) 0 7px, rgba(255, 138, 61, 0.20) 7px 14px),
-      linear-gradient(180deg, rgba(255, 138, 61, 0.055), rgba(255, 138, 61, 0.020));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.054),
-      inset 0 -2px 0 rgba(255, 138, 61, 0.20),
-      inset 0 0 0 1px var(--amber-22),
-      inset 0 0 10px rgba(255, 138, 61, 0.12),
-      0 1px 0 rgba(0, 0, 0, 0.62);
-  }
-  .vmx-signal .vmx-phase-chunk[data-kind="build"]::after {
-    opacity: 0.72;
-    right: 5px;
-  }
-  .vmx-signal .vmx-phase-chunk[data-kind="drop-ghost"] {
-    font-size: 9px;
-    letter-spacing: 0.04em;
-    border-color: var(--amber-22);
-    background: rgba(255, 138, 61, 0.025);
-  }
-  .vmx-signal .vmx-event-ribbon {
-    min-height: 78px;
-    align-self: stretch;
-    border: 1px solid rgba(214, 207, 199, 0.065);
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.014), transparent 48%),
-      rgba(0, 0, 0, 0.12);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.020),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.58);
-    padding: 12px;
-    align-content: flex-start;
-    flex-wrap: wrap;
-  }
-  .vmx-signal .vmx-event-ribbon:empty::before {
-    content: "midi idle";
-    font-family: var(--type-mono);
-    font-size: 10px;
-    letter-spacing: 0.10em;
-    text-transform: uppercase;
-    color: var(--silk-22);
-  }
-  .vmx-signal .vmx-event-chip {
-    height: 22px;
-    padding: 0 9px;
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.014), rgba(0, 0, 0, 0.18));
-    border-color: var(--silk-12);
-    color: var(--silk-40);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.018),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.48);
-  }
-  .vmx-signal .vmx-event-chip[data-age="now"],
-  .vmx-signal .vmx-event-chip[data-age="warm"] {
-    background: rgba(255, 138, 61, 0.035);
-  }
   .vmx-ghost {
     font-family: var(--type-body);
     font-variation-settings: 'wdth' 100, 'wght' 400;
@@ -768,12 +431,8 @@ const LAYOUT_CSS = `
     font-variation-settings: 'wdth' 92, 'wght' 600;
     font-size: clamp(38px, 4.8vw, 68px); line-height: 0.98; letter-spacing: 0.003em;
     color: var(--silk); text-wrap: balance; max-width: 17ch;
-    text-shadow:
-      0 1px 0 rgba(0, 0, 0, 0.75),
-      0 0 28px rgba(255, 251, 244, 0.10),
-      0 0 38px rgba(255, 138, 61, 0.12);
-    filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.32));
-    transition: color 700ms ease-out, text-shadow 700ms ease-out;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75);
+    transition: color 700ms ease-out;
   }
   .vmx-now[data-arrived="true"] { animation: vmx-rise 400ms cubic-bezier(0.16, 1, 0.3, 1); }
   @keyframes vmx-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -952,7 +611,6 @@ const LAYOUT_CSS = `
       padding: 7px 8px;
       gap: var(--sp-2);
     }
-    .vmx-nowplaying { display: none; }
     .vmx-live {
       display: none;
     }
@@ -964,64 +622,10 @@ const LAYOUT_CSS = `
       padding: 6px 10px;
       letter-spacing: 0.14em;
     }
-    .vmx-deck__speak {
-      grid-template-columns: 1fr;
-      grid-template-rows: minmax(0, 1fr) auto;
-      gap: var(--sp-5);
-      padding: var(--sp-4) 0;
-    }
     .vmx-voice {
       width: 100%;
       padding: var(--sp-5) var(--sp-4);
       min-height: 260px;
-    }
-    .vmx-signal {
-      align-self: auto;
-      grid-template-columns: 1fr;
-      grid-template-rows: auto auto auto;
-      padding: 10px 0 8px;
-    }
-    .vmx-signal__header {
-      padding: 0 0 2px;
-    }
-    .vmx-signal__drop {
-      min-height: 52px;
-      padding: 0 0 10px;
-      border-right: 0;
-      border-bottom: 1px solid var(--glass-edge);
-    }
-    .vmx-signal .vmx-drop-chip__count {
-      font-size: 24px;
-    }
-    .vmx-signal .vmx-phase-tape {
-      min-height: 78px;
-      padding: 22px 0 8px;
-    }
-    .vmx-signal .vmx-phase-tape__row {
-      gap: 2px;
-    }
-    .vmx-signal .vmx-phase-chunk {
-      font-size: 7.5px;
-      letter-spacing: 0.10em;
-      text-overflow: clip;
-    }
-    .vmx-signal .vmx-phase-chunk[data-kind="groove"] {
-      color: transparent;
-      text-shadow: none;
-    }
-    .vmx-signal .vmx-phase-chunk[data-kind="build"] {
-      font-size: 8px;
-      letter-spacing: 0.08em;
-    }
-    .vmx-signal .vmx-phase-chunk[data-kind="build"]::after {
-      display: none;
-    }
-    .vmx-signal .vmx-phase-chunk[data-kind="drop-ghost"] {
-      font-size: 8px;
-      letter-spacing: 0;
-    }
-    .vmx-signal .vmx-event-ribbon {
-      display: none;
     }
     .vmx-ghost {
       display: none;
@@ -1086,6 +690,20 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   });
   root.append(titlebar);
 
+  // Phase 97 / ONBOARD-01 — mode picker bar between titlebar and stage.
+  // Sits in its own grid row (auto-sized) so the deck stage still gets
+  // the 1fr flex remainder. Click handler reads the live mounted handle
+  // so the picker survives state diffs without re-mounting.
+  const modebar = document.createElement("div");
+  modebar.className = "vmx-modebar";
+  const modePicker = renderModePicker({
+    active: state.mode ?? "cohost",
+    onChange: (m) => mountedHandle?.current.onModeChange?.(m),
+    ariaLabel: "vibemix mode",
+  });
+  modebar.append(modePicker);
+  root.append(modebar);
+
   // Stage → the single deck.
   const stage = document.createElement("main");
   stage.className = "vmx-stage";
@@ -1108,20 +726,6 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   personaValue.className = "vmx-persona__v";
   persona.append(personaK, personaValue);
   persona.addEventListener("click", () => mountedHandle?.current.persona.onCycleMood?.());
-
-  const nowPlaying = document.createElement("div");
-  nowPlaying.className = "vmx-nowplaying";
-  nowPlaying.setAttribute("aria-label", "current deck track");
-  const nowPlayingEyebrow = document.createElement("span");
-  nowPlayingEyebrow.className = "vmx-nowplaying__eyebrow";
-  nowPlayingEyebrow.textContent = "now playing";
-  const deckTitle = document.createElement("span");
-  deckTitle.className = "vmx-nowplaying__title";
-  const deckMeta = document.createElement("span");
-  deckMeta.className = "vmx-nowplaying__meta";
-  const deckConfig = document.createElement("span");
-  deckConfig.className = "vmx-nowplaying__config";
-  nowPlaying.append(nowPlayingEyebrow, deckTitle, deckMeta, deckConfig);
 
   const controls = document.createElement("div");
   controls.className = "vmx-deck__controls";
@@ -1152,7 +756,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   liveFault.addEventListener("click", () => mountedHandle?.current.cohost.onRetry?.());
   live.append(liveLive, liveSilent, liveFault);
 
-  rail.append(persona, nowPlaying, controls, live);
+  rail.append(persona, controls, live);
   deck.append(rail);
 
   // --- speak (ghosts + claim[now + receipt])
@@ -1181,23 +785,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   claim.append(now, receipt);
   voice.append(ghost2, ghost1, claim);
 
-  const signal = document.createElement("aside");
-  signal.className = "vmx-signal";
-  signal.setAttribute("aria-label", "mix signal");
-  const signalHeader = document.createElement("div");
-  signalHeader.className = "vmx-signal__header";
-  const signalTitle = document.createElement("span");
-  signalTitle.textContent = "mix signal";
-  const signalState = document.createElement("b");
-  signalState.textContent = "grounded";
-  signalHeader.append(signalTitle, signalState);
-  const dropSlot = document.createElement("div");
-  dropSlot.className = "vmx-signal__drop";
-  const phaseTape = renderPhaseTape(state.phase);
-  const eventRibbon = renderEventRibbon({ events: state.events });
-  signal.append(signalHeader, dropSlot, phaseTape, eventRibbon);
-
-  speak.append(voice, signal);
+  speak.append(voice);
   deck.append(speak);
 
   // --- foot (bpm · key · live meter)
@@ -1238,22 +826,16 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const mounted: Mounted = {
     root,
     titlebar,
+    modePicker,
     persona,
     personaValue,
     vibeEngineButton: vibeEngineBtn,
     muteButton: muteBtn,
-    deckTitle,
-    deckMeta,
-    deckConfig,
     liveFault,
     ghosts: [ghost1, ghost2],
     now,
     receipt,
     cite,
-    signalState,
-    dropSlot,
-    phaseTape,
-    eventRibbon,
     bpm,
     key,
     meterFill,
@@ -1266,7 +848,6 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
     meterPk: 0,
     lastNowTs: null,
     citeChip: null,
-    dropKey: "",
   };
   mountedHandle = mounted;
 
@@ -1332,6 +913,16 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   if (isMount || prev.titlebar.rec !== next.titlebar.rec) setTitlebarPill(mounted.titlebar, "rec", next.titlebar.rec);
   if (isMount || prev.titlebar.sys !== next.titlebar.sys) setTitlebarPill(mounted.titlebar, "sys", next.titlebar.sys);
 
+  // --- mode picker (Phase 97 / ONBOARD-01) ---
+  // External sync path: cold-boot ipc.settings.state may carry a persisted
+  // mode. setModePickerActive flips data-active in place so the lit segment
+  // matches the singleton without rebuilding the picker.
+  const nextMode = next.mode ?? "cohost";
+  const prevMode = prev.mode ?? "cohost";
+  if (isMount || prevMode !== nextMode) {
+    setModePickerActive(mounted.modePicker, nextMode);
+  }
+
   // --- persona (tap-to-cycle mood headline) ---
   if (isMount || prev.persona.mood !== next.persona.mood) {
     mounted.personaValue.textContent = next.persona.mood.toLowerCase();
@@ -1341,13 +932,6 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
       `co-host mood: ${next.persona.mood.toLowerCase()}. tap to cycle hype, teach, coach.`,
     );
   }
-
-  const deckTitle = next.timecode.track?.title ?? "deck idle";
-  if (mounted.deckTitle.textContent !== deckTitle) mounted.deckTitle.textContent = deckTitle;
-  const deckMeta = deckMetaLabel(next.timecode);
-  if (mounted.deckMeta.textContent !== deckMeta) mounted.deckMeta.textContent = deckMeta;
-  const deckConfig = deckConfigLabel(next);
-  if (mounted.deckConfig.innerHTML !== deckConfig) mounted.deckConfig.innerHTML = deckConfig;
 
   // --- grounding-failure timer ---
   // Only runs while the co-host is ACTIVE. At IDLE there's no music to ground
@@ -1424,23 +1008,6 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     fireReceipt(mounted);
   }
   mounted.lastNowTs = nowTs;
-
-  // --- mix signal (phase tape, drop watch, recent controller moves) ---
-  setPhaseTape(mounted.phaseTape, next.phase);
-  setEventRibbon(mounted.eventRibbon, { events: next.events });
-  const signalText = downInput ? "fault" : next.cohost.grounded ? "grounded" : "tuning";
-  if (mounted.signalState.textContent !== signalText) mounted.signalState.textContent = signalText;
-  const bpmPeriod = next.drop.bpmPeriodMs ?? null;
-  const dropKey = `${next.drop.bars ?? "none"}|${bpmPeriod == null ? "auto" : Math.round(bpmPeriod)}`;
-  if (mounted.dropKey !== dropKey) {
-    mounted.dropSlot.replaceChildren();
-    const chipEl = renderDropChip({
-      bars: next.drop.bars,
-      bpmPeriodMs: bpmPeriod ?? undefined,
-    });
-    if (chipEl) mounted.dropSlot.append(chipEl);
-    mounted.dropKey = dropKey;
-  }
 
   // --- foot readouts ---
   const bpmText = next.timecode.bpm != null ? next.timecode.bpm.toFixed(1) : "—";
@@ -1537,24 +1104,6 @@ function deviceLabel(device: string): string {
   return device.length > 22 ? device.slice(0, 21) + "…" : device;
 }
 
-function deckMetaLabel(timecode: SessionState["timecode"]): string {
-  const parts: string[] = [];
-  if (timecode.deck) parts.push(`deck ${timecode.deck}`);
-  if (timecode.track?.artist) parts.push(timecode.track.artist);
-  if (timecode.genre) parts.push(timecode.genre);
-  return parts.length ? parts.join(" · ") : "waiting for deck";
-}
-
-function deckConfigLabel(state: SessionState): string {
-  return [
-    `mode <b>${state.persona.mood}</b>`,
-    `skill <b>${state.persona.skill}</b>`,
-    `voice <b>${escapeHtml(state.persona.voice)}</b>`,
-    `genre <b>${escapeHtml(state.persona.genre)}</b>`,
-    `out <b>${escapeHtml(outputLabel(state.output))}</b>`,
-  ].join(" · ");
-}
-
 function outputLabel(output: SessionState["output"]): string {
   return `${output.profile} ${deviceLabel(output.device)}`;
 }
@@ -1605,5 +1154,6 @@ export function defaultState(): SessionState {
     },
     persona: { skill: "INT", interaction: "HYPE", mood: "HYPE", voice: "kore", genre: "techno" },
     output: { device: "MacBook Pro Speakers", profile: "HP" },
+    mode: "cohost",
   };
 }

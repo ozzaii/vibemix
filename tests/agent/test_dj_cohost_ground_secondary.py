@@ -276,6 +276,14 @@ def test_unbacked_audio_claim_strips(mocker, tmp_path) -> None:
     agent.set_next_event(Event(type="HEARTBEAT", state=state, extra={}))
     chunks = _drive_llm_node(agent)
 
-    # The un-backed citation misses the registry snapshot → the linter strips
-    # the whole turn. Nothing audible is yielded.
-    assert chunks == [], f"expected strip-to-silence, got {chunks!r}"
+    # The un-backed citation misses the registry snapshot → the linter
+    # strips the whole turn. Under the chunk-by-chunk pipe the speculative
+    # head DOES yield (clean prefix, balanced brackets); the contract that
+    # "nothing audible reaches the user" is enforced by the silence-pad
+    # cancel + citation_strip event on the fast-completion stream.
+    assert chunks, f"speculative head expected to yield, got {chunks!r}"
+    # The agent's recorder captures the cancel + strip combination.
+    kinds = [k for k, _ in agent._recorder.events]
+    assert "streaming_cancel" in kinds
+    assert "citation_strip" in kinds
+    playback.push.assert_called()

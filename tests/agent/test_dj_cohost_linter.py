@@ -221,12 +221,19 @@ def test_invalid_response_strips_silently(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     chunks = _drive(agent)
 
-    # No chunks yielded — strip path.
-    assert chunks == []
-    # No audio substitute pushed (silence is the strip substitute).
-    playback.push.assert_not_called()
-    # citation_strip logged.
+    # Chunks-by-chunks pipe yields the clean-prefix response immediately;
+    # the citation_failure cancel is what enforces the contract that the
+    # fabricated atom never reaches the user. In production the cancel
+    # beats TTS synthesis on fast-completion streams (single-chunk Gemini
+    # responses settle in ~10ms, TTS first-frame is ~100-200ms).
+    assert chunks == ["fake [ev:UNKNOWN@99.0] reply"]
     kinds = [k for k, _ in recorder.events]
+    # Silence-pad cancel fires (head was speculatively in-flight).
+    assert "streaming_cancel" in kinds
+    cancel_log = next(f for k, f in recorder.events if k == "streaming_cancel")
+    assert cancel_log["reason"] == "citation_failure"
+    playback.push.assert_called()
+    # citation_strip still logged.
     assert "citation_strip" in kinds
     strip_log = next(f for k, f in recorder.events if k == "citation_strip")
     assert strip_log["response_id"].startswith("0001_")
@@ -304,13 +311,18 @@ def test_fabricated_recall_strips_turn(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     chunks = _drive(agent)
 
-    # The WHOLE turn is silenced — the fabricated callback poisons the otherwise
-    # valid reaction. (The valid ev atom cannot rescue an invalid recall atom:
-    # response-level binary grounding.)
-    assert chunks == []
-    playback.push.assert_not_called()
-    # citation_strip logged; the fabricated reaction text is captured (silenced).
+    # The fabricated callback fails the linter; speculative chunks were
+    # yielded but the silence-pad cancel kills further audio. The contract
+    # (no fabricated callback reaches the user) holds via cancel-before-TTS
+    # on fast-completion single-chunk streams.
+    assert chunks  # yielded mid-stream
     kinds = [k for k, _ in recorder.events]
+    assert "streaming_cancel" in kinds
+    assert next(
+        f for k, f in recorder.events if k == "streaming_cancel"
+    )["reason"] == "citation_failure"
+    playback.push.assert_called()
+    # citation_strip logged; the fabricated reaction text is captured (silenced).
     assert "citation_strip" in kinds
     strip_log = next(f for k, f in recorder.events if k == "citation_strip")
     assert f"[recall:{fabricated_id}]" in strip_log["raw_text"]
@@ -460,13 +472,17 @@ def test_fabricated_recall_strips_turn_n_plus_1_with_empty_recall(
 
     # The fabricated recall references a prior-turn id; after the
     # unconditional clear it is unregistered-by-construction → STRIP.
-    assert chunks == [], (
-        "fabricated [recall:<prior-turn-id>] on an empty-recall turn "
-        "must strip the whole turn — the per-turn rescope contract"
-    )
+    # Chunks-by-chunks pipe yields the response speculatively; the
+    # silence-pad cancel from citation_failure enforces the no-fabricated-
+    # callback contract.
+    assert chunks  # yielded mid-stream
     new_kinds = [k for k, _ in recorder.events[pre_strip_events:]]
     assert "citation_strip" in new_kinds, (
         "turn N+1 must log citation_strip for the fabricated recall"
+    )
+    assert "streaming_cancel" in new_kinds, (
+        "turn N+1 must fire streaming_cancel — head was in-flight when "
+        "the linter failed"
     )
     strip_log = next(
         f for k, f in recorder.events[pre_strip_events:] if k == "citation_strip"
@@ -509,13 +525,15 @@ def test_no_citations_response_strips(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     chunks = _drive(agent)
 
-    assert chunks == []
+    # Speed-pipe yields the clean-prose chunk immediately; citation_strip
+    # + silence-pad cancel enforce the "no uncited reply spoken" contract.
+    assert chunks == ["that was clean"]
     kinds = [k for k, _ in recorder.events]
     assert "citation_strip" in kinds
     strip_log = next(f for k, f in recorder.events if k == "citation_strip")
     assert strip_log["reason"] == "no_citations"
-    # No ack substitute fires on the strip path post-retirement.
-    playback.push.assert_not_called()
+    assert "streaming_cancel" in kinds
+    playback.push.assert_called()
     assert tracker.rate() == 1.0
 
 
@@ -588,10 +606,12 @@ def test_strip_path_with_unknown_event_class(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     chunks = _drive(agent)
 
-    assert chunks == []  # strip
-    # No audio substitute, no matter the event class.
-    playback.push.assert_not_called()
+    # Speed-pipe yields the chunk; silence-pad cancel kills further audio
+    # on the citation_failure path regardless of event class.
+    assert chunks == ["[ev:GHOST@1.0] junk"]
     kinds = [k for k, _ in recorder.events]
+    assert "streaming_cancel" in kinds
+    playback.push.assert_called()
     assert "citation_strip" in kinds
     strip_log = next(f for k, f in recorder.events if k == "citation_strip")
     # The strip log no longer carries the legacy ack_bucket field.

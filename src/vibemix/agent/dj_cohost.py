@@ -50,7 +50,12 @@ from livekit.agents import Agent, ModelSettings
 from livekit.agents import llm as agents_llm
 from livekit.agents import tts as agents_tts
 
-from vibemix.agent._streaming_pipe import find_sentence_end, passes_head_gate
+from vibemix.agent._streaming_pipe import (
+    can_yield_chunks,
+    find_sentence_end,
+    last_balanced_position,
+    passes_head_gate,
+)
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL, OPENROUTER_LLM_MODEL
 from vibemix.agent.proxy_client import (
@@ -1674,33 +1679,44 @@ class DJCoHostAgent(Agent):
                 f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
             )
 
-            # === Plan 41-04 streaming pipe-through (LAT-04) ===
-            # Refactor: replace buffer-then-yield with streaming sentence-
-            # boundary yield + dual-phase gate. The head is yielded
-            # SPECULATIVELY as soon as ``find_sentence_end`` returns a
-            # boundary AND ``passes_head_gate`` clears the head text. The
-            # tail then streams as-it-arrives.
+            # === Chunk-by-chunk streaming pipe-through ===
+            # Yields each chunk to TTS as the LLM emits it (no
+            # sentence-boundary buffer). The single guard is
+            # ``can_yield_chunks(full_text)`` — it blocks yielding only
+            # while the accumulated text-so-far either matches a banned
+            # opener (silence-token or slop prefix) OR could still grow
+            # into one. Once it clears, ``buffered_chunks`` is flushed
+            # in one shot and every subsequent chunk passes through
+            # verbatim. This eliminates the old sentence-boundary wait
+            # (~500ms-2s) AND the end-of-stream defer that left
+            # single-sentence responses stuck in the post-stream batched
+            # emit path.
             #
-            # ``buffered_chunks`` is still maintained so the post-stream
-            # legacy emit path (citation linter + suppression) keeps its
-            # contract for non-speculative paths (head never fired, short
-            # response, suppression). When a head was speculatively yielded,
-            # the post-stream gates run on ``full_text`` — if they fail, a
-            # silence-pad frame is pushed to ``self._playback`` (cancel-on-
-            # trailing-slop per Open Q2 auto-resolution; Pitfall 8 fallback
-            # documented below).
+            # ``buffered_chunks`` stays alive — the post-stream
+            # silence/slop/citation gates are the authority on the FULL
+            # response. When the gate never clears (banned-opener
+            # locked), the post-stream gate fires the appropriate
+            # suppression and nothing is re-yielded. When chunks WERE
+            # flushed mid-stream and the post-stream gate fails (slop in
+            # trailing text, missing citation), a silence-pad frame
+            # cancels remaining audio (``streaming_cancel`` event).
             #
             # Streaming pipe state:
-            #   accum             — running concat of chunk text since last
-            #                       boundary scan; reset (cleared) on first
-            #                       boundary, then unused (tail streams).
-            #   head_yielded      — True iff the speculative head was emitted.
-            #                       Drives post-stream branching (cancel-with-
-            #                       silence-pad vs legacy emit-from-buffer).
+            #   buffered_chunks   — every chunk text in arrival order
+            #                       (post-stream gate consumes this when
+            #                       head_yielded is False).
+            #   head_yielded      — True iff the gate cleared and the
+            #                       first flush happened. Drives
+            #                       post-stream branching (cancel-with-
+            #                       silence-pad vs re-yield-from-buffer).
             full_text = ""
             buffered_chunks: list[str] = []
-            accum = ""
             head_yielded = False
+            # Tracks the highest position in ``full_text`` we have
+            # already yielded. Combined with ``last_balanced_position``
+            # this keeps mid-stream yields clipped at the last closed
+            # citation so TTS never receives a bare ``"[ev:"`` fragment.
+            yielded_pos = 0
             t_start = time.time()
             llm_err: str | None = None
             # Plan 19-05 — record first-chunk arrival exactly once per turn for
@@ -1794,47 +1810,38 @@ class DJCoHostAgent(Agent):
                     print(txt, end="", flush=True)
                     full_text += txt
                     buffered_chunks.append(txt)
-                    # Plan 41-04 — speculative head emit. Run only while we
-                    # haven't yet committed to a streaming yield path. Once
-                    # ``head_yielded`` is True we stream subsequent chunks
-                    # as-they-arrive (the speculative commitment is the
-                    # binding signal — trailing audio just keeps the listener
-                    # in flow). The legacy buffered_chunks list is still
-                    # populated for post-stream citation linting on the full
-                    # response text.
+                    # Chunk-by-chunk yield with bracket-balance clipping.
+                    # Before the speed-gate clears we hold every chunk
+                    # in ``buffered_chunks`` so a banned opener cannot
+                    # leak to TTS. After it clears, yields are clipped
+                    # at ``last_balanced_position(full_text)`` so an
+                    # unclosed citation never reaches the synth (Pitfall
+                    # 1 — a bare ``"[ev:kick@2.5"`` would be spoken as
+                    # bracket-noise if it reached TTS).
                     if not head_yielded:
-                        accum += txt
-                        end_idx = find_sentence_end(accum)
-                        if end_idx is not None:
-                            head = accum[:end_idx]
-                            if passes_head_gate(head):
+                        if can_yield_chunks(full_text):
+                            safe_pos = last_balanced_position(full_text)
+                            if safe_pos > 0:
                                 head_yielded = True
                                 self._llm_to_tts_meter.record_first_sentence()
-                                yield head
-                                # Any trailing portion of ``accum`` past the
-                                # boundary becomes the first trailing chunk
-                                # — yield it now so the stream stays
-                                # contiguous.
-                                tail_remainder = accum[end_idx:]
-                                if tail_remainder:
-                                    yield tail_remainder
-                                accum = ""
-                            # else: head failed the gate — silence-token or
-                            # slop prefix. SUPPRESS the speculative emit
-                            # entirely; the post-stream silence/slop pipeline
-                            # is the authority and will fire the appropriate
-                            # suppression event. Keep accumulating into accum
-                            # so a later sentence boundary could still fire
-                            # on cleaner trailing text (unlikely in practice
-                            # but it's the correct boundary semantics).
-                    elif head_yielded:
-                        # Stream trailing chunks as-they-arrive. The head
-                        # already bound the speculative path; trailing audio
-                        # streams without further boundary gating. The post-
-                        # stream gate (citation linter) is the authority for
-                        # cancel-with-silence-pad if the full response is
-                        # invalid.
-                        yield txt
+                                yield full_text[:safe_pos]
+                                yielded_pos = safe_pos
+                            # else: every char is inside an open bracket
+                            # (e.g. the entire first chunk is the start
+                            # of one big citation). Defer; the next
+                            # chunk presumably closes the bracket.
+                        # else: gate still blocking — either locked on a
+                        # banned opener (post-stream gate will suppress)
+                        # or still disambiguating (next chunk may clear).
+                    else:
+                        # Gate already cleared — extend the safe yield
+                        # frontier as more brackets close. If the new
+                        # chunk lands entirely inside an open bracket,
+                        # ``safe_pos`` won't move and we just defer.
+                        safe_pos = last_balanced_position(full_text)
+                        if safe_pos > yielded_pos:
+                            yield full_text[yielded_pos:safe_pos]
+                            yielded_pos = safe_pos
             except Exception as e:
                 # ---- Plan 69-03 (OSS-02) — proxy unavailable classification ---
                 # Classify the exception against the 4 documented trigger classes

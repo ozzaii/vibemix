@@ -1,38 +1,51 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Plan 41-04 LAT-04 — sentence-boundary detector + head-gate primitives.
+"""Streaming-pipe gate primitives for ``DJCoHostAgent.llm_node``.
 
-Two private helpers feeding ``DJCoHostAgent.llm_node``'s streaming
-pipe-through refactor:
+The pipe yields chunks to TTS as fast as the LLM emits them. The gate
+here is the single guard that runs BEFORE the first yield to keep two
+classes of bad opener from reaching the listener:
 
-  * :func:`find_sentence_end` — bracket-depth-aware sentence-boundary
-    scanner. Periods (or other terminal punctuation) at bracket depth > 0
-    do NOT trigger boundaries — citations like ``[ev:kick@2.5]`` carry a
-    literal ``.`` that the legacy regex ``[.!?]\\s`` would mis-fire on
-    (Pitfall 1 — locked in 41-04-PLAN ``<refactor_blueprint>``).
+  * **Silence-token openers** — the LLM emitted ``<silence/>`` as the
+    head; the whole turn must be suppressed (post-stream silence gate is
+    the authority and will not re-emit, so deferring at the chunk gate
+    keeps us byte-identical to "never spoke a word").
 
-  * :func:`passes_head_gate` — quick prefix check before yielding the head
-    to TTS. Two rejections:
-      - Silence-token prefix (the LLM emitted ``<silence/>`` as the head
-        — the whole turn must be suppressed; the matching gate also runs
-        post-stream on the full text).
-      - A subset of the slop-PREFIX list (banned phrases that can ONLY
-        appear as openers — e.g. "as an AI", "in this dynamic world").
+  * **Slop-prefix openers** — head starts with a never-opens phrase
+    ("as an AI", "here's the thing", "fundamentally", …). These are the
+    AI-tells + slop-framings + stop-slop additions from
+    :mod:`vibemix.prompts.negative_dict`. The post-stream
+    :func:`vibemix.prompts.filter.filter_for_slop` is the authority on
+    suppressing the FULL response, but once chunks reach TTS they cannot
+    be unspoken — so the chunk gate must catch the prefix BEFORE we let
+    the first chunk out.
 
-The head gate is intentionally NARROWER than the full :mod:`vibemix.prompts.filter`
-post-hoc filter. The full filter runs on the trailing text after the stream
-completes — it catches slop that appears mid-/end-response. The head gate
-is a fast PREFIX check; it MUST be cheap (called inside the per-chunk
-accumulator loop). When in doubt about a phrase that could legitimately
-appear mid-sentence (e.g. "amazing" — the post-hoc filter rejects, but a
-head opening with "Amazing groove" is borderline), defer to the post-hoc
-filter and let the trailing-slop cancel-with-silence-pad handle it.
+:func:`can_yield_chunks` is the unified gate. It accepts the accumulated
+text-so-far and returns ``True`` iff the prefix is safe AND unambiguous —
+i.e. (a) does not match any banned prefix AND (b) is long enough that no
+banned prefix could still be forming. Until the gate clears, chunks
+accumulate in the LLM stream consumer's local buffer; once it clears,
+the buffer flushes and all subsequent chunks pass through verbatim.
 
-Subset choice (locked):
-  All 16 "Generic AI tells" + all 8 "Slop framings" — these are framings a
-  real DJ friend NEVER opens with, so a prefix match is high-confidence
-  slop. The 16 "Empty hype" phrases are NOT in the head subset — "amazing"
-  / "killer" / "love it" can legitimately open a real reaction; the
-  post-hoc full filter still catches them on the trailing text.
+This replaces the earlier sentence-boundary-buffering design (Plan
+41-04). That design waited for terminal punctuation before yielding,
+which hid LLM TTFT behind buffer-then-yield but added a 500ms-2s wait
+for the first audible word AND failed entirely for single-sentence
+responses (the EOS defer in the old ``find_sentence_end``: a period at
+the last buffer position never resolved without a next chunk that never
+arrived). The chunk-by-chunk yield is strictly faster perceived TTFT
+and gracefully handles short single-sentence responses.
+
+The slop-prefix subset is INTENTIONALLY narrower than the full
+``NEGATIVE_PHRASES`` list. The 16 "Empty hype" phrases ("amazing",
+"killer", "love it") are NOT here — they can legitimately open a real
+DJ-friend reaction; the post-stream filter still catches them on the
+trailing text. The head gate's subset is the union of (a) "Generic AI
+tells" (idx < 16) + (b) "Slop framings" (idx 32..40) + (c) "Stop-slop
+additions" (idx >= 40, lifted from ``hardikpandya/stop-slop`` MIT).
+
+:func:`find_sentence_end` and :func:`passes_head_gate` are kept for
+backward compatibility (test imports, ``vibemix.agent`` ``__init__``
+re-export). They are no longer called from ``llm_node``.
 """
 
 from __future__ import annotations
@@ -168,3 +181,107 @@ def passes_head_gate(head: str) -> bool:
         if lowered.startswith(prefix):
             return False
     return True
+
+
+# ---- Speed-gate (chunk-by-chunk yield) ----
+
+# Pre-compute max prefix length so we can short-circuit ``can_yield_chunks``
+# once the accumulated text is unambiguously past any banned prefix.
+_MAX_GATED_PREFIX_LEN: int = max(
+    (len(p) for p in _HEAD_SLOP_PREFIXES),
+    default=0,
+)
+_MAX_GATED_PREFIX_LEN = max(_MAX_GATED_PREFIX_LEN, len(SILENCE_TOKEN))
+
+
+def can_yield_chunks(text: str) -> bool:
+    """Return True iff the accumulated ``text`` is safe to flush to TTS.
+
+    Two-part check (cheap; called inside the per-chunk consumer loop):
+
+    1. **Locked match** — if (after ``lstrip``) the text starts with the
+       silence-token OR any banned slop prefix, return ``False``.
+       Adding more chunks cannot un-match a ``startswith`` hit, so this
+       result is permanent for the turn — the post-stream silence/slop
+       gate is the authority and will suppress the full response.
+
+    2. **Still-disambiguating** — if the stripped text is SHORTER than
+       any banned prefix that ``startswith`` it (i.e. the text could
+       still grow into a banned prefix on the next chunk), return
+       ``False``. The caller defers this round, the chunk goes into the
+       accumulator, and the gate is re-checked when more chars arrive.
+
+    When neither condition holds, the prefix is unambiguous and safe —
+    the caller flushes its accumulator to TTS and switches to direct
+    chunk-by-chunk yield for the rest of the stream.
+
+    Args:
+        text: Accumulated text from the LLM stream so far.
+
+    Returns:
+        True when the prefix is safe AND long enough to be unambiguous.
+    """
+    stripped = text.lstrip()
+    if not stripped:
+        # No content yet (pure whitespace) — defer; nothing to flush.
+        return False
+
+    # Locked-match check (permanent fail for the turn).
+    if stripped.startswith(SILENCE_TOKEN):
+        return False
+    lowered = stripped.lower()
+    for prefix in _HEAD_SLOP_PREFIXES:
+        if lowered.startswith(prefix):
+            return False
+
+    # Short-circuit: once the accumulated text is longer than the longest
+    # gated prefix, no prefix can still be forming. Safe.
+    if len(stripped) >= _MAX_GATED_PREFIX_LEN:
+        return True
+
+    # Still-disambiguating check: any banned prefix that the current text
+    # is a strict prefix of? If yes, defer — the next chunk might land
+    # the matching character.
+    if len(stripped) < len(SILENCE_TOKEN) and SILENCE_TOKEN.startswith(stripped):
+        return False
+    for prefix in _HEAD_SLOP_PREFIXES:
+        if len(lowered) < len(prefix) and prefix.startswith(lowered):
+            return False
+
+    return True
+
+
+def last_balanced_position(text: str) -> int:
+    """Return the largest ``i`` such that ``text[:i]`` has every ``[``
+    matched by a later ``]``.
+
+    The chunk-by-chunk yield uses this to clip mid-stream chunks at the
+    boundary of an unclosed citation: e.g. ``"Killer drop [ev:kick@2.5"``
+    yields up to position 12 (``"Killer drop "``), holding the
+    half-citation in the consumer's accumulator until the next chunk
+    closes the bracket. This keeps TTS from receiving a bare ``"[ev:"``
+    fragment and trying to speak it.
+
+    Only ``[`` / ``]`` count for depth (citations use square brackets;
+    parentheticals like ``(the groove)`` do not). Mirrors
+    :func:`find_sentence_end` bracket semantics.
+
+    Args:
+        text: Accumulated text from the LLM stream.
+
+    Returns:
+        The position ``i`` such that ``text[:i]`` has no unclosed ``[``.
+        Returns ``len(text)`` when every bracket is closed.
+    """
+    depth = 0
+    last_balanced = 0
+    for i, ch in enumerate(text):
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth = max(0, depth - 1)
+            if depth == 0:
+                last_balanced = i + 1
+        elif depth == 0:
+            last_balanced = i + 1
+    return last_balanced

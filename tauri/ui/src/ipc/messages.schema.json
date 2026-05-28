@@ -1509,6 +1509,23 @@
                   "type": "null"
                 }
               ]
+            },
+            "session.mode": {
+              "$comment": "Phase 97 (ONBOARD-01) \u2014 optional top-level mode picker value (cohost/learn/build/debrief). Null means the user has not picked a mode yet \u2014 the renderer defaults to 'cohost' in that case (matches makeDefault() in session/state.ts). Persisted via ConfigStore.extra under 'session.mode' (same path as mascot.*/recording.*); cold-boot reads this so the picker lights the last-picked segment without UI flicker.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "cohost",
+                    "learn",
+                    "build",
+                    "debrief"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         }

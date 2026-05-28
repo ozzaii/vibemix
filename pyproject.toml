@@ -29,10 +29,10 @@ dependencies = [
     "google-genai>=2.0.1",
     "httpx>=0.28",
     "keyring>=25.7.0",
-    "livekit-agents>=1.5.8",
-    "livekit-plugins-google>=1.5.8",
-    "livekit-plugins-openai>=1.5.8",
-    "livekit>=1.1.7",
+    "livekit-agents>=1.5.14",
+    "livekit-plugins-google>=1.5.14",
+    "livekit-plugins-openai>=1.5.14",
+    "livekit>=1.1.8",
     "numpy>=2.4.4",
     # Direct runtime dependency: local CLAP/CUE decode and debrief MP3 encode
     # import PyAV directly. Do not rely on LiveKit Agents to pull it transitively.

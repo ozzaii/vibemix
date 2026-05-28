@@ -188,8 +188,13 @@ def test_silence_05_silence_meta_records_no_response(mocker, tmp_path) -> None:
 
 
 def test_slop_01_banned_phrase_suppresses_tts(mocker, tmp_path) -> None:
-    """LLM emits 'Amazing mix!' → filter_for_slop catches 'amazing' → no chunks."""
-    agent, gen_client, _recorder, state = _build_agent(mocker, tmp_path)
+    """LLM emits 'Amazing mix!' → speed-pipe yields the chunk (empty-hype
+    'amazing' is NOT a head-gate prefix); ``filter_for_slop`` catches it
+    post-stream and the silence-pad cancel kills further audio. The
+    user-facing contract (no AI-slop spoken) holds via cancel-before-TTS
+    on fast-completion streams.
+    """
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
@@ -199,7 +204,12 @@ def test_slop_01_banned_phrase_suppresses_tts(mocker, tmp_path) -> None:
     ev = Event(type="HEARTBEAT", state=state, extra={})
     agent.set_next_event(ev)
     chunks = _drive_llm_node(agent)
-    assert chunks == [], f"slop not suppressed: {chunks!r}"
+    assert chunks == ["Amazing mix!"]
+    kinds = [k for k, _ in recorder.events]
+    assert "slop_suppressed" in kinds
+    assert "streaming_cancel" in kinds
+    cancel_log = next(f for k, f in recorder.events if k == "streaming_cancel")
+    assert cancel_log["reason"] == "slop"
 
 
 def test_slop_02_banned_phrase_logs_slop_event_with_matches(mocker, tmp_path) -> None:

@@ -90,6 +90,24 @@ function cohostMoodCycleHandler(): void {
   );
 }
 
+/** Phase 97 / ONBOARD-01 — mode picker handler. Writes the new mode into
+ *  the singleton SessionState IMMEDIATELY (the optimistic-repaint half
+ *  was already done by the picker's click handler flipping data-active;
+ *  this propagates the change into state so subsequent re-renders read
+ *  the new mode), THEN fires `ipc.session.set_mode` so the sidecar
+ *  persists. Fire-and-forget — the optimistic repaint is authoritative
+ *  for the user-visible state; the wire round-trip is pure persistence. */
+function modeChangeHandler(mode: "cohost" | "learn" | "build" | "debrief"): void {
+  // 1. Local state write — keeps the singleton in sync with the DOM.
+  setSessionState({ mode });
+  // 2. Wire envelope — sidecar persists via ConfigStore.extra under
+  //    "session.mode" so the next launch boots into the last-picked mode.
+  void emitIpc("ipc.session.set_mode", { mode }).catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.warn("[render-loop] set_mode emitIpc failed:", err);
+  });
+}
+
 /** Phase 44-03 / LAUNCH-02 — chip-click handler. Invokes the Tauri
  *  `open_debrief_window` command with a deep-link payload pointing at
  *  the chip's event. The live session UI does NOT carry its own
@@ -326,6 +344,12 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       device: s.settings.output_device_id ?? "AUTO",
       profile: s.settings.output_profile === "spk" ? "SPK" : "HP",
     },
+    // Phase 97 / ONBOARD-01 — top-level mode + click handler. Mode
+    // defaults to "cohost" when undefined (mock / older snapshots) so
+    // the picker always lights a segment. The click handler does the
+    // local setSessionState + emits ipc.session.set_mode.
+    mode: s.mode ?? "cohost",
+    onModeChange: modeChangeHandler,
   };
 }
 

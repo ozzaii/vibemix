@@ -1350,7 +1350,22 @@ async def main() -> None:
     # register_library-seeded ids above (invariant #2 — no linter change).
     agent.attach_grounding(grounding)
 
-    session = AgentSession(llm=llm_inst, tts=tts_inst)
+    # ── LiveKit 1.5.14 turn_handling: kill the false-interruption resume ──
+    # Mic VAD fires on music → LiveKit marks "interrupt" → 2s later "false alarm"
+    # → with the default resume_false_interruption=True the prior utterance
+    # replays from LiveKit's internal text buffer using stale content (the
+    # "audio from before comes back after close" bug). DJ booth: music is
+    # always above VAD threshold, so we disable barge-in interruption entirely.
+    session = AgentSession(
+        llm=llm_inst,
+        tts=tts_inst,
+        turn_handling={
+            "interruption": {
+                "enabled": False,
+                "resume_false_interruption": False,
+            },
+        },
+    )
     session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
     print(f"-> AgentSession headless (no Room); audio out → PlaybackQueue @ {OUTPUT_SR}Hz")
 
