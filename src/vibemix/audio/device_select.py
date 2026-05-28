@@ -194,3 +194,82 @@ def find_device_index(
     raise RuntimeError(
         f"No {kind} device matching {name_substring!r}. Available {kind} devices: {available}"
     )
+
+
+def _is_output(info: dict[str, Any]) -> bool:
+    try:
+        return int(info.get("max_output_channels", 0)) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def select_output_device(
+    devices: Sequence[dict[str, Any]],
+    *,
+    preferred_index: int | None = None,
+    fallback_name: str | None = None,
+    default_index: int | None = None,
+) -> int:
+    """Resolve the AI-voice / passthrough OUTPUT device index, degrading
+    gracefully instead of crashing when the configured/hardcoded name is absent.
+
+    Why this exists (first-launch crash, 2026-05-29): the live runtime hardcoded
+    ``OUTPUT_DEVICE = "MacBook Pro Speakers"`` and resolved it with a strict
+    :func:`find_device_index` substring match. A brand-new user on a Mac mini /
+    Mac Studio / iMac, with external speakers or headphones selected, a renamed
+    output, or a non-English macOS (localized device names) has no such device,
+    so the substring missed → ``RuntimeError`` → the process exited with the
+    BlackHole-input sentinel and a *misleading* "install BlackHole" banner. The
+    app must still boot to SOME working output.
+
+    Preference order (first that resolves to an output-capable device wins):
+
+      1. ``preferred_index`` — the wizard-persisted ``output_device_id`` (an index
+         into this same ``query_devices()`` list). The user's explicit choice.
+      2. ``fallback_name`` — case-insensitive substring (the ``OUTPUT_DEVICE``
+         constant). Preserves the legacy happy path byte-for-byte when the device
+         exists.
+      3. ``default_index`` — the OS default output (``sd.default.device[1]``).
+      4. first output-capable device that is NOT a BlackHole / controller
+         loopback — never route the AI voice into the capture device (it would
+         feed straight back into the master capture).
+      5. first output-capable device at all (last resort).
+
+    Raises:
+        RuntimeError (carrying the candidate list) only when the machine has NO
+        output-capable device whatsoever — a genuinely unusable state, distinct
+        from a missing BlackHole input.
+    """
+
+    def _resolvable(idx: int | None) -> bool:
+        return isinstance(idx, int) and 0 <= idx < len(devices) and _is_output(devices[idx])
+
+    # 1. Explicit wizard-persisted choice.
+    if _resolvable(preferred_index):
+        return preferred_index  # type: ignore[return-value]
+    # 2. Legacy substring name (happy-path parity).
+    if fallback_name:
+        try:
+            return find_device_index(devices, fallback_name, "output")
+        except RuntimeError:
+            pass
+    # 3. OS default output.
+    if _resolvable(default_index):
+        return default_index  # type: ignore[return-value]
+    # 4. First real (non-loopback, non-controller) output.
+    for idx, info in enumerate(devices):
+        if not _is_output(info):
+            continue
+        low = _name_of(info).lower()
+        if not low or _BLACKHOLE_PREFIX in low or is_controller_device(low):
+            continue
+        return idx
+    # 5. Last resort: any output-capable device.
+    for idx, info in enumerate(devices):
+        if _is_output(info):
+            return idx
+    available = [_name_of(d) for d in devices]
+    raise RuntimeError(
+        "No output-capable audio device found. vibemix needs an audio output "
+        f"for the AI voice. Available devices: {available}"
+    )

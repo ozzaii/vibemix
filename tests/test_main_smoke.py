@@ -140,6 +140,13 @@ def _build_audio_mocks(mocker):
     )
     mocker.patch.object(main_mod.AudioMacOS, "find_device", find_device)
 
+    # find_output_device (graceful output resolver) — delegate to the canned
+    # find_device for parity with the pre-2026-05-29 single-call behavior.
+    find_output_device = MagicMock(
+        side_effect=lambda preferred_index, fallback_name: find_device(fallback_name, "output")
+    )
+    mocker.patch.object(main_mod.AudioMacOS, "find_output_device", find_output_device)
+
     def _stream():
         s = MagicMock()
         s.start = MagicMock()
@@ -158,6 +165,7 @@ def _build_audio_mocks(mocker):
 
     return {
         "find_device": find_device,
+        "find_output_device": find_output_device,
         "open_capture": open_capture,
         "open_voice_output": open_voice_output,
         "open_passthrough_output": open_passthrough_output,

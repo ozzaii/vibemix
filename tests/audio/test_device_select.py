@@ -18,6 +18,7 @@ from vibemix.audio.device_select import (
     is_controller_device,
     is_mic_device,
     select_master_input,
+    select_output_device,
 )
 
 
@@ -125,3 +126,77 @@ def test_find_device_index_raises_on_miss() -> None:
     devices = [_in("MacBook Pro Speakers", ich=0, och=2)]
     with pytest.raises(RuntimeError, match="nonexistent"):
         find_device_index(devices, "nonexistent", "output")
+
+
+# ----- select_output_device: graceful fallback so first launch never crashes ----
+# Regression (2026-05-29): the live runtime hardcoded OUTPUT_DEVICE='MacBook Pro
+# Speakers' and hard-failed on a miss → any non-MacBook Mac / external output /
+# localized device name crashed first launch with a misleading 'install BlackHole'
+# banner. select_output_device must always resolve to SOME output when one exists.
+
+
+def test_output_happy_path_substring_parity() -> None:
+    # When the configured name exists and nothing is persisted, behaves exactly
+    # like the legacy find_device_index substring match (byte-identical index).
+    idx = select_output_device(FOUNDER_DEVICES, fallback_name="MacBook Pro Speakers")
+    assert idx == 1
+    assert idx == find_device_index(FOUNDER_DEVICES, "MacBook Pro Speakers", "output")
+
+
+def test_output_prefers_persisted_index_over_name() -> None:
+    # The wizard-persisted output_device_id (an index) is the user's explicit
+    # choice and wins over the fallback name.
+    idx = select_output_device(
+        FOUNDER_DEVICES, preferred_index=4, fallback_name="MacBook Pro Speakers"
+    )
+    assert idx == 4  # HEADPHONEMG (output-capable)
+
+
+def test_output_persisted_index_invalid_falls_through_to_name() -> None:
+    # Out-of-range / non-output persisted index is ignored (device unplugged
+    # since the wizard ran) → fall through to the name.
+    assert (
+        select_output_device(
+            FOUNDER_DEVICES, preferred_index=999, fallback_name="MacBook Pro Speakers"
+        )
+        == 1
+    )
+    # index 8 is BlackHole 2ch — input-only, not output-capable → ignored.
+    assert (
+        select_output_device(
+            FOUNDER_DEVICES, preferred_index=8, fallback_name="MacBook Pro Speakers"
+        )
+        == 1
+    )
+
+
+def test_output_name_miss_falls_back_to_os_default() -> None:
+    # The crux of the first-launch fix: 'MacBook Pro Speakers' absent (Mac mini /
+    # localized macOS), so fall back to the OS default output index, NOT a crash.
+    devices = [_in("Mac mini Speakers", ich=0, och=2), _in("Studio Display Speakers", ich=0, och=2)]
+    idx = select_output_device(devices, fallback_name="MacBook Pro Speakers", default_index=1)
+    assert idx == 1
+
+
+def test_output_no_default_falls_back_to_first_real_output() -> None:
+    # No name match and no OS default → first non-loopback, non-controller output.
+    # BlackHole + the controller must be SKIPPED (never route AI voice into them).
+    devices = [
+        _in("BlackHole 2ch", ich=2, och=2),  # loopback, output-capable but skip
+        _in("DDJ-FLX4", ich=4, och=4),  # controller, skip
+        _in("External DAC", ich=0, och=2),  # real output → chosen
+    ]
+    assert select_output_device(devices, fallback_name="nope") == 2
+
+
+def test_output_last_resort_returns_any_output_even_loopback() -> None:
+    # If the ONLY output is BlackHole, route to it rather than crash (better a
+    # working-but-loopback voice path than no boot).
+    devices = [_in("BlackHole 2ch", ich=2, och=2)]
+    assert select_output_device(devices, fallback_name="nope") == 0
+
+
+def test_output_raises_only_when_no_output_device_at_all() -> None:
+    devices = [_in("BlackHole 2ch", ich=2, och=0), _in("MacBook Pro Microphone", ich=1, och=0)]
+    with pytest.raises(RuntimeError, match="No output-capable"):
+        select_output_device(devices, fallback_name="MacBook Pro Speakers")

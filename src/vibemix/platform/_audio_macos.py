@@ -19,17 +19,37 @@ this module fails loud, no silent degradation.
 
 from __future__ import annotations
 
+import os
+import sys
+
 import sounddevice as sd
 
 from vibemix.audio.device_select import (
     MasterCaptureNotFoundError,
     find_device_index,
+    is_controller_device,
+    is_mic_device,
     select_master_input,
+    select_output_device,
 )
 from vibemix.audio.errors import SampleRateMismatchError
 from vibemix.audio.recorder import VoiceRecorder
 from vibemix.audio.registry import BufferRegistry
 from vibemix.platform.audio import AudioCallback, AudioStream, Kind
+
+_AUTO_MASTER_ENV = "VIBEMIX_AUTO_MASTER_INPUT"
+_AUTO_MASTER_REQUESTS = {"auto", "auto-master", "master", "master-auto"}
+_AUTO_MASTER_EXPECTED_SR = 48000
+_AUTO_MASTER_PROBE_SECONDS = 0.35
+_AUTO_MASTER_RMS_FLOOR = 0.003
+_LOOPBACK_TOKENS = (
+    "blackhole",
+    "loopback",
+    "vb-cable",
+    "soundflower",
+    "capture",
+    "aggregate",
+)
 
 
 def assert_device_sample_rate(device_index: int, expected: int) -> None:
@@ -180,6 +200,162 @@ def set_device_nominal_sample_rate(device_name: str, rate: int) -> bool:
     return False
 
 
+def _env_enabled(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _info_name(info) -> str:
+    name = info.get("name") if hasattr(info, "get") else None
+    return name if isinstance(name, str) else ""
+
+
+def _info_int(info, key: str) -> int:
+    try:
+        return int(info.get(key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _is_loopback_candidate(name: str) -> bool:
+    low = name.lower()
+    return any(token in low for token in _LOOPBACK_TOKENS)
+
+
+def _active_master_candidates(devices) -> list[tuple[int, object]]:
+    """Candidate master inputs for the signal-aware auto finder."""
+    candidates: list[tuple[int, object]] = []
+    for idx, info in enumerate(devices):
+        if _info_int(info, "max_input_channels") <= 0:
+            continue
+        name = _info_name(info)
+        if not name:
+            continue
+        if is_controller_device(name) or is_mic_device(name):
+            continue
+        if not _is_loopback_candidate(name):
+            continue
+        candidates.append((idx, info))
+    return candidates
+
+
+def _probe_input_rms(
+    device_index: int,
+    info,
+    *,
+    seconds: float = _AUTO_MASTER_PROBE_SECONDS,
+) -> dict:
+    """Sample a candidate briefly and return signal metrics.
+
+    This is intentionally small and startup-only. It never runs on the normal
+    deterministic path unless ``VIBEMIX_AUTO_MASTER_INPUT`` or ``auto`` is used.
+    """
+    import numpy as np
+
+    name = _info_name(info)
+    sample_rate = _info_int(info, "default_samplerate") or _AUTO_MASTER_EXPECTED_SR
+    channels = max(1, min(2, _info_int(info, "max_input_channels") or 1))
+    frames = max(1, int(sample_rate * seconds))
+    try:
+        audio = sd.rec(
+            frames,
+            samplerate=sample_rate,
+            channels=channels,
+            dtype="float32",
+            device=device_index,
+            blocking=True,
+        )
+        rms = float(np.sqrt(np.mean(np.square(audio)))) if audio.size else 0.0
+        peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+        error = None
+    except Exception as exc:
+        rms = 0.0
+        peak = 0.0
+        error = repr(exc)
+    return {
+        "index": device_index,
+        "name": name,
+        "sample_rate": sample_rate,
+        "rms": rms,
+        "peak": peak,
+        "error": error,
+    }
+
+
+def _master_probe_score(row: dict) -> tuple[float, float, int, int]:
+    name = str(row.get("name") or "").lower()
+    rms = float(row.get("rms") or 0.0)
+    sample_rate = int(row.get("sample_rate") or 0)
+    live = 1 if rms >= _AUTO_MASTER_RMS_FLOOR else 0
+    rate_match = 1 if sample_rate == _AUTO_MASTER_EXPECTED_SR else 0
+    exact_2ch = 1 if name == "blackhole 2ch" else 0
+    blackhole = 1 if "blackhole" in name else 0
+    # Live signal dominates; rate match beats exact 2ch when the signal is on
+    # another BlackHole variant. The small name bonus only breaks true ties.
+    return (
+        float(live * 1000) + min(rms * 1000.0, 100.0),
+        float(rate_match * 100 + exact_2ch * 5 + blackhole),
+        -int(row.get("index") or 0),
+        0,
+    )
+
+
+def select_active_master_input(devices) -> int:
+    """Signal-aware master input selection for live rigs.
+
+    Static ranking is still the default. This helper is the opt-in "auto master
+    finder": briefly sample loopback/capture candidates, pick the one that is
+    actually carrying audio, and prefer the expected 48 kHz path when multiple
+    candidates are live. If nothing is live, fall back to the existing
+    BlackHole-only selector so startup remains deterministic and safe.
+    """
+    candidates = _active_master_candidates(devices)
+    probes = [_probe_input_rms(idx, info) for idx, info in candidates]
+    live = [row for row in probes if float(row.get("rms") or 0.0) >= _AUTO_MASTER_RMS_FLOOR]
+    if live:
+        chosen = max(live, key=_master_probe_score)
+        print(
+            "[audio] auto master input: "
+            f"{chosen['name']} @ {chosen['sample_rate']}Hz "
+            f"rms={chosen['rms']:.4f} peak={chosen['peak']:.4f}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return int(chosen["index"])
+    expected_rate = [
+        row
+        for row in probes
+        if int(row.get("sample_rate") or 0) == _AUTO_MASTER_EXPECTED_SR
+        and "blackhole" in str(row.get("name") or "").lower()
+    ]
+    if expected_rate:
+        chosen = max(expected_rate, key=_master_probe_score)
+        print(
+            "[audio] auto master input: "
+            f"{chosen['name']} @ {chosen['sample_rate']}Hz "
+            "(48k fallback; no live signal during startup probe)",
+            file=sys.stderr,
+            flush=True,
+        )
+        return int(chosen["index"])
+    try:
+        return select_master_input(devices)
+    except MasterCaptureNotFoundError as exc:
+        probe_summary = [
+            {
+                "name": row["name"],
+                "sample_rate": row["sample_rate"],
+                "rms": round(float(row["rms"]), 6),
+                "peak": round(float(row["peak"]), 6),
+                "error": row["error"],
+            }
+            for row in probes
+        ]
+        raise RuntimeError(
+            "auto master input: no live loopback/capture input found; "
+            f"probes={probe_summary}"
+        ) from exc
+
+
 class _SoundDeviceStreamHandle:
     """Adapter from ``sd.Input/Output/RawInput/RawOutputStream`` to the Phase 1
     ``AudioStream`` Protocol (latency_ms + start/stop/close)."""
@@ -229,17 +405,20 @@ class AudioMacOS:
     def find_device(self, name_substring: str, kind: Kind) -> int:
         """Find a CoreAudio device for ``name_substring`` of the given ``kind``.
 
-        MASTER-CAPTURE path (the release-blocking bug, 2026-05-24): when the
-        caller asks for the BlackHole capture input (``kind == "input"`` and
-        the request targets BlackHole), selection is delegated to
+        MASTER-CAPTURE path (the release-blocking bug, 2026-05-24): generic
+        BlackHole requests still delegate to
         :func:`vibemix.audio.device_select.select_master_input`, which *ranks*
         candidates — exact ``BlackHole 2ch`` first, then other BlackHole
         variants — and EXCLUDES the DJ-controller soundcard (DDJ-FLX4 et al.)
         and any microphone. The old naive substring scan returned whichever
         input CoreAudio enumerated first, so the co-host grabbed the
-        controller instead of the master output. We never silently fall back
-        to "any input"; if BlackHole is absent we raise so the caller can show
-        the install affordance.
+        controller instead of the master output.
+
+        Live rigs can opt into ``VIBEMIX_AUTO_MASTER_INPUT=1`` (or request
+        ``"auto"``) to briefly sample loopback/capture inputs and choose the
+        one actually carrying the master. Explicit variant requests like
+        ``"BlackHole 16ch"`` are honored exactly; they no longer get rewritten
+        back to the canonical 2ch default.
 
         OUTPUT and MIC paths keep a plain case-insensitive substring match
         (the caller passes an explicit, unambiguous device name there). On a
@@ -248,7 +427,15 @@ class AudioMacOS:
         stack trace (RESEARCH.md Threat 4).
         """
         devices = sd.query_devices()
-        if kind == "input" and "blackhole" in name_substring.lower():
+        low = name_substring.strip().lower()
+        if kind == "input" and (
+            low in _AUTO_MASTER_REQUESTS
+            or ("blackhole" in low and _env_enabled(_AUTO_MASTER_ENV))
+        ):
+            return select_active_master_input(devices)
+        if kind == "input" and "blackhole" in low:
+            if low not in {"blackhole", "blackhole 2ch"}:
+                return find_device_index(devices, name_substring, kind)
             try:
                 return select_master_input(devices)
             except MasterCaptureNotFoundError as e:
@@ -257,6 +444,39 @@ class AudioMacOS:
                 # still classifies this as an input-device miss (exit code 3).
                 raise RuntimeError(f"{name_substring}: {e}") from e
         return find_device_index(devices, name_substring, kind)
+
+    def find_output_device(
+        self, preferred_index: int | None, fallback_name: str
+    ) -> int:
+        """Resolve the AI-voice / passthrough OUTPUT device, degrading gracefully.
+
+        Unlike :meth:`find_device` (which hard-fails on a substring miss), this
+        never crashes when the hardcoded ``OUTPUT_DEVICE`` name is absent — a Mac
+        mini / Mac Studio / iMac, external speakers or headphones, a renamed
+        output, or a non-English macOS all lack "MacBook Pro Speakers". It prefers
+        the wizard-persisted output device index, then the name, then the OS
+        default output, then any real (non-loopback) output. See
+        :func:`vibemix.audio.device_select.select_output_device`.
+        """
+        devices = sd.query_devices()
+        default_out: int | None = None
+        try:
+            d = sd.default.device  # (input_idx, output_idx)
+            if (
+                isinstance(d, (list, tuple))
+                and len(d) >= 2
+                and isinstance(d[1], int)
+                and d[1] >= 0
+            ):
+                default_out = int(d[1])
+        except Exception:
+            default_out = None
+        return select_output_device(
+            devices,
+            preferred_index=preferred_index,
+            fallback_name=fallback_name,
+            default_index=default_out,
+        )
 
     def open_capture(
         self,
@@ -304,22 +524,63 @@ class AudioMacOS:
         block_size: int,
         callback: AudioCallback,
     ) -> AudioStream:
-        """Open passthrough output (sd.OutputStream @ float32 — djay → speakers stereo)."""
-        assert_device_sample_rate(device_index, sample_rate)
+        """Open passthrough output (sd.OutputStream @ float32 stereo).
+
+        Passthrough is not authoritative analysis audio; it is a monitor path
+        and is currently silent by default. Open it at the device's native rate
+        when the selected output is 44.1 kHz so Rekordbox/macOS output routing
+        does not prevent vibemix from booting.
+        """
+        import numpy as np
+
+        info = sd.query_devices(device_index)
+        device_sr = int(info["default_samplerate"])
+        if device_sr == sample_rate:
+            open_sr = sample_rate
+            open_block = block_size
+            wrapped = callback
+        else:
+            from vibemix.audio.resample import resample_audio
+
+            open_sr = device_sr
+            open_block = max(1, round(block_size * (open_sr / sample_rate)))
+
+            def resample_wrapper(outdata, frames, time_info, status):
+                src_frames = max(1, round(frames * (sample_rate / open_sr)))
+                src = np.zeros((src_frames, channels), dtype=np.float32)
+                callback(src, src_frames, time_info, status)
+                converted = np.zeros((frames, channels), dtype=np.float32)
+                for channel in range(channels):
+                    channel_data = resample_audio(
+                        src[:, channel],
+                        source_sr=sample_rate,
+                        target_sr=open_sr,
+                    )
+                    if len(channel_data) < frames:
+                        channel_data = np.pad(
+                            channel_data,
+                            (0, frames - len(channel_data)),
+                        )
+                    elif len(channel_data) > frames:
+                        channel_data = channel_data[:frames]
+                    converted[:, channel] = channel_data
+                outdata[:] = converted
+
+            wrapped = resample_wrapper
         stream = sd.OutputStream(
             device=device_index,
-            samplerate=sample_rate,
+            samplerate=open_sr,
             channels=channels,
             dtype="float32",
-            blocksize=block_size,
+            blocksize=open_block,
             latency="low",
-            callback=callback,
+            callback=wrapped,
         )
-        if int(stream.samplerate) != sample_rate:
+        if int(stream.samplerate) != open_sr:
             negotiated = int(stream.samplerate)
             stream.close()
             raise SampleRateMismatchError(
-                f"PortAudio negotiated {negotiated}Hz vs requested {sample_rate}Hz on "
+                f"PortAudio negotiated {negotiated}Hz vs requested {open_sr}Hz on "
                 f"passthrough output device {device_index!r}."
             )
         stream.start()

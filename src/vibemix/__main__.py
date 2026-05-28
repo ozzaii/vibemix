@@ -926,30 +926,50 @@ async def main() -> None:
 
     # --- Audio I/O via AudioMacOS firewall ---
     audio_backend = AudioMacOS(registry, recorder)
+    # Master-capture INPUT: BlackHole 2ch. The common real-world fail is that
+    # it isn't installed — exit 3 is the sidecar's "audio-device-missing"
+    # sentinel so the Tauri shell shows the BlackHole setup banner with the
+    # install link rather than the generic crash UI.
     try:
         input_idx = audio_backend.find_device(INPUT_DEVICE, "input")
-        output_idx = audio_backend.find_device(OUTPUT_DEVICE, "output")
     except RuntimeError as e:
-        # Most common real-world fail: BlackHole 2ch isn't installed
-        # (INPUT_DEVICE missing). Exit 3 is the sidecar's "audio-device-
-        # missing" sentinel — the Tauri shell shows a setup banner with
-        # the BlackHole install link rather than the generic crash UI.
-        is_input_miss = INPUT_DEVICE in str(e)
-        device_kind = "input" if is_input_miss else "output"
-        device_name = INPUT_DEVICE if is_input_miss else OUTPUT_DEVICE
         print(
-            f"[FATAL] required audio device missing: {device_name!r} ({device_kind})",
+            f"[FATAL] required audio input device missing: {INPUT_DEVICE!r} (input)",
             file=sys.stderr,
             flush=True,
         )
         print(f"[FATAL] {e}", file=sys.stderr, flush=True)
-        if is_input_miss:
-            print(
-                "[FATAL] install BlackHole 2ch via `brew install blackhole-2ch` "
-                "or https://existential.audio/blackhole/",
-                file=sys.stderr,
-                flush=True,
-            )
+        print(
+            "[FATAL] install BlackHole 2ch via `brew install blackhole-2ch` "
+            "or https://existential.audio/blackhole/",
+            file=sys.stderr,
+            flush=True,
+        )
+        sys.exit(3)
+
+    # AI-voice / passthrough OUTPUT: resolve with graceful fallback so a brand-
+    # new user on ANY Mac boots. Prefer the wizard-persisted output_device_id
+    # (an index into query_devices), then the OUTPUT_DEVICE name, then the OS
+    # default output. Hardcoding "MacBook Pro Speakers" crashed first launch on
+    # a Mac mini/Studio/iMac, external/renamed output, or a localized macOS.
+    # Only fail when the machine has NO audio output at all — a different fault
+    # than a missing BlackHole, so we do NOT print the BlackHole hint here.
+    _persisted_output_idx: int | None = None
+    try:
+        _raw_out = _boot_settings_config.output_device_id
+        if _raw_out is not None and str(_raw_out).strip() != "":
+            _persisted_output_idx = int(_raw_out)
+    except Exception:
+        _persisted_output_idx = None
+    try:
+        output_idx = audio_backend.find_output_device(_persisted_output_idx, OUTPUT_DEVICE)
+    except RuntimeError as e:
+        print(
+            "[FATAL] no usable audio output device for the AI voice",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(f"[FATAL] {e}", file=sys.stderr, flush=True)
         sys.exit(3)
 
     stop_event = asyncio.Event()
