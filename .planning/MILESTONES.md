@@ -1,5 +1,35 @@
 # vibemix — Milestones
 
+## v10.0 12-Factor Hardening (Shipped: 2026-05-28)
+
+**Phases completed:** 3 phases (P99 HARDEN-RETRY · P100 HARDEN-CLARIFY · P101 HARDEN-CONTRACT), 18 plans, 21/21 REQ-IDs satisfied.
+
+**Stats:** 72 commits since `e06e7ecf` · 60 files changed · +15,897 / -72 LOC · ~7 hours autonomous (14:41 → 21:59 TRT).
+
+**Key accomplishments:**
+
+- **Factor 9 closed (P99 HARDEN-RETRY)** — `LibraryToolset` gained an additive per-run `_consecutive_empties` counter (`toolset.py:137`) with handler-entry / handler-exit single-writer discipline pinned by AST gate. Threshold-trip detection writes terminal `stop_reason="tool_starvation"` payload via `_write_side_channel` (`toolset.py:1379`) with a deterministic 3-case actionable hint generator (empty library / narrow theme / dispatch error). Both `curate_with_codex` and `build_set_with_codex` propagate uniformly to all callers. CLI exit code 10 distinct from "no playlist found" success.
+- **Factor 7 closed (P100 HARDEN-CLARIFY)** — NEW grounded MCP tool `request_clarification(question, choices)` lands on the FastMCP surface (`mcp_server.py:230-258`) with a teaching docstring Codex reads. `MIN_CHOICES=2`/`MAX_CHOICES=5` validation rejects 0/1 (no real disambiguation) and 6+ (choice paralysis). Sibling `stop_reason="clarification_needed"` rides the SAME side-channel seam P99 established. CLI exit code 11 + 2-block stderr render distinct from `tool_starvation` exit 10. Telegram `format_reply` clarification branch through `strip_leaks`. 6-property AST gate proves the handler has NO `track_id` surface → Invariant #2 holds by structural impossibility (a clarification cannot fabricate a track reference).
+- **Factor 3 closed (P101 HARDEN-CONTRACT)** — NEW `docs/PROMPT-COMPOSITION.md` (269 lines, ASCII-only) enumerates the live co-host prompt surface as a single named contract: 9 EventTypes × 11 EVIDENCE_SOURCES × `MIN_EVENT_GAP_PER_TYPE` cooldowns × `ACK_ELIGIBLE_EVENTS` diet-mode eligibility × recall-fragment shapes. 82 `file:line` citations, zero stale (grep-verified at write-time via the §8 appendix loop). New contributors read ONE doc and know what enters the prompt per event type without reverse-engineering `coach.py` / `evidence_registry.py` / `event_detector.py`. CLAUDE.md Architecture section gained a one-line pointer.
+- **All 4 cardinal invariants HELD by additive design** — Invariant #1 single-writer (counter writes confined to LibraryToolset instance, AST gate pins); #2 citation grounding (`seen`-set + `create_playlist` re-validation untouched; `request_clarification` has zero track_id surface; doc enumerates existing 11 sources, does NOT extend); #3 trust the audio (live co-host streaming pipeline untouched — Factor 10 honored, zero `src/vibemix/agent/` touches across 65 commits); #4 one socket (no new ws traffic; CLI + MCP STDIO + Telegram long-poll are existing transports).
+- **Disjointness contract HELD end-to-end** — Zero touches to `src/vibemix/agent/`, `src/vibemix/intel/`, `tauri/ui/*`, or the live session-loop path at `__main__.py:1353` `turn_handling` block. Per `feedback_concurrent_sessions_one_tree`: surgical commits with named paths, never `git add -A`. Three parallel sessions on this working tree (v10.0 library-subtree island + LiveKit-upgrade handoff + frontend-wiring handoff) rode together cleanly with disjoint new-file islands.
+- **Honest-green test seal** — 116/116 tests pass on the v10.0 chain (`test_codex_curate_stop_reason` + `test_toolset_starvation` + `test_toolset_clarification` + `test_cli_exit_codes` + `test_telegram_bridge` + `test_request_clarification_no_track_surface` + `test_no_seen_relaxation` + `test_mcp_server_clarification`) in 5.79s on current source.
+- **Zero tech debt introduced** — every plan shipped honest-green; no `TODO`, no `FIXME`, no commented-out code. The single optional-deferred item (CI smoke check for `file:line` resolution) is explicitly marked OPTIONAL by REQ-CONTRACT-05 and parked as HARDEN-FUTURE-04 (not tech debt).
+
+**Anti-creep acid test:** *"Does this close one of the three audit partials (Factor 9 / Factor 7 / Factor 3) without growing the surface, introducing a new AI provider / managed-memory framework / ws port / IPC envelope / heavy dep, touching `__main__.py` / `agent/` / `intel/` / `tauri/ui/*`, or relaxing any of the four cardinal invariants?"* — All 3 phases passed. No HARDEN-FUTURE items leaked into v10.0 scope.
+
+**E2E flows verified (4/4 complete):** Flow A (`tool_starvation` full chain to CLI exit 10) · Flow B (`clarification_needed` full chain to CLI exit 11 + 2-block stderr) · Flow C (Telegram bridge for either stop_reason through `strip_leaks`) · Flow D (doc-first contributor onboard via CLAUDE.md pointer → `docs/PROMPT-COMPOSITION.md`).
+
+**Known deferred items at close: 4 KAAN-ACTION ear-pass / read-through items.** Per `gsd-autonomous fully` mode, these defer to public-ship discharge on Kaan's clock (NOT engineering blockers): §HARDEN-PHASE-A-EAR-PASS (P99 `tool_starvation` tone in wild) · §HARDEN-PHASE-A-ENV-PROPAGATION-VERIFY (P99 env var on real Codex CLI) · §HARDEN-PHASE-B-CLARIFICATION-TONE (P100 clarification prompt tone in wild) · §HARDEN-PHASE-C-DOC-READTHROUGH (P101 contributor "is this useful as a contract?" feel-check). See `.planning/STATE.md` § Deferred Items.
+
+**HARDEN-FUTURE backlog (out of v10.0 scope · tracked):** Multi-turn Viber state persistence (HARDEN-FUTURE-01) · BAML/Pydantic-strict schema enforcement on FastMCP tool surface (HARDEN-FUTURE-02) · Discord / iMessage trigger transports (HARDEN-FUTURE-03) · CI smoke check for doc `file:line` resolution (HARDEN-FUTURE-04).
+
+**Audit:** `.planning/v10.0-MILESTONE-AUDIT.md` — passed, 21/21 REQs, 4/4 E2E flows, 0 gaps, 0 tech debt, 0 BLOCKER, 0 WARNING.
+
+**Archive:** `.planning/milestones/v10.0-ROADMAP.md` · `.planning/milestones/v10.0-REQUIREMENTS.md`
+
+---
+
 ## v9.0 Lesson One (Shipped: 2026-05-28)
 
 **Phases completed:** 11 phases, 35 plans, 52 tasks

@@ -10,9 +10,19 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v10.0 "12-Factor Hardening"
+## Current Milestone: *None — run `/gsd:new-milestone` when ready*
 
-**Status:** Planning 2026-05-28. `gsd-autonomous fully` · all-opus · default-YES on grey-area. 3 phases (P99-P101). Scope intentionally narrow + library-subtree-disjoint from the two active handoffs (LiveKit-upgrade in `__main__.py`, frontend wiring in `tauri/ui/`).
+The v10.0 "12-Factor Hardening" milestone shipped 2026-05-28 (audit PASSED · 21/21 REQs · 0 gaps · 0 tech debt). See below for the latest shipped summary; the full archive lives at `.planning/milestones/v10.0-ROADMAP.md` + `.planning/milestones/v10.0-REQUIREMENTS.md` + `.planning/v10.0-MILESTONE-AUDIT.md`.
+
+Two parallel handoffs remain in flight on this working tree (`live-tuning-or-brain`): the LiveKit-upgrade handoff (`src/vibemix/__main__.py:1353` `turn_handling` + livekit-agents 1.5.8→1.5.14) and the frontend wiring handoff (`tauri/ui/*` rocker visual-sync, status-tick, pill hover-peek). Both are owned by separate sessions and remain disjoint from v10.0's library-subtree island.
+
+KAAN-ACTION queue parked for public-ship discharge (4 v10.0 items + the existing v4.0 SHIP / v9.0 ear-pass / legal-disclaimer queue). See `.planning/STATE.md` § Deferred Items.
+
+---
+
+## Latest Shipped Milestone: v10.0 "12-Factor Hardening"
+
+**Status:** Shipped 2026-05-28 (audit PASSED · engineering-complete). `gsd-autonomous fully` · all-opus · default-YES on grey-area. 3 phases (P99-P101) · 18 plans · 21/21 REQ-IDs · 72 commits since `e06e7ecf` · ~7 hours autonomous (14:41 → 21:59 TRT).
 
 **Goal:** Close three concrete partial-pass items from the [humanlayer/12-factor-agents](https://github.com/humanlayer/12-factor-agents) audit (this-session). vibemix already scores 5 strong-pass + 2 pass + 3 partial + 2 N/A on the 12 factors — the live co-host's streaming pipeline is fundamentally NOT a tool-call loop and stays that way (Factor 10 — don't force the wrong abstraction). This milestone closes the three partials on the **Viber** side + writes the prompt-composition contract for the live side. No architecture rewrite.
 
@@ -41,7 +51,7 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 
 ---
 
-## Latest Shipped Milestone: v9.0 "Lesson One"
+## Prior Shipped Milestone: v9.0 "Lesson One"
 
 **Status:** Shipped 2026-05-28. `gsd-autonomous fully` · all-opus agents · default-YES on every scope question. 8 phases (P91-P98) · 26 plans · 68/72 REQ-IDs engineering-complete (94%); KAAN-ACTION queue parked for public ship (§LEARN-FULL-MILESTONE-EAR-PASS + §LEARN-LEGAL-DISCLAIMER). Audit PASSED: `.planning/milestones/v9.0-MILESTONE-AUDIT.md`.
 
