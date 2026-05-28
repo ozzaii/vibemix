@@ -103,10 +103,11 @@ If a phase doesn't pass → defer to v9.x or Bravoh.
 
 **BLOCKING (must resolve before v9.0 public ship):**
 
-- `§LEARN-LEGAL-DISCLAIMER` (P98 / AUDIT-03) — Francesco/lawyer sight-check on rendered controllers + disclaimer copy
-- `§LEARN-EAR-COURSE-1` (P98 / AUDIT-01) — Kaan ear-pass on Course 1 (16 lessons) on real FLX4
-- `§LEARN-EAR-COURSE-2` (P98 / AUDIT-01) — Kaan ear-pass on Course 2 (14 lessons) on real FLX4
-- `§LEARN-EAR-COURSE-3` (P98 / AUDIT-01) — Kaan ear-pass on Course 3 (6 lessons) on real FLX4 mid-set
+- `§LEARN-FULL-MILESTONE-EAR-PASS` (P98 / AUDIT-01 unified) — Kaan walks all 3 courses on real FLX4 + records to `docs/learn/2026-XX-kaan-walk-course-{1,2,3}.webm`; ≥90 min total. See REQUIREMENTS.md L105 for full recipe.
+- `§LEARN-LEGAL-DISCLAIMER` (P98 / AUDIT-03) — Francesco/lawyer sight-check on rendered controllers + disclaimer copy + Mixxx-precedent posture. See REQUIREMENTS.md L107 for scope.
+- `§LEARN-EAR-COURSE-1` (P98 / AUDIT-01 sub) — Kaan ear-pass on Course 1 (16 lessons) on real FLX4
+- `§LEARN-EAR-COURSE-2` (P98 / AUDIT-01 sub) — Kaan ear-pass on Course 2 (14 lessons) on real FLX4
+- `§LEARN-EAR-COURSE-3` (P98 / AUDIT-01 sub) — Kaan ear-pass on Course 3 (6 lessons) on real FLX4 mid-set
 - `§LEARN-CUE-DECISION` (P96 ratify) — Course 3 proactive count-ins (needs `[cue:]`) OR retrospective-only? Default-YES = count-ins
 
 **NON-BLOCKING (ride forward):**

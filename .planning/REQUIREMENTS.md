@@ -102,12 +102,16 @@
 
 > **`§LEARN-ONBOARD-EAR-PASS` (P98 ear-pass — Phase 97 ride-forward):** A stranger opens vibemix on a fresh-install Mac → sees the 4-mode picker (cohost / learn / build / debrief) → picks Learn → plugs FLX4 (or 300 MK2) → tutor announces by name with "let's go." closer → L1.01 verbatim dialog plays through → the lesson progress list shows the next 35 lessons (Course 1 / 2 / 3) with empty dots → no AI-slop language anywhere → disclaimer footer visible. ALL FIVE bullets must pass real-stranger ear; cannot be self-verified.
 
+> **`§LEARN-FULL-MILESTONE-EAR-PASS` (AUDIT-01 discharge — P98 ride-forward):** Kaan walks all 3 courses end-to-end on real DDJ-FLX4 hardware. **Recipe:** (1) Launch app via `cargo tauri dev` OR the shipped bundle; (2) pick Learn mode in the 4-mode picker; (3) plug FLX4 over USB; (4) walk Course 1 lessons L1.01..L1.16 end-to-end (anatomy of a deck) — record audio + screen via QuickTime / OBS / Screen Studio; (5) walk Course 2 lessons L2.01..L2.14 end-to-end (transitions); (6) walk Course 3 lessons L3.01..L3.06 end-to-end mid-set (play mode + proactive tutor lens — bring real tracks loaded into deck A/B for live coaching). **Recording targets:** `docs/learn/2026-XX-kaan-walk-course-1.webm`, `docs/learn/2026-XX-kaan-walk-course-2.webm`, `docs/learn/2026-XX-kaan-walk-course-3.webm`. Total ~30-40 minutes per course; ≥90 minutes total combined. Any AI-slop / hallucination / grounding-failure / tone-drift / lesson-stuck / wrong-highlight incidents surface back into REQUIREMENTS.md as v9.0.1 hot-fix items. Cannot be self-verified — Kaan's ear on real FLX4 hardware IS the gate.
+
+> **`§LEARN-LEGAL-DISCLAIMER` (AUDIT-03 discharge — P98 ride-forward):** Francesco / external lawyer sight-check on (a) the 11 rendered controller SVGs (`tauri/ui/src/learn/controllers/*` — stylized CDJ-Whisper schematics, NO Pioneer logo, NO Pioneer orange, NO faceplate photo-lifts; CI parity gate from P91 + P93 stays green), (b) the disclaimer copy in the app footer + repo README (ratified verbatim at P97 RENDER-08 / ONBOARD-07: *"Visual representation for instructional use. DDJ-FLX4, XDJ-RX3, etc. are trademarks of AlphaTheta / Pioneer DJ. Inpulse is a trademark of Hercules. Numark is a trademark of inMusic Brands. vibemix is not affiliated with or endorsed by these manufacturers."*), (c) the Mixxx-precedent nominative fair use posture (Mixxx, Serato, Algoriddim all ship device-specific MIDI mappings + named hardware-compatibility lists; no objection over years; settled-law fair use for compatibility identification). Any required copy-tweaks surface as v9.0.1 items. Cannot be self-verified — external legal review IS the gate. Mandatory before v9.0 public ship.
+
 ### AUDIT — milestone close-out + ear-pass + regression smoke
 
 - [ ] **AUDIT-01**: A Kaan-walk recording (screencast + audio) captures the full 3-course run on real FLX4 hardware end-to-end; saved to `docs/learn/2026-XX-kaan-walk.webm`; one item per course (Course 1 anatomy / Course 2 transitions / Course 3 live coaching) — 3 sessions, ≥90 minutes total. Surfaced as `§LEARN-EAR-COURSE-1/2/3` KAAN-ACTION (cannot be self-verified — Kaan's ear is the gate).
-- [ ] **AUDIT-02**: The v9.0 milestone audit doc `.planning/milestones/v9.0-MILESTONE-AUDIT.md` lands at P98 close — covers REQ-ID satisfaction matrix · 4 cardinal-invariant pin re-runs on real session recordings · KAAN-ACTION queue · pitfall coverage.
+- [x] **AUDIT-02**: The v9.0 milestone audit doc `.planning/milestones/v9.0-MILESTONE-AUDIT.md` lands at P98 close — covers REQ-ID satisfaction matrix · 4 cardinal-invariant pin re-runs on real session recordings · KAAN-ACTION queue · pitfall coverage.
 - [ ] **AUDIT-03**: Francesco / lawyer sight-check on the rendered controllers + disclaimer copy + Mixxx-precedent nominative fair use posture — `§LEARN-LEGAL-DISCLAIMER` KAAN-ACTION; mandatory before public ship.
-- [ ] **AUDIT-04**: rc1 standalone sidecar smoke MUST PASS unregressed — the in-flight v0.1.0-rc1 bundle/launchd fixes (`patch_livekit_agents_init.py` + sidecar.rs std::process + spec blocklist) confirmed still working post-v9.0 via `scripts/smoke/sidecar_bundle_smoke.sh` (or equivalent — write if missing). v9.0 must not block rc1.
+- [x] **AUDIT-04**: rc1 standalone sidecar smoke MUST PASS unregressed — the in-flight v0.1.0-rc1 bundle/launchd fixes (`patch_livekit_agents_init.py` + sidecar.rs std::process + spec blocklist) confirmed still working post-v9.0 via `scripts/smoke/sidecar_bundle_smoke.sh` (or equivalent — write if missing). v9.0 must not block rc1.
 
 ## Future Requirements (deferred — v9.1+ vibemix milestones or Bravoh commercial)
 
@@ -188,9 +192,9 @@
 | ONBOARD-06 | Phase 97 — Onboarding + Tone Locks + Mode Picker | Pending |
 | ONBOARD-07 | Phase 97 — Onboarding + Tone Locks + Mode Picker | Pending |
 | AUDIT-01 | Phase 98 — Live Audit + Ear-Pass Hand-Off + rc1 Regression Smoke | Pending |
-| AUDIT-02 | Phase 98 — Live Audit + Ear-Pass Hand-Off + rc1 Regression Smoke | Pending |
+| AUDIT-02 | Phase 98 — Live Audit + Ear-Pass Hand-Off + rc1 Regression Smoke | Complete |
 | AUDIT-03 | Phase 98 — Live Audit + Ear-Pass Hand-Off + rc1 Regression Smoke | Pending |
-| AUDIT-04 | Phase 98 — Live Audit + Ear-Pass Hand-Off + rc1 Regression Smoke | Pending |
+| AUDIT-04 | Phase 98 — Live Audit + Ear-Pass Hand-Off + rc1 Regression Smoke | Complete |
 
 **Coverage:**
 - v9.0 requirements: 71 total (4 TONE + 8 RENDER + 6 LESSON + 6 EXEMPLAR + 16 CURR-1 + 14 CURR-2 + 7 CURR-3 + 7 ONBOARD + 4 AUDIT)
