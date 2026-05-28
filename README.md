@@ -300,6 +300,12 @@ vibemix is Bravoh's first open-source release — a warm-up for our main product
 
 ---
 
+## Trademarks
+
+Visual representation for instructional use. DDJ-FLX4, XDJ-RX3, etc. are trademarks of AlphaTheta / Pioneer DJ. Inpulse is a trademark of Hercules. Numark is a trademark of inMusic Brands. vibemix is not affiliated with or endorsed by these manufacturers.
+
+---
+
 Apache 2.0 · ([LICENSE](LICENSE)) · ([SECURITY](SECURITY.md)) · ([CONTRIBUTING](CONTRIBUTING.md)) · ([CODE_OF_CONDUCT](CODE_OF_CONDUCT.md))
 
 <!-- Discord invite ships with v0.1.0 stable. For rc1 the Bravoh team will
