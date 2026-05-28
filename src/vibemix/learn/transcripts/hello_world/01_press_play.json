@@ -1,0 +1,36 @@
+{
+  "lesson_id": "L0.00-press-play",
+  "title": "press play",
+  "system_instruction_addendum": "HELLO WORLD ADDENDUM: Wait for the user to press deck A's play button. Do not narrate over them. Stay quiet between beats.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "find deck A's play button — it's lit up on your controller.",
+      "tts_marker": "L000.beat0",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "play",
+    "deck": "A",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "deck A is on the left side of your controller.",
+      "tts_marker": "L000.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "look for the triangular play glyph on a square button.",
+      "tts_marker": "L000.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "the play button is the bottom-row leftmost button on most controllers — press it now.",
+      "tts_marker": "L000.hint3"
+    }
+  ]
+}
