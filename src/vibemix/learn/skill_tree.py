@@ -257,7 +257,17 @@ class SkillTree:
             if not isinstance(live, dict):
                 live = {}
             mastered = bool(live.get("mastered", False))
-            live_proof_count = int(live.get("live_proof_count", 0) or 0)
+            # Mirror ``_weight_for``'s guard: ``from_dict`` only isinstance-checks
+            # the top-level ``skills`` dict, never the inner value types, so a
+            # parseable v2 JSON carrying a non-numeric ``live_proof_count``
+            # (hand-edit, partial Phase-103 write, future drift) reaches here
+            # untouched. A bare ``int()`` would raise an uncaught ``ValueError``
+            # and wedge the engine on every load — contradicting the module's
+            # never-raises contract. Degrade garbage to the safe default instead.
+            try:
+                live_proof_count = int(live.get("live_proof_count", 0) or 0)
+            except (TypeError, ValueError):
+                live_proof_count = 0
             first_mastered_at = live.get("first_mastered_at", None)
 
             if mastered:

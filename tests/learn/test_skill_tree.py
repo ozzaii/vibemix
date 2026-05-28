@@ -268,3 +268,29 @@ def test_live_portion_defaults_when_absent() -> None:
     assert sp.live_proof_count == 0
     assert sp.mastered is False
     assert sp.first_mastered_at is None
+
+
+def test_compute_never_raises_on_non_numeric_live_proof_count() -> None:
+    """WR-01: a parseable v2 JSON carrying a non-numeric ``live_proof_count``
+    (hand-edit / partial Phase-103 write / future drift) must NOT crash
+    ``compute()``. ``from_dict`` only isinstance-checks the top-level ``skills``
+    dict, not inner value types, so a string flows straight through to the
+    engine — which mirrors ``_weight_for``'s guard and degrades it to 0 instead
+    of raising the uncaught ``ValueError`` that contradicts the never-raises
+    contract."""
+    raw = {
+        "schema_version": 2,
+        "lessons": {},
+        "skills": {
+            "deck_control": {
+                "live_proof_count": "x",  # non-numeric — would crash a bare int()
+                "mastered": False,
+                "first_mastered_at": None,
+            }
+        },
+    }
+    progress = LearnProgress.from_dict(raw)  # survives — no inner type sanitisation
+
+    result = SkillTree().compute(progress)  # must NOT raise
+
+    assert result["deck_control"].live_proof_count == 0  # garbage → safe default
