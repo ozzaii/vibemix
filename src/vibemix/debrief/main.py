@@ -335,6 +335,16 @@ def run(
     }
     write_debrief(validated_session_dir, debrief_dict, tldr_mp3)
 
+    # One Mind S5 — close the debrief → profile cold-start loop. Rebuild the
+    # long-term profile from THIS session's structured events + grounded
+    # evidence (NOT the free-text drills — see profile_writeback docstring),
+    # consent-gated + best-effort. Was a review-only dead-end: the persona-
+    # shaping profile only ever updated on a manual Settings "regenerate".
+    from vibemix.debrief.profile_writeback import write_back_profile
+
+    if write_back_profile(events, evidence_snapshot):
+        logger.info("[debrief] profile updated from session evidence")
+
     state = {
         "session_dir": validated_session_dir,
         "chapters": chapters,
