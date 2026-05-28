@@ -64,4 +64,21 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| _(filled by roadmap)_ | | |
+| SKILL-01 | Phase 102 | Pending |
+| SKILL-02 | Phase 102 | Pending |
+| SKILL-03 | Phase 102 | Pending |
+| COMP-01 | Phase 102 | Pending |
+| COMP-02 | Phase 102 | Pending |
+| DATA-01 | Phase 102 | Pending |
+| DATA-02 | Phase 102 | Pending |
+| DATA-03 | Phase 102 | Pending |
+| MAST-01 | Phase 103 | Pending |
+| MAST-02 | Phase 103 | Pending |
+| MAST-03 | Phase 103 | Pending |
+| MAST-04 | Phase 103 | Pending |
+| SURF-01 | Phase 104 | Pending |
+| SURF-02 | Phase 104 | Pending |
+| SURF-03 | Phase 104 | Pending |
+| SURF-04 | Phase 104 | Pending |
+
+**Coverage:** 16/16 v11.0 requirements mapped — no orphans, no duplicates.

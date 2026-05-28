@@ -1,7 +1,7 @@
 # vibemix — Roadmap
 
 **Project:** vibemix — AI DJ Co-Host
-**Current milestone:** *None — start with `/gsd:new-milestone` when ready.*
+**Current milestone:** v11.0 "Earned" — Phases 102–104 (planning → execution). A small, contained DJ skill-tree / mastery gamification layer on top of v9.0 Lesson One: ~6 DJ competencies each level up through a two-stage, evidence-grounded mastery bar (Locked → Competent → Mastered). Nothing is given; every notch is earned.
 **Last shipped:** v10.0 "12-Factor Hardening" — 2026-05-28 (audit PASSED engineering-complete; 3 phases · 18 plans · 21/21 REQ-IDs · 0 gaps · 0 tech debt; KAAN-ACTION queue parked: 4 ear-pass / read-through items for public-ship discharge). Prior: v9.0 "Lesson One" — 2026-05-28 · v8.2 "Set Builder" — 2026-05-26.
 **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on the external Apple Dev + SignPath signature clock (NOT archived) — **v7.0's OSS-04 discharges §SHIP-V4 for real; v4.0 closes alongside when the real cut fires**. Also: **v0.1.0-rc1 ship work** (bundle/launchd fixes in flight; KAAN-ACTION ear-pass + signed-release decision parked — see `.planning/handoffs/2026-05-27-session-end.md`); **LiveKit-upgrade handoff** (`src/vibemix/__main__.py:1353` `turn_handling` override + livekit-agents 1.5.8→1.5.14 bump — separate session, not yet committed — see memory `project_streaming_pipe_speedfix_livekit_upgrade_handoff`); **frontend wiring handoff** (`tauri/ui/*` rocker visual-sync, status-tick, pill hover-peek — separate session — see memory `project_frontend_wiring_handoff`). **Disjointness contract:** v10.0 island = `src/vibemix/library/` + `docs/` + (one-line) `CLAUDE.md`; never touches `src/vibemix/__main__.py`, `src/vibemix/agent/`, `src/vibemix/intel/`, or `tauri/ui/*`. Per `feedback_concurrent_sessions_one_tree`: surgical commits with named paths, never `git add -A`.
 
@@ -23,9 +23,112 @@
 - ✅ **v8.2 Set Builder** — Phases 83–88 (shipped 2026-05-26, audit PASSED; UI-02 funded-key ear-pass parked) — *this file, below* · audit `.planning/v8.2-MILESTONE-AUDIT.md` · status `.planning/phases/v8.2-STATUS.md`
 - ✅ **v9.0 Lesson One** — Phases 91–98 (shipped 2026-05-28, audit PASSED engineering-complete 68/72 REQ-IDs; KAAN-ACTION queue parked for public ship) — see `.planning/milestones/v9.0-ROADMAP.md` · audit `.planning/milestones/v9.0-MILESTONE-AUDIT.md` · requirements `.planning/milestones/v9.0-REQUIREMENTS.md`
 - ✅ **v10.0 12-Factor Hardening** — Phases 99–101 (shipped 2026-05-28, audit PASSED engineering-complete 21/21 REQ-IDs; KAAN-ACTION queue parked for public ship) — see `.planning/milestones/v10.0-ROADMAP.md` · audit `.planning/v10.0-MILESTONE-AUDIT.md` · requirements `.planning/milestones/v10.0-REQUIREMENTS.md`
+- 🟢 **v11.0 Earned** — Phases 102–104 (planning · 16 REQ-IDs across SKILL / COMP / MAST / DATA / SURF) — *this file, below* (DJ skill-tree mastery layer on v9.0 Lesson One)
+
+# v11.0 "Earned" — 🟢 PLANNING (3 phases · P102–P104 · 16 REQ-IDs)
+
+This is the live v11.0 plan — three phases (P102–P104) that turn the v9.0 Lesson One module into a **DJ skill-tree** where ~6 real DJ competencies each level up through a two-stage, evidence-grounded mastery bar. Lessons fill a skill to **Competent**; only a real, **cited** live demonstration in an actual set unlocks **Mastered**. Nothing is given; every notch is earned. A small, contained gamification layer that adds the felt reward of progression **without growing the product surface**.
+
+**Mode:** `gsd-autonomous fully` · all-opus · default-YES on every scope question. Phase numbering continues from v10.0's P101 — v11.0 starts at **P102**, no reset.
+
+**The two-stage mastery bar (the design's spine):**
+
+```
+Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N grounded + cited live demos]──▶ Mastered
+        (Learn-grounded, Phase 102/COMP)                      (Live-grounded, Phase 103/MAST)
+```
+
+**The ~6 skills** (mapped onto the existing 36 lessons / 3 courses — zero new content): Deck Control · Beatmatching · EQ Mixing · Harmonic Mixing · Transitions · Phrasing & Performance.
+
+**Anti-creep acid test (v11.0, LOCKED):**
+
+> *"Does this phase make an existing learning/playing capability feel **earned and progressed** — grounded in real lesson outcomes and real **cited** live events — WITHOUT a new AI provider, new ws port, new IPC envelope family beyond `learn.*`, new heavy dep, new lesson content, or new live event detector? Does it NOT regress any of the 4 cardinal invariants, and NOT write to `profile.json`?"* If not, defer.
+
+**Hard constraints (locked, encoded in EVERY phase):**
+
+- **Zero new surface.** NO new AI provider (the rare grounded "Mastered" vocal reuses the existing co-host Gemini path via `model_router`). NO new ws port — skill-tree state rides the existing `learn.*` envelopes on `127.0.0.1:8765` (Invariant #4). NO new IPC envelope **family** (extensions stay inside `learn.*`); any `messages.schema.json` edit runs `cd tauri/ui && npm run codegen:ipc` (the ajv validator is pre-compiled — per `feedback_schema_edit_needs_codegen_ipc`). NO new heavy dependency (engine is pure-Python on existing primitives — `python-statemachine` already present from v9.0). NO new lesson content (skills map onto the existing 36 hand-authored transcripts). NO new live event detector (Mastered grounding reuses the existing taxonomy only). NO streaks / leaderboards / social / cohort / cross-device sync (deferred to Bravoh per the v9.0 defer list); single-user local only.
+- **NEVER write to `profile.json`.** The privacy contract is 5 named fields with `additionalProperties:false`; **all** skill data lives in a new `skills` block on `~/.cache/vibemix/learn-progress.json`. Test-pinned per phase.
+- **All four cardinal invariants hold by ADDITIVE design.**
+  - **#1 single-writer** — `src/vibemix/learn/skill_tree.py` (`SkillTree` / `SkillProgress`) is the SOLE writer of skill state and NEVER mutates `MusicState`. Static AST gate `tests/learn/test_skill_tree_invariants.py::test_skill_tree_never_mutates_musicstate` lands in P102.
+  - **#2 citation grounding** — every live "Mastered" credit must resolve a valid citation in `EvidenceRegistry`; an un-cited event grants **zero** credit. Pinned by `tests/learn/test_mastery_requires_citation.py` in P103. **No new evidence source** — the recognizer reads existing `[mix:]`/`[midi:]`/`[key:]`/`[ev:]` citations that the live path already emits.
+  - **#3 trust the audio** — live mastery credit is granted ONLY from real detected + cited events (MIX_MOVE / LAYER_ARRIVAL / harmonic / EQ-band MIDI / beatmatch); a fabricated event grants zero credit. Pinned by `tests/learn/test_mastery_no_fabricated_credit.py` in P103.
+  - **#4 one socket** — every skill-tree envelope rides `:8765`; `tests/learn/test_skill_tree_no_new_ws_port.py` static-greps `learn/` for `websockets.serve` (zero allowed). Lands in P102.
+- **Honest green.** The engine (P102) + the live recognizer (P103) are fully offline-unit-testable (synthetic lesson outcomes; synthetic cited/un-cited event streams) — **standalone-verifiable WITHOUT any UI**. The UI phase (P104) carries the HARD live-app verification gate (`cargo tauri dev` + `ui.log` `[vmx:click]/[vmx:ipc>]/[vmx:ipc<]/[vmx:error]`) per `feedback_verify_live_app_not_just_tests`.
+- **Disjointness contract.** Island = `src/vibemix/learn/` (+ the `learn-progress.json` schema + the `learn.*` IPC envelopes). Disjoint from the concurrent One Mind (`src/vibemix/**` minus learn), the LiveKit-upgrade handoff (`__main__.py` / `agent/`), and the frontend-wiring handoff (`tauri/ui/*`). The UI phase (P104) coordinates `tauri/ui` disjointness when it lands. Per `feedback_concurrent_sessions_one_tree`: surgical commits with named paths, never `git add -A`.
+- **`gsd-autonomous fully`** — default-YES on every grey-area; human-only blockers (ear-pass on the grounded "Mastered" vocal tone, real-hardware live-"Mastered" verify on Kaan's FLX4) ride forward to KAAN-ACTION; only the privacy hard rule + destructive risk pause.
+
+**Builds directly on v9.0:** `LearnProgress` atomic-JSON persistence (`learn/progress.py`, `SCHEMA_VERSION = 1` → v2 here) · `RecitalRuntime` honest-score gates (`learn/recital.py`) · the 36-lesson `CURRICULUM` (`learn/curriculum.py`) · the live `EvidenceRegistry` + existing event taxonomy (`state/evidence_registry.py`, `state/event_detector.py`).
+
+## Phases
+
+- [ ] **Phase 102: Skill-Tree Engine + Data Model + Competent Stage** — Pure-logic `skill_tree.py` (sole writer) + the ~6-skill→lesson manifest + quality-weighted Competent fill gated on the recital honest-score + a `skills` block on `learn-progress.json` with v1→v2 deterministic back-fill + corrupt-read recovery + reset. Standalone-verifiable WITHOUT any UI. Lands the Invariant #1 AST gate + Invariant #4 no-new-port gate.
+- [ ] **Phase 103: Live "Mastered" Grounding** — The Competent→Mastered segment: locked-until-Competent; a thin recognizer maps EXISTING `EvidenceRegistry` event types → skill credit, but ONLY when the event resolves a valid citation (Invariants #2/#3, test-pinned — fabricated/un-cited event grants zero credit); N grounded demos flip a skill to Mastered with persisted count + `first_mastered_at`. NO new detectors. Engine-level verifiable on synthetic cited/un-cited event streams.
+- [ ] **Phase 104: Skill-Tree Surface + Earned Celebration** — The Learn-module skill-tree panel (all ~6 skills · each stage · fill · what-remains) + a quiet Competent-fill cue + a single rare earned grounded co-host vocal on a live "Mastered" unlock (tone-gated against the anti-slop blocklist; final tone parks as KAAN-ACTION ear-pass) + v9.0 accessibility (dual color+shape, keyboard-nav, no time-pressure). The UI phase — exact surface + celebration treatment is an explicit Kaan decision-gate during the phase.
+
+| # | Phase | Goal | REQ-IDs | SC count |
+|---|-------|------|---------|----------|
+| 102 | Skill-Tree Engine + Data Model + Competent Stage | A skill fills to "Competent" from quality-weighted lesson outcomes gated on the recital honest-score; state persists in a `skills` block on `learn-progress.json` with v1→v2 back-fill + corrupt-recovery + reset; `skill_tree.py` is sole writer and never touches `MusicState` | SKILL-01, SKILL-02, SKILL-03, COMP-01, COMP-02, DATA-01, DATA-02, DATA-03 (8) | 5 |
+| 103 | Live "Mastered" Grounding | Once Competent, a skill's Mastered fill advances ONLY from real, cited live events mapped from the existing taxonomy; an un-cited/fabricated event grants zero credit; N grounded demos flip the skill to Mastered with persisted count + `first_mastered_at` | MAST-01, MAST-02, MAST-03, MAST-04 (4) | 4 |
+| 104 | Skill-Tree Surface + Earned Celebration | User views their full skill tree from the Learn module; Competent fills render a quiet progression cue; a live "Mastered" unlock triggers a single rare grounded co-host vocal; the surface honors v9.0 accessibility | SURF-01, SURF-02, SURF-03, SURF-04 (4) | 4 |
+
+**Dependency spine:** `P102 → P103 → P104` (linear). P102 is the engine + Competent stage; P103 layers the live Mastered grounding on top of the Competent gate; P104 consumes **both** prior stages for display + celebration.
+
+## Phase Details
+
+### Phase 102: Skill-Tree Engine + Data Model + Competent Stage
+**Goal:** A pure-logic skill-tree engine maps the existing 36 lessons / 3 courses onto ~6 named DJ skills, each with a two-stage bar (Locked → Competent → Mastered). Completing lessons fills a skill's Competent stage **weighted by quality** (recital pass + first-try 0-strikes > click-through), and a skill reaches Competent ONLY after passing that skill's recital honest-score gate. State persists in a new `skills` block on `learn-progress.json` (schema v1→v2 deterministic back-fill + corrupt-read recovery + reset). **Standalone-verifiable WITHOUT any UI** — every behavior is offline-unit-testable on synthetic lesson/recital outcomes. **Lands the Invariant #1 AST gate (skill_tree never mutates `MusicState`) + the Invariant #4 no-new-port gate.**
+**Depends on:** v9.0 Lesson One (`learn/progress.py` `LearnProgress`, `learn/recital.py` `RecitalRuntime`, `learn/curriculum.py` `CURRICULUM`). First v11.0 phase.
+**Requirements:** SKILL-01, SKILL-02, SKILL-03, COMP-01, COMP-02, DATA-01, DATA-02, DATA-03
+**Success Criteria** (what must be TRUE):
+  1. The 36 lessons / 3 courses map to ~6 named DJ skills (Deck Control · Beatmatching · EQ Mixing · Harmonic Mixing · Transitions · Phrasing & Performance), each carrying a two-stage mastery bar (Locked → Competent → Mastered), declared in **one readable manifest** (e.g. `src/vibemix/learn/skill_manifest.py` or a committed JSON) so a contributor can read which lessons feed which skill, each skill's Competent threshold, and its Mastered requirement WITHOUT reverse-engineering the engine. Pinned by a manifest-coverage test (every lesson maps to ≥1 skill; every skill maps to ≥1 lesson + ≥1 recital). **SKILL-01 + SKILL-03.**
+  2. A pure-logic engine `src/vibemix/learn/skill_tree.py` (`SkillTree` / `SkillProgress`) computes each skill's stage + fill from lesson/recital outcomes; it is the **sole writer** of skill state. **Static AST gate `tests/learn/test_skill_tree_invariants.py::test_skill_tree_never_mutates_musicstate` confirms ZERO writes to `MusicState` from `skill_tree.py` (Invariant #1 binding)**, and `tests/learn/test_skill_tree_no_new_ws_port.py` static-greps `learn/` for `websockets.serve` (zero new — Invariant #4 binding). Import-light: no model clients, no audio capture, no Tauri import. **SKILL-02.**
+  3. Completing a lesson advances its skill's **Competent-stage fill, weighted by quality** — a recital pass and a first-try (0-strikes) completion fill more than a click-through; the weights are read from `LearnProgress` (the existing `mark_completed` / `mark_hint_strike` / recital-pass signals at `learn/progress.py:100-163`). A pure click-through fills strictly less. Pinned by `tests/learn/test_competent_quality_weighting.py` on synthetic outcomes. **COMP-01.**
+  4. A skill reaches "Competent" **only** after the user passes that skill's recital honest-score gate (`RecitalRuntime` pass at `learn/recital.py:470-497`); pure click-through across that skill's lessons can never reach Competent without the recital pass. Pinned by `tests/learn/test_competent_requires_recital.py`. **COMP-02.**
+  5. Skill-tree state persists in a new `skills` block inside `~/.cache/vibemix/learn-progress.json` via the existing atomic write (`save_progress` at `learn/progress.py:303-326`); **skill data is NEVER written to `profile.json`** (the 5-field `additionalProperties:false` privacy contract stays intact — pinned by `tests/learn/test_skills_never_in_profile.py`). `SCHEMA_VERSION` bumps `1 → 2`: loading a v1 file deterministically **back-fills** each skill's Competent fill from existing lesson/course completions; a corrupt or older file recovers gracefully (mirrors the existing corrupt-read recovery at `learn/progress.py:269-302`). The user can reset skill-tree progress, mirroring the existing `vibemix learn reset` path (`learn/progress.py:327`). Pinned by `tests/learn/test_skill_schema_migration.py` (v1→v2 back-fill determinism + corrupt-recovery) + `tests/learn/test_skill_reset.py`. **DATA-01 + DATA-02 + DATA-03.**
+**Plans**: TBD
+
+### Phase 103: Live "Mastered" Grounding
+**Goal:** The Competent→Mastered segment of each skill bar — **the anti-slop heart of the milestone.** A skill's Mastered segment stays locked until the skill reaches Competent. Once Competent, a thin recognizer maps EXISTING `EvidenceRegistry` event types (MIX_MOVE / LAYER_ARRIVAL / harmonic / EQ-band MIDI / beatmatch) → skill credit, **but ONLY when the event resolves a valid citation in `EvidenceRegistry`** — an un-cited or fabricated event grants **zero** credit (Invariants #2 + #3, test-pinned). After a declared number `N` of grounded live demonstrations, the skill flips to "Mastered" with a persisted count + a `first_mastered_at` timestamp. **NO new detectors are invented.** Engine-level verifiable by feeding synthetic cited/un-cited event streams — no live hardware required for the gate.
+**Depends on:** Phase 102 (the Competent stage + `SkillProgress` persistence are the floor this builds on). Reads the live `state/evidence_registry.py` + existing `state/event_detector.py` taxonomy UNCHANGED.
+**Requirements:** MAST-01, MAST-02, MAST-03, MAST-04
+**Success Criteria** (what must be TRUE):
+  1. A skill's Competent→Mastered segment stays **locked** until the skill reaches Competent — Mastered fill cannot advance from live events while the skill is below Competent. Pinned by `tests/learn/test_mastered_locked_until_competent.py` (feed grounded events to a sub-Competent skill → zero Mastered fill). **MAST-01.**
+  2. Once a skill is Competent, its Mastered fill advances when the live co-host detects the user performing that skill in a **real session**, mapped from existing `EvidenceRegistry` event types (MIX_MOVE → Transitions/EQ Mixing · LAYER_ARRIVAL → Transitions · harmonic/KEY-resolution → Harmonic Mixing · EQ-band MIDI move → EQ Mixing · beatmatch → Beatmatching) — **no new detectors are invented** (the recognizer is a read-only mapper over the existing taxonomy at `state/event_detector.py`). The skill→event-type mapping lives in the same readable manifest as the lesson mapping. Pinned by `tests/learn/test_mastery_event_mapping.py`. **MAST-02.**
+  3. **Every live mastery credit must resolve a valid citation in `EvidenceRegistry`** — a credit is granted ONLY when the triggering event carries a citation that resolves (e.g. `[mix:…]`/`[midi:…]`/`[key:…]`/`[ev:…]` present in `EVIDENCE_SOURCES`); an un-cited or fabricated event grants **zero** credit. **Invariants #2 + #3 binding**, pinned by `tests/learn/test_mastery_requires_citation.py` (cited event → credit; same event with a fabricated/unregistered citation → zero credit) + `tests/learn/test_mastery_no_fabricated_credit.py` (no synthesized event ever earns Mastered fill). **No new evidence source is added** — the recognizer reads citations the live path already emits. **MAST-03.**
+  4. A skill flips to "Mastered" after a **declared number `N`** of grounded live demonstrations (the threshold lives in the manifest, per skill); the count of grounded demos and a `first_mastered_at` ISO timestamp **persist across sessions** in the `skills` block (Phase 102's atomic write). Re-loading after a restart preserves both. Pinned by `tests/learn/test_mastered_flip_and_persist.py`. **MAST-04.**
+**Plans**: TBD
+
+### Phase 104: Skill-Tree Surface + Earned Celebration
+**Goal:** The Learn-module **skill-tree panel** — the user views all ~6 skills, each bar's stage, current fill, and what remains to advance. Competent-stage fills render with a **quiet, satisfying** progression cue (no slop, no spam, no constant celebration). A live "Mastered" unlock triggers a **single, rare, earned grounded co-host vocal acknowledgment**, tone-gated against the anti-slop blocklist (final tone subject to a KAAN-ACTION ear-pass). The surface honors v9.0 accessibility (dual color+shape cue, keyboard-nav, no time-pressure). **This is the UI phase** — the exact surface layout + celebration treatment is an explicit **Kaan decision-gate** brought during the phase (he deferred it: "later on when design is done, within this gsd it will be done"). Rides existing `learn.*` envelopes on `:8765`; any `messages.schema.json` edit requires `cd tauri/ui && npm run codegen:ipc`.
+**Depends on:** Phase 102 (Competent stage + `SkillProgress` state to display) + Phase 103 (Mastered grounding to celebrate). Consumes BOTH prior stages for display.
+**Requirements:** SURF-01, SURF-02, SURF-03, SURF-04
+**Success Criteria** (what must be TRUE):
+  1. The user can open a **skill-tree panel from the Learn module** and see all ~6 skills, each with its stage (Locked / Competent / Mastered), current fill, and a plain "what remains to advance" line (e.g. "pass the EQ recital" / "2 more cited EQ swaps in a live set"). State arrives over an existing `learn.*` envelope on `127.0.0.1:8765` through `IpcRouterBus` (Invariant #4 — no new port, no new envelope family); any `messages.schema.json` edit regenerates the ajv validator via `cd tauri/ui && npm run codegen:ipc`. Verified live per `feedback_verify_live_app_not_just_tests` (`cargo tauri dev` + `ui.log` `[vmx:ipc>]/[vmx:ipc<]` round-trip). **SURF-01.**
+  2. Competent-stage fills render with a **quiet, satisfying** progression cue — no slop, no spam, no constant celebration. The fill animates once on advance and settles; it does NOT fire a co-host vocal or a loud modal. Pinned at the frontend by `tauri/ui/tests/learn/skill-tree-quiet-fill.spec.ts` (Competent fill emits no `cohost-reaction` / no celebration modal). Frontend honors `frontend-enforcement` (CDJ-Whisper retro-futurist hardware aesthetic · 20/80 amber-on-charcoal · materially textured · no AI slop). **SURF-02.**
+  3. A live "Mastered" unlock triggers a **single, rare, earned grounded co-host vocal acknowledgment** — one line, gated so it fires only on the Mastered flip (not on Competent, not on partial fill), routed through the existing co-host path (`model_router` — no new AI provider), and **tone-gated against the anti-slop blocklist** (`scripts/launch/check_no_ai_slop.py` + the v9.0 tutor-slop blocklist). The vocal copy is hand-authored / fixture-pinned (never free LLM generation that could slop). **Final tone is a KAAN-ACTION ear-pass** (`§EARNED-MASTERED-VOCAL-EAR`). Pinned by `tests/learn/test_mastered_vocal_fires_once.py` (fires exactly once per flip) + the slop-blocklist gate over the vocal copy. **SURF-03.**
+  4. The skill-tree surface honors **v9.0 accessibility**: dual-channel cue (color + shape, not amber-only — deuteranopia/protanopia/tritanopia distinguishable), full keyboard-nav for browsing the tree without hardware, and **no time-pressure** on advancement (motor-impaired-safe). Pinned by `tauri/ui/tests/learn/skill-tree-a11y.spec.ts` (dual-cue + keyboard-nav + no timed gate). **SURF-04.**
+**Plans**: TBD
+**UI hint**: yes
+
+## Progress Table
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 102. Skill-Tree Engine + Data Model + Competent Stage | 0/? | Not started | - |
+| 103. Live "Mastered" Grounding | 0/? | Not started | - |
+| 104. Skill-Tree Surface + Earned Celebration | 0/? | Not started | - |
+
+## KAAN-ACTION Queue (v11.0 — surfaced + parked, never faked)
+
+**BLOCKING (must resolve before v11.0 public ship):**
+- 🔴 `§EARNED-MASTERED-VOCAL-EAR` (P104) — Kaan ear-pass on the single rare grounded "Mastered" unlock vocal. Does it land as a real friend earning a moment with you, or as scripted gamification slop? Final tone is Kaan's gate. Anti-slop release gate.
+- 🔴 `§EARNED-LIVE-MASTERED-VERIFY` (P103) — real-hardware live-"Mastered" verify on Kaan's FLX4: play a set, perform a skill, confirm a grounded + cited event actually advances the Mastered bar (and an un-cited moment does NOT). Engine is synthetic-verified; the live round-trip is Kaan's hardware gate.
+
+**NON-BLOCKING (ride forward to KAAN-ACTION queue):**
+- 🟡 `§EARNED-SURFACE-DESIGN-GATE` (P104) — exact skill-tree panel layout + celebration treatment is an explicit Kaan design decision brought during P104 planning (deferred: "later on when design is done, within this gsd it will be done"). Default-YES proceeds with a frontend-enforcement-compliant CDJ-Whisper panel; Kaan ratifies the final treatment.
+- 🟡 `§EARNED-MASTERY-THRESHOLD-TUNE` (P103) — the per-skill `N` (grounded-demo count to flip Mastered) ships with a sane default in the manifest; Kaan tunes after the live verify ("is 3 cited EQ swaps the right bar, or does Mastered feel too cheap / too grindy?").
 
 ---
-
 
 # v10.0 "12-Factor Hardening" — ✅ SHIPPED 2026-05-28 (audit PASSED · engineering-complete · full details archived in `.planning/milestones/v10.0-ROADMAP.md`)
 
