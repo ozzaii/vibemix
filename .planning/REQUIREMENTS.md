@@ -37,13 +37,13 @@ Today on an ambiguous theme ("uplifting" — for whom? bedroom-headphones or pea
 
 Today the exact composition of what enters the live co-host prompt per event type is reverse-engineered each time someone touches `coach.py` / `dj_cohost.py` / `evidence_registry.py`. The Phase-3 audit found this is the highest-leverage Factor-3 audit gap.
 
-- [ ] **HARDEN-CONTRACT-01**: `docs/PROMPT-COMPOSITION.md` (NEW file) enumerates every EventType emitted by `EventDetector` with a table column showing the evidence fields populated for that event.
-- [ ] **HARDEN-CONTRACT-02**: Doc lists the 11 `EVIDENCE_SOURCES` (per `evidence_registry.py:129`) with the body grammar for each (`ev:<TYPE>@<t>`, `key:<deck>:<camelot>`, `recall:<record_id>`, `exemplar:<track_id>`, `cue:<anchor_id>`, etc.) and which event types may cite which sources.
-- [ ] **HARDEN-CONTRACT-03**: Doc shows the recall-fragment shape per event family (TRACK_CHANGE / MIX_MOVE / LAYER_ARRIVAL / PHASE) with concrete examples, cross-referenced to `coach.py:158 recall_fragment_for_event`.
-- [ ] **HARDEN-CONTRACT-04**: Doc identifies diet-mode-eligible events (per `ACK_ELIGIBLE_EVENTS` + `coach.py:824 if diet:`) vs full-prompt events, with the rationale (TTFT budget on ack-eligible events).
-- [ ] **HARDEN-CONTRACT-05**: Every file:line reference in the doc resolves against current source (verified by `grep` at write-time; a CI smoke check is OPTIONAL and not blocking).
-- [ ] **HARDEN-CONTRACT-06**: Doc is the named contract for new mood/lens contributors. CLAUDE.md "Architecture" section gains a one-line pointer to it ("for prompt composition, see `docs/PROMPT-COMPOSITION.md`").
-- [ ] **HARDEN-CONTRACT-07**: Doc cross-references the per-event-type cooldowns from `audio/constants.py:77 MIN_EVENT_GAP_PER_TYPE` so a reader can see in one place: "this event fires at most every Xs, surfaces these evidence fields, may cite these sources, follows this recall shape, eligible-or-not for diet mode."
+- [x] **HARDEN-CONTRACT-01**: `docs/PROMPT-COMPOSITION.md` (NEW file) enumerates every EventType emitted by `EventDetector` with a table column showing the evidence fields populated for that event.
+- [x] **HARDEN-CONTRACT-02**: Doc lists the 11 `EVIDENCE_SOURCES` (per `evidence_registry.py:129`) with the body grammar for each (`ev:<TYPE>@<t>`, `key:<deck>:<camelot>`, `recall:<record_id>`, `exemplar:<track_id>`, `cue:<anchor_id>`, etc.) and which event types may cite which sources.
+- [x] **HARDEN-CONTRACT-03**: Doc shows the recall-fragment shape per event family (TRACK_CHANGE / MIX_MOVE / LAYER_ARRIVAL / PHASE) with concrete examples, cross-referenced to `coach.py:158 recall_fragment_for_event`.
+- [x] **HARDEN-CONTRACT-04**: Doc identifies diet-mode-eligible events (per `ACK_ELIGIBLE_EVENTS` + `coach.py:824 if diet:`) vs full-prompt events, with the rationale (TTFT budget on ack-eligible events).
+- [x] **HARDEN-CONTRACT-05**: Every file:line reference in the doc resolves against current source (verified by `grep` at write-time; a CI smoke check is OPTIONAL and not blocking).
+- [x] **HARDEN-CONTRACT-06**: Doc is the named contract for new mood/lens contributors. CLAUDE.md "Architecture" section gains a one-line pointer to it ("for prompt composition, see `docs/PROMPT-COMPOSITION.md`").
+- [x] **HARDEN-CONTRACT-07**: Doc cross-references the per-event-type cooldowns from `audio/constants.py:77 MIN_EVENT_GAP_PER_TYPE` so a reader can see in one place: "this event fires at most every Xs, surfaces these evidence fields, may cite these sources, follows this recall shape, eligible-or-not for diet mode."
 
 ## Future Requirements
 
@@ -88,13 +88,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HARDEN-CLARIFY-05 | Phase 100 | Complete |
 | HARDEN-CLARIFY-06 | Phase 100 | Complete |
 | HARDEN-CLARIFY-07 | Phase 100 | Complete |
-| HARDEN-CONTRACT-01 | Phase 101 | Pending |
-| HARDEN-CONTRACT-02 | Phase 101 | Pending |
-| HARDEN-CONTRACT-03 | Phase 101 | Pending |
-| HARDEN-CONTRACT-04 | Phase 101 | Pending |
-| HARDEN-CONTRACT-05 | Phase 101 | Pending |
-| HARDEN-CONTRACT-06 | Phase 101 | Pending |
-| HARDEN-CONTRACT-07 | Phase 101 | Pending |
+| HARDEN-CONTRACT-01 | Phase 101 | Complete |
+| HARDEN-CONTRACT-02 | Phase 101 | Complete |
+| HARDEN-CONTRACT-03 | Phase 101 | Complete |
+| HARDEN-CONTRACT-04 | Phase 101 | Complete |
+| HARDEN-CONTRACT-05 | Phase 101 | Complete |
+| HARDEN-CONTRACT-06 | Phase 101 | Complete |
+| HARDEN-CONTRACT-07 | Phase 101 | Complete |
 
 **Coverage:**
 - v10.0 requirements: 21 total
