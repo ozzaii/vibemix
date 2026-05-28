@@ -36,7 +36,7 @@ The load-bearing artifact. Every shipped `EventType` emitted by `EventDetector._
 Notes:
 
 - Genre-chain re-emit at `src/vibemix/state/event_detector.py:464` is NOT a new taxonomy entry -- it re-fires whatever `ev.type` the active genre detector returned (`ACID_LINE_ENTRY`, `KICK_SWAP`, `SUB_LAYER_ARRIVAL`, `KICK_DENSITY_SHIFT`, `DISTORTION_CLIMB`, `BREAKDOWN_KICK_KILL`, `REENTRY_KICK_LAND`, `PHRASE_BOUNDARY`). Cooldowns for those types live in the same `MIN_EVENT_GAP_PER_TYPE` dict (Sec. 7).
-- "Diet-mode eligible" reproduces the `ACK_ELIGIBLE_EVENTS` frozenset at `src/vibemix/state/coach.py:54`. Only `HEARTBEAT`, `MIX_MOVE`, `LAYER_ARRIVAL`, `KAAN_SPOKE` take the compact-evidence diet path; every other event type uses the full-payload prompt. The `if diet:` dispatch lives at `src/vibemix/state/coach.py:824` and raises `ValueError` on a non-ack event passed with `diet=True` (loud failure on dispatch bugs).
+- "Diet-mode eligible" reproduces the `ACK_ELIGIBLE_EVENTS` frozenset at `src/vibemix/state/coach.py:54`. Only `HEARTBEAT`, `MIX_MOVE`, `LAYER_ARRIVAL`, `KAAN_SPOKE` take the compact-evidence diet path; every other event type uses the full-payload prompt. The `if diet:` dispatch lives at `src/vibemix/state/coach.py:828` and raises `ValueError` on a non-ack event passed with `diet=True` (loud failure on dispatch bugs).
 - "Citation sources (may carry)" lists which of the 11 `EVIDENCE_SOURCES` tokens (locked frozenset at `src/vibemix/state/evidence_registry.py:129`) the event MAY cite. The exact body grammar per source and the per-event-type association rationale live in Sec. 4 (Plan 101-02). The 11 sources are: `ev`, `aud`, `midi`, `track`, `screen`, `mix`, `tend`, `key`, `recall`, `exemplar`, `cue`. `screen` and `tend` are populated by sibling subsystems (deck-poller screen-capture / Kaan-profile) and may flow into the prompt on any event when present; they are not gated per event type.
 - Recall-fragment family (which event types trigger which template in `recall_fragment_for_event` at `src/vibemix/state/coach.py:158`). The dispatch resolves event-by-event:
   - `TRACK_CHANGE` -> transition-shape template (TRANSITION_SHAPE_RECALL_FRAGMENT_TPL).
@@ -57,7 +57,7 @@ How to read the table (worked walkthrough on TRACK_CHANGE):
 
 - "Fires at `src/vibemix/state/event_detector.py:273`" -- open the file, line 273 reads `self._fire("TRACK_CHANGE", now, state)` immediately after the new-audible-track / confidence gate at lines 258-271. That is the single point where the TRACK_CHANGE event reaches the prompt path.
 - "Cooldown 5.0" -- this is the `MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"]` value at `src/vibemix/audio/constants.py:80`. It is the per-type re-fire floor. Note: the 22.0s `EVENT_GLOBAL_MIN_GAP` cross-event-type floor still applies on top, so a TRACK_CHANGE inside 22s of any other event is still suppressed.
-- "Diet-mode no" -- TRACK_CHANGE is NOT in `ACK_ELIGIBLE_EVENTS` at `src/vibemix/state/coach.py:54`, so `build_prompt(diet=True)` on a TRACK_CHANGE event raises `ValueError` at `src/vibemix/state/coach.py:826`. The full-payload prompt is always used.
+- "Diet-mode no" -- TRACK_CHANGE is NOT in `ACK_ELIGIBLE_EVENTS` at `src/vibemix/state/coach.py:54`, so `build_prompt(diet=True)` on a TRACK_CHANGE event raises `ValueError` at `src/vibemix/state/coach.py:828`. The full-payload prompt is always used.
 - "Citation sources `ev`, `aud`, `mix`, `track`, `recall`" -- these are the entries from `EVIDENCE_SOURCES` (at `src/vibemix/state/evidence_registry.py:129`) the event MAY cite. `ev` is written by `EventDetector._fire` itself (every fire registers `("ev", event_type, t_session)` at event_detector.py:509); `aud` and `mix` flow from the state-refresh loop; `track` comes from the nowplaying-cli identity at the moment of fire; `recall` may be appended when the strongest survivor from `MemoryRecall.get_latest()` is interpolated into the transition-shape fragment.
 
 ## Citation Source Grammar
@@ -100,7 +100,7 @@ Asymmetry (intentional, do NOT "fix"): `src/vibemix/memory/ingest.py` keeps an 8
 
 ## Recall-Fragment Shapes
 
-Conditional-append seam: `recall_frag = recall_fragment_for_event(ev, recall_moments)` at `src/vibemix/state/coach.py:847`, immediately before the full-prompt return at `src/vibemix/state/coach.py:848`. The dispatch helper itself lives at `src/vibemix/state/coach.py:158` (`recall_fragment_for_event`). Cold-path falsy gate at `src/vibemix/state/coach.py:228` returns `""` when `recall_moments` is `None` or `[]` -- the v5.0 byte-identity floor every existing `tests/state/test_coach.py` golden depends on.
+Conditional-append seam: `recall_frag = recall_fragment_for_event(ev, recall_moments)` at `src/vibemix/state/coach.py:849`, immediately before the full-prompt return at `src/vibemix/state/coach.py:850`. The dispatch helper itself lives at `src/vibemix/state/coach.py:158` (`recall_fragment_for_event`). Cold-path falsy gate at `src/vibemix/state/coach.py:228` returns `""` when `recall_moments` is `None` or `[]` -- the v5.0 byte-identity floor every existing `tests/state/test_coach.py` golden depends on.
 
 Branch order in `recall_fragment_for_event` (cited from `src/vibemix/state/coach.py:238-249`):
 
@@ -141,32 +141,32 @@ Worked example: PHASE event with `recall_moments=[Record(record_id="20260520-220
 
 ### Structural pins
 
-- The diet path SKIPS the recall fragment entirely. Cited from the build_prompt docstring at `src/vibemix/state/coach.py:809-811`: "the diet branch intentionally skips the recall block -- diet events are ACK_ELIGIBLE (incl. HEARTBEAT) and are never retrieval events." Mechanically, the diet branch at `src/vibemix/state/coach.py:824-831` returns before reaching the `recall_fragment_for_event` call at `src/vibemix/state/coach.py:847`.
+- The diet path SKIPS the recall fragment entirely. Cited from the build_prompt docstring at `src/vibemix/state/coach.py:811-813`: "the diet branch intentionally skips the recall block -- diet events are ACK_ELIGIBLE (incl. HEARTBEAT) and are never retrieval events." Mechanically, the diet branch at `src/vibemix/state/coach.py:826-833` returns before reaching the `recall_fragment_for_event` call at `src/vibemix/state/coach.py:849`.
 - Registry strict-subset enforcement: `_build_citation_strip` at `src/vibemix/agent/dj_cohost.py:181` validates every `[recall:<id>]` against `EvidenceRegistry`. A fabricated id strips the whole turn -- the Phase 65 anti-poisoning linter posture cited at `src/vibemix/state/coach.py:75-77` and the comment block at `src/vibemix/state/evidence_registry.py:146-148`.
 - Byte-identity contract: the leading space at the start of each template is LOAD-BEARING (`src/vibemix/state/coach.py:98-101`) -- `build_prompt` concatenates the fragment directly onto the task tail with no separator, so the leading space is the only delimiter. Preserve it exactly if editing a template.
 
 ## Diet-Mode
 
-Eligibility gate: `ACK_ELIGIBLE_EVENTS` frozenset at `src/vibemix/state/coach.py:54`, containing exactly four event types: `HEARTBEAT`, `MIX_MOVE`, `LAYER_ARRIVAL`, `KAAN_SPOKE`. Dispatch branch: `if diet:` at `src/vibemix/state/coach.py:824`.
+Eligibility gate: `ACK_ELIGIBLE_EVENTS` frozenset at `src/vibemix/state/coach.py:54`, containing exactly four event types: `HEARTBEAT`, `MIX_MOVE`, `LAYER_ARRIVAL`, `KAAN_SPOKE`. Dispatch branch: `if diet:` at `src/vibemix/state/coach.py:828`.
 
-Diet mode is OPT-IN by caller. The default at `src/vibemix/state/coach.py:799` is `diet: bool = False`, the v4-byte-identical full-prompt path. Passing `diet=True` on a non-ack event raises `ValueError` at `src/vibemix/state/coach.py:826-828` -- dispatch bugs fail loud at the call site rather than silently producing a compressed prompt for an event that needs the full payload to ground a substantive reaction. The comment block at `src/vibemix/state/coach.py:50-53` names the contract: PHASE, TRACK_CHANGE, MANUAL, KEY_CLASH, TRANSITION_OPPORTUNITY, and the genre-chain re-emit types "truly need the 18s audio window + corpus footer + history fields" to ground; only the four ack events take the diet path.
+Diet mode is OPT-IN by caller. The default at `src/vibemix/state/coach.py:799` is `diet: bool = False`, the v4-byte-identical full-prompt path. Passing `diet=True` on a non-ack event raises `ValueError` at `src/vibemix/state/coach.py:828-830` -- dispatch bugs fail loud at the call site rather than silently producing a compressed prompt for an event that needs the full payload to ground a substantive reaction. The comment block at `src/vibemix/state/coach.py:50-53` names the contract: PHASE, TRACK_CHANGE, MANUAL, KEY_CLASH, TRANSITION_OPPORTUNITY, and the genre-chain re-emit types "truly need the 18s audio window + corpus footer + history fields" to ground; only the four ack events take the diet path.
 
 ### What diet strips
 
-Cited from the build_prompt docstring at `src/vibemix/state/coach.py:813-822` and the branch implementation at `src/vibemix/state/coach.py:824-831`:
+Cited from the build_prompt docstring at `src/vibemix/state/coach.py:815-821` and the branch implementation at `src/vibemix/state/coach.py:826-833`:
 
-- Uses `_evidence_line_compact(ev.state)` (the 5-field compact assembler) at `src/vibemix/state/coach.py:829` instead of the full `AICoach.evidence_line(...)` call -- the compact path is defined at `src/vibemix/state/coach.py:531` and excludes the registry corpus footer and the recall block by construction
-- Omits the `| event=<TYPE>` tag (the full path includes it via the f-string at `src/vibemix/state/coach.py:848`: `f"[{evidence} | event={ev.type}] {task}{recall_frag}"`; the diet return at `src/vibemix/state/coach.py:831` is `f"[{evidence}] {task}"` -- no `event=` tag)
-- Omits the evidence-corpus footer (the `evidence_corpus[ev=N,aud=M,mix=K]` footer assembled inside `AICoach.evidence_line` from `registry_snapshot`); the compact path at `src/vibemix/state/coach.py:531` never reads a `registry_snapshot` and never assembles a footer
-- Skips the recall-fragment conditional append at `src/vibemix/state/coach.py:847`; the diet branch returns at `src/vibemix/state/coach.py:831` before reaching that call. The recall fragment is the load-bearing component the diet path strips -- cited as intentional at `src/vibemix/state/coach.py:809-811` ("diet events are ACK_ELIGIBLE incl. HEARTBEAT, never retrieval events")
+- Uses `_evidence_line_compact(ev.state)` (the 5-field compact assembler) at `src/vibemix/state/coach.py:833` instead of the full `AICoach.evidence_line(...)` call -- the compact path is defined at `src/vibemix/state/coach.py:533` and excludes the registry corpus footer and the recall block by construction
+- Omits the `| event=<TYPE>` tag (the full path includes it via the f-string at `src/vibemix/state/coach.py:850`: `f"[{evidence} | event={ev.type}] {task}{recall_frag}"`; the diet return at `src/vibemix/state/coach.py:833` is `f"[{evidence}] {task}"` -- no `event=` tag)
+- Omits the evidence-corpus footer (the `evidence_corpus[ev=N,aud=M,mix=K]` footer assembled inside `AICoach.evidence_line` from `registry_snapshot`); the compact path at `src/vibemix/state/coach.py:533` never reads a `registry_snapshot` and never assembles a footer
+- Skips the recall-fragment conditional append at `src/vibemix/state/coach.py:849`; the diet branch returns at `src/vibemix/state/coach.py:833` before reaching that call. The recall fragment is the load-bearing component the diet path strips -- cited as intentional at `src/vibemix/state/coach.py:811-813` ("diet events are ACK_ELIGIBLE incl. HEARTBEAT, never retrieval events")
 
 ### Why diet exists
 
-TTFT (time-to-first-token) budget on ack-eligible event classes. Cited from `src/vibemix/state/coach.py:816-817`: "Saves >=500ms TTFT on the four ack-eligible event classes (HEARTBEAT, MIX_MOVE, LAYER_ARRIVAL, KAAN_SPOKE)."
+TTFT (time-to-first-token) budget on ack-eligible event classes. Cited from `src/vibemix/state/coach.py:818-819`: "Saves >=500ms TTFT on the four ack-eligible event classes (HEARTBEAT, MIX_MOVE, LAYER_ARRIVAL, KAAN_SPOKE)."
 
 The ack events are short, frequent, and structurally compressible -- a HEARTBEAT does not benefit from a registry corpus footer the way a TRACK_CHANGE does. The compressed prompt lands a fast vocal acknowledgment via the ack-bank fallback in `src/vibemix/agent/dj_cohost.py` without the full reasoning-grounded reaction the heavy events get. The full-prompt path is preserved for every other event type so substantive reactions stay grounded.
 
-The `ValueError` at `src/vibemix/state/coach.py:826-828` is the dispatch-bug guard: a caller that accidentally passes `diet=True` on TRACK_CHANGE (an event that needs the full payload) does NOT silently degrade to a compressed prompt -- it raises immediately, surfacing the bug at the call site instead of producing a quietly-worse reaction.
+The `ValueError` at `src/vibemix/state/coach.py:828-830` is the dispatch-bug guard: a caller that accidentally passes `diet=True` on TRACK_CHANGE (an event that needs the full payload) does NOT silently degrade to a compressed prompt -- it raises immediately, surfacing the bug at the call site instead of producing a quietly-worse reaction.
 
 ## Per-Event-Type Cooldowns
 
@@ -200,4 +200,70 @@ Notes:
 
 ## Appendix: How to Grep-Verify This Doc
 
-_TODO 101-03_ -- shell loop showing `grep -n` invocations to re-verify every file:line citation in this doc resolves on current source. Run on rebase / after `src/vibemix/state/` changes.
+Line numbers drift. Every section above cites source by `path.py:line`; the value of this doc as a contract depends on every cite resolving to the line the prose says it does. The protocol below is the write-time gate (REQ-CONTRACT-05) and the re-verification recipe for future contributors on rebase. CI smoke check is explicitly OPTIONAL per REQ-05 and not blocking -- this appendix is the canonical executable check.
+
+Run on rebase, after any `src/vibemix/state/` refactor that touches `coach.py`, `event_detector.py`, or `evidence_registry.py`, and after any cooldown tuning in `src/vibemix/audio/constants.py`. If any cite drifts, fix the line number in this doc BEFORE landing the source change so the contract stays self-consistent.
+
+### Loop 1: every `path.py:line` cite resolves to a non-empty line
+
+The doc-wide sweep. Extracts every `path.py:N` (and `path.py:N-M` range) token, resolves the path against the repo root, and flags any cite whose target line is blank, out-of-bounds, or missing. Run from the repo root. Python is used rather than `awk` because it gives deterministic newline handling and range support without shell-quoting traps.
+
+```bash
+python3 - <<'PYEOF'
+import re, pathlib
+doc = pathlib.Path("docs/PROMPT-COMPOSITION.md").read_text()
+pat = re.compile(r"([a-zA-Z0-9_/.-]+\.py):(\d+)(?:-(\d+))?")
+def resolve(p):
+    if p.startswith(("src/", "docs/", "tauri/", "tests/")):
+        return p
+    # Bare filenames (e.g. event_detector.py:239) resolve under src/vibemix/state/
+    # because that is where the doc's load-bearing cites live.
+    return f"src/vibemix/state/{p}"
+stale = []
+for m in pat.finditer(doc):
+    path, start = m.group(1), int(m.group(2))
+    end = int(m.group(3)) if m.group(3) else start
+    fp = pathlib.Path(resolve(path))
+    if not fp.exists():
+        stale.append(f"FILE_MISSING: {path}:{start}-{end}"); continue
+    lines = fp.read_text().splitlines()
+    for L in range(start, end + 1):
+        if L < 1 or L > len(lines):
+            stale.append(f"OOB: {path}:{L} (file has {len(lines)} lines)"); break
+        if not lines[L - 1].strip():
+            stale.append(f"BLANK: {path}:{L}"); break
+print(f"stale={len(stale)}")
+for s in stale: print(" ", s)
+PYEOF
+```
+
+Expected output: `stale=0`. Any line beginning with `STALE:`, `OOB:`, `BLANK:`, or `FILE_MISSING:` is a cite that needs fixing.
+
+### Loop 2: anchor-symbol grep -- catches semantic drift, not just renumbering
+
+A line cite is only useful if it still points to the symbol the prose names. Loop 1 confirms the line is non-empty; Loop 2 confirms it carries the expected symbol. Run these one at a time and confirm each returns the expected line range -- if the line number drifted but the symbol is intact, update the cite in the doc. If the symbol moved or renamed, that is a structural source change and may require a doc rewrite, not just a line-number bump.
+
+```bash
+grep -n 'EVIDENCE_SOURCES: frozenset\[str\]'        src/vibemix/state/evidence_registry.py    # expect line ~129
+grep -n 'EVIDENCE_CITATION_RE'                      src/vibemix/state/evidence_registry.py    # expect ~199 (compiled regex)
+grep -n '_SOURCE_ALT'                               src/vibemix/state/evidence_registry.py    # expect ~174 (inner-atom alternation)
+grep -n 'ACK_ELIGIBLE_EVENTS: frozenset\[str\]'     src/vibemix/state/coach.py                # expect ~54
+grep -n 'def recall_fragment_for_event'             src/vibemix/state/coach.py                # expect ~158
+grep -n 'TRANSITION_SHAPE_RECALL_FRAGMENT_TPL: str' src/vibemix/state/coach.py                # expect ~109
+grep -n 'VOCABULARY_RECALL_FRAGMENT_TPL: str'       src/vibemix/state/coach.py                # expect ~141
+grep -n 'def build_prompt'                          src/vibemix/state/coach.py                # expect ~796
+grep -n 'def _evidence_line_compact'                src/vibemix/state/coach.py                # expect ~533
+grep -nF 'if diet:'                                 src/vibemix/state/coach.py                # expect ~826 (diet dispatch branch)
+grep -n 'MIN_EVENT_GAP_PER_TYPE: dict'              src/vibemix/audio/constants.py            # expect ~77
+grep -n 'EVENT_GLOBAL_MIN_GAP'                      src/vibemix/audio/constants.py            # expect ~58 (cross-event-type floor)
+grep -nF 'self._fire('                              src/vibemix/state/event_detector.py       # expect 10 hits (9 unique event types + 1 genre-chain re-emit)
+grep -n '_build_citation_strip'                     src/vibemix/agent/dj_cohost.py            # expect ~181 (wire-side stripper)
+```
+
+### If a cite has drifted
+
+1. If only the line number changed (the symbol is intact at a nearby line per Loop 2): bump the cite in this doc to the new line number. Do not relax it to a symbol-only reference -- the precise jump-target is the doc's value.
+2. If the symbol moved between files or was renamed: re-grep the symbol across `src/vibemix/` to find its new home, then update both the path and the line in the cite. Confirm with Loop 1 that the new cite resolves.
+3. If the symbol was deleted: that is a structural source change and the surrounding doc prose likely needs more than a cite fix. Re-read Sections 1-7 around the deleted reference and audit whether the contract this doc enumerates still holds.
+
+Do not commit a doc update that fails Loop 1. The acceptance floor is `stale=0` against current source at write-time.
