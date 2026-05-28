@@ -155,7 +155,11 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
   3. **The EQ-as-Tutor Demo (L1.14, marquee/moat lesson) lands working end-to-end:** for each EQ band (low/mid/high), the AI plays a track from the user's library where that band dominates (via P93's `ExemplarFinder`); the user turns the EQ knob on their physical controller; they HEAR the band swell live; the AI's claim is cited `[exemplar:<track_id>]` (Invariant #2). Honest-null fallback to packaged bank when library is empty. **CURR-1.14.**
   4. Course 1 Recital (CURR-1.16) is a 5-prompt mixed gate (random subset of CURR-1.03..1.13 controls) — user must perform each correctly to unlock Course 2; replayable; honest grading. **CURR-1.16.**
   5. **Tone discipline gates land:** (a) NEW `scripts/launch/check_no_tutor_slop.py` extends `check_no_ai_slop.py` to catch ≥20 tutor-tic tokens ("Great question!" / "Today we'll be learning…" / "Awesome!" / "You crushed it!" / "Let's dive in!" / "Don't worry, you'll get the hang of it" + 14 more); CI-gated against all `learn/transcripts/**.json` AND runtime AI interjections. (b) Tutor system instruction includes hard lock forbidding the four learned moves (NO complimenting · NO summarizing · NO previewing · NO upbeat hook) — pinned by `tests/learn/test_tutor_system_instruction_lock.py`. **TONE-03.**
-**Plans**: TBD
+**Plans:** 4 plans
+- [x] 94-01-PLAN.md — 16 hand-authored JSON lesson fixtures + curriculum.py extension (COURSE_FRAMES + 16 CURRICULUM entries) (Wave 1) — SHIPPED 2026-05-28 (eda18aea, e00718e4)
+- [ ] 94-02-PLAN.md — `scripts/launch/check_no_tutor_slop.py` ≥20-token blocklist + byte-equality gate on iconic 4-line opening dialog (TONE-01 + TONE-03) (Wave 1)
+- [ ] 94-03-PLAN.md — L1.14 ExemplarLessonController (EQ-as-Tutor with [exemplar:] citation) + L1.16 RecitalRuntime (5-prompt deterministic gate, course_2_unlocked persistence) + LessonRuntime observer seam (Wave 2)
+- [ ] 94-04-PLAN.md — §LEARN-EAR-COURSE-1 KAAN-ACTION ride-forward (non-blocking per gsd-autonomous fully) (Wave 3)
 **UI hint**: yes
 
 ### Phase 95: Course 2 — Transitions (L2.01–L2.14)
@@ -211,7 +215,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 | 91. Controller Renderer + MIDI Mirror | 5/7 | In progress | - |
 | 92. Lesson Runtime + AI Highlight Contract | 0/? | Not started | - |
 | 93. Exemplar Engine + `[exemplar:]` Evidence Source | 1/6 | In progress | - |
-| 94. Course 1 — Anatomy | 0/? | Not started | - |
+| 94. Course 1 — Anatomy | 1/4 | In progress | - |
 | 95. Course 2 — Transitions | 0/? | Not started | - |
 | 96. Course 3 — Play Mode + tutor lens proactive | 0/? | Not started | - |
 | 97. Onboarding + Tone Locks + Mode Picker | 0/? | Not started | - |

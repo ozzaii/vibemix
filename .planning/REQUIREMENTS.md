@@ -10,7 +10,7 @@
 
 ### TONE — release-gate slop discipline (v9.0's Invariant-#2 equivalent)
 
-- [ ] **TONE-01**: A beginner opens vibemix → picks Learn → sees the verbatim 4-line iconic opening dialog ("Hello vibemix, what are you?" / "I'm the best DJ app in the world." / "If you are the best, then who the fuck am I?" / "Oh bestie, don't worry. You know why? Because I'm the beginner module of vibemix. Let's go.") — byte-equality test against `src/vibemix/learn/transcripts/course_1_anatomy/01_welcome.json` fixture, CI-red on any drift.
+- [x] **TONE-01**: A beginner opens vibemix → picks Learn → sees the verbatim 4-line iconic opening dialog ("Hello vibemix, what are you?" / "I'm the best DJ app in the world." / "If you are the best, then who the fuck am I?" / "Oh bestie, don't worry. You know why? Because I'm the beginner module of vibemix. Let's go.") — byte-equality test against `src/vibemix/learn/transcripts/course_1_anatomy/01_welcome.json` fixture, CI-red on any drift.
 - [x] **TONE-02**: Every one of the 36 lesson scripts is HAND-AUTHORED (committed to `src/vibemix/learn/transcripts/course_<N>/<lesson_id>.json`) and NEVER LLM-generated on-the-fly; static test (`tests/learn/test_scripts_are_fixtures.py`) confirms no live generative call writes a `tutor_speak` envelope's `text` field.
 - [ ] **TONE-03**: A new AI-slop blocklist `scripts/launch/check_no_tutor_slop.py` (extends `check_no_ai_slop.py`) catches ≥20 tutor-tic tokens ("Great question!" / "Today we'll be learning…" / "Awesome!" / "You crushed it!" / "Let's dive in!" / "Don't worry, you'll get the hang of it" + 14 more); CI-gated; runs against ALL `learn/transcripts/**.json` AND runtime AI interjections.
 - [x] **TONE-04**: The tutor system instruction includes a hard lock forbidding the four learned moves: NO complimenting user actions · NO summarizing what just happened · NO previewing what's next · NO closing with an upbeat hook. State ONE grounded observation + ONE forward sentence the lesson script provided. Pinned by `tests/learn/test_tutor_system_instruction_lock.py`.
@@ -46,22 +46,22 @@
 
 ### CURR-1 — Course 1: Anatomy of a Deck (16 lessons)
 
-- [ ] **CURR-1.01**: Opening Dialog — verbatim-locked iconic 4-line exchange (TONE-01 fixture). Lesson 1 of Course 1.
-- [ ] **CURR-1.02**: Meet Your Controller — AI introduces the rendered controller by manufacturer + model + 3 most-used controls.
-- [ ] **CURR-1.03**: Channel Strip — channel fader role; user moves deck A channel fader 0→max and back; advance on full sweep.
-- [ ] **CURR-1.04**: Crossfader — center / left / right; user demonstrates each position.
-- [ ] **CURR-1.05**: Pitch Fader — user shifts pitch ±4%; AI explains tempo as a percentage of BPM.
-- [ ] **CURR-1.06**: Transport Buttons — play / cue / sync / load; user presses each in sequence.
-- [ ] **CURR-1.07**: Jog Wheel (nudge mode only) — user nudges forward/back; AI explains scratch is a different art form (deferred to v9.x).
-- [ ] **CURR-1.08**: Headphone Cueing — cue button + headphones cue mix knob; user pre-listens deck B while deck A plays.
-- [ ] **CURR-1.09**: Master / Booth / Headphone Volumes — "don't touch the master fader" hygiene + red-zone clipping awareness.
-- [ ] **CURR-1.10**: Anatomy of a Song — intro / breakdown / drop / outro on a real library track; AI annotates each section tied to playback.
-- [ ] **CURR-1.11**: Counting Bars — AI counts 1-2-3-4 over playback; user counts along; AI listens for tap-tempo or beat-button consistency.
-- [ ] **CURR-1.12**: Spot Breakdown By Ear — AI plays a track, user presses cue when they hear the breakdown.
-- [ ] **CURR-1.13**: Spot Breakdown By Eye (waveform) — user identifies breakdown on the deck waveform.
-- [ ] **CURR-1.14**: **EQ-as-Tutor Demo** (THE marquee/moat lesson) — for each EQ band (low/mid/high), AI plays a track from user's library where that band dominates (EXEMPLAR-01..05), user turns the EQ knob, hears the band swell live; cited `[exemplar:<track_id>]`.
-- [ ] **CURR-1.15**: Load Two Tracks — user loads track to deck A and track to deck B using controller load buttons.
-- [ ] **CURR-1.16**: Course 1 Recital — 5-prompt mixed gate (random subset of CURR-1.03..1.13 controls); user must perform each correctly to unlock Course 2.
+- [x] **CURR-1.01**: Opening Dialog — verbatim-locked iconic 4-line exchange (TONE-01 fixture). Lesson 1 of Course 1.
+- [x] **CURR-1.02**: Meet Your Controller — AI introduces the rendered controller by manufacturer + model + 3 most-used controls.
+- [x] **CURR-1.03**: Channel Strip — channel fader role; user moves deck A channel fader 0→max and back; advance on full sweep.
+- [x] **CURR-1.04**: Crossfader — center / left / right; user demonstrates each position.
+- [x] **CURR-1.05**: Pitch Fader — user shifts pitch ±4%; AI explains tempo as a percentage of BPM.
+- [x] **CURR-1.06**: Transport Buttons — play / cue / sync / load; user presses each in sequence.
+- [x] **CURR-1.07**: Jog Wheel (nudge mode only) — user nudges forward/back; AI explains scratch is a different art form (deferred to v9.x).
+- [x] **CURR-1.08**: Headphone Cueing — cue button + headphones cue mix knob; user pre-listens deck B while deck A plays.
+- [x] **CURR-1.09**: Master / Booth / Headphone Volumes — "don't touch the master fader" hygiene + red-zone clipping awareness.
+- [x] **CURR-1.10**: Anatomy of a Song — intro / breakdown / drop / outro on a real library track; AI annotates each section tied to playback.
+- [x] **CURR-1.11**: Counting Bars — AI counts 1-2-3-4 over playback; user counts along; AI listens for tap-tempo or beat-button consistency.
+- [x] **CURR-1.12**: Spot Breakdown By Ear — AI plays a track, user presses cue when they hear the breakdown.
+- [x] **CURR-1.13**: Spot Breakdown By Eye (waveform) — user identifies breakdown on the deck waveform.
+- [x] **CURR-1.14**: **EQ-as-Tutor Demo** (THE marquee/moat lesson) — for each EQ band (low/mid/high), AI plays a track from user's library where that band dominates (EXEMPLAR-01..05), user turns the EQ knob, hears the band swell live; cited `[exemplar:<track_id>]`.
+- [x] **CURR-1.15**: Load Two Tracks — user loads track to deck A and track to deck B using controller load buttons.
+- [x] **CURR-1.16**: Course 1 Recital — 5-prompt mixed gate (random subset of CURR-1.03..1.13 controls); user must perform each correctly to unlock Course 2.
 
 ### CURR-2 — Course 2: Transitions (14 lessons)
 
@@ -151,7 +151,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TONE-01 | Phase 94 — Course 1 Anatomy (fixture lands with L1.01) | Pending |
+| TONE-01 | Phase 94 — Course 1 Anatomy (fixture lands with L1.01) | Complete |
 | TONE-02 | Phase 92 — Lesson Runtime (no-LLM-write static gate) | Complete |
 | TONE-03 | Phase 94 — Course 1 Anatomy (tutor-slop blocklist) | Pending |
 | TONE-04 | Phase 92 — Lesson Runtime (system instruction lock) | Complete |
@@ -175,7 +175,7 @@
 | EXEMPLAR-04 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Complete |
 | EXEMPLAR-05 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Complete |
 | EXEMPLAR-06 | Phase 96 — Course 3 Play Mode (active-session guard) | Pending |
-| CURR-1.01 .. 1.16 | Phase 94 — Course 1 Anatomy | Pending |
+| CURR-1.01 .. 1.16 | Phase 94 — Course 1 Anatomy | Complete (P94-01 SHIPPED 2026-05-28 — 16 hand-authored fixtures + curriculum.py extension) |
 | CURR-2.01 .. 2.14 | Phase 95 — Course 2 Transitions | Pending |
 | CURR-3.01 .. 3.07 | Phase 96 — Course 3 Play Mode | Pending |
 | ONBOARD-01 | Phase 97 — Onboarding + Tone Locks + Mode Picker | Pending |
