@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v10.0
 milestone_name: SHIP
 status: executing
-last_updated: "2026-05-28T16:12:05.961Z"
+last_updated: "2026-05-28T16:21:45.009Z"
 last_activity: 2026-05-28
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 9
 ---
 
@@ -18,7 +18,7 @@ progress:
 ## Current Position
 
 Phase: 100 (HARDEN-CLARIFY — Viber RequestClarification Tool (Factor 7)) — EXECUTING
-Plan: 6 of 7 (Plan 100-01 SHIPPED — handler + MIN/MAX_CHOICES + dispatch entry; Plan 100-02 SHIPPED — FastMCP @mcp.tool() exposure + teaching docstring; Plan 100-03 SHIPPED — CodexCurateResult.question/choices fields + side-channel propagation; Plan 100-04 SHIPPED — CLI exit 11 + 2-block stderr render + normalizer clarification branch)
+Plan: 7 of 7 (Plan 100-01 SHIPPED — handler + MIN/MAX_CHOICES + dispatch entry; Plan 100-02 SHIPPED — FastMCP @mcp.tool() exposure + teaching docstring; Plan 100-03 SHIPPED — CodexCurateResult.question/choices fields + side-channel propagation; Plan 100-04 SHIPPED — CLI exit 11 + 2-block stderr render + normalizer clarification branch)
 Status: Ready to execute
 Last activity: 2026-05-28
 
@@ -114,8 +114,10 @@ v10.0 island is disjoint from all three. Commit by named paths only, never `git 
 ## Next Action
 
 ```
-/gsd:execute-plan 100-02   # Wave-2 — FastMCP-expose request_clarification in mcp_server.py
+/gsd:execute-plan 100-07   # Wave-6 — final Phase 100 plan
 ```
+
+Plan 100-06 SHIPPED (`b5ee3cbc` test → `77b95563` test). 7 new gates total across 2 test files: 6-test AST suite at `tests/library/test_request_clarification_no_track_surface.py` (357 lines, ast.parse + walk + attribute-chain analysis pinning Cardinal Invariant #2 by construction) + new Gate 4 at `tests/repo/test_no_seen_relaxation.py::test_request_clarification_handler_two_file_pattern` (toolset.py + mcp_server.py two-file allow-list mirroring search_vibe). All 10 gates GREEN; Plan 100-01..05 regression suite 112 passed / 0 failed. Two-layer regression defense for Cardinal Invariant #2 locked in: tests/repo Gate 1 + tests/library AST gate test_baseline_seen_add_count_unchanged_post_phase_100; BASELINE_SEEN_ADD_COUNT stays at 2. HARDEN-CLARIFY-06 (single-turn) + HARDEN-CLARIFY-07 (no-track-surface AST gate) closed. See `.planning/phases/100-harden-clarify/100-06-SUMMARY.md`.
 
 Plan 100-01 SHIPPED (`b30a3bf3` RED → `c578b839` GREEN → `9068d641` test fix). 34 new tests in `tests/library/test_toolset_clarification.py`, all green; full library suite 679 passed / 0 regressions. `request_clarification` handler at `toolset.py:1126-1245`, `_build_clarification_payload` helper at `1084-1124`, `MIN_CHOICES`/`MAX_CHOICES` constants at `83-84`, dispatch entry at `1333`, `__all__` re-export at `1514-1520`. HARDEN-CLARIFY-01 closed. See `.planning/phases/100-harden-clarify/100-01-SUMMARY.md` for the seam Wave 2-4 plans consume.
 
