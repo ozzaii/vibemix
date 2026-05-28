@@ -210,7 +210,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 |-------|----------------|--------|-----------|
 | 91. Controller Renderer + MIDI Mirror | 5/7 | In progress | - |
 | 92. Lesson Runtime + AI Highlight Contract | 0/? | Not started | - |
-| 93. Exemplar Engine + `[exemplar:]` Evidence Source | 0/6 | Not started | - |
+| 93. Exemplar Engine + `[exemplar:]` Evidence Source | 1/6 | In progress | - |
 | 94. Course 1 — Anatomy | 0/? | Not started | - |
 | 95. Course 2 — Transitions | 0/? | Not started | - |
 | 96. Course 3 — Play Mode + tutor lens proactive | 0/? | Not started | - |
