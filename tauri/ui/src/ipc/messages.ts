@@ -907,6 +907,7 @@ export interface LearnProgressState {
         };
       };
       course_2_unlocked?: boolean;
+      course_3_unlocked?: boolean;
     };
   };
 }

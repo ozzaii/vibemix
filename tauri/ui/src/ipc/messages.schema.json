@@ -3265,7 +3265,8 @@
                     }
                   }
                 },
-                "course_2_unlocked": {"type": "boolean"}
+                "course_2_unlocked": {"type": "boolean"},
+                "course_3_unlocked": {"type": "boolean"}
               }
             }
           }

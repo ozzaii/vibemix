@@ -90,6 +90,13 @@ class LearnProgress:
     # False (forward-compat); the migration seam (schema_version != 1)
     # is untouched.
     course_2_unlocked: bool = False
+    # Plan 95 (CURR-2.14 binding): RecitalRuntime flips this to True on
+    # a 5/5 Course 2 Recital pass with >= 3 distinct transition types.
+    # Same additive-default-False extension pattern as course_2_unlocked
+    # — legacy schema_version=1 JSON predating the field loads as False
+    # (forward-compat). When Course 3 lands in P96, this is the gate the
+    # HUD reads to unlock the play-mode lesson selector.
+    course_3_unlocked: bool = False
 
     def mark_completed(
         self,
@@ -188,6 +195,7 @@ class LearnProgress:
             "courses": self.courses,
             "lessons": self.lessons,
             "course_2_unlocked": self.course_2_unlocked,
+            "course_3_unlocked": self.course_3_unlocked,
         }
 
     @classmethod
@@ -202,6 +210,10 @@ class LearnProgress:
         Plan 94-03: ``course_2_unlocked`` reads with a safe default
         (False) — legacy schema_version=1 JSON predating the field loads
         without raising. Additive default-False extension.
+
+        Plan 95: ``course_3_unlocked`` follows the same additive default-
+        False pattern (legacy JSON loads as locked, freshly persisted
+        course_3_unlocked round-trips through to_dict).
         """
         if not isinstance(raw, dict):
             return cls()
@@ -212,6 +224,7 @@ class LearnProgress:
             courses=raw.get("courses", {}) or {},
             lessons=raw.get("lessons", {}) or {},
             course_2_unlocked=bool(raw.get("course_2_unlocked", False)),
+            course_3_unlocked=bool(raw.get("course_3_unlocked", False)),
         )
 
 
