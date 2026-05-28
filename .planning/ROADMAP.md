@@ -67,7 +67,7 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
-| 102 | Skill-Tree Engine + Data Model + Competent Stage | A skill fills to "Competent" from quality-weighted lesson outcomes gated on the recital honest-score; state persists in a `skills` block on `learn-progress.json` with v1→v2 back-fill + corrupt-recovery + reset; `skill_tree.py` is sole writer and never touches `MusicState` | SKILL-01, SKILL-02, SKILL-03, COMP-01, COMP-02, DATA-01, DATA-02, DATA-03 (8) | 5 |
+| 102 | Skill-Tree Engine + Data Model + Competent Stage | 1/2 | In Progress|  |
 | 103 | Live "Mastered" Grounding | Once Competent, a skill's Mastered fill advances ONLY from real, cited live events mapped from the existing taxonomy; an un-cited/fabricated event grants zero credit; N grounded demos flip the skill to Mastered with persisted count + `first_mastered_at` | MAST-01, MAST-02, MAST-03, MAST-04 (4) | 4 |
 | 104 | Skill-Tree Surface + Earned Celebration | User views their full skill tree from the Learn module; Competent fills render a quiet progression cue; a live "Mastered" unlock triggers a single rare grounded co-host vocal; the surface honors v9.0 accessibility | SURF-01, SURF-02, SURF-03, SURF-04 (4) | 4 |
 
@@ -86,7 +86,7 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
   4. A skill reaches "Competent" **only** after the user passes that skill's recital honest-score gate (`RecitalRuntime` pass at `learn/recital.py:470-497`); pure click-through across that skill's lessons can never reach Competent without the recital pass. Pinned by `tests/learn/test_competent_requires_recital.py`. **COMP-02.**
   5. Skill-tree state persists in a new `skills` block inside `~/.cache/vibemix/learn-progress.json` via the existing atomic write (`save_progress` at `learn/progress.py:303-326`); **skill data is NEVER written to `profile.json`** (the 5-field `additionalProperties:false` privacy contract stays intact — pinned by `tests/learn/test_skills_never_in_profile.py`). `SCHEMA_VERSION` bumps `1 → 2`: loading a v1 file deterministically **back-fills** each skill's Competent fill from existing lesson/course completions; a corrupt or older file recovers gracefully (mirrors the existing corrupt-read recovery at `learn/progress.py:269-302`). The user can reset skill-tree progress, mirroring the existing `vibemix learn reset` path (`learn/progress.py:327`). Pinned by `tests/learn/test_skill_schema_migration.py` (v1→v2 back-fill determinism + corrupt-recovery) + `tests/learn/test_skill_reset.py`. **DATA-01 + DATA-02 + DATA-03.**
 **Plans**: 2 plans (2 waves)
-- [ ] 102-01-PLAN.md — Persistence & migration: SCHEMA_VERSION 1→2, seeded `skills` live-portion block, `_migrate_v1_to_v2` upgrader, corrupt-recovery + reset (DATA-01/02/03)
+- [x] 102-01-PLAN.md — Persistence & migration: SCHEMA_VERSION 1→2, seeded `skills` live-portion block, `_migrate_v1_to_v2` upgrader, corrupt-recovery + reset (DATA-01/02/03)
 - [ ] 102-02-PLAN.md — Pure-logic engine: `SKILL_MANIFEST` + `SkillProgress` + `SkillTree.compute` quality-weighted Competent fill gated on the recital + the 3 invariant pins (SKILL-01/02/03, COMP-01/02)
 
 ### Phase 103: Live "Mastered" Grounding

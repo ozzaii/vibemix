@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v11.0
 milestone_name: Earned
-status: roadmapped
-last_updated: "2026-05-29T00:00:00.000Z"
-last_activity: 2026-05-29
+status: executing
+last_updated: "2026-05-28T22:31:32.323Z"
+last_activity: 2026-05-28
 progress:
-  total_phases: 3
+  total_phases: 11
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -22,11 +22,11 @@ progress:
 
 ## Current Position
 
-Phase: 102 — Skill-Tree Engine + Data Model + Competent Stage (next: `/gsd:plan-phase 102`)
-Plan: —
-Status: Roadmapped — 3 phases (P102–P104), 16/16 REQ-IDs mapped, 0 orphans
-Last activity: 2026-05-29 — v11.0 roadmap created (P102→P103→P104 linear spine)
-Progress: [----------] 0/3 phases · 0% — █ P102 (engine + Competent) → P103 (live Mastered) → P104 (surface + celebration)
+Phase: 102 (Skill-Tree Engine + Data Model + Competent Stage) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-05-28
+Progress: [█████░░░░░] 50%
 
 ## Milestone Reference
 
@@ -53,10 +53,12 @@ See: `.planning/REQUIREMENTS.md` (16 v11.0 REQ-IDs across SKILL / COMP / MAST / 
 ## KAAN-ACTION Queue (v11.0 — parked, never faked)
 
 **BLOCKING (before public ship):**
+
 - 🔴 `§EARNED-MASTERED-VOCAL-EAR` (P104) — ear-pass on the rare grounded "Mastered" unlock vocal (real friend vs gamification slop).
 - 🔴 `§EARNED-LIVE-MASTERED-VERIFY` (P103) — real-FLX4 live verify: a cited event advances Mastered; an un-cited moment does not.
 
 **NON-BLOCKING:**
+
 - 🟡 `§EARNED-SURFACE-DESIGN-GATE` (P104) — exact panel layout + celebration treatment is Kaan's design decision during P104.
 - 🟡 `§EARNED-MASTERY-THRESHOLD-TUNE` (P103) — per-skill `N` (grounded-demo count) ships with a default; Kaan tunes after live verify.
 
@@ -79,4 +81,6 @@ See: `.planning/REQUIREMENTS.md` (16 v11.0 REQ-IDs across SKILL / COMP / MAST / 
 
 ## Session Continuity
 
-Next step: `/gsd:plan-phase 102` (Skill-Tree Engine + Data Model + Competent Stage). Engine-only phase — fully offline-unit-testable, standalone-verifiable without UI. Read `.planning/ROADMAP.md` § Phase 102 + the locked constraints above before touching `src/vibemix/learn/`.
+**102-01 SHIPPED (2026-05-29):** DATA-01/02/03. `learn/progress.py` `SCHEMA_VERSION 1→2` with a forward-compatible 6-skill `skills` live-portion block; explicit `_migrate_v1_to_v2` upgrader (preserves lesson history, never wipes v1); idempotent v2 reload (Phase-103 live data not clobbered, keyed on `schema_version==1`); corrupt-recovery seeds an empty v2 block; IPC reset clears the in-memory skills ledger. Only the live-portion (`live_proof_count`/`mastered`/`first_mastered_at`) is stored — `learn_fill`/`competent` are DERIVED by the Wave-2 engine (zero dual-write drift). `__main__.py`/`profile.json` untouched. Commits `ad9fd4de`→`43a54aad`→`32e5fbfc`. `tests/learn` 461 passed. Shared-tree note: concurrent One Mind learn-island edits to `progress.py`/`ipc_handlers.py`/`test_progress_persistence.py` were absorbed (git commits whole files; all on-island + green).
+
+Next step: execute `102-02-PLAN.md` (Wave 2 — `skill_tree.py` engine: `SKILL_MANIFEST` + `SkillProgress` + `compute` Competent gate + 3 invariant pins). It reads the `LearnProgress.skills` block this plan shipped. Read `.planning/ROADMAP.md` § Phase 102 + the locked constraints above before touching `src/vibemix/learn/`.

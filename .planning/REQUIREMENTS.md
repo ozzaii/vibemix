@@ -26,9 +26,9 @@
 - [ ] **MAST-04**: A skill flips to "Mastered" after a declared number of grounded live demonstrations; the count and a `first_mastered_at` timestamp persist across sessions.
 
 ### DATA — Persistence & migration
-- [ ] **DATA-01**: Skill-tree state persists in a `skills` block inside `~/.cache/vibemix/learn-progress.json` via the existing atomic write; skill data is never written to `profile.json` (the 5-field privacy contract stays intact).
-- [ ] **DATA-02**: `learn-progress.json` migrates schema v1→v2 by deterministically back-filling each skill's Competent-stage fill from existing lesson/course completions; a corrupt or older file recovers gracefully (mirrors the existing corrupt-read recovery).
-- [ ] **DATA-03**: User can reset skill-tree progress (mirrors the existing lesson-progress reset path).
+- [x] **DATA-01**: Skill-tree state persists in a `skills` block inside `~/.cache/vibemix/learn-progress.json` via the existing atomic write; skill data is never written to `profile.json` (the 5-field privacy contract stays intact).
+- [x] **DATA-02**: `learn-progress.json` migrates schema v1→v2 by deterministically back-filling each skill's Competent-stage fill from existing lesson/course completions; a corrupt or older file recovers gracefully (mirrors the existing corrupt-read recovery).
+- [x] **DATA-03**: User can reset skill-tree progress (mirrors the existing lesson-progress reset path).
 
 ### SURF — Skill-tree surface & celebration *(exact surface resolved in the UI phase, per Kaan)*
 - [ ] **SURF-01**: User can view their skill tree from the Learn module — all ~6 skills, each bar's stage, current fill, and what remains to advance.
@@ -69,9 +69,9 @@
 | SKILL-03 | Phase 102 | Pending |
 | COMP-01 | Phase 102 | Pending |
 | COMP-02 | Phase 102 | Pending |
-| DATA-01 | Phase 102 | Pending |
-| DATA-02 | Phase 102 | Pending |
-| DATA-03 | Phase 102 | Pending |
+| DATA-01 | Phase 102 | Complete |
+| DATA-02 | Phase 102 | Complete |
+| DATA-03 | Phase 102 | Complete |
 | MAST-01 | Phase 103 | Pending |
 | MAST-02 | Phase 103 | Pending |
 | MAST-03 | Phase 103 | Pending |
