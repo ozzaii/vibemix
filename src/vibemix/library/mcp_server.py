@@ -226,6 +226,36 @@ def build_server(toolset: Any) -> Any:
         Call once, with the tracks in play order. This ends the run."""
         return toolset.create_playlist({"name": name, "track_ids": track_ids})
 
+    @mcp.tool()
+    def request_clarification(question: str, choices: list[str]) -> dict[str, Any]:
+        """Ask the user for disambiguation when the theme is materially ambiguous.
+
+        Call this when the user theme is materially ambiguous and a single
+        sensible default cannot be picked. Provide 2-5 specific choices that
+        cover the disambiguation space. Examples of when to call:
+
+          * "uplifting" — for whom? Provide choices like:
+            ["bedroom-headphones", "peak-time-club", "festival-main-stage"]
+          * BPM range when the brief is silent on tempo:
+            ["slow (90-110)", "mid (118-128)", "fast (130-140)", "mixed"]
+          * Mood register when "energetic" could mean many things:
+            ["chill-energetic", "driving-energetic", "dark-energetic", "euphoric-energetic"]
+
+        Calling this tool ends the current curation run. The CLI / Telegram
+        surfaces render the question + numbered choices to the user, who then
+        re-runs the command with the augmented theme. vibemix retains NO
+        state across the clarification cycle (single-turn semantics) — this
+        is a structured way to request human input, not a multi-turn
+        dialogue.
+
+        Constraints (validated at the toolset boundary; invalid args rejected
+        without terminating the run):
+          * ``question`` MUST be a non-empty string.
+          * ``choices`` MUST be a list of 2-5 non-empty strings (0/1 = no real
+            disambiguation; 6+ = choice paralysis per Hick's-law consensus).
+        """
+        return toolset.request_clarification({"question": question, "choices": choices})
+
     # -- set-prep tools (Vibe Mix engine; grounding identical to above) ----- #
 
     @mcp.tool()
