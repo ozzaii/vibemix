@@ -10,7 +10,6 @@ stream gate — see Plan 20-01 Task 2 for the integration shape.
 
 from __future__ import annotations
 
-from vibemix.coach.citation_ipc_shim import CitationIpcShim
 from vibemix.coach.citation_linter import CitationLinter, LintResult
 from vibemix.coach.constants import (
     DEBRIEF_TOLERANCE_S,
@@ -28,7 +27,6 @@ __all__ = [
     "LIVE_TOLERANCE_S",
     "STRIPPED_RATE_THRESHOLD",
     "STRIPPED_RATE_WINDOW_S",
-    "CitationIpcShim",
     "CitationLinter",
     "LintResult",
     "StrippedRateTracker",

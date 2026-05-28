@@ -37,6 +37,7 @@ import sys
 import threading
 from collections import deque
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import numpy as np
@@ -44,6 +45,9 @@ from dotenv import load_dotenv
 
 from vibemix import __version__
 from vibemix._main_helpers import apply_genre_env
+
+if TYPE_CHECKING:
+    from vibemix.library.codex_curate import CodexCurateResult
 
 # Re-exported for test_main_smoke SMOKE-07 (asserts __main__ surfaces the
 # persona cell symbol) — not referenced in code here, so noqa the F401.
@@ -86,9 +90,11 @@ from vibemix.audio.recorder import sweep_crashed_sessions
 from vibemix.audio.resample import resample_audio
 from vibemix.coach import (
     STRIPPED_RATE_THRESHOLD,
-    CitationIpcShim,
     CitationLinter,
     StrippedRateTracker,
+)
+from vibemix.library.prepared_pool import (
+    load_latest_prepared_pool as _load_latest_prepared_pool,
 )
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
@@ -859,6 +865,18 @@ async def main() -> None:
     midi_mirror = MidiMirror(controller_state=midi_macos.controller_state)
     print("-> midi_mirror wired", file=sys.stderr)
     track_macos = TrackMacOS()
+    # Seed persona env BEFORE MusicState mood, context-cache construction, and
+    # DJCoHostAgent instantiation. The Settings drawer persists these values in
+    # ConfigStore; the prompt resolver reads the env at build time.
+    from vibemix.runtime.settings import apply_persona_config_to_env
+
+    _boot_settings_config = load_config()
+    _persona_seed = apply_persona_config_to_env(_boot_settings_config)
+    if _persona_seed:
+        print(
+            "-> persona settings: "
+            + ", ".join(f"{k}={v}" for k, v in sorted(_persona_seed.items()))
+        )
     state = MusicState()
     # 2026-05-21 — seed mood from VIBEMIX_MOOD at boot. MusicState.mood defaults
     # to "hype-man" (hardcoded), and the agent reads ``live_mood = state.mood``
@@ -1082,14 +1100,6 @@ async def main() -> None:
     citation_linter = CitationLinter() if citation_lint_enabled else None
     stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
     print(f"-> citation lint: {'on' if citation_lint_enabled else 'off (VIBEMIX_CITATION_LINT)'}")
-    # In-process IpcBus shim — Plan 20-04's coach_loop publish gate
-    # duck-types against ``await ipc_bus.emit(dict)``. The shim buffers each
-    # SessionCitation envelope into a bounded deque (no I/O). v2.x follow-up
-    # multiplexes the buffer onto the mascot ws_broadcast clients (the WS
-    # port is already owned by ws_broadcast — see citation_ipc_shim docstring
-    # for the two-option v2.x wiring path).
-    citation_shim: CitationIpcShim | None = CitationIpcShim() if anti_slop_enabled else None
-
     def _citation_telemetry() -> dict:
         """Closure invoked by ``coach_loop``'s publish gate every
         ``CITATION_PUBLISH_INTERVAL_S`` (2.0s). Reads fresh from the
@@ -1331,6 +1341,7 @@ async def main() -> None:
                     feedback_sink=_live_next_feedback_sink,
                     session_id=recorder.session_dir.name,
                     taste_scores=_load_live_taste_scores(),
+                    prepared_pool_loader=_load_latest_prepared_pool,
                 )
                 print("-> pill next-suggestion: armed")
         except Exception as e:
@@ -1466,7 +1477,7 @@ async def main() -> None:
     # SessionLoop's tested handlers via the IpcRouterBus adapter routed through
     # ws_broadcast's existing socket (no second listener — One Socket invariant).
     from vibemix.runtime.session_loop import SessionLoop
-    from vibemix.runtime.settings import SettingsApplier
+    from vibemix.runtime.settings import GenreProfileLoader, SettingsApplier
     from vibemix.runtime.ws_bus import IpcRouterBus
 
     ipc_router: IpcRouterBus | None = IpcRouterBus()
@@ -1479,12 +1490,13 @@ async def main() -> None:
     # always available; tasks add a self-removing done-callback.
     _background_tasks: set[asyncio.Task] = set()
     try:
-        _settings_config = load_config()
+        _settings_config = _boot_settings_config
         _live_settings_applier = SettingsApplier(
             config_store=_settings_config,
             music_state=state,  # mood applies live + emits mascot.mood_change
             ws_bus=ipc_router,  # mood-change + acks reach every connected client
             recordings_root=recordings_root,
+            genre_loader=GenreProfileLoader(),
         )
         _session_ipc = SessionLoop(
             ipc_router,
@@ -1535,6 +1547,18 @@ async def main() -> None:
         ipc_router = None
         _session_ipc = None
         print(f"-> session IPC handlers NOT wired: {_e!r}", file=sys.stderr)
+
+    # One Mind W1 — wire the live UI publish bus into the agent. The agent is
+    # constructed at :1230 BEFORE ipc_router exists (:1492), so its _ipc_bus
+    # defaulted to None and the citation-chip + overlay-highlight surfaces
+    # stayed dark on the live path (the reaction still reached the audience via
+    # TTS; only the "show your receipts" chips never broadcast). Bind it now —
+    # mirror of attach_grounding. ipc_router is the live bus on success, or None
+    # on the rare boot-IPC-failure path above; bind_ipc_bus(None) is a no-op
+    # that keeps the cold path byte-identical.
+    agent.bind_ipc_bus(ipc_router)
+    if ipc_router is not None:
+        print("-> agent IPC bus bound (citation chips + overlay-highlight live)")
 
     # Phase 92 (LESSON-01/03/04) — wire LessonRuntime alongside MidiMirror.
     # P91 already shipped MidiMirror (read-only 30 Hz controller-position
@@ -1612,8 +1636,102 @@ async def main() -> None:
         controller_state=midi_macos.controller_state,
         ipc_router=_lesson_ipc_adapter,
         progress_store=_learn_progress,
+        evidence_registry=evidence_registry,
+        evidence_clock=lambda: state.set_seconds,
+        prepared_pool_loader=_load_latest_prepared_pool,
     )
     print("-> lesson_runtime wired", file=sys.stderr)
+
+    class _NoopLearnExemplarPlayer:
+        """Fallback player when no output device can be resolved at boot."""
+
+        def play(self, file_path: str, /) -> None:
+            return
+
+        def stop(self) -> None:
+            return
+
+    def _learn_output_device_index() -> int | None:
+        try:
+            from vibemix.learn.settings import read_learn_headphone_device_index
+
+            configured = read_learn_headphone_device_index()
+            if configured is not None:
+                return configured
+        except Exception:
+            pass
+        try:
+            import sounddevice as sd
+
+            default_device = getattr(sd.default, "device", None)
+            if isinstance(default_device, (list, tuple)) and len(default_device) >= 2:
+                output_idx = default_device[1]
+            else:
+                output_idx = default_device
+            if output_idx is None:
+                return None
+            idx = int(output_idx)
+            return idx if idx >= 0 else None
+        except Exception:
+            return None
+
+    def _learn_observer_emit(msg: dict) -> None:
+        _lesson_ipc_adapter.emit(msg)
+        if not isinstance(msg, dict) or msg.get("type") != "ipc.learn.complete_lesson":
+            return
+        payload = msg.get("payload", {})
+        reason = payload.get("reason") if isinstance(payload, dict) else None
+        lesson_runtime.complete_observer_lesson(completed=reason == "completed")
+
+    try:
+        from vibemix.learn.exemplar import ExemplarFinder
+        from vibemix.learn.exemplar_lesson import ExemplarLessonController
+        from vibemix.learn.recital import RecitalRuntime
+
+        output_device = _learn_output_device_index()
+        exemplar_player: Any = _NoopLearnExemplarPlayer()
+        if output_device is not None:
+            try:
+                from vibemix.learn.audio_cue import ExemplarPlayer
+
+                exemplar_player = ExemplarPlayer(device_index=output_device, state=state)
+            except Exception as _player_exc:  # pragma: no cover — defensive boot path
+                print(
+                    f"-> learn exemplar audio using no-op player: {_player_exc!r}",
+                    file=sys.stderr,
+                )
+
+        lesson_runtime.register_lesson_observer(
+            "L1.14",
+            ExemplarLessonController(
+                finder=ExemplarFinder(registry=evidence_registry),
+                player=exemplar_player,
+                ipc_emit=_learn_observer_emit,
+            ),
+        )
+        lesson_runtime.register_lesson_observer(
+            "L1.16",
+            RecitalRuntime(
+                ipc_emit=_learn_observer_emit,
+                progress=_learn_progress,
+            ),
+        )
+        lesson_runtime.register_lesson_observer(
+            "L2.14",
+            RecitalRuntime(
+                ipc_emit=_learn_observer_emit,
+                progress=_learn_progress,
+            ),
+        )
+        print(
+            "-> learn lesson observers wired (L1.14/L1.16/L2.14)",
+            file=sys.stderr,
+        )
+    except Exception as _learn_observer_exc:  # pragma: no cover — defensive boot path
+        print(
+            f"-> learn lesson observers NOT wired: {_learn_observer_exc!r}",
+            file=sys.stderr,
+        )
 
     # CR-01 fix (P92 REVIEW) — register the 5 inbound ipc.learn.* handlers
     # onto the bus so frontend envelopes actually reach the FSM. Before
@@ -1711,6 +1829,8 @@ async def main() -> None:
             stop_event,
             evidence_registry=evidence_registry,
             deck_source=deck_poller,
+            section_source=deck_library,
+            learn_state=_learn_state,
         )
     )
     coach_task = asyncio.create_task(
@@ -1727,7 +1847,13 @@ async def main() -> None:
             cancel_gate=cancel_gate,
             ttft_meter=ttft_meter,
             playback=playback,
-            ipc_bus=citation_shim,
+            # One Mind W2 — drain citation telemetry to the LIVE bus. Was
+            # ``citation_shim`` (a bounded deque dead-end that nothing read);
+            # ipc_router is the real ws_broadcast router, so SessionCitation
+            # envelopes now reach the Settings → Diagnostics panel. coach_loop's
+            # ``citation_wired`` gate tolerates ipc_router=None (boot-IPC-failure
+            # path) — no emit fires there, identical to the old shim-less case.
+            ipc_bus=ipc_router,
             citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
             suggestion_service=suggestion_service,
             tracer=tracer,

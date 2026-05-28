@@ -971,6 +971,23 @@ class DJCoHostAgent(Agent):
         """
         self._grounding = grounding
 
+    def bind_ipc_bus(self, ipc_bus: IpcBus | None) -> None:
+        """Post-construction wiring for the UI publish bus (One Mind W1).
+
+        ``main()`` builds the agent (``__main__.py``) BEFORE the live
+        ``IpcRouterBus`` exists — the router is created downstream of the
+        SessionLoop / ws_broadcast wiring. Rather than reorder the build, the
+        orchestrator constructs the agent with ``ipc_bus=None`` and calls this
+        setter once the router is armed, mirroring :meth:`attach_grounding`.
+        With the bus wired, ``llm_node``'s emit-action turns publish
+        ``ipc.session.cohost-reaction`` (the citation-chip "show your receipts"
+        strip) + ``ipc.session.overlay-highlight`` envelopes. Before this call
+        (or when ``None`` is passed) the cold path is byte-identical: the
+        reaction still reaches the audience via TTS — only the chip/overlay
+        surfaces stay dark. Idempotent — safe to call at most once per agent.
+        """
+        self._ipc_bus = ipc_bus
+
     def set_next_event(self, ev: Event) -> None:
         self._pending_event = ev
         # Plan 19-05 — start the TTFT measurement window. Overwriting an
