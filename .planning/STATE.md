@@ -2,24 +2,24 @@
 gsd_state_version: 1.0
 milestone: v10.0
 milestone_name: 12-Factor Hardening
-status: executing
-last_updated: "2026-05-28T14:03:00.902Z"
+status: verifying
+last_updated: "2026-05-28T14:29:05.680Z"
 last_activity: 2026-05-28
 progress:
   total_phases: 11
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 8
-  completed_plans: 7
-  percent: 0
+  completed_plans: 8
+  percent: 9
 ---
 
 # vibemix — State
 
 ## Current Position
 
-Phase: 99 (HARDEN-RETRY — Viber Tool-Retry Policy (Factor 9)) — EXECUTING
-Plan: 8 of 8
-Status: Ready to execute
+Phase: 99 (HARDEN-RETRY — Viber Tool-Retry Policy (Factor 9)) — EXECUTED (ready for verification)
+Plan: 8 of 8 (ALL SHIPPED)
+Status: Phase complete — `/gsd:verify-work 99`
 Last activity: 2026-05-28
 
 ## Milestone Reference
@@ -114,10 +114,10 @@ v10.0 island is disjoint from all three. Commit by named paths only, never `git 
 ## Next Action
 
 ```
-/gsd:execute-phase 99   # continue with Plan 99-04 (cross-process side-channel)
+/gsd:verify-work 99   # Phase 99 fully executed — kick off verification pass
 ```
 
-Phase 99 = HARDEN-RETRY — Viber Tool-Retry Policy (Factor 9 closure). Plans 99-01, 99-02, 99-03, 99-04 SHIPPED on `live-tuning-or-brain` (commits `a0eea8b8` / `4a9b4d12` / `e7b9f5b3` / `569acd1f` / `e4c8b8d3` / `a9bcab5f` / `fecf9a3e` / `15d4829e` / `b92d20b3` / `e2514fdb` / `9c34a063` / `c023b296`). 99-04 closed Channel A end-to-end: `LibraryToolset._write_side_channel` writes the trip payload as JSON to `VIBEMIX_STOP_REASON_FILE` (silent no-op when absent); `curate_with_codex` + `build_set_with_codex` allocate the path inside `tempfile.TemporaryDirectory`, inject the env var on subprocess env, and short-circuit with `stop_reason="tool_starvation"` BEFORE the `out.json` parse (Pitfall 4 closed; Phase 100 forward-compat via `payload.get("reason")` branch); `mcp_server.build_toolset` logs env-var presence at boot (B1 Option A propagation probe — Plan 99-08's checkpoint observes the FIRST real Codex run). 69/69 plan-touched tests green, 0 regressions. **Next: Plan 99-05** (AST/grep single-writer gate).
+Phase 99 = HARDEN-RETRY — Viber Tool-Retry Policy (Factor 9 closure). **ALL 8 PLANS SHIPPED on `live-tuning-or-brain`.** Plan 99-08 (integration seal + 2 KAAN-ACTION non-blocking checkpoints) closed at commit `a8ac195f` (seal-test). The Phase 99 chain is integration-sealed: real `LibraryToolset._build_starvation_payload` generator → side-channel write → wrapper short-circuit → `CodexCurateResult.to_dict()` is now end-to-end test-covered for BOTH `curate_with_codex` and `build_set_with_codex`, plus dataclass shape pinned with key-set-parity cross-check. Both KAAN-ACTION items (§HARDEN-PHASE-A-EAR-PASS + §HARDEN-PHASE-A-ENV-PROPAGATION-VERIFY) DEFERRED to milestone close per `gsd-autonomous fully` mode (`gate="non-blocking"`, item rides forward; phase ships regardless). 7/7 green on `test_codex_curate_stop_reason.py`; 53/53 green on Phase 99 verify chain; 646/646 green on the Phase 99 island; 0 regressions in the broader suite (15 unrelated pre-existing failures triaged in `deferred-items.md`). **Next: `/gsd:verify-work 99` → then plan Phase 100 HARDEN-CLARIFY.**
 
 ## Operator Next Steps
 
