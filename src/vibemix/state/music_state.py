@@ -164,6 +164,26 @@ class MusicState:
     emotion: str | None = None  # "neutral" | "focused" | "hyped" | "concerned" | None
     last_reaction_intent: str | None = None  # MascotReaction whitelist value or None
 
+    # Phase 96 (Plan 96-01) — Course 3 proactive tutor lens scaffolding.
+    # CONTRACT (CONTEXT.md §Decisions, ROADMAP §Phase 96 step 1):
+    # - session_active flips True when the user enters the Course 3 live
+    #   coaching mode AND state/refresh.py has confirmed an audible deck.
+    #   Written ONLY by state/refresh.py (Invariant #1 — learn/ never writes;
+    #   tests/learn/test_runtime_invariants.py AST gate covers MusicState).
+    # - phrase_position_confidence is the upstream confidence the downbeat /
+    #   CueAnchor / phrase-boundary detector emits in [0..1]. 0.0 = cold (no
+    #   phrase lock yet). Mirrors bpm_confidence's confidence-floor semantics.
+    # - next_phrase_at is the absolute set_seconds timestamp (NOT wall-clock)
+    #   of the next phrase boundary the structure detector has resolved.
+    #   None = cold (no phrase lock); a float means a real, registered
+    #   boundary. NEVER fabricated.
+    # Defaults preserve the v8.0 byte-identical evidence_line golden — the
+    # new fields are read by AICoach.evidence_line ONLY when session_active
+    # is True; the cold-state default (session_active=False) emits no marker.
+    session_active: bool = False
+    phrase_position_confidence: float = 0.0  # 0..1 — 0 means "no phrase lock yet"
+    next_phrase_at: float | None = None  # set_seconds; None = cold
+
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     @property

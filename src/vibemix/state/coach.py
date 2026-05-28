@@ -249,6 +249,41 @@ def recall_fragment_for_event(
     return ""
 
 
+# ---- Plan 96-01 — Course 3 proactive tutor lens confidence floors ----
+#
+# Above floors → forward-looking count-in language ("breakdown in 16
+# beats — get ready") permitted. Below ANY → downgrade to retrospective
+# narration ("that was a breakdown — see how the bass dropped out").
+#
+# CONTEXT.md §Claude's Discretion: defaults are tunable in P98 ear-pass.
+# Named constants so the ear-pass diff is one edit per floor.
+_COUNT_IN_BPM_FLOOR: float = 0.8
+_COUNT_IN_PHRASE_FLOOR: float = 0.7
+
+
+def _count_in_eligible(state: "MusicState") -> bool:
+    """True iff Course 3 proactive lens can use forward-looking
+    count-in language this turn. False → retrospective narration only.
+
+    All three confidence floors must hold:
+      - ``bpm_confidence >= _COUNT_IN_BPM_FLOOR`` (0.8)
+      - ``phrase_position_confidence >= _COUNT_IN_PHRASE_FLOOR`` (0.7)
+      - ``next_phrase_at is not None``
+
+    Plan 96-01 (Invariant #3 binding) — the runtime conditional that
+    keeps fabricated count-ins uncitable-by-construction. Combined with
+    the AST gate (tests/learn/test_no_speculative_phrase.py) preventing
+    learn/ from computing its own phrase data, a fabricated "breakdown
+    in N beats" turn cannot survive either structural or conditional
+    enforcement.
+    """
+    return (
+        state.bpm_confidence >= _COUNT_IN_BPM_FLOOR
+        and state.phrase_position_confidence >= _COUNT_IN_PHRASE_FLOOR
+        and state.next_phrase_at is not None
+    )
+
+
 class AICoach:
     """Builds the per-event prompt. Single persona is set at session-open via
     SYSTEM_INSTRUCTION; this class only adds event-specific evidence + task."""
@@ -460,6 +495,35 @@ class AICoach:
             e.append(
                 "FROM A PAST SESSION (not happening now): " + " || ".join(parts)
             )
+
+        # Phase 96 (Plan 96-01) — Course 3 proactive tutor lens marker.
+        # ADDITIVE + gated: the cold path (session_active=False) emits
+        # zero bytes so the v8.0 byte-identical golden stays green. When
+        # the Course 3 runtime sets state.session_active=True (lens on),
+        # we emit ONE marker token per turn:
+        #
+        #   lens=retrospective_only            — downgrade (any floor fails)
+        #   lens=count_in_eligible[next@<t>]   — forward-looking permitted
+        #
+        # The marker is read by build_tutor_system_instruction (P92-01) +
+        # the Plan 96-03 proactive lens wrapper, which converts the marker
+        # into per-turn prompt instructions: retrospective_only =
+        # "no forward-looking count-in language permitted this turn";
+        # count_in_eligible = "count-in language permitted, cite via
+        # [cue:<anchor_id>] when referencing the next boundary at <t>".
+        #
+        # Trust-the-audio (Invariant #3) binding — Plan 96-01 lands the
+        # AST gate that prevents learn/ from ever computing its own
+        # phrase data; the marker here is the runtime conditional.
+        # Together they make a fabricated "breakdown in 16 beats" turn
+        # uncitable-by-construction.
+        if state.session_active:
+            if _count_in_eligible(state):
+                e.append(
+                    f"lens=count_in_eligible[next@{state.next_phrase_at:.1f}]"
+                )
+            else:
+                e.append("lens=retrospective_only")
 
         return " | ".join(e)
 
