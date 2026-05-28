@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 93 Plan 06 — ``vibemix learn exemplar <band>`` CLI dispatch (RED-state stub).
+"""Phase 93 Plan 06 — ``vibemix learn exemplar <band>`` CLI dispatch.
 
 Three subprocess tests pin the CLI contract from 93-RESEARCH.md §Pattern 12:
 
@@ -8,11 +8,10 @@ Three subprocess tests pin the CLI contract from 93-RESEARCH.md §Pattern 12:
        stdout includes "track:" / "path:" / "score:" / "why:" line block on 0.
     3. Bogus subcommand → stderr surfaces "available: reset, exemplar <sub|low|mid|high>".
 
-CLI dispatch is wired into ``src/vibemix/__main__.py`` lines 3316-3330 — the
-extension of the existing P92-04 ``learn reset`` block.
+CLI dispatch is wired into ``src/vibemix/__main__.py`` — the extension of the
+existing P92-04 ``learn reset`` block. As of Plan 93-06 all 3 tests are GREEN.
 
 REQ-ID: cross-cutting (CLI test surface for Kaan dev-loop validation).
-Downstream plan that flips this skip: **Plan 93-06**.
 """
 from __future__ import annotations
 
@@ -23,28 +22,6 @@ from pathlib import Path
 import pytest
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-
-
-def _is_cli_wired() -> bool:
-    """Probe whether the ``learn exemplar`` CLI branch exists in __main__.py.
-
-    The CLI subcommand lands in Plan 93-06 (extension of the P92-04
-    ``learn reset`` dispatch block). Until then the subprocess tests below
-    would fail with the existing fallback message (``available: reset``),
-    NOT the new message (``available: reset, exemplar ...``).
-    """
-    main_py = _PROJECT_ROOT / "src" / "vibemix" / "__main__.py"
-    if not main_py.exists():
-        return False
-    return "learn exemplar" in main_py.read_text(encoding="utf-8")
-
-
-if not _is_cli_wired():
-    pytest.skip(
-        "tests/learn/test_cli_learn_exemplar.py awaiting Plan 93-06 — "
-        "vibemix learn exemplar CLI dispatch in src/vibemix/__main__.py.",
-        allow_module_level=True,
-    )
 
 
 @pytest.mark.cli
