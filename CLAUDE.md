@@ -92,6 +92,8 @@ Single packaged app under `src/vibemix/`. Entry point: `python -m vibemix` → `
 4. **One socket** — the mascot/wizard bus binds `127.0.0.1:8765` only (never two listeners at once); debrief uses `8766`.
 5. **Idle ≠ fault** — `SessionLayout`'s grounding-failure timer runs ONLY while the co-host is ACTIVE. At idle, `grounded=false` is expected (no music to ground to) — counting it falsely flips the deck to "AI service unreachable" with a blank hero (the recurring empty-screen bug). Test-guarded in `tauri/ui/tests/session/grounding-failure.spec.ts`.
 
+> **Prompt composition contract:** see [docs/PROMPT-COMPOSITION.md](docs/PROMPT-COMPOSITION.md) — single named source for what enters the live prompt per event type (EventType × evidence-fields × citation-sources × recall-fragment × diet-mode × cooldown).
+
 ### Threading & generation model
 sounddevice callbacks (OS audio thread) → lock-protected buffers → asyncio event loop (AI calls, ws, state loops) ← MIDI daemon thread. A single in-flight Gemini generation is enforced by an `in_flight` flag with a stale-age force-clear. Errors are caught per-loop and logged to stderr + `events.jsonl`; a loop failure never wedges the `in_flight` gate.
 <!-- GSD:architecture-end -->
