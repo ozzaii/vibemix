@@ -63,7 +63,7 @@ If a phase doesn't pass → defer to HARDEN-FUTURE or out of scope.
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
-| 99 | HARDEN-RETRY — Viber Tool-Retry Policy | Curation run on an empty library exits honestly with `tool_starvation` + a real diagnosis; never silently returns "no playlist" | HARDEN-RETRY-01..07 (7) | 5 |
+| 99 | HARDEN-RETRY — Viber Tool-Retry Policy | 1/8 | In Progress|  |
 | 100 | HARDEN-CLARIFY — Viber RequestClarification | Ambiguous theme triggers a grounded `request_clarification` MCP tool call; CLI + Telegram render numbered choices; caller re-invokes with resolved theme | HARDEN-CLARIFY-01..07 (7) | 5 |
 | 101 | HARDEN-CONTRACT — Prompt Composition Doc | A new contributor reads ONE doc and knows exactly what enters the live prompt per event type — every file:line reference grep-resolves on current source | HARDEN-CONTRACT-01..07 (7) | 4 |
 
@@ -84,7 +84,7 @@ If a phase doesn't pass → defer to HARDEN-FUTURE or out of scope.
   5. `codex_curate.curate_with_codex` and `build_set_with_codex` both surface `stop_reason="tool_starvation"` uniformly to callers (CLI + Telegram + future GUI), regardless of whether the starvation originated INSIDE the toolset dispatch (a single empty search call) or AFTER the Codex MCP harness exited (multi-call run that drained the counter). Tested under `tests/library/test_codex_curate_propagates_stop_reason.py` with both injection sites.
 **Plans:** 8 plans
 Plans:
-- [ ] 99-01-PLAN.md — scaffolding: TOOL_STARVATION_THRESHOLD constant + per-instance counter + stop_reason attribute (no behavior change)
+- [x] 99-01-PLAN.md — scaffolding: TOOL_STARVATION_THRESHOLD constant + per-instance counter + stop_reason attribute (no behavior change)
 - [ ] 99-02-PLAN.md — counter increment/reset wiring in dispatch() + _is_empty_or_error helper + concurrency acid test (no terminal action yet)
 - [ ] 99-03-PLAN.md — threshold-trip detection + deterministic 3-case hint generator + terminal short-circuit in dispatch()
 - [ ] 99-04-PLAN.md — side-channel propagation: VIBEMIX_STOP_REASON_FILE env var + tempfile + wrapper-side propagation in curate_with_codex + build_set_with_codex
