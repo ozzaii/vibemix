@@ -65,6 +65,7 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 - **Logging:** startup lines `-> ...`; errors bracket-tagged to stderr (e.g. `[coach err]`); AI reactions broadcast to the UI over the ws bus (`transcript_delta`), not stderr; structured per-session events to `events.jsonl`.
 - **Frontend settings controls must repaint OPTIMISTICALLY.** `tauri/ui/src/session/state.ts::setSessionState` has no pub/sub and the settings drawer never re-renders on the `ipc.settings.state` echo — a rocker/pill that waits for the round-trip looks dead ("no buttons work"). Flip `data-active` locally in the click handler (mirror `picker.ts::selectOption`); the ~3ms round-trip stays authoritative and self-corrects.
 - **Shell numerics (this Mac is Turkish-locale):** prefix `awk`/`printf`/`bc` output that feeds `ffmpeg -ss`/numeric tools with `LC_ALL=C` — otherwise the locale emits comma decimals (`117,37`) ffmpeg can't parse and clip renders fail silently.
+- **`git commit` is shared across concurrent Claude sessions on this tree** — Kaan runs 2+ sessions in parallel and `git commit` absorbs *every* file staged across all sessions, regardless of who staged it. Verify `git diff --cached --name-only` matches your intended set BEFORE committing. `git reset --soft HEAD~1` to split a mixed commit keeps racing (the next concurrent commit re-absorbs your unstaged units within seconds). Safe atomic fix when nothing is staged: `git commit --amend -m "..."` (message-only rewrite, no race window).
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->
@@ -81,6 +82,7 @@ Single packaged app under `src/vibemix/`. Entry point: `python -m vibemix` → `
 - `coach/`, `prompts/`, `profile/` — persona/prompt templates per user level; long-term DJ profile.
 - `library/` — local CLAP ONNX 512-dim embeddings + sqlite-vec vibe search (macOS sqlite-vec / Windows numpy, bit-identical top-K parity); also home to `next_suggestion.py` (the pill's mean-centered "what's next" engine, grounded by Invariant #2) and the Viber curator core (`toolset.py`/`codex_curate.py`/`mcp_server.py`/`telegram_bridge.py`). **State on disk** under `~/.cache/vibemix/`: `library-clap.db` (sqlite-vec vectors), `embeddings.db` / CLAP-tagged cache rows, `library.pkl` (track-title cache), `library-clap_centroid.npy` (cached query centroid, auto-recomputed on store change). Historical Gemini `library.db` may exist; do not clobber it during CLAP re-embed. **Gotcha:** library/rekordbox tests MUST monkeypatch `RekordboxLibrary.CACHE_PATH` to a tmp dir, or they overwrite the real `library.pkl`.
 - **CLAP embedding engine** (the product similarity/library/curate engine): wired in `library/clap_engine.py` + `docs/clap-engine.md`; default backend is `onnx` (ship model `Xenova/larger_clap_music_and_speech`) with a torch reference backend kept for validation only. 512-dim, deterministic 10s-chunk mean-pool. `_cosine.EMBED_BACKEND` is fixed to `clap`; `build_embedder()` returns `ClapEmbedder`; `VIBEMIX_EMBED_BACKEND` is no longer the product selector. Inference target is **local per-user** (optional model download), not server-side. The full app/installer path should install the optional `[ai-local]` extra; focused jobs can use `[clap]` or `[cue]`. The shipped local path is torch-free, Transformers-free, and librosa-free: `clap`/`ai-local` install `onnxruntime` + `tokenizers`, while `cue` installs `onnxruntime`; audio decode/DSP uses PyAV/FFmpeg plus narrow numpy helpers. **Gotchas:** the HF `transformers.ClapModel` port is broken for text→audio; use the shipped Xenova ONNX path for product, CLAP is anisotropic so mean-centering is mandatory, and text→audio is reliable for coarse genre, not fine vibe.
+- `intel/` — pure musical-intelligence primitives (16 modules). Deterministic claim/decision contracts (`claims.py`, `claim_validator.py`, `decision_runtime.py`, `decision_trace.py`, `decision_validator.py`), scorers (`transition_scorer.py`, `taste_model.py`), ontology + projection (`musical_ontology.py`, `profile_projection.py`), context compilation, feedback hooks, gold-label sampling/validation. Import-light by design — no model clients, no audio capture, no Tauri, no filesystem writes.
 - `memory/` — local `memory.db` copilot store (sqlite-vec); gated behind `VIBEMIX_RECALL_ENABLED` (default off).
 - `debrief/` — post-session review UI (second Tauri window, port 8766).
 - `events/`, `midi/` (10-controller `profiles/` — the single-source catalog), `install/`, `ui_bus/`, `runtime/` (`ws_bus`, `wizard`, `session_loop`, `soak`, `ttft`, recordings index, `suggestion.py` = the pill's `SuggestionService`); `bench/` (Phase-81 dev/eval harness — multi-dimensional model bench, NOT a runtime feature).
@@ -104,6 +106,7 @@ sounddevice callbacks (OS audio thread) → lock-protected buffers → asyncio e
 | Skill | Description | Path |
 |-------|-------------|------|
 | frontend-enforcement | Project-local enforcement of vibemix frontend design standards. Loaded automatically by GSD agents that touch frontend code or UI design — frontend-design discipline, 20/80 rule, textured material feel, no AI slop. | `.claude/skills/frontend-enforcement/SKILL.md` |
+| stop-slop | Author-side anti-slop skill for prose Claude writes in this repo (docs, PR descriptions, plans, code comments, UI copy). Lifted from [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop) (MIT). Its phrase list also seeds the runtime co-host filter in `src/vibemix/prompts/negative_dict.py`. | `.claude/skills/stop-slop/SKILL.md` |
 <!-- GSD:skills-end -->
 
 <!-- GSD:workflow-start source:GSD defaults -->
@@ -160,14 +163,18 @@ The bundled Python sidecar in `cargo tauri dev` is FROZEN (lags edited `src/`) �
 **Library / vibe-search CLI** (the embedding workflow — see `docs/library.md`):
 
 ```bash
+uv run python -m vibemix library ingest [<path>]                  # auto-detect Rekordbox + embed on-device (no flags = scan default rekordbox export)
 uv run python -m vibemix library embed-folder "<dir>" [--strategy mean_excerpt|cue_anchored]  # walk+embed a folder, no Rekordbox XML needed
 uv run python -m vibemix library search "<text vibe>" [-k N]      # text→tracks (cross-modal)
 uv run python -m vibemix library similar "<track_id|file path>"   # track→similar
-VIBEMIX_CODEX_ALLOW_SHELL=1 uv run python -m vibemix library curate "<theme>" [--interactive] [--backend codex]  # Viber agent → grounded M3U/JSON playlist; local Codex is the product path
-VIBEMIX_CODEX_ALLOW_SHELL=1 uv run python -m vibemix library build-set "<brief>" [--curve peak_time|...] [--export rekordbox] [--backend codex]  # discover→sequence on an energy curve→explain why; optional Rekordbox export
-uv run python -m vibemix library export-set "<set>" --export rekordbox        # export a built set to Rekordbox XML
+VIBEMIX_CODEX_ALLOW_SHELL=1 uv run python -m vibemix library chat "<message>" [--history <jsonl>] [--backend codex]  # one-turn conversational Viber
+VIBEMIX_CODEX_ALLOW_SHELL=1 uv run python -m vibemix library curate "<theme>" [--interactive] [--backend codex] [--name <slug>]  # Viber agent → grounded M3U/JSON playlist; local Codex is the product path
+VIBEMIX_CODEX_ALLOW_SHELL=1 uv run python -m vibemix library build-set "<brief>" [--curve peak_time|...] [--n-slots N] [--export rekordbox] [--backend codex] [--name <slug>]  # discover→sequence on an energy curve→explain why; optional Rekordbox export
+uv run python -m vibemix library export-set "<set.json>" --out <path> [--name <slug>]   # export a built set to Rekordbox XML
 uv run --extra telegram python -m vibemix library telegram         # optional Viber mobile surface — long-poll bot, curate from your phone
-uv run python -m vibemix library budget --json                    # offline cost telemetry
+uv run python -m vibemix library stats [--json]                   # offline header counts (tracks/embeddings/cache hit rate)
+uv run python -m vibemix library models [--install clap|cue|all] [--force] [--progress] [--json]  # local AI model cache status + downloader (CLAP, CUE-DETR)
+uv run python -m vibemix library budget [--dau N] [--json]        # offline cost telemetry
 ```
 
 The Telegram bridge (`library/telegram_bridge.py`, optional `telegram` extra, lazy-imports `python-telegram-bot`) needs `VIBEMIX_TELEGRAM_TOKEN` (BotFather) + `VIBEMIX_TELEGRAM_ALLOWED_CHATS` (numeric chat-id allow-list = the v1 auth, fail-closed). Pure logic (allow-list/leak-strip/reply-format) is dep-free + unit-tested; outbound messages are path-scrubbed (privacy); each request runs the local Codex Viber path under a wall-clock timeout (no-hang).
@@ -185,7 +192,7 @@ and do not require a Gemini key.
 
 ## Planning Home
 
-`.planning/` is the GSD source of truth — `ROADMAP.md`, `REQUIREMENTS.md`, `PROJECT.md`, `STATE.md`, plus `codebase/*.md` (codebase maps) and `research/*.md` (pre-roadmap research). The codebase maps in `.planning/codebase/` feed the GSD-managed sections of this file. `MILESTONES.md` tracks shipped milestones (v0.1.0 → v8.1 "One Mind" → v8.2 "Set Builder", both shipped 2026-05-26; phases run continuously, currently ~90).
+`.planning/` is the GSD source of truth — `ROADMAP.md`, `REQUIREMENTS.md`, `PROJECT.md`, `STATE.md`, plus `codebase/*.md` (codebase maps) and `research/*.md` (pre-roadmap research). The codebase maps in `.planning/codebase/` feed the GSD-managed sections of this file. `MILESTONES.md` tracks shipped milestones (v0.1.0 → v10.0 "12-Factor Hardening", last shipped 2026-05-28). **Active milestone: v11.0 "Earned" (started 2026-05-28)** — turns the v9.0 "Lesson One" teaching module into an evidence-grounded DJ skill-tree: ~6 real DJ competencies each level up two stages — lessons fill a skill to "Competent", and only a **cited** live in-set demonstration unlocks "Mastered". Read `.planning/STATE.md` for the current milestone + phase before touching code.
 
 When a phase is active, its planning artifacts live under `.planning/phases/<NN>-<slug>/` (CONTEXT.md, RESEARCH.md, PLAN.md, etc.). Read those before touching code on that phase.
 
