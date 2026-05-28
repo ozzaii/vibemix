@@ -1311,4 +1311,4 @@ def _float_arg(raw: Any, *, default: float) -> float:
         return default
 
 
-__all__ = ["TOOL_CALL_TIMEOUT_S", "LibraryToolset"]
+__all__ = ["TOOL_CALL_TIMEOUT_S", "TOOL_STARVATION_THRESHOLD", "LibraryToolset"]
