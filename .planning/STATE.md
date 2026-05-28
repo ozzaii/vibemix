@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v10.0
 milestone_name: 12-Factor Hardening
 status: executing
-last_updated: "2026-05-28T13:06:37.205Z"
+last_updated: "2026-05-28T13:23:09.269Z"
 last_activity: 2026-05-28
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 8
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -18,9 +18,9 @@ progress:
 ## Current Position
 
 Phase: 99 (HARDEN-RETRY — Viber Tool-Retry Policy (Factor 9)) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 Status: Ready to execute
-Last activity: 2026-05-28
+Last activity: 2026-05-28 (99-04 SHIPPED — Channel A side-channel propagation + B1 Option A probe)
 
 ## Milestone Reference
 
@@ -117,7 +117,7 @@ v10.0 island is disjoint from all three. Commit by named paths only, never `git 
 /gsd:execute-phase 99   # continue with Plan 99-04 (cross-process side-channel)
 ```
 
-Phase 99 = HARDEN-RETRY — Viber Tool-Retry Policy (Factor 9 closure). Plans 99-01, 99-02, 99-03 SHIPPED on `live-tuning-or-brain` (commits `a0eea8b8` / `4a9b4d12` / `e7b9f5b3` / `569acd1f` / `e4c8b8d3` / `a9bcab5f` / `fecf9a3e`). 99-03 closed the in-process side of Factor 9: `LibraryToolset.dispatch()` now writes `self.stop_reason` on threshold trip (3 consecutive empty `search_vibe` / handler errors) with a deterministic three-case hint, and short-circuits subsequent dispatch calls into an idempotent terminal echo. **Next: Plan 99-04** (cross-process side-channel — `VIBEMIX_STOP_REASON_FILE` env var + best-effort write, signposted at `library/toolset.py:1134`).
+Phase 99 = HARDEN-RETRY — Viber Tool-Retry Policy (Factor 9 closure). Plans 99-01, 99-02, 99-03, 99-04 SHIPPED on `live-tuning-or-brain` (commits `a0eea8b8` / `4a9b4d12` / `e7b9f5b3` / `569acd1f` / `e4c8b8d3` / `a9bcab5f` / `fecf9a3e` / `15d4829e` / `b92d20b3` / `e2514fdb` / `9c34a063` / `c023b296`). 99-04 closed Channel A end-to-end: `LibraryToolset._write_side_channel` writes the trip payload as JSON to `VIBEMIX_STOP_REASON_FILE` (silent no-op when absent); `curate_with_codex` + `build_set_with_codex` allocate the path inside `tempfile.TemporaryDirectory`, inject the env var on subprocess env, and short-circuit with `stop_reason="tool_starvation"` BEFORE the `out.json` parse (Pitfall 4 closed; Phase 100 forward-compat via `payload.get("reason")` branch); `mcp_server.build_toolset` logs env-var presence at boot (B1 Option A propagation probe — Plan 99-08's checkpoint observes the FIRST real Codex run). 69/69 plan-touched tests green, 0 regressions. **Next: Plan 99-05** (AST/grep single-writer gate).
 
 ## Operator Next Steps
 
