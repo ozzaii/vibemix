@@ -68,6 +68,73 @@ def test_format_reply_failure_is_honest():
     assert out.startswith("⚠️")
 
 
+# -- Plan 99-07: tool_starvation branch + regression-pin --------------------- #
+#
+# Closes the Telegram leg of HARDEN-RETRY-07: Plan 99-06's
+# `_normalize_codex_curate_result` helper emits
+#   {"ok": False, "stop_reason": "tool_starvation", "hint": "<text>"}
+# and `format_reply` renders the hint via `strip_leaks` (privacy preserved).
+# Phase 100's `clarification_needed` shape will be a sibling branch — the
+# starvation branch sits BEFORE the generic `if not norm.get("ok")` block so
+# the generic branch (which matches ok=False) doesn't shadow it.
+
+
+def test_format_reply_starvation_branch():
+    """tool_starvation hint is rendered as a single warning-glyph line."""
+    out = format_reply(
+        {
+            "ok": False,
+            "stop_reason": "tool_starvation",
+            "hint": "library has 0 tracks — run `library ingest` first",
+        }
+    )
+    assert isinstance(out, str) and out
+    assert "library has 0 tracks" in out
+    # Mirrors the existing error branch's glyph convention (test_format_reply_failure_is_honest).
+    assert out.startswith("⚠️")
+    # Single line — NOT numbered choices (that's Phase 100's clarification_needed shape).
+    assert "1." not in out
+
+
+def test_format_reply_starvation_strips_leaks():
+    """FS paths in the hint are scrubbed by `strip_leaks` defensively (T-99-05)."""
+    out = format_reply(
+        {
+            "ok": False,
+            "stop_reason": "tool_starvation",
+            "hint": "library has 0 tracks at /Users/ozai/.cache/vibemix/library.pkl",
+        }
+    )
+    # Mirrors test_strip_leaks_scrubs_paths assertion style.
+    assert "/Users/ozai" not in out
+    assert "[path]" in out
+    # The non-path portion of the hint survives the scrub.
+    assert "library has 0 tracks" in out
+
+
+# Regression-pin: byte-equivalent rendering of the canonical playlist
+# happy-path. Captured from current source (pre-Task-2) — Task 2's insertion
+# must NOT change this output.
+EXPECTED_PLAYLIST_OUTPUT = (
+    "🎧 Warm-Up (2 tracks)\n"
+    "1. A - One\n"
+    "2. B - Two\n"
+    "\n"
+    "Saved to your vibemix playlists folder."
+)
+
+
+def test_format_reply_existing_branches_unchanged():
+    """Playlist happy-path rendering is byte-equivalent to pre-99-07 baseline."""
+    out = format_reply(
+        {"ok": True, "name": "Warm-Up", "titles": ["A - One", "B - Two"]}
+    )
+    assert out == EXPECTED_PLAYLIST_OUTPUT
+    # Generic error branch also stays byte-equivalent (no stop_reason key).
+    err_out = format_reply({"ok": False, "error": "no playlist (max_iters)"})
+    assert err_out == "⚠️ no playlist (max_iters)"
+
+
 # -- env wiring ------------------------------------------------------------- #
 
 
