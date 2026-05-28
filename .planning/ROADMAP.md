@@ -63,7 +63,7 @@ If a phase doesn't pass → defer to HARDEN-FUTURE or out of scope.
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
-| 99 | HARDEN-RETRY — Viber Tool-Retry Policy | 4/8 | In Progress|  |
+| 99 | HARDEN-RETRY — Viber Tool-Retry Policy | 5/8 | In Progress|  |
 | 100 | HARDEN-CLARIFY — Viber RequestClarification | Ambiguous theme triggers a grounded `request_clarification` MCP tool call; CLI + Telegram render numbered choices; caller re-invokes with resolved theme | HARDEN-CLARIFY-01..07 (7) | 5 |
 | 101 | HARDEN-CONTRACT — Prompt Composition Doc | A new contributor reads ONE doc and knows exactly what enters the live prompt per event type — every file:line reference grep-resolves on current source | HARDEN-CONTRACT-01..07 (7) | 4 |
 
@@ -88,7 +88,7 @@ Plans:
 - [x] 99-02-PLAN.md — counter increment/reset wiring in dispatch() + _is_empty_or_error helper + concurrency acid test (no terminal action yet)
 - [x] 99-03-PLAN.md — threshold-trip detection + deterministic 3-case hint generator + terminal short-circuit in dispatch()
 - [x] 99-04-PLAN.md — side-channel propagation: VIBEMIX_STOP_REASON_FILE env var + tempfile + wrapper-side propagation in curate_with_codex + build_set_with_codex
-- [ ] 99-05-PLAN.md — Invariant #2 gate: tests/repo/test_no_seen_relaxation.py AST/grep gate + create_playlist short-circuit scenario test
+- [x] 99-05-PLAN.md — Invariant #2 gate: tests/repo/test_no_seen_relaxation.py AST/grep gate + create_playlist short-circuit scenario test
 - [ ] 99-06-PLAN.md — CLI exit codes: __main__.py:2545-2556 (curate) + :2591-2602 (build-set) + Telegram curate_fn normalizer
 - [ ] 99-07-PLAN.md — Telegram bridge format_reply tool_starvation branch (renders hint via strip_leaks)
 - [ ] 99-08-PLAN.md — integration seal: uniform propagation tests + KAAN-ACTION checkpoint surfacing §HARDEN-PHASE-A-EAR-PASS
