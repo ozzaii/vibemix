@@ -301,10 +301,28 @@ class LessonRuntime(StateMachine):
 
     def min_dwell_elapsed(self, **_kwargs: Any) -> bool:
         """45 s anti-speedrun floor. Returns True iff
-        ``time.monotonic() - self._learn.lesson_started_at >= 45.0``.
+        ``time.monotonic() - self._learn.lesson_started_at >= 44.5``.
+
+        WR-06 fix (P92 REVIEW): the TS skip-button (``skip-button.ts``)
+        starts its own ``setTimeout(45_000)`` lockout from the moment
+        it's mounted. The Python ``lesson_started_at`` anchor is set
+        inside ``on_enter_loaded`` — when the lesson_loaded envelope is
+        delayed (network burst, slow ws-client startup), the TS clock
+        starts BEFORE the Python clock. A user clicking "i got it" at
+        TS clock+46s = Python clock+44.5s would otherwise: TS button
+        unlocks → emit reaches sidecar → predicate returns False → silent
+        no-op via allow_event_without_transition → user clicks again,
+        then it works. Confusing UX.
+
+        Cheaper than re-anchoring TS lockouts on lesson_loaded.ts: add
+        a 0.5 s grace margin here so the Python predicate is forgiving
+        of TS-side clock drift. The 45 s anti-speedrun product
+        constraint is preserved (44.5 s is functionally identical to
+        45 s from the user's perspective; the floor is the visible
+        countdown badge, not the predicate).
         """
         return (
-            time.monotonic() - self._learn.lesson_started_at >= 45.0
+            time.monotonic() - self._learn.lesson_started_at >= 44.5
         )
 
     # ------------------------------------------------------------------
