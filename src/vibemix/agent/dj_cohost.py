@@ -252,7 +252,18 @@ def _build_citation_strip(
         # continue`` guard with strip == [] (same final state as the
         # Phase 65 anti-poisoning gate would produce via the linter
         # whole-turn strip — defense in depth at two tiers).
-        if source not in ("ev", "mix", "midi", "key", "recall"):
+        #
+        # Phase 93 (EXEMPLAR-05) — ``exemplar`` added as the sixth allow-list
+        # entry (mirrors v6 commit 0bfc8bd0 for [recall:]). The
+        # ``ExemplarFinder.find()`` registration writes
+        # ``("exemplar", track_id, t_session)`` BEFORE the LLM emits the
+        # cite (Plan 93-04 wiring), so a grounded ``[exemplar:<id>]``
+        # resolves like any other source and an unregistered (fabricated)
+        # ``[exemplar:<bogus>]`` falls through the same ``if not timestamps:
+        # continue`` guard with strip == [] (defense in depth at two tiers:
+        # the Phase 20 CitationLinter strips the WHOLE turn upstream, and
+        # this gate drops the chip downstream).
+        if source not in ("ev", "mix", "midi", "key", "recall", "exemplar"):
             continue
         # Registry lookup uses the body verbatim (KEY@t form). Drop the
         # chip when the registry has no matching observation — closes
@@ -288,6 +299,19 @@ def _build_citation_strip(
             # tests/agent/test_citation_strip_emit.py::
             # test_verb_format_is_two_to_three_lowercase_words).
             verb = "recall"
+        elif source == "exemplar":
+            # Phase 93 (EXEMPLAR-05) — mirrors the ``recall`` and ``key``
+            # precedents above for opaque/structured bodies. The ``exemplar``
+            # body shape is ``<track_id>`` (e.g. ``library:Marlon Hoffstadt
+            # - Atlas`` or ``_packaged:low:track_03``). The full track_id
+            # rides in ``event_id`` for the click→tutor-context deep-link.
+            # The chip verb is a fixed letters-only ``"exemplar"`` label —
+            # deriving a verb from a track-id string is meaningless and
+            # would leak embedding-internal values to the UI surface
+            # (P93-RESEARCH.md §4-Site Mirror Pattern). A single lowercase
+            # word trivially matches the locked verb-format regex
+            # ``^[a-z]+( [a-z]+){0,2}$``.
+            verb = "exemplar"
         else:
             # Body shape is ``KEY@t`` for ev/aud/midi/mix; partition on "@"
             # so a missing "@" (defensive: future grammar drift) falls back

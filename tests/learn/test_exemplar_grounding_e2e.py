@@ -5,24 +5,12 @@ Mirrors the v6 test_fabricated_recall_strips_turn pattern at
 tests/agent/test_dj_cohost_linter.py:250-330.
 
 REQ-ID: EXEMPLAR-05 (citation grounding via 4-site mirror).
-Downstream plan that flips this skip: **Plan 93-05** (atomic 4-site mirror commit).
-
-This module starts RED-on-real-source — ``parse_citations`` cannot extract
-``[exemplar:<id>]`` until Plan 93-05 adds ``exemplar`` to ``_SOURCE_ALT``,
-so the assertions in ``test_parse_citations_extracts_*`` would FAIL today.
-The module-level skip holds; Plan 93-05 removes the skip line.
+Flipped GREEN by Plan 93-05 — the atomic 4-site mirror commit landed
+``exemplar`` in ``_SOURCE_ALT`` so ``parse_citations`` now extracts
+``[exemplar:<id>]`` atoms and the linter gates them via the existing
+existence check.
 """
 from __future__ import annotations
-
-import pytest
-
-# Plan 93-05 removes the line below when the atomic 4-site mirror lands.
-pytest.skip(
-    "tests/learn/test_exemplar_grounding_e2e.py awaiting Plan 93-05 — "
-    "remove this pytest.skip(...) line when [exemplar:] joins _SOURCE_ALT "
-    "so parse_citations() extracts the atom.",
-    allow_module_level=True,
-)
 
 from vibemix.state.evidence_registry import EvidenceRegistry, parse_citations
 
