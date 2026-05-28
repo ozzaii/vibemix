@@ -52,9 +52,7 @@ from livekit.agents import tts as agents_tts
 
 from vibemix.agent._streaming_pipe import (
     can_yield_chunks,
-    find_sentence_end,
     last_balanced_position,
-    passes_head_gate,
 )
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL, OPENROUTER_LLM_MODEL
