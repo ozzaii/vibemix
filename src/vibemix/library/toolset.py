@@ -113,12 +113,15 @@ class LibraryToolset:
         # export_set handler; the agent loop reads it to break with a terminal
         # "exported" stop_reason and surface the path.
         self.exported: ExportResult | None = None
-        # Phase 99 HARDEN-RETRY scaffolding (Plan 99-01, Decisions 1 + 4):
+        # Phase 99 HARDEN-RETRY (Plans 99-01..04, Decisions 1 + 4):
         # per-run consecutive empty/error counter + terminal stop_reason surface.
-        # Plan 99-02 wires the dispatch-site increment; Plan 99-03 writes the
-        # threshold-trip payload here. Pure scaffolding in this plan — no reads
-        # or writes anywhere else yet (single-writer analog precondition for
-        # Cardinal Invariant #1).
+        # Counter is incremented + reset + threshold-tripped inside ``dispatch()``
+        # below (the SINGLE writer site, on the dispatch-calling thread — see
+        # the toolset.py:407-411 serialization analog for the safety argument).
+        # ``stop_reason`` is written by ``_build_starvation_payload`` on trip and
+        # read by ``_write_side_channel`` (env-gated, observability/propagation),
+        # the ``create_playlist`` short-circuit, and the terminal dispatch-top
+        # short-circuit.
         self._consecutive_empties: int = 0
         self.stop_reason: dict[str, Any] | None = None
         # SEAM #1 (CURATE-01): lazily-built genre lookup, the SAME mechanism the
