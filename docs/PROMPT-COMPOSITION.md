@@ -62,15 +62,111 @@ How to read the table (worked walkthrough on TRACK_CHANGE):
 
 ## Citation Source Grammar
 
-_TODO 101-02_ -- body grammar per `EVIDENCE_SOURCES` entry (11 sources: `ev`, `aud`, `midi`, `track`, `screen`, `mix`, `tend`, `key`, `recall`, `exemplar`, `cue`) with concrete examples and which event types may cite which sources.
+Source-of-truth: the locked frozenset at `src/vibemix/state/evidence_registry.py:129` (`EVIDENCE_SOURCES`) defines the 11 citation tokens any reaction may emit. The compiled regex at `src/vibemix/state/evidence_registry.py:199` (`EVIDENCE_CITATION_RE`) enforces the EBNF on the wire; the inner-atom alternation at `src/vibemix/state/evidence_registry.py:174` (`_SOURCE_ALT`) is the mirror site that must move in lock-step with the frozenset.
+
+Common EBNF (all 11 sources):
+
+- `citation := '[' atom ( ',' atom )* ']'`
+- `atom := <source> ':' <body>`
+- `body` is one-or-more chars, no whitespace, no comma, no closing bracket
+- Multi-atom citations are comma-joined inside ONE bracket pair (e.g. `[ev:TRACK_CHANGE@123.4,key:A:8A]`); empty `[]` is rejected
+- The FIRST `:` separates source from body; inner colons survive as body (this is how `key:A:8A`, `recall:20260520-2200:7`, `exemplar:_packaged:low:track_03`, and `cue:phrase_boundary@45.2` all parse without a grammar change -- see the inline comment block at `src/vibemix/state/evidence_registry.py:139-167`)
+
+Per-source body grammar and citation eligibility (each row cross-references Sec. 3 for the per-EventType view):
+
+| Source     | Body grammar                                  | Introduced (phase)        | Example                                  | Event types that may cite                                                                                          |
+| ---------- | --------------------------------------------- | ------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `ev`       | `<EVENT_TYPE>@<t_session>`                    | v4 baseline               | `[ev:TRACK_CHANGE@123.4]`                | Every event -- `EventDetector._fire` writes `("ev", event_type, t_session)` at `src/vibemix/state/event_detector.py:509` on every fire |
+| `aud`      | `<audio-domain key>`                          | v4 baseline               | `[aud:rms@123.4]`                        | Any event surfacing audible-deck buffers (TRACK_CHANGE, PHASE, LAYER_ARRIVAL, MIX_MOVE, HEARTBEAT, KAAN_SPOKE, MANUAL, plus genre-chain re-emits per Sec. 3 notes) |
+| `midi`     | `<controller-msg key>`                        | v4 baseline               | `[midi:fader_a@123.4]`                   | MIX_MOVE primarily; any event that consumed a MIDI move from the controller decoder thread                          |
+| `track`    | `<track identity key>`                        | v4 baseline               | `[track:nowplaying@123.4]`               | TRACK_CHANGE primarily; any event with non-empty nowplaying identity at fire time                                   |
+| `screen`   | `<screen-watcher key>`                        | v4 baseline               | `[screen:deck_a@123.4]`                  | Any event whose state.screen_state is populated by the deck-poller subsystem (not gated per event type)             |
+| `mix`      | `<mix-state key>`                             | v4 baseline               | `[mix:last_move@123.4]`                  | Most events -- mix-state flows from the state-refresh loop and is populated for every non-cold turn                 |
+| `tend`     | `<tendency / profile key>`                    | v4 baseline               | `[tend:peak_hour@123.4]`                 | Any event when long-term Kaan-profile data is loaded (not gated per event type)                                     |
+| `key`      | `<deck> ':' <camelot>` (deck in `{A,B,C,D}`, camelot in `1A..12B`) | Phase 59 (DECK-03)        | `[key:A:8A]`                             | KEY_CLASH primarily; TRANSITION_OPPORTUNITY when both decks have detected keys; TRACK_CHANGE when the new audible deck has a detected key |
+| `recall`   | `<record_id>` (inner colon survives, e.g. session-stamp `:` index) | Phase 65 (RECALL-01)      | `[recall:20260520-2200:7]`               | TRACK_CHANGE, MIX_MOVE, LAYER_ARRIVAL via `TRANSITION_SHAPE_RECALL_FRAGMENT_TPL` at `src/vibemix/state/coach.py:109`; PHASE via `VOCABULARY_RECALL_FRAGMENT_TPL` at `src/vibemix/state/coach.py:141`. See Sec. 5 |
+| `exemplar` | `<track_id>` (library or packaged path, inner colons survive)      | Phase 93 (EXEMPLAR-05)    | `[exemplar:library:Marlon-Atlas]` or `[exemplar:_packaged:low:track_03]` | LAYER_ARRIVAL primarily; tutor-mode reactions emitting library-grounded exemplar callbacks                          |
+| `cue`      | `<anchor_id>` (e.g. `<label>@<t>`)                                 | Phase 96 (CURR-3.07)      | `[cue:phrase_boundary@45.2]` or `[cue:drop@180.0]` | TRANSITION_OPPORTUNITY primarily; any count-in / phrase-prediction reaction grounded against a CueAnchor written by `state/refresh.py` before the LLM emits the cite |
+
+Schema-mirror discipline (cite `src/vibemix/state/evidence_registry.py:126-128`): `EVIDENCE_SOURCES` is the source-of-truth. Three mirror sites must move in the SAME commit:
+
+- `_SOURCE_ALT` at `src/vibemix/state/evidence_registry.py:174` (the regex alternation)
+- `CITATION_GRAMMAR_BLOCK` in `src/vibemix/prompts/matrix.py` (the prompt-side grammar block)
+- `_build_citation_strip` in `src/vibemix/agent/dj_cohost.py:181` (the wire-side stripper)
+
+A new source added to the frozenset without joining `_SOURCE_ALT` is silently uncitable: the regex never matches, the linter never validates, and a fabricated `[<newsource>:<id>]` rides through un-stripped. The recall / exemplar / cue introductions all documented this discipline inline as a precedent (see `evidence_registry.py:144-167`).
+
+Asymmetry (intentional, do NOT "fix"): `src/vibemix/memory/ingest.py` keeps an 8-source alternation -- `recall`, `exemplar`, `cue` are RETRIEVAL-time only, never ingest-time. A stored past reaction never cited `recall`, `exemplar`, or `cue` itself (`cue` is sampled from CueAnchor at narration time, not at ingest), so the ingest-time extractor must not whitelist them. Cited from the comment block at `src/vibemix/state/evidence_registry.py:169-173`.
 
 ## Recall-Fragment Shapes
 
-_TODO 101-02_ -- enumerate the per-event-family recall templates. Transition-shape template (triggered by TRACK_CHANGE, MIX_MOVE, LAYER_ARRIVAL) at `src/vibemix/state/coach.py:109` (`TRANSITION_SHAPE_RECALL_FRAGMENT_TPL`); vocabulary template (triggered by PHASE) at `src/vibemix/state/coach.py:141` (`VOCABULARY_RECALL_FRAGMENT_TPL`); empty-string return for HEARTBEAT, KAAN_SPOKE, MANUAL, KEY_CLASH, TRANSITION_OPPORTUNITY (no recall fragment). All dispatched by `recall_fragment_for_event` at `src/vibemix/state/coach.py:158`. Plan 101-02 lands the per-template body grammar + a worked example per event family (TRACK_CHANGE worked example, MIX_MOVE worked example, LAYER_ARRIVAL worked example, PHASE worked example).
+Conditional-append seam: `recall_frag = recall_fragment_for_event(ev, recall_moments)` at `src/vibemix/state/coach.py:847`, immediately before the full-prompt return at `src/vibemix/state/coach.py:848`. The dispatch helper itself lives at `src/vibemix/state/coach.py:158` (`recall_fragment_for_event`). Cold-path falsy gate at `src/vibemix/state/coach.py:228` returns `""` when `recall_moments` is `None` or `[]` -- the v5.0 byte-identity floor every existing `tests/state/test_coach.py` golden depends on.
+
+Branch order in `recall_fragment_for_event` (cited from `src/vibemix/state/coach.py:238-249`):
+
+- `TRACK_CHANGE`, `MIX_MOVE`, `LAYER_ARRIVAL` -> transition-shape template (TRACK_CHANGE is in BOTH gates per the inline comment at `src/vibemix/state/coach.py:183-188`; transition wins by being listed FIRST -- transition is more concrete than a vocabulary echo on a track flip)
+- `PHASE` -> vocabulary template
+- All other event types (`KAAN_SPOKE`, `MANUAL`, `HEARTBEAT`, `KEY_CLASH`, `TRANSITION_OPPORTUNITY`) -> `""` returned, no fragment appended
+
+Only the STRONGEST survivor's `record_id` is interpolated (cited from `src/vibemix/state/coach.py:234`: `strongest = recall_moments[0]`). Phase 65's `cosine_topk` returns survivors sorted DESC by score, so index 0 is the highest match; weaker survivors still appear in the `FROM A PAST SESSION` block of `evidence_line` for pattern-matching, but only the strongest is named for the `[recall:<record_id>]` citation. This is the structural max-1-per-turn cap.
+
+### Transition-shape recall
+
+Template constant: `TRANSITION_SHAPE_RECALL_FRAGMENT_TPL` at `src/vibemix/state/coach.py:109`.
+
+Shape (prose summary -- the template body is a Python string literal at `src/vibemix/state/coach.py:109-126`, NOT reproduced here in full): a past-tense callback line referencing a transition-shaped past moment that lines up with the live audio, citing exactly `[recall:<record_id>]` once. The DJ hears "that blend sat longer than the last time" or "killed the bass earlier this time around" -- a delta between the past signature and the live moment, not a description of the past in isolation.
+
+Hard rules (quoted verbatim from `src/vibemix/state/coach.py:119-126` -- the template body):
+
+> Hard rules: cite [recall:{record_id}] EXACTLY ONCE (the registry validates it; a fabricated id strips the whole turn); do NOT invent a past moment, paraphrase the past signature, or describe it as live; do NOT recommend a NEXT track or move (no 'try X next time'); do NOT claim a tendency ('you usually do', 'you always') -- narrate THIS one compared to THAT one. If the past moment doesn't match, OMIT the callback entirely -- your normal reaction is the floor.
+
+Worked examples:
+
+- TRACK_CHANGE with `recall_moments=[Record(record_id="20260520-2200:7", ...)]` -> fragment appended; tail of the prompt reads "... your normal reaction is the floor." with `[recall:20260520-2200:7]` cited once. Wire-side validation at `src/vibemix/agent/dj_cohost.py:181` (`_build_citation_strip`) confirms the id resolves in the registry; a fabricated id strips the whole turn (the anti-poisoning posture documented at `src/vibemix/state/coach.py:74-77`).
+- MIX_MOVE with same fragment shape -- transition-shape branch matches MIX_MOVE just as it does TRACK_CHANGE (`src/vibemix/state/coach.py:238`).
+- LAYER_ARRIVAL with same fragment shape -- third event type in the transition-shape tuple at `src/vibemix/state/coach.py:238`.
+- TRACK_CHANGE with `recall_moments=None` or `[]` -> falsy gate at `src/vibemix/state/coach.py:228` returns `""`; nothing appended; output is byte-identical to the v5.0 baseline.
+
+### Vocabulary/register recall
+
+Template constant: `VOCABULARY_RECALL_FRAGMENT_TPL` at `src/vibemix/state/coach.py:141`.
+
+Shape (prose summary): echo the DJ's own past phrasing in the DJ's own register, citing exactly `[recall:<record_id>]` once. The anti-paraphrase discipline is baked into the template body: "speak in the same register, not Gemini-paraphrased" -- explicit framing against the failure mode where Gemini describes the DJ's voice instead of echoing it. The inline comment at `src/vibemix/state/coach.py:135-140` names this as Pitfall 4 from 66-RESEARCH.md.
+
+Hard rules (quoted verbatim from `src/vibemix/state/coach.py:149-155` -- the template body):
+
+> Hard rules: cite [recall:{record_id}] EXACTLY ONCE; do NOT invent a past phrasing; do NOT claim it's a habit ('you always', 'you tend to'); do NOT recommend a next move. If your live reaction wouldn't naturally echo the past, OMIT the callback -- a forced echo is the failure mode this phase guards.
+
+Worked example: PHASE event with `recall_moments=[Record(record_id="20260520-2200:7", ...)]` and a live moment whose natural reaction lines up with the past signature -> fragment appended; output cites `[recall:20260520-2200:7]` once and stays in the DJ's voice. Same falsy-gate behavior for cold `recall_moments`.
+
+### Structural pins
+
+- The diet path SKIPS the recall fragment entirely. Cited from the build_prompt docstring at `src/vibemix/state/coach.py:809-811`: "the diet branch intentionally skips the recall block -- diet events are ACK_ELIGIBLE (incl. HEARTBEAT) and are never retrieval events." Mechanically, the diet branch at `src/vibemix/state/coach.py:824-831` returns before reaching the `recall_fragment_for_event` call at `src/vibemix/state/coach.py:847`.
+- Registry strict-subset enforcement: `_build_citation_strip` at `src/vibemix/agent/dj_cohost.py:181` validates every `[recall:<id>]` against `EvidenceRegistry`. A fabricated id strips the whole turn -- the Phase 65 anti-poisoning linter posture cited at `src/vibemix/state/coach.py:75-77` and the comment block at `src/vibemix/state/evidence_registry.py:146-148`.
+- Byte-identity contract: the leading space at the start of each template is LOAD-BEARING (`src/vibemix/state/coach.py:98-101`) -- `build_prompt` concatenates the fragment directly onto the task tail with no separator, so the leading space is the only delimiter. Preserve it exactly if editing a template.
 
 ## Diet-Mode
 
-_TODO 101-02_ -- what triggers the diet path, what gets stripped vs full-prompt, why (TTFT budget on ack-eligible events). Cross-referenced to `src/vibemix/state/coach.py:54` (`ACK_ELIGIBLE_EVENTS`) and `src/vibemix/state/coach.py:824` (`if diet:` dispatch).
+Eligibility gate: `ACK_ELIGIBLE_EVENTS` frozenset at `src/vibemix/state/coach.py:54`, containing exactly four event types: `HEARTBEAT`, `MIX_MOVE`, `LAYER_ARRIVAL`, `KAAN_SPOKE`. Dispatch branch: `if diet:` at `src/vibemix/state/coach.py:824`.
+
+Diet mode is OPT-IN by caller. The default at `src/vibemix/state/coach.py:799` is `diet: bool = False`, the v4-byte-identical full-prompt path. Passing `diet=True` on a non-ack event raises `ValueError` at `src/vibemix/state/coach.py:826-828` -- dispatch bugs fail loud at the call site rather than silently producing a compressed prompt for an event that needs the full payload to ground a substantive reaction. The comment block at `src/vibemix/state/coach.py:50-53` names the contract: PHASE, TRACK_CHANGE, MANUAL, KEY_CLASH, TRANSITION_OPPORTUNITY, and the genre-chain re-emit types "truly need the 18s audio window + corpus footer + history fields" to ground; only the four ack events take the diet path.
+
+### What diet strips
+
+Cited from the build_prompt docstring at `src/vibemix/state/coach.py:813-822` and the branch implementation at `src/vibemix/state/coach.py:824-831`:
+
+- Uses `_evidence_line_compact(ev.state)` (the 5-field compact assembler) at `src/vibemix/state/coach.py:829` instead of the full `AICoach.evidence_line(...)` call -- the compact path is defined at `src/vibemix/state/coach.py:531` and excludes the registry corpus footer and the recall block by construction
+- Omits the `| event=<TYPE>` tag (the full path includes it via the f-string at `src/vibemix/state/coach.py:848`: `f"[{evidence} | event={ev.type}] {task}{recall_frag}"`; the diet return at `src/vibemix/state/coach.py:831` is `f"[{evidence}] {task}"` -- no `event=` tag)
+- Omits the evidence-corpus footer (the `evidence_corpus[ev=N,aud=M,mix=K]` footer assembled inside `AICoach.evidence_line` from `registry_snapshot`); the compact path at `src/vibemix/state/coach.py:531` never reads a `registry_snapshot` and never assembles a footer
+- Skips the recall-fragment conditional append at `src/vibemix/state/coach.py:847`; the diet branch returns at `src/vibemix/state/coach.py:831` before reaching that call. The recall fragment is the load-bearing component the diet path strips -- cited as intentional at `src/vibemix/state/coach.py:809-811` ("diet events are ACK_ELIGIBLE incl. HEARTBEAT, never retrieval events")
+
+### Why diet exists
+
+TTFT (time-to-first-token) budget on ack-eligible event classes. Cited from `src/vibemix/state/coach.py:816-817`: "Saves >=500ms TTFT on the four ack-eligible event classes (HEARTBEAT, MIX_MOVE, LAYER_ARRIVAL, KAAN_SPOKE)."
+
+The ack events are short, frequent, and structurally compressible -- a HEARTBEAT does not benefit from a registry corpus footer the way a TRACK_CHANGE does. The compressed prompt lands a fast vocal acknowledgment via the ack-bank fallback in `src/vibemix/agent/dj_cohost.py` without the full reasoning-grounded reaction the heavy events get. The full-prompt path is preserved for every other event type so substantive reactions stay grounded.
+
+The `ValueError` at `src/vibemix/state/coach.py:826-828` is the dispatch-bug guard: a caller that accidentally passes `diet=True` on TRACK_CHANGE (an event that needs the full payload) does NOT silently degrade to a compressed prompt -- it raises immediately, surfacing the bug at the call site instead of producing a quietly-worse reaction.
 
 ## Per-Event-Type Cooldowns
 
