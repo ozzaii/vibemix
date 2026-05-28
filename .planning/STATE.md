@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v9.0
 milestone_name: Lesson One
 status: executing
-last_updated: "2026-05-28T01:19:35.390Z"
+last_updated: "2026-05-28T01:38:35.980Z"
 last_activity: 2026-05-28
 progress:
   total_phases: 14
   completed_phases: 1
   total_plans: 14
-  completed_plans: 9
+  completed_plans: 10
   percent: 7
 ---
 
@@ -18,8 +18,8 @@ progress:
 ## Current Position
 
 Phase: 92 (Lesson Runtime + AI Highlight Contract) — EXECUTING
-Plan: 3 of 7 (92-01 SHIPPED — commits 2214911f → 3020dfba → 56c3a0be → fcdda017 on 2026-05-28 — python-statemachine ^3.1.2 dep + learn_tutor router path + 11 ipc.learn.* envelope schemas + regenerated ajv validator + 11 Python wrapper dataclasses with shared _VALIDATOR + 24 ui_bus re-exports + hardened count-parity heuristic across 5 test files at 77/77; foundation wave for the entire v9.0 lesson runtime. 92-02 SHIPPED — commits eb95b43e → 7722a403 → dd6dd43c on 2026-05-28 — 18 new test files: 5 Python AST + invariant stubs (LESSON-01 / TONE-02 / TONE-04), 5 Python wiring + parity tests (LESSON-02 / 03 / 05 / 06 + Pitfall 6 cadence), 8 TS test scaffolds (RENDER-04 ≤16ms paint, 5 a11y Playwright stubs, settings drawer, mascot regression). 3 AST gates LIVE day-one; 11-envelope round-trip parity at 13 Learn $refs LIVE; learn_tutor route LIVE; 6 module-level skips name Plan 92-03/04 dependencies. P91 verification complete — all 7 P91 plans SHIPPED with commits da2aa70c → e85fae9d.)
-Status: Ready to execute
+Plan: 4 of 7 (92-01 SHIPPED — commits 2214911f → 3020dfba → 56c3a0be → fcdda017 on 2026-05-28 — python-statemachine ^3.1.2 dep + learn_tutor router path + 11 ipc.learn.* envelope schemas + regenerated ajv validator + 11 Python wrapper dataclasses with shared _VALIDATOR + 24 ui_bus re-exports + hardened count-parity heuristic across 5 test files at 77/77; foundation wave for the entire v9.0 lesson runtime. 92-02 SHIPPED — commits eb95b43e → 7722a403 → dd6dd43c on 2026-05-28 — 18 new test files: 5 Python AST + invariant stubs (LESSON-01 / TONE-02 / TONE-04), 5 Python wiring + parity tests (LESSON-02 / 03 / 05 / 06 + Pitfall 6 cadence), 8 TS test scaffolds (RENDER-04 ≤16ms paint, 5 a11y Playwright stubs, settings drawer, mascot regression). 3 AST gates LIVE day-one; 11-envelope round-trip parity at 13 Learn $refs LIVE; learn_tutor route LIVE; 6 module-level skips name Plan 92-03/04 dependencies. 92-03 SHIPPED — commits 7144fd2f (Task 1: LearnState + curriculum.py + prompts.py + JSON fixture; 7 tests flipped skip→PASS) → 3838e1d9 (Task 2: LessonRuntime FSM 8 states/5 transitions/1 Hz tick_loop/575 lines; 7 more tests flipped skip→PASS) → 66b50397 (docstring grep-gate fix) on 2026-05-28 — the Python brain of P92: LessonRuntime as sole writer of LearnState (Invariant #1 binding via AST gate), 4-forbidden-moves tutor lock LAST for recency (TONE-04), hand-authored JSON fixture as sole source of tutor_speak.text (TONE-02). All 22 tests/learn/ pass; 1 skip (test_progress_persistence.py awaits 92-04). P91 verification complete — all 7 P91 plans SHIPPED with commits da2aa70c → e85fae9d.)
+Status: Ready to execute (92-04: LessonRuntime wire-in to __main__.main + ProgressStore + persistence)
 Last activity: 2026-05-28
 
 ## Milestone Reference

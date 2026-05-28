@@ -11,9 +11,9 @@
 ### TONE — release-gate slop discipline (v9.0's Invariant-#2 equivalent)
 
 - [ ] **TONE-01**: A beginner opens vibemix → picks Learn → sees the verbatim 4-line iconic opening dialog ("Hello vibemix, what are you?" / "I'm the best DJ app in the world." / "If you are the best, then who the fuck am I?" / "Oh bestie, don't worry. You know why? Because I'm the beginner module of vibemix. Let's go.") — byte-equality test against `src/vibemix/learn/transcripts/course_1_anatomy/01_welcome.json` fixture, CI-red on any drift.
-- [ ] **TONE-02**: Every one of the 36 lesson scripts is HAND-AUTHORED (committed to `src/vibemix/learn/transcripts/course_<N>/<lesson_id>.json`) and NEVER LLM-generated on-the-fly; static test (`tests/learn/test_scripts_are_fixtures.py`) confirms no live generative call writes a `tutor_speak` envelope's `text` field.
+- [x] **TONE-02**: Every one of the 36 lesson scripts is HAND-AUTHORED (committed to `src/vibemix/learn/transcripts/course_<N>/<lesson_id>.json`) and NEVER LLM-generated on-the-fly; static test (`tests/learn/test_scripts_are_fixtures.py`) confirms no live generative call writes a `tutor_speak` envelope's `text` field.
 - [ ] **TONE-03**: A new AI-slop blocklist `scripts/launch/check_no_tutor_slop.py` (extends `check_no_ai_slop.py`) catches ≥20 tutor-tic tokens ("Great question!" / "Today we'll be learning…" / "Awesome!" / "You crushed it!" / "Let's dive in!" / "Don't worry, you'll get the hang of it" + 14 more); CI-gated; runs against ALL `learn/transcripts/**.json` AND runtime AI interjections.
-- [ ] **TONE-04**: The tutor system instruction includes a hard lock forbidding the four learned moves: NO complimenting user actions · NO summarizing what just happened · NO previewing what's next · NO closing with an upbeat hook. State ONE grounded observation + ONE forward sentence the lesson script provided. Pinned by `tests/learn/test_tutor_system_instruction_lock.py`.
+- [x] **TONE-04**: The tutor system instruction includes a hard lock forbidding the four learned moves: NO complimenting user actions · NO summarizing what just happened · NO previewing what's next · NO closing with an upbeat hook. State ONE grounded observation + ONE forward sentence the lesson script provided. Pinned by `tests/learn/test_tutor_system_instruction_lock.py`.
 
 ### RENDER — controller visualization + MIDI position mirror
 
@@ -28,11 +28,11 @@
 
 ### LESSON — runtime + IPC + progress persistence
 
-- [ ] **LESSON-01**: The Learn runtime drives lesson state via a deterministic state machine in `src/vibemix/learn/runtime.py` (using `python-statemachine` ^3.1.2 — ONE new MIT pure-Python dep, GREEN install impact); each lesson is one state with declarative entry/exit/transition predicates; integration test `tests/learn/test_runtime_invariants.py` confirms ZERO writes to `MusicState` from the `learn/` package (Invariant #1 binding).
+- [x] **LESSON-01**: The Learn runtime drives lesson state via a deterministic state machine in `src/vibemix/learn/runtime.py` (using `python-statemachine` ^3.1.2 — ONE new MIT pure-Python dep, GREEN install impact); each lesson is one state with declarative entry/exit/transition predicates; integration test `tests/learn/test_runtime_invariants.py` confirms ZERO writes to `MusicState` from the `learn/` package (Invariant #1 binding).
 - [x] **LESSON-02**: Twelve new IPC envelopes in the `ipc.learn.*` namespace (start_course / start_lesson / complete_lesson / lesson_loaded / highlight / midi_position / advance / ack / tutor_speak / exemplar_play / exemplar_stop / progress_state) ride the existing `127.0.0.1:8765` ws_bus through `IpcRouterBus` (one-socket invariant preserved); all `additionalProperties: false`; pre-compiled ajv validator regenerated via `cd tauri/ui && npm run codegen:ipc`. Python dataclass mirrors land in `src/vibemix/ui_bus/learn_messages.py`. CI gate `tests/learn/test_no_new_ws_port.py` greps `learn/` for any `websockets.serve` (zero allowed). — Foundation SHIPPED by P92-01 (2026-05-28): schemas + dataclasses + ajv validator + count-parity at 77/77; ws-routing wiring in P92-03/04/05.
 - [ ] **LESSON-03**: Lesson progress persists between sessions in atomic JSON at `~/.cache/vibemix/learn-progress.json` — schema-versioned (`schema_version: 1`), corruption-recovery (JSONDecodeError → nuke + emit fresh empty + one-line toast); user can resume mid-course; pinned by `tests/learn/test_progress_persistence.py::test_corrupt_file_recovers_clean`. Reset CLI `vibemix learn reset` + "Reset Learn Progress" button in existing settings drawer.
-- [ ] **LESSON-04**: Lesson advancement requires the user to perform the expected MIDI action (CC drop ≥30% of range OR button press matching `expected_action.control` + `direction`); a 3-strike progressive hint surface guides the user; an "I got it" override skip is always available (motor-impaired-safe — no time-pressure); anti-speedrun min-dwell ≥45s per lesson prevents click-through gaming.
-- [ ] **LESSON-05**: The tutor persona reuses `MOOD_PERSONAS["teacher"]` from `prompts/matrix.py:53-66` (v8.1 LENS-03) — NO new lens. The lesson runtime composes `build_tutor_system_instruction(course_id, lesson_id, controller_id)` = `COURSE_FRAMES[course_id]` + `controller_frame` + `CURRICULUM[lesson_id].system_instruction_addendum` (≤200 chars) + base tutor lens system instruction.
+- [x] **LESSON-04**: Lesson advancement requires the user to perform the expected MIDI action (CC drop ≥30% of range OR button press matching `expected_action.control` + `direction`); a 3-strike progressive hint surface guides the user; an "I got it" override skip is always available (motor-impaired-safe — no time-pressure); anti-speedrun min-dwell ≥45s per lesson prevents click-through gaming.
+- [x] **LESSON-05**: The tutor persona reuses `MOOD_PERSONAS["teacher"]` from `prompts/matrix.py:53-66` (v8.1 LENS-03) — NO new lens. The lesson runtime composes `build_tutor_system_instruction(course_id, lesson_id, controller_id)` = `COURSE_FRAMES[course_id]` + `controller_frame` + `CURRICULUM[lesson_id].system_instruction_addendum` (≤200 chars) + base tutor lens system instruction.
 - [x] **LESSON-06**: All AI dialog flows through Gemini Flash via `vibemix.llm.model_router.resolve("learn_tutor")` (zero hardcoded model literals; CI grep-gated). Open Q1 resolved by P92-01 planner: NEW `learn_tutor` route entry (not `"standard"` — that key doesn't exist; planner ratified adding a separate route so future model swaps decouple live co-host from lesson tutor). Codex offline tutor parity deferred to v9.x (`§LEARN-OFFLINE-TONE-PATH`). — SHIPPED by P92-01 (2026-05-28): `resolve("learn_tutor")` returns `('gemini-3.5-flash', STANDARD)`.
 
 ### EXEMPLAR — library-driven band exemplars + `[exemplar:]` evidence source
@@ -152,9 +152,9 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | TONE-01 | Phase 94 — Course 1 Anatomy (fixture lands with L1.01) | Pending |
-| TONE-02 | Phase 92 — Lesson Runtime (no-LLM-write static gate) | Pending |
+| TONE-02 | Phase 92 — Lesson Runtime (no-LLM-write static gate) | Complete |
 | TONE-03 | Phase 94 — Course 1 Anatomy (tutor-slop blocklist) | Pending |
-| TONE-04 | Phase 92 — Lesson Runtime (system instruction lock) | Pending |
+| TONE-04 | Phase 92 — Lesson Runtime (system instruction lock) | Complete |
 | RENDER-01 | Phase 91 — Controller Renderer + MIDI Mirror | Complete |
 | RENDER-02 | Phase 91 — Controller Renderer + MIDI Mirror | Complete |
 | RENDER-03 | Phase 91 — Controller Renderer + MIDI Mirror | Complete |
@@ -163,11 +163,11 @@
 | RENDER-06 | Phase 91 — Controller Renderer + MIDI Mirror | Complete |
 | RENDER-07 | Phase 91 — Controller Renderer + MIDI Mirror | Complete |
 | RENDER-08 | Phase 97 — Onboarding + Tone Locks + Mode Picker (disclaimer copy) | Pending |
-| LESSON-01 | Phase 92 — Lesson Runtime + Highlight Contract | Pending |
+| LESSON-01 | Phase 92 — Lesson Runtime + Highlight Contract | Complete |
 | LESSON-02 | Phase 92 — Lesson Runtime + Highlight Contract | Complete (P92-01 foundation; ws-routing in P92-03/04/05) |
 | LESSON-03 | Phase 92 — Lesson Runtime + Highlight Contract | Pending |
-| LESSON-04 | Phase 92 — Lesson Runtime + Highlight Contract | Pending |
-| LESSON-05 | Phase 92 — Lesson Runtime + Highlight Contract | Pending |
+| LESSON-04 | Phase 92 — Lesson Runtime + Highlight Contract | Complete |
+| LESSON-05 | Phase 92 — Lesson Runtime + Highlight Contract | Complete |
 | LESSON-06 | Phase 92 — Lesson Runtime + Highlight Contract | Complete (P92-01 — learn_tutor route) |
 | EXEMPLAR-01 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Pending |
 | EXEMPLAR-02 | Phase 93 — Exemplar Engine + `[exemplar:]` Evidence Source | Pending |
