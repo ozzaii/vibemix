@@ -49,6 +49,7 @@ from vibemix.library.next_suggestion import (
     transition_payload_for_candidate,
     vectors_for_track_ids,
 )
+from vibemix.library.prepared_pool import PreparedPool, next_track_id_after
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,16 @@ class ResolvedSeed:
     source_deck: str | None = None
     target_deck: str | None = None
     target_track_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedTarget:
+    """A bounded target hint for the next-suggestion engine."""
+
+    track_id: str
+    reason_prefix: str
+    source: str
+    strict: bool
 
 
 def resolve_seed_context(state: Any) -> ResolvedSeed | None:
@@ -230,6 +241,7 @@ class SuggestionService:
         feedback_sink: Callable[[FeedbackEvent], None] | None = None,
         session_id: str | None = None,
         taste_scores: dict[tuple[str, str], float] | None = None,
+        prepared_pool_loader: Callable[[], PreparedPool | None] | None = None,
     ) -> None:
         self._store = store
         self._library = library
@@ -237,6 +249,7 @@ class SuggestionService:
         self._feedback_sink = feedback_sink
         self._feedback_session_id = _feedback_token(session_id or "live_session")
         self._taste_scores = dict(taste_scores or {})
+        self._prepared_pool_loader = prepared_pool_loader
         self._lock = threading.Lock()
         self._played: set[str] = set()
         self._current: dict | None = None
@@ -245,6 +258,7 @@ class SuggestionService:
         self._candidate_track_id: str | None = None
         self._candidate_vector: Any | None = None
         self._candidate_vectors_by_track_id: dict[str, Any] = {}
+        self._prepared_target_track_id: str | None = None
         self._pinned_candidate_track_id: str | None = None
         self._timing_suppressed_pairs: set[tuple[str, str]] = set()
         self._last_refresh_at = 0.0
@@ -257,6 +271,49 @@ class SuggestionService:
         """Latest suggestion dict (or None). Called at the ws serialize edge."""
         with self._lock:
             return self._current
+
+    def _prepared_target_for_seed(self, seed: ResolvedSeed) -> PreparedTarget | None:
+        """Return the strong deck target or soft saved-pool next target."""
+        if seed.target_track_id:
+            return PreparedTarget(
+                track_id=seed.target_track_id,
+                reason_prefix="loaded on target deck",
+                source="target_deck",
+                strict=True,
+            )
+        loader = self._prepared_pool_loader
+        if loader is None:
+            return None
+        try:
+            pool = loader()
+        except Exception as e:  # pragma: no cover — defensive
+            logger.warning("[suggestion] prepared pool lookup failed: %s", e)
+            return None
+        if pool is None:
+            return None
+        target_id = next_track_id_after(pool, seed.track_id)
+        if not target_id:
+            return None
+        try:
+            if self._library.lookup_by_id(target_id) is None:
+                return None
+        except Exception as e:  # pragma: no cover — defensive
+            logger.warning("[suggestion] prepared pool target lookup failed: %s", e)
+            return None
+        return PreparedTarget(
+            track_id=target_id,
+            reason_prefix="next in saved pool",
+            source="prepared_pool",
+            strict=False,
+        )
+
+    def _prepared_target_for_context(self, seed: ResolvedSeed | None) -> str | None:
+        if seed is None:
+            return None
+        with self._lock:
+            if self._seed_track_id == seed.track_id:
+                return self._prepared_target_track_id
+        return seed.target_track_id
 
     def current_for_state(self, state: Any) -> dict | None:
         """Latest suggestion after a throttled live shortlist refresh.
@@ -346,6 +403,25 @@ class SuggestionService:
         if feedback_event is not None:
             self._emit_feedback(feedback_event)
         return result
+
+    def update_taste_scores(
+        self, new_scores: dict[tuple[str, str], float] | None
+    ) -> None:
+        """One Mind S3 — apply a fresh taste model to the LIVE service.
+
+        Previously ``_taste_scores`` was set once at construction and never
+        moved: a transition the DJ rejected mid-set only changed scoring at the
+        NEXT launch. The live feedback sink now re-reads the just-appended
+        feedback into a fresh taste model and hands the scores here, so the
+        pill + coach pivot THIS session. Lock-guarded against concurrent
+        scoring (the sink is invoked lock-free, so this acquire can't deadlock).
+        ``None`` / empty is a no-op — a transient load failure must never wipe
+        the scores we already had.
+        """
+        if not new_scores:
+            return
+        with self._lock:
+            self._taste_scores = dict(new_scores)
 
     def record_feedback(
         self,
@@ -589,6 +665,7 @@ class SuggestionService:
     ) -> Any | None:
         seed = resolve_seed_context(state)
         timing = resolve_live_timing(state)
+        prepared_target_track_id = self._prepared_target_for_context(seed)
         controller = resolve_controller_mix_context(
             state,
             source_deck=seed.source_deck if seed is not None else None,
@@ -598,7 +675,7 @@ class SuggestionService:
             "active_track_id": seed.track_id if seed is not None else None,
             "source_deck": seed.source_deck if seed is not None else None,
             "target_deck": seed.target_deck if seed is not None else None,
-            "prepared_target_track_id": seed.target_track_id if seed is not None else None,
+            "prepared_target_track_id": prepared_target_track_id,
             "blend_active": timing.blend_active,
             "source_loop_recent": timing.source_loop_recent,
             "playhead_confidence": timing.playhead_confidence,
@@ -838,6 +915,9 @@ class SuggestionService:
         source_deck: str | None = None,
         target_deck: str | None = None,
         prepared_target_track_id: str | None = None,
+        prepared_target_reason_prefix: str = "loaded on target deck",
+        prepared_target_source: str = "target_deck",
+        prepared_target_strict: bool = True,
         live_remaining_bars: int | None = None,
         live_playhead_confidence: float = 0.0,
         blend_active: bool = False,
@@ -869,6 +949,8 @@ class SuggestionService:
                 source_deck=source_deck,
                 target_deck=target_deck,
                 prepared_target_track_id=prepared_target_track_id,
+                prepared_target_reason_prefix=prepared_target_reason_prefix,
+                prepared_target_source=prepared_target_source,
                 k=self._k,
                 live_remaining_bars=live_remaining_bars,
                 live_playhead_confidence=live_playhead_confidence,
@@ -910,6 +992,15 @@ class SuggestionService:
             self._candidate_track_id = (
                 candidate_track_id if isinstance(candidate_track_id, str) else None
             )
+            self._prepared_target_track_id = (
+                _context_prepared_target(
+                    prepared_target_track_id,
+                    candidate_track_id,
+                    strict=prepared_target_strict,
+                )
+                if d is not None
+                else None
+            )
             self._candidate_vector = (
                 candidate_vector.copy() if candidate_vector is not None else None
             )
@@ -939,13 +1030,19 @@ class SuggestionService:
 
     def compute_for_seed(self, seed: ResolvedSeed, timing: LiveTimingHint) -> dict | None:
         """Compute from already-resolved seed/timing facts."""
+        prepared = self._prepared_target_for_seed(seed)
         return self.compute(
             seed.track_id,
             seed_camelot=seed.camelot,
             seed_bpm=seed.bpm,
             source_deck=seed.source_deck,
             target_deck=seed.target_deck,
-            prepared_target_track_id=seed.target_track_id,
+            prepared_target_track_id=prepared.track_id if prepared is not None else None,
+            prepared_target_reason_prefix=prepared.reason_prefix
+            if prepared is not None
+            else "loaded on target deck",
+            prepared_target_source=prepared.source if prepared is not None else "target_deck",
+            prepared_target_strict=prepared.strict if prepared is not None else True,
             live_remaining_bars=timing.remaining_bars,
             live_playhead_confidence=timing.playhead_confidence,
             blend_active=timing.blend_active,
@@ -960,13 +1057,19 @@ class SuggestionService:
         if seed is None:
             return self.current()
         timing = resolve_live_timing(state)
+        prepared = self._prepared_target_for_seed(seed)
         return self.compute(
             seed.track_id,
             seed_camelot=seed.camelot,
             seed_bpm=seed.bpm,
             source_deck=seed.source_deck,
             target_deck=seed.target_deck,
-            prepared_target_track_id=seed.target_track_id,
+            prepared_target_track_id=prepared.track_id if prepared is not None else None,
+            prepared_target_reason_prefix=prepared.reason_prefix
+            if prepared is not None
+            else "loaded on target deck",
+            prepared_target_source=prepared.source if prepared is not None else "target_deck",
+            prepared_target_strict=prepared.strict if prepared is not None else True,
             live_remaining_bars=timing.remaining_bars,
             live_playhead_confidence=timing.playhead_confidence,
             blend_active=timing.blend_active,
@@ -1021,6 +1124,7 @@ class SuggestionService:
                     self._candidate_track_id = None
                     self._candidate_vector = None
                     self._candidate_vectors_by_track_id = {}
+                    self._prepared_target_track_id = None
                     self._pinned_candidate_track_id = None
                     self._timing_suppressed_pairs = {
                         pair for pair in self._timing_suppressed_pairs if pair[0] != seed_track_id
@@ -1037,6 +1141,8 @@ class SuggestionService:
             candidate_vector = None
 
         timing = resolve_live_timing(state)
+        prepared = self._prepared_target_for_seed(seed)
+        prepared_target_track_id = prepared.track_id if prepared is not None else None
         alternatives = _coerce_transition_alternatives(current.get("transition_alternatives"))
         if alternatives:
             refreshed_transitions: dict[str, dict | None] = {}
@@ -1064,14 +1170,19 @@ class SuggestionService:
                     refreshed_transitions[track_id] = _strip_transition_timing(
                         refreshed_transitions[track_id]
                     )
-            if seed.target_track_id and not any(
-                alternative.get("track_id") == seed.target_track_id for alternative in alternatives
+            if prepared_target_track_id and not any(
+                alternative.get("track_id") == prepared_target_track_id
+                for alternative in alternatives
             ):
                 target_payload = prepared_target_candidate_payload(
                     self._store,
                     self._library,
                     seed_vector=seed_vector,
-                    track_id=seed.target_track_id,
+                    track_id=prepared_target_track_id,
+                    reason_prefix=prepared.reason_prefix
+                    if prepared is not None
+                    else "loaded on target deck",
+                    source=prepared.source if prepared is not None else "target_deck",
                 )
                 if target_payload is not None:
                     target_alternative, target_vector = target_payload
@@ -1080,7 +1191,7 @@ class SuggestionService:
                         self._library,
                         seed_track_id=seed_track_id,
                         seed_vector=seed_vector,
-                        candidate_track_id=seed.target_track_id,
+                        candidate_track_id=prepared_target_track_id,
                         source_deck=seed.source_deck,
                         target_deck=seed.target_deck,
                         remaining_bars=timing.remaining_bars,
@@ -1091,24 +1202,24 @@ class SuggestionService:
                         destination_vector=target_vector,
                         taste_scores=self._taste_scores,
                     )
-                    if (seed_track_id, seed.target_track_id) in timing_suppressed_pairs:
+                    if (seed_track_id, prepared_target_track_id) in timing_suppressed_pairs:
                         transition = _strip_transition_timing(transition)
                     if transition is not None:
                         target_alternative["transition"] = transition
                         alternatives = (*alternatives, target_alternative)
-                        refreshed_transitions[seed.target_track_id] = transition
-                        candidate_vectors_by_track_id[seed.target_track_id] = target_vector
+                        refreshed_transitions[prepared_target_track_id] = transition
+                        candidate_vectors_by_track_id[prepared_target_track_id] = target_vector
             alternatives = ranked_transition_alternatives(
                 alternatives,
                 refreshed_transitions,
             )
-            if seed.target_track_id and _alternative_has_transition(
+            if prepared_target_track_id and _alternative_has_transition(
                 alternatives,
-                track_id=seed.target_track_id,
+                track_id=prepared_target_track_id,
             ):
                 alternatives = promote_transition_alternative(
                     alternatives,
-                    track_id=seed.target_track_id,
+                    track_id=prepared_target_track_id,
                 )
             elif pinned_candidate_track_id:
                 alternatives = promote_transition_alternative(
@@ -1151,6 +1262,11 @@ class SuggestionService:
             if self._seed_track_id == seed_track_id and self._current is not None:
                 self._current = current
                 self._candidate_track_id = candidate_track_id
+                self._prepared_target_track_id = _context_prepared_target(
+                    prepared_target_track_id,
+                    candidate_track_id,
+                    strict=prepared.strict if prepared is not None else True,
+                )
                 self._candidate_vector = (
                     candidate_vector.copy() if candidate_vector is not None else None
                 )
@@ -1191,6 +1307,20 @@ def _transition_alternative_track_ids(raw: dict | None) -> tuple[str, ...]:
     if isinstance(track_id, str) and track_id:
         ids.insert(0, track_id)
     return tuple(dict.fromkeys(str(track_id) for track_id in ids))
+
+
+def _context_prepared_target(
+    prepared_target_track_id: str | None,
+    candidate_track_id: Any,
+    *,
+    strict: bool,
+) -> str | None:
+    target = _str_or_none(prepared_target_track_id)
+    if target is None:
+        return None
+    if strict:
+        return target
+    return target if candidate_track_id == target else None
 
 
 def _coerce_transition_alternatives(raw: Any) -> tuple[dict, ...]:

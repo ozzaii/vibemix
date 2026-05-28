@@ -221,6 +221,48 @@ def test_record_feedback_emits_explicit_live_pill_labels():
     assert [row.action for row in events] == ["suggestion_shown", "suggestion_rejected"]
 
 
+# --- One Mind S3 — live mid-session taste adaptation -----------------------
+
+
+def test_s3_update_taste_scores_replaces_live_scores():
+    store = _FakeStore(["s", "a"], [("s", 0.99), ("a", 0.9)])
+    svc = SuggestionService(
+        store, _lib(["s", "a"]), taste_scores={("outro", "intro"): 0.5}
+    )
+    assert svc._taste_scores == {("outro", "intro"): 0.5}
+    svc.update_taste_scores({("breakdown", "drop"): 0.9})
+    assert svc._taste_scores == {("breakdown", "drop"): 0.9}
+
+
+def test_s3_update_taste_scores_none_or_empty_is_noop():
+    store = _FakeStore(["s"], [("s", 0.99)])
+    svc = SuggestionService(store, _lib(["s"]), taste_scores={("a", "b"): 0.4})
+    svc.update_taste_scores(None)
+    svc.update_taste_scores({})
+    assert svc._taste_scores == {("a", "b"): 0.4}  # never wiped by a load failure
+
+
+def test_s3_feedback_sink_updates_taste_mid_session_without_deadlock():
+    """Mirror of the __main__ wiring: record_feedback fires the sink lock-free
+    (_emit_feedback), and the sink applies a fresh taste model to the LIVE
+    service. Proves the seam updates in-memory scores this session and that the
+    sink->update_taste_scores re-entrant lock acquire does not deadlock."""
+    store = _FakeStore(["s", "a"], [("s", 0.99), ("a", 0.9)])
+    box: dict = {}
+    applied: list = []
+
+    def sink(event):
+        box["svc"].update_taste_scores({("drop", "drop"): 0.7})
+        applied.append(event)
+
+    svc = SuggestionService(store, _lib(["s", "a"]), feedback_sink=sink)
+    box["svc"] = svc
+    svc.compute("s")
+    svc.record_feedback("not_now")
+    assert applied, "feedback sink must fire"
+    assert svc._taste_scores == {("drop", "drop"): 0.7}  # live update applied
+
+
 def test_resolve_seed_from_audible_deck():
     state = MusicState()
     state.audible_deck = "A"
@@ -944,6 +986,125 @@ def test_compute_from_state_prefers_grounded_track_loaded_on_target_deck():
     assert out["transition_alternatives"][1]["track_id"] == "a"
     assert envelope is not None
     assert envelope.current["prepared_target_track_id"] == "b"
+
+
+def test_compute_from_state_prefers_grounded_next_track_in_saved_pool():
+    from dataclasses import replace
+
+    from vibemix.library.prepared_pool import PreparedPool, PreparedPoolTrack
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(
+        ["s", "a", "b"],
+        [("s", 0.99), ("a", 0.92)],
+        section_vectors={
+            "s#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "s#s001": np.array([0.0, 1.0], dtype=np.float32),
+            "a#s000": np.array([0.0, 1.0], dtype=np.float32),
+            "b#s000": np.array([1.0, 0.0], dtype=np.float32),
+        },
+    )
+    lib = _lib(["s", "a", "b"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    lib.tracks["b"] = replace(
+        lib.tracks["b"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    pool = PreparedPool(
+        name="Saved Pool",
+        created_at=1.0,
+        json_path=Path("pool.json"),
+        tracks=(
+            PreparedPoolTrack("s"),
+            PreparedPoolTrack("b"),
+            PreparedPoolTrack("a"),
+        ),
+    )
+    svc = SuggestionService(store, lib, prepared_pool_loader=lambda: pool)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=120.0)}
+    )
+
+    out = svc.compute_from_state(state)
+    envelope = svc.context_for_state(state, packet_id="ctx_live_pool")
+
+    assert out is not None
+    assert out["track_id"] == "b"
+    assert out["why"].startswith("next in saved pool")
+    assert out["transition"]["to_track_id"] == "b"
+    assert out["transition_alternatives"][0]["track_id"] == "b"
+    assert envelope is not None
+    assert envelope.current["prepared_target_track_id"] == "b"
+
+
+def test_saved_pool_target_is_soft_when_no_transition_evidence():
+    from dataclasses import replace
+
+    from vibemix.library.prepared_pool import PreparedPool, PreparedPoolTrack
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(
+        ["s", "a", "b"],
+        [("s", 0.99), ("a", 0.92)],
+        section_vectors={
+            "s#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "a#s000": np.array([1.0, 0.0], dtype=np.float32),
+        },
+    )
+    lib = _lib(["s", "a", "b"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        bpm=120.0,
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    pool = PreparedPool(
+        name="Saved Pool",
+        created_at=1.0,
+        json_path=Path("pool.json"),
+        tracks=(
+            PreparedPoolTrack("s"),
+            PreparedPoolTrack("b"),
+            PreparedPoolTrack("a"),
+        ),
+    )
+    svc = SuggestionService(store, lib, prepared_pool_loader=lambda: pool)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=120.0)}
+    )
+
+    out = svc.compute_from_state(state)
+    envelope = svc.context_for_state(state, packet_id="ctx_live_pool_soft")
+
+    assert out is not None
+    assert out["track_id"] == "a"
+    assert not out["why"].startswith("next in saved pool")
+    assert envelope is not None
+    assert envelope.current.get("prepared_target_track_id") is None
 
 
 def test_decision_suppresses_when_loaded_target_deck_track_is_not_selected():

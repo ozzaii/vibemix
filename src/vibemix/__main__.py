@@ -824,6 +824,19 @@ async def main() -> None:
         except Exception as e:
             print(f"-> pill feedback: taste append skipped ({e})", file=sys.stderr)
 
+        # One Mind S3 — apply the feedback to the LIVE in-memory taste model so
+        # this session's suggestions adapt immediately (not just next launch).
+        # _load_live_taste_scores re-reads the JSONL we just appended to. Runs
+        # outside SuggestionService._lock (the sink is invoked lock-free from
+        # _emit_feedback), so update_taste_scores' lock acquire can't deadlock.
+        # suggestion_service is bound later in main(); by the time the sink
+        # fires (live session) it is the service or None — guard for None.
+        if suggestion_service is not None:
+            try:
+                suggestion_service.update_taste_scores(_load_live_taste_scores())
+            except Exception as e:
+                print(f"-> pill taste: live update skipped ({e})", file=sys.stderr)
+
     def _load_live_taste_scores() -> dict[tuple[str, str], float] | None:
         """Load consent-gated taste feedback for live transition scoring."""
         from vibemix.intel.taste_model import load_taste_model
