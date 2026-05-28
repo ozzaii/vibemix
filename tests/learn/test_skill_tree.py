@@ -16,11 +16,12 @@ monotonic), COMP-02 (HEADLINE recital AND-gate).
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 
 import pytest
 
 from vibemix.learn.curriculum import CURRICULUM
-from vibemix.learn.progress import LearnProgress
+from vibemix.learn.progress import LearnProgress, load_progress, save_progress
 from vibemix.learn.skill_tree import (
     COMPETENT_THRESHOLD,
     SKILL_MANIFEST,
@@ -29,7 +30,26 @@ from vibemix.learn.skill_tree import (
     WEIGHT_FIRST_TRY,
     WEIGHT_FLOOR,
     WEIGHT_WITH_STRIKES,
+    record_live_demo,
 )
+
+# A fixed injected timestamp — record_live_demo never calls a clock; the caller
+# supplies ``now`` so the mutator stays deterministic (102 precedent).
+_NOW = "2026-05-29T12:00:00Z"
+# The lessons + recital gate that make eq_mixing Competent (its gate is
+# course_3_unlocked; lessons L1.14/L2.04/L2.05). Used as the primary Competent
+# fixture across the record_live_demo tests.
+_EQ_LESSONS = SKILL_MANIFEST["eq_mixing"].lesson_ids
+
+
+def _competent_eq_progress() -> LearnProgress:
+    """A LearnProgress where eq_mixing is Competent (lessons done first-try
+    AND the gating recital passed) — so record_live_demo is NOT a no-op."""
+    progress = LearnProgress()
+    _complete_all(progress, _EQ_LESSONS, strikes=0)
+    progress.course_3_unlocked = True  # the eq_mixing recital gate
+    assert SkillTree().compute(progress)["eq_mixing"].competent is True
+    return progress
 
 # The 6 REQ-locked skill ids (CONTEXT GA1 order). Mirrors progress._SKILL_IDS.
 _EXPECTED_SKILLS = {
@@ -325,3 +345,119 @@ def test_compute_never_raises_on_non_numeric_live_proof_count() -> None:
     result = SkillTree().compute(progress)  # must NOT raise
 
     assert result["deck_control"].live_proof_count == 0  # garbage → safe default
+
+
+# ---------------------------------------------------------------------------
+# Phase 103 (MAST-01 / MAST-04): record_live_demo writes the live-portion
+# ---------------------------------------------------------------------------
+def test_record_live_demo_flips_mastered_at_threshold() -> None:
+    """MAST-04: a Competent skill flips ``mastered=True`` at exactly the
+    skill's ``mastered_threshold`` (3) grounded demos — and not before.
+
+    The flip-at-N behaviour is the contract, not the literal N (102 precedent:
+    the ordering is the contract, not the numbers) — so we read the threshold
+    off the manifest rather than hard-coding 3."""
+    progress = _competent_eq_progress()
+    threshold = SKILL_MANIFEST["eq_mixing"].mastered_threshold
+
+    # Each call below the threshold increments the count but stays NOT mastered.
+    for i in range(1, threshold):
+        record_live_demo(progress, "eq_mixing", now=_NOW)
+        block = progress.skills["eq_mixing"]
+        assert block["live_proof_count"] == i
+        assert block["mastered"] is False, f"flipped early at demo {i}"
+        assert block["first_mastered_at"] is None
+
+    # The Nth grounded demo flips it.
+    record_live_demo(progress, "eq_mixing", now=_NOW)
+    block = progress.skills["eq_mixing"]
+    assert block["live_proof_count"] == threshold
+    assert block["mastered"] is True
+    assert block["first_mastered_at"] == _NOW
+
+
+def test_first_mastered_at_idempotent() -> None:
+    """MAST-04 / Pitfall 2: ``first_mastered_at`` is stamped ONLY on the
+    not-mastered→mastered transition; later demos never overwrite it, but
+    ``live_proof_count`` keeps incrementing past N."""
+    progress = _competent_eq_progress()
+    threshold = SKILL_MANIFEST["eq_mixing"].mastered_threshold
+
+    # Reach the flip.
+    for _ in range(threshold):
+        record_live_demo(progress, "eq_mixing", now=_NOW)
+    stamped_at = progress.skills["eq_mixing"]["first_mastered_at"]
+    assert stamped_at == _NOW
+
+    # Two MORE demos at a DIFFERENT timestamp must NOT re-stamp first_mastered_at.
+    later = "2026-06-01T09:30:00Z"
+    record_live_demo(progress, "eq_mixing", now=later)
+    record_live_demo(progress, "eq_mixing", now=later)
+    block = progress.skills["eq_mixing"]
+    assert block["first_mastered_at"] == stamped_at  # byte-equal, never moved
+    assert block["mastered"] is True
+    assert block["live_proof_count"] == threshold + 2  # count keeps climbing
+
+
+def test_live_demo_noop_when_not_competent() -> None:
+    """MAST-01: a sub-Competent skill (lessons done but recital gate False)
+    ignores live events entirely — record_live_demo writes NOTHING, no matter
+    how many times it is called (no buffered backfill)."""
+    progress = LearnProgress()
+    _complete_all(progress, _EQ_LESSONS, strikes=0)
+    progress.course_3_unlocked = False  # recital NOT passed → NOT Competent
+    assert SkillTree().compute(progress)["eq_mixing"].competent is False
+
+    for _ in range(10):
+        record_live_demo(progress, "eq_mixing", now=_NOW)
+
+    # No buffered backfill: the live-portion stays at its safe defaults.
+    block = progress.skills["eq_mixing"]
+    assert block["live_proof_count"] == 0
+    assert block["mastered"] is False
+    assert block["first_mastered_at"] is None
+
+
+def test_mastered_persists_across_reload(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """MAST-04: the flipped live-portion survives a save→load round-trip and
+    ``SkillTree.compute`` reads ``stage='mastered'`` from the reloaded file
+    (complements test_mastered_live_portion_promotes_stage with the WRITE path).
+
+    Routed through the monkeypatched ``progress_path`` so the real
+    ``~/.cache/vibemix/learn-progress.json`` is never touched."""
+    target = tmp_path / "learn-progress.json"
+    monkeypatch.setattr("vibemix.learn.progress.progress_path", lambda: target)
+
+    progress = _competent_eq_progress()
+    threshold = SKILL_MANIFEST["eq_mixing"].mastered_threshold
+    for _ in range(threshold):
+        record_live_demo(progress, "eq_mixing", now=_NOW)
+    save_progress(progress)
+
+    loaded, was_corrupt = load_progress()
+    assert was_corrupt is False
+    sp = SkillTree().compute(loaded)["eq_mixing"]
+    assert sp.stage == "mastered"
+    assert sp.mastered is True
+    assert sp.live_proof_count == threshold
+    assert sp.first_mastered_at == _NOW
+
+
+def test_record_live_demo_degrades_garbage_count() -> None:
+    """WR-01 / Pitfall (DoS): a Competent skill whose stored
+    ``live_proof_count`` is non-numeric (hand-edit / partial write) must NOT
+    crash record_live_demo — it treats garbage as 0 and increments to 1
+    (mirrors compute's ``int(... or 0)`` + try/except guard)."""
+    progress = _competent_eq_progress()
+    # Hand-corrupt the live-portion count with a non-numeric value.
+    progress.skills["eq_mixing"] = {
+        "live_proof_count": "x",
+        "mastered": False,
+        "first_mastered_at": None,
+    }
+
+    record_live_demo(progress, "eq_mixing", now=_NOW)  # must NOT raise
+
+    assert progress.skills["eq_mixing"]["live_proof_count"] == 1
