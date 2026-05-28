@@ -68,7 +68,7 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
 | 102 | Skill-Tree Engine + Data Model + Competent Stage | 2/2 | Complete   | 2026-05-28 |
-| 103 | Live "Mastered" Grounding | 1/2 | In Progress|  |
+| 103 | Live "Mastered" Grounding | 2/2 | Complete   | 2026-05-28 |
 | 104 | Skill-Tree Surface + Earned Celebration | User views their full skill tree from the Learn module; Competent fills render a quiet progression cue; a live "Mastered" unlock triggers a single rare grounded co-host vocal; the surface honors v9.0 accessibility | SURF-01, SURF-02, SURF-03, SURF-04 (4) | 4 |
 
 **Dependency spine:** `P102 → P103 → P104` (linear). P102 is the engine + Competent stage; P103 layers the live Mastered grounding on top of the Competent gate; P104 consumes **both** prior stages for display + celebration.
@@ -100,7 +100,7 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
   4. A skill flips to "Mastered" after a **declared number `N`** of grounded live demonstrations (the threshold lives in the manifest, per skill); the count of grounded demos and a `first_mastered_at` ISO timestamp **persist across sessions** in the `skills` block (Phase 102's atomic write). Re-loading after a restart preserves both. Pinned by `tests/learn/test_mastered_flip_and_persist.py`. **MAST-04.**
 **Plans**: 2 plans (2 waves)
 - [x] 103-01-PLAN.md — `record_live_demo` mutator + per-skill `mastered_threshold` (N=3) on `SkillSpec`: locked-until-Competent no-op + N-demo Mastered flip + idempotent `first_mastered_at` + save/load persistence (MAST-01, MAST-04)
-- [ ] 103-02-PLAN.md — `skill_recognizer.py` (new): reverse event→skill map over REAL event-type literals + the citation-gate spine (un-cited/fabricated → zero credit) + dedup + honest-uncreditable beatmatching/harmonic_mixing + no-runtime-state-import gate (MAST-02, MAST-03); live-firing call-site deferred to `§EARNED-LIVE-MASTERED-VERIFY`
+- [x] 103-02-PLAN.md — `skill_recognizer.py` (new): reverse event→skill map over REAL event-type literals + the citation-gate spine (un-cited/fabricated → zero credit) + dedup + honest-uncreditable beatmatching/harmonic_mixing + no-runtime-state-import gate (MAST-02, MAST-03); live-firing call-site deferred to `§EARNED-LIVE-MASTERED-VERIFY`
 
 ### Phase 104: Skill-Tree Surface + Earned Celebration
 **Goal:** The Learn-module **skill-tree panel** — the user views all ~6 skills, each bar's stage, current fill, and what remains to advance. Competent-stage fills render with a **quiet, satisfying** progression cue (no slop, no spam, no constant celebration). A live "Mastered" unlock triggers a **single, rare, earned grounded co-host vocal acknowledgment**, tone-gated against the anti-slop blocklist (final tone subject to a KAAN-ACTION ear-pass). The surface honors v9.0 accessibility (dual color+shape cue, keyboard-nav, no time-pressure). **This is the UI phase** — the exact surface layout + celebration treatment is an explicit **Kaan decision-gate** brought during the phase (he deferred it: "later on when design is done, within this gsd it will be done"). Rides existing `learn.*` envelopes on `:8765`; any `messages.schema.json` edit requires `cd tauri/ui && npm run codegen:ipc`.

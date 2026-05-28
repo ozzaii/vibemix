@@ -21,8 +21,8 @@
 
 ### MAST — Mastered stage (Live-grounded, anti-slop heart)
 - [x] **MAST-01**: A skill's Competent→Mastered segment stays locked until the skill reaches Competent.
-- [ ] **MAST-02**: Once Competent, a skill's Mastered fill advances only when the live co-host detects the user performing that skill in a real session, mapped from existing EvidenceRegistry event types (MIX_MOVE / LAYER_ARRIVAL / harmonic / EQ-band MIDI / beatmatch) — no new detectors are invented.
-- [ ] **MAST-03**: Every live mastery credit must resolve a valid citation in `EvidenceRegistry`; an un-cited or fabricated event grants zero credit (Invariants #2 + #3, test-pinned).
+- [x] **MAST-02**: Once Competent, a skill's Mastered fill advances only when the live co-host detects the user performing that skill in a real session, mapped from existing EvidenceRegistry event types (MIX_MOVE / LAYER_ARRIVAL / harmonic / EQ-band MIDI / beatmatch) — no new detectors are invented.
+- [x] **MAST-03**: Every live mastery credit must resolve a valid citation in `EvidenceRegistry`; an un-cited or fabricated event grants zero credit (Invariants #2 + #3, test-pinned).
 - [x] **MAST-04**: A skill flips to "Mastered" after a declared number of grounded live demonstrations; the count and a `first_mastered_at` timestamp persist across sessions.
 
 ### DATA — Persistence & migration
@@ -73,8 +73,8 @@
 | DATA-02 | Phase 102 | Complete |
 | DATA-03 | Phase 102 | Complete |
 | MAST-01 | Phase 103 | Complete |
-| MAST-02 | Phase 103 | Pending |
-| MAST-03 | Phase 103 | Pending |
+| MAST-02 | Phase 103 | Complete |
+| MAST-03 | Phase 103 | Complete |
 | MAST-04 | Phase 103 | Complete |
 | SURF-01 | Phase 104 | Pending |
 | SURF-02 | Phase 104 | Pending |

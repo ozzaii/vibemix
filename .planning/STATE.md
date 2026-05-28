@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v11.0
 milestone_name: Earned
-status: executing
-last_updated: "2026-05-28T23:24:54.768Z"
+status: verifying
+last_updated: "2026-05-28T23:36:52.491Z"
 last_activity: 2026-05-28
 progress:
   total_phases: 11
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 9
+  completed_plans: 4
+  percent: 18
 ---
 
 # vibemix — State
@@ -22,11 +22,11 @@ progress:
 
 ## Current Position
 
-Phase: 103 (Live Mastered Grounding) — EXECUTING
-Plan: 2 of 2 (103-01 SHIPPED; 103-02 next)
-Status: 103-01 complete — ready to execute 103-02 (skill_recognizer)
+Phase: 103 (Live Mastered Grounding) — COMPLETE
+Plan: 2 of 2 (103-01 + 103-02 SHIPPED)
+Status: Phase complete — ready for verification (`/gsd:verify-work`)
 Last activity: 2026-05-29
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ## Milestone Reference
 
@@ -89,4 +89,8 @@ See: `.planning/REQUIREMENTS.md` (16 v11.0 REQ-IDs across SKILL / COMP / MAST / 
 
 **103-01 SHIPPED (2026-05-29):** MAST-01, MAST-04. Added the deferred-from-102 live-portion WRITER to `learn/skill_tree.py` (additive only): `SkillSpec.mastered_threshold` (uniform default 3, per-skill tunable — future `§EARNED-MASTERY-THRESHOLD-TUNE` is a manifest edit), `_threshold_for(skill_id)` helper, and `record_live_demo(progress, skill_id, *, now) -> LearnProgress`. Pure transform over `progress.skills[skill_id]`: MAST-01 derived-Competent gate (`SkillTree.compute(...).competent` — NO-OP + zero write when not Competent / unknown id, no buffered backfill), increment with the same `int(... or 0)` + try/except never-raises guard `compute` uses, flip `mastered=True` + stamp `first_mastered_at=now` ONCE on the not-mastered→mastered transition (idempotent, monotonic). `now` injected (no clock); persistence is the caller's job. Five new tests (flip-at-N, idempotent-stamp, locked-no-op, save→load `stage="mastered"`, garbage-degrade). All 4 cardinal invariants hold by additive design (purity / no MusicState / no port — `test_skill_tree_invariants.py` green). Commits `b8c968c5` (test RED) → `db0e27f2` (feat GREEN). `tests/learn` 496 passed / 1 skipped. Surgical `--files` commits, learn-island only.
 
-Next step: 103-02 (the citation-gated pure-logic `learn/skill_recognizer.py` — maps existing `EvidenceRegistry` event types → skill credit, calls `record_live_demo` only on a resolvable citation; un-cited/fabricated → zero credit, MAST-02/03). The live-firing call-site (`runtime/coach.py`/`__main__.py`) stays a deferred KAAN-ACTION (`§EARNED-LIVE-MASTERED-VERIFY`) — non-learn island. Read `.planning/ROADMAP.md` § Phase 103 + the locked constraints above before touching `src/vibemix/learn/`.
+**103-02 SHIPPED (2026-05-29):** MAST-02, MAST-03. New pure-logic `learn/skill_recognizer.py` — the citation-gated reverse event→skill map (the anti-slop spine). `EVENT_SKILL_MAP` (single source) over REAL `state/event_detector.py` literals: `LAYER_ARRIVAL→transitions`, `PHASE`/`PHRASE_BOUNDARY→phrasing_performance`; `MIX_MOVE` resolves by move-substring (`_low:`/`_mid:`/`_hi:`/`killed`→`eq_mixing`, `_play→`/`xfader`→`deck_control`; one MIX_MOVE can credit BOTH — not a double-count). `recognize(event, *, citation_check, progress, now, _seen=None) -> list[str]`: MAST-03 spine — credit ONLY when the INJECTED `citation_check("ev", event.type, t)` predicate (live wraps `EvidenceRegistry.has`; tests inject True/False) resolves true; un-cited/fabricated → ZERO credit. Dedup by `(type, round(t,1))` transient batch set; credit delegated to `record_live_demo` (owns MAST-01 Competent gate + MAST-04 flip). **Finding #1 (anti-slop):** `beatmatching` + `harmonic_mixing` are HONEST-UNCREDITABLE in v11.0 — NO map entry / NO MIX_MOVE resolution, capped at Competent, NO proxy-slop (pinned by `test_unsignalled_skills_never_auto_master` with both made Competent first). TYPE_CHECKING-only `state/` imports — engine stays offline + island-clean. Headline `test_uncited_event_grants_zero_mastery_credit` (same event, cited=credits / uncited=zero — non-vacuous). New static gate `test_skill_recognizer_no_runtime_state_import` (TYPE_CHECKING-aware) + integration-flavored real-`EvidenceRegistry` seam test. Commits `3ad307ba` (test RED) → `5b6993e6` (feat GREEN) → `8deee4e9` (test invariant+seam). `tests/learn` 509 passed / 1 skipped. 2 NEW files + 1 additive test extension; surgical `--files`, learn-island only.
+
+**Phase 103 COMPLETE.** Both plans (103-01 record_live_demo writer, 103-02 skill_recognizer) shipped; 4/4 phase REQ-IDs (MAST-01/02/03/04) done. The live-firing call-site (`runtime/coach.py`/`__main__.py`) stays a deferred KAAN-ACTION (`§EARNED-LIVE-MASTERED-VERIFY`) — non-learn island, untouched.
+
+Next step: `/gsd:verify-work` on Phase 103, then Phase 104 (Skill-Tree Surface + Earned Celebration — the UI phase, `tauri/ui` coordination). Read `.planning/ROADMAP.md` § Phase 104 + the locked constraints above.
