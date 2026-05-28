@@ -93,6 +93,7 @@ def test_similar_empty_library_returns_empty(
 
 
 def test_similar_result_to_dict() -> None:
+    # 5-field construction still works (S6 enrichment fields default to None).
     r = SimilarResult(
         track_id="t1", similarity=0.85, title="X", artist="Y", bpm=138.0
     )
@@ -103,7 +104,28 @@ def test_similar_result_to_dict() -> None:
         "title": "X",
         "artist": "Y",
         "bpm": 138.0,
+        # One Mind S6 — additive harmonic + tempo enrichment, honest-null here.
+        "camelot": None,
+        "harmonic_compatible": None,
+        "bpm_delta": None,
     }
+
+
+def test_similar_result_to_dict_with_s6_enrichment() -> None:
+    r = SimilarResult(
+        track_id="t1",
+        similarity=0.85,
+        title="X",
+        artist="Y",
+        bpm=133.0,
+        camelot="9A",
+        harmonic_compatible=True,
+        bpm_delta=5.0,
+    )
+    d = r.to_dict()
+    assert d["camelot"] == "9A"
+    assert d["harmonic_compatible"] is True
+    assert d["bpm_delta"] == 5.0
 
 
 def test_similar_skips_unknown_track_ids(

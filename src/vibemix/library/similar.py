@@ -24,19 +24,32 @@ from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
 from vibemix.library.embed_types import TrackEmbedder
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.library.store import LibraryStore
+from vibemix.library.track_relation import compute_relation
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
 class SimilarResult:
-    """A single similar-track match."""
+    """A single similar-track match.
+
+    One Mind S6 — the ``camelot`` / ``harmonic_compatible`` / ``bpm_delta``
+    fields are additive enrichment from the unified ``track_relation`` engine.
+    Ranking is UNCHANGED (still centered cosine); these surface the
+    harmonic + tempo relation that this module previously ignored. They are
+    honest-null: ``harmonic_compatible`` is ``None`` when either key is unknown
+    (an unknown key must never read as "incompatible"). Defaults keep every
+    existing 5-field construction site byte-compatible.
+    """
 
     track_id: str
     similarity: float
     title: str
     artist: str
     bpm: float | None
+    camelot: str | None = None
+    harmonic_compatible: bool | None = None
+    bpm_delta: float | None = None  # signed dst-src; None when either bpm unknown
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -85,6 +98,8 @@ def similar_to(
     # to raw cosine for N < 2 (no centroid). This is what gives each seed a
     # distinct neighbour set instead of "everything ~0.92 similar".
     topk = store.search_centered(qvec, k=k + 1)
+    seed_bpm = seed.bpm if (seed.bpm and seed.bpm > 0) else None
+    seed_camelot = getattr(seed, "camelot", None)
     out: list[SimilarResult] = []
     for tid, sim in topk:
         if tid == seed_track_id:
@@ -92,13 +107,34 @@ def similar_to(
         t = index.get(tid)
         if t is None:
             continue
+        cand_bpm = t.bpm if (t.bpm and t.bpm > 0) else None
+        cand_camelot = getattr(t, "camelot", None)
+        # S6 — enrich with the unified harmonic + tempo relation (ranking
+        # stays centered-cosine; this only surfaces dimensions we ignored).
+        rel = compute_relation(
+            src_track_id=seed_track_id,
+            dst_track_id=tid,
+            cosine=float(sim),
+            src_camelot=seed_camelot,
+            dst_camelot=cand_camelot,
+            src_bpm=seed_bpm,
+            dst_bpm=cand_bpm,
+        )
         out.append(
             SimilarResult(
                 track_id=tid,
                 similarity=round(float(sim), 4),
                 title=t.title,
                 artist=t.artist,
-                bpm=t.bpm if (t.bpm and t.bpm > 0) else None,
+                bpm=cand_bpm,
+                camelot=cand_camelot,
+                # Honest-null: only assert (in)compatibility when BOTH keys known.
+                harmonic_compatible=(
+                    rel.harmonic_compatible
+                    if (seed_camelot and cand_camelot)
+                    else None
+                ),
+                bpm_delta=rel.bpm_delta_signed,
             )
         )
         if len(out) >= k:
