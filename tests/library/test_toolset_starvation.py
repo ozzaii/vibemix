@@ -281,3 +281,260 @@ def test_counter_monotonic_no_terminal_below_threshold(
         f"dispatch return values must be byte-equivalent to handler output; "
         f"got {expected!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan 99-03 Task 1 — threshold-trip + three-case hint + terminal idempotence.
+#
+# These seven tests pin Decisions 3 + 4 + 5 + RESEARCH.md Open Q2:
+#   * D-03: threshold = ``tool_mod.TOOL_STARVATION_THRESHOLD`` (module attr
+#           lookup so monkeypatch tunes runtime behavior — Pitfall 7).
+#   * D-04: terminal write to ``self.stop_reason`` with the payload shape
+#           ``{"reason": "tool_starvation", "hint": <str>, "tool": <str>,
+#             "consecutive": <int>}``. Idempotent — only the first trip writes.
+#   * D-05: deterministic three-case hint. Case A (zero-track library) /
+#           Case B (no theme matches) / Case C (repeated tool error).
+#           Tests pin SUBSTRINGS of key phrases ("library has 0 tracks",
+#           "no tracks matched", "kept failing") so KAAN-ACTION
+#           §HARDEN-PHASE-A-EAR-PASS can polish wording without breaking tests.
+#   * RESEARCH Q2: after trip, subsequent ``dispatch()`` calls become
+#           idempotent no-ops returning ``{"error": "tool_starvation",
+#           "stop_reason": dict(self.stop_reason)}`` — handler NOT invoked.
+# ---------------------------------------------------------------------------
+
+
+def test_threshold_trip_sets_stop_reason(
+    toolset: LibraryToolset, monkeypatch
+) -> None:
+    """D-03 + D-04: 3 consecutive empty ``search_vibe`` writes ``stop_reason``.
+
+    The library has 5 tracks (per fixture) so case A (zero-track) does NOT
+    fire — Case B (no theme matches) is the expected hint case. The trip
+    payload shape must include all four required keys.
+    """
+    _stub_empty_search(monkeypatch)
+    for _ in range(3):
+        toolset.dispatch("search_vibe", {"query": "narrow theme"})
+
+    assert toolset.stop_reason is not None, (
+        "3 empty search_vibe calls must trip the threshold and write "
+        "self.stop_reason (D-04). Got None — threshold-trip not wired."
+    )
+    payload = toolset.stop_reason
+    assert payload["reason"] == "tool_starvation", (
+        f'payload["reason"] must equal "tool_starvation"; got {payload["reason"]!r}'
+    )
+    assert payload["tool"] == "search_vibe", (
+        f'payload["tool"] must record the last-dispatched tool name; '
+        f"got {payload['tool']!r}"
+    )
+    assert payload["consecutive"] == 3, (
+        f'payload["consecutive"] must equal the counter at trip time (3); '
+        f"got {payload['consecutive']!r}"
+    )
+    assert isinstance(payload.get("hint"), str) and payload["hint"], (
+        f"payload['hint'] must be a non-empty string; got {payload.get('hint')!r}"
+    )
+
+
+def test_threshold_is_tunable(toolset: LibraryToolset, monkeypatch) -> None:
+    """Pitfall 7: ``monkeypatch.setattr(tool_mod, "TOOL_STARVATION_THRESHOLD", 2)``
+    actually changes runtime behavior. After 2 empty searches the trip MUST fire.
+
+    If this test fails, the dispatch hook is reading a captured-at-import copy
+    of the constant — fix by switching to module-attribute lookup (Pitfall 7).
+    """
+    monkeypatch.setattr(tool_mod, "TOOL_STARVATION_THRESHOLD", 2)
+    _stub_empty_search(monkeypatch)
+
+    toolset.dispatch("search_vibe", {"query": "x"})
+    assert toolset.stop_reason is None, (
+        "after only 1 empty search, threshold (=2) is not yet hit — "
+        f"stop_reason must stay None; got {toolset.stop_reason!r}"
+    )
+    toolset.dispatch("search_vibe", {"query": "x"})
+    assert toolset.stop_reason is not None, (
+        "with threshold=2, the second empty search must trip the terminal "
+        "write. If stop_reason is still None, the dispatch hook is NOT "
+        "reading tool_mod.TOOL_STARVATION_THRESHOLD via the module "
+        "attribute (Pitfall 7 — captured-at-import constant). Switch to "
+        "sys.modules[__name__].TOOL_STARVATION_THRESHOLD."
+    )
+    assert toolset.stop_reason["consecutive"] == 2, (
+        f'consecutive must equal threshold at trip time (2); '
+        f"got {toolset.stop_reason['consecutive']!r}"
+    )
+
+
+def test_hint_zero_track_library(monkeypatch) -> None:
+    """D-05 Case A: zero-track library → hint mentions ingest.
+
+    Substring match (not full-string equality) so KAAN-ACTION ear-pass can
+    polish wording without breaking the test.
+    """
+    empty_lib = RekordboxLibrary()
+    empty_lib.tracks = {}
+    ts = LibraryToolset(MagicMock(), MagicMock(), empty_lib)
+    _stub_empty_search(monkeypatch)
+
+    for _ in range(3):
+        ts.dispatch("search_vibe", {"query": "anything"})
+
+    assert ts.stop_reason is not None, (
+        "3 empties on an empty-library toolset must trip; got None"
+    )
+    hint = ts.stop_reason["hint"]
+    assert "library has 0 tracks" in hint, (
+        f'Case A hint must contain "library has 0 tracks" — D-05 seed '
+        f"copy. Substring match (ear-pass tolerant). Got: {hint!r}"
+    )
+    assert "library ingest" in hint, (
+        f'Case A hint must contain "library ingest" — D-05 seed copy '
+        f"names the action user should take. Got: {hint!r}"
+    )
+
+
+def test_hint_no_theme_match(toolset: LibraryToolset, monkeypatch) -> None:
+    """D-05 Case B: library has tracks, search_vibe empty → hint mentions theme + BPM.
+
+    Substring match on key phrases ("no tracks matched", the theme string,
+    "BPM"). Tests STRUCTURE not exact wording (D-05 ear-pass tolerance).
+    """
+    _stub_empty_search(monkeypatch)
+    theme = "uplifting 200 BPM ambient"
+    for _ in range(3):
+        toolset.dispatch("search_vibe", {"query": theme})
+
+    assert toolset.stop_reason is not None
+    hint = toolset.stop_reason["hint"]
+    assert "no tracks matched" in hint, (
+        f'Case B hint must contain "no tracks matched". Got: {hint!r}'
+    )
+    assert f"'{theme}'" in hint, (
+        f'Case B hint must interpolate the theme as a single-quoted string '
+        f"(matches D-05 seed copy). Theme={theme!r}, hint={hint!r}"
+    )
+    assert "BPM" in hint, (
+        f'Case B hint should mention BPM (seed copy: "...try a broader '
+        f'theme or different BPM range"). Got: {hint!r}'
+    )
+
+
+def test_hint_tool_error(toolset: LibraryToolset) -> None:
+    """D-05 Case C: 3 consecutive ``get_track_features`` errors → tool-error hint.
+
+    Library has 5 tracks (so case A doesn't fire); last tool is NOT
+    ``search_vibe`` (so case B doesn't fire). Case C is the expected branch.
+    """
+    for _ in range(3):
+        out = toolset.dispatch(
+            "get_track_features", {"track_id": "STILL_NOT_THERE"}
+        )
+        assert "error" in out
+
+    assert toolset.stop_reason is not None, (
+        "3 consecutive handler errors must trip the threshold; got None"
+    )
+    hint = toolset.stop_reason["hint"]
+    assert "tool 'get_track_features'" in hint, (
+        f'Case C hint must contain "tool \'get_track_features\'" — names '
+        f"the offending tool. Got: {hint!r}"
+    )
+    assert "kept failing" in hint, (
+        f'Case C hint must contain "kept failing" — D-05 seed copy. '
+        f"Got: {hint!r}"
+    )
+    assert toolset.stop_reason["tool"] == "get_track_features"
+
+
+def test_terminal_idempotence_after_starvation(
+    toolset: LibraryToolset, monkeypatch
+) -> None:
+    """After trip, subsequent dispatch calls return idempotent terminal echo.
+
+    Counter is FROZEN at threshold (does NOT advance past it because the
+    top-of-dispatch short-circuit returns BEFORE the counter hook).
+    """
+    _stub_empty_search(monkeypatch)
+    for _ in range(3):
+        toolset.dispatch("search_vibe", {"query": "narrow"})
+
+    assert toolset.stop_reason is not None
+    snapshot = dict(toolset.stop_reason)
+    counter_at_trip = toolset._consecutive_empties
+
+    # Fire another dispatch — must echo the same terminal payload.
+    echo_1 = toolset.dispatch("search_vibe", {"query": "still narrow"})
+    assert echo_1 == {
+        "error": "tool_starvation",
+        "stop_reason": snapshot,
+    }, (
+        f"post-trip dispatch must return idempotent terminal echo "
+        f"{{'error': 'tool_starvation', 'stop_reason': <copy>}}; "
+        f"got {echo_1!r}"
+    )
+
+    # Counter is FROZEN — does NOT advance past threshold.
+    assert toolset._consecutive_empties == counter_at_trip, (
+        f"counter must be frozen at threshold after trip; counter_at_trip="
+        f"{counter_at_trip!r}, now={toolset._consecutive_empties!r}"
+    )
+
+    # Try a different tool — same terminal echo. stop_reason unchanged.
+    echo_2 = toolset.dispatch("get_track_features", {"track_id": "t000"})
+    assert echo_2 == {
+        "error": "tool_starvation",
+        "stop_reason": snapshot,
+    }, (
+        f"post-trip dispatch of a different tool must STILL return the "
+        f"terminal echo (run is terminal); got {echo_2!r}"
+    )
+    assert toolset.stop_reason == snapshot, (
+        "stop_reason payload must not mutate after trip — idempotent write."
+    )
+
+    # The echo's stop_reason must be a SHALLOW COPY (mutating it must not
+    # affect the toolset's internal payload). Per RESEARCH.md Open Q2.
+    echo_2["stop_reason"]["reason"] = "tampered"
+    assert toolset.stop_reason["reason"] == "tool_starvation", (
+        f"echo[stop_reason] must be a shallow copy — mutating the caller's "
+        f"copy must not corrupt internal state. Got: "
+        f"{toolset.stop_reason['reason']!r}"
+    )
+
+
+def test_starvation_short_circuits_subsequent_dispatch(
+    toolset: LibraryToolset, monkeypatch
+) -> None:
+    """After trip, the handler is NOT invoked on subsequent dispatch calls.
+
+    Proves the short-circuit lives at the TOP of dispatch(), BEFORE the
+    ``ThreadPoolExecutor`` block. If the handler ran, it would raise — the
+    short-circuit catches it first.
+    """
+    _stub_empty_search(monkeypatch)
+    for _ in range(3):
+        toolset.dispatch("search_vibe", {"query": "narrow"})
+
+    assert toolset.stop_reason is not None
+
+    # Replace search_vibe with a sentinel that raises if invoked.
+    def explode(args):  # pragma: no cover — must NOT run
+        raise RuntimeError("handler should not run after starvation trip")
+
+    monkeypatch.setattr(toolset, "search_vibe", explode)
+
+    # If the short-circuit fires correctly, NO exception bubbles AND we get
+    # the terminal echo. If the short-circuit is below the handler dispatch,
+    # the explode handler would either crash (raising or being caught as
+    # ``{"error": "tool 'search_vibe' crashed: RuntimeError"}``) instead of
+    # returning the terminal echo.
+    echo = toolset.dispatch("search_vibe", {"query": "anything"})
+    assert echo == {
+        "error": "tool_starvation",
+        "stop_reason": dict(toolset.stop_reason),
+    }, (
+        f"short-circuit must return terminal echo WITHOUT invoking handler; "
+        f"got {echo!r}. If the result is a crash dict, the short-circuit "
+        f"lives BELOW handler dispatch — move it to the top of dispatch()."
+    )
