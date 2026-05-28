@@ -1,0 +1,175 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Phase 92 Plan 05 — LessonHud component (UI-SPEC §Component Inventory).
+//
+// 56 px-tall rail between titlebar and stage. Three regions:
+//   - LEFT:   course chip (e.g. `COURSE 0 · HELLO WORLD`)
+//             — Saira wdth 85 wght 600 10px UPPERCASE 0.22em silk-22
+//   - CENTER: lesson title (e.g. `press play`, upcased via CSS)
+//             — Saira wdth 85 wght 600 14px UPPERCASE 0.12em silk-65
+//             + progress dots row (6 px circles; pending=silk-22 outline,
+//               current=amber+glow-faint, completed=silk-65 solid)
+//   - RIGHT:  progress index (e.g. `L0.00 OF 1`)
+//             — JetBrains Mono 11px UPPERCASE 0.18em silk-22
+//
+// Border-bottom 1px var(--glass-edge); NO panel fill — the cinematic
+// void shows through. Matches the rebuild-session mock's `.rail`
+// exactly (UI-SPEC §Lesson HUD layout lines 222-253).
+//
+// Progress dots are <button>s — Tab-reachable per UI-SPEC §Accessibility
+// line 329. The Enter handler (replay completed lesson via
+// `ipc.learn.start_lesson { level: "replay" }`) is wired by
+// learn-window.ts; this component only renders the affordance.
+
+/**
+ * Display-name lookup for course chips. Course 0 (hello world) is the
+ * P92 deliverable; courses 1-3 (anatomy / transitions / play-mode)
+ * land in P94 / P95 / P96. Unknown course_ids fall back to a generic
+ * `COURSE · <id>` rendering — keeps the surface forward-compatible
+ * without coupling to fixture data.
+ */
+const COURSE_DISPLAY: Readonly<Record<string, string>> = {
+  course_0: "COURSE 0 · HELLO WORLD",
+  course_1: "COURSE 1 · ANATOMY",
+  course_2: "COURSE 2 · TRANSITIONS",
+  course_3: "COURSE 3 · PLAY-MODE",
+};
+
+export interface LessonHudProgressDot {
+  lesson_id: string;
+  status: "pending" | "current" | "completed";
+}
+
+export interface LessonHudOpts {
+  course_id: string;
+  lesson_id: string;
+  title: string;
+  progress_dots: ReadonlyArray<LessonHudProgressDot>;
+}
+
+export interface LessonHudHandle extends HTMLDivElement {
+  update(opts: Partial<LessonHudOpts>): void;
+}
+
+/**
+ * Build the lesson-HUD element. Returns the root `<div class="learn-hud">`
+ * with an attached `.update(opts)` method for partial-state refresh.
+ *
+ * The component is hand-authored DOM (no framework) — mirrors the P91
+ * pattern in `tauri/ui/src/learn/components/{titlebar,status-bar,empty-state}.ts`.
+ */
+export function LessonHud(opts: LessonHudOpts): LessonHudHandle {
+  const root = document.createElement("div") as LessonHudHandle;
+  root.className = "learn-hud";
+
+  // --- Left: course chip ---
+  const courseChip = document.createElement("div");
+  courseChip.className = "course-chip";
+  courseChip.textContent = courseDisplayFor(opts.course_id);
+  root.appendChild(courseChip);
+
+  // --- Center: lesson title + progress dots ---
+  const center = document.createElement("div");
+  center.className = "lesson-center";
+  const titleEl = document.createElement("div");
+  titleEl.className = "lesson-title";
+  titleEl.textContent = opts.title;
+  const dotsRow = document.createElement("div");
+  dotsRow.className = "dots";
+  dotsRow.setAttribute("role", "list");
+  dotsRow.setAttribute("aria-label", "lesson progress");
+  renderDots(dotsRow, opts.progress_dots);
+  center.appendChild(titleEl);
+  center.appendChild(dotsRow);
+  root.appendChild(center);
+
+  // --- Right: progress index ---
+  const indexEl = document.createElement("div");
+  indexEl.className = "progress-index";
+  indexEl.textContent = formatProgressIndex(opts.lesson_id, opts.progress_dots);
+  root.appendChild(indexEl);
+
+  // --- .update partial-state refresh ---
+  // Keeps the latest options in a closure so partial updates can compose
+  // (e.g. only `progress_dots` changing should still re-render the
+  // dependent progress index correctly).
+  let current: LessonHudOpts = {
+    course_id: opts.course_id,
+    lesson_id: opts.lesson_id,
+    title: opts.title,
+    progress_dots: opts.progress_dots,
+  };
+
+  root.update = (next: Partial<LessonHudOpts>) => {
+    current = {
+      course_id: next.course_id ?? current.course_id,
+      lesson_id: next.lesson_id ?? current.lesson_id,
+      title: next.title ?? current.title,
+      progress_dots: next.progress_dots ?? current.progress_dots,
+    };
+    if (next.course_id !== undefined) {
+      courseChip.textContent = courseDisplayFor(current.course_id);
+    }
+    if (next.title !== undefined) {
+      titleEl.textContent = current.title;
+    }
+    if (next.progress_dots !== undefined || next.lesson_id !== undefined) {
+      renderDots(dotsRow, current.progress_dots);
+      indexEl.textContent = formatProgressIndex(
+        current.lesson_id,
+        current.progress_dots,
+      );
+    }
+  };
+
+  return root;
+}
+
+function courseDisplayFor(courseId: string): string {
+  const named = COURSE_DISPLAY[courseId];
+  if (named !== undefined) return named;
+  return `COURSE · ${courseId.toUpperCase()}`;
+}
+
+/**
+ * Format the right-region progress index.
+ *
+ * - The lesson_id convention from the curriculum is `L<N>.<NN>-<slug>`
+ *   (e.g. `L0.00-press-play`). We strip the `-<slug>` suffix to keep
+ *   the index compact (the title + course chip already carry the
+ *   semantic name).
+ * - The denominator is the count of dots — for the P92 hello-world
+ *   1-lesson course, this is `OF 1`; for the future 16-lesson Course 1
+ *   it becomes `OF 16`.
+ */
+function formatProgressIndex(
+  lessonId: string,
+  dots: ReadonlyArray<LessonHudProgressDot>,
+): string {
+  const head = lessonId.split("-")[0] ?? lessonId;
+  return `${head.toUpperCase()} OF ${dots.length}`;
+}
+
+/**
+ * Render the progress-dots row into the given container, replacing any
+ * prior dots. Each dot is a `<button>` so it lands in the Tab cycle
+ * per UI-SPEC §Accessibility line 329 — the Enter-on-completed-dot
+ * replay handler is wired separately by learn-window.ts via event
+ * delegation on the dots row.
+ */
+function renderDots(
+  container: HTMLElement,
+  dots: ReadonlyArray<LessonHudProgressDot>,
+): void {
+  container.textContent = "";
+  for (const dot of dots) {
+    const d = document.createElement("button");
+    d.type = "button";
+    d.className = "dot";
+    d.setAttribute("data-status", dot.status);
+    d.setAttribute("data-lesson-id", dot.lesson_id);
+    d.setAttribute("role", "listitem");
+    d.setAttribute("aria-label", `lesson ${dot.lesson_id}, ${dot.status}`);
+    container.appendChild(d);
+  }
+}
