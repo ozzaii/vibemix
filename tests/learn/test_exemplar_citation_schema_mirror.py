@@ -7,30 +7,13 @@ fabricated [exemplar:<id>] can ride through un-validated (the silent-poisoning
 hole that the multi-site lock-step contract exists to prevent).
 
 REQ-ID: EXEMPLAR-05 (citation source schema-mirror lock).
-Downstream plan that flips this skip: **Plan 93-05** (atomic 4-site mirror commit).
-
-This module starts RED-on-real-source — the assertions check that
-``"exemplar"`` is actually present in ``EVIDENCE_SOURCES``, ``_SOURCE_ALT``,
-``CITATION_GRAMMAR_BLOCK``, and ``dj_cohost._build_citation_strip``. Today
-none of those carry the token, so the module-level skip below holds the
-suite green; Plan 93-05 lands the atomic 4-site mirror commit and removes
-the skip line so the assertions run and PASS.
+Flipped GREEN by Plan 93-05 — the atomic 4-site mirror commit landed
+``"exemplar"`` in ``EVIDENCE_SOURCES``, ``_SOURCE_ALT``,
+``CITATION_GRAMMAR_BLOCK``, and ``dj_cohost._build_citation_strip``.
 """
 from __future__ import annotations
 import re
 from pathlib import Path
-
-import pytest
-
-# Plan 93-05 removes the line below when the atomic 4-site mirror lands;
-# the assertions then run against the live source and PASS.
-pytest.skip(
-    "tests/learn/test_exemplar_citation_schema_mirror.py awaiting Plan 93-05 — "
-    "remove this pytest.skip(...) line when the atomic 4-site mirror commit "
-    "(EVIDENCE_SOURCES + _SOURCE_ALT + CITATION_GRAMMAR_BLOCK + "
-    "dj_cohost allow-list) lands.",
-    allow_module_level=True,
-)
 
 _REPO = Path(__file__).resolve().parent.parent.parent
 
