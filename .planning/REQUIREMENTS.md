@@ -11,13 +11,13 @@
 ## v11.0 Requirements
 
 ### SKILL — Skill-tree mastery model
-- [ ] **SKILL-01**: User's 36 lessons / 3 courses map to ~6 named DJ skills (Deck Control · Beatmatching · EQ Mixing · Harmonic Mixing · Transitions · Phrasing & Performance), each with a two-stage mastery bar (Locked → Competent → Mastered).
-- [ ] **SKILL-02**: A pure-logic `SkillTree` / `SkillProgress` engine (`src/vibemix/learn/skill_tree.py`) computes each skill's stage and fill from lesson/recital outcomes + live demonstrations; it is the sole writer of skill state and never mutates `MusicState` (Invariant #1, AST-gated).
-- [ ] **SKILL-03**: The skill→lesson→live-event mapping (which lessons feed which skill, each skill's Competent threshold + Mastered requirement) is declared in one readable manifest, so a contributor can understand the tree without reverse-engineering the engine.
+- [x] **SKILL-01**: User's 36 lessons / 3 courses map to ~6 named DJ skills (Deck Control · Beatmatching · EQ Mixing · Harmonic Mixing · Transitions · Phrasing & Performance), each with a two-stage mastery bar (Locked → Competent → Mastered).
+- [x] **SKILL-02**: A pure-logic `SkillTree` / `SkillProgress` engine (`src/vibemix/learn/skill_tree.py`) computes each skill's stage and fill from lesson/recital outcomes + live demonstrations; it is the sole writer of skill state and never mutates `MusicState` (Invariant #1, AST-gated).
+- [x] **SKILL-03**: The skill→lesson→live-event mapping (which lessons feed which skill, each skill's Competent threshold + Mastered requirement) is declared in one readable manifest, so a contributor can understand the tree without reverse-engineering the engine.
 
 ### COMP — Competent stage (Learn-grounded fill)
-- [ ] **COMP-01**: Completing a lesson advances its skill's Competent-stage fill, weighted by quality — a recital pass and a first-try (0-strikes) completion fill more than a click-through.
-- [ ] **COMP-02**: A skill reaches "Competent" only after the user passes that skill's recital honest-score gate; pure click-through can never reach Competent.
+- [x] **COMP-01**: Completing a lesson advances its skill's Competent-stage fill, weighted by quality — a recital pass and a first-try (0-strikes) completion fill more than a click-through.
+- [x] **COMP-02**: A skill reaches "Competent" only after the user passes that skill's recital honest-score gate; pure click-through can never reach Competent.
 
 ### MAST — Mastered stage (Live-grounded, anti-slop heart)
 - [ ] **MAST-01**: A skill's Competent→Mastered segment stays locked until the skill reaches Competent.
@@ -64,11 +64,11 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| SKILL-01 | Phase 102 | Pending |
-| SKILL-02 | Phase 102 | Pending |
-| SKILL-03 | Phase 102 | Pending |
-| COMP-01 | Phase 102 | Pending |
-| COMP-02 | Phase 102 | Pending |
+| SKILL-01 | Phase 102 | Complete |
+| SKILL-02 | Phase 102 | Complete |
+| SKILL-03 | Phase 102 | Complete |
+| COMP-01 | Phase 102 | Complete |
+| COMP-02 | Phase 102 | Complete |
 | DATA-01 | Phase 102 | Complete |
 | DATA-02 | Phase 102 | Complete |
 | DATA-03 | Phase 102 | Complete |
