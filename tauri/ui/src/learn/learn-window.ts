@@ -320,9 +320,21 @@ function mountLearnWindow(root: HTMLElement): {
   });
 
   // ipc.learn.highlight → paint highlight on the matched <g data-control-id>.
+  // WR-07 fix (P92 REVIEW): gate the apply on a mounted controller SVG.
+  // When the controller disconnects mid-lesson, `stage.clear()` resets
+  // `mountedControllerId` to null and wipes the stage's innerHTML; if a
+  // highlight envelope arrives in the gap before the next
+  // `controller_detected{connected:true}`, walking an empty stage emits
+  // a spurious console.warn and the highlight is silently lost.
+  // Short-circuit when no SVG is mounted — the runtime keeps emitting
+  // (its FSM doesn't see the unplug); we just don't paint until the
+  // SVG is back. The next highlight envelope after re-bind paints
+  // correctly because the runtime's on_enter_awaiting_action re-emits
+  // on every transition that lands in awaiting_action.
   window.addEventListener("ipc.learn.highlight", (ev: Event) => {
     const payload = (ev as CustomEvent<HighlightPayload>).detail;
     if (!payload) return;
+    if (stage.currentControllerId === null) return;
     applyHighlight(stageEl, payload);
   });
 
