@@ -64,7 +64,7 @@ If a phase doesn't pass → defer to HARDEN-FUTURE or out of scope.
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
 | 99 | HARDEN-RETRY — Viber Tool-Retry Policy | 8/8 | Complete   | 2026-05-28 |
-| 100 | HARDEN-CLARIFY — Viber RequestClarification | Ambiguous theme triggers a grounded `request_clarification` MCP tool call; CLI + Telegram render numbered choices; caller re-invokes with resolved theme | HARDEN-CLARIFY-01..07 (7) | 5 |
+| 100 | HARDEN-CLARIFY — Viber RequestClarification | 1/7 | In Progress|  |
 | 101 | HARDEN-CONTRACT — Prompt Composition Doc | A new contributor reads ONE doc and knows exactly what enters the live prompt per event type — every file:line reference grep-resolves on current source | HARDEN-CONTRACT-01..07 (7) | 4 |
 
 **Dependency spine:** `P99 → P100`, with `P101` independent (parallelizable but listed sequentially so its grep verification sees the post-hardening tool surface). `P99` ships the shared `stop_reason` payload seam that `P100` extends with a sibling reason (`clarification_needed`).
@@ -109,7 +109,7 @@ Plans:
   5. `codex_curate.curate_with_codex` and `build_set_with_codex` both propagate `stop_reason="clarification_needed"` + the question + choices payload uniformly to the result dataclass. Caller code (CLI + Telegram + future GUI) reads the same shape regardless of which entry path invoked Codex.
 **Plans:** 7 plans
 Plans:
-- [ ] 100-01-PLAN.md — request_clarification handler + MIN/MAX choices + dispatch entry (HARDEN-CLARIFY-01)
+- [x] 100-01-PLAN.md — request_clarification handler + MIN/MAX choices + dispatch entry (HARDEN-CLARIFY-01)
 - [ ] 100-02-PLAN.md — FastMCP @mcp.tool() exposure + teaching docstring (HARDEN-CLARIFY-02)
 - [ ] 100-03-PLAN.md — CodexCurateResult.question/choices + wrapper elif clarification branches (HARDEN-CLARIFY-03, HARDEN-CLARIFY-07)
 - [ ] 100-04-PLAN.md — CLI exit code 11 + 2-block stderr render + normalizer extension (HARDEN-CLARIFY-04, HARDEN-CLARIFY-06)

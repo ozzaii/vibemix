@@ -1,26 +1,26 @@
 ---
 gsd_state_version: 1.0
 milestone: v10.0
-milestone_name: milestone
-status: completed
-last_updated: "2026-05-28T14:48:49.818Z"
-last_activity: 2026-05-28 -- Phase 99 marked complete
+milestone_name: SHIP
+status: executing
+last_updated: "2026-05-28T15:27:34.798Z"
+last_activity: 2026-05-28
 progress:
-  total_phases: 3
+  total_phases: 11
   completed_phases: 1
-  total_plans: 8
-  completed_plans: 8
-  percent: 33
+  total_plans: 15
+  completed_plans: 9
+  percent: 9
 ---
 
 # vibemix — State
 
 ## Current Position
 
-Phase: 99 — COMPLETE
-Plan: 8 of 8 (ALL SHIPPED)
-Status: Phase 99 complete
-Last activity: 2026-05-28 -- Phase 99 marked complete
+Phase: 100 (HARDEN-CLARIFY — Viber RequestClarification Tool (Factor 7)) — EXECUTING
+Plan: 2 of 7 (Plan 100-01 SHIPPED — request_clarification handler + MIN/MAX_CHOICES + dispatch entry)
+Status: Ready to execute Plan 100-02 (FastMCP exposure)
+Last activity: 2026-05-28
 
 ## Milestone Reference
 
@@ -112,6 +112,14 @@ v10.0 island is disjoint from all three. Commit by named paths only, never `git 
 - v8.0 §GH-BILLING / §SHIP-V4 / §V7-LIVE
 
 ## Next Action
+
+```
+/gsd:execute-plan 100-02   # Wave-2 — FastMCP-expose request_clarification in mcp_server.py
+```
+
+Plan 100-01 SHIPPED (`b30a3bf3` RED → `c578b839` GREEN → `9068d641` test fix). 34 new tests in `tests/library/test_toolset_clarification.py`, all green; full library suite 679 passed / 0 regressions. `request_clarification` handler at `toolset.py:1126-1245`, `_build_clarification_payload` helper at `1084-1124`, `MIN_CHOICES`/`MAX_CHOICES` constants at `83-84`, dispatch entry at `1333`, `__all__` re-export at `1514-1520`. HARDEN-CLARIFY-01 closed. See `.planning/phases/100-harden-clarify/100-01-SUMMARY.md` for the seam Wave 2-4 plans consume.
+
+## Legacy Next Action (pre-Plan-100-01)
 
 ```
 /gsd:verify-work 99   # Phase 99 fully executed — kick off verification pass

@@ -25,7 +25,7 @@ Today Viber silently degrades on empty/error tool sequences. Codex's MCP harness
 
 Today on an ambiguous theme ("uplifting" — for whom? bedroom-headphones or peak-time-club? 80 BPM ambient or 130 BPM driving?), Codex silently picks one heuristic. Per 12-factor-agents Factor 7, the right pattern is a structured `request_human_input` tool the LLM can call when it needs disambiguation.
 
-- [ ] **HARDEN-CLARIFY-01**: New `request_clarification(question: str, choices: list[str])` handler in `LibraryToolset`, callable from the dispatch table. Validates that `choices` length is 2-5 (rejects 0/1 — no real disambiguation; rejects 6+ — choice paralysis).
+- [x] **HARDEN-CLARIFY-01**: New `request_clarification(question: str, choices: list[str])` handler in `LibraryToolset`, callable from the dispatch table. Validates that `choices` length is 2-5 (rejects 0/1 — no real disambiguation; rejects 6+ — choice paralysis).
 - [ ] **HARDEN-CLARIFY-02**: MCP server (`library/mcp_server.py`) exposes `request_clarification` via FastMCP with explicit Python signature `(question: str, choices: list[str]) -> dict`. Tool docstring teaches Codex when to call it ("when the user theme is materially ambiguous and a single sensible default cannot be picked").
 - [ ] **HARDEN-CLARIFY-03**: Calling `request_clarification` terminates the toolset run with `stop_reason="clarification_needed"` and surfaces the question + choices payload via the same readable seam as `tool_starvation` (HARDEN-RETRY-02 — these two stop_reasons are siblings).
 - [ ] **HARDEN-CLARIFY-04**: CLI `library curate` / `library build-set` print the formatted clarification (question + numbered choices) on `stop_reason="clarification_needed"` and exit with a distinct non-zero code separate from `tool_starvation`, so scripts can distinguish "need user input" from "library starved".
@@ -81,7 +81,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HARDEN-RETRY-05 | Phase 99 | Complete |
 | HARDEN-RETRY-06 | Phase 99 | Complete |
 | HARDEN-RETRY-07 | Phase 99 | Complete |
-| HARDEN-CLARIFY-01 | Phase 100 | Pending |
+| HARDEN-CLARIFY-01 | Phase 100 | Complete |
 | HARDEN-CLARIFY-02 | Phase 100 | Pending |
 | HARDEN-CLARIFY-03 | Phase 100 | Pending |
 | HARDEN-CLARIFY-04 | Phase 100 | Pending |
