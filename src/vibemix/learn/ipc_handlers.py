@@ -36,11 +36,119 @@ from typing import Any
 from vibemix.learn.curriculum import CURRICULUM
 from vibemix.learn.progress import (
     LearnProgress,
+    _fresh_skills_block,
     reset_progress,
     save_progress,
 )
 from vibemix.learn.runtime import LessonRuntime
 from vibemix.ui_bus.learn_messages import LearnProgressState
+
+_COURSE_ID_ALIASES = {
+    "course_1": "course_1_anatomy",
+    "course_2": "course_2_transitions",
+    "course_3": "course_3_play_mode",
+}
+
+_BUTTON_CONTROLS = {
+    "play",
+    "cue",
+    "sync",
+    "jog_touch",
+    "jog_touched",
+    "loop_in",
+    "loop_out",
+    "hotcue",
+    "filter_fx",
+    "fx_echo",
+    "tap_tempo",
+    "headphone_cue",
+    "lesson_continue",
+}
+
+_DEFAULT_PRACTICE_CONTROLLER_ID = "pioneer_ddj_flx4"
+
+
+def _canonical_lesson_id(raw: Any) -> str | None:
+    """Return the Python curriculum key for a wire lesson id.
+
+    The rebuilt Learn UI emits canonical short ids (``L1.01``), but older
+    frontend/tests may still send slugged ids (``L1.01-opening-dialog``).
+    Accept both at the boundary so the sidecar owns normalization.
+    """
+    if not isinstance(raw, str) or not raw:
+        return None
+    if raw in CURRICULUM:
+        return raw
+    head = raw.split("-", 1)[0]
+    if head in CURRICULUM:
+        return head
+    return None
+
+
+def _canonical_course_id(raw: Any) -> str | None:
+    if not isinstance(raw, str) or not raw:
+        return None
+    return _COURSE_ID_ALIASES.get(raw, raw)
+
+
+def _lesson_completed(progress: LearnProgress, lesson_id: str) -> bool:
+    entry = progress.lessons.get(lesson_id)
+    return isinstance(entry, dict) and entry.get("completed") is True
+
+
+def _course_unlocked(progress: LearnProgress, course_id: str) -> bool:
+    if course_id in {"course_0", "course_1_anatomy"}:
+        return True
+    if course_id == "course_2_transitions":
+        return progress.course_2_unlocked is True
+    if course_id == "course_3_play_mode":
+        return progress.course_3_unlocked is True
+    return False
+
+
+def _lesson_unlocked(
+    progress: LearnProgress,
+    *,
+    lesson_id: str,
+    course_id: str,
+) -> bool:
+    return _course_unlocked(progress, course_id) or _lesson_completed(
+        progress,
+        lesson_id,
+    )
+
+
+def _ack_event_type(control: str, direction: Any) -> str:
+    if control in {"jog_touch", "jog_touched"}:
+        return "cc"
+    if control in _BUTTON_CONTROLS:
+        return "button"
+    if direction in ("", "up", "down"):
+        return "cc"
+    return "cc"
+
+
+def _normalize_ack_control(
+    *,
+    control: str,
+    value: int,
+    direction: Any,
+    raw_prev: Any,
+) -> tuple[str, int, int | None]:
+    """Normalize wire-only control spellings to lesson curriculum controls."""
+    if control == "filter_fx":
+        prev = int(raw_prev) if raw_prev is not None else None
+        return "fx_echo", value, prev
+    if control not in {"jog_touch", "jog_touched"}:
+        prev = int(raw_prev) if raw_prev is not None else None
+        return control, value, prev
+
+    # Controller profiles expose jog wheels as touch events. Beginner lessons
+    # teach the motion as ``jog``; treat a touch-down as a full CC sweep so the
+    # deterministic min_delta gate can verify it.
+    if direction == "up" or value <= 0:
+        return "jog", 0, 127
+    return "jog", 127, 0
 
 
 def register_learn_handlers(
@@ -100,20 +208,30 @@ def register_learn_handlers(
         lesson_id.
         """
         payload = msg.get("payload", {}) if isinstance(msg, dict) else {}
-        lesson_id = payload.get("lesson_id")
-        if not isinstance(lesson_id, str) or lesson_id not in CURRICULUM:
+        lesson_id = _canonical_lesson_id(payload.get("lesson_id"))
+        if lesson_id is None:
             print(
                 f"[learn.ipc] start_lesson rejected: unknown lesson_id "
-                f"{lesson_id!r}",
+                f"{payload.get('lesson_id')!r}",
                 file=sys.stderr,
             )
             return
         course_id = CURRICULUM[lesson_id].course_id
-        # Resolve the currently-bound controller id (if any). Empty
-        # string sentinel when no controller is bound — the FSM's
-        # on_enter_loaded handles the empty case (WR-03 still defers
-        # the emit until a controller is bound; not part of CR-01).
-        controller_id = ""
+        if not _lesson_unlocked(
+            progress,
+            lesson_id=lesson_id,
+            course_id=course_id,
+        ):
+            print(
+                f"[learn.ipc] start_lesson rejected: {lesson_id!r} is "
+                f"locked for course {course_id!r}",
+                file=sys.stderr,
+            )
+            return
+        # Resolve the currently-bound controller id (if any). When no
+        # hardware is bound, use the default on-screen practice deck so
+        # Learn remains usable without a physical controller.
+        controller_id = _DEFAULT_PRACTICE_CONTROLLER_ID
         try:
             profile = midi_mirror.current_profile()
             if profile is not None:
@@ -142,7 +260,7 @@ def register_learn_handlers(
         entries do).
         """
         payload = msg.get("payload", {}) if isinstance(msg, dict) else {}
-        course_id = payload.get("course_id")
+        course_id = _canonical_course_id(payload.get("course_id"))
         # The shell ALSO supplies controller_id; we trust ours over the
         # client's because the sidecar owns the canonical binding state
         # (midi_mirror). The client's may be stale across hot-plug.
@@ -168,7 +286,14 @@ def register_learn_handlers(
                 file=sys.stderr,
             )
             return
-        controller_id = ""
+        if not _course_unlocked(progress, course_id):
+            print(
+                f"[learn.ipc] start_course rejected: {course_id!r} is "
+                "locked",
+                file=sys.stderr,
+            )
+            return
+        controller_id = _DEFAULT_PRACTICE_CONTROLLER_ID
         try:
             profile = midi_mirror.current_profile()
             if profile is not None:
@@ -244,16 +369,26 @@ def register_learn_handlers(
             deck = ""
         value = int(payload.get("value", 0))
         direction = payload.get("direction", "")
-        # Infer event type. Source="click" means a click on the rendered
-        # SVG (button-shaped), source="midi" can be either. We don't have
-        # the binding here, so we set "button" when a direction is
-        # present (buttons carry up/down) and "cc" otherwise. The guard
-        # re-checks expected_type vs midi_type, so a wrong inference is
-        # rejected cleanly.
-        ev_type = "button" if direction in ("up", "down") else "cc"
-        # Synthesize prev_value so a CC ack lights the ≥38 threshold.
-        # Live signal already carries direction, so prev = value ∓ 40.
-        prev_value = max(0, value - 40) if direction != "up" else min(127, value + 40)
+        raw_prev = payload.get("prev_value")
+        control, value, normalized_prev = _normalize_ack_control(
+            control=control,
+            value=value,
+            direction=direction,
+            raw_prev=raw_prev,
+        )
+        if control == "fx_echo" and not deck:
+            deck = "A"
+        ev_type = _ack_event_type(control, direction)
+        if normalized_prev is not None:
+            prev_value = normalized_prev
+        elif raw_prev is None:
+            prev_value = (
+                max(0, value - 40)
+                if direction != "up"
+                else min(127, value + 40)
+            )
+        else:
+            prev_value = int(raw_prev)
         midi = {
             "type": ev_type,
             "control": control,
@@ -261,7 +396,14 @@ def register_learn_handlers(
             "direction": direction,
             "value": value,
             "prev_value": prev_value,
+            "source": payload.get("source", ""),
         }
+        if lesson_runtime.handle_observer_ack(midi):
+            return
+        if lesson_runtime.handle_step_ack(midi):
+            return
+        if lesson_runtime.handle_mismatch_ack(midi):
+            return
         lesson_runtime.send("ack_action", midi=midi)
 
     async def _on_complete_lesson(msg: dict) -> None:
@@ -322,6 +464,13 @@ def register_learn_handlers(
             # the empty state so a subsequent boot reads matching disk.
             progress.lessons = {}
             progress.courses = {}
+            progress.course_2_unlocked = False
+            progress.course_3_unlocked = False
+            # DATA-03: clear the in-memory live-portion skill ledger too, so a
+            # settings-drawer reset returns the skill tree to defaults without
+            # waiting for a process restart. The on-disk file is unlinked by
+            # reset_progress() above; the next load re-seeds an empty v2 block.
+            progress.skills = _fresh_skills_block()
             try:
                 save_progress(progress)
             except Exception as exc:  # pragma: no cover — defensive

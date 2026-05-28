@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 92 Plan 02 — LESSON-03 progress persistence (RED-state stub).
+"""LESSON-03 progress persistence regression tests.
 
 Six small tests cover the atomic-write + corruption-recovery + reset
 flow of ``learn-progress.json`` (the schema_version 1 file at
@@ -31,19 +31,15 @@ from pathlib import Path
 import pytest
 
 try:
-    from vibemix.learn.progress import (  # Plan 92-04
+    from vibemix.learn.progress import (
         LearnProgress,
         load_progress,
-        progress_path,
         reset_progress,
         save_progress,
     )
 except ImportError:
     pytest.skip(
-        "tests/learn/test_progress_persistence.py awaits Plan 92-04 "
-        "(LESSON-03 progress.py with atomic write + corruption "
-        "recovery). When progress.py lands, this module-level skip "
-        "flips to live assertions.",
+        "Learn progress persistence is unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 
@@ -95,19 +91,34 @@ def test_corrupt_file_recovers_clean(progress_path_in_tmp: Path) -> None:
 def test_schema_version_mismatch_returns_fresh_empty(
     progress_path_in_tmp: Path,
 ) -> None:
-    """A stored ``schema_version`` != 1 yields a fresh empty
-    ``LearnProgress`` — the migration seam."""
+    """A forward-incompatible ``schema_version`` (3+/garbage) yields a fresh
+    empty ``LearnProgress`` — the wipe seam.
+
+    Phase 102 (v11.0) bumped ``SCHEMA_VERSION`` to 2 and made v1 a real
+    migration target (``_migrate_v1_to_v2``), so v2 is now the CURRENT
+    schema. The old assertion (``schema_version: 2`` → fresh-empty) is no
+    longer valid — v2 LOADS. This test is deliberately rewritten to
+    ``schema_version: 3`` (a genuine future/garbage version) so it still
+    exercises the wipe seam (RESEARCH finding #1 / Pitfall 1 — a rewrite,
+    not a regression). The lesson rows below MUST be wiped, proving the
+    wipe seam fires (a non-empty v3 dict does not silently load)."""
     import json
 
     progress_path_in_tmp.parent.mkdir(parents=True, exist_ok=True)
     progress_path_in_tmp.write_text(
-        json.dumps({"schema_version": 2, "courses": {}, "lessons": {}}),
+        json.dumps(
+            {
+                "schema_version": 3,
+                "courses": {},
+                "lessons": {"L1.01": {"completed": True}},
+            }
+        ),
         encoding="utf-8",
     )
     progress, _was_corrupt = load_progress()
     assert progress.lessons == {} and progress.courses == {}, (
-        "future schema_version must surface as fresh empty (the v9.0 "
-        "migration seam)"
+        "a forward-incompatible schema_version (3+) must surface as fresh "
+        "empty (the wipe seam) — the v1->v2 upgrader only handles v1"
     )
 
 
@@ -134,6 +145,45 @@ def test_mark_completed_updates_lesson() -> None:
     )
 
 
+def test_mark_started_creates_incomplete_schema_row() -> None:
+    """Started lessons are visible to snapshots before completion."""
+    progress = LearnProgress()
+    progress.mark_started("course_1_anatomy", "L1.03")
+
+    assert progress.courses["course_1_anatomy"] == {}
+    assert progress.lessons["L1.03"] == {
+        "completed": False,
+        "completed_at": None,
+        "strikes_used": 0,
+    }
+
+
+def test_hint_strike_updates_unfinished_attempt() -> None:
+    """Hint count persists while the lesson is still in progress."""
+    progress = LearnProgress()
+    progress.mark_hint_strike("course_1_anatomy", "L1.03", 2)
+
+    assert progress.lessons["L1.03"]["completed"] is False
+    assert progress.lessons["L1.03"]["completed_at"] is None
+    assert progress.lessons["L1.03"]["strikes_used"] == 2
+
+
+def test_mark_started_does_not_erase_completed_replay() -> None:
+    """Replaying a completed lesson must not demote the completed row."""
+    progress = LearnProgress()
+    progress.mark_completed("course_1_anatomy", "L1.03", strikes_used=1)
+
+    completed_at = progress.lessons["L1.03"]["completed_at"]
+    progress.mark_started("course_1_anatomy", "L1.03")
+    progress.mark_hint_strike("course_1_anatomy", "L1.03", 3)
+
+    assert progress.lessons["L1.03"] == {
+        "completed": True,
+        "completed_at": completed_at,
+        "strikes_used": 1,
+    }
+
+
 def test_dots_for_course_filters_by_course_id() -> None:
     """CR-03 (P92 REVIEW) regression — ``dots_for_course(course_id)`` MUST
     only return dots for lessons owned by that course.
@@ -148,7 +198,7 @@ def test_dots_for_course_filters_by_course_id() -> None:
     course_0 per CURRICULUM). Then:
 
       * dots_for_course("course_0") → 1 dot
-      * dots_for_course("course_1") → 0 dots (no lesson registered)
+      * dots_for_course("course_1") → 0 dots (legacy alias is not canonical)
       * dots_for_course(None) → 0 dots (defensive None branch)
     """
     progress = LearnProgress()
@@ -164,9 +214,9 @@ def test_dots_for_course_filters_by_course_id() -> None:
 
     course_1_dots = progress.dots_for_course("course_1")
     assert course_1_dots == (), (
-        "course_1 should have 0 dots — its lessons aren't registered "
-        "in CURRICULUM yet (P94 lands them). Without filtering, the "
-        f"unfiltered walk leaked into course_1: {course_1_dots!r}"
+        "course_1 should have 0 dots — live Course 1 is keyed by "
+        "course_1_anatomy. Without filtering, the unfiltered walk leaked "
+        f"into course_1: {course_1_dots!r}"
     )
 
     none_dots = progress.dots_for_course(None)
@@ -199,6 +249,26 @@ def test_dots_for_course_skips_unknown_lessons() -> None:
     assert course_0_dots[0]["lesson_id"] == "L0.00-press-play"
 
 
+def test_dots_for_course_renders_current_and_pending_curriculum_rows() -> None:
+    """The live HUD needs every lesson in the active course, not just
+    completed rows. A fresh Course 1 lesson should say ``OF 16`` and mark
+    the active row current instead of opening with an empty dot strip.
+    """
+    progress = LearnProgress()
+    progress.mark_completed("course_1_anatomy", "L1.01")
+
+    dots = progress.dots_for_course(
+        "course_1_anatomy",
+        current_lesson_id="L1.03",
+    )
+
+    assert len(dots) == 16
+    by_id = {dot["lesson_id"]: dot["status"] for dot in dots}
+    assert by_id["L1.01"] == "completed"
+    assert by_id["L1.03"] == "current"
+    assert by_id["L1.04"] == "pending"
+
+
 def test_runtime_completion_persists_across_load(
     progress_path_in_tmp: Path,
 ) -> None:
@@ -216,7 +286,6 @@ def test_runtime_completion_persists_across_load(
     dict — the on-disk file stayed empty — the second load_progress()
     returned a fresh-empty LearnProgress and the assertion failed.
     """
-    import time
     from unittest.mock import MagicMock
 
     from vibemix.learn.runtime import LessonRuntime
@@ -278,6 +347,88 @@ def test_runtime_completion_persists_across_load(
     assert entry.get("completed") is True, (
         f"completion flag not persisted; entry={entry!r}"
     )
+
+
+def test_runtime_start_persists_in_progress_across_load(
+    progress_path_in_tmp: Path,
+) -> None:
+    """Starting a lesson writes the unfinished attempt to disk immediately."""
+    from unittest.mock import MagicMock
+
+    from vibemix.learn.runtime import LessonRuntime
+    from vibemix.learn.state import LearnState
+
+    progress = LearnProgress()
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+    )
+
+    runtime.send(
+        "load",
+        lesson_id="L1.03",
+        course_id="course_1_anatomy",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+    reloaded, was_corrupt = load_progress()
+    assert was_corrupt is False
+    assert reloaded.courses["course_1_anatomy"] == {}
+    assert reloaded.lessons["L1.03"] == {
+        "completed": False,
+        "completed_at": None,
+        "strikes_used": 0,
+    }
+
+
+def test_runtime_completion_persists_strikes_used(
+    progress_path_in_tmp: Path,
+) -> None:
+    """Completed lesson rows preserve how many timed hints fired."""
+    from unittest.mock import MagicMock
+
+    from vibemix.learn.runtime import LessonRuntime
+    from vibemix.learn.state import LearnState
+
+    progress = LearnProgress()
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+    )
+
+    runtime.send(
+        "load",
+        lesson_id="L0.00-press-play",
+        course_id="course_0",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    runtime.send("strike")
+    runtime.send("strike")
+    assert runtime._learn.strike_count == 2
+
+    runtime.send(
+        "ack_action",
+        midi={
+            "type": "button",
+            "control": "play",
+            "deck": "A",
+            "direction": "down",
+        },
+    )
+    if runtime.current_state.id == "advancing":
+        runtime.send("finish")
+
+    reloaded, was_corrupt = load_progress()
+    assert was_corrupt is False
+    assert reloaded.lessons["L0.00-press-play"]["strikes_used"] == 2
 
 
 # ---------------------------------------------------------------------------
