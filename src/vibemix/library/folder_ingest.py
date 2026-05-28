@@ -297,6 +297,7 @@ def ingest_folder(
     progress: Callable[[str], None] | None = None,
     probe: ProbeFn = probe_duration_s,
     embed_strategy: str | None = None,
+    compute_band_shares: bool = False,
 ) -> IngestReport:
     """Walk ``root``, embed each supported audio file, persist to ``store``.
 
@@ -317,6 +318,10 @@ def ingest_folder(
             when present, else default "mean_excerpt". This NEVER changes
             embedding behavior — it's a report annotation so the caller can
             confirm the opt-in took.
+        compute_band_shares: when True, also compute per-track band-share
+            scalars + kick-correlation and write to the side-car band_shares
+            table inside library-clap.db. Best-effort — failures log and skip.
+            Default False keeps legacy callers byte-identical (Plan 93-06).
 
     Returns:
         :class:`IngestReport`.
@@ -364,6 +369,39 @@ def ingest_folder(
         # Honest store: only persist a real vector.
         store.add_batch([(entry.track_id, vec)])
         handled[entry.track_id] = entry
+
+        # === Plan 93-06 / EXEMPLAR-01 — additive: persist band-shares ===
+        # Gated by the ``compute_band_shares`` kwarg so existing CLAP-only
+        # ingest callers (e.g. ``vibemix library ingest``) stay byte-identical.
+        # Best-effort: a band-share failure NEVER aborts an otherwise-good
+        # CLAP ingest — log + skip the row.
+        #
+        # Local imports keep the legacy ingest path's import graph identical
+        # when the flag is off (``learn.exemplar`` + ``learn.band_share_store``
+        # are NEVER loaded). The 93-RESEARCH.md Pattern 9 verbatim port.
+        if compute_band_shares:
+            try:
+                from vibemix.learn import exemplar as _exemplar_mod
+                from vibemix.learn.band_share_store import (
+                    open_default_db as _bs_open,
+                    upsert as _bs_upsert,
+                )
+
+                feats = _exemplar_mod.compute_band_shares(str(path))
+                with _bs_open() as bs_conn:
+                    _bs_upsert(
+                        bs_conn,
+                        entry.track_id,
+                        feats["sub_share"],
+                        feats["low_share"],
+                        feats["mid_share"],
+                        feats["high_share"],
+                        feats["kick_corr"],
+                        time.time(),
+                    )
+            except Exception as bs_exc:
+                logger.warning("[band-share err] %s: %s", path, bs_exc)
+        # === END Plan 93-06 ===
 
         if was_cached:
             report.skipped_cached += 1
