@@ -80,10 +80,20 @@ class SkillSpec:
             must be True for this skill to reach Competent — one of
             ``"course_2_unlocked"`` / ``"course_3_unlocked"``. The honest-score
             flag is written by ``RecitalRuntime`` on a 5/5 recital pass.
+        mastered_threshold: Number of distinct grounded live demos
+            (``live_proof_count``) needed to flip the Competent→Mastered segment
+            (MAST-04). Uniform default ``3`` per RESEARCH Deliverable 4 — the
+            flip-AT-N behaviour is the contract, not the literal N (mirrors the
+            COMP-01 "ordering is the contract, not the numbers" precedent). It is
+            a per-skill field (not a module constant) so the future
+            ``§EARNED-MASTERY-THRESHOLD-TUNE`` Kaan-action can tune any one skill
+            without a code change; the 6 manifest entries stay valid unchanged
+            because the default is supplied here.
     """
 
     lesson_ids: tuple[str, ...]
     gate: str
+    mastered_threshold: int = 3
 
 
 # ---------------------------------------------------------------------------
@@ -314,3 +324,100 @@ class SkillTree:
                 first_mastered_at=first_mastered_at,
             )
         return results
+
+
+# ---------------------------------------------------------------------------
+# Phase 103 (v11.0 "Earned"), Plan 01 — the live-portion WRITER (MAST-01/04)
+# ---------------------------------------------------------------------------
+# Phase 102 deliberately left ``record_live_demo`` + the ``skills`` live-portion
+# fields as the forward seam: 102 SHIPPED the storage (``_fresh_skills_block``)
+# and the ``stage="mastered"`` DERIVATION (``compute`` above). Plan 103-01 only
+# WRITES the slot. The Wave-2 recognizer (Plan 103-02) is the citation-gated
+# caller; this mutator is reached only after that gate, but enforces the
+# MAST-01 Competent floor itself so it can never over-credit on its own.
+
+
+def _threshold_for(
+    skill_id: str, manifest: dict[str, SkillSpec] | None = None
+) -> int:
+    """Mastered threshold (N grounded demos) for one skill — MAST-04.
+
+    Reads :attr:`SkillSpec.mastered_threshold` off the manifest so a per-skill
+    tune (``§EARNED-MASTERY-THRESHOLD-TUNE``) needs no code change. An unknown
+    skill id falls back to the uniform default ``3`` (defensive — an unmapped id
+    never reaches here because :func:`record_live_demo` gates on Competent
+    first, which is False for an unknown id).
+    """
+    table = manifest if manifest is not None else SKILL_MANIFEST
+    spec = table.get(skill_id)
+    return spec.mastered_threshold if spec is not None else 3
+
+
+def record_live_demo(progress: Any, skill_id: str, *, now: str) -> Any:
+    """Credit ONE grounded live demonstration toward a skill's Mastered fill.
+
+    A PURE transform over ``progress.skills[skill_id]``: mutates that single
+    block in place and returns ``progress``. Calls no clock and does no I/O —
+    ``now`` is INJECTED (a string) for determinism (102 precedent) and
+    persistence is the caller's job (``save_progress``). Mutates ONLY the one
+    skill's live-portion; touches no other field.
+
+    Contract (MAST-01 / MAST-04):
+
+      1. MAST-01 GATE — Competent is DERIVED, never stored, so we read it via
+         ``SkillTree().compute(progress)[skill_id].competent``. If the skill is
+         not yet Competent (or the id is unknown), this is a NO-OP: return
+         ``progress`` unchanged with NO ``setdefault`` write. Locked skills
+         ignore live events entirely — no buffered backfill (you cannot master
+         what you have not learned).
+      2. ``setdefault`` the live-portion block to its safe defaults (mirrors
+         ``_fresh_skills_block`` — ``live_proof_count`` 0 / ``mastered`` False /
+         ``first_mastered_at`` None) so a sparse/missing entry is filled in.
+      3. Increment ``live_proof_count`` using the same ``int(... or 0)`` +
+         ``try/except`` guard ``compute`` uses (skill_tree.py ~:294) — a
+         hand-edited / garbage count degrades to 0 instead of raising the
+         uncaught ``ValueError`` that would contradict the engine's never-raises
+         contract (V5 input validation; the file is user-owned).
+      4. If ALREADY mastered: increment the count only — NEVER re-stamp
+         ``first_mastered_at`` (Pitfall 2: a 4th/5th demo must not lose the true
+         first-mastery moment). ``mastered`` is monotonic.
+      5. Otherwise increment, and ONLY on the not-mastered→mastered transition
+         (``count >= threshold and not mastered``) set ``mastered=True`` +
+         ``first_mastered_at=now`` — stamped exactly once, by construction.
+
+    WHY ``first_mastered_at`` is guarded: it records the genuine first moment a
+    skill was earned to Mastered; over-writing it on later demos would erase
+    that. WHY the count guard mirrors ``compute``: both read the same
+    user-editable ``skills`` block, so they must share the never-raises posture.
+    """
+    # (1) MAST-01 gate — read DERIVED Competent (not a stored field). An unknown
+    # skill id yields no SkillProgress entry → treated as not-Competent → NO-OP.
+    computed = SkillTree().compute(progress).get(skill_id)
+    if computed is None or not computed.competent:
+        return progress  # locked / unknown — ignore the event, write nothing
+
+    # (2) Fill the live-portion block if sparse/missing (mirror the 102 shape).
+    block = progress.skills.setdefault(
+        skill_id,
+        {"live_proof_count": 0, "mastered": False, "first_mastered_at": None},
+    )
+
+    # (3) Read the current count with the same never-raises guard as compute.
+    try:
+        count = int(block.get("live_proof_count", 0) or 0)
+    except (TypeError, ValueError):
+        count = 0
+
+    already_mastered = bool(block.get("mastered", False))
+    count += 1
+    block["live_proof_count"] = count
+
+    if already_mastered:
+        # (4) Monotonic — count may keep climbing, ts NEVER re-stamped.
+        return progress
+
+    # (5) Stamp the first-mastery moment exactly once, on the transition only.
+    if count >= _threshold_for(skill_id):
+        block["mastered"] = True
+        block["first_mastered_at"] = now
+    return progress
