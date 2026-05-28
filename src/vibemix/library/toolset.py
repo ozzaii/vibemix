@@ -64,6 +64,14 @@ logger = logging.getLogger(__name__)
 # can never park a caller's loop past this.
 TOOL_CALL_TIMEOUT_S = 30.0
 
+# Phase 99 HARDEN-RETRY (Decision 3, locked): after N consecutive empty
+# ``search_vibe`` returns or ``{"error": ...}`` tool responses, the next
+# ``dispatch()`` call short-circuits with a terminal ``tool_starvation``
+# stop_reason. Default 3 — fast feedback on real failure modes without
+# false-firing on a single missed search. Tunable in tests via monkeypatch.
+# Wiring (counter increment + threshold trip) lands in Plan 99-02 / 99-03.
+TOOL_STARVATION_THRESHOLD: int = 3
+
 
 class _EmbeddingProvider(Protocol):
     def embed_query(self, query: str) -> Any: ...
@@ -103,6 +111,14 @@ class LibraryToolset:
         # export_set handler; the agent loop reads it to break with a terminal
         # "exported" stop_reason and surface the path.
         self.exported: ExportResult | None = None
+        # Phase 99 HARDEN-RETRY scaffolding (Plan 99-01, Decisions 1 + 4):
+        # per-run consecutive empty/error counter + terminal stop_reason surface.
+        # Plan 99-02 wires the dispatch-site increment; Plan 99-03 writes the
+        # threshold-trip payload here. Pure scaffolding in this plan — no reads
+        # or writes anywhere else yet (single-writer analog precondition for
+        # Cardinal Invariant #1).
+        self._consecutive_empties: int = 0
+        self.stop_reason: dict[str, Any] | None = None
         # SEAM #1 (CURATE-01): lazily-built genre lookup, the SAME mechanism the
         # co-host reads (genre_prototypes.GenrePrototypeLookup). Built on first
         # get_track_features call so __init__ stays import-boundary clean (no
