@@ -281,3 +281,42 @@ def test_uncited_does_not_reach_mastered_even_over_threshold() -> None:
     sp = SkillTree().compute(progress)["eq_mixing"]
     assert sp.mastered is False
     assert sp.stage != "mastered"
+
+
+# ---------------------------------------------------------------------------
+# Integration-flavored: the LIVE predicate shape (wraps real EvidenceRegistry)
+# ---------------------------------------------------------------------------
+def test_real_registry_predicate_credits() -> None:
+    """Prove the live ``reg.has(...)``-wrapping predicate shape resolves once
+    against a REAL EvidenceRegistry (no-arg construct). The EventDetector writes
+    ``("ev", type, t_session)`` at fire time; the recognizer's citation key is
+    the same tuple. A cited MIX_MOVE at t=12.3 with an EQ move credits eq_mixing;
+    the same event at a t the registry has NO observation for does not.
+
+    The rest of the suite stays registry-free for purity — this is the single
+    seam test that the injected predicate matches the live grounding contract.
+    """
+    from vibemix.state.evidence_registry import EvidenceRegistry
+
+    reg = EvidenceRegistry()
+    reg.write("ev", "MIX_MOVE", 12.3)
+    citation_check = lambda s, k, t: reg.has(s, k, t, tol=1.0)  # noqa: E731
+
+    progress = _competent_progress("eq_mixing")
+
+    # A cited MIX_MOVE at the written time → credits eq_mixing.
+    ev = _event("MIX_MOVE", t=12.3, moves=["A_low: open→killed (big twist)"])
+    credited = recognize(
+        ev, citation_check=citation_check, progress=progress, now=_NOW
+    )
+    assert credited == ["eq_mixing"]
+    assert _count(progress, "eq_mixing") == 1
+
+    # The same event at a far-off t the registry never observed → zero credit
+    # (the live grounding contract: no observation within ±tol → False).
+    far = _event("MIX_MOVE", t=999.0, moves=["A_low: open→killed (big twist)"])
+    credited2 = recognize(
+        far, citation_check=citation_check, progress=progress, now=_NOW
+    )
+    assert credited2 == []
+    assert _count(progress, "eq_mixing") == 1  # unchanged

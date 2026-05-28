@@ -39,6 +39,9 @@ def _repo_root() -> pathlib.Path:
 
 
 SKILL_TREE_PATH = _repo_root() / "src" / "vibemix" / "learn" / "skill_tree.py"
+SKILL_RECOGNIZER_PATH = (
+    _repo_root() / "src" / "vibemix" / "learn" / "skill_recognizer.py"
+)
 
 
 def _code_lines(path: pathlib.Path) -> list[tuple[int, str]]:
@@ -185,3 +188,86 @@ def test_skills_never_in_profile_json() -> None:
             f"Privacy violation — skill key {leak_key!r} appeared in "
             "PROFILE_SCHEMA.properties. Skill state must never reach profile.json."
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 103 — skill_recognizer.py imports no state/ module for RUNTIME use
+# ---------------------------------------------------------------------------
+# T-103-07 (RESEARCH Pitfall 3): the recognizer must stay island-clean — it may
+# reference ``EvidenceRegistry`` / ``EventDetector`` types ONLY inside a
+# ``TYPE_CHECKING`` block (mirrors exemplar.py:40), never as an unconditional
+# runtime import. A runtime hard-dependency would couple the engine to the
+# One-Mind-in-flux ``state/`` island (concurrent-session owned) and break the
+# offline-test contract. It also writes no MusicState (Invariant #1).
+#
+# An actual ``import`` / ``from ... import`` of the two state modules. The
+# docstring legitimately NAMES them (explaining what it does NOT runtime-import)
+# — those prose mentions match none of these precise import patterns.
+_FORBIDDEN_STATE_IMPORTS = (
+    re.compile(r"^\s*import\s+vibemix\.state\.evidence_registry\b"),
+    re.compile(r"^\s*from\s+vibemix\.state\.evidence_registry\b"),
+    re.compile(r"^\s*import\s+vibemix\.state\.event_detector\b"),
+    re.compile(r"^\s*from\s+vibemix\.state\.event_detector\b"),
+)
+
+
+def _typecheck_guarded_line_nos(path: pathlib.Path) -> set[int]:
+    """Line numbers of source lines that sit inside an ``if TYPE_CHECKING:``
+    block (indented more than the guard). A TYPE_CHECKING-guarded import is
+    permitted; the gate exempts exactly those lines."""
+    source = path.read_text(encoding="utf-8")
+    guarded: set[int] = set()
+    in_block = False
+    block_indent = 0
+    for line_no, line in enumerate(source.splitlines(), start=1):
+        stripped = line.strip()
+        if not in_block:
+            if re.match(r"^\s*if\s+TYPE_CHECKING\s*:", line):
+                in_block = True
+                block_indent = len(line) - len(line.lstrip())
+            continue
+        # Inside the block: a blank/comment line stays inside; a line indented
+        # at-or-below the guard ends the block.
+        if stripped == "" or stripped.startswith("#"):
+            guarded.add(line_no)
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent <= block_indent:
+            in_block = False
+            continue
+        guarded.add(line_no)
+    return guarded
+
+
+def test_skill_recognizer_no_runtime_state_import() -> None:
+    """T-103-07: skill_recognizer.py never RUNTIME-imports
+    ``vibemix.state.evidence_registry`` / ``vibemix.state.event_detector`` (a
+    ``TYPE_CHECKING``-guarded import is allowed), and writes no MusicState /
+    ControllerState. The citation check is INJECTED — the engine stays offline
+    + island-clean."""
+    guarded = _typecheck_guarded_line_nos(SKILL_RECOGNIZER_PATH)
+
+    import_offenders: list[str] = []
+    write_offenders: list[str] = []
+    for line_no, line in _code_lines(SKILL_RECOGNIZER_PATH):
+        for pat in _FORBIDDEN_STATE_IMPORTS:
+            if pat.search(line) and line_no not in guarded:
+                import_offenders.append(
+                    f"{SKILL_RECOGNIZER_PATH}:{line_no}: RUNTIME IMPORT {line.strip()}"
+                )
+        for pat in _FORBIDDEN_WRITES:
+            if pat.search(line):
+                write_offenders.append(
+                    f"{SKILL_RECOGNIZER_PATH}:{line_no}: WRITE {line.strip()}"
+                )
+
+    assert not import_offenders, (
+        "T-103-07 violation — skill_recognizer.py runtime-imported a state/ "
+        "module. The citation check must be INJECTED; state/ types are "
+        "TYPE_CHECKING-only.\n" + "\n".join(import_offenders)
+    )
+    assert not write_offenders, (
+        "Invariant #1 violation — skill_recognizer.py wrote MusicState/"
+        "ControllerState. The recognizer is pure; only record_live_demo mutates "
+        "the skills block.\n" + "\n".join(write_offenders)
+    )
