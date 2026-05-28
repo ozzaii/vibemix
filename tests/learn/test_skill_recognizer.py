@@ -50,11 +50,26 @@ def _uncited(_s: str, _k: str, _t: float) -> bool:
 
 
 def _event(ev_type: str, *, t: float = 10.0, moves=None):
-    """A synthetic Event stand-in: a tiny object with ``.type`` / ``.extra`` /
-    ``.t_session``. NOT a real MusicState — the recognizer must never require
-    one (it consumes only the string contract)."""
+    """A synthetic Event stand-in mirroring the REAL ``state/event.py::Event``
+    shape: a tiny object with ``.type`` + ``.extra`` and NO time attribute (the
+    real ``Event`` carries only type/state/extra/priority — no session-relative
+    time). The session-relative ``t`` rides on a private ``_t`` only so the
+    ``_recognize`` helper can thread it through the explicit ``event_t`` param —
+    the LIVE contract (the real caller computes ``t_session = max(0.0, now -
+    state.set_start_at)`` and passes it, since it is not on the Event)."""
     extra = {"moves": list(moves)} if moves else {}
-    return SimpleNamespace(type=ev_type, extra=extra, t_session=t)
+    ev = SimpleNamespace(type=ev_type, extra=extra)
+    ev._t = t  # test-only carrier for the explicit event_t contract; NOT t_session
+    return ev
+
+
+def _recognize(event, **kwargs):
+    """Call ``recognize`` the way the LIVE caller must: pass the session-relative
+    time explicitly via ``event_t`` (the real ``Event`` has no time attribute, so
+    the caller — here the test — supplies it). Threads the synthetic event's
+    ``_t`` into ``event_t`` unless the caller overrides it."""
+    kwargs.setdefault("event_t", getattr(event, "_t", None))
+    return recognize(event, **kwargs)
 
 
 # --- Competent fixtures (mirror test_skill_tree.py::_competent_eq_progress) --
@@ -102,7 +117,7 @@ def test_cited_event_grants_credit() -> None:
     progress = _competent_progress("eq_mixing")
     ev = _event("MIX_MOVE", moves=["A_low: open→killed (big twist)"])
 
-    credited = recognize(ev, citation_check=_cited, progress=progress, now=_NOW)
+    credited = _recognize(ev, citation_check=_cited, progress=progress, now=_NOW)
 
     assert "eq_mixing" in credited
     assert _count(progress, "eq_mixing") == 1
@@ -120,7 +135,7 @@ def test_uncited_event_grants_zero_mastery_credit() -> None:
     progress = _competent_progress("eq_mixing")
     ev = _event("MIX_MOVE", moves=["A_low: open→killed (big twist)"])
 
-    credited = recognize(ev, citation_check=_uncited, progress=progress, now=_NOW)
+    credited = _recognize(ev, citation_check=_uncited, progress=progress, now=_NOW)
 
     assert credited == []  # nothing credited
     assert _count(progress, "eq_mixing") == 0  # the bar did not move
@@ -139,7 +154,7 @@ def test_event_skill_map_credits_real_events() -> None:
     )
 
     # LAYER_ARRIVAL → transitions.
-    credited = recognize(
+    credited = _recognize(
         _event("LAYER_ARRIVAL", t=11.0),
         citation_check=_cited,
         progress=progress,
@@ -149,7 +164,7 @@ def test_event_skill_map_credits_real_events() -> None:
     assert _count(progress, "transitions") == 1
 
     # PHASE → phrasing_performance.
-    credited = recognize(
+    credited = _recognize(
         _event("PHASE", t=12.0),
         citation_check=_cited,
         progress=progress,
@@ -159,7 +174,7 @@ def test_event_skill_map_credits_real_events() -> None:
     assert _count(progress, "phrasing_performance") == 1
 
     # PHRASE_BOUNDARY → phrasing_performance (the genre-chain variant).
-    credited = recognize(
+    credited = _recognize(
         _event("PHRASE_BOUNDARY", t=13.0),
         citation_check=_cited,
         progress=progress,
@@ -169,7 +184,7 @@ def test_event_skill_map_credits_real_events() -> None:
     assert _count(progress, "phrasing_performance") == 2
 
     # MIX_MOVE with a play-toggle move → deck_control.
-    credited = recognize(
+    credited = _recognize(
         _event("MIX_MOVE", t=14.0, moves=["A_play→ON"]),
         citation_check=_cited,
         progress=progress,
@@ -179,7 +194,7 @@ def test_event_skill_map_credits_real_events() -> None:
     assert _count(progress, "deck_control") == 1
 
     # An unmapped event type credits nothing.
-    credited = recognize(
+    credited = _recognize(
         _event("HEARTBEAT", t=15.0),
         citation_check=_cited,
         progress=progress,
@@ -218,7 +233,7 @@ def test_unsignalled_skills_never_auto_master() -> None:
         _event("PHRASE_BOUNDARY", t=24.0),
     ]
     for ev in stream:
-        recognize(ev, citation_check=_cited, progress=progress, now=_NOW)
+        _recognize(ev, citation_check=_cited, progress=progress, now=_NOW)
 
     for unsignalled in ("beatmatching", "harmonic_mixing"):
         assert _count(progress, unsignalled) == 0, (
@@ -242,8 +257,8 @@ def test_event_identity_dedup_no_double_count() -> None:
     progress = _competent_progress("eq_mixing")
     ev = _event("MIX_MOVE", t=30.0, moves=["A_low: open→killed (big twist)"])
     seen: set = set()
-    recognize(ev, citation_check=_cited, progress=progress, now=_NOW, _seen=seen)
-    recognize(ev, citation_check=_cited, progress=progress, now=_NOW, _seen=seen)
+    _recognize(ev, citation_check=_cited, progress=progress, now=_NOW, _seen=seen)
+    _recognize(ev, citation_check=_cited, progress=progress, now=_NOW, _seen=seen)
     assert _count(progress, "eq_mixing") == 1  # second call is a no-op
 
     # (b) one event crediting TWO distinct skills is correct, not a double-count.
@@ -253,7 +268,7 @@ def test_event_identity_dedup_no_double_count() -> None:
         t=31.0,
         moves=["A_low: open→killed (big twist)", "A_play→ON"],
     )
-    credited = recognize(both, citation_check=_cited, progress=progress2, now=_NOW)
+    credited = _recognize(both, citation_check=_cited, progress=progress2, now=_NOW)
     assert set(credited) == {"eq_mixing", "deck_control"}
     assert _count(progress2, "eq_mixing") == 1
     assert _count(progress2, "deck_control") == 1
@@ -275,7 +290,7 @@ def test_uncited_does_not_reach_mastered_even_over_threshold() -> None:
             t=40.0 + i,  # distinct identities so dedup is not the reason
             moves=["A_low: open→killed (big twist)"],
         )
-        recognize(ev, citation_check=_uncited, progress=progress, now=_NOW)
+        _recognize(ev, citation_check=_uncited, progress=progress, now=_NOW)
 
     assert _count(progress, "eq_mixing") == 0
     sp = SkillTree().compute(progress)["eq_mixing"]
@@ -304,9 +319,11 @@ def test_real_registry_predicate_credits() -> None:
 
     progress = _competent_progress("eq_mixing")
 
-    # A cited MIX_MOVE at the written time → credits eq_mixing.
+    # A cited MIX_MOVE at the written time → credits eq_mixing. The live caller
+    # passes the SAME t the registry was written with via event_t (the real
+    # Event has no time attribute).
     ev = _event("MIX_MOVE", t=12.3, moves=["A_low: open→killed (big twist)"])
-    credited = recognize(
+    credited = _recognize(
         ev, citation_check=citation_check, progress=progress, now=_NOW
     )
     assert credited == ["eq_mixing"]
@@ -315,8 +332,80 @@ def test_real_registry_predicate_credits() -> None:
     # The same event at a far-off t the registry never observed → zero credit
     # (the live grounding contract: no observation within ±tol → False).
     far = _event("MIX_MOVE", t=999.0, moves=["A_low: open→killed (big twist)"])
-    credited2 = recognize(
+    credited2 = _recognize(
         far, citation_check=citation_check, progress=progress, now=_NOW
     )
     assert credited2 == []
     assert _count(progress, "eq_mixing") == 1  # unchanged
+
+
+# ---------------------------------------------------------------------------
+# WR-01 regression pin: the recognizer's citation t_target IS the value
+# EvidenceRegistry.write stored — and the real Event carries no time itself.
+# ---------------------------------------------------------------------------
+def test_event_t_target_matches_registry_write_time() -> None:
+    """Pin the WR-01 contract so it cannot silently regress when the live hook
+    lands. The EventDetector writes ``registry.write("ev", type, t_session)`` with
+    ``t_session = max(0.0, now - state.set_start_at)`` (event_detector.py:508-509)
+    and the real ``Event`` carries NO time attribute. The recognizer must use the
+    caller-supplied ``event_t`` as the EXACT citation ``t_target`` it hands to
+    ``citation_check`` — i.e. the same value the registry was written with — so a
+    real ``EvidenceRegistry.has(..., tol=1.0)`` resolves anywhere into the set, not
+    only the first ~1s. We capture the (source, key, t) the recognizer passes and
+    assert it equals the written t_session."""
+    from vibemix.state.event import Event
+
+    # The real Event has no session-relative time field — credit must come from
+    # the explicit event_t, never an attribute on the object.
+    assert not hasattr(Event, "t_session")
+    real_field_names = {f for f in Event.__dataclass_fields__}
+    assert "t_session" not in real_field_names
+    assert real_field_names == {"type", "state", "extra", "priority"}
+
+    captured: list[tuple[str, str, float]] = []
+
+    def _capture(source: str, key: str, t: float) -> bool:
+        captured.append((source, key, t))
+        return True  # cited
+
+    # The session-relative time the EventDetector would have written for this
+    # fire (mid-set — well past the ~1s window where a 0.0 fallback survives).
+    t_session = 137.4  # = max(0.0, now - set_start_at) at fire time
+
+    progress = _competent_progress("eq_mixing")
+    ev = _event("MIX_MOVE", moves=["A_low: open→killed (big twist)"])
+    credited = recognize(
+        ev,
+        citation_check=_capture,
+        progress=progress,
+        now=_NOW,
+        event_t=t_session,  # the LIVE contract: caller supplies the registry t
+    )
+
+    assert credited == ["eq_mixing"]
+    # The citation key the recognizer built is the EXACT (source, key, t) tuple
+    # the EventDetector wrote — t_target == the stored t_session, not 0.0.
+    assert captured == [("ev", "MIX_MOVE", t_session)]
+
+
+def test_missing_event_t_falls_back_to_zero_not_raises() -> None:
+    """A real ``Event`` with no time attribute and no ``event_t`` supplied falls
+    back to ``0.0`` (never raises) — fail-CLOSED. This documents the trap the
+    WR-01 fix guards against: the live caller MUST pass ``event_t`` or credit is
+    denied past t≈1s (the 0.0 fallback is only ever a safe degrade, never a
+    silent false-credit)."""
+    captured: list[float] = []
+
+    def _capture_t(_s: str, _k: str, t: float) -> bool:
+        captured.append(t)
+        return True
+
+    progress = _competent_progress("eq_mixing")
+    ev = SimpleNamespace(  # bare real-Event-shaped stub: no time attribute
+        type="MIX_MOVE", extra={"moves": ["A_low: open→killed (big twist)"]}
+    )
+    recognize(
+        ev, citation_check=_capture_t, progress=progress, now=_NOW
+    )  # NO event_t — fallback path
+
+    assert captured == [0.0]  # safe fail-closed degrade, not a raise

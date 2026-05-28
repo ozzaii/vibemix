@@ -28,9 +28,15 @@ The credit pipeline per event:
      that is one event crediting two distinct skills, NOT a double-count). No
      match → return ``[]`` (no fill, ever).
   2. Citation gate (MAST-03): for each candidate, build the ``ev`` citation key
-     ``(source="ev", key=event.type, t_target=<event t_session>)`` — the exact
+     ``(source="ev", key=event.type, t_target=<session-relative t>)`` — the exact
      tuple the EventDetector wrote at fire time (event_detector.py:509) — and
-     skip the candidate if ``citation_check(...)`` is False.
+     skip the candidate if ``citation_check(...)`` is False. The session-relative
+     ``t`` is NOT a field on the real ``Event`` (it carries only type/state/extra/
+     priority); the EventDetector derives it as ``max(0.0, now -
+     state.set_start_at)`` at fire time and writes it into the registry. The
+     deferred live caller (``§EARNED-LIVE-MASTERED-VERIFY``) MUST therefore pass
+     that same value explicitly via ``recognize(..., event_t=t_session)`` — the
+     ``_event_time`` attribute fallback exists ONLY for the synthetic test stubs.
   3. Dedup (MAST-04): by ``(event.type, round(t, 1))`` within the credit batch
      (a transient ``seen`` set, NOT persisted). The same fire handed twice
      credits once; distinct skills from one event each credit once.
@@ -74,7 +80,13 @@ EVENT_SKILL_MAP: dict[str, tuple[str, ...]] = {
 # demonstrate eq_mixing; play-toggle/xfader moves demonstrate deck_control. A
 # single MIX_MOVE carrying both kinds credits BOTH skills (one event, two
 # distinct skills — correct, not a double-count).
-_MIX_MOVE_EQ_SUBSTRINGS: tuple[str, ...] = ("_low:", "_mid:", "_hi:", "killed")
+#
+# ``_filter:`` (IN-01) is in the EventDetector MIX_MOVE significance set
+# (event_detector.py:330) and midi/state.py:348-355 emits filter twists as
+# "{deck}_filter: low→high (big twist)"; a filter sweep is an EQ-family move,
+# so it credits eq_mixing too — without this, a filter-only mix move resolved
+# to ``[]`` and silently under-credited a real, citable move.
+_MIX_MOVE_EQ_SUBSTRINGS: tuple[str, ...] = ("_low:", "_mid:", "_hi:", "_filter:", "killed")
 _MIX_MOVE_DECK_SUBSTRINGS: tuple[str, ...] = ("_play→", "xfader")
 
 # HONEST-UNCREDITABLE in v11.0 (Finding #1, anti-slop):
@@ -126,12 +138,22 @@ def _candidate_skills(event: Any) -> list[str]:
 
 
 def _event_time(event: Any) -> float:
-    """The event's session-relative time (the ``ev`` citation t_target).
+    """SYNTHETIC-STUB FALLBACK for the ``ev`` citation t_target — NOT the live path.
 
-    Reads ``event.t_session`` (the synthetic/real field carrying the value the
-    EventDetector wrote as ``registry.write("ev", type, t_session)``). Falls
-    back to ``0.0`` for a shape without it — the citation_check then decides
-    grounding at that t (never raises here)."""
+    The REAL ``state/event.py::Event`` dataclass has exactly four fields —
+    ``type``, ``state``, ``extra``, ``priority`` — and NO session-relative time
+    attribute. The session-relative ``t_session`` the registry was written with
+    is computed by the EventDetector at fire time as
+    ``max(0.0, now - state.set_start_at)`` (event_detector.py:508-509); it lives
+    only in the registry, never on the ``Event`` object. So a real ``Event`` has
+    nothing for this function to read and it returns ``0.0``.
+
+    The LIVE caller therefore MUST pass the registry time explicitly via
+    ``recognize(..., event_t=t_session)``; this attribute read is the fallback
+    ONLY for the synthetic test stubs (``SimpleNamespace(..., t_session=t)``).
+    Reading ``0.0`` here for a real ``Event`` would deny credit for the whole set
+    after t≈1s (it would land within ±tol of ``set_start_at`` only for the first
+    ~1s) — which is exactly why ``recognize`` prefers an explicit ``event_t``."""
     t = getattr(event, "t_session", None)
     if isinstance(t, (int, float)):
         return float(t)
@@ -144,19 +166,34 @@ def recognize(
     citation_check: Callable[[str, str, float], bool],
     progress: Any,
     now: str,
+    event_t: float | None = None,
     _seen: set[tuple[str, float]] | None = None,
 ) -> list[str]:
     """Credit the skill(s) a CITED live event demonstrates; return their ids.
 
     Pure-logic, offline-testable. The ``citation_check`` predicate is the SOLE
     arbiter of credit (MAST-03): a candidate skill is credited ONLY when
-    ``citation_check(source="ev", key=event.type, t_target=<t_session>)`` returns
+    ``citation_check(source="ev", key=event.type, t_target=<t>)`` returns
     True. An un-cited / fabricated event yields ``[]`` and moves no bar.
+
+    LIVE-WIRING CONTRACT (``§EARNED-LIVE-MASTERED-VERIFY`` KAAN-ACTION): the real
+    ``state/event.py::Event`` carries NO session-relative time (only type/state/
+    extra/priority). The EventDetector wrote the registry with
+    ``t_session = max(0.0, now - state.set_start_at)`` (event_detector.py:
+    508-509), so the live caller MUST pass that SAME value as ``event_t`` —
+    otherwise ``_event_time`` falls back to ``0.0`` and the ``has(..., tol=1.0)``
+    check would deny credit for the whole set past t≈1s. Concretely::
+
+        t_session = max(0.0, now_monotonic - state.set_start_at)
+        recognize(event, citation_check=lambda s, k, t: reg.has(s, k, t, tol=1.0),
+                  progress=progress, now=iso_now, event_t=t_session)
 
     Args:
         event: A detected event with ``.type`` (str) + optional ``.extra``
-            (dict with ``"moves"`` for MIX_MOVE) + ``.t_session`` (float). A
-            synthetic object suffices — NO MusicState required.
+            (dict with ``"moves"`` for MIX_MOVE). A synthetic object suffices —
+            NO MusicState required. The real ``Event`` has no time attribute, so
+            the session-relative time comes from ``event_t`` (below), not the
+            object.
         citation_check: ``(source, key, t_target) -> bool`` wrapping
             ``EvidenceRegistry.has`` in live wiring (injected — the engine never
             imports the registry for runtime use).
@@ -165,6 +202,11 @@ def recognize(
             Competent gate + the MAST-04 flip).
         now: Injected ISO timestamp stamped as ``first_mastered_at`` on the
             Mastered transition (determinism — no clock here).
+        event_t: The session-relative time the registry was written with
+            (``max(0.0, now - state.set_start_at)``). The live caller MUST
+            supply this — it is the citation ``t_target`` and the dedup time.
+            When ``None`` (synthetic test stubs only) it falls back to
+            ``_event_time(event)``, which reads ``event.t_session`` off the stub.
         _seen: A transient per-batch identity set ``(type, round(t,1))`` for
             dedup across calls in one batch (MAST-04 / Pitfall 4). NOT persisted.
             Defaults to a fresh per-call set.
@@ -178,7 +220,9 @@ def recognize(
         return []  # unmapped event → no fill, ever
 
     ev_type = getattr(event, "type", "")
-    t = _event_time(event)
+    # The session-relative t is supplied by the live caller (the real Event has
+    # no such field); the attribute read is the synthetic-stub fallback only.
+    t = event_t if event_t is not None else _event_time(event)
 
     # Dedup identity: the (type, rounded-time) pair the EventDetector itself
     # uses as the registry key+timestamp (Event has no stable id field). Guards
