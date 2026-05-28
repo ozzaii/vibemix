@@ -68,7 +68,7 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
 | 102 | Skill-Tree Engine + Data Model + Competent Stage | 2/2 | Complete   | 2026-05-28 |
-| 103 | Live "Mastered" Grounding | Once Competent, a skill's Mastered fill advances ONLY from real, cited live events mapped from the existing taxonomy; an un-cited/fabricated event grants zero credit; N grounded demos flip the skill to Mastered with persisted count + `first_mastered_at` | MAST-01, MAST-02, MAST-03, MAST-04 (4) | 4 |
+| 103 | Live "Mastered" Grounding | 1/2 | In Progress|  |
 | 104 | Skill-Tree Surface + Earned Celebration | User views their full skill tree from the Learn module; Competent fills render a quiet progression cue; a live "Mastered" unlock triggers a single rare grounded co-host vocal; the surface honors v9.0 accessibility | SURF-01, SURF-02, SURF-03, SURF-04 (4) | 4 |
 
 **Dependency spine:** `P102 → P103 → P104` (linear). P102 is the engine + Competent stage; P103 layers the live Mastered grounding on top of the Competent gate; P104 consumes **both** prior stages for display + celebration.
@@ -99,7 +99,7 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
   3. **Every live mastery credit must resolve a valid citation in `EvidenceRegistry`** — a credit is granted ONLY when the triggering event carries a citation that resolves (e.g. `[mix:…]`/`[midi:…]`/`[key:…]`/`[ev:…]` present in `EVIDENCE_SOURCES`); an un-cited or fabricated event grants **zero** credit. **Invariants #2 + #3 binding**, pinned by `tests/learn/test_mastery_requires_citation.py` (cited event → credit; same event with a fabricated/unregistered citation → zero credit) + `tests/learn/test_mastery_no_fabricated_credit.py` (no synthesized event ever earns Mastered fill). **No new evidence source is added** — the recognizer reads citations the live path already emits. **MAST-03.**
   4. A skill flips to "Mastered" after a **declared number `N`** of grounded live demonstrations (the threshold lives in the manifest, per skill); the count of grounded demos and a `first_mastered_at` ISO timestamp **persist across sessions** in the `skills` block (Phase 102's atomic write). Re-loading after a restart preserves both. Pinned by `tests/learn/test_mastered_flip_and_persist.py`. **MAST-04.**
 **Plans**: 2 plans (2 waves)
-- [ ] 103-01-PLAN.md — `record_live_demo` mutator + per-skill `mastered_threshold` (N=3) on `SkillSpec`: locked-until-Competent no-op + N-demo Mastered flip + idempotent `first_mastered_at` + save/load persistence (MAST-01, MAST-04)
+- [x] 103-01-PLAN.md — `record_live_demo` mutator + per-skill `mastered_threshold` (N=3) on `SkillSpec`: locked-until-Competent no-op + N-demo Mastered flip + idempotent `first_mastered_at` + save/load persistence (MAST-01, MAST-04)
 - [ ] 103-02-PLAN.md — `skill_recognizer.py` (new): reverse event→skill map over REAL event-type literals + the citation-gate spine (un-cited/fabricated → zero credit) + dedup + honest-uncreditable beatmatching/harmonic_mixing + no-runtime-state-import gate (MAST-02, MAST-03); live-firing call-site deferred to `§EARNED-LIVE-MASTERED-VERIFY`
 
 ### Phase 104: Skill-Tree Surface + Earned Celebration

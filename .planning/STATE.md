@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v11.0
 milestone_name: Earned
-status: verifying
-last_updated: "2026-05-28T22:40:52.082Z"
+status: executing
+last_updated: "2026-05-28T23:24:54.768Z"
 last_activity: 2026-05-28
 progress:
   total_phases: 11
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 9
 ---
 
@@ -22,11 +22,11 @@ progress:
 
 ## Current Position
 
-Phase: 102 (Skill-Tree Engine + Data Model + Competent Stage) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-05-28
-Progress: [██████████] 100%
+Phase: 103 (Live Mastered Grounding) — EXECUTING
+Plan: 2 of 2 (103-01 SHIPPED; 103-02 next)
+Status: 103-01 complete — ready to execute 103-02 (skill_recognizer)
+Last activity: 2026-05-29
+Progress: [████████░░] 75%
 
 ## Milestone Reference
 
@@ -85,4 +85,8 @@ See: `.planning/REQUIREMENTS.md` (16 v11.0 REQ-IDs across SKILL / COMP / MAST / 
 
 **102-02 SHIPPED (2026-05-29):** SKILL-01/02/03, COMP-01/02. Pure-logic `learn/skill_tree.py` (279 lines): 6-skill `SKILL_MANIFEST`→real CURRICULUM lesson ids + recital gate (import-time drift assertion), `SkillSpec`/`SkillProgress` dataclasses, `SkillTree.compute(progress)` single-arg pure engine. Quality-weighted fill (first-try 1.0 > with-strikes 0.6 > floor 0.0; `COMPETENT_THRESHOLD 0.6`), monotonic on reload (Pitfall 4b). **COMP-02 headline: Competent AND-gates `course_N_unlocked` — 100% click-through with the gate False stays `locked`** (`test_full_clickthrough_without_recital_not_competent` is a real assertion). 3 invariant pins green (#1 no MusicState write, #4 no new ws port, privacy no profile.json leak — `PROFILE_SCHEMA` still exactly 5 fields). Live-portion read read-only from `progress.skills`; learn-portion derived every call (zero dual-write drift). Commits `ad771709`→`22861a65`→`b8af7f58`. `tests/learn` 479 passed / 1 skipped. Shared-tree: 3 NEW files, surgical `--files` commits, no absorption.
 
-**Phase 102 COMPLETE — ready for verification.** Both plans (102-01 data model, 102-02 engine) shipped; 8/8 phase REQ-IDs (DATA-01/02/03 + SKILL-01/02/03 + COMP-01/02) done. Next step: verifier on Phase 102, then plan Phase 103 (Live "Mastered" Grounding — MAST-01/02/03/04, reads `EvidenceRegistry`; locked-until-Competent; writes the live-portion `compute` already reads). Read `.planning/ROADMAP.md` § Phase 103 + the locked constraints above before touching `src/vibemix/learn/`.
+**Phase 102 COMPLETE — verified.** Both plans (102-01 data model, 102-02 engine) shipped; 8/8 phase REQ-IDs (DATA-01/02/03 + SKILL-01/02/03 + COMP-01/02) done.
+
+**103-01 SHIPPED (2026-05-29):** MAST-01, MAST-04. Added the deferred-from-102 live-portion WRITER to `learn/skill_tree.py` (additive only): `SkillSpec.mastered_threshold` (uniform default 3, per-skill tunable — future `§EARNED-MASTERY-THRESHOLD-TUNE` is a manifest edit), `_threshold_for(skill_id)` helper, and `record_live_demo(progress, skill_id, *, now) -> LearnProgress`. Pure transform over `progress.skills[skill_id]`: MAST-01 derived-Competent gate (`SkillTree.compute(...).competent` — NO-OP + zero write when not Competent / unknown id, no buffered backfill), increment with the same `int(... or 0)` + try/except never-raises guard `compute` uses, flip `mastered=True` + stamp `first_mastered_at=now` ONCE on the not-mastered→mastered transition (idempotent, monotonic). `now` injected (no clock); persistence is the caller's job. Five new tests (flip-at-N, idempotent-stamp, locked-no-op, save→load `stage="mastered"`, garbage-degrade). All 4 cardinal invariants hold by additive design (purity / no MusicState / no port — `test_skill_tree_invariants.py` green). Commits `b8c968c5` (test RED) → `db0e27f2` (feat GREEN). `tests/learn` 496 passed / 1 skipped. Surgical `--files` commits, learn-island only.
+
+Next step: 103-02 (the citation-gated pure-logic `learn/skill_recognizer.py` — maps existing `EvidenceRegistry` event types → skill credit, calls `record_live_demo` only on a resolvable citation; un-cited/fabricated → zero credit, MAST-02/03). The live-firing call-site (`runtime/coach.py`/`__main__.py`) stays a deferred KAAN-ACTION (`§EARNED-LIVE-MASTERED-VERIFY`) — non-learn island. Read `.planning/ROADMAP.md` § Phase 103 + the locked constraints above before touching `src/vibemix/learn/`.
