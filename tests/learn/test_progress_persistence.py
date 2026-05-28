@@ -280,6 +280,74 @@ def test_runtime_completion_persists_across_load(
     )
 
 
+# ---------------------------------------------------------------------------
+# Plan 94-03 — LESSON-03 extension: course_2_unlocked field (CURR-1.16 binding)
+# ---------------------------------------------------------------------------
+
+
+def test_progress_default_course_2_unlocked_false() -> None:
+    """A fresh ``LearnProgress()`` has ``course_2_unlocked = False``.
+
+    Plan 94-03 adds the field as an additive default-False extension to
+    schema_version 1 — the migration seam still short-circuits on
+    schema_version != 1; existing schema_version=1 JSON without the field
+    loads as False (forward-compat).
+    """
+    progress = LearnProgress()
+    assert progress.course_2_unlocked is False, (
+        f"LearnProgress.course_2_unlocked must default to False; "
+        f"got {progress.course_2_unlocked!r}"
+    )
+
+
+def test_progress_round_trips_course_2_unlocked_true() -> None:
+    """Setting ``course_2_unlocked = True``, serialising via to_dict,
+    and round-tripping through from_dict preserves the value.
+    """
+    progress = LearnProgress()
+    progress.course_2_unlocked = True
+    raw = progress.to_dict()
+    assert raw.get("course_2_unlocked") is True, (
+        f"to_dict must serialise course_2_unlocked; got {raw!r}"
+    )
+    reloaded = LearnProgress.from_dict(raw)
+    assert reloaded.course_2_unlocked is True, (
+        f"from_dict must read course_2_unlocked back; "
+        f"got {reloaded.course_2_unlocked!r}"
+    )
+
+
+def test_progress_legacy_json_loads_with_default_false() -> None:
+    """A legacy schema_version=1 JSON dict WITHOUT the
+    ``course_2_unlocked`` field (pre-Plan-94-03 disk format) must load
+    as False — no KeyError, no migration prompt.
+
+    Forward-compat guarantee: a user who upgrades from v9.0 RC1
+    (pre-Plan-94-03) to a build that ships the recital must NOT see
+    their existing progress nuked. The default-False additive extension
+    is invisible to the migration seam.
+    """
+    legacy_raw = {
+        "schema_version": 1,
+        "courses": {},
+        "lessons": {
+            "L0.00-press-play": {
+                "completed": True,
+                "completed_at": "2026-05-27T00:00:00Z",
+                "strikes_used": 0,
+            },
+        },
+    }
+    progress = LearnProgress.from_dict(legacy_raw)
+    assert progress.course_2_unlocked is False, (
+        f"legacy JSON missing the field must load with course_2_unlocked=False; "
+        f"got {progress.course_2_unlocked!r}"
+    )
+    # And the pre-existing lessons survive unchanged.
+    assert "L0.00-press-play" in progress.lessons
+    assert progress.lessons["L0.00-press-play"]["completed"] is True
+
+
 @pytest.mark.cli
 def test_reset_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """``uv run python -m vibemix learn reset`` exits 0 and leaves the
