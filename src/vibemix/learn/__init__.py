@@ -29,6 +29,10 @@ Public surface (Phase 92):
 * :class:`LessonRuntime` — the deterministic FSM driving the lesson
   lifecycle (LESSON-01 / LESSON-04). 8 states / 5 transitions /
   1 Hz tick_loop; sole writer of :class:`LearnState`.
+* :class:`LearnProgress` + :func:`load_progress` / :func:`save_progress`
+  / :func:`reset_progress` / :func:`progress_path` / :data:`SCHEMA_VERSION`
+  — atomic JSON persistence for lesson completion at
+  ``~/.cache/vibemix/learn-progress.json`` (LESSON-03 / Plan 92-04).
 
 Single-writer invariant (#1): nothing in this package writes
 ``MusicState`` or ``ControllerState``. Pure reader of
@@ -39,6 +43,14 @@ from __future__ import annotations
 
 from vibemix.learn.curriculum import COURSE_FRAMES, CURRICULUM, LessonMeta
 from vibemix.learn.midi_mirror import MidiMirror
+from vibemix.learn.progress import (
+    SCHEMA_VERSION,
+    LearnProgress,
+    load_progress,
+    progress_path,
+    reset_progress,
+    save_progress,
+)
 from vibemix.learn.prompts import build_tutor_system_instruction
 from vibemix.learn.runtime import LessonRuntime
 from vibemix.learn.state import LearnState
@@ -46,9 +58,15 @@ from vibemix.learn.state import LearnState
 __all__ = [
     "COURSE_FRAMES",
     "CURRICULUM",
+    "LearnProgress",
     "LearnState",
     "LessonMeta",
     "LessonRuntime",
     "MidiMirror",
+    "SCHEMA_VERSION",
     "build_tutor_system_instruction",
+    "load_progress",
+    "progress_path",
+    "reset_progress",
+    "save_progress",
 ]
