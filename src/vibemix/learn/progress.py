@@ -83,6 +83,13 @@ class LearnProgress:
     schema_version: int = SCHEMA_VERSION
     courses: dict[str, dict[str, Any]] = field(default_factory=dict)
     lessons: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Plan 94-03 (CURR-1.16 binding): RecitalRuntime flips this to True
+    # on a 5/5 Course 1 Recital pass; the HUD reads it to unlock the
+    # Course 2 lesson selector. Additive default-False extension to
+    # schema_version 1 — a legacy JSON file WITHOUT this field loads as
+    # False (forward-compat); the migration seam (schema_version != 1)
+    # is untouched.
+    course_2_unlocked: bool = False
 
     def mark_completed(
         self,
@@ -180,6 +187,7 @@ class LearnProgress:
             "schema_version": self.schema_version,
             "courses": self.courses,
             "lessons": self.lessons,
+            "course_2_unlocked": self.course_2_unlocked,
         }
 
     @classmethod
@@ -190,6 +198,10 @@ class LearnProgress:
         ``raw["schema_version"] != SCHEMA_VERSION`` — the migration seam.
         Future v2 schemas land an explicit ``_migrate_v2_to_v1`` upgrader
         instead of attempting a garbled merge here.
+
+        Plan 94-03: ``course_2_unlocked`` reads with a safe default
+        (False) — legacy schema_version=1 JSON predating the field loads
+        without raising. Additive default-False extension.
         """
         if not isinstance(raw, dict):
             return cls()
@@ -199,6 +211,7 @@ class LearnProgress:
             schema_version=SCHEMA_VERSION,
             courses=raw.get("courses", {}) or {},
             lessons=raw.get("lessons", {}) or {},
+            course_2_unlocked=bool(raw.get("course_2_unlocked", False)),
         )
 
 

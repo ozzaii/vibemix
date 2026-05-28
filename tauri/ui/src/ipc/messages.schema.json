@@ -3264,7 +3264,8 @@
                       "strikes_used": {"type": "integer", "minimum": 0, "maximum": 3}
                     }
                   }
-                }
+                },
+                "course_2_unlocked": {"type": "boolean"}
               }
             }
           }

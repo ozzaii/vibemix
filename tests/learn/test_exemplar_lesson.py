@@ -148,7 +148,7 @@ def test_start_emits_play_and_speak_with_citation_for_first_band() -> None:
         player=player,
         ipc_emit=emitted.append,
     )
-    controller.start(script=_make_script(), lesson_id="L1.14")
+    controller.start(script=_make_script(), lesson_id="L1.14-eq-as-tutor")
 
     types = _emitted_types(emitted)
     assert "ipc.learn.exemplar_play" in types, (
@@ -200,11 +200,11 @@ def test_ack_advances_to_next_band_emitting_stop_then_play() -> None:
         player=player,
         ipc_emit=emitted.append,
     )
-    controller.start(script=_make_script(), lesson_id="L1.14")
+    controller.start(script=_make_script(), lesson_id="L1.14-eq-as-tutor")
 
     # Snapshot length so we measure the post-ack delta only.
     initial_count = len(emitted)
-    controller.ack(lesson_id="L1.14")
+    controller.ack(lesson_id="L1.14-eq-as-tutor")
 
     new_emits = emitted[initial_count:]
     new_types = _emitted_types(new_emits)
@@ -244,10 +244,10 @@ def test_full_cycle_emits_complete_lesson_after_three_bands() -> None:
         player=player,
         ipc_emit=emitted.append,
     )
-    controller.start(script=_make_script(), lesson_id="L1.14")
-    controller.ack(lesson_id="L1.14")  # low → mid
-    controller.ack(lesson_id="L1.14")  # mid → high
-    controller.ack(lesson_id="L1.14")  # high → complete
+    controller.start(script=_make_script(), lesson_id="L1.14-eq-as-tutor")
+    controller.ack(lesson_id="L1.14-eq-as-tutor")  # low → mid
+    controller.ack(lesson_id="L1.14-eq-as-tutor")  # mid → high
+    controller.ack(lesson_id="L1.14-eq-as-tutor")  # high → complete
 
     types = _emitted_types(emitted)
     assert "ipc.learn.complete_lesson" in types, (
@@ -256,7 +256,7 @@ def test_full_cycle_emits_complete_lesson_after_three_bands() -> None:
     complete_env = next(
         e for e in emitted if e["type"] == "ipc.learn.complete_lesson"
     )
-    assert complete_env["payload"]["lesson_id"] == "L1.14"
+    assert complete_env["payload"]["lesson_id"] == "L1.14-eq-as-tutor"
 
     # Player.stop() must have been called as part of the final teardown
     # (or earlier on each advance). At minimum, it MUST have been called
@@ -287,7 +287,7 @@ def test_degraded_install_emits_honest_null_speak_with_no_citation() -> None:
         player=player,
         ipc_emit=emitted.append,
     )
-    controller.start(script=_make_script(), lesson_id="L1.14")
+    controller.start(script=_make_script(), lesson_id="L1.14-eq-as-tutor")
 
     # No exemplar_play (no audio to play); a tutor_speak with EMPTY
     # citations and the honest-null phrasing.
@@ -309,9 +309,9 @@ def test_degraded_install_emits_honest_null_speak_with_no_citation() -> None:
     # Cycle still advances on user MIDI — 3 ack()s must reach
     # complete_lesson without raising (the controller must not block on
     # missing audio).
-    controller.ack(lesson_id="L1.14")
-    controller.ack(lesson_id="L1.14")
-    controller.ack(lesson_id="L1.14")
+    controller.ack(lesson_id="L1.14-eq-as-tutor")
+    controller.ack(lesson_id="L1.14-eq-as-tutor")
+    controller.ack(lesson_id="L1.14-eq-as-tutor")
     final_types = _emitted_types(emitted)
     assert "ipc.learn.complete_lesson" in final_types, (
         f"degraded install must still complete after 3 ack()s; "
@@ -344,13 +344,13 @@ def test_stop_is_idempotent_and_safe_from_any_state() -> None:
     )
 
     # No active cycle yet — must not raise.
-    controller.stop(lesson_id="L1.14")
-    controller.stop(lesson_id="L1.14")
+    controller.stop(lesson_id="L1.14-eq-as-tutor")
+    controller.stop(lesson_id="L1.14-eq-as-tutor")
 
     # Start a cycle, then stop mid-flight.
-    controller.start(script=_make_script(), lesson_id="L1.14")
+    controller.start(script=_make_script(), lesson_id="L1.14-eq-as-tutor")
     pre_stop_count = len(emitted)
-    controller.stop(lesson_id="L1.14")
+    controller.stop(lesson_id="L1.14-eq-as-tutor")
     new_after_stop = emitted[pre_stop_count:]
     assert any(
         e["type"] == "ipc.learn.exemplar_stop" for e in new_after_stop
@@ -361,7 +361,7 @@ def test_stop_is_idempotent_and_safe_from_any_state() -> None:
 
     # Second stop must not re-emit (idempotent).
     second_pre_count = len(emitted)
-    controller.stop(lesson_id="L1.14")
+    controller.stop(lesson_id="L1.14-eq-as-tutor")
     second_new = emitted[second_pre_count:]
     assert not any(
         e["type"] == "ipc.learn.exemplar_stop" for e in second_new

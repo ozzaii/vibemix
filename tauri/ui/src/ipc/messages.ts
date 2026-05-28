@@ -906,6 +906,7 @@ export interface LearnProgressState {
           strikes_used?: number;
         };
       };
+      course_2_unlocked?: boolean;
     };
   };
 }

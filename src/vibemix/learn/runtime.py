@@ -213,7 +213,66 @@ class LessonRuntime(StateMachine):
         # bare ``asyncio.create_task`` drops the handle, so long-lived
         # sessions with multiple lesson replays slowly leak coroutines.
         self._finish_task: asyncio.Task | None = None
+        # Plan 94-03 — per-lesson observer registry. Maps lesson_id to a
+        # controller object exposing .start(script, lesson_id) /
+        # .matches(midi) / .ack(lesson_id) / .stop(lesson_id). When the
+        # active lesson has a registered observer, the runtime delegates
+        # on_enter_awaiting_action / on_ack_action / on_enter_completed
+        # to it. The observer NEVER writes LearnState; Invariant #1
+        # remains bound to LessonRuntime alone (AST gate stays green).
+        self._lesson_observers: dict[str, Any] = {}
         super().__init__()
+
+    # ------------------------------------------------------------------
+    # Plan 94-03 — per-lesson observer registry (CURR-1.14 / CURR-1.16)
+    # ------------------------------------------------------------------
+    def register_lesson_observer(
+        self, lesson_id: str, observer: Any
+    ) -> None:
+        """Register a per-lesson observer that intercepts cycle lifecycle.
+
+        The observer MUST expose:
+
+          * ``.start(*, script: dict[str, Any], lesson_id: str) -> None``
+          * ``.matches(midi: dict[str, Any]) -> bool``
+          * ``.ack(*, lesson_id: str) -> None``
+          * ``.stop(*, lesson_id: str) -> None``
+
+        When the active lesson matches ``lesson_id``, the runtime:
+
+          * calls ``observer.start(script=..., lesson_id=...)`` AFTER the
+            normal ``on_enter_awaiting_action`` emit (highlight +
+            tutor_speak) — observer envelopes land last for strongest
+            recency on the wire.
+          * delegates ``ack_action`` MIDI to ``observer.ack()`` when
+            ``observer.matches(midi)`` returns True (the runtime
+            SUPPRESSES its normal advancing transition to let the
+            observer drive the per-cycle advance).
+          * calls ``observer.stop()`` on the ``on_enter_completed``
+            teardown.
+
+        The observer is an EMIT-only collaborator — it MUST NOT write
+        :class:`LearnState`. The AST gate
+        ``tests/learn/test_runtime_invariants.py`` continues to grep
+        ``src/vibemix/learn/`` for forbidden writes and stays green.
+
+        Plan 94-03 binds:
+          * ``L1.14`` → :class:`ExemplarLessonController` (3-band cycle)
+          * ``L1.16`` → :class:`RecitalRuntime` (5-prompt recital)
+        """
+        self._lesson_observers[lesson_id] = observer
+
+    def _active_observer(self) -> Any | None:
+        """Return the registered observer for the active lesson, or None.
+
+        Reads :class:`LearnState` (NEVER writes); returns None when no
+        lesson is active OR no observer is registered for the active
+        lesson_id. Internal helper.
+        """
+        lesson_id = self._learn.current_lesson_id
+        if lesson_id is None:
+            return None
+        return self._lesson_observers.get(lesson_id)
 
     # ------------------------------------------------------------------
     # Guards — both predicates accept ``**kwargs`` because python-
@@ -330,8 +389,33 @@ class LessonRuntime(StateMachine):
     # the transition, before ``on_enter_<state>``. We use them to set
     # the ``_last_was_match`` flag the advance envelope reads.
     # ------------------------------------------------------------------
-    def on_ack_action(self, **_kwargs: Any) -> None:
+    def on_ack_action(self, **kwargs: Any) -> None:
         self._last_was_match = True
+
+        # Plan 94-03 — forward the ack_action MIDI to a registered
+        # lesson observer (if any). The observer drives a parallel
+        # cycle (3-band exemplar walk for L1.14; 5-prompt recital for
+        # L1.16) that lives ALONGSIDE the FSM, not inside it. The
+        # runtime's main FSM still transitions to ``advancing`` per the
+        # normal contract; the observer's ack() emits its own cycle
+        # envelopes (exemplar_stop / exemplar_play / advance) so the UI
+        # can paint the per-band progression even though the runtime's
+        # main FSM only knows about lesson-level state.
+        observer = self._active_observer()
+        if observer is not None:
+            midi = kwargs.get("midi")
+            try:
+                if midi is not None and observer.matches(midi):
+                    observer.ack(
+                        lesson_id=self._learn.current_lesson_id or ""
+                    )
+            except Exception as exc:  # pragma: no cover — defensive
+                import sys
+
+                print(
+                    f"[learn.runtime] lesson observer ack failed: {exc!r}",
+                    file=sys.stderr,
+                )
 
     def on_skip(self, **_kwargs: Any) -> None:
         self._last_was_match = False
@@ -481,6 +565,25 @@ class LessonRuntime(StateMachine):
         # Reset the strike timer's state-entry anchor.
         self._state_entered_at = time.monotonic()
 
+        # Plan 94-03 — notify any registered lesson observer that the
+        # awaiting_action state has been entered. Observers extend the
+        # runtime's behavior WITHOUT changing it (LessonRuntime stays
+        # the sole writer of LearnState; the observer reads + emits to
+        # ipc_router). For L1.14 the ExemplarLessonController.start()
+        # call kicks off the 3-band cycle; for L1.16 the
+        # RecitalRuntime.start() call samples 5 prompts.
+        observer = self._active_observer()
+        if observer is not None:
+            try:
+                observer.start(script=lesson.script, lesson_id=lesson_id)
+            except Exception as exc:  # pragma: no cover — defensive
+                import sys
+
+                print(
+                    f"[learn.runtime] lesson observer start failed: {exc!r}",
+                    file=sys.stderr,
+                )
+
     def on_enter_hint_strike_1(self, **_kwargs: Any) -> None:
         self._learn.strike_count = 1
         self._emit_hint(1)
@@ -619,6 +722,24 @@ class LessonRuntime(StateMachine):
             import sys
 
             print(f"[learn.runtime] progress snapshot emit failed: {exc!r}", file=sys.stderr)
+
+        # Plan 94-03 — tear down any registered lesson observer. The
+        # observer's .stop() emits a final exemplar_stop (if a pick was
+        # active) and resets internal cycle state. Safe to call from
+        # any observer state (idempotent contract).
+        observer = self._active_observer()
+        if observer is not None:
+            try:
+                observer.stop(
+                    lesson_id=self._learn.current_lesson_id or ""
+                )
+            except Exception as exc:  # pragma: no cover — defensive
+                import sys
+
+                print(
+                    f"[learn.runtime] lesson observer stop failed: {exc!r}",
+                    file=sys.stderr,
+                )
 
     # ------------------------------------------------------------------
     # Helpers — tutor + hint emit sites
