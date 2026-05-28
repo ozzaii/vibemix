@@ -134,6 +134,71 @@ def test_mark_completed_updates_lesson() -> None:
     )
 
 
+def test_dots_for_course_filters_by_course_id() -> None:
+    """CR-03 (P92 REVIEW) regression — ``dots_for_course(course_id)`` MUST
+    only return dots for lessons owned by that course.
+
+    Before CR-03 fix: the function deleted its course_id parameter and
+    walked every completed lesson; an L0.* completion would surface as a
+    dot on every course (course_1, course_2, …). With one course shipped
+    (v9.0) this is silently correct; with two courses (P94+) the HUD
+    paints 30+ dots when Course 1 should show 16.
+
+    Test setup: complete the L0.00-press-play lesson (which belongs to
+    course_0 per CURRICULUM). Then:
+
+      * dots_for_course("course_0") → 1 dot
+      * dots_for_course("course_1") → 0 dots (no lesson registered)
+      * dots_for_course(None) → 0 dots (defensive None branch)
+    """
+    progress = LearnProgress()
+    progress.mark_completed("course_0", "L0.00-press-play")
+
+    course_0_dots = progress.dots_for_course("course_0")
+    assert len(course_0_dots) == 1, (
+        f"course_0 should have 1 dot, got {len(course_0_dots)}: "
+        f"{course_0_dots!r}"
+    )
+    assert course_0_dots[0]["lesson_id"] == "L0.00-press-play"
+    assert course_0_dots[0]["status"] == "completed"
+
+    course_1_dots = progress.dots_for_course("course_1")
+    assert course_1_dots == (), (
+        "course_1 should have 0 dots — its lessons aren't registered "
+        "in CURRICULUM yet (P94 lands them). Without filtering, the "
+        f"unfiltered walk leaked into course_1: {course_1_dots!r}"
+    )
+
+    none_dots = progress.dots_for_course(None)
+    assert none_dots == (), (
+        f"None course_id should return empty tuple, got {none_dots!r}"
+    )
+
+
+def test_dots_for_course_skips_unknown_lessons() -> None:
+    """Stale lesson rows that no longer appear in CURRICULUM must be
+    silently skipped. Future-proofing: if a prior CURRICULUM exported a
+    lesson id that has since been pruned, the on-disk progress may still
+    carry the row, but the HUD cannot paint a dot for a lesson it
+    doesn't know about.
+    """
+    progress = LearnProgress()
+    # Inject a stale row directly (bypasses mark_completed's normal
+    # path — simulates a progress file from a prior CURRICULUM).
+    progress.lessons["L9.99-from-the-future"] = {
+        "completed": True,
+        "completed_at": "2026-01-01T00:00:00Z",
+        "strikes_used": 0,
+    }
+    progress.mark_completed("course_0", "L0.00-press-play")
+
+    course_0_dots = progress.dots_for_course("course_0")
+    assert len(course_0_dots) == 1, (
+        f"only the known lesson should produce a dot; got {course_0_dots!r}"
+    )
+    assert course_0_dots[0]["lesson_id"] == "L0.00-press-play"
+
+
 def test_runtime_completion_persists_across_load(
     progress_path_in_tmp: Path,
 ) -> None:

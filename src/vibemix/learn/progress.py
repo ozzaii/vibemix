@@ -128,11 +128,19 @@ class LearnProgress:
         accepts this raw-dict form and normalises it into
         :class:`LearnProgressDot` tuples.
 
+        Filters by ``course_id`` via the
+        :data:`vibemix.learn.curriculum.CURRICULUM` lookup —
+        ``CURRICULUM[lesson_id].course_id`` is the authoritative owner of
+        each lesson. Lessons not present in CURRICULUM (e.g. stale
+        entries from a prior CURRICULUM that have been pruned) are
+        silently skipped — they cannot be displayed anyway. ``None``
+        course_id returns an empty tuple (no course loaded).
+
         For v9.0 ("Lesson One") only ``course_0`` ships with the
-        hello-world single-lesson curriculum; this method walks
-        ``self.lessons`` and reports anything marked completed. Empty
-        tuple when nothing is completed yet — schema-valid (the
-        ``progress_dots`` array has no ``minItems`` constraint).
+        hello-world single-lesson curriculum; the filter is a no-op
+        because every lesson belongs to ``course_0``. CR-03 (P92 REVIEW)
+        regression — when P94 lands Course 1 (16 lessons) the unfiltered
+        walk would have returned 30+ dots, busting the HUD.
 
         Rule 2 (auto-add missing critical functionality): the
         :class:`LessonRuntime`'s ``on_enter_loaded`` callback calls
@@ -140,11 +148,28 @@ class LearnProgress:
         Without this method the call would throw ``AttributeError`` and
         the defensive try/except would spam stderr on every lesson load.
         """
-        del course_id  # currently unused — v9.0 ships ``course_0`` only;
-        #                future plans extend this filter when multi-course
-        #                lookup needs to distinguish per-course progress.
+        if course_id is None:
+            return ()
+        # Local import — CURRICULUM lives in a sibling module; importing
+        # at module-load time would create a circular reference (the
+        # curriculum module pulls in transcript JSON paths but not this
+        # module today; the lazy local import keeps the import graph
+        # one-way regardless of future refactors).
+        from vibemix.learn.curriculum import CURRICULUM
+
         dots: list[dict[str, str]] = []
         for lesson_id, entry in self.lessons.items():
+            meta = CURRICULUM.get(lesson_id)
+            if meta is None:
+                # Lesson id is not in the current CURRICULUM; cannot be
+                # attributed to a course → silently skip. This preserves
+                # forward-compat with progress rows from a prior
+                # CURRICULUM (e.g. test/debug rows that drift out of the
+                # ship table); the HUD doesn't paint dots for unknown
+                # lessons anyway.
+                continue
+            if meta.course_id != course_id:
+                continue
             if entry.get("completed") is True:
                 dots.append({"lesson_id": lesson_id, "status": "completed"})
         return tuple(dots)
