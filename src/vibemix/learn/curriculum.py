@@ -47,7 +47,13 @@ COURSE_FRAMES: dict[str, str] = {
         "Course 0 is the hello-world tutorial — a one-lesson demo proving "
         "the runtime end-to-end."
     ),
-    # P94 adds course_1 (anatomy: decks, mixer, transport, EQ).
+    "course_1_anatomy": (
+        "Course 1 is the anatomy walkthrough — a beginner meets their "
+        "controller, names every section (decks / mixer / transport / EQ), "
+        "then hears the EQ bands demonstrated on a track from their own "
+        "library. The user has no DJ vocabulary yet; ground every "
+        "observation in what their hands and ears are doing right now."
+    ),
     # P95 adds course_2 (transitions: blends, EQ swap, filter, fade).
     # P96 adds course_3 (play mode: free-form jam with grounded reactions).
 }
@@ -117,5 +123,172 @@ CURRICULUM: dict[str, LessonMeta] = {
         ),
         transcript_path="hello_world/01_press_play.json",
     ),
-    # P94 adds L1.01..L1.16, P95 adds L2.01..L2.14, P96 adds L3.01..L3.07.
+    # ------------------------------------------------------------------
+    # P94 — Course 1 (Anatomy of a Deck): 16 lessons L1.01..L1.16.
+    # Every addendum is byte-equal to the corresponding fixture's
+    # ``system_instruction_addendum`` field (drift gate pinned by
+    # Plan 94-02's test). Titles are lowercase + period-free per UI-SPEC.
+    # ------------------------------------------------------------------
+    "L1.01": LessonMeta(
+        title="opening dialog",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "OPENING DIALOG ADDENDUM: Read the four scripted lines verbatim. "
+            "Do not improvise, paraphrase, or add an extra line."
+        ),
+        transcript_path="course_1_anatomy/01_welcome.json",
+    ),
+    "L1.02": LessonMeta(
+        title="meet your controller",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "MEET CONTROLLER ADDENDUM: Name the rendered controller's three "
+            "sections — left deck, mixer, right deck. Do not narrate "
+            "features beyond the three sections."
+        ),
+        transcript_path="course_1_anatomy/02_meet_your_controller.json",
+    ),
+    "L1.03": LessonMeta(
+        title="channel strip",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "CHANNEL STRIP ADDENDUM: A channel strip is one deck's tone "
+            "column — gain, three EQ knobs, fader. Name the parts as the "
+            "user sweeps them. Stay quiet during the sweep."
+        ),
+        transcript_path="course_1_anatomy/03_channel_strip.json",
+    ),
+    "L1.04": LessonMeta(
+        title="crossfader",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "CROSSFADER ADDENDUM: The crossfader is the horizontal slider "
+            "between decks. Left equals deck A only, right equals deck B "
+            "only, center equals both. State only the mechanical behavior."
+        ),
+        transcript_path="course_1_anatomy/04_crossfader.json",
+    ),
+    "L1.05": LessonMeta(
+        title="pitch fader",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "PITCH FADER ADDENDUM: The pitch fader is a percentage "
+            "adjustment to the BPM. Reference the tempo display on the "
+            "user's deck. Sync is a separate lesson."
+        ),
+        transcript_path="course_1_anatomy/05_pitch_fader.json",
+    ),
+    "L1.06": LessonMeta(
+        title="transport buttons",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "TRANSPORT BUTTONS ADDENDUM: Play, cue, and sync are deck "
+            "transport. Cue plays from the cue point while held. Do not "
+            "pre-empt the sync explanation; Course 2 owns sync."
+        ),
+        transcript_path="course_1_anatomy/06_transport_buttons.json",
+    ),
+    "L1.07": LessonMeta(
+        title="jog wheel",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "JOG WHEEL ADDENDUM: The jog wheel is the round platter used "
+            "to nudge a track forward or back. Scratching is a separate "
+            "art form, deferred to a later course. Do not narrate "
+            "scratching."
+        ),
+        transcript_path="course_1_anatomy/07_jog_wheel.json",
+    ),
+    "L1.08": LessonMeta(
+        title="headphone cueing",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "HEADPHONE CUEING ADDENDUM: The cue button routes a deck to "
+            "the headphones only. Master and headphone cue can differ — "
+            "that is the point."
+        ),
+        transcript_path="course_1_anatomy/08_headphone_cueing.json",
+    ),
+    "L1.09": LessonMeta(
+        title="master · booth · headphones",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "MASTER VOL ADDENDUM: Master sets venue volume, booth is the "
+            "monitor send, headphones is the cue send. Red zone above "
+            "-6 dBFS clips. Do not move master mid-set."
+        ),
+        transcript_path="course_1_anatomy/09_master_booth_headphones.json",
+    ),
+    "L1.10": LessonMeta(
+        title="anatomy of a song",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "SONG ANATOMY ADDENDUM: Walk through intro, build, drop, "
+            "breakdown, outro on the playing track. Reference the audio "
+            "you both hear, not music-theory jargon."
+        ),
+        transcript_path="course_1_anatomy/10_anatomy_of_a_song.json",
+    ),
+    "L1.11": LessonMeta(
+        title="counting bars",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "COUNTING BARS ADDENDUM: Count one-two-three-four across four "
+            "bars (sixteen beats). The user taps on the one each bar. Do "
+            "not narrate microtiming."
+        ),
+        transcript_path="course_1_anatomy/11_counting_bars.json",
+    ),
+    "L1.12": LessonMeta(
+        title="spot breakdown by ear",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "SPOT BREAKDOWN EAR ADDENDUM: The breakdown is the energy "
+            "drop — usually the kick steps out and a sustained chord or "
+            "vocal carries through. State the audible cue, not the bar "
+            "number."
+        ),
+        transcript_path="course_1_anatomy/12_spot_breakdown_by_ear.json",
+    ),
+    "L1.13": LessonMeta(
+        title="spot breakdown by eye",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "SPOT BREAKDOWN EYE ADDENDUM: The breakdown on the waveform "
+            "is a thinner section — less low end, taller mids. Point to "
+            "the waveform, not the audio."
+        ),
+        transcript_path="course_1_anatomy/13_spot_breakdown_by_eye.json",
+    ),
+    "L1.14": LessonMeta(
+        title="eq as tutor",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "EQ AS TUTOR ADDENDUM: Cycle three EQ bands — low, mid, high. "
+            "Cite the exemplar track once per band. Stay quiet while the "
+            "user is sweeping the knob."
+        ),
+        transcript_path="course_1_anatomy/14_eq_as_tutor.json",
+    ),
+    "L1.15": LessonMeta(
+        title="load two tracks",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "LOAD TWO TRACKS ADDENDUM: The user loads a track to deck A, "
+            "then a track to deck B. Reference the load button on the "
+            "controller, not the laptop keyboard."
+        ),
+        transcript_path="course_1_anatomy/15_load_two_tracks.json",
+    ),
+    "L1.16": LessonMeta(
+        title="course 1 recital",
+        course_id="course_1_anatomy",
+        system_instruction_addendum=(
+            "COURSE 1 RECITAL ADDENDUM: Five mixed prompts from prior "
+            "lessons. State the score honestly. Do not soften a fail; do "
+            "not embellish a pass."
+        ),
+        transcript_path="course_1_anatomy/16_course_1_recital.json",
+    ),
+    # P95 adds L2.01..L2.14, P96 adds L3.01..L3.07.
 }
