@@ -96,3 +96,188 @@ def test_stop_reason_initial_none(toolset: LibraryToolset) -> None:
     assert toolset.stop_reason is None, (
         f"stop_reason must start as None; got {toolset.stop_reason!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan 99-02 Task 1 — counter-update behavior in dispatch().
+#
+# These five tests pin Decisions 2 + 7 (CONTEXT.md):
+#   * D-02: counter increments on (a) empty search_vibe results AND
+#           (b) any handler returning {"error": ...}; resets on any
+#           successful non-empty/non-error tool return.
+#   * D-07: unit-tested against the toolset directly with fake
+#           embedder / store / library, NO Codex install required.
+#
+# The threshold-trip / stop_reason write lands in Plan 99-03 — every
+# scenario in this plan keeps the counter BELOW threshold so
+# self.stop_reason remains None. The "monotonic_no_terminal_below_threshold"
+# test pins that explicitly.
+# ---------------------------------------------------------------------------
+
+
+def _stub_empty_search(monkeypatch) -> None:
+    """Make ``vibe_search`` return a zero-result tuple (the empty-search signal)."""
+
+    def fake(emb, st, lib, query, k=15):
+        return ([], False)
+
+    monkeypatch.setattr(tool_mod, "vibe_search", fake)
+
+
+def _stub_nonempty_search(monkeypatch, ids: list[str]) -> None:
+    """Make ``vibe_search`` return ``ids`` as concrete results."""
+    from types import SimpleNamespace
+
+    def fake(emb, st, lib, query, k=15):
+        return (
+            [
+                SimpleNamespace(
+                    track_id=t, title=f"T{t}", artist="A", bpm=124.0, confidence=0.9
+                )
+                for t in ids
+            ],
+            False,
+        )
+
+    monkeypatch.setattr(tool_mod, "vibe_search", fake)
+
+
+def test_empty_search_increments(toolset: LibraryToolset, monkeypatch) -> None:
+    """D-02(a): empty ``search_vibe`` results increment the counter by 1.
+
+    No terminal write below the threshold (Plan 99-03 lands that).
+    """
+    _stub_empty_search(monkeypatch)
+    result = toolset.dispatch("search_vibe", {"query": "hypnotic", "k": 5})
+
+    # Surface: empty results dict, byte-equivalent to pre-plan handler output.
+    assert result == {"results": []}, (
+        f"empty search must return {{'results': []}}; got {result!r}"
+    )
+    # Counter: incremented exactly once.
+    assert toolset._consecutive_empties == 1, (
+        f"empty search_vibe must increment counter to 1; got "
+        f"{toolset._consecutive_empties!r}"
+    )
+    # No terminal yet — Plan 99-03 wires the trip.
+    assert toolset.stop_reason is None, (
+        f"counter below threshold must keep stop_reason None; got "
+        f"{toolset.stop_reason!r}"
+    )
+
+
+def test_handler_error_increments(toolset: LibraryToolset) -> None:
+    """D-02(b): any handler returning ``{"error": ...}`` increments the counter.
+
+    ``get_track_features`` with an unknown track_id is the canonical error path
+    (handler returns ``{"error": "unknown track_id ..."}``). The dispatch hook
+    must recognize this AS an error-return and bump the counter.
+    """
+    out = toolset.dispatch("get_track_features", {"track_id": "NOT_IN_LIBRARY"})
+
+    # Surface: error dict, byte-equivalent to pre-plan handler output.
+    assert "error" in out, f"unknown track_id must return error dict; got {out!r}"
+    # Counter: incremented exactly once.
+    assert toolset._consecutive_empties == 1, (
+        f"handler error must increment counter to 1; got "
+        f"{toolset._consecutive_empties!r}"
+    )
+    # No terminal yet — Plan 99-03 wires the trip.
+    assert toolset.stop_reason is None, (
+        f"counter below threshold must keep stop_reason None; got "
+        f"{toolset.stop_reason!r}"
+    )
+
+
+def test_counter_resets_on_success(toolset: LibraryToolset, monkeypatch) -> None:
+    """D-02 reset clause: a successful non-empty tool return resets to 0.
+
+    Sequence: empty search (counter=1) → non-empty search (counter=0).
+    """
+    # Step 1: empty search → counter = 1
+    _stub_empty_search(monkeypatch)
+    toolset.dispatch("search_vibe", {"query": "narrow theme"})
+    assert toolset._consecutive_empties == 1, (
+        f"after empty search counter must be 1; got "
+        f"{toolset._consecutive_empties!r}"
+    )
+
+    # Step 2: non-empty search → counter resets to 0.
+    _stub_nonempty_search(monkeypatch, ["t000", "t001"])
+    out = toolset.dispatch("search_vibe", {"query": "broader theme"})
+    assert "results" in out and len(out["results"]) == 2, (
+        f"non-empty search must return 2 results; got {out!r}"
+    )
+    assert toolset._consecutive_empties == 0, (
+        f"successful non-empty search must reset counter to 0; got "
+        f"{toolset._consecutive_empties!r}"
+    )
+    assert toolset.stop_reason is None, (
+        f"reset path must keep stop_reason None; got {toolset.stop_reason!r}"
+    )
+
+
+def test_counter_resets_after_partial_failures(
+    toolset: LibraryToolset, monkeypatch
+) -> None:
+    """D-02 reset clause under a mixed sequence.
+
+    Sequence: empty (0→1) → error (1→2) → success (2→0).
+    Pins "consecutive" semantics: a single success wipes prior failures.
+    """
+    # Step 1: empty search → 1
+    _stub_empty_search(monkeypatch)
+    toolset.dispatch("search_vibe", {"query": "x"})
+    assert toolset._consecutive_empties == 1
+
+    # Step 2: handler error → 2
+    out = toolset.dispatch("get_track_features", {"track_id": "STILL_UNKNOWN"})
+    assert "error" in out
+    assert toolset._consecutive_empties == 2, (
+        f"error after empty must increment counter to 2; got "
+        f"{toolset._consecutive_empties!r}"
+    )
+
+    # Step 3: successful non-empty search → 0 (the "consecutive" reset).
+    _stub_nonempty_search(monkeypatch, ["t000"])
+    toolset.dispatch("search_vibe", {"query": "broader"})
+    assert toolset._consecutive_empties == 0, (
+        f"successful non-empty after error must reset counter to 0; got "
+        f"{toolset._consecutive_empties!r}"
+    )
+    assert toolset.stop_reason is None
+
+
+def test_counter_monotonic_no_terminal_below_threshold(
+    toolset: LibraryToolset, monkeypatch
+) -> None:
+    """Below threshold: counter strictly increments, no stop_reason write.
+
+    Bumps the threshold to 4 (via monkeypatch on the module constant so the
+    dispatch hook reads it fresh on each call — Pitfall 7) and fires 3 empties.
+    Counter lands at 3; stop_reason stays None; every dispatch return value is
+    byte-equivalent to the original handler output (no short-circuit).
+    """
+    monkeypatch.setattr(tool_mod, "TOOL_STARVATION_THRESHOLD", 4)
+    _stub_empty_search(monkeypatch)
+
+    expected: list[dict] = []
+    for i in range(3):
+        out = toolset.dispatch("search_vibe", {"query": f"narrow_{i}"})
+        expected.append(out)
+
+    # Counter at exactly 3 (threshold − 1).
+    assert toolset._consecutive_empties == 3, (
+        f"three empties must take counter to 3; got "
+        f"{toolset._consecutive_empties!r}"
+    )
+    # No terminal write yet (Plan 99-03 lands the trip).
+    assert toolset.stop_reason is None, (
+        f"counter below threshold must keep stop_reason None; got "
+        f"{toolset.stop_reason!r}"
+    )
+    # Each dispatch return value is the original handler result — byte-equivalent.
+    assert all(out == {"results": []} for out in expected), (
+        f"dispatch return values must be byte-equivalent to handler output; "
+        f"got {expected!r}"
+    )
