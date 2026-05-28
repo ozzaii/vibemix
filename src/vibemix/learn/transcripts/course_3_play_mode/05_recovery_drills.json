@@ -1,0 +1,55 @@
+{
+  "lesson_id": "L3.05",
+  "title": "recovery drills",
+  "system_instruction_addendum": "RECOVERY DRILLS ADDENDUM: Synthetic train-wreck on deck B (key clash OR misaligned phrase). User bails out via echo-out, filter, or cut within 4 bars.",
+  "proactive_lens_active": true,
+  "exemplar_audio_forbidden": true,
+  "drill_shapes": [
+    {
+      "drill": "key_clash",
+      "deck": "B",
+      "shape": "playback-pitch drift on deck b causes harmonic clash with deck a"
+    },
+    {
+      "drill": "misaligned_phrase",
+      "deck": "B",
+      "shape": "playback-rate drift on deck b causes phrase misalignment with deck a"
+    }
+  ],
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "i'm going to introduce a problem in your mix. two drills. one at a time.",
+      "tts_marker": "L305.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "when you hear it go off, bail out within four bars. echo-out, filter sweep, or hard cut. your choice.",
+      "tts_marker": "L305.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "load two tracks, get them playing together. i'll introduce drill one when you're settled.",
+      "tts_marker": "L305.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "drill one is a key clash. drill two is a phrase misalignment.",
+      "tts_marker": "L305.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "tap continue when both drills are recovered.",
+      "tts_marker": "L305.hint3"
+    }
+  ]
+}

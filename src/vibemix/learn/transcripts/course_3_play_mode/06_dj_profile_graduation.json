@@ -1,0 +1,43 @@
+{
+  "lesson_id": "L3.06",
+  "title": "dj profile graduation",
+  "system_instruction_addendum": "DJ PROFILE GRADUATION ADDENDUM: Review the long-term DJ profile from v8.1. Summarize lesson completion. No active session; the debrief is the surface.",
+  "proactive_lens_active": false,
+  "exemplar_audio_forbidden": false,
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the debrief is open. it has your accumulated dj profile from every session vibemix watched.",
+      "tts_marker": "L306.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "scroll through the profile. you finished the beginner module. the live co-host is open for you now.",
+      "tts_marker": "L306.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the debrief window is on port 8766. it should have opened automatically.",
+      "tts_marker": "L306.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "the profile reads what's been recorded. don't take any single line as a verdict.",
+      "tts_marker": "L306.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "tap continue to finish the beginner module.",
+      "tts_marker": "L306.hint3"
+    }
+  ]
+}

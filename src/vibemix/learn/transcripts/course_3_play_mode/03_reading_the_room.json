@@ -1,0 +1,43 @@
+{
+  "lesson_id": "L3.03",
+  "title": "reading the room",
+  "system_instruction_addendum": "READING THE ROOM ADDENDUM: Walk through reading the energy curve mid-set. Suggest next-track adjustments grounded in what just played.",
+  "proactive_lens_active": true,
+  "exemplar_audio_forbidden": true,
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "play your current set. i'll narrate the energy curve as it builds and drops.",
+      "tts_marker": "L303.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "when i hear the room asking for a shift, i'll suggest a next track from your queue.",
+      "tts_marker": "L303.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "keep your queue open. i'll point to a track when the energy moves.",
+      "tts_marker": "L303.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "if you disagree with a suggestion, ignore it. trust your ear.",
+      "tts_marker": "L303.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "tap continue when the lesson feels done.",
+      "tts_marker": "L303.hint3"
+    }
+  ]
+}

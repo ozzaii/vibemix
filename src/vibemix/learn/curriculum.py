@@ -61,7 +61,15 @@ COURSE_FRAMES: dict[str, str] = {
         "phrase matching, and train-wreck diagnosis. Ground every "
         "observation in what the two decks are doing right now."
     ),
-    # P96 adds course_3 (play mode: free-form jam with grounded reactions).
+    "course_3_play_mode": (
+        "Course 3 is the play mode — the beginner runs a real set with "
+        "vibemix coaching live. Forward calls land only when [cue:] "
+        "anchors back the prediction; otherwise narration stays "
+        "retrospective. No exemplar playback while a deck is audible "
+        "(verbal coaching only). The user has finished anatomy and "
+        "transitions; the floor is muscle memory, the work here is "
+        "judgment under live conditions."
+    ),
 }
 
 
@@ -445,5 +453,72 @@ CURRICULUM: dict[str, LessonMeta] = {
         ),
         transcript_path="course_2_transitions/14_course_2_recital.json",
     ),
-    # P96 adds L3.01..L3.07.
+    # ------------------------------------------------------------------
+    # P96 — Course 3 (Play Mode): 6 lessons L3.01..L3.06.
+    # Every addendum is byte-equal to the corresponding fixture's
+    # ``system_instruction_addendum`` field (drift gate pinned by
+    # Plan 96-03's test). Titles are lowercase + period-free per UI-SPEC.
+    # L3.01-L3.05 carry proactive_lens_active=true + exemplar_audio_forbidden=true;
+    # L3.06 (post-set review) carries both false.
+    # ------------------------------------------------------------------
+    "L3.01": LessonMeta(
+        title="first 5-minute mix",
+        course_id="course_3_play_mode",
+        system_instruction_addendum=(
+            "FIRST 5-MIN MIX ADDENDUM: User picks tracks freely. Suggest "
+            "one grounded move per minute. Count-ins require [cue:] "
+            "evidence; otherwise narrate retrospectively."
+        ),
+        transcript_path="course_3_play_mode/01_first_5_minute_mix.json",
+    ),
+    "L3.02": LessonMeta(
+        title="first 15-minute set",
+        course_id="course_3_play_mode",
+        system_instruction_addendum=(
+            "FIRST 15-MIN SET ADDENDUM: A pre-sequenced pool is loaded "
+            "from v8.2 build-a-set. Coach each transition. Cite [cue:] "
+            "when forward calls are grounded."
+        ),
+        transcript_path="course_3_play_mode/02_first_15_minute_set.json",
+    ),
+    "L3.03": LessonMeta(
+        title="reading the room",
+        course_id="course_3_play_mode",
+        system_instruction_addendum=(
+            "READING THE ROOM ADDENDUM: Walk through reading the energy "
+            "curve mid-set. Suggest next-track adjustments grounded in "
+            "what just played."
+        ),
+        transcript_path="course_3_play_mode/03_reading_the_room.json",
+    ),
+    "L3.04": LessonMeta(
+        title="first 30-minute set capstone",
+        course_id="course_3_play_mode",
+        system_instruction_addendum=(
+            "30-MIN CAPSTONE ADDENDUM: Full proactive co-pilot. Forward "
+            "calls ONLY on [cue:] evidence. Session is recorded; debrief "
+            "opens at end."
+        ),
+        transcript_path="course_3_play_mode/04_first_30_minute_capstone.json",
+    ),
+    "L3.05": LessonMeta(
+        title="recovery drills",
+        course_id="course_3_play_mode",
+        system_instruction_addendum=(
+            "RECOVERY DRILLS ADDENDUM: Synthetic train-wreck on deck B "
+            "(key clash OR misaligned phrase). User bails out via "
+            "echo-out, filter, or cut within 4 bars."
+        ),
+        transcript_path="course_3_play_mode/05_recovery_drills.json",
+    ),
+    "L3.06": LessonMeta(
+        title="dj profile graduation",
+        course_id="course_3_play_mode",
+        system_instruction_addendum=(
+            "DJ PROFILE GRADUATION ADDENDUM: Review the long-term DJ "
+            "profile from v8.1. Summarize lesson completion. No active "
+            "session; the debrief is the surface."
+        ),
+        transcript_path="course_3_play_mode/06_dj_profile_graduation.json",
+    ),
 }

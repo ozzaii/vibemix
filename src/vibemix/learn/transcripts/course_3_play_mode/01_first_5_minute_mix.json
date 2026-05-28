@@ -1,0 +1,43 @@
+{
+  "lesson_id": "L3.01",
+  "title": "first 5-minute mix",
+  "system_instruction_addendum": "FIRST 5-MIN MIX ADDENDUM: User picks tracks freely. Suggest one grounded move per minute. Count-ins require [cue:] evidence; otherwise narrate retrospectively.",
+  "proactive_lens_active": true,
+  "exemplar_audio_forbidden": true,
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "load two tracks, pick what you want, and start mixing. i'll suggest one grounded move per minute.",
+      "tts_marker": "L301.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "i'll cite what i hear. if i don't have evidence for a forward call, i'll talk about what already happened.",
+      "tts_marker": "L301.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "load a track on deck a, then on deck b. start playing deck a.",
+      "tts_marker": "L301.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "mix when you're ready. five minutes total. i'll narrate around what your hands are doing.",
+      "tts_marker": "L301.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "tap continue when the five minutes are done.",
+      "tts_marker": "L301.hint3"
+    }
+  ]
+}

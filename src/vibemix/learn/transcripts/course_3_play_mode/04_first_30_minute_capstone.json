@@ -1,0 +1,43 @@
+{
+  "lesson_id": "L3.04",
+  "title": "first 30-minute set capstone",
+  "system_instruction_addendum": "30-MIN CAPSTONE ADDENDUM: Full proactive co-pilot. Forward calls ONLY on [cue:] evidence. Session is recorded; debrief opens at end.",
+  "proactive_lens_active": true,
+  "exemplar_audio_forbidden": true,
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "thirty minutes. proactive co-pilot is on. forward calls land only when the audio gives me a cue to anchor.",
+      "tts_marker": "L304.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "this is recorded. when you finish, the debrief opens with cited moments from the set.",
+      "tts_marker": "L304.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "load your first track on deck a. mix when you're ready.",
+      "tts_marker": "L304.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "you can pause and step away. the recording keeps going.",
+      "tts_marker": "L304.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "tap continue when the thirty minutes are up.",
+      "tts_marker": "L304.hint3"
+    }
+  ]
+}
