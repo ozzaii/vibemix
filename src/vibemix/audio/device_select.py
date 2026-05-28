@@ -242,7 +242,18 @@ def select_output_device(
     """
 
     def _resolvable(idx: int | None) -> bool:
-        return isinstance(idx, int) and 0 <= idx < len(devices) and _is_output(devices[idx])
+        # output_device_id is a POSITIONAL query_devices() index, which reorders
+        # on plug/unplug/reboot. A stale index that lands on a BlackHole output
+        # variant would route the AI voice INTO the master-capture device — the
+        # co-host would then hear itself (a feedback loop + an anti-slop hazard).
+        # So the persisted-index (step 1) and OS-default (step 3) paths reject a
+        # loopback device; only the explicit last-resort (step 5) may use one.
+        # Controllers are NOT excluded here — a stale index onto a controller is
+        # merely wrong-output, not a capture loop, and a user may legitimately
+        # route the voice to a controller's headphone out.
+        if not (isinstance(idx, int) and 0 <= idx < len(devices) and _is_output(devices[idx])):
+            return False
+        return _BLACKHOLE_PREFIX not in _name_of(devices[idx]).lower()
 
     # 1. Explicit wizard-persisted choice.
     if _resolvable(preferred_index):

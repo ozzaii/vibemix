@@ -200,3 +200,36 @@ def test_output_raises_only_when_no_output_device_at_all() -> None:
     devices = [_in("BlackHole 2ch", ich=2, och=0), _in("MacBook Pro Microphone", ich=1, och=0)]
     with pytest.raises(RuntimeError, match="No output-capable"):
         select_output_device(devices, fallback_name="MacBook Pro Speakers")
+
+
+def test_output_stale_persisted_index_onto_blackhole_is_rejected() -> None:
+    # Anti-feedback-loop hardening: output_device_id is a positional index that
+    # reorders on plug/unplug. A stale index landing on a BlackHole OUTPUT
+    # variant must NOT be honored (routing AI voice into the master capture =
+    # the co-host hears itself). Falls through to the real output instead.
+    devices = [
+        _in("BlackHole 2ch", ich=2, och=2),  # loopback, output-capable
+        _in("MacBook Pro Speakers", ich=0, och=2),
+    ]
+    assert select_output_device(devices, preferred_index=0, fallback_name="MacBook Pro Speakers") == 1
+
+
+def test_output_os_default_onto_blackhole_is_rejected() -> None:
+    # Same guard on the OS-default path: a BlackHole-inclusive default output is
+    # skipped in favor of a real, non-loopback output.
+    devices = [
+        _in("BlackHole 2ch", ich=2, och=2),
+        _in("External DAC", ich=0, och=2),
+    ]
+    assert select_output_device(devices, fallback_name="nope", default_index=0) == 1
+
+
+def test_output_persisted_controller_index_is_still_honored() -> None:
+    # Controllers are NOT excluded from the explicit persisted choice — a user
+    # may legitimately route the voice to a controller's headphone out, and a
+    # controller output is not a capture-feedback loop.
+    devices = [
+        _in("MacBook Pro Speakers", ich=0, och=2),
+        _in("DDJ-FLX4", ich=4, och=4),  # controller output
+    ]
+    assert select_output_device(devices, preferred_index=1, fallback_name="MacBook Pro Speakers") == 1
