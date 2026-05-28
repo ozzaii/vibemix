@@ -91,6 +91,10 @@ const DEFAULT_STATE: WizardState = {
     detectedDjApp: undefined,
     windowPickerMode: "hint",
     windowSelected: false,
+    // Phase 97 / ONBOARD-04 — headphone picker default = system default
+    // (null on the wire). The user can flip this to any real device
+    // index via the Step 2 picker.
+    selectedHeadphoneDeviceIndex: null,
   },
   step3: {
     detectedController: undefined,
@@ -426,6 +430,26 @@ export function renderCurrentStep(): void {
             step2: { ...wizardState.step2, windowPickerMode: "enum" },
           });
           void refreshWindowList();
+        },
+        // Phase 97 / ONBOARD-04 — headphone picker callback. Updates the
+        // local Step 2 state AND fires ipc.settings.set so the sidecar
+        // persists the choice via ConfigStore.extra. The schema's
+        // 'learn.headphone_device_index' field was landed in P93 with the
+        // EXEMPLAR-04 wiring; we're just adding the picker surface here.
+        onSelectHeadphoneDevice: (idx) => {
+          setState({
+            step2: {
+              ...wizardState.step2,
+              selectedHeadphoneDeviceIndex: idx,
+            },
+          });
+          void emitIpc("ipc.settings.set", {
+            field: "learn.headphone_device_index",
+            value: idx,
+          }).catch((err: unknown) => {
+            // eslint-disable-next-line no-console
+            console.warn("[wizard] headphone device set failed:", err);
+          });
         },
       });
       break;
