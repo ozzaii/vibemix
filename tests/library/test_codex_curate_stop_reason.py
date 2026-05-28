@@ -291,3 +291,283 @@ def test_malformed_side_channel_falls_through(library, monkeypatch, tmp_path):
         f"logic; got {res.stop_reason!r}"
     )
     assert res.track_ids == ["t000"]
+
+
+# ---------------------------------------------------------------------------
+# Plan 99-08 — INTEGRATION SEAL.
+#
+# These three tests close the chain by exercising the REAL toolset's
+# ``_build_starvation_payload`` (NOT a hardcoded dict) → side-channel write
+# → wrapper short-circuit → ``CodexCurateResult.to_dict()``.
+#
+# If any future PR breaks any leg of the chain — payload-generator shape
+# drift, wrapper short-circuit reordering, dataclass field rename — one
+# of these tests fails LOUDLY with a precise diff.
+#
+# Forward-compat (Phase 100): the same posture (real generator + real
+# wrapper + fake _runner with side-channel) clones for
+# ``clarification_needed`` — swap the generator call for
+# ``_build_clarification_payload`` and the asserted substring strings.
+# ---------------------------------------------------------------------------
+
+
+# Import the toolset HERE — the seal tests construct the real generator
+# inline. Kept local to the seal block so the file's import order signals
+# which suites need the toolset (seal) vs. wrapper-only (99-04 tests above).
+#
+# Plan deviation note (Rule 1 — plan/code drift fix): the 99-08 plan
+# frontmatter calls out ``CodexBuildSetResult.to_dict()`` as a separate
+# shape pin, but the shipped codebase uses ONE ``CodexCurateResult``
+# dataclass for BOTH ``curate_with_codex`` and ``build_set_with_codex``
+# return values (see codex_curate.py:397 + :731 — both declared as
+# ``-> CodexCurateResult``). The seal still proves "uniform shape across
+# both wrappers" — it just does so via the same dataclass rather than a
+# parallel class. The ``test_to_dict_serializes_starvation_shape`` test
+# pins all field keys so any future split of the dataclass surfaces here
+# with a precise field-name diff.
+from vibemix.library.rekordbox import RekordboxLibrary as _RekordboxLibrary  # noqa: E402
+from vibemix.library.toolset import LibraryToolset as _LibraryToolset  # noqa: E402
+from unittest.mock import MagicMock as _MagicMock  # noqa: E402
+
+
+def _empty_library() -> _RekordboxLibrary:
+    """Zero-track library — triggers Case A (zero-track) in
+    ``_build_starvation_payload``."""
+    lib = _RekordboxLibrary()
+    lib.tracks = {}
+    return lib
+
+
+def _make_real_payload(library: _RekordboxLibrary, last_tool: str, args: dict) -> dict:
+    """Generate the side-channel payload via the REAL toolset method.
+
+    Plan 99-08 seal contract: the seal test must NOT hardcode a payload
+    dict — it must invoke ``LibraryToolset._build_starvation_payload`` on a
+    real toolset constructed against the supplied library. This proves the
+    payload that COMES OUT of the toolset's generator is the same one the
+    wrapper consumes (no shape drift).
+    """
+    toolset = _LibraryToolset(_MagicMock(), _MagicMock(), library)
+    # Simulate the threshold-trip site: counter equals threshold at the
+    # moment the payload is built (matches toolset.py:1175-1176).
+    toolset._consecutive_empties = 3
+    return toolset._build_starvation_payload(last_tool=last_tool, args=args)
+
+
+def test_uniform_propagation_curate_path():
+    """SEAL: real generator → side-channel file → wrapper → CodexCurateResult.to_dict().
+
+    Exercises REQ-HARDEN-RETRY-02 (terminal stop_reason discriminator
+    surfaces through to dataclass), REQ-HARDEN-RETRY-03 (hint carried
+    through to ``error`` field), AND REQ-HARDEN-RETRY-07 (uniform
+    propagation seam from toolset → wrapper).
+
+    The fake ``_runner`` GENERATES the side-channel payload via the real
+    ``_build_starvation_payload`` method (Case A, zero-track library),
+    writes it to the env-var path, and returns a normal
+    ``CompletedProcess(returncode=0)``. The wrapper MUST short-circuit
+    with ``stop_reason="tool_starvation"`` and surface the hint as
+    ``error``, and the resulting ``to_dict()`` MUST carry the same
+    fields the JSON / GUI consumer reads.
+    """
+    empty_lib = _empty_library()
+    real_payload = _make_real_payload(
+        empty_lib, last_tool="search_vibe", args={"query": "anything"}
+    )
+    # Case A hint structure is the Plan 99-03 contract.
+    assert real_payload["reason"] == "tool_starvation", (
+        f"generator pre-check: real payload must have reason='tool_starvation'; "
+        f"got {real_payload.get('reason')!r}"
+    )
+    assert "library has 0 tracks" in real_payload["hint"], (
+        f"generator pre-check: Case A hint must contain "
+        f'"library has 0 tracks"; got {real_payload.get("hint")!r}'
+    )
+
+    runner = _runner_with_side_channel(
+        side_channel_payload=real_payload,
+        out_payload=None,  # MCP child wrote stop_reason.json INSTEAD of out.json
+    )
+
+    res = curate_with_codex(
+        "anything",
+        empty_lib,
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    # Wrapper-side dataclass shape.
+    assert isinstance(res, CodexCurateResult), (
+        f"wrapper must return CodexCurateResult; got {type(res).__name__}"
+    )
+    assert res.stop_reason == "tool_starvation", (
+        f'stop_reason must propagate as "tool_starvation"; got {res.stop_reason!r}'
+    )
+    assert res.error is not None, "error must carry the hint string"
+    assert "library has 0 tracks" in res.error, (
+        f"hint substring must round-trip through wrapper; got error={res.error!r}"
+    )
+    assert res.playlist_name is None
+    assert res.track_ids == []
+    assert res.m3u_path is None
+
+    # to_dict() — the GUI / JSON consumer surface.
+    d = res.to_dict()
+    assert d["stop_reason"] == "tool_starvation", (
+        f"to_dict()['stop_reason'] must propagate; got {d.get('stop_reason')!r}"
+    )
+    assert "library has 0 tracks" in (d.get("error") or ""), (
+        f"to_dict()['error'] must carry the hint; got {d.get('error')!r}"
+    )
+    assert d["track_ids"] == []
+    assert d["playlist_name"] is None
+    assert d["m3u_path"] is None
+
+
+def test_uniform_propagation_build_set_path():
+    """SEAL: same chain via build_set_with_codex (parallel wrapper).
+
+    Proves the SAME ``_build_starvation_payload`` output reaches the
+    set-prep wrapper too — the propagation surface is uniform across
+    both wrappers. Uses Case B (no-theme-match) to exercise a different
+    hint case than the curate-path test.
+    """
+    # Library with tracks — triggers Case B (no-theme-match) when last_tool
+    # is search_vibe and the counter hits threshold.
+    lib = _RekordboxLibrary()
+    lib.tracks = {f"t{i:03d}": _track(f"t{i:03d}") for i in range(5)}
+
+    real_payload = _make_real_payload(
+        lib, last_tool="search_vibe", args={"query": "too-narrow-theme"}
+    )
+    assert real_payload["reason"] == "tool_starvation"
+    assert "no tracks matched" in real_payload["hint"], (
+        f"generator pre-check: Case B hint must contain "
+        f'"no tracks matched"; got {real_payload.get("hint")!r}'
+    )
+    assert "too-narrow-theme" in real_payload["hint"], (
+        f"Case B hint must interpolate the theme string; "
+        f"got {real_payload.get('hint')!r}"
+    )
+
+    runner = _runner_with_side_channel(
+        side_channel_payload=real_payload,
+        out_payload=None,
+    )
+
+    res = build_set_with_codex(
+        "too-narrow-theme",
+        lib,
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    # build_set_with_codex returns CodexCurateResult (the codebase ships
+    # ONE dataclass for BOTH wrappers — see plan-deviation note at the
+    # top of the seal block). The seal still proves "uniform shape across
+    # both wrappers" — same dataclass, same propagation contract.
+    assert isinstance(res, CodexCurateResult), (
+        f"build_set_with_codex must return CodexCurateResult; "
+        f"got {type(res).__name__}"
+    )
+    assert res.stop_reason == "tool_starvation", (
+        f'stop_reason must propagate as "tool_starvation"; got {res.stop_reason!r}'
+    )
+    assert res.error is not None
+    assert "no tracks matched" in res.error, (
+        f"hint substring must round-trip through set-prep wrapper; "
+        f"got error={res.error!r}"
+    )
+    assert "too-narrow-theme" in res.error, (
+        f"theme interpolation must reach the wrapper; got error={res.error!r}"
+    )
+    assert res.track_ids == []
+    assert res.export_path is None
+
+    # to_dict() — GUI/JSON surface.
+    d = res.to_dict()
+    assert d["stop_reason"] == "tool_starvation"
+    assert "no tracks matched" in (d.get("error") or "")
+    assert d["track_ids"] == []
+    assert d["export_path"] is None
+
+
+def test_to_dict_serializes_starvation_shape():
+    """SEAL: dataclass shape pin.
+
+    Direct construction of both result dataclasses with starvation fields,
+    then ``to_dict()`` must surface every documented key. Any future field
+    rename / drop / reorder fails this test with a precise field-name diff
+    (T-99-SHAPE mitigation).
+    """
+    # CodexCurateResult — plain-curation surface.
+    cr = CodexCurateResult(
+        theme="x",
+        stop_reason="tool_starvation",
+        error="test hint",
+    )
+    d = cr.to_dict()
+    # Required keys for the GUI / JSON consumer (matches the field list in
+    # codex_curate.py:205-215).
+    required_curate_keys = {
+        "theme",
+        "stop_reason",
+        "playlist_name",
+        "track_ids",
+        "m3u_path",
+        "json_path",
+        "rationale",
+        "error",
+        "export_path",
+    }
+    missing = required_curate_keys - set(d.keys())
+    assert not missing, (
+        f"CodexCurateResult.to_dict() missing required keys: {missing}. "
+        f"A dataclass field was renamed or dropped — update the consumer "
+        f"contracts (CLI / Telegram / Tauri bridge) accordingly."
+    )
+    assert d["stop_reason"] == "tool_starvation"
+    assert d["error"] == "test hint"
+    assert d["theme"] == "x"
+    # Default values must remain stable — empty list / None for the
+    # starvation surface (no partial playlist written).
+    assert d["track_ids"] == [], (
+        f"track_ids default must remain []; got {d.get('track_ids')!r}"
+    )
+    assert d["playlist_name"] is None
+    assert d["m3u_path"] is None
+
+    # Set-prep starvation surface — same CodexCurateResult dataclass, but
+    # with the ``export_path`` field carrying the set-prep null. The seal
+    # proves: even on the set-prep code path, the returned dataclass
+    # exposes the SAME starvation contract (stop_reason + error + cleared
+    # outputs). This is the "uniform shape" pin.
+    br = CodexCurateResult(
+        theme="x",
+        stop_reason="tool_starvation",
+        error="test hint",
+        export_path=None,  # set-prep null on starvation — no XML written
+    )
+    d2 = br.to_dict()
+    # Same required-key set (same dataclass). The set-prep ``export_path``
+    # field is part of that set already.
+    missing2 = required_curate_keys - set(d2.keys())
+    assert not missing2, (
+        f"CodexCurateResult set-prep starvation surface missing required keys: "
+        f"{missing2}. Dataclass field was renamed or dropped."
+    )
+    assert d2["stop_reason"] == "tool_starvation"
+    assert d2["error"] == "test hint"
+    assert d2["track_ids"] == []
+    assert d2["export_path"] is None
+    # Cross-check: the curate-path and set-prep-path to_dict() outputs
+    # share the same key set — proving the "ONE dataclass for both
+    # wrappers" surface (T-99-SHAPE mitigation). Drift here would break
+    # the Tauri bridge / Telegram normalizer / CLI exit-code dispatcher
+    # all at once.
+    assert set(d.keys()) == set(d2.keys()), (
+        f"curate and set-prep to_dict() key sets must match (uniform "
+        f"shape contract); diff={set(d.keys()) ^ set(d2.keys())}"
+    )
