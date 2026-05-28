@@ -77,7 +77,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
 | 91 | Controller Renderer + MIDI Mirror | 7/7 | Complete   | 2026-05-27 |
-| 92 | Lesson Runtime + AI Highlight Contract | 6/7 | In Progress|  |
+| 92 | Lesson Runtime + AI Highlight Contract | 7/7 | Complete   | 2026-05-28 |
 | 93 | Exemplar Engine + `[exemplar:]` Evidence Source | DSP-band exemplar engine picks strongest-band track from user's library; falls back to packaged CC-BY bank when empty; plays through dedicated `ExemplarPlayer`; `[exemplar:<id>]` resolves via 4-site mirror | EXEMPLAR-01, EXEMPLAR-02, EXEMPLAR-03, EXEMPLAR-04, EXEMPLAR-05 (5) | 4 |
 | 94 | Course 1 — Anatomy (L1.01–L1.16) | Beginner opens Learn, sees verbatim 4-line opening dialog, walks through 16 hand-authored anatomy lessons culminating in EQ-as-Tutor demo using library exemplars | TONE-01, TONE-03, CURR-1.01..1.16 (18) | 5 |
 | 95 | Course 2 — Transitions (L2.01–L2.14) | User learns beatmatching (ear + sync) + 5 canonical transitions (long blend, EQ swap, kick swap, filter fade, echo-out, drop swap, loop) + harmonic mixing via Camelot wheel | CURR-2.01..2.14 (14) | 4 |
@@ -125,7 +125,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 - [x] 92-04-PLAN.md — Progress persistence + `vibemix learn reset` CLI + __main__.main() LessonRuntime wiring (Wave 3)
 - [x] 92-05-PLAN.md — Lesson UI: hud.ts + tutor-dock.ts + skip-button.ts + applyHighlight on controller-stage + 11 envelope handlers in learn-window.ts (Wave 4)
 - [x] 92-06-PLAN.md — Settings drawer LearnGroup (Reset Learn Progress row + destructive confirm dialog) (Wave 4)
-- [ ] 92-07-PLAN.md — Kaan FLX4 ear-pass checkpoint (live verification per feedback_verify_live_app_not_just_tests) (Wave 5)
+- [x] 92-07-PLAN.md — Kaan FLX4 ear-pass checkpoint (live verification per feedback_verify_live_app_not_just_tests) (Wave 5)
 **UI hint**: yes
 
 ### Phase 93: Exemplar Engine + `[exemplar:]` Evidence Source
@@ -137,7 +137,13 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
   2. When the user's library is empty or ≤3 tracks pass the band-share floor, the system falls back to a packaged ~3–5 MB CC-BY exemplar bank at `assets/learn/band_exemplars/{sub,low,mid,high}/*` (4 tracks, instrumental, no vocals, ≤60s each) — honest-null reasoning surfaced as *"Your library doesn't have a great example of this — listen to this one we packaged"*. Empty-library path verified by `tests/learn/test_exemplar_packaged_fallback.py`. **EXEMPLAR-03.**
   3. Exemplar audio plays through a dedicated `src/vibemix/learn/audio_cue.py::ExemplarPlayer` on a SECOND `sd.OutputStream` to a user-picked headphone device — NOT reusing `audio.buffers.PlaybackQueue` (which is mic-gated at `audio/buffers.py:195` and would mute the user). Stereo float32 @ track sample rate via PyAV/FFmpeg decode. Default-safe playback gain: -12 dB (or -18 dB if master deck audio > -6 dBFS — defer until quiet). Headphone device picker added to existing wizard; persists as `learn.headphone_device_index` on existing `ipc.settings.set` envelope. **EXEMPLAR-04.**
   4. AI claims about exemplar tracks resolve via a NEW `[exemplar:<track_id>]` evidence source — added atomically to the 4 schema-mirror sites in a single commit (mirrors v6 `[recall:]` precedent EXACTLY): `state/evidence_registry.py:111` (EVIDENCE_SOURCES frozenset) · `state/evidence_registry.py:137` (`_SOURCE_ALT` regex) · `prompts/matrix.py` (CITATION_GRAMMAR_BLOCK) · `agent/dj_cohost.py` (`_build_citation_strip`). Pinned by `tests/learn/test_exemplar_citation_schema_mirror.py` (4-site lock test) + `tests/learn/test_exemplar_grounding_e2e.py` (fabricated `[exemplar:bogus]` strips whole turn — **Invariant #2 binding**). **EXEMPLAR-05.**
-**Plans**: TBD
+**Plans:** 6 plans
+- [ ] 93-01-PLAN.md — Test scaffolding: 11 RED-state stubs across tests/learn/ + tests/ipc/ (Nyquist-compliant gated-skip pattern) (Wave 1)
+- [ ] 93-02-PLAN.md — Side-car band_shares store + compute_band_shares + _kick_correlation pure-compute primitives (Wave 2)
+- [ ] 93-03-PLAN.md — ExemplarPlayer + load_audio_stereo + learn.headphone_device_index settings persistence + codegen:ipc (Wave 2)
+- [ ] 93-04-PLAN.md — ExemplarFinder + ExemplarPick + packaged CC-BY bank scaffold + NOTICE.md (Wave 3)
+- [ ] 93-05-PLAN.md — Atomic 4-site `[exemplar:]` mirror across evidence_registry + matrix + dj_cohost; sites 1+2 atomic + sites 3 + 4 sequential commits (Wave 4)
+- [ ] 93-06-PLAN.md — folder_ingest.compute_band_shares opt-in + `vibemix learn exemplar <band>` CLI + phase-smoke (Wave 5)
 
 ### Phase 94: Course 1 — Anatomy (L1.01–L1.16)
 **Goal:** A beginner opens vibemix, picks Learn, sees the verbatim 4-line iconic opening dialog ("Oh bestie…"), and walks through 16 hand-authored anatomy lessons culminating in the EQ-as-Tutor marquee demo using library exemplars. **The tone byte-equality test on opening dialog + tutor-slop blocklist v2 + tutor system instruction lock all land here.**
@@ -204,7 +210,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 |-------|----------------|--------|-----------|
 | 91. Controller Renderer + MIDI Mirror | 5/7 | In progress | - |
 | 92. Lesson Runtime + AI Highlight Contract | 0/? | Not started | - |
-| 93. Exemplar Engine + `[exemplar:]` Evidence Source | 0/? | Not started | - |
+| 93. Exemplar Engine + `[exemplar:]` Evidence Source | 0/6 | Not started | - |
 | 94. Course 1 — Anatomy | 0/? | Not started | - |
 | 95. Course 2 — Transitions | 0/? | Not started | - |
 | 96. Course 3 — Play Mode + tutor lens proactive | 0/? | Not started | - |
