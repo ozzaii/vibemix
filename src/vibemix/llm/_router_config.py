@@ -43,6 +43,14 @@ _ROUTES: dict[str, tuple[str, ServiceTierName | None]] = {
         "google/gemini-3.1-flash-tts-preview",
         None,
     ),
+    # Phase 92 Plan 92-01 (LESSON-06 — Open Q1 resolution). The Learn module's
+    # AI tutor lens. Decoupled from ``live_coach`` so future model swaps don't
+    # drag both surfaces — the live co-host (party/coach) and the lesson tutor
+    # are independent product surfaces and the planner ratified them keeping
+    # separate router entries (see 92-RESEARCH.md §Open Questions Q1). Same
+    # model id + tier as ``live_coach`` today; the decoupling is structural,
+    # not operational.
+    "learn_tutor": ("gemini-3.5-flash", "STANDARD"),
     "debrief": ("gemini-3.5-flash", "FLEX"),
     "debrief_tts": ("gemini-3-flash-tts-preview", "FLEX"),
     "library_auto_tag": ("gemini-3.5-flash", "FLEX"),

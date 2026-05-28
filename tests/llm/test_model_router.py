@@ -91,14 +91,17 @@ def test_router_paths_is_frozen_tuple() -> None:
     assert isinstance(ROUTER_PATHS, tuple)
     # The Library/Viber agent is local Codex now, so no Gemini `library_agent`
     # route remains. OpenRouter live-coach/TTS aliases are the only non-SDK
-    # routes.
-    assert len(ROUTER_PATHS) == 9
+    # routes. Phase 92 Plan 92-01 (LESSON-06, Open Q1) adds ``learn_tutor`` for
+    # the Learn module's AI tutor lens — decoupled from ``live_coach`` so
+    # future model swaps don't drag both surfaces.
+    assert len(ROUTER_PATHS) == 10
     expected = {
         "live_coach",
         "live_coach_openrouter",
         "live_coach_tts",
         "live_coach_tts_fallback",
         "live_coach_tts_openrouter",
+        "learn_tutor",
         "debrief",
         "debrief_tts",
         "library_auto_tag",

@@ -1651,6 +1651,15 @@ wheels = [
 ]
 
 [[package]]
+name = "python-statemachine"
+version = "3.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/e2/dcc389e9855f65a3e54c859499dd409341d5ba561da74af22ce824bc4964/python_statemachine-3.1.2.tar.gz", hash = "sha256:3a64c4ae91d628eb256580f328c68b16e472f25794d2c478e91f2f1dfb8b0668", size = 710648, upload-time = "2026-05-19T00:13:12.495Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f2/f5/fe9072bfc9d245138561c09bf05b841bf6d92b4ce93d44dbfa18d96e498e/python_statemachine-3.1.2-py3-none-any.whl", hash = "sha256:89dcdbcbf7b197adade16138c75bee4f32e0c98b7eeb18d30aeb1c830dbbdd62", size = 126113, upload-time = "2026-05-19T00:13:10.854Z" },
+]
+
+[[package]]
 name = "python-telegram-bot"
 version = "22.7"
 source = { registry = "https://pypi.org/simple" }
@@ -2078,6 +2087,7 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "python-dotenv" },
     { name = "python-rtmidi" },
+    { name = "python-statemachine" },
     { name = "pywin32", marker = "sys_platform == 'win32'" },
     { name = "sounddevice" },
     { name = "sqlalchemy" },
@@ -2147,6 +2157,7 @@ requires-dist = [
     { name = "python-dateutil", specifier = "==2.9.0.post0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "python-rtmidi", specifier = ">=1.5.8" },
+    { name = "python-statemachine", specifier = ">=3.1.2,<4.0" },
     { name = "python-telegram-bot", marker = "extra == 'telegram'", specifier = ">=21" },
     { name = "pywin32", marker = "sys_platform == 'win32'", specifier = ">=308" },
     { name = "sounddevice", specifier = ">=0.5.5" },
