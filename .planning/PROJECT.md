@@ -10,9 +10,9 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v9.0 "Lesson One"
+## Latest Shipped Milestone: v9.0 "Lesson One"
 
-**Status:** Started 2026-05-27. `gsd-autonomous fully` · all-opus agents · default-YES on every scope question. Research in flight (4 parallel opus agents covering Stack / Features / Architecture / Pitfalls — including web survey of the canonical beginner-DJ curriculum). Phase numbering continues from P88; P89/P90 were direct wire-ins → this milestone starts at **P91**.
+**Status:** Shipped 2026-05-28. `gsd-autonomous fully` · all-opus agents · default-YES on every scope question. 8 phases (P91-P98) · 26 plans · 68/72 REQ-IDs engineering-complete (94%); KAAN-ACTION queue parked for public ship (§LEARN-FULL-MILESTONE-EAR-PASS + §LEARN-LEGAL-DISCLAIMER). Audit PASSED: `.planning/milestones/v9.0-MILESTONE-AUDIT.md`.
 
 **Goal:** Turn vibemix into the **AI teaching module beginner DJs have been waiting for**. Open the app, pick **Learn**, and the AI walks you through three progressive courses with YOUR specific MIDI controller mirrored on screen as a real-time interactive vector visualization. The AI highlights physical controls ("here are the Mids"), explains what each one does, then proves it audibly by pulling a track from YOUR library where that band is most prominent — so as you turn the knob, you HEAR the band swell. The opening dialog is the iconic Kaan-vision (verbatim-locked):
 
@@ -46,11 +46,10 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 
 ---
 
-## Latest Shipped Milestone: v8.2 "Set Builder"
+## Prior Shipped Milestone: v8.2 "Set Builder"
 
-**Status:** Shipped 2026-05-26; audit passed. Engine, agent, CLI, and GUI path
-are wired. The remaining UI-02 funded-key ear-pass is KAAN-ACTION, not an
-engineering gap.
+<details>
+<summary>v8.2 "Set Builder" — Shipped 2026-05-26 (audit passed; engine/agent/CLI/GUI wired; UI-02 funded-key ear-pass parked as KAAN-ACTION).</summary>
 
 **Goal:** Wire the Viber agent engine into a DJ **set-prep co-host** — turn the flat-playlist curator into a tool that *discovers a pool from the DJ's OWN crate → sequences it on an energy curve with harmonically-valid transitions → exports one-click to Rekordbox → and explains why each transition works.* This is the library-local (Mode A) half of Francesco's "Vibe Mix Discovery & Sequencing" spec, built inside vibemix's locked constraints (local Codex as the Viber set-prep/chat brain, local CLAP ONNX embeddings, sqlite-vec local, Apache-clean). The deep DJ value: *"give me a sequenced, harmonically-correct, energy-curved set from my own library, ready to load — and tell me why,"* the thing DJs spend hours on, grounded so it never invents a track.
 
@@ -65,6 +64,8 @@ engineering gap.
 **Constraints (locked):** Mode A library-local ONLY. **DEFER to Bravoh-commercial** (explicit out-of-scope): public catalog (Beatport/Spotify/SoundCloud) + affiliate + purchase links (Modes B/C), Chromaprint/AcoustID fingerprint, XGBoost energy regressor, 1001Tracklists scraping moat, Serato/Engine/Traktor export (Rekordbox first). Live co-host brain remains separate and config-resolved; local Codex is the current Viber set-prep/chat path for demo/test; local CLAP ONNX owns library embeddings; sqlite-vec local; no extra Set-Builder deps beyond the approved CLAP/onnxruntime/tokenizers stack; Apache-clean (essentia = AGPL, excluded — and not actually installed); all four cardinal invariants hold by additive design; the grounding gate (seen-set + library re-validation) unchanged; honest green (offline-unit-testable, no API key). New modules are **dim-agnostic** over current 512D CLAP vectors or future D. Shared-tree discipline applies around CLAP/CueAnchor/metadata ownership; do not refresh `.planning/codebase/orphans.csv` unless that baseline is the explicit task.
 
 **Charter + research (read first):** `.planning/research/vibe-mix-agent-engine-synthesis.md` (scope + spec↔constraint reconciliation), `.planning/research/vibe-mix-engine-research.md` (energy formula, beam-search design, Rekordbox export — implementation-ready), `.planning/research/vibe-mix-ui-ipc-button-audit.md` (seams + dead-control inventory). Source spec: `VibeMix_Discovery_Sequencing_Spec_EN.pdf` (Francesco, v1.0).
+
+</details>
 
 ---
 

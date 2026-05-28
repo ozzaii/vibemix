@@ -1,5 +1,46 @@
 # vibemix — Milestones
 
+## v9.0 Lesson One (Shipped: 2026-05-28)
+
+**Phases completed:** 11 phases, 35 plans, 52 tasks
+
+**Key accomplishments:**
+
+- 1. [Rule 3 - Blocking Issue] Added `tauri/ui/src/learn/learn-window.ts` placeholder
+- 5 Python test files + 14 vitest/playwright TS test stubs scaffolded under `tests/learn/` + `tests/ipc/` + `tests/runtime/` + `tauri/ui/tests/learn/` — every REQ-ID for P91 now has at least one automated test file an executor can flip from red to green, and 5 grep gates are GREEN day-one as permanent invariant-pin contracts.
+- MidiMirror class + ws_broadcast wiring + __main__ port_watcher layering — the engine that turns a physical MIDI knob twist into a wire frame the Learn webview can consume, riding the existing 30 Hz tick on the SAME ws:8765 socket (Invariants #1 + #4 preserved).
+- Tauri 2.x `learn_window.rs` module + main.rs wire-in: `LEARN_WINDOW_LABEL = "learn"` const, `open_learn_window` command (focus-existing semantics, 1280×720 default), trimmed mirror of debrief precedent (no sidecar lifecycle).
+- 11 frontend files under `tauri/ui/src/learn/` ship the user-facing artifact: the LearnWindow webview now opens a ws:8765 client, mounts the FLX4 inline SVG (25 hit-regions) on `ipc.learn.controller_detected`, and mirrors physical knob positions onto the SVG via transform-only updates inside a rAF-coalesced drainer — P95 synthetic latency 0.66ms (target 50ms, red 80ms).
+- All 10 supported controllers + generic now render as parity-clean inline SVGs under `tauri/ui/src/learn/controllers/`; the 11 Plan-02 parameterised gate rows go fully GREEN; brand-safety + currentColor + ARIA + dual-cue + lazy-chunk-budget gates hold across the closed roster.
+- Status:
+- 1. [Rule 1 - Bug] Bumped `tests/llm/test_model_router.py::test_router_paths_is_frozen_tuple` count 9 → 10
+- 18 new test files landed in 3 named-path-strict commits, pinning every P92 phase-requirement to an automated verification gate that runs as part of CI — 3 AST gates LIVE day-one (Invariant #1, TONE-02, P13 mascot mitigation), 11-envelope round-trip + parity LIVE (Plan 92-01 foundations), 6 module-level stubs that flip skip → pass the moment Plans 92-03..06 land their production modules.
+- LessonRuntime FSM (8 states / 5 transitions / 1 Hz tick_loop / single-writer of LearnState) + LearnState mutable dataclass + CURRICULUM dispatch with 1 hello-world lesson + build_tutor_system_instruction composing 5 fragments with 4-forbidden-moves lock LAST for strongest recency + hand-authored JSON fixture — the Python brain of P92.
+- Atomic JSON persistence (mirror of `config_store.save()` os.replace pattern) + corruption-recovery + reset CLI subcommand + LessonRuntime wired into `__main__.main()` alongside MidiMirror — the seam that takes Plan 92-03's standalone FSM into a real running service. The live app now boots with both `-> midi_mirror wired` (P91) and `-> lesson_runtime wired` (P92) in stderr, and the 1 Hz tick_loop runs alongside ws_broadcast's 30 Hz without stutter.
+- 3 new component files (~520 lines) + 122-line extension to controller-stage.ts (applyHighlight / clearHighlight / setHighlightHintIntensity) + 285-line extension to learn-window.ts (11 envelope listeners + ack-emit + lazy-mount + toast helper) + 379-line additive extension to learn.css (ZERO new design tokens) + Plan 92-02's highlight-paint.test.ts flipped from skip-stub to 3/3 LIVE PASS (P95 = 0.547 ms in jsdom, 29× under the 16 ms RENDER-04 budget) — the user-facing slice of P92.
+- Files modified:
+- Status:
+- 11 RED-state pytest stubs covering EXEMPLAR-01..05 — self-gated module-level skips named to each downstream plan (93-02..93-06), zero new dependencies, suite stays green today
+- DSP-band ranker foundation — sidecar `band_shares` sqlite table inside `library-clap.db` + pure-compute `compute_band_shares()` / `_kick_correlation()` primitives with spectral-leakage-gated Pearson r against a 0.8 compressed-kick threshold; flipped 3 Plan 93-01 RED stubs to GREEN with no regression
+- Dedicated headphone ``sd.OutputStream`` + stereo PyAV decode + persisted ``learn.headphone_device_index`` settings field — the load-bearing audio-routing surface for tutor exemplar playback that P94/P95 lessons consume; never touches the mic-gated co-host playback queue (Pitfall 2 architectural rule, grep-gated)
+- ExemplarFinder.find(band, k) — library-first kick-guarded ranker + packaged CC-BY honest-null fallback with EvidenceRegistry write per pick (Invariant #2 binding); 2 Plan 93-01 RED test stubs lifted, 5 sub-tests GREEN against the production class with 3 graceful inner skips for the §EXEMPLAR-BANK-SOURCING KAAN-ACTION
+- 4-site schema-mirror lock for `[exemplar:<track_id>]` landed atomically — EVIDENCE_SOURCES 9 → 10, _SOURCE_ALT alternation extended, CITATION_GRAMMAR_BLOCK Forms list gains the 10th entry, _build_citation_strip allow-list 5-tuple → 6-tuple; the v6 [recall:] precedent (commits 2016e36b → 977c0140 → 0bfc8bd0) mirrored EXACTLY into 3 commits c2c8aa41 / 2a49e0f4 / 853e776a. With Plan 93-04's `ExemplarFinder.find()` pre-registration write, a fabricated `[exemplar:bogus]` now strips the whole AI turn via the existing Phase 20 CitationLinter — Invariant #2 binding closed.
+- `ingest_folder(compute_band_shares=True)` opt-in landed (additive side-car write, default-False byte-identical, best-effort per-track error swallow) + `vibemix learn exemplar <band>` CLI dispatch wired into the existing `learn` block (band allow-list → ExemplarFinder.find → 4-line stdout block on success / honest-null on empty / exit 2 on unknown band). The last Plan 93-01 stub module (`test_cli_learn_exemplar.py`) flipped GREEN; cumulative 10 of 10 Phase 93 test modules now collect with ZERO module-level skips. Phase 93 Exemplar Engine + `[exemplar:]` Evidence Source SHIPPED — engine + CLI test surface complete; lesson UI wiring lands in Plan 94 (CURR-1.14).
+- 16 hand-authored Course 1 lesson JSON fixtures landed under src/vibemix/learn/transcripts/course_1_anatomy/ with L1.01 iconic dialog byte-locked, L1.14 EQ-as-Tutor exemplar_cycle declared, and L1.16 recital_pool + outcomes copy ready — plus curriculum.py extended with COURSE_FRAMES['course_1_anatomy'] + 16 L1.NN entries that maintain addendum byte-equality with their fixtures.
+- Two mechanical enforcers of v9.0 "real DJ friend in your ear, no AI slop" landed: (1) scripts/launch/check_no_tutor_slop.py — 35-token tutor-tic blocklist deep-scanning every JSON lesson fixture, sibling to the Phase 44 SHIP-TWEET copy gate; (2) tests/learn/test_tutor_prompts_byte_equality.py — pins the iconic 4-line L1.01 opening dialog byte-equal to a single source of truth tuple, smoke-tested with deliberate U+2019 drift to confirm it bites red. Both gates inherited automatically by Course 2 + 3 + onboarding fixtures.
+- ExemplarLessonController + RecitalRuntime + LearnProgress.course_2_unlocked + LessonRuntime observer seam shipped — Course 1's marquee EQ-as-Tutor demo and 5-prompt unlock gate both have backend logic ready, wired through an emit-only observer pattern that preserves the single-writer Invariant #1.
+- Status:
+- 14 hand-authored Course 2 lesson fixtures landed under src/vibemix/learn/transcripts/course_2_transitions/, curriculum.py extended with COURSE_FRAMES + 14 L2.NN entries (every addendum byte-equal to fixture), RecitalRuntime extended for Course 2 mode (pool-shape detection + 3-distinct-transition-type variety floor as anti-grind gate + course_3_unlocked persistence), and 69 new tests pin the curriculum dispatch + Course 2 recital contracts at 190 pass / 3 skip across the full tests/learn/ suite.
+- 1. [Rule 1 — Bug] `_has_opt_out_comment` lookback too narrow
+- 1. [Rule 1 — Bug] P93 exemplar mirror test site-4 regex was closed-form
+- `tests/learn/test_course_3_curriculum.py`
+- Status:
+- 1. [Rule 3 - Concurrent-session staging contamination] Sibling-session edits in MY commits
+- [Rule 3 - Blocking issue] IPC schema parity check exit code
+- P98 engineering-complete.
+
+---
+
 ## v8.1 One Mind (Shipped: 2026-05-26)
 
 **Phases completed:** 6 phases, 19 plans, 29 tasks
