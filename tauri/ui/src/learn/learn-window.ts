@@ -38,11 +38,26 @@
 
 import "./styles/learn.css";
 import { LearnWsClient } from "./ws-client.js";
-import { ControllerStage } from "./components/controller-stage.js";
+import {
+  ControllerStage,
+  applyHighlight,
+  clearHighlight,
+  setHighlightHintIntensity,
+} from "./components/controller-stage.js";
 import { LearnTitlebar } from "./components/titlebar.js";
 import { StatusBar } from "./components/status-bar.js";
 import { mountEmptyState } from "./components/empty-state.js";
 import { showUnpluggedToast } from "./components/unplugged-toast.js";
+import { LessonHud, type LessonHudHandle } from "./lesson/hud.js";
+import {
+  TutorSpeakDock,
+  type TutorSpeakHandle,
+} from "./lesson/tutor-dock.js";
+import {
+  LessonSkipButton,
+  type LessonSkipHandle,
+} from "./lesson/skip-button.js";
+import { emitIpc } from "../ipc/client.js";
 
 interface ControllerDetectedPayload {
   connected: boolean;
@@ -60,6 +75,74 @@ interface MidiPositionPayload {
 
 interface IpcEnvelopeMeta {
   ts?: string;
+}
+
+/* ===================================================================
+ * Phase 92 Plan 05 — lesson-mode envelope payload interfaces.
+ *
+ * Mirrors the shapes in `tauri/ui/src/ipc/messages.ts` (LearnHighlight /
+ * LearnTutorSpeak / LearnLessonLoaded / LearnAdvance / LearnCompleteLesson /
+ * LearnProgressState / LearnExemplarPlay / LearnExemplarStop). The ws-client
+ * already runs each envelope through the pre-compiled ajv validator before
+ * dispatching the CustomEvent (with the payload as `detail`), so the
+ * handlers here treat the payload as already-validated.
+ * =================================================================== */
+
+interface LessonLoadedPayload {
+  course_id: string;
+  lesson_id: string;
+  title: string;
+  controller_id: string;
+  progress_dots: ReadonlyArray<{
+    lesson_id: string;
+    status: "pending" | "current" | "completed";
+  }>;
+}
+
+interface HighlightPayload {
+  control_id: string;
+  deck: "" | "A" | "B" | "C" | "D";
+  cue_color: "amber" | "warning";
+  cue_shape: "pulse-ring" | "static-glow";
+  annotation: string;
+  expected_action: {
+    type: "cc" | "button";
+    control: string;
+    deck?: "" | "A" | "B" | "C" | "D";
+    direction?: "" | "up" | "down";
+    min_delta?: number;
+  };
+}
+
+interface TutorSpeakWirePayload {
+  text: string;
+  tts_marker: string;
+  citations: ReadonlyArray<string>;
+  data_state: "active" | "hint";
+}
+
+interface AdvancePayload {
+  lesson_id: string;
+  reason: "action_matched" | "user_skip";
+}
+
+interface CompleteLessonPayload {
+  lesson_id: string;
+  reason: "completed" | "user_skip";
+}
+
+interface ProgressStatePayload {
+  action: "snapshot" | "reset" | "reset_ack";
+  was_recovered?: boolean;
+  progress?: {
+    schema_version: number;
+    courses: Record<string, { completed?: boolean; completed_at?: string | null }>;
+    lessons: Record<string, {
+      completed?: boolean;
+      completed_at?: string | null;
+      strikes_used?: number;
+    }>;
+  };
 }
 
 const LEARN_ROOT_ID = "learn-root";
@@ -158,6 +241,189 @@ function mountLearnWindow(root: HTMLElement): {
     void envelopeMeta;
   });
 
+  /* ===================================================================
+   * Phase 92 Plan 05 — lesson-mode envelope handlers.
+   *
+   * 9 sidecar→shell envelopes consumed here (lesson_loaded / highlight /
+   * tutor_speak / advance / complete_lesson / progress_state /
+   * exemplar_play / exemplar_stop) + a SECOND midi_position listener that
+   * emits `ipc.learn.ack` whenever a controlled position changes while a
+   * lesson is active. shell→sidecar envelopes (start_course /
+   * start_lesson) are not subscribed to here — only emitted by the mode
+   * picker (P97) and devtools-invoke during demos.
+   *
+   * The 3 lesson components (LessonHud / TutorSpeakDock /
+   * LessonSkipButton) mount lazily on the first `ipc.learn.lesson_loaded`
+   * envelope. Without an active lesson, the P91 Learn-window layout
+   * stays untouched. UI-SPEC §Wiring contract lines 354-371 is the
+   * locked map for what each handler paints.
+   * =================================================================== */
+
+  // Lazy-mount handles for the 3 lesson components. Tracked at function
+  // scope so subsequent handlers can reach the same instances without
+  // re-mounting. `currentLessonId` is the source of truth for "is a
+  // lesson currently active" — gates the ack-emit listener below.
+  let lessonHud: LessonHudHandle | null = null;
+  let tutorDock: TutorSpeakHandle | null = null;
+  let skipButton: LessonSkipHandle | null = null;
+  let currentLessonId: string | null = null;
+  // Per-controlled-position last-known values (for delta detection in
+  // the ack-emit listener). Cleared on lesson_loaded so a fresh lesson
+  // doesn't inherit stale deltas.
+  let lastPositions: Record<string, number> = {};
+
+  // ipc.learn.lesson_loaded → mount HUD + prep dock + skip-button lockout.
+  window.addEventListener("ipc.learn.lesson_loaded", (ev: Event) => {
+    const payload = (ev as CustomEvent<LessonLoadedPayload>).detail;
+    if (!payload) return;
+    currentLessonId = payload.lesson_id;
+    lastPositions = {};
+
+    // Flip the lesson-mode class so the grid extends to host the HUD + dock.
+    root.classList.add("lesson-mode");
+
+    // Mount or refresh the HUD between titlebar + stage.
+    if (lessonHud) {
+      lessonHud.update(payload);
+    } else {
+      lessonHud = LessonHud(payload);
+      // Insert HUD before the stage element so the grid order matches
+      // titlebar / hud / stage / dock / statusbar.
+      stageEl.parentElement?.insertBefore(lessonHud, stageEl);
+    }
+
+    // Mount the dock after the stage if not already present. Starts
+    // collapsed (data-state="idle") until the first tutor_speak.
+    if (!tutorDock) {
+      tutorDock = TutorSpeakDock();
+      stageEl.parentElement?.insertBefore(tutorDock, stageEl.nextSibling);
+    } else {
+      tutorDock.hide();
+    }
+
+    // Mount the skip button inside the dock's receipt-row skip-slot.
+    if (!skipButton) {
+      skipButton = LessonSkipButton({
+        onSkip: () => {
+          if (!currentLessonId) return;
+          void emitIpc("ipc.learn.complete_lesson", {
+            lesson_id: currentLessonId,
+            reason: "user_skip",
+          });
+        },
+      });
+      const skipSlot = tutorDock.querySelector(".skip-slot");
+      if (skipSlot) skipSlot.appendChild(skipButton);
+    }
+    // New lesson → restart the 45 s anti-speedrun lockout fresh.
+    skipButton.resetLockout();
+  });
+
+  // ipc.learn.highlight → paint highlight on the matched <g data-control-id>.
+  window.addEventListener("ipc.learn.highlight", (ev: Event) => {
+    const payload = (ev as CustomEvent<HighlightPayload>).detail;
+    if (!payload) return;
+    applyHighlight(stageEl, payload);
+  });
+
+  // ipc.learn.tutor_speak → dock.show + (hint state → pulse-ring intensify).
+  window.addEventListener("ipc.learn.tutor_speak", (ev: Event) => {
+    const payload = (ev as CustomEvent<TutorSpeakWirePayload>).detail;
+    if (!payload) return;
+    if (tutorDock) tutorDock.show(payload);
+    // Secondary a11y channel — when the dock enters hint state, the
+    // currently-lit highlight intensifies (UI-SPEC §Motion line 306).
+    setHighlightHintIntensity(stageEl, payload.data_state === "hint");
+  });
+
+  // ipc.learn.advance → cycle dock + clear highlight.
+  window.addEventListener("ipc.learn.advance", (ev: Event) => {
+    const payload = (ev as CustomEvent<AdvancePayload>).detail;
+    if (!payload) return;
+    if (tutorDock) tutorDock.advance();
+    clearHighlight(stageEl);
+  });
+
+  // ipc.learn.complete_lesson → no paint here; the runtime will follow up
+  // with progress_state(snapshot) to refresh dot state. We track the
+  // lesson-end so the ack-emit listener stops firing.
+  window.addEventListener("ipc.learn.complete_lesson", (ev: Event) => {
+    const payload = (ev as CustomEvent<CompleteLessonPayload>).detail;
+    if (!payload) return;
+    // For P92 hello-world (1-lesson course), this marks the end. For
+    // future multi-lesson courses, the next lesson_loaded re-populates
+    // currentLessonId. The skip button stays locked until a fresh
+    // lesson_loaded fires resetLockout.
+    currentLessonId = null;
+    if (tutorDock) tutorDock.hide();
+    clearHighlight(stageEl);
+    lastPositions = {};
+  });
+
+  // ipc.learn.progress_state → refresh HUD dots; surface recovery / reset
+  // toasts on the corresponding action.
+  window.addEventListener("ipc.learn.progress_state", (ev: Event) => {
+    const payload = (ev as CustomEvent<ProgressStatePayload>).detail;
+    if (!payload) return;
+    if (payload.action === "reset_ack") {
+      showLearnToast("learn progress reset.");
+    } else if (payload.was_recovered) {
+      showLearnToast("learn progress restored.");
+    }
+    // Snapshot path: defer to a future plan that decides how to derive
+    // a HUD dot list from the multi-lesson progress payload. For P92's
+    // 1-lesson hello-world, the HUD dots are set on lesson_loaded and
+    // updated locally on complete_lesson — no snapshot-derived re-paint
+    // is needed here.
+  });
+
+  // ipc.learn.exemplar_play / exemplar_stop → log-only in P92 (P93 lands
+  // the UI consumer; the envelope shapes exist so the wire contract is
+  // stable, but no paint surface mounts yet).
+  window.addEventListener("ipc.learn.exemplar_play", (ev: Event) => {
+    // eslint-disable-next-line no-console
+    console.log("[learn] exemplar_play:", (ev as CustomEvent).detail);
+  });
+  window.addEventListener("ipc.learn.exemplar_stop", (ev: Event) => {
+    // eslint-disable-next-line no-console
+    console.log("[learn] exemplar_stop:", (ev as CustomEvent).detail);
+  });
+
+  // Second midi_position listener — emits ipc.learn.ack whenever a
+  // controlled position changes while a lesson is active. The P91 listener
+  // above stays intact (records pendingPositions for rAF drain); this one
+  // ADDITIVELY emits acks. The LessonRuntime's action_matches filter on
+  // the sidecar end discards acks that don't match the lesson's expected
+  // action — so a blast of unrelated control changes during the lesson
+  // doesn't false-advance.
+  window.addEventListener("ipc.learn.midi_position", (ev: Event) => {
+    if (!currentLessonId) return;
+    const detail = (ev as CustomEvent<MidiPositionPayload>).detail;
+    if (!detail) return;
+    for (const [controlId, value] of Object.entries(detail.positions ?? {})) {
+      if (typeof value !== "number") continue;
+      const prev = lastPositions[controlId];
+      if (prev === undefined) {
+        // First sighting — record baseline; do NOT emit ack (no delta yet).
+        lastPositions[controlId] = value;
+        continue;
+      }
+      if (value === prev) continue;
+      const direction: "up" | "down" = value > prev ? "down" : "up";
+      // ipc.learn.ack { control_id, source, value, direction } — wire
+      // shape matches `LearnAck` in tauri/ui/src/ipc/messages.ts. The
+      // sidecar LessonRuntime evaluates the ack via action_matches and
+      // replies with advance(reason="action_matched") when it fits.
+      void emitIpc("ipc.learn.ack", {
+        control_id: controlId,
+        source: "midi",
+        value,
+        direction,
+      });
+      lastPositions[controlId] = value;
+    }
+  });
+
   // rAF drainer — paint at most one frame per repaint slot
   // (RESEARCH §Pitfall 6). On tab-resume floods, only the latest
   // pendingPositions reaches the SVG.
@@ -245,6 +511,24 @@ if (typeof document !== "undefined") {
     const root = document.getElementById(LEARN_ROOT_ID);
     if (root) mountLearnWindow(root);
   }
+}
+
+/* ===================================================================
+ * Phase 92 Plan 05 — toast helper for progress_state acknowledgments.
+ *
+ * Used by the ipc.learn.progress_state handler to surface a one-line
+ * toast on `action: "reset_ack"` (after a settings-drawer reset) or
+ * `was_recovered: true` (boot-time corruption recovery in Plan 92-04).
+ * Mirrors the existing recordings-delete toast pattern — append a
+ * transient div with class .learn-toast for 3 s.
+ * =================================================================== */
+function showLearnToast(message: string): void {
+  if (typeof document === "undefined") return;
+  const t = document.createElement("div");
+  t.className = "learn-toast";
+  t.textContent = message;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
 }
 
 // Export for vitest jsdom mounting (allows tests to call mountLearnWindow
