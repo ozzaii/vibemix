@@ -462,26 +462,33 @@ def test_dispatch_short_circuit_via_request_clarification_dispatch_entry(
 
 
 def test_no_track_id_surface_on_accept(toolset: LibraryToolset) -> None:
-    """Valid call must NOT touch self.seen, self.seen_sections, or library/store/embedder."""
+    """Valid call must NOT touch self.seen / self.seen_sections / issued_* dicts.
+
+    Behavioral pin for Cardinal Invariant #2 (no track_id surface). The
+    grounding spine (``self.seen``) is the per-run anti-hallucination gate;
+    a clarification handler that wrote to it would let the LLM smuggle
+    invented track ids through the discriminated-union payload. Snapshot
+    state before the call, run the handler with valid args, snapshot after
+    — every grounding container must be UNCHANGED.
+
+    Plan 100-06 will install the AST gate; this test is the runtime pin
+    that complements it.
+    """
     # Snapshot grounding state pre-call.
     seen_before = set(toolset.seen)
     seen_sections_before = dict(toolset.seen_sections)
     issued_transitions_before = dict(toolset.issued_transition_candidates)
     issued_context_before = dict(toolset.issued_context_packets)
-
-    # Wrap the library/store/embedder with sentinels that crash on ANY access.
-    crashing = MagicMock()
-    crashing.__getattr__ = MagicMock(
-        side_effect=AssertionError("Cardinal Invariant #2 broken — handler touched library/store/embedder")
-    )
-    # Don't replace — just snapshot id() so we can verify .seen is unchanged.
+    issued_cues_before = dict(toolset.issued_cue_proposals)
+    seen_urls_before = set(getattr(toolset, "seen_urls", set()))
 
     result = toolset.request_clarification(
         {"question": "Q?", "choices": ["a", "b", "c"]}
     )
     assert result.get("clarification_needed") is True
 
-    # Grounding spine UNCHANGED — no track_id was introduced into self.seen.
+    # Every grounding container UNCHANGED — no track_id / section / context /
+    # cue / url was introduced via the clarification path.
     assert toolset.seen == seen_before, (
         "Cardinal Invariant #2 — request_clarification must NOT write to "
         f"self.seen. Diff: {toolset.seen - seen_before!r}"
@@ -489,6 +496,8 @@ def test_no_track_id_surface_on_accept(toolset: LibraryToolset) -> None:
     assert toolset.seen_sections == seen_sections_before
     assert toolset.issued_transition_candidates == issued_transitions_before
     assert toolset.issued_context_packets == issued_context_before
+    assert toolset.issued_cue_proposals == issued_cues_before
+    assert getattr(toolset, "seen_urls", set()) == seen_urls_before
 
 
 def test_no_consecutive_empties_drift_on_accept(toolset: LibraryToolset) -> None:
