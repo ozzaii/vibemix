@@ -1,0 +1,41 @@
+{
+  "lesson_id": "L2.12",
+  "title": "phrase matching",
+  "system_instruction_addendum": "PHRASE MATCHING ADDENDUM: A phrase is four bars. Bringing deck b in on deck a's phrase-one keeps the structure intact. Frame it as bars, not seconds.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "a phrase is four bars — sixteen beats. tracks build by stacking phrases.",
+      "tts_marker": "L212.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "bring deck b in on the beat one of deck a's next phrase — throw the crossfader on that downbeat.",
+      "tts_marker": "L212.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "xfader",
+    "min_delta": 100
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "count one-two-three-four across four bars to find the next phrase one.",
+      "tts_marker": "L212.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "the kick on the one is your anchor — that is where deck b should enter.",
+      "tts_marker": "L212.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "throw the crossfader on the next downbeat of deck a's phrase.",
+      "tts_marker": "L212.hint3"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L2.04",
+  "title": "eq swap",
+  "system_instruction_addendum": "EQ SWAP ADDENDUM: Crossfade with EQs, not the crossfader. Cut deck a's lows as you raise deck b's lows. Frame it as a band-by-band hand-off.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the eq swap is a transition without the crossfader. you cut deck a's bands one by one as you raise deck b's matching bands.",
+      "tts_marker": "L204.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "start with the lows. drop deck a's low knob, then raise deck b's low knob on the next beat one.",
+      "tts_marker": "L204.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "eq_low",
+    "deck": "A",
+    "min_delta": 80
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the low knob is at the bottom of the channel strip.",
+      "tts_marker": "L204.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "turn it all the way down — you want the bass gone from deck a.",
+      "tts_marker": "L204.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "cut deck a's low eq knob to its minimum.",
+      "tts_marker": "L204.hint3"
+    }
+  ]
+}

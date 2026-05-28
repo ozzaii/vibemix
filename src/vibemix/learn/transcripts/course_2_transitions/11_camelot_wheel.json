@@ -1,0 +1,47 @@
+{
+  "lesson_id": "L2.11",
+  "title": "camelot wheel",
+  "system_instruction_addendum": "CAMELOT WHEEL ADDENDUM: The camelot wheel labels keys 1a through 12a (minor) and 1b through 12b (major). Compatible neighbors are same-number-different-letter, plus or minus one number same letter.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the camelot wheel is a clock face with twenty-four labels. every track has one — for example, 8a or 12b.",
+      "tts_marker": "L211.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "two tracks blend cleanly when their labels are the same, or one number apart, or same number with a flipped letter.",
+      "tts_marker": "L211.beat1",
+      "citations": []
+    },
+    {
+      "beat": 2,
+      "text": "tap continue to move on. the wheel takes a few sets to feel natural.",
+      "tts_marker": "L211.beat2",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "your library tool shows the camelot label next to the bpm.",
+      "tts_marker": "L211.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "same number, different letter is a major/minor swap — sounds emotional, stays harmonic.",
+      "tts_marker": "L211.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "tap continue when you've read the wheel diagram.",
+      "tts_marker": "L211.hint3"
+    }
+  ]
+}

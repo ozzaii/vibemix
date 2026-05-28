@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L2.05",
+  "title": "bassline swap",
+  "system_instruction_addendum": "BASSLINE SWAP ADDENDUM: The kick belongs to one deck at a time. Cut deck a's lows then raise deck b's lows on the beat-1 of a phrase. Two basslines stacking is the train wreck this lesson prevents.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "two kicks at once is the sound of a train wreck. the bassline swap moves the low end from one deck to the other in a single beat.",
+      "tts_marker": "L205.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "on the next beat one, swap deck b's low knob from zero to full while you drop deck a's low knob to zero.",
+      "tts_marker": "L205.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "eq_low",
+    "deck": "B",
+    "min_delta": 80
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the swap happens in one motion — both knobs cross at the same moment.",
+      "tts_marker": "L205.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "wait for the kick on beat one, then move both knobs.",
+      "tts_marker": "L205.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "raise deck b's low knob to full on the next beat one.",
+      "tts_marker": "L205.hint3"
+    }
+  ]
+}

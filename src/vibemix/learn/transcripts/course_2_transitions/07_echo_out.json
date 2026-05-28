@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L2.07",
+  "title": "echo-out",
+  "system_instruction_addendum": "ECHO-OUT ADDENDUM: The echo-out is a bail. Hit echo on deck a, kill its channel, deck b takes over. Frame it as a safety net, not a featured move.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the echo-out is your bail. hit echo on deck a, pull the channel down, and deck b owns the room.",
+      "tts_marker": "L207.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "tap the echo button on deck a — the tail decays while deck b plays clean.",
+      "tts_marker": "L207.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "fx_echo",
+    "deck": "A",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the echo lives in the effects strip — on the flx4 it shares the pad row.",
+      "tts_marker": "L207.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "tap it once to arm — the deck's tail starts repeating.",
+      "tts_marker": "L207.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press the echo button on deck a.",
+      "tts_marker": "L207.hint3"
+    }
+  ]
+}

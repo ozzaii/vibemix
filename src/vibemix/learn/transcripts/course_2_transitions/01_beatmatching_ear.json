@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L2.01",
+  "title": "beatmatching by ear",
+  "system_instruction_addendum": "BEATMATCH EAR ADDENDUM: Sync stays off. The user lines up deck B's tempo against deck A by listening for the drift between the two kicks. State the drift direction, never the percentage.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "sync stays off for this one. you'll hear the kicks drift in and out of phase — your job is to close the gap with the pitch fader.",
+      "tts_marker": "L201.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "nudge deck b's pitch fader a touch — listen for the kicks pulling together or drifting apart.",
+      "tts_marker": "L201.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "tempo",
+    "deck": "B",
+    "min_delta": 20
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "if the kicks slow down relative to deck a, push pitch up. if they speed up, pull it down.",
+      "tts_marker": "L201.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "a tiny nudge is enough — the pitch fader is finer than it looks.",
+      "tts_marker": "L201.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "move deck b's pitch fader a small amount in either direction.",
+      "tts_marker": "L201.hint3"
+    }
+  ]
+}

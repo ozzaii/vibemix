@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L2.02",
+  "title": "beatmatching with sync",
+  "system_instruction_addendum": "BEATMATCH SYNC ADDENDUM: Sync is the modern fast-path — press it and the BPMs match. Frame it as a tool, not a shortcut. The ear-version still matters for hardware without sync.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "sync is the button that locks deck b's bpm to deck a. modern decks have it; older ones do not.",
+      "tts_marker": "L202.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "press sync on deck b — the bpm display jumps to match deck a.",
+      "tts_marker": "L202.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "sync",
+    "deck": "B",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the sync button sits in the transport row, near play and cue.",
+      "tts_marker": "L202.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "press it once — the deck snaps to deck a's tempo.",
+      "tts_marker": "L202.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press the sync button on deck b now.",
+      "tts_marker": "L202.hint3"
+    }
+  ]
+}

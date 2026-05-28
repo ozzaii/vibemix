@@ -1,0 +1,47 @@
+{
+  "lesson_id": "L2.03",
+  "title": "long blend",
+  "system_instruction_addendum": "LONG BLEND ADDENDUM: A 32-bar crossfader fade from deck a to deck b. State the bar count. Do not narrate the EQ swap — that is the next lesson.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the long blend is a thirty-two bar fade — slow, gradual, almost invisible.",
+      "tts_marker": "L203.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "start with the crossfader on deck a. when i count you in, walk it across to deck b over thirty-two bars.",
+      "tts_marker": "L203.beat1",
+      "citations": []
+    },
+    {
+      "beat": 2,
+      "text": "i'll count down the last eight bars.",
+      "tts_marker": "L203.beat2",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "xfader",
+    "min_delta": 100
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the crossfader sits at the bottom of the mixer, lying flat.",
+      "tts_marker": "L203.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "thirty-two bars at one-twenty-eight bpm is about a minute — go slow.",
+      "tts_marker": "L203.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "throw the crossfader from deck a's side all the way to deck b's side.",
+      "tts_marker": "L203.hint3"
+    }
+  ]
+}

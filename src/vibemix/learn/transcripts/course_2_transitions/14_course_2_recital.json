@@ -1,0 +1,122 @@
+{
+  "lesson_id": "L2.14",
+  "title": "course 2 recital",
+  "system_instruction_addendum": "COURSE 2 RECITAL ADDENDUM: Five transitions drawn from prior lessons. At least three different transition types are required to pass. State the score honestly.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "five transitions. perform each on your controller.",
+      "tts_marker": "L214.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "three different transition types are required to pass. if you nail it, course three unlocks.",
+      "tts_marker": "L214.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "recital_pool": [
+    {
+      "from_lesson": "L2.03",
+      "transition_type": "long_blend",
+      "prompt": "perform a long blend — fade the crossfader from deck a to deck b.",
+      "expected_action": {
+        "type": "cc",
+        "control": "xfader",
+        "min_delta": 100
+      }
+    },
+    {
+      "from_lesson": "L2.04",
+      "transition_type": "eq_swap",
+      "prompt": "perform an eq swap — cut deck a's low eq while you hold the crossfader steady.",
+      "expected_action": {
+        "type": "cc",
+        "control": "eq_low",
+        "deck": "A",
+        "min_delta": 80
+      }
+    },
+    {
+      "from_lesson": "L2.05",
+      "transition_type": "bassline_swap",
+      "prompt": "perform a bassline swap — raise deck b's low eq to full on a beat one.",
+      "expected_action": {
+        "type": "cc",
+        "control": "eq_low",
+        "deck": "B",
+        "min_delta": 80
+      }
+    },
+    {
+      "from_lesson": "L2.06",
+      "transition_type": "filter_fade",
+      "prompt": "perform a filter fade — sweep deck a's filter knob to one extreme.",
+      "expected_action": {
+        "type": "cc",
+        "control": "filter",
+        "deck": "A",
+        "min_delta": 60
+      }
+    },
+    {
+      "from_lesson": "L2.07",
+      "transition_type": "echo_out",
+      "prompt": "perform an echo-out — tap echo on deck a.",
+      "expected_action": {
+        "type": "button",
+        "control": "fx_echo",
+        "deck": "A",
+        "direction": "down"
+      }
+    },
+    {
+      "from_lesson": "L2.08",
+      "transition_type": "drop_swap",
+      "prompt": "perform a drop swap — throw the crossfader fully to deck b on a downbeat.",
+      "expected_action": {
+        "type": "cc",
+        "control": "xfader",
+        "min_delta": 100
+      }
+    },
+    {
+      "from_lesson": "L2.09",
+      "transition_type": "loop_transition",
+      "prompt": "perform a loop transition — tap loop in on deck a.",
+      "expected_action": {
+        "type": "button",
+        "control": "loop_in",
+        "deck": "A",
+        "direction": "down"
+      }
+    }
+  ],
+  "recital_outcomes": {
+    "pass": "5 of 5 with {types} different transition types. course 3 unlocked.",
+    "fail": "{score} of 5 with {types} different transition types. replay when you're ready."
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "read the prompt at the top of the screen — perform that exact transition.",
+      "tts_marker": "L214.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "five prompts total, drawn from your transitions lessons.",
+      "tts_marker": "L214.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press the prompted control or tap continue to begin.",
+      "tts_marker": "L214.hint3"
+    }
+  ]
+}

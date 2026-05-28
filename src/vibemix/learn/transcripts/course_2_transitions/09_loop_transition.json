@@ -1,0 +1,48 @@
+{
+  "lesson_id": "L2.09",
+  "title": "loop transition",
+  "system_instruction_addendum": "LOOP TRANSITION ADDENDUM: A loop on deck a buys time while deck b enters. Loop in, crossfade across, loop out. State the bar length of the loop.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "a loop buys you bars. drop a four-bar loop on deck a, bring deck b in over it, then let deck a's loop go.",
+      "tts_marker": "L209.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "tap loop in on deck a — the deck holds the next four bars on repeat.",
+      "tts_marker": "L209.beat1",
+      "citations": []
+    },
+    {
+      "beat": 2,
+      "text": "while the loop runs, crossfade to deck b.",
+      "tts_marker": "L209.beat2",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "loop_in",
+    "deck": "A",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the loop in button sits near the pad row on deck a.",
+      "tts_marker": "L209.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "tap loop in once — the deck repeats from that moment.",
+      "tts_marker": "L209.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press loop in on deck a now.",
+      "tts_marker": "L209.hint3"
+    }
+  ]
+}

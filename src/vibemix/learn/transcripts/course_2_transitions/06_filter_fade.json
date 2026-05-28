@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L2.06",
+  "title": "filter fade",
+  "system_instruction_addendum": "FILTER FADE ADDENDUM: The color filter sweeps both extremes. Pulling left thins to high-pass; pushing right narrows to low-pass. The filter sounds like rising water.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the filter knob lives above each channel strip. center is open; sweep left and you lose the bass, sweep right and you lose the highs.",
+      "tts_marker": "L206.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "sweep deck a's filter knob to one extreme and back to center.",
+      "tts_marker": "L206.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "filter",
+    "deck": "A",
+    "min_delta": 60
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the filter sits just above the eq stack on deck a.",
+      "tts_marker": "L206.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "turn it past twelve o'clock and listen to the sound thin.",
+      "tts_marker": "L206.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "sweep deck a's filter knob in either direction.",
+      "tts_marker": "L206.hint3"
+    }
+  ]
+}

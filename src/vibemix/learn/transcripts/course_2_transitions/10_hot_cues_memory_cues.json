@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L2.10",
+  "title": "hot cues and memory cues",
+  "system_instruction_addendum": "HOT CUES ADDENDUM: Hot cues are jump points. If the user has rekordbox cues, use them; otherwise frame cue 2 as the breakdown entry. Do not narrate scratching.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "hot cues are jump points you can hit at any time. cue 1 is usually the first kick; cue 2 is usually the breakdown entry.",
+      "tts_marker": "L210.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "press hot cue 2 on deck b to enter on the breakdown — the deck jumps straight to it.",
+      "tts_marker": "L210.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "hotcue",
+    "deck": "B",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the hot cue pads are the row of square buttons under the jog wheel.",
+      "tts_marker": "L210.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "the second pad in the row is hot cue 2.",
+      "tts_marker": "L210.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press hot cue 2 on deck b now.",
+      "tts_marker": "L210.hint3"
+    }
+  ]
+}
