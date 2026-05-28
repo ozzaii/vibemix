@@ -1286,6 +1286,7 @@
           ],
           "properties": {
             "field": {
+              "$comment": "Phase 93 (EXEMPLAR-04) — learn.headphone_device_index is integer >= 0 OR null (system default).",
               "type": "string",
               "enum": [
                 "voice",
@@ -1298,7 +1299,8 @@
                 "mood",
                 "click_through",
                 "lighter_blur",
-                "skill"
+                "skill",
+                "learn.headphone_device_index"
               ]
             },
             "value": {
@@ -1450,6 +1452,18 @@
                     "intermediate",
                     "pro"
                   ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "learn.headphone_device_index": {
+              "$comment": "Phase 93 Plan 03 (EXEMPLAR-04) \u2014 optional headphone output device index for tutor exemplar playback (ExemplarPlayer.sd.OutputStream device kwarg). Null = system default (user did NOT pick a device); int >= 0 = explicit ``sounddevice`` device index. Persisted via ConfigStore.extra (mirrors the mascot.*/recording.* pattern \u2014 no config-store schema bump).",
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
                 },
                 {
                   "type": "null"

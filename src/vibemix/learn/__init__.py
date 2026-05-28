@@ -62,6 +62,7 @@ from vibemix.learn.progress import (
 )
 from vibemix.learn.prompts import build_tutor_system_instruction
 from vibemix.learn.runtime import LessonRuntime
+from vibemix.learn.settings import read_learn_headphone_device_index
 from vibemix.learn.state import LearnState
 
 __all__ = [
@@ -81,6 +82,7 @@ __all__ = [
     "load_progress",
     "open_default_db",
     "progress_path",
+    "read_learn_headphone_device_index",
     "reset_progress",
     "save_progress",
     "top_for_band",

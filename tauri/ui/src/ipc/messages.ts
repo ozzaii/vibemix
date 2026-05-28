@@ -302,7 +302,8 @@ export interface SettingsSet {
       | "mood"
       | "click_through"
       | "lighter_blur"
-      | "skill";
+      | "skill"
+      | "learn.headphone_device_index";
     value: string | number | boolean | null;
   };
 }
@@ -327,6 +328,7 @@ export interface SettingsState {
     mood?: ("hype-man" | "teacher" | "coach") | null;
     click_through?: boolean | null;
     skill?: ("beginner" | "intermediate" | "pro") | null;
+    "learn.headphone_device_index"?: number | null;
   };
 }
 export interface StatusRecheck {

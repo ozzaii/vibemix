@@ -226,6 +226,8 @@ class SettingsApplier:
                 return await self._apply_click_through(value)
             if field == "lighter_blur":
                 return await self._apply_lighter_blur(value)
+            if field == "learn.headphone_device_index":
+                return await self._apply_learn_headphone_device_index(value)
             return (False, f"unknown settings field: {field!r}")
         except Exception as e:  # pragma: no cover — guard against bad hooks
             log.exception("SettingsApplier.apply(%r, %r) raised", field, value)
@@ -594,6 +596,51 @@ class SettingsApplier:
         # (per Plan 14-04 ConfigStore extension) so SettingsState boot
         # snapshots can include it without an ``extra`` round-trip.
         self.config_store.lighter_blur = value
+        save_config(self.config_store)
+        return (True, None)
+
+    # ------------------------------------------------------------------
+    # Phase 93 Plan 03 — learn.headphone_device_index (EXEMPLAR-04)
+    # ------------------------------------------------------------------
+
+    async def _apply_learn_headphone_device_index(
+        self, value: Any
+    ) -> tuple[bool, str | None]:
+        """Apply the tutor exemplar headphone output device index.
+
+        Persists in :attr:`ConfigStore.extra` under
+        ``"learn.headphone_device_index"`` (mirrors the mood / skill /
+        lens / click_through pattern). NO MusicState write, NO ws_bus
+        emit, NO live-stream restart — the Phase 97 onboarding wizard
+        is the one place that surfaces this; ExemplarPlayer reads the
+        persisted value when it instantiates per lesson.
+
+        Validation: ``int >= 0`` OR ``None``. ``bool`` is rejected even
+        though ``isinstance(True, int)`` — booleans accidentally piped
+        through the IPC layer would silently map to device 0/1, which
+        is the worst kind of latent footgun for an audio surface.
+        Threat T-93-03-01 (tampering): the ajv pre-compiled validator
+        already gates the envelope at the ws boundary, but the Python
+        side re-validates for defense-in-depth.
+        """
+        if value is None:
+            self.config_store.extra["learn.headphone_device_index"] = None
+            save_config(self.config_store)
+            return (True, None)
+        # Reject bool BEFORE int — Python's bool is a subclass of int.
+        if isinstance(value, bool) or not isinstance(value, int):
+            return (
+                False,
+                "learn.headphone_device_index expects int >= 0 or null, "
+                f"got {type(value).__name__}",
+            )
+        if value < 0:
+            return (
+                False,
+                "learn.headphone_device_index expects int >= 0 or null, "
+                f"got {value!r}",
+            )
+        self.config_store.extra["learn.headphone_device_index"] = value
         save_config(self.config_store)
         return (True, None)
 

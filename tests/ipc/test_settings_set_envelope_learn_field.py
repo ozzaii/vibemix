@@ -109,11 +109,21 @@ def test_settings_state_carries_headphone_device_index_after_set() -> None:
     pattern) — this stub asserts the envelope round-trip shape; the live
     ws-bus round-trip is deferred to a slow-marked test in P97.
 
-    Static check: the schema's ``SettingsState`` definition declares the
-    new property OR the catch-all ``learn`` property bag.
+    Static check: the schema's ``SettingsState`` payload declares the new
+    property OR the catch-all ``learn`` property bag. The Plan 93-01 stub
+    originally read ``schema.definitions.SettingsState.properties`` (the
+    wrapper-level keys ``type`` / ``ts`` / ``payload``) — that path is
+    wrong because every settings field on this envelope lives **inside**
+    ``payload.properties`` (see ``voice`` / ``mode`` / ``skill`` etc. at
+    schema lines 1380-1457). Plan 93-03 corrects the path to walk into
+    ``payload.properties`` (a Rule-1 test-bug fix). The semantic check is
+    unchanged: either nested ``learn`` object OR a flat
+    ``learn.headphone_device_index`` key satisfies the contract.
     """
     schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
-    state_props = schema["definitions"]["SettingsState"]["properties"]
+    state_props = schema["definitions"]["SettingsState"]["properties"][
+        "payload"
+    ]["properties"]
     # Either an explicit "learn" object property OR a flat key — both are
     # valid envelope shapes; P93-03 picks one and the test passes.
     has_explicit_learn = "learn" in state_props
@@ -121,6 +131,6 @@ def test_settings_state_carries_headphone_device_index_after_set() -> None:
     assert has_explicit_learn or has_flat_key, (
         "SettingsState envelope must carry the headphone device index — "
         "either as a nested 'learn' object property OR a flat "
-        "'learn.headphone_device_index' key. Got SettingsState properties: "
-        f"{sorted(state_props.keys())!r}"
+        "'learn.headphone_device_index' key. Got SettingsState.payload "
+        f"properties: {sorted(state_props.keys())!r}"
     )
