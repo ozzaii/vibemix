@@ -77,7 +77,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
 | 91 | Controller Renderer + MIDI Mirror | 7/7 | Complete   | 2026-05-27 |
-| 92 | Lesson Runtime + AI Highlight Contract | A "hello world" 1-step lesson runs end-to-end: AI says "press play deck A", highlight glows on the rendered control, user presses physical button → lesson advances | TONE-02, TONE-04, LESSON-01, LESSON-02, LESSON-03, LESSON-04, LESSON-05, LESSON-06, RENDER-04 (9) | 4 |
+| 92 | Lesson Runtime + AI Highlight Contract | 2/7 | In Progress|  |
 | 93 | Exemplar Engine + `[exemplar:]` Evidence Source | DSP-band exemplar engine picks strongest-band track from user's library; falls back to packaged CC-BY bank when empty; plays through dedicated `ExemplarPlayer`; `[exemplar:<id>]` resolves via 4-site mirror | EXEMPLAR-01, EXEMPLAR-02, EXEMPLAR-03, EXEMPLAR-04, EXEMPLAR-05 (5) | 4 |
 | 94 | Course 1 — Anatomy (L1.01–L1.16) | Beginner opens Learn, sees verbatim 4-line opening dialog, walks through 16 hand-authored anatomy lessons culminating in EQ-as-Tutor demo using library exemplars | TONE-01, TONE-03, CURR-1.01..1.16 (18) | 5 |
 | 95 | Course 2 — Transitions (L2.01–L2.14) | User learns beatmatching (ear + sync) + 5 canonical transitions (long blend, EQ swap, kick swap, filter fade, echo-out, drop swap, loop) + harmonic mixing via Camelot wheel | CURR-2.01..2.14 (14) | 4 |
@@ -120,7 +120,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
   4. The tutor persona reuses `MOOD_PERSONAS["teacher"]` from `prompts/matrix.py:53-66` (v8.1 LENS-03 — NO new lens); the lesson runtime composes `build_tutor_system_instruction(course_id, lesson_id, controller_id)` = `COURSE_FRAMES[course_id]` + `controller_frame` + `CURRICULUM[lesson_id].system_instruction_addendum` (≤200 chars) + base tutor lens system instruction. All AI dialog flows through Gemini Flash via `vibemix.llm.model_router.resolve("standard")` (zero hardcoded model literals; CI grep-gated). **Tutor system instruction lock pinned by `tests/learn/test_tutor_system_instruction_lock.py` — forbids the four learned moves (NO complimenting · NO summarizing · NO previewing · NO upbeat hook closer)**. Static fixture gate `tests/learn/test_scripts_are_fixtures.py` confirms no live generative call writes a `tutor_speak` envelope's `text` field — all 36 scripts hand-authored JSON. **TONE-02 + TONE-04 + LESSON-05 + LESSON-06.**
 **Plans:** 7 plans (1 of 7 SHIPPED)
 - [x] 92-01-PLAN.md — Foundation: pyproject.toml + uv sync + learn_tutor route + messages.schema.json +11 envelopes + codegen:ipc + Python dataclasses + 5 count-parity test files (Wave 1) — SHIPPED 2026-05-28 commits 2214911f → fcdda017; count parity 77/77; codegen idempotent; LESSON-02 + LESSON-06 done
-- [ ] 92-02-PLAN.md — Test scaffolding: 10 Python + 8 TS test files (Nyquist-compliant; gated-skip pattern with named-Plan dependencies) (Wave 2)
+- [x] 92-02-PLAN.md — Test scaffolding: 10 Python + 8 TS test files (Nyquist-compliant; gated-skip pattern with named-Plan dependencies) (Wave 2)
 - [ ] 92-03-PLAN.md — Python backend core: state.py + runtime.py + curriculum.py + prompts.py + hello_world JSON fixture (Wave 2)
 - [ ] 92-04-PLAN.md — Progress persistence + `vibemix learn reset` CLI + __main__.main() LessonRuntime wiring (Wave 3)
 - [ ] 92-05-PLAN.md — Lesson UI: hud.ts + tutor-dock.ts + skip-button.ts + applyHighlight on controller-stage + 11 envelope handlers in learn-window.ts (Wave 4)

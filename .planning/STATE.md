@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v9.0
 milestone_name: Lesson One
 status: executing
-last_updated: "2026-05-28T00:53:51Z"
-last_activity: 2026-05-28 -- Phase 92 Plan 92-01 SHIPPED (lesson-runtime foundation)
+last_updated: "2026-05-28T01:19:35.390Z"
+last_activity: 2026-05-28
 progress:
   total_phases: 14
   completed_phases: 1
   total_plans: 14
   completed_plans: 9
-  percent: 14
+  percent: 7
 ---
 
 # vibemix — State
@@ -18,9 +18,9 @@ progress:
 ## Current Position
 
 Phase: 92 (Lesson Runtime + AI Highlight Contract) — EXECUTING
-Plan: 1 of 7 (92-01 SHIPPED — commits 2214911f → 3020dfba → 56c3a0be → fcdda017 on 2026-05-28 — python-statemachine ^3.1.2 dep + learn_tutor router path + 11 ipc.learn.* envelope schemas + regenerated ajv validator + 11 Python wrapper dataclasses with shared _VALIDATOR + 24 ui_bus re-exports + hardened count-parity heuristic across 5 test files at 77/77; foundation wave for the entire v9.0 lesson runtime. P91 verification complete — all 7 P91 plans SHIPPED with commits da2aa70c → e85fae9d.)
-Status: Ready to execute Plan 92-02 (test scaffolding wave)
-Last activity: 2026-05-28 -- Phase 92 Plan 92-01 SHIPPED
+Plan: 3 of 7 (92-01 SHIPPED — commits 2214911f → 3020dfba → 56c3a0be → fcdda017 on 2026-05-28 — python-statemachine ^3.1.2 dep + learn_tutor router path + 11 ipc.learn.* envelope schemas + regenerated ajv validator + 11 Python wrapper dataclasses with shared _VALIDATOR + 24 ui_bus re-exports + hardened count-parity heuristic across 5 test files at 77/77; foundation wave for the entire v9.0 lesson runtime. 92-02 SHIPPED — commits eb95b43e → 7722a403 → dd6dd43c on 2026-05-28 — 18 new test files: 5 Python AST + invariant stubs (LESSON-01 / TONE-02 / TONE-04), 5 Python wiring + parity tests (LESSON-02 / 03 / 05 / 06 + Pitfall 6 cadence), 8 TS test scaffolds (RENDER-04 ≤16ms paint, 5 a11y Playwright stubs, settings drawer, mascot regression). 3 AST gates LIVE day-one; 11-envelope round-trip parity at 13 Learn $refs LIVE; learn_tutor route LIVE; 6 module-level skips name Plan 92-03/04 dependencies. P91 verification complete — all 7 P91 plans SHIPPED with commits da2aa70c → e85fae9d.)
+Status: Ready to execute
+Last activity: 2026-05-28
 
 ## Milestone Reference
 
