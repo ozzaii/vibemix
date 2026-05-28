@@ -79,7 +79,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 | 91 | Controller Renderer + MIDI Mirror | 7/7 | Complete   | 2026-05-27 |
 | 92 | Lesson Runtime + AI Highlight Contract | 7/7 | Complete   | 2026-05-28 |
 | 93 | Exemplar Engine + `[exemplar:]` Evidence Source | 6/6 | Complete   | 2026-05-28 |
-| 94 | Course 1 — Anatomy (L1.01–L1.16) | Beginner opens Learn, sees verbatim 4-line opening dialog, walks through 16 hand-authored anatomy lessons culminating in EQ-as-Tutor demo using library exemplars | TONE-01, TONE-03, CURR-1.01..1.16 (18) | 5 |
+| 94 | Course 1 — Anatomy (L1.01–L1.16) | 3/4 | In Progress|  |
 | 95 | Course 2 — Transitions (L2.01–L2.14) | User learns beatmatching (ear + sync) + 5 canonical transitions (long blend, EQ swap, kick swap, filter fade, echo-out, drop swap, loop) + harmonic mixing via Camelot wheel | CURR-2.01..2.14 (14) | 4 |
 | 96 | Course 3 — Play Mode (L3.01–L3.07) + tutor lens proactive integration | User plays real 30-min set with proactive tutor mode active; count-ins grounded on `[cue:]` evidence ONLY; recovery drills + DJ profile graduation | EXEMPLAR-06, CURR-3.01..3.07 (8) | 5 |
 | 97 | Onboarding + Verbatim Tone Locks + Mode Picker | Stranger opens app, picks Learn from mode picker, first-launch MIDI probe detects controller, sees verbatim opening, advances seamlessly; disclaimer copy ships | RENDER-08, ONBOARD-01..07 (8) | 4 |
@@ -157,8 +157,8 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
   5. **Tone discipline gates land:** (a) NEW `scripts/launch/check_no_tutor_slop.py` extends `check_no_ai_slop.py` to catch ≥20 tutor-tic tokens ("Great question!" / "Today we'll be learning…" / "Awesome!" / "You crushed it!" / "Let's dive in!" / "Don't worry, you'll get the hang of it" + 14 more); CI-gated against all `learn/transcripts/**.json` AND runtime AI interjections. (b) Tutor system instruction includes hard lock forbidding the four learned moves (NO complimenting · NO summarizing · NO previewing · NO upbeat hook) — pinned by `tests/learn/test_tutor_system_instruction_lock.py`. **TONE-03.**
 **Plans:** 4 plans
 - [x] 94-01-PLAN.md — 16 hand-authored JSON lesson fixtures + curriculum.py extension (COURSE_FRAMES + 16 CURRICULUM entries) (Wave 1) — SHIPPED 2026-05-28 (eda18aea, e00718e4)
-- [ ] 94-02-PLAN.md — `scripts/launch/check_no_tutor_slop.py` ≥20-token blocklist + byte-equality gate on iconic 4-line opening dialog (TONE-01 + TONE-03) (Wave 1)
-- [ ] 94-03-PLAN.md — L1.14 ExemplarLessonController (EQ-as-Tutor with [exemplar:] citation) + L1.16 RecitalRuntime (5-prompt deterministic gate, course_2_unlocked persistence) + LessonRuntime observer seam (Wave 2)
+- [x] 94-02-PLAN.md — `scripts/launch/check_no_tutor_slop.py` ≥20-token blocklist + byte-equality gate on iconic 4-line opening dialog (TONE-01 + TONE-03) (Wave 1)
+- [x] 94-03-PLAN.md — L1.14 ExemplarLessonController (EQ-as-Tutor with [exemplar:] citation) + L1.16 RecitalRuntime (5-prompt deterministic gate, course_2_unlocked persistence) + LessonRuntime observer seam (Wave 2)
 - [ ] 94-04-PLAN.md — §LEARN-EAR-COURSE-1 KAAN-ACTION ride-forward (non-blocking per gsd-autonomous fully) (Wave 3)
 **UI hint**: yes
 
