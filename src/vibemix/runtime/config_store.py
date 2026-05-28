@@ -88,6 +88,12 @@ _PHASE12_FIELDS: tuple[str, ...] = (
     # Same dark-pattern discipline as telemetry_consent: an unset /
     # missing key reads as False.
     "bravoh_waitlist_opt_in",
+    # One Mind W5 — persisted LLM mode ("direct" = BYO Gemini key, "proxy" =
+    # keyless Bravoh proxy). Lets a UI mode-picker choice survive relaunch;
+    # VIBEMIX_LLM_MODE env still overrides at boot. Ships defaulting to
+    # "direct" — the packaged-default flip to "proxy" is KAAN-ACTION, gated on
+    # the Bravoh /register + /health + /v1 endpoints being live.
+    "llm_mode",
 )
 _PHASE11_FIELDS: tuple[str, ...] = (
     "first_run_completed",
@@ -176,6 +182,11 @@ class ConfigStore:
     # the debrief settings drawer toggle. The field's existence does
     # NOT imply opt-in (mirrors telemetry_consent's dark-pattern guard).
     bravoh_waitlist_opt_in: bool = False
+    # One Mind W5 — LLM mode select. "direct" = BYO GEMINI_API_KEY (default,
+    # protects current users); "proxy" = keyless Bravoh proxy. The VIBEMIX_LLM_MODE
+    # env var overrides this at boot; otherwise main() reads this persisted value.
+    # The packaged-default flip to "proxy" is KAAN-ACTION (Bravoh endpoints live).
+    llm_mode: str = "direct"
 
     # Phase 11 fields (preserved verbatim — sidecar reads only, Rust writes)
     first_run_completed: bool | None = None

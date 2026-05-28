@@ -591,8 +591,21 @@ async def main() -> None:
     except Exception as _e:  # pragma: no cover — banner must never crash
         print(f"[sec_check] banner skipped: {_e}", file=sys.stderr)
 
-    # ----- Phase 5 mode dispatch -----
-    mode = os.environ.get("VIBEMIX_LLM_MODE", "direct").lower()
+    # ----- Phase 5 / One Mind W5 — mode dispatch (env > persisted config) -----
+    # VIBEMIX_LLM_MODE env wins (dev/CI override). Otherwise the persisted
+    # ConfigStore.llm_mode drives it so a UI mode-picker choice survives
+    # relaunch. Ships defaulting to "direct" (BYO key) — the packaged-default
+    # flip to "proxy" is KAAN-ACTION, gated on the Bravoh /register + /health
+    # + /v1 endpoints being live (a premature proxy default would exit boot
+    # below for every user without those endpoints).
+    _env_mode = os.environ.get("VIBEMIX_LLM_MODE")
+    if _env_mode is not None:
+        mode = _env_mode.strip().lower()
+    else:
+        try:
+            mode = (load_config().llm_mode or "direct").strip().lower()
+        except Exception:
+            mode = "direct"
     proxy_base_url = os.environ.get("VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world")
     client_version = os.environ.get("VIBEMIX_CLIENT_VERSION", __version__)
 
@@ -1286,23 +1299,19 @@ async def main() -> None:
             "-> library: no cache at ~/.cache/vibemix/library.pkl — citations limited to nowplaying-cli"
         )
 
-    # ── Plan 28-07 — 30-day staleness nudge ──
-    # Once-per-boot check. emit_ipc currently logs to stdout; the renderer
-    # IpcBus subscription is added in the same wave's UI banner spec. Plan
-    # 28-09's ipc.library.staleness_nudge schema validates the payload shape.
+    # ── Plan 28-07 / One Mind W3 — 30-day staleness nudge ──
+    # Once-per-boot check (cheap file-stat). The nudge payload is CAPTURED here
+    # and flushed onto the live ipc_router below (the router is created
+    # downstream at :1492, after this point). Was print-only — the renderer's
+    # staleness banner never lit because nothing reached the bus.
+    _pending_staleness_nudges: list[dict] = []
     try:
         from vibemix.library import emit_nudge_if_stale as _emit_staleness
 
-        def _staleness_emit(msg_type: str, payload: dict) -> None:
-            # v1: log a structured line; the WS bus broadcast path lands
-            # alongside the Plan 28-06 drag-drop wiring (same renderer
-            # subscription pipeline).
-            print(
-                f"-> [ipc.outbound] {msg_type} {payload}",
-                flush=True,
-            )
+        def _staleness_capture(msg_type: str, payload: dict) -> None:
+            _pending_staleness_nudges.append(payload)
 
-        _emit_staleness(_staleness_emit, library_cache)
+        _emit_staleness(_staleness_capture, library_cache)
     except Exception as e:
         print(f"-> staleness check failed: {e}", file=sys.stderr)
 
@@ -1312,6 +1321,13 @@ async def main() -> None:
     # co-host brain/TTS only, not for library grounding embeddings.
     grounding = None
     suggestion_service = None
+    # One Mind W3 — pre-declare so the library-import handler (registered after
+    # ipc_router, downstream) can lazily build + rebind these via ``nonlocal``
+    # even when no cache exists yet. A first-time import MUST work cold: the
+    # whole point of "import library" is to create the embedding store the very
+    # first time, when ``library_cache.exists()`` is still False.
+    _library_embedder = None
+    _library_store = None
     if library_cache.exists():
         try:
             from vibemix.library import (
@@ -1559,6 +1575,164 @@ async def main() -> None:
     agent.bind_ipc_bus(ipc_router)
     if ipc_router is not None:
         print("-> agent IPC bus bound (citation chips + overlay-highlight live)")
+
+    # ── One Mind W3 — library import + staleness producers on the live bus ──
+    # importer.py (Plan 09) + staleness.py (Plan 28) were built + unit-tested
+    # but never registered on the live router: ipc.library.import /
+    # import_cancel / staleness_action frames from the renderer had no
+    # responder, and the boot staleness nudge only printed. Wire them here — the
+    # library embedder/store + evidence_registry + _background_tasks all live in
+    # THIS scope (not SessionLoop's), so registering directly on ipc_router is
+    # the localized fix (no SessionLoop constructor churn). No schema change:
+    # these message types already exist in messages.schema.json.
+    if ipc_router is not None:
+        try:
+            import json as _json
+
+            from vibemix.library.importer import LibraryImporter
+            from vibemix.library.staleness import apply_snooze_action
+            from vibemix.ui_bus.messages import (
+                LibraryImportProgress,
+                LibraryStalenessNudge,
+            )
+
+            _import_state: dict[str, Any] = {"importer": None, "task": None}
+
+            async def _emit_library(envelope: dict) -> None:
+                try:
+                    await ipc_router.emit(envelope)
+                except Exception as _e:  # pragma: no cover — best-effort UI
+                    print(f"-> [library emit err] {_e!r}", file=sys.stderr)
+
+            def _progress_envelope(p: dict) -> dict:
+                return _json.loads(
+                    LibraryImportProgress.make(
+                        total=int(p.get("total", 0)),
+                        done=int(p.get("done", 0)),
+                        current_track_name=str(p.get("current_track_name", "")),
+                        cache_hits=int(p.get("cache_hits", 0)),
+                        cancelled=bool(p.get("cancelled", False)),
+                    ).to_json()
+                )
+
+            async def _on_library_import(msg: dict) -> None:
+                nonlocal _library_embedder, _library_store
+                _task = _import_state.get("task")
+                if _task is not None and not _task.done():
+                    return  # an import is already running — drop the duplicate
+                payload = msg.get("payload") or {}
+                raw_path = str(payload.get("path", "")).strip()
+                if not raw_path:
+                    return
+                xml_path = Path(raw_path).expanduser()
+                # Lazily build embedder + store — import is the one path that
+                # must run cold (first-time user has no cache yet). build_embedder
+                # loads the local CLAP ONNX model.
+                try:
+                    if _library_embedder is None or _library_store is None:
+                        from vibemix.library import open_store as _open_store
+                        from vibemix.library.embed_factory import (
+                            build_embedder as _build_embedder,
+                        )
+
+                        _library_embedder = _build_embedder()
+                        _library_store = _open_store()
+                except Exception as _e:
+                    print(
+                        f"-> library import: embedder unavailable ({_e!r})",
+                        file=sys.stderr,
+                    )
+                    return
+
+                loop = asyncio.get_running_loop()
+
+                def _on_progress(p: dict) -> None:
+                    # Sync callback fired on the loop thread from import_library;
+                    # schedule the async bus emit. Retain a strong ref (RUF006 /
+                    # WR-02): the loop only weakly references tasks, so a bare
+                    # create_task can be GC'd mid-emit.
+                    _pt = loop.create_task(_emit_library(_progress_envelope(p)))
+                    _background_tasks.add(_pt)
+                    _pt.add_done_callback(_background_tasks.discard)
+
+                importer = LibraryImporter(
+                    _library_embedder, _library_store, on_progress=_on_progress
+                )
+                _import_state["importer"] = importer
+
+                async def _run_import() -> None:
+                    try:
+                        result = await importer.import_library(xml_path)
+                        if not result.get("cancelled"):
+                            # Refresh the EvidenceRegistry so [track:<id>]
+                            # citations resolve mid-session, no restart needed
+                            # (mirrors import_library_async).
+                            try:
+                                _lib = RekordboxLibrary()
+                                if _lib.try_load_cache():
+                                    evidence_registry.register_library(_lib)
+                            except Exception as _e:
+                                print(
+                                    f"-> post-import registry refresh failed: {_e!r}",
+                                    file=sys.stderr,
+                                )
+                        # Final frame doubles as the completion signal.
+                        await _emit_library(
+                            _progress_envelope(
+                                {
+                                    "total": result.get("total", 0),
+                                    "done": result.get("done", 0),
+                                    "current_track_name": "",
+                                    "cache_hits": result.get("cache_hits", 0),
+                                    "cancelled": result.get("cancelled", False),
+                                }
+                            )
+                        )
+                    except Exception as _e:
+                        print(f"-> library import failed: {_e!r}", file=sys.stderr)
+
+                _t = loop.create_task(_run_import())
+                _import_state["task"] = _t
+                _background_tasks.add(_t)
+                _t.add_done_callback(_background_tasks.discard)
+
+            async def _on_library_import_cancel(msg: dict) -> None:
+                importer = _import_state.get("importer")
+                if importer is not None:
+                    importer.cancel_flag.set()
+
+            async def _on_library_staleness_action(msg: dict) -> None:
+                payload = msg.get("payload") or {}
+                action = str(payload.get("action", "")).strip()
+                try:
+                    apply_snooze_action(action)
+                except ValueError as _e:
+                    print(f"-> staleness action rejected: {_e}", file=sys.stderr)
+
+            ipc_router.register_handler("ipc.library.import", _on_library_import)
+            ipc_router.register_handler(
+                "ipc.library.import_cancel", _on_library_import_cancel
+            )
+            ipc_router.register_handler(
+                "ipc.library.staleness_action", _on_library_staleness_action
+            )
+            print("-> library import + staleness handlers wired")
+
+            # Flush the boot staleness nudge captured above onto the live bus.
+            for _p in _pending_staleness_nudges:
+                await _emit_library(
+                    _json.loads(
+                        LibraryStalenessNudge.make(
+                            age_days=int(_p.get("age_days", 0)),
+                            snoozed_until_ts=_p.get("snoozed_until_ts"),
+                        ).to_json()
+                    )
+                )
+            if _pending_staleness_nudges:
+                _age = _pending_staleness_nudges[0].get("age_days")
+                print(f"-> staleness nudge emitted ({_age}d stale)")
+        except Exception as _e:
+            print(f"-> library import/staleness NOT wired: {_e!r}", file=sys.stderr)
 
     # Phase 92 (LESSON-01/03/04) — wire LessonRuntime alongside MidiMirror.
     # P91 already shipped MidiMirror (read-only 30 Hz controller-position
