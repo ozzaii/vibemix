@@ -454,12 +454,37 @@ class LessonRuntime(StateMachine):
         self.send("finish")
 
     def on_enter_completed(self, **_kwargs: Any) -> None:
-        """Persist progress + emit terminal envelopes."""
+        """Persist progress + emit terminal envelopes.
+
+        CR-02 fix (P92 REVIEW): mark_completed mutates the in-memory dict
+        only; without a save_progress() call the completion is lost on
+        next boot (load_progress() reads the un-changed JSON). Persist
+        atomically via save_progress() right after the mutation; the
+        save_progress import is local so the synchronous test path that
+        never reaches this state (e.g. min-dwell skip tests) doesn't
+        force a save_progress import side-effect.
+
+        Defensive: progress_store may be a MagicMock (unit-test path) —
+        the inner save_progress(self._progress) call works on a real
+        LearnProgress dataclass; for a Mock progress_store this branch
+        is silently no-op'd because save_progress(mock) would write a
+        Mock-shaped dict and the test fixture redirects progress_path()
+        to tmp anyway. The bracket-tagged stderr line surfaces save
+        failures without wedging the FSM.
+        """
         try:
             self._progress.mark_completed(
                 self._learn.current_course_id,
                 self._learn.current_lesson_id,
             )
+            # CR-02: persist to disk via atomic save (tmp + os.replace).
+            # Skip save when progress_store isn't a real LearnProgress
+            # (unit-test MagicMock path); the live boot in __main__.py
+            # always passes a real LearnProgress instance.
+            from vibemix.learn.progress import LearnProgress, save_progress
+
+            if isinstance(self._progress, LearnProgress):
+                save_progress(self._progress)
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 

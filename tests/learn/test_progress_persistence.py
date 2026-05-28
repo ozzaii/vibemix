@@ -134,6 +134,87 @@ def test_mark_completed_updates_lesson() -> None:
     )
 
 
+def test_runtime_completion_persists_across_load(
+    progress_path_in_tmp: Path,
+) -> None:
+    """CR-02 (P92 REVIEW) regression — LessonRuntime.on_enter_completed
+    must call ``save_progress`` so completion survives a process restart.
+
+    Sequence:
+      1. Drive a fresh LessonRuntime through the full FSM lifecycle so it
+         enters ``completed``.
+      2. Call ``load_progress()`` directly — simulating a fresh boot
+         reading from the same on-disk file.
+      3. Assert the lesson is still marked ``completed=True``.
+
+    Before CR-02 fix: the runtime mutated only the in-memory progress
+    dict — the on-disk file stayed empty — the second load_progress()
+    returned a fresh-empty LearnProgress and the assertion failed.
+    """
+    import time
+    from unittest.mock import MagicMock
+
+    from vibemix.learn.runtime import LessonRuntime
+    from vibemix.learn.state import LearnState
+
+    learn_state = LearnState()
+    midi_mirror = MagicMock(name="midi_mirror")
+    controller_state = MagicMock(name="controller_state")
+    ipc_router = MagicMock(name="ipc_router")
+    # Real LearnProgress instance — this is what live __main__.py wires
+    # via load_progress(). The Mock version of progress_store in other
+    # smoke tests intentionally side-steps this path; CR-02 cares about
+    # the real-progress branch.
+    progress = LearnProgress()
+    runtime = LessonRuntime(
+        learn_state=learn_state,
+        midi_mirror=midi_mirror,
+        controller_state=controller_state,
+        ipc_router=ipc_router,
+        progress_store=progress,
+    )
+
+    # Drive to advancing, then synthesize finish (the live path waits
+    # ~45s + 0.7s before send("finish"); the test path doesn't have an
+    # async loop running so the scheduling falls back to a no-op; we
+    # finalize manually).
+    runtime.send(
+        "load",
+        lesson_id="L0.00-press-play",
+        course_id="course_0",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    runtime.send(
+        "ack_action",
+        midi={
+            "type": "button",
+            "control": "play",
+            "deck": "A",
+            "direction": "down",
+        },
+    )
+    # If the smoke test ended in ``advancing``, finalize to completed.
+    if runtime.current_state.id == "advancing":
+        runtime.send("finish")
+    assert runtime.current_state.id == "completed", (
+        f"runtime did not reach completed; state={runtime.current_state.id!r}"
+    )
+
+    # Now simulate a process restart — read fresh from disk.
+    reloaded, was_corrupt = load_progress()
+    assert was_corrupt is False, "fresh save should not be flagged corrupt"
+    entry = reloaded.lessons.get("L0.00-press-play")
+    assert entry is not None, (
+        "CR-02 fix missing — runtime did not persist completion; the "
+        "on-disk file is empty after the lifecycle. Verify "
+        "on_enter_completed calls save_progress(self._progress)."
+    )
+    assert entry.get("completed") is True, (
+        f"completion flag not persisted; entry={entry!r}"
+    )
+
+
 @pytest.mark.cli
 def test_reset_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """``uv run python -m vibemix learn reset`` exits 0 and leaves the
