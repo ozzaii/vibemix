@@ -96,8 +96,18 @@ class SkillSpec:
 # phrasing_performance (Open-Q#1): its lessons span the C1 musicality block,
 # the C2 phrasing lessons, and all of C3 play-mode. C3 has NO recital and NO
 # completion flag, so it is gated on ``course_3_unlocked`` — the honest C2
-# recital pass that EARNS play-mode entry. (``L0.00-press-play`` / ``L1.01``
-# feed no skill — valid no-ops, never referenced here.)
+# recital pass that EARNS play-mode entry.
+#
+# FIVE curriculum lessons feed no skill (deliberately, not by oversight):
+#   * ``L0.00-press-play`` / ``L1.01`` (opening dialog) — intro stubs.
+#   * ``L1.16`` (course 1 recital) / ``L2.14`` (course 2 recital) — the
+#     recitals are the GATE for their skills, never fill (counting them would
+#     double-count the AND-gate as fill).
+#   * ``L1.15`` (load two tracks) — an orphaned teaching lesson that fills no
+#     skill. Whether it SHOULD map to deck_control is a product-design call
+#     (deck_control covers L1.02-L1.09 contiguously, then jumps to course 2);
+#     it is left a deliberate non-fill until that call is made. Do NOT read
+#     this gap as accidental coverage.
 SKILL_MANIFEST: dict[str, SkillSpec] = {
     "deck_control": SkillSpec(
         lesson_ids=(
