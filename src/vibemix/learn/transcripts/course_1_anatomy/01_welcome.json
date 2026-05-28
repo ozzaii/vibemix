@@ -1,0 +1,57 @@
+{
+  "lesson_id": "L1.01",
+  "title": "opening dialog",
+  "system_instruction_addendum": "OPENING DIALOG ADDENDUM: Read the four scripted lines verbatim. Do not improvise, paraphrase, or add an extra line.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "speaker": "user",
+      "text": "Hello vibemix, what are you?",
+      "tts_marker": "L101.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "speaker": "vibemix",
+      "text": "I'm the best DJ app in the world.",
+      "tts_marker": "L101.beat1",
+      "citations": []
+    },
+    {
+      "beat": 2,
+      "speaker": "user",
+      "text": "If you are the best, then who the fuck am I?",
+      "tts_marker": "L101.beat2",
+      "citations": []
+    },
+    {
+      "beat": 3,
+      "speaker": "vibemix",
+      "text": "Oh bestie, don't worry. You know why? Because I'm the beginner module of vibemix. Let's go.",
+      "tts_marker": "L101.beat3",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "tap anywhere to read the next line.",
+      "tts_marker": "L101.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "the dialog runs four lines. tap to advance.",
+      "tts_marker": "L101.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press the continue button at the bottom of the window.",
+      "tts_marker": "L101.hint3"
+    }
+  ]
+}

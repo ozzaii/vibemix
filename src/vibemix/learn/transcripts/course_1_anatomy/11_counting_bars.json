@@ -1,0 +1,47 @@
+{
+  "lesson_id": "L1.11",
+  "title": "counting bars",
+  "system_instruction_addendum": "COUNTING BARS ADDENDUM: Count one-two-three-four across four bars (sixteen beats). The user taps on the one each bar. Do not narrate microtiming.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "a bar is four beats — count one, two, three, four.",
+      "tts_marker": "L111.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "four bars in a row is a phrase — the unit most tracks build on.",
+      "tts_marker": "L111.beat1",
+      "citations": []
+    },
+    {
+      "beat": 2,
+      "text": "listen to the next four bars and tap continue on the one that opens bar five.",
+      "tts_marker": "L111.beat2",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the one of each bar is the heaviest kick — that is your anchor.",
+      "tts_marker": "L111.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "count out loud — one two three four, one two three four.",
+      "tts_marker": "L111.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "tap continue after sixteen beats.",
+      "tts_marker": "L111.hint3"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "lesson_id": "L1.12",
+  "title": "spot breakdown by ear",
+  "system_instruction_addendum": "SPOT BREAKDOWN EAR ADDENDUM: The breakdown is the energy drop — usually the kick steps out and a sustained chord or vocal carries through. State the audible cue, not the bar number.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the breakdown is the moment the energy thins — the kick steps out, a chord or vocal hangs in the air.",
+      "tts_marker": "L112.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "listen for it. tap continue the instant you hear the kick disappear.",
+      "tts_marker": "L112.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the loudest thing in the mix is usually the kick — wait for it to stop.",
+      "tts_marker": "L112.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "when the room would feel quieter and the chord takes over — that is it.",
+      "tts_marker": "L112.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "tap continue the moment the kick falls away.",
+      "tts_marker": "L112.hint3"
+    }
+  ]
+}

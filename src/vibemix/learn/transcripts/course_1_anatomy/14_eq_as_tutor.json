@@ -1,0 +1,83 @@
+{
+  "lesson_id": "L1.14",
+  "title": "eq as tutor",
+  "system_instruction_addendum": "EQ AS TUTOR ADDENDUM: Cycle three EQ bands — low, mid, high. Cite the exemplar track once per band. Stay quiet while the user is sweeping the knob.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "you've met every knob on your controller — now we use them on real music.",
+      "tts_marker": "L114.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "for each EQ band, i'll play a track from your library where that band lives loudest. you turn the knob; you hear it swell or fade.",
+      "tts_marker": "L114.beat1",
+      "citations": []
+    },
+    {
+      "beat": 2,
+      "text": "low band first, then mid, then high.",
+      "tts_marker": "L114.beat2",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "eq_low",
+    "deck": "A",
+    "min_delta": 80
+  },
+  "exemplar_cycle": [
+    {
+      "band": "low",
+      "expected_action": {
+        "type": "cc",
+        "control": "eq_low",
+        "deck": "A",
+        "min_delta": 80
+      },
+      "tutor_speak": "i picked a low-heavy track from your library. turn deck A's low EQ knob and listen to the bass swell and fade.",
+      "citations": []
+    },
+    {
+      "band": "mid",
+      "expected_action": {
+        "type": "cc",
+        "control": "eq_mid",
+        "deck": "A",
+        "min_delta": 80
+      },
+      "tutor_speak": "now a mid-heavy track. turn deck A's mid EQ knob and listen to the vocals and snares move.",
+      "citations": []
+    },
+    {
+      "band": "high",
+      "expected_action": {
+        "type": "cc",
+        "control": "eq_hi",
+        "deck": "A",
+        "min_delta": 80
+      },
+      "tutor_speak": "and a high-heavy track. turn deck A's high EQ knob and listen to the hats and shimmer change.",
+      "citations": []
+    }
+  ],
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the EQ knobs are stacked above the channel fader on deck A.",
+      "tts_marker": "L114.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "the bottom knob is low, the middle knob is mid, the top knob is high.",
+      "tts_marker": "L114.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "turn the EQ knob that matches the current band — sweep it from one extreme to the other.",
+      "tts_marker": "L114.hint3"
+    }
+  ]
+}

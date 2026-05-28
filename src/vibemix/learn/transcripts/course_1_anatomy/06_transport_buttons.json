@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L1.06",
+  "title": "transport buttons",
+  "system_instruction_addendum": "TRANSPORT BUTTONS ADDENDUM: Play, cue, and sync are deck transport. Cue plays from the cue point while held. Do not pre-empt the sync explanation; Course 2 owns sync.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the transport row on each deck holds three buttons — play, cue, and sync.",
+      "tts_marker": "L106.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "press and hold the cue button on deck A — the track plays only while you hold it.",
+      "tts_marker": "L106.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "cue",
+    "deck": "A",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the cue button sits next to play, usually labeled with a circle or CUE.",
+      "tts_marker": "L106.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "press cue on deck A — hold it down for a moment.",
+      "tts_marker": "L106.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press the cue button on deck A now.",
+      "tts_marker": "L106.hint3"
+    }
+  ]
+}

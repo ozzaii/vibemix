@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L1.05",
+  "title": "pitch fader",
+  "system_instruction_addendum": "PITCH FADER ADDENDUM: The pitch fader is a percentage adjustment to the BPM. Reference the tempo display on the user's deck. Sync is a separate lesson.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the pitch fader is the tall vertical slider on deck A — it nudges the BPM up or down as a percentage.",
+      "tts_marker": "L105.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "shift it about a quarter of the throw — watch the tempo display change.",
+      "tts_marker": "L105.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "tempo",
+    "deck": "A",
+    "min_delta": 50
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the pitch fader is the long slider on the outer edge of deck A.",
+      "tts_marker": "L105.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "push it about a quarter of the way down, then back up.",
+      "tts_marker": "L105.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "move the pitch fader on deck A a noticeable amount in either direction.",
+      "tts_marker": "L105.hint3"
+    }
+  ]
+}

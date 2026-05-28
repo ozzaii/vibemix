@@ -1,0 +1,47 @@
+{
+  "lesson_id": "L1.15",
+  "title": "load two tracks",
+  "system_instruction_addendum": "LOAD TWO TRACKS ADDENDUM: The user loads a track to deck A, then a track to deck B. Reference the load button on the controller, not the laptop keyboard.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "two decks means two tracks loaded — one on each side.",
+      "tts_marker": "L115.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "browse to a track in the library window, press load on deck A. browse to another, press load on deck B.",
+      "tts_marker": "L115.beat1",
+      "citations": []
+    },
+    {
+      "beat": 2,
+      "text": "tap continue when both decks have a track on them.",
+      "tts_marker": "L115.beat2",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the load buttons sit just above each jog wheel — one per deck.",
+      "tts_marker": "L115.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "use the browse encoder on the controller to scroll through tracks.",
+      "tts_marker": "L115.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press load on deck A, then load on deck B, then tap continue.",
+      "tts_marker": "L115.hint3"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "lesson_id": "L1.09",
+  "title": "master · booth · headphones",
+  "system_instruction_addendum": "MASTER VOL ADDENDUM: Master sets venue volume, booth is the monitor send, headphones is the cue send. Red zone above -6 dBFS clips. Do not move master mid-set.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "three volume knobs sit in the master section — master to the room, booth to your monitor, headphones to your cue.",
+      "tts_marker": "L109.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "touch the master knob once so you know where it lives, then leave it at noon.",
+      "tts_marker": "L109.beat1",
+      "citations": []
+    },
+    {
+      "beat": 2,
+      "text": "anything above minus six on the meter is the red zone — that is clipping, not loudness.",
+      "tts_marker": "L109.beat2",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "master_vol",
+    "min_delta": 5
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the master section is the small column at the top of the mixer.",
+      "tts_marker": "L109.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "the largest of the three knobs is master volume.",
+      "tts_marker": "L109.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "tap the master knob once and put it back to noon.",
+      "tts_marker": "L109.hint3"
+    }
+  ]
+}

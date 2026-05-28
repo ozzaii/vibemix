@@ -1,0 +1,41 @@
+{
+  "lesson_id": "L1.04",
+  "title": "crossfader",
+  "system_instruction_addendum": "CROSSFADER ADDENDUM: The crossfader is the horizontal slider between decks. Left equals deck A only, right equals deck B only, center equals both. State only the mechanical behavior.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the crossfader is the horizontal slider in the middle of the mixer — it blends deck A on the left with deck B on the right.",
+      "tts_marker": "L104.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "slide it from one side to the other and feel the throw.",
+      "tts_marker": "L104.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "xfader",
+    "min_delta": 100
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the crossfader sits at the bottom of the mixer, lying flat.",
+      "tts_marker": "L104.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "push it fully left, then fully right.",
+      "tts_marker": "L104.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "throw the slider all the way to one side, then all the way to the other.",
+      "tts_marker": "L104.hint3"
+    }
+  ]
+}

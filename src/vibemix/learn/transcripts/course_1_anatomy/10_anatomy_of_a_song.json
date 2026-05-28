@@ -1,0 +1,65 @@
+{
+  "lesson_id": "L1.10",
+  "title": "anatomy of a song",
+  "system_instruction_addendum": "SONG ANATOMY ADDENDUM: Walk through intro, build, drop, breakdown, outro on the playing track. Reference the audio you both hear, not music-theory jargon.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "a track moves through five sections — intro, build, drop, breakdown, outro.",
+      "tts_marker": "L110.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "the intro is sparse — usually drums or a single element, easy to mix into.",
+      "tts_marker": "L110.beat1",
+      "citations": []
+    },
+    {
+      "beat": 2,
+      "text": "the build pulls energy up — risers, snare rolls, the kick getting busier.",
+      "tts_marker": "L110.beat2",
+      "citations": []
+    },
+    {
+      "beat": 3,
+      "text": "the drop is the loudest, fullest section — the part the crowd was waiting for.",
+      "tts_marker": "L110.beat3",
+      "citations": []
+    },
+    {
+      "beat": 4,
+      "text": "the breakdown drops the kick — the chord or melody sustains over thin air.",
+      "tts_marker": "L110.beat4",
+      "citations": []
+    },
+    {
+      "beat": 5,
+      "text": "the outro thins out again — the place you mix out of.",
+      "tts_marker": "L110.beat5",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "listen across the whole track first — the five sections will repeat.",
+      "tts_marker": "L110.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "tap continue when you can name each section from the audio.",
+      "tts_marker": "L110.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press continue to move on.",
+      "tts_marker": "L110.hint3"
+    }
+  ]
+}

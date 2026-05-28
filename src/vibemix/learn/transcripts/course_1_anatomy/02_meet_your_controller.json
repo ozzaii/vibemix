@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L1.02",
+  "title": "meet your controller",
+  "system_instruction_addendum": "MEET CONTROLLER ADDENDUM: Name the rendered controller's three sections — left deck, mixer, right deck. Do not narrate features beyond the three sections.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "your controller has three big sections — left deck, mixer in the middle, right deck.",
+      "tts_marker": "L102.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "press the play button on the left deck when you've spotted it.",
+      "tts_marker": "L102.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "play",
+    "deck": "A",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the left deck is everything on the left third of your controller.",
+      "tts_marker": "L102.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "play sits in the bottom row of the deck — triangle glyph on a square button.",
+      "tts_marker": "L102.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press play on the left deck now.",
+      "tts_marker": "L102.hint3"
+    }
+  ]
+}

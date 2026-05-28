@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L1.07",
+  "title": "jog wheel",
+  "system_instruction_addendum": "JOG WHEEL ADDENDUM: The jog wheel is the round platter used to nudge a track forward or back. Scratching is a separate art form, deferred to a later course. Do not narrate scratching.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the jog wheel is the round platter on deck A — nudge it forward to push the track a hair ahead, back to pull it behind.",
+      "tts_marker": "L107.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "give the outer edge a small nudge in either direction.",
+      "tts_marker": "L107.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "cc",
+    "control": "jog",
+    "deck": "A",
+    "min_delta": 10
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the jog wheel is the big circular platter on the deck.",
+      "tts_marker": "L107.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "press lightly on the outer rim and rotate a small amount.",
+      "tts_marker": "L107.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "nudge the deck A jog wheel forward or back.",
+      "tts_marker": "L107.hint3"
+    }
+  ]
+}

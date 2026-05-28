@@ -1,0 +1,42 @@
+{
+  "lesson_id": "L1.08",
+  "title": "headphone cueing",
+  "system_instruction_addendum": "HEADPHONE CUEING ADDENDUM: The cue button routes a deck to the headphones only. Master and headphone cue can differ — that is the point.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the headphone cue button routes a deck to your headphones only — the room hears master, you hear the cued deck.",
+      "tts_marker": "L108.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "tap the headphone cue toggle on deck A.",
+      "tts_marker": "L108.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "headphone_cue",
+    "deck": "A",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the headphone cue toggle sits in the mixer column above the channel fader.",
+      "tts_marker": "L108.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "it usually carries a headphone glyph or the word CUE.",
+      "tts_marker": "L108.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "press the headphone cue button on the deck A column.",
+      "tts_marker": "L108.hint3"
+    }
+  ]
+}

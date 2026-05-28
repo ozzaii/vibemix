@@ -1,0 +1,41 @@
+{
+  "lesson_id": "L1.13",
+  "title": "spot breakdown by eye",
+  "system_instruction_addendum": "SPOT BREAKDOWN EYE ADDENDUM: The breakdown on the waveform is a thinner section — less low end, taller mids. Point to the waveform, not the audio.",
+  "tutor_speak": [
+    {
+      "beat": 0,
+      "text": "the breakdown shows up on the waveform as a thin section — the low end thins out, the mids carry alone.",
+      "tts_marker": "L113.beat0",
+      "citations": []
+    },
+    {
+      "beat": 1,
+      "text": "scan the waveform on deck A. tap continue when your cursor sits inside the thin section.",
+      "tts_marker": "L113.beat1",
+      "citations": []
+    }
+  ],
+  "expected_action": {
+    "type": "button",
+    "control": "lesson_continue",
+    "direction": "down"
+  },
+  "hints": [
+    {
+      "strike": 1,
+      "text": "the kick draws the tallest bars on the waveform — find where they shrink.",
+      "tts_marker": "L113.hint1"
+    },
+    {
+      "strike": 2,
+      "text": "the breakdown often shows up as a stripe of skinny waveform.",
+      "tts_marker": "L113.hint2"
+    },
+    {
+      "strike": 3,
+      "text": "tap continue when you've spotted the thin section.",
+      "tts_marker": "L113.hint3"
+    }
+  ]
+}
