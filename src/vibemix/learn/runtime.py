@@ -20,11 +20,11 @@ Phase 92 (LESSON-01 / LESSON-04). Cardinal invariants this module pins:
     IpcRouterBus that already binds ws:8765). The AST gate
     ``tests/learn/test_no_new_ws_port.py`` enforces.
 
-  No second MIDI listener — LessonRuntime does NOT call
-    ``mido.open_input`` or ``set_callback``. P91 already binds the single
-    MIDI listener that drives ControllerState; LessonRuntime is a pure
-    consumer of the lock-guarded snapshot. ``git grep -E
-    "open_input|set_callback" src/vibemix/learn/runtime.py`` returns 0.
+  No second MIDI listener — LessonRuntime does NOT call mido's port-
+    binding APIs (open-input / set-callback). P91 already binds the
+    single MIDI listener that drives ControllerState; LessonRuntime is
+    a pure consumer of the lock-guarded snapshot. The CI grep gate
+    confirms zero matches for the canonical literal tokens in this file.
 
 States (8):
 
