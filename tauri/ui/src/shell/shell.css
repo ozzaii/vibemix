@@ -408,6 +408,44 @@
   color: var(--text-muted);
 }
 
+/* ── Folded interiors — when a real surface mounts into the shell. ─────────
+ * The five surfaces were built as standalone windows each with their own
+ * titlebar chrome; folded into one shell that chrome duplicates the shell's
+ * own. So: drop the at-rest empty state, suppress the surface's window
+ * titlebar (the shell chrome + sidebar + footer carry that role now — one app,
+ * not seven windows), and let the interior fill its region. The `surface--
+ * mounted` flag is set by the surface-mount layer (surface-mounts.ts) only when
+ * a real interior actually mounts, so an un-folded surface keeps its empty
+ * state untouched. */
+.surface--mounted .surface-empty { display: none; }
+
+/* Suppress each folded surface's own window titlebar / drag chrome — the shell
+ * chrome owns the wordmark, clock, and window drag region. */
+.surface--mounted .vmx-titlebar,
+.surface--mounted .vmx-lib-titlebar { display: none; }
+
+/* A stub surface's interior fills its region (overriding the centered stub). */
+.surface--stub.surface--mounted { align-items: stretch; justify-content: stretch; padding: 0; }
+.surface--mounted .surface-mount {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* The deck: the live session fills the stage (no centered 720px placeholder). */
+.surface--deck.surface--mounted { align-items: stretch; justify-content: stretch; padding: 0; }
+.surface--deck.surface--mounted .deck-stage {
+  max-width: none;
+  height: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 /* ── Grounding panel — contextual right drawer. ──────────────────────────── */
 .shell-panel {
   position: absolute;

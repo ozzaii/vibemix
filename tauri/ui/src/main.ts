@@ -30,7 +30,6 @@ import {
   stopPerfObserver,
   type PerfHandle,
 } from "./mascot/perf-observer.js";
-import { routeSession } from "./session/router.js";
 import {
   consumeUrlParam,
   getDevSurface,
@@ -83,10 +82,10 @@ for (const channel of IPC_EVENTS) {
     try {
       const msg = parseIpcMessage(event.payload);
       // eslint-disable-next-line no-console
-      console.log(`[${channel}]`, msg);
+      console.log("[ipc]", channel, msg);
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.warn(`[${channel}] schema violation:`, err);
+      console.warn("[ipc] schema violation:", channel, err);
     }
   });
 }
@@ -160,6 +159,16 @@ async function boot(): Promise<void> {
       await routeSessionMock();
       return;
     }
+    // `?dev=shell` mounts the cohesive shell directly (bypassing the Tauri
+    // first-run check) so the folded app can be eyeballed in pure Vite dev.
+    if (params.get("dev") === "shell") {
+      vmxLog("[vmx:state]", "boot → shell app (dev=shell)");
+      const { mountShellApp } = await import("./shell/app.js");
+      const host = document.createElement("div");
+      document.body.appendChild(host);
+      await mountShellApp(host);
+      return;
+    }
   }
 
   const wizardMode = await shouldShowWizard();
@@ -183,11 +192,24 @@ async function boot(): Promise<void> {
     return;
   }
 
-  // Phase 12 path — mount the live session UI.
-  vmxLog("[vmx:state]", "boot → mounting live session");
+  // v6 tozpembe path — mount the cohesive shell app. The deck surface IS the
+  // live session (routeSession folds onto the deck stage); crate/learn/settings
+  // fold in alongside. The shell takes over the window body, so the crash banner
+  // is hoisted out of #wizard-app first (its refs are cached in crash-banner.ts,
+  // so a later sidecar crash still surfaces), then the static wizard skeleton is
+  // shed.
+  vmxLog("[vmx:state]", "boot → mounting shell app");
   try {
-    await routeSession();
-    vmxLog("[vmx:state]", "boot: live session mounted");
+    const banner = document.getElementById("crash-banner");
+    if (banner && banner.parentElement !== document.body) {
+      document.body.appendChild(banner);
+    }
+    document.getElementById("wizard-app")?.remove();
+    const shellHost = document.createElement("div");
+    document.body.appendChild(shellHost);
+    const { mountShellApp } = await import("./shell/app.js");
+    await mountShellApp(shellHost);
+    vmxLog("[vmx:state]", "boot: shell app mounted");
   } catch (err) {
     // Without surfacing this, the user sees a blank window with no
     // indication anything failed. Route through the existing crash
@@ -195,11 +217,11 @@ async function boot(): Promise<void> {
     // bounces the Python process which is usually enough to recover
     // (the webview reloads on app restart anyway).
     const detail = err instanceof Error ? err.message : String(err);
-    vmxLog("[vmx:error]", "routeSession failed", {
+    vmxLog("[vmx:error]", "shell app mount failed", {
       detail,
       stack: err instanceof Error ? err.stack : undefined,
     });
-    showFatalBanner("session-mount-failed", `Session UI failed to mount: ${detail}`);
+    showFatalBanner("session-mount-failed", `App UI failed to mount: ${detail}`);
   }
 }
 
