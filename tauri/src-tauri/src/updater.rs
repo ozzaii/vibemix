@@ -61,12 +61,6 @@ use tauri_plugin_updater::UpdaterExt;
 
 use crate::config::KEY_UPDATE_CHECK_ON_LAUNCH;
 
-/// Mirrors `crate::config::STORE_PATH`. Re-declared here so this module
-/// can be unit-tested + read independently. Both must reference the
-/// SAME file ("config.json" under `$APPDATA/vibemix/`) — drift would
-/// silently split the opt-out flag from the rest of the config.
-const STORE_PATH: &str = "config.json";
-
 /// Read the user opt-out flag from `tauri-plugin-store`'s config.json.
 ///
 /// Returns `true` (check enabled) on any of:
@@ -78,7 +72,19 @@ const STORE_PATH: &str = "config.json";
 ///
 /// Returns `false` ONLY when the key is present AND the value is `false`.
 pub fn check_on_launch_enabled(app: &AppHandle) -> bool {
-    let store = match app.store(STORE_PATH) {
+    // This fn returns `bool` (not Result), so `?` is invalid here. Fold the
+    // config_store_path() Err into the SAME default-ON behavior the store-init
+    // Err arm already uses — a corrupt/unresolvable config must never silently
+    // disable security updates. (Quick 260529-m4m: absolute path so this reads
+    // the SAME config.json the Python sidecar writes.)
+    let path = match crate::config::config_store_path() {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::debug!("updater: config path failed ({e}); defaulting check_on_launch=true");
+            return true;
+        }
+    };
+    let store = match app.store(path) {
         Ok(s) => s,
         Err(e) => {
             tracing::debug!("updater: store init failed ({e}); defaulting check_on_launch=true");

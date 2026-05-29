@@ -16,9 +16,9 @@
 //!     visible lozenge; the window itself has no opaque background.
 //!   * `always_on_top(true)` — the pill floats over the user's DJ app.
 //!   * `decorations(false)` — no titlebar/close box; lifecycle is tray-owned.
-//!   * `resizable(false)` — the pill is FIXED-size; expand is CSS height
-//!     growth inside the webview, NOT a window resize (avoids resize flicker
-//!     + geometry-persist thrash; UI-SPEC "expands DOWN only").
+//!   * `resizable(false)` — users cannot resize the pill. The renderer may
+//!     programmatically adjust height through `set_pill_height` so the expanded
+//!     receipt and hover peek are not clipped; width stays fixed.
 //!   * `skip_taskbar(true)` — not an Alt-Tab / Dock target.
 //!   * `visible_on_all_workspaces(true)` — Super-Whisper cross-Space float.
 //!   * `focused(false)` — request non-activating on build (Leg A floor).
@@ -74,10 +74,10 @@ pub const PILL_WINDOW_LABEL: &str = "pill";
 
 // Pill store key (config.json). The pill keeps its own geometry block so it
 // does not entangle with the mascot's `mascot_window` key — PILL is the
-// primary surface and persists x/y/w/h independently. config.rs is NOT
-// touched by this plan (the `primary_surface` switch is plan 62-02); the
-// pill reaches tauri-plugin-store directly here for its geometry only.
-const STORE_PATH: &str = "config.json";
+// primary surface and persists x/y/w/h independently. The store path itself
+// now routes through `crate::config::config_store_path()` (Quick 260529-m4m)
+// so Rust + the Python sidecar share ONE config.json; the pill still owns only
+// its `pill_window` geometry key within that shared file.
 const KEY_PILL_WINDOW: &str = "pill_window";
 
 // Collapsed dimensions. UI-SPEC §Pill Dimensions LOCKED 280×44. Pinning
@@ -152,12 +152,13 @@ pub fn clamp_to_work_area(x: i32, y: i32, w: u32, h: u32, area: WorkArea) -> (i3
 pub fn create_pill_window(app: &AppHandle) -> tauri::Result<Option<tauri::WebviewWindow>> {
     let state = load_pill_state(app).unwrap_or_default();
 
-    // The pill is FIXED-size: `resizable(false)` and the expand panel grows via
-    // CSS height inside the webview, NEVER a window resize. So persisted
-    // width/height are meaningless — and a corrupted save (observed in the wild:
+    // The pill BOOTS collapsed: `resizable(false)` blocks user resizing, while
+    // `set_pill_height` can programmatically grow the shell for the expanded
+    // receipt or hover peek. Persisted width/height are therefore meaningless
+    // and potentially harmful — a corrupted save (observed in the wild:
     // 8960×1408, from a physical-vs-logical pixel scale bug in an old geometry
-    // write) would restore an insanely huge window. ALWAYS use the locked
-    // collapsed dims; only x/y are restored from saved state.
+    // write) would restore an insanely huge window. Always use the locked
+    // collapsed dims at boot; only x/y are restored from saved state.
     let width = PILL_COLLAPSED_W as u32;
     let height = PILL_COLLAPSED_H as u32;
     let (default_x, default_y) = default_top_right(app, width);
@@ -188,7 +189,7 @@ pub fn create_pill_window(app: &AppHandle) -> tauri::Result<Option<tauri::Webvie
             .transparent(true)
             .always_on_top(true)
             .decorations(false)
-            .resizable(false) // DELTA vs mascot: pill is fixed-size; expand is CSS height.
+            .resizable(false) // User-fixed; renderer controls bounded height.
             .skip_taskbar(true)
             .visible_on_all_workspaces(true)
             .focused(false) // DELTA vs mascot: request non-activating (Leg A floor).
@@ -377,7 +378,7 @@ fn window_size(app: &AppHandle) -> tauri::Result<PhysicalSize<u32>> {
 fn load_pill_state(app: &AppHandle) -> Result<PillWindowState, String> {
     use tauri_plugin_store::StoreExt;
     let store = app
-        .store(STORE_PATH)
+        .store(crate::config::config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
     match store.get(KEY_PILL_WINDOW) {
         Some(value) => {
@@ -391,7 +392,7 @@ fn load_pill_state(app: &AppHandle) -> Result<PillWindowState, String> {
 fn save_pill_state(app: &AppHandle, state: &PillWindowState) -> Result<(), String> {
     use tauri_plugin_store::StoreExt;
     let store = app
-        .store(STORE_PATH)
+        .store(crate::config::config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
     let value = serde_json::to_value(state).map_err(|e| format!("encode failed: {e}"))?;
     store.set(KEY_PILL_WINDOW, value);

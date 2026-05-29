@@ -38,7 +38,6 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-const STORE_PATH: &str = "config.json";
 const KEY_FIRST_RUN_STATE: &str = "first_run_state";
 const KEY_MASCOT_WINDOW: &str = "mascot_window";
 const KEY_BRAVOH_WAITLIST_OPT_IN: &str = "bravoh_waitlist_opt_in";
@@ -158,7 +157,7 @@ pub fn is_first_run(app: &AppHandle) -> bool {
 fn load_state(app: &AppHandle) -> Result<FirstRunState, String> {
     use tauri_plugin_store::StoreExt;
     let store = app
-        .store(STORE_PATH)
+        .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
     match store.get(KEY_FIRST_RUN_STATE) {
         Some(value) => {
@@ -171,7 +170,7 @@ fn load_state(app: &AppHandle) -> Result<FirstRunState, String> {
 fn save_state(app: &AppHandle, state: &FirstRunState) -> Result<(), String> {
     use tauri_plugin_store::StoreExt;
     let store = app
-        .store(STORE_PATH)
+        .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
     // The plugin loads config.json into an in-memory cache ONCE at boot
     // (before the wizard runs). The Python sidecar writes config.json
@@ -198,7 +197,7 @@ fn save_state(app: &AppHandle, state: &FirstRunState) -> Result<(), String> {
 pub fn load_mascot_state(app: &AppHandle) -> Result<MascotWindowState, String> {
     use tauri_plugin_store::StoreExt;
     let store = app
-        .store(STORE_PATH)
+        .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
     match store.get(KEY_MASCOT_WINDOW) {
         Some(value) => {
@@ -214,7 +213,7 @@ pub fn load_mascot_state(app: &AppHandle) -> Result<MascotWindowState, String> {
 pub fn save_mascot_state(app: &AppHandle, state: &MascotWindowState) -> Result<(), String> {
     use tauri_plugin_store::StoreExt;
     let store = app
-        .store(STORE_PATH)
+        .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
     let value = serde_json::to_value(state).map_err(|e| format!("encode failed: {e}"))?;
     store.set(KEY_MASCOT_WINDOW, value);
@@ -227,7 +226,7 @@ pub fn save_mascot_state(app: &AppHandle, state: &MascotWindowState) -> Result<(
 fn load_bool_key(app: &AppHandle, key: &str, default: bool) -> Result<bool, String> {
     use tauri_plugin_store::StoreExt;
     let store = app
-        .store(STORE_PATH)
+        .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
     match store.get(key) {
         Some(value) => value
@@ -240,7 +239,7 @@ fn load_bool_key(app: &AppHandle, key: &str, default: bool) -> Result<bool, Stri
 fn save_bool_key(app: &AppHandle, key: &str, value: bool) -> Result<(), String> {
     use tauri_plugin_store::StoreExt;
     let store = app
-        .store(STORE_PATH)
+        .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
     store.set(key, serde_json::Value::Bool(value));
     store
@@ -257,7 +256,7 @@ fn save_bool_key(app: &AppHandle, key: &str, value: bool) -> Result<(), String> 
 pub fn load_primary_surface(app: &AppHandle) -> Result<PrimarySurface, String> {
     use tauri_plugin_store::StoreExt;
     let store = app
-        .store(STORE_PATH)
+        .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
     match store.get(KEY_PRIMARY_SURFACE) {
         Some(value) => {
@@ -277,7 +276,7 @@ pub fn load_primary_surface(app: &AppHandle) -> Result<PrimarySurface, String> {
 pub fn save_primary_surface(app: &AppHandle, surface: PrimarySurface) -> Result<(), String> {
     use tauri_plugin_store::StoreExt;
     let store = app
-        .store(STORE_PATH)
+        .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
     let value = serde_json::to_value(surface).map_err(|e| format!("encode failed: {e}"))?;
     store.set(KEY_PRIMARY_SURFACE, value);
