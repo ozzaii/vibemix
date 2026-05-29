@@ -72,6 +72,10 @@ See: `.planning/REQUIREMENTS.md` (16 v11.0 REQ-IDs across SKILL / COMP / MAST / 
 | verification_gap | v10.0 §HARDEN-PHASE-C-DOC-READTHROUGH | human_needed |
 | ear_pass | v9.0 §LEARN-EAR-COURSE-1/2/3 + §LEARN-LEGAL-DISCLAIMER | human_needed |
 
+## Audit Trail (retired overrides)
+
+- **Phase 16 ear-test memory override — RETIRED** as of Plan 42-05 (2026-05-16). The v2.1 P85 autonomous-only override is formally retired and replaced by the v3.0 hybrid hallucination gate (`scripts/release/check_gate.sh` + `check_ear_test.sh`) wired into `cut_release.sh` at Gate 2b. Cross-reference: `.planning/decisions/P85-OVERRIDE-RETIRED.md`. (v8.1 BENCH-03 re-invokes the Phase-16 "Kaan's ear is final judge" rule for the bench — consistent with the hybrid gate: auto-eval is the fast-lane rank, Kaan's ear is the veto.)
+
 ## Open Alongside (Other Workstreams)
 
 - **v4.0 SHIP** — engineering-complete 8/8 since 2026-05-21; publish gated on Apple Dev + SignPath signature clock. Not archived.

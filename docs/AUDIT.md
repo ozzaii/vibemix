@@ -30,10 +30,10 @@
 | `httpx` | 0.28.1 | see uv.lock | HTTP client used by google-genai + livekit-agents transitives. | 🟢 Green |  |
 | `jsonschema` | 4.26.0 | see uv.lock | JSON-schema validation (IPC schema gate, dep_ratings_schema). Pure-Python. | 🟢 Green |  |
 | `keyring` | 25.7.0 | see uv.lock | Native macOS Keychain / Windows Credential Locker integration via pure-Python ctypes; no compile step. | 🟡 Yellow |  |
-| `livekit` | 1.1.7 | see uv.lock | WebRTC client; transitively pulls av + aiortc. Prebuilt wheels for Mac+Win64. | 🟡 Yellow |  |
-| `livekit-agents` | 1.5.8 | see uv.lock | Gemini Live API wrapper (cohost_v2/lk variants). Pure-Python. | 🟢 Green |  |
-| `livekit-plugins-google` | 1.5.8 | see uv.lock | LiveKit Gemini adapter — the seam through which all Gemini Live audio flows. | 🟢 Green |  |
-| `livekit-plugins-openai` | 1.5.8 | see uv.lock | [CULL-BLOCKED] Used by src/vibemix/agent/tts_chain.py for the proxy TTS fallback chain. Cannot remove without rewiring the TTS chain — out of scope for Phase 46. | 🟡 Yellow |  |
+| `livekit` | 1.1.8 | see uv.lock | WebRTC client; transitively pulls av + aiortc. Prebuilt wheels for Mac+Win64. | 🟡 Yellow |  |
+| `livekit-agents` | 1.5.14 | see uv.lock | Gemini Live API wrapper (cohost_v2/lk variants). Pure-Python. | 🟢 Green |  |
+| `livekit-plugins-google` | 1.5.14 | see uv.lock | LiveKit Gemini adapter — the seam through which all Gemini Live audio flows. | 🟢 Green |  |
+| `livekit-plugins-openai` | 1.5.14 | see uv.lock | [CULL-BLOCKED] Used by src/vibemix/agent/tts_chain.py for the proxy TTS fallback chain. Cannot remove without rewiring the TTS chain — out of scope for Phase 46. | 🟡 Yellow |  |
 | `mcp` | 1.27.1 | see uv.lock | Codex MCP bridge for the local Viber tool surface. Pure-Python; optional at runtime outside Codex-backed chat/curate/build-set. | 🟢 Green |  |
 | `mido` | 1.3.3 | see uv.lock | MIDI message parsing (DDJ-FLX4 controller decode). Pure-Python. | 🟢 Green |  |
 | `mss` | 10.2.0 | see uv.lock | Win32 screen capture (CoreGraphics on Mac uses ScreenCaptureKit). Pure-Python. | 🟢 Green |  |
@@ -51,6 +51,7 @@
 | `python-dateutil` | 2.9.0.post0 | see uv.lock | pyrekordbox transitive — date parsing. Pure-Python. | 🟢 Green |  |
 | `python-dotenv` | 1.2.2 | see uv.lock | load_dotenv() for GEMINI_API_KEY ingest. Pure-Python. | 🟢 Green |  |
 | `python-rtmidi` | 1.5.8 | see uv.lock | Low-level MIDI I/O (mido backend). Prebuilt wheels Mac+Win64. | 🟡 Yellow |  |
+| `python-statemachine` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `pywin32` | 311 | see uv.lock | Win32 API bindings (Win-only). Prebuilt wheels. | 🟡 Yellow |  |
 | `sounddevice` | 0.5.5 | see uv.lock | CoreAudio (Mac) + WASAPI (Win) bridge. Pure-Python over CFFI; system PortAudio resolved by the installer. | 🟡 Yellow |  |
 | `SQLAlchemy` | 2.0.49 | see uv.lock | pyrekordbox transitive — required for db6 import chain even when SQLCipher dormant. Prebuilt wheels all platforms. | 🟡 Yellow |  |
@@ -66,6 +67,7 @@
 | `dirs-next` | see Cargo.lock | see Cargo.toml | Cross-platform user-dirs resolution (config, cache). Pure-Rust. | 🟢 Green |  |
 | `file-rotate` | see Cargo.lock | see Cargo.toml | Log file rotation. Pure-Rust. | 🟢 Green |  |
 | `futures-util` | see Cargo.lock | see Cargo.toml | Futures helper traits. Pure-Rust. | 🟢 Green |  |
+| `libc` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `serde` | see Cargo.lock | see Cargo.toml | Serialization. Compile-time codegen; no runtime native deps. | 🟢 Green |  |
 | `serde_json` | see Cargo.lock | see Cargo.toml | JSON path for IPC payloads. Compile-time codegen. | 🟢 Green |  |
 | `tauri` | see Cargo.lock | see Cargo.toml | Desktop shell framework. Mac/Win supported with native toolchains; build chain is installer-invisible. | 🟡 Yellow |  |
@@ -95,6 +97,7 @@
 | `@types/three` | see package-lock.json | see package-lock.json | TS type declarations for three. Dev only. | 🟢 Green |  |
 | `ajv` | see package-lock.json | see package-lock.json | JSON-schema validation (IPC schema gate). Pure-JS. | 🟢 Green |  |
 | `ajv-formats` | see package-lock.json | see package-lock.json | ajv format validators. | 🟢 Green |  |
+| `axe-core` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `gltf-pipeline` | see package-lock.json | see package-lock.json | GLB compression pipeline. Build-time only. | 🟢 Green |  |
 | `jsdom` | see package-lock.json | see package-lock.json | DOM emulator for vitest. Dev only. | 🟢 Green |  |
 | `json-schema-to-typescript` | see package-lock.json | see package-lock.json | IPC schema to TS codegen. Build-time only. | 🟢 Green |  |

@@ -443,7 +443,10 @@ def test_pyinstaller_specs_filter_test_submodules(spec_name: str) -> None:
         '"benchmarks"',
         '"scripts"',
         '"tools"',
-        '"cli"',
+        # '"cli"' is intentionally NOT required: the spec keeps livekit.agents.cli,
+        # a runtime import (agent_session.py). Blocking it reintroduced the frozen
+        # "cannot import name 'cli'" sidecar crash. The filter targets test/demo/tool
+        # trees, not this runtime CLI leaf.
         '"jupyter"',
         '"vibemix.bench"',
         '"__main__"',

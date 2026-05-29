@@ -24,7 +24,9 @@ SCRIPT = REPO_ROOT / "scripts" / "launch" / "sync_github_meta.sh"
 META_DOC = REPO_ROOT / "docs" / "launch" / "github-meta.md"
 
 REQUIRED_TOPICS = [
-    "dj", "ai", "gemini", "tauri", "open-source",
+    # Public-repo topics carry no model names (partner/public-copy rule):
+    # github-meta.md ships "multimodal", not "gemini".
+    "dj", "ai", "multimodal", "tauri", "open-source",
     "mascot", "livekit", "audio", "vibemix", "bravoh",
 ]
 
@@ -85,12 +87,14 @@ def test_topics_list_includes_required_10():
     )
 
 
-def test_homepage_url_is_altidus_with_utm():
+def test_homepage_url_is_bravoh_with_utm():
+    # Public homepage = bravoh.ai (partner-facing domain); altidus.world is
+    # legacy/internal and no longer ships in public metadata.
     body = META_DOC.read_text(encoding="utf-8")
     m = re.search(r"^## Homepage URL.*?\n```\n(.*?)\n```", body, re.DOTALL | re.MULTILINE)
     assert m
     url = m.group(1).strip()
-    assert "altidus.world" in url
+    assert "bravoh.ai" in url
     assert "utm_source=github" in url
     assert "utm_campaign=vibemix_launch" in url
 

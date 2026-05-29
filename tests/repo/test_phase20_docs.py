@@ -302,10 +302,13 @@ def test_active_planning_docs_pin_viber_to_codex_not_gemini_fallback():
             f"STATE head still has stale Viber backend wording: {phrase}"
         )
 
-    assert "Phase 88 (UI) is now wired into the Vibe Engine Library surface" in state_head
-    assert "Next: packaged fresh-install/updater rehearsal" in state_head
+    # The two v8.2-era STATE.md-head pins ("Phase 88 (UI) is now wired…", "Next:
+    # packaged fresh-install/updater rehearsal") were removed — STATE.md has
+    # legitimately advanced to milestone v11.0 "Earned". The enduring contract this
+    # test protects (Viber pinned to local Codex, no Gemini fallback) is still
+    # enforced by the forbidden-phrase scan above + the source-doc pins below.
     assert "Library/Viber uses local Codex" in _read(".planning/codebase/STACK.md")
     assert "local Codex is the current Viber set-prep/chat path" in _read(".planning/PROJECT.md")
     assert "Viber set-prep/chat uses local Codex" in _read(".planning/ROADMAP.md")
-    assert "local Codex Viber agent" in _read(".planning/REQUIREMENTS.md")
+    assert "local Codex (Viber)" in _read(".planning/REQUIREMENTS.md")  # v11.0 wording
     assert "local Codex for set-prep/chat demo/test" in _read(".planning/phases/v8.2-STATUS.md")
