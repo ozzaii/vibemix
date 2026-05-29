@@ -443,6 +443,8 @@ Acceptance evidence:
 - unsupported timing/cue/harmonic/tempo/taste/export phrases are rejected;
 - role-specific section language (`drop`, `breakdown`, `outro`, etc.) requires
   a cited `section_role` claim whose value matches the spoken role;
+- unhedged role-specific copy requires an `allowed` role claim; `hedged` role
+  claims must use hedged language such as "likely drop";
 - review-only cues cannot be called export-ready;
 - exported/saved language requires an action-success claim;
 - playlist/M3U/JSON creation language requires a `playlist_created` action claim;
