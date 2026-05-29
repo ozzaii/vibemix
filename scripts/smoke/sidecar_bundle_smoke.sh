@@ -129,26 +129,10 @@ check_mascot_envelope() {
 
 # ---------- 4. IPC schema parity (validator + dataclass coverage) ----------
 check_ipc_schema() {
-  # check_ipc_schema.py exits 1 if the schema has an unmirror'd oneOf
-  # entry (pre-existing baseline drift from the 2026-05-28 sibling-
-  # session cross-merge commit 456e1fdb — `ipc.session.set_mode`
-  # added to schema without a Python dataclass mirror in
-  # ui_bus/messages.py). That drift is NOT v9.0-caused (P97 added
-  # set_mode via the cross-session merge; the AUDIT-04 mandate is
-  # rc1 + v9.0-additive regression, not cleaning sibling-session
-  # drift). Surface as WARN, not FAIL.
   local out rc
   out=$(uv run python scripts/check_ipc_schema.py 2>&1)
   rc=$?
   echo "$out" | tail -5
-  if [ "$rc" -ne 0 ] && echo "$out" | grep -q "FAIL: schema/dataclass drift"; then
-    # Pre-existing drift surfaced — does NOT regress the validator
-    # path (which is the actual rc1-affected surface).
-    if echo "$out" | grep -q "OK: 77 dataclasses validate"; then
-      warn "ipc-schema: pre-existing schema/dataclass drift (sibling-session cross-merge); 77 dataclasses still validate"
-      return 0
-    fi
-  fi
   return $rc
 }
 

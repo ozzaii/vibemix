@@ -14,6 +14,7 @@ On Ctrl-C / timeout, prints a final summary line:
 
 License: Apache-2.0 (matches repo).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,15 +23,16 @@ import sys
 import time
 from typing import Any
 
-
 __all__ = [
     "AmbiguousPortError",
     "enumerate_ports",
-    "match_port",
     "format_frame",
-    "summarize",
     "main",
+    "match_port",
+    "summarize",
 ]
+
+SUPPORTED_TYPES = frozenset({"control_change", "note_on", "note_off"})
 
 
 class AmbiguousPortError(Exception):
@@ -41,8 +43,7 @@ class AmbiguousPortError(Exception):
         self.matches = matches
         joined = ", ".join(matches)
         super().__init__(
-            f"--port '{substring}' is ambiguous; matches: [{joined}]. "
-            f"Be more specific."
+            f"--port '{substring}' is ambiguous; matches: [{joined}]. Be more specific."
         )
 
 
@@ -130,17 +131,29 @@ def _emit(frame: dict) -> None:
     sys.stdout.flush()
 
 
-def _run_capture(port_name: str, seconds: int) -> int:
-    """Open the port, capture for `seconds`, print JSONL + summary. Returns exit code."""
-    import mido  # type: ignore[import-not-found]
+def _record_supported_msg(msg: Any, frames: list[dict], start: float) -> bool:
+    """Emit a supported MIDI message and append it to ``frames``.
 
+    Returns True when a frame was captured. Unsupported MIDI traffic is ignored
+    so the public JSONL schema stays minimal and threat-modelled.
+    """
+    if msg.type not in SUPPORTED_TYPES:
+        return False
+    ts = time.monotonic() - start
+    frame = format_frame(msg, ts)
+    frames.append(frame)
+    _emit(frame)
+    return True
+
+
+def _run_poll_capture(mido: Any, port_name: str, seconds: int) -> int:
     frames: list[dict] = []
     start = time.monotonic()
     deadline = start + seconds
     try:
         with mido.open_input(port_name) as port:
             print(
-                f"# sniffing '{port_name}' for {seconds}s — Ctrl-C to stop early",
+                f"# sniffing '{port_name}' for {seconds}s via poll — Ctrl-C to stop early",
                 file=sys.stderr,
                 flush=True,
             )
@@ -150,17 +163,45 @@ def _run_capture(port_name: str, seconds: int) -> int:
                     # Avoid busy-loop; 1ms idle keeps us under <1% CPU.
                     time.sleep(0.001)
                     continue
-                if msg.type not in ("control_change", "note_on", "note_off"):
-                    continue
-                ts = time.monotonic() - start
-                frame = format_frame(msg, ts)
-                frames.append(frame)
-                _emit(frame)
+                _record_supported_msg(msg, frames, start)
     except KeyboardInterrupt:
         pass
     duration = time.monotonic() - start
     _emit(summarize(frames, duration))
     return 0
+
+
+def _run_callback_capture(mido: Any, port_name: str, seconds: int) -> int:
+    frames: list[dict] = []
+    start = time.monotonic()
+    deadline = start + seconds
+
+    def _callback(msg: Any) -> None:
+        _record_supported_msg(msg, frames, start)
+
+    try:
+        with mido.open_input(port_name, callback=_callback):
+            print(
+                f"# sniffing '{port_name}' for {seconds}s via callback — Ctrl-C to stop early",
+                file=sys.stderr,
+                flush=True,
+            )
+            while time.monotonic() < deadline:
+                time.sleep(0.01)
+    except KeyboardInterrupt:
+        pass
+    duration = time.monotonic() - start
+    _emit(summarize(frames, duration))
+    return 0
+
+
+def _run_capture(port_name: str, seconds: int, mode: str = "poll") -> int:
+    """Open the port, capture for `seconds`, print JSONL + summary. Returns exit code."""
+    import mido  # type: ignore[import-not-found]
+
+    if mode == "callback":
+        return _run_callback_capture(mido, port_name, seconds)
+    return _run_poll_capture(mido, port_name, seconds)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -185,6 +226,15 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=300,
         help="Capture duration in seconds (default: 300 = 5 min, matches Pitfall 25 window).",
+    )
+    p.add_argument(
+        "--mode",
+        choices=("poll", "callback"),
+        default="poll",
+        help=(
+            "capture mode: poll (default, mirrors vibemix listener) or callback "
+            "(independent python-rtmidi callback diagnostic)"
+        ),
     )
     p.add_argument(
         "--list",
@@ -219,7 +269,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 3
 
-    return _run_capture(matched, args.seconds)
+    return _run_capture(matched, args.seconds, mode=args.mode)
 
 
 if __name__ == "__main__":  # pragma: no cover
