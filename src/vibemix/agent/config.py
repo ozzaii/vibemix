@@ -19,6 +19,8 @@ compatibility — every existing import (``__main__.py``, ``agent/cache.py``,
 
 from __future__ import annotations
 
+import os
+
 from vibemix.llm.model_router import resolve, resolve_model
 
 # ---- LLM + TTS model identifiers (v4:97-99, router-derived per Plan 41-01) ----
@@ -41,9 +43,19 @@ OPENROUTER_TTS_MODEL: str = resolve_model("live_coach_tts_openrouter")
 VOICE: str = "Achird"
 
 # ---- Device names (v4:101-103) ----
-INPUT_DEVICE: str = "BlackHole 2ch"
-OUTPUT_DEVICE: str = "MacBook Pro Speakers"  # 2026-05-18 — Kaan's pick for tonight (was "AI Capture" aggregate, switched to laptop speakers).
-MIC_DEVICE: str = "MacBook Pro Microphone"
+# Factory defaults stay pinned for ordinary installs. The env overrides are
+# intentionally import-time only so live proof runs can select a rig-specific
+# CoreAudio device before ``python -m vibemix`` boots.
+
+
+def _device_name(env_name: str, default: str) -> str:
+    override = os.environ.get(env_name, "").strip()
+    return override or default
+
+
+INPUT_DEVICE: str = _device_name("VIBEMIX_INPUT_DEVICE", "BlackHole 2ch")
+OUTPUT_DEVICE: str = _device_name("VIBEMIX_OUTPUT_DEVICE", "MacBook Pro Speakers")
+MIC_DEVICE: str = _device_name("VIBEMIX_MIC_DEVICE", "MacBook Pro Microphone")
 
 
 def __getattr__(name: str):

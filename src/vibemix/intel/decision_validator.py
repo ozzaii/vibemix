@@ -117,6 +117,7 @@ def _expected_subjects_for_selected_claim(
         "cue_operability",
         "taste_fit",
         "taste_uncertain",
+        "move_grade",
     }:
         return support["candidate"]
     if claim_type in {"section_role", "section_boundary"}:

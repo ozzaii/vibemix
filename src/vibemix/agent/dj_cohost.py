@@ -78,6 +78,27 @@ from vibemix.runtime.llm_to_tts_delta_meter import LLMToTTSDeltaMeter
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
+from vibemix.state.deck_context import (
+    apply_live_claim_guard,
+    live_claim_policy,
+    render_audio_delta_items,
+    render_audio_part_context,
+    render_audio_window_context,
+    render_audio_window_map,
+    render_context_feed_contract,
+    render_deck_audio_context,
+    render_deck_audio_separation_context,
+    render_deck_change_context,
+    render_deck_context,
+    render_deck_lane_context,
+    render_deck_reference_context,
+    render_deck_source_context,
+    render_live_evidence_context,
+    render_mixer_context,
+    render_move_context,
+    render_move_effect_context,
+    should_defer_live_claim_stream,
+)
 from vibemix.ui_bus import SessionCohostReaction, SessionOverlayHighlight
 
 if TYPE_CHECKING:  # pragma: no cover — typing-only
@@ -174,6 +195,249 @@ CITATION_VERB_MAX_WORDS: int = 3
 # (§RECALL-EAR in KAAN-ACTION-LEGAL.md) may re-tune this value via a
 # single edit here — no surrounding wiring depends on the literal.
 RECALL_CALLBACK_COOLDOWN_S: float = 120.0
+
+
+def _event_live_move_labels(ev: Event | None, fallback_state: MusicState) -> tuple[str, ...]:
+    """Return bounded move labels for live claim gating."""
+    if ev is not None:
+        raw = ev.extra.get("moves")
+        if isinstance(raw, (list, tuple)):
+            labels = tuple(str(label) for label in raw if str(label).strip())
+            if labels:
+                return labels[-3:]
+        state = ev.state
+    else:
+        state = fallback_state
+
+    labels: list[str] = []
+    for item in getattr(state, "recent_moves", []) or []:
+        if not isinstance(item, (list, tuple)) or len(item) < 2:
+            continue
+        age_raw, label = item[0], item[1]
+        try:
+            age = float(age_raw)
+        except (TypeError, ValueError):
+            continue
+        if age <= 8.0 and str(label).strip():
+            labels.append(str(label))
+    return tuple(labels[-3:])
+
+
+def _build_attached_audio_context_clause(
+    state: MusicState,
+    moves: list[str] | tuple[str, ...] = (),
+    *,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_seconds: float = DIET_AUDIO_SECONDS,
+    mic_part_label: str | None = None,
+    lookahead_part_label: str | None = None,
+    lookahead_horizon_s: float = 3.0,
+) -> str:
+    """Return deck-grounding context adjacent to Gemini's live audio Part.
+
+    ``AICoach.build_prompt`` already carries the full evidence packet. This
+    small suffix repeats only the live audio/deck gates immediately before the
+    attached P1 audio description so Gemini binds "what I hear" to "which deck
+    evidence permits that claim" in the same local context window. It is
+    bounded text, not a raw MIDI/screen Part.
+    """
+    move_items = tuple(str(item) for item in moves if str(item).strip())
+    context_lines: list[str] = []
+    for item in (
+        render_context_feed_contract(
+            state,
+            move_items,
+            surface="gemini_p1",
+            audio_seconds=audio_seconds,
+            force=True,
+        ),
+        render_audio_part_context(
+            audio_seconds=audio_seconds,
+            mic_part_label=mic_part_label,
+            lookahead_part_label=lookahead_part_label,
+            lookahead_horizon_s=lookahead_horizon_s,
+        ),
+        render_deck_context(state, compact=True),
+        render_deck_lane_context(state, compact=True),
+        render_deck_reference_context(state, compact=True),
+        render_deck_source_context(state, compact=True),
+        render_mixer_context(state),
+        render_deck_audio_context(state),
+        render_deck_audio_separation_context(),
+        render_audio_window_context(
+            state,
+            move_items,
+            audio_seconds=audio_seconds,
+            lookahead_part_label=lookahead_part_label,
+            lookahead_horizon_s=lookahead_horizon_s,
+            force=True,
+        ),
+        _render_audio_window_map_line(
+            render_audio_window_map(
+                state,
+                move_items,
+                audio_seconds=audio_seconds,
+                lookahead_part_label=lookahead_part_label,
+                lookahead_horizon_s=lookahead_horizon_s,
+                force=True,
+            )
+        ),
+        render_move_context(state, move_items),
+        render_deck_change_context(state, move_items),
+        render_move_effect_context(
+            state,
+            move_items,
+            audio_delta_items=audio_delta_items,
+        ),
+        render_live_evidence_context(
+            state,
+            move_items,
+            audio_delta_items=audio_delta_items,
+        ),
+    ):
+        if item:
+            context_lines.append(item)
+
+    policy, reason = live_claim_policy(state, move_items)
+    policy_fields = [f"policy={policy}"]
+    if reason:
+        policy_fields.append(f"reason={reason}")
+    if policy in {"blocked", "watch_not_claim"}:
+        policy_fields.append("rule=do_not_claim_transition_blend_handoff")
+    elif policy == "candidate_not_verdict":
+        policy_fields.append("rule=candidate_not_quality_verdict")
+    else:
+        policy_fields.append("rule=multi_deck_outcome_requires_live_support")
+    context_lines.append("claim_policy[" + " ".join(policy_fields) + "]")
+
+    return (
+        "\n\nAUDIO CONTEXT MAP FOR ATTACHED P1:\n"
+        + "\n".join(context_lines)
+        + "\nAUDIO PART CONTRACT: P1=live_global_mix isolated_decks=false "
+        "deck_separation=structured_text_only audio_window_context=time_aligned "
+        "deck_audio_separation_context=capture_capability "
+        "optional_later_parts_not_current_deck_audio."
+        + "\nAUDIO CLAIM RULE: P1 is the global live mix, not isolated deck stems. "
+        "Transition/blend/drop/handoff/bridge claims require deck/live_evidence "
+        "support; controller moves plus audio deltas are timing evidence, not "
+        "causal or quality proof."
+    )
+
+
+def _render_audio_window_map_line(audio_map: dict[str, Any] | None) -> str | None:
+    if not audio_map:
+        return None
+    anchors = audio_map.get("move_anchors")
+    if isinstance(anchors, list) and anchors:
+        anchor_tokens = []
+        for item in anchors[:3]:
+            if not isinstance(item, dict):
+                continue
+            token = str(item.get("token") or "move")[:96]
+            relation = str(item.get("relation") or "unknown")[:32]
+            age = item.get("age_s")
+            if isinstance(age, (int, float)):
+                anchor_tokens.append(f"{token}@-{float(age):.1f}s:{relation}")
+            else:
+                anchor_tokens.append(f"{token}:age_unknown")
+        anchor_text = ",".join(anchor_tokens) if anchor_tokens else "none"
+    else:
+        anchor_text = "none"
+
+    future = audio_map.get("future") if isinstance(audio_map.get("future"), dict) else {}
+    future_text = "not_attached"
+    if future.get("part") and isinstance(future.get("span_s"), list):
+        span = future.get("span_s") or [0.0, 0.0]
+        try:
+            future_text = f"{future.get('part')}:{float(span[0]):.1f}..+{float(span[1]):.1f}"
+        except (TypeError, ValueError, IndexError):
+            future_text = str(future.get("part"))
+
+    return (
+        "audio_window_map["
+        "P1=master_global_mix heard=true old=pre_s current=current_s action=action_s "
+        "future=" + future_text + " deckA_audio=not_attached deckB_audio=not_attached "
+        "duplicate_audio=same_master_not_deck_split anchors="
+        + anchor_text
+        + " rule=time_alignment_not_outcome_verdict]"
+    )
+
+
+def _build_recall_query_context(ev: Event) -> str:
+    """Return ingest-signature context fields for memory recall queries."""
+    state = ev.state
+    moves = _event_live_move_labels(ev, state)
+    audio_delta_items = render_audio_delta_items(state)
+    fields: list[tuple[str, object | None]] = [
+        (
+            "context_feed",
+            render_context_feed_contract(
+                state,
+                moves,
+                surface="gemini_recall_query",
+                audio_seconds=DIET_AUDIO_SECONDS,
+            ),
+        ),
+        ("deck_lane", render_deck_lane_context(state)),
+        ("deck_ref", render_deck_reference_context(state)),
+        ("deck_source", render_deck_source_context(state, compact=True)),
+        ("deck_audio", render_deck_audio_context(state)),
+        ("deck_audio_separation", render_deck_audio_separation_context()),
+        (
+            "audio_window",
+            render_audio_window_context(
+                state,
+                moves,
+                audio_seconds=DIET_AUDIO_SECONDS,
+            ),
+        ),
+        (
+            "live_evidence",
+            render_live_evidence_context(
+                state,
+                moves if moves else None,
+                audio_delta_items=audio_delta_items,
+            ),
+        ),
+    ]
+    if moves:
+        fields.extend(
+            [
+                ("move", render_move_context(state, moves)),
+                (
+                    "move_effect",
+                    render_move_effect_context(
+                        state,
+                        moves,
+                        audio_delta_items=audio_delta_items,
+                    ),
+                ),
+            ]
+        )
+    if audio_delta_items:
+        fields.append(("audio_delta", audio_delta_items))
+
+    rendered: list[str] = []
+    for name, value in fields:
+        if name == "audio_window":
+            cap = 480
+        elif name == "context_feed":
+            cap = 420
+        else:
+            cap = 240
+        field = _recall_query_field(value, cap=cap)
+        if field != "none":
+            rendered.append(f"{name}={field}")
+    return " | ".join(rendered)
+
+
+def _recall_query_field(value: object | None, *, cap: int = 240) -> str:
+    if isinstance(value, (list, tuple)):
+        raw = "; ".join(str(item) for item in value[:4] if item)
+    else:
+        raw = str(value) if value else ""
+    raw = " ".join(raw.split()).replace("|", "/")
+    return raw[:cap] if raw else "none"
 
 
 def _build_citation_strip(
@@ -428,9 +692,7 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
                 app_data_dir() / "taste_feedback.jsonl", profile_consent=_consent
             )
             taste_tags = tuple(
-                project_profile(_model, consent=_consent).get(
-                    "transition_style_tags", ()
-                )
+                project_profile(_model, consent=_consent).get("transition_style_tags", ())
             )
     except Exception:  # pragma: no cover — any read fail = no overlay
         taste_tags = ()
@@ -443,16 +705,12 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
 
         if lens in LENS_TO_MODE_MOOD:
             mode, lens_mood = LENS_TO_MODE_MOOD[lens]
-            return build_system_instruction(
-                skill, mode, lens_mood, taste_persona_tags=taste_tags
-            )
+            return build_system_instruction(skill, mode, lens_mood, taste_persona_tags=taste_tags)
 
     mode = os.environ.get(ENV_MODE, DEFAULT_MODE)
     if mood is None:
         mood = os.environ.get(ENV_MOOD, DEFAULT_MOOD)
-    return build_system_instruction(
-        skill, mode, mood, taste_persona_tags=taste_tags
-    )
+    return build_system_instruction(skill, mode, mood, taste_persona_tags=taste_tags)
 
 
 class DJCoHostAgent(Agent):
@@ -638,8 +896,7 @@ class DJCoHostAgent(Agent):
         self._stripped_tracker: StrippedRateTracker | None = stripped_rate_tracker
         self._playback: PlaybackQueue | None = playback
         self._linter_wired: bool = all(
-            x is not None
-            for x in (citation_linter, stripped_rate_tracker, playback)
+            x is not None for x in (citation_linter, stripped_rate_tracker, playback)
         )
         # Plan 24-02 — overlay-highlight publish path. Wired iff non-None.
         self._ipc_bus: IpcBus | None = ipc_bus
@@ -758,9 +1015,7 @@ class DJCoHostAgent(Agent):
         # ``self._proxy_base_url is not None``).
         _llm_mode = os.environ.get("VIBEMIX_LLM_MODE", "direct").strip().lower()
         self._proxy_base_url: str | None = (
-            os.environ.get(
-                "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
-            ).rstrip("/")
+            os.environ.get("VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world").rstrip("/")
             if _llm_mode == "proxy"
             else None
         )
@@ -822,9 +1077,7 @@ class DJCoHostAgent(Agent):
             self._proxy_unavailable_message_emitted = True
             self._push_transcript("Co-host unavailable this session")
             try:
-                self._recorder.log_event(
-                    "proxy_unavailable", reason=reason, path="live_coach"
-                )
+                self._recorder.log_event("proxy_unavailable", reason=reason, path="live_coach")
             except Exception:
                 pass
 
@@ -886,12 +1139,24 @@ class DJCoHostAgent(Agent):
         # Coarse, secret-free classification for the log line.
         if any(
             tok in low
-            for tok in ("401", "403", "unauthorized", "permission", "api key", "api_key", "invalid key", "authenticat")
+            for tok in (
+                "401",
+                "403",
+                "unauthorized",
+                "permission",
+                "api key",
+                "api_key",
+                "invalid key",
+                "authenticat",
+            )
         ):
             kind = "auth"
         elif any(tok in low for tok in ("getaddrinfo", "name resolution", "dns")):
             kind = "dns"
-        elif any(tok in low for tok in ("refused", "connection reset", "ssl", "tls", "timed out", "timeout")):
+        elif any(
+            tok in low
+            for tok in ("refused", "connection reset", "ssl", "tls", "timed out", "timeout")
+        ):
             kind = "connection"
         else:
             kind = "unknown"
@@ -957,9 +1222,7 @@ class DJCoHostAgent(Agent):
             return
         self._last_proxy_health_probe = now_monotonic
         loop = asyncio.get_running_loop()
-        ok = await loop.run_in_executor(
-            None, probe_proxy_health, self._proxy_base_url
-        )
+        ok = await loop.run_in_executor(None, probe_proxy_health, self._proxy_base_url)
         if ok:
             self._maybe_emit_proxy_recovery()
 
@@ -1180,17 +1443,17 @@ class DJCoHostAgent(Agent):
         try:
             from vibemix.memory.retrieval import (
                 RECALL_DEADLINE_S,
-                RECALL_EVENT_GATE,
                 build_recall_query,
+                should_recall_event,
             )
         except Exception as _e:  # pragma: no cover — defensive only
             print(f"[recall dispatch import err] {_e}", file=sys.stderr)
             return
-        # Event gate — short-circuit BEFORE any executor / loop work on
-        # the high-frequency event classes (HEARTBEAT, MIX_MOVE, etc.).
-        # MemoryRecall.on_event ALSO gates internally (defense in depth),
-        # but checking here avoids burning a task + executor slot.
-        if ev.type not in RECALL_EVENT_GATE:
+        # Event gate — short-circuit BEFORE any executor / loop work. MIX_MOVE
+        # only passes when the event has a move label plus audio_delta, so
+        # historical knob/fader memory is learned without embedding every
+        # controller twitch.
+        if not should_recall_event(ev):
             return
         # Build the query text + resolve current_session_id before the
         # executor hop — `build_recall_query` is duck-typed (no live-path
@@ -1198,6 +1461,9 @@ class DJCoHostAgent(Agent):
         # session-id basename used by the rest of the runtime.
         try:
             query_text = build_recall_query(ev)
+            recall_query_context = _build_recall_query_context(ev)
+            if recall_query_context:
+                query_text = f"{query_text} | {recall_query_context}"
             current_session_id = self._recorder.session_dir.name
         except Exception as _e:
             print(f"[recall dispatch prep err] {_e}", file=sys.stderr)
@@ -1293,9 +1559,7 @@ class DJCoHostAgent(Agent):
         # that" reasoning by the full turn latency. Threaded through the
         # three _record_said call sites below as ``set_s_at_event=``.
         ev_set_seconds: float | None = (
-            float(getattr(ev.state, "set_seconds", 0.0) or 0.0)
-            if ev is not None
-            else None
+            float(getattr(ev.state, "set_seconds", 0.0) or 0.0) if ev is not None else None
         )
         recall_moments: list = []
         try:
@@ -1392,9 +1656,10 @@ class DJCoHostAgent(Agent):
                 # the audience" semantic per CONTEXT.md Area 1 Q3 + RESEARCH
                 # §Pitfall 2 + §Open Q5; a bus-emit failure cannot arm. Pinned
                 # by ``test_cooldown_suppresses_back_to_back_recalls_COPILOT02``.
-                if recall_moments and (
-                    time.time() - self._last_recall_callback_at
-                ) < RECALL_CALLBACK_COOLDOWN_S:
+                if (
+                    recall_moments
+                    and (time.time() - self._last_recall_callback_at) < RECALL_CALLBACK_COOLDOWN_S
+                ):
                     recall_moments = []
                 if recall_moments and self._registry is not None:
                     # Phase 65 review CR-01/CR-02 — the registered set MUST
@@ -1474,10 +1739,11 @@ class DJCoHostAgent(Agent):
             # mocker.assert_called_once_with(..., registry_snapshot=..., diet=)
             # tests pin the EXACT kwargs — so we omit recall_moments when
             # there's nothing to inject. The non-diet path with survivors
-            # passes the kwarg; the diet path NEVER receives it (diet =
-            # ACK_ELIGIBLE_EVENTS, never a retrieval event).
+            # passes the kwarg. Diet prompts render a compact recall block
+            # only when hot, so MIX_MOVE can use historical move->sound memory
+            # without expanding to the full prompt.
             _bp_kwargs: dict[str, Any] = {"registry_snapshot": snapshot, "diet": diet}
-            if recall_moments and not diet:
+            if recall_moments:
                 _bp_kwargs["recall_moments"] = recall_moments
             if ev is not None:
                 text_prompt = AICoach.build_prompt(ev, **_bp_kwargs)
@@ -1573,16 +1839,12 @@ class DJCoHostAgent(Agent):
                     if pcm.size == 0:
                         mic_skip_reason = "mic_ring_empty"
                     else:
-                        mic_rms_int16 = float(
-                            _np.sqrt(_np.mean(pcm.astype(_np.float32) ** 2))
-                        )
+                        mic_rms_int16 = float(_np.sqrt(_np.mean(pcm.astype(_np.float32) ** 2)))
                         presence_floor_int16 = MIC_AUDIO_PART_PRESENCE_RMS * 32767.0
                         if mic_rms_int16 < presence_floor_int16:
                             mic_skip_reason = "mic_silent"
                         else:
-                            mic_wav = snapshot_wav(
-                                self._mic_audio_buf, MIC_AUDIO_PART_SECONDS
-                            )
+                            mic_wav = snapshot_wav(self._mic_audio_buf, MIC_AUDIO_PART_SECONDS)
 
             # Plan 40-03 / AUDIO-02 + AUDIO-04 — source-file lookahead Part 3
             # decision. Belt-and-braces try/except wrapping: the provider's
@@ -1622,12 +1884,7 @@ class DJCoHostAgent(Agent):
                 secondary_ear=self._secondary_ear,
             )
 
-            contents: list = [
-                text_prompt + parts_clause + history_clause,
-                types.Part.from_bytes(data=audio_wav, mime_type="audio/wav"),
-            ]
             if mic_attached:
-                contents.append(types.Part.from_bytes(data=mic_wav, mime_type="audio/wav"))
                 self._recorder.log_event(
                     "mic_part_attached",
                     duration_s=MIC_AUDIO_PART_SECONDS,
@@ -1649,9 +1906,6 @@ class DJCoHostAgent(Agent):
             # event carries the provider's full meta dict so events.jsonl
             # consumers see title / file / seek / duration / reason.
             if lookahead_attached:
-                contents.append(
-                    types.Part.from_bytes(data=lookahead_wav, mime_type="audio/wav")
-                )
                 self._recorder.log_event(
                     "lookahead_part_attached",
                     bytes=len(lookahead_wav),
@@ -1662,6 +1916,39 @@ class DJCoHostAgent(Agent):
                     "lookahead_part_skipped",
                     **lookahead_meta,
                 )
+            live_claim_state = ev.state if ev is not None else self._state
+            live_claim_moves = _event_live_move_labels(ev, self._state)
+            live_claim_audio_delta = render_audio_delta_items(live_claim_state)
+            lookahead_part_label = (
+                "P3"
+                if lookahead_attached and mic_attached
+                else "P2"
+                if lookahead_attached
+                else None
+            )
+            try:
+                lookahead_horizon_s = float(lookahead_meta.get("delta_sec") or 3.0)
+            except (TypeError, ValueError):
+                lookahead_horizon_s = 3.0
+            audio_context_clause = _build_attached_audio_context_clause(
+                live_claim_state,
+                live_claim_moves,
+                audio_delta_items=live_claim_audio_delta,
+                audio_seconds=float(audio_seconds),
+                mic_part_label="P2" if mic_attached else None,
+                lookahead_part_label=lookahead_part_label,
+                lookahead_horizon_s=lookahead_horizon_s,
+            )
+            full_text_prompt = text_prompt + history_clause + audio_context_clause + parts_clause
+
+            contents: list = [
+                full_text_prompt,
+                types.Part.from_bytes(data=audio_wav, mime_type="audio/wav"),
+            ]
+            if mic_attached:
+                contents.append(types.Part.from_bytes(data=mic_wav, mime_type="audio/wav"))
+            if lookahead_attached:
+                contents.append(types.Part.from_bytes(data=lookahead_wav, mime_type="audio/wav"))
             if screen_jpeg and not skip_screen:
                 contents.append(types.Part.from_bytes(data=screen_jpeg, mime_type="image/jpeg"))
 
@@ -1725,6 +2012,10 @@ class DJCoHostAgent(Agent):
                 f"({int(audio_seconds)}s) diet={diet} cache={cache_state} "
                 f"linter={linter_state} "
                 f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
+            )
+            live_claim_defer_stream = should_defer_live_claim_stream(
+                live_claim_state,
+                live_claim_moves,
             )
 
             # === Chunk-by-chunk streaming pipe-through ===
@@ -1832,9 +2123,7 @@ class DJCoHostAgent(Agent):
                         # final chunk's totals are authoritative. Recorded ONCE
                         # post-stream (see the `else` branch) to avoid double-bill.
                         last_usage = usage
-                        cached_tokens = (
-                            getattr(usage, "cached_content_token_count", None) or 0
-                        )
+                        cached_tokens = getattr(usage, "cached_content_token_count", None) or 0
                         if cached_tokens > 0 and cached_tokens != last_cache_hit_emitted:
                             try:
                                 self._recorder.log_event(
@@ -1858,6 +2147,8 @@ class DJCoHostAgent(Agent):
                     print(txt, end="", flush=True)
                     full_text += txt
                     buffered_chunks.append(txt)
+                    if live_claim_defer_stream:
+                        continue
                     # Chunk-by-chunk yield with bracket-balance clipping.
                     # Before the speed-gate clears we hold every chunk
                     # in ``buffered_chunks`` so a banned opener cannot
@@ -1927,8 +2218,7 @@ class DJCoHostAgent(Agent):
                         get_session_meter().record(
                             "live_coach",
                             prompt=getattr(last_usage, "prompt_token_count", 0) or 0,
-                            cached=getattr(last_usage, "cached_content_token_count", 0)
-                            or 0,
+                            cached=getattr(last_usage, "cached_content_token_count", 0) or 0,
                             output=getattr(last_usage, "candidates_token_count", 0) or 0,
                         )
                     elif self._or_client is not None:
@@ -2048,6 +2338,39 @@ class DJCoHostAgent(Agent):
                 except Exception:
                     pass
 
+            live_claim_guard = None
+            if suppression is None:
+                try:
+                    live_claim_guard = apply_live_claim_guard(
+                        full_text,
+                        live_claim_state,
+                        live_claim_moves,
+                        audio_delta_items=live_claim_audio_delta,
+                    )
+                except Exception as _e:
+                    live_claim_guard = None
+                    print(f"[live-claim guard err] {_e}", file=sys.stderr)
+                if live_claim_guard is not None and live_claim_guard.corrected:
+                    raw_live_claim_text = full_text
+                    full_text = live_claim_guard.text
+                    stripped = full_text.strip()
+                    buffered_chunks = [full_text] if full_text else []
+                    try:
+                        self._recorder.log_event(
+                            "live_claim_guard",
+                            event=ev_tag,
+                            policy=live_claim_guard.policy,
+                            reason=live_claim_guard.reason,
+                            summary=live_claim_guard.summary,
+                            raw_text=raw_live_claim_text,
+                            corrected_text=full_text,
+                            latency_s=round(elapsed, 2),
+                        )
+                    except Exception:
+                        pass
+                    if head_yielded:
+                        _push_silence_pad_and_cancel("live_claim_guard")
+
             if suppression == "silence":
                 self._recorder.log_event(
                     "silence_short_circuit",
@@ -2069,6 +2392,20 @@ class DJCoHostAgent(Agent):
                 print(f"[ai_text] <slop suppressed: {slop_matches}>", flush=True)
                 if head_yielded:
                     _push_silence_pad_and_cancel("slop")
+            elif live_claim_guard is not None and live_claim_guard.corrected:
+                citation_action = "emit"
+                if not head_yielded:
+                    yield full_text
+                if self._stripped_tracker is not None:
+                    self._stripped_tracker.record(False)
+                print(f"[ai_text] {stripped!r}", flush=True)
+                self._recorder.log_event(
+                    "ai_text",
+                    text=full_text,
+                    latency_s=round(elapsed, 2),
+                )
+                self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
+                self._push_transcript(stripped[:140])
             else:
                 # Plan 20-01 — citation linter chokepoint runs HERE, after the
                 # silence/slop gate, before yielding chunks. The wired path
@@ -2087,9 +2424,7 @@ class DJCoHostAgent(Agent):
                 #      (The pre-recorded ack-bank substitution was retired —
                 #      see the strip block below.)
                 if self._linter_wired and self._linter is not None:
-                    lint_result = self._linter.check(
-                        full_text, snapshot, mode="live"
-                    )
+                    lint_result = self._linter.check(full_text, snapshot, mode="live")
                     citation_lint_valid = lint_result.valid
                     citation_lint_reason = lint_result.reason
                     citation_lint_missing_payload = [list(t) for t in lint_result.missing]
@@ -2139,9 +2474,7 @@ class DJCoHostAgent(Agent):
                             # last-unverified text: the user HEARD this unverified
                             # line, so the diagnostics strip must show it.
                             if self._stripped_tracker is not None:
-                                self._stripped_tracker.record(
-                                    False, unverified_text=full_text
-                                )
+                                self._stripped_tracker.record(False, unverified_text=full_text)
                             self._recorder.log_event(
                                 "citation_bypass",
                                 response_id=response_id,
@@ -2150,9 +2483,7 @@ class DJCoHostAgent(Agent):
                                 reason=lint_result.reason,
                                 latency_s=round(elapsed, 2),
                             )
-                            print(
-                                f"[ai_text:unverified] {stripped!r}", flush=True
-                            )
+                            print(f"[ai_text:unverified] {stripped!r}", flush=True)
                             # History appended on bypass — the user heard the
                             # text, so the no-repeat memory must reflect it.
                             if stripped:
@@ -2176,9 +2507,7 @@ class DJCoHostAgent(Agent):
                             # NOT hear, but the diagnostics strip should show what
                             # got silenced. Mirrors the raw_text= log field below.
                             if self._stripped_tracker is not None:
-                                self._stripped_tracker.record(
-                                    True, unverified_text=full_text
-                                )
+                                self._stripped_tracker.record(True, unverified_text=full_text)
                             self._recorder.log_event(
                                 "citation_strip",
                                 response_id=response_id,
@@ -2335,10 +2664,7 @@ class DJCoHostAgent(Agent):
                     # only runs on a clean bus emit, but the inner wrapper
                     # matches the project idiom (Pattern B in 66-PATTERNS.md).
                     try:
-                        if any(
-                            chip.get("event_id", "").startswith("recall:")
-                            for chip in strip
-                        ):
+                        if any(chip.get("event_id", "").startswith("recall:") for chip in strip):
                             self._last_recall_callback_at = time.time()
                     except Exception as _e:
                         print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
@@ -2380,10 +2706,7 @@ class DJCoHostAgent(Agent):
                             reaction_text=full_text,
                             registry=self._registry,
                         )
-                        if any(
-                            chip.get("event_id", "").startswith("recall:")
-                            for chip in strip
-                        ):
+                        if any(chip.get("event_id", "").startswith("recall:") for chip in strip):
                             self._last_recall_callback_at = time.time()
                     except Exception as _e:
                         print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)

@@ -34,16 +34,18 @@ class DeckTrack:
     never a fabricated key.
     """
 
-    title: str | None = None       # resolved track label
-    track_id: str | None = None    # RekordboxLibrary TrackEntry.track_id — feeds [track:<id>]
-    bpm: float = 0.0               # from source metadata (AverageBpm), NOT audio autocorr
-    key: str | None = None         # RAW tag as the source gives it ("Am", "F#m")
-    camelot: str | None = None     # normalized via harmonics.to_camelot() ("8A", "11A")
-    open_key: str | None = None    # open-key form ("1m"/"1d") for honesty/UI
-    energy: int | None = None      # 1..10 if source exposes it (rekordbox), else None
+    title: str | None = None  # resolved track label
+    track_id: str | None = None  # RekordboxLibrary TrackEntry.track_id — feeds [track:<id>]
+    bpm: float = 0.0  # from source metadata (AverageBpm), NOT audio autocorr
+    key: str | None = None  # RAW tag as the source gives it ("Am", "F#m")
+    camelot: str | None = None  # normalized via harmonics.to_camelot() ("8A", "11A")
+    open_key: str | None = None  # open-key form ("1m"/"1d") for honesty/UI
+    energy: int | None = None  # 1..10 if source exposes it (rekordbox), else None
     loaded_at: float = 0.0
-    confidence: float = 0.0        # 0..1 — how sure we are this deck holds this track
-    source: str = "unknown"        # "rekordbox_xml" | "screen_vision" | "numpy_key" | "nowplaying" | "unknown"
+    confidence: float = 0.0  # 0..1 — how sure we are this deck holds this track
+    # "rekordbox_xml" | "folder_cache" | "screen_vision" | "numpy_key" |
+    # "nowplaying" | "unknown"
+    source: str = "unknown"
 
 
 @dataclass
@@ -52,7 +54,11 @@ class DeckState:
 
     ``decks`` defaults to an empty dict so an empty ``DeckState`` serializes to
     nothing in ``evidence_line`` (golden-equivalence — Pitfall 5).
+    ``source_status`` is a bounded provenance/debug map from the read-only deck
+    poller: why title→deck identity did or did not resolve this tick. It is not
+    a track identity and must never be treated as deck proof by itself.
     """
 
     decks: dict[str, DeckTrack] = field(default_factory=dict)  # {"A": DeckTrack, "B": ...}
     updated_at: float = 0.0
+    source_status: dict[str, str] = field(default_factory=dict)

@@ -9,12 +9,12 @@ geometry: no DSP, no ffmpeg, no audio decode, no genai. Those live downstream
 Two functions:
 
     anchors_for_track(track) -> list[CueAnchor]
-        DJ-FIRST: a track carrying ≥1 *structural* DJ cue (a ``cue`` or ``loop``
-        position mark — hot OR memory) yields ``source="dj"`` :class:`CueAnchor`s,
-        one per usable cue, sorted by ``start_s``, capped at ``max_cues``. Each
-        anchor's window ``end_s`` is clamped to ``min(start + 80s, next_cue,
-        duration)``. Labels are BEST-EFFORT and NEVER fabricated: hot cue number
-        0 → ``"intro"``, every other cue → ``"drop"``. Positions are
+        DJ-FIRST: a track carrying ≥1 *structural* cue (a ``cue`` or ``loop``
+        position mark — hot OR memory, or materialized ANLZ/auto structure)
+        yields :class:`CueAnchor`s, one per usable cue, sorted by ``start_s``,
+        capped at ``max_cues``. Each anchor's window ``end_s`` is clamped to
+        ``min(start + 80s, next_cue, duration)``. Labels are BEST-EFFORT and
+        never fabricated beyond the shared cue vocabulary. Positions are
         authoritative; a ``load`` / ``fadein`` / ``fadeout`` mark is NOT a
         structural anchor (it is dropped — T-89-08, "trust the audio").
 
@@ -106,6 +106,8 @@ def anchors_for_track(
             start = max(0.0, float(cue.start_s))
             # Window end = min(start + window, next cue start, duration).
             end = start + float(window_s)
+            if cue.end_s is not None and float(cue.end_s) > start:
+                end = min(end, float(cue.end_s))
             if i + 1 < len(structural):
                 end = min(end, float(structural[i + 1].start_s))
             if duration_s > 0.0:
@@ -119,8 +121,8 @@ def anchors_for_track(
                     label=_label_for_cue(cue),
                     start_s=start,
                     end_s=end,
-                    confidence=_DJ_CONFIDENCE,
-                    source="dj",
+                    confidence=_confidence_for_cue(cue),
+                    source=_source_for_cue(cue),
                 )
             )
         if anchors:
@@ -163,9 +165,38 @@ def _label_for_cue(cue: CuePoint) -> CueLabel:
     ``"build"`` / ``"breakdown"`` semantics from a bare position mark — the
     source XML carries no such signal (T-89-08).
     """
+    name = (cue.name or "").strip().lower()
+    if "intro" in name or "mix in" in name or "mix-in" in name or "start" in name:
+        return "intro"
+    if "build" in name or "rise" in name:
+        return "build"
+    if "break" in name or "breakdown" in name:
+        return "breakdown"
+    if "outro" in name or "mix out" in name or "mix-out" in name or "end" in name:
+        return "outro"
+    if "drop" in name or "chorus" in name or "hook" in name:
+        return "drop"
     if cue.number == 0:
         return "intro"
     return "drop"
+
+
+def _source_for_cue(cue: CuePoint) -> str:
+    source = (getattr(cue, "source", "") or "dj").strip().lower()
+    return source or "dj"
+
+
+def _confidence_for_cue(cue: CuePoint) -> float:
+    raw = getattr(cue, "confidence", None)
+    if raw is not None:
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            value = _DJ_CONFIDENCE
+        else:
+            if 0.0 <= value <= 1.0:
+                return value
+    return _DJ_CONFIDENCE if _source_for_cue(cue) == "dj" else 0.65
 
 
 def cut_windows(anchors: list[CueAnchor], duration_s: float) -> list[tuple[float, float]]:

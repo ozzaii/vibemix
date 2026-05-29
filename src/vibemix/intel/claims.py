@@ -39,6 +39,8 @@ MusicClaimType = Literal[
     "taste_fit",
     "taste_uncertain",
     "transition_fit",
+    "move_grade",
+    "grade_progress",
     "export_result",
     "playlist_created",
     "proposal_issued",

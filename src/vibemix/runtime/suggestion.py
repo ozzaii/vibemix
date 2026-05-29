@@ -62,6 +62,7 @@ CONTROLLER_TARGET_VOLUME_FLOOR = 16
 CONTROLLER_XFADER_FACTOR_FLOOR = 0.20
 TARGET_DECK_TRACK_CONFIDENCE_FLOOR = 0.50
 SOURCE_LOOP_RECENCY_S = 8.0
+GRADE_XP_LEVEL_STEP = 250
 EXPLICIT_FEEDBACK_ACTIONS: dict[str, tuple[str, str]] = {
     "accept": ("suggestion_accepted", "accepted"),
     "keep": ("suggestion_accepted", "accepted"),
@@ -261,6 +262,7 @@ class SuggestionService:
         self._prepared_target_track_id: str | None = None
         self._pinned_candidate_track_id: str | None = None
         self._timing_suppressed_pairs: set[tuple[str, str]] = set()
+        self._grade_progress: dict[str, Any] = _empty_grade_progress()
         self._last_refresh_at = 0.0
         self._last_compute_seed_track_id: str | None = None
         self._compute_inflight = False
@@ -380,6 +382,9 @@ class SuggestionService:
             fallback_candidate_track_id=fallback_track,
             fallback_candidate_vector=fallback_candidate_vector,
         )
+        with self._lock:
+            next_grade_progress = dict(self._grade_progress)
+        current, next_grade_progress = _attach_grade_progress(current, next_grade_progress)
         if state is not None:
             current["decision"] = self._safe_decision_payload_for_suggestion(state, current)
 
@@ -394,6 +399,7 @@ class SuggestionService:
         with self._lock:
             if self._current is None:
                 return None
+            self._grade_progress = next_grade_progress
             self._current = current
             self._candidate_track_id = selected_track_id
             self._candidate_vector = selected_vector.copy() if selected_vector is not None else None
@@ -509,12 +515,19 @@ class SuggestionService:
             fallback_candidate_track_id=fallback_track,
             fallback_candidate_vector=fallback_candidate_vector,
         )
+        with self._lock:
+            next_grade_progress = dict(self._grade_progress)
+        suggestion, next_grade_progress = _attach_grade_progress(
+            suggestion,
+            next_grade_progress,
+        )
         if state is not None:
             suggestion["decision"] = self._safe_decision_payload_for_suggestion(state, suggestion)
 
         with self._lock:
             if self._current is None:
                 return
+            self._grade_progress = next_grade_progress
             self._current = suggestion
             self._candidate_track_id = selected_track_id
             self._candidate_vector = selected_vector.copy() if selected_vector is not None else None
@@ -676,6 +689,9 @@ class SuggestionService:
             "source_deck": seed.source_deck if seed is not None else None,
             "target_deck": seed.target_deck if seed is not None else None,
             "prepared_target_track_id": prepared_target_track_id,
+            "grade_progress": suggestion.get("grade_progress")
+            if isinstance(suggestion.get("grade_progress"), dict)
+            else None,
             "blend_active": timing.blend_active,
             "source_loop_recent": timing.source_loop_recent,
             "playhead_confidence": timing.playhead_confidence,
@@ -986,6 +1002,12 @@ class SuggestionService:
                     previous_seed_track_id=previous_seed_track_id,
                     new_seed_track_id=seed_track_id,
                 )
+            if d is not None:
+                d, self._grade_progress = _attach_grade_progress(d, self._grade_progress)
+            else:
+                self._grade_progress = _empty_grade_progress(
+                    _int_range(self._grade_progress.get("total_xp"), 0, 999_999, 0)
+                )
             self._current = d
             self._seed_track_id = seed_track_id if d is not None else None
             self._seed_vector = vec.copy() if d is not None else None
@@ -1126,6 +1148,9 @@ class SuggestionService:
                     self._candidate_vectors_by_track_id = {}
                     self._prepared_target_track_id = None
                     self._pinned_candidate_track_id = None
+                    self._grade_progress = _empty_grade_progress(
+                        _int_range(self._grade_progress.get("total_xp"), 0, 999_999, 0)
+                    )
                     self._timing_suppressed_pairs = {
                         pair for pair in self._timing_suppressed_pairs if pair[0] != seed_track_id
                     }
@@ -1257,9 +1282,13 @@ class SuggestionService:
             if (seed_track_id, candidate_track_id) in timing_suppressed_pairs:
                 transition = _strip_transition_timing(transition)
             current["transition"] = transition
+        with self._lock:
+            next_grade_progress = dict(self._grade_progress)
+        current, next_grade_progress = _attach_grade_progress(current, next_grade_progress)
         current["decision"] = self._safe_decision_payload_for_suggestion(state, current)
         with self._lock:
             if self._seed_track_id == seed_track_id and self._current is not None:
+                self._grade_progress = next_grade_progress
                 self._current = current
                 self._candidate_track_id = candidate_track_id
                 self._prepared_target_track_id = _context_prepared_target(
@@ -1307,6 +1336,146 @@ def _transition_alternative_track_ids(raw: dict | None) -> tuple[str, ...]:
     if isinstance(track_id, str) and track_id:
         ids.insert(0, track_id)
     return tuple(dict.fromkeys(str(track_id) for track_id in ids))
+
+
+def _empty_grade_progress(total_xp: int = 0) -> dict[str, Any]:
+    return {
+        "key": "",
+        "slug": "",
+        "streak": 0,
+        "xp": 0,
+        "total_xp": max(0, int(total_xp)),
+        "last_xp": 0,
+        "earned": False,
+        "heat": 0,
+        "level_up": False,
+        "levels_gained": 0,
+    }
+
+
+def _attach_grade_progress(
+    suggestion: dict,
+    previous_progress: dict[str, Any],
+) -> tuple[dict, dict[str, Any]]:
+    current = dict(suggestion)
+    progress = _next_grade_progress(previous_progress, current)
+    current["grade_progress"] = _public_grade_progress(progress)
+    return current, progress
+
+
+def _next_grade_progress(
+    previous_progress: dict[str, Any],
+    suggestion: dict,
+) -> dict[str, Any]:
+    total_xp = _int_range(previous_progress.get("total_xp"), 0, 999_999, 0)
+    grade = _selected_move_grade(suggestion)
+    key = _suggestion_grade_key(suggestion, grade)
+    if grade is None or not key:
+        return _empty_grade_progress(total_xp)
+
+    slug = _str_or_none(grade.get("slug")) or ""
+    xp = _int_range(grade.get("xp"), 0, 999, 0)
+    if previous_progress.get("key") == key and previous_progress.get("slug") == slug:
+        return dict(previous_progress)
+
+    earned = bool(grade.get("deserved")) and slug not in {"mid", "negative"}
+    streak = (
+        _int_range(previous_progress.get("streak"), 0, 999, 0) + 1
+        if earned
+        else 0
+    )
+    last_xp = xp if earned else 0
+    next_total_xp = min(999_999, total_xp + last_xp)
+    previous_level = _grade_xp_level(total_xp)["level"]
+    next_level = _grade_xp_level(next_total_xp)["level"]
+    levels_gained = max(0, next_level - previous_level) if earned else 0
+    return {
+        "key": key,
+        "slug": slug,
+        "streak": streak,
+        "xp": xp,
+        "total_xp": next_total_xp,
+        "last_xp": last_xp,
+        "earned": earned,
+        "heat": min(
+            100,
+            max(
+                _int_range(grade.get("intensity"), 0, 100, 0),
+                streak * 18,
+            ),
+        )
+        if earned
+        else 0,
+        "level_up": levels_gained > 0,
+        "levels_gained": levels_gained,
+    }
+
+
+def _public_grade_progress(progress: dict[str, Any]) -> dict[str, Any]:
+    total_xp = _int_range(progress.get("total_xp"), 0, 999_999, 0)
+    return {
+        "streak": _int_range(progress.get("streak"), 0, 999, 0),
+        "total_xp": total_xp,
+        "last_xp": _int_range(progress.get("last_xp"), 0, 999, 0),
+        "earned": bool(progress.get("earned")),
+        "heat": _int_range(progress.get("heat"), 0, 100, 0),
+        "level_up": bool(progress.get("level_up")),
+        "levels_gained": _int_range(progress.get("levels_gained"), 0, 999, 0),
+        **_grade_xp_level(total_xp),
+    }
+
+
+def _grade_xp_level(total_xp: int) -> dict[str, int]:
+    total = _int_range(total_xp, 0, 999_999, 0)
+    step = GRADE_XP_LEVEL_STEP
+    level = min(999, total // step + 1)
+    level_xp = total % step
+    return {
+        "level": level,
+        "level_xp": level_xp,
+        "next_level_xp": step,
+        "level_progress": round((level_xp / step) * 100),
+    }
+
+
+def _selected_move_grade(suggestion: dict) -> dict[str, Any] | None:
+    transition = _dict_or_none(suggestion.get("transition"))
+    grade = _dict_or_none((transition or {}).get("move_grade"))
+    if grade is not None:
+        return grade
+    for alternative in _coerce_transition_alternatives(suggestion.get("transition_alternatives")):
+        if alternative.get("selected") is False:
+            continue
+        transition = _dict_or_none(alternative.get("transition"))
+        grade = _dict_or_none((transition or {}).get("move_grade"))
+        if grade is not None:
+            return grade
+    return None
+
+
+def _suggestion_grade_key(suggestion: dict, grade: dict[str, Any] | None) -> str:
+    if grade is None:
+        return ""
+    transition = _dict_or_none(suggestion.get("transition")) or {}
+    parts = (
+        _str_or_none(suggestion.get("track_id")),
+        _str_or_none(transition.get("candidate_id")),
+        _str_or_none(transition.get("from_track_id")),
+        _str_or_none(transition.get("to_track_id")),
+        _str_or_none(transition.get("from_section_id")),
+        _str_or_none(transition.get("to_section_id")),
+        _str_or_none(transition.get("cue_slot")),
+        _str_or_none(grade.get("slug")),
+    )
+    return "|".join(part or "" for part in parts)
+
+
+def _int_range(raw: Any, floor: int, ceiling: int, default: int) -> int:
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(floor, min(ceiling, value))
 
 
 def _context_prepared_target(

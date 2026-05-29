@@ -46,11 +46,10 @@ TONE-02 / TONE-04 / LESSON-01..LESSON-06 / RENDER-04.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Literal
 
-from vibemix.ui_bus.messages import _now_iso, _serialize
-
+from vibemix.ui_bus.messages import _now_iso, _serialize, _tuples_to_lists, _validate
 
 # ---------------------------------------------------------------------------
 # Payload structs
@@ -534,6 +533,7 @@ class LearnAckPayload:
     # sites stay ergonomic. The schema's additionalProperties: false ensures
     # only declared fields land on the wire.
     value: int = 0
+    prev_value: int = 0
     direction: Literal["", "up", "down"] = ""
 
 
@@ -552,6 +552,7 @@ class LearnAck:
         control_id: str,
         source: str,
         value: int = 0,
+        prev_value: int = 0,
         direction: str = "",
     ) -> LearnAck:
         return cls(
@@ -561,6 +562,7 @@ class LearnAck:
                 control_id=control_id,
                 source=source,  # type: ignore[arg-type]
                 value=int(value),
+                prev_value=int(prev_value),
                 direction=direction,  # type: ignore[arg-type]
             ),
         )
@@ -591,6 +593,49 @@ class LearnTutorSpeakPayload:
     # aud|midi|screen|mix|tend|key|recall):.+\]$ — maxItems 4 schema-side.
     citations: tuple[str, ...]
     data_state: Literal["active", "hint"]
+    teaching_loop: LearnTeachingLoopPayload | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LearnTeachingObservationPayload:
+    """Socket-visible observation record for one backstage teaching turn."""
+
+    lesson_id: str
+    step_id: str
+    kind: str
+    control_id: str
+    input_surfaces: tuple[str, ...]
+    backstage_lenses: tuple[str, ...]
+    strikes_used: int
+
+
+@dataclass(frozen=True, slots=True)
+class LearnTeachingVerificationPayload:
+    """Socket-visible deterministic verification record for a teaching turn."""
+
+    kind: Literal["button_press", "cc_delta"]
+    control: str
+    deck: str
+    observable_control_ids: tuple[str, ...]
+    input_surfaces: tuple[str, ...]
+    direction: Literal["", "up", "down"]
+    min_delta: int
+
+
+@dataclass(frozen=True, slots=True)
+class LearnTeachingLoopPayload:
+    """Optional backstage loop metadata carried beside tutor text.
+
+    The Learn frontstage ignores this by default. It gives proof tooling and
+    future dev surfaces a citable observe -> decide -> teach -> verify -> adapt
+    record without adding copy to the learner's booth.
+    """
+
+    stages: tuple[str, ...]
+    turn_kind: Literal["teach", "hint", "adapt"]
+    route_path: str
+    observation: LearnTeachingObservationPayload
+    verification: LearnTeachingVerificationPayload
 
 
 @dataclass(frozen=True, slots=True)
@@ -609,6 +654,7 @@ class LearnTutorSpeak:
         tts_marker: str,
         citations: tuple[str, ...] | list[str] = (),
         data_state: str = "active",
+        teaching_loop: LearnTeachingLoopPayload | None = None,
     ) -> LearnTutorSpeak:
         return cls(
             type="ipc.learn.tutor_speak",
@@ -618,11 +664,16 @@ class LearnTutorSpeak:
                 tts_marker=tts_marker,
                 citations=tuple(citations),
                 data_state=data_state,  # type: ignore[arg-type]
+                teaching_loop=teaching_loop,
             ),
         )
 
     def to_json(self) -> str:
-        return _serialize(self)
+        d = _tuples_to_lists(asdict(self))
+        if d["payload"].get("teaching_loop") is None:
+            d["payload"].pop("teaching_loop", None)
+        _validate(d)
+        return json.dumps(d, separators=(",", ":"))
 
     def to_dict(self) -> dict:
         return json.loads(self.to_json())

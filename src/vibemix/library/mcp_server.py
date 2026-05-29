@@ -103,6 +103,37 @@ def build_toolset() -> Any:
     return LibraryToolset(embedder, store, library)
 
 
+class _ToolTapProxy:
+    """Wrap a LibraryToolset so every handler call the MCP server makes also
+    appends a live tool-tape record (``LibraryToolset._emit_tool_event``).
+
+    The FastMCP tool wrappers in ``build_server`` call handlers DIRECTLY
+    (``toolset.search_vibe(...)``), bypassing ``dispatch()`` where the tape emit
+    lives. So the emit must happen here, the one chokepoint the Codex MCP path
+    actually flows through. Best-effort: a tape failure never breaks a tool call.
+    """
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+
+    def __getattr__(self, name: str) -> Any:
+        # Only triggered for attrs not on the proxy itself (i.e. the handlers).
+        attr = getattr(self._inner, name)
+        if name.startswith("_") or not callable(attr):
+            return attr
+
+        def _tapped(*args: Any, **kwargs: Any) -> Any:
+            result = attr(*args, **kwargs)
+            try:
+                tool_args = args[0] if args and isinstance(args[0], dict) else None
+                self._inner._emit_tool_event(name, result, tool_args)
+            except Exception:
+                pass
+            return result
+
+        return _tapped
+
+
 def build_server(toolset: Any) -> Any:
     """Wrap ``toolset`` in a FastMCP STDIO server exposing Viber tools.
 
@@ -113,13 +144,18 @@ def build_server(toolset: Any) -> Any:
     """
     from mcp.server.fastmcp import FastMCP
 
+    # The tool wrappers below call handlers directly (not via dispatch), so wrap
+    # the toolset to emit a live tool-tape record per call — the only chokepoint
+    # the Codex MCP path flows through.
+    toolset = _ToolTapProxy(toolset)
+
     mcp = FastMCP("vibemix-library")
 
     @mcp.tool()
     def search_vibe(query: str, k: int = 15) -> dict[str, Any]:
         """Semantic vibe-search the user's library. Returns real track_ids
-        (title/artist/bpm/confidence). The ONLY way to discover tracks — every
-        id you later put in a playlist MUST come from a search_vibe result."""
+        (title/artist/bpm/confidence). A grounded discovery path: every id it
+        returns may be sequenced/exported."""
         return toolset.search_vibe({"query": query, "k": k})
 
     @mcp.tool()
@@ -222,8 +258,9 @@ def build_server(toolset: Any) -> Any:
     @mcp.tool()
     def create_playlist(name: str, track_ids: list[str]) -> dict[str, Any]:
         """Persist the curated playlist (M3U + JSON). Every track_id must have
-        come from a prior search_vibe result this run, or the call is rejected.
-        Call once, with the tracks in play order. This ends the run."""
+        come from a prior search_vibe/discover_pool result this run, or the
+        call is rejected. Call once, with the tracks in play order. This ends
+        the run."""
         return toolset.create_playlist({"name": name, "track_ids": track_ids})
 
     @mcp.tool()
@@ -388,8 +425,28 @@ def build_server(toolset: Any) -> Any:
     return mcp
 
 
+def _promote_arg_paths_to_env() -> None:
+    """Promote side-channel paths passed as ARGS into ``os.environ``.
+
+    Codex spawns this server with an explicit argv but does NOT forward the
+    parent's process env to MCP children (boot-probe verified). So the live
+    tool tape's path arrives as ``--vibemix-tool-events <path>`` and is promoted
+    here, before the toolset is built, so ``LibraryToolset.dispatch``'s env-gated
+    tape writer fires. ``setdefault`` lets a real env var (if one ever crosses)
+    win. Unknown extra args are ignored — FastMCP never parses argv."""
+    import os
+
+    argv = sys.argv[1:]
+    for flag, key in (("--vibemix-tool-events", "VIBEMIX_TOOL_EVENTS_FILE"),):
+        if flag in argv:
+            i = argv.index(flag)
+            if i + 1 < len(argv):
+                os.environ.setdefault(key, argv[i + 1])
+
+
 def main() -> None:
     logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
+    _promote_arg_paths_to_env()
     toolset = build_toolset()
     server = build_server(toolset)
     server.run()  # STDIO transport

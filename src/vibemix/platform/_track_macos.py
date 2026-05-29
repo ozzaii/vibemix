@@ -47,6 +47,7 @@ class TrackInfo:
         self.duration_sec: float | None = None
         self.position_sec: float | None = None
         self.playback_rate: float = 1.0
+        self.client_bundle_id: str | None = None
         self._cli = shutil.which("nowplaying-cli") or "/opt/homebrew/bin/nowplaying-cli"
 
     def poll_once(self) -> None:
@@ -81,6 +82,9 @@ class TrackInfo:
         playback_rate = _float_or_none(
             raw.get("kMRMediaRemoteNowPlayingInfoPlaybackRate") if raw else None
         )
+        client_bundle_id = (
+            raw.get("kMRMediaRemoteNowPlayingInfoClientBundleIdentifier") if raw else None
+        )
         with self._lock:
             if full and full != self.title:
                 self.prev_title = self.title
@@ -90,6 +94,9 @@ class TrackInfo:
                 self.position_sec = position_sec
                 self.duration_sec = duration_sec
                 self.playback_rate = playback_rate if playback_rate is not None else 1.0
+                self.client_bundle_id = (
+                    str(client_bundle_id).strip() if client_bundle_id else None
+                )
 
     def _poll_raw(self) -> dict | None:
         try:
@@ -118,6 +125,7 @@ class TrackInfo:
                 "duration_sec": self.duration_sec,
                 "position_sec": self.position_sec,
                 "playback_rate": self.playback_rate,
+                "client_bundle_id": self.client_bundle_id,
             }
 
 

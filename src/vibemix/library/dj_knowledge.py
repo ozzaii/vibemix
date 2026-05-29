@@ -127,6 +127,16 @@ class KnowledgeStore:
     def chunks(self) -> list[KnowledgeChunk]:
         return list(self._chunks)
 
+    @property
+    def dim(self) -> int | None:
+        """Embedding dimensionality of the stored matrix; ``None`` when empty.
+
+        Lets the retrieval entry point detect a wrong-space query embedder
+        (e.g. 512-d audio/CLAP against a 1536-d Gemini text store) and fail
+        loudly instead of letting ``search`` swallow the mismatch as ``[]``.
+        """
+        return None if self._matrix is None else int(self._matrix.shape[1])
+
     def add(self, chunk: KnowledgeChunk, vector: np.ndarray) -> None:
         """Append a chunk + its (L2-normalized-here) embedding row.
 
@@ -274,6 +284,23 @@ def retrieve_dj_knowledge(
         qvec = _embed_with(embedder, query)
     except Exception as e:
         return {"error": f"retrieve_dj_knowledge embed failed: {type(e).__name__}"}
+
+    # Fail LOUD on a wrong-space embedder. The toolset injects ONE embedder for
+    # everything; if the audio/CLAP embedder (512-d) reaches this text store
+    # (Gemini text-embedding, 1536-d), the dims don't match and `search` would
+    # silently return [] — masking a wiring bug as "empty knowledge base". Name
+    # both dims + the cause so the fix (wire a matching text embedder) is obvious.
+    store_dim = store.dim
+    if store_dim is not None and int(qvec.shape[0]) != store_dim:
+        return {
+            "error": (
+                f"retrieve_dj_knowledge: query embedder produced dim "
+                f"{int(qvec.shape[0])} but the knowledge store is dim {store_dim} "
+                f"— a TEXT embedder matching the store (Gemini text-embedding) "
+                f"must be wired for DJ-knowledge retrieval, not the audio/CLAP "
+                f"embedder."
+            )
+        }
 
     try:
         hits = store.search(qvec, k=k, topic=topic, skill_level=skill_level)

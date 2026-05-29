@@ -55,6 +55,11 @@ _ROLE_PATTERN_TEXTS = {
     ),
 }
 _ROLE_PATTERNS = {role: re.compile(pattern, re.I) for role, pattern in _ROLE_PATTERN_TEXTS.items()}
+_ROLE_HEDGE_RE = re.compile(
+    r"\b(?:likely|maybe|probably|possibly|roughly|seems\s+like|feels\s+like|"
+    r"works\s+like|might\s+be|could\s+be|reads\s+as|acts\s+like)\b",
+    re.I,
+)
 _STRUCTURE_RE = re.compile(
     "|".join(f"(?:{pattern})" for pattern in _ROLE_PATTERN_TEXTS.values()), re.I
 )
@@ -78,6 +83,10 @@ _SUPPRESSION_RE = re.compile(
     r"\b(?:stayed\s+quiet|kept\s+quiet|held\s+back|suppressed|stayed\s+silent)\b",
     re.I,
 )
+_COMBO_RE = re.compile(r"\bcombo\s+x\d{1,3}\b", re.I)
+_XP_RE = re.compile(r"(?:\+\d{1,3}|\b\d{1,6})\s*xp\b", re.I)
+_LEVEL_RE = re.compile(r"\b(?:lv|level)\s+\d{1,3}\b", re.I)
+_LEVEL_UP_RE = re.compile(r"\blevel\s+up\b", re.I)
 _UNSUPPORTED_MUSICAL_FACT_RE = re.compile(
     r"\b(?:crowd|audience|dancefloor|floor)\s+"
     r"(?:will|is\s+going\s+to|gonna)\s+"
@@ -104,6 +113,7 @@ _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "taste": frozenset({"taste_preference", "taste_fit", "taste_uncertain"}),
     "risk": frozenset({"risk", "uncertainty"}),
     "suppression": frozenset({"decision_suppressed", "blend_suppression"}),
+    "grade_progress": frozenset({"grade_progress"}),
     "unsupported_musical_fact": frozenset(),
 }
 _SUCCESS_CLAIM_VALUES = frozenset(
@@ -176,6 +186,7 @@ def validate_decision_claims(
     _validate_action_success_phrases(text, cited_rows, errors)
     _validate_timestamp_phrases(text, cited_rows, errors)
     _validate_section_role_phrases(text, cited_rows, errors)
+    _validate_grade_progress_phrases(text, cited_rows, errors)
 
     return (
         ClaimValidationResult("rejected", tuple(errors))
@@ -202,6 +213,10 @@ def _claim_families_implied_by_text(text: str) -> tuple[str, ...]:
         ("taste", _TASTE_RE),
         ("risk", _RISK_RE),
         ("suppression", _SUPPRESSION_RE),
+        ("grade_progress", _COMBO_RE),
+        ("grade_progress", _XP_RE),
+        ("grade_progress", _LEVEL_RE),
+        ("grade_progress", _LEVEL_UP_RE),
         ("unsupported_musical_fact", _UNSUPPORTED_MUSICAL_FACT_RE),
     )
     for family, pattern in checks:
@@ -277,16 +292,35 @@ def _validate_section_role_phrases(
             errors.append(f"missing_claim_id_for_section_role:{role}")
         return
 
-    cited_roles = {
-        role
-        for role in (_normalize_section_role_value(row.get("value")) for row in role_rows)
-        if role is not None
-    }
+    rows_by_role = _section_role_rows_by_value(role_rows)
     for role in roles:
-        if role in cited_roles:
+        rows = rows_by_role.get(role, ())
+        if not rows:
+            claim_id = str(role_rows[0].get("claim_id") or "unknown")
+            errors.append(f"section_role_value_mismatch:{claim_id}:{role}")
             continue
-        claim_id = str(role_rows[0].get("claim_id") or "unknown")
-        errors.append(f"section_role_value_mismatch:{claim_id}:{role}")
+        if _role_mentions_are_hedged(text, role):
+            continue
+        if any(row.get("status") == "allowed" for row in rows):
+            continue
+        claim_id = str(rows[0].get("claim_id") or "unknown")
+        errors.append(f"section_role_requires_hedged_language:{claim_id}:{role}")
+
+
+def _validate_grade_progress_phrases(
+    text: str,
+    cited_rows: list[dict[str, Any]],
+    errors: list[str],
+) -> None:
+    if not _LEVEL_UP_RE.search(text):
+        return
+    progress_rows = [row for row in cited_rows if row.get("type") == "grade_progress"]
+    if not progress_rows:
+        return
+    if any("level_up:true" in row.get("reason_codes", ()) for row in progress_rows):
+        return
+    claim_id = str(progress_rows[0].get("claim_id") or "unknown")
+    errors.append(f"grade_progress_level_up_value_mismatch:{claim_id}")
 
 
 def _claim_value_is_success(value: Any) -> bool:
@@ -300,6 +334,30 @@ def _claim_value_is_success(value: Any) -> bool:
 def _section_roles_implied_by_text(text: str) -> tuple[str, ...]:
     roles = [role for role, pattern in _ROLE_PATTERNS.items() if pattern.search(text)]
     return tuple(dict.fromkeys(roles))
+
+
+def _section_role_rows_by_value(
+    rows: list[dict[str, Any]],
+) -> dict[str, tuple[dict[str, Any], ...]]:
+    indexed: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        role = _normalize_section_role_value(row.get("value"))
+        if role is None:
+            continue
+        indexed.setdefault(role, []).append(row)
+    return {role: tuple(role_rows) for role, role_rows in indexed.items()}
+
+
+def _role_mentions_are_hedged(text: str, role: str) -> bool:
+    pattern = _ROLE_PATTERNS.get(role)
+    if pattern is None:
+        return False
+    matches = tuple(pattern.finditer(text))
+    if not matches:
+        return False
+    return all(
+        _ROLE_HEDGE_RE.search(text[max(0, match.start() - 32) : match.end()]) for match in matches
+    )
 
 
 def _normalize_section_role_value(value: Any) -> str | None:

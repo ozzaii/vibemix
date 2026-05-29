@@ -143,8 +143,8 @@ def _build_cited_critique(events: list[dict], chapters: list[ChapterRegion]) -> 
     """Lossy condensation of events.jsonl into a citation-rich critique string.
 
     Picks up the ``ai_text`` event lines (the live cohost's replies — already
-    cited per Phase 18 grammar) and joins them with their preceding event-id
-    citations. Result is the input the TLDR + drills prompts consume.
+    cited per Phase 18 grammar) plus Learn lesson/action events. Result is the
+    input the TLDR + drills prompts consume.
     """
     out: list[str] = []
     last_event_tag: str | None = None
@@ -163,7 +163,60 @@ def _build_cited_critique(events: list[dict], chapters: list[ChapterRegion]) -> 
                 if not EVIDENCE_CITATION_RE.search(text):
                     text = f"{text} {last_event_tag}"
                 out.append(text)
+        elif kind == "learn_action_observed":
+            text = _learn_action_critique_line(e)
+            if text:
+                out.append(text)
+        elif kind == "learn_tutor_speak":
+            text = _learn_tutor_critique_line(e)
+            if text:
+                out.append(text)
     return " ".join(out)
+
+
+def _learn_action_critique_line(event: dict) -> str:
+    observed = str(event.get("observed_control_id") or "").strip()
+    if not observed:
+        return ""
+    lesson_id = str(event.get("lesson_id") or "unknown").strip()
+    step_id = str(event.get("step_id") or "").strip()
+    expected = str(event.get("expected_control_id") or "").strip()
+    source = str(event.get("source") or "midi").strip()
+    citation_source = "screen" if source == "click" else "midi"
+    citation_time = _learn_event_time(event)
+    citation = f"[{citation_source}:{observed}@{citation_time:.3f}]"
+    matched = event.get("matched")
+    if matched is True:
+        action = f"matched {observed}"
+    elif expected:
+        action = f"moved {observed} while the lesson expected {expected}"
+    else:
+        action = f"moved {observed}"
+    step = f" step {step_id}" if step_id else ""
+    return f"Learn {lesson_id}{step}: learner {action} via {source} {citation}."
+
+
+def _learn_tutor_critique_line(event: dict) -> str:
+    citations = event.get("citations")
+    citation_list = [str(c) for c in citations] if isinstance(citations, list) else []
+    if not citation_list:
+        return ""
+    text = str(event.get("text") or "").strip()
+    if not text:
+        return ""
+    lesson_id = str(event.get("lesson_id") or "unknown").strip()
+    tts_marker = str(event.get("tts_marker") or "").strip()
+    marker = f" {tts_marker}" if tts_marker else ""
+    return f"Learn tutor {lesson_id}{marker}: {text} {' '.join(citation_list)}"
+
+
+def _learn_event_time(event: dict) -> float:
+    for key in ("evidence_time", "t"):
+        try:
+            return max(0.0, float(event.get(key)))
+        except (TypeError, ValueError):
+            continue
+    return 0.0
 
 
 def _chapter_summaries(chapters: list[ChapterRegion]) -> list[str]:

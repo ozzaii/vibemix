@@ -33,10 +33,12 @@ NEVER exits on exception (verbatim v4 behavior).
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 import threading
 import time
 from collections import deque
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -58,6 +60,12 @@ from vibemix.audio.constants import (
     BUILDUP_SLOPE_WINDOW_S,
     GENRE_BPM_BANDS,
     GENRE_CENTROID_HARD_TEK_MIN,
+)
+from vibemix.library.section_builder import next_section_after_position, sections_for_entry
+from vibemix.state.deck_context import (
+    live_mix_evidence_keys,
+    midi_evidence_key,
+    render_audio_delta_items,
 )
 from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
 from vibemix.state.emotion_router import derive_emotion
@@ -89,6 +97,9 @@ from vibemix.state.track_resolver import derive_audible_deck, derive_audible_tra
 # active_genre to unknown/house, which destabilised the genre profile and let
 # phase classification fall back to the no-hysteresis path → live phase flicker.
 _BPM_RING_MAXLEN = 5  # ~15 s at the 3 s estimate cadence
+_COURSE3_CUE_CONF_FLOOR = 0.7
+_COURSE3_MIX_TITLE_MATCH_POSITION_CONF = 0.75
+_COURSE3_REVIEW_ONLY_LESSONS = frozenset({"L3.06"})
 
 # Phase 52 (GENRE-01): cache the loaded GenreProfile library once — the profile
 # JSONs do not change at runtime, so re-loading all of them every tick (10Hz)
@@ -152,6 +163,23 @@ def _classify_active_genre(bpm: float, feats: dict) -> str:
     return "unknown"
 
 
+def _course3_session_lens_active(learn_state) -> bool:
+    """Return whether the current Learn lesson should activate live coaching.
+
+    Course 3 contains one post-set review lesson (L3.06) whose fixture marks
+    ``proactive_lens_active=false``. Keep the hot-path dependency light by
+    keying off the stable lesson id instead of importing the curriculum table.
+    Older callers that only supply ``current_course_id`` keep the coarse Course
+    3 behavior for compatibility.
+    """
+    if getattr(learn_state, "current_course_id", None) != "course_3_play_mode":
+        return False
+    lesson_id = getattr(learn_state, "current_lesson_id", None)
+    if lesson_id in _COURSE3_REVIEW_ONLY_LESSONS:
+        return False
+    return True
+
+
 def _compute_buildup_score(curve: list, window_s: float, hop_s: float = 1.0) -> float:
     """Slope of the trailing `int(window_s/hop_s)` samples of `curve`,
     normalized into [0.0, 1.0]. Negative slopes (energy falling) clamp to 0.0
@@ -190,6 +218,52 @@ def _optional_float(raw: object) -> float | None:
         return float(raw)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+
+
+def _write_live_grounding_evidence(
+    evidence_registry: EvidenceRegistry | None,
+    state: MusicState,
+    *,
+    t_session: float,
+    evidence_dedupe: set[str] | None,
+    audio_delta_items: list[str],
+) -> None:
+    """Register citable deck/move/audio-delta facts without hot-loop spam."""
+    if evidence_registry is None:
+        return
+    try:
+        for raw in state.recent_moves:
+            if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+                continue
+            try:
+                age = max(0.0, float(raw[0]))
+            except (TypeError, ValueError):
+                continue
+            if age > 8.0:
+                continue
+            label = str(raw[1])
+            key = midi_evidence_key(label)
+            move_t = round(max(0.0, t_session - age), 1)
+            dedupe_key = f"midi:{key}@{move_t:.1f}"
+            if evidence_dedupe is not None and dedupe_key in evidence_dedupe:
+                continue
+            evidence_registry.write("midi", key, move_t)
+            if evidence_dedupe is not None:
+                evidence_dedupe.add(dedupe_key)
+
+        for key in live_mix_evidence_keys(
+            state,
+            state.recent_moves,
+            audio_delta_items=audio_delta_items,
+        ):
+            dedupe_key = f"mix:{key}"
+            if evidence_dedupe is not None and dedupe_key in evidence_dedupe:
+                continue
+            evidence_registry.write("mix", key, t_session)
+            if evidence_dedupe is not None:
+                evidence_dedupe.add(dedupe_key)
+    except Exception:
+        pass
 
 
 def _compose_trajectory(phase_history: list, buildup_score: float, recent_moves: list) -> str:
@@ -264,6 +338,167 @@ def _dispatch_genre_lookup(genre_source, track_id: str) -> None:
         print(f"[genre dispatch err] {e}", file=sys.stderr)
 
 
+@dataclass(frozen=True, slots=True)
+class _Course3PhraseAnchor:
+    confidence: float
+    next_phrase_at: float
+    cue_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class _Course3AnchorDeck:
+    track_id: str
+    deck_confidence: float
+    position_confidence: float
+
+
+def _lookup_section_entry(section_source, track_id: str):
+    if section_source is None or not track_id:
+        return None
+    try:
+        lookup = getattr(section_source, "lookup_by_id", None)
+        if callable(lookup):
+            return lookup(track_id)
+        tracks = getattr(section_source, "tracks", None)
+        if isinstance(tracks, dict):
+            return tracks.get(track_id)
+        if isinstance(section_source, dict):
+            return section_source.get(track_id)
+        if callable(section_source):
+            return section_source(track_id)
+    except Exception:
+        return None
+    return None
+
+
+def _cue_anchor_id(section) -> str:
+    raw = f"{section.track_id}:{section.role}@{float(section.start_s):.1f}"
+    return re.sub(r"[\s,\[\]]+", "_", raw)
+
+
+def _normalized_title(raw: object) -> str:
+    return str(raw or "").strip().casefold()
+
+
+def _course3_anchor_deck(
+    *,
+    deck_snap: dict | None,
+    audible_deck: str,
+    track_title: str | None,
+    position_confidence: float,
+) -> _Course3AnchorDeck | None:
+    if deck_snap is None:
+        return None
+
+    if audible_deck in {"A", "B"}:
+        dt = deck_snap.get(audible_deck)
+        if dt is None or not getattr(dt, "track_id", None):
+            return None
+        deck_confidence = float(getattr(dt, "confidence", 0.0) or 0.0)
+        if deck_confidence < DECK_CITE_MIN_CONF:
+            return None
+        return _Course3AnchorDeck(
+            track_id=str(dt.track_id),
+            deck_confidence=deck_confidence,
+            position_confidence=position_confidence,
+        )
+
+    if audible_deck != "mix":
+        return None
+
+    title = _normalized_title(track_title)
+    if not title:
+        return None
+
+    matches: list[_Course3AnchorDeck] = []
+    for side in ("A", "B"):
+        dt = deck_snap.get(side)
+        if dt is None or not getattr(dt, "track_id", None):
+            continue
+        deck_confidence = float(getattr(dt, "confidence", 0.0) or 0.0)
+        if deck_confidence < DECK_CITE_MIN_CONF:
+            continue
+        if _normalized_title(getattr(dt, "title", None)) != title:
+            continue
+        matches.append(
+            _Course3AnchorDeck(
+                track_id=str(dt.track_id),
+                deck_confidence=deck_confidence,
+                position_confidence=max(
+                    float(position_confidence or 0.0),
+                    _COURSE3_MIX_TITLE_MATCH_POSITION_CONF,
+                ),
+            )
+        )
+    if len(matches) != 1:
+        return None
+    return matches[0]
+
+
+def _resolve_course3_phrase_anchor(
+    *,
+    section_source,
+    deck_snap: dict | None,
+    audible_deck: str,
+    track_title: str | None,
+    position_s: float | None,
+    position_confidence: float,
+    now: float,
+    set_start_at: float,
+) -> _Course3PhraseAnchor | None:
+    if section_source is None:
+        return None
+    if position_s is None:
+        return None
+    anchor_deck = _course3_anchor_deck(
+        deck_snap=deck_snap,
+        audible_deck=audible_deck,
+        track_title=track_title,
+        position_confidence=position_confidence,
+    )
+    if anchor_deck is None:
+        return None
+
+    entry = _lookup_section_entry(section_source, anchor_deck.track_id)
+    if entry is None:
+        return None
+    try:
+        next_section = next_section_after_position(sections_for_entry(entry), position_s)
+    except Exception:
+        return None
+    if next_section is None or next_section.source != "dj":
+        return None
+
+    cue_confidence = (
+        next_section.cue_confidence
+        if next_section.cue_confidence is not None
+        else next_section.confidence
+    )
+    section_confidence = min(float(next_section.confidence), float(cue_confidence or 0.0))
+    if section_confidence < _COURSE3_CUE_CONF_FLOOR:
+        return None
+
+    confidence = max(
+        0.0,
+        min(
+            1.0,
+            section_confidence,
+            anchor_deck.deck_confidence,
+            anchor_deck.position_confidence,
+        ),
+    )
+    if confidence <= 0.0:
+        return None
+    set_seconds = max(0.0, now - set_start_at)
+    seconds_to_boundary = max(0.0, float(next_section.start_s) - max(0.0, position_s))
+    next_phrase_at = set_seconds + seconds_to_boundary
+    return _Course3PhraseAnchor(
+        confidence=confidence,
+        next_phrase_at=next_phrase_at,
+        cue_id=_cue_anchor_id(next_section),
+    )
+
+
 if TYPE_CHECKING:
     from vibemix.platform._midi_macos import ControllerState
     from vibemix.platform._track_macos import TrackInfo
@@ -289,6 +524,9 @@ def _tick_once(
     genre_hysteresis: GenreHysteresis | None = None,
     deck_source=None,
     genre_source=None,
+    learn_state=None,
+    section_source=None,
+    evidence_dedupe: set[str] | None = None,
 ) -> tuple[float, float, float, float]:
     """One iteration of the state_refresh_loop body. Extracted so tests can
     drive single ticks deterministically with fake time and fake snapshots.
@@ -313,6 +551,11 @@ def _tick_once(
     consistent across all writers (refresh.py + EventDetector._fire). Closes
     Pitfall P12 (registry race) at the runtime boundary. All registry writes
     wrapped in try/except so a downstream failure cannot kill the tick.
+
+    Phase 96 Course 3 lens: optional ``learn_state`` is read-only. This
+    function remains the sole writer to ``MusicState``; LearnRuntime never
+    writes live audio state. ``session_active`` flips on only when the
+    active lesson course is Course 3 and this tick has an audible deck.
     """
     # Lazy-default Phase 6 loop-local state for tests that omit them.
     if crest_smoother is None:
@@ -572,6 +815,15 @@ def _tick_once(
         aud_deck, deck_conf = derive_audible_deck(cs["A"], cs["B"], cs["xfader"], cs["connected"])
         state.audible_deck = aud_deck
         state.deck_confidence = deck_conf
+        course3_live = _course3_session_lens_active(learn_state)
+        state.session_active = bool(course3_live and state.audible and aud_deck != "none")
+        prev_phrase_cue_id = state.next_phrase_cue_id
+        # Course 3 may coach live, but stale forward calls are worse than silence.
+        # Clear first; the grounded section-source block below writes these back
+        # only after it resolves a DJ-authored cue section and registers evidence.
+        state.phrase_position_confidence = 0.0
+        state.next_phrase_at = None
+        state.next_phrase_cue_id = None
         if evidence_registry is not None and prev_deck != aud_deck:
             try:
                 t_session = max(0.0, now - state.set_start_at)
@@ -629,6 +881,17 @@ def _tick_once(
                 dt.camelot = to_camelot(dt.key)
             state.deck_state.decks = deck_snap
             state.deck_state.updated_at = now
+            try:
+                source_status = (
+                    deck_source.source_snapshot()
+                    if hasattr(deck_source, "source_snapshot")
+                    else {}
+                )
+            except Exception:
+                source_status = {}
+            state.deck_state.source_status = (
+                dict(source_status) if isinstance(source_status, dict) else {}
+            )
 
             # Change-only, confidence-gated key:/track: registry writes. Bounded
             # registry growth (Pitfall T-59-04-04): only write when a deck's
@@ -648,9 +911,51 @@ def _tick_once(
                             evidence_registry.write("track", dt.track_id, t_session)
                     except Exception:
                         pass
+        else:
+            deck_snap = None
+
+        if state.session_active:
+            course3_position_s = state.audible_track_position_s
+            course3_position_confidence = state.audible_track_position_confidence
+            if (
+                course3_position_s is None
+                and state.audible_deck == "mix"
+                and tt
+                and position_s is not None
+            ):
+                course3_position_s = max(0.0, position_s)
+                course3_position_confidence = tc
+            anchor = _resolve_course3_phrase_anchor(
+                section_source=section_source,
+                deck_snap=deck_snap,
+                audible_deck=state.audible_deck,
+                track_title=tt,
+                position_s=course3_position_s,
+                position_confidence=course3_position_confidence,
+                now=now,
+                set_start_at=state.set_start_at,
+            )
+            if anchor is not None:
+                state.phrase_position_confidence = anchor.confidence
+                state.next_phrase_at = anchor.next_phrase_at
+                state.next_phrase_cue_id = anchor.cue_id
+                if evidence_registry is not None and anchor.cue_id != prev_phrase_cue_id:
+                    try:
+                        evidence_registry.write("cue", anchor.cue_id, anchor.next_phrase_at)
+                    except Exception:
+                        pass
 
         # Recent moves
         state.recent_moves = controller_state.moves_since(now - 12.0)
+        audio_delta_items = render_audio_delta_items(state, use_cached=False)
+        state.audio_delta = audio_delta_items
+        _write_live_grounding_evidence(
+            evidence_registry,
+            state,
+            t_session=max(0.0, now - state.set_start_at),
+            evidence_dedupe=evidence_dedupe,
+            audio_delta_items=audio_delta_items,
+        )
 
         # Long arc — recompute every cycle is fine (cheap reduction over the
         # 16k ring buffer, ~1ms)
@@ -717,6 +1022,8 @@ async def state_refresh_loop(
     evidence_registry: EvidenceRegistry | None = None,
     deck_source=None,
     genre_source=None,
+    learn_state=None,
+    section_source=None,
 ) -> None:
     """Updates MusicState every 100ms from all sources. The ONLY writer to state.
     Audible flag is debounced — sustained samples required to flip in either
@@ -734,6 +1041,12 @@ async def state_refresh_loop(
     mix observations are written INSIDE the same ``with state._lock:`` batch
     that writes MusicState fields — single-snapshot consistency. Default
     ``None`` preserves backward compat with all existing callers.
+
+    Phase 96 Course 3 lens: optional ``learn_state`` threads the current
+    course id into the single-writer loop so ``MusicState.session_active``
+    reflects real Course 3 live coaching only when the deck is audible.
+    ``section_source`` may be a read-only RekordboxLibrary; when present, Course
+    3 count-ins can use DJ-authored cue sections instead of staying cold.
     """
     last_audible_high = 0.0
     last_audible_low = 0.0
@@ -750,6 +1063,7 @@ async def state_refresh_loop(
     # Phase 52 (GENRE-01) loop-local genre-detector hysteresis — separate
     # state object from the phase HysteresisState above; threaded into _tick_once.
     genre_hysteresis = GenreHysteresis()
+    evidence_dedupe: set[str] = set()
 
     while not stop_event.is_set():
         await asyncio.sleep(0.1)
@@ -774,6 +1088,9 @@ async def state_refresh_loop(
                 genre_hysteresis=genre_hysteresis,
                 deck_source=deck_source,
                 genre_source=genre_source,
+                learn_state=learn_state,
+                section_source=section_source,
+                evidence_dedupe=evidence_dedupe,
             )
         except Exception as e:
             print(f"[state refresh err] {e}", file=sys.stderr)

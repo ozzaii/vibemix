@@ -68,11 +68,17 @@ class MusicState:
     # recent_moves) — recomputed, never accumulated. Default "" so the gated
     # render branch omits on the cold path.
     #
+    # `audio_delta` is the rendered before→after DSP delta for the CURRENT
+    # committed tick, computed before `prev_perceive` is advanced. Consumers
+    # read this cached field instead of trying to diff after the refresh loop has
+    # already moved the prior snapshot forward.
+    #
     # Additive falsy defaults preserve golden-equivalence: a cold MusicState
     # renders byte-identical to the v8.0 baseline until _tick_once writes these
     # AND coach.py's `if <field>:`-gated branches fire. Anti-slop lives at the
     # render edge (render_delta abstains below floor; trajectory gate omits on "").
     prev_perceive: dict = field(default_factory=dict)
+    audio_delta: list[str] = field(default_factory=list)
     trajectory_narrative: str = ""
 
     # Phase 59 (DECK-01) — embedded per-deck state (currently-loaded track +
@@ -177,12 +183,15 @@ class MusicState:
     #   of the next phrase boundary the structure detector has resolved.
     #   None = cold (no phrase lock); a float means a real, registered
     #   boundary. NEVER fabricated.
+    # - next_phrase_cue_id is the registry key written under source="cue" for
+    #   that same boundary. None means no citable cue anchor is available.
     # Defaults preserve the v8.0 byte-identical evidence_line golden — the
     # new fields are read by AICoach.evidence_line ONLY when session_active
     # is True; the cold-state default (session_active=False) emits no marker.
     session_active: bool = False
     phrase_position_confidence: float = 0.0  # 0..1 — 0 means "no phrase lock yet"
     next_phrase_at: float | None = None  # set_seconds; None = cold
+    next_phrase_cue_id: str | None = None  # EvidenceRegistry cue key; None = uncitable
 
     _lock: threading.Lock = field(default_factory=threading.Lock)
 

@@ -17,7 +17,7 @@ Locked schema (09-CONTEXT.md §Locked Decisions §Mapping format)::
       "controls": {
         "<binding_name>": {
           "kind": "cc", "channel": 0..15, "cc": 0..127,
-          "axis": "unipolar" | "bipolar",
+          "axis": "unipolar" | "bipolar" | "relative",
           "deck": "A" | "B" | null, "field": "vol" | "eq_hi" | ...
         },
         ...
@@ -53,8 +53,10 @@ from dataclasses import dataclass
 
 _PROFILES_PKG = "vibemix.midi.profiles"
 
-# Locked per 09-CONTEXT.md §Magnitude semantics — only two axes Wave 1+2 ship.
-_VALID_AXES = frozenset({"unipolar", "bipolar"})
+# Locked per 09-CONTEXT.md §Magnitude semantics. ``relative`` was added after
+# the 2026-05-28 FLX4 hardware sniff exposed jog-wheel ticks as CC33 values
+# around center (63/65), not as an absolute platter position.
+_VALID_AXES = frozenset({"unipolar", "bipolar", "relative"})
 
 # Superset covering Wave 1 (FLX4) + Wave 2's 9 controllers (DDJ-1000 + DDJ-SX3
 # add hotcues; XDJ-RX3 + Hercules add filter_fx and tap_tempo). Adding to this
@@ -88,7 +90,7 @@ class ControlBinding:
     kind: str  # always 'cc' for Wave 1+2
     channel: int  # 0..15 MIDI channel
     cc: int  # 0..127 CC number
-    axis: str  # 'unipolar' (knob) | 'bipolar' (tempo/filter/xfader, center=64)
+    axis: str  # 'unipolar' | 'bipolar' (center=64) | 'relative' (encoder tick)
     deck: str | None  # 'A'/'B'/'C'/'D' or None for master-section (xfader)
     field: (
         str  # semantic field name: 'vol', 'eq_hi', 'eq_mid', 'eq_low', 'tempo', 'filter', 'xfader'

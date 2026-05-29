@@ -39,6 +39,7 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
+from vibemix.intel.move_grade import grade_transition_payload
 from vibemix.library._cosine import l2_normalize
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
 from vibemix.library.section_vectors import resolve_section_vector
@@ -107,6 +108,8 @@ def next_suggestion(
     source_deck: str | None = None,
     target_deck: str | None = None,
     prepared_target_track_id: str | None = None,
+    prepared_target_reason_prefix: str = "loaded on target deck",
+    prepared_target_source: str = "target_deck",
     k: int = 5,
     bpm_window: float = 15.0,
     live_remaining_bars: int | None = None,
@@ -182,6 +185,8 @@ def next_suggestion(
         seed_track_id=seed_track_id,
         played_ids=played_ids,
         existing_track_ids={option.track_id for option in options},
+        reason_prefix=prepared_target_reason_prefix,
+        source=prepared_target_source,
     )
     if prepared_option is not None:
         options.append(prepared_option)
@@ -248,7 +253,8 @@ def _select_set_aware_option(
     """
     if seed_track_id is None:
         first_search_option = next(
-            (option for option in options if option.source != "target_deck"), None
+            (option for option in options if not _requires_transition(option.source)),
+            None,
         )
         return (first_search_option, None, ()) if first_search_option is not None else None
 
@@ -274,7 +280,11 @@ def _select_set_aware_option(
         ranked.append((_selection_key(option, transition, order), option, transition))
 
     ranked.sort(key=lambda item: item[0], reverse=True)
-    ranked = [item for item in ranked if item[1].source != "target_deck" or item[2] is not None]
+    ranked = [
+        item
+        for item in ranked
+        if not _requires_transition(item[1].source) or item[2] is not None
+    ]
     if not ranked:
         return None
     ranked = _prefer_prepared_target_option(ranked, prepared_target_track_id)
@@ -299,6 +309,8 @@ def prepared_target_candidate_payload(
     *,
     seed_vector: np.ndarray,
     track_id: str | None,
+    reason_prefix: str = "loaded on target deck",
+    source: str = "target_deck",
 ) -> tuple[dict, np.ndarray] | None:
     """Return UI metadata + vector for a loaded target-deck candidate.
 
@@ -315,6 +327,8 @@ def prepared_target_candidate_payload(
         seed_track_id=None,
         played_ids=set(),
         existing_track_ids=set(),
+        reason_prefix=reason_prefix,
+        source=source,
     )
     if result is None:
         return None
@@ -342,6 +356,8 @@ def _prepared_target_option(
     seed_track_id: str | None,
     played_ids: set[str],
     existing_track_ids: set[str],
+    reason_prefix: str,
+    source: str,
 ) -> _SuggestionOption | None:
     result = _prepared_target_option_with_vector(
         store,
@@ -351,6 +367,8 @@ def _prepared_target_option(
         seed_track_id=seed_track_id,
         played_ids=played_ids,
         existing_track_ids=existing_track_ids,
+        reason_prefix=reason_prefix,
+        source=source,
     )
     return result[0] if result is not None else None
 
@@ -364,6 +382,8 @@ def _prepared_target_option_with_vector(
     seed_track_id: str | None,
     played_ids: set[str],
     existing_track_ids: set[str],
+    reason_prefix: str,
+    source: str,
 ) -> tuple[_SuggestionOption, np.ndarray] | None:
     track_id = prepared_target_track_id.strip() if isinstance(prepared_target_track_id, str) else ""
     if (
@@ -387,8 +407,8 @@ def _prepared_target_option_with_vector(
         similarity=_cosine_similarity(seed_vector, vector),
         camelot=cand_camelot,
         bpm=cand_bpm,
-        why=_why_for_entry(entry, prefix="loaded on target deck"),
-        source="target_deck",
+        why=_why_for_entry(entry, prefix=reason_prefix),
+        source=source,
     )
     return option, vector
 
@@ -434,6 +454,7 @@ def annotate_transition_selection(transition: dict | None, similarity: float | N
     annotated = dict(transition)
     annotated["selection_score"] = round(_selection_score_for_similarity(similarity, transition), 6)
     annotated["selection_basis"] = "section_transition"
+    annotated["move_grade"] = grade_transition_payload(annotated)
     return annotated
 
 
@@ -568,6 +589,10 @@ def _prefer_prepared_target_option(
         if option.track_id == prepared and transition is not None:
             return [item, *ranked[:index], *ranked[index + 1 :]]
     return ranked
+
+
+def _requires_transition(source: str) -> bool:
+    return source in {"target_deck", "prepared_pool"}
 
 
 def _alternative_selection_key(
@@ -748,7 +773,7 @@ def transition_payload_for_candidate(
         section_timing_basis,
         grounded_source_position_s,
     )
-    return {
+    payload = {
         "candidate_id": candidate.candidate_id,
         "source_deck": _deck_label(source_deck),
         "target_deck": _deck_label(target_deck),
@@ -781,6 +806,8 @@ def transition_payload_for_candidate(
         "risk_flags": list(candidate.risk_flags),
         "reasons": list(candidate.reasons),
     }
+    payload["move_grade"] = grade_transition_payload(payload)
+    return payload
 
 
 def _timing_basis(

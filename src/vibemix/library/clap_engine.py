@@ -310,8 +310,19 @@ class ClapEngine:
         snapshot — see ``_DEFAULT_ONNX_DIR`` doc above. Raises a clear, actionable
         error (NOT a wrong vector) when the model files are absent.
         """
-        import onnxruntime as ort  # lazy — ship dep
-        from tokenizers import Tokenizer  # lazy — ship dep
+        try:
+            import onnxruntime as ort  # lazy — ship dep (bundled via [ai-local])
+            from tokenizers import Tokenizer  # lazy — ship dep
+        except ModuleNotFoundError as e:
+            # The packaged app bundles these via the [ai-local] extra; a dev
+            # checkout (or a stale/partial install) can miss them, and the bare
+            # ModuleNotFoundError hides the fix. Name the package + the cure so
+            # the failure is actionable wherever it surfaces (Set Notes, CLI).
+            raise RuntimeError(
+                f"CLAP runtime not installed ({e.name}): the embedding engine "
+                "needs onnxruntime + tokenizers. The packaged app bundles them; "
+                "in a dev checkout run `uv sync --extra ai-local`."
+            ) from e
 
         mdir = clap_onnx_dir()
         audio_path = mdir / _ONNX_AUDIO_REL

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 import os
+from math import isfinite
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -135,6 +136,8 @@ def web_search(query: str, k: int = 5, *, client: Any | None = None) -> dict[str
             score = float(r.get("score")) if r.get("score") is not None else 0.0
         except (TypeError, ValueError):
             score = 0.0
+        if not isfinite(score):
+            score = 0.0
         results.append(
             {
                 "title": _truncate(r.get("title", ""), _SNIPPET_MAX),
@@ -198,10 +201,13 @@ def fetch_url(url: str, *, client: Any | None = None) -> dict[str, Any]:
     first = raw_results[0]
     if not isinstance(first, dict):
         return {"error": "fetch_url failed: malformed extract result"}
+    raw_text = first.get("raw_content")
+    if not isinstance(raw_text, str) or not raw_text.strip():
+        return {"error": "fetch_url failed: no extractable content"}
     return {
         "url": url,
         "title": _truncate(first.get("title", ""), _SNIPPET_MAX),
-        "text": _truncate(first.get("raw_content", ""), _TEXT_MAX),
+        "text": _truncate(raw_text, _TEXT_MAX),
     }
 
 

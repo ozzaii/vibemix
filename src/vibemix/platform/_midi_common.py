@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Cross-platform MIDI listener thread — parameterized by ControllerProfile.
 
-Phase 7 Wave 1 lifted the device-enumerate + open-input + poll-loop body out
+Phase 7 Wave 1 lifted the device-enumerate + open-input + dispatch-loop body out
 of ``MidiMacOS.start_listener_thread`` so Wave 4's ``_midi_windows.py`` could
 reuse it. Phase 9 Wave 1 Task 3 swaps the third positional from a single
 ``port_hint: str`` to a full ``ControllerProfile`` so the listener can:
@@ -21,7 +21,8 @@ Backward compatibility:
 Test injection seam: ``mido_module`` is the fourth positional parameter so
 tests can pass a ``types.SimpleNamespace`` with ``get_input_names()`` and
 ``open_input(name)`` callables, exercising the loop deterministically without
-a physical MIDI device.
+a physical MIDI device. Backends that accept ``open_input(name, callback=...)``
+use callback dispatch; older/test backends fall back to polling.
 """
 
 from __future__ import annotations
@@ -81,7 +82,7 @@ def _find_first_port_match(port_names: list[str], port_name_hints: tuple[str, ..
 
 
 def midi_listener_thread(controller_state, stop_event, profile, mido_module):
-    """Run the MIDI device enumerate-open-poll loop until ``stop_event`` is set.
+    """Run the MIDI device enumerate-open-dispatch loop until ``stop_event`` is set.
 
     Phase 9 Wave 1 Task 3: third positional is now a ``ControllerProfile``
     (with a one-release ``str`` shim — see ``_coerce_profile_arg``).
@@ -93,11 +94,12 @@ def midi_listener_thread(controller_state, stop_event, profile, mido_module):
        port whose name contains the hint (case-insensitive).
     3. If no hint matches any port: sleep 2s, retry. If stop_event was set
        during the sleep, exit.
-    4. If a match: ``open_input(match)`` (context-managed), call
-       ``controller_state.mark_connected(match)``, then enter the inner poll
-       loop.
-    5. Inner loop: ``port.poll()``; if None sleep 5ms and re-check
-       stop_event; otherwise call ``controller_state.handle_msg(msg)``.
+    4. If a match: prefer ``open_input(match, callback=...)``. If the backend
+       does not accept a callback kwarg, fall back to ``open_input(match)``.
+    5. Call ``controller_state.mark_connected(match)``. Callback mode sleeps
+       cooperatively while the backend calls ``handle_msg``; fallback mode
+       calls ``port.poll()``, sleeps 5ms on ``None``, and dispatches any
+       returned message.
     6. On any exception in the outer try: print ``[midi listener err]`` to
        stderr, sleep 2s, restart from step 1.
 
@@ -121,10 +123,25 @@ def midi_listener_thread(controller_state, stop_event, profile, mido_module):
             if not match:
                 time.sleep(2.0)
                 continue
-            with mido_module.open_input(match) as port:
+
+            def _on_msg(msg):
+                controller_state.handle_msg(msg)
+
+            try:
+                port_context = mido_module.open_input(match, callback=_on_msg)
+                callback_bound = True
+            except TypeError:
+                port_context = mido_module.open_input(match)
+                callback_bound = False
+
+            with port_context as port:
                 controller_state.mark_connected(match)
-                print(f"-> MIDI controller in: {match!r} (profile={profile_obj.id})")
+                mode = "callback" if callback_bound else "poll"
+                print(f"-> MIDI controller in: {match!r} (profile={profile_obj.id}, mode={mode})")
                 while not stop_event.is_set():
+                    if callback_bound:
+                        time.sleep(0.005)
+                        continue
                     msg = port.poll()
                     if msg is None:
                         time.sleep(0.005)

@@ -39,14 +39,16 @@ def sections_for_entry(entry: TrackEntry) -> tuple[SectionRecord, ...]:
         if end_s <= start_s:
             end_s = start_s + 80.0
         section_id = f"{entry.track_id}#s{index:03d}"
+        cue_source = _cue_source(cue)
+        cue_confidence = _cue_confidence(cue, cue_source)
         sections.append(
             SectionRecord(
                 section_id=section_id,
                 track_id=entry.track_id,
                 role=_role_for_cue(cue, index=index, total=len(cues)),
-                source="dj",
-                source_detail="hotcue" if 0 <= cue.number <= 7 else "memory_cue",
-                confidence=1.0,
+                source=cue_source,
+                source_detail=_source_detail_for_cue(cue, cue_source),
+                confidence=cue_confidence if cue_confidence is not None else 0.65,
                 start_s=start_s,
                 end_s=end_s,
                 start_beat=_beat_for_seconds(start_s, bpm),
@@ -55,8 +57,8 @@ def sections_for_entry(entry: TrackEntry) -> tuple[SectionRecord, ...]:
                 bpm=bpm,
                 camelot=camelot,
                 cue_slot=_cue_slot(cue.number),
-                cue_source="dj",
-                cue_confidence=1.0,
+                cue_source=cue_source,
+                cue_confidence=cue_confidence,
             )
         )
     return tuple(sections)
@@ -268,6 +270,38 @@ def _role_for_cue(cue: CuePoint, *, index: int, total: int) -> str:
 def _cue_slot(number: int) -> str | None:
     if 0 <= number <= 7:
         return chr(ord("A") + number)
+    return None
+
+
+def _cue_source(cue: CuePoint) -> str:
+    source = (getattr(cue, "source", "") or "dj").strip().lower()
+    if source in {"rekordbox", "rb"}:
+        return "rekordbox"
+    return source or "dj"
+
+
+def _source_detail_for_cue(cue: CuePoint, source: str) -> str:
+    if source == "dj":
+        return "hotcue" if 0 <= cue.number <= 7 else "memory_cue"
+    if source == "anlz":
+        return "pssi"
+    if source == "auto":
+        return "auto_cue"
+    return source
+
+
+def _cue_confidence(cue: CuePoint, source: str) -> float | None:
+    raw = getattr(cue, "confidence", None)
+    if raw is not None:
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            value = None
+        else:
+            if math.isfinite(value):
+                return min(1.0, max(0.0, value))
+    if source in {"dj", "rekordbox"}:
+        return 1.0
     return None
 
 

@@ -25,9 +25,11 @@ Invariants (the milestone's anti-poisoning + off-path core):
     * Budget / off-path (RECALL-04): event-gated to track-aware events (NEVER
       HEARTBEAT — the highest-frequency class), exactly one local CLAP query
       embed per gated event, cosine-only (NO time-decay blend — that is a
-      KAAN-ACTION deferral, not v1), conservative top-K. The hard deadline
-      (``RECALL_DEADLINE_S``) is enforced AGENT-side (Plan 65-04) via
-      ``asyncio.wait_for``; defined here as the shared default.
+      KAAN-ACTION deferral, not v1), conservative top-K. MIX_MOVE is eligible
+      only when the caller has move + sound-change evidence, so knob/fader
+      history can be recalled without embedding every controller twitch. The
+      hard deadline (``RECALL_DEADLINE_S``) is enforced AGENT-side (Plan 65-04)
+      via ``asyncio.wait_for``; defined here as the shared default.
 """
 
 from __future__ import annotations
@@ -43,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 class _RecallEmbedder(Protocol):  # pragma: no cover - structural typing only
     def embed_query(self, query: str): ...
+
 
 # ---------------------------------------------------------------------------
 # Retrieval policy defaults (research §Retrieval Policy Defaults). Conservative
@@ -61,11 +64,13 @@ RECALL_TOP_K = 3
 # asyncio.wait_for; defined here as the single source of the default.
 RECALL_DEADLINE_S = 0.5
 
-# Event gate — track-aware events ONLY. Deliberately NARROWER than Grounding's
-# TRACK_AWARE_EVENTS: it excludes MIX_MOVE (and never HEARTBEAT / KAAN_SPOKE /
-# MANUAL). A non-gated event short-circuits to [] BEFORE any embed.
+# Event gate — track-aware events ONLY. HEARTBEAT / KAAN_SPOKE / MANUAL stay
+# out. MIX_MOVE is admitted only behind ``should_recall_event(ev)``'s
+# move+audio-delta evidence gate at the agent dispatch seam; the service-level
+# ``on_event`` still gates only by event_type because it intentionally receives
+# no live state object.
 RECALL_EVENT_GATE: frozenset[str] = frozenset(
-    {"TRACK_CHANGE", "PHASE", "LAYER_ARRIVAL"}
+    {"TRACK_CHANGE", "PHASE", "LAYER_ARRIVAL", "MIX_MOVE"}
 )
 
 
@@ -111,7 +116,71 @@ def build_recall_query(ev) -> str:
         deck = getattr(state, "audible_deck", None) or "none"
     etype = getattr(ev, "type", None) or "MANUAL"
     # Prefix only — omit cite=/said: (no spoken line at retrieval time).
-    return f"coach_line | track={track} | phase={phase} | deck={deck} | event={etype}"
+    base = f"coach_line | track={track} | phase={phase} | deck={deck} | event={etype}"
+
+    # Optional caller-supplied context mirrors the ingest signature fields. The
+    # memory layer intentionally does not import live deck helpers; the agent
+    # can pass these strings through ``ev.extra`` when it already has them.
+    extra = getattr(ev, "extra", None)
+    if not isinstance(extra, dict):
+        return base
+    pieces: list[str] = []
+    for field, key in (
+        ("context_feed", "context_feed_contract"),
+        ("deck_lane", "deck_lane_context"),
+        ("deck_ref", "deck_reference_context"),
+        ("deck_source", "deck_source_context"),
+        ("deck_audio", "deck_audio_context"),
+        ("audio_window", "audio_window_context"),
+        ("live_evidence", "live_evidence_context"),
+        ("move", "move_context"),
+        ("move_effect", "move_effect_context"),
+        ("audio_delta", "audio_delta"),
+    ):
+        cap = 420 if field == "context_feed" else 240
+        rendered = _query_field(extra.get(key), cap=cap)
+        if rendered != "none":
+            pieces.append(f"{field}={rendered}")
+    if not pieces:
+        return base
+    return base + " | " + " | ".join(pieces)
+
+
+def should_recall_event(ev) -> bool:
+    """Return whether an event is worth a memory recall query.
+
+    This is the cheap caller-side cost gate. Track/phase/layer events are
+    already sparse enough. MIX_MOVE can be noisy, so it only passes when the
+    event carries a concrete controller move and the state/extra payload carries
+    at least one audio delta. That is the grounded "knob/fader -> sound changed"
+    condition the historical memory is meant to learn.
+    """
+    etype = getattr(ev, "type", None)
+    if etype not in RECALL_EVENT_GATE:
+        return False
+    if etype != "MIX_MOVE":
+        return True
+
+    extra = getattr(ev, "extra", None)
+    moves = extra.get("moves") if isinstance(extra, dict) else None
+    if not isinstance(moves, (list, tuple)) or not any(str(item).strip() for item in moves):
+        return False
+
+    audio_delta = None
+    if isinstance(extra, dict):
+        audio_delta = extra.get("audio_delta")
+    if not audio_delta:
+        audio_delta = getattr(getattr(ev, "state", None), "audio_delta", None)
+    return isinstance(audio_delta, (list, tuple)) and any(str(item).strip() for item in audio_delta)
+
+
+def _query_field(value: object, *, cap: int = 240) -> str:
+    if isinstance(value, (list, tuple)):
+        raw = "; ".join(str(item) for item in value[:4] if item)
+    else:
+        raw = str(value) if value else ""
+    raw = " ".join(raw.split()).replace("|", "/")
+    return raw[:cap] if raw else "none"
 
 
 class MemoryRecall:
@@ -181,9 +250,7 @@ class MemoryRecall:
         # must never perturb a live turn; fail empty and clear the latch for
         # this dispatch.
         try:
-            hits = self._store.query_topk(
-                qvec, RECALL_TOP_K, exclude_session=current_session_id
-            )
+            hits = self._store.query_topk(qvec, RECALL_TOP_K, exclude_session=current_session_id)
         except Exception as exc:
             logger.warning("memory recall query failed: %s", exc)
             with self._lock:
@@ -245,4 +312,5 @@ __all__ = [
     "RECALL_TOP_K",
     "MemoryRecall",
     "build_recall_query",
+    "should_recall_event",
 ]

@@ -277,17 +277,13 @@ class SessionLoop:
         #   regenerate → regenerate_result (consent-gated, citation-gated)
         #   delete     → delete_ack    (unlink + cache invalidate is caller's job)
         self.bus.register_handler("ipc.profile.view", self._on_profile_view)
-        self.bus.register_handler(
-            "ipc.profile.regenerate", self._on_profile_regenerate
-        )
+        self.bus.register_handler("ipc.profile.regenerate", self._on_profile_regenerate)
         self.bus.register_handler("ipc.profile.delete", self._on_profile_delete)
         # PROFILE-05 — Settings panel may also surface a re-toggle of consent
         # (the "enable" affordance on the consent-off empty state). The
         # WizardLoop handler is the primary writer but the SessionLoop also
         # accepts it so the panel works post-wizard without re-launching it.
-        self.bus.register_handler(
-            "ipc.profile.set_consent", self._on_profile_set_consent
-        )
+        self.bus.register_handler("ipc.profile.set_consent", self._on_profile_set_consent)
 
     async def boot(self) -> None:
         """Emit ``ipc.boot {ready: true}``. Mirrors WizardLoop.boot()."""
@@ -442,9 +438,7 @@ class SessionLoop:
             index = RecordingsIndex(self.recordings_root)
             summaries = await loop.run_in_executor(None, index.list)
             _, bytes_total = await loop.run_in_executor(None, index.compute_usage)
-            result = RecordingsListResult.make(
-                sessions=summaries, bytes_total=bytes_total
-            )
+            result = RecordingsListResult.make(sessions=summaries, bytes_total=bytes_total)
             await self.bus.emit(json.loads(result.to_json()))
         except Exception as e:
             log.exception("recordings.list handler failed")
@@ -490,19 +484,13 @@ class SessionLoop:
             loop = asyncio.get_running_loop()
             index = RecordingsIndex(self.recordings_root)
             ok, err = await loop.run_in_executor(None, index.delete, session_dir)
-            ack = RecordingsDeleteAck.make(
-                session_dir=session_dir, ok=ok, error=err
-            )
+            ack = RecordingsDeleteAck.make(session_dir=session_dir, ok=ok, error=err)
             await self.bus.emit(json.loads(ack.to_json()))
             # Fire a fresh usage push so the drawer's disk line updates
             # post-delete. We re-read the index because the cached numbers
             # are stale (one session just disappeared).
-            sessions, bytes_total = await loop.run_in_executor(
-                None, index.compute_usage
-            )
-            usage = RecordingsUsage.make(
-                sessions=sessions, bytes_total=bytes_total
-            )
+            sessions, bytes_total = await loop.run_in_executor(None, index.compute_usage)
+            usage = RecordingsUsage.make(sessions=sessions, bytes_total=bytes_total)
             await self.bus.emit(json.loads(usage.to_json()))
         except Exception as e:
             log.exception("recordings.delete handler failed")
@@ -546,9 +534,7 @@ class SessionLoop:
                 return
             loop = asyncio.get_running_loop()
             index = RecordingsIndex(self.recordings_root)
-            events, err = await loop.run_in_executor(
-                None, index.read_events, session_dir
-            )
+            events, err = await loop.run_in_executor(None, index.read_events, session_dir)
             if err is not None:
                 await self.bus.emit(
                     json.loads(
@@ -606,24 +592,18 @@ class SessionLoop:
             consent = load_consent()
             profile = load_profile() if consent else None
             raw = (
-                json.dumps(profile, separators=(",", ":"), sort_keys=True).encode(
-                    "utf-8"
-                )
+                json.dumps(profile, separators=(",", ":"), sort_keys=True).encode("utf-8")
                 if profile
                 else b""
             )
-            result = ProfileViewResult.make(
-                profile=profile, bytes=len(raw), consent=consent
-            )
+            result = ProfileViewResult.make(profile=profile, bytes=len(raw), consent=consent)
             await self.bus.emit(json.loads(result.to_json()))
         except Exception as e:
             log.exception("profile.view handler failed")
             # Best-effort: emit a view_result with profile=None so the UI
             # can still render the empty state.
             try:
-                fallback = ProfileViewResult.make(
-                    profile=None, bytes=0, consent=False
-                )
+                fallback = ProfileViewResult.make(profile=None, bytes=0, consent=False)
                 await self.bus.emit(json.loads(fallback.to_json()))
             except Exception:
                 pass
@@ -653,9 +633,7 @@ class SessionLoop:
             )
 
             if not load_consent():
-                result = ProfileRegenerateResult.make(
-                    ok=False, profile=None, error="consent_off"
-                )
+                result = ProfileRegenerateResult.make(ok=False, profile=None, error="consent_off")
                 await self.bus.emit(json.loads(result.to_json()))
                 return
             prior = load_profile()
@@ -688,16 +666,12 @@ class SessionLoop:
                 await self.bus.emit(json.loads(result.to_json()))
                 return
             save_profile(new_profile)
-            result = ProfileRegenerateResult.make(
-                ok=True, profile=new_profile, error=None
-            )
+            result = ProfileRegenerateResult.make(ok=True, profile=new_profile, error=None)
             await self.bus.emit(json.loads(result.to_json()))
         except Exception as e:
             log.exception("profile.regenerate handler failed")
             err_short = f"{type(e).__name__}: {e}"[:200]
-            result = ProfileRegenerateResult.make(
-                ok=False, profile=None, error=err_short
-            )
+            result = ProfileRegenerateResult.make(ok=False, profile=None, error=err_short)
             await self.bus.emit(json.loads(result.to_json()))
 
     async def _on_profile_delete(self, _msg: dict) -> None:
@@ -714,9 +688,7 @@ class SessionLoop:
             from vibemix.profile import delete_profile
 
             deleted = delete_profile()
-            result = ProfileDeleteAck.make(
-                ok=deleted, error=None if deleted else "not_found"
-            )
+            result = ProfileDeleteAck.make(ok=deleted, error=None if deleted else "not_found")
             await self.bus.emit(json.loads(result.to_json()))
         except Exception as e:
             log.exception("profile.delete handler failed")
@@ -743,9 +715,7 @@ class SessionLoop:
             consent = bool(payload.get("consent", False))
             save_consent(consent)
             log.info("profile_consent persisted from session panel: %s", consent)
-            await self.bus.emit(
-                json.loads(ProfileConsentState.make(consent=consent).to_json())
-            )
+            await self.bus.emit(json.loads(ProfileConsentState.make(consent=consent).to_json()))
         except Exception as e:
             log.warning("session.profile.set_consent persistence failed: %s", e)
 
@@ -943,8 +913,7 @@ class SessionLoop:
                     if trigger == "close" and session_dir is not None:
                         result = ingest_session(session_dir, store, embedder)
                         log.info(
-                            "memory ingest (close): session=%s records=%s embeds=%s "
-                            "skipped=%s",
+                            "memory ingest (close): session=%s records=%s embeds=%s skipped=%s",
                             getattr(result, "session_id", "?"),
                             getattr(result, "records_written", "?"),
                             getattr(result, "embeds_made", "?"),
@@ -968,9 +937,7 @@ class SessionLoop:
         except Exception:
             log.exception("memory ingest (%s) dispatch failed", trigger)
 
-    def _log_retention_event_to_active_recorder(
-        self, *, count: int, bytes_pruned: int
-    ) -> None:
+    def _log_retention_event_to_active_recorder(self, *, count: int, bytes_pruned: int) -> None:
         """Write the `retention_pruned` events.jsonl line on the live recorder.
 
         No-op when ``self.active_recorder`` is None (the --session standalone
@@ -988,9 +955,7 @@ class SessionLoop:
             return
         log_event = getattr(self.active_recorder, "log_event", None)
         if log_event is None:
-            log.warning(
-                "active_recorder has no log_event method — retention_pruned not logged"
-            )
+            log.warning("active_recorder has no log_event method — retention_pruned not logged")
             return
         try:
             log_event("retention_pruned", count=count, bytes=bytes_pruned)
@@ -1032,12 +997,8 @@ class SessionLoop:
         try:
             loop = asyncio.get_running_loop()
             index = RecordingsIndex(self.recordings_root)
-            sessions, bytes_total = await loop.run_in_executor(
-                None, index.compute_usage
-            )
-            msg = RecordingsUsage.make(
-                sessions=sessions, bytes_total=bytes_total
-            )
+            sessions, bytes_total = await loop.run_in_executor(None, index.compute_usage)
+            msg = RecordingsUsage.make(sessions=sessions, bytes_total=bytes_total)
             await self.bus.emit(json.loads(msg.to_json()))
         except Exception:
             log.exception("recordings.usage emit failed")
@@ -1076,10 +1037,7 @@ class SessionLoop:
 
     def _live_runtime_attached(self) -> bool:
         """True when SessionLoop is acting as handlers for the full live app."""
-        return any(
-            ref is not None
-            for ref in (self.music_state, self.levels, self.playback_queue)
-        )
+        return any(ref is not None for ref in (self.music_state, self.levels, self.playback_queue))
 
     # ------------------------------------------------------------------
     # Snapshot construction
@@ -1196,9 +1154,7 @@ class SessionLoop:
             # variable emit latency. If we already overran, yield once.
             dt = time.monotonic() - t0
             try:
-                await asyncio.wait_for(
-                    self._stop.wait(), timeout=max(0.0, SNAPSHOT_INTERVAL - dt)
-                )
+                await asyncio.wait_for(self._stop.wait(), timeout=max(0.0, SNAPSHOT_INTERVAL - dt))
                 return
             except TimeoutError:
                 continue
@@ -1209,12 +1165,11 @@ class SessionLoop:
 
     async def _emit_settings_state(self) -> None:
         """Emit a full ``ipc.settings.state`` reflecting current config + ``muted``."""
-        # IN-03 in 14-REVIEW.md — round-trip mood + click_through too,
-        # so the SettingsSet enum's 10 fields can all be persisted
-        # through SettingsState. mood reads from MusicState (the live
-        # source-of-truth Plan 13-05's settings applier writes to);
-        # click_through reads from ConfigStore.extra (where Plan 13-05's
-        # _apply_click_through persists it).
+        # IN-03 in 14-REVIEW.md — round-trip extra-backed fields too,
+        # so SettingsSet fields can be persisted through SettingsState.
+        # mood reads from MusicState (the live source-of-truth Plan 13-05's
+        # settings applier writes to); extra-backed fields read from
+        # ConfigStore.extra where their SettingsApplier handlers persist them.
         mood: str | None = None
         if self.music_state is not None:
             raw_mood = getattr(self.music_state, "mood", None)
@@ -1229,24 +1184,81 @@ class SessionLoop:
         # _apply_skill persists it to ConfigStore.extra (same path as mood/
         # click_through); validate the enum here before it hits the wire.
         skill_raw = self.config_store.extra.get("skill")
-        skill: str | None = (
-            skill_raw
-            if skill_raw in ("beginner", "intermediate", "pro")
+        skill: str | None = skill_raw if skill_raw in ("beginner", "intermediate", "pro") else None
+        lens_raw = self.config_store.extra.get("lens")
+        lens: str | None = lens_raw if lens_raw in ("hype", "critique", "tutor") else None
+        # Phase 97 — round-trip the top-level mode picker through the same
+        # settings snapshot so cold boot can light the last-picked segment.
+        session_mode_raw = self.config_store.extra.get("session.mode")
+        session_mode: str | None = (
+            session_mode_raw if session_mode_raw in self._VALID_SESSION_MODES else None
+        )
+        learn_headphone_raw = self.config_store.extra.get("learn.headphone_device_index")
+        learn_headphone_device_index: int | None = (
+            learn_headphone_raw
+            if isinstance(learn_headphone_raw, int)
+            and not isinstance(learn_headphone_raw, bool)
+            and learn_headphone_raw >= 0
             else None
         )
+        defaults = ConfigStore()
+        voice = (
+            self.config_store.voice
+            if isinstance(self.config_store.voice, str) and self.config_store.voice
+            else defaults.voice
+        )
+        mode = (
+            self.config_store.mode if self.config_store.mode in ("hype", "coach") else defaults.mode
+        )
+        genre = (
+            self.config_store.genre
+            if isinstance(self.config_store.genre, str) and self.config_store.genre
+            else defaults.genre
+        )
+        raw_output_device_id = self.config_store.output_device_id
+        output_device_id = (
+            raw_output_device_id
+            if isinstance(raw_output_device_id, str) or raw_output_device_id is None
+            else None
+        )
+        output_profile = (
+            self.config_store.output_profile
+            if self.config_store.output_profile in ("hp", "spk")
+            else defaults.output_profile
+        )
+        retention_days = (
+            self.config_store.retention_days
+            if isinstance(self.config_store.retention_days, int)
+            and self.config_store.retention_days >= 0
+            else defaults.retention_days
+        )
+        push_to_mute_hotkey = (
+            self.config_store.push_to_mute_hotkey
+            if isinstance(self.config_store.push_to_mute_hotkey, str)
+            and self.config_store.push_to_mute_hotkey
+            else defaults.push_to_mute_hotkey
+        )
+        lighter_blur = (
+            self.config_store.lighter_blur
+            if isinstance(self.config_store.lighter_blur, bool)
+            else defaults.lighter_blur
+        )
         state = SettingsState.make(
-            voice=self.config_store.voice,
-            mode=self.config_store.mode,  # type: ignore[arg-type]
-            genre=self.config_store.genre,
-            output_device_id=self.config_store.output_device_id,
-            output_profile=self.config_store.output_profile,  # type: ignore[arg-type]
-            retention_days=self.config_store.retention_days,
-            push_to_mute_hotkey=self.config_store.push_to_mute_hotkey,
+            voice=voice,
+            mode=mode,  # type: ignore[arg-type]
+            genre=genre,
+            output_device_id=output_device_id,
+            output_profile=output_profile,  # type: ignore[arg-type]
+            retention_days=retention_days,
+            push_to_mute_hotkey=push_to_mute_hotkey,
             muted=self.muted,
-            lighter_blur=self.config_store.lighter_blur,
+            lighter_blur=lighter_blur,
             mood=mood,  # type: ignore[arg-type]
             click_through=click_through,
             skill=skill,  # type: ignore[arg-type]
+            lens=lens,  # type: ignore[arg-type]
+            learn_headphone_device_index=learn_headphone_device_index,
+            session_mode=session_mode,  # type: ignore[arg-type]
         )
         await self.bus.emit(json.loads(state.to_json()))
 
@@ -1296,9 +1308,7 @@ class SessionLoop:
     # WizardBus._handler also validates, so this is belt-and-suspenders
     # for the test path that bypasses the bus and calls handlers directly.
 
-    def _wrap_with_validation(
-        self, handler, original_type: str
-    ):
+    def _wrap_with_validation(self, handler, original_type: str):
         """Return a wrapper that re-validates then dispatches.
 
         Tests drive handlers directly (bypassing the bus's schema check);
@@ -1349,8 +1359,7 @@ class SessionLoop:
                 flush=True,
             )
             print(
-                "[FATAL] another vibemix process is already running; "
-                "quit it before relaunching.",
+                "[FATAL] another vibemix process is already running; quit it before relaunching.",
                 file=sys.stderr,
                 flush=True,
             )
@@ -1367,9 +1376,7 @@ class SessionLoop:
         # standalone mode without the recordings tree). Cancellation is
         # sub-second via the asyncio.wait_for race against _stop.
         if self.recordings_root is not None:
-            self._retention_task = asyncio.create_task(
-                self._periodic_retention_sweep_loop()
-            )
+            self._retention_task = asyncio.create_task(self._periodic_retention_sweep_loop())
 
         # SIGTERM (Tauri Cmd+Q) + SIGINT — same pattern as WizardLoop.
         loop = asyncio.get_running_loop()

@@ -275,12 +275,23 @@ def _deterministic_decision(
     role_pair = _role_pair_text(candidate.get("from_role"), candidate.get("to_role"))
     role_suffix = f", {role_pair}" if role_pair else ""
     loop_hold = _loop_hold_active(envelope, candidate)
+    grade_lead = _move_grade_lead(candidate)
+    care_callout = _move_grade_care_callout(candidate)
+    progress_callout = _grade_progress_callout(envelope.current)
+    callouts = tuple(bit for bit in (care_callout, progress_callout) if bit)
+    callout_prefix = f"{', '.join(callouts)}, " if callouts else ""
     if timing_text:
-        spoken = f"Next good entry: {track_short} {cue_text}{role_suffix}, {timing_text}."
+        spoken = (
+            f"{grade_lead}: {callout_prefix}{track_short} {cue_text}{role_suffix}, "
+            f"{timing_text}."
+        )
     elif loop_hold:
-        spoken = f"Next good entry: {track_short} from {cue_text}{role_suffix}, loop held."
+        spoken = (
+            f"{grade_lead}: {callout_prefix}{track_short} from {cue_text}{role_suffix}, "
+            "loop held."
+        )
     else:
-        spoken = f"Next good entry: {track_short} from {cue_text}{role_suffix}."
+        spoken = f"{grade_lead}: {callout_prefix}{track_short} from {cue_text}{role_suffix}."
     cited_claim_ids = _claim_ids_for_candidate(
         envelope,
         candidate,
@@ -313,7 +324,8 @@ def _claim_ids_for_candidate(
 ) -> tuple[str, ...]:
     candidate_id = str(candidate.get("candidate_id"))
     target_track_id = _nonempty_str(candidate.get("to_track_id"))
-    candidate_claims = {"transition_fit", "cue_slot"}
+    candidate_claims = {"transition_fit", "cue_slot", "move_grade"}
+    include_grade_progress = bool(_grade_progress_callout(envelope.current))
     if include_timing:
         candidate_claims.add("bars_until_event")
     section_claims: set[str] = set()
@@ -343,9 +355,66 @@ def _claim_ids_for_candidate(
             ids.append(str(row["claim_id"]))
         elif claim_type in section_claims and subject_id in section_ids:
             ids.append(str(row["claim_id"]))
+        elif include_grade_progress and claim_type == "grade_progress":
+            ids.append(str(row["claim_id"]))
         elif include_risk and _is_loop_hold_risk_claim(row):
             ids.append(str(row["claim_id"]))
     return tuple(ids)
+
+
+def _move_grade_lead(candidate: dict) -> str:
+    grade = candidate.get("move_grade")
+    if not isinstance(grade, dict):
+        return "Next good entry"
+    slug = _nonempty_str(grade.get("slug"))
+    label = _nonempty_str(grade.get("label"))
+    if slug in {"clean", "sexy", "bomb", "lit_aff"} and label is not None:
+        return f"Next {label} move"
+    if slug == "mid":
+        return "Next MID move"
+    if slug == "negative":
+        return "Risky move"
+    return "Next good entry"
+
+
+def _move_grade_care_callout(candidate: dict) -> str:
+    grade = candidate.get("move_grade")
+    if not isinstance(grade, dict):
+        return ""
+    slug = _nonempty_str(grade.get("slug"))
+    if slug in {"negative", "mid"}:
+        return "use care"
+    return ""
+
+
+def _grade_progress_callout(current: dict | None) -> str:
+    if not isinstance(current, dict):
+        return ""
+    progress = current.get("grade_progress")
+    if not isinstance(progress, dict) or progress.get("earned") is not True:
+        return ""
+    try:
+        streak = int(progress.get("streak"))
+    except (TypeError, ValueError):
+        return ""
+    try:
+        last_xp = int(progress.get("last_xp"))
+    except (TypeError, ValueError):
+        last_xp = 0
+    try:
+        level = int(progress.get("level"))
+    except (TypeError, ValueError):
+        level = 0
+    bits: list[str] = []
+    if progress.get("level_up") is True:
+        bits.append("level up")
+    if last_xp > 0:
+        bits.append(f"deserved +{min(999, last_xp)} xp")
+    if streak >= 2:
+        bits.append(f"combo x{min(999, streak)}")
+    if level >= 2:
+        bits.append(f"lv {min(999, level)}")
+    return ", ".join(bits)
 
 
 def _track_identity_for_candidate(envelope: AgentContextEnvelope, candidate: dict) -> str | None:

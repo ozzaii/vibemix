@@ -662,10 +662,7 @@ def build_parts_description(
         - cohost_v4.py:1791-1813 (Part assembly reference; v4 uses the
           rejected swap pattern — we deliberately diverge here).
     """
-    refrain = (
-        "Your ears are the referee — "
-        "the evidence above is grounded context."
-    )
+    refrain = "Your ears are the referee — the evidence above is grounded context."
     secs = int(audio_seconds)
 
     # Phase 80 / GROUND-01 — gated secondary-ear framing. Built ONLY when the
@@ -696,34 +693,36 @@ def build_parts_description(
         # 1-Part baseline — no mic, no lookahead. Mention only P1.
         base = (
             f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
-            f"(audience perspective). {refrain}"
+            f"(audience perspective; global mix, not isolated deck stems). {refrain}"
         )
     elif has_mic_part and not has_lookahead_part:
         # 2-Part (mic) — P1 mix + P2 mic. No "NOT YET HEARD" labeling.
         base = (
             f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
-            f"(audience perspective). P2 = your mic (last 8s, Kaan's "
-            f"literal voice). {refrain}"
+            f"(audience perspective; global mix, not isolated deck stems). "
+            f"P2 = your mic (last 8s, Kaan's literal voice; not deck audio). {refrain}"
         )
     elif not has_mic_part and has_lookahead_part:
         # 2-Part (lookahead at P2) — slot numbering stays contiguous when
         # mic is absent. Anti-prediction guard refers to Part 2.
         base = (
             f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
-            f"(audience perspective). P2 = 18s from the source file "
-            f"ending ~3s past now — NOT YET HEARD BY AUDIENCE; do NOT "
-            f"describe Part 2 as if it has played. Use it only to ground "
-            f"what you HEAR in Part 1 about to happen. {refrain}"
+            f"(audience perspective; global mix, not isolated deck stems). "
+            f"P2 = 18s from the source file ending ~3s past now — NOT YET "
+            f"HEARD BY AUDIENCE; do NOT describe Part 2 as if it has played. "
+            f"Use it only to ground what you HEAR in Part 1 about to happen; "
+            f"it is not current live deck audio. {refrain}"
         )
     else:
         # Both True — 3-Part full contract. Mic at P2, lookahead at P3.
         base = (
             f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
-            f"(audience perspective). P2 = your mic (last 8s, Kaan's literal "
-            f"voice). P3 = 18s from the source file ending ~3s past now — "
-            f"NOT YET HEARD BY AUDIENCE; do NOT describe Part 3 as if it has "
-            f"played. Use it only to ground what you HEAR in Part 1 about to "
-            f"happen. {refrain}"
+            f"(audience perspective; global mix, not isolated deck stems). "
+            f"P2 = your mic (last 8s, Kaan's literal voice; not deck audio). "
+            f"P3 = 18s from the source file ending ~3s past now — NOT YET "
+            f"HEARD BY AUDIENCE; do NOT describe Part 3 as if it has played. "
+            f"Use it only to ground what you HEAR in Part 1 about to happen; "
+            f"it is not current live deck audio. {refrain}"
         )
 
     return base + secondary_clause
@@ -790,9 +789,7 @@ def _render_taste_overlay(taste_persona_tags: tuple[str, ...] | list[str]) -> st
     """Render the taste→persona overlay from allowlisted tags. Empty if none
     resolve (defense-in-depth filter; a foreign tag is silently dropped)."""
     phrases = [
-        TASTE_PERSONA_TAG_PHRASES[t]
-        for t in taste_persona_tags
-        if t in TASTE_PERSONA_TAG_PHRASES
+        TASTE_PERSONA_TAG_PHRASES[t] for t in taste_persona_tags if t in TASTE_PERSONA_TAG_PHRASES
     ]
     if not phrases:
         return ""
@@ -871,9 +868,7 @@ def build_system_instruction(
     if mode_norm not in _VALID_MODES:
         raise ValueError(f"unknown mode {mode!r} — must be one of {sorted(_VALID_MODES)}")
     if mood not in MOOD_PERSONAS:
-        raise ValueError(
-            f"unknown mood {mood!r} — must be one of {sorted(MOOD_PERSONAS.keys())}"
-        )
+        raise ValueError(f"unknown mood {mood!r} — must be one of {sorted(MOOD_PERSONAS.keys())}")
 
     body = _CELLS[(skill_norm, mode_norm)]
 
@@ -920,9 +915,7 @@ def build_system_instruction(
     if include_tag_dsl:
         # Coach mode gets the calm-only tag set (no [excited]/[fast]) so the
         # delivery never reads as hype; hype mode keeps the full 6-tag DSL.
-        body = body + (
-            COACH_TAG_DSL_BLOCK if mode_norm == "coach" else TTS_TAG_DSL_BLOCK
-        )
+        body = body + (COACH_TAG_DSL_BLOCK if mode_norm == "coach" else TTS_TAG_DSL_BLOCK)
         # 2026-05-21 (Kaan): the LAST thing a coach reads — strongest recency.
         # Everything above is context to internalize, NOT a checklist to recite.
         # Kaan: "eqları seslendirebilir ... tam bir professional coach olmalı, ne
@@ -1007,8 +1000,7 @@ def build_curator_instruction(lens: str = "tutor") -> str:
     lens_norm = lens.lower().strip()
     if lens_norm not in _CURATOR_LENS_TO_MOOD:
         raise ValueError(
-            f"unknown lens {lens!r} — must be one of "
-            f"{sorted(_CURATOR_LENS_TO_MOOD.keys())}"
+            f"unknown lens {lens!r} — must be one of {sorted(_CURATOR_LENS_TO_MOOD.keys())}"
         )
 
     persona = MOOD_PERSONAS[_CURATOR_LENS_TO_MOOD[lens_norm]]
@@ -1085,8 +1077,6 @@ def build_lens_instruction(lens: str = "hype", skill: str = "intermediate", **kw
     """
     lens_norm = lens.lower().strip()
     if lens_norm not in LENS_TO_MODE_MOOD:
-        raise ValueError(
-            f"unknown lens {lens!r} — must be one of {sorted(LENS_TO_MODE_MOOD)}"
-        )
+        raise ValueError(f"unknown lens {lens!r} — must be one of {sorted(LENS_TO_MODE_MOOD)}")
     mode, mood = LENS_TO_MODE_MOOD[lens_norm]
     return build_system_instruction(skill, mode, mood, **kw)

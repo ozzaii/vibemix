@@ -64,6 +64,19 @@ from typing import TYPE_CHECKING, Any
 
 from vibemix.audio import AI_TALK_THRESHOLD, MIC_TALK_THRESHOLD, Levels, VoiceRecorder
 from vibemix.state import EventDetector, MusicState
+from vibemix.state.deck_context import (
+    render_audio_delta_items,
+    render_audio_window_context,
+    render_context_feed_contract,
+    render_deck_audio_context,
+    render_deck_change_context,
+    render_deck_lane_context,
+    render_deck_reference_context,
+    render_deck_source_context,
+    render_live_evidence_context,
+    render_move_context,
+    render_move_effect_context,
+)
 from vibemix.ui_bus import SessionCitation
 
 if TYPE_CHECKING:
@@ -224,6 +237,48 @@ async def coach_loop(
                     "STATE", "audible_deck", "state.audible_deck", state.audible_deck
                 )
                 tracer.note_change("STATE", "bpm", "state.bpm", round(float(state.bpm or 0.0), 1))
+                tracer.note_change(
+                    "STATE",
+                    "context_feed_contract",
+                    "state.context_feed_contract",
+                    render_context_feed_contract(state, surface="session_event"),
+                )
+                tracer.note_change(
+                    "STATE",
+                    "deck_lane_context",
+                    "state.deck_lane_context",
+                    render_deck_lane_context(state),
+                )
+                tracer.note_change(
+                    "STATE",
+                    "deck_reference_context",
+                    "state.deck_reference_context",
+                    render_deck_reference_context(state),
+                )
+                tracer.note_change(
+                    "STATE",
+                    "deck_source_context",
+                    "state.deck_source_context",
+                    render_deck_source_context(state),
+                )
+                tracer.note_change(
+                    "STATE",
+                    "deck_audio_context",
+                    "state.deck_audio_context",
+                    render_deck_audio_context(state),
+                )
+                tracer.note_change(
+                    "STATE",
+                    "audio_delta",
+                    "state.audio_delta",
+                    tuple(render_audio_delta_items(state)),
+                )
+                tracer.note_change(
+                    "STATE",
+                    "live_evidence_context",
+                    "state.live_evidence_context",
+                    render_live_evidence_context(state),
+                )
             except Exception:
                 pass
 
@@ -299,15 +354,63 @@ async def coach_loop(
                 f"track={state.audible_track!r}({state.audible_track_confidence:.1f}) "
                 f"phase={state.phase}"
             )
-            recorder.log_event(
-                "event",
-                type=tag,
-                audible=state.audible,
-                deck=state.audible_deck,
-                track=state.audible_track,
-                track_conf=round(state.audible_track_confidence, 2),
-                phase=state.phase,
+            event_payload = {
+                "type": tag,
+                "audible": state.audible,
+                "deck": state.audible_deck,
+                "track": state.audible_track,
+                "track_conf": round(state.audible_track_confidence, 2),
+                "phase": state.phase,
+            }
+            audio_delta_items = render_audio_delta_items(state)
+            moves = ev.extra.get("moves", []) if isinstance(ev.extra, dict) else []
+            context_feed_contract = render_context_feed_contract(
+                state,
+                moves,
+                surface="session_event",
             )
+            if context_feed_contract:
+                event_payload["context_feed_contract"] = context_feed_contract
+            deck_lane_context = render_deck_lane_context(state)
+            if deck_lane_context:
+                event_payload["deck_lane_context"] = deck_lane_context
+            deck_reference_context = render_deck_reference_context(state)
+            if deck_reference_context:
+                event_payload["deck_reference_context"] = deck_reference_context
+            deck_source_context = render_deck_source_context(state)
+            if deck_source_context:
+                event_payload["deck_source_context"] = deck_source_context
+            deck_audio_context = render_deck_audio_context(state)
+            if deck_audio_context:
+                event_payload["deck_audio_context"] = deck_audio_context
+            if audio_delta_items:
+                event_payload["audio_delta"] = audio_delta_items[:4]
+            if moves:
+                audio_window_context = render_audio_window_context(state, moves)
+                if audio_window_context:
+                    event_payload["audio_window_context"] = audio_window_context
+            live_evidence_context = render_live_evidence_context(
+                state,
+                moves if moves else None,
+                audio_delta_items=audio_delta_items,
+            )
+            if live_evidence_context:
+                event_payload["live_evidence_context"] = live_evidence_context
+            if moves:
+                move_context = render_move_context(state, moves)
+                deck_change_context = render_deck_change_context(state, moves)
+                move_effect_context = render_move_effect_context(
+                    state,
+                    moves,
+                    audio_delta_items=audio_delta_items,
+                )
+                if move_context:
+                    event_payload["move_context"] = move_context
+                if deck_change_context:
+                    event_payload["deck_change_context"] = deck_change_context
+                if move_effect_context:
+                    event_payload["move_effect_context"] = move_effect_context
+            recorder.log_event("event", **event_payload)
 
             if wired:
                 # ---- cancel-and-refire on stale in-flight ----

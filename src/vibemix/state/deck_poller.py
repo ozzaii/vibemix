@@ -40,10 +40,12 @@ swallows its own exception and returns last-known state — no exception escapes
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 import threading
 import time
 from dataclasses import replace
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from vibemix.state.deck_state import DeckTrack
@@ -71,6 +73,36 @@ NUMPY_CONF_FLOOR: float = 0.5  # consumed when the deferred KS estimator lands
 # (RESEARCH Spike 3, A4 — mirrors the audible_track_confidence 0.5 gate, set a
 # touch higher so only confident keys are ever citable).
 DECK_CITE_MIN_CONF: float = 0.6
+
+_NON_DECK_NOWPLAYING_BUNDLE_EXACT: frozenset[str] = frozenset(
+    {
+        "com.apple.music",
+        "com.apple.quicktimeplayerx",
+        "com.spotify.client",
+        "com.tidal.desktop",
+        "com.apple.podcasts",
+    }
+)
+_NON_DECK_NOWPLAYING_BUNDLE_PREFIXES: tuple[str, ...] = (
+    "com.apple.webkit",
+    "com.apple.safari",
+    "com.google.chrome",
+    "com.microsoft.edgemac",
+    "org.mozilla.firefox",
+)
+_DJ_NOWPLAYING_BUNDLE_HINTS: tuple[str, ...] = (
+    "rekordbox",
+    "pioneerdj",
+    "djay",
+    "algoriddim",
+    "serato",
+    "traktor",
+    "native-instruments",
+    "virtualdj",
+    "mixxx",
+    "engine",
+    "denondj",
+)
 
 
 class DeckPoller:
@@ -117,13 +149,19 @@ class DeckPoller:
         # Internal holder — the last-known resolved deck map. Empty until the
         # first successful poll. snapshot() returns COPIES of these.
         self._decks: dict[str, DeckTrack] = {}
-        # Title→track_id index, rebuilt when the library identity or track count
+        # Bounded provenance for why the deck identity ladder did/did not
+        # resolve. This is context, not proof; refresh.py copies it into
+        # MusicState.deck_state.source_status under the single-writer lock.
+        self._source_status: dict[str, str] = {}
+        # Now-playing label→track_id index, rebuilt when the library identity or track count
         # changes (read-only). Keyed on id(library)+len(tracks) so a mid-session
         # collection.xml re-import (RekordboxLibrary.load_xml overwrites
         # self.tracks in place — same object, new count) invalidates the cache
         # instead of resolving titles against a STALE map (WR-01: a stale index
         # mis-attributes track_id/key → a false-confident [track:]/[key:] cite).
-        self._title_index: dict[str, str] | None = None
+        # A value of None means the label is ambiguous across tracks and must not
+        # be used for deck identity.
+        self._title_index: dict[str, str | None] | None = None
         self._index_for_library_id: int | None = None
         self._index_track_count: int = -1
 
@@ -132,12 +170,15 @@ class DeckPoller:
     # ------------------------------------------------------------------ #
 
     def _resolve_title(self, title: str | None):
-        """Title → ``TrackEntry`` via a read-only scan of the cache-warm library.
+        """Now-playing title → ``TrackEntry`` via a read-only cache-warm index.
 
         ``RekordboxLibrary`` only exposes ``lookup_by_id``; this is the read-only
-        title→entry helper (RESEARCH §interfaces — "add a title→TrackEntry
-        resolution helper that iterates self.tracks"). Case-insensitive on the
-        title. Returns ``None`` on no library / no match. NEVER writes anything.
+        now-playing-label→entry helper. macOS ``TrackInfo`` publishes
+        ``"Artist - Title"`` when artist is available, while Rekordbox rows store
+        title and artist separately. The index therefore includes both the bare
+        title and artist-title forms, but duplicate/ambiguous labels map to
+        ``None`` so the poller abstains instead of inventing a deck identity.
+        NEVER writes anything.
         """
         if not title or self._library is None:
             return None
@@ -159,15 +200,13 @@ class DeckPoller:
             or id(self._library) != self._index_for_library_id
             or track_count != self._index_track_count
         ):
-            try:
-                self._title_index = {
-                    e.title.casefold(): tid for tid, e in tracks.items() if e.title
-                }
-            except Exception:
-                self._title_index = {}
+            self._title_index = _build_nowplaying_index(tracks)
             self._index_for_library_id = id(self._library)
             self._index_track_count = track_count
-        tid = self._title_index.get(title.casefold())
+        lookup_key = _nowplaying_index_key(title)
+        if not lookup_key:
+            return None
+        tid = self._title_index.get(lookup_key)
         if tid is None:
             return None
         try:
@@ -176,7 +215,7 @@ class DeckPoller:
             return None
 
     def _xml_decktrack(self, entry, *, confidence: float, now: float) -> DeckTrack:
-        """Build a ``rekordbox_xml``-sourced DeckTrack from a library entry.
+        """Build a library-sourced DeckTrack from a cache-warm entry.
 
         ``key`` keeps the RAW Tonality tag (``"Am"``); ``camelot`` is LEFT None
         — the single-writer normalizes it via ``harmonics.to_camelot`` inside the
@@ -194,8 +233,22 @@ class DeckPoller:
             energy=None,
             loaded_at=now,
             confidence=confidence,
-            source="rekordbox_xml",
+            source=self._library_source_name(),
         )
+
+    def _library_source_name(self) -> str:
+        """Return the honest provenance label for the loaded library cache."""
+        raw_path = getattr(self._library, "xml_path", "") if self._library is not None else ""
+        if raw_path:
+            try:
+                path = Path(str(raw_path)).expanduser()
+                if path.is_dir():
+                    return "folder_cache"
+                if path.suffix.lower() == ".xml":
+                    return "rekordbox_xml"
+            except Exception:
+                pass
+        return "rekordbox_xml"
 
     # ------------------------------------------------------------------ #
     # Poll — compose the source ladder + cross-deck suppression           #
@@ -210,14 +263,15 @@ class DeckPoller:
         """
         now = time.time()
         try:
-            decks = self._build_decks(now)
+            decks, source_status = self._build_decks(now)
         except Exception as e:  # never let a source failure escape the poller
             print(f"[deck poll err] {e}", file=sys.stderr)
             return
         with self._lock:
             self._decks = decks
+            self._source_status = source_status
 
-    def _build_decks(self, now: float) -> dict[str, DeckTrack]:
+    def _build_decks(self, now: float) -> tuple[dict[str, DeckTrack], dict[str, str]]:
         """Compose the ladder for both decks with cross-deck suppression.
 
         Step 1 — attribution: ``derive_audible_deck`` (REUSED, never hand-rolled)
@@ -232,20 +286,28 @@ class DeckPoller:
         """
         # Read the controller + nowplaying snapshots (read-only).
         cs = self._controller.deck_snapshot() if self._controller is not None else None
+        source_status: dict[str, str] = {"controller": "present" if cs is not None else "missing"}
         title = None
         if self._track_info is not None:
             tsnap = self._track_info.snapshot()
-            title = tsnap.get("title") or None
+            source_status.update(_nowplaying_source_status(tsnap))
+            if nowplaying_source_is_deck_candidate(tsnap):
+                title = tsnap.get("title") or None
+        else:
+            source_status["nowplaying"] = "unavailable"
+            source_status["nowplaying_title"] = "none"
 
         decks: dict[str, DeckTrack] = {}
 
         # Without a controller we cannot attribute a deck — honest unknown.
         if cs is None:
-            return decks
+            source_status["resolution"] = "no_controller"
+            return decks, source_status
 
         audible_deck, deck_conf = derive_audible_deck(
             cs.get("A", {}), cs.get("B", {}), cs.get("xfader", 64), cs.get("connected", False)
         )
+        source_status["audible_deck"] = str(audible_deck)
 
         # Step 2: resolve ONLY the independently-confirmed (audible) single deck.
         # "mix"/"none" are NOT a single attributable deck → suppress (no guess).
@@ -263,6 +325,16 @@ class DeckPoller:
                 # breaks the cite gate.)
                 conf = max(XML_CONF_FLOOR, min(1.0, deck_conf))
                 decks[audible_deck] = self._xml_decktrack(entry, confidence=conf, now=now)
+                source_status["resolution"] = "library_match"
+                source_status["resolved_side"] = str(audible_deck)
+            elif title:
+                source_status["resolution"] = "library_miss"
+            elif source_status.get("nowplaying") == "blocked_non_deck_owner":
+                source_status["resolution"] = "blocked_non_deck_nowplaying"
+            else:
+                source_status["resolution"] = "no_nowplaying_title"
+        else:
+            source_status["resolution"] = "no_single_attributable_deck"
 
         # The second / non-audible deck is SUPPRESSED unless an INDEPENDENT source
         # confirms it. The GATED vision leg (Plan 59-05 `deck_vision` →
@@ -279,7 +351,7 @@ class DeckPoller:
         # ``vision_enabled`` is the only step gated behind the real-screenshot eval.
         if self._vision_enabled and self._vision_reader is not None:
             self._maybe_apply_vision(decks, audible_deck, now)
-        return decks
+        return decks, source_status
 
     def _maybe_apply_vision(self, decks: dict, audible_deck, now: float) -> None:
         """Consume the GATED vision leg for any deck without an independent source.
@@ -347,6 +419,11 @@ class DeckPoller:
         with self._lock:
             return {side: replace_decktrack(dt) for side, dt in self._decks.items()}
 
+    def source_snapshot(self) -> dict[str, str]:
+        """Return bounded source-ladder provenance from the latest poll."""
+        with self._lock:
+            return dict(self._source_status)
+
     # ------------------------------------------------------------------ #
     # Cadence wrapper (mirrors TrackMacOS.run_poll_loop)                  #
     # ------------------------------------------------------------------ #
@@ -380,3 +457,97 @@ def replace_decktrack(dt: DeckTrack) -> DeckTrack:
     dataclass of immutable scalars, so ``replace(dt)`` with no overrides yields
     exactly the desired copy and stays correct as fields are added."""
     return replace(dt)
+
+
+def _nowplaying_index_key(raw: object) -> str:
+    return " ".join(str(raw or "").split()).casefold()
+
+
+def _source_status_token(raw: object, *, max_len: int = 80) -> str | None:
+    text = " ".join(str(raw or "").split()).casefold()
+    text = re.sub(r"[^a-z0-9_.:+-]+", "_", text).strip("_")
+    return text[:max_len] if text else None
+
+
+def _nowplaying_bundle(snapshot: dict) -> str | None:
+    raw_bundle = (
+        snapshot.get("client_bundle_id")
+        or snapshot.get("bundle_id")
+        or snapshot.get("source_bundle_id")
+        or snapshot.get("client")
+    )
+    return _source_status_token(raw_bundle)
+
+
+def _nowplaying_source_status(snapshot: object) -> dict[str, str]:
+    if not isinstance(snapshot, dict):
+        return {"nowplaying": "unknown_snapshot", "nowplaying_title": "none"}
+    bundle = _nowplaying_bundle(snapshot)
+    title_seen = "seen" if str(snapshot.get("title") or "").strip() else "none"
+    status = {
+        "nowplaying": "deck_candidate"
+        if nowplaying_source_is_deck_candidate(snapshot)
+        else "blocked_non_deck_owner",
+        "nowplaying_title": title_seen,
+    }
+    if bundle:
+        status["nowplaying_owner"] = bundle
+    return status
+
+
+def nowplaying_source_is_deck_candidate(snapshot: object) -> bool:
+    """Return whether an OS Now Playing snapshot is safe to attribute to a deck.
+
+    macOS Now Playing is global: a browser tab, Apple Music, or Spotify can own
+    the current title while the controller still reports a deck playing. Treat
+    those consumer-media bundles as non-deck sources so an accidental library
+    title match cannot become a citable deck identity.
+    """
+    if not isinstance(snapshot, dict):
+        return True
+    bundle = _nowplaying_bundle(snapshot) or ""
+    if not bundle:
+        return True
+    if any(hint in bundle for hint in _DJ_NOWPLAYING_BUNDLE_HINTS):
+        return True
+    if bundle in _NON_DECK_NOWPLAYING_BUNDLE_EXACT:
+        return False
+    return not any(bundle.startswith(prefix) for prefix in _NON_DECK_NOWPLAYING_BUNDLE_PREFIXES)
+
+
+def _entry_nowplaying_keys(entry) -> set[str]:
+    """Return labels that can honestly identify a cached library row."""
+    keys: set[str] = set()
+    title = " ".join(str(getattr(entry, "title", "") or "").split())
+    artist = " ".join(str(getattr(entry, "artist", "") or "").split())
+    if title:
+        keys.add(title)
+        if artist:
+            keys.add(f"{artist} - {title}")
+            keys.add(f"{artist} – {title}")
+    filepath = str(getattr(entry, "filepath", "") or "")
+    if filepath:
+        stem = Path(filepath).stem
+        if stem:
+            keys.add(stem)
+    return {key for key in (_nowplaying_index_key(label) for label in keys) if key}
+
+
+def _build_nowplaying_index(tracks: dict) -> dict[str, str | None]:
+    """Build an ambiguity-aware now-playing label index from library rows."""
+    index: dict[str, str | None] = {}
+    try:
+        items = list(tracks.items())
+    except Exception:
+        return index
+    for tid, entry in items:
+        track_id = str(getattr(entry, "track_id", tid) or tid)
+        for key in _entry_nowplaying_keys(entry):
+            existing = index.get(key)
+            if existing is None and key in index:
+                continue
+            if existing is not None and existing != track_id:
+                index[key] = None
+                continue
+            index[key] = track_id
+    return index

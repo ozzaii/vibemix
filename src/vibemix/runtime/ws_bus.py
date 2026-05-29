@@ -25,8 +25,20 @@ from typing import TYPE_CHECKING, Any, Protocol
 import jsonschema as _jsonschema
 import websockets
 
-from vibemix.audio import WS_HOST, WS_PORT, Levels
+from vibemix.audio import SILENT_RMS, WS_HOST, WS_PORT, Levels
 from vibemix.state import MusicState
+from vibemix.state.deck_context import (
+    live_evidence_packet,
+    render_audio_delta_items,
+    render_audio_part_context,
+    render_audio_window_context,
+    render_audio_window_map,
+    render_deck_audio_context,
+    render_deck_audio_separation_context,
+    render_deck_lane_context,
+    render_deck_reference_context,
+    render_deck_source_context,
+)
 from vibemix.ui_bus.validator import validate_message as _validate_outbound
 
 if TYPE_CHECKING:
@@ -52,8 +64,10 @@ class _MidiMirrorProtocol(Protocol):
     :mod:`vibemix.learn` package into this module.
     """
 
-    def drain_pending_detected(self) -> list[dict]: ...  # noqa: E704
-    def snapshot(self) -> dict | None: ...  # noqa: E704
+    def drain_pending_detected(self) -> list[dict]: ...
+
+    def snapshot(self) -> dict | None: ...
+
 
 # ---------------------------------------------------------------------------
 # ipc.session.snapshot — wired into the LIVE runtime (the real cohost).
@@ -100,6 +114,9 @@ _MIDI_EVENT_CAP: int = 64
 # a deck fault (audio-only is a valid mode; see faultInput in SessionLayout.ts).
 # A missing capture backend reports "unavailable" instead of a false green "ok".
 STATUS_EVERY_N: int = 30
+_COURSE3_CUE_CONFIDENCE_FLOOR: float = 0.7
+_COURSE3_DECK_CITE_MIN_CONF: float = 0.6
+_COURSE3_ATTRIBUTED_DECKS = frozenset({"A", "B", "mix"})
 
 
 def _probe_screen_status(screen_available: bool | None = None) -> str:
@@ -141,12 +158,31 @@ def _now_iso() -> str:
     return _impl()
 
 
+LIVE_CONTEXT_SCHEMA_VERSION = 2
+LIVE_CONTEXT_CAPABILITIES: tuple[str, ...] = (
+    "deck_state",
+    "deck_mixer",
+    "deck_lanes_context",
+    "deck_reference_context",
+    "deck_source_context",
+    "deck_source_status",
+    "deck_audio_context",
+    "deck_audio_separation_context",
+    "audio_part_context",
+    "audio_window_context",
+    "audio_window_map",
+    "audio_delta",
+    "live_evidence",
+)
+
+
 def _serialize_deck_state(state: MusicState) -> dict[str, dict[str, Any]]:
     """Read-only serialize ``MusicState.deck_state`` → flat-frame ``deck_state`` map.
 
-    Maps Phase-59 ``DeckState.decks`` → ``{side: {title, camelot, key, bpm,
-    confidence}}`` for the additive field on the flat 30Hz mascot frame (PILL-03,
-    the producer half consumed by Plan 62-04's deck-chips).
+    Maps Phase-59 ``DeckState.decks`` → ``{side: {title, track_id, camelot,
+    key, bpm, confidence, source}}`` for the additive field on the flat 30Hz
+    mascot frame (PILL-03, the producer half consumed by Plan 62-04's
+    deck-chips and Viber live grounding).
 
     Three invariants this helper exists to GUARANTEE:
 
@@ -171,6 +207,7 @@ def _serialize_deck_state(state: MusicState) -> dict[str, dict[str, Any]]:
     return {
         side: {
             "title": dt.title,
+            "track_id": dt.track_id,
             "camelot": dt.camelot,  # honest-null: None -> JSON null, never fabricated
             "key": dt.key,  # honest-null: None -> JSON null, never fabricated
             # honest-null: DeckTrack defaults bpm to 0.0 (typed-empty), NOT None.
@@ -180,9 +217,306 @@ def _serialize_deck_state(state: MusicState) -> dict[str, dict[str, Any]]:
             # `bpm = raw if raw > 0 else None` normalization below (CR-02).
             "bpm": dt.bpm if dt.bpm and dt.bpm > 0.0 else None,
             "confidence": dt.confidence,
+            # Source provenance is load-bearing for Viber/Gemini grounding:
+            # "rekordbox_xml" is an XML-backed deck row, "folder_cache" is the
+            # local folder ingest cache, "screen_vision" is the future
+            # independent panel read, and "unknown" stays honest.
+            "source": dt.source or "unknown",
         }
         for side, dt in decks.items()
     }
+
+
+_DECK_SOURCE_STATUS_KEYS: tuple[str, ...] = (
+    "controller",
+    "nowplaying",
+    "nowplaying_owner",
+    "nowplaying_title",
+    "audible_deck",
+    "resolution",
+    "resolved_side",
+)
+
+
+def _source_status_token(raw: Any) -> str | None:
+    if raw is None:
+        return None
+    text = " ".join(str(raw).split()).strip()
+    if not text:
+        return None
+    out = "".join(
+        ch if (ch.isalnum() or ch in "._:-+=@") else "_" for ch in text[:96].lower()
+    ).strip("_")
+    return out or None
+
+
+def _serialize_deck_source_status(state: MusicState) -> dict[str, str]:
+    """Read-only serialize bounded deck-source diagnostics.
+
+    This is provenance, not identity proof. It lets Viber/Gemini explain why a
+    deck is unresolved (`nowplaying=blocked_non_deck_owner`, etc.) without
+    reverse-parsing `deck_source_context[...]` or treating a browser/media-player
+    title as deck evidence.
+    """
+    status = getattr(getattr(state, "deck_state", None), "source_status", None)
+    if not isinstance(status, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key in _DECK_SOURCE_STATUS_KEYS:
+        token = _source_status_token(status.get(key))
+        if token:
+            out[key] = token
+    return out
+
+
+def _int_0_127(raw: Any, default: int) -> int:
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(127, value))
+
+
+def _serialize_deck_controls(raw: Any) -> dict[str, Any]:
+    deck = raw if isinstance(raw, dict) else {}
+    return {
+        "vol": _int_0_127(deck.get("vol"), 0),
+        "eq_low": _int_0_127(deck.get("eq_low"), 64),
+        "eq_mid": _int_0_127(deck.get("eq_mid"), 64),
+        "eq_hi": _int_0_127(deck.get("eq_hi"), 64),
+        "filter": _int_0_127(deck.get("filter"), 64),
+        "play": bool(deck.get("play", False)),
+    }
+
+
+def _serialize_deck_mixer(state: MusicState) -> dict[str, Any]:
+    """Read-only serialize per-deck mixer posture for live deck reasoning."""
+    return {
+        "connected": bool(getattr(state, "controller_connected", False)),
+        "xfader": _int_0_127(getattr(state, "xfader", 64), 64),
+        "deck_confidence": max(
+            0.0,
+            min(1.0, float(getattr(state, "deck_confidence", 0.0) or 0.0)),
+        ),
+        "A": _serialize_deck_controls(getattr(state, "deck_a", {})),
+        "B": _serialize_deck_controls(getattr(state, "deck_b", {})),
+    }
+
+
+def _serialize_audio_delta(state: MusicState) -> list[str]:
+    """Read-only serialize bounded DSP deltas for Viber live grounding."""
+    return render_audio_delta_items(state)
+
+
+def _serialize_recent_moves(state: MusicState, *, max_age_s: float = 8.0) -> list[str]:
+    """Read-only serialize recent controller labels for live move grounding."""
+    out: list[str] = []
+    for item in getattr(state, "recent_moves", []) or []:
+        if not isinstance(item, (list, tuple)) or len(item) < 2:
+            continue
+        try:
+            age = float(item[0])
+        except (TypeError, ValueError):
+            continue
+        label = str(item[1]).strip()
+        if age <= max_age_s and label:
+            out.append(" ".join(label.split())[:72])
+    return out[-6:]
+
+
+def _serialize_audio_window_context(
+    state: MusicState,
+    recent_moves: list[str] | tuple[str, ...],
+) -> str | None:
+    """Read-only serialize the time map between P1 audio and recent moves."""
+    return render_audio_window_context(state, recent_moves)
+
+
+def _serialize_audio_window_map(
+    state: MusicState,
+    recent_moves: list[str] | tuple[str, ...],
+) -> dict[str, Any] | None:
+    """Read-only serialize structured P1 old/current/future audio labels."""
+    return render_audio_window_map(state, recent_moves)
+
+
+def _serialize_live_evidence(
+    state: MusicState,
+    *,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Read-only serialize bounded evidence refs for Viber live grounding.
+
+    The payload names evidence categories only: it is not a transition verdict,
+    a skill grade, or raw audio. Viber still has to obey the claim policy.
+    """
+    return live_evidence_packet(state, audio_delta_items=audio_delta_items)
+
+
+def _course3_float(raw: Any, default: float = 0.0) -> float:
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _course3_deck_has_citable_track(state: MusicState, audible_deck: str) -> bool:
+    """True when deck-state can cite the currently audible deck's track.
+
+    Course 3 can only teach phrasing from grounded deck evidence. For A/B we
+    require that same side to clear the track confidence floor; for a crossfader
+    "mix" attribution, either deck may be the citable source. A stale row on the
+    silent side never makes a single-deck attribution look ready.
+    """
+    deck_state = getattr(state, "deck_state", None)
+    decks = getattr(deck_state, "decks", None) or {}
+    if not isinstance(decks, dict) or audible_deck not in _COURSE3_ATTRIBUTED_DECKS:
+        return False
+
+    if audible_deck in {"A", "B"}:
+        candidates = [decks.get(audible_deck)]
+    else:
+        candidates = list(decks.values())
+
+    for track in candidates:
+        if track is None or not getattr(track, "track_id", None):
+            continue
+        if _course3_float(getattr(track, "confidence", 0.0)) >= _COURSE3_DECK_CITE_MIN_CONF:
+            return True
+    return False
+
+
+def _course3_operator_action(
+    *,
+    blockers: list[str],
+    session_active: bool,
+    audio_active: bool,
+    deck_attributed: bool,
+    deck_track_citable: bool,
+    cue_ready: bool,
+) -> dict[str, Any] | None:
+    """Return one calm Course 3 action from observed lens blockers.
+
+    This is a projection of facts already serialized in ``course3_lens``. It
+    does not inspect Rekordbox settings, route devices, or proof artifacts, so
+    it cannot claim a specific BlackHole route. The richer route doctor remains
+    owned by ``learn_live_readiness.py``; the live socket only says the next
+    safe move it can prove from ``MusicState``.
+    """
+    if cue_ready or not (session_active or audio_active):
+        return None
+    blocker_set = set(blockers)
+    if "waiting_for_audio" in blocker_set:
+        return {
+            "prompt": "Press play on deck.",
+            "steps": [
+                "Route Rekordbox to the routed master audio path selected by readiness.",
+                "Load and play a real Rekordbox library track.",
+                "Raise the playing channel fader and master until the status changes.",
+            ],
+        }
+    if audio_active and not deck_attributed:
+        return {
+            "prompt": "Open one channel.",
+            "steps": [
+                "Open one deck channel so the coach can attribute deck A or B.",
+                "Keep the master up while the live lens listens.",
+            ],
+        }
+    if audio_active and deck_attributed and not deck_track_citable:
+        return {
+            "prompt": "Load a track.",
+            "steps": [
+                "Load a Rekordbox library track on the audible deck so the coach can cite it.",
+            ],
+        }
+    if "waiting_for_cue" in blocker_set:
+        return {
+            "prompt": "Keep playing.",
+            "steps": [
+                "Keep the phrase playing until cue-section lookahead locks the next phrase.",
+            ],
+        }
+    return None
+
+
+def _serialize_course3_lens(state: MusicState) -> dict[str, Any]:
+    """Read-only serialize Course 3 live-teaching lens state.
+
+    The Learn integration pass needs to prove the live audio/course lens without
+    peeking into process memory. This rides on the existing flat 30 Hz socket
+    frame, just like ``deck_state``. The source remains ``MusicState`` and the
+    single writer remains ``state_refresh_loop``; the bus is a dumb wire.
+
+    Defaults are honest-cold:
+      - ``session_active=False`` means Course 3 live coaching is not active.
+      - ``next_phrase_at=None`` and ``next_phrase_cue_id=None`` mean no citable
+        forward count-in exists.
+      - confidence is clamped into [0, 1] so malformed test doubles cannot leak
+        invalid wire values.
+      - readiness fields explain the cold path without making the UI inspect
+        unrelated flat-frame fields.
+    """
+    confidence = getattr(state, "phrase_position_confidence", 0.0)
+    try:
+        confidence_f = float(confidence)
+    except (TypeError, ValueError):
+        confidence_f = 0.0
+    confidence_f = max(0.0, min(1.0, confidence_f))
+
+    next_phrase_at = getattr(state, "next_phrase_at", None)
+    try:
+        next_phrase_at_f = float(next_phrase_at) if next_phrase_at is not None else None
+    except (TypeError, ValueError):
+        next_phrase_at_f = None
+
+    cue_id = getattr(state, "next_phrase_cue_id", None)
+    cue_id_s = str(cue_id) if cue_id else None
+    session_active = bool(getattr(state, "session_active", False))
+    audio_active = (
+        bool(getattr(state, "audible", False))
+        and _course3_float(getattr(state, "rms", 0.0)) >= SILENT_RMS
+    )
+    audible_deck = str(getattr(state, "audible_deck", "none") or "none")
+    deck_attributed = audible_deck in _COURSE3_ATTRIBUTED_DECKS
+    deck_track_citable = _course3_deck_has_citable_track(state, audible_deck)
+    cue_ready = (
+        session_active
+        and confidence_f >= _COURSE3_CUE_CONFIDENCE_FLOOR
+        and next_phrase_at_f is not None
+        and cue_id_s is not None
+    )
+    blockers: list[str] = []
+    if not audio_active:
+        blockers.append("waiting_for_audio")
+    if not deck_attributed:
+        blockers.append("waiting_for_deck")
+    if not deck_track_citable:
+        blockers.append("waiting_for_deck_track")
+    if not cue_ready:
+        blockers.append("waiting_for_cue")
+    lens = {
+        "session_active": session_active,
+        "phrase_position_confidence": confidence_f,
+        "next_phrase_at": next_phrase_at_f,
+        "next_phrase_cue_id": cue_id_s,
+        "audio_active": audio_active,
+        "deck_attributed": deck_attributed,
+        "deck_track_citable": deck_track_citable,
+        "cue_ready": cue_ready,
+        "blockers": blockers,
+    }
+    operator_action = _course3_operator_action(
+        blockers=blockers,
+        session_active=session_active,
+        audio_active=audio_active,
+        deck_attributed=deck_attributed,
+        deck_track_citable=deck_track_citable,
+        cue_ready=cue_ready,
+    )
+    if operator_action is not None:
+        lens["operator_action"] = operator_action
+    return lens
 
 
 def _validate_snapshot(msg: dict) -> None:
@@ -372,6 +706,7 @@ async def ws_broadcast(
     ipc_router: IpcRouterBus | None = None,
     screen_available: bool | None = None,
     midi_mirror: _MidiMirrorProtocol | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> None:
     """30Hz outbound mascot broadcast + inbound manual-trigger handler.
 
@@ -519,8 +854,27 @@ async def ws_broadcast(
             # at the emit boundary (BRINGUP-04). The key set / ordering / 30Hz
             # cadence are unchanged — the guard below only decides whether to
             # PUT this tick on the wire, it never reshapes a valid frame.
+            audio_delta = _serialize_audio_delta(state)
+            recent_moves = _serialize_recent_moves(state)
+            audio_window_context = _serialize_audio_window_context(state, recent_moves)
+            audio_window_map = _serialize_audio_window_map(state, recent_moves)
+            audio_part_context = render_audio_part_context(
+                audio_seconds=6.0,
+                surface="live_context",
+                p1_model_heard=False,
+            )
+            deck_lanes_context = render_deck_lane_context(state)
+            deck_reference_context = render_deck_reference_context(state)
+            deck_source_context = render_deck_source_context(state)
+            deck_audio_context = render_deck_audio_context(state)
+            deck_audio_separation_context = render_deck_audio_separation_context(
+                audio_capture_context
+            )
+            deck_source_status = _serialize_deck_source_status(state)
             mascot_frame = {
                 **levels.snapshot(),
+                "live_context_schema_version": LIVE_CONTEXT_SCHEMA_VERSION,
+                "live_context_capabilities": list(LIVE_CONTEXT_CAPABILITIES),
                 "audible": state.audible,
                 "deck": state.audible_deck,
                 "phase": state.phase,
@@ -552,6 +906,55 @@ async def ws_broadcast(
                 # PURE READ at the serialize edge; the single writer
                 # (``_tick_once``) is upstream and untouched.
                 "deck_state": _serialize_deck_state(state),
+                # Per-deck mixer posture — additive, read-only. This is the
+                # cheap controller context Viber/Gemini need to distinguish
+                # "deck A low was cut" from "a musical transition happened":
+                # deck faders/EQ/filter/play, crossfader, and attribution
+                # confidence. It is evidence only, not a quality verdict.
+                "deck_mixer": _serialize_deck_mixer(state),
+                # Structured source/provenance diagnostics, separate from deck
+                # identity. The text prompt context below is for LLM grammar;
+                # this map is for lossless UI/Viber transport and debugging.
+                **({"deck_source_status": deck_source_status} if deck_source_status else {}),
+                # Direct deck1/deck2 text maps for Viber/Gemini. These repeat
+                # the same state as deck_state/deck_mixer in a bounded prompt
+                # grammar so downstream agents do not have to infer that
+                # deck1=A/deck2=B from separate fields. They are context, not
+                # verdicts, and are omitted when the source state is cold.
+                **({"deck_lanes_context": deck_lanes_context} if deck_lanes_context else {}),
+                **(
+                    {"deck_reference_context": deck_reference_context}
+                    if deck_reference_context
+                    else {}
+                ),
+                **({"deck_source_context": deck_source_context} if deck_source_context else {}),
+                **({"deck_audio_context": deck_audio_context} if deck_audio_context else {}),
+                "deck_audio_separation_context": deck_audio_separation_context,
+                "audio_part_context": audio_part_context,
+                # Bounded DSP deltas from the existing perceive snapshot. This
+                # gives Viber/Gemini a cheap "what changed in the sound" hint
+                # around recent moves without adding another model/audio pass.
+                "audio_delta": audio_delta,
+                # Time-aligned "old/action/future" context for Viber/Gemini.
+                # This is a live timing contract, not an audio stem and not a
+                # quality verdict. Recent moves annotate it when present; cold
+                # frames still carry move_anchor=none whenever live state gives
+                # us a reference (controller, audio, deck rows, or lookahead).
+                **({"recent_moves": recent_moves} if recent_moves else {}),
+                **({"audio_window_context": audio_window_context} if audio_window_context else {}),
+                **({"audio_window_map": audio_window_map} if audio_window_map else {}),
+                # Bounded evidence keys for Viber/Gemini. These are citable
+                # categories (deck route, move scope, DSP delta, MIDI move),
+                # not quality verdicts; existing consumers can ignore them.
+                "live_evidence": _serialize_live_evidence(
+                    state,
+                    audio_delta_items=audio_delta,
+                ),
+                # Learn Course 3 live lens — additive, read-only. Lets the
+                # integration pass verify live audio/course/phrase readiness
+                # over the existing socket without inspecting process memory.
+                # Honest-cold defaults mean no citable count-in exists.
+                "course3_lens": _serialize_course3_lens(state),
             }
             # Phase (PILL next-suggestion) — additive, read-only. The pill's
             # "what's next" card reads ``next_suggestion`` = the latest grounded
@@ -591,7 +994,7 @@ async def ws_broadcast(
                 continue
             payload = json.dumps(mascot_frame)
             dead = []
-            for c in clients:
+            for c in list(clients):
                 try:
                     await c.send(payload)
                 except Exception:
@@ -657,7 +1060,7 @@ async def ws_broadcast(
                     _validate_snapshot(snap_msg)
                     snap_payload = json.dumps(snap_msg, separators=(",", ":"))
                     snap_dead = []
-                    for c in clients:
+                    for c in list(clients):
                         try:
                             await c.send(snap_payload)
                         except Exception:
@@ -685,7 +1088,7 @@ async def ws_broadcast(
                     )
                     status_payload = status_msg.to_json()
                     status_dead = []
-                    for c in clients:
+                    for c in list(clients):
                         try:
                             await c.send(status_payload)
                         except Exception:
@@ -784,7 +1187,7 @@ class WizardBus:
         _validate_outbound(msg)
         payload = json.dumps(msg, separators=(",", ":"))
         dead = []
-        for c in self._clients:
+        for c in list(self._clients):
             try:
                 await c.send(payload)
             except Exception:

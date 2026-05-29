@@ -13,11 +13,10 @@ config store. Per the 12-02-PLAN must-have:
       retention_days   → config_store.set + persist
       push_to_mute_hotkey → config_store.set + persist (Tauri rebinds)
 
-Every hook ref is **optional** — the cascade agent, event detector,
-audio core, and genre loader are wired by ``12-04`` (the glue plan).
-Until then this module accepts ``None`` for any hook and returns a
-``(False, "<reason>")`` ack so the UI can surface the missing wiring
-without crashing the loop.
+Every hook ref is **optional**. The live path wires the DSP genre loader;
+voice, output-device, and a few persona changes can still be deferred when
+their owning engine has no safe mid-session swap hook. Deferred fields persist
+and succeed so the next session boots with the selected value.
 
 Persistence rule: voice, mode, genre, output_device_id, output_profile,
 retention_days, push_to_mute_hotkey ALL persist via ``config_store``.
@@ -36,6 +35,7 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import MutableMapping
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Protocol
@@ -55,6 +55,9 @@ _VALID_MOODS: frozenset[str] = frozenset({"hype-man", "teacher", "coach"})
 # SettingsApplier must stay import-light. Keep in sync with dj_cohost.py:106.
 _VALID_SKILLS: frozenset[str] = frozenset({"beginner", "intermediate", "pro"})
 _ENV_SKILL_LEVEL = "VIBEMIX_SKILL_LEVEL"
+_VALID_MODES: frozenset[str] = frozenset({"hype", "coach"})
+_ENV_MODE = "VIBEMIX_MODE"
+_ENV_MOOD = "VIBEMIX_MOOD"
 
 # Phase 79 LENS-02 — the canonical persona-axis enum. MUST equal the keys of
 # ``vibemix.prompts.matrix.LENS_TO_MODE_MOOD`` (the single source of truth for
@@ -63,6 +66,42 @@ _ENV_SKILL_LEVEL = "VIBEMIX_SKILL_LEVEL"
 # SettingsApplier must stay import-light (same rationale as _VALID_SKILLS above).
 # Keep in sync with matrix.LENS_TO_MODE_MOOD / matrix._CURATOR_LENS_TO_MOOD.
 _VALID_LENSES: frozenset[str] = frozenset({"hype", "critique", "tutor"})
+
+
+def apply_persona_config_to_env(
+    store: ConfigStore,
+    environ: MutableMapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Seed process persona env from persisted Settings.
+
+    The live co-host resolves its prompt cell from ``VIBEMIX_SKILL_LEVEL`` /
+    ``VIBEMIX_MODE`` / ``VIBEMIX_MOOD`` at agent construction time. The Settings
+    UI persists those user choices in ``ConfigStore``; this bridge makes cold
+    boot read the same source of truth before the agent/cache are built.
+
+    Returns the values applied, which lets ``main()`` log the seed without
+    re-reading or re-validating the store.
+    """
+    import os
+
+    env = os.environ if environ is None else environ
+    applied: dict[str, str] = {}
+
+    if isinstance(store.mode, str) and store.mode in _VALID_MODES:
+        env[_ENV_MODE] = store.mode
+        applied["mode"] = store.mode
+
+    skill = store.extra.get("skill")
+    if isinstance(skill, str) and skill in _VALID_SKILLS:
+        env[_ENV_SKILL_LEVEL] = skill
+        applied["skill"] = skill
+
+    mood = store.extra.get("mood")
+    if isinstance(mood, str) and mood in _VALID_MOODS:
+        env[_ENV_MOOD] = mood
+        applied["mood"] = mood
+
+    return applied
 
 
 def read_shared_lens(
@@ -116,6 +155,54 @@ class _AudioCoreHook(Protocol):
 
 class _GenreLoaderHook(Protocol):
     def reload(self, genre: str) -> None: ...
+
+
+_GENRE_PROFILE_ALIASES: dict[str, str | None] = {
+    # Settings drawer values that do not match the profile filenames 1:1.
+    "tech-house": "house",
+    "tech_house": "house",
+    "dnb": "drum_and_bass",
+    "drum-and-bass": "drum_and_bass",
+    "hard-tek": "techno",
+    "hard_tek": "techno",
+    "hardtechno": "techno",
+    "hard-techno": "techno",
+    "trance": "psytrance",
+    # No tuned profile exists yet. Falling back to auto keeps the live loop
+    # honest instead of pinning a wrong profile.
+    "auto": None,
+    "edm-generic": None,
+    "edm_generic": None,
+    "hip-hop": None,
+    "hip_hop": None,
+    "none": None,
+    "unknown": None,
+}
+
+
+def resolve_genre_profile_name(genre: str) -> str | None:
+    """Resolve a settings/UI genre value to a real DSP profile name.
+
+    Returns ``None`` when no tuned profile exists, which deliberately re-enables
+    auto-detect instead of pretending an unrelated profile is correct.
+    """
+    normalized = genre.strip().lower()
+    from vibemix.state.genre import list_profiles
+
+    if normalized in list_profiles():
+        return normalized
+    return _GENRE_PROFILE_ALIASES.get(normalized)
+
+
+class GenreProfileLoader:
+    """Live Settings hook that applies the drawer's genre to the DSP profile."""
+
+    def reload(self, genre: str) -> None:
+        from vibemix.state.genre import set_active_profile, set_auto_enabled
+
+        profile_name = resolve_genre_profile_name(genre)
+        set_active_profile(profile_name)
+        set_auto_enabled(profile_name is None)
 
 
 class _MusicStateHook(Protocol):
@@ -258,8 +345,11 @@ class SettingsApplier:
         return (True, None)
 
     async def _apply_mode(self, value: Any) -> tuple[bool, str | None]:
-        if value not in ("hype", "coach"):
+        if value not in _VALID_MODES:
             return (False, f"mode must be 'hype' or 'coach', got {value!r}")
+        import os
+
+        os.environ[_ENV_MODE] = value
         if self.event_detector is None:
             # No live set_mode hook in the LiveKit path. Persist + succeed
             # (deferred-live, like _apply_genre) so the control sticks and the
@@ -649,4 +739,10 @@ class SettingsApplier:
 _ = asdict
 
 
-__all__ = ["GENRE_OVERLAY_S", "SettingsApplier"]
+__all__ = [
+    "GENRE_OVERLAY_S",
+    "GenreProfileLoader",
+    "SettingsApplier",
+    "apply_persona_config_to_env",
+    "resolve_genre_profile_name",
+]

@@ -74,16 +74,17 @@ class CuePoint:
     """A single Rekordbox cue / loop / fade / load marker.
 
     Field set is the union of ``pyrekordbox.rbxml.PositionMark`` attributes
-    relevant to vibemix's grounding grammar. ``end_s`` is set ONLY when
-    ``type == "loop"``; for any other type the source XML has no End
-    attribute and we record ``None``.
+    relevant to vibemix's grounding grammar, plus materialized source metadata
+    from offline structure such as Rekordbox ANLZ.
     """
 
     name: str  # PositionMark.Name; "" when unlabeled
     type: str  # one of: "cue" | "loop" | "fadein" | "fadeout" | "load"
     start_s: float  # PositionMark.Start in seconds
-    end_s: float | None  # PositionMark.End (loop only); None otherwise
+    end_s: float | None  # PositionMark.End, loop end, or materialized section end
     number: int  # Num — 1..8 for hot cues, -1 for memory cues
+    source: str = "dj"  # "dj" for XML cues, "anlz"/"auto" for materialized structure
+    confidence: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,7 +163,7 @@ class RekordboxLibrary:
         Source path of the most recent successful load. ``""`` before load.
     """
 
-    SCHEMA_VERSION: int = 2  # bumped in Plan 89-02 (TrackEntry shape widened)
+    SCHEMA_VERSION: int = 3  # bumped in sweep: CuePoint source/confidence widened
     STALE_AGE_DAYS: int = 30
 
     # Class attribute (NOT a default arg) so tests can monkeypatch the
@@ -271,7 +272,7 @@ class RekordboxLibrary:
             return None
         if not isinstance(blob, _CacheBlob):
             return None
-        if blob.version not in (1, self.SCHEMA_VERSION):
+        if blob.version not in (1, 2, self.SCHEMA_VERSION):
             return None
         # Mtime check: if the XML file on disk is NEWER than the cache,
         # the cache is stale — fall through.
@@ -358,7 +359,7 @@ def _coerce_cache_tracks(tracks: dict[str, Any]) -> dict[str, TrackEntry]:
             bpm=_coerce_float(getattr(entry, "bpm", 0.0), default=0.0),
             key=str(getattr(entry, "key", "") or ""),
             duration_s=_coerce_float(getattr(entry, "duration_s", 0.0), default=0.0),
-            cues=tuple(getattr(entry, "cues", ()) or ()),
+            cues=_coerce_cue_points(getattr(entry, "cues", ()) or ()),
             filepath=str(getattr(entry, "filepath", "") or ""),
             genre=str(getattr(entry, "genre", "") or ""),
             label=str(getattr(entry, "label", "") or ""),
@@ -369,6 +370,32 @@ def _coerce_cache_tracks(tracks: dict[str, Any]) -> dict[str, TrackEntry]:
             beatgrid=tuple(getattr(entry, "beatgrid", ()) or ()),
         )
     return out
+
+
+def _coerce_cue_points(cues: Any) -> tuple[CuePoint, ...]:
+    """Normalize cue rows across cache schema bumps."""
+    out: list[CuePoint] = []
+    for cue in cues or ():
+        out.append(
+            CuePoint(
+                name=str(getattr(cue, "name", "") or ""),
+                type=str(getattr(cue, "type", "cue") or "cue"),
+                start_s=_coerce_float(getattr(cue, "start_s", 0.0), default=0.0),
+                end_s=(
+                    _coerce_float(getattr(cue, "end_s", None), default=0.0)
+                    if getattr(cue, "end_s", None) is not None
+                    else None
+                ),
+                number=_coerce_int(getattr(cue, "number", -1), default=-1),
+                source=str(getattr(cue, "source", "dj") or "dj"),
+                confidence=(
+                    _coerce_float(getattr(cue, "confidence", None), default=0.0)
+                    if getattr(cue, "confidence", None) is not None
+                    else None
+                ),
+            )
+        )
+    return tuple(out)
 
 
 def _track_to_entry(track: Any) -> TrackEntry:

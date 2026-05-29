@@ -10,7 +10,7 @@ constants live in ``vibemix.midi.profiles/<id>.json`` and are loaded into
 What's preserved byte-equivalently from v4:
 - ``_knob_label`` 6-tier mapping (v4:601-607).
 - ``_xfader_label`` 5-tier mapping (v4:610-615).
-- ``deck_snapshot()`` shape: ``{deck_letter: {vol/eq/filter/tempo/play/cue/jog_touched}, xfader, connected}``.
+- ``deck_snapshot()`` shape: ``{deck_letter: {vol/eq/filter/tempo/jog/play/cue/jog_touched}, xfader, connected}``.
 - ``moves_since(t)`` output: ``[(seconds_ago_rounded_to_0.1, label), ...]``.
 - The dedup-within-400ms collapse (v4:646-648).
 - The 12s ring trim (v4:650-652).
@@ -24,8 +24,9 @@ What's new in Wave 1 (additive — moves ring is byte-equivalent):
   direction). For ``axis='unipolar'``: ``mag = (v - prev) / 127`` (signed
   delta — surface direction-of-twist for Coach prompts; ``abs(mag)`` is in
   ``[0, 1]`` by convention). For ``axis='bipolar'``: ``mag = (v - 64) / 63``
-  (signed absolute position from center). Buttons emit MidiEvent with
-  ``magnitude=None``.
+  (signed absolute position from center). For ``axis='relative'``: any non-center
+  tick emits ``+1.0`` or ``-1.0`` so jog nudges are observable as events, not
+  tiny fake absolute positions. Buttons emit MidiEvent with ``magnitude=None``.
 - ``events_since(t)`` symmetric to ``moves_since(t)`` returning ``list[MidiEvent]``.
 
 Threading: ``threading.Lock`` protects ``deck`` / ``xfader`` / ``_moves`` /
@@ -103,7 +104,8 @@ class MidiEvent:
         value_raw: 0..127 raw MIDI value (CC value or note velocity).
         magnitude: signed unit-interval delta. Set for ``kind='cc'``:
             unipolar = ``(v - prev) / 127`` (signed); bipolar = ``(v - 64) / 63``
-            (signed-from-center). None for buttons + jog_touch.
+            (signed-from-center); relative = ``+1.0`` / ``-1.0`` for encoder
+            ticks. None for buttons + jog_touch.
     """
 
     id: int
@@ -145,7 +147,9 @@ class ControllerState:
 
         # Per-deck dict — keys derive from profile.decks (FLX4 → A,B; future
         # 4-deck profiles → A,B,C,D). Defaults match v4: vol=0, EQ/filter/tempo=64,
-        # play/cue/jog_touched=False.
+        # play/cue/jog_touched=False. `jog` is an event-like pulse baseline:
+        # relative jog-wheel CCs reset here and MidiMirror overlays a one-frame
+        # 127 pulse from the typed-event ring when a real tick arrives.
         self.deck: dict[str, dict] = {
             d: {
                 "vol": 0,
@@ -154,6 +158,7 @@ class ControllerState:
                 "eq_hi": 64,
                 "filter": 64,
                 "tempo": 64,
+                "jog": 0,
                 "play": False,
                 "cue": False,
                 "jog_touched": False,
@@ -268,6 +273,8 @@ class ControllerState:
 
         - unipolar: ``(v - prev) / 127`` — signed delta surfaces direction.
         - bipolar: ``(v - 64) / 63`` — signed absolute position from center.
+        - relative: non-center encoder ticks become a signed full-strength
+          event; the deck snapshot keeps a neutral pulse baseline.
 
         Both clamped to ``[-1.0, 1.0]``.
         """
@@ -275,6 +282,11 @@ class ControllerState:
             mag = (v - prev) / 127.0
         elif axis == "bipolar":
             mag = (v - 64) / 63.0
+        elif axis == "relative":
+            if v == 64:
+                mag = 0.0
+            else:
+                mag = 1.0 if v > 64 else -1.0
         else:
             mag = 0.0
         return _clamp(mag, -1.0, 1.0)
@@ -320,10 +332,16 @@ class ControllerState:
                         )
                     else:
                         prev = self.deck[deck][field]
-                        self.deck[deck][field] = v
+                        if binding.axis == "relative":
+                            self.deck[deck][field] = 0
+                        else:
+                            self.deck[deck][field] = v
                         abs_d = abs(v - prev)
                         mag_label = "small" if abs_d < 15 else ("medium" if abs_d < 40 else "big")
-                        if field in ("vol", "tempo"):
+                        if field == "jog" and binding.axis == "relative" and v != 64:
+                            direction = "forward" if v > 64 else "back"
+                            self._record_move(f"{deck}_jog nudge {direction}", now)
+                        elif field in ("vol", "tempo"):
                             if abs_d > 15:
                                 direction = "up" if v > prev else "down"
                                 self._record_move(f"{deck}_{field} {direction} ({mag_label})", now)

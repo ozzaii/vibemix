@@ -44,6 +44,7 @@ import subprocess
 import tempfile
 import urllib.parse
 from collections.abc import Callable, Iterable
+from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
@@ -52,7 +53,7 @@ import numpy as np
 from vibemix.library.cache_paths import CLAP_EMBED_CACHE_DB_PATH
 from vibemix.library.excerpt import anchors_for_track, cut_windows
 from vibemix.library.folder_ingest import IngestReport, _write_library_cache
-from vibemix.library.rekordbox import TrackEntry
+from vibemix.library.rekordbox import CuePoint, TrackEntry
 from vibemix.library.section_builder import sections_for_entry
 from vibemix.library.section_vectors import (
     SECTION_VECTOR_CACHE_VERSION,
@@ -232,6 +233,49 @@ def _cue_strategy_tag_for_anlz(meta: object | None) -> str:
     if meta is None:
         return INGEST_CUE_STRATEGY_VERSION
     return f"{INGEST_CUE_STRATEGY_VERSION}:meta:{_anlz_meta_fingerprint(meta)}"
+
+
+def _materialize_anlz_cues(track: TrackEntry, meta: object | None) -> TrackEntry:
+    """Persist matched ANLZ phrases as provenance-tagged cue records.
+
+    The embed path already consumes ANLZ anchors, but the live pill later reads
+    only the cached TrackEntry. Materializing matched structure here keeps
+    section scoring grounded after restart while preserving DJ-authored cues as
+    the higher-trust source.
+    """
+    if meta is None:
+        return track
+    if any(cue.type in {"cue", "loop"} for cue in track.cues or ()):
+        return track
+    try:
+        from vibemix.library.anlz_ingest import anchors_from_anlz
+
+        anchors = anchors_from_anlz(track, meta, max_cues=8)
+    except Exception as e:
+        logger.warning(
+            "[ingest] ANLZ cue materialization failed for %s (%s); keeping track cues.",
+            track.track_id,
+            e,
+        )
+        return track
+    cues: list[CuePoint] = []
+    for index, anchor in enumerate(anchors[:8]):
+        if anchor.source != "anlz":
+            continue
+        cues.append(
+            CuePoint(
+                name=str(anchor.label).upper(),
+                type="cue",
+                start_s=float(anchor.start_s),
+                end_s=float(anchor.end_s),
+                number=index,
+                source="anlz",
+                confidence=float(anchor.confidence),
+            )
+        )
+    if not cues:
+        return track
+    return replace(track, cues=tuple(cues))
 
 
 def _anlz_meta_fingerprint(meta: object) -> str:
@@ -602,22 +646,23 @@ def ingest_source(
                 report.failures.append((str(local), f"unreadable: {e}"))
                 _emit(progress, idx, "err", label)
                 continue
+            working_track = _materialize_anlz_cues(track, anlz_meta)
 
             cached = _cache_get(cache, key)
             if cached is not None:
                 if not dim_reconciled:
                     _reconcile_store_dim(store, int(cached.shape[0]))
                     dim_reconciled = True
-                store.add_batch([(track.track_id, cached.astype(np.float32))])
+                store.add_batch([(working_track.track_id, cached.astype(np.float32))])
                 _ensure_section_vectors_for_track(
-                    track,
+                    working_track,
                     local,
                     embedder,
                     section_cache,
                     track_cache_key=key,
                     backend_tag=backend_tag,
                 )
-                handled[track.track_id] = track
+                handled[working_track.track_id] = working_track
                 report.skipped_cached += 1
                 _emit(progress, idx, "skip", label)
                 continue
@@ -627,7 +672,7 @@ def ingest_source(
             # file never aborts the run.
             try:
                 vec = _embed_track_cue_anchored(
-                    track,
+                    working_track,
                     local,
                     embedder,
                     anlz_index=anlz_index,
@@ -646,16 +691,16 @@ def ingest_source(
 
             # Honest store: only a real vector lands. Cache AFTER a clean embed.
             _cache_put(cache, key, vec)
-            store.add_batch([(track.track_id, vec)])
+            store.add_batch([(working_track.track_id, vec)])
             _ensure_section_vectors_for_track(
-                track,
+                working_track,
                 local,
                 embedder,
                 section_cache,
                 track_cache_key=key,
                 backend_tag=backend_tag,
             )
-            handled[track.track_id] = track
+            handled[working_track.track_id] = working_track
             report.embedded += 1
             _emit(progress, idx, "ok", label)
     finally:

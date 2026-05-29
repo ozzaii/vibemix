@@ -946,6 +946,11 @@ async def main() -> None:
             flush=True,
         )
         sys.exit(3)
+    audio_capture_context = audio_backend.describe_capture_input(
+        input_idx,
+        requested_device=INPUT_DEVICE,
+        opened_channels=2,
+    )
 
     # AI-voice / passthrough OUTPUT: resolve with graceful fallback so a brand-
     # new user on ANY Mac boots. Prefer the wizard-persisted output_device_id
@@ -1146,6 +1151,7 @@ async def main() -> None:
     citation_linter = CitationLinter() if citation_lint_enabled else None
     stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
     print(f"-> citation lint: {'on' if citation_lint_enabled else 'off (VIBEMIX_CITATION_LINT)'}")
+
     def _citation_telemetry() -> dict:
         """Closure invoked by ``coach_loop``'s publish gate every
         ``CITATION_PUBLISH_INTERVAL_S`` (2.0s). Reads fresh from the
@@ -1750,9 +1756,7 @@ async def main() -> None:
                     print(f"-> staleness action rejected: {_e}", file=sys.stderr)
 
             ipc_router.register_handler("ipc.library.import", _on_library_import)
-            ipc_router.register_handler(
-                "ipc.library.import_cancel", _on_library_import_cancel
-            )
+            ipc_router.register_handler("ipc.library.import_cancel", _on_library_import_cancel)
             ipc_router.register_handler(
                 "ipc.library.staleness_action", _on_library_staleness_action
             )
@@ -1844,6 +1848,16 @@ async def main() -> None:
     _learn_state = LearnState()
     _learn_progress, _learn_was_recovered = _load_progress()
     _lesson_ipc_adapter = _LessonRuntimeIpcAdapter(ipc_router)
+
+    def _learn_session_event(kind: str, fields: dict[str, Any]) -> None:
+        try:
+            recorder.log_event(kind, **fields)
+        except Exception as _learn_log_exc:  # pragma: no cover — defensive
+            print(
+                f"[learn boot] session event log failed: {_learn_log_exc!r}",
+                file=sys.stderr,
+            )
+
     lesson_runtime = LessonRuntime(
         learn_state=_learn_state,
         midi_mirror=midi_mirror,
@@ -1853,6 +1867,7 @@ async def main() -> None:
         evidence_registry=evidence_registry,
         evidence_clock=lambda: state.set_seconds,
         prepared_pool_loader=_load_latest_prepared_pool,
+        session_event_logger=_learn_session_event,
     )
     print("-> lesson_runtime wired", file=sys.stderr)
 
@@ -2010,6 +2025,7 @@ async def main() -> None:
             ipc_router=ipc_router,
             screen_available=screen_macos.is_available(),
             midi_mirror=midi_mirror,
+            audio_capture_context=audio_capture_context,
         )
     )
     # Phase 92 (LESSON-01) — drive LessonRuntime's 1 Hz tick_loop
@@ -2403,6 +2419,19 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         help='prior turns as JSON: [{"role":"you"|"viber","text":...}, ...]',
     )
     sp_chat.add_argument(
+        "--live-context",
+        default=None,
+        help="bounded live deck context JSON from the app socket (optional)",
+    )
+    sp_chat.add_argument(
+        "--live-context-file",
+        default=None,
+        help=(
+            "read live deck context JSON from a file; accepts either a raw "
+            "context dict or a `library live-context --out` proof artifact"
+        ),
+    )
+    sp_chat.add_argument(
         "--backend",
         choices=("codex",),
         default="codex",
@@ -2414,6 +2443,86 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_chat.add_argument("--json", action="store_true")
     sp_chat.set_defaults(func=_cmd_library_chat)
+
+    sp_live_context = sub.add_parser(
+        "live-context",
+        help="Sample the running app socket and show the live context Viber would receive",
+        description=(
+            "Connects to the existing 127.0.0.1:8765 app socket, samples flat "
+            "deck frames plus ipc.session.snapshot MIDI events, and renders the "
+            "bounded deck/control/claim-policy packet passed to Viber chat. "
+            "No model call, no Rekordbox database read."
+        ),
+    )
+    sp_live_context.add_argument(
+        "--timeout",
+        type=float,
+        default=1.5,
+        help="seconds to sample the running socket (default 1.5)",
+    )
+    sp_live_context.add_argument(
+        "--frames",
+        type=int,
+        default=90,
+        help="maximum websocket frames to inspect (default 90)",
+    )
+    sp_live_context.add_argument(
+        "--require-proof",
+        action="store_true",
+        help=(
+            "exit non-zero unless live deck/controller/audio/evidence proof is "
+            "present; useful during physical DJ verification"
+        ),
+    )
+    sp_live_context.add_argument(
+        "--wait-ready",
+        type=float,
+        default=0.0,
+        help=(
+            "keep resampling for this many seconds until --require-proof is "
+            "ready; implies --require-proof (default 0)"
+        ),
+    )
+    sp_live_context.add_argument(
+        "--interval",
+        type=float,
+        default=1.0,
+        help="seconds between --wait-ready proof attempts (default 1.0)",
+    )
+    sp_live_context.add_argument(
+        "--out",
+        default=None,
+        help="write the full bounded live-context proof packet to this JSON file",
+    )
+    sp_live_context.add_argument("--json", action="store_true")
+    sp_live_context.set_defaults(func=_cmd_library_live_context)
+
+    sp_verify_live_reply = sub.add_parser(
+        "verify-live-reply",
+        help="Verify a Viber reply against a captured live-context proof packet",
+        description=(
+            "Deterministically checks whether a Viber reply would violate the "
+            "same live deck/audio claim guard used after Codex speaks. Use this "
+            "after `library live-context --out` and `library chat --json`."
+        ),
+    )
+    sp_verify_live_reply.add_argument(
+        "--live-context-file",
+        required=True,
+        help="raw live-context JSON or `library live-context --out` proof artifact",
+    )
+    sp_verify_live_reply.add_argument(
+        "--chat-result-file",
+        default=None,
+        help="JSON output from `library chat --json`; extracts reply and move_grades",
+    )
+    sp_verify_live_reply.add_argument(
+        "--reply",
+        default=None,
+        help="reply text to verify when --chat-result-file is not provided",
+    )
+    sp_verify_live_reply.add_argument("--json", action="store_true")
+    sp_verify_live_reply.set_defaults(func=_cmd_library_verify_live_reply)
 
     # Vibe Mix engine — export a saved JSON set to Rekordbox XML
     sp_export_set = sub.add_parser(
@@ -2495,6 +2604,19 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         help=argparse.SUPPRESS,
     )
     sp_models.set_defaults(func=_cmd_library_models)
+
+    sp_doctor = sub.add_parser(
+        "doctor",
+        help="Live capability self-check: which grounded tools actually work",
+        description=(
+            "Probe each capability against the real environment (CLAP runtime + "
+            "model, library cache, vector store, dj-knowledge store dim, "
+            "web-search key, cue-export deps, Codex CLI) and report ok/not-ok "
+            "with the exact fix. Tells a stale build apart from a real breakage."
+        ),
+    )
+    sp_doctor.add_argument("--json", action="store_true")
+    sp_doctor.set_defaults(func=_cmd_library_doctor)
 
     # Phase 89 Plan 01 — ingest: auto-detect a DJ library + embed it on-device.
     sp_ingest = sub.add_parser(
@@ -2852,6 +2974,46 @@ def _cmd_library_curate(args: argparse.Namespace) -> int:
     return _cmd_library_curate_codex(args, lib)
 
 
+def _viber_live_context_from_json_payload(payload: Any) -> dict[str, Any] | None:
+    """Extract Viber live context from raw JSON or a live-context proof artifact."""
+    if not isinstance(payload, dict):
+        return None
+    nested = payload.get("live_context")
+    if isinstance(nested, dict):
+        return nested
+    return payload
+
+
+def _load_viber_live_context_file(path_raw: str) -> dict[str, Any]:
+    import json as _json
+
+    path = Path(path_raw).expanduser()
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    context = _viber_live_context_from_json_payload(payload)
+    if not context:
+        raise ValueError("file did not contain a live-context object")
+    return context
+
+
+def _load_json_file(path_raw: str) -> Any:
+    import json as _json
+
+    return _json.loads(Path(path_raw).expanduser().read_text(encoding="utf-8"))
+
+
+def _viber_reply_from_chat_payload(payload: Any) -> tuple[str, list[dict[str, Any]]]:
+    if not isinstance(payload, dict):
+        raise ValueError("chat result file did not contain a JSON object")
+    reply = str(payload.get("reply") or "").strip()
+    raw_grades = payload.get("move_grades")
+    grades = (
+        [item for item in raw_grades if isinstance(item, dict)]
+        if isinstance(raw_grades, list)
+        else []
+    )
+    return reply, grades
+
+
 def _cmd_library_chat(args: argparse.Namespace) -> int:
     """Viber chat — one conversational, tool-using co-host turn → JSON.
 
@@ -2877,6 +3039,31 @@ def _cmd_library_chat(args: argparse.Namespace) -> int:
         except (ValueError, TypeError):
             history = None  # malformed history degrades to a fresh turn
 
+    live_context = None
+    if getattr(args, "live_context", None):
+        try:
+            parsed_context = _json.loads(args.live_context)
+            live_context = _viber_live_context_from_json_payload(parsed_context)
+        except (ValueError, TypeError):
+            live_context = None  # malformed live context degrades to no live hint
+    if getattr(args, "live_context_file", None):
+        try:
+            live_context = _load_viber_live_context_file(str(args.live_context_file))
+        except (OSError, ValueError, TypeError, _json.JSONDecodeError) as exc:
+            print(
+                _json.dumps(
+                    {
+                        "reply": f"Could not read live context file: {exc}",
+                        "stop_reason": "live_context_file_error",
+                        "tool_trace": [],
+                        "playlist": None,
+                        "export_path": None,
+                    }
+                ),
+                file=sys.stderr,
+            )
+            return 1
+
     backend = getattr(args, "backend", "codex")
     if backend != "codex":
         print(
@@ -2900,13 +3087,1177 @@ def _cmd_library_chat(args: argparse.Namespace) -> int:
     # grounded tools; the library is read-only for result-boundary grounding.
     from vibemix.library.codex_curate import chat_with_codex
 
-    result = chat_with_codex(args.message, lib, history=history)
+    result = chat_with_codex(args.message, lib, history=history, live_context=live_context)
     _json.dump(result.to_dict(), sys.stdout, indent=2)
     sys.stdout.write("\n")
     print(
         f"-> viber chat [codex] ({len(result.tools_used)} tools, stop={result.stop_reason})",
         file=sys.stderr,
     )
+    return 0
+
+
+def _cmd_library_verify_live_reply(args: argparse.Namespace) -> int:
+    import json as _json
+
+    try:
+        proof_payload = _load_json_file(str(args.live_context_file))
+        live_context = _viber_live_context_from_json_payload(proof_payload)
+        if not live_context:
+            raise ValueError("live context file did not contain a live-context object")
+    except (OSError, ValueError, TypeError, _json.JSONDecodeError) as exc:
+        result = {
+            "ok": False,
+            "violations": ["live_context_file_error"],
+            "error": str(exc),
+        }
+        _json.dump(result, sys.stdout if getattr(args, "json", False) else sys.stderr, indent=2)
+        sys.stdout.write("\n") if getattr(args, "json", False) else sys.stderr.write("\n")
+        return 1
+
+    reply = str(getattr(args, "reply", "") or "").strip()
+    move_grades: list[dict[str, Any]] = []
+    if getattr(args, "chat_result_file", None):
+        try:
+            reply, move_grades = _viber_reply_from_chat_payload(
+                _load_json_file(str(args.chat_result_file))
+            )
+        except (OSError, ValueError, TypeError, _json.JSONDecodeError) as exc:
+            result = {
+                "ok": False,
+                "violations": ["chat_result_file_error"],
+                "error": str(exc),
+            }
+            _json.dump(
+                result,
+                sys.stdout if getattr(args, "json", False) else sys.stderr,
+                indent=2,
+            )
+            sys.stdout.write("\n") if getattr(args, "json", False) else sys.stderr.write("\n")
+            return 1
+
+    from vibemix.library.codex_curate import verify_live_reply_for_viber
+
+    result = verify_live_reply_for_viber(reply, live_context, move_grades=move_grades)
+    proof_ready: bool | None = None
+    if isinstance(proof_payload, dict) and isinstance(proof_payload.get("readiness"), dict):
+        proof_ready = bool(proof_payload["readiness"].get("ready"))
+        if not proof_ready:
+            result = {
+                **result,
+                "ok": False,
+                "violations": [*result.get("violations", []), "proof_not_ready"],
+            }
+    result = {
+        **result,
+        "proof_ready": proof_ready,
+        "live_context_file": str(Path(str(args.live_context_file)).expanduser()),
+        "chat_result_file": (
+            str(Path(str(args.chat_result_file)).expanduser())
+            if getattr(args, "chat_result_file", None)
+            else None
+        ),
+    }
+    if getattr(args, "json", False):
+        _json.dump(result, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+    elif result["ok"]:
+        print("live reply verification: ok")
+    else:
+        print("live reply verification failed:", file=sys.stderr)
+        for violation in result.get("violations", []):
+            print(f"- {violation}", file=sys.stderr)
+        corrected = result.get("corrected_reply")
+        if corrected:
+            print(f"corrected reply: {corrected}", file=sys.stderr)
+    return 0 if result["ok"] else 1
+
+
+def _session_snapshot_recent_moves(frame: dict[str, Any], *, cap: int = 6) -> list[str]:
+    payload = frame.get("payload") if isinstance(frame.get("payload"), dict) else frame
+    events = payload.get("midi_events") if isinstance(payload, dict) else None
+    if not isinstance(events, list):
+        return []
+    moves: list[str] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        control = str(event.get("control") or "").strip()
+        if control:
+            moves.append(" ".join(control.split())[:72])
+    return moves[-cap:]
+
+
+_VIBER_LIVE_AUDIO_FLOOR: float = 0.012
+_VIBER_LIVE_DECK_CONF_FLOOR: float = 0.3
+_VIBER_LIVE_DECK_SOURCES: frozenset[str] = frozenset(
+    {
+        "rekordbox_xml",
+        "folder_cache",
+        "screen_vision",
+        "numpy_key",
+        "nowplaying",
+    }
+)
+_VIBER_LIVE_EVIDENCE_CAP: int = 8
+_VIBER_LIVE_MIDI_EVIDENCE_CAP: int = 4
+_VIBER_LIVE_CONTEXT_SCHEMA_VERSION: int = 2
+_VIBER_LIVE_CONTEXT_REQUIRED_CAPABILITIES: frozenset[str] = frozenset(
+    {
+        "audio_part_context",
+        "deck_audio_separation_context",
+        "deck_source_status",
+        "audio_window_map",
+        "audio_delta",
+        "live_evidence",
+    }
+)
+
+
+def _file_probe(path: Path) -> dict[str, Any]:
+    out: dict[str, Any] = {"path": str(path), "exists": path.exists()}
+    if not out["exists"]:
+        return out
+    try:
+        st = path.stat()
+        out["size"] = st.st_size
+        out["mtime"] = st.st_mtime
+    except OSError:
+        pass
+    return out
+
+
+def _rekordbox_event_probe(path: Path) -> dict[str, Any]:
+    out = _file_probe(path)
+    if not out.get("exists"):
+        return out
+    try:
+        import xml.etree.ElementTree as ET
+
+        root = ET.parse(path).getroot()
+        count = int(str(root.attrib.get("event_item_count") or "0"))
+        controller_count = int(str(root.attrib.get("event_controller_item_count") or "0"))
+        out["event_item_count"] = max(0, count)
+        out["event_controller_item_count"] = max(0, controller_count)
+        out["has_live_deck_payload"] = bool(count or controller_count)
+    except Exception:
+        out["has_live_deck_payload"] = False
+    return out
+
+
+def _library_cache_probe() -> dict[str, Any]:
+    lib = RekordboxLibrary()
+    cache_path = lib.CACHE_PATH
+    out = _file_probe(cache_path)
+    out["loaded"] = False
+    out["track_count"] = 0
+    out["source_type"] = "missing"
+    if not out.get("exists"):
+        return out
+    try:
+        loaded = lib.try_load_cache()
+    except Exception:
+        loaded = False
+    out["loaded"] = bool(loaded)
+    if not loaded:
+        out["source_type"] = "unreadable"
+        return out
+    out["track_count"] = len(lib.tracks)
+    source_path = Path(lib.xml_path).expanduser() if lib.xml_path else None
+    if source_path is not None:
+        out["source_path"] = str(source_path)
+        if source_path.is_dir():
+            out["source_type"] = "folder_cache"
+        elif source_path.suffix.lower() == ".xml":
+            out["source_type"] = "rekordbox_xml"
+        else:
+            out["source_type"] = "unknown_cache_source"
+    return out
+
+
+def _nowplaying_probe() -> dict[str, Any]:
+    """Return the current OS Now Playing source without artwork payloads."""
+    import json as _json
+    import shutil as _shutil
+    import subprocess as _subprocess
+
+    cli = _shutil.which("nowplaying-cli") or "/opt/homebrew/bin/nowplaying-cli"
+    out: dict[str, Any] = {"cli": cli, "available": Path(cli).exists()}
+    if not out["available"]:
+        return out
+    try:
+        lines = (
+            _subprocess.check_output(
+                [cli, "get", "title", "artist"],
+                timeout=1.5,
+                stderr=_subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+            .splitlines()
+        )
+        title = lines[0].strip() if len(lines) > 0 else ""
+        artist = lines[1].strip() if len(lines) > 1 else ""
+        if title:
+            out["title"] = title[:160]
+        if artist:
+            out["artist"] = artist[:120]
+    except Exception as exc:
+        out["title_error"] = type(exc).__name__
+    try:
+        raw = _json.loads(
+            _subprocess.check_output(
+                [cli, "get-raw"],
+                timeout=1.5,
+                stderr=_subprocess.DEVNULL,
+            )
+        )
+        bundle = raw.get("kMRMediaRemoteNowPlayingInfoClientBundleIdentifier")
+        if bundle:
+            out["client_bundle_id"] = str(bundle)[:160]
+        if raw.get("kMRMediaRemoteNowPlayingInfoPlaybackRate") is not None:
+            out["playback_rate"] = raw.get("kMRMediaRemoteNowPlayingInfoPlaybackRate")
+        from vibemix.state.deck_poller import nowplaying_source_is_deck_candidate
+
+        out["deck_source_candidate"] = nowplaying_source_is_deck_candidate(
+            {"client_bundle_id": bundle}
+        )
+    except Exception as exc:
+        out["raw_error"] = type(exc).__name__
+    return out
+
+
+def _ws_port_listener_probe() -> dict[str, Any]:
+    """Return the process listening on the app websocket port, if any."""
+    from vibemix.audio import WS_HOST, WS_PORT
+
+    out: dict[str, Any] = {"host": WS_HOST, "port": WS_PORT, "listening": False}
+    try:
+        import psutil
+    except Exception as exc:
+        out["error"] = f"psutil unavailable: {type(exc).__name__}"
+        return out
+
+    try:
+        conns = psutil.net_connections(kind="tcp")
+    except Exception as exc:
+        out["error"] = f"net_connections failed: {type(exc).__name__}"
+        fallback = _ws_port_listener_lsof_probe(WS_HOST, WS_PORT)
+        fallback["fallback"] = "lsof"
+        fallback["psutil_error"] = out["error"]
+        return fallback
+
+    host_aliases = {WS_HOST, "127.0.0.1", "::1", "localhost"}
+    for conn in conns:
+        laddr = getattr(conn, "laddr", None)
+        if not laddr:
+            continue
+        try:
+            ip = str(laddr.ip)
+            port = int(laddr.port)
+        except AttributeError:
+            try:
+                ip = str(laddr[0])
+                port = int(laddr[1])
+            except (TypeError, ValueError, IndexError):
+                continue
+        if port != WS_PORT or ip not in host_aliases:
+            continue
+        if str(getattr(conn, "status", "")).upper() != "LISTEN":
+            continue
+
+        out["listening"] = True
+        pid = getattr(conn, "pid", None)
+        if pid is not None:
+            out["pid"] = pid
+            try:
+                proc = psutil.Process(pid)
+                out["name"] = proc.name()
+                cmdline = [str(arg) for arg in proc.cmdline()]
+                if cmdline:
+                    out["cmdline"] = cmdline[:8]
+                    out["looks_like_vibemix"] = any("vibemix" in arg.lower() for arg in cmdline)
+            except Exception as exc:
+                out["process_error"] = type(exc).__name__
+        return out
+    fallback = _ws_port_listener_lsof_probe(WS_HOST, WS_PORT)
+    if fallback.get("listening"):
+        fallback["fallback"] = "lsof"
+        return fallback
+    return out
+
+
+def _ws_port_listener_lsof_probe(host: str, port: int) -> dict[str, Any]:
+    """Best-effort macOS-friendly listener probe when psutil is denied."""
+    out: dict[str, Any] = {"host": host, "port": port, "listening": False}
+    try:
+        import subprocess as _subprocess
+
+        proc = _subprocess.run(
+            ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-F", "pc"],
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+            check=False,
+        )
+    except Exception as exc:
+        out["error"] = f"lsof failed: {type(exc).__name__}"
+        return out
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return out
+
+    pid: int | None = None
+    name: str | None = None
+    for line in proc.stdout.splitlines():
+        if line.startswith("p"):
+            try:
+                pid = int(line[1:])
+            except ValueError:
+                pid = None
+        elif line.startswith("c") and line[1:]:
+            name = line[1:]
+        if pid is not None and name:
+            break
+    if pid is None and not name:
+        return out
+
+    out["listening"] = True
+    if pid is not None:
+        out["pid"] = pid
+    if name:
+        out["name"] = name
+
+    cmd_text = ""
+    if pid is not None:
+        try:
+            ps = _subprocess.run(
+                ["ps", "-p", str(pid), "-o", "command="],
+                capture_output=True,
+                text=True,
+                timeout=1.0,
+                check=False,
+            )
+            cmd_text = " ".join(ps.stdout.split())
+        except Exception:
+            cmd_text = ""
+    if cmd_text:
+        out["cmdline"] = [cmd_text[:300]]
+        out["looks_like_vibemix"] = "vibemix" in cmd_text.lower()
+    elif name:
+        out["looks_like_vibemix"] = "vibemix" in name.lower()
+    return out
+
+
+def _viber_local_source_status() -> dict[str, Any]:
+    """Return a compact, content-free local source diagnostic for Viber proof."""
+    home = Path.home()
+    return {
+        "ws_port_listener": _ws_port_listener_probe(),
+        "library_cache": _library_cache_probe(),
+        "nowplaying": _nowplaying_probe(),
+        "rekordbox_app": _file_probe(Path("/Applications/rekordbox 7/rekordbox.app")),
+        "rekordbox_master_db": _file_probe(home / "Library/Pioneer/rekordbox/master.db"),
+        "rekordbox_event_xml": [
+            _rekordbox_event_probe(
+                home / "Library/Application Support/Pioneer/rekordbox/rekordboxEvent.xml"
+            ),
+            _rekordbox_event_probe(
+                home / "Library/Application Support/Pioneer/rekordbox6/rekordboxEvent.xml"
+            ),
+        ],
+        "live_db_policy": {
+            "reads_rekordbox_master_db_live": False,
+            "reason": "SQLCipher live DB path stays disabled; deck context uses app state plus library cache.",
+        },
+    }
+
+
+def _viber_live_context_hint(error: str | None, source_status: dict[str, Any]) -> str:
+    listener = source_status.get("ws_port_listener")
+    if isinstance(listener, dict) and listener.get("listening"):
+        if not listener.get("looks_like_vibemix"):
+            cmdline = listener.get("cmdline")
+            if isinstance(cmdline, list) and cmdline:
+                label = str(cmdline[0])[:160]
+            else:
+                label = str(listener.get("name") or "another process")
+            pid = listener.get("pid")
+            pid_hint = f" pid={pid}" if pid is not None else ""
+            return (
+                f"Port 8765 is occupied by {label}{pid_hint}, not the Vibemix live socket. "
+                "Stop that process or free the port, then start the Vibemix live session "
+                "and rerun `vibemix library live-context`."
+            )
+        if error:
+            return (
+                "A Vibemix-like process is listening on 8765, but the proof client could not "
+                "read frames. Keep the live session open and rerun with --require-proof."
+            )
+    return "Start the vibemix live session, then rerun `vibemix library live-context`."
+
+
+def _float_or_zero(raw: Any) -> float:
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _viber_live_context_schema_version(raw: Any) -> int:
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, value)
+
+
+def _viber_live_context_capabilities(raw: Any) -> set[str]:
+    if not isinstance(raw, list):
+        return set()
+    out: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        token = item.strip()
+        if token and all(ch.isalnum() or ch == "_" for ch in token):
+            out.add(token[:48])
+    return out
+
+
+def _viber_live_evidence_priority(token: str) -> int:
+    if token.startswith("midi:"):
+        return 0
+    if "deck_lanes=" in token:
+        return 1
+    if "deck_reference=" in token:
+        return 2
+    if "deck_source=" in token:
+        return 3
+    if "transition_block=" in token or "transition_watch=" in token:
+        return 4
+    if "transition_candidate=" in token:
+        return 5
+    if "second_deck_identity=" in token:
+        return 6
+    if "move_scope=" in token:
+        return 7
+    if "move_effect=" in token or "audio_delta=" in token:
+        return 8
+    if "deck_audio_support=" in token:
+        return 9
+    if "deck_route=" in token:
+        return 10
+    return 11
+
+
+def _merge_viber_live_evidence_tokens(
+    existing: Any,
+    incoming: Any,
+    *,
+    cap: int = _VIBER_LIVE_EVIDENCE_CAP,
+) -> list[str]:
+    items: list[tuple[int, int, str]] = []
+    seen: set[str] = set()
+    index = 0
+    for raw_list in (existing, incoming):
+        if not isinstance(raw_list, list):
+            continue
+        for raw in raw_list:
+            if not isinstance(raw, str):
+                continue
+            token = raw.strip()
+            if not token or token in seen:
+                continue
+            seen.add(token)
+            items.append((_viber_live_evidence_priority(token), index, token))
+            index += 1
+    if len(items) <= cap:
+        return [token for _priority, _index, token in items]
+    selected = sorted(items, key=lambda item: (item[0], item[1]))[:cap]
+    selected.sort(key=lambda item: item[1])
+    return [token for _priority, _index, token in selected]
+
+
+def _merge_viber_live_midi_evidence(existing: Any, incoming: Any) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    seen: set[tuple[str, float]] = set()
+    for raw_list in (existing, incoming):
+        if not isinstance(raw_list, list):
+            continue
+        for item in raw_list:
+            if not isinstance(item, dict):
+                continue
+            key = item.get("key")
+            if not isinstance(key, str) or not key:
+                continue
+            t_session = _float_or_zero(item.get("t"))
+            if t_session < 0:
+                continue
+            rounded_t = round(t_session, 1)
+            ident = (key, rounded_t)
+            if ident in seen:
+                continue
+            seen.add(ident)
+            items.append({"key": key, "t": rounded_t})
+    return items[-_VIBER_LIVE_MIDI_EVIDENCE_CAP:]
+
+
+def _merge_viber_live_evidence(existing: Any, incoming: Any) -> dict[str, Any]:
+    old = existing if isinstance(existing, dict) else {}
+    new = incoming if isinstance(incoming, dict) else {}
+    merged: dict[str, Any] = {}
+    mix = _merge_viber_live_evidence_tokens(old.get("mix"), new.get("mix"))
+    if mix:
+        merged["mix"] = mix
+    midi = _merge_viber_live_midi_evidence(old.get("midi"), new.get("midi"))
+    if midi:
+        merged["midi"] = midi
+    refs = _merge_viber_live_evidence_tokens(old.get("refs"), new.get("refs"))
+    if refs:
+        merged["refs"] = refs
+    return merged
+
+
+def _viber_mixer_posture_sides(mixer: Any) -> list[str]:
+    """Return controller deck sides that carried concrete mixer posture."""
+    if not isinstance(mixer, dict):
+        return []
+    sides: list[str] = []
+    posture_keys = {"vol", "eq_low", "eq_mid", "eq_hi", "filter", "play"}
+    for side in ("A", "B"):
+        row = mixer.get(side)
+        if isinstance(row, dict) and posture_keys.intersection(row):
+            sides.append(side)
+    return sides
+
+
+def _viber_deck_lane_route_evidence_seen(evidence_items: list[str]) -> bool:
+    """Return True when a citable deck_lanes atom has non-unknown routes."""
+    for item in evidence_items:
+        if "deck_lanes=" not in item:
+            continue
+        if "_route_" in item and "_route_unknown" not in item:
+            return True
+    return False
+
+
+def _viber_deck_reference_route_evidence_seen(evidence_items: list[str]) -> bool:
+    """Return True when a citable deck_reference atom has non-unknown routes."""
+    for item in evidence_items:
+        if "deck_reference=" not in item:
+            continue
+        if "_route_" in item and "_route_unknown" not in item:
+            return True
+    return False
+
+
+def _viber_live_context_readiness(
+    context: dict[str, Any],
+    *,
+    frames_seen: int,
+    flat_deck_frame_seen: bool,
+    session_snapshot_seen: bool,
+) -> dict[str, Any]:
+    """Return an honest physical-proof verdict for the sampled live context."""
+    from vibemix.library.codex_curate import (
+        normalize_live_audio_window_map_for_viber,
+        normalize_live_context_for_viber,
+        normalize_live_source_status_for_viber,
+        render_live_context_preview,
+    )
+    from vibemix.state.deck_context import (
+        normalize_audio_part_context_text,
+        normalize_audio_window_context_text,
+        normalize_deck_audio_separation_context_text,
+        normalize_deck_source_context_text,
+    )
+
+    normalized_context = normalize_live_context_for_viber(context)
+    if normalized_context:
+        context = normalized_context
+
+    schema_version = _viber_live_context_schema_version(context.get("live_context_schema_version"))
+    capabilities = _viber_live_context_capabilities(context.get("live_context_capabilities"))
+    missing_capabilities = sorted(_VIBER_LIVE_CONTEXT_REQUIRED_CAPABILITIES - capabilities)
+    deck_state = context.get("deck_state") if isinstance(context.get("deck_state"), dict) else {}
+    resolved_decks: list[str] = []
+    citable_decks: list[str] = []
+    sourced_decks: list[str] = []
+    if isinstance(deck_state, dict):
+        for side, row in deck_state.items():
+            if not isinstance(row, dict):
+                continue
+            confidence = _float_or_zero(row.get("confidence"))
+            has_identity = bool(row.get("title") or row.get("track_id") or row.get("camelot"))
+            if confidence >= _VIBER_LIVE_DECK_CONF_FLOOR and has_identity:
+                resolved_decks.append(str(side))
+            if confidence >= _VIBER_LIVE_DECK_CONF_FLOOR and row.get("track_id"):
+                citable_decks.append(str(side))
+                if row.get("source") in _VIBER_LIVE_DECK_SOURCES:
+                    sourced_decks.append(str(side))
+
+    mixer = context.get("deck_mixer") if isinstance(context.get("deck_mixer"), dict) else {}
+    recent_moves = (
+        context.get("recent_moves") if isinstance(context.get("recent_moves"), list) else []
+    )
+    audio_delta = context.get("audio_delta") if isinstance(context.get("audio_delta"), list) else []
+    live_evidence = (
+        context.get("live_evidence") if isinstance(context.get("live_evidence"), dict) else {}
+    )
+    evidence_items: list[str] = []
+    if isinstance(live_evidence, dict):
+        for key in ("mix", "refs"):
+            values = live_evidence.get(key)
+            if isinstance(values, list):
+                evidence_items.extend(str(item) for item in values if item)
+    has_transition_gate = any(
+        token in item
+        for item in evidence_items
+        for token in ("transition_block=", "transition_watch=", "transition_candidate=")
+    )
+    has_deck_lane_evidence = any("deck_lanes=" in item for item in evidence_items)
+    has_deck_lane_route_evidence = _viber_deck_lane_route_evidence_seen(evidence_items)
+    has_deck_reference_evidence = any("deck_reference=" in item for item in evidence_items)
+    has_deck_reference_route_evidence = _viber_deck_reference_route_evidence_seen(evidence_items)
+    has_deck_source_evidence = any("deck_source=" in item for item in evidence_items)
+    max_music = _float_or_zero(context.get("music"))
+    preview = render_live_context_preview(context)
+    has_deck_lane_context = "deck_lanes_context[" in preview
+    has_deck_reference_context = "deck_reference_context[" in preview
+    has_deck_source_context = "deck_source_context[" in preview or bool(
+        normalize_deck_source_context_text(context.get("deck_source_context"))
+    )
+    has_deck_source_status = bool(
+        normalize_live_source_status_for_viber(context.get("deck_source_status"))
+    )
+    has_raw_audio_part_context = bool(
+        normalize_audio_part_context_text(context.get("audio_part_context"))
+    )
+    has_deck_audio_separation_context = bool(
+        normalize_deck_audio_separation_context_text(context.get("deck_audio_separation_context"))
+        or "deck_audio_separation_context[" in preview
+    )
+    prompt_audio_part_context_seen = "audio_part_context[" in preview
+    has_raw_audio_window_context = bool(
+        normalize_audio_window_context_text(context.get("audio_window_context"))
+    )
+    has_audio_window_map = bool(
+        normalize_live_audio_window_map_for_viber(context.get("audio_window_map"))
+    )
+    prompt_audio_window_context_seen = "audio_window_context[" in preview
+    has_controller_signal = bool(mixer.get("connected")) if isinstance(mixer, dict) else False
+    has_live_audio_window_signal = (
+        bool(recent_moves)
+        or has_controller_signal
+        or bool(deck_state)
+        or bool(context.get("audible"))
+        or max_music >= _VIBER_LIVE_AUDIO_FLOOR
+    )
+    has_audio_window_context = has_raw_audio_window_context or (
+        prompt_audio_window_context_seen and has_live_audio_window_signal
+    )
+    has_audio_part_context = has_raw_audio_part_context or (
+        prompt_audio_part_context_seen and has_live_audio_window_signal
+    )
+    mixer_posture_sides = _viber_mixer_posture_sides(mixer)
+    checks = {
+        "frames_seen": frames_seen > 0,
+        "flat_deck_frame_seen": bool(flat_deck_frame_seen),
+        "live_context_schema_seen": schema_version >= _VIBER_LIVE_CONTEXT_SCHEMA_VERSION,
+        "live_context_capabilities_seen": not missing_capabilities,
+        "deck_state_resolved": bool(resolved_decks),
+        "deck_state_citable_track": bool(citable_decks),
+        "deck_state_source_provenance": bool(sourced_decks),
+        "deck_lane_context_seen": has_deck_lane_context,
+        "deck_reference_context_seen": has_deck_reference_context,
+        "deck_source_context_seen": has_deck_source_context,
+        "deck_source_status_seen": has_deck_source_status,
+        "controller_connected": bool(mixer.get("connected")) if isinstance(mixer, dict) else False,
+        "controller_deck_posture_seen": set(mixer_posture_sides) >= {"A", "B"},
+        "recent_moves_seen": bool(recent_moves),
+        "audio_part_context_seen": has_audio_part_context,
+        "deck_audio_separation_context_seen": has_deck_audio_separation_context,
+        "audio_window_context_seen": has_audio_window_context,
+        "audio_window_map_seen": has_audio_window_map,
+        "audio_observed": bool(context.get("audible")) or max_music >= _VIBER_LIVE_AUDIO_FLOOR,
+        "audio_delta_seen": bool(audio_delta),
+        "live_evidence_seen": bool(evidence_items),
+        "transition_gate_seen": has_transition_gate,
+        "deck_lane_evidence_seen": has_deck_lane_evidence,
+        "deck_lane_route_evidence_seen": has_deck_lane_route_evidence,
+        "deck_reference_evidence_seen": has_deck_reference_evidence,
+        "deck_reference_route_evidence_seen": has_deck_reference_route_evidence,
+        "deck_source_evidence_seen": has_deck_source_evidence,
+    }
+    blockers: list[str] = []
+    if not checks["frames_seen"]:
+        blockers.append("no websocket frames arrived")
+    if not checks["flat_deck_frame_seen"]:
+        blockers.append("no flat deck frame was observed")
+    if not checks["live_context_schema_seen"]:
+        blockers.append("live socket did not advertise structured live-context schema v2")
+    if not checks["live_context_capabilities_seen"]:
+        blockers.append(
+            "live socket capabilities missing " + ",".join(missing_capabilities)
+            if missing_capabilities
+            else "live socket capabilities were not observed"
+        )
+    if not checks["deck_state_resolved"]:
+        blockers.append("deck_state had no resolved deck row")
+    if not checks["deck_state_citable_track"]:
+        blockers.append("deck_state had no citable track_id at confidence floor")
+    if checks["deck_state_citable_track"] and not checks["deck_state_source_provenance"]:
+        blockers.append("deck_state had no trusted source provenance for a citable track")
+    if not checks["deck_lane_context_seen"]:
+        blockers.append("rendered live context had no per-deck lane map")
+    if not checks["deck_reference_context_seen"]:
+        blockers.append("rendered live context had no deck1/deck2 reference map")
+    if not checks["deck_source_context_seen"]:
+        blockers.append("rendered live context had no deck source/provenance map")
+    if not checks["deck_source_status_seen"]:
+        blockers.append("no structured deck_source_status was observed")
+    if not checks["controller_connected"]:
+        blockers.append("controller mixer posture was not connected")
+    if not checks["controller_deck_posture_seen"]:
+        blockers.append("controller mixer posture did not include both deck A and deck B")
+    if not checks["recent_moves_seen"]:
+        blockers.append("no recent controller moves were observed")
+    if not checks["audio_part_context_seen"]:
+        blockers.append("no audio_part_context part-role contract was observed")
+    if not checks["deck_audio_separation_context_seen"]:
+        blockers.append("no deck_audio_separation_context capture-separation contract was observed")
+    if not checks["audio_window_context_seen"]:
+        blockers.append("no time-aligned audio_window_context was observed")
+    if not checks["audio_window_map_seen"]:
+        blockers.append("no structured audio_window_map was observed")
+    if not checks["audio_observed"]:
+        blockers.append("live master audio was not observed above the audible floor")
+    if not checks["audio_delta_seen"]:
+        blockers.append("no bounded audio_delta was observed")
+    if not checks["live_evidence_seen"]:
+        blockers.append("no structured live_evidence was observed")
+    if not checks["transition_gate_seen"]:
+        blockers.append("live_evidence had no transition block/watch/candidate gate")
+    if not checks["deck_lane_evidence_seen"]:
+        blockers.append("live_evidence had no citable deck_lanes atom")
+    if not checks["deck_lane_route_evidence_seen"]:
+        blockers.append("live_evidence deck_lanes atom had no concrete deck route tiers")
+    if not checks["deck_reference_evidence_seen"]:
+        blockers.append("live_evidence had no citable deck_reference atom")
+    if not checks["deck_reference_route_evidence_seen"]:
+        blockers.append("live_evidence deck_reference atom had no concrete deck route tiers")
+    if not checks["deck_source_evidence_seen"]:
+        blockers.append("live_evidence had no citable deck_source atom")
+    stale_live_runtime = bool(
+        checks["frames_seen"]
+        and checks["flat_deck_frame_seen"]
+        and (not checks["live_context_schema_seen"] or not checks["live_context_capabilities_seen"])
+    )
+    if stale_live_runtime:
+        diagnosis = "stale_live_runtime"
+        next_action = (
+            "Restart the Vibemix live session so the socket advertises "
+            f"live_context_schema_version={_VIBER_LIVE_CONTEXT_SCHEMA_VERSION} "
+            "and required capabilities "
+            + ",".join(sorted(_VIBER_LIVE_CONTEXT_REQUIRED_CAPABILITIES))
+            + "; then rerun `vibemix library live-context --require-proof`."
+        )
+    elif not checks["frames_seen"] or not checks["flat_deck_frame_seen"]:
+        diagnosis = "live_socket_missing"
+        next_action = (
+            "Start the Vibemix live session and keep it open, then rerun "
+            "`vibemix library live-context --require-proof`."
+        )
+    elif blockers:
+        diagnosis = "missing_physical_proof"
+        next_action = (
+            "Collect the missing live proof legs shown in blockers, then rerun "
+            "`vibemix library live-context --require-proof`."
+        )
+    else:
+        diagnosis = "ready"
+        next_action = "Live Viber deck/audio context proof is ready."
+
+    return {
+        "ready": not blockers,
+        "diagnosis": diagnosis,
+        "next_action": next_action,
+        "checks": checks,
+        "blockers": blockers,
+        "stale_live_runtime": stale_live_runtime,
+        "resolved_decks": sorted(resolved_decks),
+        "citable_decks": sorted(citable_decks),
+        "sourced_decks": sorted(sourced_decks),
+        "mixer_posture_sides": mixer_posture_sides,
+        "max_music": max_music,
+        "live_context_schema_version": schema_version,
+        "missing_capabilities": missing_capabilities,
+        "session_snapshot_seen": bool(session_snapshot_seen),
+    }
+
+
+def _merge_viber_live_context_frame(
+    context: dict[str, Any], frame: dict[str, Any]
+) -> dict[str, bool]:
+    """Merge one ws frame into the bounded Viber live-context draft.
+
+    Flat 30 Hz frames carry ``deck_state``. Schema snapshots carry recent MIDI
+    control labels. Keeping this pure lets tests pin the proof path without a
+    live controller or socket.
+    """
+    from vibemix.library.codex_curate import (
+        normalize_live_audio_window_map_for_viber,
+        normalize_live_source_status_for_viber,
+    )
+    from vibemix.state.deck_context import (
+        normalize_audio_part_context_text,
+        normalize_audio_window_context_text,
+        normalize_deck_audio_context_text,
+        normalize_deck_audio_separation_context_text,
+        normalize_deck_lanes_context_text,
+        normalize_deck_reference_context_text,
+        normalize_deck_source_context_text,
+    )
+
+    flags = {"changed": False, "flat_deck_frame": False, "session_snapshot": False}
+    if not isinstance(frame, dict):
+        return flags
+
+    if isinstance(frame.get("deck_state"), dict):
+        flags["flat_deck_frame"] = True
+        reset_live_evidence = "deck_state" in frame
+        for key in (
+            "live_context_schema_version",
+            "live_context_capabilities",
+            "deck",
+            "audible",
+            "music",
+            "phase",
+            "bpm",
+            "deck_state",
+            "deck_mixer",
+            "deck_lanes_context",
+            "deck_reference_context",
+            "deck_source_context",
+            "deck_source_status",
+            "deck_audio_context",
+            "deck_audio_separation_context",
+            "audio_part_context",
+            "audio_window_context",
+            "audio_window_map",
+            "audio_delta",
+            "live_evidence",
+        ):
+            if key in frame:
+                if key == "music":
+                    context[key] = max(_float_or_zero(context.get(key)), _float_or_zero(frame[key]))
+                elif key == "live_context_schema_version":
+                    schema_version = _viber_live_context_schema_version(frame[key])
+                    if schema_version:
+                        context[key] = schema_version
+                    else:
+                        context.pop(key, None)
+                elif key == "live_context_capabilities":
+                    capabilities = sorted(_viber_live_context_capabilities(frame[key]))
+                    if capabilities:
+                        context[key] = capabilities
+                    else:
+                        context.pop(key, None)
+                elif key == "audio_delta" and isinstance(frame[key], list):
+                    if frame[key] or "audio_delta" not in context:
+                        context[key] = frame[key]
+                elif key == "audio_window_context":
+                    text = normalize_audio_window_context_text(frame[key])
+                    if text:
+                        context[key] = text
+                    else:
+                        context.pop(key, None)
+                elif key == "audio_part_context":
+                    text = normalize_audio_part_context_text(frame[key])
+                    if text:
+                        context[key] = text
+                    else:
+                        context.pop(key, None)
+                elif key == "deck_lanes_context":
+                    text = normalize_deck_lanes_context_text(frame[key])
+                    if text:
+                        context[key] = text
+                    else:
+                        context.pop(key, None)
+                elif key == "deck_reference_context":
+                    text = normalize_deck_reference_context_text(frame[key])
+                    if text:
+                        context[key] = text
+                    else:
+                        context.pop(key, None)
+                elif key == "deck_source_context":
+                    text = normalize_deck_source_context_text(frame[key])
+                    if text:
+                        context[key] = text
+                    else:
+                        context.pop(key, None)
+                elif key == "deck_source_status":
+                    source_status = normalize_live_source_status_for_viber(frame[key])
+                    if source_status:
+                        context[key] = source_status
+                    else:
+                        context.pop(key, None)
+                elif key == "deck_audio_context":
+                    text = normalize_deck_audio_context_text(frame[key])
+                    if text:
+                        context[key] = text
+                    else:
+                        context.pop(key, None)
+                elif key == "deck_audio_separation_context":
+                    text = normalize_deck_audio_separation_context_text(frame[key])
+                    if text:
+                        context[key] = text
+                    else:
+                        context.pop(key, None)
+                elif key == "audio_window_map":
+                    audio_window_map = normalize_live_audio_window_map_for_viber(frame[key])
+                    if audio_window_map:
+                        context[key] = audio_window_map
+                    else:
+                        context.pop(key, None)
+                elif key == "live_evidence" and isinstance(frame[key], dict):
+                    if frame[key]:
+                        existing = None if reset_live_evidence else context.get(key)
+                        context[key] = _merge_viber_live_evidence(existing, frame[key])
+                    elif reset_live_evidence:
+                        context.pop(key, None)
+                else:
+                    context[key] = frame[key]
+                flags["changed"] = True
+
+    if frame.get("type") == "ipc.session.snapshot" or isinstance(
+        (frame.get("payload") if isinstance(frame, dict) else None),
+        dict,
+    ):
+        moves = _session_snapshot_recent_moves(frame)
+        if moves:
+            context["recent_moves"] = moves
+            flags["changed"] = True
+        if frame.get("type") == "ipc.session.snapshot":
+            flags["session_snapshot"] = True
+    return flags
+
+
+def _viber_live_context_sample_complete(
+    context: dict[str, Any],
+    *,
+    frames_seen: int,
+    flat_deck_frame_seen: bool,
+    session_snapshot_seen: bool,
+    require_proof: bool,
+) -> bool:
+    if require_proof:
+        readiness = _viber_live_context_readiness(
+            context,
+            frames_seen=frames_seen,
+            flat_deck_frame_seen=flat_deck_frame_seen,
+            session_snapshot_seen=session_snapshot_seen,
+        )
+        return bool(readiness.get("ready"))
+    return bool(flat_deck_frame_seen and (session_snapshot_seen or "recent_moves" in context))
+
+
+async def _sample_viber_live_context(
+    timeout_s: float = 1.5,
+    max_frames: int = 90,
+    *,
+    require_proof: bool = False,
+) -> dict[str, Any]:
+    import json as _json
+
+    import websockets
+
+    from vibemix.audio import WS_HOST, WS_PORT
+    from vibemix.library.codex_curate import (
+        normalize_live_context_for_viber,
+        render_live_context_preview,
+    )
+
+    timeout_s = max(0.1, float(timeout_s))
+    max_frames = max(1, int(max_frames))
+    uri = f"ws://{WS_HOST}:{WS_PORT}"
+    context: dict[str, Any] = {}
+    frames_seen = 0
+    flat_seen = False
+    snapshot_seen = False
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_s
+    try:
+        async with websockets.connect(uri) as ws:
+            while frames_seen < max_frames:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    break
+                try:
+                    raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
+                except TimeoutError:
+                    break
+                frames_seen += 1
+                try:
+                    frame = _json.loads(raw)
+                except (TypeError, ValueError):
+                    continue
+                flags = _merge_viber_live_context_frame(context, frame)
+                flat_seen = flat_seen or flags["flat_deck_frame"]
+                snapshot_seen = snapshot_seen or flags["session_snapshot"]
+                if _viber_live_context_sample_complete(
+                    context,
+                    frames_seen=frames_seen,
+                    flat_deck_frame_seen=flat_seen,
+                    session_snapshot_seen=snapshot_seen,
+                    require_proof=require_proof,
+                ):
+                    break
+    except Exception as exc:
+        source_status = _viber_local_source_status()
+        normalized_context = normalize_live_context_for_viber(context) or context
+        error = str(exc)
+        return {
+            "ok": False,
+            "source": uri,
+            "frames_seen": frames_seen,
+            "flat_deck_frame_seen": flat_seen,
+            "session_snapshot_seen": snapshot_seen,
+            "live_context": normalized_context,
+            "preview": render_live_context_preview(normalized_context),
+            "readiness": _viber_live_context_readiness(
+                normalized_context,
+                frames_seen=frames_seen,
+                flat_deck_frame_seen=flat_seen,
+                session_snapshot_seen=snapshot_seen,
+            ),
+            "source_status": source_status,
+            "error": error,
+            "hint": _viber_live_context_hint(error, source_status),
+        }
+
+    normalized_context = normalize_live_context_for_viber(context) or context
+    preview = render_live_context_preview(normalized_context)
+    readiness = _viber_live_context_readiness(
+        normalized_context,
+        frames_seen=frames_seen,
+        flat_deck_frame_seen=flat_seen,
+        session_snapshot_seen=snapshot_seen,
+    )
+    return {
+        "ok": bool(preview),
+        "source": uri,
+        "frames_seen": frames_seen,
+        "flat_deck_frame_seen": flat_seen,
+        "session_snapshot_seen": snapshot_seen,
+        "live_context": normalized_context,
+        "preview": preview,
+        "readiness": readiness,
+        "source_status": _viber_local_source_status(),
+        "error": None if preview else "No deck/context frames were observed before timeout.",
+        "hint": None
+        if preview
+        else "Keep the live session open and make sure the socket is emitting frames.",
+    }
+
+
+async def _sample_viber_live_context_until_ready(
+    *,
+    timeout_s: float,
+    max_frames: int,
+    require_proof: bool,
+    wait_ready_s: float = 0.0,
+    interval_s: float = 1.0,
+) -> dict[str, Any]:
+    """Sample once, or keep sampling until the physical proof packet is ready."""
+    wait_ready_s = max(0.0, float(wait_ready_s or 0.0))
+    interval_s = max(0.1, float(interval_s or 1.0))
+    if wait_ready_s > 0:
+        require_proof = True
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + wait_ready_s
+    attempts = 0
+    while True:
+        attempts += 1
+        result = await _sample_viber_live_context(
+            timeout_s=timeout_s,
+            max_frames=max_frames,
+            require_proof=require_proof,
+        )
+        result["proof_attempts"] = attempts
+        result["wait_ready_s"] = wait_ready_s
+        result["wait_interval_s"] = interval_s
+
+        readiness = result.get("readiness")
+        ready = isinstance(readiness, dict) and readiness.get("ready")
+        if ready or wait_ready_s <= 0 or not require_proof:
+            return result
+
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            return result
+        await asyncio.sleep(min(interval_s, remaining))
+
+
+def _cmd_library_live_context(args: argparse.Namespace) -> int:
+    import json as _json
+
+    wait_ready_s = float(getattr(args, "wait_ready", 0.0) or 0.0)
+    require_proof = bool(getattr(args, "require_proof", False) or wait_ready_s > 0)
+    result = asyncio.run(
+        _sample_viber_live_context_until_ready(
+            timeout_s=float(getattr(args, "timeout", 1.5) or 1.5),
+            max_frames=int(getattr(args, "frames", 90) or 90),
+            require_proof=require_proof,
+            wait_ready_s=wait_ready_s,
+            interval_s=float(getattr(args, "interval", 1.0) or 1.0),
+        )
+    )
+    out_path_raw = getattr(args, "out", None)
+    if out_path_raw:
+        out_path = Path(str(out_path_raw)).expanduser()
+        result = {**result, "proof_path": str(out_path)}
+        try:
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(_json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"live-context proof write failed: {exc}", file=sys.stderr)
+            return 1
+    if getattr(args, "json", False):
+        _json.dump(result, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+    elif result.get("ok"):
+        print(result.get("preview") or "")
+        if require_proof and not (
+            isinstance(result.get("readiness"), dict) and result["readiness"].get("ready")
+        ):
+            blockers = (
+                result.get("readiness", {}).get("blockers", [])
+                if isinstance(result.get("readiness"), dict)
+                else []
+            )
+            if blockers:
+                print("live-context proof blockers:", file=sys.stderr)
+                for blocker in blockers:
+                    print(f"- {blocker}", file=sys.stderr)
+            next_action = (
+                result.get("readiness", {}).get("next_action")
+                if isinstance(result.get("readiness"), dict)
+                else None
+            )
+            if next_action:
+                print(f"next action: {next_action}", file=sys.stderr)
+    else:
+        print(f"live-context unavailable: {result.get('error')}", file=sys.stderr)
+        hint = result.get("hint")
+        if hint:
+            print(hint, file=sys.stderr)
+    if not result.get("ok"):
+        return 1
+    if require_proof:
+        readiness = result.get("readiness")
+        return 0 if isinstance(readiness, dict) and readiness.get("ready") else 1
     return 0
 
 
@@ -3610,6 +4961,23 @@ def _library_agent_setup_status() -> dict[str, object]:
     }
 
 
+def _cmd_library_doctor(args: argparse.Namespace) -> int:
+    """Live capability self-check. Runs every grounded-tool probe and prints a
+    human table (or ``--json``). Exit 0 when all checks pass, else 1 — so it can
+    gate a setup script. Never crashes: a failed probe is a finding, not a raise.
+    """
+    import json as _json
+
+    from vibemix.library.doctor import format_report, run_doctor
+
+    report = run_doctor()
+    if getattr(args, "json", False):
+        print(_json.dumps(report, indent=2))
+    else:
+        print(format_report(report), file=sys.stderr)
+    return 0 if report["all_ok"] else 1
+
+
 def _cmd_library_stats(args: argparse.Namespace) -> int:
     """Offline library-store stats for the desktop Vibe Engine header.
 
@@ -3805,6 +5173,23 @@ def cli_entry(argv: list[str] | None = None) -> None:
     # Plan 28-08 will add `budget` via the same _build_library_subparsers
     # helper below.
     raw_argv = sys.argv[1:] if argv is None else list(argv)
+    # Packaged-Viber fix: Codex launches the STDIO MCP server as
+    # ``sys.executable -m vibemix.library.mcp_server <flags>`` (see
+    # library/codex_curate.py). A real interpreter consumes ``-m`` and runs the
+    # module before main() is ever reached; a PyInstaller binary does NOT — the
+    # bootloader passes ``-m`` straight through as argv[0]. Without this
+    # intercept the bundled sidecar would treat ``-m`` as an unknown flag (or
+    # fall through to the live session), Codex would get no grounded tools, and
+    # shipped Viber would be dead (search_vibe et al. unreachable). Hand off to
+    # the server's main(), rewriting argv so its sys.argv[1:] parser sees only
+    # the trailing flags — i.e. exactly the ``python -m`` contract. In a real
+    # interpreter this branch never triggers, so the dev path is untouched.
+    if raw_argv[:2] == ["-m", "vibemix.library.mcp_server"]:
+        from vibemix.library.mcp_server import main as _mcp_main
+
+        sys.argv = [sys.argv[0], *raw_argv[2:]]
+        _mcp_main()
+        sys.exit(0)
     if raw_argv and raw_argv[0] == "library":
         sys.exit(_run_library_cli(raw_argv[1:]))
     # Phase 81 — `vibemix bench <sub>` (the validation-instrument produce step),

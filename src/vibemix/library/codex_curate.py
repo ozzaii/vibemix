@@ -35,7 +35,9 @@ import glob
 import json
 import logging
 import os
+import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -46,6 +48,95 @@ from pathlib import Path
 from typing import Any
 
 from vibemix.library.rekordbox import RekordboxLibrary
+from vibemix.state.deck_context import (
+    LIVE_CANDIDATE_HELD_REPLY as _SHARED_LIVE_CANDIDATE_HELD_REPLY,
+)
+from vibemix.state.deck_context import (
+    LIVE_TRANSITION_HELD_REPLY as _SHARED_LIVE_TRANSITION_HELD_REPLY,
+)
+from vibemix.state.deck_context import (
+    apply_live_claim_guard as _shared_apply_live_claim_guard,
+)
+from vibemix.state.deck_context import (
+    has_multi_deck_outcome_claim as _shared_has_multi_deck_outcome_claim,
+)
+from vibemix.state.deck_context import (
+    has_multi_deck_outcome_disclaimer as _shared_has_multi_deck_outcome_disclaimer,
+)
+from vibemix.state.deck_context import (
+    has_unsafe_multi_deck_disclaimer_claim as _shared_has_unsafe_multi_deck_disclaimer_claim,
+)
+from vibemix.state.deck_context import (
+    live_claim_policy as _shared_live_claim_policy,
+)
+from vibemix.state.deck_context import (
+    live_evidence_packet as _shared_live_evidence_packet,
+)
+from vibemix.state.deck_context import (
+    normalize_audio_part_context_text as _shared_normalize_audio_part_context_text,
+)
+from vibemix.state.deck_context import (
+    normalize_audio_window_context_text as _shared_normalize_audio_window_context_text,
+)
+from vibemix.state.deck_context import (
+    normalize_deck_audio_context_text as _shared_normalize_deck_audio_context_text,
+)
+from vibemix.state.deck_context import (
+    normalize_deck_audio_separation_context_text as _shared_normalize_deck_audio_separation,
+)
+from vibemix.state.deck_context import (
+    normalize_deck_lanes_context_text as _shared_normalize_deck_lanes_context_text,
+)
+from vibemix.state.deck_context import (
+    normalize_deck_reference_context_text as _shared_normalize_deck_reference_context_text,
+)
+from vibemix.state.deck_context import (
+    normalize_deck_source_context_text as _shared_normalize_deck_source_context_text,
+)
+from vibemix.state.deck_context import (
+    render_audio_part_context as _shared_render_audio_part_context,
+)
+from vibemix.state.deck_context import (
+    render_audio_window_context as _shared_render_audio_window_context,
+)
+from vibemix.state.deck_context import (
+    render_context_feed_contract as _shared_render_context_feed_contract,
+)
+from vibemix.state.deck_context import (
+    render_deck_audio_context as _shared_render_deck_audio_context,
+)
+from vibemix.state.deck_context import (
+    render_deck_audio_separation_context as _shared_render_deck_audio_separation,
+)
+from vibemix.state.deck_context import (
+    render_deck_change_context as _shared_render_deck_change_context,
+)
+from vibemix.state.deck_context import (
+    render_deck_context as _shared_render_deck_context,
+)
+from vibemix.state.deck_context import (
+    render_deck_lane_context as _shared_render_deck_lane_context,
+)
+from vibemix.state.deck_context import (
+    render_deck_reference_context as _shared_render_deck_reference_context,
+)
+from vibemix.state.deck_context import (
+    render_deck_source_context as _shared_render_deck_source_context,
+)
+from vibemix.state.deck_context import (
+    render_mixer_context as _shared_render_mixer_context,
+)
+from vibemix.state.deck_context import (
+    render_move_context as _shared_render_move_context,
+)
+from vibemix.state.deck_context import (
+    render_move_effect_context as _shared_render_move_effect_context,
+)
+from vibemix.state.deck_context import (
+    sanitize_historical_move_signature_for_prompt as _shared_sanitize_history_signature,
+)
+from vibemix.state.deck_state import DeckState, DeckTrack
+from vibemix.state.music_state import MusicState
 
 logger = logging.getLogger(__name__)
 
@@ -396,6 +487,97 @@ def _validate_against_library(track_ids: list[str], library: RekordboxLibrary) -
     return out
 
 
+def _drain_tool_tape(events_path: str, printed: int) -> int:
+    """Print any new complete tool-event lines since ``printed``; return the new
+    count. The MCP child appends one JSON record per tool call; we echo each as
+    a ``[viber-tool] <name> <ok|err> <summary>`` line on STDERR (stdout stays the
+    pristine result-JSON channel). Best-effort: a missing file or a half-written
+    final line is skipped, never fatal."""
+    try:
+        text = Path(events_path).read_text(encoding="utf-8")
+    except OSError:
+        return printed
+    lines = text.split("\n")
+    complete = lines[:-1]  # trailing element is "" (or a partial line) until \n lands
+    for line in complete[printed:]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        name = str(rec.get("tool", "?"))
+        ok = "ok" if rec.get("ok") else "err"
+        arg = str(rec.get("arg", "")).strip()
+        summary = str(rec.get("summary", ""))
+        detail = f"{arg}; {summary}" if arg and summary else arg or summary
+        print(f"[viber-tool] {name} {ok} {detail}".rstrip(), file=sys.stderr, flush=True)
+    return len(complete)
+
+
+def _tool_event_display_arg(rec: dict[str, Any]) -> str:
+    arg = str(rec.get("arg", "")).replace("\n", " ").strip()
+    summary = str(rec.get("summary", "")).replace("\n", " ").strip()
+    if arg and summary:
+        return f"{arg}; {summary}"[:220]
+    return (arg or summary)[:220]
+
+
+def _read_tool_event_trace(events_path: str) -> list[dict[str, Any]]:
+    """Return the authoritative MCP tool tape as UI-ready chat trace rows."""
+    try:
+        lines = Path(events_path).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in lines:
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        name = str(rec.get("tool") or "").strip()
+        if not name:
+            continue
+        ok = rec.get("ok")
+        rows.append(
+            {
+                "name": name,
+                "arg": _tool_event_display_arg(rec),
+                "ok": ok if isinstance(ok, bool) else True,
+            }
+        )
+    return rows
+
+
+def _start_tool_tape(events_path: str) -> Callable[[], None]:
+    """Start a daemon tailer that streams the live tool tape to STDERR while the
+    blocking Codex subprocess runs. Returns a ``stop()`` callable the caller MUST
+    invoke (in a ``finally``) to halt the thread and drain the last lines —
+    otherwise the daemon spins until process exit once the tempdir is cleaned."""
+    stop = threading.Event()
+
+    def _tail() -> None:
+        printed = 0
+        while not stop.is_set():
+            printed = _drain_tool_tape(events_path, printed)
+            stop.wait(0.15)
+        _drain_tool_tape(events_path, printed)  # final drain after Codex exits
+
+    t = threading.Thread(target=_tail, name="viber-tool-tape", daemon=True)
+    t.start()
+
+    def _stop() -> None:
+        stop.set()
+        t.join(timeout=1.0)
+
+    return _stop
+
+
 def curate_with_codex(
     theme: str,
     library: RekordboxLibrary,
@@ -472,12 +654,17 @@ def curate_with_codex(
         # (Pitfall 4): the temp dir is cleaned up at `with` exit, so the read
         # MUST happen before this block ends or the file disappears.
         stop_reason_path = str(Path(td) / "stop_reason.json")
+        # Live tool-tape side-channel. Passed to the MCP child as an ARG (see
+        # build_argv mcp_args below), NOT via env: the boot-probe verified Codex
+        # does not forward the parent's process env to MCP children, so the env
+        # route silently no-ops. Args are part of the spawn command → always cross.
+        tool_events_path = str(Path(td) / "tool_events.jsonl")
         Path(schema_path).write_text(json.dumps(_OUTPUT_SCHEMA), encoding="utf-8")
 
         argv = build_argv(
             codex,
             mcp_command=command,
-            mcp_args=args,
+            mcp_args=[*args, "--vibemix-tool-events", tool_events_path],
             schema_path=schema_path,
             out_path=out_path,
             prompt=build_prompt(theme),
@@ -491,6 +678,14 @@ def curate_with_codex(
         # (Plan 99-04 Task 5, B1 Option A probe).
         env = build_subprocess_env(codex)
         env["VIBEMIX_STOP_REASON_FILE"] = stop_reason_path
+        # LIVE TOOL TAPE: the MCP child (LibraryToolset.dispatch) appends one
+        # JSON record per tool call to this path; a daemon tailer echoes each to
+        # STDERR as `[viber-tool] …` while the (blocking) Codex subprocess runs,
+        # so the user watches Viber work instead of a frozen prompt. STDERR keeps
+        # the stdout result-JSON channel pristine; the Rust layer tails these
+        # `[viber-tool]` lines for the in-app tape.
+        env["VIBEMIX_TOOL_EVENTS_FILE"] = tool_events_path
+        _tape_stop = _start_tool_tape(tool_events_path)
 
         try:
             proc = _runner(
@@ -518,6 +713,8 @@ def curate_with_codex(
                 stop_reason="timeout",
                 error=f"Codex did not finish within {timeout_s:.0f}s.",
             )
+        finally:
+            _tape_stop()
 
         stderr = proc.stderr or ""
         if proc.returncode != 0:
@@ -544,13 +741,8 @@ def curate_with_codex(
         # always seeds 'hint' for cases A/B/C; the fallback is defensive only.
         if Path(stop_reason_path).exists():
             try:
-                payload = json.loads(
-                    Path(stop_reason_path).read_text(encoding="utf-8")
-                )
-                if (
-                    isinstance(payload, dict)
-                    and payload.get("reason") == "tool_starvation"
-                ):
+                payload = json.loads(Path(stop_reason_path).read_text(encoding="utf-8"))
+                if isinstance(payload, dict) and payload.get("reason") == "tool_starvation":
                     return CodexCurateResult(
                         theme=theme,
                         stop_reason="tool_starvation",
@@ -568,19 +760,14 @@ def curate_with_codex(
                 # in production (Plan 100-01's _build_clarification_payload
                 # always populates both fields with the right shape, pinned
                 # by Plan 100-01's tests).
-                if (
-                    isinstance(payload, dict)
-                    and payload.get("reason") == "clarification_needed"
-                ):
+                if isinstance(payload, dict) and payload.get("reason") == "clarification_needed":
                     q = payload.get("question")
                     cs = payload.get("choices")
                     return CodexCurateResult(
                         theme=theme,
                         stop_reason="clarification_needed",
                         question=str(q) if isinstance(q, str) else None,
-                        choices=(
-                            [str(c) for c in cs] if isinstance(cs, list) else None
-                        ),
+                        choices=([str(c) for c in cs] if isinstance(cs, list) else None),
                     )
             except (OSError, json.JSONDecodeError):
                 pass  # fall through to existing parse logic
@@ -813,12 +1000,17 @@ def build_set_with_codex(
         # Plan 99-04: parallel propagation for set-prep. Same Pitfall-4
         # discipline as curate_with_codex — read INSIDE the `with` block.
         stop_reason_path = str(Path(td) / "stop_reason.json")
+        # Live tool-tape side-channel. Passed to the MCP child as an ARG (see
+        # build_argv mcp_args below), NOT via env: the boot-probe verified Codex
+        # does not forward the parent's process env to MCP children, so the env
+        # route silently no-ops. Args are part of the spawn command → always cross.
+        tool_events_path = str(Path(td) / "tool_events.jsonl")
         Path(schema_path).write_text(json.dumps(_BUILD_SET_SCHEMA), encoding="utf-8")
 
         argv = build_argv(
             codex,
             mcp_command=command,
-            mcp_args=args,
+            mcp_args=[*args, "--vibemix-tool-events", tool_events_path],
             schema_path=schema_path,
             out_path=out_path,
             prompt=build_set_prompt(
@@ -836,6 +1028,14 @@ def build_set_with_codex(
         # isolation rationale).
         env = build_subprocess_env(codex)
         env["VIBEMIX_STOP_REASON_FILE"] = stop_reason_path
+        # LIVE TOOL TAPE: the MCP child (LibraryToolset.dispatch) appends one
+        # JSON record per tool call to this path; a daemon tailer echoes each to
+        # STDERR as `[viber-tool] …` while the (blocking) Codex subprocess runs,
+        # so the user watches Viber work instead of a frozen prompt. STDERR keeps
+        # the stdout result-JSON channel pristine; the Rust layer tails these
+        # `[viber-tool]` lines for the in-app tape.
+        env["VIBEMIX_TOOL_EVENTS_FILE"] = tool_events_path
+        _tape_stop = _start_tool_tape(tool_events_path)
 
         try:
             proc = _runner(
@@ -858,6 +1058,8 @@ def build_set_with_codex(
                 stop_reason="timeout",
                 error=f"Codex did not finish within {timeout_s:.0f}s.",
             )
+        finally:
+            _tape_stop()
 
         stderr = proc.stderr or ""
         if proc.returncode != 0:
@@ -882,13 +1084,8 @@ def build_set_with_codex(
         # _build_starvation_payload always seeds 'hint').
         if Path(stop_reason_path).exists():
             try:
-                payload = json.loads(
-                    Path(stop_reason_path).read_text(encoding="utf-8")
-                )
-                if (
-                    isinstance(payload, dict)
-                    and payload.get("reason") == "tool_starvation"
-                ):
+                payload = json.loads(Path(stop_reason_path).read_text(encoding="utf-8"))
+                if isinstance(payload, dict) and payload.get("reason") == "tool_starvation":
                     return CodexCurateResult(
                         theme=brief,
                         stop_reason="tool_starvation",
@@ -901,19 +1098,14 @@ def build_set_with_codex(
                 # branch. Uniform propagation across both wrappers — the
                 # set-prep code path also surfaces clarification_needed via
                 # the same dataclass shape (theme=brief substitution).
-                if (
-                    isinstance(payload, dict)
-                    and payload.get("reason") == "clarification_needed"
-                ):
+                if isinstance(payload, dict) and payload.get("reason") == "clarification_needed":
                     q = payload.get("question")
                     cs = payload.get("choices")
                     return CodexCurateResult(
                         theme=brief,
                         stop_reason="clarification_needed",
                         question=str(q) if isinstance(q, str) else None,
-                        choices=(
-                            [str(c) for c in cs] if isinstance(cs, list) else None
-                        ),
+                        choices=([str(c) for c in cs] if isinstance(cs, list) else None),
                     )
             except (OSError, json.JSONDecodeError):
                 pass  # fall through to existing parse logic
@@ -1021,6 +1213,47 @@ _CHAT_SCHEMA: dict[str, Any] = {
             },
         },
         "track_ids": {"type": "array", "items": {"type": "string"}},
+        "move_grades": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "candidate_id": {"type": "string"},
+                    "track_id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "slug": {"type": "string"},
+                    "label": {"type": "string"},
+                    "xp": {"type": "number"},
+                    "reason": {"type": "string"},
+                    "overdrive": {"type": "boolean"},
+                    "streak": {"type": ["number", "null"]},
+                    "total_xp": {"type": ["number", "null"]},
+                    "level": {"type": ["number", "null"]},
+                    "level_xp": {"type": ["number", "null"]},
+                    "next_level_xp": {"type": ["number", "null"]},
+                    "level_up": {"type": "boolean"},
+                    "levels_gained": {"type": "number"},
+                },
+                "required": [
+                    "candidate_id",
+                    "track_id",
+                    "title",
+                    "slug",
+                    "label",
+                    "xp",
+                    "reason",
+                    "overdrive",
+                    "streak",
+                    "total_xp",
+                    "level",
+                    "level_xp",
+                    "next_level_xp",
+                    "level_up",
+                    "levels_gained",
+                ],
+                "additionalProperties": False,
+            },
+        },
         "playlist": {
             "type": ["object", "null"],
             "properties": {
@@ -1040,6 +1273,7 @@ _CHAT_SCHEMA: dict[str, Any] = {
         "tools_used",
         "tool_trace",
         "track_ids",
+        "move_grades",
         "playlist",
         "export_path",
     ],
@@ -1066,11 +1300,18 @@ _CHAT_RULES_BLOCK = (
     "5. You do NOT have to call a tool every turn; if they're just chatting, "
     "chat back.\n"
     "6. When done, return the final JSON {reply, tools_used, tool_trace, "
-    "track_ids, playlist, export_path}: reply is your spoken answer to the DJ; "
+    "track_ids, move_grades, playlist, export_path}: reply is your spoken answer to the DJ; "
     "tools_used lists the tool names you called this turn. tool_trace lists the "
     "same calls as {name, arg, ok}, where arg is the shortest useful argument "
     "or intent the DJ should see and ok is false only if the tool failed. "
     "track_ids is any library track you referenced (in order, empty if none). "
+    "move_grades is any transition_slate / compile_musical_context grade you "
+    "explicitly used, copied as {candidate_id, track_id, title, slug, label, "
+    "xp, reason, overdrive, streak, total_xp, level, level_xp, next_level_xp, "
+    "level_up, levels_gained}. Copy streak/level fields from current.grade_progress "
+    "or a grade_progress claim only when the tool packet exposed them; otherwise "
+    "use null for numeric progress fields, false for level_up, and 0 for "
+    "levels_gained. Use [] if no transition grade was used. "
     "If you call create_playlist, "
     "copy its returned {name, track_ids, m3u_path, json_path, dropped_ids} into "
     "playlist; otherwise playlist=null. If you call export_set, copy its "
@@ -1085,20 +1326,1641 @@ def _chat_system_prompt() -> str:
     return build_curator_instruction(_shared_lens()) + "\n" + _CHAT_RULES_BLOCK + _taste_hint()
 
 
-def chat_prompt(message: str, history: list[dict[str, Any]] | None = None) -> str:
-    """Render the chat system prompt + the conversation so far + the new turn."""
-    convo = ""
-    for turn in history or []:
-        if not isinstance(turn, dict):
+_LIVE_CONTEXT_MIN_CONF: float = 0.3
+_LIVE_DECK_SIDES = ("A", "B", "C", "D")
+_LIVE_MOVE_RE = re.compile(r"\b([ABCD])_(?:low|mid|hi|filter|volume|play)")
+_LIVE_RECENT_MOVE_CAP = 6
+_LIVE_AUDIO_DELTA_CAP = 4
+_LIVE_EVIDENCE_CAP = 8
+_LIVE_EVIDENCE_REFS_CAP = 9
+_LIVE_MIDI_EVIDENCE_CAP = 4
+_LIVE_HISTORY_CAP = 3
+_LIVE_HISTORY_SCAN_LIMIT = 80
+_CHAT_HISTORY_TURNS_CAP = 8
+_CHAT_HISTORY_TEXT_CAP = 500
+_LIVE_EVIDENCE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_:.=@+-]{1,128}$")
+_LIVE_SOURCE_STATUS_KEYS: tuple[str, ...] = (
+    "controller",
+    "nowplaying",
+    "nowplaying_owner",
+    "nowplaying_title",
+    "audible_deck",
+    "resolution",
+    "resolved_side",
+)
+_LIVE_DECK_SOURCES: frozenset[str] = frozenset(
+    {
+        "rekordbox_xml",
+        "folder_cache",
+        "screen_vision",
+        "numpy_key",
+        "nowplaying",
+        "live_context",
+        "unknown",
+    }
+)
+_LIVE_CONTEXT_CAP = 16
+_LIVE_CONTEXT_SCHEMA_VERSION = 2
+_LIVE_CONTEXT_REQUIRED_CAPABILITIES: frozenset[str] = frozenset(
+    {
+        "audio_part_context",
+        "deck_audio_separation_context",
+        "deck_source_status",
+        "audio_window_map",
+        "audio_delta",
+        "live_evidence",
+    }
+)
+_MULTI_DECK_VERDICT_RE = re.compile(
+    r"\b("
+    r"great|good|clean|successful|smooth|tight|solid|nice|nailed|worked|perfect|"
+    r"lit|bomb|sexy"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIVE_CONTEXT_DIRECT_REQUEST_RE = re.compile(
+    r"\b("
+    r"what happened|what(?:'s| is) happening|was that|did that|did it|did i|am i|"
+    r"current|currently|right now|now playing|live deck|loaded|audible|"
+    r"deck|move|knob|fader|crossfader|xfader|eq|filter|mixer|controller"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIVE_CONTEXT_DEICTIC_RE = re.compile(
+    r"\b(what happened|what(?:'s| is) happening|was that|did that|did it|did i|am i|this|that|just)\b",
+    re.IGNORECASE,
+)
+_LIVE_CONTEXT_OUTCOME_RE = re.compile(
+    r"\b("
+    r"transition|blend|switch|segue|handoff|bridge|layer|drop|mix"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIBRARY_CONTEXT_REQUEST_RE = re.compile(
+    r"\b("
+    r"find|search|discover|dig|recommend|suggest|give me|make me|build|curate|"
+    r"playlist|crate|set|tracks?|songs?|vibe"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIVE_CONTEXT_CORRECTION_REPLY_RE = re.compile(
+    r"\b("
+    r"i need to correct (?:the|that) live read|resolved decks=|"
+    r"live evidence gate:|won't call that a transition|"
+    r"cannot call that a transition|can't call that a transition|"
+    r"musical outcome claim needs|live proof is incomplete|"
+    r"transition verdict is held|quality grade is held|"
+    r"cause or quality verdict is held|"
+    r"hold the transition verdict|hold the quality grade|"
+    r"hold the cause/quality verdict"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _compact_chat_request(message: str) -> str:
+    return " ".join(str(message or "").strip().lower().split())
+
+
+def _live_context_use_mode(message: str) -> str:
+    """Return how prominently Viber should use the live deck packet this turn."""
+    text = _compact_chat_request(message)
+    if not text:
+        return "silent_guard"
+
+    direct_live_request = bool(_LIVE_CONTEXT_DIRECT_REQUEST_RE.search(text))
+    deictic_outcome_request = bool(
+        _LIVE_CONTEXT_DEICTIC_RE.search(text) and _LIVE_CONTEXT_OUTCOME_RE.search(text)
+    )
+    if not (direct_live_request or deictic_outcome_request):
+        return "silent_guard"
+
+    # Search/crate/set-prep words do not hide an explicit current-deck ask
+    # ("find me something for what is loaded now"), but they keep generic
+    # library requests from being pulled into live-deck correction mode just
+    # because the live packet is attached.
+    library_request = bool(_LIBRARY_CONTEXT_REQUEST_RE.search(text))
+    current_deck_anchor = bool(
+        re.search(
+            r"\b(current|currently|right now|now playing|loaded|audible|live deck|deck)\b",
+            text,
+            re.IGNORECASE,
+        )
+    )
+    if library_request and not (current_deck_anchor or deictic_outcome_request):
+        return "silent_guard"
+    return "active_live_context"
+
+
+def _live_context_transport_is_stale(live_context: dict[str, Any] | None) -> bool:
+    if not live_context:
+        return False
+    schema_version = _clean_live_float(live_context.get("live_context_schema_version"))
+    capabilities = set(_live_context_capabilities(live_context.get("live_context_capabilities")))
+    return bool(
+        schema_version is None
+        or schema_version < _LIVE_CONTEXT_SCHEMA_VERSION
+        or (_LIVE_CONTEXT_REQUIRED_CAPABILITIES - capabilities)
+    )
+
+
+def _live_context_use_instruction(
+    message: str,
+    live_context: dict[str, Any] | None = None,
+) -> str:
+    mode = _live_context_use_mode(message)
+    if mode == "active_live_context":
+        text = (
+            "LIVE CONTEXT USE: active_live_context. The DJ is asking about the "
+            "current live deck/move/audio moment, so apply CURRENT LIVE DECK "
+            "CONTEXT, claim_policy, freshness, provenance, and evidence gates "
+            "directly before answering."
+        )
+        if _live_context_transport_is_stale(live_context):
+            text += (
+                " Transport is stale_or_pre_schema_v2, so treat live context as "
+                "partial: do not judge transitions or move outcomes; say the live "
+                "session must be restarted/resampled before a reliable live verdict."
+            )
+        return text
+    text = (
+        "LIVE CONTEXT USE: silent_guard. The DJ's last turn is not asking about "
+        "the current live deck/move/audio moment. Keep CURRENT LIVE DECK CONTEXT "
+        "as a hidden safety rail only: do not mention live_context, claim_policy, "
+        "resolved decks, deck blockers, evidence gates, or live-read correction "
+        "language. For crate, library search, vibe, playlist, or set-building "
+        "requests, answer the requested library job with grounded tool results."
+    )
+    if _live_context_transport_is_stale(live_context):
+        text += " Stale transport remains hidden unless the DJ asks about current live proof."
+    return text
+
+
+def _looks_like_unprompted_live_correction(reply: str) -> bool:
+    return bool(reply and _LIVE_CONTEXT_CORRECTION_REPLY_RE.search(reply))
+
+
+def _clean_live_text(raw: Any, *, max_len: int = 96) -> str | None:
+    if raw is None:
+        return None
+    text = " ".join(str(raw).split())
+    if not text:
+        return None
+    return text[:max_len]
+
+
+def _clean_live_float(raw: Any) -> float | None:
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not (value == value and value not in (float("inf"), float("-inf"))):
+        return None
+    return value
+
+
+def _clean_live_evidence_token(raw: Any, *, max_len: int = 128) -> str | None:
+    text = _clean_live_text(raw, max_len=max_len)
+    if not text or " " in text:
+        return None
+    return text if _LIVE_EVIDENCE_TOKEN_RE.fullmatch(text) else None
+
+
+def _live_evidence_priority(token: str) -> int:
+    if token.startswith("midi:"):
+        return 0
+    if "deck_lanes=" in token:
+        return 1
+    if "deck_reference=" in token:
+        return 2
+    if "deck_source=" in token:
+        return 3
+    if "transition_block=" in token or "transition_watch=" in token:
+        return 4
+    if "transition_candidate=" in token:
+        return 5
+    if "second_deck_identity=" in token:
+        return 6
+    if "move_scope=" in token:
+        return 7
+    if "move_effect=" in token or "audio_delta=" in token:
+        return 8
+    if "deck_audio_support=" in token:
+        return 9
+    if "deck_route=" in token:
+        return 10
+    return 11
+
+
+def _clean_live_evidence_list(raw: Any, *, cap: int = _LIVE_EVIDENCE_CAP) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    out: list[tuple[int, int, str]] = []
+    seen: set[str] = set()
+    index = 0
+    for item in raw:
+        token = _clean_live_evidence_token(item)
+        if token and token not in seen:
+            out.append((_live_evidence_priority(token), index, token))
+            seen.add(token)
+            index += 1
+    if len(out) <= cap:
+        return [token for _priority, _index, token in out]
+    selected = sorted(out, key=lambda item: (item[0], item[1]))[:cap]
+    selected.sort(key=lambda item: item[1])
+    return [token for _priority, _index, token in selected]
+
+
+def _live_evidence(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+
+    out: dict[str, Any] = {}
+    mix = _clean_live_evidence_list(raw.get("mix"))
+    if mix:
+        out["mix"] = mix
+
+    midi: list[dict[str, Any]] = []
+    raw_midi = raw.get("midi")
+    if isinstance(raw_midi, list):
+        for item in raw_midi[-_LIVE_MIDI_EVIDENCE_CAP:]:
+            if not isinstance(item, dict):
+                continue
+            key = _clean_live_evidence_token(item.get("key"), max_len=96)
+            t_session = _clean_live_float(item.get("t"))
+            if key is None or t_session is None:
+                continue
+            midi.append({"key": key, "t": round(max(0.0, t_session), 1)})
+    if midi:
+        out["midi"] = midi
+
+    raw_refs = raw.get("refs") if isinstance(raw.get("refs"), list) else []
+    derived_refs = [f"midi:{item['key']}@{item['t']:.1f}" for item in midi]
+    derived_refs.extend(f"mix:{key}" for key in mix)
+    refs = _clean_live_evidence_list([*raw_refs, *derived_refs], cap=_LIVE_EVIDENCE_REFS_CAP)
+    if refs:
+        out["refs"] = refs[:_LIVE_EVIDENCE_REFS_CAP]
+
+    return out or None
+
+
+def _merge_live_evidence(existing: Any, incoming: Any) -> dict[str, Any] | None:
+    """Merge raw socket evidence with locally derived deck-context atoms."""
+    old = existing if isinstance(existing, dict) else {}
+    new = _live_evidence(incoming) if isinstance(incoming, dict) else None
+    new = new or {}
+
+    merged: dict[str, Any] = {}
+    mix = _clean_live_evidence_list(
+        [
+            *(old.get("mix") if isinstance(old.get("mix"), list) else []),
+            *(new.get("mix") if isinstance(new.get("mix"), list) else []),
+        ]
+    )
+    if mix:
+        merged["mix"] = mix
+
+    midi: list[dict[str, Any]] = []
+    seen_midi: set[tuple[str, float]] = set()
+    for raw_list in (old.get("midi"), new.get("midi")):
+        if not isinstance(raw_list, list):
             continue
-        text = str(turn.get("text") or "").strip()
+        for item in raw_list:
+            if not isinstance(item, dict):
+                continue
+            key = _clean_live_evidence_token(item.get("key"), max_len=96)
+            t_session = _clean_live_float(item.get("t"))
+            if key is None or t_session is None:
+                continue
+            rounded_t = round(max(0.0, t_session), 1)
+            ident = (key, rounded_t)
+            if ident in seen_midi:
+                continue
+            seen_midi.add(ident)
+            midi.append({"key": key, "t": rounded_t})
+    if midi:
+        merged["midi"] = midi[-_LIVE_MIDI_EVIDENCE_CAP:]
+
+    derived_refs = [f"midi:{item['key']}@{item['t']:.1f}" for item in merged.get("midi", [])]
+    derived_refs.extend(f"mix:{key}" for key in mix)
+    refs = _clean_live_evidence_list(
+        [
+            *(old.get("refs") if isinstance(old.get("refs"), list) else []),
+            *(new.get("refs") if isinstance(new.get("refs"), list) else []),
+            *derived_refs,
+        ],
+        cap=_LIVE_EVIDENCE_REFS_CAP,
+    )
+    if refs:
+        merged["refs"] = refs
+
+    return merged or None
+
+
+def _live_deck_fields(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+
+    deck: dict[str, Any] = {}
+    for key in ("title", "track_id", "camelot", "key"):
+        text = _clean_live_text(raw.get(key))
+        if text:
+            deck[key] = text
+
+    bpm = _clean_live_float(raw.get("bpm"))
+    if bpm is not None and bpm > 0:
+        deck["bpm"] = bpm
+
+    confidence = _clean_live_float(raw.get("confidence"))
+    if confidence is not None:
+        deck["confidence"] = max(0.0, min(1.0, confidence))
+
+    source = _clean_live_evidence_token(raw.get("source"), max_len=32)
+    if deck and source in _LIVE_DECK_SOURCES:
+        deck["source"] = source
+
+    return deck or None
+
+
+def _clean_live_int_0_127(raw: Any, *, default: int | None = None) -> int | None:
+    value = _clean_live_float(raw)
+    if value is None:
+        return default
+    return max(0, min(127, int(value)))
+
+
+def _live_deck_controls(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    out: dict[str, Any] = {}
+    for key, default in (
+        ("vol", 0),
+        ("eq_low", 64),
+        ("eq_mid", 64),
+        ("eq_hi", 64),
+        ("filter", 64),
+    ):
+        value = _clean_live_int_0_127(raw.get(key), default=default)
+        if value is not None:
+            out[key] = value
+    if isinstance(raw.get("play"), bool):
+        out["play"] = raw["play"]
+    return out or None
+
+
+def _live_deck_mixer(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    out: dict[str, Any] = {}
+    if isinstance(raw.get("connected"), bool):
+        out["connected"] = raw["connected"]
+    xfader = _clean_live_int_0_127(raw.get("xfader"), default=None)
+    if xfader is not None:
+        out["xfader"] = xfader
+    confidence = _clean_live_float(raw.get("deck_confidence"))
+    if confidence is not None:
+        out["deck_confidence"] = max(0.0, min(1.0, confidence))
+    for side in ("A", "B"):
+        controls = _live_deck_controls(raw.get(side))
+        if controls:
+            out[side] = controls
+    return out or None
+
+
+def _live_source_status(raw: Any) -> dict[str, str] | None:
+    if not isinstance(raw, dict):
+        return None
+    out: dict[str, str] = {}
+    for key in _LIVE_SOURCE_STATUS_KEYS:
+        text = _clean_live_text(raw.get(key), max_len=96)
         if not text:
             continue
-        speaker = "Viber" if turn.get("role") == "viber" else "DJ"
+        token = re.sub(r"[^A-Za-z0-9_:.=@+-]+", "_", text.strip().lower()).strip("_")
+        if token:
+            out[key] = token[:96]
+    return out or None
+
+
+def _live_span_pair(raw: Any) -> list[float] | None:
+    if not isinstance(raw, list) or len(raw) < 2:
+        return None
+    a = _clean_live_float(raw[0])
+    b = _clean_live_float(raw[1])
+    if a is None or b is None:
+        return None
+    return [round(a, 1), round(b, 1)]
+
+
+def _live_context_capabilities(raw: Any) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        token = _clean_live_evidence_token(item, max_len=48)
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        out.append(token)
+        if len(out) >= _LIVE_CONTEXT_CAP:
+            break
+    return out
+
+
+def _live_audio_window_map(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    required = {
+        "p1": "master_global_mix",
+        "p1_heard": True,
+        "timeline": "past_action_future",
+        "together_audio": "P1_global_mix",
+        "decks_together": True,
+        "deckA_audio": "not_attached",
+        "deckB_audio": "not_attached",
+        "per_deck_audio": "structured_text_only",
+        "duplicate_audio": "same_master_not_deck_split",
+        "deck_separation": "deck_lanes_context",
+        "lane_aliases": "deck1:A,deck2:B",
+        "rule": "time_alignment_not_outcome_verdict",
+    }
+    if any(raw.get(key) != expected for key, expected in required.items()):
+        return None
+    pre_s = _live_span_pair(raw.get("pre_s"))
+    current_s = _live_span_pair(raw.get("current_s"))
+    action_s = _live_span_pair(raw.get("action_s"))
+    if pre_s is None or current_s is None or action_s is None:
+        return None
+    anchors: list[dict[str, Any]] = []
+    raw_anchors = raw.get("move_anchors")
+    if isinstance(raw_anchors, list):
+        for item in raw_anchors[-3:]:
+            if not isinstance(item, dict):
+                continue
+            label = _clean_live_text(item.get("label"), max_len=72)
+            token = _clean_live_evidence_token(item.get("token"), max_len=96)
+            relation = _clean_live_evidence_token(item.get("relation"), max_len=32)
+            if not label or not token or not relation:
+                continue
+            anchors.append(
+                {
+                    "label": label,
+                    "token": token,
+                    "age_s": _clean_live_float(item.get("age_s")),
+                    "relation": relation,
+                }
+            )
+    future_raw = raw.get("future")
+    future = future_raw if isinstance(future_raw, dict) else {}
+    if future.get("heard") is not False:
+        return None
+    return {
+        **required,
+        "pre_s": pre_s,
+        "current_s": current_s,
+        "action_s": action_s,
+        "move_anchors": anchors,
+        "future": {
+            key: value
+            for key, value in future.items()
+            if key in {"heard", "span", "part", "source", "span_s", "rule"}
+        },
+    }
+
+
+def normalize_live_source_status_for_viber(raw: Any) -> dict[str, str] | None:
+    """Return the bounded structured deck-source status Viber may inspect."""
+    return _live_source_status(raw)
+
+
+def normalize_live_audio_window_map_for_viber(raw: Any) -> dict[str, Any] | None:
+    """Return the bounded structured P1 audio-window map Viber may inspect."""
+    return _live_audio_window_map(raw)
+
+
+def _render_audio_window_map_line(audio_map: Any) -> str | None:
+    if not isinstance(audio_map, dict):
+        return None
+    anchors = []
+    raw_anchors = audio_map.get("move_anchors")
+    if isinstance(raw_anchors, list):
+        for item in raw_anchors[:3]:
+            if not isinstance(item, dict):
+                continue
+            token = _clean_live_evidence_token(item.get("token"), max_len=96) or "move"
+            relation = _clean_live_evidence_token(item.get("relation"), max_len=32) or "unknown"
+            age = _clean_live_float(item.get("age_s"))
+            anchors.append(
+                f"{token}@-{age:.1f}s:{relation}" if age is not None else f"{token}:age_unknown"
+            )
+    future_text = "not_attached"
+    future = audio_map.get("future") if isinstance(audio_map.get("future"), dict) else {}
+    span = future.get("span_s")
+    if future.get("part") and isinstance(span, list) and len(span) >= 2:
+        try:
+            future_text = f"{future.get('part')}:{float(span[0]):.1f}..+{float(span[1]):.1f}"
+        except (TypeError, ValueError):
+            future_text = str(future.get("part"))[:24]
+    return (
+        "audio_window_map[P1=master_global_mix heard=true old=pre_s "
+        f"current=current_s action=action_s future={future_text} "
+        "deckA_audio=not_attached deckB_audio=not_attached "
+        "duplicate_audio=same_master_not_deck_split anchors="
+        + (",".join(anchors) if anchors else "none")
+        + " rule=time_alignment_not_outcome_verdict]"
+    )
+
+
+def _normalize_live_context(raw: Any) -> dict[str, Any] | None:
+    """Keep only the tiny live-deck fields Viber may safely reason from."""
+    if not isinstance(raw, dict):
+        return None
+
+    out: dict[str, Any] = {}
+    deck = _clean_live_text(raw.get("deck"), max_len=16)
+    if deck:
+        out["deck"] = deck
+    if isinstance(raw.get("audible"), bool):
+        out["audible"] = raw["audible"]
+    phase = _clean_live_text(raw.get("phase"), max_len=48)
+    if phase:
+        out["phase"] = phase
+    bpm = _clean_live_float(raw.get("bpm"))
+    if bpm is not None and bpm > 0:
+        out["bpm"] = bpm
+    music = _clean_live_float(raw.get("music"))
+    if music is not None and music >= 0:
+        out["music"] = min(1.0, music)
+
+    schema_version = _clean_live_float(raw.get("live_context_schema_version"))
+    if schema_version is not None and schema_version >= 1:
+        out["live_context_schema_version"] = int(schema_version)
+    capabilities = _live_context_capabilities(raw.get("live_context_capabilities"))
+    if capabilities:
+        out["live_context_capabilities"] = capabilities
+
+    deck_state: dict[str, dict[str, Any]] = {}
+    raw_decks = raw.get("deck_state")
+    has_deck_state_payload = isinstance(raw_decks, dict)
+    if has_deck_state_payload:
+        for side in _LIVE_DECK_SIDES:
+            deck_fields = _live_deck_fields(raw_decks.get(side))
+            if deck_fields:
+                deck_state[side] = deck_fields
+    if has_deck_state_payload:
+        out["deck_state"] = deck_state
+
+    has_deck_mixer_payload = isinstance(raw.get("deck_mixer"), dict)
+    deck_mixer = _live_deck_mixer(raw.get("deck_mixer"))
+    if deck_mixer:
+        out["deck_mixer"] = deck_mixer
+    elif has_deck_mixer_payload:
+        out["deck_mixer"] = {}
+
+    deck_source_status = _live_source_status(raw.get("deck_source_status"))
+    if deck_source_status:
+        out["deck_source_status"] = deck_source_status
+
+    recent_moves: list[str] = []
+    raw_moves = raw.get("recent_moves")
+    if isinstance(raw_moves, list):
+        for label in raw_moves[-_LIVE_RECENT_MOVE_CAP:]:
+            text = _clean_live_text(label, max_len=72)
+            if text:
+                recent_moves.append(text)
+    if recent_moves:
+        out["recent_moves"] = recent_moves
+
+    deck_lanes_context = _shared_normalize_deck_lanes_context_text(raw.get("deck_lanes_context"))
+    if deck_lanes_context:
+        out["deck_lanes_context"] = deck_lanes_context
+
+    deck_reference_context = _shared_normalize_deck_reference_context_text(
+        raw.get("deck_reference_context")
+    )
+    if deck_reference_context:
+        out["deck_reference_context"] = deck_reference_context
+
+    deck_source_context = _shared_normalize_deck_source_context_text(raw.get("deck_source_context"))
+    if deck_source_context:
+        out["deck_source_context"] = deck_source_context
+
+    deck_audio_context = _shared_normalize_deck_audio_context_text(raw.get("deck_audio_context"))
+    if deck_audio_context:
+        out["deck_audio_context"] = deck_audio_context
+
+    deck_audio_separation_context = _shared_normalize_deck_audio_separation(
+        raw.get("deck_audio_separation_context")
+    )
+    if deck_audio_separation_context:
+        out["deck_audio_separation_context"] = deck_audio_separation_context
+
+    audio_part_context = _shared_normalize_audio_part_context_text(raw.get("audio_part_context"))
+    if audio_part_context:
+        out["audio_part_context"] = audio_part_context
+
+    audio_window_context = _shared_normalize_audio_window_context_text(
+        raw.get("audio_window_context")
+    )
+    if audio_window_context:
+        out["audio_window_context"] = audio_window_context
+
+    audio_window_map = _live_audio_window_map(raw.get("audio_window_map"))
+    if audio_window_map:
+        out["audio_window_map"] = audio_window_map
+
+    audio_delta: list[str] = []
+    raw_audio_delta = raw.get("audio_delta")
+    if isinstance(raw_audio_delta, list):
+        for item in raw_audio_delta[-_LIVE_AUDIO_DELTA_CAP:]:
+            text = _clean_live_text(item, max_len=96)
+            if text:
+                audio_delta.append(text)
+    if audio_delta:
+        out["audio_delta"] = audio_delta
+
+    evidence = _live_evidence(raw.get("live_evidence"))
+    if evidence:
+        out["live_evidence"] = evidence
+
+    state = _music_state_from_live_context(out)
+    derived_evidence = _shared_live_evidence_packet(
+        state,
+        _live_context_recent_moves(out),
+        audio_delta_items=_live_context_audio_delta(out),
+    )
+    merged_evidence = _merge_live_evidence(out.get("live_evidence"), derived_evidence)
+    if merged_evidence:
+        out["live_evidence"] = merged_evidence
+
+    return out or None
+
+
+def normalize_live_context_for_viber(live_context: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Return the bounded live context Viber will prompt against."""
+    normalized = _normalize_live_context(live_context)
+    return dict(normalized) if normalized else None
+
+
+def _music_state_from_live_context(context: dict[str, Any]) -> MusicState:
+    """Adapt Viber's raw live-context dict into the shared deck guard model."""
+    state = MusicState()
+    deck = _clean_live_text(context.get("deck"), max_len=16)
+    state.audible_deck = deck or "none"
+    if isinstance(context.get("audible"), bool):
+        state.audible = context["audible"]
+    phase = _clean_live_text(context.get("phase"), max_len=48)
+    if phase:
+        state.phase = phase
+    bpm = _clean_live_float(context.get("bpm"))
+    if bpm is not None and bpm > 0:
+        state.bpm = bpm
+
+    mixer = context.get("deck_mixer")
+    if isinstance(mixer, dict):
+        state.controller_connected = bool(mixer.get("connected", False))
+        state.xfader = _clean_live_int_0_127(mixer.get("xfader"), default=64) or 64
+        state.deck_confidence = _clean_live_float(mixer.get("deck_confidence")) or 0.0
+        for side, attr in (("A", "deck_a"), ("B", "deck_b")):
+            controls = _live_deck_controls(mixer.get(side))
+            if controls:
+                setattr(state, attr, controls)
+
+    decks: dict[str, DeckTrack] = {}
+    raw_decks = context.get("deck_state")
+    if isinstance(raw_decks, dict):
+        for side in _LIVE_DECK_SIDES:
+            row = raw_decks.get(side)
+            if not isinstance(row, dict):
+                continue
+            source = row.get("source")
+            source_text = str(source) if source in _LIVE_DECK_SOURCES else "live_context"
+            track = DeckTrack(
+                title=_clean_live_text(row.get("title")),
+                track_id=_clean_live_text(row.get("track_id")),
+                bpm=_clean_live_float(row.get("bpm")) or 0.0,
+                key=_clean_live_text(row.get("key")),
+                camelot=_clean_live_text(row.get("camelot")),
+                confidence=_clean_live_float(row.get("confidence")) or 0.0,
+                source=source_text,
+            )
+            decks[side] = track
+    source_status = _live_source_status(context.get("deck_source_status")) or {}
+    state.deck_state = DeckState(decks=decks, source_status=source_status)
+    return state
+
+
+def _live_context_recent_moves(context: dict[str, Any]) -> list[str]:
+    moves = context.get("recent_moves")
+    if not isinstance(moves, list):
+        return []
+    return [str(label) for label in moves if isinstance(label, str)][-_LIVE_RECENT_MOVE_CAP:]
+
+
+def _live_context_audio_delta(context: dict[str, Any]) -> list[str]:
+    items = context.get("audio_delta")
+    if not isinstance(items, list):
+        return []
+    return [str(item) for item in items if isinstance(item, str)][-_LIVE_AUDIO_DELTA_CAP:]
+
+
+def _memory_db_candidates() -> list[Path]:
+    """Return local memory metadata DB paths, newest schema first."""
+    try:
+        from vibemix.runtime.config_store import app_data_dir
+
+        root = app_data_dir()
+    except Exception:
+        return []
+    return [root / "memory.db", root / "memory_moments.db"]
+
+
+def _history_token(text: str) -> str | None:
+    token = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+    return token[:48] if len(token) >= 2 else None
+
+
+def _historical_move_query_tokens(
+    moves: list[str],
+    audio_delta: list[str],
+    context: dict[str, Any] | None = None,
+) -> list[str]:
+    tokens: list[str] = []
+    raw_sources: list[str] = [*moves[-3:], *audio_delta[:4]]
+    if context is not None:
+        state = _music_state_from_live_context(context)
+        deck_source_context = _shared_render_deck_source_context(state, compact=True)
+        if not deck_source_context:
+            deck_source_context = (
+                context.get("deck_source_context")
+                if isinstance(context.get("deck_source_context"), str)
+                else None
+            )
+        if deck_source_context:
+            raw_sources.append(deck_source_context)
+        deck_lane_context = _shared_render_deck_lane_context(state, compact=True)
+        if deck_lane_context:
+            raw_sources.append(deck_lane_context)
+        deck_reference_context = _shared_render_deck_reference_context(state, compact=True)
+        if deck_reference_context:
+            raw_sources.append(deck_reference_context)
+        audio_window_context = _shared_render_audio_window_context(state, moves)
+        if audio_window_context:
+            raw_sources.append(audio_window_context)
+        evidence = context.get("live_evidence")
+        if isinstance(evidence, dict):
+            for key in ("mix", "refs"):
+                values = evidence.get(key)
+                if not isinstance(values, list):
+                    continue
+                for value in values:
+                    text = str(value)
+                    if (
+                        "deck_lanes=" in text
+                        or "deck_reference=" in text
+                        or "deck_source=" in text
+                        or "deck_audio_support=" in text
+                    ):
+                        raw_sources.append(text)
+        context_feed_contract = _shared_render_context_feed_contract(
+            state,
+            moves,
+            surface="viber_history_query",
+        )
+        if context_feed_contract:
+            raw_sources.append(context_feed_contract)
+
+    for raw in raw_sources:
+        whole = _history_token(raw)
+        if whole and whole not in tokens:
+            tokens.append(whole)
+        for part in re.split(r"[^A-Za-z0-9_]+", raw):
+            token = _history_token(part)
+            if token and token not in tokens:
+                tokens.append(token)
+    return tokens[:96]
+
+
+def _compact_history_signature(signature: str, *, cap: int = 220) -> str:
+    return _shared_sanitize_history_signature(signature, cap=cap)
+
+
+def _score_historical_signature(signature: str, tokens: list[str]) -> int:
+    low = signature.lower()
+    normalized = re.sub(r"[^a-z0-9]+", "_", low)
+    score = 0
+    if "event=mix_move" in low:
+        score += 4
+    if "move_effect=" in low:
+        score += 3
+    if "audio_delta=" in low:
+        score += 3
+    if "audio_window=" in low or "audio_window_context[" in low:
+        score += 2
+    for token in tokens:
+        if token and (token in low or token in normalized):
+            score += 1
+    return score
+
+
+def _read_historical_move_rows(db_path: Path) -> list[tuple[str, str, float, str]]:
+    if not db_path.exists():
+        return []
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return []
+    try:
+        rows = conn.execute(
+            "SELECT record_id, session_id, ts, signature FROM moments "
+            "WHERE kind = 'coach_line' AND signature LIKE '%event=MIX_MOVE%' "
+            "ORDER BY ts DESC LIMIT ?",
+            (_LIVE_HISTORY_SCAN_LIMIT,),
+        ).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        conn.close()
+    out: list[tuple[str, str, float, str]] = []
+    for record_id, session_id, ts, signature in rows:
+        if not isinstance(signature, str) or not signature.strip():
+            continue
+        out.append((str(record_id), str(session_id), float(ts or 0.0), signature))
+    return out
+
+
+def _render_historical_move_context(raw: Any) -> str | None:
+    """Render cheap past move/effect memory for Viber chat.
+
+    This is a raw memory scan, not a generation or audio call. It only activates
+    when live_context has both recent controller moves and audio_delta, matching
+    the live Gemini recall cost gate.
+    """
+    context = _normalize_live_context(raw)
+    if not context:
+        return None
+    moves = _live_context_recent_moves(context)
+    audio_delta = _live_context_audio_delta(context)
+    if not moves or not audio_delta:
+        return None
+
+    tokens = _historical_move_query_tokens(moves, audio_delta, context)
+    scored: list[tuple[int, float, str, str, str]] = []
+    seen: set[str] = set()
+    for db_path in _memory_db_candidates():
+        for record_id, session_id, ts, signature in _read_historical_move_rows(db_path):
+            if record_id in seen:
+                continue
+            seen.add(record_id)
+            score = _score_historical_signature(signature, tokens)
+            if score <= 0:
+                continue
+            scored.append((score, ts, record_id, session_id, signature))
+    if not scored:
+        return None
+
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    lines = [
+        "HISTORICAL MOVE CONTEXT (past-session raw memory; not live proof; no extra model call):"
+    ]
+    for score, _ts, record_id, session_id, signature in scored[:_LIVE_HISTORY_CAP]:
+        lines.append(
+            "history_move["
+            f"id={_clean_live_evidence_token(record_id, max_len=96) or 'unknown'} "
+            f"session={_clean_live_evidence_token(session_id, max_len=96) or 'unknown'} "
+            f"match={score} "
+            f"signature={_compact_history_signature(signature)!r}]"
+        )
+    lines.append(
+        "Historical move context is comparison memory only. It can suggest what "
+        "similar knob/fader moves sounded like before, but it cannot upgrade "
+        "the current live claim policy or prove the current move was good, "
+        "clean, successful, or a transition."
+    )
+    return "\n".join(lines)
+
+
+def _render_live_evidence_context(context: dict[str, Any]) -> str | None:
+    evidence = context.get("live_evidence")
+    if not isinstance(evidence, dict):
+        return None
+
+    fields: list[str] = []
+    refs = evidence.get("refs")
+    if isinstance(refs, list):
+        clean_refs = [str(item) for item in refs if isinstance(item, str)][:_LIVE_EVIDENCE_REFS_CAP]
+        if clean_refs:
+            fields.append("refs=" + ",".join(clean_refs))
+
+    mix = evidence.get("mix")
+    if isinstance(mix, list):
+        clean_mix = [str(item) for item in mix if isinstance(item, str)][:_LIVE_EVIDENCE_CAP]
+        if clean_mix:
+            fields.append("mix=" + ",".join(clean_mix))
+
+    midi = evidence.get("midi")
+    if isinstance(midi, list):
+        midi_refs: list[str] = []
+        for item in midi[:_LIVE_MIDI_EVIDENCE_CAP]:
+            if not isinstance(item, dict):
+                continue
+            key = item.get("key")
+            t_session = item.get("t")
+            if isinstance(key, str) and isinstance(t_session, (int, float)):
+                midi_refs.append(f"{key}@{float(t_session):.1f}")
+        if midi_refs:
+            fields.append("midi=" + ",".join(midi_refs))
+
+    if not fields:
+        return None
+    fields.append("rule=evidence_categories_not_quality_verdict")
+    return "live_evidence[" + " ".join(fields) + "]"
+
+
+def _transition_context_token(rendered: str | None) -> str | None:
+    if not rendered:
+        return None
+    match = re.search(r"\btransition_(?:block|candidate|watch)=[^\]\s]+", rendered)
+    return match.group(0) if match else None
+
+
+def _policy_from_transition_context(*contexts: str | None) -> str:
+    chunks = [context or "" for context in contexts]
+    if any("transition_block=" in chunk for chunk in chunks):
+        return "blocked"
+    if any("transition_watch=" in chunk for chunk in chunks):
+        return "watch_not_claim"
+    if any("transition_candidate=" in chunk for chunk in chunks):
+        return "candidate_not_verdict"
+    return "requires_more_evidence"
+
+
+def _strongest_live_policy(*policies: str | None) -> str:
+    ordered = ("blocked", "watch_not_claim", "candidate_not_verdict")
+    policy_set = {policy for policy in policies if policy}
+    for policy in ordered:
+        if policy in policy_set:
+            return policy
+    return "requires_more_evidence"
+
+
+def _live_policy_strength(policy: str | None) -> int:
+    return {
+        "blocked": 3,
+        "watch_not_claim": 2,
+        "candidate_not_verdict": 1,
+    }.get(policy or "", 0)
+
+
+def _live_evidence_policy(context: dict[str, Any]) -> str:
+    return _policy_from_transition_context(_render_live_evidence_context(context))
+
+
+def _live_context_transition_status(audible_deck: str | None, resolved_sides: list[str]) -> str:
+    if not resolved_sides:
+        return "transition_block=no_resolved_decks"
+    if len(resolved_sides) == 1:
+        return "transition_block=single_resolved_deck"
+    if audible_deck == "mix":
+        return "transition_candidate=two_resolved_decks_mixing"
+    if audible_deck in ("A", "B"):
+        return f"transition_watch=two_resolved_decks_single_audible_{audible_deck}"
+    return "transition_watch=two_resolved_decks_audible_unknown"
+
+
+def _live_move_sides(labels: list[str]) -> set[str]:
+    sides: set[str] = set()
+    for label in labels:
+        sides.update(_LIVE_MOVE_RE.findall(label))
+    return sides
+
+
+def _live_move_controls(labels: list[str]) -> set[str]:
+    controls: set[str] = set()
+    for label in labels:
+        if "xfader" in label:
+            controls.add("xfader")
+        if "_low:" in label:
+            controls.add("low")
+        if "_mid:" in label:
+            controls.add("mid")
+        if "_hi:" in label:
+            controls.add("hi")
+        if "_filter:" in label:
+            controls.add("filter")
+        if "_play" in label:
+            controls.add("play")
+        if "_volume:" in label:
+            controls.add("volume")
+        if "killed" in label:
+            controls.add("eq_kill")
+    return controls
+
+
+def _live_move_scope(touched_sides: set[str], controls: set[str]) -> str:
+    if "xfader" in controls or len(touched_sides) >= 2:
+        return "cross_deck_move"
+    if len(touched_sides) == 1:
+        return f"single_deck_move_{next(iter(touched_sides))}"
+    return "deck_unknown_move"
+
+
+def _live_move_transition_status(
+    audible_deck: str | None,
+    resolved_sides: list[str],
+    scope: str,
+    controls: set[str],
+) -> str:
+    if not resolved_sides:
+        return "transition_block=no_resolved_decks"
+    if len(resolved_sides) < 2:
+        return "transition_block=single_resolved_deck"
+    if not (scope == "cross_deck_move" or "xfader" in controls):
+        return "transition_block=single_deck_move"
+    if audible_deck == "mix":
+        return "transition_candidate=two_deck_move_audible_mix"
+    return "transition_watch=two_deck_move_single_audible"
+
+
+def _render_live_move_context(
+    context: dict[str, Any],
+    audible_deck: str | None,
+    resolved_sides: list[str],
+) -> str | None:
+    raw_moves = context.get("recent_moves")
+    if not isinstance(raw_moves, list) or not raw_moves:
+        return None
+    labels = [str(label) for label in raw_moves if isinstance(label, str)]
+    if not labels:
+        return None
+
+    touched_sides = _live_move_sides(labels)
+    controls = _live_move_controls(labels)
+    scope = _live_move_scope(touched_sides, controls)
+    transition = _live_move_transition_status(
+        audible_deck,
+        resolved_sides,
+        scope,
+        controls,
+    )
+    fields = [
+        f"scope={scope}",
+        f"sides={'+'.join(sorted(touched_sides)) if touched_sides else 'unknown'}",
+        f"controls={'+'.join(sorted(controls)) if controls else 'unknown'}",
+        f"audible={audible_deck or 'unknown'}",
+        f"resolved={'+'.join(resolved_sides) if resolved_sides else 'none'}",
+        transition,
+    ]
+    return "move_context[" + " ".join(fields) + "]"
+
+
+def _live_policy_multi_deck_outcome(
+    live_status: str,
+    move_context: str | None,
+    live_evidence_context: str | None = None,
+) -> str:
+    return _policy_from_transition_context(live_status, move_context, live_evidence_context)
+
+
+def _render_live_claim_policy(
+    live_status: str,
+    move_context: str | None,
+    resolved_sides: list[str],
+    has_recent_moves: bool,
+    *,
+    shared_policy: str | None = None,
+) -> str:
+    resolved = "+".join(resolved_sides) if resolved_sides else "none"
+    policy = shared_policy or _live_policy_multi_deck_outcome(live_status, move_context)
+    fields = [
+        f"deck_reference=resolved_{resolved}",
+        "control_reference=observed_recent_moves_only"
+        if has_recent_moves
+        else "control_reference=none",
+        f"multi_deck_outcome={policy}",
+        "audio_quality=not_observed_by_viber",
+        "control_to_music_outcome=do_not_infer",
+    ]
+    return "claim_policy[" + " ".join(fields) + "]"
+
+
+def _render_live_context_transport(context: dict[str, Any]) -> str | None:
+    schema_version = _clean_live_float(context.get("live_context_schema_version"))
+    capabilities = _live_context_capabilities(context.get("live_context_capabilities"))
+    capability_set = set(capabilities)
+    missing_capabilities = sorted(_LIVE_CONTEXT_REQUIRED_CAPABILITIES - capability_set)
+    stale = (
+        schema_version is None
+        or schema_version < _LIVE_CONTEXT_SCHEMA_VERSION
+        or bool(missing_capabilities)
+    )
+    fields: list[str] = []
+    if schema_version is not None and schema_version >= 1:
+        fields.append(f"schema={int(schema_version)}")
+    else:
+        fields.append("schema=missing")
+    if capabilities:
+        fields.append("capabilities=" + ",".join(capabilities[:_LIVE_CONTEXT_CAP]))
+    if missing_capabilities:
+        fields.append("missing=" + ",".join(missing_capabilities))
+    fields.append(f"status={'stale_or_pre_schema_v2' if stale else 'fresh_schema_v2'}")
+    fields.append("rule=transport_receipt_not_musical_evidence")
+    return "live_context_transport[" + " ".join(fields) + "]"
+
+
+def _render_live_context(raw: Any) -> str | None:
+    context = _normalize_live_context(raw)
+    if not context:
+        return None
+    state = _music_state_from_live_context(context)
+    recent_moves = _live_context_recent_moves(context)
+
+    decks = context.get("deck_state") if isinstance(context.get("deck_state"), dict) else {}
+    resolved_sides: list[str] = []
+    deck_lines: list[str] = []
+    for side in _LIVE_DECK_SIDES:
+        deck = decks.get(side) if isinstance(decks, dict) else None
+        if not isinstance(deck, dict):
+            continue
+        confidence = _clean_live_float(deck.get("confidence")) or 0.0
+        has_identity = any(deck.get(key) for key in ("title", "track_id", "camelot"))
+        if confidence >= _LIVE_CONTEXT_MIN_CONF and has_identity:
+            resolved_sides.append(side)
+
+        parts = [f"{side}={deck.get('title')!r}" if deck.get("title") else f"{side}=unknown"]
+        if deck.get("camelot"):
+            parts.append(f"key={deck['camelot']}")
+        elif deck.get("key"):
+            parts.append(f"key={deck['key']}")
+        bpm = _clean_live_float(deck.get("bpm"))
+        if bpm is not None and bpm > 0:
+            parts.append(f"bpm={bpm:.0f}")
+        if confidence:
+            parts.append(f"conf={confidence:.2f}")
+        source = deck.get("source")
+        if source:
+            parts.append(f"src={source}")
+        deck_lines.append(" ".join(parts))
+
+    audible_deck = _clean_live_text(context.get("deck"), max_len=16)
+    header_parts = []
+    if audible_deck:
+        header_parts.append(f"deck={audible_deck}")
+    if isinstance(context.get("audible"), bool):
+        header_parts.append(f"audible={str(context['audible']).lower()}")
+    if context.get("phase"):
+        header_parts.append(f"phase={context['phase']}")
+    bpm = _clean_live_float(context.get("bpm"))
+    if bpm is not None and bpm > 0:
+        header_parts.append(f"bpm={bpm:.0f}")
+    music = _clean_live_float(context.get("music"))
+    if music is not None and music >= 0:
+        header_parts.append(f"music={music:.3f}")
+    header_parts.append(f"resolved={'+'.join(resolved_sides) if resolved_sides else 'none'}")
+    deck_context = _shared_render_deck_context(state)
+    live_status = _transition_context_token(deck_context) or _live_context_transition_status(
+        audible_deck,
+        resolved_sides,
+    )
+    header_parts.append(live_status)
+
+    lines = [
+        "CURRENT LIVE DECK CONTEXT (bounded app snapshot, read-only; no extra model call):",
+        "live_context[" + " ".join(header_parts) + "]",
+    ]
+    transport_line = _render_live_context_transport(context)
+    if transport_line:
+        lines.append(transport_line)
+    context_feed_contract = _shared_render_context_feed_contract(
+        state,
+        recent_moves,
+        surface="viber_text",
+        force=True,
+    )
+    if context_feed_contract:
+        lines.append(context_feed_contract)
+    audio_part_context = (
+        context.get("audio_part_context")
+        if isinstance(context.get("audio_part_context"), str)
+        else None
+    )
+    if not audio_part_context:
+        audio_part_context = _shared_render_audio_part_context(
+            audio_seconds=6.0,
+            surface="viber_live_context",
+            p1_model_heard=False,
+        )
+    if audio_part_context:
+        lines.append(audio_part_context)
+    if deck_context:
+        lines.append(deck_context)
+    deck_lane_context = _shared_render_deck_lane_context(state)
+    if not deck_lane_context:
+        deck_lane_context = (
+            context.get("deck_lanes_context")
+            if isinstance(context.get("deck_lanes_context"), str)
+            else None
+        )
+    if deck_lane_context:
+        lines.append(deck_lane_context)
+    deck_reference_context = _shared_render_deck_reference_context(state)
+    if not deck_reference_context:
+        deck_reference_context = (
+            context.get("deck_reference_context")
+            if isinstance(context.get("deck_reference_context"), str)
+            else None
+        )
+    if deck_reference_context:
+        lines.append(deck_reference_context)
+    deck_source_context = _shared_render_deck_source_context(state)
+    if deck_source_context:
+        lines.append(deck_source_context)
+    else:
+        deck_source_context = (
+            context.get("deck_source_context")
+            if isinstance(context.get("deck_source_context"), str)
+            else None
+        )
+        if deck_source_context:
+            lines.append(deck_source_context)
+    mixer_context = _shared_render_mixer_context(state)
+    if mixer_context:
+        lines.append(mixer_context)
+    deck_audio_context = _shared_render_deck_audio_context(state)
+    if not deck_audio_context:
+        deck_audio_context = (
+            context.get("deck_audio_context")
+            if isinstance(context.get("deck_audio_context"), str)
+            else None
+        )
+    if deck_audio_context:
+        lines.append(deck_audio_context)
+    deck_audio_separation_context = (
+        context.get("deck_audio_separation_context")
+        if isinstance(context.get("deck_audio_separation_context"), str)
+        else None
+    )
+    if not deck_audio_separation_context:
+        deck_audio_separation_context = _shared_render_deck_audio_separation()
+    if deck_audio_separation_context:
+        lines.append(deck_audio_separation_context)
+    if deck_lines:
+        lines.append("decks[" + " | ".join(deck_lines) + "]")
+    if isinstance(recent_moves, list) and recent_moves:
+        lines.append("recent_moves[" + " | ".join(str(label) for label in recent_moves) + "]")
+    audio_window_context = (
+        context.get("audio_window_context")
+        if isinstance(context.get("audio_window_context"), str)
+        else None
+    )
+    if not audio_window_context:
+        audio_window_context = _shared_render_audio_window_context(
+            state,
+            recent_moves,
+            force=True,
+        )
+    if audio_window_context:
+        lines.append(audio_window_context)
+    audio_window_map_line = _render_audio_window_map_line(context.get("audio_window_map"))
+    if audio_window_map_line:
+        lines.append(audio_window_map_line)
+    move_context = _shared_render_move_context(state, recent_moves)
+    if move_context:
+        lines.append(move_context)
+    deck_change_context = _shared_render_deck_change_context(state, recent_moves)
+    if deck_change_context:
+        lines.append(deck_change_context)
+    move_effect_context = _shared_render_move_effect_context(
+        state,
+        recent_moves,
+        audio_delta_items=_live_context_audio_delta(context),
+    )
+    if move_effect_context:
+        lines.append(move_effect_context)
+    live_evidence_context = _render_live_evidence_context(context)
+    if live_evidence_context:
+        lines.append(live_evidence_context)
+    shared_policy, _reason = _shared_live_claim_policy(state, recent_moves)
+    context_policy = _live_policy_multi_deck_outcome(
+        live_status,
+        move_context,
+        live_evidence_context,
+    )
+    shared_policy = _strongest_live_policy(shared_policy, context_policy)
+    lines.append(
+        _render_live_claim_policy(
+            live_status,
+            move_context,
+            resolved_sides,
+            isinstance(recent_moves, list) and bool(recent_moves),
+            shared_policy=shared_policy,
+        )
+    )
+    lines.append(
+        "Read this as labeled live context before reasoning: bind deck1/deck2, "
+        "source/provenance, freshness/TTL, cache/static-vs-volatile boundaries, "
+        "and history-as-comparison first. Then answer from those labels plus the "
+        "grounded tools. If live_context_transport carries status=stale_or_pre_schema_v2, "
+        "do not give live transition or move-outcome verdicts; ask for a restarted "
+        "live session/resample. If live_context, deck_context, deck_lanes_context, "
+        "deck_reference_context, deck_source_context, deck_audio_context, "
+        "deck_audio_separation_context, audio_window_context, deck_change_context, "
+        "move_effect_context, live_evidence, or move_context carries "
+        "transition_block/transition_watch, "
+        "do not praise or claim a transition/blend/switch/segue/handoff/bridge/layer. "
+        "If it carries transition_candidate, you may name it as a candidate but "
+        "must not grade it as good/clean/successful. Treat move_effect_context "
+        "and live_evidence as evidence category references, not causal proof or "
+        "a skill grade. Use grounded tools for library tracks, cue timing, and "
+        "mix-point claims."
+    )
+    return "\n".join(lines)
+
+
+def _live_guard_summary(context: dict[str, Any]) -> str:
+    deck = _clean_live_text(context.get("deck"), max_len=16) or "unknown deck"
+    decks = context.get("deck_state") if isinstance(context.get("deck_state"), dict) else {}
+    resolved: list[str] = []
+    if isinstance(decks, dict):
+        for side in _LIVE_DECK_SIDES:
+            row = decks.get(side)
+            if not isinstance(row, dict):
+                continue
+            confidence = _clean_live_float(row.get("confidence")) or 0.0
+            if confidence >= _LIVE_CONTEXT_MIN_CONF and any(
+                row.get(key) for key in ("title", "track_id", "camelot")
+            ):
+                resolved.append(side)
+    moves = context.get("recent_moves")
+    move_hint = ""
+    if isinstance(moves, list) and moves:
+        move_hint = f"; recent control evidence: {' | '.join(str(m) for m in moves[-3:])}"
+    evidence_gate = _transition_context_token(_render_live_evidence_context(context))
+    if evidence_gate:
+        move_hint += f"; live evidence gate: {evidence_gate}"
+    lane_hint = _live_guard_lane_hint(context)
+    if lane_hint:
+        move_hint += f"; deck lanes={lane_hint}"
+    source_hint = _live_guard_source_hint(context)
+    if source_hint:
+        move_hint += f"; deck source={source_hint}"
+    return f"audible deck {deck}; resolved decks={'+'.join(resolved) if resolved else 'none'}{move_hint}"
+
+
+def _live_guard_lane_hint(context: dict[str, Any]) -> str | None:
+    state = _music_state_from_live_context(context)
+    rendered = _shared_render_deck_lane_context(state, compact=True)
+    if not rendered:
+        return None
+    inner = rendered.removeprefix("deck_lanes_context[").removesuffix("]")
+    inner = inner.replace(" rule=per_lane_identity_route_control_not_outcome", "")
+    return inner.replace(" | ", " / ") or None
+
+
+def _live_guard_source_hint(context: dict[str, Any]) -> str | None:
+    state = _music_state_from_live_context(context)
+    rendered = _shared_render_deck_source_context(state, compact=True)
+    if not rendered:
+        rendered = (
+            context.get("deck_source_context")
+            if isinstance(context.get("deck_source_context"), str)
+            else None
+        )
+    if not rendered:
+        return None
+    inner = rendered.removeprefix("deck_source_context[").removesuffix("]")
+    fields = [
+        field
+        for field in inner.split()
+        if field.startswith(
+            (
+                "resolved=",
+                "unresolved=",
+                "sources=",
+                "second_deck=",
+                "rule=",
+            )
+        )
+    ]
+    return " ".join(fields) or None
+
+
+def _apply_live_claim_guard(reply: str, live_context: dict[str, Any] | None) -> str:
+    """Correct unsupported live outcome claims at the result boundary.
+
+    This is intentionally category-based, not phrase-based: under a blocking
+    live policy, Viber may reference the observed deck/control evidence, but it
+    may not promote that evidence into a multi-deck musical outcome.
+    """
+    context = _normalize_live_context(live_context)
+    if not context or not reply.strip():
+        return reply
+    outcome_claim = _shared_has_multi_deck_outcome_claim(reply)
+    stale_transport = _live_context_transport_is_stale(context)
+    if stale_transport and outcome_claim:
+        return "Refresh the live session first, then I'll judge that transition."
+    evidence_policy = _live_evidence_policy(context)
+    state = _music_state_from_live_context(context)
+    recent_moves = _live_context_recent_moves(context)
+    shared_policy, _reason = _shared_live_claim_policy(state, recent_moves)
+    active_policy = _strongest_live_policy(evidence_policy, shared_policy)
+    evidence_overrides_shared = _live_policy_strength(evidence_policy) > _live_policy_strength(
+        shared_policy
+    )
+    has_disclaimer = bool(outcome_claim and _shared_has_multi_deck_outcome_disclaimer(reply))
+    if has_disclaimer and (
+        active_policy not in {"blocked", "watch_not_claim", "candidate_not_verdict"}
+        or not _shared_has_unsafe_multi_deck_disclaimer_claim(reply)
+    ):
+        return reply
+    if (
+        evidence_overrides_shared
+        and evidence_policy in {"blocked", "watch_not_claim"}
+        and outcome_claim
+    ):
+        return _SHARED_LIVE_TRANSITION_HELD_REPLY
+    if (
+        evidence_overrides_shared
+        and evidence_policy == "candidate_not_verdict"
+        and outcome_claim
+        and _MULTI_DECK_VERDICT_RE.search(reply)
+    ):
+        return _SHARED_LIVE_CANDIDATE_HELD_REPLY
+    result = _shared_apply_live_claim_guard(
+        reply,
+        state,
+        recent_moves,
+        audio_delta_items=_live_context_audio_delta(context),
+    )
+    if result.corrected:
+        return result.text
+
+    rendered = _render_live_context(context) or ""
+    if (
+        "multi_deck_outcome=blocked" not in rendered
+        and "multi_deck_outcome=watch_not_claim" not in rendered
+    ):
+        return reply
+    if not _shared_has_multi_deck_outcome_claim(reply):
+        return reply
+    if _shared_has_multi_deck_outcome_disclaimer(reply):
+        return reply
+    return _SHARED_LIVE_TRANSITION_HELD_REPLY
+
+
+def _live_context_claim_policy(context: dict[str, Any] | None) -> str:
+    if not context:
+        return "requires_more_evidence"
+    if _live_context_transport_is_stale(context):
+        return "requires_more_evidence"
+    evidence_policy = _live_evidence_policy(context)
+    state = _music_state_from_live_context(context)
+    shared_policy, _reason = _shared_live_claim_policy(state, _live_context_recent_moves(context))
+    return _strongest_live_policy(evidence_policy, shared_policy)
+
+
+def _live_context_allows_move_grades(live_context: dict[str, Any] | None) -> bool:
+    """Return False when live deck evidence cannot support skill/transition grades."""
+    context = _normalize_live_context(live_context)
+    if not context:
+        return True
+    policy = _live_context_claim_policy(context)
+    return policy not in {
+        "blocked",
+        "watch_not_claim",
+        "candidate_not_verdict",
+        "requires_more_evidence",
+    }
+
+
+def _sanitize_chat_history_text(
+    text: str,
+    *,
+    role: str,
+    live_context: dict[str, Any] | None,
+) -> str:
+    """Bound chat history and keep stale assistant live claims out of the prompt."""
+    clean = " ".join(str(text).split())
+    if not clean:
+        return ""
+    if len(clean) > _CHAT_HISTORY_TEXT_CAP:
+        clean = clean[: _CHAT_HISTORY_TEXT_CAP - 3].rstrip() + "..."
+
+    # User claims/questions are kept as dialogue. Assistant live outcome claims
+    # are the dangerous priming source: an older hallucinated "great transition"
+    # should not sit beside a current single-deck live_context packet.
+    if role != "viber":
+        return clean
+    if not _shared_has_multi_deck_outcome_claim(clean):
+        return clean
+
+    policy = _live_context_claim_policy(live_context)
+    if policy not in {
+        "blocked",
+        "watch_not_claim",
+        "candidate_not_verdict",
+        "requires_more_evidence",
+    }:
+        return clean
+    if _shared_has_multi_deck_outcome_disclaimer(
+        clean
+    ) and not _shared_has_unsafe_multi_deck_disclaimer_claim(clean):
+        return clean
+    if policy == "candidate_not_verdict" and not _MULTI_DECK_VERDICT_RE.search(clean):
+        return clean
+    return "[prior Viber live outcome claim omitted; re-check CURRENT LIVE DECK CONTEXT]"
+
+
+def render_live_context_preview(live_context: dict[str, Any] | None) -> str:
+    """Render the exact bounded live-context block Viber chat would receive."""
+    return _render_live_context(live_context) or ""
+
+
+def verify_live_reply_for_viber(
+    reply: str,
+    live_context: dict[str, Any] | None,
+    *,
+    move_grades: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Return a deterministic verdict for a Viber reply against live proof.
+
+    This is the same result-boundary guard used after Codex speaks, exposed as
+    a proof/check helper so a captured live-context packet plus a chat result
+    can be audited without another model call.
+    """
+    context = _normalize_live_context(live_context)
+    text = " ".join(str(reply or "").split())
+    corrected_reply = _apply_live_claim_guard(text, context) if text else text
+    corrected = corrected_reply != text
+    grades = move_grades if isinstance(move_grades, list) else []
+    grades_allowed = _live_context_allows_move_grades(context)
+    violations: list[str] = []
+    if not text:
+        violations.append("empty_reply")
+    if corrected:
+        violations.append("unsupported_live_outcome_claim")
+    if grades and not grades_allowed:
+        violations.append("move_grades_without_live_proof")
+    transport_status = "none"
+    if context:
+        transport_status = (
+            "stale_or_pre_schema_v2"
+            if _live_context_transport_is_stale(context)
+            else "fresh_schema_v2"
+        )
+    return {
+        "ok": not violations,
+        "violations": violations,
+        "reply": text,
+        "corrected": corrected,
+        "corrected_reply": corrected_reply if corrected else None,
+        "claim_policy": _live_context_claim_policy(context),
+        "transport_status": transport_status,
+        "move_grades_allowed": grades_allowed,
+        "move_grades_seen": len(grades),
+    }
+
+
+def chat_prompt(
+    message: str,
+    history: list[dict[str, Any]] | None = None,
+    *,
+    live_context: dict[str, Any] | None = None,
+) -> str:
+    """Render the chat system prompt + the conversation so far + the new turn."""
+    convo = ""
+    normalized_live_context = _normalize_live_context(live_context)
+    for turn in (history or [])[-_CHAT_HISTORY_TURNS_CAP:]:
+        if not isinstance(turn, dict):
+            continue
+        role = str(turn.get("role") or "")
+        text = _sanitize_chat_history_text(
+            str(turn.get("text") or ""),
+            role=role,
+            live_context=normalized_live_context,
+        )
+        if not text:
+            continue
+        speaker = "Viber" if role == "viber" else "DJ"
         convo += f"{speaker}: {text}\n"
     convo += f"DJ: {message.strip()}"
+    live_block = _render_live_context(normalized_live_context)
+    history_block = _render_historical_move_context(normalized_live_context)
+    context_parts = []
+    if live_block:
+        context_parts.append(live_block)
+        context_parts.append(_live_context_use_instruction(message, normalized_live_context))
+        context_parts.append(
+            "CHAT HISTORY RULE: previous chat text is dialogue, not live evidence; "
+            "CURRENT LIVE DECK CONTEXT and claim_policy override older Viber live reads."
+        )
+    if history_block:
+        context_parts.append(history_block)
+    context_block = "\n\n" + "\n\n".join(context_parts) if context_parts else ""
     return (
-        f"{_chat_system_prompt()}\n\nConversation so far:\n{convo}\n\n"
+        f"{_chat_system_prompt()}{context_block}\n\nConversation so far:\n{convo}\n\n"
         "Reply to the DJ's last message."
     )
 
@@ -1161,6 +3023,111 @@ def _normalize_chat_tool_trace(raw_trace: Any, tools_used: list[str]) -> list[di
     return [{"name": n, "arg": "", "ok": True} for n in tools_used]
 
 
+def _library_request_fallback_reply(
+    *,
+    playlist: dict[str, Any] | None,
+    track_ids: list[str],
+    tools_used: list[str],
+    tool_trace: list[dict[str, Any]],
+) -> str:
+    """Replace an irrelevant live correction with the grounded library outcome."""
+    if playlist is not None:
+        name = str(playlist.get("name") or "playlist").strip() or "playlist"
+        count = len(playlist.get("track_ids") or track_ids)
+        return f"Built a grounded playlist for that: {name} ({count} tracks)."
+    if track_ids:
+        return f"Found {len(track_ids)} grounded library candidates for that vibe."
+    if tool_trace or tools_used:
+        return "I searched the local library for that request; no grounded playlist came back."
+    return "I kept that as a library request, but I do not have grounded results to show yet."
+
+
+_MOVE_GRADE_SLUGS = {"negative", "mid", "clean", "sexy", "bomb", "lit_aff"}
+
+
+def _optional_move_grade_int(raw: Any, *, lower: int, upper: int) -> int | None:
+    if raw is None or isinstance(raw, bool):
+        return None
+    if isinstance(raw, float) and not raw.is_integer():
+        return None
+    try:
+        value = int(raw)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    if value < lower:
+        return None
+    return min(value, upper)
+
+
+def _normalize_chat_move_grades(raw: Any, library: RekordboxLibrary) -> list[dict[str, Any]]:
+    """Return grounded move-grade receipts echoed from Viber's transition tools."""
+    if not isinstance(raw, list):
+        return []
+    raw_track_ids = [
+        str(item.get("track_id")).strip()
+        for item in raw
+        if isinstance(item, dict) and str(item.get("track_id") or "").strip()
+    ]
+    valid_ids = set(_validate_against_library(_dedupe_ordered(raw_track_ids), library))
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        track_id = str(item.get("track_id") or "").strip()
+        if track_id not in valid_ids:
+            continue
+        candidate_id = str(item.get("candidate_id") or "").strip()
+        slug = str(item.get("slug") or "").strip().lower()
+        label = str(item.get("label") or "").strip().upper()
+        if not candidate_id or slug not in _MOVE_GRADE_SLUGS or not label:
+            continue
+        try:
+            xp = int(item.get("xp"))
+        except (TypeError, ValueError):
+            continue
+        if xp < 0 or xp > 999:
+            continue
+        title = str(item.get("title") or "").strip() or track_id
+        reason = str(item.get("reason") or "").strip() or "move grade"
+        key = (candidate_id, track_id, slug)
+        if key in seen:
+            continue
+        seen.add(key)
+        level_up = item.get("level_up") is True
+        levels_gained = _optional_move_grade_int(item.get("levels_gained"), lower=0, upper=999)
+        if level_up and levels_gained is None:
+            levels_gained = 1
+        rows.append(
+            {
+                "candidate_id": candidate_id,
+                "track_id": track_id,
+                "title": title,
+                "slug": slug,
+                "label": label,
+                "xp": xp,
+                "reason": reason,
+                "overdrive": bool(item.get("overdrive")),
+                "streak": _optional_move_grade_int(item.get("streak"), lower=0, upper=999),
+                "total_xp": _optional_move_grade_int(
+                    item.get("total_xp"),
+                    lower=0,
+                    upper=999_999,
+                ),
+                "level": _optional_move_grade_int(item.get("level"), lower=1, upper=999),
+                "level_xp": _optional_move_grade_int(item.get("level_xp"), lower=0, upper=999_999),
+                "next_level_xp": _optional_move_grade_int(
+                    item.get("next_level_xp"),
+                    lower=1,
+                    upper=999_999,
+                ),
+                "level_up": level_up,
+                "levels_gained": levels_gained if level_up else 0,
+            }
+        )
+    return rows
+
+
 @dataclass(slots=True)
 class CodexChatResult:
     """Outcome of one Codex chat turn (normalized to the shared ChatResult shape)."""
@@ -1169,10 +3136,14 @@ class CodexChatResult:
     tools_used: list[str] = field(default_factory=list)
     tool_trace: list[dict[str, Any]] = field(default_factory=list)
     track_ids: list[str] = field(default_factory=list)
+    move_grades: list[dict[str, Any]] = field(default_factory=list)
+    live_verification: dict[str, Any] | None = None
     playlist: dict[str, Any] | None = None
     export_path: str | None = None
     stop_reason: str = "model_done"
     error: str | None = None
+    question: str | None = None
+    choices: list[str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         # Match agent.ChatResult.to_dict so the Tauri bridge reads ONE shape
@@ -1182,15 +3153,34 @@ class CodexChatResult:
         reply = self.reply or (self.error or "")
         tool_trace = self.tool_trace or _normalize_chat_tool_trace(None, self.tools_used)
         iterations = 0 if self.error else max(1, len(tool_trace))
-        return {
+        out = {
             "reply": reply,
             "tool_trace": tool_trace,
             "playlist": self.playlist,
             "export_path": self.export_path,
             "seen_track_ids": self.track_ids,
+            "move_grades": self.move_grades,
             "iterations": iterations,
             "stop_reason": self.stop_reason,
         }
+        if self.live_verification is not None:
+            out["live_verification"] = self.live_verification
+        if self.question is not None:
+            out["question"] = self.question
+        if self.choices is not None:
+            out["choices"] = list(self.choices)
+        return out
+
+
+def _chat_clarification_reply(question: str | None, choices: list[str] | None) -> str:
+    lines = [question or "I need one more detail before I can answer that."]
+    for i, choice in enumerate(choices or [], start=1):
+        lines.append(f"{i}. {choice}")
+    return "\n".join(lines)
+
+
+def _missing_live_context_reply() -> str:
+    return "Live proof is not armed, so I won't judge that transition or deck move yet."
 
 
 def chat_with_codex(
@@ -1198,6 +3188,7 @@ def chat_with_codex(
     library: RekordboxLibrary,
     *,
     history: list[dict[str, Any]] | None = None,
+    live_context: dict[str, Any] | None = None,
     timeout_s: float = CHAT_TIMEOUT_S,
     codex_path: str | None = None,
     mcp_command: str | None = None,
@@ -1213,6 +3204,28 @@ def chat_with_codex(
     for re-validating any ``track_ids`` the reply referenced (Invariant #2 at the
     result boundary).
     """
+    if _live_context_use_mode(message) == "active_live_context" and not live_context:
+        reply = _missing_live_context_reply()
+        live_verification = {
+            **verify_live_reply_for_viber(reply, None),
+            "transport_status": "missing_live_context",
+            "move_grades_allowed": False,
+            "guard_applied": False,
+            "guard_violations": [],
+        }
+        return CodexChatResult(
+            reply=reply,
+            tool_trace=[
+                {
+                    "name": "live_context_required",
+                    "arg": "live proof not armed",
+                    "ok": False,
+                }
+            ],
+            live_verification=live_verification,
+            stop_reason="live_context_required",
+        )
+
     if allow_shell is None:
         allow_shell = os.environ.get("VIBEMIX_CODEX_ALLOW_SHELL", "").strip() not in (
             "",
@@ -1246,17 +3259,34 @@ def chat_with_codex(
     with tempfile.TemporaryDirectory(prefix="viber-codex-chat-") as td:
         schema_path = str(Path(td) / "schema.json")
         out_path = str(Path(td) / "out.json")
+        stop_reason_path = str(Path(td) / "stop_reason.json")
+        # Live tool-tape side-channel. Passed to the MCP child as an ARG (see
+        # build_argv mcp_args below), NOT via env: the boot-probe verified Codex
+        # does not forward the parent's process env to MCP children, so the env
+        # route silently no-ops. Args are part of the spawn command → always cross.
+        tool_events_path = str(Path(td) / "tool_events.jsonl")
         Path(schema_path).write_text(json.dumps(_CHAT_SCHEMA), encoding="utf-8")
 
         argv = build_argv(
             codex,
             mcp_command=command,
-            mcp_args=args,
+            mcp_args=[*args, "--vibemix-tool-events", tool_events_path],
             schema_path=schema_path,
             out_path=out_path,
-            prompt=chat_prompt(message, history),
+            prompt=chat_prompt(message, history, live_context=live_context),
             bypass_sandbox=allow_shell,
         )
+
+        env = build_subprocess_env(codex)
+        env["VIBEMIX_STOP_REASON_FILE"] = stop_reason_path
+        # LIVE TOOL TAPE: the MCP child (LibraryToolset.dispatch) appends one
+        # JSON record per tool call to this path; a daemon tailer echoes each to
+        # STDERR as `[viber-tool] …` while the (blocking) Codex subprocess runs,
+        # so the user watches Viber work instead of a frozen prompt. STDERR keeps
+        # the stdout result-JSON channel pristine; the Rust layer tails these
+        # `[viber-tool]` lines for the in-app tape.
+        env["VIBEMIX_TOOL_EVENTS_FILE"] = tool_events_path
+        _tape_stop = _start_tool_tape(tool_events_path)
 
         try:
             proc = _runner(
@@ -1264,7 +3294,7 @@ def chat_with_codex(
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,
-                env=build_subprocess_env(codex),
+                env=env,
                 stdin=subprocess.DEVNULL,
             )
         except FileNotFoundError:
@@ -1277,6 +3307,8 @@ def chat_with_codex(
                 stop_reason="timeout",
                 error=f"Codex did not finish within {timeout_s:.0f}s.",
             )
+        finally:
+            _tape_stop()
 
         stderr = proc.stderr or ""
         if proc.returncode != 0:
@@ -1290,6 +3322,49 @@ def chat_with_codex(
                 stop_reason="error",
                 error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
             )
+
+        if Path(stop_reason_path).exists():
+            try:
+                stop_payload = json.loads(Path(stop_reason_path).read_text(encoding="utf-8"))
+                if (
+                    isinstance(stop_payload, dict)
+                    and stop_payload.get("reason") == "tool_starvation"
+                ):
+                    return CodexChatResult(
+                        stop_reason="tool_starvation",
+                        error=str(
+                            stop_payload.get("hint")
+                            or "Viber stopped after repeated empty tool results."
+                        ),
+                    )
+                if (
+                    isinstance(stop_payload, dict)
+                    and stop_payload.get("reason") == "clarification_needed"
+                ):
+                    raw_question = stop_payload.get("question")
+                    raw_choices = stop_payload.get("choices")
+                    question = raw_question if isinstance(raw_question, str) else None
+                    choices = (
+                        [str(choice) for choice in raw_choices]
+                        if isinstance(raw_choices, list)
+                        else None
+                    )
+                    return CodexChatResult(
+                        reply=_chat_clarification_reply(question, choices),
+                        tools_used=["request_clarification"],
+                        tool_trace=[
+                            {
+                                "name": "request_clarification",
+                                "arg": question or "clarification",
+                                "ok": True,
+                            }
+                        ],
+                        stop_reason="clarification_needed",
+                        question=question,
+                        choices=choices,
+                    )
+            except (OSError, json.JSONDecodeError):
+                pass
 
         try:
             raw = Path(out_path).read_text(encoding="utf-8").strip()
@@ -1307,18 +3382,63 @@ def chat_with_codex(
             return CodexChatResult(
                 stop_reason="empty_output", error="Codex output was not an object."
             )
+        actual_tool_trace = _read_tool_event_trace(tool_events_path)
 
-    reply = str(payload.get("reply", "")).strip()
+    raw_reply = str(payload.get("reply", "")).strip()
     tools_used = [t for t in (payload.get("tools_used") or []) if isinstance(t, str)]
-    tool_trace = _normalize_chat_tool_trace(payload.get("tool_trace"), tools_used)
+    tool_trace = actual_tool_trace or _normalize_chat_tool_trace(
+        payload.get("tool_trace"), tools_used
+    )
     if not tools_used:
         tools_used = [str(row["name"]) for row in tool_trace]
     raw_ids = [t for t in (payload.get("track_ids") or []) if isinstance(t, str)]
+    move_grades = _normalize_chat_move_grades(payload.get("move_grades"), library)
+    if not _live_context_allows_move_grades(live_context):
+        move_grades = []
+    raw_ids.extend(row["track_id"] for row in move_grades if isinstance(row.get("track_id"), str))
     playlist = _normalize_chat_playlist(payload.get("playlist"), library)
     if playlist is not None:
         raw_ids.extend(playlist["track_ids"])
     # Grounding at the result boundary: keep only ids that resolve in the library.
     track_ids = _validate_against_library(_dedupe_ordered(raw_ids), library)
+
+    live_context_mode = _live_context_use_mode(message) if live_context else "none"
+    if live_context_mode == "active_live_context":
+        reply = _apply_live_claim_guard(raw_reply, live_context)
+    elif live_context and _looks_like_unprompted_live_correction(raw_reply):
+        reply = _library_request_fallback_reply(
+            playlist=playlist,
+            track_ids=track_ids,
+            tools_used=tools_used,
+            tool_trace=tool_trace,
+        )
+    else:
+        reply = raw_reply
+
+    live_verification = None
+    if live_context:
+        live_verification = verify_live_reply_for_viber(
+            reply,
+            live_context,
+            move_grades=move_grades,
+        )
+        if raw_reply != reply:
+            raw_verification = verify_live_reply_for_viber(
+                raw_reply,
+                live_context,
+                move_grades=move_grades,
+            )
+            live_verification = {
+                **live_verification,
+                "guard_applied": True,
+                "guard_violations": list(raw_verification.get("violations", [])),
+            }
+        else:
+            live_verification = {
+                **live_verification,
+                "guard_applied": False,
+                "guard_violations": [],
+            }
 
     export_path = None
     raw_export_path = payload.get("export_path")
@@ -1335,6 +3455,8 @@ def chat_with_codex(
         tools_used=tools_used,
         tool_trace=tool_trace,
         track_ids=track_ids,
+        move_grades=move_grades,
+        live_verification=live_verification,
         playlist=playlist,
         export_path=export_path,
         stop_reason=stop_reason,
@@ -1356,4 +3478,9 @@ __all__ = [
     "chat_with_codex",
     "curate_with_codex",
     "find_codex",
+    "normalize_live_audio_window_map_for_viber",
+    "normalize_live_context_for_viber",
+    "normalize_live_source_status_for_viber",
+    "render_live_context_preview",
+    "verify_live_reply_for_viber",
 ]

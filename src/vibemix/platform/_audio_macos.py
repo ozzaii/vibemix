@@ -19,7 +19,9 @@ this module fails loud, no silent degradation.
 
 from __future__ import annotations
 
+import json
 import os
+import subprocess
 import sys
 
 import sounddevice as sd
@@ -38,6 +40,7 @@ from vibemix.audio.registry import BufferRegistry
 from vibemix.platform.audio import AudioCallback, AudioStream, Kind
 
 _AUTO_MASTER_ENV = "VIBEMIX_AUTO_MASTER_INPUT"
+_AUTO_MASTER_FALLBACK_ENV = "VIBEMIX_AUTO_MASTER_FALLBACK_DEVICE"
 _AUTO_MASTER_REQUESTS = {"auto", "auto-master", "master", "master-auto"}
 _AUTO_MASTER_EXPECTED_SR = 48000
 _AUTO_MASTER_PROBE_SECONDS = 0.35
@@ -102,9 +105,19 @@ def set_device_nominal_sample_rate(device_name: str, rate: int) -> bool:
 
     Uses pyobjc's CoreAudio bindings to walk
     kAudioHardwarePropertyDevices, match by deviceNameCFString, then write
-    kAudioDevicePropertyNominalSampleRate. Returns True on success, False
-    on any failure (device not found, rate unsupported, API error).
+    kAudioDevicePropertyNominalSampleRate. Falls back to the system Swift
+    CoreAudio bridge because PyObjC cannot reliably marshal this void-buffer
+    API on every local install. Returns True on success, False on any failure
+    (device not found, rate unsupported, API error).
     """
+    return _set_device_nominal_sample_rate_pyobjc(
+        device_name,
+        rate,
+    ) or _set_device_nominal_sample_rate_swift(device_name, rate)
+
+
+def _set_device_nominal_sample_rate_pyobjc(device_name: str, rate: int) -> bool:
+    """Best-effort PyObjC implementation for programmatic rate repair."""
     try:
         from CoreAudio import (  # type: ignore[import-not-found]
             AudioObjectGetPropertyData,
@@ -131,9 +144,7 @@ def set_device_nominal_sample_rate(device_name: str, rate: int) -> bool:
         kAudioObjectPropertyElementMain,
     )
     try:
-        status, size = AudioObjectGetPropertyDataSize(
-            kAudioObjectSystemObject, addr, 0, None, None
-        )
+        status, size = AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, addr, 0, None, None)
     except Exception:
         return False
     if status != 0 or size == 0:
@@ -161,9 +172,7 @@ def set_device_nominal_sample_rate(device_name: str, rate: int) -> bool:
 
     for dev_id in device_ids:
         try:
-            status_n, name_size = AudioObjectGetPropertyDataSize(
-                dev_id, name_addr, 0, None, None
-            )
+            status_n, name_size = AudioObjectGetPropertyDataSize(dev_id, name_addr, 0, None, None)
             if status_n != 0:
                 continue
             status_n, _sz, name_obj = AudioObjectGetPropertyData(
@@ -191,13 +200,114 @@ def set_device_nominal_sample_rate(device_name: str, rate: int) -> bool:
         if int(cur_value) == rate:
             return True
         try:
-            set_status = AudioObjectSetPropertyData(
-                dev_id, rate_addr, 0, None, 8, float(rate)
-            )
+            set_status = AudioObjectSetPropertyData(dev_id, rate_addr, 0, None, 8, float(rate))
         except Exception:
             return False
         return set_status == 0
     return False
+
+
+def _set_device_nominal_sample_rate_swift(device_name: str, rate: int) -> bool:
+    """Use Swift/CoreAudio to set a device rate when PyObjC marshalling fails."""
+    script = f"""
+import CoreAudio
+import Foundation
+
+let targetName = {json.dumps(device_name)}
+let targetRate = Float64({float(rate)!r})
+
+var devicesAddress = AudioObjectPropertyAddress(
+    mSelector: kAudioHardwarePropertyDevices,
+    mScope: kAudioObjectPropertyScopeGlobal,
+    mElement: kAudioObjectPropertyElementMain
+)
+var dataSize: UInt32 = 0
+var status = AudioObjectGetPropertyDataSize(
+    AudioObjectID(kAudioObjectSystemObject),
+    &devicesAddress,
+    0,
+    nil,
+    &dataSize
+)
+if status != noErr {{ exit(10) }}
+let count = Int(dataSize) / MemoryLayout<AudioDeviceID>.size
+var devices = [AudioDeviceID](repeating: 0, count: count)
+status = AudioObjectGetPropertyData(
+    AudioObjectID(kAudioObjectSystemObject),
+    &devicesAddress,
+    0,
+    nil,
+    &dataSize,
+    &devices
+)
+if status != noErr {{ exit(11) }}
+
+func nominalRate(_ id: AudioDeviceID) -> Float64? {{
+    var rateAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioDevicePropertyNominalSampleRate,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var rate = Float64(0)
+    var size = UInt32(MemoryLayout<Float64>.size)
+    let status = AudioObjectGetPropertyData(id, &rateAddress, 0, nil, &size, &rate)
+    return status == noErr ? rate : nil
+}}
+
+for id in devices {{
+    var nameAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioObjectPropertyName,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var name: CFString = "" as CFString
+    var nameSize = UInt32(MemoryLayout<CFString>.size)
+    let nameStatus = AudioObjectGetPropertyData(
+        id,
+        &nameAddress,
+        0,
+        nil,
+        &nameSize,
+        &name
+    )
+    if nameStatus != noErr || (name as String) != targetName {{ continue }}
+    if Int(nominalRate(id) ?? 0) == Int(targetRate) {{ exit(0) }}
+
+    var rateAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioDevicePropertyNominalSampleRate,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var newRate = targetRate
+    let setStatus = AudioObjectSetPropertyData(
+        id,
+        &rateAddress,
+        0,
+        nil,
+        UInt32(MemoryLayout<Float64>.size),
+        &newRate
+    )
+    if setStatus != noErr {{ exit(13) }}
+    for _ in 0..<20 {{
+        if Int(nominalRate(id) ?? 0) == Int(targetRate) {{ exit(0) }}
+        usleep(100_000)
+    }}
+    exit(14)
+}}
+exit(12)
+"""
+    try:
+        proc = subprocess.run(
+            ["swift", "-"],
+            input=script,
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
 
 
 def _env_enabled(name: str) -> bool:
@@ -299,6 +409,19 @@ def _master_probe_score(row: dict) -> tuple[float, float, int, int]:
     )
 
 
+def _preferred_auto_master_fallback(probes: list[dict]) -> dict | None:
+    requested = os.environ.get(_AUTO_MASTER_FALLBACK_ENV, "").strip().lower()
+    if not requested:
+        return None
+    exact = [row for row in probes if str(row.get("name") or "").strip().lower() == requested]
+    if exact:
+        return max(exact, key=_master_probe_score)
+    fuzzy = [row for row in probes if requested in str(row.get("name") or "").strip().lower()]
+    if fuzzy:
+        return max(fuzzy, key=_master_probe_score)
+    return None
+
+
 def select_active_master_input(devices) -> int:
     """Signal-aware master input selection for live rigs.
 
@@ -321,6 +444,16 @@ def select_active_master_input(devices) -> int:
             flush=True,
         )
         return int(chosen["index"])
+    preferred = _preferred_auto_master_fallback(probes)
+    if preferred is not None:
+        print(
+            "[audio] auto master input: "
+            f"{preferred['name']} @ {preferred['sample_rate']}Hz "
+            "(preferred fallback; no live signal during startup probe)",
+            file=sys.stderr,
+            flush=True,
+        )
+        return int(preferred["index"])
     expected_rate = [
         row
         for row in probes
@@ -351,8 +484,7 @@ def select_active_master_input(devices) -> int:
             for row in probes
         ]
         raise RuntimeError(
-            "auto master input: no live loopback/capture input found; "
-            f"probes={probe_summary}"
+            f"auto master input: no live loopback/capture input found; probes={probe_summary}"
         ) from exc
 
 
@@ -429,8 +561,7 @@ class AudioMacOS:
         devices = sd.query_devices()
         low = name_substring.strip().lower()
         if kind == "input" and (
-            low in _AUTO_MASTER_REQUESTS
-            or ("blackhole" in low and _env_enabled(_AUTO_MASTER_ENV))
+            low in _AUTO_MASTER_REQUESTS or ("blackhole" in low and _env_enabled(_AUTO_MASTER_ENV))
         ):
             return select_active_master_input(devices)
         if kind == "input" and "blackhole" in low:
@@ -445,9 +576,7 @@ class AudioMacOS:
                 raise RuntimeError(f"{name_substring}: {e}") from e
         return find_device_index(devices, name_substring, kind)
 
-    def find_output_device(
-        self, preferred_index: int | None, fallback_name: str
-    ) -> int:
+    def find_output_device(self, preferred_index: int | None, fallback_name: str) -> int:
         """Resolve the AI-voice / passthrough OUTPUT device, degrading gracefully.
 
         Unlike :meth:`find_device` (which hard-fails on a substring miss), this
@@ -462,12 +591,7 @@ class AudioMacOS:
         default_out: int | None = None
         try:
             d = sd.default.device  # (input_idx, output_idx)
-            if (
-                isinstance(d, (list, tuple))
-                and len(d) >= 2
-                and isinstance(d[1], int)
-                and d[1] >= 0
-            ):
+            if isinstance(d, (list, tuple)) and len(d) >= 2 and isinstance(d[1], int) and d[1] >= 0:
                 default_out = int(d[1])
         except Exception:
             default_out = None
@@ -477,6 +601,32 @@ class AudioMacOS:
             fallback_name=fallback_name,
             default_index=default_out,
         )
+
+    def describe_capture_input(
+        self,
+        device_index: int,
+        *,
+        requested_device: str,
+        opened_channels: int,
+    ) -> dict[str, object]:
+        """Return bounded capture metadata for live LLM deck-audio context."""
+        try:
+            info = sd.query_devices(device_index)
+        except Exception:
+            return {
+                "requested_device": requested_device,
+                "device_name": "unknown",
+                "input_channels": 0,
+                "opened_channels": opened_channels,
+                "sample_rate": 0,
+            }
+        return {
+            "requested_device": requested_device,
+            "device_name": str(info.get("name") or "unknown"),
+            "input_channels": int(info.get("max_input_channels") or 0),
+            "opened_channels": int(opened_channels),
+            "sample_rate": int(float(info.get("default_samplerate") or 0)),
+        }
 
     def open_capture(
         self,
@@ -616,6 +766,7 @@ class AudioMacOS:
         elif device_sr % sample_rate == 0:
             ratio = device_sr // sample_rate
             open_sr = device_sr
+
             # The source callback (in __main__.py:_voice_callback_factory) is
             # ``outdata[:] = playback.pull(frames * 2)``. It assumes frame-
             # count matches its native source rate. So we pull
@@ -669,9 +820,7 @@ class AudioMacOS:
 
                 callback(_SrcView(), src_frames, time_info, status)
                 src_arr = np.frombuffer(src_bytes, dtype=np.int16).astype(np.float32)
-                out_f = resample_audio(
-                    src_arr, source_sr=sample_rate, target_sr=device_sr
-                )
+                out_f = resample_audio(src_arr, source_sr=sample_rate, target_sr=device_sr)
                 out_i = np.clip(out_f, -32768, 32767).astype(np.int16)
                 # Pad or trim to exact frame count expected by sd.
                 if len(out_i) < frames:

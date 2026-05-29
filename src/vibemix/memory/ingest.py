@@ -70,7 +70,7 @@ __all__ = [
 # Bump to re-embed ALL signatures if the template changes (mirrors embed.py's
 # EXCERPT_STRATEGY_VERSION). Flows into the embed-cache key SHA256 + the
 # memory_ingested marker's sig_template_version column.
-SIG_TEMPLATE_VERSION = "v1-coach_line"
+SIG_TEMPLATE_VERSION = "v8-coach_line-context-feed"
 
 # COPIED VERBATIM from state/evidence_registry.py:133 — the LOCKED citation
 # grammar. lock-step source-of-truth: state/evidence_registry.py:133 (keep in
@@ -78,9 +78,7 @@ SIG_TEMPLATE_VERSION = "v1-coach_line"
 # and unambiguously gate-clean — RESEARCH A5).
 _SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend|key"
 _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
-EVIDENCE_CITATION_RE: re.Pattern[str] = re.compile(
-    rf"\[{_INNER_ATOM}(?:,{_INNER_ATOM})*\]"
-)
+EVIDENCE_CITATION_RE: re.Pattern[str] = re.compile(rf"\[{_INNER_ATOM}(?:,{_INNER_ATOM})*\]")
 
 # The leading ``[chill]`` / ``[hype]`` TTS directive — NOT a citation (no
 # ``source:`` colon-form). Stripped from the embedded reaction text so the
@@ -100,7 +98,14 @@ def build_coach_line_signature(reaction_text: str, ctx: dict | None) -> str:
     Template (64-RESEARCH §Signature Template Spec, implement verbatim)::
 
         coach_line | track={track} | phase={phase} | deck={deck}
-            | event={event_type} | cite={citation_tokens} | said: {reaction_text}
+            | event={event_type} | context_feed={context_feed_contract}
+            | deck_lane={deck_lane_context}
+            | deck_ref={deck_reference_context} | deck_source={deck_source_context}
+            | deck_audio={deck_audio_context} | audio_window={audio_window_context}
+            | live_evidence={live_evidence_context}
+            | move={move_context} | move_effect={move_effect_context}
+            | audio_delta={audio_delta} | cite={citation_tokens}
+            | said: {reaction_text}
 
     Field rules:
         * ``track`` / ``phase`` from the nearest preceding ``event`` line;
@@ -121,24 +126,46 @@ def build_coach_line_signature(reaction_text: str, ctx: dict | None) -> str:
     phase = ctx.get("phase") or "unknown"
     deck = ctx.get("deck") or "none"
     etype = ctx.get("type") or "MANUAL"
+    context_feed = _ctx_field(ctx.get("context_feed_contract"), cap=420)
+    deck_lane = _ctx_field(ctx.get("deck_lane_context"))
+    deck_ref = _ctx_field(ctx.get("deck_reference_context"))
+    deck_source = _ctx_field(ctx.get("deck_source_context"))
+    deck_audio = _ctx_field(ctx.get("deck_audio_context"))
+    audio_window = _ctx_field(ctx.get("audio_window_context"))
+    live_evidence = _ctx_field(ctx.get("live_evidence_context"))
+    move_context = _ctx_field(ctx.get("move_context"))
+    move_effect = _ctx_field(ctx.get("move_effect_context"))
+    audio_delta = _ctx_field(ctx.get("audio_delta"))
     # Sorted so a re-ordering in the text can never change the hash (defensive;
     # in practice text order is stable). strip("[]") drops the outer brackets.
-    cites = sorted(
-        m.group(0).strip("[]") for m in EVIDENCE_CITATION_RE.finditer(reaction_text)
-    )
+    cites = sorted(m.group(0).strip("[]") for m in EVIDENCE_CITATION_RE.finditer(reaction_text))
     cite_str = ",".join(cites)
     # Dedupe: the citation tokens already live (sorted) in ``cite=``; strip the
     # inline ``[ev:drop]``/``[track:...]`` brackets from ``said:`` too so a
     # citation is never repeated within the signature and the embedded vector
     # encodes pure spoken language, not machine tokens (IN-01). Deterministic +
     # order-stable: regex sub over a fixed grammar → same input, same bytes.
-    said = EVIDENCE_CITATION_RE.sub(
-        "", _EMOTION_TAG_RE.sub("", reaction_text)
-    ).strip()
+    said = EVIDENCE_CITATION_RE.sub("", _EMOTION_TAG_RE.sub("", reaction_text)).strip()
     return (
         f"coach_line | track={track} | phase={phase} | deck={deck} "
-        f"| event={etype} | cite={cite_str} | said: {said}"
+        f"| event={etype} | context_feed={context_feed} "
+        f"| deck_lane={deck_lane} | deck_ref={deck_ref} "
+        f"| deck_source={deck_source} "
+        f"| deck_audio={deck_audio} | audio_window={audio_window} "
+        f"| live_evidence={live_evidence} | move={move_context} "
+        f"| move_effect={move_effect} | audio_delta={audio_delta} "
+        f"| cite={cite_str} | said: {said}"
     )
+
+
+def _ctx_field(value: object, *, cap: int = 240) -> str:
+    """Render bounded event-context metadata for deterministic signatures."""
+    if isinstance(value, (list, tuple)):
+        raw = "; ".join(str(item) for item in value[:4] if item)
+    else:
+        raw = str(value) if value else ""
+    raw = " ".join(raw.split()).replace("|", "/")
+    return raw[:cap] if raw else "none"
 
 
 # ─── Malformed-tolerant JSONL reader (MIRROR of session_loader._read_events) ────
@@ -162,9 +189,7 @@ def _read_events_jsonl(events_jsonl_path: Path) -> list[dict]:
             try:
                 obj = json.loads(raw)
             except json.JSONDecodeError as e:
-                logger.warning(
-                    "[ingest] events.jsonl line %d malformed: %s", line_no, e
-                )
+                logger.warning("[ingest] events.jsonl line %d malformed: %s", line_no, e)
                 continue
             if isinstance(obj, dict):
                 events.append(obj)
@@ -262,9 +287,7 @@ def _embed_cache_key(signature: str, model_id: str) -> str:
 
 def _cache_get(conn: sqlite3.Connection, key: str) -> np.ndarray | None:
     """Round-trip clone of embed.py:605-612."""
-    row = conn.execute(
-        "SELECT vector FROM embed_cache WHERE key = ?", (key,)
-    ).fetchone()
+    row = conn.execute("SELECT vector FROM embed_cache WHERE key = ?", (key,)).fetchone()
     if row is None:
         return None
     return np.frombuffer(row[0], dtype=np.float32).copy()
@@ -286,8 +309,7 @@ def _marker_present(conn: sqlite3.Connection, session_id: str) -> bool:
     A ``sig_template_version`` mismatch forces re-ingest (the template changed).
     """
     row = conn.execute(
-        "SELECT 1 FROM memory_ingested "
-        "WHERE session_id = ? AND sig_template_version = ?",
+        "SELECT 1 FROM memory_ingested WHERE session_id = ? AND sig_template_version = ?",
         (session_id, SIG_TEMPLATE_VERSION),
     ).fetchone()
     return row is not None
@@ -374,9 +396,7 @@ def ingest_session(
     try:
         # A4: marker AND live moments both required to skip — so an evicted
         # session (0 moments) re-ingests despite a surviving marker.
-        if _marker_present(conn, session_id) and _session_has_moments(
-            store, session_id
-        ):
+        if _marker_present(conn, session_id) and _session_has_moments(store, session_id):
             logger.debug(
                 "[ingest] %s already ingested (marker + moments) — skip",
                 session_id,
@@ -403,6 +423,16 @@ def ingest_session(
                     "phase": ev.get("phase"),
                     "deck": ev.get("deck"),
                     "type": ev.get("type"),
+                    "context_feed_contract": ev.get("context_feed_contract"),
+                    "deck_lane_context": ev.get("deck_lane_context"),
+                    "deck_reference_context": ev.get("deck_reference_context"),
+                    "deck_source_context": ev.get("deck_source_context"),
+                    "deck_audio_context": ev.get("deck_audio_context"),
+                    "audio_window_context": ev.get("audio_window_context"),
+                    "live_evidence_context": ev.get("live_evidence_context"),
+                    "move_context": ev.get("move_context"),
+                    "move_effect_context": ev.get("move_effect_context"),
+                    "audio_delta": ev.get("audio_delta"),
                 }
                 continue
             if kind != "ai_text":

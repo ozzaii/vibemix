@@ -29,6 +29,21 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+from vibemix.state.deck_context import (
+    render_audio_window_context,
+    render_deck_audio_context,
+    render_deck_change_context,
+    render_deck_context,
+    render_deck_lane_context,
+    render_deck_reference_context,
+    render_deck_source_context,
+    render_grounding_ref_context,
+    render_live_evidence_context,
+    render_mixer_context,
+    render_move_context,
+    render_move_effect_context,
+    sanitize_historical_move_signature_for_prompt,
+)
 from vibemix.state.deltas import DELTA_FLOOR, render_delta
 from vibemix.state.event import Event
 from vibemix.state.music_state import MusicState
@@ -113,9 +128,9 @@ TRANSITION_SHAPE_RECALL_FRAGMENT_TPL: str = (
     "just happened in the live audio, you MAY add ONE short past-tense "
     "callback line referencing it, citing exactly [recall:{record_id}]. "
     "Compare what you heard NOW vs. what's in the past signature — the "
-    "delta is the whole point. Examples of shape: \"that blend sat longer "
-    "than the same one you ran last set\", \"killed the bass earlier this "
-    "time around\", \"cleaner cut than the version you ran before\". "
+    'delta is the whole point. Examples of shape: "that blend sat longer '
+    'than the same one you ran last set", "killed the bass earlier this '
+    'time around", "cleaner cut than the version you ran before". '
     "Hard rules: cite [recall:{record_id}] EXACTLY ONCE (the registry "
     "validates it; a fabricated id strips the whole turn); do NOT invent a "
     "past moment, paraphrase the past signature, or describe it as live; "
@@ -145,8 +160,8 @@ VOCABULARY_RECALL_FRAGMENT_TPL: str = (
     "up with that past signature, you MAY echo your own past words, "
     "citing exactly [recall:{record_id}]. The past signature is YOUR "
     "voice from before; speak in the same register, not Gemini-paraphrased. "
-    "Examples: \"same call you made on the last drop like this\", "
-    "\"your line from the last set still holds\". Hard rules: cite "
+    'Examples: "same call you made on the last drop like this", '
+    '"your line from the last set still holds". Hard rules: cite '
     "[recall:{record_id}] EXACTLY ONCE; do NOT invent a past phrasing; "
     "do NOT claim it's a habit ('you always', 'you tend to'); do NOT "
     "recommend a next move. If your live reaction wouldn't naturally "
@@ -154,10 +169,21 @@ VOCABULARY_RECALL_FRAGMENT_TPL: str = (
     "mode this phase guards."
 )
 
+COMPACT_TRANSITION_RECALL_FRAGMENT_TPL: str = (
+    " Past memory: compare this move in the live audio with [recall:{record_id}]; "
+    "cite once only on a true match."
+)
+
+COMPACT_VOCABULARY_RECALL_FRAGMENT_TPL: str = (
+    " Past wording memory: echo [recall:{record_id}] once only if it fits now."
+)
+
 
 def recall_fragment_for_event(
     ev: Event,
     recall_moments: list[Record] | None,
+    *,
+    compact: bool = False,
 ) -> str:
     """Phase 66 (COPILOT-01/02) — dispatch the right recall fragment
     template for the event type, or return ``""`` on cold/empty input.
@@ -236,17 +262,38 @@ def recall_fragment_for_event(
     # Q1). TRACK_CHANGE is in BOTH gates; transition-shape WINS by being
     # listed FIRST.
     if ev.type in ("TRACK_CHANGE", "MIX_MOVE", "LAYER_ARRIVAL"):
-        return TRANSITION_SHAPE_RECALL_FRAGMENT_TPL.format(
-            record_id=strongest.record_id
-        )
+        if compact:
+            return COMPACT_TRANSITION_RECALL_FRAGMENT_TPL.format(record_id=strongest.record_id)
+        return TRANSITION_SHAPE_RECALL_FRAGMENT_TPL.format(record_id=strongest.record_id)
     if ev.type == "PHASE":
-        return VOCABULARY_RECALL_FRAGMENT_TPL.format(
-            record_id=strongest.record_id
-        )
+        if compact:
+            return COMPACT_VOCABULARY_RECALL_FRAGMENT_TPL.format(record_id=strongest.record_id)
+        return VOCABULARY_RECALL_FRAGMENT_TPL.format(record_id=strongest.record_id)
     # Other event types (KAAN_SPOKE, MANUAL, HEARTBEAT, KEY_CLASH,
     # TRANSITION_OPPORTUNITY) → no fragment. The byte-identity guarantee
     # for these types is preserved by returning "".
     return ""
+
+
+def compact_recall_context_for_event(recall_moments: list[Record] | None) -> str:
+    """Return a compact past-session block for diet prompts.
+
+    Full prompts carry the recall block inside ``evidence_line``. Diet prompts
+    intentionally skip the full evidence footer, so when recall is hot we need
+    a tiny equivalent block or the fragment would mention a "past signature"
+    the model cannot see. Cold/empty input returns zero bytes.
+    """
+    if not recall_moments:
+        return ""
+    parts = [
+        f"[recall:{m.record_id}] {_compact_recall_signature(m.signature)}"
+        for m in recall_moments[:3]
+    ]
+    return " FROM A PAST SESSION (not happening now): " + " || ".join(parts)
+
+
+def _compact_recall_signature(signature: str, *, cap: int = 120) -> str:
+    return sanitize_historical_move_signature_for_prompt(signature, cap=cap)
 
 
 # ---- Plan 96-01 — Course 3 proactive tutor lens confidence floors ----
@@ -364,13 +411,12 @@ class AICoach:
         # 59-01 baseline test stays green). Once the poller populates decks, show
         # the resolved decks (camelot present + confidence >= 0.3, mirroring the
         # track= gate); decks present but none resolved → honest decks=unknown.
-        # NOT added to _evidence_line_compact — deck-state is substantive
-        # full-payload, out of the diet/ack path (RESEARCH line 243).
+        # The raw deck block stays here for backward prompt continuity. The
+        # bounded deck_context[...] packet below adds the explicit transition
+        # gate and is also safe for the diet path.
         if state.deck_state.decks:
             resolved = {
-                s: d
-                for s, d in state.deck_state.decks.items()
-                if d.camelot and d.confidence >= 0.3
+                s: d for s, d in state.deck_state.decks.items() if d.camelot and d.confidence >= 0.3
             }
             if resolved:
                 parts = [
@@ -417,13 +463,30 @@ class AICoach:
                             else "harmonic-drift"
                         )
                         why = rel.why()
-                        e.append(
-                            f"blend[{why} {verdict}]" if why else f"blend[{verdict}]"
-                        )
+                        e.append(f"blend[{why} {verdict}]" if why else f"blend[{verdict}]")
                     except Exception:  # pragma: no cover — grounding is best-effort
                         pass
             else:
                 e.append("decks=unknown")
+            deck_context = render_deck_context(state)
+            if deck_context:
+                e.append(deck_context)
+            deck_lane_context = render_deck_lane_context(state)
+            if deck_lane_context:
+                e.append(deck_lane_context)
+            deck_reference_context = render_deck_reference_context(state)
+            if deck_reference_context:
+                e.append(deck_reference_context)
+        deck_source_context = render_deck_source_context(state)
+        if deck_source_context:
+            e.append(deck_source_context)
+
+        mixer_context = render_mixer_context(state)
+        if mixer_context:
+            e.append(mixer_context)
+        deck_audio_context = render_deck_audio_context(state)
+        if deck_audio_context:
+            e.append(deck_audio_context)
 
         # WIRE #4 — auto-detected genre. ADDITIVE + gated exactly like the
         # decks[…] block above so the default MusicState (detected_genre=
@@ -453,6 +516,16 @@ class AICoach:
             e.append(f"recent_moves[8s]: {mv}")
         else:
             e.append("recent_moves[8s]: NONE")
+
+        grounding_refs = render_grounding_ref_context(
+            state,
+            registry_snapshot=registry_snapshot,
+        )
+        if grounding_refs:
+            e.append(grounding_refs)
+        live_evidence_context = render_live_evidence_context(state)
+        if live_evidence_context:
+            e.append(live_evidence_context)
 
         # Phase 78 (PERCEIVE-02) — multi-scale trajectory narrative. ADDITIVE +
         # gated exactly like the decks[…] / recent_moves blocks: a falsy ""
@@ -526,19 +599,18 @@ class AICoach:
         # ``[recall:<unregistered>]`` then strips the WHOLE turn via the
         # existing CitationLinter's existence-only branch (the headline
         # RECALL-01 poisoning gate).  The diet/compact path intentionally
-        # has NO recall block (diet = ACK_ELIGIBLE_EVENTS incl. HEARTBEAT,
-        # which is never a retrieval event — keeping recall off the diet
-        # path is correct).
+        # has its own compact recall block only when recall_moments is hot;
+        # cold diet prompts still emit zero recall bytes.
         # Inner separator " || " (double-pipe) distinguishes recall moments
         # from the outer " | "-joined evidence fields — makes a grep over
         # evidence_line unambiguous about field count vs moment count.
         if recall_moments:
             parts = [
-                f"[recall:{m.record_id}] {m.signature}" for m in recall_moments
+                f"[recall:{m.record_id}] "
+                f"{sanitize_historical_move_signature_for_prompt(m.signature)}"
+                for m in recall_moments
             ]
-            e.append(
-                "FROM A PAST SESSION (not happening now): " + " || ".join(parts)
-            )
+            e.append("FROM A PAST SESSION (not happening now): " + " || ".join(parts))
 
         # Phase 96 (Plan 96-01) — Course 3 proactive tutor lens marker.
         # ADDITIVE + gated: the cold path (session_active=False) emits
@@ -563,9 +635,7 @@ class AICoach:
         # uncitable-by-construction.
         if state.session_active:
             if _count_in_eligible(state):
-                e.append(
-                    f"lens=count_in_eligible[next@{state.next_phrase_at:.1f}]"
-                )
+                e.append(f"lens=count_in_eligible[next@{state.next_phrase_at:.1f}]")
                 if getattr(state, "next_phrase_cue_id", None):
                     e.append(f"cue_anchor={state.next_phrase_cue_id}")
             else:
@@ -574,14 +644,22 @@ class AICoach:
         return " | ".join(e)
 
     @staticmethod
-    def _evidence_line_compact(state: MusicState) -> str:
-        """Plan 19-02 — 5-field compact evidence_line for the diet path.
+    def _evidence_line_compact(
+        state: MusicState,
+        *,
+        registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None = None,
+        include_live_evidence: bool = True,
+    ) -> str:
+        """Plan 19-02 — compact evidence_line for the diet path.
 
         Drops phase_age / track_age / set_arc / phase_history / recent_tracks
         from the full evidence_line (saves ~400 token-proxy chars on a
         maximally-populated state). The 6s audio window in DJCoHostAgent.
         llm_node is the safety net that recovers grounding for the dropped
-        history fields.
+        history fields. ``deck_context[...]`` and compact
+        ``deck_lanes_context[...]`` are gated onto this path because MIX_MOVE
+        needs the one-deck-vs-two-deck guard and the lane routing map while
+        staying cheap.
 
         Branches are COPIES of the relevant evidence_line branches — kept
         separate so the v4-byte-identical evidence_line stays untouched.
@@ -602,6 +680,18 @@ class AICoach:
             e.append("track=unknown")
 
         e.append(f"deck={state.audible_deck}")
+        deck_context = render_deck_context(state, compact=True)
+        if deck_context:
+            e.append(deck_context)
+        deck_lane_context = render_deck_lane_context(state, compact=True)
+        if deck_lane_context:
+            e.append(deck_lane_context)
+        mixer_context = render_mixer_context(state)
+        if mixer_context:
+            e.append(mixer_context)
+        deck_audio_context = render_deck_audio_context(state)
+        if deck_audio_context:
+            e.append(deck_audio_context)
         e.append(f"set_time={int(state.set_seconds // 60)}:{int(state.set_seconds % 60):02d}")
 
         recent_8s = [(age, label) for age, label in state.recent_moves if age <= 8.0]
@@ -612,6 +702,18 @@ class AICoach:
         else:
             e.append("recent_moves[8s]: NONE")
 
+        grounding_refs = render_grounding_ref_context(
+            state,
+            registry_snapshot=registry_snapshot,
+        )
+        if grounding_refs:
+            e.append(grounding_refs)
+        live_evidence_context = (
+            render_live_evidence_context(state) if include_live_evidence else None
+        )
+        if live_evidence_context:
+            e.append(live_evidence_context)
+
         return " | ".join(e)
 
     @staticmethod
@@ -619,8 +721,7 @@ class AICoach:
         t = ev.type
         if t == "KAAN_SPOKE":
             return (
-                "Kaan just SPOKE — answer him directly, friend tone. Short. "
-                "Not a music reaction."
+                "Kaan just SPOKE — answer him directly, friend tone. Short. Not a music reaction."
             )
         if t == "MANUAL":
             return (
@@ -647,18 +748,41 @@ class AICoach:
                 "riff, pad. Name what arrived and how it feels."
             )
         if t == "MIX_MOVE":
-            mv = ", ".join(ev.extra.get("moves", []))
+            moves = ev.extra.get("moves", [])
+            mv = ", ".join(moves)
+            audio_window_context = render_audio_window_context(ev.state, moves)
+            move_context = render_move_context(ev.state, moves)
+            change_context = render_deck_change_context(ev.state, moves)
+            effect_context = render_move_effect_context(ev.state, moves)
+            live_evidence_context = render_live_evidence_context(ev.state, moves)
+            context_bits = [
+                bit
+                for bit in (
+                    audio_window_context,
+                    move_context,
+                    change_context,
+                    effect_context,
+                    live_evidence_context,
+                )
+                if bit
+            ]
+            move_clause = f"{' '.join(context_bits)}. " if context_bits else ""
             return (
-                f"A move just landed [{mv}]. The recent_moves[8s] ages tell you HOW "
-                "MANY SECONDS AGO it hit — that moment is a CHANGE point in the audio. "
-                "Put your ears RIGHT THERE and listen to the before→after: what shifted "
-                "in the SOUND (energy, low-end, space, tension, how the blend sits). "
-                "Ground your feedback on what that change DID to the mix — did it land, "
-                "muddy it, open it up — and if it needs a fix, give the fix. Name the "
-                "EQ, filter, or move if that's genuinely what's worth flagging — you're "
-                "a pro, you decide what matters this moment. If the change did nothing "
-                "notable, give your read on how the mix is sitting overall, or output a "
-                "single space to stay silent."
+                f"A controller move was observed [{mv}]. {move_clause}"
+                "recent_moves[8s] gives seconds ago; that is a CHANGE point. "
+                "Hear before→after: energy, lows, space, tension. "
+                "Use deck_context, deck_reference_context, deck_source_context, "
+                "deck_audio_context, audio_window_context, "
+                "deck_change_context, move_effect_context, live_evidence, and move_context "
+                "as the hard deck gate: transition_block/watch => do NOT call this "
+                "a transition or blend/switch/segue/handoff/bridge/layer. "
+                "Use them only with transition_candidate + audio/move support; "
+                "don't grade quality without strong two-deck support. live_evidence categories, "
+                "not causal proof or skill grade. "
+                "Ground feedback on before→after; give a fix if needed. "
+                "Name the EQ, filter, or move if that's worth flagging; "
+                "you're a pro, you decide what matters. If nothing changed, read the "
+                "mix or output a single space to stay silent."
             )
         if t == "HEARTBEAT":
             return (
@@ -778,17 +902,21 @@ class AICoach:
             delta = ev.extra.get("delta")
             direction = "denser" if isinstance(delta, (int, float)) and delta > 0 else "sparser"
             return (
-                f"The KICK PATTERN density just changed — the system measured it "
-                f"move from {prev} to {new} ({delta:+}), the pattern got {direction}. "
-                f"React to what that does to the drive — busier, more rolling, "
-                f"stripped-back, more space — grounded only in that measured density "
-                f"shift. If it's not worth a call, output a single space to stay "
-                f"silent."
-            ) if isinstance(delta, (int, float)) else (
-                f"The KICK PATTERN density just changed — the system measured it "
-                f"move from {prev} to {new}. React to what that does to the drive, "
-                f"grounded only in that measured shift. If it's not worth a call, "
-                f"output a single space to stay silent."
+                (
+                    f"The KICK PATTERN density just changed — the system measured it "
+                    f"move from {prev} to {new} ({delta:+}), the pattern got {direction}. "
+                    f"React to what that does to the drive — busier, more rolling, "
+                    f"stripped-back, more space — grounded only in that measured density "
+                    f"shift. If it's not worth a call, output a single space to stay "
+                    f"silent."
+                )
+                if isinstance(delta, (int, float))
+                else (
+                    f"The KICK PATTERN density just changed — the system measured it "
+                    f"move from {prev} to {new}. React to what that does to the drive, "
+                    f"grounded only in that measured shift. If it's not worth a call, "
+                    f"output a single space to stay silent."
+                )
             )
         if t == "DISTORTION_CLIMB":
             db = ev.extra.get("distortion_db")
@@ -851,10 +979,9 @@ class AICoach:
         preserves the v4 byte-identical output.
 
         ``recall_moments`` (Phase 65 Plan 04, RECALL-02): optional list of
-        past-session ``Record`` objects. Threads through to ``evidence_line``;
-        ``None``/``[]`` → no recall block, byte-identical to v5.0. The diet
-        branch intentionally skips the recall block — diet events are
-        ACK_ELIGIBLE (incl. HEARTBEAT) and are never retrieval events.
+        past-session ``Record`` objects. Threads through to ``evidence_line``
+        in full prompts, and through a compact past-session block in diet
+        prompts. ``None``/``[]`` → no recall block, byte-identical to v5.0.
 
         ``diet`` (Plan 19-02): when True, returns a compressed prompt for
         ack-eligible events — the compact 5-field evidence_line + the
@@ -869,12 +996,16 @@ class AICoach:
         """
         if diet:
             if ev.type not in ACK_ELIGIBLE_EVENTS:
-                raise ValueError(
-                    f"diet path only valid for ACK_ELIGIBLE_EVENTS; got {ev.type}"
-                )
-            evidence = AICoach._evidence_line_compact(ev.state)
+                raise ValueError(f"diet path only valid for ACK_ELIGIBLE_EVENTS; got {ev.type}")
+            evidence = AICoach._evidence_line_compact(
+                ev.state,
+                registry_snapshot=registry_snapshot,
+                include_live_evidence=ev.type != "MIX_MOVE",
+            )
             task = AICoach.task_for_event(ev)
-            return f"[{evidence}] {task}"
+            recall_context = compact_recall_context_for_event(recall_moments)
+            recall_frag = recall_fragment_for_event(ev, recall_moments, compact=True)
+            return f"[{evidence}] {task}{recall_context}{recall_frag}"
         evidence = AICoach.evidence_line(
             ev.state,
             registry_snapshot=registry_snapshot,

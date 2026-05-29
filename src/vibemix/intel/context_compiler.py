@@ -13,6 +13,7 @@ from vibemix.intel.agent_contract import (
     ContextMode,
 )
 from vibemix.intel.claims import MusicClaimLedger
+from vibemix.intel.move_grade import grade_transition_candidate
 from vibemix.intel.transition_scorer import (
     EXACT_TIMING_CONFIDENCE_FLOOR,
     LIVE_SELECT_CONFIDENCE_FLOOR,
@@ -24,6 +25,8 @@ DEFAULT_ALLOWED_CLAIMS: tuple[str, ...] = (
     "track_identity",
     "transition_role",
     "transition_fit",
+    "move_grade",
+    "grade_progress",
     "section_role",
     "section_boundary",
     "semantic_fit",
@@ -262,6 +265,7 @@ def _candidate_payload(candidate: TransitionCandidate) -> dict[str, Any]:
         },
         "risk_flags": candidate.risk_flags,
         "deterministic_reason": candidate.reasons[0] if candidate.reasons else "",
+        "move_grade": grade_transition_candidate(candidate),
     }
 
 
@@ -435,6 +439,7 @@ def _claim_ledger(
     current: dict[str, Any],
 ) -> MusicClaimLedger:
     ledger = MusicClaimLedger(packet_id)
+    _add_grade_progress_claim(ledger, packet_id, current)
     _add_source_context_claims(ledger, packet_id, current)
     for candidate in candidates:
         candidate_ref = f"candidate:{candidate.candidate_id}"
@@ -456,6 +461,7 @@ def _claim_ledger(
             reason_codes=candidate.risk_flags,
             provenance_ref=candidate_ref,
         )
+        _add_move_grade_claim(ledger, candidate, candidate_ref)
         _add_section_role_claim(
             ledger,
             candidate_ref,
@@ -618,6 +624,110 @@ def _claim_ledger(
                 provenance_ref=f"packet:{packet_id}",
             )
     return ledger
+
+
+def _add_grade_progress_claim(
+    ledger: MusicClaimLedger,
+    packet_id: str,
+    current: dict[str, Any],
+) -> None:
+    progress = current.get("grade_progress")
+    if not isinstance(progress, dict) or progress.get("earned") is not True:
+        return
+    streak = _optional_int(progress.get("streak"))
+    total_xp = _optional_int(progress.get("total_xp"))
+    last_xp = _optional_int(progress.get("last_xp"))
+    heat = _optional_int(progress.get("heat"))
+    level = _optional_int(progress.get("level"))
+    level_up = progress.get("level_up") is True
+    levels_gained = _optional_int(progress.get("levels_gained"))
+    if streak is None or streak <= 0:
+        return
+    if total_xp is None or total_xp < 0:
+        total_xp = 0
+    if last_xp is None or last_xp < 0:
+        last_xp = 0
+    if heat is None:
+        heat = 0
+    heat = max(0, min(100, heat))
+    if level is None or level < 1:
+        level = 1
+    if levels_gained is None or levels_gained < 0:
+        levels_gained = 0
+    allowed_phrases = (
+        f"combo x{min(999, streak)}",
+        f"{min(999_999, total_xp)} xp",
+        f"+{min(999, last_xp)} xp",
+        f"deserved +{min(999, last_xp)} xp",
+        f"lv {min(999, level)}",
+        f"level {min(999, level)}",
+    )
+    if level_up:
+        allowed_phrases = (*allowed_phrases, "level up")
+    ledger.add(
+        "grade_progress",
+        subject_id="live_session",
+        value=streak,
+        unit="streak",
+        evidence_refs=(f"current:{packet_id}:grade_progress",),
+        confidence=0.9 if heat >= 66 else 0.78,
+        scope="action",
+        allowed_phrases=allowed_phrases,
+        forbidden_phrases=("guaranteed streak", "perfect streak"),
+        reason_codes=(
+            f"streak:{min(999, streak)}",
+            f"total_xp:{min(999_999, total_xp)}",
+            f"last_xp:{min(999, last_xp)}",
+            f"heat:{heat}",
+            f"level:{min(999, level)}",
+            f"level_up:{str(level_up).lower()}",
+            f"levels_gained:{min(999, levels_gained)}",
+        ),
+        provenance_ref=f"current:{packet_id}:grade_progress",
+    )
+
+
+def _add_move_grade_claim(
+    ledger: MusicClaimLedger,
+    candidate: TransitionCandidate,
+    candidate_ref: str,
+) -> None:
+    grade = grade_transition_candidate(candidate)
+    slug = _required_str(grade.get("slug"))
+    if slug is None:
+        return
+    confidence = candidate.confidence
+    if slug in {"negative", "mid"}:
+        confidence = max(confidence, 0.55)
+    reason = _required_str(grade.get("reason")) or "move_grade"
+    ledger.add(
+        "move_grade",
+        subject_id=candidate.candidate_id,
+        value=slug,
+        evidence_refs=(candidate_ref, f"score:{candidate.candidate_id}:move_grade"),
+        confidence=confidence,
+        scope="transition",
+        allowed_phrases=_move_grade_phrases(slug),
+        forbidden_phrases=("perfect", "guaranteed", "flawless"),
+        reason_codes=(*candidate.risk_flags, reason),
+        provenance_ref=f"score:{candidate.candidate_id}:move_grade",
+    )
+
+
+def _move_grade_phrases(slug: str) -> tuple[str, ...]:
+    if slug == "negative":
+        return ("risky move", "rough entry")
+    if slug == "mid":
+        return ("mid entry", "tentative move")
+    if slug == "clean":
+        return ("clean move", "clean entry")
+    if slug == "sexy":
+        return ("sexy move", "smooth entry")
+    if slug == "bomb":
+        return ("bomb entry", "big payoff")
+    if slug == "lit_aff":
+        return ("lit aff", "everything clicks")
+    return ("graded move",)
 
 
 def _add_track_identity_claim(

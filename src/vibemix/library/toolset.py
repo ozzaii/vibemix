@@ -11,14 +11,14 @@ lives at the tool boundary instead of in a prompt:
 
 The base playlist tools:
 
-* ``search_vibe`` — the ONLY discovery path. Every id it returns is recorded
-  in a per-run ``seen`` set.
+* ``search_vibe`` / ``discover_pool`` — the grounded discovery paths. Every id
+  either returns is recorded in a per-run ``seen`` set.
 * ``get_track_features`` — deterministic facts (Camelot via
   ``harmonics.to_camelot``; LLM never computes keys). Honest null for absent
   fields.
 * ``create_playlist`` — the single validated write. **Gate #1:** every
-  ``track_id`` must be in ``seen`` (returned by a prior ``search_vibe`` this
-  run) — an invented id rejects the whole call. **Gate #2:**
+  ``track_id`` must be in ``seen`` (returned by ``search_vibe`` or
+  ``discover_pool`` this run) — an invented id rejects the whole call. **Gate #2:**
   ``create_playlist.create_playlist`` re-validates each surviving id against
   the live library. A playlist can never reference a track the agent invented
   or the library does not contain.
@@ -117,6 +117,9 @@ class LibraryToolset:
         self.issued_transition_candidates: dict[str, TransitionCandidate] = {}
         self.issued_cue_proposals: dict[str, SmartCueProposal] = {}
         self.issued_context_packets: dict[str, AgentContextEnvelope] = {}
+        # Grounding spine for external research: fetch_url may only read URLs
+        # issued by web_search in this run, mirroring the track-id seen gate.
+        self.seen_urls: set[str] = set()
         self.created: PlaylistResult | None = None
         # BL-02: the successful set-prep export (mirrors ``created``). Set by the
         # export_set handler; the agent loop reads it to break with a terminal
@@ -158,7 +161,7 @@ class LibraryToolset:
             )
         except Exception as e:
             logger.warning("[viber] search_vibe failed: %s", e)
-            return {"error": f"search_vibe failed: {type(e).__name__}"}
+            return {"error": f"search_vibe failed: {type(e).__name__}: {e}"}
         for r in results:
             self.seen.add(r.track_id)
         return {
@@ -311,7 +314,7 @@ class LibraryToolset:
             )
         except Exception as e:
             logger.warning("[viber] transition_slate failed: %s", e)
-            return {"error": f"transition_slate failed: {type(e).__name__}"}
+            return {"error": f"transition_slate failed: {type(e).__name__}: {e}"}
 
         for candidate in slate:
             self.issued_transition_candidates[candidate.candidate_id] = candidate
@@ -358,7 +361,7 @@ class LibraryToolset:
             )
         except Exception as e:
             logger.warning("[viber] compile_musical_context failed: %s", e)
-            return {"error": f"compile_musical_context failed: {type(e).__name__}"}
+            return {"error": f"compile_musical_context failed: {type(e).__name__}: {e}"}
         self.issued_context_packets[packet_id] = envelope
         return {"packet": asdict(envelope)}
 
@@ -409,7 +412,7 @@ class LibraryToolset:
                 proposals.append(proposal)
         except Exception as e:
             logger.warning("[viber] smart_hot_cues failed: %s", e)
-            return {"error": f"smart_hot_cues failed: {type(e).__name__}"}
+            return {"error": f"smart_hot_cues failed: {type(e).__name__}: {e}"}
 
         return {"proposals": [_smart_cue_proposal_to_dict(proposal) for proposal in proposals]}
 
@@ -463,15 +466,15 @@ class LibraryToolset:
             return {
                 "error": (
                     "rejected: these track_ids were never returned by "
-                    f"search_vibe this run (invented): {invented}. Only use "
-                    "ids from a search_vibe result."
+                    f"search_vibe/discover_pool this run (invented): {invented}. "
+                    "Only use ids from a discovery result."
                 )
             }
         try:
             result = create_playlist(self._library, name, track_ids)
         except Exception as e:
             logger.warning("[viber] create_playlist failed: %s", e)
-            return {"error": f"create_playlist failed: {type(e).__name__}"}
+            return {"error": f"create_playlist failed: {type(e).__name__}: {e}"}
         self.created = result
         return {
             "created": True,
@@ -500,7 +503,16 @@ class LibraryToolset:
             k = int(k)
         except (TypeError, ValueError):
             k = 5
-        return web_research.web_search(query, k=k)
+        result = web_research.web_search(query, k=k)
+        results = result.get("results") if isinstance(result, dict) else None
+        if isinstance(results, list):
+            for row in results:
+                if not isinstance(row, dict):
+                    continue
+                url = row.get("url")
+                if isinstance(url, str) and url.strip():
+                    self.seen_urls.add(url)
+        return result
 
     def fetch_url(self, args: dict[str, Any]) -> dict[str, Any]:
         """Fetch one web page's readable text (from a prior web_search url).
@@ -511,6 +523,13 @@ class LibraryToolset:
         url = args.get("url")
         if not isinstance(url, str) or not url:
             return {"error": "fetch_url: 'url' must be a string"}
+        if url not in self.seen_urls:
+            return {
+                "error": (
+                    "rejected: url was not returned by web_search this run: "
+                    f"{url!r}"
+                )
+            }
         return web_research.fetch_url(url)
 
     # -- set-prep tools (Vibe Mix engine; lazy-import the engine modules) ---- #
@@ -560,7 +579,7 @@ class LibraryToolset:
         try:
             from vibemix.library import discovery
         except Exception as e:
-            return {"error": f"discover_pool unavailable: {type(e).__name__}"}
+            return {"error": f"discover_pool unavailable: {type(e).__name__}: {e}"}
 
         query = args.get("query")
         text_query = query if isinstance(query, str) and query.strip() else None
@@ -601,7 +620,7 @@ class LibraryToolset:
             )
         except Exception as e:
             logger.warning("[viber] discover_pool failed: %s", e)
-            return {"error": f"discover_pool failed: {type(e).__name__}"}
+            return {"error": f"discover_pool failed: {type(e).__name__}: {e}"}
         for item in pool:
             self.seen.add(item.track_id)
         return {
@@ -693,7 +712,7 @@ class LibraryToolset:
             return {"error": f"sequence_set: unknown curve preset {e}"}
         except Exception as e:
             logger.warning("[viber] sequence_set failed: %s", e)
-            return {"error": f"sequence_set failed: {type(e).__name__}"}
+            return {"error": f"sequence_set failed: {type(e).__name__}: {e}"}
         return {
             "candidates": [
                 {
@@ -767,7 +786,7 @@ class LibraryToolset:
             )
         except Exception as e:
             logger.warning("[viber] export_set failed: %s", e)
-            return {"error": f"export_set failed: {type(e).__name__}"}
+            return {"error": f"export_set failed: {type(e).__name__}: {e}"}
         # BL-02: record the export so the agent loop can break with a terminal
         # "exported" stop_reason and carry the path into the result (mirrors how
         # ``created`` ends a create_playlist run).
@@ -885,7 +904,7 @@ class LibraryToolset:
             )
         except Exception as e:
             logger.warning("[viber] export_smart_cues failed: %s", e)
-            return {"error": f"export_smart_cues failed: {type(e).__name__}"}
+            return {"error": f"export_smart_cues failed: {type(e).__name__}: {e}"}
 
         self.exported = result
         return {
@@ -1005,7 +1024,7 @@ class LibraryToolset:
             )
         except Exception as e:
             logger.warning("[viber] export_cues failed: %s", e)
-            return {"error": f"export_cues failed: {type(e).__name__}"}
+            return {"error": f"export_cues failed: {type(e).__name__}: {e}"}
 
     # -- dispatch (hard per-tool timeout; never raises) --------------------- #
 
@@ -1265,6 +1284,149 @@ class LibraryToolset:
             # (UnicodeEncodeError ⊂ UnicodeError ⊂ ValueError.)
             return
 
+    @staticmethod
+    def _tool_event_arg_summary(name: str, args: dict[str, Any] | None) -> str:
+        """Short, redacted argument label for the live tool tape."""
+        if not isinstance(args, dict):
+            return ""
+
+        def text(key: str, *, limit: int = 80) -> str:
+            raw = args.get(key)
+            if raw is None:
+                return ""
+            return str(raw).replace("\n", " ").strip()[:limit]
+
+        def count(key: str) -> int | None:
+            raw = args.get(key)
+            return len(raw) if isinstance(raw, (list, tuple)) else None
+
+        if name in ("search_vibe", "discover_pool"):
+            parts = [text("query")]
+            bpm_min = args.get("bpm_min")
+            bpm_max = args.get("bpm_max")
+            if bpm_min is not None or bpm_max is not None:
+                parts.append(f"bpm={bpm_min or '?'}-{bpm_max or '?'}")
+            if args.get("k") is not None:
+                parts.append(f"k={args.get('k')}")
+            return "; ".join(p for p in parts if p)[:160]
+        if name in ("get_track_features", "get_track_energy", "get_track_sections"):
+            return text("track_id", limit=120)
+        if name == "sequence_set":
+            n = count("track_ids")
+            parts = [text("curve", limit=40), f"{n} tracks" if n is not None else ""]
+            if args.get("n_slots") is not None:
+                parts.append(f"slots={args.get('n_slots')}")
+            return "; ".join(p for p in parts if p)[:160]
+        if name in ("create_playlist", "export_set"):
+            n = count("track_ids")
+            parts = [text("name", limit=80), f"{n} tracks" if n is not None else ""]
+            return "; ".join(p for p in parts if p)[:160]
+        if name == "transition_slate":
+            n = count("candidate_track_ids")
+            parts = [text("mode", limit=40), f"{n} candidates" if n is not None else ""]
+            source = text("source_section_id", limit=40) or text("source_track_id", limit=40)
+            if source:
+                parts.append(f"source={source}")
+            return "; ".join(p for p in parts if p)[:160]
+        if name == "compile_musical_context":
+            n = count("candidate_ids")
+            parts = [text("mode", limit=40), f"{n} candidates" if n is not None else ""]
+            intent = text("intent", limit=70)
+            if intent:
+                parts.append(intent)
+            return "; ".join(p for p in parts if p)[:160]
+        if name == "request_clarification":
+            return text("question", limit=140)
+        if name in ("web_search", "retrieve_dj_knowledge"):
+            return text("query", limit=140)
+        if name == "fetch_url":
+            return text("url", limit=140)
+        if name == "quote_moment":
+            return text("track_id", limit=80)
+        if name == "smart_hot_cues":
+            n = count("track_ids")
+            parts = [text("track_id", limit=80), f"{n} tracks" if n is not None else ""]
+            return "; ".join(p for p in parts if p)[:160]
+        if name == "export_smart_cues":
+            return text("proposal_id", limit=120)
+        if name == "export_cues":
+            title = text("title", limit=80)
+            artist = text("artist", limit=60)
+            return " - ".join(p for p in (artist, title) if p)[:160]
+
+        for key in ("query", "name", "track_id", "proposal_id", "mode"):
+            value = text(key)
+            if value:
+                return value[:160]
+        return ""
+
+    @staticmethod
+    def _tool_event_summary(name: str, result: dict[str, Any]) -> str:
+        """A short human one-liner for the live tool tape (≤160 chars).
+
+        Errors carry their (now legible) message; discovery tools carry a
+        count; the rest fall back to a plain "ok". Deliberately tolerant of
+        unknown result shapes — the tape must never crash on a new tool."""
+        if not isinstance(result, dict):
+            return ""
+        err = result.get("error")
+        if err is not None:
+            return str(err)[:160]
+        if name in ("search_vibe", "discover_pool"):
+            items = result.get("results")
+            if items is None:
+                items = result.get("pool") or result.get("track_ids") or []
+            n = len(items) if isinstance(items, (list, tuple)) else 0
+            return f"{n} track{'' if n == 1 else 's'}"
+        if name == "sequence_set":
+            # sequence_set returns ranked {"candidates": [{track_ids, …}]}.
+            cands = result.get("candidates")
+            if isinstance(cands, (list, tuple)):
+                n = len(cands)
+                return f"{n} candidate{'' if n == 1 else 's'}"
+        if name in ("create_playlist", "export_set"):
+            ids = result.get("track_ids")
+            if ids is None:
+                pl = result.get("playlist")
+                ids = pl.get("track_ids") if isinstance(pl, dict) else None
+            if isinstance(ids, (list, tuple)):
+                n = len(ids)
+                return f"{n} track{'' if n == 1 else 's'}"
+        # Unknown shape: the tool NAME + ok/err is the signal; no noisy "ok".
+        return ""
+
+    def _emit_tool_event(
+        self, name: str, result: dict[str, Any], args: dict[str, Any] | None = None
+    ) -> None:
+        """Append one tool-call record to the live tool-event side-channel.
+
+        Mirrors ``_write_side_channel`` exactly: env-gated
+        (``VIBEMIX_TOOL_EVENTS_FILE``), best-effort, never raises. One JSONL
+        line per call (append, not overwrite) so the parent wrapper can tail
+        the file and surface each tool the agent fires — search, sequence,
+        create — the moment it fires, turning the opaque Codex run into a
+        visible agentic tape. Silent no-op when the env var is absent, so
+        direct CLI usage and unit tests are unaffected."""
+        path = os.environ.get("VIBEMIX_TOOL_EVENTS_FILE")
+        if not path:
+            return
+        import time  # local — `time` is not a module-top import here
+
+        record = {
+            "tool": name,
+            "arg": self._tool_event_arg_summary(name, args),
+            "ok": not (isinstance(result, dict) and result.get("error") is not None),
+            "summary": self._tool_event_summary(name, result),
+            "ts": time.time(),
+        }
+        try:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record) + "\n")
+        except (OSError, TypeError, ValueError):
+            # Best-effort — never wedge dispatch on a tape write (mirrors the
+            # _write_side_channel rationale). The tape is observability only.
+            return
+
     def _is_empty_or_error(self, name: str, result: dict[str, Any]) -> bool:
         """Phase 99 HARDEN-RETRY Decision 2: identify counter-incrementing returns.
 
@@ -1326,7 +1488,14 @@ class LibraryToolset:
             except concurrent.futures.TimeoutError:
                 result = {"error": f"tool {name!r} timed out"}
             except Exception as e:
-                result = {"error": f"tool {name!r} crashed: {type(e).__name__}"}
+                result = {"error": f"tool {name!r} crashed: {type(e).__name__}: {e}"}
+
+        # ─── LIVE TOOL TAPE — make the agentic work visible ──────────────
+        # Append one record per call to the tool-event side-channel so the
+        # parent wrapper can tail it and stream "what Viber is doing" to the
+        # UI as it happens, instead of the run being opaque until the final
+        # result. Env-gated + best-effort (mirrors ``_write_side_channel``).
+        self._emit_tool_event(name, result, args)
 
         # ─── PHASE 99 HOOK (Plan 99-02 — counter telemetry, no terminal) ───
         # Counter writes confined to the dispatch-calling thread (NEVER the
@@ -1458,7 +1627,11 @@ def _export_cues_and_grid(entry: Any) -> dict[str, Any]:
 
 
 def _transition_candidate_to_dict(candidate: TransitionCandidate) -> dict[str, Any]:
-    return asdict(candidate)
+    from vibemix.intel.move_grade import grade_transition_candidate
+
+    data = asdict(candidate)
+    data["move_grade"] = grade_transition_candidate(candidate)
+    return data
 
 
 def _smart_cue_proposal_to_dict(proposal: SmartCueProposal) -> dict[str, Any]:
@@ -1493,9 +1666,9 @@ def _float_arg(raw: Any, *, default: float) -> float:
 
 
 __all__ = [
+    "MAX_CHOICES",
+    "MIN_CHOICES",
     "TOOL_CALL_TIMEOUT_S",
     "TOOL_STARVATION_THRESHOLD",
-    "MIN_CHOICES",
-    "MAX_CHOICES",
     "LibraryToolset",
 ]
