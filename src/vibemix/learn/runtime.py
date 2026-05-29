@@ -87,6 +87,11 @@ from vibemix.learn.graduation import (
     build_graduation_tutor_line,
     graduation_citations,
 )
+from vibemix.learn.harmonic_practice import (
+    HarmonicPracticePair,
+    build_harmonic_practice_prompt,
+    harmonic_practice_citations,
+)
 from vibemix.learn.lesson_flow import LessonFlow, LessonStep, build_lesson_flow
 from vibemix.learn.state import LearnState
 from vibemix.learn.teaching_loop import (
@@ -393,6 +398,7 @@ class LessonRuntime(StateMachine):
         evidence_registry: Any | None = None,
         evidence_clock: Callable[[], float] | None = None,
         prepared_pool_loader: Callable[[], PreparedPool | None] | None = None,
+        harmonic_pair_loader: Callable[[], HarmonicPracticePair | None] | None = None,
         graduation_summary_loader: Callable[[Any], GraduationSummary | None] | None = None,
         session_event_logger: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
@@ -426,6 +432,9 @@ class LessonRuntime(StateMachine):
             prepared_pool_loader: Optional Course 3 hook that returns the
                 newest real saved playlist/set-prep pool. None keeps the
                 runtime byte-identical for tests and installs without a pool.
+            harmonic_pair_loader: Optional Course 2 hook that returns one
+                deterministic library-grounded Camelot pair for L2.11. None
+                keeps the fixture-only path unchanged when no library exists.
             graduation_summary_loader: Optional L3.06 hook that reads the
                 existing progress/profile/debrief seams. None uses the shipped
                 local storage readers.
@@ -442,6 +451,7 @@ class LessonRuntime(StateMachine):
         self._evidence_registry = evidence_registry
         self._evidence_clock = evidence_clock
         self._prepared_pool_loader = prepared_pool_loader
+        self._harmonic_pair_loader = harmonic_pair_loader
         self._graduation_summary_loader = graduation_summary_loader
         self._session_event_logger = session_event_logger
         # The wall-clock anchor for the 30 s strike escalation timer.
@@ -1450,6 +1460,7 @@ class LessonRuntime(StateMachine):
         ):
             self._learn.current_beat_index = 0
             self._emit_tutor_beat(0)
+            self._emit_harmonic_pair_prompt_if_needed()
             self._emit_prepared_pool_prompt_if_needed()
             self._emit_graduation_summary_if_needed()
             return
@@ -1514,6 +1525,42 @@ class LessonRuntime(StateMachine):
 
             print(
                 f"[learn.runtime] prepared pool tutor emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _emit_harmonic_pair_prompt_if_needed(self) -> None:
+        """Emit L2.11's deterministic user-library Camelot pair when available."""
+        if self._learn.current_lesson_id != "L2.11":
+            return
+        loader = self._harmonic_pair_loader
+        if loader is None:
+            return
+        try:
+            pair = loader()
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] harmonic pair lookup failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return
+        if pair is None:
+            return
+        try:
+            speak = LearnTutorSpeak.make(
+                text=build_harmonic_practice_prompt(pair),
+                tts_marker="L211.library_pair",
+                citations=harmonic_practice_citations(pair, self._evidence_registry),
+                data_state="active",
+            ).to_dict()
+            self._ipc.emit(speak)
+            self._log_tutor_speak_event(speak)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] harmonic pair tutor emit failed: {exc!r}",
                 file=sys.stderr,
             )
 

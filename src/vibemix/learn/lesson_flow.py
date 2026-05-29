@@ -458,6 +458,8 @@ def _compile_backstage_lenses(
         lenses.append("controller_state")
     if isinstance(script.get("exemplar_cycle"), list):
         lenses.append("library_exemplars")
+    if bool(script.get("library_melody_pair", False)):
+        lenses.append("library_suggestions")
     if isinstance(script.get("recital_pool"), list):
         lenses.append("recital_observer")
 

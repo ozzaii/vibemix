@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 """Refresh deterministic Learn quality artifacts and the package verifier."""
+
 from __future__ import annotations
 
 import argparse
@@ -178,27 +179,17 @@ def _quality_contract_summary(verification: dict[str, Any] | None) -> dict[str, 
             "required_commands": python_quality.get("required_commands"),
             "commands": python_command_names,
             "model_router_guard": "learn_model_router_guard" in python_command_names,
-            "all_lessons_runtime": (
-                "learn_all_lessons_runtime_pytest" in python_command_names
-            ),
-            "adaptive_coaching": (
-                "learn_adaptive_coaching_pytest" in python_command_names
-            ),
-            "auto_master_finder": (
-                "learn_auto_master_finder_pytest" in python_command_names
-            ),
-            "course3_mix_anchor": (
-                "learn_course3_mix_anchor_pytest" in python_command_names
-            ),
+            "all_lessons_runtime": ("learn_all_lessons_runtime_pytest" in python_command_names),
+            "adaptive_coaching": ("learn_adaptive_coaching_pytest" in python_command_names),
+            "auto_master_finder": ("learn_auto_master_finder_pytest" in python_command_names),
+            "course3_mix_anchor": ("learn_course3_mix_anchor_pytest" in python_command_names),
             "course_pack_preflight": "learn_course_pack_pytest" in python_command_names,
         },
         "frontend_quality": {
             "path": frontend_quality.get("path"),
             "passed": frontend_quality.get("passed") is True,
             "commands": frontend_command_names,
-            "browser_booth_quality": (
-                "learn_browser_booth_playwright" in frontend_command_names
-            ),
+            "browser_booth_quality": ("learn_browser_booth_playwright" in frontend_command_names),
             "tauri_window_contract": "learn_tauri_window_vitest" in frontend_command_names,
         },
         "desktop_quality": {
@@ -219,10 +210,13 @@ def _release_blocker_recipe(verification: dict[str, Any] | None) -> list[dict[st
 
 def _release_blocker_recipe_ids(recipe: list[dict[str, Any]]) -> list[str]:
     return [
-        str(row["id"])
-        for row in recipe
-        if isinstance(row.get("id"), str) and row["id"].strip()
+        str(row["id"]) for row in recipe if isinstance(row.get("id"), str) and row["id"].strip()
     ]
+
+
+def _release_gate_cue_card(verification: dict[str, Any] | None) -> dict[str, Any] | None:
+    cue_card = verification.get("release_gate_cue_card") if verification else None
+    return cue_card if isinstance(cue_card, dict) else None
 
 
 def build_report(
@@ -236,6 +230,7 @@ def build_report(
         for command in commands
     )
     release_blocker_recipe = _release_blocker_recipe(verification)
+    release_gate_cue_card = _release_gate_cue_card(verification)
     return {
         "schema_version": 1,
         "generated_at": now_iso(),
@@ -243,35 +238,27 @@ def build_report(
         "passed": all(command.get("passed") is True for command in commands)
         and bool(verification and verification.get("passed") is True),
         "release_ready": bool(verification and verification.get("release_ready") is True),
-        "non_external_ready": bool(
-            verification and verification.get("non_external_ready") is True
-        ),
-        "deferred_external_blocker_ids": verification.get(
-            "deferred_external_blocker_ids"
-        )
+        "non_external_ready": bool(verification and verification.get("non_external_ready") is True),
+        "deferred_external_blocker_ids": verification.get("deferred_external_blocker_ids")
         if verification
         else [],
-        "internal_blocker_ids": verification.get("internal_blocker_ids")
-        if verification
-        else [],
+        "internal_blocker_ids": verification.get("internal_blocker_ids") if verification else [],
         "verification_path": str(verification_path),
         "verification_refreshed": verification_refreshed,
         "verification_summary": {
             "passed": verification.get("passed") if verification else None,
             "technical_passed": verification.get("technical_passed") if verification else None,
             "release_ready": verification.get("release_ready") if verification else None,
-            "non_external_ready": verification.get("non_external_ready")
-            if verification
-            else None,
-            "deferred_external_blocker_ids": verification.get(
-                "deferred_external_blocker_ids"
-            )
+            "non_external_ready": verification.get("non_external_ready") if verification else None,
+            "deferred_external_blocker_ids": verification.get("deferred_external_blocker_ids")
             if verification
             else None,
             "internal_blocker_ids": verification.get("internal_blocker_ids")
             if verification
             else None,
-            "completion_blockers": verification.get("completion_blockers") if verification else None,
+            "completion_blockers": verification.get("completion_blockers")
+            if verification
+            else None,
             "completion_matrix": verification.get("completion_matrix", {}).get("summary")
             if verification
             else None,
@@ -279,10 +266,9 @@ def build_report(
             if verification
             else None,
         },
+        "release_gate_cue_card": release_gate_cue_card,
         "release_blocker_recipe": release_blocker_recipe,
-        "release_blocker_recipe_ids": _release_blocker_recipe_ids(
-            release_blocker_recipe
-        ),
+        "release_blocker_recipe_ids": _release_blocker_recipe_ids(release_blocker_recipe),
         "quality_contract": _quality_contract_summary(verification),
         "commands": commands,
     }
@@ -339,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
                 "non_external_ready": report["non_external_ready"],
                 "verification_refreshed": report["verification_refreshed"],
                 "verification": report["verification_summary"],
+                "release_gate_cue_card": report["release_gate_cue_card"],
                 "release_blocker_recipe_ids": report["release_blocker_recipe_ids"],
                 "commands": [
                     {

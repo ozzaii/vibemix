@@ -11,14 +11,28 @@ The Learn beginner module is now a real structured 36-lesson teaching system,
 not a syllabus wall. The current package passes Python quality, frontend
 quality, desktop quality, and the consolidated package verifier. With the
 current user boundary, it is `non_external_ready=true`: there are no internal
-package blockers outside the two explicitly deferred external gates:
+package blockers, and the packaged EQ exemplar loops now have a durable human
+ear-pass approval. The only remaining release gate is Course 3 routed-audio
+count-in proof with real Rekordbox/deck evidence.
 
-1. Human ear-pass for the packaged EQ exemplar loops.
-2. Course 3 routed-audio count-in proof with real Rekordbox/deck evidence.
-
-Do not mark the full Learn goal complete until those two gates are proven in
-fresh artifacts, but do not keep looping on internal code as if more package
+Do not mark the full Learn goal complete until that Course 3 gate is proven in
+a fresh artifact, but do not keep looping on internal code as if more package
 work is blocking release.
+
+The verifier now makes that boundary easy to hand off. The current
+`learn-package-verification-current.json` includes a compact
+`release_gate_cue_card` with status `waiting_on_external_gates`, the first
+action, the remaining Course 3 prompt, route, diagnosis code, current
+Rekordbox route, target capture route, route-mismatch boolean,
+spoken-prompt flag, run command, and verify command. Use
+`uv run python scripts/verify_learn_package.py --cue-card --out
+/tmp/vibemix-live-learn-proof/learn-package-verification-current.json` to print
+only that small cue card while refreshing the full report on disk. Add
+`--say-cue-card` when you want macOS to speak the cue-card headline and first
+gate prompt before a hands-on proof pass. The top-level perfection artifact now
+carries the same cue card too, so
+`/tmp/vibemix-live-learn-proof/learn-perfection-package-current.json` is the
+single status handoff for package health plus the next external proof steps.
 
 ## Character Direction
 
@@ -47,6 +61,51 @@ turning into a game layer or a data wall.
 - Course 3 graduation now uses that same memory in its existing grounded status
   line, for example `practice: mostly hardware deck`, giving the learner a
   small "it knows my path" payoff without showing counts or a dashboard.
+
+## Melody/Library Course Direction
+
+The next high-value course direction should be melody-first and library-first,
+not another generic theory syllabus. Keep the same practice-booth surface, but
+let the learner choose a track from their own crate and teach from what vibemix
+can already observe: key/Camelot, cue and section anchors, phrase boundaries,
+energy, track familiarity, and library suggestions. The frontstage should still
+be one prompt at a time, for example: "Loop the melodic intro on deck A", "bring
+in a compatible key on deck B", "swap bass after the phrase turn", then show
+the exact melodic/key/section evidence that made the coaching grounded.
+
+The winning UX is not "open a melody course." It is "pick a track you love, and
+I will teach you through it." The learner should feel that Learn has taste:
+vibemix finds a usable hook, a safe phrase entry, a compatible second track, or
+a likely clash in the user's own library, then turns that into one physical
+mission. Example frontstage lines:
+
+- "Loop the hook on deck A. Keep it alive for 8 bars."
+- "Bring in this 9A intro under the last 16 bars."
+- "Kill the bass on B until the vocal phrase turns."
+- "Save this as a practice pair if it felt clean."
+
+Backstage, every melody/library mission should carry a structured exemplar:
+`track_id`, `section_id`, `cue_anchor`, key/Camelot evidence, phrase span,
+energy delta, and a short reason such as `compatible_key`, `hook_to_intro`,
+`vocal_clash_risk`, or `melodic_release`. The UI should not expose that as a
+table. It should use the evidence to render one calm reason chip and one
+coaching sentence. If the user's library is unavailable or too sparse, fall
+back to packaged exemplars, but make that a graceful fallback rather than the
+default product identity.
+
+Course 4 should probably be organized as six hidden mission families rather
+than a visible syllabus wall: hook spotting, phrase alignment, key-safe blends,
+melody-clash control, tension/release, and a tiny personal routine built from
+the learner's own tracks. The existing course-pack authoring rules should still
+apply: canonical IDs, observable controls, deterministic verification,
+adaptive hints, replay/jump support, progress/unlocks, and tests.
+
+Treat this as a future course pack, likely Course 4, using the existing
+`validate_course_pack_draft(...)` path. It should add value by making practice
+feel personalized to the user's own library, while the current release gate
+stays unchanged: do not merge melodic-library lessons into the 36-lesson
+beginner release unless they pass the same structured-flow, prompt, hint,
+grounding, progress, and frontend contracts.
 
 ## What Was Built
 
@@ -114,6 +173,22 @@ turning into a game layer or a data wall.
   controller or the on-screen deck via `practice_sources` and
   `last_practice_source`, giving the backstage coach useful learner data while
   keeping the booth visually unchanged.
+- Course 3 route-mismatch evidence now survives the Learn UI runtime path. A
+  flat `course3_lens.operator_action` frame can carry
+  `current_rekordbox_route`, `target_capture_route`, and `route_mismatch`; the
+  normalizer preserves them, and the status rail collapses the fix into one
+  calm line such as `route Rekordbox to BlackHole 16ch` while keeping the exact
+  current/target routes in aria/title text.
+- The runtime `course3_lens` itself still stays honest: if it only knows
+  `MusicState`, it says `selected by readiness` and does not invent
+  BlackHole/DDJ route details. Route-specific fixes come from the readiness
+  doctor, verifier cue card, or generic operator-action seam where that
+  evidence exists.
+- The generic `learn.operator_action` seam now has inbound transport: flat
+  ws frames can carry `learn_operator_action`, and Tauri can emit
+  `learn-operator-action`. Both paths normalize into the same one-action status
+  rail, so future course doctors can show one grounded action without extending
+  the Learn IPC schema or adding another UI surface.
 - The shared IPC schema, generated TypeScript IPC types, generated validator,
   and Learn window progress payload type now accept those fields, so the real
   WebSocket/Tauri progress path stays schema-clean.
@@ -270,7 +345,32 @@ turning into a game layer or a data wall.
   - `desktop_quality`
   - `package_verifier`
 - The package artifact persists `release_blocker_recipe_ids` so handoff tools
-  can read the two remaining blocker IDs directly.
+  can read the remaining blocker ID directly.
+
+### Melody/Library-First Course 2 Direction
+
+- Added `src/vibemix/learn/harmonic_practice.py`, a deterministic
+  library-grounded Camelot pair picker. It uses existing Rekordbox track facts,
+  `TrackRelation`, and `harmonics.to_camelot`; it does not ask a model to
+  compute keys and it does not play audio.
+- `L2.11` now carries `library_melody_pair=true`, and `lesson_flow` declares
+  the `library_suggestions` backstage lens for that lesson. Course 2 also
+  declares the `library_suggestions` capability in both Python and the generated
+  TypeScript curriculum mirror.
+- `LessonRuntime` now accepts `harmonic_pair_loader` and, only for `L2.11`,
+  emits one extra grounded tutor line when a compatible pair exists:
+  `tts_marker="L211.library_pair"`, with `[track:<id>]` citations only when the
+  shared `EvidenceRegistry` resolves the library tracks.
+- `__main__.py` wires `harmonic_pair_loader=_load_learn_harmonic_pair`, reusing
+  the already-loaded Rekordbox cache when present and falling back to
+  `RekordboxLibrary.try_load_cache()` when Learn starts after a cold import.
+- New tests cover pair selection, seed-track future wiring, prompt bounds,
+  citation safety, runtime emission/no-pair fallback, frontend capability
+  projection, and boot wiring.
+- Product meaning: the Camelot lesson is no longer only a wheel/diagram. If the
+  user's crate has compatible keyed tracks, Learn says "your library pair..." and
+  teaches melody through music they already own while keeping the same calm
+  one-action booth.
 
 ## Current Evidence
 
@@ -282,14 +382,12 @@ Use these as the latest local proof points:
   - commands passed: Python, frontend, desktop, package verifier
   - `non_external_ready=true`
   - `internal_blocker_ids=[]`
-  - `deferred_external_blocker_ids=["packaged_eq_exemplar_ear_pass","course3_live_audio_play_mode"]`
+  - `deferred_external_blocker_ids=["course3_live_audio_play_mode"]`
   - `release_ready=false`
-  - objective audit: `7/9` proven
+  - objective audit: `8/9` proven
   - blocking objective IDs:
     - `course3_live_play_mode`
-    - `audible_example_quality`
   - blocker IDs:
-    - `packaged_eq_exemplar_ear_pass`
     - `course3_live_audio_play_mode`
 - `/tmp/vibemix-live-learn-proof/learn-curriculum-audit-current.json`
   - `passed=true`
@@ -325,33 +423,35 @@ uv run python scripts/run_learn_perfection_package.py --out /tmp/vibemix-live-le
 uv run python scripts/audit_learn_curriculum.py --out /tmp/vibemix-live-learn-proof/learn-curriculum-audit-current.json
 uv run pytest -q tests/learn/test_lesson_flow_contract.py tests/learn/test_curriculum_audit.py tests/learn/test_course_pack.py tests/learn/test_verify_learn_package.py
 uv run pytest -q tests/learn/test_course_pack.py tests/learn/test_curriculum_audit.py tests/learn/test_verify_learn_package.py tests/learn/test_run_learn_perfection_package.py
+uv run pytest -q tests/learn/test_harmonic_practice.py tests/learn/test_harmonic_practice_runtime.py tests/learn/test_lesson_flow_contract.py tests/learn/test_course_2_curriculum.py tests/learn/test_observer_boot_wiring.py
+npm --prefix tauri/ui test -- tests/learn/test_curriculum_meta.spec.ts
+uv run python scripts/export_learn_curriculum_meta.py --check
 ```
 
 ## Remaining Release Work
 
 ### EQ Ear-Pass
 
-Run the audition, listen, then approve only if the loops are good enough:
-
-```bash
-uv run python scripts/audition_learn_exemplars.py --play --say-prompts --out /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json
-uv run python scripts/audition_learn_exemplars.py --approve-ear-pass --approved-by <name> --audition /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json --approval-out /tmp/vibemix-live-learn-proof/learn-exemplar-ear-pass-current.json
-```
-
-If the loops feel thin, replace them with stronger licensed or self-authored
-examples and rerun the manifest/hash tests.
+Done. The current approval artifact is
+`/tmp/vibemix-live-learn-proof/learn-exemplar-ear-pass-current.json`, approved
+by `ozai` after playback through MacBook Pro Speakers. The approved bank
+fingerprint digest is
+`34e7aafe568b2e8badecb75fd28e0a8bd710f4fd1b1f2d84e7ff4a78584096e9`.
 
 ### Course 3 Routed Audio
 
-The current blocker is not a port conflict. The last known good app socket was
-`127.0.0.1:8765`, owned by `python3 -m vibemix`, with a successful websocket
-handshake. The remaining action is real Rekordbox master audio and citable deck
-metadata:
+The current blocker is not a port conflict and not an internal Learn-code
+blocker. The latest proof attempt started the app, opened the socket, spoke the
+Course 3 prompt with `say(1)`, and successfully nudged Rekordbox with Space,
+but capture stayed silent. The remaining action is real Rekordbox master audio
+and citable deck metadata:
 
 1. Stop unrelated browser/system media or make Rekordbox the active source.
-2. Load and play a real Rekordbox library track.
-3. Route Rekordbox/master output to the intended 48 kHz loopback/aggregate
-   path.
+2. In Rekordbox Audio preferences, set the audio output from
+   `DDJ-FLX4 @ 48000Hz` to `BlackHole 16ch @ 48000Hz` or a 48 kHz aggregate
+   that includes it. The DDJ-FLX4 hardware route is visible and useful, but it
+   is not the capture route that proves Course 3.
+3. Load and play a real Rekordbox library track.
 4. Raise channel fader, crossfader, trim, and master until capture has signal.
 5. Rerun Course 3 live proof with spoken prompts.
 

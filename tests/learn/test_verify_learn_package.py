@@ -108,11 +108,7 @@ def _exemplar_report(*, release_ready: bool = False) -> dict:
             "track_count": 4,
         },
         "diagnosis": {
-            "code": (
-                "approved"
-                if release_ready
-                else "technical_audit_passed_ear_pass_pending"
-            )
+            "code": ("approved" if release_ready else "technical_audit_passed_ear_pass_pending")
         },
         "technical_failures": [],
         "operator_commands": {
@@ -184,7 +180,9 @@ def test_launched_tauri_smoke_script_writes_verifier_discoverable_artifact_by_de
 
 
 def test_exemplar_status_enriches_operator_action_with_output_devices(monkeypatch) -> None:
-    monkeypatch.setattr(verifier, "audit_packaged_bank", lambda approval_path=None: _exemplar_report())
+    monkeypatch.setattr(
+        verifier, "audit_packaged_bank", lambda approval_path=None: _exemplar_report()
+    )
     monkeypatch.setattr(
         verifier,
         "list_output_devices",
@@ -244,8 +242,7 @@ def _frontend_quality(path: Path, *, passed: bool = True) -> Path:
         {
             "name": "learn_tauri_window_vitest",
             "command": (
-                "npm --prefix tauri/ui test -- "
-                "tests/learn/test_learn_window_label.spec.ts"
+                "npm --prefix tauri/ui test -- tests/learn/test_learn_window_label.spec.ts"
             ),
             "returncode": 0,
             "duration_s": 1.0,
@@ -351,10 +348,7 @@ def _python_quality(path: Path, *, passed: bool = True) -> Path:
         },
         {
             "name": "learn_adaptive_coaching_pytest",
-            "command": (
-                "uv run pytest -q "
-                "tests/learn/test_adaptive_coaching_runtime_contract.py"
-            ),
+            "command": ("uv run pytest -q tests/learn/test_adaptive_coaching_runtime_contract.py"),
             "returncode": 0,
             "duration_s": 1.0,
             "passed": True,
@@ -432,10 +426,7 @@ def _desktop_quality(path: Path, *, passed: bool = True) -> Path:
         },
         {
             "name": "learn_cargo_learn_window_test",
-            "command": (
-                "cargo test --manifest-path tauri/src-tauri/Cargo.toml "
-                "learn_window"
-            ),
+            "command": ("cargo test --manifest-path tauri/src-tauri/Cargo.toml learn_window"),
             "returncode": 0,
             "duration_s": 1.0,
             "passed": True,
@@ -443,8 +434,7 @@ def _desktop_quality(path: Path, *, passed: bool = True) -> Path:
         {
             "name": "learn_cargo_sidecar_audio_test",
             "command": (
-                "cargo test --manifest-path tauri/src-tauri/Cargo.toml "
-                "sidecar_audio_env_defaults"
+                "cargo test --manifest-path tauri/src-tauri/Cargo.toml sidecar_audio_env_defaults"
             ),
             "returncode": 0,
             "duration_s": 1.0,
@@ -481,19 +471,11 @@ def _live_artifact(
         app_start_result = {
             "audio_env": {
                 "auto_master_input": True,
-                "auto_master_fallback_candidate": course3_route_plan.get(
-                    "candidate"
-                ),
-                "auto_master_fallback_device": course3_route_plan.get(
-                    "fallback_device"
-                ),
-                "auto_master_fallback_rejected_reason": course3_route_plan.get(
-                    "rejected_reason"
-                ),
+                "auto_master_fallback_candidate": course3_route_plan.get("candidate"),
+                "auto_master_fallback_device": course3_route_plan.get("fallback_device"),
+                "auto_master_fallback_rejected_reason": course3_route_plan.get("rejected_reason"),
             },
-            "audio_runtime": {
-                "auto_master_input": course3_route_plan.get("selected_input")
-            },
+            "audio_runtime": {"auto_master_input": course3_route_plan.get("selected_input")},
         }
     stages = {
         "app_start": {"status": "passed", "result": app_start_result},
@@ -614,6 +596,15 @@ def _course3_readiness(path: Path) -> Path:
                     "code": "macos_output_not_loopback",
                     "severity": "fix_route",
                     "next_action": "Route macOS output to the selected loopback device.",
+                    "operator_action": {
+                        "prompt": "Route Rekordbox into the selected loopback capture.",
+                        "route": "BlackHole 16ch @ 48000Hz",
+                        "current_rekordbox_route": "DDJ-FLX4 @ 48000Hz",
+                        "target_capture_route": "BlackHole 16ch @ 48000Hz",
+                        "steps": [
+                            "Set Rekordbox Audio output to BlackHole 16ch @ 48000Hz.",
+                        ],
+                    },
                 },
                 "course3_route_doctor": {
                     "ok": False,
@@ -621,8 +612,7 @@ def _course3_readiness(path: Path) -> Path:
                     "diagnosis_code": "macos_output_not_loopback",
                     "route": "BlackHole 16ch @ 48000Hz",
                     "next_step": (
-                        "Free 127.0.0.1:8765 so the Vibemix Learn sidecar owns "
-                        "the app socket."
+                        "Free 127.0.0.1:8765 so the Vibemix Learn sidecar owns the app socket."
                     ),
                     "operator_steps": [
                         "Free 127.0.0.1:8765 so the Vibemix Learn sidecar owns the app socket.",
@@ -730,7 +720,9 @@ def test_verifier_separates_static_package_pass_from_release_ready(
     frontend = _frontend_quality(tmp_path / verifier.FRONTEND_QUALITY_NAME)
     desktop = _desktop_quality(tmp_path / verifier.DESKTOP_QUALITY_NAME)
     live = _live_artifact(tmp_path / "proof-current.json")
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -755,9 +747,7 @@ def test_verifier_separates_static_package_pass_from_release_ready(
     ]
     assert report["internal_blocker_ids"] == ["physical_controller_path"]
     assert report["sections"]["curriculum"]["beginner_lessons"] == 36
-    assert report["sections"]["curriculum"]["flow_contract_summary"][
-        "beginner_flows_ok"
-    ] is True
+    assert report["sections"]["curriculum"]["flow_contract_summary"]["beginner_flows_ok"] is True
     assert report["sections"]["curriculum"]["transcript_inventory"]["ok"] is True
     assert (
         report["sections"]["curriculum"]["course_pack_contract"]["frontend_contract"][
@@ -783,10 +773,7 @@ def test_verifier_separates_static_package_pass_from_release_ready(
             "audible_example_quality",
         ],
     }
-    objectives = {
-        row["id"]: row
-        for row in objective_audit["objectives"]
-    }
+    objectives = {row["id"]: row for row in objective_audit["objectives"]}
     assert objectives["full_36_lesson_beginner_module"]["status"] == "proven"
     assert objectives["simple_practice_booth_no_syllabus_wall"]["status"] == "proven"
     assert objectives["grounded_adaptive_teaching_loop"]["status"] == "proven"
@@ -802,18 +789,15 @@ def test_verifier_separates_static_package_pass_from_release_ready(
     assert objectives["audible_example_quality"]["blocking_row_ids"] == [
         "packaged_eq_exemplar_ear_pass"
     ]
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["frontend_quality_suite"] == "proven"
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["frontstage_simplicity_contract"] == "proven"
-    frontstage_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["frontstage_simplicity_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "frontend_quality_suite"
+    ] == "proven"
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "frontstage_simplicity_contract"
+    ] == "proven"
+    frontstage_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "frontstage_simplicity_contract"
+    ]
     assert frontstage_evidence["frontstage_default"] == (
         "primary recommended action plus opt-in chooser"
     )
@@ -822,12 +806,11 @@ def test_verifier_separates_static_package_pass_from_release_ready(
         "keeps the lesson map opt-in, and repaints the active lesson "
         "highlight after mid-lesson remounts"
     )
-    assert "tests/learn/test_practice_booth_shell.spec.ts" in frontstage_evidence[
-        "covered_tests"
-    ]
-    assert "tests/learn/test_tutor_speak_sr_announcement.spec.ts" in frontstage_evidence[
-        "covered_tests"
-    ]
+    assert "tests/learn/test_practice_booth_shell.spec.ts" in frontstage_evidence["covered_tests"]
+    assert (
+        "tests/learn/test_tutor_speak_sr_announcement.spec.ts"
+        in frontstage_evidence["covered_tests"]
+    )
     assert frontstage_evidence["action_receipts"] == (
         "matched learner actions render a compact receipt naming the "
         "control gesture, known input source, and action count; the "
@@ -869,14 +852,12 @@ def test_verifier_separates_static_package_pass_from_release_ready(
         "LearnProgress, giving future coaching/profile logic real "
         "learner data without adding frontstage chrome"
     )
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["lesson_choice_replay_contract"] == "proven"
-    choice_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["lesson_choice_replay_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "lesson_choice_replay_contract"
+    ] == "proven"
+    choice_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "lesson_choice_replay_contract"
+    ]
     assert choice_evidence["hud_replay_affordance"] == (
         "completed HUD progress dots announce press-to-replay, "
         "current dots announce the current step, and pending dots "
@@ -887,14 +868,12 @@ def test_verifier_separates_static_package_pass_from_release_ready(
         "in-progress rows announce retry, and locked rows keep "
         "the exact lock reason in aria/title text"
     )
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["browser_practice_booth_quality_contract"] == "proven"
-    browser_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["browser_practice_booth_quality_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "browser_practice_booth_quality_contract"
+    ] == "proven"
+    browser_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "browser_practice_booth_quality_contract"
+    ]
     assert browser_evidence["required_command"] == "learn_browser_booth_playwright"
     assert (
         "recommended L1.01 completes through Tauri forwarder and direct WebSocket fallback"
@@ -904,49 +883,38 @@ def test_verifier_separates_static_package_pass_from_release_ready(
         "wrong on-screen EQ move reaches the Python sidecar, renders a grounded citation chip, and recovers to lesson completion"
         in browser_evidence["browser_claims"]
     )
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["app_entry_contract"] == "proven"
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["tauri_learn_window_contract"] == "proven"
-    tauri_window_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["tauri_learn_window_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "app_entry_contract"
+    ] == "proven"
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "tauri_learn_window_contract"
+    ] == "proven"
+    tauri_window_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "tauri_learn_window_contract"
+    ]
     assert tauri_window_evidence["required_frontend_command"] == "learn_tauri_window_vitest"
-    assert (
-        tauri_window_evidence["required_desktop_command"]
-        == "learn_cargo_learn_window_test"
-    )
+    assert tauri_window_evidence["required_desktop_command"] == "learn_cargo_learn_window_test"
     assert tauri_window_evidence["window_label"] == "learn"
     assert tauri_window_evidence["webview_url"] == "learn.html"
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["python_quality_suite"] == "proven"
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["all_lessons_runtime_contract"] == "proven"
-    runtime_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["all_lessons_runtime_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "python_quality_suite"
+    ] == "proven"
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "all_lessons_runtime_contract"
+    ] == "proven"
+    runtime_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "all_lessons_runtime_contract"
+    ]
     assert runtime_evidence["required_command"] == "learn_all_lessons_runtime_pytest"
     assert runtime_evidence["lesson_count"] == 36
     assert runtime_evidence["observer_lessons"] == ["L1.14", "L1.16", "L2.14"]
     assert "ipc.learn.start_lesson" in runtime_evidence["runtime_path"]
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["teaching_loop_contract"] == "proven"
-    teaching_loop_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["teaching_loop_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "teaching_loop_contract"
+    ] == "proven"
+    teaching_loop_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "teaching_loop_contract"
+    ]
     assert teaching_loop_evidence["teaching_grounding_contract"] == {
         "ok": True,
         "teaching_turn_count": 76,
@@ -961,72 +929,61 @@ def test_verifier_separates_static_package_pass_from_release_ready(
         "cited_hint_turn_count": 228,
         "failing_lesson_ids": [],
     }
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["adaptive_coaching_runtime_contract"] == "proven"
-    adaptive_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["adaptive_coaching_runtime_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "adaptive_coaching_runtime_contract"
+    ] == "proven"
+    adaptive_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "adaptive_coaching_runtime_contract"
+    ]
     assert adaptive_evidence["required_command"] == "learn_adaptive_coaching_pytest"
     assert adaptive_evidence["citation_sources"] == ["midi", "screen"]
     assert (
         "wrong screen control emits teaching_loop.turn_kind=adapt without advancing"
         in adaptive_evidence["runtime_behaviors"]
     )
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["course3_auto_master_finder_contract"] == "proven"
-    auto_master_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["course3_auto_master_finder_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "course3_auto_master_finder_contract"
+    ] == "proven"
+    auto_master_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "course3_auto_master_finder_contract"
+    ]
     assert auto_master_evidence["required_command"] == "learn_auto_master_finder_pytest"
     assert (
         "rate-mismatched fallbacks are rejected before app startup"
         in auto_master_evidence["finder_claims"]
     )
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["course3_mix_count_in_anchor_contract"] == "proven"
-    mix_anchor_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["course3_mix_count_in_anchor_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "course3_mix_count_in_anchor_contract"
+    ] == "proven"
+    mix_anchor_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "course3_mix_count_in_anchor_contract"
+    ]
     assert mix_anchor_evidence["required_command"] == "learn_course3_mix_anchor_pytest"
     assert (
         "mix-state anchors require an exact unambiguous Now Playing title match"
         in mix_anchor_evidence["anchor_policy"]
     )
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["session_debrief_profile_contract"] == "proven"
-    session_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["session_debrief_profile_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "session_debrief_profile_contract"
+    ] == "proven"
+    session_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "session_debrief_profile_contract"
+    ]
     assert "tests/learn/test_graduation.py" in session_evidence["covered_tests"]
     assert session_evidence["graduation_practice_summary"] == (
         "the L3.06 graduation handoff can fold persisted "
         "hardware/screen practice-source memory into one grounded "
         "status line without adding a dashboard"
     )
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["desktop_shell_quality"] == "proven"
-    assert {
-        row["id"]: row["status"]
-        for row in matrix["requirements"]
-    }["future_course_extension_contract"] == "proven"
-    extension_evidence = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["future_course_extension_contract"]
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "desktop_shell_quality"
+    ] == "proven"
+    assert {row["id"]: row["status"] for row in matrix["requirements"]}[
+        "future_course_extension_contract"
+    ] == "proven"
+    extension_evidence = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "future_course_extension_contract"
+    ]
     assert extension_evidence["frontend_contract"]["manual_frontend_edits"] == "forbidden"
     assert (
         extension_evidence["draft_validator"]["function"]
@@ -1043,15 +1000,9 @@ def test_verifier_separates_static_package_pass_from_release_ready(
     assert "flow_preview" in extension_evidence["draft_validator"]["result_fields"]
     assert "integration_plan" in extension_evidence["draft_validator"]["result_fields"]
     assert "prompt_contract" in extension_evidence["draft_validator"]["result_fields"]
-    assert "teaching_grounding_contract" in extension_evidence["draft_validator"][
-        "result_fields"
-    ]
-    assert "hint_grounding_contract" in extension_evidence["draft_validator"][
-        "result_fields"
-    ]
-    assert "authoring_contract" in extension_evidence["draft_validator"][
-        "result_fields"
-    ]
+    assert "teaching_grounding_contract" in extension_evidence["draft_validator"]["result_fields"]
+    assert "hint_grounding_contract" in extension_evidence["draft_validator"]["result_fields"]
+    assert "authoring_contract" in extension_evidence["draft_validator"]["result_fields"]
     assert "copy_truthfulness" in extension_evidence["draft_validator"]["result_fields"]
     assert extension_evidence["prompt_contract"] == {
         "max_chars": 150,
@@ -1110,9 +1061,10 @@ def test_verifier_separates_static_package_pass_from_release_ready(
             ),
         ],
     }
-    assert "debrief opens" in extension_evidence["copy_truthfulness_contract"][
-        "unsupported_auto_open_phrases"
-    ]
+    assert (
+        "debrief opens"
+        in extension_evidence["copy_truthfulness_contract"]["unsupported_auto_open_phrases"]
+    )
     assert (
         "uv run python scripts/export_learn_curriculum_meta.py --check"
         in extension_evidence["verification_commands"]
@@ -1125,14 +1077,12 @@ def test_verifier_separates_static_package_pass_from_release_ready(
         "uv run python scripts/validate_learn_course_pack.py <course-pack.json>"
         in extension_evidence["verification_commands"]
     )
-    assert {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["curriculum_36_lesson_contract"]["flow_contract_summary"]["min_hint_count"] == 3
-    flow_summary = {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["curriculum_36_lesson_contract"]["flow_contract_summary"]
+    assert {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "curriculum_36_lesson_contract"
+    ]["flow_contract_summary"]["min_hint_count"] == 3
+    flow_summary = {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "curriculum_36_lesson_contract"
+    ]["flow_contract_summary"]
     assert flow_summary["verification_kind_counts"] == {
         "button_press": 51,
         "cc_delta": 25,
@@ -1157,25 +1107,19 @@ def test_verifier_separates_static_package_pass_from_release_ready(
         "hardware+screen": 32,
         "screen": 44,
     }
-    assert {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["curriculum_36_lesson_contract"]["transcript_inventory"]["orphan_paths"] == []
-    assert {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["curriculum_36_lesson_contract"]["unlock_gate_contract"][
-        "unsupported_unlock_gates"
-    ] == []
-    assert {
-        row["id"]: row["evidence"]
-        for row in matrix["requirements"]
-    }["curriculum_36_lesson_contract"]["copy_truthfulness_contract"][
-        "unsupported_debrief_auto_open_claims"
-    ] == []
-    assert "--list-devices" in report["sections"]["exemplars"]["operator_commands"][
-        "list_output_devices"
-    ]
+    assert {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "curriculum_36_lesson_contract"
+    ]["transcript_inventory"]["orphan_paths"] == []
+    assert {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "curriculum_36_lesson_contract"
+    ]["unlock_gate_contract"]["unsupported_unlock_gates"] == []
+    assert {row["id"]: row["evidence"] for row in matrix["requirements"]}[
+        "curriculum_36_lesson_contract"
+    ]["copy_truthfulness_contract"]["unsupported_debrief_auto_open_claims"] == []
+    assert (
+        "--list-devices"
+        in report["sections"]["exemplars"]["operator_commands"]["list_output_devices"]
+    )
     assert report["sections"]["live_proofs"]["screen"]["passed"] is True
     assert report["sections"]["live_proofs"]["physical"]["status"] == "unavailable"
     physical_commands = report["sections"]["live_proofs"]["physical"]["operator_commands"]
@@ -1203,52 +1147,39 @@ def test_verifier_separates_static_package_pass_from_release_ready(
         and "--approve-ear-pass" in action
         for action in report["next_actions"]
     )
-    assert "physical controller lesson proof is not strictly proven" in report[
-        "completion_blockers"
-    ]
-    assert "Course 3 routed-audio count-in proof is not strictly proven" in report[
-        "completion_blockers"
-    ]
+    assert (
+        "physical controller lesson proof is not strictly proven" in report["completion_blockers"]
+    )
+    assert (
+        "Course 3 routed-audio count-in proof is not strictly proven"
+        in report["completion_blockers"]
+    )
     recipe = {row["id"]: row for row in report["release_blocker_recipe"]}
     assert set(recipe) == {
         "packaged_eq_exemplar_ear_pass",
         "physical_controller_path",
         "course3_live_audio_play_mode",
     }
-    assert recipe["packaged_eq_exemplar_ear_pass"]["status"] == (
-        "pending_human_ear_pass"
-    )
+    assert recipe["packaged_eq_exemplar_ear_pass"]["status"] == ("pending_human_ear_pass")
     assert recipe["packaged_eq_exemplar_ear_pass"]["operator_action"]["steps"][0].endswith(
         "--list-devices"
     )
-    assert "--device-index" in recipe["packaged_eq_exemplar_ear_pass"][
-        "operator_steps"
-    ][1]
-    assert "--say-prompts" in recipe["packaged_eq_exemplar_ear_pass"][
-        "operator_steps"
-    ][1]
-    assert "--audition" in recipe["packaged_eq_exemplar_ear_pass"]["commands"][
-        "approve"
-    ]
-    assert "--list-devices" in recipe["packaged_eq_exemplar_ear_pass"]["commands"][
-        "list_output_devices"
-    ]
-    assert "sniff_controller.py --list" in recipe["physical_controller_path"][
-        "commands"
-    ]["list_controller"]
+    assert "--device-index" in recipe["packaged_eq_exemplar_ear_pass"]["operator_steps"][1]
+    assert "--say-prompts" in recipe["packaged_eq_exemplar_ear_pass"]["operator_steps"][1]
+    assert "--audition" in recipe["packaged_eq_exemplar_ear_pass"]["commands"]["approve"]
+    assert (
+        "--list-devices"
+        in recipe["packaged_eq_exemplar_ear_pass"]["commands"]["list_output_devices"]
+    )
+    assert (
+        "sniff_controller.py --list"
+        in recipe["physical_controller_path"]["commands"]["list_controller"]
+    )
     assert "--physical" in recipe["physical_controller_path"]["commands"]["proof"]
-    assert "--say-physical-prompts" in recipe["physical_controller_path"]["commands"][
-        "proof"
-    ]
-    assert "--require course3" in recipe["course3_live_audio_play_mode"]["commands"][
-        "readiness"
-    ]
-    assert "--require-count-in" in recipe["course3_live_audio_play_mode"]["commands"][
-        "proof"
-    ]
-    assert "--say-course3-prompts" in recipe["course3_live_audio_play_mode"]["commands"][
-        "proof"
-    ]
+    assert "--say-physical-prompts" in recipe["physical_controller_path"]["commands"]["proof"]
+    assert "--require course3" in recipe["course3_live_audio_play_mode"]["commands"]["readiness"]
+    assert "--require-count-in" in recipe["course3_live_audio_play_mode"]["commands"]["proof"]
+    assert "--say-course3-prompts" in recipe["course3_live_audio_play_mode"]["commands"]["proof"]
     assert recipe["course3_live_audio_play_mode"]["operator_action"]["steps"][-1] == (
         "Rerun the Course 3 proof command; it will speak the route/playback moment."
     )
@@ -1263,7 +1194,9 @@ def test_verifier_can_mark_non_external_ready_when_only_deferred_gates_remain(
     frontend = _frontend_quality(tmp_path / verifier.FRONTEND_QUALITY_NAME)
     desktop = _desktop_quality(tmp_path / verifier.DESKTOP_QUALITY_NAME)
     live = _live_artifact(tmp_path / "proof-current.json", physical=True)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1289,6 +1222,111 @@ def test_verifier_can_mark_non_external_ready_when_only_deferred_gates_remain(
     assert report["internal_blocker_ids"] == []
     assert report["internal_blockers"] == []
     assert "human ear-pass" in report["non_external_ready_rule"]
+    cue_card = report["release_gate_cue_card"]
+    assert cue_card["status"] == "waiting_on_external_gates"
+    assert (
+        cue_card["headline"]
+        == "Technical package is green; finish the remaining external release proofs."
+    )
+    assert cue_card["non_external_ready"] is True
+    assert cue_card["release_ready"] is False
+    assert cue_card["gate_count"] == 2
+    assert cue_card["primary_next_action"] == report["next_actions"][0]
+    gates = {row["id"]: row for row in cue_card["gates"]}
+    assert set(gates) == {
+        "packaged_eq_exemplar_ear_pass",
+        "course3_live_audio_play_mode",
+    }
+    assert gates["packaged_eq_exemplar_ear_pass"]["prompt"].startswith(
+        "Listen to the four EQ exemplar loops"
+    )
+    assert gates["packaged_eq_exemplar_ear_pass"]["spoken_prompt_enabled"] is True
+    assert "--play" in gates["packaged_eq_exemplar_ear_pass"]["run_command"]
+    assert gates["course3_live_audio_play_mode"]["spoken_prompt_enabled"] is True
+    assert "--require-count-in" in gates["course3_live_audio_play_mode"]["run_command"]
+
+
+def test_verifier_say_cue_card_uses_macos_say(monkeypatch) -> None:
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(verifier.sys, "platform", "darwin")
+    monkeypatch.setattr(verifier.subprocess, "run", fake_run)
+
+    spoken = verifier._say_cue_card(
+        {
+            "headline": "Technical package is green.",
+            "gates": [{"prompt": "Listen to the four EQ exemplar loops."}],
+        },
+        enabled=True,
+    )
+
+    assert spoken is True
+    assert calls[0][0] == [
+        "say",
+        "Technical package is green. Next: Listen to the four EQ exemplar loops.",
+    ]
+    assert calls[0][1]["timeout"] == 8
+
+
+def test_verifier_say_cue_card_stays_quiet_when_disabled(monkeypatch) -> None:
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(verifier.sys, "platform", "darwin")
+    monkeypatch.setattr(verifier.subprocess, "run", fake_run)
+
+    spoken = verifier._say_cue_card(
+        {
+            "headline": "Technical package is green.",
+            "gates": [{"prompt": "Listen to the four EQ exemplar loops."}],
+        },
+        enabled=False,
+    )
+
+    assert spoken is False
+    assert calls == []
+
+
+def test_verifier_cli_say_cue_card_speaks_current_card(monkeypatch, capsys) -> None:
+    calls = []
+    cue_card = {
+        "schema_version": 1,
+        "status": "waiting_on_external_gates",
+        "headline": "Technical package is green.",
+        "gates": [{"prompt": "Listen to the four EQ exemplar loops."}],
+    }
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(
+        verifier,
+        "verify_package",
+        lambda **kwargs: {
+            "passed": True,
+            "release_ready": False,
+            "release_gate_cue_card": cue_card,
+        },
+    )
+    monkeypatch.setattr(verifier.sys, "platform", "darwin")
+    monkeypatch.setattr(verifier.subprocess, "run", fake_run)
+
+    code = verifier.main(["--cue-card", "--say-cue-card"])
+
+    assert code == 0
+    assert json.loads(capsys.readouterr().out) == cue_card
+    assert calls[0][0] == [
+        "say",
+        "Technical package is green. Next: Listen to the four EQ exemplar loops.",
+    ]
 
 
 def test_verifier_uses_fresh_course3_readiness_for_release_recipe(
@@ -1301,7 +1339,9 @@ def test_verifier_uses_fresh_course3_readiness_for_release_recipe(
     desktop = _desktop_quality(tmp_path / verifier.DESKTOP_QUALITY_NAME)
     live = _live_artifact(tmp_path / "proof-current.json", physical=True)
     _course3_readiness(tmp_path / verifier.COURSE3_READINESS_NAME)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1323,9 +1363,7 @@ def test_verifier_uses_fresh_course3_readiness_for_release_recipe(
         "port 8765 is occupied by python3.1 pid 85484, not the Vibemix Learn sidecar websocket"
         in course3["blockers"]
     )
-    assert course3["operator_commands"]["manual_action"].startswith(
-        "Free 127.0.0.1:8765"
-    )
+    assert course3["operator_commands"]["manual_action"].startswith("Free 127.0.0.1:8765")
     assert course3["operator_commands"]["current_fallback_candidate"] == {
         "name": "BlackHole 16ch",
         "sample_rate": 48000,
@@ -1338,6 +1376,8 @@ def test_verifier_uses_fresh_course3_readiness_for_release_recipe(
     course3_recipe = recipe["course3_live_audio_play_mode"]
     assert course3_recipe["readiness_status"]["status"] == "fix_route"
     assert course3_recipe["course3_route_doctor"]["route"] == "BlackHole 16ch @ 48000Hz"
+    assert course3_recipe["operator_action"]["current_rekordbox_route"] == "DDJ-FLX4 @ 48000Hz"
+    assert course3_recipe["operator_action"]["target_capture_route"] == "BlackHole 16ch @ 48000Hz"
     assert course3_recipe["operator_steps"][:4] == [
         "Free 127.0.0.1:8765 so the Vibemix Learn sidecar owns the app socket.",
         "Route macOS/Rekordbox output to BlackHole 16ch or the intended loopback route.",
@@ -1347,6 +1387,18 @@ def test_verifier_uses_fresh_course3_readiness_for_release_recipe(
     assert report["next_actions"] == [
         "Free 127.0.0.1:8765 so the Vibemix Learn sidecar owns the app socket."
     ]
+    assert report["release_gate_cue_card"]["headline"] == (
+        "Technical package is green; finish the Course 3 routed-audio proof."
+    )
+    gates = {row["id"]: row for row in report["release_gate_cue_card"]["gates"]}
+    assert gates["course3_live_audio_play_mode"]["diagnosis_code"] == "macos_output_not_loopback"
+    assert gates["course3_live_audio_play_mode"]["current_rekordbox_route"] == (
+        "DDJ-FLX4 @ 48000Hz"
+    )
+    assert gates["course3_live_audio_play_mode"]["target_capture_route"] == (
+        "BlackHole 16ch @ 48000Hz"
+    )
+    assert gates["course3_live_audio_play_mode"]["route_mismatch"] is True
 
 
 def test_verifier_uses_fresh_physical_readiness_for_release_recipe(
@@ -1359,7 +1411,9 @@ def test_verifier_uses_fresh_physical_readiness_for_release_recipe(
     desktop = _desktop_quality(tmp_path / verifier.DESKTOP_QUALITY_NAME)
     live = _live_artifact(tmp_path / "proof-current.json")
     readiness_path = _physical_readiness(tmp_path / verifier.PHYSICAL_READINESS_NAME)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1381,9 +1435,7 @@ def test_verifier_uses_fresh_physical_readiness_for_release_recipe(
     assert physical["operator_commands"]["manual_action"] == (
         "Use a data-capable USB cable or powered adapter, then wait for DDJ-FLX4 in MIDI."
     )
-    assert "physical controller is not visible on USB or controller audio" in physical[
-        "blockers"
-    ]
+    assert "physical controller is not visible on USB or controller audio" in physical["blockers"]
 
     recipe = {row["id"]: row for row in report["release_blocker_recipe"]}
     physical_recipe = recipe["physical_controller_path"]
@@ -1396,10 +1448,7 @@ def test_verifier_uses_fresh_physical_readiness_for_release_recipe(
         "Use a data-capable USB cable or powered adapter, then wait for DDJ-FLX4 in MIDI."
     )
 
-    matrix = {
-        row["id"]: row["evidence"]
-        for row in report["completion_matrix"]["requirements"]
-    }
+    matrix = {row["id"]: row["evidence"] for row in report["completion_matrix"]["requirements"]}
     assert matrix["physical_controller_path"]["readiness_status"]["status"] == "missing_midi"
 
 
@@ -1413,7 +1462,9 @@ def test_verifier_does_not_downgrade_passed_physical_proof_with_stale_readiness(
     desktop = _desktop_quality(tmp_path / verifier.DESKTOP_QUALITY_NAME)
     live = _live_artifact(tmp_path / "proof-current.json", physical=True, course3=True)
     readiness_path = _physical_readiness(tmp_path / verifier.PHYSICAL_READINESS_NAME)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1438,10 +1489,7 @@ def test_verifier_does_not_downgrade_passed_physical_proof_with_stale_readiness(
     assert physical["physical_connection_doctor"] is None
     assert all(row["id"] != "physical_controller_path" for row in report["release_blocker_recipe"])
 
-    matrix = {
-        row["id"]: row["evidence"]
-        for row in report["completion_matrix"]["requirements"]
-    }
+    matrix = {row["id"]: row["evidence"] for row in report["completion_matrix"]["requirements"]}
     assert matrix["physical_controller_path"]["readiness_status"]["status"] == "missing_midi"
     assert matrix["physical_controller_path"]["physical_connection_doctor"] is None
 
@@ -1483,7 +1531,9 @@ def test_verifier_surfaces_course3_probe_operator_action(
         },
     }
     live.write_text(json.dumps(artifact), encoding="utf-8")
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1509,10 +1559,7 @@ def test_verifier_surfaces_course3_probe_operator_action(
     assert course3_recipe["operator_action"] == operator_action
     assert course3_recipe["operator_steps"] == operator_action["steps"]
 
-    matrix = {
-        row["id"]: row["evidence"]
-        for row in report["completion_matrix"]["requirements"]
-    }
+    matrix = {row["id"]: row["evidence"] for row in report["completion_matrix"]["requirements"]}
     assert matrix["course3_live_audio_play_mode"]["probe_operator_action"] == operator_action
 
 
@@ -1525,7 +1572,9 @@ def test_verifier_reports_release_ready_only_when_all_completion_evidence_exists
     frontend = _frontend_quality(tmp_path / verifier.FRONTEND_QUALITY_NAME)
     desktop = _desktop_quality(tmp_path / verifier.DESKTOP_QUALITY_NAME)
     live = _live_artifact(tmp_path / "proof-current.json", physical=True, course3=True)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1562,6 +1611,16 @@ def test_verifier_reports_release_ready_only_when_all_completion_evidence_exists
         "not_proven": 0,
         "release_ready": True,
         "blocking_objective_ids": [],
+    }
+    assert report["release_gate_cue_card"] == {
+        "schema_version": 1,
+        "status": "release_ready",
+        "release_ready": True,
+        "non_external_ready": True,
+        "headline": "All Learn release gates are proven.",
+        "primary_next_action": None,
+        "gate_count": 0,
+        "gates": [],
     }
 
 
@@ -1604,31 +1663,27 @@ def test_verifier_rejects_incomplete_future_course_extension_contract(
         live_proof_paths=[live],
     )
 
-    extension_row = {
-        row["id"]: row
-        for row in report["completion_matrix"]["requirements"]
-    }["future_course_extension_contract"]
+    extension_row = {row["id"]: row for row in report["completion_matrix"]["requirements"]}[
+        "future_course_extension_contract"
+    ]
     assert report["passed"] is True
     assert report["release_ready"] is False
     assert extension_row["status"] == "not_proven"
-    assert "course extension frontend projection is not generated-only" in extension_row[
-        "blockers"
-    ]
-    assert "course extension canonical course_id pattern is missing" in extension_row[
-        "blockers"
-    ]
-    assert "course extension copy truthfulness phrases are missing" in extension_row[
-        "blockers"
-    ]
-    assert "course extension starter template authoring contract is missing" in extension_row[
-        "blockers"
-    ]
+    assert "course extension frontend projection is not generated-only" in extension_row["blockers"]
+    assert "course extension canonical course_id pattern is missing" in extension_row["blockers"]
+    assert "course extension copy truthfulness phrases are missing" in extension_row["blockers"]
+    assert (
+        "course extension starter template authoring contract is missing"
+        in extension_row["blockers"]
+    )
     assert any("verification commands missing" in blocker for blocker in extension_row["blockers"])
 
 
 def test_verifier_rejects_missing_tauri_smoke(monkeypatch, tmp_path: Path) -> None:
     live = _live_artifact(tmp_path / "proof-current.json", physical=True, course3=True)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1643,9 +1698,7 @@ def test_verifier_rejects_missing_tauri_smoke(monkeypatch, tmp_path: Path) -> No
 
     assert report["passed"] is False
     assert report["release_ready"] is False
-    assert "launched Tauri Learn smoke is missing or failing" in report[
-        "completion_blockers"
-    ]
+    assert "launched Tauri Learn smoke is missing or failing" in report["completion_blockers"]
 
 
 def test_verifier_rejects_missing_frontend_quality_artifact(
@@ -1654,7 +1707,9 @@ def test_verifier_rejects_missing_frontend_quality_artifact(
 ) -> None:
     tauri = _tauri_smoke(tmp_path / "learn-tauri-smoke-current.json")
     live = _live_artifact(tmp_path / "proof-current.json", physical=True, course3=True)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1670,33 +1725,25 @@ def test_verifier_rejects_missing_frontend_quality_artifact(
     assert report["passed"] is False
     assert report["release_ready"] is False
     assert report["sections"]["frontend_quality"]["status"] == "missing"
-    assert "full Learn frontend quality gate is missing or failing" in report[
-        "completion_blockers"
-    ]
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["frontend_quality_suite"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["frontstage_simplicity_contract"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["lesson_choice_replay_contract"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["browser_practice_booth_quality_contract"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["app_entry_contract"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["tauri_learn_window_contract"] == "not_proven"
+    assert "full Learn frontend quality gate is missing or failing" in report["completion_blockers"]
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "frontend_quality_suite"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "frontstage_simplicity_contract"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "lesson_choice_replay_contract"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "browser_practice_booth_quality_contract"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "app_entry_contract"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "tauri_learn_window_contract"
+    ] == "not_proven"
 
 
 def test_verifier_rejects_missing_python_quality_artifact(
@@ -1706,7 +1753,9 @@ def test_verifier_rejects_missing_python_quality_artifact(
     tauri = _tauri_smoke(tmp_path / "learn-tauri-smoke-current.json")
     _frontend_quality(tmp_path / verifier.FRONTEND_QUALITY_NAME)
     live = _live_artifact(tmp_path / "proof-current.json", physical=True, course3=True)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1722,37 +1771,28 @@ def test_verifier_rejects_missing_python_quality_artifact(
     assert report["passed"] is False
     assert report["release_ready"] is False
     assert report["sections"]["python_quality"]["status"] == "missing"
-    assert "full Learn Python quality gate is missing or failing" in report[
-        "completion_blockers"
-    ]
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["python_quality_suite"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["all_lessons_runtime_contract"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["teaching_loop_contract"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["adaptive_coaching_runtime_contract"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["course3_auto_master_finder_contract"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["course3_mix_count_in_anchor_contract"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["session_debrief_profile_contract"] == "not_proven"
+    assert "full Learn Python quality gate is missing or failing" in report["completion_blockers"]
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "python_quality_suite"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "all_lessons_runtime_contract"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "teaching_loop_contract"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "adaptive_coaching_runtime_contract"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "course3_auto_master_finder_contract"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "course3_mix_count_in_anchor_contract"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "session_debrief_profile_contract"
+    ] == "not_proven"
 
 
 def test_verifier_rejects_missing_desktop_quality_artifact(
@@ -1763,7 +1803,9 @@ def test_verifier_rejects_missing_desktop_quality_artifact(
     _python_quality(tmp_path / verifier.PYTHON_QUALITY_NAME)
     _frontend_quality(tmp_path / verifier.FRONTEND_QUALITY_NAME)
     live = _live_artifact(tmp_path / "proof-current.json", physical=True, course3=True)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1779,17 +1821,13 @@ def test_verifier_rejects_missing_desktop_quality_artifact(
     assert report["passed"] is False
     assert report["release_ready"] is False
     assert report["sections"]["desktop_quality"]["status"] == "missing"
-    assert "Learn desktop shell quality gate is missing or failing" in report[
-        "completion_blockers"
-    ]
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["desktop_shell_quality"] == "not_proven"
-    assert {
-        row["id"]: row["status"]
-        for row in report["completion_matrix"]["requirements"]
-    }["tauri_learn_window_contract"] == "not_proven"
+    assert "Learn desktop shell quality gate is missing or failing" in report["completion_blockers"]
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "desktop_shell_quality"
+    ] == "not_proven"
+    assert {row["id"]: row["status"] for row in report["completion_matrix"]["requirements"]}[
+        "tauri_learn_window_contract"
+    ] == "not_proven"
 
 
 def test_verifier_discovers_exemplar_approval_under_proof_dir(
@@ -1803,7 +1841,9 @@ def test_verifier_discovers_exemplar_approval_under_proof_dir(
     live = _live_artifact(tmp_path / "proof-current.json", physical=True, course3=True)
     approval = tmp_path / verifier.EXEMPLAR_APPROVAL_NAME
     approval.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1826,7 +1866,9 @@ def test_verifier_surfaces_exemplar_bank_fingerprint(monkeypatch, tmp_path: Path
     _frontend_quality(tmp_path / verifier.FRONTEND_QUALITY_NAME)
     _desktop_quality(tmp_path / verifier.DESKTOP_QUALITY_NAME)
     live = _live_artifact(tmp_path / "proof-current.json")
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -1994,7 +2036,9 @@ def test_verifier_prefers_richer_course3_unavailable_attempt(
         },
         playback_nudge={"ok": True, "action": "rekordbox_spacebar"},
     )
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -2012,8 +2056,7 @@ def test_verifier_prefers_richer_course3_unavailable_attempt(
     assert course3["path"] == str(auto_master_current)
     assert course3["auto_master_recommendation"]["reason"] == "saved_loopback_route"
     assert (
-        course3["route_plan"]["auto_master_fallback_candidate"]["reason"]
-        == "saved_loopback_route"
+        course3["route_plan"]["auto_master_fallback_candidate"]["reason"] == "saved_loopback_route"
     )
     assert course3["playback_nudge"]["action"] == "rekordbox_spacebar"
     assert course3["operator_commands"]["manual_action"] == (
@@ -2027,9 +2070,7 @@ def test_verifier_prefers_richer_course3_unavailable_attempt(
         "deck_state needs a Rekordbox-published title that matches the "
         "imported library"
     )
-    assert course3["operator_commands"]["operator_action"]["route"] == (
-        "BlackHole 2ch @ 48000Hz"
-    )
+    assert course3["operator_commands"]["operator_action"]["route"] == ("BlackHole 2ch @ 48000Hz")
     assert course3["operator_commands"]["operator_action"]["steps"][0] == (
         "Stop unrelated media or make Rekordbox the active playing source."
     )
@@ -2058,7 +2099,9 @@ def test_verifier_surfaces_course3_audio_diagnosis(monkeypatch, tmp_path: Path) 
     }
     tauri = _tauri_smoke(tmp_path / "learn-tauri-smoke-current.json")
     live = _live_artifact(tmp_path / "proof-current.json", course3_diagnosis=diagnosis)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -2096,7 +2139,9 @@ def test_verifier_surfaces_physical_probe_diagnosis(monkeypatch, tmp_path: Path)
     }
     tauri = _tauri_smoke(tmp_path / "learn-tauri-smoke-current.json")
     live = _live_artifact(tmp_path / "proof-current.json", physical_diagnosis=diagnosis)
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -2119,9 +2164,7 @@ def test_verifier_surfaces_physical_probe_diagnosis(monkeypatch, tmp_path: Path)
     assert "sniff_controller.py --list" in physical["operator_commands"]["list_controller"]
     assert "--wait-physical-seconds 30" in physical["operator_commands"]["proof"]
     assert "--say-physical-prompts" in physical["operator_commands"]["proof"]
-    assert "Nudge the left jog wheel during the active proof window." in report[
-        "next_actions"
-    ]
+    assert "Nudge the left jog wheel during the active proof window." in report["next_actions"]
 
 
 def test_verifier_surfaces_physical_connection_doctor(
@@ -2158,7 +2201,9 @@ def test_verifier_surfaces_physical_connection_doctor(
         "result": {"last": {"physical_connection_doctor": doctor}},
     }
     live.write_text(json.dumps(artifact), encoding="utf-8")
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -2176,9 +2221,7 @@ def test_verifier_surfaces_physical_connection_doctor(
     assert physical["physical_connection_doctor"] == doctor
     assert physical["attempts"][0]["physical_connection_doctor"] == doctor
     assert physical["operator_commands"]["manual_action"] == doctor["next_step"]
-    assert physical["operator_commands"]["operator_action"]["steps"] == doctor[
-        "operator_steps"
-    ]
+    assert physical["operator_commands"]["operator_action"]["steps"] == doctor["operator_steps"]
     assert physical["operator_commands"]["physical_connection_doctor"] == doctor
     assert doctor["next_step"] in report["next_actions"]
 
@@ -2187,10 +2230,7 @@ def test_verifier_surfaces_physical_connection_doctor(
     assert physical_recipe["operator_steps"] == doctor["operator_steps"]
     assert physical_recipe["physical_connection_doctor"] == doctor
 
-    matrix = {
-        row["id"]: row["evidence"]
-        for row in report["completion_matrix"]["requirements"]
-    }
+    matrix = {row["id"]: row["evidence"] for row in report["completion_matrix"]["requirements"]}
     assert matrix["physical_controller_path"]["physical_connection_doctor"] == doctor
 
 
@@ -2221,7 +2261,9 @@ def test_verifier_surfaces_course3_route_plan(monkeypatch, tmp_path: Path) -> No
         course3_diagnosis=diagnosis,
         course3_route_plan=route_plan,
     )
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -2240,16 +2282,11 @@ def test_verifier_surfaces_course3_route_plan(monkeypatch, tmp_path: Path) -> No
     assert course3["attempts"][0]["route_plan"]["selected_input"]["reason"] == "48k_fallback"
     assert course3["operator_commands"]["current_selected_input"]["name"] == "BlackHole 16ch"
     assert course3["operator_commands"]["current_fallback_candidate"]["name"] == "BlackHole 2ch"
-    assert course3["operator_commands"]["operator_action"]["route"] == (
-        "BlackHole 16ch @ 48000Hz"
-    )
+    assert course3["operator_commands"]["operator_action"]["route"] == ("BlackHole 16ch @ 48000Hz")
     assert course3["operator_commands"]["operator_action"]["steps"][1] == (
         "Route Rekordbox master/output audio to BlackHole 16ch @ 48000Hz."
     )
-    assert any(
-        "BlackHole 2ch is 44100Hz" in action
-        for action in report["next_actions"]
-    )
+    assert any("BlackHole 2ch is 44100Hz" in action for action in report["next_actions"])
     assert "align Rekordbox with the vibemix capture input" in report["next_actions"]
 
 
@@ -2270,7 +2307,9 @@ def test_verifier_surfaces_course3_playback_nudge(monkeypatch, tmp_path: Path) -
             "precheck": {"ok": False, "loopback_ok": False},
         },
     )
-    monkeypatch.setattr(verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report())
+    monkeypatch.setattr(
+        verifier, "audit_curriculum", lambda frontend_path=None: _curriculum_report()
+    )
     monkeypatch.setattr(
         verifier,
         "audit_packaged_bank",
@@ -2329,9 +2368,36 @@ def test_verifier_cli_writes_json_and_keeps_release_gate_separate(tmp_path: Path
     file_report = json.loads(out_path.read_text(encoding="utf-8"))
     assert stdout_report["passed"] is True
     assert file_report["release_ready"] is False
-    assert "packaged EQ exemplar human ear-pass is pending" in file_report[
-        "completion_blockers"
-    ]
+    assert "packaged EQ exemplar human ear-pass is pending" in file_report["completion_blockers"]
+
+    cue_card = subprocess.run(
+        [
+            sys.executable,
+            "scripts/verify_learn_package.py",
+            "--proof-dir",
+            str(tmp_path),
+            "--tauri-smoke",
+            str(tauri),
+            "--live-proof",
+            str(live),
+            "--cue-card",
+            "--out",
+            str(out_path),
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert cue_card.returncode == 0
+    cue_stdout = json.loads(cue_card.stdout)
+    file_report = json.loads(out_path.read_text(encoding="utf-8"))
+    assert cue_stdout == file_report["release_gate_cue_card"]
+    assert cue_stdout["status"] == "needs_internal_work"
+    assert cue_stdout["gate_count"] == 3
+    assert "completion_matrix" not in cue_stdout
 
     strict = subprocess.run(
         [

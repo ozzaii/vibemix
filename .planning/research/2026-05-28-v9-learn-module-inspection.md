@@ -3824,6 +3824,32 @@ Failed or incomplete:
   `press to replay` and carry a matching title. In-progress rows announce retry,
   and locked rows preserve the exact unlock reason in aria/title text. This
   improves graceful lesson choice without changing the visible practice booth.
+  Verification: the progress-list Vitest passed 24, verifier tests passed 24,
+  Ruff passed for the verifier/test files, `npm --prefix tauri/ui run build`
+  passed, `git diff --check` passed before the package refresh, and the full
+  Learn perfection package refreshed with `passed=true`,
+  `non_external_ready=true`, `internal_blocker_ids=[]`, and only the two
+  deferred external blockers.
+- A two-hundred-nineteenth slice adds a compact release-gate cue card to the
+  consolidated verifier. This is not another proof path and does not change the
+  learner-facing booth; it derives from `release_blocker_recipe` and exposes
+  the next operator's status, primary next action, gate prompts, route/device,
+  spoken-prompt flags, run commands, and verify commands at the top level of the
+  package artifact. The refreshed artifact currently says
+  `waiting_on_external_gates`, recommends MacBook Pro Speakers for EQ ear-pass,
+  points Course 3 at `DDJ-FLX4 @ 48000Hz`, and keeps `release_ready=false`
+  until ear-pass and routed-audio proof are real. The verifier now supports
+  `--cue-card`, which prints only that small object while `--out` still writes
+  the full report; opt-in `--say-cue-card` speaks the headline and first gate
+  prompt through macOS `say`. `run_learn_perfection_package.py` now carries the
+  same cue card into `learn-perfection-package-current.json`, making the
+  top-level package artifact the single status handoff. Verification:
+  verifier/package wrapper Ruff passed, focused verifier/package-wrapper tests
+  passed 33, direct package verification passed with `--cue-card`, and the full
+  Learn perfection package refreshed with `passed=true`,
+  `non_external_ready=true`, `internal_blocker_ids=[]`,
+  `release_gate_cue_card.status=waiting_on_external_gates`, and only the two
+  deferred external blockers.
 
 ## Release Call
 

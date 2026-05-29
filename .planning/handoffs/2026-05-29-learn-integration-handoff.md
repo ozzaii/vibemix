@@ -21,8 +21,11 @@ proof, and a restrained practice-booth frontstage.
 The remaining proof is integration evidence, not another syllabus pass:
 
 1. Course 3 routed-audio count-in proof with grounded Rekordbox/deck evidence.
-2. Human ear-pass for the packaged EQ loops, or replacement with richer
-   licensed examples.
+
+The packaged EQ loops are now human ear-passed in
+`/tmp/vibemix-live-learn-proof/learn-exemplar-ear-pass-current.json` by `ozai`
+against bank fingerprint
+`34e7aafe568b2e8badecb75fd28e0a8bd710f4fd1b1f2d84e7ff4a78584096e9`.
 
 ## Product Direction
 
@@ -33,9 +36,96 @@ extra dashboards, or syllabus-first navigation to create personality. The
 personality is precision: `eq turn · hardware · 01`, `clean pass · 1 move`, a
 specific citation chip, and a next action that makes the learner feel capable.
 
+The best vNext direction is melody-first and library-first. Keep the same calm
+practice booth, but teach from the user's own crate: key/Camelot, cue and
+section anchors, phrase boundaries, energy, track familiarity, and library
+suggestions. This should land as a future course pack, likely Course 4, through
+the existing `validate_course_pack_draft(...)` contract rather than being
+bolted onto the 36-lesson beginner release. The frontstage still gets one
+prompt at a time; the backstage gets smarter by grounding each prompt in the
+user's own tracks.
+
+Make this feel like musical taste, not a data feature. The ideal first line is
+"pick a track you love," then Learn finds a hook, phrase entry, compatible key,
+or melody-clash risk from the user's library and converts it into one deck
+mission. The backstage contract should emit structured library exemplars with
+`track_id`, `section_id`, `cue_anchor`, key/Camelot evidence, phrase span,
+energy delta, and a compact reason code such as `hook_to_intro`,
+`compatible_key`, `vocal_clash_risk`, or `melodic_release`. The frontstage
+shows one reason chip and one action, not a track table. Packaged exemplars are
+only the fallback when the library is missing or too sparse.
+
 ## Latest completed slice
 
 The latest Learn slice added or hardened these areas:
+
+- Release-gate cue card:
+  The consolidated verifier now emits a compact top-level
+  `release_gate_cue_card` derived from the existing release blocker recipe. It
+  does not add new proof semantics; it gives the next operator one small object
+  with the current status, first action, each gate's prompt, route/device,
+  diagnosis code, current Rekordbox route, target capture route,
+  route-mismatch boolean, spoken-prompt flag, run command, and verify command.
+  The current artifact says `waiting_on_external_gates`, points Course 3 at
+  `BlackHole 16ch @ 48000Hz` for capture while recording the current Rekordbox
+  route as `DDJ-FLX4 @ 48000Hz`, emits `route_mismatch=true`, and confirms the
+  Course 3 proof path uses spoken prompts. The verifier also
+  supports `--cue-card`, so the
+  next session can print only that small object while `--out` still writes the
+  full report. It also supports opt-in `--say-cue-card`, which speaks the cue
+  card headline and first gate prompt through macOS `say` for hands-on proof
+  sessions. The full perfection package wrapper now carries that same cue card
+  at top level, so
+  `/tmp/vibemix-live-learn-proof/learn-perfection-package-current.json` is the
+  single artifact for both package status and the next external proof steps.
+  Focused proof:
+  `uv run ruff check scripts/verify_learn_package.py
+  tests/learn/test_verify_learn_package.py` passed,
+  `uv run pytest -q tests/learn/test_verify_learn_package.py` passed 27, and
+  the full package refresh passed Python quality, frontend quality, desktop
+  quality, and the package verifier with `non_external_ready=true`,
+  `internal_blocker_ids=[]`, and only the Course 3 routed-audio blocker.
+
+- Course 3 route-mismatch UI wiring:
+  The route mismatch fields are now wired through the real Learn UI runtime,
+  not only the verifier artifact. `LearnOperatorAction` preserves
+  `current_rekordbox_route`, `target_capture_route`, and `route_mismatch`;
+  the shared socket Course 3 lens normalizer keeps them; the status rail
+  renders one calm frontstage phrase, for example
+  `route Rekordbox to BlackHole 16ch`, while full current/target routes remain in
+  aria/title text. Focused proof:
+  `npm --prefix tauri/ui test -- tests/learn/test_operator_action.spec.ts
+  tests/learn/test_practice_booth_shell.spec.ts
+  tests/learn/test_ws_client_filters_mascot.spec.ts` passed 43,
+  `npm --prefix tauri/ui run build` passed, and the full Learn perfection
+  package passed all four commands again with only
+  `course3_live_audio_play_mode` still unproven.
+
+- Course 3 lens honesty guard:
+  The flat runtime socket lens remains a MusicState projection and does not
+  invent route-specific device names. When Course 3 is waiting for audio, its
+  operator action stays generic (`selected by readiness`) and avoids naming
+  `BlackHole` or `DDJ-FLX4`; the route-specific fix comes from the readiness
+  doctor, verifier cue card, or generic operator-action seam where those facts
+  are actually observed. Focused proof:
+  `uv run pytest -q tests/runtime/test_ws_bus_course3_lens.py` passed 9,
+  `uv run ruff check tests/runtime/test_ws_bus_course3_lens.py` passed, and
+  the full Learn perfection package passed all four commands.
+
+- Generic operator-action bridge:
+  The existing `learn.operator_action` frontstage seam now has real inbound
+  transport. Browser/ws fallback can carry a flat `learn_operator_action` frame,
+  and the Tauri event bridge listens to `learn-operator-action`; both normalize
+  into the same one-action status rail used by Course 3 and future course
+  doctors. This lets route doctors, readiness checks, and future library/melody
+  missions surface one grounded action without adding a page or extending the
+  Learn IPC schema. Focused proof:
+  `npm --prefix tauri/ui test -- tests/learn/test_ws_client_filters_mascot.spec.ts
+  tests/learn/test_ws_client_tauri_bridge.spec.ts
+  tests/learn/test_operator_action.spec.ts
+  tests/learn/test_practice_booth_shell.spec.ts` passed 47,
+  `npm --prefix tauri/ui run build` passed, and the full Learn perfection
+  package passed all four commands again.
 
 - Lesson-map replay/retry affordance:
   The opt-in lesson map already emitted `level: "replay"` for completed rows
@@ -44,9 +134,14 @@ The latest Learn slice added or hardened these areas:
   announce retry, and locked rows carry the exact lock reason. This keeps
   graceful lesson choice understandable without changing the visual booth.
   Focused proof:
-  `npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts`,
-  `uv run pytest -q tests/learn/test_verify_learn_package.py`, and Ruff for
-  the verifier/test files.
+  `npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts`
+  passed 24, `uv run pytest -q tests/learn/test_verify_learn_package.py`
+  passed 24, `uv run ruff check scripts/verify_learn_package.py
+  tests/learn/test_verify_learn_package.py` passed, and
+  `npm --prefix tauri/ui run build` passed. Full package refresh passed Python
+  quality, frontend quality, desktop quality, and the package verifier with
+  `non_external_ready=true`, `internal_blocker_ids=[]`, and only the deferred
+  ear-pass / Course 3 routed-audio blockers.
 
 - Source-aware clean-pass payoff:
   The one-line completion reward now carries the matched input source when the
@@ -61,8 +156,8 @@ The latest Learn slice added or hardened these areas:
   passed 31, `uv run pytest -q tests/learn/test_verify_learn_package.py`
   passed 24, and Ruff passed for the verifier/test files. Full package refresh
   passed Python quality, frontend quality, desktop quality, and the package
-  verifier with `non_external_ready=true`, `internal_blocker_ids=[]`, and only
-  the deferred ear-pass / Course 3 routed-audio blockers.
+  verifier with `non_external_ready=true`, `internal_blocker_ids=[]`; at that
+  time the deferred gates were ear-pass and Course 3 routed audio.
 
 - HUD replay affordance labels:
   Completed lesson HUD dots already replay lessons through the same
@@ -171,7 +266,7 @@ The latest Learn slice added or hardened these areas:
   and named in
   `frontstage_simplicity_contract.evidence.completion_reward`. Full package
   refreshed with `passed=true`, `non_external_ready=true`,
-  `internal_blocker_ids=[]`, and only the two deferred external blockers.
+  `internal_blocker_ids=[]`; at that point only external proof gates remained.
 - In-progress recommendation copy:
   when progress says the recommended lesson has been started but not finished,
   the primary booth action says `retry <lesson title>` instead of
@@ -183,13 +278,13 @@ The latest Learn slice added or hardened these areas:
   `scripts/verify_learn_package.py` and
   `scripts/run_learn_perfection_package.py` now report
   `non_external_ready`. This is the exact current user boundary: the package is
-  internally complete when deterministic quality passes and the only blockers
-  are the deferred human EQ ear-pass and Course 3 routed-audio proof. Current
-  package artifact reports `passed=true`, `technical_passed=true`,
-  `non_external_ready=true`, `internal_blocker_ids=[]`,
-  `deferred_external_blocker_ids=["packaged_eq_exemplar_ear_pass",
-  "course3_live_audio_play_mode"]`, and `release_ready=false`. If any other
-  blocker appears, the same field flips false instead of hiding it.
+  internally complete when deterministic quality passes and the only remaining
+  blocker is the Course 3 routed-audio proof. Current package artifact reports
+  `passed=true`, `technical_passed=true`, `non_external_ready=true`,
+  `internal_blocker_ids=[]`,
+  `deferred_external_blocker_ids=["course3_live_audio_play_mode"]`, and
+  `release_ready=false`. If any other blocker appears, the same field flips
+  false instead of hiding it.
 - Future course-pack grounding parity:
   `src/vibemix/learn/course_pack.py` now validates future course drafts against
   the same grounded teaching-loop standard as the shipped 36 lessons.
@@ -212,8 +307,8 @@ The latest Learn slice added or hardened these areas:
   `uv run pytest -q tests/learn/test_course_pack.py
   tests/learn/test_curriculum_audit.py tests/learn/test_verify_learn_package.py`
   passed 48, Ruff passed for touched Python files, and the full Learn
-  perfection package passed all four commands with only the two deferred
-  external blockers.
+  perfection package passed all four commands; at that time only the two
+  external gates remained.
 - Grounded hint-turn contract:
   `src/vibemix/learn/teaching_loop.py` now exposes
   `teaching_turn_is_grounded(...)`, a pure check that a tutor turn carries the
@@ -940,6 +1035,51 @@ The latest Learn slice added or hardened these areas:
 
 ## Known-good verification from the latest slice
 
+- `uv run ruff check scripts/verify_learn_package.py tests/learn/test_verify_learn_package.py`
+  - Passed after adding the top-level `release_gate_cue_card`.
+- `uv run ruff check scripts/verify_learn_package.py tests/learn/test_verify_learn_package.py scripts/run_learn_perfection_package.py tests/learn/test_run_learn_perfection_package.py`
+  - Passed after adding optional `--say-cue-card` speech and carrying the cue
+    card into the top-level perfection package artifact.
+- `uv run pytest -q tests/learn/test_verify_learn_package.py`
+  - Passed: 27 tests after pinning the cue-card status, gate count,
+    spoken-prompt flags, run command, release-ready empty state, and
+    `--cue-card` / `--say-cue-card` CLI behavior.
+- `uv run pytest -q tests/learn/test_verify_learn_package.py tests/learn/test_run_learn_perfection_package.py`
+  - Passed: 33 tests.
+- `uv run python scripts/verify_learn_package.py --python-quality /tmp/vibemix-live-learn-proof/learn-python-quality-current.json --frontend-quality /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json --desktop-quality /tmp/vibemix-live-learn-proof/learn-desktop-quality-current.json --cue-card --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json`
+  - Passed and refreshed the package verification artifact with
+    `release_gate_cue_card.status=waiting_on_external_gates` while printing
+    only the cue card to stdout.
+- `uv run python scripts/run_learn_perfection_package.py --out /tmp/vibemix-live-learn-proof/learn-perfection-package-current.json`
+  - Passed with all four package commands green: Python quality, frontend
+    quality, desktop quality, and package verifier. The refreshed artifact
+    reports `passed=true`, `non_external_ready=true`,
+    `internal_blocker_ids=[]`, `release_ready=false`,
+    `release_gate_cue_card.status=waiting_on_external_gates`, and only the two
+    deferred external blocker IDs: `packaged_eq_exemplar_ear_pass` and
+    `course3_live_audio_play_mode`.
+- `npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts`
+  - Passed: 24 tests after completed lesson-map rows announced
+    `press to replay`, in-progress rows announced retry, and locked rows kept
+    their exact lock reason in aria/title text.
+- `uv run pytest -q tests/learn/test_verify_learn_package.py`
+  - Passed: 24 tests after the package verifier recorded
+    `lesson_choice_replay_contract.evidence.progress_list_affordance`.
+- `uv run ruff check scripts/verify_learn_package.py tests/learn/test_verify_learn_package.py`
+  - Passed.
+- `npm --prefix tauri/ui run build`
+  - Passed after the lesson-map aria/title helper kept its label fragments typed
+    as `string[]`.
+- `uv run python scripts/run_learn_desktop_quality.py --out /tmp/vibemix-live-learn-proof/learn-desktop-quality-current.json`
+  - Passed with frontend dist build, Rust fmt/check, learn-window tests, and
+    sidecar audio tests green.
+- `uv run python scripts/run_learn_perfection_package.py --out /tmp/vibemix-live-learn-proof/learn-perfection-package-current.json`
+  - Passed with all four package commands green: Python quality, frontend
+    quality, desktop quality, and package verifier. The refreshed artifact
+    reports `passed=true`, `non_external_ready=true`,
+    `internal_blocker_ids=[]`, `release_ready=false`; at that time the
+    external blocker IDs were `packaged_eq_exemplar_ear_pass` and
+    `course3_live_audio_play_mode`.
 - `uv run ruff check scripts/audition_learn_exemplars.py scripts/verify_learn_package.py tests/learn/test_exemplar_audition.py tests/learn/test_verify_learn_package.py`
   - Passed after adding hash-bound ear-pass approval artifacts.
 - `uv run pytest -q tests/learn/test_exemplar_audition.py tests/learn/test_verify_learn_package.py`
@@ -976,9 +1116,9 @@ The latest Learn slice added or hardened these areas:
   - Passed: 37 tests after pinning the audition-before-approval gate.
 - `uv run python scripts/run_learn_perfection_package.py --out /tmp/vibemix-live-learn-proof/learn-perfection-package-current.json`
   - Passed with all four commands green: Python quality, frontend quality,
-    desktop quality, and package verifier. Current matrix remains
+    desktop quality, and package verifier. At that time matrix remained
     `20/22`, `passed=true`, `technical_passed=true`, `release_ready=false`;
-    the two honest blockers are still packaged EQ human ear-pass and Course 3
+    the two honest blockers were packaged EQ human ear-pass and Course 3
     routed-audio count-in proof.
 - `uv run ruff check scripts/verify_learn_package.py tests/learn/test_verify_learn_package.py`
   - Passed after pinning audible operator prompts in the generated verifier
@@ -990,7 +1130,7 @@ The latest Learn slice added or hardened these areas:
     verification artifact now shows the physical proof command with
     `--say-physical-prompts`, the Course 3 proof command with
     `--say-course3-prompts`, and the EQ recipe with `--say-prompts` plus the
-    required `--audition` artifact. Matrix remains `20/22`,
+    required `--audition` artifact. At that time matrix remained `20/22`,
     `release_ready=false`.
 - `uv run ruff check src/vibemix/learn/course_pack.py src/vibemix/learn/curriculum_audit.py scripts/verify_learn_package.py tests/learn/test_course_pack.py tests/learn/test_curriculum_audit.py tests/learn/test_verify_learn_package.py`
   - Passed after adding the canonical future-course ID contract.
@@ -999,7 +1139,7 @@ The latest Learn slice added or hardened these areas:
 - `uv run python scripts/run_learn_perfection_package.py --out /tmp/vibemix-live-learn-proof/learn-perfection-package-current.json`
   - Passed again. The refreshed verification artifact proves
     `future_course_extension_contract.evidence.canonical_id_contract` with no
-    blockers. Matrix remains `20/22`, `release_ready=false`.
+    blockers. At that time matrix remained `20/22`, `release_ready=false`.
 - `uv run ruff check src/vibemix/learn/course_pack.py src/vibemix/learn/curriculum_audit.py scripts/validate_learn_course_pack.py scripts/verify_learn_package.py tests/learn/test_course_pack.py tests/learn/test_curriculum_audit.py tests/learn/test_verify_learn_package.py`
   - Passed after adding the canonical starter-template CLI.
 - `uv run pytest -q tests/learn/test_course_pack.py tests/learn/test_curriculum_audit.py tests/learn/test_verify_learn_package.py`
@@ -1010,7 +1150,7 @@ The latest Learn slice added or hardened these areas:
 - `uv run python scripts/run_learn_perfection_package.py --out /tmp/vibemix-live-learn-proof/learn-perfection-package-current.json`
   - Passed again. The refreshed verifier proves
     `draft_validator.template_cli` and the canonical starter-template contract.
-    Matrix remains `20/22`, `release_ready=false`.
+    At that time matrix remained `20/22`, `release_ready=false`.
 - `uv run ruff check src/vibemix/learn/course_pack.py src/vibemix/learn/curriculum_audit.py scripts/verify_learn_package.py tests/learn/test_course_pack.py tests/learn/test_curriculum_audit.py tests/learn/test_verify_learn_package.py`
   - Passed after adding course-pack `flow_preview` reports.
 - `uv run pytest -q tests/learn/test_course_pack.py tests/learn/test_curriculum_audit.py tests/learn/test_verify_learn_package.py`
@@ -1021,7 +1161,7 @@ The latest Learn slice added or hardened these areas:
 - `uv run python scripts/run_learn_perfection_package.py --out /tmp/vibemix-live-learn-proof/learn-perfection-package-current.json`
   - Passed again. The refreshed verifier proves `flow_preview` in
     `future_course_extension_contract.evidence.draft_validator.result_fields`.
-    Matrix remains `20/22`, `release_ready=false`.
+    At that time matrix remained `20/22`, `release_ready=false`.
 - `uv run ruff check src/vibemix/learn/copy_truth.py src/vibemix/learn/course_pack.py src/vibemix/learn/curriculum_audit.py scripts/verify_learn_package.py tests/learn/test_course_pack.py tests/learn/test_curriculum_audit.py tests/learn/test_verify_learn_package.py`
   - Passed after sharing the copy-truthfulness guard with course-pack
     validation.
@@ -1035,7 +1175,7 @@ The latest Learn slice added or hardened these areas:
   - Passed again. The refreshed verifier proves `copy_truthfulness` in
     `future_course_extension_contract.evidence.draft_validator.result_fields`
     and includes the unsupported auto-open phrase list. Matrix remains
-    `20/22`, `release_ready=false`.
+    `20/22`, `release_ready=false` at that time.
 - `npm --prefix tauri/ui test -- --run tests/learn/test_practice_booth_shell.spec.ts`
   - Passed: 16 tests after adding the active Course 3 `waiting for audio`
     status.
@@ -1071,8 +1211,9 @@ The latest Learn slice added or hardened these areas:
     `last_lens.audio_active=false`, and no sidecar left listening on
     `8765`/`8766`.
 - `uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json`
-  - Passed with `release_ready=false`; the two blockers remain packaged EQ
-    exemplar human ear-pass and strict Course 3 routed-audio count-in proof.
+  - Passed with `release_ready=false`; at that time the two blockers were
+    packaged EQ exemplar human ear-pass and strict Course 3 routed-audio
+    count-in proof.
   - Latest regenerated report now prefers the Course 3 auto-master-plan
     artifact and exposes `auto_master_recommendation.reason=saved_loopback_route`
     plus `source=rekordbox_audio_settings` and `playback_nudge.ok=true` in the
@@ -1895,7 +2036,7 @@ refreshes `/tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json`,
 refreshes `/tmp/vibemix-live-learn-proof/learn-desktop-quality-current.json`,
 then refreshes `/tmp/vibemix-live-learn-proof/learn-package-verification-current.json`.
 Current package command result: `passed=true`, `release_ready=false`,
-`verification_refreshed=true`; the matrix is now 20/22 proven because
+`verification_refreshed=true`; the matrix is now 21/22 proven because
 `python_quality_suite`, `all_lessons_runtime_contract`,
 `teaching_loop_contract`, `adaptive_coaching_runtime_contract`,
 `course3_auto_master_finder_contract`,
@@ -2221,9 +2362,9 @@ three Course 3 steps above.
 After the readiness fix, the full package was refreshed again at
 `/tmp/vibemix-live-learn-proof/learn-perfection-package-current.json`: Python
 quality, frontend quality, desktop quality, and package verifier all passed;
-`technical_passed=true`, `release_ready=false`, matrix `20/22`. The two
-remaining release rows are still the human EQ ear-pass and the Course 3 routed
-audio/count-in proof. The latest package run also caught a global webview build
+`technical_passed=true`, `release_ready=false`, matrix `21/22`. The remaining
+release row is Course 3 routed audio/count-in proof; packaged EQ ear-pass is
+approved. The latest package run also caught a global webview build
 fixture drift in `tauri/ui/src/pill/index.test.ts`; the fixture now includes the
 required `camelot` and `bpm` fields for `NextSuggestionWire`, and
 `npm --prefix tauri/ui run build` is green again. The latest full package after
@@ -2383,25 +2524,42 @@ until a human approval artifact exists.
   Rekordbox library track, raise the channel fader/crossfader/trim/master until
   capture has signal, then rerun Course 3 proof. The route doctor now keeps
   structured operator-action steps before generic blocker steps in this state.
+- Course 3 DDJ-vs-capture-route learning: a visible `DDJ-FLX4 @ 48000Hz`
+  capture row is not enough to treat the Rekordbox route as Course 3-aligned.
+  The route doctor now considers a route aligned only when it is a loopback or
+  aggregate-style capture route at 48 kHz. On the current desk it records
+  Rekordbox saved to `DDJ-FLX4 @ 48000Hz` but tells the operator to route/play
+  through `BlackHole 16ch @ 48000Hz`, which matches the proof target. The cue
+  card's first step is now explicit: set Rekordbox Audio output from
+  `DDJ-FLX4 @ 48000Hz` to `BlackHole 16ch @ 48000Hz`, then play the library
+  track.
 - Perfection package artifact learning: `learn-perfection-package-current.json`
   now persists `release_blocker_recipe_ids` beside `release_blocker_recipe`.
-  The current IDs are `packaged_eq_exemplar_ear_pass` and
-  `course3_live_audio_play_mode`; integration tooling no longer needs to
-  recompute them from recipe rows.
+  The current ID is `course3_live_audio_play_mode`; integration tooling no
+  longer needs to recompute it from recipe rows.
 - Latest package-quality learning: a fresh run of
   `uv run python scripts/run_learn_perfection_package.py --out
   /tmp/vibemix-live-learn-proof/learn-perfection-package-current.json` passed
   `python_quality`, `frontend_quality`, `desktop_quality`, and
   `package_verifier`. The saved package artifact has `passed=true`,
   `verification_summary.technical_passed=true`, `release_ready=false`, matrix
-  `20/22`, objective audit `7/9`, and exactly two blocker IDs:
-  `packaged_eq_exemplar_ear_pass` and `course3_live_audio_play_mode`.
+  `21/22`, objective audit `8/9`, and exactly one blocker ID:
+  `course3_live_audio_play_mode`.
 - Objective-audit learning: `scripts/verify_learn_package.py` now emits
   `objective_audit`, which maps the original Learn goal into nine concrete
-  objective groups. The current package proves seven groups and blocks exactly
-  two: `course3_live_play_mode` and `audible_example_quality`. This is the
+  objective groups. The current package proves eight groups and blocks exactly
+  one: `course3_live_play_mode`. This is the
   fastest current way to tell what part of the broad goal remains unproven
   without reading every completion-matrix row.
+- Melody/library-first learning: `L2.11` now has a real, grounded library
+  branch instead of only explaining the Camelot diagram. The new
+  `vibemix.learn.harmonic_practice` module picks a compatible pair from the
+  user's Rekordbox library using deterministic `TrackRelation`/Camelot/BPM
+  facts. `LessonRuntime` accepts `harmonic_pair_loader` and emits
+  `tts_marker="L211.library_pair"` with `[track:<id>]` citations only when
+  `EvidenceRegistry` resolves them. Course 2 declares `library_suggestions` in
+  Python and generated TS metadata. The UX remains one prompt/action; no lesson
+  wall and no automatic suggestion outside the user-started Learn lesson.
 - Future-course integration-plan learning: `validate_course_pack_draft(...)`
   now emits `integration_plan` with `merge_ready`, exact target files,
   `COURSE_REGISTRY`/`COURSE_FRAMES`/`CURRICULUM` edit rows, transcript paths,

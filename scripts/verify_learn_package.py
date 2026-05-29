@@ -7,10 +7,12 @@ beginner module. It separates deterministic package integrity from release
 readiness so a green curriculum audit can coexist with honest blockers such as
 human ear-pass or missing Course 3 routed-audio proof.
 """
+
 from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,9 +35,7 @@ from scripts.validate_learn_live_proof import (  # noqa: E402
 from vibemix.learn.curriculum_audit import audit_curriculum  # noqa: E402
 
 DEFAULT_PROOF_DIR = Path("/tmp/vibemix-live-learn-proof")
-DEFAULT_FRONTEND = (
-    _REPO_ROOT / "tauri" / "ui" / "src" / "learn" / "lesson" / "curriculum-meta.ts"
-)
+DEFAULT_FRONTEND = _REPO_ROOT / "tauri" / "ui" / "src" / "learn" / "lesson" / "curriculum-meta.ts"
 TAURI_SMOKE_CANDIDATES = (
     "learn-tauri-smoke-after-audio-wait.json",
     "learn-tauri-smoke-current.json",
@@ -450,11 +450,11 @@ def _course3_readiness_status(path: Path | None) -> dict[str, Any] | None:
             "errors": [str(error)],
         }
 
-    blockers = [
-        str(blocker)
-        for blocker in artifact.get("blockers", [])
-        if str(blocker).strip()
-    ] if isinstance(artifact.get("blockers"), list) else []
+    blockers = (
+        [str(blocker) for blocker in artifact.get("blockers", []) if str(blocker).strip()]
+        if isinstance(artifact.get("blockers"), list)
+        else []
+    )
     diagnosis = artifact.get("course3_audio_diagnosis")
     diagnosis = diagnosis if isinstance(diagnosis, dict) else None
     route_doctor = artifact.get("course3_route_doctor")
@@ -504,11 +504,11 @@ def _physical_readiness_status(path: Path | None) -> dict[str, Any] | None:
             "errors": [str(error)],
         }
 
-    blockers = [
-        str(blocker)
-        for blocker in artifact.get("blockers", [])
-        if str(blocker).strip()
-    ] if isinstance(artifact.get("blockers"), list) else []
+    blockers = (
+        [str(blocker) for blocker in artifact.get("blockers", []) if str(blocker).strip()]
+        if isinstance(artifact.get("blockers"), list)
+        else []
+    )
     doctor = artifact.get("physical_connection_doctor")
     doctor = doctor if isinstance(doctor, dict) else None
     hardware_connection = artifact.get("hardware_connection")
@@ -620,9 +620,7 @@ def _live_requirement_status(paths: list[Path], requirement: Requirement) -> dic
         auto_master_recommendation = (
             _course3_auto_master_recommendation(artifact) if requirement == "course3" else None
         )
-        playback_nudge = (
-            _course3_playback_nudge(artifact) if requirement == "course3" else None
-        )
+        playback_nudge = _course3_playback_nudge(artifact) if requirement == "course3" else None
         probe_operator_action = (
             _course3_probe_operator_action(artifact) if requirement == "course3" else None
         )
@@ -728,7 +726,11 @@ def _live_requirement_status(paths: list[Path], requirement: Requirement) -> dic
             None,
         ),
         "playback_nudge": next(
-            (attempt.get("playback_nudge") for attempt in attempts if attempt.get("playback_nudge")),
+            (
+                attempt.get("playback_nudge")
+                for attempt in attempts
+                if attempt.get("playback_nudge")
+            ),
             None,
         ),
         "probe_operator_action": next(
@@ -1060,7 +1062,9 @@ def _exemplar_status(approval_path: Path | None) -> dict[str, Any]:
         "output_devices": report.get("output_devices"),
         "output_device_error": report.get("output_device_error"),
         "technical_failures": report.get("technical_failures", []),
-        "track_count": len(report.get("tracks", []) if isinstance(report.get("tracks"), list) else []),
+        "track_count": len(
+            report.get("tracks", []) if isinstance(report.get("tracks"), list) else []
+        ),
     }
 
 
@@ -1140,19 +1144,9 @@ def _objective_audit_row(
     objective: str,
     evidence_row_ids: list[str],
 ) -> dict[str, Any]:
-    evidence_rows = [
-        rows_by_id[row_id]
-        for row_id in evidence_row_ids
-        if row_id in rows_by_id
-    ]
-    missing_row_ids = [
-        row_id
-        for row_id in evidence_row_ids
-        if row_id not in rows_by_id
-    ]
-    not_proven_rows = [
-        row for row in evidence_rows if row.get("status") != "proven"
-    ]
+    evidence_rows = [rows_by_id[row_id] for row_id in evidence_row_ids if row_id in rows_by_id]
+    missing_row_ids = [row_id for row_id in evidence_row_ids if row_id not in rows_by_id]
+    not_proven_rows = [row for row in evidence_rows if row.get("status") != "proven"]
     blockers: list[str] = []
     next_actions: list[str] = []
     for row in not_proven_rows:
@@ -1170,14 +1164,10 @@ def _objective_audit_row(
         "status": "proven" if not not_proven_rows and not missing_row_ids else "not_proven",
         "evidence_row_ids": evidence_row_ids,
         "proven_row_ids": [
-            str(row.get("id"))
-            for row in evidence_rows
-            if row.get("status") == "proven"
+            str(row.get("id")) for row in evidence_rows if row.get("status") == "proven"
         ],
         "blocking_row_ids": [
-            str(row.get("id"))
-            for row in not_proven_rows
-            if row.get("id") is not None
+            str(row.get("id")) for row in not_proven_rows if row.get("id") is not None
         ],
         "missing_row_ids": missing_row_ids,
         "blockers": _dedupe(blockers),
@@ -1315,12 +1305,8 @@ def _objective_audit(completion_matrix: dict[str, Any]) -> dict[str, Any]:
             evidence_row_ids=["packaged_eq_exemplar_ear_pass"],
         ),
     ]
-    proven_objectives = [
-        row for row in objectives if row.get("status") == "proven"
-    ]
-    not_proven_objectives = [
-        row for row in objectives if row.get("status") != "proven"
-    ]
+    proven_objectives = [row for row in objectives if row.get("status") == "proven"]
+    not_proven_objectives = [row for row in objectives if row.get("status") != "proven"]
     return {
         "schema_version": 1,
         "summary": {
@@ -1328,9 +1314,7 @@ def _objective_audit(completion_matrix: dict[str, Any]) -> dict[str, Any]:
             "proven": len(proven_objectives),
             "not_proven": len(not_proven_objectives),
             "release_ready": not not_proven_objectives,
-            "blocking_objective_ids": [
-                str(row.get("id")) for row in not_proven_objectives
-            ],
+            "blocking_objective_ids": [str(row.get("id")) for row in not_proven_objectives],
         },
         "objectives": objectives,
     }
@@ -1356,9 +1340,7 @@ def _course_extension_contract_summary(
         transcript_required_fields if isinstance(transcript_required_fields, list) else []
     )
     canonical_id_contract = contract.get("canonical_id_contract")
-    canonical_id_contract = (
-        canonical_id_contract if isinstance(canonical_id_contract, dict) else {}
-    )
+    canonical_id_contract = canonical_id_contract if isinstance(canonical_id_contract, dict) else {}
     starter_template_contract = contract.get("starter_template_contract")
     starter_template_contract = (
         starter_template_contract if isinstance(starter_template_contract, dict) else {}
@@ -1383,9 +1365,7 @@ def _course_extension_contract_summary(
         "draft_preflight_cli": "scripts/validate_learn_course_pack.py",
     }
     missing_sources = sorted(
-        key
-        for key, expected in required_sources.items()
-        if source_of_truth.get(key) != expected
+        key for key, expected in required_sources.items() if source_of_truth.get(key) != expected
     )
     if missing_sources:
         blockers.append(f"course extension source map missing: {', '.join(missing_sources)}")
@@ -1395,10 +1375,7 @@ def _course_extension_contract_summary(
     if missing_entries:
         blockers.append(f"course extension registry entries missing: {', '.join(missing_entries)}")
 
-    if (
-        draft_validator.get("function")
-        != "vibemix.learn.course_pack.validate_course_pack_draft"
-    ):
+    if draft_validator.get("function") != "vibemix.learn.course_pack.validate_course_pack_draft":
         blockers.append("course extension draft validator is missing")
     if (
         draft_validator.get("cli")
@@ -1446,8 +1423,7 @@ def _course_extension_contract_summary(
     )
     if missing_transcript_fields:
         blockers.append(
-            "course extension transcript fields missing: "
-            + ", ".join(missing_transcript_fields)
+            "course extension transcript fields missing: " + ", ".join(missing_transcript_fields)
         )
 
     if canonical_id_contract.get("course_id_pattern") != "course_<number>_<slug>":
@@ -1480,9 +1456,7 @@ def _course_extension_contract_summary(
     if starter_template_contract.get("required_hint_count") != 3:
         blockers.append("course extension starter template hint floor is missing")
     starter_prompt_limits = starter_template_contract.get("prompt_limits")
-    starter_prompt_limits = (
-        starter_prompt_limits if isinstance(starter_prompt_limits, dict) else {}
-    )
+    starter_prompt_limits = starter_prompt_limits if isinstance(starter_prompt_limits, dict) else {}
     if starter_prompt_limits.get("max_chars") != 150:
         blockers.append("course extension starter prompt character cap is missing")
     if starter_prompt_limits.get("max_words") != 24:
@@ -1516,9 +1490,7 @@ def _course_extension_contract_summary(
 
     copy_truthfulness_contract = contract.get("copy_truthfulness_contract")
     copy_truthfulness_contract = (
-        copy_truthfulness_contract
-        if isinstance(copy_truthfulness_contract, dict)
-        else {}
+        copy_truthfulness_contract if isinstance(copy_truthfulness_contract, dict) else {}
     )
     phrases = copy_truthfulness_contract.get("unsupported_auto_open_phrases")
     if not isinstance(phrases, list) or "debrief opens" not in phrases:
@@ -1570,11 +1542,12 @@ def _course_extension_contract_summary(
         "uv run pytest -q tests/learn/test_lesson_flow_contract.py",
         "npm --prefix tauri/ui test -- tests/learn/test_curriculum_meta.spec.ts",
     }
-    missing_commands = sorted(required_commands - set(str(command) for command in verification_commands))
+    missing_commands = sorted(
+        required_commands - set(str(command) for command in verification_commands)
+    )
     if missing_commands:
         blockers.append(
-            "course extension verification commands missing: "
-            + ", ".join(missing_commands)
+            "course extension verification commands missing: " + ", ".join(missing_commands)
         )
     if curriculum.get("passed") is not True:
         blockers.append("curriculum audit is not passing")
@@ -1635,24 +1608,16 @@ def _completion_matrix(
     }
     missing_capabilities = sorted(required_capabilities - declared_capabilities)
     flow_contract_summary = curriculum.get("flow_contract_summary")
-    flow_contract_summary = (
-        flow_contract_summary if isinstance(flow_contract_summary, dict) else {}
-    )
+    flow_contract_summary = flow_contract_summary if isinstance(flow_contract_summary, dict) else {}
     hint_grounding_contract = flow_contract_summary.get("hint_grounding_contract")
     hint_grounding_contract = (
         hint_grounding_contract if isinstance(hint_grounding_contract, dict) else {}
     )
-    teaching_grounding_contract = flow_contract_summary.get(
-        "teaching_grounding_contract"
-    )
+    teaching_grounding_contract = flow_contract_summary.get("teaching_grounding_contract")
     teaching_grounding_contract = (
-        teaching_grounding_contract
-        if isinstance(teaching_grounding_contract, dict)
-        else {}
+        teaching_grounding_contract if isinstance(teaching_grounding_contract, dict) else {}
     )
-    teaching_turn_count = int(
-        teaching_grounding_contract.get("teaching_turn_count") or 0
-    )
+    teaching_turn_count = int(teaching_grounding_contract.get("teaching_turn_count") or 0)
     grounded_teaching_turn_count = int(
         teaching_grounding_contract.get("grounded_teaching_turn_count") or 0
     )
@@ -1666,12 +1631,8 @@ def _completion_matrix(
         and teaching_turn_count == cited_teaching_turn_count
     )
     hint_turn_count = int(hint_grounding_contract.get("hint_turn_count") or 0)
-    grounded_hint_turn_count = int(
-        hint_grounding_contract.get("grounded_hint_turn_count") or 0
-    )
-    cited_hint_turn_count = int(
-        hint_grounding_contract.get("cited_hint_turn_count") or 0
-    )
+    grounded_hint_turn_count = int(hint_grounding_contract.get("grounded_hint_turn_count") or 0)
+    cited_hint_turn_count = int(hint_grounding_contract.get("cited_hint_turn_count") or 0)
     hint_grounding_ok = (
         hint_grounding_contract.get("ok") is True
         and hint_turn_count >= 228
@@ -1692,9 +1653,7 @@ def _completion_matrix(
                 "frontend_projection": curriculum.get("frontend_projection"),
                 "flow_contract_summary": curriculum.get("flow_contract_summary"),
                 "unlock_gate_contract": curriculum.get("unlock_gate_contract"),
-                "copy_truthfulness_contract": curriculum.get(
-                    "copy_truthfulness_contract"
-                ),
+                "copy_truthfulness_contract": curriculum.get("copy_truthfulness_contract"),
                 "transcript_inventory": curriculum.get("transcript_inventory"),
             },
             blockers=list(curriculum.get("errors") or []),
@@ -2217,8 +2176,7 @@ def _completion_matrix(
                 + list(desktop_quality.get("errors") or [])
                 + (
                     ["learn_tauri_window_vitest did not run"]
-                    if "learn_tauri_window_vitest"
-                    not in _quality_command_names(frontend_quality)
+                    if "learn_tauri_window_vitest" not in _quality_command_names(frontend_quality)
                     else []
                 )
                 + (
@@ -2302,15 +2260,11 @@ def _completion_matrix(
                 "path": live["physical"].get("path"),
                 "diagnosis": live["physical"].get("diagnosis"),
                 "readiness_status": live["physical"].get("readiness_status"),
-                "physical_connection_doctor": live["physical"].get(
-                    "physical_connection_doctor"
-                ),
+                "physical_connection_doctor": live["physical"].get("physical_connection_doctor"),
                 "operator_commands": live["physical"].get("operator_commands"),
             },
             blockers=list(live["physical"].get("blockers") or []),
-            next_actions=[
-                live["physical"].get("operator_commands", {}).get("proof")
-            ],
+            next_actions=[live["physical"].get("operator_commands", {}).get("proof")],
             category="live_proof",
         ),
         _completion_row(
@@ -2331,9 +2285,7 @@ def _completion_matrix(
                 "probe_operator_action": live["course3"].get("probe_operator_action"),
             },
             blockers=list(live["course3"].get("blockers") or []),
-            next_actions=[
-                live["course3"].get("operator_commands", {}).get("proof")
-            ]
+            next_actions=[live["course3"].get("operator_commands", {}).get("proof")]
             if isinstance(live["course3"].get("operator_commands"), dict)
             else [],
             category="live_proof",
@@ -2458,7 +2410,9 @@ def verify_package(
         live=live,
     )
     objective_audit = _objective_audit(completion_matrix)
-    release_ready = not completion_blockers and completion_matrix["summary"]["release_ready"] is True
+    release_ready = (
+        not completion_blockers and completion_matrix["summary"]["release_ready"] is True
+    )
     release_blocker_recipe = _release_blocker_recipe(
         completion_blockers=completion_blockers,
         exemplars=exemplars,
@@ -2469,6 +2423,21 @@ def verify_package(
         completion_blockers=completion_blockers,
         release_blocker_recipe=release_blocker_recipe,
     )
+    next_actions = _next_actions(
+        completion_blockers,
+        physical_diagnosis=live["physical"].get("diagnosis"),
+        physical_connection_doctor=live["physical"].get("physical_connection_doctor"),
+        course3_diagnosis=live["course3"].get("diagnosis"),
+        course3_route_plan=live["course3"].get("route_plan"),
+        course3_route_doctor=live["course3"].get("course3_route_doctor"),
+        course3_probe_operator_action=live["course3"].get("probe_operator_action"),
+    )
+    release_gate_cue_card = _release_gate_cue_card(
+        release_ready=release_ready,
+        non_external_ready=non_external_status["ready"],
+        release_blocker_recipe=release_blocker_recipe,
+        next_actions=next_actions,
+    )
     return {
         "schema_version": 1,
         "generated_at": datetime.now(UTC).isoformat(),
@@ -2476,13 +2445,9 @@ def verify_package(
         "technical_passed": deterministic_passed,
         "release_ready": release_ready,
         "non_external_ready": non_external_status["ready"],
-        "deferred_external_blocker_ids": non_external_status[
-            "deferred_external_blocker_ids"
-        ],
+        "deferred_external_blocker_ids": non_external_status["deferred_external_blocker_ids"],
         "internal_blocker_ids": non_external_status["internal_blocker_ids"],
-        "deferred_external_blockers": non_external_status[
-            "deferred_external_blockers"
-        ],
+        "deferred_external_blockers": non_external_status["deferred_external_blockers"],
         "internal_blockers": non_external_status["internal_blockers"],
         "non_external_ready_rule": non_external_status["rule"],
         "proof_dir": str(proof_dir),
@@ -2499,16 +2464,145 @@ def verify_package(
         "objective_audit": objective_audit,
         "completion_blockers": completion_blockers,
         "release_blocker_recipe": release_blocker_recipe,
-        "next_actions": _next_actions(
-            completion_blockers,
-            physical_diagnosis=live["physical"].get("diagnosis"),
-            physical_connection_doctor=live["physical"].get("physical_connection_doctor"),
-            course3_diagnosis=live["course3"].get("diagnosis"),
-            course3_route_plan=live["course3"].get("route_plan"),
-            course3_route_doctor=live["course3"].get("course3_route_doctor"),
-            course3_probe_operator_action=live["course3"].get("probe_operator_action"),
-        ),
+        "release_gate_cue_card": release_gate_cue_card,
+        "next_actions": next_actions,
     }
+
+
+def _has_spoken_prompt(*values: Any) -> bool:
+    joined = " ".join(str(value) for value in values if value)
+    return "--say" in joined
+
+
+def _cue_card_say_text(cue_card: dict[str, Any] | None) -> str:
+    if not isinstance(cue_card, dict):
+        return ""
+    headline = str(cue_card.get("headline") or "").strip()
+    gates = cue_card.get("gates")
+    first_prompt = ""
+    if isinstance(gates, list) and gates:
+        first_gate = gates[0]
+        if isinstance(first_gate, dict):
+            first_prompt = str(first_gate.get("prompt") or "").strip()
+    parts = [headline] if headline else []
+    if first_prompt:
+        parts.append(f"Next: {first_prompt}")
+    return " ".join(parts)
+
+
+def _say_cue_card(cue_card: dict[str, Any] | None, *, enabled: bool) -> bool:
+    """Speak the current release cue card on macOS, best-effort and opt-in."""
+    text = _cue_card_say_text(cue_card)
+    if not enabled or not text or sys.platform != "darwin":
+        return False
+    try:
+        subprocess.run(
+            ["say", text],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=8,
+            check=False,
+        )
+    except Exception:
+        return False
+    return True
+
+
+def _release_gate_cue_card(
+    *,
+    release_ready: bool,
+    non_external_ready: bool,
+    release_blocker_recipe: list[dict[str, Any]],
+    next_actions: list[str],
+) -> dict[str, Any]:
+    """Return the small operator-facing view of the current release gates."""
+    if release_ready:
+        status = "release_ready"
+        headline = "All Learn release gates are proven."
+    elif non_external_ready:
+        status = "waiting_on_external_gates"
+        headline = _external_release_headline(release_blocker_recipe)
+    else:
+        status = "needs_internal_work"
+        headline = "Learn still has internal blockers before release proof can finish."
+
+    gates: list[dict[str, Any]] = []
+    for row in release_blocker_recipe:
+        operator_action = row.get("operator_action")
+        operator_action = operator_action if isinstance(operator_action, dict) else {}
+        diagnosis = row.get("diagnosis")
+        diagnosis = diagnosis if isinstance(diagnosis, dict) else {}
+        route_doctor = row.get("course3_route_doctor")
+        route_doctor = route_doctor if isinstance(route_doctor, dict) else {}
+        commands = row.get("commands")
+        commands = commands if isinstance(commands, dict) else {}
+        steps = row.get("operator_steps")
+        steps = (
+            [str(step) for step in steps if str(step).strip()] if isinstance(steps, list) else []
+        )
+        current_rekordbox_route = operator_action.get("current_rekordbox_route")
+        target_capture_route = operator_action.get("target_capture_route") or operator_action.get(
+            "route"
+        )
+        route_mismatch = (
+            bool(current_rekordbox_route)
+            and bool(target_capture_route)
+            and str(current_rekordbox_route) != str(target_capture_route)
+        )
+        recommended_devices = operator_action.get("recommended_output_devices")
+        recommended_device = None
+        if isinstance(recommended_devices, list) and recommended_devices:
+            first = recommended_devices[0]
+            if isinstance(first, dict):
+                recommended_device = first.get("name")
+
+        gates.append(
+            {
+                "id": row.get("id"),
+                "status": row.get("status"),
+                "prompt": operator_action.get("prompt")
+                or row.get("manual_action")
+                or row.get("blocker"),
+                "diagnosis_code": route_doctor.get("diagnosis_code") or diagnosis.get("code"),
+                "route": operator_action.get("route"),
+                "current_rekordbox_route": current_rekordbox_route,
+                "target_capture_route": target_capture_route,
+                "route_mismatch": route_mismatch,
+                "recommended_output_device": recommended_device,
+                "first_step": steps[0] if steps else None,
+                "step_count": len(steps),
+                "spoken_prompt_enabled": _has_spoken_prompt(commands, steps),
+                "run_command": commands.get("proof") or commands.get("play"),
+                "verify_command": commands.get("verify"),
+            }
+        )
+
+    return {
+        "schema_version": 1,
+        "status": status,
+        "release_ready": release_ready,
+        "non_external_ready": non_external_ready,
+        "headline": headline,
+        "primary_next_action": next_actions[0] if next_actions else None,
+        "gate_count": len(gates),
+        "gates": gates,
+    }
+
+
+def _external_release_headline(release_blocker_recipe: list[dict[str, Any]]) -> str:
+    """Name the remaining external proof without stale plural gate copy."""
+    gate_ids = {
+        str(row.get("id") or "").strip()
+        for row in release_blocker_recipe
+        if str(row.get("id") or "").strip()
+    }
+    if gate_ids == {"course3_live_audio_play_mode"}:
+        return "Technical package is green; finish the Course 3 routed-audio proof."
+    if gate_ids == {"packaged_eq_exemplar_ear_pass"}:
+        return "Technical package is green; finish the EQ exemplar ear-pass."
+    if len(gate_ids) == 1:
+        return "Technical package is green; finish the remaining external release proof."
+    return "Technical package is green; finish the remaining external release proofs."
 
 
 def _release_blocker_recipe(
@@ -2581,9 +2675,7 @@ def _release_blocker_recipe(
                     },
                     "diagnosis": physical.get("diagnosis"),
                     "readiness_status": physical.get("readiness_status"),
-                    "physical_connection_doctor": physical.get(
-                        "physical_connection_doctor"
-                    ),
+                    "physical_connection_doctor": physical.get("physical_connection_doctor"),
                 }
             )
             continue
@@ -2611,9 +2703,7 @@ def _release_blocker_recipe(
                         if commands.get(key)
                     },
                     "current_selected_input": commands.get("current_selected_input"),
-                    "current_fallback_candidate": commands.get(
-                        "current_fallback_candidate"
-                    ),
+                    "current_fallback_candidate": commands.get("current_fallback_candidate"),
                     "diagnosis": course3.get("diagnosis"),
                     "readiness_status": course3.get("readiness_status"),
                     "course3_route_doctor": course3.get("course3_route_doctor"),
@@ -2662,11 +2752,7 @@ def _deferred_external_completion_status(
         )
 
     internal_blocker_ids = _dedupe(
-        [
-            str(row.get("id"))
-            for row in internal_blockers
-            if str(row.get("id") or "").strip()
-        ]
+        [str(row.get("id")) for row in internal_blockers if str(row.get("id") or "").strip()]
     )
     deferred_external_blocker_ids = _dedupe(
         [
@@ -2726,8 +2812,7 @@ def _physical_operator_commands(physical: dict[str, Any]) -> dict[str, Any]:
         "list_controller": "uv run python scripts/sniff_controller.py --list",
         "readiness": (
             str(connection_doctor.get("readiness_command"))
-            if isinstance(connection_doctor, dict)
-            and connection_doctor.get("readiness_command")
+            if isinstance(connection_doctor, dict) and connection_doctor.get("readiness_command")
             else (
                 "uv run python scripts/learn_live_readiness.py --require physical "
                 "--out /tmp/vibemix-live-learn-proof/learn-physical-readiness-current.json"
@@ -2735,8 +2820,7 @@ def _physical_operator_commands(physical: dict[str, Any]) -> dict[str, Any]:
         ),
         "proof": (
             str(connection_doctor.get("proof_command"))
-            if isinstance(connection_doctor, dict)
-            and connection_doctor.get("proof_command")
+            if isinstance(connection_doctor, dict) and connection_doctor.get("proof_command")
             else (
                 "uv run python scripts/run_learn_live_proof.py --start-app --no-screen "
                 "--physical --wait-physical-seconds 30 --physical-seconds 40 "
@@ -2814,16 +2898,16 @@ def _course3_operator_commands(course3: dict[str, Any]) -> dict[str, Any]:
         else None
     )
     if isinstance(route_doctor, dict) and isinstance(route_doctor.get("operator_steps"), list):
-        doctor_steps = [
-            str(step)
-            for step in route_doctor["operator_steps"]
-            if str(step).strip()
-        ]
-        operator_action = {
-            "prompt": str(manual_action),
-            "route": route_doctor.get("route"),
-            "steps": doctor_steps,
-        }
+        doctor_steps = [str(step) for step in route_doctor["operator_steps"] if str(step).strip()]
+        route_doctor_action = dict(operator_action or {})
+        route_doctor_action.update(
+            {
+                "prompt": str(manual_action),
+                "route": route_doctor.get("route"),
+                "steps": doctor_steps,
+            }
+        )
+        operator_action = route_doctor_action
     if operator_action is None and probe_operator_action is not None:
         operator_action = probe_operator_action
     if operator_action is None:
@@ -2943,8 +3027,7 @@ def _next_actions(
         elif "Course 3" in blocker:
             doctor_next_step = (
                 course3_route_doctor.get("next_step")
-                if isinstance(course3_route_doctor, dict)
-                and course3_route_doctor.get("next_step")
+                if isinstance(course3_route_doctor, dict) and course3_route_doctor.get("next_step")
                 else None
             )
             rejected_reason = (
@@ -3083,6 +3166,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument(
+        "--cue-card",
+        action="store_true",
+        help="Print only the compact release_gate_cue_card to stdout.",
+    )
+    parser.add_argument(
+        "--say-cue-card",
+        action="store_true",
+        help="Speak the current release cue card with macOS say, best-effort.",
+    )
+    parser.add_argument(
         "--require-release-ready",
         action="store_true",
         help="Exit non-zero unless every completion blocker is cleared.",
@@ -3106,7 +3199,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.out is not None:
         write_report(report, args.out)
-    print(json.dumps(report, sort_keys=True))
+    _say_cue_card(report.get("release_gate_cue_card"), enabled=args.say_cue_card)
+    stdout_payload = report.get("release_gate_cue_card") if args.cue_card else report
+    print(json.dumps(stdout_payload, sort_keys=True))
     if args.require_release_ready:
         return 0 if report.get("release_ready") is True else 4
     return 0 if report.get("passed") is True else 4

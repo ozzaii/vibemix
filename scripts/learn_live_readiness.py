@@ -1023,8 +1023,8 @@ def _course3_external_playback_action(
         if isinstance(rekordbox_hint, dict)
         else None
     )
-    if current_route_aligned is False and auto_route:
-        route = auto_route
+    if current_route_aligned is False:
+        route = auto_route or "the selected loopback capture route"
     elif current_route:
         route = current_route
     elif auto_route:
@@ -1035,6 +1035,17 @@ def _course3_external_playback_action(
     steps: list[str] = []
     if nowplaying_blocker:
         steps.append("Stop unrelated media or make Rekordbox the active playing source.")
+    if current_route_aligned is False:
+        if current_route and route:
+            steps.append(
+                "In Rekordbox Audio preferences, set the audio output from "
+                f"{current_route} to {route}."
+            )
+        else:
+            steps.append(
+                "In Rekordbox Audio preferences, set the audio output to the "
+                f"{route}."
+            )
     steps.extend(
         [
             f"In Rekordbox, load and play a real library track through {route}.",
@@ -1042,11 +1053,14 @@ def _course3_external_playback_action(
             "Rerun the Course 3 live proof with --require-count-in.",
         ]
     )
+    prompt = f"Play a real Rekordbox library track through {route} with channel and master faders up."
+    if current_route_aligned is False:
+        prompt = (
+            f"Set Rekordbox audio to {route}, then play a real library track "
+            "with channel and master faders up."
+        )
     return {
-        "prompt": (
-            f"Play a real Rekordbox library track through {route} with channel "
-            "and master faders up."
-        ),
+        "prompt": prompt,
         "route": route,
         "current_rekordbox_route": current_route or None,
         "target_capture_route": auto_route or None,
@@ -1293,6 +1307,14 @@ def _is_dj_capture_row(row: dict[str, Any]) -> bool:
     return bool(name) and bool(matching_names([name], DJ_AUDIO_NEEDLES))
 
 
+def _is_rekordbox_capture_route_name(name: str) -> bool:
+    lowered = name.strip().lower()
+    return bool(lowered) and (
+        bool(matching_names([lowered], AUDIO_LOOPBACK_NEEDLES))
+        or "aggregate" in lowered
+    )
+
+
 def _trim_capture_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     trimmed: list[dict[str, Any]] = []
     for row in rows[:4]:
@@ -1355,6 +1377,7 @@ def _rekordbox_route_hint(
                 current_row = _capture_row_by_name(capture_matrix_check, current_output)
                 current_route_aligned = (
                     isinstance(current_row, dict)
+                    and _is_rekordbox_capture_route_name(current_output)
                     and _info_int(current_row, "sample_rate")
                     == EXPECTED_CAPTURE_SAMPLE_RATE
                     and saved_rate_mismatch is None

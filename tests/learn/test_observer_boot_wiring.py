@@ -59,3 +59,11 @@ def test_lesson_runtime_uses_latest_prepared_pool_loader_in_main() -> None:
 
     assert "load_latest_prepared_pool as _load_latest_prepared_pool" in src
     assert "prepared_pool_loader=_load_latest_prepared_pool" in src
+
+
+def test_lesson_runtime_uses_library_harmonic_pair_loader_in_main() -> None:
+    src = _main_source()
+
+    assert "def _load_learn_harmonic_pair()" in src
+    assert "pick_harmonic_practice_pair(lib)" in src
+    assert "harmonic_pair_loader=_load_learn_harmonic_pair" in src

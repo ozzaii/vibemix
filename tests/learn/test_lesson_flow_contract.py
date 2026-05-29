@@ -258,7 +258,16 @@ def test_course3_continue_lessons_expose_live_backstage_lenses() -> None:
     graduation = build_lesson_flow("L3.06")
     assert graduation.proactive_lens_active is False
     assert graduation.exemplar_audio_forbidden is False
-    assert "live_audio" not in set(graduation.backstage_lenses)
+
+
+def test_camelot_lesson_declares_library_suggestion_lens() -> None:
+    """L2.11 teaches key compatibility through the user's own library when possible."""
+    flow = build_lesson_flow("L2.11")
+
+    assert "library_suggestions" in set(flow.backstage_lenses)
+    for step in flow.steps:
+        assert "library_suggestions" in set(step.backstage_lenses)
+    assert "live_audio" not in set(flow.backstage_lenses)
 
 
 def test_recovery_drills_keep_authored_shapes_in_structured_flow() -> None:

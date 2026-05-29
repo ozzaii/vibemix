@@ -1,7 +1,8 @@
 {
   "lesson_id": "L2.11",
   "title": "camelot wheel",
-  "system_instruction_addendum": "CAMELOT WHEEL ADDENDUM: The camelot wheel labels keys 1a through 12a (minor) and 1b through 12b (major). Compatible neighbors are same-number-different-letter, plus or minus one number same letter.",
+  "system_instruction_addendum": "CAMELOT WHEEL ADDENDUM: The camelot wheel labels keys 1a through 12a and 1b through 12b. If a library pair is provided, teach the wheel through those two real tracks.",
+  "library_melody_pair": true,
   "tutor_speak": [
     {
       "beat": 0,

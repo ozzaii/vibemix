@@ -45,6 +45,12 @@ def test_build_report_summarizes_verifier_release_state(tmp_path: Path) -> None:
                 "internal_blocker_ids": [],
                 "completion_blockers": ["human ear-pass"],
                 "completion_matrix": {"summary": {"proven": 12, "total": 14}},
+                "release_gate_cue_card": {
+                    "schema_version": 1,
+                    "status": "waiting_on_external_gates",
+                    "gate_count": 1,
+                    "gates": [{"id": "packaged_eq_exemplar_ear_pass"}],
+                },
                 "sections": {
                     "python_quality": {
                         "path": str(tmp_path / "python.json"),
@@ -132,6 +138,12 @@ def test_build_report_summarizes_verifier_release_state(tmp_path: Path) -> None:
     assert report["verification_summary"]["internal_blocker_ids"] == []
     assert report["verification_summary"]["completion_blockers"] == ["human ear-pass"]
     assert report["verification_summary"]["completion_matrix"] == {"proven": 12, "total": 14}
+    assert report["release_gate_cue_card"] == {
+        "schema_version": 1,
+        "status": "waiting_on_external_gates",
+        "gate_count": 1,
+        "gates": [{"id": "packaged_eq_exemplar_ear_pass"}],
+    }
     assert report["quality_contract"]["python_quality"]["model_router_guard"] is True
     assert report["quality_contract"]["python_quality"]["all_lessons_runtime"] is True
     assert report["quality_contract"]["python_quality"]["adaptive_coaching"] is True
@@ -212,12 +224,16 @@ def test_main_writes_package_artifact_and_keeps_release_gate_separate(
                         "technical_passed": True,
                         "release_ready": False,
                         "non_external_ready": True,
-                        "deferred_external_blocker_ids": [
-                            "course3_live_audio_play_mode"
-                        ],
+                        "deferred_external_blocker_ids": ["course3_live_audio_play_mode"],
                         "internal_blocker_ids": [],
                         "completion_blockers": ["Course 3"],
                         "completion_matrix": {"summary": {"proven": 12, "total": 14}},
+                        "release_gate_cue_card": {
+                            "schema_version": 1,
+                            "status": "waiting_on_external_gates",
+                            "gate_count": 1,
+                            "gates": [{"id": "course3_live_audio_play_mode"}],
+                        },
                         "sections": {
                             "python_quality": {
                                 "path": str(tmp_path / "python.json"),
@@ -328,11 +344,15 @@ def test_main_writes_package_artifact_and_keeps_release_gate_separate(
     assert artifact["passed"] is True
     assert artifact["release_ready"] is False
     assert artifact["non_external_ready"] is True
-    assert artifact["deferred_external_blocker_ids"] == [
-        "course3_live_audio_play_mode"
-    ]
+    assert artifact["deferred_external_blocker_ids"] == ["course3_live_audio_play_mode"]
     assert artifact["internal_blocker_ids"] == []
     assert artifact["verification_refreshed"] is True
+    assert artifact["release_gate_cue_card"] == {
+        "schema_version": 1,
+        "status": "waiting_on_external_gates",
+        "gate_count": 1,
+        "gates": [{"id": "course3_live_audio_play_mode"}],
+    }
     assert artifact["quality_contract"]["python_quality"]["model_router_guard"] is True
     assert artifact["quality_contract"]["python_quality"]["all_lessons_runtime"] is True
     assert artifact["quality_contract"]["python_quality"]["adaptive_coaching"] is True

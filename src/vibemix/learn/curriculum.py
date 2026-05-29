@@ -119,6 +119,7 @@ COURSE_REGISTRY: dict[str, CourseMeta] = {
             "evidence_registry",
             "controller_state",
             "on_screen_deck",
+            "library_suggestions",
             "recital_observer",
         ),
     ),
@@ -166,7 +167,8 @@ COURSE_FRAMES: dict[str, str] = {
         "Course 2 walks the user through beatmatching (ear and sync) then "
         "the five canonical transitions: long blend, eq swap, bassline "
         "swap, filter fade, echo-out. Add hot cues, the camelot wheel, "
-        "phrase matching, and train-wreck diagnosis. Ground every "
+        "phrase matching, and train-wreck diagnosis. When library keys "
+        "exist, teach melody through the user's own tracks. Ground every "
         "observation in what the two decks are doing right now."
     ),
     "course_3_play_mode": (
@@ -525,9 +527,8 @@ CURRICULUM: dict[str, LessonMeta] = {
         course_id="course_2_transitions",
         system_instruction_addendum=(
             "CAMELOT WHEEL ADDENDUM: The camelot wheel labels keys 1a "
-            "through 12a (minor) and 1b through 12b (major). Compatible "
-            "neighbors are same-number-different-letter, plus or minus "
-            "one number same letter."
+            "through 12a and 1b through 12b. If a library pair is "
+            "provided, teach the wheel through those two real tracks."
         ),
         transcript_path="course_2_transitions/11_camelot_wheel.json",
     ),

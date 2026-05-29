@@ -1532,6 +1532,85 @@ def test_build_summary_says_start_playback_when_rekordbox_loopback_is_aligned() 
     assert doctor["operator_steps"] == diagnosis["operator_action"]["steps"]
 
 
+def test_build_summary_aligns_controller_route_before_course3_playback() -> None:
+    summary = readiness.build_summary(
+        requirement="course3",
+        socket_check={"ok": True},
+        rekordbox_check={"ok": True},
+        midi_check={"ok": True, "ports": ["DDJ-FLX4"], "controller_matches": ["DDJ-FLX4"]},
+        usb_check={"ok": True, "controller_matches": ["DDJ-FLX4"]},
+        audio_check={
+            "ok": True,
+            "loopback_present": True,
+            "dj_audio_present": True,
+            "controller_audio_present": True,
+        },
+        audio_route_check={
+            "available": True,
+            "ok": False,
+            "output_device": "MacBook Pro Speakers",
+            "blockers": ["current macOS output route is not loopback"],
+        },
+        loopback_self_test_check={"enabled": True, "ok": True, "blockers": []},
+        loopback_signal_check={"enabled": True, "ok": False, "blockers": []},
+        capture_matrix_check={
+            "enabled": True,
+            "ok": False,
+            "rows": [
+                {
+                    "name": "DDJ-FLX4",
+                    "rms": 0.000176,
+                    "peak": 0.000824,
+                    "sample_rate": 48000,
+                    "signal": False,
+                },
+                {
+                    "name": "BlackHole 16ch",
+                    "rms": 0.0,
+                    "peak": 0.0,
+                    "sample_rate": 48000,
+                    "signal": False,
+                },
+            ],
+            "blockers": ["all sampled DJ/loopback capture inputs are below signal floor"],
+        },
+        live_context_check={"ok": False, "blockers": ["live master audio is not audible yet"]},
+        rekordbox_audio_settings_check={
+            "ok": True,
+            "path": "/tmp/rekordbox3.settings",
+            "current": {
+                "audio_output_device_name": "DDJ-FLX4",
+                "audio_input_device_name": "DDJ-FLX4",
+                "audio_device_rate": "48000.0",
+            },
+            "recent": [],
+            "blockers": [],
+        },
+    )
+
+    diagnosis = summary["course3_audio_diagnosis"]
+    assert diagnosis["code"] == "loopback_route_healthy_external_playback_absent"
+    assert diagnosis["rekordbox_route_hint"]["current_rekordbox_route_aligned"] is False
+    assert "align Rekordbox Audio preferences" in diagnosis["next_action"]
+    assert diagnosis["operator_action"]["current_rekordbox_route"] == "DDJ-FLX4 @ 48000Hz"
+    assert diagnosis["operator_action"]["target_capture_route"] == "BlackHole 16ch @ 48000Hz"
+    assert diagnosis["operator_action"]["route"] == "BlackHole 16ch @ 48000Hz"
+    assert diagnosis["operator_action"]["prompt"] == (
+        "Set Rekordbox audio to BlackHole 16ch @ 48000Hz, then play a real "
+        "library track with channel and master faders up."
+    )
+    assert diagnosis["operator_action"]["steps"][0] == (
+        "In Rekordbox Audio preferences, set the audio output from DDJ-FLX4 @ 48000Hz "
+        "to BlackHole 16ch @ 48000Hz."
+    )
+    assert diagnosis["operator_action"]["steps"][1] == (
+        "In Rekordbox, load and play a real library track through BlackHole 16ch @ 48000Hz."
+    )
+    doctor = summary["course3_route_doctor"]
+    assert doctor["next_step"] == diagnosis["operator_action"]["steps"][0]
+    assert doctor["route"] == "BlackHole 16ch @ 48000Hz"
+
+
 def test_build_summary_diagnoses_rekordbox_aggregate_capture_rate_mismatch() -> None:
     summary = readiness.build_summary(
         requirement="course3",
