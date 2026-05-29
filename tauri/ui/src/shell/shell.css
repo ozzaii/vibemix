@@ -338,7 +338,11 @@
   right: 0;
   margin-left: var(--sidebar-w);
   margin-right: var(--panel-cur);
-  transition: margin 300ms var(--ease-brand);
+  /* Each main edge moves in LOCKSTEP with the chrome edge it meets — the left
+   * margin with the sidebar (200ms), the right with the grounding panel
+   * (250ms). A single shared duration (was 300ms) desynced both seams, so the
+   * void flashed through the gap for ~100ms on collapse / panel-open. */
+  transition: margin-left 200ms var(--ease-brand), margin-right 250ms var(--ease-brand);
   overflow: hidden;
 }
 /* The 48px inset shadow that makes the sidebar read as a raised slab. */
