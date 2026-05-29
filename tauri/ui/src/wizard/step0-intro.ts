@@ -6,11 +6,12 @@
  * read as a generic settings dialog. This step ships the missing moment.
  *
  * Visual anatomy:
- *   - Three-line hero. Saira wdth 82 wght 800 at 64-72px for the wordmark
- *     stack; wdth 82 wght 600 for the third line, em-rule-bracketed in
- *     --silk-65 (mock pattern).
- *   - Single amber accent: the "V" of "VIBEMIX" gets the lead glyph
- *     treatment (one amber moment per panel, see DESIGN.md §5).
+ *   - Three-line hero. Saira wdth 82 wght 800 at 76px for the lowercase
+ *     wordmark stack; wdth 82 wght 700 for the "DJ FRIEND" line, the slogan
+ *     em-rule-bracketed in --silk-65 (mock pattern).
+ *   - Single rose accent: the "mix" syllable is lit in --brand (one rose
+ *     moment per panel, see DESIGN.md §5) — the same two-tone split, same
+ *     lowercase case, as the persistent shell sidebar wordmark.
  *   - Single "[ Let's go ]" CTA at the bottom. Secondary visual treatment
  *     (mock-verbatim button armed state from button.ts).
  *
@@ -413,15 +414,15 @@ export function renderStep0Intro(cb: Step0IntroCallbacks): HTMLElement {
 
   const wordmark = document.createElement("span");
   wordmark.className = "wizard-intro__wordmark";
-  // Same trademark logic as the shell sidebar (vibe in ink, mix lit in rose),
-  // here at hero scale + uppercase — so the first impression and the persistent
-  // chrome read as one brand, not two different wordmarks.
+  // The SAME wordmark as the shell sidebar: lowercase, "vibe" in ink + "mix" lit
+  // in rose, here at hero scale — so the first impression and the persistent
+  // chrome are one trademark, identical in case, not two different wordmarks.
   const wordmarkVibe = document.createElement("span");
   wordmarkVibe.className = "wizard-intro__wordmark-vibe";
-  wordmarkVibe.textContent = "VIBE";
+  wordmarkVibe.textContent = "vibe";
   const wordmarkMix = document.createElement("span");
   wordmarkMix.className = "wizard-intro__wordmark-mix";
-  wordmarkMix.textContent = "MIX";
+  wordmarkMix.textContent = "mix";
   wordmark.append(wordmarkVibe, wordmarkMix);
 
   const phrase = document.createElement("span");
