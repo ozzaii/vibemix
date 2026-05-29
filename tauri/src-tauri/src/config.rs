@@ -39,6 +39,7 @@ use tauri::{AppHandle, Manager};
 const STORE_PATH: &str = "config.json";
 const KEY_FIRST_RUN_STATE: &str = "first_run_state";
 const KEY_MASCOT_WINDOW: &str = "mascot_window";
+const KEY_BRAVOH_WAITLIST_OPT_IN: &str = "bravoh_waitlist_opt_in";
 
 /// Phase 62 Plan 02 — top-level config key choosing the in-set surface
 /// (PILL-02). Sits alongside `mascot_window` / `first_run_state`. A
@@ -157,6 +158,17 @@ fn save_state(app: &AppHandle, state: &FirstRunState) -> Result<(), String> {
     let store = app
         .store(STORE_PATH)
         .map_err(|e| format!("store init failed: {e}"))?;
+    // The plugin loads config.json into an in-memory cache ONCE at boot
+    // (before the wizard runs). The Python sidecar writes config.json
+    // DIRECTLY during the wizard — e.g. the skill-level step persists
+    // `extra["skill"]`, later read at cold boot by
+    // `apply_persona_config_to_env`. Without reloading, this terminal
+    // wizard-completion save serializes the stale boot cache and silently
+    // clobbers every Python-written key (skill / mood / lens). reload()
+    // merges the current on-disk state into the cache first so the save
+    // preserves them. Errors (e.g. file absent on a truly fresh install)
+    // are non-fatal — the cache is simply unchanged. (Quick 260529-ifq)
+    let _ = store.reload();
     let value = serde_json::to_value(state).map_err(|e| format!("encode failed: {e}"))?;
     store.set(KEY_FIRST_RUN_STATE, value);
     // Force flush so a crash mid-wizard doesn't lose calibration state.
@@ -191,6 +203,31 @@ pub fn save_mascot_state(app: &AppHandle, state: &MascotWindowState) -> Result<(
         .map_err(|e| format!("store init failed: {e}"))?;
     let value = serde_json::to_value(state).map_err(|e| format!("encode failed: {e}"))?;
     store.set(KEY_MASCOT_WINDOW, value);
+    store
+        .save()
+        .map_err(|e| format!("store save failed: {e}"))?;
+    Ok(())
+}
+
+fn load_bool_key(app: &AppHandle, key: &str, default: bool) -> Result<bool, String> {
+    use tauri_plugin_store::StoreExt;
+    let store = app
+        .store(STORE_PATH)
+        .map_err(|e| format!("store init failed: {e}"))?;
+    match store.get(key) {
+        Some(value) => value
+            .as_bool()
+            .ok_or_else(|| format!("{key} decode failed: expected bool")),
+        None => Ok(default),
+    }
+}
+
+fn save_bool_key(app: &AppHandle, key: &str, value: bool) -> Result<(), String> {
+    use tauri_plugin_store::StoreExt;
+    let store = app
+        .store(STORE_PATH)
+        .map_err(|e| format!("store init failed: {e}"))?;
+    store.set(key, serde_json::Value::Bool(value));
     store
         .save()
         .map_err(|e| format!("store save failed: {e}"))?;
@@ -256,6 +293,16 @@ pub async fn write_mascot_window_state(
     state: MascotWindowState,
 ) -> Result<(), String> {
     save_mascot_state(&app, &state)
+}
+
+#[tauri::command]
+pub async fn read_bravoh_waitlist_opt_in(app: AppHandle) -> Result<bool, String> {
+    load_bool_key(&app, KEY_BRAVOH_WAITLIST_OPT_IN, false)
+}
+
+#[tauri::command]
+pub async fn write_bravoh_waitlist_opt_in(app: AppHandle, value: bool) -> Result<(), String> {
+    save_bool_key(&app, KEY_BRAVOH_WAITLIST_OPT_IN, value)
 }
 
 /// Toggle mascot window visibility. Updates the persisted state AND
