@@ -636,12 +636,20 @@ button[disabled] { cursor: not-allowed; }
   font-family: var(--type-display);
   font-variation-settings: "wdth" 85, "wght" 700;
   font-size: 18px;
-  letter-spacing: 0;
-  text-transform: uppercase;
+  /* Lowercase + tight, the exact case + tracking of the shell sidebar wordmark.
+   * The boot/wizard titlebar is the first persistent mark the user sees, so it
+   * must be the SAME trademark as the chrome that follows — not an uppercase
+   * variant. (Only the static index.html boot titlebar uses this selector; the
+   * session/learn titlebars carry their own classes.) */
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   line-height: 1;
   text-shadow: 0 0 12px var(--brand-12);
 }
+/* The two-tone split: "vibe" inherits ink, "mix" is lit in --brand rose — the
+ * single decisive brand-color moment, same as the sidebar wordmark + intro hero.
+ * Solid per syllable, never a gradient (banned). */
+.titlebar .wordmark .wm-mix { color: var(--brand); }
 
 .titlebar .traffic-spacer {
   /* macOS native traffic-light buttons render here when decorations:false */
