@@ -687,7 +687,11 @@
   padding-top: 14vh;
   background: rgba(0, 0, 0, 0.6);
 }
-.shell-palette.is-open { display: flex; }
+/* Spotlight-style entrance: the scrim fades up (no harsh dark flash) and the
+ * panel settles down into place (a hair of rise + a 1.5% scale), ease-out-expo.
+ * Entrance only — Esc/backdrop close stays instant. */
+.shell-palette.is-open { display: flex; animation: palette-scrim-in 130ms var(--ease-brand); }
+.shell-palette.is-open .palette-panel { animation: palette-panel-in 165ms var(--ease-brand) both; }
 .palette-panel {
   width: min(640px, 92vw);
   max-height: 60vh;
@@ -767,6 +771,15 @@
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* Command-palette entrance — scrim fade + panel settle. */
+@keyframes palette-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes palette-panel-in {
+  from { opacity: 0; transform: translateY(-5px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 @media (prefers-reduced-motion: reduce) {
   /* Only the genuinely animated marks need freezing: the breathing brand ear,
    * the collapsed-rail monogram that inherits its breath, the connection dot,
@@ -776,5 +789,7 @@
   .sb-monogram,
   .conn-dot,
   .tail-cursor,
-  .surface.is-active { animation: none !important; }
+  .surface.is-active,
+  .shell-palette.is-open,
+  .shell-palette.is-open .palette-panel { animation: none !important; }
 }
