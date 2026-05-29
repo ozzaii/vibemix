@@ -223,6 +223,26 @@
   text-transform: uppercase;
   color: var(--text-secondary);
   white-space: nowrap;
+  /* Paint-only transition (no layout props) so the pill warms smoothly as the
+   * co-host comes alive, instead of snapping. */
+  transition: background 240ms var(--ease-brand), border-color 240ms var(--ease-brand),
+    color 240ms var(--ease-brand);
+}
+/* The co-host foot pill carries an honest activation state — quiet at idle,
+ * warming as it starts listening, fully present once it is live in your ear.
+ * This is the persistent "who's with you" mark: it stays lit while you browse
+ * the crate or learn, so the co-host never silently disappears. It mirrors the
+ * deck energy-field step (0.5 -> 0.85) and adds NO new animation: the deck tail
+ * cursor stays the screen's single live breath, so the pill's ear only
+ * brightens, it never pulses (PRODUCT principle 3: one breathing mark at once). */
+#shell-root[data-state="listening"] .sb-cohost { border-color: var(--brand-22); }
+#shell-root[data-state="live"] .sb-cohost {
+  background: var(--brand-08);
+  border-color: var(--brand-40);
+  color: var(--brand);
+}
+#shell-root[data-state="live"] .sb-cohost .sb-ear {
+  box-shadow: 0 0 10px var(--brand-65), 0 0 3px var(--brand);
 }
 
 /* Collapsed rail — labels + kbd hide, glyphs center, brand wordmark hides. */
