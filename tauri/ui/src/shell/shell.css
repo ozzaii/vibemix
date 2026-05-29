@@ -290,8 +290,14 @@
 }
 .surface.is-active { display: flex; }
 
-/* ── Deck surface — the home stage. Idle hero vs live line swap by state. ── */
-.surface--deck { position: relative; align-items: center; justify-content: center; padding: var(--sp-6); }
+/* ── Deck surface — the home stage. Idle hero vs live line swap by state. ──
+ * Stays `position: absolute; inset: 0` like every other .surface (base rule
+ * above) so the active region fills the full stage height. An absolutely
+ * positioned box is still a containing block for the energy field + z-stage,
+ * so it needs no `position: relative` — and `relative` would nullify the
+ * inherited `inset: 0`, collapsing the deck to its content height (the session
+ * grid's `1fr` stage row then starves to 0px). */
+.surface--deck { align-items: center; justify-content: center; padding: var(--sp-6); }
 .deck-stage { position: relative; z-index: var(--z-stage); max-width: 720px; width: 100%; text-align: center; }
 
 /* Subliminal energy field — a pure rose deck-light bloom rising from below
@@ -450,6 +456,13 @@
   min-height: 0;
 }
 .surface--deck .vmx-session { height: 100%; } /* fill the stage, not the viewport */
+/* The session grid is `titlebar | modebar | 1fr stage | statusbar`. Folded, we
+ * display:none the titlebar + modebar (shell chrome owns them) — but display:none
+ * drops them from grid auto-flow, so the stage shifts up into the fixed titlebar
+ * track (collapsing to ~56px and spilling its content over the statusrow) and the
+ * 1fr row goes empty. With exactly the stage + statusrow left in flow, re-declare
+ * the track list so the stage takes the 1fr and the statusrow sits at the foot. */
+.surface--deck .vmx-session { grid-template-rows: 1fr auto; }
 .surface--deck .vmx-titlebar { display: none; } /* shell chrome owns the titlebar */
 /* Suppress the folded session's own mode-picker row (COHOST/LEARN/BUILD/DEBRIEF).
  * In the standalone window it was the surface switcher; folded into the shell the
