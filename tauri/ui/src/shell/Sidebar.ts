@@ -27,9 +27,13 @@ export function createSidebar(store: ShellStore): HTMLElement {
 
   const brand = document.createElement("div");
   brand.className = "sb-brand";
+  // Two-tone lockup: "vibe" in ink, "mix" lit in brand rose. The split is
+  // cosmetic only — the syllables sit flush so the mark still reads as one
+  // lowercase word ("vibemix"), but the second syllable can carry the identity
+  // color the way the ear and the active nav glyph do.
   brand.innerHTML =
     '<span class="sb-ear" aria-hidden="true"></span>' +
-    '<span class="sb-wordmark">vibemix</span>';
+    '<span class="sb-wordmark"><span class="wm-vibe">vibe</span><span class="wm-mix">mix</span></span>';
 
   const nav = document.createElement("nav");
   nav.className = "sb-nav";

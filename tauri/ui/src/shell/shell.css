@@ -140,17 +140,24 @@
  * -> brand ear). */
 #shell-root[data-conn="reconnecting"] .sb-brand .sb-ear { animation: none; }
 .sb-brand .sb-wordmark {
-  /* The shell's single wordmark — matches the brand wordmark treatment
-   * (condensed Saira, uppercase, 700) used in the titlebar, not a lowercase
-   * one-off. Uppercase gets a touch of positive tracking (Tracking-by-Case). */
+  /* The shell's single persistent brand mark (the session titlebar is folded
+   * away, so this is THE trademark). Lowercase, not corporate caps — the young,
+   * friendlier read for a name with a heartbeat. Saira display, heavy and only
+   * lightly condensed so the lowercase lockup stays confident, not cramped, with
+   * the tiny negative tracking a tight modern wordmark wants. */
   font-family: var(--type-display);
-  font-variation-settings: "wdth" 85, "wght" 700;
-  font-size: 18px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-variation-settings: "wdth" 92, "wght" 700;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  text-transform: none;
   color: var(--text-primary);
   white-space: nowrap;
 }
+/* "vibe" is the feeling (ink); "mix" is the act, lit in the identity rose — the
+ * one decisive brand-color moment in the chrome, the same full --brand the ear
+ * and active glyph carry. Solid color per syllable, never a gradient (banned). */
+.sb-brand .wm-vibe { color: var(--text-primary); }
+.sb-brand .wm-mix { color: var(--brand); }
 
 .sb-nav {
   flex: 1 1 auto;
