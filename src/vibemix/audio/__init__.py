@@ -60,6 +60,7 @@ from vibemix.audio.features import (
     energy_curve,
     estimate_bpm,
     long_arc_curve,
+    pcm_to_wav,
     snapshot_features,
     snapshot_wav,
 )
@@ -127,6 +128,7 @@ __all__ = [
     "is_controller_device",
     "is_mic_device",
     "long_arc_curve",
+    "pcm_to_wav",
     "select_master_input",
     "snapshot_features",
     "snapshot_wav",

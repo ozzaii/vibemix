@@ -22,6 +22,7 @@ import pytest
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
 from vibemix.state.deck_poller import (
     DECK_CITE_MIN_CONF,
+    LAST_KNOWN_CONTEXT_CONF,
     XML_CONF_FLOOR,
     DeckPoller,
 )
@@ -96,6 +97,27 @@ class _FakeTrackInfo:
             "prev_title": "",
             "title_changed_at": 0.0,
             "client_bundle_id": self._client_bundle_id,
+        }
+
+
+class _MutableController:
+    def __init__(self, snap: dict):
+        self.snap = snap
+
+    def deck_snapshot(self) -> dict:
+        return self.snap
+
+
+class _MutableTrackInfo:
+    def __init__(self, title: str):
+        self.title = title
+
+    def snapshot(self) -> dict:
+        return {
+            "title": self.title,
+            "prev_title": "",
+            "title_changed_at": 0.0,
+            "client_bundle_id": "com.pioneerdj.rekordbox",
         }
 
 
@@ -266,9 +288,31 @@ def test_non_deck_nowplaying_source_does_not_resolve_deck_identity():
 
     assert p.snapshot() == {}
     status = p.source_snapshot()
+    assert status["library"] == "present"
+    assert status["library_tracks"] == "1"
+    assert status["library_source"] == "rekordbox_xml"
+    assert status["library_match"] == "not_attempted_non_deck_nowplaying"
     assert status["nowplaying"] == "blocked_non_deck_owner"
     assert status["nowplaying_owner"] == "com.apple.webkit.gpu"
     assert status["resolution"] == "blocked_non_deck_nowplaying"
+    assert status["screen_vision"] == "disabled"
+
+
+def test_controller_connection_status_distinguishes_disconnected_controller():
+    """`controller=present` means the reader is wired, not that hardware is live."""
+    p = DeckPoller(
+        library=_lib(_entry("1", "Strobe")),
+        controller=_FakeController(_ctrl_snap(connected=False)),
+        track_info=_FakeTrackInfo("Strobe"),
+    )
+
+    p.poll_once()
+
+    assert p.snapshot() == {}
+    status = p.source_snapshot()
+    assert status["controller"] == "present"
+    assert status["controller_connection"] == "disconnected"
+    assert status["resolution"] == "no_single_attributable_deck"
 
 
 def test_dj_nowplaying_source_can_resolve_deck_identity():
@@ -286,9 +330,12 @@ def test_dj_nowplaying_source_can_resolve_deck_identity():
 
     assert p.snapshot()["A"].track_id == "1"
     status = p.source_snapshot()
+    assert status["controller_connection"] == "connected"
     assert status["nowplaying"] == "deck_candidate"
+    assert status["library_match"] == "matched"
     assert status["resolution"] == "library_match"
     assert status["resolved_side"] == "A"
+    assert status["second_deck_source"] == "suppressed_requires_independent_source"
 
 
 def test_ambiguous_bare_title_abstains_but_artist_title_disambiguates():
@@ -312,6 +359,9 @@ def test_ambiguous_bare_title_abstains_but_artist_title_disambiguates():
 
     assert ambiguous.snapshot() == {}
     assert disambiguated.snapshot()["A"].track_id == "1"
+    assert ambiguous.source_snapshot()["library_match"] == "ambiguous_label"
+    assert ambiguous.source_snapshot()["resolution"] == "library_miss"
+    assert disambiguated.source_snapshot()["library_match"] == "matched"
 
 
 def test_nowplaying_filename_stem_resolves_folder_cache_row(tmp_path):
@@ -376,6 +426,36 @@ def test_suppressed_deck_never_borrows_audible_title():
         assert snap["B"].title != "Strobe"
 
 
+def test_previous_deck_identity_returns_as_last_known_context_not_proof():
+    """A previously resolved deck can ride as context, but never as citable proof."""
+    lib = _lib(
+        _entry("1", "Strobe", key="Am"),
+        _entry("2", "Signal", key="Em"),
+    )
+    controller = _MutableController(_ctrl_snap(vol_a=127, vol_b=0, xfader=0))
+    track_info = _MutableTrackInfo("Strobe")
+    p = DeckPoller(library=lib, controller=controller, track_info=track_info)
+
+    p.poll_once()
+    assert p.snapshot()["A"].track_id == "1"
+
+    controller.snap = _ctrl_snap(vol_a=0, vol_b=127, xfader=127)
+    track_info.title = "Signal"
+    p.poll_once()
+    snap = p.snapshot()
+
+    assert snap["B"].track_id == "2"
+    assert snap["B"].source == "rekordbox_xml"
+    assert snap["A"].track_id == "1"
+    assert snap["A"].source == "last_known"
+    assert snap["A"].confidence == pytest.approx(LAST_KNOWN_CONTEXT_CONF)
+    assert snap["A"].confidence < DECK_CITE_MIN_CONF
+    status = p.source_snapshot()
+    assert status["last_known_sides"] == "A"
+    assert status["last_known_rule"] == "context_only_not_current_identity_proof"
+    assert status["second_deck_source"] == "suppressed_requires_independent_source"
+
+
 # ---------------------------------------------------------------------- #
 # Graceful degradation — no exception escapes snapshot()                  #
 # ---------------------------------------------------------------------- #
@@ -421,6 +501,12 @@ def test_no_library_at_all_degrades_to_unknown():
     snap = p.snapshot()
     for dt in snap.values():
         assert dt.source != "rekordbox_xml"
+    status = p.source_snapshot()
+    assert status["library"] == "missing"
+    assert status["library_tracks"] == "0"
+    assert status["library_source"] == "none"
+    assert status["library_match"] == "library_missing"
+    assert status["resolution"] == "library_miss"
 
 
 # ---------------------------------------------------------------------- #

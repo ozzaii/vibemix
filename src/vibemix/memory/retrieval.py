@@ -26,19 +26,21 @@ Invariants (the milestone's anti-poisoning + off-path core):
       HEARTBEAT — the highest-frequency class), exactly one local CLAP query
       embed per gated event, cosine-only (NO time-decay blend — that is a
       KAAN-ACTION deferral, not v1), conservative top-K. MIX_MOVE is eligible
-      only when the caller has move + sound-change evidence, so knob/fader
-      history can be recalled without embedding every controller twitch. The
-      hard deadline (``RECALL_DEADLINE_S``) is enforced AGENT-side (Plan 65-04)
-      via ``asyncio.wait_for``; defined here as the shared default.
+      only when the caller has move + global or per-deck sound-change evidence,
+      so knob/fader history can be recalled without embedding every controller
+      twitch. The hard deadline (``RECALL_DEADLINE_S``) is enforced AGENT-side
+      (Plan 65-04) via ``asyncio.wait_for``; defined here as the shared default.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from typing import Protocol
 
 from vibemix.memory.store import MemoryStore, Record
+from vibemix.state.deck_context import normalize_audio_window_context_text
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,17 @@ RECALL_DEADLINE_S = 0.5
 # no live state object.
 RECALL_EVENT_GATE: frozenset[str] = frozenset(
     {"TRACK_CHANGE", "PHASE", "LAYER_ARRIVAL", "MIX_MOVE"}
+)
+_UNTRUSTED_AUDIO_WINDOW = "omitted_untrusted_audio_window"
+_AUDIO_WINDOW_DECK_A_RE = re.compile(r"\bdeckA_audio=(P[2-9][0-9]?)\b")
+_AUDIO_WINDOW_DECK_B_RE = re.compile(r"\bdeckB_audio=(P[2-9][0-9]?)\b")
+_AUDIO_WINDOW_FORBIDDEN_ATOMS = (
+    "deckA_audio=attached",
+    "deckB_audio=attached",
+    "deckA_audio=stem",
+    "deckB_audio=stem",
+    "per_deck_audio=attached",
+    "isolated_decks=true",
 )
 
 
@@ -131,14 +144,26 @@ def build_recall_query(ev) -> str:
         ("deck_ref", "deck_reference_context"),
         ("deck_source", "deck_source_context"),
         ("deck_audio", "deck_audio_context"),
+        ("deck_audio_separation", "deck_audio_separation_context"),
+        ("deck_audio_features", "deck_audio_features_context"),
+        ("deck_audio_delta", "deck_audio_delta_context"),
+        ("deck_audio_window", "deck_audio_window_context"),
         ("audio_window", "audio_window_context"),
         ("live_evidence", "live_evidence_context"),
         ("move", "move_context"),
         ("move_effect", "move_effect_context"),
         ("audio_delta", "audio_delta"),
     ):
-        cap = 420 if field == "context_feed" else 240
-        rendered = _query_field(extra.get(key), cap=cap)
+        if field == "context_feed":
+            cap = 420
+        elif field == "live_evidence":
+            cap = 640
+        else:
+            cap = 240
+        if key == "audio_window_context":
+            rendered = _query_audio_window_field(extra.get(key), cap=cap)
+        else:
+            rendered = _query_field(extra.get(key), cap=cap)
         if rendered != "none":
             pieces.append(f"{field}={rendered}")
     if not pieces:
@@ -152,8 +177,9 @@ def should_recall_event(ev) -> bool:
     This is the cheap caller-side cost gate. Track/phase/layer events are
     already sparse enough. MIX_MOVE can be noisy, so it only passes when the
     event carries a concrete controller move and the state/extra payload carries
-    at least one audio delta. That is the grounded "knob/fader -> sound changed"
-    condition the historical memory is meant to learn.
+    global or per-deck audio delta evidence. That is the grounded
+    "knob/fader -> sound changed" condition the historical memory is meant to
+    learn.
     """
     etype = getattr(ev, "type", None)
     if etype not in RECALL_EVENT_GATE:
@@ -166,12 +192,38 @@ def should_recall_event(ev) -> bool:
     if not isinstance(moves, (list, tuple)) or not any(str(item).strip() for item in moves):
         return False
 
-    audio_delta = None
+    return _has_sound_change_evidence(ev)
+
+
+def _has_sound_change_evidence(ev) -> bool:
+    extra = getattr(ev, "extra", None)
     if isinstance(extra, dict):
-        audio_delta = extra.get("audio_delta")
-    if not audio_delta:
-        audio_delta = getattr(getattr(ev, "state", None), "audio_delta", None)
-    return isinstance(audio_delta, (list, tuple)) and any(str(item).strip() for item in audio_delta)
+        if _has_evidence_value(extra.get("audio_delta")):
+            return True
+        if _has_evidence_value(extra.get("deck_audio_delta_context")):
+            return True
+        if _has_evidence_value(extra.get("deck_audio_window_context")):
+            return True
+        capture = extra.get("audio_capture_context")
+        if isinstance(capture, dict) and (
+            _has_evidence_value(capture.get("deck_audio_deltas"))
+            or _has_evidence_value(capture.get("deck_audio_delta_context"))
+            or _has_evidence_value(capture.get("deck_audio_windows"))
+            or _has_evidence_value(capture.get("deck_audio_window_context"))
+        ):
+            return True
+    return _has_evidence_value(getattr(getattr(ev, "state", None), "audio_delta", None))
+
+
+def _has_evidence_value(value: object) -> bool:
+    if value is None or isinstance(value, bool):
+        return False
+    if isinstance(value, dict):
+        return any(_has_evidence_value(item) for item in value.values())
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return any(_has_evidence_value(item) for item in value)
+    text = str(value).strip()
+    return bool(text) and text.lower() not in {"none", "null", "[]", "{}"}
 
 
 def _query_field(value: object, *, cap: int = 240) -> str:
@@ -181,6 +233,30 @@ def _query_field(value: object, *, cap: int = 240) -> str:
         raw = str(value) if value else ""
     raw = " ".join(raw.split()).replace("|", "/")
     return raw[:cap] if raw else "none"
+
+
+def _query_audio_window_field(value: object, *, cap: int = 240) -> str:
+    rendered = _query_field(value, cap=900)
+    if rendered == "none":
+        return "none"
+    trusted = normalize_audio_window_context_text(rendered, max_len=900)
+    if trusted:
+        return _query_field(trusted, cap=cap)
+    if _audio_window_context_is_untrusted(rendered):
+        return _UNTRUSTED_AUDIO_WINDOW
+    return _query_field(rendered, cap=cap)
+
+
+def _audio_window_context_is_untrusted(text: str) -> bool:
+    if "audio_window_context[" not in text:
+        return False
+    if any(atom in text for atom in _AUDIO_WINDOW_FORBIDDEN_ATOMS):
+        return True
+    deck_a = _AUDIO_WINDOW_DECK_A_RE.search(text)
+    deck_b = _AUDIO_WINDOW_DECK_B_RE.search(text)
+    if deck_a or deck_b:
+        return not (deck_a and deck_b) or deck_a.group(1) == deck_b.group(1)
+    return "per_deck_audio=deck_pair_parts" in text
 
 
 class MemoryRecall:

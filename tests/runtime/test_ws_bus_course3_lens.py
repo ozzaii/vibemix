@@ -94,6 +94,21 @@ def test_course3_lens_clamps_bad_confidence_and_bad_boundary() -> None:
     }
 
 
+def test_course3_lens_waiting_audio_action_does_not_invent_route_details() -> None:
+    state = MusicState(session_active=True)
+    state.audible = False
+    state.rms = 0.0
+
+    lens = _serialize_course3_lens(state)
+
+    action = lens["operator_action"]
+    assert action["prompt"] == "Press play on deck."
+    action_text = " ".join([action["prompt"], *action["steps"]])
+    assert "BlackHole" not in action_text
+    assert "DDJ-FLX4" not in action_text
+    assert "selected by readiness" in action["steps"][0]
+
+
 def test_course3_lens_explains_audible_audio_without_deck_attribution() -> None:
     state = MusicState()
     state.audible = True

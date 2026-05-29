@@ -180,6 +180,38 @@ def test_mix_move_recall_requires_move_and_audio_delta() -> None:
     )
     assert should_recall_event(no_delta) is False
 
+    deck_delta = SimpleNamespace(
+        type="MIX_MOVE",
+        state=state,
+        extra={
+            "moves": ["A_low: flat→killed"],
+            "audio_capture_context": {
+                "deck_audio_deltas": {
+                    "A": ["rms_rose_100pct_strong"],
+                    "B": [],
+                }
+            },
+        },
+    )
+    assert should_recall_event(deck_delta) is True
+
+    deck_window = SimpleNamespace(
+        type="MIX_MOVE",
+        state=state,
+        extra={
+            "moves": ["A_low: flat→killed"],
+            "audio_capture_context": {
+                "deck_audio_windows": {
+                    "A": {
+                        "pre": {"activity": "active", "rms": 0.02},
+                        "current": {"activity": "active", "rms": 0.04},
+                    }
+                }
+            },
+        },
+    )
+    assert should_recall_event(deck_window) is True
+
     state.audio_delta = ["low energy fell 50% (strong)"]
     hot = SimpleNamespace(
         type="MIX_MOVE",
@@ -222,6 +254,23 @@ def test_recall_query_includes_live_move_context_when_supplied() -> None:
                 "unresolved=B second_deck=independent_source_required]"
             ),
             "deck_audio_context": "deck_audio_context[source=global_mix support=single_deck_A]",
+            "deck_audio_separation_context": (
+                "deck_audio_separation_context[mode=deck_pair_capture_configured "
+                "deckA_audio=captured deckB_audio=captured]"
+            ),
+            "deck_audio_features_context": (
+                "deck_audio_features_context[A_activity=active A_rms=0.020 "
+                "B_activity=silent B_rms=0.000 rule=deck_audio_features_not_outcome_verdict]"
+            ),
+            "deck_audio_delta_context": (
+                "deck_audio_delta_context[A_delta=rms_rose_100pct_strong "
+                "B_delta=rms_fell_50pct_strong rule=deck_audio_delta_not_causal_proof]"
+            ),
+            "deck_audio_window_context": (
+                "deck_audio_window_context[source=deck_pair_capture timeline=pre_action_current "
+                "per_deck_audio=captured_window_features A_current=active_rms_0.040 "
+                "rule=deck_audio_window_not_causal_or_quality_verdict]"
+            ),
             "audio_window_context": (
                 "audio_window_context[P1=master_global_mix P1_heard=true "
                 "timeline=past_action_future action=-1.0..0.0 "
@@ -251,6 +300,26 @@ def test_recall_query_includes_live_move_context_when_supplied() -> None:
         "unresolved=B second_deck=independent_source_required]" in query
     )
     assert "deck_audio=deck_audio_context[source=global_mix support=single_deck_A]" in query
+    assert (
+        "deck_audio_separation=deck_audio_separation_context["
+        "mode=deck_pair_capture_configured deckA_audio=captured deckB_audio=captured]"
+        in query
+    )
+    assert (
+        "deck_audio_features=deck_audio_features_context[A_activity=active A_rms=0.020 "
+        "B_activity=silent B_rms=0.000 rule=deck_audio_features_not_outcome_verdict]"
+        in query
+    )
+    assert (
+        "deck_audio_delta=deck_audio_delta_context[A_delta=rms_rose_100pct_strong "
+        "B_delta=rms_fell_50pct_strong rule=deck_audio_delta_not_causal_proof]" in query
+    )
+    assert (
+        "deck_audio_window=deck_audio_window_context[source=deck_pair_capture "
+        "timeline=pre_action_current per_deck_audio=captured_window_features "
+        "A_current=active_rms_0.040 "
+        "rule=deck_audio_window_not_causal_or_quality_verdict]" in query
+    )
     assert "audio_window=audio_window_context[P1=master_global_mix P1_heard=true" in query
     assert "timeline=past_action_future" in query
     assert "action=-1.0..0.0" in query
@@ -260,6 +329,33 @@ def test_recall_query_includes_live_move_context_when_supplied() -> None:
     assert "move=move_context[scope=single_deck_move_A]" in query
     assert "move_effect=move_effect_context[rule=dsp_delta_not_causal_proof]" in query
     assert "audio_delta=low energy fell 50% (strong)" in query
+
+
+def test_recall_query_omits_conflicting_deck_pair_audio_window_context() -> None:
+    ev = SimpleNamespace(
+        type="MIX_MOVE",
+        state=SimpleNamespace(
+            audible_track="Strobe",
+            phase="groove",
+            audible_deck="A",
+        ),
+        extra={
+            "moves": ["A_low: flat->killed"],
+            "audio_window_context": (
+                "audio_window_context[P1=master_global_mix P1_heard=true "
+                "timeline=past_action_future deckA_audio=P2 deckB_audio=P2 "
+                "per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts "
+                "deck_separation=deck_lanes_context lane_aliases=deck1:A,deck2:B "
+                "action=-1.0..0.0 rule=time_alignment_not_outcome_verdict]"
+            ),
+        },
+    )
+
+    query = build_recall_query(ev)
+
+    assert "audio_window=omitted_untrusted_audio_window" in query
+    assert "deckA_audio=P2" not in query
+    assert "deckB_audio=P2" not in query
 
 
 # ---------------------------------------------------------------------------

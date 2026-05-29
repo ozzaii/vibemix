@@ -49,6 +49,9 @@ from typing import Any
 
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.state.deck_context import (
+    DECK_CONTEXT_TRUSTED_SOURCES as _SHARED_DECK_CONTEXT_TRUSTED_SOURCES,
+)
+from vibemix.state.deck_context import (
     LIVE_CANDIDATE_HELD_REPLY as _SHARED_LIVE_CANDIDATE_HELD_REPLY,
 )
 from vibemix.state.deck_context import (
@@ -82,7 +85,16 @@ from vibemix.state.deck_context import (
     normalize_deck_audio_context_text as _shared_normalize_deck_audio_context_text,
 )
 from vibemix.state.deck_context import (
+    normalize_deck_audio_delta_context_text as _shared_normalize_deck_audio_delta_context,
+)
+from vibemix.state.deck_context import (
+    normalize_deck_audio_features_context_text as _shared_normalize_deck_audio_features_context,
+)
+from vibemix.state.deck_context import (
     normalize_deck_audio_separation_context_text as _shared_normalize_deck_audio_separation,
+)
+from vibemix.state.deck_context import (
+    normalize_deck_audio_window_context_text as _shared_normalize_deck_audio_window_context,
 )
 from vibemix.state.deck_context import (
     normalize_deck_lanes_context_text as _shared_normalize_deck_lanes_context_text,
@@ -106,7 +118,16 @@ from vibemix.state.deck_context import (
     render_deck_audio_context as _shared_render_deck_audio_context,
 )
 from vibemix.state.deck_context import (
+    render_deck_audio_delta_context as _shared_render_deck_audio_delta_context,
+)
+from vibemix.state.deck_context import (
+    render_deck_audio_features_context as _shared_render_deck_audio_features_context,
+)
+from vibemix.state.deck_context import (
     render_deck_audio_separation_context as _shared_render_deck_audio_separation,
+)
+from vibemix.state.deck_context import (
+    render_deck_audio_window_context as _shared_render_deck_audio_window_context,
 )
 from vibemix.state.deck_context import (
     render_deck_change_context as _shared_render_deck_change_context,
@@ -136,7 +157,6 @@ from vibemix.state.deck_context import (
     sanitize_historical_move_signature_for_prompt as _shared_sanitize_history_signature,
 )
 from vibemix.state.deck_state import DeckState, DeckTrack
-from vibemix.state.music_state import MusicState
 
 logger = logging.getLogger(__name__)
 
@@ -1315,7 +1335,11 @@ _CHAT_RULES_BLOCK = (
     "If you call create_playlist, "
     "copy its returned {name, track_ids, m3u_path, json_path, dropped_ids} into "
     "playlist; otherwise playlist=null. If you call export_set, copy its "
-    "returned path into export_path; otherwise export_path=null."
+    "returned path into export_path; otherwise export_path=null.\n"
+    "7. If a live/deck/move answer has weak evidence, do not confess, apologize, "
+    "self-correct, or expose guard/proof/debug language. Use calm product "
+    "language about the grounded move or sound note, and keep the internal "
+    "reasons in tool_trace / live_verification only."
 )
 
 
@@ -1331,8 +1355,8 @@ _LIVE_DECK_SIDES = ("A", "B", "C", "D")
 _LIVE_MOVE_RE = re.compile(r"\b([ABCD])_(?:low|mid|hi|filter|volume|play)")
 _LIVE_RECENT_MOVE_CAP = 6
 _LIVE_AUDIO_DELTA_CAP = 4
-_LIVE_EVIDENCE_CAP = 8
-_LIVE_EVIDENCE_REFS_CAP = 9
+_LIVE_EVIDENCE_CAP = 10
+_LIVE_EVIDENCE_REFS_CAP = 14
 _LIVE_MIDI_EVIDENCE_CAP = 4
 _LIVE_HISTORY_CAP = 3
 _LIVE_HISTORY_SCAN_LIMIT = 80
@@ -1341,23 +1365,25 @@ _CHAT_HISTORY_TEXT_CAP = 500
 _LIVE_EVIDENCE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_:.=@+-]{1,128}$")
 _LIVE_SOURCE_STATUS_KEYS: tuple[str, ...] = (
     "controller",
+    "controller_connection",
+    "library",
+    "library_tracks",
+    "library_source",
+    "library_match",
     "nowplaying",
     "nowplaying_owner",
     "nowplaying_title",
     "audible_deck",
     "resolution",
     "resolved_side",
+    "second_deck_source",
+    "screen_vision",
+    "last_known_sides",
+    "last_known_rule",
 )
-_LIVE_DECK_SOURCES: frozenset[str] = frozenset(
-    {
-        "rekordbox_xml",
-        "folder_cache",
-        "screen_vision",
-        "numpy_key",
-        "nowplaying",
-        "live_context",
-        "unknown",
-    }
+_LIVE_TRUSTED_DECK_SOURCES: frozenset[str] = _SHARED_DECK_CONTEXT_TRUSTED_SOURCES
+_LIVE_DECK_SOURCES: frozenset[str] = _LIVE_TRUSTED_DECK_SOURCES | frozenset(
+    {"last_known", "live_context", "unknown"}
 )
 _LIVE_CONTEXT_CAP = 16
 _LIVE_CONTEXT_SCHEMA_VERSION = 2
@@ -1365,6 +1391,9 @@ _LIVE_CONTEXT_REQUIRED_CAPABILITIES: frozenset[str] = frozenset(
     {
         "audio_part_context",
         "deck_audio_separation_context",
+        "deck_audio_features_context",
+        "deck_audio_delta_context",
+        "deck_audio_window_context",
         "deck_source_status",
         "audio_window_map",
         "audio_delta",
@@ -1412,9 +1441,50 @@ _LIVE_CONTEXT_CORRECTION_REPLY_RE = re.compile(
     r"transition verdict is held|quality grade is held|"
     r"cause or quality verdict is held|"
     r"hold the transition verdict|hold the quality grade|"
-    r"hold the cause/quality verdict"
+    r"hold the cause/quality verdict|"
+    r"tracking that as a live mix moment|tracking that as a live move|"
+    r"i only have audible deck mix|cleaner two-deck read|"
+    r"live read is stronger|live read is still locking"
     r")\b",
     re.IGNORECASE,
+)
+_LIVE_CONTEXT_PUBLIC_DIAGNOSTIC_REPLY_RE = re.compile(
+    r"\b("
+    r"i need to correct (?:the|that) live read|resolved decks=|"
+    r"live evidence gate:|transition_block=|transition_watch=|"
+    r"second_deck_identity=|deck_lanes=|deck_reference=|deck_source=|"
+    r"claim_policy=|proof_not_ready|missing_physical_proof|"
+    r"unsupported_live_outcome_claim|move_grades_without_live_proof|"
+    r"guard_violations|live_verification|tool_trace|"
+    r"source_status_rule=|rule=unresolved_deck_is_not_transition_evidence|"
+    r"rule=deck1_deck2_reference_not_outcome|"
+    r"rule=per_lane_identity_route_control_not_outcome|"
+    r"my bad(?: on| with)? (?:the )?live|"
+    r"my mistake(?: on| with)? (?:the )?live|"
+    r"bad read on my part|"
+    r"i (?:gave|fed) you (?:a )?(?:bad|wrong) (?:live )?read|"
+    r"i (?:messed|screwed) up(?: on| with)? (?:the )?live|"
+    r"i (?:was|am|'m) wrong(?: about| on| with)? (?:the )?live|"
+    r"i (?:made|am making|made a) mistake(?: in| with| on)? (?:the )?live|"
+    r"i (?:got|read) (?:that|this) wrong(?: from| in)? (?:the )?live|"
+    r"i hallucinated (?:the )?live|"
+    r"i (?:should(?:n't| not) have|should not have) (?:called|claimed|said)|"
+    r"i (?:overclaimed|over-claimed|falsely claimed)|"
+    r"i(?:'m| am| was) (?:being )?(?:stupid|dumb|confused)(?: about| on| with)? "
+    r"(?:the )?live|"
+    r"i(?:'m| am| was) (?:doing|saying) (?:something )?(?:stupid|dumb|stupidity)"
+    r"(?: about| on| with)? (?:the )?live|"
+    r"(?:that|this) was (?:stupid|dumb) (?:on|from) (?:the )?live|"
+    r"i only have audible deck mix|live read is still locking|"
+    r"i(?:'m| am) not sure(?: yet)? (?:what happened|from this live read|"
+    r"from the live read|about the live read|on the live read)|"
+    r"i (?:can't|cannot) tell(?: yet)? (?:what happened|from this live read|"
+    r"from the live read)"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIVE_GROUNDED_PUBLIC_REPLY = (
+    "The live read is grounded now. I can score it from the locked deck context."
 )
 
 
@@ -1497,7 +1567,13 @@ def _live_context_use_instruction(
 
 
 def _looks_like_unprompted_live_correction(reply: str) -> bool:
-    return bool(reply and _LIVE_CONTEXT_CORRECTION_REPLY_RE.search(reply))
+    return bool(
+        reply
+        and (
+            _LIVE_CONTEXT_CORRECTION_REPLY_RE.search(reply)
+            or _LIVE_CONTEXT_PUBLIC_DIAGNOSTIC_REPLY_RE.search(reply)
+        )
+    )
 
 
 def _clean_live_text(raw: Any, *, max_len: int = 96) -> str | None:
@@ -1543,15 +1619,23 @@ def _live_evidence_priority(token: str) -> int:
         return 5
     if "second_deck_identity=" in token:
         return 6
-    if "move_scope=" in token:
+    if "deck_audio_capture=" in token:
         return 7
-    if "move_effect=" in token or "audio_delta=" in token:
+    if "deck_audio_features=" in token:
         return 8
-    if "deck_audio_support=" in token:
+    if "deck_audio_delta=" in token:
         return 9
-    if "deck_route=" in token:
+    if "deck_audio_window=" in token:
         return 10
-    return 11
+    if "move_scope=" in token:
+        return 11
+    if "move_effect=" in token or "audio_delta=" in token:
+        return 12
+    if "deck_audio_support=" in token:
+        return 13
+    if "deck_route=" in token:
+        return 14
+    return 15
 
 
 def _clean_live_evidence_list(raw: Any, *, cap: int = _LIVE_EVIDENCE_CAP) -> list[str]:
@@ -1753,6 +1837,14 @@ def _live_span_pair(raw: Any) -> list[float] | None:
     return [round(a, 1), round(b, 1)]
 
 
+def _live_audio_part_label(raw: Any) -> str | None:
+    label = _clean_live_text(raw, max_len=8)
+    if not label:
+        return None
+    label = label.upper()
+    return label if re.fullmatch(r"P[2-9][0-9]?", label) else None
+
+
 def _live_context_capabilities(raw: Any) -> list[str]:
     if not isinstance(raw, list):
         return []
@@ -1772,22 +1864,59 @@ def _live_context_capabilities(raw: Any) -> list[str]:
 def _live_audio_window_map(raw: Any) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
-    required = {
+    common_required = {
         "p1": "master_global_mix",
         "p1_heard": True,
         "timeline": "past_action_future",
         "together_audio": "P1_global_mix",
         "decks_together": True,
-        "deckA_audio": "not_attached",
-        "deckB_audio": "not_attached",
-        "per_deck_audio": "structured_text_only",
-        "duplicate_audio": "same_master_not_deck_split",
         "deck_separation": "deck_lanes_context",
         "lane_aliases": "deck1:A,deck2:B",
         "rule": "time_alignment_not_outcome_verdict",
     }
-    if any(raw.get(key) != expected for key, expected in required.items()):
+    if any(raw.get(key) != expected for key, expected in common_required.items()):
         return None
+
+    deck_a = raw.get("deckA_audio")
+    deck_b = raw.get("deckB_audio")
+    per_deck_audio = raw.get("per_deck_audio")
+    duplicate_audio = raw.get("duplicate_audio")
+    deck_audio_separation: str | None = None
+    deck_part_span_s: list[float] | None = None
+    deck_part_activity: dict[str, str] = {}
+    if (
+        deck_a == "not_attached"
+        and deck_b == "not_attached"
+        and per_deck_audio == "structured_text_only"
+        and duplicate_audio == "same_master_not_deck_split"
+        and raw.get("deck_audio_separation") in {None, "not_attached"}
+    ):
+        deck_a_out = "not_attached"
+        deck_b_out = "not_attached"
+        deck_audio_separation = "not_attached"
+    else:
+        deck_a_label = _live_audio_part_label(deck_a)
+        deck_b_label = _live_audio_part_label(deck_b)
+        if not (
+            deck_a_label
+            and deck_b_label
+            and deck_a_label != deck_b_label
+            and per_deck_audio == "deck_pair_parts"
+            and duplicate_audio == "separate_deck_pair_parts"
+            and raw.get("deck_audio_separation") == "deck_audio_separation_context"
+        ):
+            return None
+        deck_a_out = deck_a_label
+        deck_b_out = deck_b_label
+        deck_audio_separation = "deck_audio_separation_context"
+        deck_part_span_s = _live_span_pair(raw.get("deck_part_span_s"))
+        raw_activity = raw.get("deck_part_activity")
+        if isinstance(raw_activity, dict):
+            for side in ("A", "B"):
+                value = _clean_live_evidence_token(raw_activity.get(side), max_len=16)
+                if value in {"active", "silent"}:
+                    deck_part_activity[side] = value
+
     pre_s = _live_span_pair(raw.get("pre_s"))
     current_s = _live_span_pair(raw.get("current_s"))
     action_s = _live_span_pair(raw.get("action_s"))
@@ -1816,8 +1945,13 @@ def _live_audio_window_map(raw: Any) -> dict[str, Any] | None:
     future = future_raw if isinstance(future_raw, dict) else {}
     if future.get("heard") is not False:
         return None
-    return {
-        **required,
+    out = {
+        **common_required,
+        "deckA_audio": deck_a_out,
+        "deckB_audio": deck_b_out,
+        "per_deck_audio": per_deck_audio,
+        "duplicate_audio": duplicate_audio,
+        "deck_audio_separation": deck_audio_separation,
         "pre_s": pre_s,
         "current_s": current_s,
         "action_s": action_s,
@@ -1828,6 +1962,80 @@ def _live_audio_window_map(raw: Any) -> dict[str, Any] | None:
             if key in {"heard", "span", "part", "source", "span_s", "rule"}
         },
     }
+    if deck_part_span_s is not None:
+        out["deck_part_span_s"] = deck_part_span_s
+    if deck_part_activity:
+        out["deck_part_activity"] = deck_part_activity
+    return out
+
+
+def _audio_part_deck_labels_for_viber(audio_part_context: str | None) -> dict[str, str]:
+    if not audio_part_context or "per_deck_audio=deck_pair_parts" not in audio_part_context:
+        return {}
+    labels: dict[str, str] = {}
+    for side in ("A", "B"):
+        match = re.search(rf"\bdeck{side}_part=(P[2-9][0-9]?)\b", audio_part_context)
+        if not match:
+            return {}
+        labels[side] = match.group(1)
+    return labels if labels.get("A") != labels.get("B") else {}
+
+
+def _audio_part_deck_activity_for_viber(
+    audio_part_context: str | None,
+    deck_labels: dict[str, str],
+) -> dict[str, str]:
+    if not audio_part_context or set(deck_labels) != {"A", "B"}:
+        return {}
+    activity: dict[str, str] = {}
+    for side, label in deck_labels.items():
+        match = re.search(
+            rf"\b{re.escape(label)}_activity=deck{side}_(active|silent)\b",
+            audio_part_context,
+        )
+        if match:
+            activity[side] = match.group(1)
+    return activity
+
+
+def _audio_window_context_deck_labels_for_viber(audio_window_context: str | None) -> dict[str, str]:
+    if not audio_window_context or "per_deck_audio=deck_pair_parts" not in audio_window_context:
+        return {}
+    labels: dict[str, str] = {}
+    for side in ("A", "B"):
+        match = re.search(rf"\bdeck{side}_audio=(P[2-9][0-9]?)\b", audio_window_context)
+        if not match:
+            return {}
+        labels[side] = match.group(1)
+    return labels if labels.get("A") != labels.get("B") else {}
+
+
+def _audio_window_matches_audio_parts_for_viber(
+    audio_window_context: str | None,
+    deck_labels: dict[str, str],
+) -> bool:
+    window_labels = _audio_window_context_deck_labels_for_viber(audio_window_context)
+    if deck_labels:
+        return window_labels == deck_labels
+    return not window_labels
+
+
+def _audio_window_map_matches_audio_parts_for_viber(
+    audio_window_map: dict[str, Any] | None,
+    deck_labels: dict[str, str],
+) -> bool:
+    if not audio_window_map or audio_window_map.get("per_deck_audio") != "deck_pair_parts":
+        return not deck_labels
+    map_labels = {
+        "A": str(audio_window_map.get("deckA_audio") or ""),
+        "B": str(audio_window_map.get("deckB_audio") or ""),
+    }
+    return bool(
+        deck_labels
+        and map_labels == deck_labels
+        and map_labels["A"] != map_labels["B"]
+        and all(_live_audio_part_label(label) for label in map_labels.values())
+    )
 
 
 def normalize_live_source_status_for_viber(raw: Any) -> dict[str, str] | None:
@@ -1863,11 +2071,17 @@ def _render_audio_window_map_line(audio_map: Any) -> str | None:
             future_text = f"{future.get('part')}:{float(span[0]):.1f}..+{float(span[1]):.1f}"
         except (TypeError, ValueError):
             future_text = str(future.get("part"))[:24]
+    deck_a_audio = _clean_live_evidence_token(audio_map.get("deckA_audio"), max_len=24)
+    deck_b_audio = _clean_live_evidence_token(audio_map.get("deckB_audio"), max_len=24)
+    per_deck_audio = _clean_live_evidence_token(audio_map.get("per_deck_audio"), max_len=32)
+    duplicate_audio = _clean_live_evidence_token(audio_map.get("duplicate_audio"), max_len=48)
+    if not (deck_a_audio and deck_b_audio and per_deck_audio and duplicate_audio):
+        return None
     return (
         "audio_window_map[P1=master_global_mix heard=true old=pre_s "
         f"current=current_s action=action_s future={future_text} "
-        "deckA_audio=not_attached deckB_audio=not_attached "
-        "duplicate_audio=same_master_not_deck_split anchors="
+        f"deckA_audio={deck_a_audio} deckB_audio={deck_b_audio} "
+        f"per_deck_audio={per_deck_audio} duplicate_audio={duplicate_audio} anchors="
         + (",".join(anchors) if anchors else "none")
         + " rule=time_alignment_not_outcome_verdict]"
     )
@@ -1957,17 +2171,46 @@ def _normalize_live_context(raw: Any) -> dict[str, Any] | None:
     if deck_audio_separation_context:
         out["deck_audio_separation_context"] = deck_audio_separation_context
 
+    deck_audio_features_context = _shared_normalize_deck_audio_features_context(
+        raw.get("deck_audio_features_context")
+    )
+    if deck_audio_features_context:
+        out["deck_audio_features_context"] = deck_audio_features_context
+
+    deck_audio_delta_context = _shared_normalize_deck_audio_delta_context(
+        raw.get("deck_audio_delta_context")
+    )
+    if deck_audio_delta_context:
+        out["deck_audio_delta_context"] = deck_audio_delta_context
+
+    deck_audio_window_context = _shared_normalize_deck_audio_window_context(
+        raw.get("deck_audio_window_context")
+    )
+    if deck_audio_window_context:
+        out["deck_audio_window_context"] = deck_audio_window_context
+
     audio_part_context = _shared_normalize_audio_part_context_text(raw.get("audio_part_context"))
     if audio_part_context:
         out["audio_part_context"] = audio_part_context
+    deck_part_labels = _audio_part_deck_labels_for_viber(audio_part_context)
 
     audio_window_context = _shared_normalize_audio_window_context_text(
         raw.get("audio_window_context")
     )
+    if audio_window_context and not _audio_window_matches_audio_parts_for_viber(
+        audio_window_context,
+        deck_part_labels,
+    ):
+        audio_window_context = None
     if audio_window_context:
         out["audio_window_context"] = audio_window_context
 
     audio_window_map = _live_audio_window_map(raw.get("audio_window_map"))
+    if audio_window_map and not _audio_window_map_matches_audio_parts_for_viber(
+        audio_window_map,
+        deck_part_labels,
+    ):
+        audio_window_map = None
     if audio_window_map:
         out["audio_window_map"] = audio_window_map
 
@@ -2004,8 +2247,13 @@ def normalize_live_context_for_viber(live_context: dict[str, Any] | None) -> dic
     return dict(normalized) if normalized else None
 
 
-def _music_state_from_live_context(context: dict[str, Any]) -> MusicState:
+def _music_state_from_live_context(context: dict[str, Any]) -> "MusicState":
     """Adapt Viber's raw live-context dict into the shared deck guard model."""
+    # Import locally so the curator module never leaks MusicState as a top-level
+    # attribute — the curate/Viber boundary stays decoupled from runtime state
+    # (test_curate_unify::test_curator_does_not_import_musicstate).
+    from vibemix.state.music_state import MusicState
+
     state = MusicState()
     deck = _clean_live_text(context.get("deck"), max_len=16)
     state.audible_deck = deck or "none"
@@ -2298,12 +2546,99 @@ def _policy_from_transition_context(*contexts: str | None) -> str:
 
 
 def _strongest_live_policy(*policies: str | None) -> str:
-    ordered = ("blocked", "watch_not_claim", "candidate_not_verdict")
     policy_set = {policy for policy in policies if policy}
-    for policy in ordered:
+    for policy in ("blocked", "watch_not_claim"):
         if policy in policy_set:
             return policy
+    if "supported_verdict" in policy_set:
+        return "supported_verdict"
+    if "candidate_not_verdict" in policy_set:
+        return "candidate_not_verdict"
     return "requires_more_evidence"
+
+
+def _live_evidence_tokens(context: dict[str, Any]) -> list[str]:
+    evidence = context.get("live_evidence")
+    if not isinstance(evidence, dict):
+        return []
+    out: list[str] = []
+    for key in ("mix", "refs"):
+        values = evidence.get(key)
+        if not isinstance(values, list):
+            continue
+        out.extend(str(item) for item in values if item)
+    return out
+
+
+def _live_context_has_trusted_deck_pair(context: dict[str, Any]) -> bool:
+    rows = context.get("deck_state")
+    if not isinstance(rows, dict):
+        return False
+    for side in ("A", "B"):
+        row = rows.get(side)
+        if not isinstance(row, dict):
+            return False
+        confidence = _clean_live_float(row.get("confidence")) or 0.0
+        if confidence < _LIVE_CONTEXT_MIN_CONF:
+            return False
+        if not _clean_live_text(row.get("track_id")):
+            return False
+        if row.get("source") not in _LIVE_TRUSTED_DECK_SOURCES:
+            return False
+    return True
+
+
+def _live_context_has_consistent_deck_pair_audio_parts(context: dict[str, Any]) -> bool:
+    audio_part_context = (
+        context.get("audio_part_context")
+        if isinstance(context.get("audio_part_context"), str)
+        else None
+    )
+    deck_labels = _audio_part_deck_labels_for_viber(audio_part_context)
+    if set(deck_labels) != {"A", "B"}:
+        return False
+    audio_window_context = (
+        context.get("audio_window_context")
+        if isinstance(context.get("audio_window_context"), str)
+        else None
+    )
+    if not _audio_window_matches_audio_parts_for_viber(audio_window_context, deck_labels):
+        return False
+    audio_window_map = context.get("audio_window_map")
+    if not isinstance(audio_window_map, dict):
+        return False
+    return _audio_window_map_matches_audio_parts_for_viber(audio_window_map, deck_labels)
+
+
+def _live_evidence_supports_verdict(context: dict[str, Any]) -> bool:
+    tokens = _live_evidence_tokens(context)
+    if not tokens or not _live_context_recent_moves(context):
+        return False
+    if not _live_context_has_trusted_deck_pair(context):
+        return False
+    required_packets = (
+        "deck_audio_separation_context",
+        "deck_audio_features_context",
+        "deck_audio_delta_context",
+        "deck_audio_window_context",
+        "audio_part_context",
+        "audio_window_context",
+        "audio_window_map",
+    )
+    if not all(context.get(packet) for packet in required_packets):
+        return False
+    if not _live_context_has_consistent_deck_pair_audio_parts(context):
+        return False
+    text = " ".join(tokens)
+    return (
+        "transition_candidate=" in text
+        and "deck_audio_capture=A_active+B_active" in text
+        and "deck_audio_features=" in text
+        and "A_active" in text
+        and "B_active" in text
+        and "deck_audio_delta=" in text
+        and "deck_audio_window=" in text
+    )
 
 
 def _live_policy_strength(policy: str | None) -> int:
@@ -2311,10 +2646,13 @@ def _live_policy_strength(policy: str | None) -> int:
         "blocked": 3,
         "watch_not_claim": 2,
         "candidate_not_verdict": 1,
+        "supported_verdict": 0,
     }.get(policy or "", 0)
 
 
 def _live_evidence_policy(context: dict[str, Any]) -> str:
+    if _live_evidence_supports_verdict(context):
+        return "supported_verdict"
     return _policy_from_transition_context(_render_live_evidence_context(context))
 
 
@@ -2434,14 +2772,22 @@ def _render_live_claim_policy(
 ) -> str:
     resolved = "+".join(resolved_sides) if resolved_sides else "none"
     policy = shared_policy or _live_policy_multi_deck_outcome(live_status, move_context)
+    audio_quality = (
+        "deck_pair_audio_observed" if policy == "supported_verdict" else "not_observed_by_viber"
+    )
+    outcome_rule = (
+        "grounded_by_live_deck_pair_audio"
+        if policy == "supported_verdict"
+        else "do_not_infer"
+    )
     fields = [
         f"deck_reference=resolved_{resolved}",
         "control_reference=observed_recent_moves_only"
         if has_recent_moves
         else "control_reference=none",
         f"multi_deck_outcome={policy}",
-        "audio_quality=not_observed_by_viber",
-        "control_to_music_outcome=do_not_infer",
+        f"audio_quality={audio_quality}",
+        f"control_to_music_outcome={outcome_rule}",
     ]
     return "claim_policy[" + " ".join(fields) + "]"
 
@@ -2552,6 +2898,8 @@ def _render_live_context(raw: Any) -> str | None:
             surface="viber_live_context",
             p1_model_heard=False,
         )
+    deck_part_labels = _audio_part_deck_labels_for_viber(audio_part_context)
+    deck_part_activity = _audio_part_deck_activity_for_viber(audio_part_context, deck_part_labels)
     if audio_part_context:
         lines.append(audio_part_context)
     if deck_context:
@@ -2606,6 +2954,39 @@ def _render_live_context(raw: Any) -> str | None:
         deck_audio_separation_context = _shared_render_deck_audio_separation()
     if deck_audio_separation_context:
         lines.append(deck_audio_separation_context)
+    deck_audio_features_context = (
+        context.get("deck_audio_features_context")
+        if isinstance(context.get("deck_audio_features_context"), str)
+        else None
+    )
+    if not deck_audio_features_context:
+        deck_audio_features_context = _shared_render_deck_audio_features_context(
+            context if isinstance(context, dict) else None
+        )
+    if deck_audio_features_context:
+        lines.append(deck_audio_features_context)
+    deck_audio_delta_context = (
+        context.get("deck_audio_delta_context")
+        if isinstance(context.get("deck_audio_delta_context"), str)
+        else None
+    )
+    if not deck_audio_delta_context:
+        deck_audio_delta_context = _shared_render_deck_audio_delta_context(
+            context if isinstance(context, dict) else None
+        )
+    if deck_audio_delta_context:
+        lines.append(deck_audio_delta_context)
+    deck_audio_window_context = (
+        context.get("deck_audio_window_context")
+        if isinstance(context.get("deck_audio_window_context"), str)
+        else None
+    )
+    if not deck_audio_window_context:
+        deck_audio_window_context = _shared_render_deck_audio_window_context(
+            context if isinstance(context, dict) else None
+        )
+    if deck_audio_window_context:
+        lines.append(deck_audio_window_context)
     if deck_lines:
         lines.append("decks[" + " | ".join(deck_lines) + "]")
     if isinstance(recent_moves, list) and recent_moves:
@@ -2619,6 +3000,8 @@ def _render_live_context(raw: Any) -> str | None:
         audio_window_context = _shared_render_audio_window_context(
             state,
             recent_moves,
+            deck_part_labels=deck_part_labels or None,
+            deck_part_activity=deck_part_activity or None,
             force=True,
         )
     if audio_window_context:
@@ -2666,15 +3049,18 @@ def _render_live_context(raw: Any) -> str | None:
         "do not give live transition or move-outcome verdicts; ask for a restarted "
         "live session/resample. If live_context, deck_context, deck_lanes_context, "
         "deck_reference_context, deck_source_context, deck_audio_context, "
-        "deck_audio_separation_context, audio_window_context, deck_change_context, "
+        "deck_audio_separation_context, deck_audio_features_context, "
+        "deck_audio_delta_context, deck_audio_window_context, audio_window_context, "
+        "deck_change_context, "
         "move_effect_context, live_evidence, or move_context carries "
         "transition_block/transition_watch, "
         "do not praise or claim a transition/blend/switch/segue/handoff/bridge/layer. "
         "If it carries transition_candidate, you may name it as a candidate but "
-        "must not grade it as good/clean/successful. Treat move_effect_context "
-        "and live_evidence as evidence category references, not causal proof or "
-        "a skill grade. Use grounded tools for library tracks, cue timing, and "
-        "mix-point claims."
+        "must not grade it as good/clean/successful. Treat move_effect_context, "
+        "deck_audio_features_context, deck_audio_delta_context, deck_audio_window_context, "
+        "and live_evidence "
+        "as evidence category references, not causal proof or a skill grade. Use "
+        "grounded tools for library tracks, cue timing, and mix-point claims."
     )
     return "\n".join(lines)
 
@@ -2758,8 +3144,9 @@ def _apply_live_claim_guard(reply: str, live_context: dict[str, Any] | None) -> 
     if not context or not reply.strip():
         return reply
     outcome_claim = _shared_has_multi_deck_outcome_claim(reply)
+    public_diagnostic = bool(_LIVE_CONTEXT_PUBLIC_DIAGNOSTIC_REPLY_RE.search(reply))
     stale_transport = _live_context_transport_is_stale(context)
-    if stale_transport and outcome_claim:
+    if stale_transport and (outcome_claim or public_diagnostic):
         return "Refresh the live session first, then I'll judge that transition."
     evidence_policy = _live_evidence_policy(context)
     state = _music_state_from_live_context(context)
@@ -2769,11 +3156,24 @@ def _apply_live_claim_guard(reply: str, live_context: dict[str, Any] | None) -> 
     evidence_overrides_shared = _live_policy_strength(evidence_policy) > _live_policy_strength(
         shared_policy
     )
+    if public_diagnostic:
+        if active_policy == "supported_verdict":
+            return _LIVE_GROUNDED_PUBLIC_REPLY
+        if active_policy == "candidate_not_verdict":
+            return _SHARED_LIVE_CANDIDATE_HELD_REPLY
+        return _SHARED_LIVE_TRANSITION_HELD_REPLY
     has_disclaimer = bool(outcome_claim and _shared_has_multi_deck_outcome_disclaimer(reply))
-    if has_disclaimer and (
-        active_policy not in {"blocked", "watch_not_claim", "candidate_not_verdict"}
-        or not _shared_has_unsafe_multi_deck_disclaimer_claim(reply)
-    ):
+    if has_disclaimer and not _shared_has_unsafe_multi_deck_disclaimer_claim(reply):
+        if active_policy in {"blocked", "watch_not_claim", "requires_more_evidence"}:
+            return _SHARED_LIVE_TRANSITION_HELD_REPLY
+        if active_policy == "candidate_not_verdict":
+            return _SHARED_LIVE_CANDIDATE_HELD_REPLY
+        return reply
+    if has_disclaimer and active_policy not in {
+        "blocked",
+        "watch_not_claim",
+        "candidate_not_verdict",
+    }:
         return reply
     if (
         evidence_overrides_shared
@@ -2788,6 +3188,8 @@ def _apply_live_claim_guard(reply: str, live_context: dict[str, Any] | None) -> 
         and _MULTI_DECK_VERDICT_RE.search(reply)
     ):
         return _SHARED_LIVE_CANDIDATE_HELD_REPLY
+    if active_policy == "supported_verdict":
+        return reply
     result = _shared_apply_live_claim_guard(
         reply,
         state,
@@ -2863,12 +3265,6 @@ def _sanitize_chat_history_text(
         "candidate_not_verdict",
         "requires_more_evidence",
     }:
-        return clean
-    if _shared_has_multi_deck_outcome_disclaimer(
-        clean
-    ) and not _shared_has_unsafe_multi_deck_disclaimer_claim(clean):
-        return clean
-    if policy == "candidate_not_verdict" and not _MULTI_DECK_VERDICT_RE.search(clean):
         return clean
     return "[prior Viber live outcome claim omitted; re-check CURRENT LIVE DECK CONTEXT]"
 
@@ -3180,7 +3576,7 @@ def _chat_clarification_reply(question: str | None, choices: list[str] | None) -
 
 
 def _missing_live_context_reply() -> str:
-    return "Live proof is not armed, so I won't judge that transition or deck move yet."
+    return "Start live monitoring first, then I'll read the live move from the decks."
 
 
 def chat_with_codex(
@@ -3218,7 +3614,7 @@ def chat_with_codex(
             tool_trace=[
                 {
                     "name": "live_context_required",
-                    "arg": "live proof not armed",
+                    "arg": "waiting for live deck feed",
                     "ok": False,
                 }
             ],
@@ -3403,15 +3799,21 @@ def chat_with_codex(
     track_ids = _validate_against_library(_dedupe_ordered(raw_ids), library)
 
     live_context_mode = _live_context_use_mode(message) if live_context else "none"
+    guarded_reply = _apply_live_claim_guard(raw_reply, live_context) if live_context else raw_reply
     if live_context_mode == "active_live_context":
-        reply = _apply_live_claim_guard(raw_reply, live_context)
-    elif live_context and _looks_like_unprompted_live_correction(raw_reply):
-        reply = _library_request_fallback_reply(
-            playlist=playlist,
-            track_ids=track_ids,
-            tools_used=tools_used,
-            tool_trace=tool_trace,
-        )
+        reply = guarded_reply
+    elif live_context and (
+        _looks_like_unprompted_live_correction(raw_reply) or guarded_reply != raw_reply
+    ):
+        if playlist is not None or track_ids or tools_used or tool_trace:
+            reply = _library_request_fallback_reply(
+                playlist=playlist,
+                track_ids=track_ids,
+                tools_used=tools_used,
+                tool_trace=tool_trace,
+            )
+        else:
+            reply = guarded_reply
     else:
         reply = raw_reply
 

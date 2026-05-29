@@ -430,6 +430,45 @@ def test_evidence_line_renders_registered_move_grounding_refs():
     assert "mix:move_scope=single_deck_move_A" in out
 
 
+def test_evidence_line_renders_registered_deck_audio_window_ref():
+    state = MusicState(audible=True, rms=0.05, bpm=120.0, audible_deck="mix")
+    audio_capture_context = {
+        "deck_audio_capture_enabled": True,
+        "deck_audio_rms": {"A": 0.04, "B": 0.02},
+        "deck_audio_features": {
+            "A": {"activity": "active", "rms": 0.04},
+            "B": {"activity": "active", "rms": 0.02},
+        },
+        "deck_audio_deltas": {
+            "A": ["rms_rose_100pct_strong"],
+            "B": ["rms_fell_33pct_clear"],
+        },
+        "deck_audio_windows": {
+            "A": {
+                "pre": {"activity": "active", "rms": 0.02},
+                "current": {"activity": "active", "rms": 0.04},
+            },
+            "B": {
+                "pre": {"activity": "active", "rms": 0.03},
+                "current": {"activity": "active", "rms": 0.02},
+            },
+        },
+    }
+    expected = (
+        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_active_pre_0.030_current_0.020"
+    )
+
+    out = AICoach.evidence_line(
+        state,
+        registry_snapshot={"mix": {expected: (44.0,)}},
+        audio_capture_context=audio_capture_context,
+    )
+
+    assert f"[mix:{expected}]" in out
+    assert f"mix:{expected}" in out
+
+
 def test_evidence_line_renders_live_evidence_categories_for_gemini():
     state = MusicState(
         audible=True,
@@ -605,6 +644,55 @@ def test_task_mix_move_LOAD_BEARING_anti_slop_clause():
     assert "you decide what matters" in out
     # Silence path still present.
     assert "output a single space to stay silent" in out
+
+
+def test_task_mix_move_live_evidence_uses_event_audio_capture_context():
+    state = MusicState(audible=True, rms=0.05, audible_deck="A")
+    state.controller_connected = True
+    state.xfader = 0
+    state.deck_a = {"vol": 110, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_state = DeckState(decks={"A": DeckTrack(title="OutA", confidence=0.8)})
+    audio_capture_context = {
+        "deck_audio_capture_enabled": True,
+        "deck_audio_rms": {"A": 0.04, "B": 0.0},
+        "deck_audio_features": {
+            "A": {"activity": "active", "rms": 0.04},
+            "B": {"activity": "silent", "rms": 0.0},
+        },
+        "deck_audio_deltas": {
+            "A": ["rms_rose_100pct_strong"],
+            "B": ["rms_fell_50pct_strong"],
+        },
+        "deck_audio_windows": {
+            "A": {
+                "pre": {"activity": "active", "rms": 0.02},
+                "current": {"activity": "active", "rms": 0.04},
+            },
+            "B": {
+                "pre": {"activity": "active", "rms": 0.03},
+                "current": {"activity": "silent", "rms": 0.0},
+            },
+        },
+    }
+
+    out = AICoach.task_for_event(
+        Event(
+            type="MIX_MOVE",
+            state=state,
+            extra={
+                "moves": ["A_low: flat→killed"],
+                "audio_capture_context": audio_capture_context,
+            },
+        )
+    )
+
+    assert "live_evidence[" in out
+    assert (
+        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_silent_pre_0.030_current_0.000"
+        in out
+    )
 
 
 def test_task_mix_move_includes_move_effect_context_when_dsp_delta_is_grounded():

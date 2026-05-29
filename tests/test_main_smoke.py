@@ -158,10 +158,20 @@ def _build_audio_mocks(mocker):
     open_voice_output = MagicMock(return_value=_stream())
     open_passthrough_output = MagicMock(return_value=_stream())
     open_mic_capture = MagicMock(return_value=_stream())
+    describe_capture_input = MagicMock(
+        return_value={
+            "requested_device": "BlackHole 2ch",
+            "device_name": "BlackHole 2ch",
+            "input_channels": 2,
+            "opened_channels": 2,
+            "sample_rate": 48000,
+        }
+    )
     mocker.patch.object(main_mod.AudioMacOS, "open_capture", open_capture)
     mocker.patch.object(main_mod.AudioMacOS, "open_voice_output", open_voice_output)
     mocker.patch.object(main_mod.AudioMacOS, "open_passthrough_output", open_passthrough_output)
     mocker.patch.object(main_mod.AudioMacOS, "open_mic_capture", open_mic_capture)
+    mocker.patch.object(main_mod.AudioMacOS, "describe_capture_input", describe_capture_input)
 
     return {
         "find_device": find_device,
@@ -170,7 +180,91 @@ def _build_audio_mocks(mocker):
         "open_voice_output": open_voice_output,
         "open_passthrough_output": open_passthrough_output,
         "open_mic_capture": open_mic_capture,
+        "describe_capture_input": describe_capture_input,
     }
+
+
+def test_deck_audio_auto_upgrades_default_blackhole_input(monkeypatch, mocker):
+    import vibemix.__main__ as main_mod
+
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "auto")
+    monkeypatch.delenv("VIBEMIX_INPUT_DEVICE", raising=False)
+    backend = MagicMock()
+    backend.find_device.return_value = 16
+
+    def _describe(device_index, *, requested_device, opened_channels):
+        return {
+            "requested_device": requested_device,
+            "device_name": requested_device,
+            "input_channels": 16 if requested_device == "BlackHole 16ch" else 2,
+            "opened_channels": opened_channels,
+            "sample_rate": 48000,
+            "device_index": device_index,
+        }
+
+    backend.describe_capture_input.side_effect = _describe
+    original_routing = MagicMock(
+        reason="capture_device_too_few_channels",
+        required_opened_channels=4,
+        opened_channels=2,
+    )
+    upgraded_routing = MagicMock(enabled=True, opened_channels=4)
+    routing_from_env = mocker.patch.object(
+        main_mod,
+        "deck_audio_routing_from_env",
+        return_value=upgraded_routing,
+    )
+
+    idx, name, context, routing = main_mod._maybe_upgrade_input_device_for_deck_audio(
+        backend,
+        input_idx=0,
+        input_device_name="BlackHole 2ch",
+        base_audio_capture_context=_describe(
+            0,
+            requested_device="BlackHole 2ch",
+            opened_channels=2,
+        ),
+        deck_audio_routing=original_routing,
+    )
+
+    assert idx == 16
+    assert name == "BlackHole 16ch"
+    assert context["requested_device"] == "BlackHole 16ch"
+    assert context["opened_channels"] == 4
+    assert routing is upgraded_routing
+    backend.find_device.assert_called_once_with("BlackHole 16ch", "input")
+    routing_from_env.assert_called_once()
+    assert routing_from_env.call_args.kwargs["input_channels"] == 16
+
+
+def test_deck_audio_auto_respects_explicit_input_device(monkeypatch):
+    import vibemix.__main__ as main_mod
+
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "auto")
+    monkeypatch.setenv("VIBEMIX_INPUT_DEVICE", "BlackHole 2ch")
+    backend = MagicMock()
+    original_context = {"requested_device": "BlackHole 2ch"}
+    original_routing = MagicMock(
+        reason="capture_device_too_few_channels",
+        required_opened_channels=4,
+        opened_channels=2,
+    )
+
+    idx, name, context, routing = main_mod._maybe_upgrade_input_device_for_deck_audio(
+        backend,
+        input_idx=0,
+        input_device_name="BlackHole 2ch",
+        base_audio_capture_context=original_context,
+        deck_audio_routing=original_routing,
+    )
+
+    assert (idx, name, context, routing) == (
+        0,
+        "BlackHole 2ch",
+        original_context,
+        original_routing,
+    )
+    backend.find_device.assert_not_called()
 
 
 def _build_sensor_mocks(mocker):
@@ -781,8 +875,7 @@ def test_smoke_07_main_imports_cache_and_latency_primitives() -> None:
 
     assert hasattr(main_mod, "GeminiContextCache"), "missing GeminiContextCache import"
     assert not hasattr(main_mod, "AckBank"), (
-        "AckBank import leaked back into __main__.py — the placeholder "
-        "ack-bank surface is retired"
+        "AckBank import leaked back into __main__.py — the placeholder ack-bank surface is retired"
     )
     assert hasattr(main_mod, "CancelGate"), "missing CancelGate import"
     assert hasattr(main_mod, "TTFTMeter"), "missing TTFTMeter import"
@@ -832,10 +925,9 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
     # would silently never start the coroutine and silently regress the
     # cache-boot fail-fast guarantee — this test now catches that drift.
     # Updated 2026-05-23 (Phase 67 / Plan 67P01 + REVIEW WR-03).
-    assert (
-        "await cache.create()" in src
-        or "await asyncio.wait_for(cache.create()" in src
-    ), "cache.create not awaited (bare or wait_for-wrapped form must be awaited)"
+    assert "await cache.create()" in src or "await asyncio.wait_for(cache.create()" in src, (
+        "cache.create not awaited (bare or wait_for-wrapped form must be awaited)"
+    )
     # Graceful degradation — cache=None on failure, no propagation of exception
     assert "cache = None" in src, "graceful-degradation cache=None branch missing"
     # Plan 41-02 — wall-clock refresh_loop deleted. Cache refresh is event-
@@ -857,15 +949,11 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
     assert "ttft_meter=ttft_meter" in src, "DJCoHostAgent must receive ttft_meter=ttft_meter kwarg"
     # coach_loop gets cancel_gate + ttft_meter + playback (no ack_bank
     # since the placeholder surface is retired).
-    assert "ack_bank=" not in src, (
-        "ack_bank= kwarg leaked back into __main__.py wiring"
-    )
+    assert "ack_bank=" not in src, "ack_bank= kwarg leaked back into __main__.py wiring"
     assert "cancel_gate=cancel_gate" in src, "coach_loop must receive cancel_gate kwarg"
     assert "playback=playback" in src, "coach_loop must receive playback kwarg"
     # Construction order — TTFTMeter + CancelGate before agent. AckBank
     # is explicitly NOT instantiated anymore.
     assert "TTFTMeter()" in src, "TTFTMeter not instantiated"
-    assert "AckBank(" not in src, (
-        "AckBank constructor leaked back into __main__.py"
-    )
+    assert "AckBank(" not in src, "AckBank constructor leaked back into __main__.py"
     assert "CancelGate()" in src, "CancelGate not instantiated"

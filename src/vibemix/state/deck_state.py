@@ -44,7 +44,7 @@ class DeckTrack:
     loaded_at: float = 0.0
     confidence: float = 0.0  # 0..1 — how sure we are this deck holds this track
     # "rekordbox_xml" | "folder_cache" | "screen_vision" | "numpy_key" |
-    # "nowplaying" | "unknown"
+    # "nowplaying" | "last_known" | "unknown"
     source: str = "unknown"
 
 

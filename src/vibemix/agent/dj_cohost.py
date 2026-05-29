@@ -39,11 +39,13 @@ import asyncio
 import collections
 import json
 import os
+import re
 import sys
 import time
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 from google import genai
 from google.genai import types
 from livekit.agents import Agent, ModelSettings
@@ -67,6 +69,7 @@ from vibemix.audio import (
     MIC_AUDIO_PART_SECONDS,
     AudioBuffer,
     VoiceRecorder,
+    pcm_to_wav,
     snapshot_wav,
 )
 from vibemix.coach import CitationLinter, StrippedRateTracker
@@ -79,6 +82,7 @@ from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
 from vibemix.state.deck_context import (
+    GEMINI_AUDIO_TOKENS_PER_SECOND,
     apply_live_claim_guard,
     live_claim_policy,
     render_audio_delta_items,
@@ -87,7 +91,10 @@ from vibemix.state.deck_context import (
     render_audio_window_map,
     render_context_feed_contract,
     render_deck_audio_context,
+    render_deck_audio_delta_context,
+    render_deck_audio_features_context,
     render_deck_audio_separation_context,
+    render_deck_audio_window_context,
     render_deck_change_context,
     render_deck_context,
     render_deck_lane_context,
@@ -125,10 +132,17 @@ SCREEN_SKIP_EVENTS: frozenset[str] = frozenset({"MIX_MOVE", "HEARTBEAT"})
 # default 18s INVOKE_AUDIO_SECONDS to 6s — saves ≥500ms TTFT (CONTEXT D-08
 # Pitfall 9) by reducing the multimodal payload size.
 DIET_AUDIO_SECONDS: float = 6.0
+DECK_AUDIO_PART_SECONDS_DEFAULT: float = 3.0
+DECK_AUDIO_PART_MIN_RMS: float = 0.003
+DECK_AUDIO_PART_AUTO_EVENTS: frozenset[str] = frozenset(
+    {"MIX_MOVE", "TRANSITION_OPPORTUNITY", "KEY_CLASH", "MANUAL"}
+)
 
 # Env-var names — public contract, surfaced in CLI / Settings UI in Phase 11/12.
 ENV_SKILL_LEVEL = "VIBEMIX_SKILL_LEVEL"
 ENV_MODE = "VIBEMIX_MODE"
+ENV_GEMINI_DECK_AUDIO_PARTS = "VIBEMIX_GEMINI_DECK_AUDIO_PARTS"
+ENV_GEMINI_DECK_AUDIO_PART_SECONDS = "VIBEMIX_GEMINI_DECK_AUDIO_PART_SECONDS"
 # Phase 13-05 — mood persona env override. Default "hype-man" preserves
 # Phase 10 backward compat (the byte-identical-to-v4 invariant) — the
 # Coach prompt template renders the mood only for COACH cells.
@@ -223,14 +237,117 @@ def _event_live_move_labels(ev: Event | None, fallback_state: MusicState) -> tup
     return tuple(labels[-3:])
 
 
+def _deck_audio_parts_mode(raw: str | None = None) -> str:
+    text = str(raw if raw is not None else os.environ.get(ENV_GEMINI_DECK_AUDIO_PARTS, "auto"))
+    mode = text.strip().lower()
+    if mode in {"0", "false", "no", "off", "never", "disabled"}:
+        return "off"
+    if mode in {"1", "true", "yes", "on", "always"}:
+        return "always"
+    return "auto"
+
+
+def _deck_audio_part_seconds(raw: object | None = None) -> float:
+    value = raw if raw is not None else os.environ.get(ENV_GEMINI_DECK_AUDIO_PART_SECONDS)
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        seconds = DECK_AUDIO_PART_SECONDS_DEFAULT
+    return max(1.0, min(6.0, seconds))
+
+
+def _deck_audio_rms_activity(audio_capture_context: dict[str, object] | None) -> dict[str, str]:
+    if not isinstance(audio_capture_context, dict):
+        return {}
+    raw = audio_capture_context.get("deck_audio_rms")
+    if not isinstance(raw, dict):
+        return {}
+    activity: dict[str, str] = {}
+    for side in ("A", "B"):
+        value = raw.get(side)
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            rms = float(value)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if rms == rms and rms >= 0.0:
+            activity[side] = "active" if rms >= DECK_AUDIO_PART_MIN_RMS else "silent"
+    return activity
+
+
+def _deck_audio_rms_active(audio_capture_context: dict[str, object] | None) -> bool:
+    return any(
+        activity == "active" for activity in _deck_audio_rms_activity(audio_capture_context).values()
+    )
+
+
+def _deck_audio_pcm_activity(pcm: np.ndarray) -> str:
+    if pcm.size == 0:
+        return "silent"
+    pcm_f = pcm.astype(np.float32) / 32768.0
+    rms = float(np.sqrt(np.mean(pcm_f * pcm_f)))
+    return "active" if rms >= DECK_AUDIO_PART_MIN_RMS else "silent"
+
+
+def _deck_audio_part_suffix(parts: list[dict[str, object]]) -> str:
+    if not parts:
+        return ""
+    lines = []
+    for part in parts:
+        label = str(part.get("label") or "")
+        side = str(part.get("side") or "")
+        if label and side in {"A", "B"}:
+            activity = str(part.get("activity") or "").strip().lower()
+            suffix = f" ({activity})" if activity in {"active", "silent"} else ""
+            lines.append(f"{label} = captured Deck {side} audio{suffix}")
+    if not lines:
+        return ""
+    joined = "; ".join(lines)
+    return (
+        "\n\nAdditional attached deck audio: "
+        f"{joined}. These Parts are configured deck-pair captures aligned with P1; "
+        "use them to map deck A/deck B contribution. P1 remains the audience-truth "
+        "master mix, and deck Parts are not a transition quality verdict by themselves."
+    )
+
+
+def _deck_audio_part_contract_labels(
+    deck_part_labels: dict[str, str] | None,
+    *,
+    reserved_labels: tuple[str | None, ...] = (),
+) -> dict[str, str]:
+    if not isinstance(deck_part_labels, dict):
+        return {}
+    labels: dict[str, str] = {}
+    for side in ("A", "B"):
+        label = str(deck_part_labels.get(side) or "").strip().upper()
+        if re.fullmatch(r"P[2-9][0-9]?", label):
+            labels[side] = label
+    if set(labels) != {"A", "B"} or labels["A"] == labels["B"]:
+        return {}
+    reserved = {
+        label
+        for label in (str(item or "").strip().upper() for item in reserved_labels)
+        if re.fullmatch(r"P[2-9][0-9]?", label)
+    }
+    if labels["A"] in reserved or labels["B"] in reserved:
+        return {}
+    return labels
+
+
 def _build_attached_audio_context_clause(
     state: MusicState,
     moves: list[str] | tuple[str, ...] = (),
     *,
     audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
     audio_seconds: float = DIET_AUDIO_SECONDS,
     mic_part_label: str | None = None,
     lookahead_part_label: str | None = None,
+    deck_part_labels: dict[str, str] | None = None,
+    deck_part_activity: dict[str, str] | None = None,
+    deck_part_seconds: float = DECK_AUDIO_PART_SECONDS_DEFAULT,
     lookahead_horizon_s: float = 3.0,
 ) -> str:
     """Return deck-grounding context adjacent to Gemini's live audio Part.
@@ -242,6 +359,10 @@ def _build_attached_audio_context_clause(
     bounded text, not a raw MIDI/screen Part.
     """
     move_items = tuple(str(item) for item in moves if str(item).strip())
+    contract_deck_part_labels = _deck_audio_part_contract_labels(
+        deck_part_labels,
+        reserved_labels=(mic_part_label, lookahead_part_label),
+    )
     context_lines: list[str] = []
     for item in (
         render_context_feed_contract(
@@ -254,7 +375,11 @@ def _build_attached_audio_context_clause(
         render_audio_part_context(
             audio_seconds=audio_seconds,
             mic_part_label=mic_part_label,
+            mic_part_seconds=MIC_AUDIO_PART_SECONDS,
             lookahead_part_label=lookahead_part_label,
+            deck_part_labels=deck_part_labels,
+            deck_part_activity=deck_part_activity,
+            deck_part_seconds=deck_part_seconds,
             lookahead_horizon_s=lookahead_horizon_s,
         ),
         render_deck_context(state, compact=True),
@@ -263,12 +388,19 @@ def _build_attached_audio_context_clause(
         render_deck_source_context(state, compact=True),
         render_mixer_context(state),
         render_deck_audio_context(state),
-        render_deck_audio_separation_context(),
+        render_deck_audio_separation_context(audio_capture_context),
+        render_deck_audio_features_context(audio_capture_context),
+        render_deck_audio_delta_context(audio_capture_context),
+        render_deck_audio_window_context(audio_capture_context),
         render_audio_window_context(
             state,
             move_items,
             audio_seconds=audio_seconds,
+            mic_part_label=mic_part_label,
             lookahead_part_label=lookahead_part_label,
+            deck_part_labels=deck_part_labels,
+            deck_part_activity=deck_part_activity,
+            deck_part_seconds=deck_part_seconds,
             lookahead_horizon_s=lookahead_horizon_s,
             force=True,
         ),
@@ -277,7 +409,11 @@ def _build_attached_audio_context_clause(
                 state,
                 move_items,
                 audio_seconds=audio_seconds,
+                mic_part_label=mic_part_label,
                 lookahead_part_label=lookahead_part_label,
+                deck_part_labels=deck_part_labels,
+                deck_part_activity=deck_part_activity,
+                deck_part_seconds=deck_part_seconds,
                 lookahead_horizon_s=lookahead_horizon_s,
                 force=True,
             )
@@ -288,17 +424,25 @@ def _build_attached_audio_context_clause(
             state,
             move_items,
             audio_delta_items=audio_delta_items,
+            audio_capture_context=audio_capture_context,
         ),
         render_live_evidence_context(
             state,
             move_items,
             audio_delta_items=audio_delta_items,
+            audio_capture_context=audio_capture_context,
         ),
     ):
         if item:
             context_lines.append(item)
 
-    policy, reason = live_claim_policy(state, move_items)
+    policy, reason = live_claim_policy(
+        state,
+        move_items,
+        audio_capture_context=audio_capture_context,
+        audio_delta_items=audio_delta_items,
+        deck_audio_parts_attached=bool(contract_deck_part_labels),
+    )
     policy_fields = [f"policy={policy}"]
     if reason:
         policy_fields.append(f"reason={reason}")
@@ -306,21 +450,53 @@ def _build_attached_audio_context_clause(
         policy_fields.append("rule=do_not_claim_transition_blend_handoff")
     elif policy == "candidate_not_verdict":
         policy_fields.append("rule=candidate_not_quality_verdict")
+    elif policy == "supported_verdict":
+        policy_fields.append("rule=grounded_verdict_allowed")
     else:
         policy_fields.append("rule=multi_deck_outcome_requires_live_support")
     context_lines.append("claim_policy[" + " ".join(policy_fields) + "]")
+
+    deck_audio_part_contract = "deck_audio_parts=not_attached."
+    deck_separation_contract = "structured_text_only"
+    if contract_deck_part_labels:
+        deck_contract_fields = ["deck_audio_parts=attached_configured_deck_pair_refs"]
+        for side in ("A", "B"):
+            label = contract_deck_part_labels.get(side, "not_attached")
+            activity = str((deck_part_activity or {}).get(side) or "unknown")
+            deck_contract_fields.append(f"deck{side}_audio={label}")
+            deck_contract_fields.append(f"deck{side}_activity={activity}")
+        ordered_parts = [
+            "P1",
+            *sorted(
+                {
+                    str(label)
+                    for label in (
+                        mic_part_label,
+                        lookahead_part_label,
+                        *contract_deck_part_labels.values(),
+                    )
+                    if re.fullmatch(r"P[2-9][0-9]?", str(label))
+                },
+                key=lambda label: int(label[1:]),
+            ),
+        ]
+        deck_contract_fields.append("part_order=" + ",".join(ordered_parts))
+        deck_contract_fields.append("deck_parts_rule=reference_not_quality_verdict.")
+        deck_audio_part_contract = " ".join(deck_contract_fields)
+        deck_separation_contract = "deck_pair_parts"
 
     return (
         "\n\nAUDIO CONTEXT MAP FOR ATTACHED P1:\n"
         + "\n".join(context_lines)
         + "\nAUDIO PART CONTRACT: P1=live_global_mix isolated_decks=false "
-        "deck_separation=structured_text_only audio_window_context=time_aligned "
+        f"deck_separation={deck_separation_contract} audio_window_context=time_aligned "
         "deck_audio_separation_context=capture_capability "
-        "optional_later_parts_not_current_deck_audio."
+        f"{deck_audio_part_contract}"
         + "\nAUDIO CLAIM RULE: P1 is the global live mix, not isolated deck stems. "
         "Transition/blend/drop/handoff/bridge claims require deck/live_evidence "
         "support; controller moves plus audio deltas are timing evidence, not "
-        "causal or quality proof."
+        "causal or quality proof. Deck audio Parts identify per-deck contribution; "
+        "they are not a score by themselves."
     )
 
 
@@ -353,11 +529,37 @@ def _render_audio_window_map_line(audio_map: dict[str, Any] | None) -> str | Non
         except (TypeError, ValueError, IndexError):
             future_text = str(future.get("part"))
 
+    deck_part_span = audio_map.get("deck_part_span_s")
+    deck_span_text = ""
+    if isinstance(deck_part_span, list) and len(deck_part_span) >= 2:
+        try:
+            deck_span_text = f":{float(deck_part_span[0]):.1f}..{float(deck_part_span[1]):.1f}"
+        except (TypeError, ValueError):
+            deck_span_text = ""
+
+    def _deck_audio_text(key: str) -> str:
+        value = str(audio_map.get(key) or "not_attached").strip()
+        if value.startswith("P") and value[1:].isdigit():
+            return value + deck_span_text
+        return value or "not_attached"
+
+    per_deck_audio = str(audio_map.get("per_deck_audio") or "structured_text_only")
+    duplicate_audio = str(audio_map.get("duplicate_audio") or "same_master_not_deck_split")
+
     return (
         "audio_window_map["
         "P1=master_global_mix heard=true old=pre_s current=current_s action=action_s "
-        "future=" + future_text + " deckA_audio=not_attached deckB_audio=not_attached "
-        "duplicate_audio=same_master_not_deck_split anchors="
+        "future="
+        + future_text
+        + " deckA_audio="
+        + _deck_audio_text("deckA_audio")
+        + " deckB_audio="
+        + _deck_audio_text("deckB_audio")
+        + " per_deck_audio="
+        + per_deck_audio
+        + " duplicate_audio="
+        + duplicate_audio
+        + " anchors="
         + anchor_text
         + " rule=time_alignment_not_outcome_verdict]"
     )
@@ -368,6 +570,11 @@ def _build_recall_query_context(ev: Event) -> str:
     state = ev.state
     moves = _event_live_move_labels(ev, state)
     audio_delta_items = render_audio_delta_items(state)
+    extra = ev.extra if isinstance(ev.extra, dict) else {}
+    maybe_audio_capture_context = extra.get("audio_capture_context")
+    audio_capture_context = (
+        maybe_audio_capture_context if isinstance(maybe_audio_capture_context, dict) else None
+    )
     fields: list[tuple[str, object | None]] = [
         (
             "context_feed",
@@ -382,7 +589,13 @@ def _build_recall_query_context(ev: Event) -> str:
         ("deck_ref", render_deck_reference_context(state)),
         ("deck_source", render_deck_source_context(state, compact=True)),
         ("deck_audio", render_deck_audio_context(state)),
-        ("deck_audio_separation", render_deck_audio_separation_context()),
+        (
+            "deck_audio_separation",
+            render_deck_audio_separation_context(audio_capture_context),
+        ),
+        ("deck_audio_features", render_deck_audio_features_context(audio_capture_context)),
+        ("deck_audio_delta", render_deck_audio_delta_context(audio_capture_context)),
+        ("deck_audio_window", render_deck_audio_window_context(audio_capture_context)),
         (
             "audio_window",
             render_audio_window_context(
@@ -397,6 +610,7 @@ def _build_recall_query_context(ev: Event) -> str:
                 state,
                 moves if moves else None,
                 audio_delta_items=audio_delta_items,
+                audio_capture_context=audio_capture_context,
             ),
         ),
     ]
@@ -410,6 +624,7 @@ def _build_recall_query_context(ev: Event) -> str:
                         state,
                         moves,
                         audio_delta_items=audio_delta_items,
+                        audio_capture_context=audio_capture_context,
                     ),
                 ),
             ]
@@ -421,6 +636,8 @@ def _build_recall_query_context(ev: Event) -> str:
     for name, value in fields:
         if name == "audio_window":
             cap = 480
+        elif name == "live_evidence":
+            cap = 640
         elif name == "context_feed":
             cap = 420
         else:
@@ -831,6 +1048,15 @@ class DJCoHostAgent(Agent):
         # in ``__main__.py``. The judgment "is the second ear worth it / which
         # model wins" is Phase-81 BENCH + KAAN-ACTION.
         secondary_ear: bool = False,
+        # Optional live capture-capability receipt from __main__. This does not
+        # attach extra audio by itself; it tells Gemini whether P1 is global-only
+        # or the runtime has real deck-pair capture available.
+        audio_capture_context: dict[str, object] | None = None,
+        # Optional per-deck rings from the multichannel capture path. These only
+        # become Gemini Parts when VIBEMIX_GEMINI_DECK_AUDIO_PARTS permits it.
+        deck_audio_buffers: dict[str, AudioBuffer] | None = None,
+        deck_audio_parts_mode: str | None = None,
+        deck_audio_part_seconds: float | None = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -939,6 +1165,22 @@ class DJCoHostAgent(Agent):
         # Phase 80 Plan 02 — GROUND-01 secondary-ear framing gate. Default
         # False → parts_clause/contents byte-identical to v8.0.
         self._secondary_ear: bool = secondary_ear
+        # Keep the shared runtime dict so the audio callback can update deck
+        # RMS/activity between turns without needing another model or bus pass.
+        self._audio_capture_context = (
+            audio_capture_context if isinstance(audio_capture_context, dict) else None
+        )
+        self._deck_audio_buffers: dict[str, AudioBuffer] = (
+            {
+                side: buf
+                for side, buf in deck_audio_buffers.items()
+                if side in {"A", "B"} and isinstance(buf, AudioBuffer)
+            }
+            if isinstance(deck_audio_buffers, dict)
+            else {}
+        )
+        self._deck_audio_parts_mode = _deck_audio_parts_mode(deck_audio_parts_mode)
+        self._deck_audio_part_seconds = _deck_audio_part_seconds(deck_audio_part_seconds)
         # Phase 66 (COPILOT-02) — wall-clock timestamp of the last recall
         # callback that REACHED the audience (the ``await self._ipc_bus.
         # emit(...)`` returned without raising on a turn that emitted a
@@ -1533,6 +1775,81 @@ class DJCoHostAgent(Agent):
             prev.cancel()
         self._recall_task = asyncio.create_task(_run())
 
+    def _deck_audio_part_snapshots(
+        self, ev_type: str, first_part_index: int
+    ) -> list[dict[str, object]]:
+        """Return short Deck A/B WAV Parts when configured and worth the cost."""
+        context = self._audio_capture_context
+        if not self._deck_audio_buffers:
+            self._recorder.log_event("deck_audio_parts_skipped", reason="no_deck_audio_buffers")
+            return []
+        if not isinstance(context, dict) or not context.get("deck_audio_capture_enabled"):
+            self._recorder.log_event("deck_audio_parts_skipped", reason="capture_not_enabled")
+            return []
+        mode = self._deck_audio_parts_mode
+        if mode == "off":
+            self._recorder.log_event("deck_audio_parts_skipped", reason="mode_off")
+            return []
+        if mode == "auto" and ev_type not in DECK_AUDIO_PART_AUTO_EVENTS:
+            self._recorder.log_event(
+                "deck_audio_parts_skipped",
+                reason="event_not_auto",
+                event=ev_type,
+            )
+            return []
+        if mode == "auto" and not _deck_audio_rms_active(context):
+            self._recorder.log_event(
+                "deck_audio_parts_skipped",
+                reason="deck_audio_silent",
+                event=ev_type,
+            )
+            return []
+
+        seconds = self._deck_audio_part_seconds
+        parts: list[dict[str, object]] = []
+        for offset, side in enumerate(("A", "B")):
+            buf = self._deck_audio_buffers.get(side)
+            if buf is None:
+                self._recorder.log_event(
+                    "deck_audio_parts_skipped",
+                    reason=f"missing_deck_{side}_buffer",
+                    event=ev_type,
+                )
+                return []
+            pcm = buf.snapshot(int(seconds * buf._sr))
+            if pcm.size == 0:
+                self._recorder.log_event(
+                    "deck_audio_parts_skipped",
+                    reason=f"empty_deck_{side}_buffer",
+                    event=ev_type,
+                )
+                return []
+            wav = pcm_to_wav(pcm, buf._sr)
+            parts.append(
+                {
+                    "side": side,
+                    "label": f"P{first_part_index + offset}",
+                    "wav": wav,
+                    "seconds": seconds,
+                    "bytes": len(wav),
+                    "activity": _deck_audio_pcm_activity(pcm),
+                }
+            )
+
+        self._recorder.log_event(
+            "deck_audio_parts_attached",
+            event=ev_type,
+            mode=mode,
+            seconds=seconds,
+            sides="+".join(str(part["side"]) for part in parts),
+            labels="+".join(str(part["label"]) for part in parts),
+            activity="+".join(
+                f"{part['side']}:{part.get('activity', 'unknown')}" for part in parts
+            ),
+            bytes=sum(int(part["bytes"]) for part in parts),
+        )
+        return parts
+
     async def llm_node(
         self,
         chat_ctx: agents_llm.ChatContext,
@@ -1729,6 +2046,13 @@ class DJCoHostAgent(Agent):
             diet = ev_type_for_diet in ACK_ELIGIBLE_EVENTS
             audio_seconds = DIET_AUDIO_SECONDS if diet else INVOKE_AUDIO_SECONDS
             skip_screen = ev_type_for_diet in SCREEN_SKIP_EVENTS
+            ev_extra = ev.extra if ev is not None and isinstance(ev.extra, dict) else {}
+            ev_audio_capture_context = ev_extra.get("audio_capture_context")
+            prompt_audio_capture_context = (
+                ev_audio_capture_context
+                if isinstance(ev_audio_capture_context, dict)
+                else self._audio_capture_context
+            )
 
             # Build grounded text packet (same evidence + task v2 used).
             # Phase 65 Plan 04 — thread ``recall_moments`` ONLY when non-empty
@@ -1745,6 +2069,8 @@ class DJCoHostAgent(Agent):
             _bp_kwargs: dict[str, Any] = {"registry_snapshot": snapshot, "diet": diet}
             if recall_moments:
                 _bp_kwargs["recall_moments"] = recall_moments
+            if prompt_audio_capture_context is not None:
+                _bp_kwargs["audio_capture_context"] = prompt_audio_capture_context
             if ev is not None:
                 text_prompt = AICoach.build_prompt(ev, **_bp_kwargs)
             else:
@@ -1866,6 +2192,23 @@ class DJCoHostAgent(Agent):
                     lookahead_meta = {"ok": False, "reason": f"exception: {e!r}"}
             mic_attached = mic_wav is not None
             lookahead_attached = lookahead_wav is not None
+            ev_tag = ev.type if ev else "MANUAL"
+            first_deck_part_index = 2 + int(mic_attached) + int(lookahead_attached)
+            deck_audio_parts = self._deck_audio_part_snapshots(
+                ev_tag,
+                first_part_index=first_deck_part_index,
+            )
+            deck_part_labels = {
+                str(part["side"]): str(part["label"])
+                for part in deck_audio_parts
+                if str(part.get("side")) in {"A", "B"} and str(part.get("label"))
+            }
+            deck_part_activity = {
+                str(part["side"]): str(part["activity"])
+                for part in deck_audio_parts
+                if str(part.get("side")) in {"A", "B"}
+                and str(part.get("activity")) in {"active", "silent"}
+            }
 
             # Plan 40-03 — Part-aware prompt suffix via build_parts_description.
             # Delegates the 4-way string dispatch (1-Part baseline / mic-only /
@@ -1883,6 +2226,7 @@ class DJCoHostAgent(Agent):
                 # via contents[0] — no path-specific branch.
                 secondary_ear=self._secondary_ear,
             )
+            parts_clause += _deck_audio_part_suffix(deck_audio_parts)
 
             if mic_attached:
                 self._recorder.log_event(
@@ -1926,17 +2270,42 @@ class DJCoHostAgent(Agent):
                 if lookahead_attached
                 else None
             )
+            deck_audio_parts_attached = bool(
+                _deck_audio_part_contract_labels(
+                    deck_part_labels or None,
+                    reserved_labels=("P2" if mic_attached else None, lookahead_part_label),
+                )
+            )
             try:
                 lookahead_horizon_s = float(lookahead_meta.get("delta_sec") or 3.0)
             except (TypeError, ValueError):
                 lookahead_horizon_s = 3.0
+            audio_tokens_est = round(float(audio_seconds) * GEMINI_AUDIO_TOKENS_PER_SECOND)
+            if mic_attached:
+                audio_tokens_est += round(MIC_AUDIO_PART_SECONDS * GEMINI_AUDIO_TOKENS_PER_SECOND)
+            if lookahead_attached:
+                audio_tokens_est += round(
+                    max(0.1, min(12.0, lookahead_horizon_s)) * GEMINI_AUDIO_TOKENS_PER_SECOND
+                )
+            for deck_part in deck_audio_parts:
+                try:
+                    deck_seconds = float(deck_part.get("seconds") or self._deck_audio_part_seconds)
+                except (TypeError, ValueError):
+                    deck_seconds = self._deck_audio_part_seconds
+                audio_tokens_est += round(
+                    max(1.0, min(6.0, deck_seconds)) * GEMINI_AUDIO_TOKENS_PER_SECOND
+                )
             audio_context_clause = _build_attached_audio_context_clause(
                 live_claim_state,
                 live_claim_moves,
                 audio_delta_items=live_claim_audio_delta,
+                audio_capture_context=prompt_audio_capture_context,
                 audio_seconds=float(audio_seconds),
                 mic_part_label="P2" if mic_attached else None,
                 lookahead_part_label=lookahead_part_label,
+                deck_part_labels=deck_part_labels or None,
+                deck_part_activity=deck_part_activity or None,
+                deck_part_seconds=self._deck_audio_part_seconds,
                 lookahead_horizon_s=lookahead_horizon_s,
             )
             full_text_prompt = text_prompt + history_clause + audio_context_clause + parts_clause
@@ -1949,10 +2318,11 @@ class DJCoHostAgent(Agent):
                 contents.append(types.Part.from_bytes(data=mic_wav, mime_type="audio/wav"))
             if lookahead_attached:
                 contents.append(types.Part.from_bytes(data=lookahead_wav, mime_type="audio/wav"))
+            for deck_part in deck_audio_parts:
+                contents.append(types.Part.from_bytes(data=deck_part["wav"], mime_type="audio/wav"))
             if screen_jpeg and not skip_screen:
                 contents.append(types.Part.from_bytes(data=screen_jpeg, mime_type="image/jpeg"))
 
-            ev_tag = ev.type if ev else "MANUAL"
             full_prompt = contents[0] if contents else text_prompt
             try:
                 (invoke_dir / "prompt.txt").write_text(full_prompt)
@@ -1995,6 +2365,8 @@ class DJCoHostAgent(Agent):
                 track=self._state.audible_track,
                 phase=self._state.phase,
                 audio_bytes=len(audio_wav),
+                audio_tokens_est=audio_tokens_est,
+                deck_audio_parts=len(deck_audio_parts),
                 has_screen=bool(screen_jpeg),
                 audio_seconds=int(audio_seconds),
                 diet=diet,
@@ -2016,6 +2388,9 @@ class DJCoHostAgent(Agent):
             live_claim_defer_stream = should_defer_live_claim_stream(
                 live_claim_state,
                 live_claim_moves,
+                audio_capture_context=prompt_audio_capture_context,
+                audio_delta_items=live_claim_audio_delta,
+                deck_audio_parts_attached=deck_audio_parts_attached,
             )
 
             # === Chunk-by-chunk streaming pipe-through ===
@@ -2346,6 +2721,8 @@ class DJCoHostAgent(Agent):
                         live_claim_state,
                         live_claim_moves,
                         audio_delta_items=live_claim_audio_delta,
+                        audio_capture_context=prompt_audio_capture_context,
+                        deck_audio_parts_attached=deck_audio_parts_attached,
                     )
                 except Exception as _e:
                     live_claim_guard = None

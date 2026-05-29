@@ -155,8 +155,12 @@ def test_flag_off_byte_identical(mocker, tmp_path) -> None:
     assert isinstance(contents[1], types.Part)
 
     text_packet = contents[0]
-    # v8.0 baseline strings present (the parts_clause from build_parts_description).
-    assert "(audience perspective)" in text_packet
+    # Audience-perspective grounding present (parts_clause from build_parts_description).
+    # The live-deck-context phase extended the v8.0 "(audience perspective)" label
+    # with the anti-hallucination "global mix, not isolated deck stems" clarifier;
+    # the audience-perspective grounding + ears-are-referee refrain still hold on the
+    # cold path, which is what this pin protects.
+    assert "(audience perspective; global mix, not isolated deck stems)" in text_packet
     assert "Your ears are the referee" in text_packet
     # Secondary-ear framing token is ABSENT on the cold path (Plan 02 adds it).
     assert "secondary grounding signal" not in text_packet

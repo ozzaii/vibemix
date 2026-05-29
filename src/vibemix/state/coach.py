@@ -341,6 +341,7 @@ class AICoach:
         *,
         registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None = None,
         recall_moments: list[Record] | None = None,
+        audio_capture_context: dict[str, object] | None = None,
     ) -> str:
         """Build the grounded-state evidence string for the AI prompt.
 
@@ -520,10 +521,14 @@ class AICoach:
         grounding_refs = render_grounding_ref_context(
             state,
             registry_snapshot=registry_snapshot,
+            audio_capture_context=audio_capture_context,
         )
         if grounding_refs:
             e.append(grounding_refs)
-        live_evidence_context = render_live_evidence_context(state)
+        live_evidence_context = render_live_evidence_context(
+            state,
+            audio_capture_context=audio_capture_context,
+        )
         if live_evidence_context:
             e.append(live_evidence_context)
 
@@ -649,6 +654,7 @@ class AICoach:
         *,
         registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None = None,
         include_live_evidence: bool = True,
+        audio_capture_context: dict[str, object] | None = None,
     ) -> str:
         """Plan 19-02 — compact evidence_line for the diet path.
 
@@ -705,11 +711,17 @@ class AICoach:
         grounding_refs = render_grounding_ref_context(
             state,
             registry_snapshot=registry_snapshot,
+            audio_capture_context=audio_capture_context,
         )
         if grounding_refs:
             e.append(grounding_refs)
         live_evidence_context = (
-            render_live_evidence_context(state) if include_live_evidence else None
+            render_live_evidence_context(
+                state,
+                audio_capture_context=audio_capture_context,
+            )
+            if include_live_evidence
+            else None
         )
         if live_evidence_context:
             e.append(live_evidence_context)
@@ -719,6 +731,7 @@ class AICoach:
     @staticmethod
     def task_for_event(ev: Event) -> str:
         t = ev.type
+        ev_extra = ev.extra if isinstance(ev.extra, dict) else {}
         if t == "KAAN_SPOKE":
             return (
                 "Kaan just SPOKE — answer him directly, friend tone. Short. Not a music reaction."
@@ -729,15 +742,15 @@ class AICoach:
                 "(audible event or recent move)."
             )
         if t == "TRACK_CHANGE":
-            prev = ev.extra.get("prev_track")
+            prev = ev_extra.get("prev_track")
             prev_clause = f" (was: {prev!r})" if prev else ""
             return (
                 f"Track flipped{prev_clause}. React to the NEW track's vibe vs "
                 "the previous — heavier, weirder, darker, more euphoric?"
             )
         if t == "PHASE":
-            new = ev.extra.get("new_phase", "?")
-            prev = ev.extra.get("prev_phase", "?")
+            new = ev_extra.get("new_phase", "?")
+            prev = ev_extra.get("prev_phase", "?")
             return (
                 f"Phase shifted: {prev}→{new}. React to what the new section "
                 "FEELS like, not the label."
@@ -748,13 +761,25 @@ class AICoach:
                 "riff, pad. Name what arrived and how it feels."
             )
         if t == "MIX_MOVE":
-            moves = ev.extra.get("moves", [])
+            moves = ev_extra.get("moves", [])
             mv = ", ".join(moves)
+            raw_audio_capture_context = ev_extra.get("audio_capture_context")
+            audio_capture_context = (
+                raw_audio_capture_context if isinstance(raw_audio_capture_context, dict) else None
+            )
             audio_window_context = render_audio_window_context(ev.state, moves)
             move_context = render_move_context(ev.state, moves)
             change_context = render_deck_change_context(ev.state, moves)
-            effect_context = render_move_effect_context(ev.state, moves)
-            live_evidence_context = render_live_evidence_context(ev.state, moves)
+            effect_context = render_move_effect_context(
+                ev.state,
+                moves,
+                audio_capture_context=audio_capture_context,
+            )
+            live_evidence_context = render_live_evidence_context(
+                ev.state,
+                moves,
+                audio_capture_context=audio_capture_context,
+            )
             context_bits = [
                 bit
                 for bit in (
@@ -971,6 +996,7 @@ class AICoach:
         registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None = None,
         recall_moments: list[Record] | None = None,
         diet: bool = False,
+        audio_capture_context: dict[str, object] | None = None,
     ) -> str:
         """Format the per-event prompt body.
 
@@ -1001,6 +1027,7 @@ class AICoach:
                 ev.state,
                 registry_snapshot=registry_snapshot,
                 include_live_evidence=ev.type != "MIX_MOVE",
+                audio_capture_context=audio_capture_context,
             )
             task = AICoach.task_for_event(ev)
             recall_context = compact_recall_context_for_event(recall_moments)
@@ -1010,6 +1037,7 @@ class AICoach:
             ev.state,
             registry_snapshot=registry_snapshot,
             recall_moments=recall_moments,
+            audio_capture_context=audio_capture_context,
         )
         task = AICoach.task_for_event(ev)
         # Phase 66 (COPILOT-01/02) — conditional recall fragment append.

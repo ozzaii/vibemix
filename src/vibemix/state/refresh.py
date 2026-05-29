@@ -227,6 +227,7 @@ def _write_live_grounding_evidence(
     t_session: float,
     evidence_dedupe: set[str] | None,
     audio_delta_items: list[str],
+    audio_capture_context: dict[str, object] | None = None,
 ) -> None:
     """Register citable deck/move/audio-delta facts without hot-loop spam."""
     if evidence_registry is None:
@@ -255,6 +256,7 @@ def _write_live_grounding_evidence(
             state,
             state.recent_moves,
             audio_delta_items=audio_delta_items,
+            audio_capture_context=audio_capture_context,
         ):
             dedupe_key = f"mix:{key}"
             if evidence_dedupe is not None and dedupe_key in evidence_dedupe:
@@ -527,6 +529,7 @@ def _tick_once(
     learn_state=None,
     section_source=None,
     evidence_dedupe: set[str] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> tuple[float, float, float, float]:
     """One iteration of the state_refresh_loop body. Extracted so tests can
     drive single ticks deterministically with fake time and fake snapshots.
@@ -955,6 +958,7 @@ def _tick_once(
             t_session=max(0.0, now - state.set_start_at),
             evidence_dedupe=evidence_dedupe,
             audio_delta_items=audio_delta_items,
+            audio_capture_context=audio_capture_context,
         )
 
         # Long arc — recompute every cycle is fine (cheap reduction over the
@@ -1024,6 +1028,7 @@ async def state_refresh_loop(
     genre_source=None,
     learn_state=None,
     section_source=None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> None:
     """Updates MusicState every 100ms from all sources. The ONLY writer to state.
     Audible flag is debounced — sustained samples required to flip in either
@@ -1091,6 +1096,7 @@ async def state_refresh_loop(
                 learn_state=learn_state,
                 section_source=section_source,
                 evidence_dedupe=evidence_dedupe,
+                audio_capture_context=audio_capture_context,
             )
         except Exception as e:
             print(f"[state refresh err] {e}", file=sys.stderr)

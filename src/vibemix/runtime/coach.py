@@ -69,6 +69,10 @@ from vibemix.state.deck_context import (
     render_audio_window_context,
     render_context_feed_contract,
     render_deck_audio_context,
+    render_deck_audio_delta_context,
+    render_deck_audio_features_context,
+    render_deck_audio_separation_context,
+    render_deck_audio_window_context,
     render_deck_change_context,
     render_deck_lane_context,
     render_deck_reference_context,
@@ -123,6 +127,7 @@ async def coach_loop(
     citation_telemetry: Callable[[], dict] | None = None,
     suggestion_service: Any | None = None,
     tracer: Any | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> None:
     """Polls MusicState for events at 10Hz. On event → prompt AI. Single
     in-flight generation at a time. Mic detection happens here against
@@ -269,6 +274,30 @@ async def coach_loop(
                 )
                 tracer.note_change(
                     "STATE",
+                    "deck_audio_separation_context",
+                    "state.deck_audio_separation_context",
+                    render_deck_audio_separation_context(audio_capture_context),
+                )
+                tracer.note_change(
+                    "STATE",
+                    "deck_audio_features_context",
+                    "state.deck_audio_features_context",
+                    render_deck_audio_features_context(audio_capture_context),
+                )
+                tracer.note_change(
+                    "STATE",
+                    "deck_audio_delta_context",
+                    "state.deck_audio_delta_context",
+                    render_deck_audio_delta_context(audio_capture_context),
+                )
+                tracer.note_change(
+                    "STATE",
+                    "deck_audio_window_context",
+                    "state.deck_audio_window_context",
+                    render_deck_audio_window_context(audio_capture_context),
+                )
+                tracer.note_change(
+                    "STATE",
                     "audio_delta",
                     "state.audio_delta",
                     tuple(render_audio_delta_items(state)),
@@ -277,10 +306,16 @@ async def coach_loop(
                     "STATE",
                     "live_evidence_context",
                     "state.live_evidence_context",
-                    render_live_evidence_context(state),
+                    render_live_evidence_context(
+                        state,
+                        audio_capture_context=audio_capture_context,
+                    ),
                 )
             except Exception:
                 pass
+
+        if ev is not None and isinstance(audio_capture_context, dict):
+            ev.extra.setdefault("audio_capture_context", audio_capture_context)
 
         if ev is not None:
             _tr(
@@ -383,6 +418,20 @@ async def coach_loop(
             deck_audio_context = render_deck_audio_context(state)
             if deck_audio_context:
                 event_payload["deck_audio_context"] = deck_audio_context
+            deck_audio_separation_context = render_deck_audio_separation_context(
+                audio_capture_context
+            )
+            if deck_audio_separation_context:
+                event_payload["deck_audio_separation_context"] = deck_audio_separation_context
+            deck_audio_features_context = render_deck_audio_features_context(audio_capture_context)
+            if deck_audio_features_context:
+                event_payload["deck_audio_features_context"] = deck_audio_features_context
+            deck_audio_delta_context = render_deck_audio_delta_context(audio_capture_context)
+            if deck_audio_delta_context:
+                event_payload["deck_audio_delta_context"] = deck_audio_delta_context
+            deck_audio_window_context = render_deck_audio_window_context(audio_capture_context)
+            if deck_audio_window_context:
+                event_payload["deck_audio_window_context"] = deck_audio_window_context
             if audio_delta_items:
                 event_payload["audio_delta"] = audio_delta_items[:4]
             if moves:
@@ -393,6 +442,7 @@ async def coach_loop(
                 state,
                 moves if moves else None,
                 audio_delta_items=audio_delta_items,
+                audio_capture_context=audio_capture_context,
             )
             if live_evidence_context:
                 event_payload["live_evidence_context"] = live_evidence_context
@@ -403,6 +453,7 @@ async def coach_loop(
                     state,
                     moves,
                     audio_delta_items=audio_delta_items,
+                    audio_capture_context=audio_capture_context,
                 )
                 if move_context:
                     event_payload["move_context"] = move_context

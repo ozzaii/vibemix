@@ -11,7 +11,7 @@ test functions (same pattern as ``tests/state/test_refresh.py``).
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import ANY, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from vibemix.runtime.coach import coach_loop
 from vibemix.state import Event
@@ -202,17 +202,14 @@ def test_coach_03_event_fire_path(
     fake_session.generate_reply.assert_called_once_with(allow_interruptions=False)
     assert fake_handle.wait_for_playout.await_count == 1
     assert trigger_state["in_flight"] is False
-    fake_recorder.log_event.assert_any_call(
-        "event",
-        type="TRACK_CHANGE",
-        audible=True,
-        deck="A",
-        track="Some Track",
-        track_conf=0.85,
-        phase="peak",
-        context_feed_contract=ANY,
-    )
     event_payload = fake_recorder.log_event.call_args.kwargs
+    assert fake_recorder.log_event.call_args.args == ("event",)
+    assert event_payload["type"] == "TRACK_CHANGE"
+    assert event_payload["audible"] is True
+    assert event_payload["deck"] == "A"
+    assert event_payload["track"] == "Some Track"
+    assert event_payload["track_conf"] == 0.85
+    assert event_payload["phase"] == "peak"
     assert "context_feed_contract[" in event_payload["context_feed_contract"]
     assert "speed=no_extra_model_pass" in event_payload["context_feed_contract"]
 
@@ -240,7 +237,49 @@ def test_coach_event_log_carries_deck_move_audio_context(
         state=music_state,
         extra={"moves": ["A_low: flat→killed (big twist)"]},
     )
+    audio_capture_context = {
+        "deck_channels": {"A": "0,1", "B": "2,3"},
+        "deck_audio_capture_enabled": True,
+        "deck_audio_rms": {"A": 0.02, "B": 0.0},
+        "deck_audio_features": {
+            "A": {"activity": "active", "rms": 0.02, "peak": 0.1, "zcr": 0.03},
+            "B": {"activity": "silent", "rms": 0.0, "peak": 0.0, "zcr": 0.0},
+        },
+        "deck_audio_deltas": {
+            "A": ["rms_rose_100pct_strong"],
+            "B": ["rms_fell_50pct_strong"],
+        },
+        "deck_audio_windows": {
+            "pre_s": [-6.0, -1.0],
+            "current_s": [-1.0, 0.0],
+            "A": {
+                "pre": {"activity": "active", "rms": 0.02, "peak": 0.1, "flux": 0.004},
+                "current": {
+                    "activity": "active",
+                    "rms": 0.04,
+                    "peak": 0.12,
+                    "flux": 0.009,
+                },
+                "delta": ["rms_rose_100pct_strong"],
+            },
+            "B": {
+                "pre": {"activity": "active", "rms": 0.03, "peak": 0.11, "flux": 0.006},
+                "current": {
+                    "activity": "silent",
+                    "rms": 0.0,
+                    "peak": 0.0,
+                    "flux": 0.001,
+                },
+                "delta": ["rms_fell_50pct_strong"],
+            },
+        },
+    }
     fake_event_detector.detect.return_value = ev
+
+    def _capture_event_at_agent_handoff(sent_ev):
+        assert sent_ev.extra["audio_capture_context"] is audio_capture_context
+
+    fake_agent.set_next_event.side_effect = _capture_event_at_agent_handoff
 
     stop_event = asyncio.Event()
     fake_sleep, _ = _make_stop_after(2, stop_event)
@@ -258,6 +297,7 @@ def test_coach_event_log_carries_deck_move_audio_context(
             asyncio.Event(),
             {"in_flight": False},
             stop_event,
+            audio_capture_context=audio_capture_context,
         )
     )
 
@@ -281,6 +321,17 @@ def test_coach_event_log_carries_deck_move_audio_context(
     assert "second_deck=independent_source_required" in payload["deck_source_context"]
     assert "rule=unresolved_deck_is_not_transition_evidence" in payload["deck_source_context"]
     assert payload["deck_audio_context"].startswith("deck_audio_context[")
+    assert payload["deck_audio_separation_context"].startswith(
+        "deck_audio_separation_context["
+    )
+    assert "mode=deck_pair_capture_configured" in payload["deck_audio_separation_context"]
+    assert payload["deck_audio_features_context"].startswith("deck_audio_features_context[")
+    assert "A_activity=active" in payload["deck_audio_features_context"]
+    assert payload["deck_audio_delta_context"].startswith("deck_audio_delta_context[")
+    assert "A_delta=rms_rose_100pct_strong" in payload["deck_audio_delta_context"]
+    assert payload["deck_audio_window_context"].startswith("deck_audio_window_context[")
+    assert "timeline=pre_action_current" in payload["deck_audio_window_context"]
+    assert "A_current=active_rms_0.040" in payload["deck_audio_window_context"]
     assert payload["audio_window_context"].startswith("audio_window_context[")
     assert (
         "move_anchor=A_low:_flat_to_killed_big_twist@-0.5s:inside_P1"
@@ -289,7 +340,21 @@ def test_coach_event_log_carries_deck_move_audio_context(
     assert payload["audio_delta"] == ["sub energy fell 50% (strong)"]
     assert "live_evidence[" in payload["live_evidence_context"]
     assert "mix:deck_audio_support=single_deck_A" in payload["live_evidence_context"]
-    assert "mix:move_effect=sub_energy_fell_50pct_strong" in payload["live_evidence_context"]
+    assert "mix:deck_audio_capture=A_active+B_silent" in payload["live_evidence_context"]
+    assert (
+        "mix:deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000"
+        in payload["live_evidence_context"]
+    )
+    assert (
+        "mix:deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong"
+        in payload["live_evidence_context"]
+    )
+    assert (
+        "mix:deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_silent_pre_0.030_current_0.000"
+        in payload["live_evidence_context"]
+    )
+    assert ev.extra["audio_capture_context"] is audio_capture_context
     assert "move_context[" in payload["move_context"]
     assert "deck_change_context[" in payload["deck_change_context"]
     assert "move_effect_context[" in payload["move_effect_context"]

@@ -225,7 +225,7 @@ def test_live_claim_guard_corrects_single_deck_transition_claim(mocker, tmp_path
     chunks = _drive(agent)
 
     assert len(chunks) == 1
-    assert "hold the transition verdict" in chunks[0]
+    assert "sound change right there" in chunks[0]
     assert "deck lanes=A=known:dominant / B=unknown:muted" not in chunks[0]
     assert "second_deck=independent_source_required" not in chunks[0]
     assert "rule=unresolved_deck_is_not_transition_evidence" not in chunks[0]
@@ -260,7 +260,7 @@ def test_live_claim_guard_defers_watch_only_stream_before_correction(mocker, tmp
     chunks = _drive(agent)
 
     assert len(chunks) == 1
-    assert chunks[0].startswith("I'll hold the transition verdict")
+    assert chunks[0].startswith("I caught the live move.")
     assert all("Nice " not in chunk for chunk in chunks)
     guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
     assert guard_log["policy"] == "watch_not_claim"
@@ -297,7 +297,7 @@ def test_live_claim_guard_corrects_move_effect_verdict(mocker, tmp_path) -> None
     chunks = _drive(agent)
 
     assert len(chunks) == 1
-    assert "hold the cause/quality verdict" in chunks[0]
+    assert "energy shifted right after it" in chunks[0]
     assert "low cut cleaned" not in chunks[0]
     guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
     assert guard_log["policy"] == "move_effect_not_verdict"

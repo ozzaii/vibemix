@@ -1456,6 +1456,64 @@ def test_tick_registers_citable_deck_source_evidence_from_deck_snapshot() -> Non
     assert registry.snapshot()["mix"][expected] == (100.0,)
 
 
+def test_tick_registers_citable_deck_audio_window_evidence() -> None:
+    """The registry must cite pre/current Deck A/B audio windows, not only render them."""
+    registry = EvidenceRegistry()
+    state = MusicState()
+    state.set_start_at = 900.0
+    ctrl = _ctrl_mock()
+    ctrl.moves_since.return_value = [(0.4, "A_low: flat→killed")]
+    audio_capture_context = {
+        "deck_audio_capture_enabled": True,
+        "deck_audio_rms": {"A": 0.04, "B": 0.02},
+        "deck_audio_features": {
+            "A": {"activity": "active", "rms": 0.04},
+            "B": {"activity": "active", "rms": 0.02},
+        },
+        "deck_audio_deltas": {
+            "A": ["rms_rose_100pct_strong"],
+            "B": ["rms_fell_33pct_clear"],
+        },
+        "deck_audio_windows": {
+            "pre_s": (-6.0, -1.0),
+            "current_s": (-1.0, 0.0),
+            "A": {
+                "pre": {"activity": "active", "rms": 0.02},
+                "current": {"activity": "active", "rms": 0.04},
+                "delta": ["rms_rose_100pct_strong"],
+            },
+            "B": {
+                "pre": {"activity": "active", "rms": 0.03},
+                "current": {"activity": "active", "rms": 0.02},
+                "delta": ["rms_fell_33pct_clear"],
+            },
+        },
+    }
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        ctrl,
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=900.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=999.5,
+        evidence_registry=registry,
+        audio_capture_context=audio_capture_context,
+    )
+
+    mix = registry.snapshot()["mix"]
+    assert "deck_audio_capture=A_active+B_active" in mix
+    assert "deck_audio_features=A_active_rms_0.040+B_active_rms_0.020" in mix
+    assert "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_33pct_clear" in mix
+    assert (
+        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_active_pre_0.030_current_0.020"
+    ) in mix
+
+
 def test_18_02_aud_NOT_written_when_silent():
     """Test F — per-tick aud writes ONLY when audible (anti-noise).
 
@@ -1739,8 +1797,10 @@ def test_18_02_state_refresh_loop_threads_registry_kwarg(mocker):
 
     sig = inspect.signature(state_refresh_loop)
     assert "evidence_registry" in sig.parameters
+    assert "audio_capture_context" in sig.parameters
     # Default is None for backward compat
     assert sig.parameters["evidence_registry"].default is None
+    assert sig.parameters["audio_capture_context"].default is None
 
     # Behavioral: call state_refresh_loop with registry, capture _tick_once kwargs
     state = MusicState()
@@ -1748,6 +1808,7 @@ def test_18_02_state_refresh_loop_threads_registry_kwarg(mocker):
     buf = _audible_buf()
     stop = asyncio.Event()
     registry = EvidenceRegistry()
+    audio_capture_context = {"deck_audio_capture_enabled": True}
 
     captured_kwargs: list[dict] = []
 
@@ -1770,11 +1831,18 @@ def test_18_02_state_refresh_loop_threads_registry_kwarg(mocker):
 
     asyncio.run(
         state_refresh_loop(
-            state, buf, _ctrl_mock(), _track_mock(), stop, evidence_registry=registry
+            state,
+            buf,
+            _ctrl_mock(),
+            _track_mock(),
+            stop,
+            evidence_registry=registry,
+            audio_capture_context=audio_capture_context,
         )
     )
     assert captured_kwargs, "tick_once was never called"
     assert captured_kwargs[0].get("evidence_registry") is registry
+    assert captured_kwargs[0].get("audio_capture_context") is audio_capture_context
 
 
 # ---------- Phase 52 (GENRE-01): genre auto-detect wiring ----------

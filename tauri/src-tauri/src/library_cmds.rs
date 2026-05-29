@@ -1540,6 +1540,9 @@ mod tests {
                 "deck_source_status",
                 "audio_part_context",
                 "deck_audio_separation_context",
+                "deck_audio_features_context",
+                "deck_audio_delta_context",
+                "deck_audio_window_context",
                 "audio_window_map",
                 "audio_delta",
                 "live_evidence"
@@ -1571,6 +1574,30 @@ mod tests {
                 "upgrade_path=multi_channel_deck_pair_capture ",
                 "rule=separation_capability_not_outcome]"
             ),
+            "deck_audio_features_context": concat!(
+                "deck_audio_features_context[source=deck_pair_capture ",
+                "window=latest_callback per_deck_audio=captured_features ",
+                "A_activity=active A_rms=0.020 B_activity=active B_rms=0.030 ",
+                "rule=deck_audio_features_not_outcome_verdict]"
+            ),
+            "deck_audio_delta_context": concat!(
+                "deck_audio_delta_context[source=deck_pair_capture ",
+                "window=latest_callback per_deck_delta=captured_feature_delta ",
+                "A_delta=rms_rose_100pct_strong B_delta=rms_fell_50pct_strong ",
+                "rule=deck_audio_delta_not_causal_proof]"
+            ),
+            "deck_audio_window_context": concat!(
+                "deck_audio_window_context[source=deck_pair_capture ",
+                "timeline=pre_action_current pre=-6.0..-1.0 current=-1.0..0.0 ",
+                "action=-1.0..0.0 per_deck_audio=captured_window_features ",
+                "A_pre=active_rms_0.020_peak_0.100_flux_0.004 ",
+                "A_current=active_rms_0.040_peak_0.120_flux_0.009 ",
+                "A_delta=rms_rose_100pct_strong ",
+                "B_pre=active_rms_0.030_peak_0.110_flux_0.006 ",
+                "B_current=active_rms_0.020_peak_0.090_flux_0.004 ",
+                "B_delta=rms_fell_33pct_clear ",
+                "rule=deck_audio_window_not_causal_or_quality_verdict]"
+            ),
             "audio_window_context": concat!(
                 "audio_window_context[P1=master_global_mix pre=-6.0..-1.0 ",
                 "action=-1.0..0.0 move_anchor=A_low_cut_to_killed@-0.3s:inside_P1 ",
@@ -1580,6 +1607,30 @@ mod tests {
                 "per_deck_audio=structured_text_only duplicate_audio=same_master_not_deck_split ",
                 "deck_separation=deck_lanes_context lane_aliases=deck1:A,deck2:B]"
             ),
+            "audio_window_map": {
+                "p1": "master_global_mix",
+                "p1_heard": true,
+                "timeline": "past_action_future",
+                "together_audio": "P1_global_mix",
+                "decks_together": true,
+                "deckA_audio": "not_attached",
+                "deckB_audio": "not_attached",
+                "per_deck_audio": "structured_text_only",
+                "duplicate_audio": "same_master_not_deck_split",
+                "deck_separation": "deck_lanes_context",
+                "lane_aliases": "deck1:A,deck2:B",
+                "pre_s": [-6.0, -1.0],
+                "current_s": [-1.0, 0.0],
+                "action_s": [-1.0, 0.0],
+                "move_anchors": [{
+                    "label": "A_low: cut->killed",
+                    "token": "A_low_cut_to_killed",
+                    "age_s": 0.3,
+                    "relation": "inside_P1"
+                }],
+                "future": {"heard": false, "span": "not_attached"},
+                "rule": "time_alignment_not_outcome_verdict"
+            },
         });
         let live_context_json =
             serde_json::to_string(&live_context).expect("live context serializes");
@@ -1631,6 +1682,24 @@ mod tests {
             .iter()
             .any(|value| value.as_str() == Some("deck_audio_separation_context")));
         assert!(parsed
+            .get("live_context_capabilities")
+            .and_then(Value::as_array)
+            .expect("capabilities array")
+            .iter()
+            .any(|value| value.as_str() == Some("deck_audio_features_context")));
+        assert!(parsed
+            .get("live_context_capabilities")
+            .and_then(Value::as_array)
+            .expect("capabilities array")
+            .iter()
+            .any(|value| value.as_str() == Some("deck_audio_delta_context")));
+        assert!(parsed
+            .get("live_context_capabilities")
+            .and_then(Value::as_array)
+            .expect("capabilities array")
+            .iter()
+            .any(|value| value.as_str() == Some("deck_audio_window_context")));
+        assert!(parsed
             .get("audio_part_context")
             .and_then(Value::as_str)
             .unwrap_or("")
@@ -1650,6 +1719,28 @@ mod tests {
             .and_then(Value::as_str)
             .unwrap_or("")
             .contains("per_deck_audio=not_attached"));
+        assert!(parsed
+            .get("deck_audio_features_context")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .contains("B_activity=active"));
+        assert!(parsed
+            .get("deck_audio_delta_context")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .contains("B_delta=rms_fell_50pct_strong"));
+        assert!(parsed
+            .get("deck_audio_window_context")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .contains("timeline=pre_action_current"));
+        assert_eq!(
+            parsed
+                .get("audio_window_map")
+                .and_then(|value| value.get("deckA_audio"))
+                .and_then(Value::as_str),
+            Some("not_attached")
+        );
         assert!(parsed
             .get("deck_source_context")
             .and_then(Value::as_str)

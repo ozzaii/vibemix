@@ -90,19 +90,15 @@ def snapshot_features(buf: AudioBuffer, seconds: float = 5.0) -> dict:
     }
 
 
-def snapshot_wav(
-    buf: AudioBuffer, seconds: float, normalize_peak_dbfs: float | None = -3.0
+def pcm_to_wav(
+    pcm: np.ndarray, sample_rate: int, normalize_peak_dbfs: float | None = -3.0
 ) -> bytes:
-    """Return the last `seconds` of audio as RIFF-WAV bytes (mono int16 @ buf._sr).
+    """Return an int16 PCM slice as RIFF-WAV bytes (mono @ sample_rate).
 
     Peak-normalize math: scale so peak hits `normalize_peak_dbfs` (default -3 dBFS).
     CLIPS BEFORE CAST when scale > 1.0 (RESEARCH.md Pitfall 4 — int16 overflow
     silently produces -32768 if order inverted). Verbatim port of v4:306-331.
     """
-    sr = buf._sr
-    n = int(sr * seconds)
-    pcm = buf.snapshot(n)
-
     if normalize_peak_dbfs is not None and pcm.size > 0:
         peak = int(np.abs(pcm).max())
         if peak > 0:
@@ -117,9 +113,19 @@ def snapshot_wav(
     with wave.open(bio, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
-        w.setframerate(sr)
+        w.setframerate(sample_rate)
         w.writeframes(pcm.tobytes())
     return bio.getvalue()
+
+
+def snapshot_wav(
+    buf: AudioBuffer, seconds: float, normalize_peak_dbfs: float | None = -3.0
+) -> bytes:
+    """Return the last `seconds` of audio as RIFF-WAV bytes (mono int16 @ buf._sr)."""
+    sr = buf._sr
+    n = int(sr * seconds)
+    pcm = buf.snapshot(n)
+    return pcm_to_wav(pcm, sr, normalize_peak_dbfs=normalize_peak_dbfs)
 
 
 def energy_curve(buf: AudioBuffer, seconds: float = 12.0, hop: float = 1.0) -> list[float]:

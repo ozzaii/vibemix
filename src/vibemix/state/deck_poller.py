@@ -73,6 +73,11 @@ NUMPY_CONF_FLOOR: float = 0.5  # consumed when the deferred KS estimator lands
 # (RESEARCH Spike 3, A4 — mirrors the audible_track_confidence 0.5 gate, set a
 # touch higher so only confident keys are ever citable).
 DECK_CITE_MIN_CONF: float = 0.6
+# Last-known deck rows are contextual memory only, not current deck identity
+# proof. Keep this below deck_context.DECK_CONTEXT_MIN_CONF (0.3) so shared
+# claim policy never treats a carried-over lane as resolved/citable.
+LAST_KNOWN_CONTEXT_CONF: float = 0.29
+LAST_KNOWN_MAX_AGE_S: float = 30.0 * 60.0
 
 _NON_DECK_NOWPLAYING_BUNDLE_EXACT: frozenset[str] = frozenset(
     {
@@ -153,6 +158,9 @@ class DeckPoller:
         # resolve. This is context, not proof; refresh.py copies it into
         # MusicState.deck_state.source_status under the single-writer lock.
         self._source_status: dict[str, str] = {}
+        # Non-citable memory of sides independently resolved earlier in this
+        # session. Used only to label lanes as "last known", never as proof.
+        self._last_known_decks: dict[str, DeckTrack] = {}
         # Now-playing label→track_id index, rebuilt when the library identity or track count
         # changes (read-only). Keyed on id(library)+len(tracks) so a mid-session
         # collection.xml re-import (RekordboxLibrary.load_xml overwrites
@@ -180,21 +188,49 @@ class DeckPoller:
         ``None`` so the poller abstains instead of inventing a deck identity.
         NEVER writes anything.
         """
-        if not title or self._library is None:
-            return None
+        entry, _status = self._resolve_title_with_status(title)
+        return entry
+
+    def _library_source_status(self) -> dict[str, str]:
+        """Return bounded cache diagnostics without exposing track content."""
+        if self._library is None:
+            return {"library": "missing", "library_tracks": "0", "library_source": "none"}
+        try:
+            tracks = self._library.tracks
+            track_count = len(tracks)
+        except Exception:
+            return {
+                "library": "error",
+                "library_tracks": "unknown",
+                "library_source": self._library_source_name(),
+            }
+        return {
+            "library": "present" if track_count > 0 else "empty",
+            "library_tracks": str(max(0, track_count)),
+            "library_source": self._library_source_name(),
+        }
+
+    def _resolve_title_with_status(self, title: str | None):
+        """Return ``(TrackEntry|None, status_token)`` for source-status diagnostics."""
+        if not title:
+            return None, "no_title"
+        if self._library is None:
+            return None, "library_missing"
         try:
             tracks = self._library.tracks
         except Exception:
-            return None
+            return None, "library_error"
+        try:
+            track_count = len(tracks)
+        except Exception:
+            track_count = -1
+        if track_count <= 0:
+            return None, "library_empty"
         # Build/refresh a case-folded title→id index (bounded — collection size).
         # Rebuild when the library object changed (id) OR the track count moved
         # (a re-import) — otherwise a re-imported collection.xml would keep
         # resolving against the stale index (WR-01). The len() guard catches
         # re-imports that change count; id() covers a same-count object swap.
-        try:
-            track_count = len(tracks)
-        except Exception:
-            track_count = -1
         if (
             self._title_index is None
             or id(self._library) != self._index_for_library_id
@@ -205,14 +241,19 @@ class DeckPoller:
             self._index_track_count = track_count
         lookup_key = _nowplaying_index_key(title)
         if not lookup_key:
-            return None
+            return None, "no_title"
+        if lookup_key not in self._title_index:
+            return None, "not_found"
         tid = self._title_index.get(lookup_key)
         if tid is None:
-            return None
+            return None, "ambiguous_label"
         try:
-            return tracks.get(tid)
+            entry = tracks.get(tid)
         except Exception:
-            return None
+            return None, "library_lookup_error"
+        if entry is None:
+            return None, "track_row_missing"
+        return entry, "matched"
 
     def _xml_decktrack(self, entry, *, confidence: float, now: float) -> DeckTrack:
         """Build a library-sourced DeckTrack from a cache-warm entry.
@@ -287,6 +328,18 @@ class DeckPoller:
         # Read the controller + nowplaying snapshots (read-only).
         cs = self._controller.deck_snapshot() if self._controller is not None else None
         source_status: dict[str, str] = {"controller": "present" if cs is not None else "missing"}
+        source_status.update(self._library_source_status())
+        source_status["screen_vision"] = (
+            "enabled" if self._vision_enabled and self._vision_reader is not None
+            else "enabled_no_reader" if self._vision_enabled
+            else "disabled"
+        )
+        if cs is None:
+            source_status["controller_connection"] = "unavailable"
+        else:
+            source_status["controller_connection"] = (
+                "connected" if bool(cs.get("connected", False)) else "disconnected"
+            )
         title = None
         if self._track_info is not None:
             tsnap = self._track_info.snapshot()
@@ -312,7 +365,8 @@ class DeckPoller:
         # Step 2: resolve ONLY the independently-confirmed (audible) single deck.
         # "mix"/"none" are NOT a single attributable deck → suppress (no guess).
         if audible_deck in ("A", "B"):
-            entry = self._resolve_title(title)
+            entry, match_status = self._resolve_title_with_status(title)
+            source_status["library_match"] = match_status
             if entry is not None:
                 # XML match clears the floor → resolved DeckTrack on the audible
                 # deck. An XML tag is high-trust regardless of how strongly the
@@ -331,6 +385,7 @@ class DeckPoller:
                 source_status["resolution"] = "library_miss"
             elif source_status.get("nowplaying") == "blocked_non_deck_owner":
                 source_status["resolution"] = "blocked_non_deck_nowplaying"
+                source_status["library_match"] = "not_attempted_non_deck_nowplaying"
             else:
                 source_status["resolution"] = "no_nowplaying_title"
         else:
@@ -351,7 +406,61 @@ class DeckPoller:
         # ``vision_enabled`` is the only step gated behind the real-screenshot eval.
         if self._vision_enabled and self._vision_reader is not None:
             self._maybe_apply_vision(decks, audible_deck, now)
+        self._remember_current_decks(decks)
+        self._append_last_known_decks(
+            decks,
+            now,
+            source_status,
+            controller_connected=bool(cs.get("connected", False)),
+        )
+        current_identity_sides = {
+            side for side, deck in decks.items() if deck.source != "last_known"
+        }
+        if audible_deck in ("A", "B") and {"A", "B"} - current_identity_sides:
+            source_status["second_deck_source"] = "suppressed_requires_independent_source"
         return decks, source_status
+
+    def _remember_current_decks(self, decks: dict[str, DeckTrack]) -> None:
+        """Remember independently resolved decks as non-citable future context."""
+        for side, deck in decks.items():
+            if side not in {"A", "B"}:
+                continue
+            if deck.source in {"unknown", "last_known"}:
+                continue
+            if deck.confidence <= 0 or not (deck.title or deck.track_id or deck.camelot):
+                continue
+            self._last_known_decks[side] = replace_decktrack(deck)
+
+    def _append_last_known_decks(
+        self,
+        decks: dict[str, DeckTrack],
+        now: float,
+        source_status: dict[str, str],
+        *,
+        controller_connected: bool,
+    ) -> None:
+        """Add previous deck identity as labeled context, never as proof."""
+        if not controller_connected:
+            return
+        appended: list[str] = []
+        for side in ("A", "B"):
+            if side in decks:
+                continue
+            previous = self._last_known_decks.get(side)
+            if previous is None:
+                continue
+            age_s = max(0.0, now - float(previous.loaded_at or 0.0))
+            if age_s > LAST_KNOWN_MAX_AGE_S:
+                continue
+            decks[side] = replace(
+                previous,
+                source="last_known",
+                confidence=min(LAST_KNOWN_CONTEXT_CONF, max(0.0, previous.confidence)),
+            )
+            appended.append(side)
+        if appended:
+            source_status["last_known_sides"] = "+".join(appended)
+            source_status["last_known_rule"] = "context_only_not_current_identity_proof"
 
     def _maybe_apply_vision(self, decks: dict, audible_deck, now: float) -> None:
         """Consume the GATED vision leg for any deck without an independent source.

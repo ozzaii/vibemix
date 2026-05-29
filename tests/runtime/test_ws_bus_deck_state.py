@@ -140,9 +140,17 @@ def test_payload_includes_populated_deck_state(mocker):
         },
         source_status={
             "controller": "present",
+            "controller_connection": "connected",
+            "library": "present",
+            "library_tracks": "24",
+            "library_source": "rekordbox_xml",
+            "library_match": "matched",
             "nowplaying": "blocked_non_deck_owner",
             "nowplaying_owner": "com.apple.webkit.gpu",
+            "nowplaying_title": "seen",
             "resolution": "blocked_non_deck_nowplaying",
+            "second_deck_source": "suppressed_requires_independent_source",
+            "screen_vision": "disabled",
         },
     )
 
@@ -243,9 +251,17 @@ def test_payload_includes_bounded_deck_context_maps(mocker):
         },
         source_status={
             "controller": "present",
+            "controller_connection": "connected",
+            "library": "present",
+            "library_tracks": "24",
+            "library_source": "rekordbox_xml",
+            "library_match": "matched",
             "nowplaying": "blocked_non_deck_owner",
             "nowplaying_owner": "com.apple.webkit.gpu",
+            "nowplaying_title": "seen",
             "resolution": "blocked_non_deck_nowplaying",
+            "second_deck_source": "suppressed_requires_independent_source",
+            "screen_vision": "disabled",
         },
     )
 
@@ -268,15 +284,33 @@ def test_payload_includes_bounded_deck_context_maps(mocker):
     assert "resolved=A" in payload["deck_source_context"]
     assert "unresolved=B" in payload["deck_source_context"]
     assert "nowplaying=blocked_non_deck_owner" in payload["deck_source_context"]
+    assert "controller_connection=connected" in payload["deck_source_context"]
+    assert "library=present" in payload["deck_source_context"]
+    assert "library_tracks=24" in payload["deck_source_context"]
+    assert "library_source=rekordbox_xml" in payload["deck_source_context"]
+    assert "library_match=matched" in payload["deck_source_context"]
     assert "nowplaying_owner=com.apple.webkit.gpu" in payload["deck_source_context"]
+    assert "nowplaying_title=seen" in payload["deck_source_context"]
     assert "resolution=blocked_non_deck_nowplaying" in payload["deck_source_context"]
+    assert "second_deck_source=suppressed_requires_independent_source" in payload[
+        "deck_source_context"
+    ]
+    assert "screen_vision=disabled" in payload["deck_source_context"]
     assert "second_deck=independent_source_required" in payload["deck_source_context"]
     assert "rule=unresolved_deck_is_not_transition_evidence" in payload["deck_source_context"]
     assert payload["deck_source_status"] == {
         "controller": "present",
+        "controller_connection": "connected",
+        "library": "present",
+        "library_tracks": "24",
+        "library_source": "rekordbox_xml",
+        "library_match": "matched",
         "nowplaying": "blocked_non_deck_owner",
         "nowplaying_owner": "com.apple.webkit.gpu",
+        "nowplaying_title": "seen",
         "resolution": "blocked_non_deck_nowplaying",
+        "second_deck_source": "suppressed_requires_independent_source",
+        "screen_vision": "disabled",
     }
 
     assert payload["deck_audio_context"].startswith("deck_audio_context[")
@@ -416,6 +450,168 @@ def test_payload_includes_capture_separation_context_for_multichannel_devices(mo
     assert "current_capture=P1_global_mix" in ctx
     assert "deckA_audio=not_captured" in ctx
     assert "deckB_audio=not_captured" in ctx
+
+
+def test_payload_marks_configured_deck_pair_capture(mocker):
+    state = MusicState()
+    state.controller_connected = True
+
+    payload = _capture_payload(
+        state,
+        mocker,
+        audio_capture_context={
+            "requested_device": "BlackHole 16ch",
+            "device_name": "BlackHole 16ch",
+            "input_channels": 16,
+            "opened_channels": 4,
+            "sample_rate": 48000,
+            "master_channels": "0,1,2,3",
+            "deck_channels": {"A": "0,1", "B": "2,3"},
+            "deck_audio_capture_enabled": True,
+            "deck_audio_rms": {"A": 0.02, "B": 0.0},
+            "deck_audio_features": {
+                "A": {"activity": "active", "rms": 0.02, "peak": 0.1, "zcr": 0.03},
+                "B": {"activity": "silent", "rms": 0.0, "peak": 0.0, "zcr": 0.0},
+            },
+            "deck_audio_deltas": {
+                "A": ["rms_rose_100pct_strong"],
+                "B": ["rms_fell_50pct_strong"],
+            },
+            "deck_audio_windows": {
+                "pre_s": [-6.0, -1.0],
+                "current_s": [-1.0, 0.0],
+                "A": {
+                    "pre": {"activity": "active", "rms": 0.02, "peak": 0.1, "flux": 0.004},
+                    "current": {
+                        "activity": "active",
+                        "rms": 0.04,
+                        "peak": 0.12,
+                        "flux": 0.009,
+                    },
+                    "delta": ["rms_rose_100pct_strong"],
+                },
+                "B": {
+                    "pre": {"activity": "active", "rms": 0.03, "peak": 0.11, "flux": 0.006},
+                    "current": {
+                        "activity": "silent",
+                        "rms": 0.0,
+                        "peak": 0.0,
+                        "flux": 0.001,
+                    },
+                    "delta": ["rms_fell_50pct_strong"],
+                },
+            },
+        },
+    )
+
+    ctx = payload["deck_audio_separation_context"]
+    assert "mode=deck_pair_capture_configured" in ctx
+    assert "current_capture=P1_global_mix_plus_deck_pairs" in ctx
+    assert "deckA_audio=captured" in ctx
+    assert "deckB_audio=captured" in ctx
+    assert "per_deck_audio=captured_not_attached" in ctx
+    assert "deck_audio_activity=A_active+B_silent" in ctx
+    assert "deck_audio_features_context" in payload["live_context_capabilities"]
+    assert "deck_audio_features_context[" in payload["deck_audio_features_context"]
+    assert "A_activity=active" in payload["deck_audio_features_context"]
+    assert "B_activity=silent" in payload["deck_audio_features_context"]
+    assert "deck_audio_delta_context" in payload["live_context_capabilities"]
+    assert "deck_audio_delta_context[" in payload["deck_audio_delta_context"]
+    assert "A_delta=rms_rose_100pct_strong" in payload["deck_audio_delta_context"]
+    assert "B_delta=rms_fell_50pct_strong" in payload["deck_audio_delta_context"]
+    assert "deck_audio_window_context" in payload["live_context_capabilities"]
+    assert "deck_audio_window_context[" in payload["deck_audio_window_context"]
+    assert "timeline=pre_action_current" in payload["deck_audio_window_context"]
+    assert "A_current=active_rms_0.040" in payload["deck_audio_window_context"]
+    assert "deck_audio_capture=A_active+B_silent" in payload["live_evidence"]["mix"]
+    assert "deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000" in payload[
+        "live_evidence"
+    ]["mix"]
+    assert "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong" in payload[
+        "live_evidence"
+    ]["mix"]
+    assert (
+        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_silent_pre_0.030_current_0.000"
+    ) in payload["live_evidence"]["mix"]
+
+
+def test_configured_deck_pair_capture_forces_audio_window_on_silent_frame(mocker):
+    """A routed Deck A/B capture is enough structure to publish the P1 time map."""
+    state = MusicState()
+
+    payload = _capture_payload(
+        state,
+        mocker,
+        audio_capture_context={
+            "requested_device": "BlackHole 16ch",
+            "device_name": "BlackHole 16ch",
+            "input_channels": 16,
+            "opened_channels": 4,
+            "sample_rate": 48000,
+            "master_channels": "0,1,2,3",
+            "deck_channels": {"A": "0,1", "B": "2,3"},
+            "deck_audio_capture_enabled": True,
+            "deck_audio_rms": {"A": 0.0, "B": 0.0},
+            "deck_audio_features": {
+                "A": {"activity": "silent", "rms": 0.0, "peak": 0.0, "zcr": 0.0},
+                "B": {"activity": "silent", "rms": 0.0, "peak": 0.0, "zcr": 0.0},
+            },
+        },
+    )
+
+    assert payload["deck"] == "none"
+    assert payload["audible"] is False
+    assert payload["deck_audio_separation_context"].startswith(
+        "deck_audio_separation_context["
+    )
+    assert "mode=deck_pair_capture_configured" in payload["deck_audio_separation_context"]
+    assert "deck_audio_delta_context" in payload["live_context_capabilities"]
+    assert payload["deck_audio_delta_context"].startswith("deck_audio_delta_context[")
+    assert "A_delta=no_clear_delta" in payload["deck_audio_delta_context"]
+    assert "B_delta=no_clear_delta" in payload["deck_audio_delta_context"]
+    assert payload["audio_window_context"].startswith("audio_window_context[")
+    assert "move_anchor=none" in payload["audio_window_context"]
+    assert payload["audio_window_map"]["p1"] == "master_global_mix"
+    assert payload["audio_window_map"]["move_anchors"] == []
+    assert payload["audio_window_map"]["future"]["span"] == "not_attached"
+
+
+def test_payload_renders_source_context_from_diagnostic_source_status(mocker):
+    state = MusicState()
+    state.deck_state.source_status = {
+        "controller": "present",
+        "controller_connection": "disconnected",
+        "nowplaying": "deck_candidate",
+        "nowplaying_title": "none",
+        "audible_deck": "none",
+        "resolution": "no_single_attributable_deck",
+    }
+
+    payload = _capture_payload(state, mocker)
+
+    assert payload["deck_source_context"].startswith("deck_source_context[")
+    assert payload["deck_lanes_context"].startswith("deck_lanes_context[")
+    assert "A(identity=unknown route=unknown" in payload["deck_lanes_context"]
+    assert "B(identity=unknown route=unknown" in payload["deck_lanes_context"]
+    assert payload["deck_reference_context"].startswith("deck_reference_context[")
+    assert "deck1=A identity=unknown route=unknown" in payload["deck_reference_context"]
+    assert "deck2=B identity=unknown route=unknown" in payload["deck_reference_context"]
+    assert "controller=present" in payload["deck_source_context"]
+    assert "controller_connection=disconnected" in payload["deck_source_context"]
+    assert "resolution=no_single_attributable_deck" in payload["deck_source_context"]
+    assert "source_status_rule=diagnostic_not_deck_identity" in payload["deck_source_context"]
+    assert "transition_block=no_resolved_decks" in payload["live_evidence"]["mix"]
+    assert "second_deck_identity=blocked" in payload["live_evidence"]["mix"]
+    assert "deck_lanes=A_unknown_route_unknown+B_unknown_route_unknown" in payload[
+        "live_evidence"
+    ]["mix"]
+    assert "deck_reference=deck1_A_unknown_route_unknown+deck2_B_unknown_route_unknown" in payload[
+        "live_evidence"
+    ]["mix"]
+    assert "deck_source=deck1_A_unknown_src_none+deck2_B_unknown_src_none" in payload[
+        "live_evidence"
+    ]["mix"]
 
 
 def test_payload_includes_audio_window_map_without_recent_moves(mocker):

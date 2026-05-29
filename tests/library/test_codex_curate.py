@@ -56,10 +56,126 @@ def _fresh_live_transport() -> dict:
             "deck_source_status",
             "audio_part_context",
             "deck_audio_separation_context",
+            "deck_audio_features_context",
+            "deck_audio_delta_context",
+            "deck_audio_window_context",
             "audio_window_map",
             "audio_delta",
             "live_evidence",
         ],
+    }
+
+
+def _deck_pair_audio_separation_context() -> str:
+    return (
+        "deck_audio_separation_context[requested_device=BlackHole_16ch "
+        "capture_device=BlackHole_16ch input_channels=16 opened_channels=4 "
+        "sample_rate=48000 device_capacity=multichannel_available "
+        "mode=deck_pair_capture_configured master_channels=0,1,2,3 "
+        "current_capture=P1_global_mix_plus_deck_pairs "
+        "gemini_audio=mono_downmix_of_master_capture deckA_audio=captured "
+        "deckB_audio=captured per_deck_audio=captured_not_attached "
+        "isolated_decks=runtime_capture_available deck_pairs=A:0,1+B:2,3 "
+        "upgrade_path=attach_deck_pair_audio_parts_when_needed "
+        "deck_audio_activity=A_active+B_active "
+        "rule=separation_capability_not_outcome]"
+    )
+
+
+def _deck_audio_features_context() -> str:
+    return (
+        "deck_audio_features_context[source=deck_pair_capture window=latest_callback "
+        "per_deck_audio=captured_features A_activity=active A_rms=0.024 "
+        "A_peak=0.120 A_zcr=0.030 B_activity=active B_rms=0.031 "
+        "B_peak=0.140 B_zcr=0.034 rule=deck_audio_features_not_outcome_verdict]"
+    )
+
+
+def _deck_audio_delta_context() -> str:
+    return (
+        "deck_audio_delta_context[source=deck_pair_capture window=latest_callback "
+        "per_deck_delta=captured_feature_delta A_delta=rms_rose_60pct_strong "
+        "B_delta=rms_fell_20pct_slight rule=deck_audio_delta_not_causal_proof]"
+    )
+
+
+def _deck_audio_window_context() -> str:
+    return (
+        "deck_audio_window_context[source=deck_pair_capture "
+        "timeline=pre_action_current pre=-6.0..-1.0 current=-1.0..0.0 "
+        "action=-1.0..0.0 per_deck_audio=captured_window_features "
+        "A_pre=active_rms_0.015_peak_0.090_flux_0.003 "
+        "A_current=active_rms_0.024_peak_0.120_flux_0.006 "
+        "A_delta=rms_rose_60pct_strong "
+        "B_pre=active_rms_0.039_peak_0.160_flux_0.006 "
+        "B_current=active_rms_0.031_peak_0.140_flux_0.004 "
+        "B_delta=rms_fell_20pct_slight "
+        "rule=deck_audio_window_not_causal_or_quality_verdict]"
+    )
+
+
+def _deck_audio_window_evidence() -> str:
+    return (
+        "deck_audio_window=A_active_pre_0.015_current_0.024+"
+        "B_active_pre_0.039_current_0.031"
+    )
+
+
+def _deck_pair_audio_part_context(deck_a: str = "P2", deck_b: str = "P3") -> str:
+    return (
+        "audio_part_context[surface=gemini_parts P1=live_global_mix "
+        "P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true "
+        "P1_span=-6.0..0.0 P1_deck_audio=global_mix_not_stems deck1=A deck2=B "
+        f"together_audio=P1 part_order=P1,{deck_a},{deck_b} "
+        "per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts "
+        f"deckA_part={deck_a} {deck_a}=deckA_configured_capture "
+        f"{deck_a}_model_heard=true {deck_a}_audience_heard=false "
+        f"{deck_a}_deck_audio=deckA_configured_capture "
+        f"{deck_a}_rule=deck_pair_capture_reference_not_quality_verdict "
+        f"deckB_part={deck_b} {deck_b}=deckB_configured_capture "
+        f"{deck_b}_model_heard=true {deck_b}_audience_heard=false "
+        f"{deck_b}_deck_audio=deckB_configured_capture "
+        f"{deck_b}_rule=deck_pair_capture_reference_not_quality_verdict "
+        "rule=part_labels_not_outcome_verdict]"
+    )
+
+
+def _deck_pair_audio_window_context(deck_a: str = "P2", deck_b: str = "P3") -> str:
+    return (
+        "audio_window_context[P1=master_global_mix P1_heard=true "
+        "timeline=past_action_future together_audio=P1_global_mix decks_together=true "
+        f"deckA_audio={deck_a} deckB_audio={deck_b} "
+        "per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts "
+        "deck_separation=deck_lanes_context "
+        "deck_audio_separation=deck_audio_separation_context "
+        "lane_aliases=deck1:A,deck2:B pre=-6.0..-1.0 current=-1.0..0.0 "
+        "action=-1.0..0.0 rule=time_alignment_not_outcome_verdict "
+        "move_anchor=none future_heard=false future=not_attached]"
+    )
+
+
+def _deck_pair_audio_window_map(deck_a: str = "P2", deck_b: str = "P3") -> dict:
+    return {
+        "p1": "master_global_mix",
+        "p1_heard": True,
+        "timeline": "past_action_future",
+        "together_audio": "P1_global_mix",
+        "decks_together": True,
+        "deckA_audio": deck_a,
+        "deckB_audio": deck_b,
+        "per_deck_audio": "deck_pair_parts",
+        "duplicate_audio": "separate_deck_pair_parts",
+        "deck_separation": "deck_lanes_context",
+        "deck_audio_separation": "deck_audio_separation_context",
+        "deck_part_span_s": [-3.0, 0.0],
+        "deck_part_activity": {"A": "active", "B": "active"},
+        "lane_aliases": "deck1:A,deck2:B",
+        "pre_s": [-6.0, -1.0],
+        "current_s": [-1.0, 0.0],
+        "action_s": [-1.0, 0.0],
+        "move_anchors": [],
+        "future": {"heard": False, "span": "not_attached"},
+        "rule": "time_alignment_not_outcome_verdict",
     }
 
 
@@ -188,7 +304,7 @@ def test_chat_prompt_omits_stale_viber_live_outcome_from_history():
     assert "multi_deck_outcome=blocked" in p
 
 
-def test_chat_prompt_keeps_viber_self_correction_in_history():
+def test_chat_prompt_omits_viber_self_correction_from_history():
     p = chat_prompt(
         "ok, what should I do now?",
         history=[
@@ -203,9 +319,9 @@ def test_chat_prompt_keeps_viber_self_correction_in_history():
         },
     )
 
-    assert "I saw a deck A low move" in p
-    assert "can't call it a transition" in p
-    assert "prior Viber live outcome claim omitted" not in p
+    assert "I saw a deck A low move" not in p
+    assert "can't call it a transition" not in p
+    assert "prior Viber live outcome claim omitted" in p
 
 
 def test_chat_prompt_does_not_advertise_gemini_youtube_tool():
@@ -225,6 +341,9 @@ def test_chat_prompt_includes_bounded_live_deck_context_guard():
                 "deck_source_status",
                 "audio_part_context",
                 "deck_audio_separation_context",
+                "deck_audio_features_context",
+                "deck_audio_delta_context",
+                "deck_audio_window_context",
                 "audio_window_map",
                 "audio_delta",
                 "live_evidence",
@@ -266,10 +385,23 @@ def test_chat_prompt_includes_bounded_live_deck_context_guard():
             },
             "deck_source_status": {
                 "controller": "present",
+                "controller_connection": "connected",
                 "nowplaying": "blocked_non_deck_owner",
                 "nowplaying_owner": "com.apple.WebKit.GPU",
                 "resolution": "blocked_non_deck_nowplaying",
             },
+            "deck_audio_features_context": (
+                "deck_audio_features_context[source=deck_pair_capture "
+                "window=latest_callback per_deck_audio=captured_features "
+                "A_activity=active A_rms=0.020 B_activity=silent B_rms=0.000 "
+                "rule=deck_audio_features_not_outcome_verdict]"
+            ),
+            "deck_audio_delta_context": (
+                "deck_audio_delta_context[source=deck_pair_capture "
+                "window=latest_callback per_deck_delta=captured_feature_delta "
+                "A_delta=rms_rose_100pct_strong B_delta=rms_fell_50pct_strong "
+                "rule=deck_audio_delta_not_causal_proof]"
+            ),
             "audio_window_map": {
                 "p1": "master_global_mix",
                 "p1_heard": True,
@@ -305,7 +437,9 @@ def test_chat_prompt_includes_bounded_live_deck_context_guard():
     assert "schema=2" in p
     assert (
         "capabilities=deck_state,deck_source_status,audio_part_context,"
-        "deck_audio_separation_context,audio_window_map,audio_delta,live_evidence"
+        "deck_audio_separation_context,deck_audio_features_context,"
+        "deck_audio_delta_context,deck_audio_window_context,audio_window_map,"
+        "audio_delta,live_evidence"
     ) in p
     assert "status=fresh_schema_v2" in p
     assert "rule=transport_receipt_not_musical_evidence" in p
@@ -317,6 +451,7 @@ def test_chat_prompt_includes_bounded_live_deck_context_guard():
     assert "audio=P1_global_mix" in p
     assert "per_deck_audio=not_attached" in p
     assert "deck_source_context[" in p
+    assert "controller_connection=connected" in p
     assert "nowplaying=blocked_non_deck_owner" in p
     assert "nowplaying_owner=com.apple.webkit.gpu" in p
     assert "resolution=blocked_non_deck_nowplaying" in p
@@ -326,6 +461,10 @@ def test_chat_prompt_includes_bounded_live_deck_context_guard():
     assert "mixer_context[" in p
     assert "deck_audio_context[" in p
     assert "deck_audio_separation_context[" in p
+    assert "deck_audio_features_context[" in p
+    assert "deck_audio_features_not_outcome_verdict" in p
+    assert "deck_audio_delta_context[" in p
+    assert "deck_audio_delta_not_causal_proof" in p
     assert "deckA_audio=not_captured" in p
     assert "deckB_audio=not_captured" in p
     assert "source=global_mix" in p
@@ -362,6 +501,201 @@ def test_chat_prompt_includes_bounded_live_deck_context_guard():
     assert "do not praise or claim a transition/blend" in p
 
 
+def test_chat_prompt_preserves_deck_pair_audio_window_map():
+    p = chat_prompt(
+        "what changed on each deck?",
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "mix",
+            "audible": True,
+            "deck_state": {
+                "A": {"title": "Strobe", "track_id": "t000", "confidence": 0.82},
+                "B": {"title": "Pulse", "track_id": "t001", "confidence": 0.8},
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 64,
+                "A": {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 96, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "audio_part_context": (
+                "audio_part_context[surface=gemini_parts P1=live_global_mix "
+                "P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true "
+                "P1_span=-6.0..0.0 P1_deck_audio=global_mix_not_stems deck1=A deck2=B "
+                "together_audio=P1 part_order=P1,P2,P3 per_deck_audio=deck_pair_parts "
+                "duplicate_audio=separate_deck_pair_parts deckA_part=P2 "
+                "P2=deckA_configured_capture P2_model_heard=true P2_audience_heard=false "
+                "P2_span=-3.0..0.0 P2_deck_audio=deckA_configured_capture "
+                "P2_rule=deck_pair_capture_reference_not_quality_verdict deckB_part=P3 "
+                "P3=deckB_configured_capture P3_model_heard=true P3_audience_heard=false "
+                "P3_span=-3.0..0.0 P3_deck_audio=deckB_configured_capture "
+                "P3_rule=deck_pair_capture_reference_not_quality_verdict "
+                "rule=part_labels_not_outcome_verdict]"
+            ),
+            "audio_window_context": (
+                "audio_window_context[P1=master_global_mix P1_heard=true "
+                "timeline=past_action_future together_audio=P1_global_mix decks_together=true "
+                "deckA_audio=P2 deckB_audio=P3 per_deck_audio=deck_pair_parts "
+                "duplicate_audio=separate_deck_pair_parts deck_separation=deck_lanes_context "
+                "deck_audio_separation=deck_audio_separation_context "
+                "deck_part_span=-3.0..0.0 deckA_activity=active deckB_activity=silent "
+                "lane_aliases=deck1:A,deck2:B pre=-6.0..-1.0 current=-1.0..0.0 "
+                "action=-1.0..0.0 rule=time_alignment_not_outcome_verdict "
+                "move_anchor=none future_heard=false future=not_attached]"
+            ),
+            "audio_window_map": {
+                "p1": "master_global_mix",
+                "p1_heard": True,
+                "timeline": "past_action_future",
+                "together_audio": "P1_global_mix",
+                "decks_together": True,
+                "deckA_audio": "P2",
+                "deckB_audio": "P3",
+                "per_deck_audio": "deck_pair_parts",
+                "duplicate_audio": "separate_deck_pair_parts",
+                "deck_separation": "deck_lanes_context",
+                "deck_audio_separation": "deck_audio_separation_context",
+                "deck_part_span_s": [-3.0, 0.0],
+                "deck_part_activity": {"A": "active", "B": "silent"},
+                "lane_aliases": "deck1:A,deck2:B",
+                "pre_s": [-6.0, -1.0],
+                "current_s": [-1.0, 0.0],
+                "action_s": [-1.0, 0.0],
+                "move_anchors": [],
+                "future": {"heard": False, "span": "not_attached"},
+                "rule": "time_alignment_not_outcome_verdict",
+            },
+        },
+    )
+
+    assert "audio_part_context[" in p
+    assert "per_deck_audio=deck_pair_parts" in p
+    assert "audio_window_context[" in p
+    assert "deckA_audio=P2" in p
+    assert "deckB_audio=P3" in p
+    assert "duplicate_audio=separate_deck_pair_parts" in p
+    assert "audio_window_map[" in p
+    assert "deckA_audio=P2 deckB_audio=P3" in p
+
+
+def test_chat_prompt_recomputes_audio_window_when_part_labels_disagree():
+    p = chat_prompt(
+        "what changed on each deck?",
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "mix",
+            "audible": True,
+            "deck_state": {
+                "A": {"title": "Strobe", "track_id": "t000", "confidence": 0.82},
+                "B": {"title": "Pulse", "track_id": "t001", "confidence": 0.8},
+            },
+            "audio_part_context": (
+                "audio_part_context[surface=gemini_parts P1=live_global_mix "
+                "P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true "
+                "P1_span=-6.0..0.0 P1_deck_audio=global_mix_not_stems deck1=A deck2=B "
+                "together_audio=P1 part_order=P1,P2,P3,P4,P5 per_deck_audio=deck_pair_parts "
+                "duplicate_audio=separate_deck_pair_parts deckA_part=P4 "
+                "P4=deckA_configured_capture P4_model_heard=true P4_audience_heard=false "
+                "P4_span=-3.0..0.0 P4_deck_audio=deckA_configured_capture "
+                "P4_rule=deck_pair_capture_reference_not_quality_verdict "
+                "P4_activity=deckA_active deckB_part=P5 "
+                "P5=deckB_configured_capture P5_model_heard=true P5_audience_heard=false "
+                "P5_span=-3.0..0.0 P5_deck_audio=deckB_configured_capture "
+                "P5_rule=deck_pair_capture_reference_not_quality_verdict "
+                "P5_activity=deckB_silent P2=user_mic P2_model_heard=true "
+                "P2_role=user_speech P2_deck_audio=none P2_rule=not_deck_audio "
+                "P3=source_file_lookahead P3_model_heard=true P3_audience_heard=false "
+                "P3_span=0.0..+3.0 P3_deck_audio=none "
+                "P3_rule=forecast_only_not_current_live_evidence "
+                "rule=part_labels_not_outcome_verdict]"
+            ),
+            "audio_window_context": (
+                "audio_window_context[P1=master_global_mix P1_heard=true "
+                "timeline=past_action_future together_audio=P1_global_mix decks_together=true "
+                "deckA_audio=P2 deckB_audio=P3 per_deck_audio=deck_pair_parts "
+                "duplicate_audio=separate_deck_pair_parts deck_separation=deck_lanes_context "
+                "deck_audio_separation=deck_audio_separation_context "
+                "deck_part_span=-3.0..0.0 lane_aliases=deck1:A,deck2:B "
+                "pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 "
+                "rule=time_alignment_not_outcome_verdict move_anchor=none "
+                "future_heard=false future=not_attached]"
+            ),
+            "audio_window_map": {
+                "p1": "master_global_mix",
+                "p1_heard": True,
+                "timeline": "past_action_future",
+                "together_audio": "P1_global_mix",
+                "decks_together": True,
+                "deckA_audio": "P2",
+                "deckB_audio": "P3",
+                "per_deck_audio": "deck_pair_parts",
+                "duplicate_audio": "separate_deck_pair_parts",
+                "deck_separation": "deck_lanes_context",
+                "deck_audio_separation": "deck_audio_separation_context",
+                "deck_part_span_s": [-3.0, 0.0],
+                "lane_aliases": "deck1:A,deck2:B",
+                "pre_s": [-6.0, -1.0],
+                "current_s": [-1.0, 0.0],
+                "action_s": [-1.0, 0.0],
+                "move_anchors": [],
+                "future": {"heard": False, "span": "not_attached"},
+                "rule": "time_alignment_not_outcome_verdict",
+            },
+        },
+    )
+
+    assert "deckA_part=P4" in p
+    assert "deckB_part=P5" in p
+    assert "deckA_audio=P4" in p
+    assert "deckB_audio=P5" in p
+    assert "deckA_audio=P2 deckB_audio=P3" not in p
+    assert "audio_window_map[" not in p
+
+
+def test_chat_prompt_rejects_colliding_deck_pair_audio_window_map():
+    p = chat_prompt(
+        "what changed on each deck?",
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "mix",
+            "audible": True,
+            "audio_window_context": (
+                "audio_window_context[P1=master_global_mix P1_heard=true "
+                "timeline=past_action_future together_audio=P1_global_mix decks_together=true "
+                "deckA_audio=P2 deckB_audio=P2 per_deck_audio=deck_pair_parts "
+                "duplicate_audio=separate_deck_pair_parts deck_separation=deck_lanes_context "
+                "deck_audio_separation=deck_audio_separation_context "
+                "lane_aliases=deck1:A,deck2:B pre=-6.0..-1.0 current=-1.0..0.0 "
+                "action=-1.0..0.0 rule=time_alignment_not_outcome_verdict "
+                "move_anchor=none future_heard=false future=not_attached]"
+            ),
+            "audio_window_map": {
+                "p1": "master_global_mix",
+                "p1_heard": True,
+                "timeline": "past_action_future",
+                "together_audio": "P1_global_mix",
+                "decks_together": True,
+                "deckA_audio": "P2",
+                "deckB_audio": "P2",
+                "per_deck_audio": "deck_pair_parts",
+                "duplicate_audio": "separate_deck_pair_parts",
+                "deck_separation": "deck_lanes_context",
+                "deck_audio_separation": "deck_audio_separation_context",
+                "lane_aliases": "deck1:A,deck2:B",
+                "pre_s": [-6.0, -1.0],
+                "current_s": [-1.0, 0.0],
+                "action_s": [-1.0, 0.0],
+                "move_anchors": [],
+                "future": {"heard": False, "span": "not_attached"},
+                "rule": "time_alignment_not_outcome_verdict",
+            },
+        },
+    )
+
+    assert "audio_window_map[" not in p
+    assert "deckA_audio=P2 deckB_audio=P2" not in p
+
+
 def test_chat_prompt_marks_stale_live_transport_as_partial_for_active_questions():
     p = chat_prompt(
         "was that a transition?",
@@ -388,7 +722,9 @@ def test_chat_prompt_marks_stale_live_transport_as_partial_for_active_questions(
     assert "schema=missing" in p
     assert (
         "missing=audio_delta,audio_part_context,audio_window_map,"
-        "deck_audio_separation_context,deck_source_status,live_evidence"
+        "deck_audio_delta_context,deck_audio_features_context,"
+        "deck_audio_separation_context,deck_audio_window_context,"
+        "deck_source_status,live_evidence"
     ) in p
     assert "status=stale_or_pre_schema_v2" in p
     assert "Transport is stale_or_pre_schema_v2" in p
@@ -425,6 +761,46 @@ def test_chat_prompt_marks_current_live_question_as_active_context():
 
     assert "LIVE CONTEXT USE: active_live_context" in p
     assert "asking about the current live deck/move/audio moment" in p
+
+
+def test_chat_prompt_preserves_last_known_deck_as_unverified_context_only():
+    p = chat_prompt(
+        "what changed on each deck?",
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "B",
+            "audible": True,
+            "deck_state": {
+                "A": {
+                    "title": "Strobe",
+                    "track_id": "t000",
+                    "camelot": "8A",
+                    "bpm": 128,
+                    "confidence": 0.29,
+                    "source": "last_known",
+                },
+                "B": {
+                    "title": "Signal",
+                    "track_id": "t001",
+                    "camelot": "9A",
+                    "bpm": 130,
+                    "confidence": 0.8,
+                    "source": "rekordbox_xml",
+                },
+            },
+            "deck_source_status": {
+                "last_known_sides": "A",
+                "last_known_rule": "context_only_not_current_identity_proof",
+            },
+        },
+    )
+
+    assert "A(identity=last_known_unverified" in p
+    assert "src=last_known" in p
+    assert "last_title='Strobe'" in p
+    assert "resolved=B" in p
+    assert "transition_block=single_resolved_deck" in p
+    assert "last_known_rule=context_only_not_current_identity_proof" in p
 
 
 def test_chat_prompt_marks_two_loaded_single_audible_as_watch_not_claim_without_moves():
@@ -735,7 +1111,7 @@ def test_chat_with_codex_corrects_outcome_after_empty_live_deck_clear(library):
     )
 
     assert "Great transition" not in res.reply
-    assert "hold the transition verdict" in res.reply
+    assert "sound change right there" in res.reply
     assert "resolved decks=none" not in res.reply
     assert "won't call that a transition" not in res.reply
 
@@ -800,7 +1176,9 @@ def test_codex_chat_result_to_dict_surfaces_live_verification():
     verification = {
         "ok": True,
         "violations": [],
-        "reply": "I'll hold the transition verdict until live deck proof is stronger.",
+        "reply": (
+            "I caught the live move. The useful note is the sound change right there."
+        ),
         "corrected": False,
         "corrected_reply": None,
         "claim_policy": "blocked",
@@ -811,7 +1189,9 @@ def test_codex_chat_result_to_dict_surfaces_live_verification():
         "guard_violations": ["unsupported_live_outcome_claim"],
     }
     out = CodexChatResult(
-        reply="I'll hold the transition verdict until live deck proof is stronger.",
+        reply=(
+            "I caught the live move. The useful note is the sound change right there."
+        ),
         live_verification=verification,
     ).to_dict()
 
@@ -908,11 +1288,11 @@ def test_chat_with_codex_live_question_without_context_fails_closed(library, tmp
     )
 
     assert (
-        res.reply == "Live proof is not armed, so I won't judge that transition or deck move yet."
+        res.reply == "Start live monitoring first, then I'll read the live move from the decks."
     )
     assert res.stop_reason == "live_context_required"
     assert res.tool_trace == [
-        {"name": "live_context_required", "arg": "live proof not armed", "ok": False}
+        {"name": "live_context_required", "arg": "waiting for live deck feed", "ok": False}
     ]
     assert res.live_verification is not None
     assert res.live_verification["ok"] is True
@@ -1232,7 +1612,7 @@ def test_chat_with_codex_corrects_unsupported_multi_deck_outcome_claim(library):
     )
 
     assert "Great transition" not in res.reply
-    assert "hold the transition verdict" in res.reply
+    assert "sound change right there" in res.reply
     assert "I need to correct that live read" not in res.reply
     assert "resolved decks=A" not in res.reply
     assert "deck lanes=A=known" not in res.reply
@@ -1326,7 +1706,7 @@ def test_chat_with_codex_uses_shared_guard_for_transition_synonyms(library):
 
     assert "Nice switch" not in res.reply
     assert "incoming track came in clean" not in res.reply
-    assert "hold the transition verdict" in res.reply
+    assert "sound change right there" in res.reply
     assert "recent control evidence: xfader->A-side" not in res.reply
 
 
@@ -1366,8 +1746,8 @@ def test_chat_with_codex_corrects_candidate_quality_verdict(library):
     )
 
     assert "great transition" not in res.reply.lower()
-    assert "transition candidate" in res.reply
-    assert "hold the quality grade" in res.reply
+    assert "transition setup" in res.reply
+    assert "shape, not a quality score" in res.reply
 
 
 def test_chat_with_codex_live_evidence_block_overrides_candidate_correction(library):
@@ -1411,7 +1791,7 @@ def test_chat_with_codex_live_evidence_block_overrides_candidate_correction(libr
 
     assert "great transition" not in res.reply.lower()
     assert "transition or blend candidate" not in res.reply
-    assert "hold the transition verdict" in res.reply
+    assert "sound change right there" in res.reply
     assert "live evidence gate: transition_block=single_deck_move" not in res.reply
 
 
@@ -1455,11 +1835,263 @@ def test_chat_with_codex_live_evidence_candidate_blocks_quality_grade(library):
     )
 
     assert "Great transition" not in res.reply
-    assert "transition candidate" in res.reply
-    assert "hold the quality grade" in res.reply
+    assert "transition setup" in res.reply
+    assert "shape, not a quality score" in res.reply
     assert "live evidence gate: transition_candidate=two_deck_move_audible_mix" not in res.reply
     assert res.move_grades == []
     assert res.track_ids == []
+
+
+def test_chat_with_codex_allows_quality_grade_with_strong_deck_pair_proof(library):
+    runner = _runner_writing(
+        {
+            "reply": "Great transition, clean handoff.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "move_grades": [
+                {
+                    "candidate_id": "tr_001",
+                    "track_id": "t000",
+                    "title": "Tt000",
+                    "slug": "lit_aff",
+                    "label": "LIT AFF",
+                    "xp": 100,
+                    "reason": "both decks are locked",
+                    "overdrive": True,
+                }
+            ],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "mix",
+            "audible": True,
+            "deck_state": {
+                "A": {
+                    "title": "Left",
+                    "track_id": "t000",
+                    "confidence": 0.9,
+                    "source": "rekordbox_xml",
+                },
+                "B": {
+                    "title": "Right",
+                    "track_id": "t001",
+                    "confidence": 0.88,
+                    "source": "rekordbox_xml",
+                },
+            },
+            "recent_moves": ["xfader->center"],
+            "audio_delta": ["sub energy rose 20% (slight)"],
+            "deck_audio_separation_context": _deck_pair_audio_separation_context(),
+            "deck_audio_features_context": _deck_audio_features_context(),
+            "deck_audio_delta_context": _deck_audio_delta_context(),
+            "deck_audio_window_context": _deck_audio_window_context(),
+            "audio_part_context": _deck_pair_audio_part_context(),
+            "audio_window_context": _deck_pair_audio_window_context(),
+            "audio_window_map": _deck_pair_audio_window_map(),
+            "live_evidence": {
+                "mix": [
+                    "transition_candidate=two_deck_move_audible_mix",
+                    "deck_lanes=A_known_route_dominant+B_known_route_present",
+                    "deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+                    "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_known_src_rekordbox_xml",
+                    "deck_audio_capture=A_active+B_active",
+                    "deck_audio_features=A_active_rms_0.024+B_active_rms_0.031",
+                    "deck_audio_delta=A_rms_rose_60pct_strong+B_rms_fell_20pct_slight",
+                    _deck_audio_window_evidence(),
+                ],
+                "refs": [
+                    "mix:transition_candidate=two_deck_move_audible_mix",
+                    "mix:deck_audio_capture=A_active+B_active",
+                    "mix:deck_audio_features=A_active_rms_0.024+B_active_rms_0.031",
+                    "mix:deck_audio_delta=A_rms_rose_60pct_strong+B_rms_fell_20pct_slight",
+                    "mix:" + _deck_audio_window_evidence(),
+                ],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "Great transition" in res.reply
+    assert "clean handoff" in res.reply
+    assert len(res.move_grades) == 1
+    assert res.live_verification is not None
+    assert res.live_verification["claim_policy"] == "supported_verdict"
+
+
+def test_chat_with_codex_requires_consistent_audio_parts_for_quality_grade(library):
+    runner = _runner_writing(
+        {
+            "reply": "Great transition, clean handoff.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "move_grades": [
+                {
+                    "candidate_id": "tr_001",
+                    "track_id": "t000",
+                    "title": "Tt000",
+                    "slug": "lit_aff",
+                    "label": "LIT AFF",
+                    "xp": 100,
+                    "reason": "mismatched parts should not score",
+                    "overdrive": True,
+                }
+            ],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "mix",
+            "audible": True,
+            "deck_state": {
+                "A": {
+                    "title": "Left",
+                    "track_id": "t000",
+                    "confidence": 0.9,
+                    "source": "rekordbox_xml",
+                },
+                "B": {
+                    "title": "Right",
+                    "track_id": "t001",
+                    "confidence": 0.88,
+                    "source": "rekordbox_xml",
+                },
+            },
+            "recent_moves": ["xfader->center"],
+            "audio_delta": ["sub energy rose 20% (slight)"],
+            "deck_audio_separation_context": _deck_pair_audio_separation_context(),
+            "deck_audio_features_context": _deck_audio_features_context(),
+            "deck_audio_delta_context": _deck_audio_delta_context(),
+            "deck_audio_window_context": _deck_audio_window_context(),
+            "audio_part_context": _deck_pair_audio_part_context("P4", "P5"),
+            "audio_window_context": _deck_pair_audio_window_context("P2", "P3"),
+            "audio_window_map": _deck_pair_audio_window_map("P2", "P3"),
+            "live_evidence": {
+                "mix": [
+                    "transition_candidate=two_deck_move_audible_mix",
+                    "deck_lanes=A_known_route_dominant+B_known_route_present",
+                    "deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+                    "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_known_src_rekordbox_xml",
+                    "deck_audio_capture=A_active+B_active",
+                    "deck_audio_features=A_active_rms_0.024+B_active_rms_0.031",
+                    "deck_audio_delta=A_rms_rose_60pct_strong+B_rms_fell_20pct_slight",
+                    _deck_audio_window_evidence(),
+                ],
+                "refs": [
+                    "mix:transition_candidate=two_deck_move_audible_mix",
+                    "mix:deck_audio_capture=A_active+B_active",
+                    "mix:deck_audio_features=A_active_rms_0.024+B_active_rms_0.031",
+                    "mix:deck_audio_delta=A_rms_rose_60pct_strong+B_rms_fell_20pct_slight",
+                    "mix:" + _deck_audio_window_evidence(),
+                ],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "Great transition" not in res.reply
+    assert "transition setup" in res.reply
+    assert res.move_grades == []
+    assert res.live_verification is not None
+    assert res.live_verification["claim_policy"] == "candidate_not_verdict"
+    assert res.live_verification["guard_applied"] is True
+
+
+def test_chat_with_codex_requires_trusted_sources_for_quality_grade(library):
+    runner = _runner_writing(
+        {
+            "reply": "Great transition, clean handoff.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "move_grades": [
+                {
+                    "candidate_id": "tr_001",
+                    "track_id": "t000",
+                    "title": "Tt000",
+                    "slug": "lit_aff",
+                    "label": "LIT AFF",
+                    "xp": 100,
+                    "reason": "untrusted source should not score",
+                    "overdrive": True,
+                }
+            ],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "mix",
+            "audible": True,
+            "deck_state": {
+                "A": {
+                    "title": "Left",
+                    "track_id": "t000",
+                    "confidence": 0.9,
+                    "source": "rekordbox_xml",
+                },
+                "B": {
+                    "title": "Right",
+                    "track_id": "t001",
+                    "confidence": 0.88,
+                    "source": "beatport_scrape",
+                },
+            },
+            "recent_moves": ["xfader->center"],
+            "audio_delta": ["sub energy rose 20% (slight)"],
+            "live_evidence": {
+                "mix": [
+                    "transition_candidate=two_deck_move_audible_mix",
+                    "deck_lanes=A_known_route_dominant+B_known_route_present",
+                    "deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+                    "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_known_src_beatport_scrape",
+                    "deck_audio_capture=A_active+B_active",
+                    "deck_audio_features=A_active_rms_0.024+B_active_rms_0.031",
+                    "deck_audio_delta=A_rms_rose_60pct_strong+B_rms_fell_20pct_slight",
+                    _deck_audio_window_evidence(),
+                ],
+                "refs": [
+                    "mix:transition_candidate=two_deck_move_audible_mix",
+                    "mix:deck_audio_capture=A_active+B_active",
+                    "mix:deck_audio_features=A_active_rms_0.024+B_active_rms_0.031",
+                    "mix:deck_audio_delta=A_rms_rose_60pct_strong+B_rms_fell_20pct_slight",
+                    "mix:" + _deck_audio_window_evidence(),
+                ],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "Great transition" not in res.reply
+    assert "transition setup" in res.reply
+    assert res.move_grades == []
+    assert res.live_verification is not None
+    assert res.live_verification["claim_policy"] == "candidate_not_verdict"
 
 
 def test_chat_with_codex_drops_move_grade_when_live_policy_blocks_current_claim(library):
@@ -1508,7 +2140,7 @@ def test_chat_with_codex_drops_move_grade_when_live_policy_blocks_current_claim(
     )
 
     assert "Great transition" not in res.reply
-    assert "hold the transition verdict" in res.reply
+    assert "sound change right there" in res.reply
     assert res.move_grades == []
     assert res.track_ids == []
 
@@ -1548,11 +2180,11 @@ def test_chat_with_codex_corrects_move_effect_causal_verdict(library):
     )
 
     assert "low cut cleaned" not in res.reply
-    assert "hold the cause/quality verdict" in res.reply
+    assert "energy shifted right after it" in res.reply
     assert "sub energy fell 50% (strong)" not in res.reply
 
 
-def test_chat_with_codex_keeps_self_corrected_transition_disclaimer(library):
+def test_chat_with_codex_normalizes_self_corrected_transition_disclaimer(library):
     runner = _runner_writing(
         {
             "reply": "I saw a deck A low move, but I can't call it a transition.",
@@ -1578,7 +2210,186 @@ def test_chat_with_codex_keeps_self_corrected_transition_disclaimer(library):
         _runner=runner,
     )
 
-    assert res.reply == "I saw a deck A low move, but I can't call it a transition."
+    assert "I saw a deck A low move" not in res.reply
+    assert "can't call it a transition" not in res.reply
+    assert "sound change right there" in res.reply
+
+
+def test_chat_with_codex_normalizes_public_live_diagnostics_without_transition_claim(library):
+    runner = _runner_writing(
+        {
+            "reply": (
+                "I need to correct the live read: resolved decks=none; "
+                "live evidence gate: transition_block=no_resolved_decks; "
+                "claim_policy=blocked."
+            ),
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "what happened?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "none",
+            "deck_state": {},
+            "live_evidence": {
+                "mix": ["transition_block=no_resolved_decks"],
+                "refs": ["mix:transition_block=no_resolved_decks"],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "correct the live read" not in res.reply
+    assert "resolved decks" not in res.reply
+    assert "live evidence gate" not in res.reply
+    assert "claim_policy" not in res.reply
+    assert "sound change right there" in res.reply
+    assert res.live_verification is not None
+    assert res.live_verification["guard_applied"] is True
+    assert "unsupported_live_outcome_claim" in res.live_verification["guard_violations"]
+
+
+def test_chat_with_codex_normalizes_public_live_self_confession(library):
+    runner = _runner_writing(
+        {
+            "reply": (
+                "My mistake on the live read. I'm not sure what happened from this live read yet."
+            ),
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "what happened there?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.8}},
+            "recent_moves": ["A_low: cut->killed"],
+            "live_evidence": {
+                "mix": ["transition_block=single_resolved_deck"],
+                "refs": ["mix:transition_block=single_resolved_deck"],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "mistake" not in res.reply
+    assert "not sure" not in res.reply
+    assert "live move" in res.reply
+    assert "sound change right there" in res.reply
+    assert res.live_verification is not None
+    assert res.live_verification["ok"] is True
+    assert res.live_verification["guard_applied"] is True
+    assert "unsupported_live_outcome_claim" in res.live_verification["guard_violations"]
+
+
+@pytest.mark.parametrize(
+    "bad_reply",
+    [
+        "My bad on the live read. I was wrong about the live moment.",
+        "I messed up on the live read and gave you a bad live read.",
+        "I shouldn't have called that a transition. That was dumb from the live read.",
+        "I overclaimed from the live proof and got this wrong in the live read.",
+        "I'm doing something stupid about the live read.",
+    ],
+)
+def test_chat_with_codex_normalizes_public_live_self_diagnosis_variants(library, bad_reply):
+    runner = _runner_writing(
+        {
+            "reply": bad_reply,
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "what happened there?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.8}},
+            "recent_moves": ["A_low: cut->killed"],
+            "live_evidence": {
+                "mix": ["transition_block=single_resolved_deck"],
+                "refs": ["mix:transition_block=single_resolved_deck"],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    lower = res.reply.lower()
+    assert "my bad" not in lower
+    assert "wrong" not in lower
+    assert "messed up" not in lower
+    assert "shouldn't have" not in lower
+    assert "dumb" not in lower
+    assert "stupid" not in lower
+    assert "overclaimed" not in lower
+    assert "live move" in res.reply
+    assert "sound change right there" in res.reply
+    assert res.live_verification is not None
+    assert res.live_verification["ok"] is True
+    assert res.live_verification["guard_applied"] is True
+    assert "unsupported_live_outcome_claim" in res.live_verification["guard_violations"]
+
+
+def test_chat_with_codex_replaces_non_live_outcome_hallucination_with_library_result(library):
+    runner = _runner_writing(
+        {
+            "reply": "Great transition, and I found a few dark tracks.",
+            "tools_used": ["search_vibe"],
+            "tool_trace": [{"name": "search_vibe", "arg": "dark rolling techno", "ok": True}],
+            "track_ids": ["t000", "t001"],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "find me dark rolling techno",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "none",
+            "deck_state": {},
+            "live_evidence": {
+                "mix": ["transition_block=no_resolved_decks"],
+                "refs": ["mix:transition_block=no_resolved_decks"],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "Great transition" not in res.reply
+    assert res.reply == "Found 2 grounded library candidates for that vibe."
+    assert res.track_ids == ["t000", "t001"]
+    assert res.live_verification is not None
+    assert res.live_verification["guard_applied"] is True
 
 
 def test_chat_with_codex_corrects_disclaimer_with_fresh_blend_claim(library):
@@ -1608,7 +2419,7 @@ def test_chat_with_codex_corrects_disclaimer_with_fresh_blend_claim(library):
     )
 
     assert "blend was clean" not in res.reply
-    assert "hold the transition verdict" in res.reply
+    assert "sound change right there" in res.reply
     assert "I need to correct that live read" not in res.reply
     assert "deck lanes=A=known" not in res.reply
     assert "won't call that a transition" not in res.reply

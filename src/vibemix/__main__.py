@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import re
 import signal
 import sys
 import threading
@@ -86,6 +87,11 @@ from vibemix.audio import (
     PlaybackQueue,
     VoiceRecorder,
 )
+from vibemix.audio.deck_capture import (
+    DeckAudioCapture,
+    deck_audio_routing_from_env,
+    rekordbox_deck_output_routing_hint,
+)
 from vibemix.audio.recorder import sweep_crashed_sessions
 from vibemix.audio.resample import resample_audio
 from vibemix.coach import (
@@ -110,6 +116,7 @@ from vibemix.state import (
     MusicState,
     state_refresh_loop,
 )
+from vibemix.state.deck_context import DECK_CONTEXT_TRUSTED_SOURCES
 from vibemix.state.deck_poller import DeckPoller
 
 # Cohost-only imports are resolved lazily so library/model CLI commands do not
@@ -452,18 +459,31 @@ def _input_callback_factory(
     audio_buf: AudioBuffer,
     clean_audio_buf: AudioBuffer,
     recorder: VoiceRecorder,
+    deck_audio_capture: DeckAudioCapture | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ):
     """Verbatim port of cohost_v4.py:912-945 input stream callback."""
 
     def callback(indata, frames, time_info, status):
         if status:
             print(f"[input status] {status}", file=sys.stderr)
-        if PASSTHROUGH_GAIN != 1.0:
-            passthrough.push((indata * PASSTHROUGH_GAIN).astype(np.float32).tobytes())
+        if deck_audio_capture is not None:
+            captured = deck_audio_capture.process(indata, source_sr=INPUT_SR_NATIVE)
+            passthrough_audio = captured.passthrough_stereo
+            music48 = captured.master_mono
+            if audio_capture_context is not None:
+                audio_capture_context.update(deck_audio_capture.context())
         else:
-            passthrough.push(indata.tobytes())
+            passthrough_audio = indata[:, :2]
+            if passthrough_audio.shape[1] == 1:
+                passthrough_audio = np.repeat(passthrough_audio, 2, axis=1)
+            music48 = indata.mean(axis=1).astype(np.float32)
 
-        music48 = indata.mean(axis=1).astype(np.float32)
+        if PASSTHROUGH_GAIN != 1.0:
+            passthrough.push((passthrough_audio * PASSTHROUGH_GAIN).astype(np.float32).tobytes())
+        else:
+            passthrough.push(passthrough_audio.astype(np.float32).tobytes())
+
         # Mic is captured on a SEPARATE stream (mic_buf) for KAAN_SPOKE
         # detection via levels.mic; NEVER mix it into the music buffers —
         # otherwise Gemini hears Kaan's voice as "vocals" in the track.
@@ -488,6 +508,69 @@ def _input_callback_factory(
         levels.update_music(state_pcm_48k)
 
     return callback
+
+
+def _deck_audio_auto_requested() -> bool:
+    return str(os.environ.get("VIBEMIX_DECK_AUDIO_CHANNELS") or "").strip().lower() in {
+        "auto",
+        "rekordbox",
+    }
+
+
+def _input_device_env_is_explicit() -> bool:
+    return bool(str(os.environ.get("VIBEMIX_INPUT_DEVICE") or "").strip())
+
+
+def _maybe_upgrade_input_device_for_deck_audio(
+    audio_backend: AudioMacOS,
+    *,
+    input_idx: int,
+    input_device_name: str,
+    base_audio_capture_context: dict[str, object],
+    deck_audio_routing: Any,
+) -> tuple[int, str, dict[str, object], Any]:
+    """Prefer multichannel BlackHole when explicit deck-auto routing needs it."""
+    if not _deck_audio_auto_requested() or _input_device_env_is_explicit():
+        return input_idx, input_device_name, base_audio_capture_context, deck_audio_routing
+    if getattr(deck_audio_routing, "reason", None) != "capture_device_too_few_channels":
+        return input_idx, input_device_name, base_audio_capture_context, deck_audio_routing
+    required = int(getattr(deck_audio_routing, "required_opened_channels", 0) or 0)
+    opened = int(getattr(deck_audio_routing, "opened_channels", 0) or 0)
+    if required <= opened or "blackhole" not in input_device_name.lower():
+        return input_idx, input_device_name, base_audio_capture_context, deck_audio_routing
+
+    for candidate_device in ("BlackHole 16ch",):
+        if candidate_device.lower() == input_device_name.lower():
+            continue
+        try:
+            candidate_idx = audio_backend.find_device(candidate_device, "input")
+            candidate_context = audio_backend.describe_capture_input(
+                candidate_idx,
+                requested_device=candidate_device,
+                opened_channels=2,
+            )
+        except Exception:
+            continue
+        candidate_routing = deck_audio_routing_from_env(
+            input_channels=candidate_context.get("input_channels"),
+            default_opened_channels=2,
+            capture_device_name=str(candidate_context.get("device_name") or candidate_device),
+        )
+        if not candidate_routing.enabled:
+            continue
+        candidate_context = audio_backend.describe_capture_input(
+            candidate_idx,
+            requested_device=candidate_device,
+            opened_channels=candidate_routing.opened_channels,
+        )
+        print(
+            "-> deck audio auto: upgraded input device "
+            f"{input_device_name!r} -> {candidate_device!r} "
+            f"({candidate_routing.opened_channels}ch)"
+        )
+        return candidate_idx, candidate_device, candidate_context, candidate_routing
+
+    return input_idx, input_device_name, base_audio_capture_context, deck_audio_routing
 
 
 def _voice_callback_factory(playback: PlaybackQueue):
@@ -930,11 +1013,12 @@ async def main() -> None:
     # it isn't installed — exit 3 is the sidecar's "audio-device-missing"
     # sentinel so the Tauri shell shows the BlackHole setup banner with the
     # install link rather than the generic crash UI.
+    input_device_name = INPUT_DEVICE
     try:
-        input_idx = audio_backend.find_device(INPUT_DEVICE, "input")
+        input_idx = audio_backend.find_device(input_device_name, "input")
     except RuntimeError as e:
         print(
-            f"[FATAL] required audio input device missing: {INPUT_DEVICE!r} (input)",
+            f"[FATAL] required audio input device missing: {input_device_name!r} (input)",
             file=sys.stderr,
             flush=True,
         )
@@ -946,11 +1030,37 @@ async def main() -> None:
             flush=True,
         )
         sys.exit(3)
-    audio_capture_context = audio_backend.describe_capture_input(
+    _base_audio_capture_context = audio_backend.describe_capture_input(
         input_idx,
-        requested_device=INPUT_DEVICE,
+        requested_device=input_device_name,
         opened_channels=2,
     )
+    deck_audio_routing = deck_audio_routing_from_env(
+        input_channels=_base_audio_capture_context.get("input_channels"),
+        default_opened_channels=2,
+        capture_device_name=str(_base_audio_capture_context.get("device_name") or input_device_name),
+    )
+    (
+        input_idx,
+        input_device_name,
+        _base_audio_capture_context,
+        deck_audio_routing,
+    ) = _maybe_upgrade_input_device_for_deck_audio(
+        audio_backend,
+        input_idx=input_idx,
+        input_device_name=input_device_name,
+        base_audio_capture_context=_base_audio_capture_context,
+        deck_audio_routing=deck_audio_routing,
+    )
+    deck_audio_capture = (
+        DeckAudioCapture(deck_audio_routing)
+        if deck_audio_routing.enabled or deck_audio_routing.opened_channels != 2
+        else None
+    )
+    audio_capture_context = {
+        **_base_audio_capture_context,
+        **deck_audio_routing.context(),
+    }
 
     # AI-voice / passthrough OUTPUT: resolve with graceful fallback so a brand-
     # new user on ANY Mac boots. Prefer the wizard-persisted output_device_id
@@ -1324,6 +1434,8 @@ async def main() -> None:
         # via VIBEMIX_GROUND_SECONDARY_EAR). Omitting the env var = v8.0
         # byte-identical behavior.
         secondary_ear=ground_secondary_ear,
+        audio_capture_context=audio_capture_context,
+        deck_audio_buffers=deck_audio_capture.buffers if deck_audio_capture is not None else None,
     )
 
     # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──
@@ -1849,6 +1961,25 @@ async def main() -> None:
     _learn_progress, _learn_was_recovered = _load_progress()
     _lesson_ipc_adapter = _LessonRuntimeIpcAdapter(ipc_router)
 
+    def _load_learn_harmonic_pair() -> Any | None:
+        """Return one user-library harmonic pair for Course 2, if available."""
+        try:
+            from vibemix.learn.harmonic_practice import pick_harmonic_practice_pair
+            from vibemix.library.rekordbox import RekordboxLibrary as _RBLibrary
+
+            lib = deck_library
+            if lib is None:
+                lib = _RBLibrary()
+                if not lib.try_load_cache():
+                    return None
+            return pick_harmonic_practice_pair(lib)
+        except Exception as _learn_pair_exc:  # pragma: no cover - defensive boot path
+            print(
+                f"[learn boot] harmonic pair lookup failed: {_learn_pair_exc!r}",
+                file=sys.stderr,
+            )
+            return None
+
     def _learn_session_event(kind: str, fields: dict[str, Any]) -> None:
         try:
             recorder.log_event(kind, **fields)
@@ -1867,6 +1998,7 @@ async def main() -> None:
         evidence_registry=evidence_registry,
         evidence_clock=lambda: state.set_seconds,
         prepared_pool_loader=_load_latest_prepared_pool,
+        harmonic_pair_loader=_load_learn_harmonic_pair,
         session_event_logger=_learn_session_event,
     )
     print("-> lesson_runtime wired", file=sys.stderr)
@@ -2061,6 +2193,7 @@ async def main() -> None:
             deck_source=deck_poller,
             section_source=deck_library,
             learn_state=_learn_state,
+            audio_capture_context=audio_capture_context,
         )
     )
     coach_task = asyncio.create_task(
@@ -2087,6 +2220,7 @@ async def main() -> None:
             citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
             suggestion_service=suggestion_service,
             tracer=tracer,
+            audio_capture_context=audio_capture_context,
         )
     )
 
@@ -2103,13 +2237,23 @@ async def main() -> None:
     input_stream = audio_backend.open_capture(
         input_idx,
         sample_rate=INPUT_SR_NATIVE,
-        channels=2,
+        channels=deck_audio_routing.opened_channels,
         block_size=INPUT_CHUNK_FRAMES,
         callback=_input_callback_factory(
-            levels, passthrough, mic, audio_buf, clean_audio_buf, recorder
+            levels,
+            passthrough,
+            mic,
+            audio_buf,
+            clean_audio_buf,
+            recorder,
+            deck_audio_capture,
+            audio_capture_context,
         ),
     )
-    print(f"-> listening to {INPUT_DEVICE} @ {INPUT_SR_NATIVE}Hz -> audio_buf + clean_audio_buf")
+    print(
+        f"-> listening to {input_device_name} @ {INPUT_SR_NATIVE}Hz "
+        f"({deck_audio_routing.opened_channels}ch) -> audio_buf + clean_audio_buf"
+    )
 
     try:
         await stop_event.wait()
@@ -3190,22 +3334,18 @@ def _session_snapshot_recent_moves(frame: dict[str, Any], *, cap: int = 6) -> li
 
 _VIBER_LIVE_AUDIO_FLOOR: float = 0.012
 _VIBER_LIVE_DECK_CONF_FLOOR: float = 0.3
-_VIBER_LIVE_DECK_SOURCES: frozenset[str] = frozenset(
-    {
-        "rekordbox_xml",
-        "folder_cache",
-        "screen_vision",
-        "numpy_key",
-        "nowplaying",
-    }
-)
-_VIBER_LIVE_EVIDENCE_CAP: int = 8
+_VIBER_LIVE_DECK_SOURCES: frozenset[str] = DECK_CONTEXT_TRUSTED_SOURCES
+_VIBER_LIVE_EVIDENCE_CAP: int = 10
+_VIBER_LIVE_EVIDENCE_REFS_CAP: int = 14
 _VIBER_LIVE_MIDI_EVIDENCE_CAP: int = 4
 _VIBER_LIVE_CONTEXT_SCHEMA_VERSION: int = 2
 _VIBER_LIVE_CONTEXT_REQUIRED_CAPABILITIES: frozenset[str] = frozenset(
     {
         "audio_part_context",
         "deck_audio_separation_context",
+        "deck_audio_features_context",
+        "deck_audio_delta_context",
+        "deck_audio_window_context",
         "deck_source_status",
         "audio_window_map",
         "audio_delta",
@@ -3451,6 +3591,10 @@ def _ws_port_listener_lsof_probe(host: str, port: int) -> dict[str, Any]:
 def _viber_local_source_status() -> dict[str, Any]:
     """Return a compact, content-free local source diagnostic for Viber proof."""
     home = Path.home()
+    routing_hint = rekordbox_deck_output_routing_hint(
+        capture_device_name=str(os.environ.get("VIBEMIX_INPUT_DEVICE") or INPUT_DEVICE),
+        input_channels=None,
+    )
     return {
         "ws_port_listener": _ws_port_listener_probe(),
         "library_cache": _library_cache_probe(),
@@ -3465,6 +3609,7 @@ def _viber_local_source_status() -> dict[str, Any]:
                 home / "Library/Application Support/Pioneer/rekordbox6/rekordboxEvent.xml"
             ),
         ],
+        "rekordbox_deck_routing_hint": routing_hint,
         "live_db_policy": {
             "reads_rekordbox_master_db_live": False,
             "reason": "SQLCipher live DB path stays disabled; deck context uses app state plus library cache.",
@@ -3494,6 +3639,97 @@ def _viber_live_context_hint(error: str | None, source_status: dict[str, Any]) -
                 "read frames. Keep the live session open and rerun with --require-proof."
             )
     return "Start the vibemix live session, then rerun `vibemix library live-context`."
+
+
+def _viber_route_hint_channel_map(raw: Any) -> str | None:
+    """Return an env-ready A/B channel map from a Rekordbox route hint."""
+    hint = raw if isinstance(raw, dict) else {}
+    deck_channels = hint.get("deck_channels")
+    if not isinstance(deck_channels, dict):
+        return None
+    pairs: list[str] = []
+    for side in ("A", "B"):
+        raw_channels = deck_channels.get(side)
+        if not isinstance(raw_channels, (list, tuple)) or len(raw_channels) < 2:
+            return None
+        channels: list[int] = []
+        for raw_channel in raw_channels[:2]:
+            try:
+                channel = int(raw_channel)
+            except (TypeError, ValueError):
+                return None
+            if channel < 0 or channel >= 32:
+                return None
+            channels.append(channel)
+        pairs.append(f"{side}={channels[0]},{channels[1]}")
+    return ";".join(pairs)
+
+
+def _viber_setup_hint_from_source_status(
+    source_status: dict[str, Any],
+    readiness: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Return actionable deck-pair setup guidance, clearly fenced as not proof."""
+    if isinstance(readiness, dict) and readiness.get("ready"):
+        return None
+    hint = source_status.get("rekordbox_deck_routing_hint")
+    if not isinstance(hint, dict):
+        return None
+    channel_map = _viber_route_hint_channel_map(hint)
+    if not channel_map:
+        return None
+    highest_channel = max(
+        int(ch)
+        for pair in channel_map.split(";")
+        for ch in pair.split("=", 1)[1].split(",")
+    )
+    opened_channels = max(2, highest_channel + 1)
+    current_device = str(os.environ.get("VIBEMIX_INPUT_DEVICE") or INPUT_DEVICE)
+    recommended_device = current_device
+    if "2ch" in current_device.lower() and opened_channels > 2:
+        recommended_device = "BlackHole 16ch"
+    default_auto_upgrade = (
+        not _input_device_env_is_explicit()
+        and current_device == INPUT_DEVICE
+        and "blackhole" in current_device.lower()
+        and recommended_device != current_device
+    )
+    output_device = str(hint.get("output_device") or "unknown")
+    if default_auto_upgrade:
+        recommended_env = {"VIBEMIX_DECK_AUDIO_CHANNELS": "auto"}
+        next_action = (
+            "Rekordbox deck route hint found "
+            f"({channel_map} via {output_device}). Start the live session with "
+            "VIBEMIX_DECK_AUDIO_CHANNELS=auto; Vibemix will try BlackHole 16ch "
+            "for the deck-pair capture automatically. Play both decks, move a "
+            "controller, then rerun `vibemix library live-context --require-proof`."
+        )
+    else:
+        recommended_env = {
+            "VIBEMIX_INPUT_DEVICE": recommended_device,
+            "VIBEMIX_DECK_AUDIO_CHANNELS": "auto",
+        }
+        next_action = (
+            "Rekordbox deck route hint found "
+            f"({channel_map} via {output_device}). Start the live session with "
+            f"VIBEMIX_INPUT_DEVICE='{recommended_device}' "
+            "VIBEMIX_DECK_AUDIO_CHANNELS=auto, play both decks, move a controller, "
+            "then rerun `vibemix library live-context --require-proof`."
+        )
+    return {
+        "status": "rekordbox_route_hint_found",
+        "deck_channels": channel_map,
+        "opened_channels_min": opened_channels,
+        "recommended_env": recommended_env,
+        "explicit_env": {
+            "VIBEMIX_INPUT_DEVICE": recommended_device,
+            "VIBEMIX_DECK_AUDIO_CHANNELS": channel_map,
+        },
+        "auto_upgrade_input_device": recommended_device if default_auto_upgrade else None,
+        "output_device": output_device,
+        "next_action": next_action,
+        "rule": "setup_hint_not_live_audio_proof",
+    }
 
 
 def _float_or_zero(raw: Any) -> float:
@@ -3539,15 +3775,23 @@ def _viber_live_evidence_priority(token: str) -> int:
         return 5
     if "second_deck_identity=" in token:
         return 6
-    if "move_scope=" in token:
+    if "deck_audio_capture=" in token:
         return 7
-    if "move_effect=" in token or "audio_delta=" in token:
+    if "deck_audio_features=" in token:
         return 8
-    if "deck_audio_support=" in token:
+    if "deck_audio_delta=" in token:
         return 9
-    if "deck_route=" in token:
+    if "deck_audio_window=" in token:
         return 10
-    return 11
+    if "move_scope=" in token:
+        return 11
+    if "move_effect=" in token or "audio_delta=" in token:
+        return 12
+    if "deck_audio_support=" in token:
+        return 13
+    if "deck_route=" in token:
+        return 14
+    return 15
 
 
 def _merge_viber_live_evidence_tokens(
@@ -3612,7 +3856,11 @@ def _merge_viber_live_evidence(existing: Any, incoming: Any) -> dict[str, Any]:
     midi = _merge_viber_live_midi_evidence(old.get("midi"), new.get("midi"))
     if midi:
         merged["midi"] = midi
-    refs = _merge_viber_live_evidence_tokens(old.get("refs"), new.get("refs"))
+    refs = _merge_viber_live_evidence_tokens(
+        old.get("refs"),
+        new.get("refs"),
+        cap=_VIBER_LIVE_EVIDENCE_REFS_CAP,
+    )
     if refs:
         merged["refs"] = refs
     return merged
@@ -3651,6 +3899,142 @@ def _viber_deck_reference_route_evidence_seen(evidence_items: list[str]) -> bool
     return False
 
 
+def _viber_deck_pair_capture_configured(
+    raw_context: object,
+    *,
+    preview: str,
+) -> bool:
+    text = str(raw_context or "")
+    if "deck_audio_separation_context[" not in text:
+        text = preview
+    return all(
+        atom in text
+        for atom in (
+            "mode=deck_pair_capture_configured",
+            "deckA_audio=captured",
+            "deckB_audio=captured",
+            "per_deck_audio=captured_not_attached",
+            "isolated_decks=runtime_capture_available",
+        )
+    )
+
+
+def _viber_deck_audio_capture_evidence_seen(evidence_items: list[str]) -> bool:
+    return any("deck_audio_capture=" in item for item in evidence_items)
+
+
+def _viber_deck_audio_capture_active(evidence_items: list[str]) -> bool:
+    for item in evidence_items:
+        if "deck_audio_capture=" not in item:
+            continue
+        if "A_active" in item or "B_active" in item:
+            return True
+    return False
+
+
+def _viber_deck_audio_capture_both_active(evidence_items: list[str]) -> bool:
+    for item in evidence_items:
+        if "deck_audio_capture=" not in item:
+            continue
+        if "A_active" in item and "B_active" in item:
+            return True
+    return False
+
+
+def _viber_audio_part_deck_labels(raw: object) -> dict[str, str]:
+    text = str(raw or "")
+    if "per_deck_audio=deck_pair_parts" not in text:
+        return {}
+    labels: dict[str, str] = {}
+    for side in ("A", "B"):
+        match = re.search(rf"\bdeck{side}_part=(P[2-9][0-9]?)\b", text)
+        if not match:
+            return {}
+        labels[side] = match.group(1)
+    return labels if labels.get("A") != labels.get("B") else {}
+
+
+def _viber_audio_window_deck_labels(raw: object) -> dict[str, str]:
+    text = str(raw or "")
+    if "per_deck_audio=deck_pair_parts" not in text:
+        return {}
+    labels: dict[str, str] = {}
+    for side in ("A", "B"):
+        match = re.search(rf"\bdeck{side}_audio=(P[2-9][0-9]?)\b", text)
+        if not match:
+            return {}
+        labels[side] = match.group(1)
+    return labels if labels.get("A") != labels.get("B") else {}
+
+
+def _viber_audio_window_map_deck_labels(raw: object) -> dict[str, str]:
+    if not isinstance(raw, dict) or raw.get("per_deck_audio") != "deck_pair_parts":
+        return {}
+    labels = {
+        "A": str(raw.get("deckA_audio") or ""),
+        "B": str(raw.get("deckB_audio") or ""),
+    }
+    valid = all(re.fullmatch(r"P[2-9][0-9]?", label) for label in labels.values())
+    return labels if valid and labels["A"] != labels["B"] else {}
+
+
+def _viber_audio_part_window_labels_consistent(context: dict[str, Any]) -> bool:
+    part_labels = _viber_audio_part_deck_labels(context.get("audio_part_context"))
+    window_labels = _viber_audio_window_deck_labels(context.get("audio_window_context"))
+    map_labels = _viber_audio_window_map_deck_labels(context.get("audio_window_map"))
+    observed = [labels for labels in (window_labels, map_labels) if labels]
+    if not part_labels:
+        return not observed
+    return all(labels == part_labels for labels in observed)
+
+
+def _viber_deck_source_status_blockers(source_status: dict[str, str]) -> list[str]:
+    """Translate source-status diagnostics into content-light proof blockers."""
+    if not source_status:
+        return []
+    status = {key: str(value).lower() for key, value in source_status.items()}
+    blockers: list[str] = []
+    controller_connection = status.get("controller_connection")
+    if controller_connection in {"disconnected", "unavailable"}:
+        blockers.append("deck identity source: controller snapshot is not connected")
+    elif status.get("controller") == "missing":
+        blockers.append("deck identity source: controller snapshot is missing")
+
+    library = status.get("library")
+    if library == "missing":
+        blockers.append("deck identity source: library cache is missing")
+    elif library == "empty":
+        blockers.append("deck identity source: library cache is empty")
+    elif library == "error":
+        blockers.append("deck identity source: library cache could not be read")
+
+    if status.get("nowplaying") == "blocked_non_deck_owner":
+        blockers.append("deck identity source: Now Playing is owned by a non-DJ app")
+    elif status.get("nowplaying_title") == "none":
+        blockers.append("deck identity source: no deck Now Playing title was observed")
+
+    library_match = status.get("library_match")
+    if library_match in {"ambiguous_label", "not_found", "track_row_missing"}:
+        blockers.append("deck identity source: Now Playing did not match a unique library row")
+    elif library_match in {"library_missing", "library_empty", "library_error"}:
+        blockers.append("deck identity source: Now Playing could not be checked against the library")
+
+    if status.get("resolution") == "no_single_attributable_deck":
+        blockers.append("deck identity source: controller posture did not identify one deck")
+    if status.get("second_deck_source") == "suppressed_requires_independent_source":
+        blockers.append("second deck identity source requires independent deck evidence")
+    if status.get("screen_vision") in {"disabled", "enabled_no_reader"}:
+        blockers.append("screen vision is not currently resolving the independent second deck")
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for blocker in blockers:
+        if blocker not in seen:
+            out.append(blocker)
+            seen.add(blocker)
+    return out
+
+
 def _viber_live_context_readiness(
     context: dict[str, Any],
     *,
@@ -3668,13 +4052,19 @@ def _viber_live_context_readiness(
     from vibemix.state.deck_context import (
         normalize_audio_part_context_text,
         normalize_audio_window_context_text,
+        normalize_deck_audio_delta_context_text,
+        normalize_deck_audio_features_context_text,
         normalize_deck_audio_separation_context_text,
+        normalize_deck_audio_window_context_text,
         normalize_deck_source_context_text,
     )
 
+    raw_context = context
+    raw_audio_part_window_consistent = _viber_audio_part_window_labels_consistent(raw_context)
     normalized_context = normalize_live_context_for_viber(context)
     if normalized_context:
         context = normalized_context
+    normalized_audio_part_window_consistent = _viber_audio_part_window_labels_consistent(context)
 
     schema_version = _viber_live_context_schema_version(context.get("live_context_schema_version"))
     capabilities = _viber_live_context_capabilities(context.get("live_context_capabilities"))
@@ -3727,15 +4117,47 @@ def _viber_live_context_readiness(
     has_deck_source_context = "deck_source_context[" in preview or bool(
         normalize_deck_source_context_text(context.get("deck_source_context"))
     )
-    has_deck_source_status = bool(
-        normalize_live_source_status_for_viber(context.get("deck_source_status"))
-    )
+    deck_source_status = normalize_live_source_status_for_viber(
+        context.get("deck_source_status")
+    ) or {}
+    has_deck_source_status = bool(deck_source_status)
+    deck_source_status_blockers = _viber_deck_source_status_blockers(deck_source_status)
     has_raw_audio_part_context = bool(
         normalize_audio_part_context_text(context.get("audio_part_context"))
     )
     has_deck_audio_separation_context = bool(
         normalize_deck_audio_separation_context_text(context.get("deck_audio_separation_context"))
         or "deck_audio_separation_context[" in preview
+    )
+    has_deck_audio_features_context = bool(
+        normalize_deck_audio_features_context_text(context.get("deck_audio_features_context"))
+        or "deck_audio_features_context[" in preview
+    )
+    has_deck_audio_delta_context = bool(
+        normalize_deck_audio_delta_context_text(context.get("deck_audio_delta_context"))
+        or "deck_audio_delta_context[" in preview
+    )
+    has_deck_audio_window_context = bool(
+        normalize_deck_audio_window_context_text(context.get("deck_audio_window_context"))
+        or "deck_audio_window_context[" in preview
+    )
+    has_deck_pair_capture_configured = _viber_deck_pair_capture_configured(
+        context.get("deck_audio_separation_context"),
+        preview=preview,
+    )
+    has_deck_pair_setup_block = (
+        "setup_block=capture_device_too_few_channels" in preview
+        or "setup_block=opened_channels_too_few" in preview
+    )
+    has_deck_audio_capture_evidence = _viber_deck_audio_capture_evidence_seen(evidence_items)
+    has_deck_audio_capture_active = _viber_deck_audio_capture_active(evidence_items)
+    has_deck_audio_capture_both_active = _viber_deck_audio_capture_both_active(evidence_items)
+    has_deck_audio_features_evidence = any(
+        "deck_audio_features=" in item for item in evidence_items
+    )
+    has_deck_audio_delta_evidence = any("deck_audio_delta=" in item for item in evidence_items)
+    has_deck_audio_window_evidence = any(
+        "deck_audio_window=" in item for item in evidence_items
     )
     prompt_audio_part_context_seen = "audio_part_context[" in preview
     has_raw_audio_window_context = bool(
@@ -3768,6 +4190,9 @@ def _viber_live_context_readiness(
         "deck_state_resolved": bool(resolved_decks),
         "deck_state_citable_track": bool(citable_decks),
         "deck_state_source_provenance": bool(sourced_decks),
+        "deck_state_pair_resolved": set(resolved_decks) >= {"A", "B"},
+        "deck_state_pair_citable_tracks": set(citable_decks) >= {"A", "B"},
+        "deck_state_pair_source_provenance": set(sourced_decks) >= {"A", "B"},
         "deck_lane_context_seen": has_deck_lane_context,
         "deck_reference_context_seen": has_deck_reference_context,
         "deck_source_context_seen": has_deck_source_context,
@@ -3777,8 +4202,21 @@ def _viber_live_context_readiness(
         "recent_moves_seen": bool(recent_moves),
         "audio_part_context_seen": has_audio_part_context,
         "deck_audio_separation_context_seen": has_deck_audio_separation_context,
+        "deck_audio_features_context_seen": has_deck_audio_features_context,
+        "deck_audio_delta_context_seen": has_deck_audio_delta_context,
+        "deck_audio_window_context_seen": has_deck_audio_window_context,
+        "deck_pair_capture_configured": has_deck_pair_capture_configured,
+        "deck_audio_capture_evidence_seen": has_deck_audio_capture_evidence,
+        "deck_audio_capture_active": has_deck_audio_capture_active,
+        "deck_audio_capture_both_active": has_deck_audio_capture_both_active,
+        "deck_audio_features_evidence_seen": has_deck_audio_features_evidence,
+        "deck_audio_delta_evidence_seen": has_deck_audio_delta_evidence,
+        "deck_audio_window_evidence_seen": has_deck_audio_window_evidence,
         "audio_window_context_seen": has_audio_window_context,
         "audio_window_map_seen": has_audio_window_map,
+        "audio_part_window_labels_consistent": (
+            raw_audio_part_window_consistent and normalized_audio_part_window_consistent
+        ),
         "audio_observed": bool(context.get("audible")) or max_music >= _VIBER_LIVE_AUDIO_FLOOR,
         "audio_delta_seen": bool(audio_delta),
         "live_evidence_seen": bool(evidence_items),
@@ -3804,10 +4242,19 @@ def _viber_live_context_readiness(
         )
     if not checks["deck_state_resolved"]:
         blockers.append("deck_state had no resolved deck row")
+        blockers.extend(deck_source_status_blockers)
     if not checks["deck_state_citable_track"]:
         blockers.append("deck_state had no citable track_id at confidence floor")
     if checks["deck_state_citable_track"] and not checks["deck_state_source_provenance"]:
         blockers.append("deck_state had no trusted source provenance for a citable track")
+    if not checks["deck_state_pair_resolved"]:
+        blockers.append("deck_state did not resolve both deck A and deck B")
+        if checks["deck_state_resolved"]:
+            blockers.extend(deck_source_status_blockers)
+    if not checks["deck_state_pair_citable_tracks"]:
+        blockers.append("deck_state did not have citable track_id for both deck A and deck B")
+    if checks["deck_state_pair_citable_tracks"] and not checks["deck_state_pair_source_provenance"]:
+        blockers.append("deck_state did not have trusted source provenance for both deck lanes")
     if not checks["deck_lane_context_seen"]:
         blockers.append("rendered live context had no per-deck lane map")
     if not checks["deck_reference_context_seen"]:
@@ -3826,10 +4273,36 @@ def _viber_live_context_readiness(
         blockers.append("no audio_part_context part-role contract was observed")
     if not checks["deck_audio_separation_context_seen"]:
         blockers.append("no deck_audio_separation_context capture-separation contract was observed")
+    if not checks["deck_audio_features_context_seen"]:
+        blockers.append("no deck_audio_features_context per-deck audio descriptor was observed")
+    if not checks["deck_audio_delta_context_seen"]:
+        blockers.append("no deck_audio_delta_context per-deck change descriptor was observed")
+    if not checks["deck_audio_window_context_seen"]:
+        blockers.append("no deck_audio_window_context pre/current deck-lane window was observed")
+    if not checks["deck_pair_capture_configured"]:
+        blockers.append("deck-pair audio capture was not configured in the live packet")
+        if has_deck_pair_setup_block:
+            blockers.append(
+                "deck-pair route hint requires a multichannel capture device/opened channels"
+            )
+    if not checks["deck_audio_capture_evidence_seen"]:
+        blockers.append("live_evidence had no deck_audio_capture activity receipt")
+    if not checks["deck_audio_capture_active"]:
+        blockers.append("deck_audio_capture showed no active deck audio lane")
+    if not checks["deck_audio_capture_both_active"]:
+        blockers.append("deck_audio_capture did not show active audio on both deck lanes")
+    if not checks["deck_audio_features_evidence_seen"]:
+        blockers.append("live_evidence had no deck_audio_features descriptor receipt")
+    if not checks["deck_audio_delta_evidence_seen"]:
+        blockers.append("live_evidence had no deck_audio_delta descriptor receipt")
+    if not checks["deck_audio_window_evidence_seen"]:
+        blockers.append("live_evidence had no deck_audio_window pre/current descriptor receipt")
     if not checks["audio_window_context_seen"]:
         blockers.append("no time-aligned audio_window_context was observed")
     if not checks["audio_window_map_seen"]:
         blockers.append("no structured audio_window_map was observed")
+    if not checks["audio_part_window_labels_consistent"]:
+        blockers.append("audio Part labels disagreed with audio_window deck labels")
     if not checks["audio_observed"]:
         blockers.append("live master audio was not observed above the audible floor")
     if not checks["audio_delta_seen"]:
@@ -3892,6 +4365,7 @@ def _viber_live_context_readiness(
         "max_music": max_music,
         "live_context_schema_version": schema_version,
         "missing_capabilities": missing_capabilities,
+        "deck_source_status": deck_source_status,
         "session_snapshot_seen": bool(session_snapshot_seen),
     }
 
@@ -3913,7 +4387,10 @@ def _merge_viber_live_context_frame(
         normalize_audio_part_context_text,
         normalize_audio_window_context_text,
         normalize_deck_audio_context_text,
+        normalize_deck_audio_delta_context_text,
+        normalize_deck_audio_features_context_text,
         normalize_deck_audio_separation_context_text,
+        normalize_deck_audio_window_context_text,
         normalize_deck_lanes_context_text,
         normalize_deck_reference_context_text,
         normalize_deck_source_context_text,
@@ -3942,6 +4419,9 @@ def _merge_viber_live_context_frame(
             "deck_source_status",
             "deck_audio_context",
             "deck_audio_separation_context",
+            "deck_audio_features_context",
+            "deck_audio_delta_context",
+            "deck_audio_window_context",
             "audio_part_context",
             "audio_window_context",
             "audio_window_map",
@@ -4010,6 +4490,24 @@ def _merge_viber_live_context_frame(
                         context.pop(key, None)
                 elif key == "deck_audio_separation_context":
                     text = normalize_deck_audio_separation_context_text(frame[key])
+                    if text:
+                        context[key] = text
+                    else:
+                        context.pop(key, None)
+                elif key == "deck_audio_features_context":
+                    text = normalize_deck_audio_features_context_text(frame[key])
+                    if text:
+                        context[key] = text
+                    else:
+                        context.pop(key, None)
+                elif key == "deck_audio_delta_context":
+                    text = normalize_deck_audio_delta_context_text(frame[key])
+                    if text:
+                        context[key] = text
+                    else:
+                        context.pop(key, None)
+                elif key == "deck_audio_window_context":
+                    text = normalize_deck_audio_window_context_text(frame[key])
                     if text:
                         context[key] = text
                     else:
@@ -4117,6 +4615,12 @@ async def _sample_viber_live_context(
         source_status = _viber_local_source_status()
         normalized_context = normalize_live_context_for_viber(context) or context
         error = str(exc)
+        readiness = _viber_live_context_readiness(
+            normalized_context,
+            frames_seen=frames_seen,
+            flat_deck_frame_seen=flat_seen,
+            session_snapshot_seen=snapshot_seen,
+        )
         return {
             "ok": False,
             "source": uri,
@@ -4125,13 +4629,9 @@ async def _sample_viber_live_context(
             "session_snapshot_seen": snapshot_seen,
             "live_context": normalized_context,
             "preview": render_live_context_preview(normalized_context),
-            "readiness": _viber_live_context_readiness(
-                normalized_context,
-                frames_seen=frames_seen,
-                flat_deck_frame_seen=flat_seen,
-                session_snapshot_seen=snapshot_seen,
-            ),
+            "readiness": readiness,
             "source_status": source_status,
+            "setup_hint": _viber_setup_hint_from_source_status(source_status, readiness),
             "error": error,
             "hint": _viber_live_context_hint(error, source_status),
         }
@@ -4144,6 +4644,7 @@ async def _sample_viber_live_context(
         flat_deck_frame_seen=flat_seen,
         session_snapshot_seen=snapshot_seen,
     )
+    source_status = _viber_local_source_status()
     return {
         "ok": bool(preview),
         "source": uri,
@@ -4153,7 +4654,8 @@ async def _sample_viber_live_context(
         "live_context": normalized_context,
         "preview": preview,
         "readiness": readiness,
-        "source_status": _viber_local_source_status(),
+        "source_status": source_status,
+        "setup_hint": _viber_setup_hint_from_source_status(source_status, readiness),
         "error": None if preview else "No deck/context frames were observed before timeout.",
         "hint": None
         if preview
@@ -4248,11 +4750,17 @@ def _cmd_library_live_context(args: argparse.Namespace) -> int:
             )
             if next_action:
                 print(f"next action: {next_action}", file=sys.stderr)
+            setup_hint = result.get("setup_hint")
+            if isinstance(setup_hint, dict) and setup_hint.get("next_action"):
+                print(f"setup hint: {setup_hint['next_action']}", file=sys.stderr)
     else:
         print(f"live-context unavailable: {result.get('error')}", file=sys.stderr)
         hint = result.get("hint")
         if hint:
             print(hint, file=sys.stderr)
+        setup_hint = result.get("setup_hint")
+        if isinstance(setup_hint, dict) and setup_hint.get("next_action"):
+            print(f"setup hint: {setup_hint['next_action']}", file=sys.stderr)
     if not result.get("ok"):
         return 1
     if require_proof:

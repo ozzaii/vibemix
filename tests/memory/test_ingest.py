@@ -193,6 +193,7 @@ def test_signature_deterministic() -> None:
     assert "deck_lane=none" in sig_a
     assert "deck_audio=none" in sig_a
     assert "audio_window=none" in sig_a
+    assert "deck_audio_window=none" in sig_a
     assert "live_evidence=none" in sig_a
     assert "move=none" in sig_a
     assert "move_effect=none" in sig_a
@@ -214,7 +215,7 @@ def test_signature_deterministic() -> None:
     assert "go go go" in sig_missing
 
     # Template version is the pinned constant 64-02 must expose.
-    assert SIG_TEMPLATE_VERSION == "v8-coach_line-context-feed"
+    assert SIG_TEMPLATE_VERSION == "v9-coach_line-deck-audio-context"
 
 
 def test_signature_includes_live_deck_move_context() -> None:
@@ -238,6 +239,23 @@ def test_signature_includes_live_deck_move_context() -> None:
             "unresolved=B second_deck=independent_source_required]"
         ),
         "deck_audio_context": "deck_audio_context[source=global_mix support=single_deck_A]",
+        "deck_audio_separation_context": (
+            "deck_audio_separation_context[mode=deck_pair_capture_configured "
+            "deckA_audio=captured deckB_audio=captured]"
+        ),
+        "deck_audio_features_context": (
+            "deck_audio_features_context[A_activity=active A_rms=0.020 "
+            "B_activity=silent B_rms=0.000 rule=deck_audio_features_not_outcome_verdict]"
+        ),
+        "deck_audio_delta_context": (
+            "deck_audio_delta_context[A_delta=rms_rose_100pct_strong "
+            "B_delta=rms_fell_50pct_strong rule=deck_audio_delta_not_causal_proof]"
+        ),
+        "deck_audio_window_context": (
+            "deck_audio_window_context[source=deck_pair_capture timeline=pre_action_current "
+            "per_deck_audio=captured_window_features A_current=active_rms_0.040 "
+            "rule=deck_audio_window_not_causal_or_quality_verdict]"
+        ),
         "audio_window_context": (
             "audio_window_context[P1=master_global_mix P1_heard=true "
             "timeline=past_action_future action=-1.0..0.0 deckA_audio=not_attached "
@@ -265,6 +283,25 @@ def test_signature_includes_live_deck_move_context() -> None:
         "unresolved=B second_deck=independent_source_required]" in sig
     )
     assert "deck_audio=deck_audio_context[source=global_mix support=single_deck_A]" in sig
+    assert (
+        "deck_audio_separation=deck_audio_separation_context["
+        "mode=deck_pair_capture_configured deckA_audio=captured deckB_audio=captured]" in sig
+    )
+    assert (
+        "deck_audio_features=deck_audio_features_context[A_activity=active A_rms=0.020 "
+        "B_activity=silent B_rms=0.000 rule=deck_audio_features_not_outcome_verdict]"
+        in sig
+    )
+    assert (
+        "deck_audio_delta=deck_audio_delta_context[A_delta=rms_rose_100pct_strong "
+        "B_delta=rms_fell_50pct_strong rule=deck_audio_delta_not_causal_proof]" in sig
+    )
+    assert (
+        "deck_audio_window=deck_audio_window_context[source=deck_pair_capture "
+        "timeline=pre_action_current per_deck_audio=captured_window_features "
+        "A_current=active_rms_0.040 "
+        "rule=deck_audio_window_not_causal_or_quality_verdict]" in sig
+    )
     assert "audio_window=audio_window_context[P1=master_global_mix P1_heard=true" in sig
     assert "timeline=past_action_future" in sig
     assert "action=-1.0..0.0" in sig
@@ -274,6 +311,28 @@ def test_signature_includes_live_deck_move_context() -> None:
     assert "move=move_context[scope=single_deck_move_A]" in sig
     assert "move_effect=move_effect_context[rule=dsp_delta_not_causal_proof]" in sig
     assert "audio_delta=sub energy fell 50% (strong); low energy fell 50% (strong)" in sig
+
+
+def test_signature_omits_conflicting_deck_pair_audio_window_context() -> None:
+    ctx = {
+        "track": _TRACK,
+        "phase": "groove",
+        "deck": "A",
+        "type": "MIX_MOVE",
+        "audio_window_context": (
+            "audio_window_context[P1=master_global_mix P1_heard=true "
+            "timeline=past_action_future deckA_audio=P2 deckB_audio=P2 "
+            "per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts "
+            "deck_separation=deck_lanes_context lane_aliases=deck1:A,deck2:B "
+            "action=-1.0..0.0 rule=time_alignment_not_outcome_verdict]"
+        ),
+    }
+
+    sig = build_coach_line_signature("heard it tighten [midi:A_low@42.0]", ctx)
+
+    assert "audio_window=omitted_untrusted_audio_window" in sig
+    assert "deckA_audio=P2" not in sig
+    assert "deckB_audio=P2" not in sig
 
 
 def test_ingest_emits_coach_lines(tmp_path: Path) -> None:

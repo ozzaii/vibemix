@@ -21,6 +21,16 @@ if TYPE_CHECKING:  # pragma: no cover - typing-only import
 
 
 DECK_CONTEXT_MIN_CONF: float = 0.3
+DECK_CONTEXT_TRUSTED_SOURCES: frozenset[str] = frozenset(
+    {
+        "rekordbox_xml",
+        "folder_cache",
+        "screen_vision",
+        "numpy_key",
+        "nowplaying",
+    }
+)
+GEMINI_AUDIO_TOKENS_PER_SECOND: int = 32
 _MOVE_SIDE_RE = re.compile(r"\b([ABCD])_(?:low|mid|hi|filter|volume|play)")
 _MULTI_DECK_OUTCOME_RE = re.compile(
     r"\b("
@@ -42,6 +52,28 @@ _MULTI_DECK_DISCLAIMER_RE = re.compile(
     r"not a transition|no transition|single[- ]deck|one[- ]deck|only one deck|"
     r"cannot call|can't call|won't call|wouldn't call|do not have evidence|"
     r"don't have evidence"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIVE_PUBLIC_DIAGNOSTIC_RE = re.compile(
+    r"\b("
+    r"i need to correct (?:the|that) live read|resolved decks=|"
+    r"live evidence gate:|transition_block=|claim_policy=|"
+    r"proof_not_ready|unsupported_live_outcome_claim|guard_violations|"
+    r"my bad(?: on| with)? (?:the )?live|"
+    r"my mistake(?: on| with)? (?:the )?live|"
+    r"bad read on my part|"
+    r"i (?:gave|fed) you (?:a )?(?:bad|wrong) (?:live )?read|"
+    r"i (?:messed|screwed) up(?: on| with)? (?:the )?live|"
+    r"i (?:was|am|'m) wrong(?: about| on| with)? (?:the )?live|"
+    r"i (?:got|read) (?:that|this) wrong(?: from| in)? (?:the )?live|"
+    r"i (?:overclaimed|over-claimed|falsely claimed)|"
+    r"i(?:'m| am| was) (?:being )?(?:stupid|dumb|confused)(?: about| on| with)? "
+    r"(?:the )?live|"
+    r"i(?:'m| am| was) (?:doing|saying) (?:something )?(?:stupid|dumb|stupidity)"
+    r"(?: about| on| with)? (?:the )?live|"
+    r"i(?:'m| am) not sure(?: yet)? (?:what happened|from this live read|"
+    r"from the live read|about the live read|on the live read)"
     r")\b",
     re.IGNORECASE,
 )
@@ -82,14 +114,23 @@ _AUDIO_WINDOW_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
     "P1=master_global_mix",
     "P1_heard=true",
     "timeline=past_action_future",
-    "deckA_audio=not_attached",
-    "deckB_audio=not_attached",
-    "per_deck_audio=structured_text_only",
-    "duplicate_audio=same_master_not_deck_split",
     "deck_separation=deck_lanes_context",
     "lane_aliases=deck1:A,deck2:B",
     "action=-1.0..0.0",
     "rule=time_alignment_not_outcome_verdict",
+)
+_AUDIO_WINDOW_CONTEXT_SHAPES: tuple[tuple[str, ...], ...] = (
+    (
+        "deckA_audio=not_attached",
+        "deckB_audio=not_attached",
+        "per_deck_audio=structured_text_only",
+        "duplicate_audio=same_master_not_deck_split",
+    ),
+    (
+        "per_deck_audio=deck_pair_parts",
+        "duplicate_audio=separate_deck_pair_parts",
+        "deck_audio_separation=deck_audio_separation_context",
+    ),
 )
 _AUDIO_WINDOW_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
     "deckA_audio=attached",
@@ -107,27 +148,45 @@ _AUDIO_PART_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
     "deck1=A",
     "deck2=B",
     "together_audio=P1",
-    "per_deck_audio=not_attached",
-    "duplicate_audio=same_master_not_deck_split",
     "rule=part_labels_not_outcome_verdict",
+)
+_AUDIO_PART_CONTEXT_SHAPES: tuple[tuple[str, ...], ...] = (
+    (
+        "per_deck_audio=not_attached",
+        "duplicate_audio=same_master_not_deck_split",
+    ),
+    (
+        "per_deck_audio=deck_pair_parts",
+        "duplicate_audio=separate_deck_pair_parts",
+    ),
 )
 _AUDIO_PART_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
     "deckA_audio=attached",
     "deckB_audio=attached",
     "deckA_audio=stem",
     "deckB_audio=stem",
-    "per_deck_audio=attached",
     "isolated_decks=true",
     "P1_deck_audio=stems",
-    "P2_deck_audio=stems",
-    "P3_deck_audio=stems",
+    "deck_audio=stems",
 )
 _DECK_AUDIO_SEPARATION_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
-    "deckA_audio=not_captured",
-    "deckB_audio=not_captured",
-    "current_capture=P1_global_mix",
-    "per_deck_audio=not_attached",
     "rule=separation_capability_not_outcome",
+)
+_DECK_AUDIO_SEPARATION_CONTEXT_SHAPES: tuple[tuple[str, ...], ...] = (
+    (
+        "deckA_audio=not_captured",
+        "deckB_audio=not_captured",
+        "current_capture=P1_global_mix",
+        "per_deck_audio=not_attached",
+        "isolated_decks=false",
+    ),
+    (
+        "deckA_audio=captured",
+        "deckB_audio=captured",
+        "current_capture=P1_global_mix_plus_deck_pairs",
+        "per_deck_audio=captured_not_attached",
+        "isolated_decks=runtime_capture_available",
+    ),
 )
 _DECK_AUDIO_SEPARATION_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
     "deckA_audio=attached",
@@ -136,6 +195,42 @@ _DECK_AUDIO_SEPARATION_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
     "deckB_audio=stem",
     "per_deck_audio=attached",
     "isolated_decks=true",
+)
+_DECK_AUDIO_FEATURES_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
+    "source=deck_pair_capture",
+    "per_deck_audio=captured_features",
+    "rule=deck_audio_features_not_outcome_verdict",
+)
+_DECK_AUDIO_FEATURES_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
+    "transition_verdict=",
+    "quality_verdict=",
+    "great_transition",
+    "clean_transition",
+)
+_DECK_AUDIO_DELTA_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
+    "source=deck_pair_capture",
+    "per_deck_delta=captured_feature_delta",
+    "rule=deck_audio_delta_not_causal_proof",
+)
+_DECK_AUDIO_DELTA_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
+    "transition_verdict=",
+    "quality_verdict=",
+    "caused_by_move=true",
+    "great_transition",
+    "clean_transition",
+)
+_DECK_AUDIO_WINDOW_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
+    "source=deck_pair_capture",
+    "timeline=pre_action_current",
+    "per_deck_audio=captured_window_features",
+    "rule=deck_audio_window_not_causal_or_quality_verdict",
+)
+_DECK_AUDIO_WINDOW_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
+    "transition_verdict=",
+    "quality_verdict=",
+    "caused_by_move=true",
+    "great_transition",
+    "clean_transition",
 )
 _HISTORICAL_CITATION_RE = re.compile(
     r"\[(?:ev|aud|midi|track|screen|mix|tend|key|recall|exemplar|cue):[^\]]+\]"
@@ -158,14 +253,14 @@ class LiveClaimGuardResult:
     summary: str = ""
 
 
-LIVE_TRANSITION_HELD_REPLY = "I'll hold the transition verdict until live deck proof is stronger."
+LIVE_TRANSITION_HELD_REPLY = (
+    "I caught the live move. The useful note is the sound change right there."
+)
 LIVE_CANDIDATE_HELD_REPLY = (
-    "I see a transition candidate; I'll hold the quality grade until stronger "
-    "two-deck proof is available."
+    "That reads like a transition setup. The useful note is the shape, not a quality score."
 )
 LIVE_MOVE_EFFECT_HELD_REPLY = (
-    "I see the control move and audio change; I'll hold the cause/quality "
-    "verdict until live proof is stronger."
+    "I caught the move and the sound change. The useful note is how the energy shifted right after it."
 )
 
 
@@ -187,20 +282,97 @@ def normalize_audio_window_context_text(raw: object, *, max_len: int = 900) -> s
         return None
     if not all(atom in text for atom in _AUDIO_WINDOW_CONTEXT_REQUIRED_ATOMS):
         return None
+    if not any(all(atom in text for atom in shape) for shape in _AUDIO_WINDOW_CONTEXT_SHAPES):
+        return None
+    if "per_deck_audio=deck_pair_parts" in text and not _audio_window_deck_labels_are_valid(
+        text
+    ):
+        return None
     if any(atom in text for atom in _AUDIO_WINDOW_CONTEXT_FORBIDDEN_ATOMS):
         return None
     return text
 
 
-def normalize_audio_part_context_text(raw: object, *, max_len: int = 900) -> str | None:
+def _audio_window_deck_labels_are_valid(text: str) -> bool:
+    deck_a = re.search(r"\bdeckA_audio=(P[2-9][0-9]?)\b", text)
+    deck_b = re.search(r"\bdeckB_audio=(P[2-9][0-9]?)\b", text)
+    if not deck_a or not deck_b:
+        return False
+    return deck_a.group(1) != deck_b.group(1)
+
+
+def normalize_audio_part_context_text(raw: object, *, max_len: int = 1400) -> str | None:
     """Return trusted ``audio_part_context[...]`` text, or ``None``."""
-    return _normalize_live_context_text(
+    text = _normalize_live_context_text(
         raw,
         prefix="audio_part_context",
         required_atoms=_AUDIO_PART_CONTEXT_REQUIRED_ATOMS,
         forbidden_atoms=_AUDIO_PART_CONTEXT_FORBIDDEN_ATOMS,
         max_len=max_len,
     )
+    if text is None:
+        return None
+    if not any(all(atom in text for atom in shape) for shape in _AUDIO_PART_CONTEXT_SHAPES):
+        return None
+    if "per_deck_audio=not_attached" in text:
+        if re.search(r"\bdeck[AB]_part=P[2-9][0-9]?\b", text):
+            return None
+    if "per_deck_audio=deck_pair_parts" in text and not _audio_part_deck_pair_map_is_valid(
+        text
+    ):
+        return None
+    return text
+
+
+def _audio_part_deck_pair_map_is_valid(text: str) -> bool:
+    """Return True when Deck A/B part labels are complete and non-conflicting."""
+    deck_labels: dict[str, str] = {}
+    for side in ("A", "B"):
+        match = re.search(rf"\bdeck{side}_part=(P[2-9][0-9]?)\b", text)
+        if not match:
+            return False
+        deck_labels[side] = match.group(1)
+    if deck_labels["A"] == deck_labels["B"]:
+        return False
+
+    part_order = _audio_part_order(text)
+    if part_order is None:
+        return False
+    if part_order[0] != "P1" or len(part_order) != len(set(part_order)):
+        return False
+    if part_order != sorted(part_order, key=lambda label: int(label[1:])):
+        return False
+    if not all(label in part_order for label in deck_labels.values()):
+        return False
+
+    for side, label in deck_labels.items():
+        expected_role = f"deck{side}_configured_capture"
+        required_atoms = (
+            f"deck{side}_part={label}",
+            f"{label}={expected_role}",
+            f"{label}_model_heard=true",
+            f"{label}_audience_heard=false",
+            f"{label}_deck_audio={expected_role}",
+            f"{label}_rule=deck_pair_capture_reference_not_quality_verdict",
+        )
+        if not all(_audio_part_has_atom(text, atom) for atom in required_atoms):
+            return False
+        roles = set(re.findall(rf"\b{re.escape(label)}=([A-Za-z0-9_]+)\b", text))
+        if roles != {expected_role}:
+            return False
+    return True
+
+
+def _audio_part_order(text: str) -> list[str] | None:
+    match = re.search(r"\bpart_order=(P1(?:,P[2-9][0-9]?)*)\b", text)
+    if not match:
+        return None
+    return match.group(1).split(",")
+
+
+def _audio_part_has_atom(text: str, atom: str) -> bool:
+    haystack = " " + text.replace("[", " ").replace("]", " ") + " "
+    return f" {atom} " in haystack
 
 
 def normalize_deck_lanes_context_text(raw: object, *, max_len: int = 900) -> str | None:
@@ -287,13 +459,68 @@ def normalize_deck_audio_context_text(raw: object, *, max_len: int = 900) -> str
 
 def normalize_deck_audio_separation_context_text(raw: object, *, max_len: int = 900) -> str | None:
     """Return trusted ``deck_audio_separation_context[...]`` text, or ``None``."""
-    return _normalize_live_context_text(
+    text = _normalize_live_context_text(
         raw,
         prefix="deck_audio_separation_context",
         required_atoms=_DECK_AUDIO_SEPARATION_CONTEXT_REQUIRED_ATOMS,
         forbidden_atoms=_DECK_AUDIO_SEPARATION_CONTEXT_FORBIDDEN_ATOMS,
         max_len=max_len,
     )
+    if text is None:
+        return None
+    if not any(
+        all(atom in text for atom in shape) for shape in _DECK_AUDIO_SEPARATION_CONTEXT_SHAPES
+    ):
+        return None
+    return text
+
+
+def normalize_deck_audio_features_context_text(raw: object, *, max_len: int = 900) -> str | None:
+    """Return trusted ``deck_audio_features_context[...]`` text, or ``None``."""
+    text = _normalize_live_context_text(
+        raw,
+        prefix="deck_audio_features_context",
+        required_atoms=_DECK_AUDIO_FEATURES_CONTEXT_REQUIRED_ATOMS,
+        forbidden_atoms=_DECK_AUDIO_FEATURES_CONTEXT_FORBIDDEN_ATOMS,
+        max_len=max_len,
+    )
+    if text is None:
+        return None
+    if not any(f"{side}_activity=" in text and f"{side}_rms=" in text for side in ("A", "B")):
+        return None
+    return text
+
+
+def normalize_deck_audio_delta_context_text(raw: object, *, max_len: int = 900) -> str | None:
+    """Return trusted ``deck_audio_delta_context[...]`` text, or ``None``."""
+    text = _normalize_live_context_text(
+        raw,
+        prefix="deck_audio_delta_context",
+        required_atoms=_DECK_AUDIO_DELTA_CONTEXT_REQUIRED_ATOMS,
+        forbidden_atoms=_DECK_AUDIO_DELTA_CONTEXT_FORBIDDEN_ATOMS,
+        max_len=max_len,
+    )
+    if text is None:
+        return None
+    if not any(f"{side}_delta=" in text for side in ("A", "B")):
+        return None
+    return text
+
+
+def normalize_deck_audio_window_context_text(raw: object, *, max_len: int = 1100) -> str | None:
+    """Return trusted ``deck_audio_window_context[...]`` text, or ``None``."""
+    text = _normalize_live_context_text(
+        raw,
+        prefix="deck_audio_window_context",
+        required_atoms=_DECK_AUDIO_WINDOW_CONTEXT_REQUIRED_ATOMS,
+        forbidden_atoms=_DECK_AUDIO_WINDOW_CONTEXT_FORBIDDEN_ATOMS,
+        max_len=max_len,
+    )
+    if text is None:
+        return None
+    if not any(f"{side}_current=" in text for side in ("A", "B")):
+        return None
+    return text
 
 
 def _normalize_live_context_text(
@@ -429,13 +656,18 @@ def render_deck_lane_context(state: MusicState, *, compact: bool = False) -> str
     how that lane is routed through the controller.
     """
     decks = getattr(state.deck_state, "decks", {})
-    if not decks and not getattr(state, "controller_connected", False):
+    source_status = getattr(getattr(state, "deck_state", None), "source_status", {})
+    if not decks and not getattr(state, "controller_connected", False) and not source_status:
         return None
 
     resolved = _resolved_decks(decks)
     scores = dict(_deck_route_scores(state))
     sides: set[str] = set()
-    if getattr(state, "controller_connected", False) or any(side in decks for side in ("A", "B")):
+    if (
+        getattr(state, "controller_connected", False)
+        or source_status
+        or any(side in decks for side in ("A", "B"))
+    ):
         sides.update(("A", "B"))
     sides.update(side for side in decks if side in {"A", "B", "C", "D"})
     if not sides:
@@ -463,7 +695,10 @@ def render_deck_reference_context(state: MusicState, *, compact: bool = False) -
     says the only attached audio is the global mix; it is not an outcome grade.
     """
     decks = getattr(state.deck_state, "decks", {})
-    has_deck_reference = bool(decks) or bool(getattr(state, "controller_connected", False))
+    source_status = getattr(getattr(state, "deck_state", None), "source_status", {})
+    has_deck_reference = (
+        bool(decks) or bool(getattr(state, "controller_connected", False)) or bool(source_status)
+    )
     if not has_deck_reference:
         return None
 
@@ -502,13 +737,25 @@ def render_deck_source_context(state: MusicState, *, compact: bool = False) -> s
     source.
     """
     decks = getattr(state.deck_state, "decks", {})
-    has_reference = bool(decks) or bool(getattr(state, "controller_connected", False))
+    source_status = getattr(getattr(state, "deck_state", None), "source_status", {})
+    has_reference = (
+        bool(decks)
+        or bool(getattr(state, "controller_connected", False))
+        or bool(source_status)
+    )
     if not has_reference:
         return None
 
     resolved = _resolved_decks(decks)
     observed_sides = sorted(side for side in decks if side in {"A", "B", "C", "D"})
-    reference_sides = {"A", "B"} if getattr(state, "controller_connected", False) else set()
+    source_controller_connected = (
+        str(source_status.get("controller_connection") or "").lower() == "connected"
+    )
+    reference_sides = (
+        {"A", "B"}
+        if getattr(state, "controller_connected", False) or source_controller_connected
+        else set()
+    )
     reference_sides.update(observed_sides)
     unresolved_sides = sorted(side for side in reference_sides if side not in resolved)
     source_labels = sorted(
@@ -546,12 +793,21 @@ def _deck_source_status_fields(state: MusicState, *, compact: bool) -> list[str]
         return []
     keys = (
         ("controller", "controller"),
+        ("controller_connection", "controller_connection"),
+        ("library", "library"),
+        ("library_tracks", "library_tracks"),
+        ("library_source", "library_source"),
+        ("library_match", "library_match"),
         ("nowplaying", "nowplaying"),
         ("nowplaying_owner", "nowplaying_owner"),
         ("nowplaying_title", "nowplaying_title"),
         ("audible_deck", "source_audible_deck"),
         ("resolution", "resolution"),
         ("resolved_side", "resolved_side"),
+        ("second_deck_source", "second_deck_source"),
+        ("screen_vision", "screen_vision"),
+        ("last_known_sides", "last_known_sides"),
+        ("last_known_rule", "last_known_rule"),
     )
     fields: list[str] = []
     for key, label in keys:
@@ -614,9 +870,15 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
     device = _evidence_token(str(capture.get("device_name") or "unknown")) or "unknown"
     input_channels = _capture_channel_token(capture.get("input_channels"))
     opened_channels = _capture_channel_token(capture.get("opened_channels"))
-    sample_rate = _capture_channel_token(capture.get("sample_rate"))
+    sample_rate = _capture_sample_rate_token(capture.get("sample_rate"))
     max_in = _capture_int(capture.get("input_channels"))
     opened = _capture_int(capture.get("opened_channels"))
+    required_opened = _capture_int(capture.get("deck_audio_required_opened_channels"))
+    capture_reason = _evidence_token(str(capture.get("deck_audio_capture_reason") or "unknown"))
+    deck_channels = _capture_deck_channels(capture.get("deck_channels"))
+    deck_capture_enabled = bool(capture.get("deck_audio_capture_enabled")) and all(
+        side in deck_channels for side in ("A", "B")
+    )
     capacity = (
         "multichannel_available"
         if max_in is not None and max_in >= 4
@@ -624,7 +886,9 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
         if max_in is not None
         else "unknown"
     )
-    if opened is not None and opened >= 4:
+    if deck_capture_enabled:
+        mode = "deck_pair_capture_configured"
+    elif opened is not None and opened >= 4:
         mode = "multichannel_open_but_deck_pairs_not_attached"
     elif max_in is not None and max_in >= 4:
         mode = "multichannel_device_available_but_runtime_opened_stereo"
@@ -640,16 +904,192 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
         f"sample_rate={sample_rate}",
         f"device_capacity={capacity}",
         f"mode={mode}",
-        "current_capture=P1_global_mix",
-        "gemini_audio=mono_downmix_of_capture",
-        "deckA_audio=not_captured",
-        "deckB_audio=not_captured",
-        "per_deck_audio=not_attached",
-        "isolated_decks=false",
-        "upgrade_path=multi_channel_deck_pair_capture",
-        "rule=separation_capability_not_outcome",
     ]
+    master_channels = _capture_channel_map_token(capture.get("master_channels"))
+    if master_channels:
+        fields.append(f"master_channels={master_channels}")
+    if required_opened and required_opened > 0:
+        fields.append(f"required_opened_channels={required_opened}")
+    if capture_reason and capture_reason != "unknown":
+        fields.append(f"capture_reason={capture_reason}")
+    routing_hint = _capture_routing_hint_token(capture.get("deck_audio_routing_hint"))
+    if routing_hint:
+        fields.append(f"routing_hint={routing_hint}")
+        fields.append("routing_hint_rule=output_routing_not_live_audio_proof")
+    if (
+        not deck_capture_enabled
+        and capture_reason in {"capture_device_too_few_channels", "opened_channels_too_few"}
+    ):
+        fields.append(f"setup_block={capture_reason}")
+    if deck_capture_enabled:
+        activity = _deck_audio_activity_token(capture.get("deck_audio_rms"))
+        fields.extend(
+            [
+                "current_capture=P1_global_mix_plus_deck_pairs",
+                "gemini_audio=mono_downmix_of_master_capture",
+                "deckA_audio=captured",
+                "deckB_audio=captured",
+                "per_deck_audio=captured_not_attached",
+                "isolated_decks=runtime_capture_available",
+                "deck_pairs=" + _deck_pairs_token(deck_channels),
+                "upgrade_path=attach_deck_pair_audio_parts_when_needed",
+            ]
+        )
+        if activity:
+            fields.append(f"deck_audio_activity={activity}")
+    else:
+        fields.extend(
+            [
+                "current_capture=P1_global_mix",
+                "gemini_audio=mono_downmix_of_capture",
+                "deckA_audio=not_captured",
+                "deckB_audio=not_captured",
+                "per_deck_audio=not_attached",
+                "isolated_decks=false",
+                "upgrade_path=multi_channel_deck_pair_capture",
+            ]
+        )
+    fields.append("rule=separation_capability_not_outcome")
     return "deck_audio_separation_context[" + " ".join(fields) + "]"
+
+
+def render_deck_audio_features_context(capture: dict[str, object] | None = None) -> str | None:
+    """Return compact per-deck audio measurements from configured deck capture.
+
+    These are descriptors for "what each captured lane is doing", not a
+    transition score. They are safe for Viber text context because they are
+    small deterministic numbers from the audio callback, not raw audio and not
+    another model pass.
+    """
+    capture = capture if isinstance(capture, dict) else {}
+    deck_channels = _capture_deck_channels(capture.get("deck_channels"))
+    deck_capture_enabled = bool(capture.get("deck_audio_capture_enabled")) and all(
+        side in deck_channels for side in ("A", "B")
+    )
+    if not deck_capture_enabled:
+        return None
+
+    rows = _deck_audio_feature_values(capture.get("deck_audio_features"))
+    if not rows:
+        rows = {
+            side: {"activity": "active" if rms >= 0.003 else "silent", "rms": rms}
+            for side, rms in _deck_audio_rms_values(capture.get("deck_audio_rms")).items()
+        }
+    if not rows:
+        return None
+
+    fields = [
+        "source=deck_pair_capture",
+        "window=latest_callback",
+        "per_deck_audio=captured_features",
+    ]
+    for side in ("A", "B"):
+        row = rows.get(side)
+        if not row:
+            continue
+        activity = str(row.get("activity") or "").strip().lower()
+        if activity not in {"active", "silent"}:
+            rms = _feature_float(row.get("rms"))
+            activity = "active" if rms is not None and rms >= 0.003 else "silent"
+        fields.append(f"{side}_activity={activity}")
+        for key, places in (
+            ("rms", 3),
+            ("peak", 3),
+            ("zcr", 3),
+            ("flux", 3),
+            ("crest", 1),
+        ):
+            value = _feature_float(row.get(key))
+            if value is not None:
+                fields.append(f"{side}_{key}={value:.{places}f}")
+    if not any(field.startswith(("A_rms=", "B_rms=")) for field in fields):
+        return None
+    fields.append("rule=deck_audio_features_not_outcome_verdict")
+    return "deck_audio_features_context[" + " ".join(fields) + "]"
+
+
+def render_deck_audio_delta_context(capture: dict[str, object] | None = None) -> str | None:
+    """Return per-deck feature changes from configured deck capture.
+
+    This is the per-lane counterpart of global ``audio_delta``. It says what
+    changed on each captured deck lane, while explicitly refusing causal or
+    quality claims about the user's move.
+    """
+    capture = capture if isinstance(capture, dict) else {}
+    deck_channels = _capture_deck_channels(capture.get("deck_channels"))
+    deck_capture_enabled = bool(capture.get("deck_audio_capture_enabled")) and all(
+        side in deck_channels for side in ("A", "B")
+    )
+    if not deck_capture_enabled:
+        return None
+    deltas = _deck_audio_delta_values(capture.get("deck_audio_deltas"))
+    features = _deck_audio_feature_values(capture.get("deck_audio_features"))
+    if not deltas and not any(features.get(side) for side in ("A", "B")):
+        return None
+
+    fields = [
+        "source=deck_pair_capture",
+        "window=latest_callback",
+        "per_deck_delta=captured_feature_delta",
+    ]
+    for side in ("A", "B"):
+        items = deltas.get(side)
+        if items:
+            fields.append(f"{side}_delta={'+'.join(items[:4])}")
+        elif features.get(side):
+            fields.append(f"{side}_delta=no_clear_delta")
+    if not any(field.startswith(("A_delta=", "B_delta=")) for field in fields):
+        return None
+    fields.append("rule=deck_audio_delta_not_causal_proof")
+    return "deck_audio_delta_context[" + " ".join(fields) + "]"
+
+
+def render_deck_audio_window_context(capture: dict[str, object] | None = None) -> str | None:
+    """Return per-deck pre/current audio movement from configured deck capture.
+
+    This is the user's "older part / current part" idea made cheap and explicit:
+    deterministic feature summaries from Deck A and Deck B around the current
+    action window. It labels what changed on each lane; it is not a transition
+    verdict and not proof that a controller move caused the change.
+    """
+    capture = capture if isinstance(capture, dict) else {}
+    deck_channels = _capture_deck_channels(capture.get("deck_channels"))
+    deck_capture_enabled = bool(capture.get("deck_audio_capture_enabled")) and all(
+        side in deck_channels for side in ("A", "B")
+    )
+    if not deck_capture_enabled:
+        return None
+    windows = _deck_audio_window_values(capture.get("deck_audio_windows"))
+    if not windows:
+        return None
+
+    pre_span = _window_span_token(windows.get("pre_s"), fallback="-6.0..-1.0")
+    current_span = _window_span_token(windows.get("current_s"), fallback="-1.0..0.0")
+    fields = [
+        "source=deck_pair_capture",
+        "timeline=pre_action_current",
+        f"pre={pre_span}",
+        f"current={current_span}",
+        "action=-1.0..0.0",
+        "per_deck_audio=captured_window_features",
+    ]
+    for side in ("A", "B"):
+        row = windows.get(side)
+        if not isinstance(row, dict):
+            continue
+        pre = _deck_audio_window_feature_row(row.get("pre"))
+        current = _deck_audio_window_feature_row(row.get("current"))
+        delta = _deck_audio_delta_values({side: row.get("delta")}).get(side, [])
+        if pre:
+            fields.append(f"{side}_pre={_window_feature_token(pre)}")
+        if current:
+            fields.append(f"{side}_current={_window_feature_token(current)}")
+        if delta:
+            fields.append(f"{side}_delta={'+'.join(delta[:4])}")
+    if not any(field.startswith(("A_current=", "B_current=")) for field in fields):
+        return None
+    fields.append("rule=deck_audio_window_not_causal_or_quality_verdict")
+    return "deck_audio_window_context[" + " ".join(fields) + "]"
 
 
 def render_audio_window_context(
@@ -657,19 +1097,27 @@ def render_audio_window_context(
     moves: list[str] | tuple[str, ...] | None = None,
     *,
     audio_seconds: float = 6.0,
+    mic_part_label: str | None = None,
     lookahead_part_label: str | None = None,
+    deck_part_labels: dict[str, str] | None = None,
+    deck_part_activity: dict[str, str] | None = None,
+    deck_part_seconds: float = 3.0,
     lookahead_horizon_s: float = 3.0,
     force: bool = False,
 ) -> str | None:
     """Return a temporal map for the attached master-audio window.
 
     This is the cheap "old part / current move / +3s forward" bridge. It does
-    not add another audio Part and it never pretends Deck A/B stems are present.
-    Deck separation still comes from ``deck_lanes_context`` and controller
-    routing unless a future capture path attaches real isolated deck audio.
+    not add another audio Part. Deck separation comes from ``deck_lanes_context``
+    and, when optional deck-pair Parts are really attached, from the explicit
+    deck Part labels. Those Parts are references, not transition verdicts.
     """
     labels = [_move_label(item).strip() for item in (moves or ())]
     labels = [label for label in labels if label][-3:]
+    deck_labels = _deck_audio_part_labels(
+        deck_part_labels,
+        reserved_labels=(mic_part_label, lookahead_part_label),
+    )
     has_reference = bool(
         force
         or labels
@@ -677,6 +1125,7 @@ def render_audio_window_context(
         or getattr(state, "controller_connected", False)
         or getattr(state.deck_state, "decks", {})
         or lookahead_part_label
+        or deck_labels
     )
     if not has_reference:
         return None
@@ -694,17 +1143,47 @@ def render_audio_window_context(
         "timeline=past_action_future",
         "together_audio=P1_global_mix",
         "decks_together=true",
-        "deckA_audio=not_attached",
-        "deckB_audio=not_attached",
-        "per_deck_audio=structured_text_only",
-        "duplicate_audio=same_master_not_deck_split",
-        "deck_separation=deck_lanes_context",
-        "lane_aliases=deck1:A,deck2:B",
-        f"pre=-{seconds:.1f}..{pre_end:.1f}",
-        "current=-1.0..0.0",
-        "action=-1.0..0.0",
-        "rule=time_alignment_not_outcome_verdict",
     ]
+    if deck_labels:
+        try:
+            deck_seconds = float(deck_part_seconds)
+        except (TypeError, ValueError):
+            deck_seconds = 3.0
+        deck_seconds = max(1.0, min(6.0, deck_seconds))
+        fields.extend(
+            [
+                f"deckA_audio={deck_labels.get('A', 'not_attached')}",
+                f"deckB_audio={deck_labels.get('B', 'not_attached')}",
+                "per_deck_audio=deck_pair_parts",
+                "duplicate_audio=separate_deck_pair_parts",
+                "deck_separation=deck_lanes_context",
+                "deck_audio_separation=deck_audio_separation_context",
+                f"deck_part_span=-{deck_seconds:.1f}..0.0",
+            ]
+        )
+        deck_activity = _deck_audio_part_activity(deck_part_activity)
+        for side in ("A", "B"):
+            if side in deck_activity:
+                fields.append(f"deck{side}_activity={deck_activity[side]}")
+    else:
+        fields.extend(
+            [
+                "deckA_audio=not_attached",
+                "deckB_audio=not_attached",
+                "per_deck_audio=structured_text_only",
+                "duplicate_audio=same_master_not_deck_split",
+                "deck_separation=deck_lanes_context",
+            ]
+        )
+    fields.extend(
+        [
+            "lane_aliases=deck1:A,deck2:B",
+            f"pre=-{seconds:.1f}..{pre_end:.1f}",
+            "current=-1.0..0.0",
+            "action=-1.0..0.0",
+            "rule=time_alignment_not_outcome_verdict",
+        ]
+    )
 
     anchors: list[str] = []
     for label in labels:
@@ -743,7 +1222,11 @@ def render_audio_part_context(
     *,
     audio_seconds: float = 6.0,
     mic_part_label: str | None = None,
+    mic_part_seconds: float = 8.0,
     lookahead_part_label: str | None = None,
+    deck_part_labels: dict[str, str] | None = None,
+    deck_part_activity: dict[str, str] | None = None,
+    deck_part_seconds: float = 3.0,
     lookahead_horizon_s: float = 3.0,
     surface: str = "gemini_parts",
     p1_model_heard: bool = True,
@@ -765,32 +1248,111 @@ def render_audio_part_context(
     surface_label = _evidence_token(surface) or "gemini_parts"
     fields = [
         f"surface={surface_label}",
+        f"audio_token_rate={GEMINI_AUDIO_TOKENS_PER_SECOND}_per_second",
         "P1=live_global_mix",
         f"P1_model_heard={'true' if p1_model_heard else 'false'}",
         f"P1_runtime_observed={'true' if p1_runtime_observed else 'false'}",
         "P1_audience_heard=true",
         f"P1_span=-{seconds:.1f}..0.0",
+        f"P1_tokens_est={round(seconds * GEMINI_AUDIO_TOKENS_PER_SECOND)}",
         "P1_deck_audio=global_mix_not_stems",
         "deck1=A",
         "deck2=B",
         "together_audio=P1",
-        "per_deck_audio=not_attached",
-        "duplicate_audio=same_master_not_deck_split",
     ]
+    model_audio_tokens_est = (
+        round(seconds * GEMINI_AUDIO_TOKENS_PER_SECOND) if p1_model_heard else 0
+    )
 
     mic_label = _audio_part_label(mic_part_label)
+    lookahead_label = _audio_part_label(lookahead_part_label)
+    deck_labels = _deck_audio_part_labels(
+        deck_part_labels,
+        reserved_labels=(mic_label, lookahead_label),
+    )
+    ordered_parts = ["P1"]
+    ordered_parts.extend(
+        sorted(
+            {
+                label
+                for label in (
+                    mic_label,
+                    lookahead_label,
+                    deck_labels.get("A"),
+                    deck_labels.get("B"),
+                )
+                if label
+            },
+            key=lambda label: int(label[1:]),
+        )
+    )
+    fields.append("part_order=" + ",".join(ordered_parts))
+
+    deck_activity: dict[str, str] = {}
+    if isinstance(deck_part_activity, dict):
+        for side in ("A", "B"):
+            activity = str(deck_part_activity.get(side) or "").strip().lower()
+            if activity in {"active", "silent"}:
+                deck_activity[side] = activity
+    if deck_labels:
+        try:
+            deck_seconds = float(deck_part_seconds)
+        except (TypeError, ValueError):
+            deck_seconds = 3.0
+        deck_seconds = max(1.0, min(6.0, deck_seconds))
+        fields.extend(
+            [
+                "per_deck_audio=deck_pair_parts",
+                "duplicate_audio=separate_deck_pair_parts",
+            ]
+        )
+        for side in ("A", "B"):
+            label = deck_labels.get(side)
+            if not label:
+                continue
+            fields.extend(
+                [
+                    f"deck{side}_part={label}",
+                    f"{label}=deck{side}_configured_capture",
+                    f"{label}_model_heard=true",
+                    f"{label}_audience_heard=false",
+                    f"{label}_span=-{deck_seconds:.1f}..0.0",
+                    f"{label}_tokens_est={round(deck_seconds * GEMINI_AUDIO_TOKENS_PER_SECOND)}",
+                    f"{label}_deck_audio=deck{side}_configured_capture",
+                    f"{label}_rule=deck_pair_capture_reference_not_quality_verdict",
+                ]
+            )
+            model_audio_tokens_est += round(deck_seconds * GEMINI_AUDIO_TOKENS_PER_SECOND)
+            activity = deck_activity.get(side)
+            if activity:
+                fields.append(f"{label}_activity=deck{side}_{activity}")
+    else:
+        fields.extend(
+            [
+                "per_deck_audio=not_attached",
+                "duplicate_audio=same_master_not_deck_split",
+            ]
+        )
+
     if mic_label:
+        try:
+            mic_seconds = float(mic_part_seconds)
+        except (TypeError, ValueError):
+            mic_seconds = 8.0
+        mic_seconds = max(1.0, min(30.0, mic_seconds))
         fields.extend(
             [
                 f"{mic_label}=user_mic",
                 f"{mic_label}_model_heard=true",
+                f"{mic_label}_span=-{mic_seconds:.1f}..0.0",
+                f"{mic_label}_tokens_est={round(mic_seconds * GEMINI_AUDIO_TOKENS_PER_SECOND)}",
                 f"{mic_label}_role=user_speech",
                 f"{mic_label}_deck_audio=none",
                 f"{mic_label}_rule=not_deck_audio",
             ]
         )
+        model_audio_tokens_est += round(mic_seconds * GEMINI_AUDIO_TOKENS_PER_SECOND)
 
-    lookahead_label = _audio_part_label(lookahead_part_label)
     if lookahead_label:
         try:
             horizon = float(lookahead_horizon_s)
@@ -803,13 +1365,49 @@ def render_audio_part_context(
                 f"{lookahead_label}_model_heard=true",
                 f"{lookahead_label}_audience_heard=false",
                 f"{lookahead_label}_span=0.0..+{horizon:.1f}",
+                f"{lookahead_label}_tokens_est={round(horizon * GEMINI_AUDIO_TOKENS_PER_SECOND)}",
                 f"{lookahead_label}_deck_audio=none",
                 f"{lookahead_label}_rule=forecast_only_not_current_live_evidence",
             ]
         )
+        model_audio_tokens_est += round(horizon * GEMINI_AUDIO_TOKENS_PER_SECOND)
 
+    fields.append(f"model_audio_tokens_est={model_audio_tokens_est}")
     fields.append("rule=part_labels_not_outcome_verdict")
     return "audio_part_context[" + " ".join(fields) + "]"
+
+
+def _deck_audio_part_labels(
+    deck_part_labels: dict[str, str] | None,
+    *,
+    reserved_labels: tuple[str | None, ...] = (),
+) -> dict[str, str]:
+    if not isinstance(deck_part_labels, dict):
+        return {}
+    labels: dict[str, str] = {}
+    for side in ("A", "B"):
+        label = _audio_part_label(deck_part_labels.get(side))
+        if label:
+            labels[side] = label
+    if set(labels) != {"A", "B"}:
+        return {}
+    if labels["A"] == labels["B"]:
+        return {}
+    reserved = {label for label in (_audio_part_label(item) for item in reserved_labels) if label}
+    if labels["A"] in reserved or labels["B"] in reserved:
+        return {}
+    return labels
+
+
+def _deck_audio_part_activity(deck_part_activity: dict[str, str] | None) -> dict[str, str]:
+    activity: dict[str, str] = {}
+    if not isinstance(deck_part_activity, dict):
+        return activity
+    for side in ("A", "B"):
+        value = str(deck_part_activity.get(side) or "").strip().lower()
+        if value in {"active", "silent"}:
+            activity[side] = value
+    return activity
 
 
 def render_audio_window_map(
@@ -817,7 +1415,11 @@ def render_audio_window_map(
     moves: list[str] | tuple[str, ...] | None = None,
     *,
     audio_seconds: float = 6.0,
+    mic_part_label: str | None = None,
     lookahead_part_label: str | None = None,
+    deck_part_labels: dict[str, str] | None = None,
+    deck_part_activity: dict[str, str] | None = None,
+    deck_part_seconds: float = 3.0,
     lookahead_horizon_s: float = 3.0,
     force: bool = False,
 ) -> dict[str, Any] | None:
@@ -829,6 +1431,10 @@ def render_audio_window_map(
     """
     labels = [_move_label(item).strip() for item in (moves or ())]
     labels = [label for label in labels if label][-3:]
+    deck_labels = _deck_audio_part_labels(
+        deck_part_labels,
+        reserved_labels=(mic_part_label, lookahead_part_label),
+    )
     has_reference = bool(
         force
         or labels
@@ -836,6 +1442,7 @@ def render_audio_window_map(
         or getattr(state, "controller_connected", False)
         or getattr(state.deck_state, "decks", {})
         or lookahead_part_label
+        or deck_labels
     )
     if not has_reference:
         return None
@@ -879,17 +1486,35 @@ def render_audio_window_map(
             "rule": "forecast_only_not_audience_evidence",
         }
 
+    deck_activity = _deck_audio_part_activity(deck_part_activity)
+    deck_pair_attached = bool(deck_labels)
+    deck_part_span: list[float] | None = None
+    if deck_pair_attached:
+        try:
+            deck_seconds = float(deck_part_seconds)
+        except (TypeError, ValueError):
+            deck_seconds = 3.0
+        deck_seconds = max(1.0, min(6.0, deck_seconds))
+        deck_part_span = [-round(deck_seconds, 1), 0.0]
+
     return {
         "p1": "master_global_mix",
         "p1_heard": True,
         "timeline": "past_action_future",
         "together_audio": "P1_global_mix",
         "decks_together": True,
-        "deckA_audio": "not_attached",
-        "deckB_audio": "not_attached",
-        "per_deck_audio": "structured_text_only",
-        "duplicate_audio": "same_master_not_deck_split",
+        "deckA_audio": deck_labels.get("A", "not_attached"),
+        "deckB_audio": deck_labels.get("B", "not_attached"),
+        "per_deck_audio": "deck_pair_parts" if deck_pair_attached else "structured_text_only",
+        "duplicate_audio": (
+            "separate_deck_pair_parts" if deck_pair_attached else "same_master_not_deck_split"
+        ),
         "deck_separation": "deck_lanes_context",
+        "deck_audio_separation": (
+            "deck_audio_separation_context" if deck_pair_attached else "not_attached"
+        ),
+        "deck_part_span_s": deck_part_span,
+        "deck_part_activity": deck_activity,
         "lane_aliases": "deck1:A,deck2:B",
         "pre_s": [-round(seconds, 1), round(pre_end, 1)],
         "current_s": [-1.0, 0.0],
@@ -1086,9 +1711,14 @@ def live_mix_evidence_keys(
     moves: list[str] | tuple[str, ...] | None = None,
     *,
     audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> list[str]:
     """Return citation-safe ``mix`` evidence keys for current deck grounding."""
     keys: list[str] = []
+    labels = [_move_label(item) for item in (moves or [])]
+    labels = [label for label in labels if label]
+    move_scope_key: str | None = None
+    move_transition_key: str | None = None
     scores = _deck_route_scores(state)
     route_key: str | None = None
     if scores:
@@ -1097,11 +1727,20 @@ def live_mix_evidence_keys(
         route_key = f"deck_route={route}"
 
     resolved = _resolved_decks(state.deck_state.decks)
+    source_status_map = getattr(getattr(state, "deck_state", None), "source_status", {})
     has_identity_reference = bool(state.deck_state.decks) or bool(
         getattr(state, "controller_connected", False)
-    )
+    ) or bool(source_status_map)
     if has_identity_reference:
-        keys.append(_transition_status(state, resolved))
+        if labels:
+            touched_sides = _move_sides(labels)
+            controls = _move_controls(labels)
+            scope = _move_scope(touched_sides, controls)
+            move_scope_key = f"move_scope={scope}"
+            move_transition_key = _move_transition_status(state, resolved, scope, controls)
+            keys.append(move_transition_key)
+        else:
+            keys.append(_transition_status(state, resolved))
         keys.append(_deck_identity_evidence_status(resolved))
     lane_status = _deck_lane_evidence_status(state)
     if lane_status:
@@ -1112,17 +1751,29 @@ def live_mix_evidence_keys(
     source_status = _deck_source_evidence_status(state)
     if source_status:
         keys.append(source_status)
+    capture_status = _deck_audio_capture_evidence_status(audio_capture_context)
+    if capture_status:
+        keys.append(capture_status)
+    feature_status = _deck_audio_features_evidence_status(audio_capture_context)
+    if feature_status:
+        keys.append(feature_status)
+    delta_status = _deck_audio_delta_evidence_status(audio_capture_context)
+    if delta_status:
+        keys.append(delta_status)
+    window_status = _deck_audio_window_evidence_status(audio_capture_context)
+    if window_status:
+        keys.append(window_status)
 
-    labels = [_move_label(item) for item in (moves or [])]
-    labels = [label for label in labels if label]
-    move_scope_key: str | None = None
     if labels:
-        touched_sides = _move_sides(labels)
-        controls = _move_controls(labels)
-        scope = _move_scope(touched_sides, controls)
-        status = _move_transition_status(state, resolved, scope, controls)
-        move_scope_key = f"move_scope={scope}"
-        keys.append(status)
+        if move_transition_key is None:
+            touched_sides = _move_sides(labels)
+            controls = _move_controls(labels)
+            scope = _move_scope(touched_sides, controls)
+            move_scope_key = f"move_scope={scope}"
+            keys.append(_move_transition_status(state, resolved, scope, controls))
+    elif capture_status and _deck_audio_capture_has_two_active(audio_capture_context):
+        if len(resolved) >= 2:
+            keys.append("transition_candidate=two_resolved_decks_captured_audio")
 
     if move_scope_key:
         keys.append(move_scope_key)
@@ -1140,7 +1791,7 @@ def live_mix_evidence_keys(
         if safe_key and safe_key not in seen:
             out.append(safe_key)
             seen.add(safe_key)
-    return out[:8]
+    return out[:10]
 
 
 def live_evidence_packet(
@@ -1148,6 +1799,7 @@ def live_evidence_packet(
     moves: list[str] | tuple[str, ...] | None = None,
     *,
     audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Return bounded live evidence categories for prompt/socket transport."""
     move_items = tuple(_recent_move_items(state)) if moves is None else tuple(moves)
@@ -1155,12 +1807,13 @@ def live_evidence_packet(
         state,
         move_items,
         audio_delta_items=audio_delta_items,
+        audio_capture_context=audio_capture_context,
     )
     midi_atoms = move_evidence_atoms(state, move_items) if move_items else []
 
     out: dict[str, object] = {}
     if mix_keys:
-        out["mix"] = mix_keys[:8]
+        out["mix"] = mix_keys[:10]
     if midi_atoms:
         out["midi"] = [
             {"key": key, "t": round(float(t_session), 1)} for key, t_session in midi_atoms[:4]
@@ -1171,7 +1824,7 @@ def live_evidence_packet(
         refs.append(f"midi:{key}@{float(t_session):.1f}")
     refs.extend(f"mix:{key}" for key in mix_keys)
     if refs:
-        out["refs"] = refs[:9]
+        out["refs"] = refs[:14]
     return out
 
 
@@ -1180,12 +1833,14 @@ def render_live_evidence_context(
     moves: list[str] | tuple[str, ...] | None = None,
     *,
     audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> str | None:
     """Render prompt-readable evidence categories without implying a verdict."""
     packet = live_evidence_packet(
         state,
         moves,
         audio_delta_items=audio_delta_items,
+        audio_capture_context=audio_capture_context,
     )
     if not packet:
         return None
@@ -1193,10 +1848,10 @@ def render_live_evidence_context(
     fields: list[str] = []
     refs = packet.get("refs")
     if isinstance(refs, list) and refs:
-        fields.append("refs=" + ",".join(str(item) for item in refs[:9]))
+        fields.append("refs=" + ",".join(str(item) for item in refs[:14]))
     mix = packet.get("mix")
     if isinstance(mix, list) and mix:
-        fields.append("mix=" + ",".join(str(item) for item in mix[:8]))
+        fields.append("mix=" + ",".join(str(item) for item in mix[:10]))
     midi = packet.get("midi")
     if isinstance(midi, list) and midi:
         midi_refs: list[str] = []
@@ -1233,6 +1888,7 @@ def render_grounding_ref_context(
     *,
     registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None,
     moves: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> str | None:
     """Render exact citable refs that are already present in the registry."""
     if not registry_snapshot:
@@ -1244,13 +1900,17 @@ def render_grounding_ref_context(
         if observed_t is not None:
             refs.append(f"[midi:{key}@{observed_t:.1f}]")
 
-    for key in live_mix_evidence_keys(state, moves or getattr(state, "recent_moves", [])):
+    for key in live_mix_evidence_keys(
+        state,
+        moves or getattr(state, "recent_moves", []),
+        audio_capture_context=audio_capture_context,
+    ):
         if key in registry_snapshot.get("mix", {}):
             refs.append(f"[mix:{key}]")
 
     if not refs:
         return None
-    return "grounding_refs[" + " ".join(refs[:9]) + "]"
+    return "grounding_refs[" + " ".join(refs[:14]) + "]"
 
 
 def render_move_effect_context(
@@ -1258,20 +1918,75 @@ def render_move_effect_context(
     moves: list[str] | tuple[str, ...],
     *,
     audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> str | None:
     """Return move-scoped DSP deltas without treating them as proof of skill."""
     if not moves:
         return None
     deltas = [str(item) for item in (audio_delta_items or render_audio_delta_items(state)) if item]
-    if not deltas:
+    deck_delta = _move_deck_audio_delta_token(audio_capture_context)
+    deck_window = _move_deck_audio_window_token(audio_capture_context)
+    if not deltas and not deck_delta and not deck_window:
         return None
     fields = [
         "window=recent_moves",
         f"moves={min(len(moves), 3)}",
-        "deltas=" + "; ".join(deltas[:4]),
-        "rule=dsp_delta_not_causal_proof",
     ]
+    if deltas:
+        fields.append("deltas=" + "; ".join(deltas[:4]))
+    if deck_delta:
+        fields.append(f"deck_deltas={deck_delta}")
+    if deck_window:
+        fields.append(f"deck_windows={deck_window}")
+    if deck_delta or deck_window:
+        fields.append("rule=move_audio_timing_not_causal_or_quality_proof")
+    else:
+        fields.append("rule=dsp_delta_not_causal_proof")
     return "move_effect_context[" + " ".join(fields) + "]"
+
+
+def _move_deck_audio_delta_token(capture: dict[str, object] | None) -> str | None:
+    if not isinstance(capture, dict) or not bool(capture.get("deck_audio_capture_enabled")):
+        return None
+    deltas = _deck_audio_delta_values(capture.get("deck_audio_deltas"))
+    if not deltas:
+        return None
+    parts: list[str] = []
+    for side in ("A", "B"):
+        items = deltas.get(side)
+        if items:
+            parts.append(f"{side}:{'+'.join(items[:2])}")
+    return "+".join(parts) if parts else None
+
+
+def _move_deck_audio_window_token(capture: dict[str, object] | None) -> str | None:
+    if not isinstance(capture, dict) or not bool(capture.get("deck_audio_capture_enabled")):
+        return None
+    windows = _deck_audio_window_values(capture.get("deck_audio_windows"))
+    if not windows:
+        return None
+    parts: list[str] = []
+    for side in ("A", "B"):
+        row = windows.get(side)
+        if not isinstance(row, dict):
+            continue
+        pre = row.get("pre")
+        current = row.get("current")
+        if not isinstance(current, dict):
+            continue
+        activity = str(current.get("activity") or "unknown")
+        pre_rms = _feature_float(pre.get("rms")) if isinstance(pre, dict) else None
+        current_rms = _feature_float(current.get("rms"))
+        side_parts = [side, activity if activity in {"active", "silent"} else "unknown"]
+        if pre_rms is not None:
+            side_parts.append(f"pre_{pre_rms:.3f}")
+        if current_rms is not None:
+            side_parts.append(f"current_{current_rms:.3f}")
+        delta = row.get("delta")
+        if isinstance(delta, list) and delta:
+            side_parts.append("delta_" + "+".join(str(item) for item in delta[:2]))
+        parts.append(":".join(side_parts))
+    return "+".join(parts) if parts else None
 
 
 def render_mixer_context(state: MusicState) -> str | None:
@@ -1322,6 +2037,10 @@ def has_unsafe_multi_deck_disclaimer_claim(text: str) -> bool:
 def live_claim_policy(
     state: MusicState,
     moves: list[str] | tuple[str, ...] = (),
+    *,
+    audio_capture_context: dict[str, object] | None = None,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    deck_audio_parts_attached: bool | None = None,
 ) -> tuple[str, str | None]:
     """Return the allowed multi-deck outcome policy for the current evidence.
 
@@ -1352,18 +2071,79 @@ def live_claim_policy(
     if "transition_candidate=" in deck_status or (
         move_status is not None and "transition_candidate=" in move_status
     ):
+        if _supports_grounded_transition_verdict(
+            resolved,
+            moves,
+            audio_capture_context=audio_capture_context,
+            audio_delta_items=audio_delta_items,
+        ):
+            if deck_audio_parts_attached is False:
+                return "candidate_not_verdict", "deck_audio_parts_not_attached"
+            return "supported_verdict", "two_deck_audio_window_delta_proof"
         return "candidate_not_verdict", None
     return "requires_more_evidence", None
+
+
+def _supports_grounded_transition_verdict(
+    resolved: dict[str, DeckTrack],
+    moves: list[str] | tuple[str, ...],
+    *,
+    audio_capture_context: dict[str, object] | None,
+    audio_delta_items: list[str] | tuple[str, ...] | None,
+) -> bool:
+    """Return True only when a transition verdict has citable Deck A/B proof."""
+    if not moves:
+        return False
+    if not all(side in resolved for side in ("A", "B")):
+        return False
+    for side in ("A", "B"):
+        deck = resolved[side]
+        if not deck.track_id:
+            return False
+        if str(deck.source or "").strip().lower() not in DECK_CONTEXT_TRUSTED_SOURCES:
+            return False
+    if not _deck_audio_capture_has_two_active(audio_capture_context):
+        return False
+    features = _deck_audio_feature_values(
+        audio_capture_context.get("deck_audio_features")
+        if isinstance(audio_capture_context, dict)
+        else None
+    )
+    if not all(features.get(side) for side in ("A", "B")):
+        return False
+    if not _deck_audio_window_has_two_pre_current_lanes(audio_capture_context):
+        return False
+    deltas = _deck_audio_delta_values(
+        audio_capture_context.get("deck_audio_deltas")
+        if isinstance(audio_capture_context, dict)
+        else None
+    )
+    return bool(deltas or audio_delta_items)
 
 
 def should_defer_live_claim_stream(
     state: MusicState,
     moves: list[str] | tuple[str, ...] = (),
+    *,
+    audio_capture_context: dict[str, object] | None = None,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    deck_audio_parts_attached: bool | None = None,
 ) -> bool:
     """Return True when the response must be post-checked before TTS flush."""
-    policy, _reason = live_claim_policy(state, moves)
+    policy, _reason = live_claim_policy(
+        state,
+        moves,
+        audio_capture_context=audio_capture_context,
+        audio_delta_items=audio_delta_items,
+        deck_audio_parts_attached=deck_audio_parts_attached,
+    )
+    capture_deltas = (
+        _deck_audio_delta_values(audio_capture_context.get("deck_audio_deltas"))
+        if isinstance(audio_capture_context, dict)
+        else {}
+    )
     return policy in {"blocked", "watch_not_claim", "candidate_not_verdict"} or bool(
-        moves and render_audio_delta_items(state)
+        moves and (audio_delta_items or render_audio_delta_items(state) or capture_deltas)
     )
 
 
@@ -1373,15 +2153,26 @@ def apply_live_claim_guard(
     moves: list[str] | tuple[str, ...] = (),
     *,
     audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
+    deck_audio_parts_attached: bool | None = None,
 ) -> LiveClaimGuardResult:
-    """Correct unsupported multi-deck outcome claims from live coach text.
+    """Correct unsupported or debuggy live outcome text from live coach text.
 
     This is a result-boundary guard. The prompt teaches the rule, but this
     catches failures without depending on a specific phrase such as "great
-    transition".
+    transition". Public copy should not expose the model's internal proof
+    struggle either: "I can't call that a transition" is true, but still reads
+    like debug self-correction in the DJ's ear.
     """
-    policy, reason = live_claim_policy(state, moves)
+    policy, reason = live_claim_policy(
+        state,
+        moves,
+        audio_capture_context=audio_capture_context,
+        audio_delta_items=audio_delta_items,
+        deck_audio_parts_attached=deck_audio_parts_attached,
+    )
     outcome_claim = has_multi_deck_outcome_claim(text)
+    public_diagnostic = bool(_LIVE_PUBLIC_DIAGNOSTIC_RE.search(text))
     effect_deltas = [str(item) for item in (audio_delta_items or render_audio_delta_items(state))]
     effect_claim = bool(
         moves
@@ -1404,8 +2195,43 @@ def apply_live_claim_guard(
             reason="dsp_delta_not_causal_proof",
             summary=log_summary,
         )
+    if public_diagnostic:
+        summary = _live_guard_summary(state, moves)
+        if policy == "candidate_not_verdict":
+            return LiveClaimGuardResult(
+                text=LIVE_CANDIDATE_HELD_REPLY,
+                corrected=True,
+                policy=policy,
+                reason=reason,
+                summary=summary,
+            )
+        return LiveClaimGuardResult(
+            text=LIVE_TRANSITION_HELD_REPLY,
+            corrected=True,
+            policy=policy,
+            reason=reason,
+            summary=summary,
+        )
     has_disclaimer = bool(outcome_claim and has_multi_deck_outcome_disclaimer(text))
     if has_disclaimer and not has_unsafe_multi_deck_disclaimer_claim(text):
+        if policy == "candidate_not_verdict":
+            summary = _live_guard_summary(state, moves)
+            return LiveClaimGuardResult(
+                text=LIVE_CANDIDATE_HELD_REPLY,
+                corrected=True,
+                policy=policy,
+                reason=reason,
+                summary=summary,
+            )
+        if policy in {"blocked", "watch_not_claim", "requires_more_evidence"}:
+            summary = _live_guard_summary(state, moves)
+            return LiveClaimGuardResult(
+                text=LIVE_TRANSITION_HELD_REPLY,
+                corrected=True,
+                policy=policy,
+                reason=reason,
+                summary=summary,
+            )
         return LiveClaimGuardResult(text=text, policy=policy, reason=reason)
     if policy == "candidate_not_verdict" and outcome_claim and _MULTI_DECK_VERDICT_RE.search(text):
         summary = _live_guard_summary(state, moves)
@@ -1499,12 +2325,17 @@ def _deck_identity_evidence_status(resolved: dict[str, DeckTrack]) -> str:
 
 def _deck_lane_evidence_status(state: MusicState) -> str | None:
     decks = getattr(state.deck_state, "decks", {})
-    if not decks and not getattr(state, "controller_connected", False):
+    source_status = getattr(getattr(state, "deck_state", None), "source_status", {})
+    if not decks and not getattr(state, "controller_connected", False) and not source_status:
         return None
     resolved = _resolved_decks(decks)
     scores = dict(_deck_route_scores(state))
     sides: set[str] = set()
-    if getattr(state, "controller_connected", False) or any(side in decks for side in ("A", "B")):
+    if (
+        getattr(state, "controller_connected", False)
+        or source_status
+        or any(side in decks for side in ("A", "B"))
+    ):
         sides.update(("A", "B"))
     sides.update(side for side in decks if side in {"A", "B", "C", "D"})
     if not sides:
@@ -1524,7 +2355,8 @@ def _deck_lane_evidence_status(state: MusicState) -> str | None:
 
 def _deck_reference_evidence_status(state: MusicState) -> str | None:
     decks = getattr(state.deck_state, "decks", {})
-    if not decks and not getattr(state, "controller_connected", False):
+    source_status = getattr(getattr(state, "deck_state", None), "source_status", {})
+    if not decks and not getattr(state, "controller_connected", False) and not source_status:
         return None
     resolved = _resolved_decks(decks)
     scores = dict(_deck_route_scores(state))
@@ -1543,7 +2375,8 @@ def _deck_reference_evidence_status(state: MusicState) -> str | None:
 
 def _deck_source_evidence_status(state: MusicState) -> str | None:
     decks = getattr(state.deck_state, "decks", {})
-    if not decks and not getattr(state, "controller_connected", False):
+    source_status = getattr(getattr(state, "deck_state", None), "source_status", {})
+    if not decks and not getattr(state, "controller_connected", False) and not source_status:
         return None
     resolved = _resolved_decks(decks)
     atoms: list[str] = []
@@ -1623,6 +2456,328 @@ def _capture_int(raw: object) -> int | None:
 def _capture_channel_token(raw: object) -> str:
     value = _capture_int(raw)
     return str(value) if value is not None else "unknown"
+
+
+def _capture_channel_map_token(raw: object) -> str | None:
+    if raw is None:
+        return None
+    text = str(raw).strip().replace(" ", "")
+    if re.fullmatch(r"\d+(?:,\d+)*", text):
+        return text
+    token = _evidence_token(text)
+    return token or None
+
+
+def _capture_routing_hint_token(raw: object) -> str | None:
+    if raw is None:
+        return None
+    text = " ".join(str(raw).split())
+    if not text.startswith("rekordbox_deck_routing_hint["):
+        return None
+    match = re.search(r"\bdeck_outputs=([^\]\s]+)", text)
+    if not match:
+        return None
+    outputs = match.group(1).replace(",", "+")
+    token = _evidence_token(f"rekordbox_settings_{outputs}")
+    return token or None
+
+
+def _capture_deck_channels(raw: object) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, str] = {}
+    for side in ("A", "B"):
+        value = raw.get(side)
+        token = _capture_channel_map_token(value)
+        if token:
+            out[side] = token
+    return out
+
+
+def _deck_pairs_token(deck_channels: dict[str, str]) -> str:
+    parts = [f"{side}:{deck_channels[side]}" for side in ("A", "B") if side in deck_channels]
+    return "+".join(parts) if parts else "none"
+
+
+def _deck_audio_rms_values(raw: object) -> dict[str, float]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, float] = {}
+    for side in ("A", "B"):
+        value = raw.get(side)
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            rms = float(value)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if rms == rms and rms >= 0.0:
+            out[side] = min(rms, 9.999)
+    return out
+
+
+def _feature_float(raw: object) -> float | None:
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if value != value or value < 0.0:
+        return None
+    return min(value, 99.9)
+
+
+def _deck_audio_feature_values(raw: object) -> dict[str, dict[str, object]]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, dict[str, object]] = {}
+    for side in ("A", "B"):
+        row = raw.get(side)
+        if not isinstance(row, dict):
+            continue
+        clean: dict[str, object] = {}
+        activity = str(row.get("activity") or "").strip().lower()
+        if activity in {"active", "silent"}:
+            clean["activity"] = activity
+        for key in ("rms", "peak", "zcr", "flux", "crest"):
+            value = _feature_float(row.get(key))
+            if value is not None:
+                clean[key] = value
+        if clean:
+            out[side] = clean
+    return out
+
+
+def _deck_audio_delta_values(raw: object) -> dict[str, list[str]]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, list[str]] = {}
+    for side in ("A", "B"):
+        values = raw.get(side)
+        if not isinstance(values, (list, tuple)):
+            continue
+        clean: list[str] = []
+        for value in values:
+            token = _evidence_token(str(value))
+            if token:
+                clean.append(token)
+            if len(clean) >= 4:
+                break
+        if clean:
+            out[side] = clean
+    return out
+
+
+def _deck_audio_window_values(raw: object) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, object] = {}
+    for key in ("pre_s", "current_s"):
+        span = _window_span_pair(raw.get(key))
+        if span is not None:
+            out[key] = span
+    for side in ("A", "B"):
+        row = raw.get(side)
+        if not isinstance(row, dict):
+            continue
+        clean: dict[str, object] = {}
+        pre = _deck_audio_window_feature_row(row.get("pre"))
+        current = _deck_audio_window_feature_row(row.get("current"))
+        delta = _deck_audio_delta_values({side: row.get("delta")}).get(side, [])
+        if pre:
+            clean["pre"] = pre
+        if current:
+            clean["current"] = current
+        if delta:
+            clean["delta"] = delta
+        if clean:
+            out[side] = clean
+    return out
+
+
+def _deck_audio_window_feature_row(raw: object) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        return {}
+    clean: dict[str, object] = {}
+    activity = str(raw.get("activity") or "").strip().lower()
+    if activity in {"active", "silent"}:
+        clean["activity"] = activity
+    for key in ("rms", "peak", "zcr", "flux", "crest"):
+        value = _feature_float(raw.get(key))
+        if value is not None:
+            clean[key] = value
+    frames = _capture_int(raw.get("frames"))
+    if frames is not None and frames > 0:
+        clean["frames"] = min(frames, 10000)
+    if "activity" not in clean:
+        rms = _feature_float(clean.get("rms"))
+        if rms is not None:
+            clean["activity"] = "active" if rms >= 0.003 else "silent"
+    return clean
+
+
+def _window_feature_token(row: dict[str, object]) -> str:
+    activity = str(row.get("activity") or "unknown")
+    parts = [activity if activity in {"active", "silent"} else "unknown"]
+    for key in ("rms", "peak", "flux"):
+        value = _feature_float(row.get(key))
+        if value is not None:
+            parts.append(f"{key}_{value:.3f}")
+    return "_".join(parts)
+
+
+def _window_span_pair(raw: object) -> tuple[float, float] | None:
+    if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+        return None
+    try:
+        start = float(raw[0])
+        end = float(raw[1])
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if start != start or end != end or start > end:
+        return None
+    return (max(-30.0, min(30.0, start)), max(-30.0, min(30.0, end)))
+
+
+def _window_span_token(raw: object, *, fallback: str) -> str:
+    span = _window_span_pair(raw)
+    if span is None:
+        return fallback
+    return f"{span[0]:.1f}..{span[1]:.1f}"
+
+
+def _deck_audio_activity_token(raw: object) -> str | None:
+    rms = _deck_audio_rms_values(raw)
+    if not rms:
+        return None
+    parts = []
+    for side in ("A", "B"):
+        value = rms.get(side)
+        if value is None:
+            continue
+        tier = "active" if value >= 0.003 else "silent"
+        parts.append(f"{side}_{tier}")
+    return "+".join(parts) if parts else None
+
+
+def _deck_audio_capture_evidence_status(capture: dict[str, object] | None) -> str | None:
+    if not isinstance(capture, dict) or not bool(capture.get("deck_audio_capture_enabled")):
+        return None
+    activity = _deck_audio_activity_token(capture.get("deck_audio_rms"))
+    if activity:
+        return f"deck_audio_capture={activity}"
+    return "deck_audio_capture=configured"
+
+
+def _deck_audio_features_evidence_status(capture: dict[str, object] | None) -> str | None:
+    if not isinstance(capture, dict) or not bool(capture.get("deck_audio_capture_enabled")):
+        return None
+    rows = _deck_audio_feature_values(capture.get("deck_audio_features"))
+    if not rows:
+        return None
+    parts: list[str] = []
+    for side in ("A", "B"):
+        row = rows.get(side)
+        if not row:
+            continue
+        activity = str(row.get("activity") or "").strip().lower()
+        if activity not in {"active", "silent"}:
+            rms = _feature_float(row.get("rms")) or 0.0
+            activity = "active" if rms >= 0.003 else "silent"
+        rms = _feature_float(row.get("rms"))
+        if rms is None:
+            parts.append(f"{side}_{activity}")
+        else:
+            parts.append(f"{side}_{activity}_rms_{rms:.3f}")
+    return "deck_audio_features=" + "+".join(parts) if parts else None
+
+
+def _deck_audio_delta_evidence_status(capture: dict[str, object] | None) -> str | None:
+    if not isinstance(capture, dict) or not bool(capture.get("deck_audio_capture_enabled")):
+        return None
+    deltas = _deck_audio_delta_values(capture.get("deck_audio_deltas"))
+    if not deltas:
+        return None
+    parts = [
+        f"{side}_{items[0]}" for side in ("A", "B") for items in [deltas.get(side)] if items
+    ]
+    return "deck_audio_delta=" + "+".join(parts) if parts else None
+
+
+def _deck_audio_window_evidence_status(capture: dict[str, object] | None) -> str | None:
+    if not isinstance(capture, dict) or not bool(capture.get("deck_audio_capture_enabled")):
+        return None
+    windows = _deck_audio_window_values(capture.get("deck_audio_windows"))
+    if not windows:
+        return None
+
+    parts: list[str] = []
+    for side in ("A", "B"):
+        row = windows.get(side)
+        if not isinstance(row, dict):
+            continue
+        pre = row.get("pre")
+        current = row.get("current")
+        pre_rms = _feature_float(pre.get("rms")) if isinstance(pre, dict) else None
+        current_rms = _feature_float(current.get("rms")) if isinstance(current, dict) else None
+        activity = "unknown"
+        if isinstance(current, dict) and current.get("activity") in {"active", "silent"}:
+            activity = str(current["activity"])
+        elif isinstance(pre, dict) and pre.get("activity") in {"active", "silent"}:
+            activity = str(pre["activity"])
+
+        if pre_rms is not None and current_rms is not None:
+            parts.append(f"{side}_{activity}_pre_{pre_rms:.3f}_current_{current_rms:.3f}")
+        elif current_rms is not None:
+            parts.append(f"{side}_{activity}_current_{current_rms:.3f}")
+        elif pre_rms is not None:
+            parts.append(f"{side}_{activity}_pre_{pre_rms:.3f}")
+        else:
+            delta = row.get("delta")
+            if isinstance(delta, list) and delta:
+                parts.append(f"{side}_{delta[0]}")
+    return "deck_audio_window=" + "+".join(parts) if parts else None
+
+
+def _deck_audio_window_has_two_pre_current_lanes(capture: dict[str, object] | None) -> bool:
+    if not isinstance(capture, dict) or not bool(capture.get("deck_audio_capture_enabled")):
+        return False
+    windows = _deck_audio_window_values(capture.get("deck_audio_windows"))
+    if not windows:
+        return False
+    for side in ("A", "B"):
+        row = windows.get(side)
+        if not isinstance(row, dict):
+            return False
+        pre = row.get("pre")
+        current = row.get("current")
+        if not isinstance(pre, dict) or not isinstance(current, dict):
+            return False
+        if _feature_float(pre.get("rms")) is None:
+            return False
+        if _feature_float(current.get("rms")) is None:
+            return False
+    return True
+
+
+def _deck_audio_capture_has_two_active(capture: dict[str, object] | None) -> bool:
+    if not isinstance(capture, dict) or not bool(capture.get("deck_audio_capture_enabled")):
+        return False
+    rms = _deck_audio_rms_values(capture.get("deck_audio_rms"))
+    return all(rms.get(side, 0.0) >= 0.003 for side in ("A", "B"))
+
+
+def _capture_sample_rate_token(raw: object) -> str:
+    if raw is None or isinstance(raw, bool):
+        return "unknown"
+    try:
+        value = int(float(str(raw)))
+    except (TypeError, ValueError, OverflowError):
+        return "unknown"
+    if value <= 0:
+        return "unknown"
+    return str(min(value, 384000))
 
 
 def _move_age_for_label(state: MusicState, label: str) -> float | None:
@@ -1743,7 +2898,16 @@ def _deck_lane_summary(
         parts.append(f"src={resolved_deck.source}")
         parts.append(f"conf={resolved_deck.confidence:.2f}")
     elif deck is not None:
-        parts.append("identity=unresolved")
+        if deck.source == "last_known":
+            parts.append("identity=last_known_unverified")
+            if deck.title:
+                parts.append(f"last_title={_prompt_quote(deck.title)}")
+            if deck.camelot:
+                parts.append(f"last_key={deck.camelot}")
+            if deck.bpm and deck.bpm > 0:
+                parts.append(f"last_bpm={deck.bpm:.0f}")
+        else:
+            parts.append("identity=unresolved")
         parts.append(f"src={deck.source}")
         parts.append(f"conf={deck.confidence:.2f}")
     else:
@@ -1806,8 +2970,16 @@ def _deck_reference_lane(
             fields.append(f"src={resolved_deck.source}")
             fields.append(f"conf={resolved_deck.confidence:.2f}")
     elif deck is not None:
-        fields = [f"{alias}={side}", "identity=unresolved", f"src={deck.source}"]
+        identity = "last_known_unverified" if deck.source == "last_known" else "unresolved"
+        fields = [f"{alias}={side}", f"identity={identity}", f"src={deck.source}"]
+        if deck.source == "last_known" and deck.title:
+            fields.append(f"last_title={_prompt_quote(deck.title)}")
         if not compact:
+            if deck.source == "last_known":
+                if deck.camelot:
+                    fields.append(f"last_key={deck.camelot}")
+                if deck.bpm and deck.bpm > 0:
+                    fields.append(f"last_bpm={deck.bpm:.0f}")
             fields.append(f"conf={deck.confidence:.2f}")
     else:
         fields = [f"{alias}={side}", "identity=unknown"]

@@ -34,7 +34,10 @@ from vibemix.state.deck_context import (
     render_audio_window_context,
     render_audio_window_map,
     render_deck_audio_context,
+    render_deck_audio_delta_context,
+    render_deck_audio_features_context,
     render_deck_audio_separation_context,
+    render_deck_audio_window_context,
     render_deck_lane_context,
     render_deck_reference_context,
     render_deck_source_context,
@@ -168,6 +171,9 @@ LIVE_CONTEXT_CAPABILITIES: tuple[str, ...] = (
     "deck_source_status",
     "deck_audio_context",
     "deck_audio_separation_context",
+    "deck_audio_features_context",
+    "deck_audio_delta_context",
+    "deck_audio_window_context",
     "audio_part_context",
     "audio_window_context",
     "audio_window_map",
@@ -229,12 +235,21 @@ def _serialize_deck_state(state: MusicState) -> dict[str, dict[str, Any]]:
 
 _DECK_SOURCE_STATUS_KEYS: tuple[str, ...] = (
     "controller",
+    "controller_connection",
+    "library",
+    "library_tracks",
+    "library_source",
+    "library_match",
     "nowplaying",
     "nowplaying_owner",
     "nowplaying_title",
     "audible_deck",
     "resolution",
     "resolved_side",
+    "second_deck_source",
+    "screen_vision",
+    "last_known_sides",
+    "last_known_rule",
 )
 
 
@@ -327,30 +342,51 @@ def _serialize_recent_moves(state: MusicState, *, max_age_s: float = 8.0) -> lis
 def _serialize_audio_window_context(
     state: MusicState,
     recent_moves: list[str] | tuple[str, ...],
+    *,
+    force: bool = False,
 ) -> str | None:
     """Read-only serialize the time map between P1 audio and recent moves."""
-    return render_audio_window_context(state, recent_moves)
+    return render_audio_window_context(state, recent_moves, force=force)
 
 
 def _serialize_audio_window_map(
     state: MusicState,
     recent_moves: list[str] | tuple[str, ...],
+    *,
+    force: bool = False,
 ) -> dict[str, Any] | None:
     """Read-only serialize structured P1 old/current/future audio labels."""
-    return render_audio_window_map(state, recent_moves)
+    return render_audio_window_map(state, recent_moves, force=force)
+
+
+def _deck_pair_capture_configured(audio_capture_context: dict[str, object] | None) -> bool:
+    """Return True when the live capture has a real A/B deck-pair map."""
+    if not isinstance(audio_capture_context, dict):
+        return False
+    if not bool(audio_capture_context.get("deck_audio_capture_enabled")):
+        return False
+    deck_channels = audio_capture_context.get("deck_channels")
+    if not isinstance(deck_channels, dict):
+        return False
+    return all(side in deck_channels and deck_channels.get(side) for side in ("A", "B"))
 
 
 def _serialize_live_evidence(
     state: MusicState,
     *,
     audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     """Read-only serialize bounded evidence refs for Viber live grounding.
 
     The payload names evidence categories only: it is not a transition verdict,
     a skill grade, or raw audio. Viber still has to obey the claim policy.
     """
-    return live_evidence_packet(state, audio_delta_items=audio_delta_items)
+    return live_evidence_packet(
+        state,
+        audio_delta_items=audio_delta_items,
+        audio_capture_context=audio_capture_context,
+    )
 
 
 def _course3_float(raw: Any, default: float = 0.0) -> float:
@@ -856,8 +892,17 @@ async def ws_broadcast(
             # PUT this tick on the wire, it never reshapes a valid frame.
             audio_delta = _serialize_audio_delta(state)
             recent_moves = _serialize_recent_moves(state)
-            audio_window_context = _serialize_audio_window_context(state, recent_moves)
-            audio_window_map = _serialize_audio_window_map(state, recent_moves)
+            force_audio_window = _deck_pair_capture_configured(audio_capture_context)
+            audio_window_context = _serialize_audio_window_context(
+                state,
+                recent_moves,
+                force=force_audio_window,
+            )
+            audio_window_map = _serialize_audio_window_map(
+                state,
+                recent_moves,
+                force=force_audio_window,
+            )
             audio_part_context = render_audio_part_context(
                 audio_seconds=6.0,
                 surface="live_context",
@@ -870,6 +915,11 @@ async def ws_broadcast(
             deck_audio_separation_context = render_deck_audio_separation_context(
                 audio_capture_context
             )
+            deck_audio_features_context = render_deck_audio_features_context(
+                audio_capture_context
+            )
+            deck_audio_delta_context = render_deck_audio_delta_context(audio_capture_context)
+            deck_audio_window_context = render_deck_audio_window_context(audio_capture_context)
             deck_source_status = _serialize_deck_source_status(state)
             mascot_frame = {
                 **levels.snapshot(),
@@ -930,6 +980,21 @@ async def ws_broadcast(
                 **({"deck_source_context": deck_source_context} if deck_source_context else {}),
                 **({"deck_audio_context": deck_audio_context} if deck_audio_context else {}),
                 "deck_audio_separation_context": deck_audio_separation_context,
+                **(
+                    {"deck_audio_features_context": deck_audio_features_context}
+                    if deck_audio_features_context
+                    else {}
+                ),
+                **(
+                    {"deck_audio_delta_context": deck_audio_delta_context}
+                    if deck_audio_delta_context
+                    else {}
+                ),
+                **(
+                    {"deck_audio_window_context": deck_audio_window_context}
+                    if deck_audio_window_context
+                    else {}
+                ),
                 "audio_part_context": audio_part_context,
                 # Bounded DSP deltas from the existing perceive snapshot. This
                 # gives Viber/Gemini a cheap "what changed in the sound" hint
@@ -949,6 +1014,7 @@ async def ws_broadcast(
                 "live_evidence": _serialize_live_evidence(
                     state,
                     audio_delta_items=audio_delta,
+                    audio_capture_context=audio_capture_context,
                 ),
                 # Learn Course 3 live lens — additive, read-only. Lets the
                 # integration pass verify live audio/course/phrase readiness

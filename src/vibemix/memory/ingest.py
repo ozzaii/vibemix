@@ -53,6 +53,7 @@ import numpy as np
 
 from vibemix.library._cosine import EMBEDDING_DIM
 from vibemix.memory.store import MemoryStore
+from vibemix.state.deck_context import normalize_audio_window_context_text
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ __all__ = [
 # Bump to re-embed ALL signatures if the template changes (mirrors embed.py's
 # EXCERPT_STRATEGY_VERSION). Flows into the embed-cache key SHA256 + the
 # memory_ingested marker's sig_template_version column.
-SIG_TEMPLATE_VERSION = "v8-coach_line-context-feed"
+SIG_TEMPLATE_VERSION = "v9-coach_line-deck-audio-context"
 
 # COPIED VERBATIM from state/evidence_registry.py:133 — the LOCKED citation
 # grammar. lock-step source-of-truth: state/evidence_registry.py:133 (keep in
@@ -84,6 +85,17 @@ EVIDENCE_CITATION_RE: re.Pattern[str] = re.compile(rf"\[{_INNER_ATOM}(?:,{_INNER
 # ``source:`` colon-form). Stripped from the embedded reaction text so the
 # signature is the actual spoken line.
 _EMOTION_TAG_RE: re.Pattern[str] = re.compile(r"^\[[a-z]+\]\s*")
+_UNTRUSTED_AUDIO_WINDOW = "omitted_untrusted_audio_window"
+_AUDIO_WINDOW_DECK_A_RE = re.compile(r"\bdeckA_audio=(P[2-9][0-9]?)\b")
+_AUDIO_WINDOW_DECK_B_RE = re.compile(r"\bdeckB_audio=(P[2-9][0-9]?)\b")
+_AUDIO_WINDOW_FORBIDDEN_ATOMS = (
+    "deckA_audio=attached",
+    "deckB_audio=attached",
+    "deckA_audio=stem",
+    "deckB_audio=stem",
+    "per_deck_audio=attached",
+    "isolated_decks=true",
+)
 
 
 # ─── Pure signature builder (NO model, NO I/O) ──────────────────────────────────
@@ -101,7 +113,12 @@ def build_coach_line_signature(reaction_text: str, ctx: dict | None) -> str:
             | event={event_type} | context_feed={context_feed_contract}
             | deck_lane={deck_lane_context}
             | deck_ref={deck_reference_context} | deck_source={deck_source_context}
-            | deck_audio={deck_audio_context} | audio_window={audio_window_context}
+            | deck_audio={deck_audio_context}
+            | deck_audio_separation={deck_audio_separation_context}
+            | deck_audio_features={deck_audio_features_context}
+            | deck_audio_delta={deck_audio_delta_context}
+            | deck_audio_window={deck_audio_window_context}
+            | audio_window={audio_window_context}
             | live_evidence={live_evidence_context}
             | move={move_context} | move_effect={move_effect_context}
             | audio_delta={audio_delta} | cite={citation_tokens}
@@ -131,8 +148,12 @@ def build_coach_line_signature(reaction_text: str, ctx: dict | None) -> str:
     deck_ref = _ctx_field(ctx.get("deck_reference_context"))
     deck_source = _ctx_field(ctx.get("deck_source_context"))
     deck_audio = _ctx_field(ctx.get("deck_audio_context"))
-    audio_window = _ctx_field(ctx.get("audio_window_context"))
-    live_evidence = _ctx_field(ctx.get("live_evidence_context"))
+    deck_audio_separation = _ctx_field(ctx.get("deck_audio_separation_context"))
+    deck_audio_features = _ctx_field(ctx.get("deck_audio_features_context"))
+    deck_audio_delta = _ctx_field(ctx.get("deck_audio_delta_context"))
+    deck_audio_window = _ctx_field(ctx.get("deck_audio_window_context"))
+    audio_window = _audio_window_ctx_field(ctx.get("audio_window_context"))
+    live_evidence = _ctx_field(ctx.get("live_evidence_context"), cap=640)
     move_context = _ctx_field(ctx.get("move_context"))
     move_effect = _ctx_field(ctx.get("move_effect_context"))
     audio_delta = _ctx_field(ctx.get("audio_delta"))
@@ -151,7 +172,12 @@ def build_coach_line_signature(reaction_text: str, ctx: dict | None) -> str:
         f"| event={etype} | context_feed={context_feed} "
         f"| deck_lane={deck_lane} | deck_ref={deck_ref} "
         f"| deck_source={deck_source} "
-        f"| deck_audio={deck_audio} | audio_window={audio_window} "
+        f"| deck_audio={deck_audio} "
+        f"| deck_audio_separation={deck_audio_separation} "
+        f"| deck_audio_features={deck_audio_features} "
+        f"| deck_audio_delta={deck_audio_delta} "
+        f"| deck_audio_window={deck_audio_window} "
+        f"| audio_window={audio_window} "
         f"| live_evidence={live_evidence} | move={move_context} "
         f"| move_effect={move_effect} | audio_delta={audio_delta} "
         f"| cite={cite_str} | said: {said}"
@@ -166,6 +192,30 @@ def _ctx_field(value: object, *, cap: int = 240) -> str:
         raw = str(value) if value else ""
     raw = " ".join(raw.split()).replace("|", "/")
     return raw[:cap] if raw else "none"
+
+
+def _audio_window_ctx_field(value: object, *, cap: int = 240) -> str:
+    rendered = _ctx_field(value, cap=900)
+    if rendered == "none":
+        return "none"
+    trusted = normalize_audio_window_context_text(rendered, max_len=900)
+    if trusted:
+        return _ctx_field(trusted, cap=cap)
+    if _audio_window_context_is_untrusted(rendered):
+        return _UNTRUSTED_AUDIO_WINDOW
+    return _ctx_field(rendered, cap=cap)
+
+
+def _audio_window_context_is_untrusted(text: str) -> bool:
+    if "audio_window_context[" not in text:
+        return False
+    if any(atom in text for atom in _AUDIO_WINDOW_FORBIDDEN_ATOMS):
+        return True
+    deck_a = _AUDIO_WINDOW_DECK_A_RE.search(text)
+    deck_b = _AUDIO_WINDOW_DECK_B_RE.search(text)
+    if deck_a or deck_b:
+        return not (deck_a and deck_b) or deck_a.group(1) == deck_b.group(1)
+    return "per_deck_audio=deck_pair_parts" in text
 
 
 # ─── Malformed-tolerant JSONL reader (MIRROR of session_loader._read_events) ────
@@ -428,6 +478,12 @@ def ingest_session(
                     "deck_reference_context": ev.get("deck_reference_context"),
                     "deck_source_context": ev.get("deck_source_context"),
                     "deck_audio_context": ev.get("deck_audio_context"),
+                    "deck_audio_separation_context": ev.get(
+                        "deck_audio_separation_context"
+                    ),
+                    "deck_audio_features_context": ev.get("deck_audio_features_context"),
+                    "deck_audio_delta_context": ev.get("deck_audio_delta_context"),
+                    "deck_audio_window_context": ev.get("deck_audio_window_context"),
                     "audio_window_context": ev.get("audio_window_context"),
                     "live_evidence_context": ev.get("live_evidence_context"),
                     "move_context": ev.get("move_context"),

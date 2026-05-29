@@ -27,6 +27,9 @@ def _live_context_capabilities() -> list[str]:
         "deck_source_status",
         "deck_audio_context",
         "deck_audio_separation_context",
+        "deck_audio_features_context",
+        "deck_audio_delta_context",
+        "deck_audio_window_context",
         "audio_part_context",
         "audio_window_context",
         "audio_window_map",
@@ -38,12 +41,18 @@ def _live_context_capabilities() -> list[str]:
 def _deck_source_status() -> dict[str, str]:
     return {
         "controller": "connected",
+        "controller_connection": "connected",
+        "library": "present",
+        "library_tracks": "24",
+        "library_source": "rekordbox_xml",
+        "library_match": "matched",
         "nowplaying": "blocked_non_deck_owner",
         "nowplaying_owner": "com.apple.webkit.gpu",
         "nowplaying_title": "pink_floyd",
         "audible_deck": "A",
         "resolution": "library_cache_match",
         "resolved_side": "A",
+        "screen_vision": "disabled",
     }
 
 
@@ -86,6 +95,55 @@ def _audio_part_context() -> str:
     )
 
 
+def _deck_pair_audio_part_context(deck_a: str = "P2", deck_b: str = "P3") -> str:
+    return (
+        "audio_part_context[surface=gemini_parts P1=live_global_mix "
+        "P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true "
+        "P1_span=-6.0..0.0 P1_deck_audio=global_mix_not_stems deck1=A deck2=B "
+        f"together_audio=P1 part_order=P1,{deck_a},{deck_b} "
+        "per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts "
+        f"deckA_part={deck_a} {deck_a}=deckA_configured_capture "
+        f"{deck_a}_model_heard=true {deck_a}_audience_heard=false "
+        f"{deck_a}_deck_audio=deckA_configured_capture "
+        f"{deck_a}_rule=deck_pair_capture_reference_not_quality_verdict "
+        f"deckB_part={deck_b} {deck_b}=deckB_configured_capture "
+        f"{deck_b}_model_heard=true {deck_b}_audience_heard=false "
+        f"{deck_b}_deck_audio=deckB_configured_capture "
+        f"{deck_b}_rule=deck_pair_capture_reference_not_quality_verdict "
+        "rule=part_labels_not_outcome_verdict]"
+    )
+
+
+def _deck_pair_audio_window_context(deck_a: str = "P2", deck_b: str = "P3") -> str:
+    return (
+        "audio_window_context[P1=master_global_mix P1_heard=true "
+        "timeline=past_action_future together_audio=P1_global_mix decks_together=true "
+        f"deckA_audio={deck_a} deckB_audio={deck_b} "
+        "per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts "
+        "deck_separation=deck_lanes_context "
+        "deck_audio_separation=deck_audio_separation_context "
+        "lane_aliases=deck1:A,deck2:B pre=-6.0..-1.0 current=-1.0..0.0 "
+        "action=-1.0..0.0 rule=time_alignment_not_outcome_verdict "
+        "move_anchor=none future_heard=false future=not_attached]"
+    )
+
+
+def _deck_pair_audio_window_map(deck_a: str = "P2", deck_b: str = "P3") -> dict:
+    row = _audio_window_map()
+    row.update(
+        {
+            "deckA_audio": deck_a,
+            "deckB_audio": deck_b,
+            "per_deck_audio": "deck_pair_parts",
+            "duplicate_audio": "separate_deck_pair_parts",
+            "deck_audio_separation": "deck_audio_separation_context",
+            "deck_part_span_s": [-3.0, 0.0],
+            "deck_part_activity": {"A": "active", "B": "active"},
+        }
+    )
+    return row
+
+
 def _deck_audio_separation_context() -> str:
     return (
         "deck_audio_separation_context[requested_device=BlackHole_2ch "
@@ -96,6 +154,63 @@ def _deck_audio_separation_context() -> str:
         "per_deck_audio=not_attached isolated_decks=false "
         "upgrade_path=multi_channel_deck_pair_capture "
         "rule=separation_capability_not_outcome]"
+    )
+
+
+def _deck_pair_audio_separation_context() -> str:
+    return (
+        "deck_audio_separation_context[requested_device=BlackHole_16ch "
+        "capture_device=BlackHole_16ch input_channels=16 opened_channels=4 "
+        "sample_rate=48000 device_capacity=multichannel_available "
+        "mode=deck_pair_capture_configured master_channels=0,1,2,3 "
+        "current_capture=P1_global_mix_plus_deck_pairs "
+        "gemini_audio=mono_downmix_of_master_capture deckA_audio=captured "
+        "deckB_audio=captured per_deck_audio=captured_not_attached "
+        "isolated_decks=runtime_capture_available deck_pairs=A:0,1+B:2,3 "
+        "upgrade_path=attach_deck_pair_audio_parts_when_needed "
+        "deck_audio_activity=A_active+B_silent "
+        "rule=separation_capability_not_outcome]"
+    )
+
+
+def _deck_audio_features_context() -> str:
+    return (
+        "deck_audio_features_context[source=deck_pair_capture "
+        "window=latest_callback per_deck_audio=captured_features "
+        "A_activity=active A_rms=0.020 A_peak=0.100 A_zcr=0.030 "
+        "B_activity=silent B_rms=0.000 B_peak=0.000 B_zcr=0.000 "
+        "rule=deck_audio_features_not_outcome_verdict]"
+    )
+
+
+def _deck_audio_delta_context() -> str:
+    return (
+        "deck_audio_delta_context[source=deck_pair_capture "
+        "window=latest_callback per_deck_delta=captured_feature_delta "
+        "A_delta=rms_rose_100pct_strong B_delta=rms_fell_50pct_strong "
+        "rule=deck_audio_delta_not_causal_proof]"
+    )
+
+
+def _deck_audio_window_context() -> str:
+    return (
+        "deck_audio_window_context[source=deck_pair_capture "
+        "timeline=pre_action_current pre=-6.0..-1.0 current=-1.0..0.0 "
+        "action=-1.0..0.0 per_deck_audio=captured_window_features "
+        "A_pre=active_rms_0.020_peak_0.100_flux_0.004 "
+        "A_current=active_rms_0.040_peak_0.120_flux_0.009 "
+        "A_delta=rms_rose_100pct_strong "
+        "B_pre=active_rms_0.030_peak_0.110_flux_0.006 "
+        "B_current=active_rms_0.020_peak_0.090_flux_0.004 "
+        "B_delta=rms_fell_33pct_clear "
+        "rule=deck_audio_window_not_causal_or_quality_verdict]"
+    )
+
+
+def _deck_audio_window_evidence() -> str:
+    return (
+        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_active_pre_0.030_current_0.020"
     )
 
 
@@ -322,18 +437,32 @@ def test_merge_viber_live_context_frame_prioritizes_safety_evidence_under_cap():
                     "deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
                     "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none",
                     "transition_block=single_resolved_deck",
+                    "deck_audio_capture=A_active+B_silent",
+                    "deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000",
+                    "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+                    (
+                        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+                        "B_silent_pre_0.030_current_0.000"
+                    ),
                 ],
                 "refs": [
                     "mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted",
                     "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
                     "mix:deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none",
                     "mix:transition_block=single_resolved_deck",
+                    "mix:deck_audio_capture=A_active+B_silent",
+                    "mix:deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000",
+                    "mix:deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+                    (
+                        "mix:deck_audio_window=A_active_pre_0.020_current_0.040+"
+                        "B_silent_pre_0.030_current_0.000"
+                    ),
                 ],
             },
         },
     )
 
-    assert len(context["live_evidence"]["mix"]) == 4
+    assert len(context["live_evidence"]["mix"]) == 8
     assert (
         "deck_lanes=A_known_route_dominant+B_unknown_route_muted" in context["live_evidence"]["mix"]
     )
@@ -346,6 +475,19 @@ def test_merge_viber_live_context_frame_prioritizes_safety_evidence_under_cap():
         in context["live_evidence"]["mix"]
     )
     assert "transition_block=single_resolved_deck" in context["live_evidence"]["mix"]
+    assert "deck_audio_capture=A_active+B_silent" in context["live_evidence"]["mix"]
+    assert (
+        "deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000"
+        in context["live_evidence"]["mix"]
+    )
+    assert (
+        "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong"
+        in context["live_evidence"]["mix"]
+    )
+    assert (
+        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_silent_pre_0.030_current_0.000"
+    ) in context["live_evidence"]["mix"]
     assert "noise_0=kept" not in context["live_evidence"]["mix"]
     assert (
         "mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted"
@@ -360,6 +502,19 @@ def test_merge_viber_live_context_frame_prioritizes_safety_evidence_under_cap():
         in context["live_evidence"]["refs"]
     )
     assert "mix:transition_block=single_resolved_deck" in context["live_evidence"]["refs"]
+    assert "mix:deck_audio_capture=A_active+B_silent" in context["live_evidence"]["refs"]
+    assert (
+        "mix:deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000"
+        in context["live_evidence"]["refs"]
+    )
+    assert (
+        "mix:deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong"
+        in context["live_evidence"]["refs"]
+    )
+    assert (
+        "mix:deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_silent_pre_0.030_current_0.000"
+    ) in context["live_evidence"]["refs"]
     assert "mix:noise_0=kept" not in context["live_evidence"]["refs"]
 
 
@@ -528,6 +683,61 @@ def test_viber_live_context_readiness_reports_physical_proof_blockers():
     assert "live_evidence had no citable deck_source atom" not in readiness["blockers"]
 
 
+def test_viber_live_context_readiness_explains_deck_identity_source_blockers():
+    readiness = main_mod._viber_live_context_readiness(
+        {
+            "live_context_schema_version": 2,
+            "live_context_capabilities": _live_context_capabilities(),
+            "deck": "A",
+            "audible": False,
+            "music": 0.0,
+            "deck_state": {},
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 0,
+                "A": {"vol": 127, "play": True},
+                "B": {"vol": 0, "play": False},
+            },
+            "deck_source_status": {
+                "controller": "present",
+                "controller_connection": "connected",
+                "library": "present",
+                "library_tracks": "24",
+                "library_source": "rekordbox_xml",
+                "library_match": "ambiguous_label",
+                "nowplaying": "deck_candidate",
+                "nowplaying_title": "seen",
+                "audible_deck": "A",
+                "resolution": "library_miss",
+                "second_deck_source": "suppressed_requires_independent_source",
+                "screen_vision": "disabled",
+            },
+            "live_evidence": {
+                "mix": [
+                    "transition_block=no_resolved_decks",
+                    "deck_source=deck1_A_unknown_src_none+deck2_B_unknown_src_none",
+                ],
+                "refs": ["mix:transition_block=no_resolved_decks"],
+            },
+        },
+        frames_seen=2,
+        flat_deck_frame_seen=True,
+        session_snapshot_seen=False,
+    )
+
+    assert readiness["ready"] is False
+    assert readiness["diagnosis"] == "missing_physical_proof"
+    assert readiness["deck_source_status"]["library_match"] == "ambiguous_label"
+    assert (
+        "deck identity source: Now Playing did not match a unique library row"
+        in readiness["blockers"]
+    )
+    assert "second deck identity source requires independent deck evidence" in readiness["blockers"]
+    assert "screen vision is not currently resolving the independent second deck" in readiness[
+        "blockers"
+    ]
+
+
 def test_viber_live_context_readiness_diagnoses_stale_socket_before_physical_proof():
     readiness = main_mod._viber_live_context_readiness(
         {
@@ -563,7 +773,10 @@ def test_viber_live_context_readiness_diagnoses_stale_socket_before_physical_pro
         "audio_delta",
         "audio_part_context",
         "audio_window_map",
+        "deck_audio_delta_context",
+        "deck_audio_features_context",
         "deck_audio_separation_context",
+        "deck_audio_window_context",
         "deck_source_status",
         "live_evidence",
     ]
@@ -634,6 +847,77 @@ def test_viber_live_context_readiness_requires_source_for_citable_track():
     assert "live_evidence had no citable deck_source atom" not in readiness["blockers"]
 
 
+def test_viber_live_context_readiness_names_too_narrow_deck_capture_device():
+    readiness = main_mod._viber_live_context_readiness(
+        {
+            "live_context_schema_version": 2,
+            "live_context_capabilities": _live_context_capabilities(),
+            "deck": "A",
+            "audible": True,
+            "music": 0.2,
+            "deck_state": {
+                "A": {
+                    "title": "Strobe",
+                    "track_id": "track-1",
+                    "confidence": 0.82,
+                    "source": "folder_cache",
+                }
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 32,
+                "A": {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "recent_moves": ["A_low: cut->killed"],
+            "deck_source_status": _deck_source_status(),
+            "deck_audio_separation_context": (
+                "deck_audio_separation_context[requested_device=BlackHole_2ch "
+                "capture_device=BlackHole_2ch input_channels=2 opened_channels=2 "
+                "sample_rate=48000 device_capacity=stereo_or_less mode=global_mix_only "
+                "required_opened_channels=4 "
+                "capture_reason=capture_device_too_few_channels "
+                "routing_hint=rekordbox_settings_A:0+1+B:2+3 "
+                "routing_hint_rule=output_routing_not_live_audio_proof "
+                "setup_block=capture_device_too_few_channels "
+                "current_capture=P1_global_mix gemini_audio=mono_downmix_of_capture "
+                "deckA_audio=not_captured deckB_audio=not_captured "
+                "per_deck_audio=not_attached isolated_decks=false "
+                "upgrade_path=multi_channel_deck_pair_capture "
+                "rule=separation_capability_not_outcome]"
+            ),
+            "audio_delta": ["sub energy fell 50% (strong)"],
+            "audio_window_map": _audio_window_map(),
+            "live_evidence": {
+                "mix": [
+                    "transition_block=single_resolved_deck",
+                    "deck_lanes=A_known_route_dominant+B_unknown_route_muted",
+                    "deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
+                    "deck_source=deck1_A_known_src_folder_cache+deck2_B_unknown_src_none",
+                ],
+                "refs": [
+                    "mix:transition_block=single_resolved_deck",
+                    "mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted",
+                    "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
+                    "mix:deck_source=deck1_A_known_src_folder_cache+deck2_B_unknown_src_none",
+                ],
+            },
+        },
+        frames_seen=12,
+        flat_deck_frame_seen=True,
+        session_snapshot_seen=True,
+    )
+
+    assert readiness["ready"] is False
+    assert "deck-pair audio capture was not configured in the live packet" in readiness[
+        "blockers"
+    ]
+    assert (
+        "deck-pair route hint requires a multichannel capture device/opened channels"
+        in readiness["blockers"]
+    )
+
+
 def test_viber_live_context_sample_complete_waits_for_proof_when_required():
     cold_context = {
         "deck": "A",
@@ -677,30 +961,56 @@ def test_viber_live_context_readiness_passes_for_deck_controller_audio_evidence(
                     "camelot": "8A",
                     "confidence": 0.82,
                     "source": "folder_cache",
-                }
+                },
+                "B": {
+                    "title": "Signal",
+                    "track_id": "track-2",
+                    "camelot": "9A",
+                    "confidence": 0.84,
+                    "source": "folder_cache",
+                },
             },
             "deck_mixer": {
                 "connected": True,
                 "xfader": 32,
                 "A": {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
-                "B": {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 96, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
             },
             "recent_moves": ["A_low: cut->killed"],
             "deck_source_status": _deck_source_status(),
+            "deck_audio_separation_context": _deck_pair_audio_separation_context().replace(
+                "A_active+B_silent",
+                "A_active+B_active",
+            ),
+            "deck_audio_features_context": _deck_audio_features_context()
+            .replace("B_activity=silent", "B_activity=active")
+            .replace("B_rms=0.000", "B_rms=0.030")
+            .replace("B_peak=0.000", "B_peak=0.110")
+            .replace("B_zcr=0.000", "B_zcr=0.035"),
+            "deck_audio_delta_context": _deck_audio_delta_context(),
+            "deck_audio_window_context": _deck_audio_window_context(),
             "audio_delta": ["sub energy fell 50% (strong)"],
             "audio_window_map": _audio_window_map(),
             "live_evidence": {
                 "mix": [
-                    "transition_block=single_resolved_deck",
-                    "deck_lanes=A_known_route_dominant+B_unknown_route_muted",
-                    "deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
-                    "deck_source=deck1_A_known_src_folder_cache+deck2_B_unknown_src_none",
+                    "transition_candidate=two_resolved_decks_captured_audio",
+                    "deck_lanes=A_known_route_dominant+B_known_route_present",
+                    "deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+                    "deck_source=deck1_A_known_src_folder_cache+deck2_B_known_src_folder_cache",
+                    "deck_audio_capture=A_active+B_active",
+                    "deck_audio_features=A_active_rms_0.020+B_active_rms_0.030",
+                    "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+                    _deck_audio_window_evidence(),
                 ],
                 "refs": [
-                    "mix:transition_block=single_resolved_deck",
-                    "mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted",
-                    "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
-                    "mix:deck_source=deck1_A_known_src_folder_cache+deck2_B_unknown_src_none",
+                    "mix:transition_candidate=two_resolved_decks_captured_audio",
+                    "mix:deck_lanes=A_known_route_dominant+B_known_route_present",
+                    "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+                    "mix:deck_source=deck1_A_known_src_folder_cache+deck2_B_known_src_folder_cache",
+                    "mix:deck_audio_capture=A_active+B_active",
+                    "mix:deck_audio_features=A_active_rms_0.020+B_active_rms_0.030",
+                    "mix:deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+                    "mix:" + _deck_audio_window_evidence(),
                 ],
             },
         },
@@ -721,6 +1031,9 @@ def test_viber_live_context_readiness_passes_for_deck_controller_audio_evidence(
             "deck_state_resolved": True,
             "deck_state_citable_track": True,
             "deck_state_source_provenance": True,
+            "deck_state_pair_resolved": True,
+            "deck_state_pair_citable_tracks": True,
+            "deck_state_pair_source_provenance": True,
             "deck_lane_context_seen": True,
             "deck_reference_context_seen": True,
             "deck_source_context_seen": True,
@@ -730,8 +1043,19 @@ def test_viber_live_context_readiness_passes_for_deck_controller_audio_evidence(
             "recent_moves_seen": True,
             "audio_part_context_seen": True,
             "deck_audio_separation_context_seen": True,
+            "deck_audio_features_context_seen": True,
+            "deck_audio_delta_context_seen": True,
+            "deck_audio_window_context_seen": True,
+            "deck_pair_capture_configured": True,
+            "deck_audio_capture_evidence_seen": True,
+            "deck_audio_capture_active": True,
+            "deck_audio_capture_both_active": True,
+            "deck_audio_features_evidence_seen": True,
+            "deck_audio_delta_evidence_seen": True,
+            "deck_audio_window_evidence_seen": True,
             "audio_window_context_seen": True,
             "audio_window_map_seen": True,
+            "audio_part_window_labels_consistent": True,
             "audio_observed": True,
             "audio_delta_seen": True,
             "live_evidence_seen": True,
@@ -744,15 +1068,195 @@ def test_viber_live_context_readiness_passes_for_deck_controller_audio_evidence(
         },
         "blockers": [],
         "stale_live_runtime": False,
-        "resolved_decks": ["A"],
-        "citable_decks": ["A"],
-        "sourced_decks": ["A"],
+        "resolved_decks": ["A", "B"],
+        "citable_decks": ["A", "B"],
+        "sourced_decks": ["A", "B"],
         "mixer_posture_sides": ["A", "B"],
         "max_music": 0.2,
         "live_context_schema_version": 2,
         "missing_capabilities": [],
+        "deck_source_status": {
+            "controller": "connected",
+            "controller_connection": "connected",
+            "library": "present",
+            "library_tracks": "24",
+            "library_source": "rekordbox_xml",
+            "library_match": "matched",
+            "nowplaying": "blocked_non_deck_owner",
+            "nowplaying_owner": "com.apple.webkit.gpu",
+            "nowplaying_title": "pink_floyd",
+            "audible_deck": "a",
+            "resolution": "library_cache_match",
+            "resolved_side": "a",
+            "screen_vision": "disabled",
+        },
         "session_snapshot_seen": True,
     }
+
+
+def test_viber_live_context_readiness_rejects_mismatched_deck_audio_part_labels():
+    readiness = main_mod._viber_live_context_readiness(
+        {
+            "live_context_schema_version": 2,
+            "live_context_capabilities": _live_context_capabilities(),
+            "deck": "mix",
+            "audible": True,
+            "music": 0.2,
+            "deck_state": {
+                "A": {
+                    "title": "Strobe",
+                    "track_id": "track-1",
+                    "camelot": "8A",
+                    "confidence": 0.82,
+                    "source": "folder_cache",
+                },
+                "B": {
+                    "title": "Signal",
+                    "track_id": "track-2",
+                    "camelot": "9A",
+                    "confidence": 0.84,
+                    "source": "folder_cache",
+                },
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 48,
+                "A": {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 96, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "recent_moves": ["xfader: A->center"],
+            "deck_source_status": _deck_source_status(),
+            "deck_audio_separation_context": _deck_pair_audio_separation_context().replace(
+                "A_active+B_silent",
+                "A_active+B_active",
+            ),
+            "deck_audio_features_context": _deck_audio_features_context()
+            .replace("B_activity=silent", "B_activity=active")
+            .replace("B_rms=0.000", "B_rms=0.030")
+            .replace("B_peak=0.000", "B_peak=0.110")
+            .replace("B_zcr=0.000", "B_zcr=0.035"),
+            "deck_audio_delta_context": _deck_audio_delta_context(),
+            "deck_audio_window_context": _deck_audio_window_context(),
+            "audio_part_context": _deck_pair_audio_part_context("P4", "P5"),
+            "audio_window_context": _deck_pair_audio_window_context("P2", "P3"),
+            "audio_window_map": _deck_pair_audio_window_map("P2", "P3"),
+            "audio_delta": ["sub energy fell 50% (strong)"],
+            "live_evidence": {
+                "mix": [
+                    "transition_candidate=two_resolved_decks_captured_audio",
+                    "deck_lanes=A_known_route_dominant+B_known_route_present",
+                    "deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+                    "deck_source=deck1_A_known_src_folder_cache+deck2_B_known_src_folder_cache",
+                    "deck_audio_capture=A_active+B_active",
+                    "deck_audio_features=A_active_rms_0.020+B_active_rms_0.030",
+                    "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+                    _deck_audio_window_evidence(),
+                ],
+                "refs": [
+                    "mix:transition_candidate=two_resolved_decks_captured_audio",
+                    "mix:deck_lanes=A_known_route_dominant+B_known_route_present",
+                    "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+                    "mix:deck_source=deck1_A_known_src_folder_cache+deck2_B_known_src_folder_cache",
+                    "mix:deck_audio_capture=A_active+B_active",
+                    "mix:deck_audio_features=A_active_rms_0.020+B_active_rms_0.030",
+                    "mix:deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+                    "mix:" + _deck_audio_window_evidence(),
+                ],
+            },
+        },
+        frames_seen=12,
+        flat_deck_frame_seen=True,
+        session_snapshot_seen=True,
+    )
+
+    assert readiness["ready"] is False
+    assert readiness["checks"]["audio_part_context_seen"] is True
+    assert readiness["checks"]["audio_window_context_seen"] is True
+    assert readiness["checks"]["audio_window_map_seen"] is False
+    assert readiness["checks"]["audio_part_window_labels_consistent"] is False
+    assert "audio Part labels disagreed with audio_window deck labels" in readiness["blockers"]
+    assert "no structured audio_window_map was observed" in readiness["blockers"]
+
+
+def test_viber_live_context_readiness_requires_both_deck_audio_lanes_active():
+    readiness = main_mod._viber_live_context_readiness(
+        {
+            "live_context_schema_version": 2,
+            "live_context_capabilities": _live_context_capabilities(),
+            "deck": "mix",
+            "audible": True,
+            "music": 0.2,
+            "deck_state": {
+                "A": {
+                    "title": "Strobe",
+                    "track_id": "track-1",
+                    "camelot": "8A",
+                    "confidence": 0.82,
+                    "source": "folder_cache",
+                },
+                "B": {
+                    "title": "Signal",
+                    "track_id": "track-2",
+                    "camelot": "9A",
+                    "confidence": 0.84,
+                    "source": "folder_cache",
+                },
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 48,
+                "A": {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 96, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "recent_moves": ["xfader: A->center"],
+            "deck_source_status": _deck_source_status(),
+            "deck_audio_separation_context": _deck_pair_audio_separation_context(),
+            "deck_audio_features_context": _deck_audio_features_context(),
+            "deck_audio_delta_context": _deck_audio_delta_context(),
+            "deck_audio_window_context": _deck_audio_window_context(),
+            "audio_part_context": _audio_part_context(),
+            "audio_delta": ["sub energy fell 50% (strong)"],
+            "audio_window_map": _audio_window_map(),
+            "live_evidence": {
+                "mix": [
+                    "transition_candidate=two_resolved_decks_captured_audio",
+                    "deck_lanes=A_known_route_dominant+B_known_route_present",
+                    "deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+                    "deck_source=deck1_A_known_src_folder_cache+deck2_B_known_src_folder_cache",
+                    "deck_audio_capture=A_active+B_silent",
+                    "deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000",
+                    "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+                    (
+                        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+                        "B_silent_pre_0.030_current_0.000"
+                    ),
+                ],
+                "refs": [
+                    "mix:transition_candidate=two_resolved_decks_captured_audio",
+                    "mix:deck_lanes=A_known_route_dominant+B_known_route_present",
+                    "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+                    "mix:deck_source=deck1_A_known_src_folder_cache+deck2_B_known_src_folder_cache",
+                    "mix:deck_audio_capture=A_active+B_silent",
+                    "mix:deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000",
+                    "mix:deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+                    (
+                        "mix:deck_audio_window=A_active_pre_0.020_current_0.040+"
+                        "B_silent_pre_0.030_current_0.000"
+                    ),
+                ],
+            },
+        },
+        frames_seen=12,
+        flat_deck_frame_seen=True,
+        session_snapshot_seen=True,
+    )
+
+    assert readiness["ready"] is False
+    assert readiness["checks"]["deck_audio_capture_active"] is True
+    assert readiness["checks"]["deck_audio_capture_both_active"] is False
+    assert "deck_audio_capture did not show active audio on both deck lanes" in readiness[
+        "blockers"
+    ]
 
 
 def test_viber_live_context_readiness_requires_rendered_deck_lane_context():
@@ -909,11 +1413,33 @@ def test_viber_source_status_reports_ws_port_listener(monkeypatch):
             "looks_like_vibemix": False,
         },
     )
+    monkeypatch.setattr(
+        main_mod,
+        "rekordbox_deck_output_routing_hint",
+        lambda **_kwargs: {
+            "source": "rekordbox_settings",
+            "settings_file": "rekordbox6/rekordbox3.settings",
+            "settings_entry": "audioDeviceManager_PerformanceMode_1178899479",
+            "output_device": "Aggregate_Device",
+            "mixer_mode": "external",
+            "deck_channels": {"A": (0, 1), "B": (2, 3)},
+            "fits_input_channels": True,
+            "rule": "rekordbox_output_routing_hint_not_live_audio_proof",
+        },
+    )
 
     status = main_mod._viber_local_source_status()
 
     assert status["ws_port_listener"]["listening"] is True
     assert status["ws_port_listener"]["name"] == "uvicorn"
+    assert status["rekordbox_deck_routing_hint"]["deck_channels"] == {
+        "A": (0, 1),
+        "B": (2, 3),
+    }
+    assert (
+        status["rekordbox_deck_routing_hint"]["rule"]
+        == "rekordbox_output_routing_hint_not_live_audio_proof"
+    )
 
 
 def test_ws_port_listener_lsof_probe_reports_wrong_owner(monkeypatch):
@@ -981,6 +1507,75 @@ def test_viber_live_context_hint_names_wrong_port_owner():
 
     assert "Port 8765 is occupied by uvicorn pid=44456" in hint
     assert "not the Vibemix live socket" in hint
+
+
+def test_viber_setup_hint_turns_rekordbox_route_hint_into_env(monkeypatch):
+    monkeypatch.delenv("VIBEMIX_INPUT_DEVICE", raising=False)
+    setup_hint = main_mod._viber_setup_hint_from_source_status(
+        {
+            "rekordbox_deck_routing_hint": {
+                "source": "rekordbox_settings",
+                "settings_file": "rekordbox6/rekordbox3.settings",
+                "settings_entry": "audioDeviceManager_PerformanceMode_1178899479",
+                "output_device": "Aggregate_Device",
+                "mixer_mode": "external",
+                "deck_channels": {"A": (0, 1), "B": (2, 3)},
+                "fits_input_channels": True,
+                "rule": "rekordbox_output_routing_hint_not_live_audio_proof",
+            }
+        },
+        {"ready": False},
+    )
+
+    assert setup_hint == {
+        "status": "rekordbox_route_hint_found",
+        "deck_channels": "A=0,1;B=2,3",
+        "opened_channels_min": 4,
+        "recommended_env": {
+            "VIBEMIX_DECK_AUDIO_CHANNELS": "auto",
+        },
+        "explicit_env": {
+            "VIBEMIX_INPUT_DEVICE": "BlackHole 16ch",
+            "VIBEMIX_DECK_AUDIO_CHANNELS": "A=0,1;B=2,3",
+        },
+        "auto_upgrade_input_device": "BlackHole 16ch",
+        "output_device": "Aggregate_Device",
+        "next_action": (
+            "Rekordbox deck route hint found (A=0,1;B=2,3 via Aggregate_Device). "
+            "Start the live session with VIBEMIX_DECK_AUDIO_CHANNELS=auto; "
+            "Vibemix will try BlackHole 16ch for the deck-pair capture automatically. "
+            "Play both decks, move a controller, "
+            "then rerun `vibemix library live-context --require-proof`."
+        ),
+        "rule": "setup_hint_not_live_audio_proof",
+    }
+
+
+def test_viber_setup_hint_respects_explicit_input_device(monkeypatch):
+    monkeypatch.setenv("VIBEMIX_INPUT_DEVICE", "BlackHole 2ch")
+    setup_hint = main_mod._viber_setup_hint_from_source_status(
+        {
+            "rekordbox_deck_routing_hint": {
+                "source": "rekordbox_settings",
+                "settings_file": "rekordbox6/rekordbox3.settings",
+                "settings_entry": "audioDeviceManager_PerformanceMode_1178899479",
+                "output_device": "Aggregate_Device",
+                "mixer_mode": "external",
+                "deck_channels": {"A": (0, 1), "B": (2, 3)},
+                "fits_input_channels": True,
+                "rule": "rekordbox_output_routing_hint_not_live_audio_proof",
+            }
+        },
+        {"ready": False},
+    )
+
+    assert setup_hint is not None
+    assert setup_hint["recommended_env"] == {
+        "VIBEMIX_INPUT_DEVICE": "BlackHole 16ch",
+        "VIBEMIX_DECK_AUDIO_CHANNELS": "auto",
+    }
+    assert setup_hint["auto_upgrade_input_device"] is None
+    assert "VIBEMIX_INPUT_DEVICE='BlackHole 16ch'" in setup_hint["next_action"]
 
 
 def test_cmd_library_live_context_json_success(monkeypatch, capsys):
@@ -1134,6 +1729,14 @@ def test_cmd_library_live_context_text_failure(monkeypatch, capsys):
             "live_context": {},
             "preview": "",
             "readiness": {"ready": False, "blockers": ["no websocket frames arrived"]},
+            "setup_hint": {
+                "next_action": (
+                    "Rekordbox deck route hint found (A=0,1;B=2,3 via Aggregate_Device). "
+                    "Start the live session with VIBEMIX_INPUT_DEVICE='BlackHole 16ch' "
+                    "VIBEMIX_DECK_AUDIO_CHANNELS=auto."
+                ),
+                "rule": "setup_hint_not_live_audio_proof",
+            },
             "error": "connect failed",
             "hint": "start the session",
         }
@@ -1148,6 +1751,8 @@ def test_cmd_library_live_context_text_failure(monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "live-context unavailable: connect failed" in err
     assert "start the session" in err
+    assert "setup hint: Rekordbox deck route hint found" in err
+    assert "VIBEMIX_DECK_AUDIO_CHANNELS=auto" in err
 
 
 def test_cmd_library_live_context_require_proof_fails_with_blockers(monkeypatch, capsys):
@@ -1306,6 +1911,88 @@ def _write_ready_single_deck_proof(path) -> None:
     )
 
 
+def _write_ready_single_deck_deck_audio_proof(path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "live_context": {
+                    "deck": "A",
+                    "audible": True,
+                    "music": 0.8,
+                    "live_context_schema_version": 2,
+                    "live_context_capabilities": _live_context_capabilities(),
+                    "deck_state": {
+                        "A": {
+                            "title": "Strobe",
+                            "track_id": "track-1",
+                            "confidence": 0.9,
+                            "source": "rekordbox_xml",
+                        }
+                    },
+                    "deck_mixer": {
+                        "connected": True,
+                        "xfader": 32,
+                        "A": {
+                            "vol": 110,
+                            "eq_low": 2,
+                            "eq_mid": 64,
+                            "eq_hi": 64,
+                            "filter": 64,
+                        },
+                        "B": {
+                            "vol": 0,
+                            "eq_low": 64,
+                            "eq_mid": 64,
+                            "eq_hi": 64,
+                            "filter": 64,
+                        },
+                    },
+                    "recent_moves": ["A_low: flat->killed"],
+                    "deck_source_status": _deck_source_status(),
+                    "deck_audio_separation_context": _deck_pair_audio_separation_context(),
+                    "deck_audio_features_context": _deck_audio_features_context(),
+                        "deck_audio_delta_context": _deck_audio_delta_context(),
+                        "deck_audio_window_context": _deck_audio_window_context(),
+                        "audio_part_context": _audio_part_context(),
+                    "audio_delta": ["low energy fell 50% (strong)"],
+                    "audio_window_map": _audio_window_map(),
+                    "live_evidence": {
+                        "mix": [
+                            "transition_block=single_resolved_deck",
+                            "deck_lanes=A_known_route_dominant+B_unknown_route_muted",
+                            "deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
+                            "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none",
+                            "deck_audio_capture=A_active+B_silent",
+                            "deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000",
+                            "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+                            (
+                                "deck_audio_window=A_active_pre_0.020_current_0.040+"
+                                "B_silent_pre_0.030_current_0.000"
+                            ),
+                        ],
+                        "refs": [
+                            "mix:transition_block=single_resolved_deck",
+                            "mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted",
+                            "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
+                            "mix:deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none",
+                            "mix:deck_audio_capture=A_active+B_silent",
+                            "mix:deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000",
+                            "mix:deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+                            (
+                                "mix:deck_audio_window=A_active_pre_0.020_current_0.040+"
+                                "B_silent_pre_0.030_current_0.000"
+                            ),
+                        ],
+                    },
+                },
+                "readiness": {"ready": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_cmd_library_verify_live_reply_rejects_unsupported_transition_claim(tmp_path, capsys):
     proof_path = tmp_path / "proof.json"
     chat_path = tmp_path / "chat.json"
@@ -1329,10 +2016,53 @@ def test_cmd_library_verify_live_reply_rejects_unsupported_transition_claim(tmp_
     assert out["ok"] is False
     assert "unsupported_live_outcome_claim" in out["violations"]
     assert "Great transition" not in out["corrected_reply"]
-    assert "hold the transition verdict" in out["corrected_reply"]
+    assert "sound change right there" in out["corrected_reply"]
 
 
-def test_cmd_library_verify_live_reply_accepts_grounded_disclaimer(tmp_path, capsys):
+def test_cmd_library_verify_live_reply_rejects_deck_audio_rich_single_deck_transition(
+    tmp_path, capsys
+):
+    proof_path = tmp_path / "proof.json"
+    chat_path = tmp_path / "chat.json"
+    _write_ready_single_deck_deck_audio_proof(proof_path)
+    chat_path.write_text(
+        json.dumps(
+            {
+                "reply": "Great transition, the incoming deck landed clean.",
+                "move_grades": [
+                    {
+                        "track_id": "track-1",
+                        "label": "LIT AFF",
+                        "reason": "transition_slate said it was clean",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    rc = main_mod._cmd_library_verify_live_reply(
+        argparse.Namespace(
+            live_context_file=str(proof_path),
+            chat_result_file=str(chat_path),
+            reply=None,
+            json=True,
+        )
+    )
+
+    assert rc == 1
+    out = json.loads(capsys.readouterr().out)
+    assert out["proof_ready"] is True
+    assert out["claim_policy"] == "blocked"
+    assert out["move_grades_allowed"] is False
+    assert "unsupported_live_outcome_claim" in out["violations"]
+    assert "move_grades_without_live_proof" in out["violations"]
+    assert "Great transition" not in out["corrected_reply"]
+    assert "incoming deck landed clean" not in out["corrected_reply"]
+    assert "sound change right there" in out["corrected_reply"]
+
+
+def test_cmd_library_verify_live_reply_rejects_public_self_correction(tmp_path, capsys):
     proof_path = tmp_path / "proof.json"
     _write_ready_single_deck_proof(proof_path)
 
@@ -1345,11 +2075,40 @@ def test_cmd_library_verify_live_reply_accepts_grounded_disclaimer(tmp_path, cap
         )
     )
 
-    assert rc == 0
+    assert rc == 1
     out = json.loads(capsys.readouterr().out)
-    assert out["ok"] is True
-    assert out["violations"] == []
+    assert out["ok"] is False
+    assert "unsupported_live_outcome_claim" in out["violations"]
     assert out["proof_ready"] is True
+    assert "can't call it a transition" not in out["corrected_reply"]
+    assert "sound change right there" in out["corrected_reply"]
+
+
+def test_cmd_library_verify_live_reply_rejects_public_debug_labels(tmp_path, capsys):
+    proof_path = tmp_path / "proof.json"
+    _write_ready_single_deck_proof(proof_path)
+
+    rc = main_mod._cmd_library_verify_live_reply(
+        argparse.Namespace(
+            live_context_file=str(proof_path),
+            chat_result_file=None,
+            reply=(
+                "I need to correct the live read: resolved decks=none; "
+                "live evidence gate: transition_block=no_resolved_decks; "
+                "claim_policy=blocked."
+            ),
+            json=True,
+        )
+    )
+
+    assert rc == 1
+    out = json.loads(capsys.readouterr().out)
+    assert out["ok"] is False
+    assert "unsupported_live_outcome_claim" in out["violations"]
+    assert "correct the live read" not in out["corrected_reply"]
+    assert "resolved decks" not in out["corrected_reply"]
+    assert "claim_policy" not in out["corrected_reply"]
+    assert "sound change right there" in out["corrected_reply"]
 
 
 def test_cmd_library_verify_live_reply_rejects_unready_proof_artifact(tmp_path, capsys):

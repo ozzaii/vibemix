@@ -25,12 +25,41 @@ Use the app's existing live state as the primary deck reference:
   assume: the model hears the global booth/master mix, not isolated per-deck
   stems; deck routing is inferred from controller posture and must stay a
   reference frame, not a verdict.
+- `deck_audio_separation_context` for the capture-capability contract:
+  the current attached/captured audio is `P1_global_mix`, Gemini receives a
+  mono downmix of that capture, `deckA_audio=not_captured`,
+  `deckB_audio=not_captured`, `per_deck_audio=not_attached`, and
+  `isolated_decks=false`. This is the explicit bridge between "deck1/deck2
+  labels are structured text" and "the model is not hearing isolated deck
+  channels." When a multichannel deck-pair route is configured, the same packet
+  switches to `mode=deck_pair_capture_configured`, `deckA_audio=captured`,
+  `deckB_audio=captured`, `per_deck_audio=captured_not_attached`, and a compact
+  RMS activity receipt such as `deck_audio_activity=A_active+B_silent`. Gemini
+  still uses one P1 master/global Part by default, but selected live-reaction
+  turns can now attach short Deck A / Deck B audio Parts from the configured
+  capture rings. The socket/Viber path also gets
+  `deck_audio_features_context[...]` from the configured deck-pair capture:
+  per-lane activity, RMS, peak, zero-cross rate, flux, and crest from the
+  latest captured callback frame. Those descriptors are explicitly tagged as
+  evidence, not a transition-quality verdict. It also gets
+  `deck_audio_delta_context[...]` from the latest per-deck feature comparison,
+  such as `A_delta=rms_rose_100pct_strong` /
+  `B_delta=rms_fell_50pct_strong`, tagged
+  `rule=deck_audio_delta_not_causal_proof`.
+  The socket/Viber/Gemini prompt path now also gets
+  `deck_audio_window_context[...]`, a cheap pre/current deck-pair feature
+  packet. It compares an older lane window (`pre=-6.0..-1.0`) against the
+  current action lane window (`current=-1.0..0.0`) and emits tokens such as
+  `A_pre=...`, `A_current=...`, and `A_delta=...`. This is the user's
+  "older part / current part" idea implemented as deterministic text labels,
+  not as duplicate audio and not as a causal/quality verdict.
 - `audio_part_context` for Gemini's attached audio Parts: P1 is the current
   live global mix, optional P2 can be Kaan's mic/user speech, optional P2/P3 can
-  be source-file lookahead, and none of those Parts are deck stems. This makes
-  the "old/current/action/+3s" arrangement explicit without duplicating audio or
-  giving the model permission to treat future/lookahead as current audience
-  evidence.
+  be source-file lookahead, and optional later Parts can be
+  `deckA_configured_capture` / `deckB_configured_capture` when the deck-pair
+  capture seam is active. This makes the "old/current/action/+3s" arrangement
+  explicit without giving the model permission to treat future/lookahead as
+  current audience evidence or deck-pair captures as quality verdicts.
 - `deck_source_context` for the source/provenance ladder: live deck identity is
   read from `MusicState.deck_state`; the robust path is now-playing/controller
   attribution into the library cache; live `master.db` is not read; diagnostic
@@ -52,6 +81,17 @@ Use the app's existing live state as the primary deck reference:
   - `mix:second_deck_identity=unknown_or_suppressed|observed|blocked` so
     prompts and Viber have an explicit deck-identity capability signal, not
     just a transition gate.
+  - `mix:deck_audio_capture=A_active+B_silent` when the optional deck-pair
+    capture path is configured and RMS activity has been observed. This is
+    capture activity, not a transition grade.
+  - `mix:deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000` when the
+    optional deck-pair capture path has measured per-deck feature descriptors.
+    This lets Viber cite per-deck audio activity without seeing or storing raw
+    deck audio.
+  - `mix:deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong`
+    when the optional deck-pair capture path has compared the latest callback
+    against the prior one. This is per-deck change evidence, not proof that a
+    move caused the change or that a transition was good.
   - `mix:move_scope=<scope>`, transition block/watch/candidate keys, and
     `mix:move_effect=<delta>` for move-local grounding. These are de-duped in
     the refresh loop and rendered as `grounding_refs[...]` only when the
@@ -80,6 +120,48 @@ are gated by deterministic policy:
 This treats "great transition" as one example of an unsupported outcome class,
 not as the only phrase to block.
 
+Public language rule added 2026-05-30: proof/debug uncertainty stays internal.
+If evidence is weak, Viber/Gemini must not say "I need to correct", "I'm not
+sure", "I only have audible deck mix", or explain missing proof to the DJ.
+The guard can still correct unsafe outcome claims, but the replacement sentence
+must be grounded product copy about the move/sound shape, while the detailed
+reason remains in `live_verification`, logs, and proof tooling.
+
+Event-scope consistency rule added 2026-05-30: if a live event carries
+`extra.audio_capture_context`, that same context must drive the task tail,
+Gemini audio-adjacent prompt, stream deferral, and result guard. Agent-level
+capture context is only the fallback. This prevents one turn from showing Deck
+A/B capture/window proof to Gemini while the public guard evaluates an older or
+empty context.
+
+Supported-verdict proof rule added 2026-05-30: the shared live-claim gate now
+requires the pre/current `deck_audio_window` packet before allowing
+`supported_verdict`. Two trusted deck identities, two active deck lanes,
+features, and deltas are necessary but not enough; without the old/current
+deck-lane window, the public answer stays at transition setup/candidate
+language. This keeps the user's "older part / current part / action moment"
+context as a proof requirement rather than prompt decoration.
+
+Deck-auto setup rule added 2026-05-30: `VIBEMIX_DECK_AUDIO_CHANNELS=auto` should
+be practical, not a trap. If Rekordbox settings show Deck A/B on channels that
+do not fit the default BlackHole 2ch input, and the user has not explicitly set
+`VIBEMIX_INPUT_DEVICE`, the live runtime now attempts to upgrade to BlackHole
+16ch before opening the stream. Explicit input-device choices remain pinned and
+too-narrow explicit devices still produce setup blockers instead of false proof.
+The proof CLI mirrors this: with the current local Rekordbox hint
+`A=0,1;B=2,3`, the recommended setup env is now just
+`VIBEMIX_DECK_AUDIO_CHANNELS=auto`; the proof artifact includes
+`auto_upgrade_input_device=BlackHole 16ch` and an explicit fallback env map.
+
+Local live proof update 2026-05-30: booting the runtime with
+`VIBEMIX_DECK_AUDIO_CHANNELS=auto` now actually upgraded from BlackHole 2ch to
+BlackHole 16ch and opened a 4-channel capture stream. A socket sample during
+that run saw 58 frames and confirmed `deck_pair_capture_configured=true` plus
+deck-audio separation, features, delta, and pre/current window contexts. The
+capture was silent, so readiness correctly remained `missing_physical_proof`.
+The delta context now emits `A_delta=no_clear_delta` / `B_delta=no_clear_delta`
+for stable lanes; this is context only, not citable transition evidence.
+
 ## Official Gemini Facts Used
 
 Sources:
@@ -92,7 +174,8 @@ Sources:
 - Gemini models: https://ai.google.dev/gemini-api/docs/models/gemini
 - Pricing: https://ai.google.dev/pricing
 
-Relevant facts verified 2026-05-29 from the current docs:
+Relevant facts verified 2026-05-29 and rechecked 2026-05-30 from the current
+docs:
 
 - Gemini accepts audio as inline data or uploaded files.
 - Inline audio belongs only under the 20 MB total request limit; larger or
@@ -115,16 +198,31 @@ Relevant facts verified 2026-05-29 from the current docs:
   explicit caching for repeated large prefixes. This supports the existing
   architecture: static persona/rules in cache, volatile deck/audio routing in
   the per-turn prompt.
+- Official AlphaTheta/rekordbox support documents the `[Output Channel]`
+  mapping for deck output selection, for example Output Deck1 and Output Deck2
+  routing. That supports using local Rekordbox output-channel settings as setup
+  hints only. It is not live audio proof until Vibemix actually opens and
+  measures the matching capture channels.
 - Current pricing docs list Gemini 2.5 Flash Native Audio (Live API) paid audio
   input at `$3.00 / 1M tokens` and audio output at `$12.00 / 1M tokens`.
   Standard `generateContent` audio prices vary by model tier and are lower for
   Flash/Lite than native-audio Live output. Treat all pricing facts as volatile
   and re-check before any launch/billing decision.
+- Official docs rechecked on 2026-05-29:
+  Gemini audio understanding says each second of audio is 32 tokens and the
+  token-counting guide repeats the same fixed audio rate; the pricing guide
+  currently lists Gemini 2.5 Flash standard audio input at `$1.00 / 1M tokens`,
+  Gemini 2.5 Flash-Lite standard audio input at `$0.30 / 1M tokens`, and
+  Gemini 2.5 Flash Native Audio Live API audio/video input at
+  `$3.00 / 1M tokens`.
 
 Implication for Vibemix:
 
 - The current 6s diet window costs about 192 audio tokens.
 - The current 18s full window costs about 576 audio tokens.
+- A default 3s Deck A + 3s Deck B pair costs about 192 extra audio tokens, so
+  the cheap shape is still P1 plus conditional short Deck A/B Parts, not a
+  continuous native-audio session.
 - Deck/control context should stay small text, not another audio/model pass.
 - Audio Part labels should stay small text too: a single `audio_part_context`
   line describes P1/P2/P3 roles, while the actual audio stays one live P1 plus
@@ -140,15 +238,100 @@ Implication for Vibemix:
   `current=-1s..0s`, `action=-1s..0s`, `move_anchor=<move>@-age`, and optional
   `future=0..+3s` only when the file lookahead Part is truly attached. Future
   spans are always labeled `future_heard=false`.
+- Per-deck move timing should also be text first. The current implementation
+  keeps a short deterministic feature history in the deck-pair capture object
+  and emits `deck_audio_window_context[...]` from that history. This gives the
+  model "older Deck A/B vs current Deck A/B" labels without another audio Part,
+  without another model call, and without delaying the reaction.
 - Exact citable refs should be small text copied from the registry snapshot.
   They are essentially free compared with another audio pass and give the
   linter a structural way to reject invented move/route claims.
 - Long persona/profile/static grounding belongs in the existing Gemini context
   cache; volatile deck/move state stays in the per-turn prompt.
+- Historical move memory is comparison material only. It should carry the
+  `history=past_comparison_not_live_proof` label and may help retrieval
+  similarity, but unsafe or contradictory Deck A/B audio-window labels must be
+  omitted before entering prompts or recall queries.
+- Audio-Part labels must be consistent across every packet in the same live
+  turn. A valid `audio_part_context[...]` and a valid `audio_window_context[...]`
+  can still be contradictory if one says Deck A/B are `P4/P5` and the other says
+  `P2/P3`; Viber should drop/recompute the weaker window/map instead of feeding
+  both to the model.
+- Readiness/proof has to enforce the same rule. Otherwise the app could refuse
+  contradictory context in chat while still writing a proof artifact that says
+  the live deck/audio context is ready.
+- Positive transition scoring should use the same threshold. Strong-looking
+  `live_evidence` tokens are not enough unless the validated Part/window/map
+  packets are present and mutually consistent.
+- Guard/debug/self-correction language belongs in artifacts such as
+  `live_verification`, not in the user-facing Viber reply. If the model produces
+  "my mistake on the live read" or similar self-confession text, the result
+  boundary should replace it with calm product copy while preserving the raw
+  violation internally.
 - Per-deck "hearing" must be represented as structured routing context unless
   we add true isolated deck capture. Gemini's audio guide says multi-channel
   audio is combined into one channel, so sending a stereo/master feed cannot be
   relied on as deck A/deck B separation.
+
+## Local Audio/rekordbox Probe on 2026-05-29
+
+Local CoreAudio devices relevant to capture/routing:
+
+- `DDJ-FLX4`: 2 inputs, 4 outputs, 48000 Hz
+- `BlackHole 16ch`: 16 inputs, 16 outputs, 48000 Hz
+- `BlackHole 2ch`: 2 inputs, 2 outputs, 48000 Hz
+- `rekordbox Aggregate Device`: 2 inputs, 6 outputs, 48000 Hz
+- `Aggregate Device`: 0 inputs, 2 outputs, 48000 Hz
+
+The default runtime uses `INPUT_DEVICE=BlackHole 2ch`, opens it with
+`channels=2`, then averages input channels to mono before Gemini/state buffers.
+Therefore the default system can label deck identity/control/routing, but it
+does not capture isolated Deck A / Deck B audio.
+
+The next runtime seam now exists and was physically booted against
+`BlackHole 16ch` on 2026-05-29:
+
+- `VIBEMIX_INPUT_DEVICE='BlackHole 16ch'`
+- `VIBEMIX_DECK_AUDIO_CHANNELS='A=0,1;B=2,3'`
+
+With that configuration, Vibemix opened a 4-channel stream and the live socket
+advertised:
+`deck_audio_separation_context[requested_device=BlackHole_16ch capture_device=BlackHole_16ch input_channels=16 opened_channels=4 sample_rate=48000 device_capacity=multichannel_available mode=deck_pair_capture_configured master_channels=0,1,2,3 current_capture=P1_global_mix_plus_deck_pairs gemini_audio=mono_downmix_of_master_capture deckA_audio=captured deckB_audio=captured per_deck_audio=captured_not_attached isolated_decks=runtime_capture_available deck_pairs=A:0,1+B:2,3 upgrade_path=attach_deck_pair_audio_parts_when_needed deck_audio_activity=A_silent+B_silent rule=separation_capability_not_outcome]`
+
+The same live frame carried `live_evidence.mix` with
+`deck_audio_capture=A_silent+B_silent`, proving the runtime callback updates
+the capture-activity receipt through the socket path.
+
+The local `rekordbox6/rekordbox3.settings` file also contains external-mixer
+deck output routing evidence. The best current hint is
+`audioDeviceManager_PerformanceMode_1178899479` with
+`audioOutputDeviceName=Aggregate Device`, `MixerMode_Is_Internal=0`,
+`OutputChannel_Deck0_L/R=0/1`, and `OutputChannel_Deck1_L/R=2/3`. Vibemix now
+parses this as a setup hint:
+`rekordbox_deck_routing_hint[... deck_outputs=A:0,1+B:2,3 ...]`. This is
+deliberately not treated as live audio proof; it only says how rekordbox was
+configured to output decks. The runtime can use it when explicitly requested
+with `VIBEMIX_DECK_AUDIO_CHANNELS=auto`, while the default remains disabled
+unless a real deck-capture map is configured.
+
+This proves the app can open and label a configured deck-pair capture. It does
+not yet prove a live DJ transition because the sample was silent and had no
+resolved deck rows or recent controls. The remaining upgrade is not a prompt
+trick; it is a real routed-audio and proof workflow:
+
+1. route rekordbox/driver deck outputs into the configured BlackHole 16ch
+   input pairs;
+2. map device channels to deck lanes from explicit env config or the
+   Rekordbox-settings routing hint (`VIBEMIX_DECK_AUDIO_CHANNELS=auto`);
+3. attach or summarize deck-pair audio only after that mapping is proven;
+4. keep `deck_audio_separation_context` as the capability receipt so Viber and
+   Gemini know whether per-deck audio is real or not.
+
+Official AlphaTheta/rekordbox docs support this distinction: rekordbox audio
+settings expose deck output-channel routing, and external mixer mode can route
+track decks to separate output channels. That is output routing evidence and a
+good upgrade path, but it is not the same thing as Vibemix currently capturing
+isolated deck audio.
 
 ## Local Implementation Map
 
@@ -159,30 +342,46 @@ Implication for Vibemix:
     (`audio/wav`). It is the audience-true global mix, not isolated deck stems.
   - Optional later Parts are separately labeled by the prompt suffix: mic audio
     only when Kaan recently spoke, and lookahead only when explicitly enabled as
-    `NOT YET HEARD BY AUDIENCE`. Those Parts must never be treated as current
-    deck audio.
+    `NOT YET HEARD BY AUDIENCE`. Deck A/B audio Parts are appended only when
+    `VIBEMIX_GEMINI_DECK_AUDIO_PARTS` permits it and the configured deck-pair
+    capture has activity. `auto` is the default, bounded to useful event types
+    such as `MIX_MOVE`; `off` disables it; `always` forces it. The window is
+    bounded by `VIBEMIX_GEMINI_DECK_AUDIO_PART_SECONDS` at 1-6 seconds, default
+    3 seconds. Each deck Part is labeled with activity computed from the same
+    ring-buffer PCM slice encoded as attached audio, e.g.
+    `P2_activity=deckA_active` / `P3_activity=deckB_silent`, so Gemini can
+    treat a captured quiet lane as quiet instead of inferring a hidden blend.
+  - `audio_part_context[...]` now carries the doc-backed
+    `audio_token_rate=32_per_second` plus bounded per-Part estimates such as
+    `P1_tokens_est=192` and `P2_tokens_est=96`.
   - The `AUDIO CONTEXT MAP FOR ATTACHED P1` sits immediately before the audio
     Part description and repeats only bounded live facts:
     `deck_context`, compact `deck_lanes_context`, `deck_source_context`,
-    `mixer_context`, `deck_audio_context`, `audio_window_context`,
-    `move_context`, `deck_change_context`, `move_effect_context`,
-    `live_evidence`, and `claim_policy`.
+    `mixer_context`, `deck_audio_context`, `deck_audio_separation_context`,
+    `deck_audio_features_context`, `deck_audio_delta_context`,
+    `audio_window_context`, `move_context`, `deck_change_context`,
+    `move_effect_context`, `live_evidence`, and `claim_policy`.
   - `audio_window_context[...]` is the "old part / current move / +3s forward"
     contract. It labels P1 as the heard master/global mix with `P1_heard=true`,
     marks the packet as `timeline=past_action_future`, splits P1 into `pre`,
     `current`, and `action` spans, anchors recent user moves by age when
     available, and labels any lookahead Part as `future_heard=false` /
-    `forecast_only_not_audience_evidence`. It also states
-    `deckA_audio=not_attached` and `deckB_audio=not_attached`, so duplicated
-    master audio can never masquerade as clean deck stems. The source/limit
-    fields are intentionally emitted before long `move_anchor` strings so the
-    UI/Viber cap cannot clip away the anti-hallucination contract.
+    `forecast_only_not_audience_evidence`. If no Deck A/B Parts are attached it
+    states `deckA_audio=not_attached` and `deckB_audio=not_attached`, so
+    duplicated master audio can never masquerade as clean deck stems. If Deck
+    A/B Parts are attached, both `audio_window_context[...]` and the structured
+    `audio_window_map` now say `deckA_audio=P2` and `deckB_audio=P3` with
+    `per_deck_audio=deck_pair_parts`; they no longer contradict the attached
+    audio by saying deck audio is `not_attached`. The source/limit fields are
+    intentionally emitted before long `move_anchor` strings so the UI/Viber cap
+    cannot clip away the anti-hallucination contract.
   - The runtime prompt now also carries an explicit `AUDIO PART CONTRACT`:
     `P1=live_global_mix isolated_decks=false
     deck_separation=structured_text_only
     audio_window_context=time_aligned`. The generic Part suffix labels P1 as a
-    global mix rather than isolated deck stems, mic Parts as not deck audio, and
-    lookahead Parts as not current live deck audio.
+    global mix rather than isolated deck stems, mic Parts as not deck audio,
+    lookahead Parts as not current live deck audio, and configured deck-pair
+    Parts as deck-contribution references rather than transition grades.
   - This shape follows the Gemini docs: audio is tokenized at 32 tokens/sec,
     multi-channel audio is combined to mono, and context caching is the cost
     lever for repeated prefixes. Therefore deck separation must come from small
@@ -198,13 +397,15 @@ Implication for Vibemix:
   or candidate-not-verdict.
 - Historical/session understanding: `src/vibemix/runtime/coach.py` logs
   `deck_reference_context`, `deck_source_context`, `deck_audio_context`,
-  `audio_window_context`, `audio_delta`, `move_context`,
-  `deck_change_context`, and `move_effect_context` on move event rows;
-  `src/vibemix/memory/ingest.py` includes those fields in deterministic
-  `coach_line` signatures (`SIG_TEMPLATE_VERSION=v8-coach_line-context-feed`)
+  `deck_audio_separation_context`, `deck_audio_features_context`,
+  `deck_audio_delta_context`, `audio_window_context`, `audio_delta`,
+  `move_context`, `deck_change_context`, and `move_effect_context` on move event
+  rows; `src/vibemix/memory/ingest.py` includes those fields in deterministic
+  `coach_line` signatures (`SIG_TEMPLATE_VERSION=v9-coach_line-deck-audio-context`)
   without doing extraction or another model call. `src/vibemix/memory/retrieval.py`
-  and `src/vibemix/agent/dj_cohost.py` mirror `audio_window=` into recall
-  queries, so "this knob/fader move changed the sound this way" can be compared
+  and `src/vibemix/agent/dj_cohost.py` mirror `audio_window=`,
+  `deck_audio_features=`, and `deck_audio_delta=` into recall queries, so
+  "this knob/fader move changed the sound this way on deck A/B" can be compared
   to past move/effect memories without upgrading the current live claim policy.
   The recall-query cap for `audio_window=` is larger than the generic field cap
   so the safety atoms and the `move_anchor=<move>@-age` both survive.
@@ -272,7 +473,7 @@ Implication for Vibemix:
   atoms. It also preserves the peak bounded `music` master-level scalar as
   global audio-presence evidence; this is not a deck stem, quality verdict, or
   policy upgrade. The UI normalizer also prioritizes `deck_lanes=...` and
-  transition gates under its 8-token cap.
+  transition gates under its 9-token mix cap and 13-token ref cap.
 - Library UI stale-deck clearing: explicit empty `deck_state`, `deck="none"`,
   or disconnected `deck_mixer` payloads are now preserved through normalization
   and treated as authoritative clears in the browser merge. Older deck identity
@@ -297,7 +498,7 @@ Implication for Vibemix:
   readiness uses the same shared validator, so a raw context-poor packet cannot
   satisfy `audio_window_context_seen`.
 - Viber backend evidence sanitizer: the final Python chat backend now uses the
-  same safety-token priority under its 8-token cap and derives missing `mix:...`
+  same safety-token priority under its 9-token mix cap and derives missing `mix:...`
   refs from `live_evidence.mix`, so direct CLI/Tauri payloads cannot lose the
   citable deck-lane or transition-gate atoms at the last prompt boundary.
 - Viber chat-history sanitizer: prior chat turns are bounded before entering
@@ -306,9 +507,11 @@ Implication for Vibemix:
   wording remains dialogue, but older assistant phrases such as "great
   transition" no longer prime a fresh turn beside a single-deck evidence packet.
 - Result-boundary correction hardening: shared Gemini guard code and the Viber
-  chat wrapper now preserve honest self-corrections such as "I can't call that a
-  transition," but do not let a disclaimer smuggle in a fresh unsupported
-  outcome claim such as "but that blend was clean."
+  chat wrapper now keep self-correction/proof language internal. Public Viber
+  copy uses calm product states such as "I'll score it once both decks are
+  locked" instead of exposing "I can't call that a transition"; a disclaimer
+  also cannot smuggle in a fresh unsupported outcome claim such as "but that
+  blend was clean."
 - Viber move-grade artifact hardening: the same live claim policy now gates
   `move_grades` receipts at the backend result boundary. If the current live
   context is blocked, watch-only, candidate-not-verdict, or lacks enough
@@ -374,17 +577,17 @@ Implication for Vibemix:
   preserve `second_deck=independent_source_required` and
   `rule=unresolved_deck_is_not_transition_evidence` across prompt, socket,
   browser, CLI, and memory paths.
-- Result-boundary corrections should name the compact lane evidence when
-  available. If the model says "great transition" from one-deck evidence, the
-  corrected reply now carries a summary such as
+- Result-boundary corrections should keep compact lane evidence in structured
+  diagnostics, not spoken copy. If the model says "great transition" from
+  one-deck evidence, the guard summary carries details such as
   `deck lanes=A=known:dominant / B=unknown:muted` plus
   `deck source=... second_deck=independent_source_required
-  rule=unresolved_deck_is_not_transition_evidence`, so the final answer teaches
-  the same per-deck and source-provenance frame the prompt used.
-- A self-correction is safe only when it actually withdraws the claim. "I can't
-  call that a transition" may pass; "I can't call it a transition, but that
-  blend was clean" must still be corrected because the second clause invents a
-  multi-deck quality verdict.
+  rule=unresolved_deck_is_not_transition_evidence`, while the public reply stays
+  short and calm.
+- A self-correction is diagnostic, not user copy. "I can't call that a
+  transition" is normalized to a calm held-state reply, and "I can't call it a
+  transition, but that blend was clean" is also corrected because the second
+  clause invents a multi-deck quality verdict.
 - The blocked phrase class must generalize beyond `transition`: clean switch,
   clean segue, handoff, bridge, layer, other-deck/incoming-deck, and
   incoming-track-came-in claims are all multi-deck outcome claims unless the
@@ -567,7 +770,7 @@ Structured evidence propagation proof on 2026-05-29:
   passed with 117 tests, and
   `npm --prefix tauri/ui test -- src/library/api.test.ts` passed with 27 tests.
   This locks cross-frame `live_evidence` merging, `deck_lane_evidence_seen` proof
-  gating, safety-evidence priority under the 8-atom cap, and browser-side
+  gating, safety-evidence priority under the 9-atom cap, and browser-side
   preservation of `deck_lanes=...`/`mix:deck_lanes=...`.
 - Library UI live-context merge proof:
   `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/api.test.ts`
@@ -635,7 +838,7 @@ Structured evidence propagation proof on 2026-05-29:
   intact.
 - Shared Gemini/Viber historical-memory sanitizer proof:
   `uv run pytest -q tests/agent/test_dj_cohost.py tests/library/test_codex_curate.py tests/library/test_live_context_cli.py tests/state/test_deck_context.py tests/state/test_coach.py tests/state/test_coach_prompt_diet.py tests/memory/test_ingest.py tests/memory/test_retrieval.py`
-  passed with 254 tests, and Ruff check/format check passed on the touched
+  passed with 256 tests, and Ruff check/format check passed on the touched
   Python files. This proves full Gemini recall prompts, compact diet MIX_MOVE
   recall prompts, and Viber historical move context all omit old attached-stem
   audio-window claims and stale spoken transition verdicts while keeping useful
@@ -655,7 +858,8 @@ Structured evidence propagation proof on 2026-05-29:
   passed with 263 tests, and Ruff check/format check passed. This locks
   `deck_reference=deck1_A_...+deck2_B_...` into shared live evidence, WS
   frames, Viber evidence priority/normalization, and the physical proof gate.
-  The ordering keeps `move_effect=...` inside the 8-item evidence cap by
+  The ordering keeps the deck-audio capture/features/delta receipts inside the
+  9-item evidence cap by
   treating raw `deck_route=...` as lower priority than the plain deck1/deck2
   reference and move-effect signals.
 - Evidence-level deck-source proof:
@@ -761,7 +965,7 @@ Structured evidence propagation proof on 2026-05-29:
   `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
   passed with 44 tests, and `npm --prefix tauri/ui run build` passed. The UI
   normalizer and live-frame merge helper now keep `deck_reference=...` at the
-  same high priority as the Python/Viber/CLI path, so the 8-token cap preserves
+  same high priority as the Python/Viber/CLI path, so the 9-token cap preserves
   the deck1/deck2 reference atom alongside `deck_lanes=...` and transition
   blockers.
 - Explicit live-frame context-map proof:
@@ -1040,11 +1244,26 @@ Current local blocker on 2026-05-29:
   see `nowplaying=blocked_non_deck_owner`,
   `nowplaying_owner=com.apple.webkit.gpu`, and
   `resolution=blocked_non_deck_nowplaying` as diagnostic context without
-  treating them as identity proof. Verification:
+  treating them as identity proof.
+  Follow-up source-resolution expansion adds `library`, `library_tracks`,
+  `library_source`, `library_match`, `second_deck_source`, and `screen_vision`
+  to the same bounded lane. The live proof CLI now surfaces private, content-light
+  blockers for missing/empty library cache, ambiguous title match, blocked
+  browser/media-player Now Playing, controller disconnection, disabled
+  screen-vision, and the independent-source requirement for Deck B. These
+  explain why the system cannot know Deck 1/Deck 2 yet without upgrading the
+  diagnostic into proof.
+  Verification:
   `uv run pytest -q tests/runtime/test_ws_bus_deck_state.py tests/library/test_codex_curate.py tests/state/test_deck_context.py tests/library/test_live_context_cli.py`
   passed with 138 tests;
   `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
   passed with 48 tests; and Ruff passed on the touched Python files.
+  Latest expanded-source verification:
+  `uv run pytest -q tests/state/test_deck_poller.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py`
+  passed with 153 tests; `npm --prefix tauri/ui test -- src/library/api.test.ts`
+  passed with 44 tests; and
+  `uv run ruff check src/vibemix/state/deck_poller.py src/vibemix/state/deck_context.py src/vibemix/runtime/ws_bus.py src/vibemix/library/codex_curate.py src/vibemix/__main__.py tests/state/test_deck_poller.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py`
+  passed.
 - Structured audio-window transport:
   `audio_window_map` now rides beside the existing `audio_window_context[...]`.
   The text packet stays the compact LLM grammar, while the map carries
@@ -1076,10 +1295,14 @@ Current local blocker on 2026-05-29:
 - Structured proof readiness:
   `library live-context --require-proof` now preserves and validates
   `live_context_schema_version=2`, `live_context_capabilities`,
-  `audio_part_context`, `deck_source_status`, and `audio_window_map` before
-  declaring the sampled live packet ready. Missing schema/capabilities or structured lanes produce
-  explicit blockers instead of letting a string-rendered prompt fence look like
-  full proof. The Library UI now preserves the same schema/capability receipt
+  `audio_part_context`, `deck_audio_separation_context`,
+  `deck_source_status`, `audio_window_map`, configured deck-pair capture,
+  deck-audio capture/features/delta context and evidence, and at least one
+  active deck audio lane before declaring the sampled live packet ready.
+  Missing schema/capabilities, structured lanes, or capture activity produce
+  explicit blockers instead of
+  letting a string-rendered prompt fence look like full proof. The Library UI
+  now preserves the same schema/capability receipt
   through `normalizeLiveContextPayload` and into `libraryChat`, so a Viber chat
   turn can see whether the live context came from a schema-v2 socket. The
   prompt renderer also emits `live_context_transport[schema=2 capabilities=...
@@ -1088,8 +1311,8 @@ Current local blocker on 2026-05-29:
   proof is missing, the latest local sampler writes
   `.planning/research/live-context-latest-proof.json` with
   `readiness.diagnosis=live_socket_missing`, `frames_seen=0`, and missing
-  capabilities including `audio_part_context`.
-  data is absent or incomplete, the same prompt line renders
+  capabilities including `audio_part_context`. When transport data is absent or
+  incomplete, the same prompt line renders
   `status=stale_or_pre_schema_v2` plus missing capabilities, and active live
   questions instruct Viber not to give transition or move-outcome verdicts until
   the live session is restarted/resampled.
@@ -1188,14 +1411,15 @@ Current local blocker on 2026-05-29:
   `uv run pytest -q tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/runtime/test_ws_bus_deck_state.py tests/state/test_deck_context.py`
   passed with 151 tests; Ruff passed on `src/vibemix/__main__.py`,
   `src/vibemix/library/codex_curate.py`, and `tests/library/test_live_context_cli.py`.
-- Viber live-proof receipt in the shipped chat path:
+- Viber live-read receipt in the shipped chat path:
   the verifier is now attached to real `library chat` results whenever live
   context is present. `CodexChatResult.to_dict()` carries a bounded
   `live_verification` packet with final reply pass/fail, claim policy,
   transport freshness, move-grade allowance, and internal guard/correction
-  diagnostics. The Library UI normalizes that packet into a `live proof` row in
-  the chat side rack, with calm states such as `not armed`, `needs proof`,
-  `verdict held`, and `checked`. Raw internal labels such as
+  diagnostics. The Library UI normalizes that packet into a `live read` row in
+  the chat side rack, with calm states such as `waiting`, `listening`,
+  `live move checked`, `setup noted`, `grounded`, and `checked`.
+  Raw internal labels such as
   `live_reply_verify`, `guard`, `live_context_required`, and
   `unsupported_live_outcome_claim` are not rendered in the user-facing chrome.
   This gives the DJ a visible proof receipt without exposing private model
@@ -1215,10 +1439,11 @@ Current local blocker on 2026-05-29:
   resulting product requirement is clear: if no live packet is attached, an
   active live/deck/move question must not fall through to a normal model turn.
   `chat_with_codex` now returns before spawning Codex for that case. The spoken
-  answer stays short (`Live proof is not armed...`), while structured detail
+  answer stays short (`Start live monitoring first, then I'll read that
+  transition from the decks.`), while structured detail
   stays in the JSON/CLI receipt (`transport_status=missing_live_context`,
   `claim_policy=requires_more_evidence`, `move_grades_allowed=false`). The
-  Library UI maps the stop/tool detail to `live proof` and `live proof needed`
+  Library UI maps the stop/tool detail to `live read` and `live read waiting`
   rather than showing raw `live_context_required` text to the DJ.
   Verification:
   `uv run python -m vibemix library chat 'was that transition good?' --json`
@@ -1231,17 +1456,21 @@ Current local blocker on 2026-05-29:
   passed with 3 tests; and Ruff passed on
   `src/vibemix/library/codex_curate.py` plus
   `tests/library/test_codex_curate.py`.
-- Viber idle proof visibility:
-  the chat side rack now renders a calm live-proof status row before the user
-  asks. It shows `not armed`, `partial`, or `armed` based on the same schema-v2,
-  deck lane/reference, source/provenance, audio-window, and transition-gate
-  fields sent to Viber. When context is present, the row includes the deck
+- Viber idle live-read visibility:
+  the chat side rack now renders a calm live-read status row before the user
+  asks. It shows `waiting`, `partial`, or `armed` based on the same schema-v2,
+  deck lane/reference, source/provenance, audio-window, transition-gate,
+  configured deck-pair capture, `deck_audio_capture=...`,
+  `deck_audio_features=...`, and `deck_audio_delta=...` receipts sent to Viber.
+  A global-mix/stereo-only packet can show `partial`, but cannot show `armed`;
+  a packet with feature/delta context but missing those evidence receipts also
+  stays `partial`. When context is present, the row includes the deck
   reference summary (`deck1 A=known:dominant / deck2 B=unknown:present`) so the
   operator can see whether Viber has deck1/deck2 footing without reading a long
   explanation. This is UI chrome, not spoken Viber copy, and it deliberately
   avoids raw guard/violation/stop labels. Verification:
   `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/api.test.ts`
-  passed with 53 tests, and `npm --prefix tauri/ui run build` passed. The build
+  passed with 59 tests, and `npm --prefix tauri/ui run build` passed. The build
   also required preserving and adjusting an existing shell `GroundingPanel.ts`
   iterator change with `Array.from(...)`.
 - Viber tool-trace visibility / black-box wait fix:
@@ -1258,19 +1487,530 @@ Current local blocker on 2026-05-29:
   `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/api.test.ts`
   passed with 48 tests; and Ruff passed on the touched Python trace files.
 - Socket-running proof and public-copy cleanup:
-  a live `uv run python -m vibemix` session was started and sampled with
+  a live `uv run python -m vibemix` session was first started with
+  `VIBEMIX_INPUT_DEVICE='BlackHole 16ch'` and
+  `VIBEMIX_DECK_AUDIO_CHANNELS='A=0,1;B=2,3'`. That controlled boot proved the
+  runtime can open and label a configured deck-pair capture: the socket emitted
+  `mode=deck_pair_capture_configured`, `deckA_audio=captured`,
+  `deckB_audio=captured`, `deck_pairs=A:0,1+B:2,3`, and
+  `deck_audio_capture=A_silent+B_silent`. It did not prove a live DJ transition
+  because the capture was silent and had no resolved deck rows, recent controls,
+  master audio, `audio_delta`, or per-deck feature/delta activity to evaluate.
+
+  The current `.planning/research/live-context-latest-proof.json` was then
+  refreshed from the already-running socket on `127.0.0.1:8765` with
   `uv run python -m vibemix library live-context --wait-ready 3 --interval 1 --json --out .planning/research/live-context-latest-proof.json`.
-  The sampler reached the real socket (`frames_seen=63`,
-  `flat_deck_frame_seen=true`, `session_snapshot_seen=true`), saw schema v2
-  with `missing_capabilities=[]`, and confirmed `audio_part_context_seen=true`.
-  Readiness stayed false for physical reasons only: no resolved/citable deck
-  row, no recent control move, no audible master audio, and no bounded
-  `audio_delta`. The runtime was then stopped cleanly. In the same pass, the
-  visible live-claim correction text was changed from diagnostic self-correction
-  prose to short product copy such as `Live proof is incomplete, so the
-  transition verdict is held for now.` Detailed lane/source/provenance reasons
-  remain in structured guard summaries and `live_verification`, not in the
-  spoken/chat reply. Verification:
-  `uv run pytest -q tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_codex_curate.py tests/library/test_live_context_cli.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py tests/agent/test_dj_cohost_linter.py`
-  passed with 219 tests, `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
-  passed with 53 tests, and Ruff passed on the edited guard/copy files.
+  That sample reached schema v2 with `missing_capabilities=[]`,
+  `audio_part_context_seen=true`, and
+  `deck_audio_separation_context_seen=true`, but the sampled separation packet
+  says `requested_device=BlackHole_2ch`, `capture_device=BlackHole_16ch`,
+  `input_channels=16`, `opened_channels=2`, and
+  `mode=multichannel_device_available_but_runtime_opened_stereo`. The stricter
+  readiness gate therefore keeps `diagnosis=missing_physical_proof` with the
+  new blockers `deck_pair_capture_configured=false`, no deck audio
+  capture/features/delta evidence, and no active deck audio lane, alongside the
+  older physical
+  blockers: no resolved/citable deck row, no recent control move, no audible
+  master audio, and no bounded `audio_delta`.
+
+  In the same pass, the visible live-claim correction text was changed from
+  diagnostic correction prose to short product copy such as
+  `I caught the live move. The useful note is the sound change right there.`
+  Detailed lane/source/provenance reasons remain in structured guard summaries,
+  logs, and `live_verification`, not in the spoken/chat reply. New visible copy
+  should not apologize, confess internal stupidity, or expose guard/debug
+  labels; the public state is calm (`waiting`, `listening`, `live move checked`,
+  `setup noted`, `grounded`) while diagnostics stay in artifacts.
+  Follow-up hardening extends that rule to pure diagnostic/proof labels even
+  when there is no explicit "great transition" phrase: public replies containing
+  `resolved decks=...`, `live evidence gate:...`, `transition_block=...`,
+  `claim_policy=...`, `guard_violations`, or similar proof/debug tokens are
+  normalized at the Viber result boundary. If the DJ asked for a library/crate
+  task and the model accidentally talks about a live transition anyway, Viber now
+  replaces that stray live claim with the grounded library result instead of
+  showing the hallucinated live verdict. Latest follow-up also catches softer
+  self-confession/self-diagnosis forms: "my bad on the live read", "I was
+  wrong", "I messed up", "I shouldn't have called that", "that was dumb", and
+  "I overclaimed" all normalize to calm public copy while details stay in
+  `live_verification`.
+  Verification:
+  `uv run pytest -q tests/audio/test_deck_capture.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py tests/agent/test_dj_cohost_linter.py tests/library/test_codex_curate.py tests/library/test_live_context_cli.py tests/test_main_smoke.py`
+  passed with 256 tests, `uv run pytest -q tests/library/test_codex_curate.py tests/library/test_live_context_cli.py`
+  passed with 98 tests, `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/api.test.ts`
+  passed with 56 tests, Ruff passed on the edited Python files, and
+  `git diff --check` passed.
+  Latest focused verification for the public-diagnostic hardening:
+  `uv run pytest -q tests/library/test_codex_curate.py tests/library/test_live_context_cli.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py`
+  passed with 189 tests; `uv run ruff check src/vibemix/library/codex_curate.py tests/library/test_codex_curate.py tests/library/test_live_context_cli.py`
+  passed; and `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/api.test.ts`
+  passed with 66 tests.
+  Latest self-diagnosis variant verification:
+  `uv run pytest -q tests/library/test_codex_curate.py::test_chat_with_codex_normalizes_public_live_self_confession tests/library/test_codex_curate.py::test_chat_with_codex_normalizes_public_live_self_diagnosis_variants tests/library/test_codex_curate.py::test_chat_with_codex_normalizes_public_live_diagnostics_without_transition_claim tests/library/test_live_context_cli.py::test_cmd_library_verify_live_reply_rejects_public_debug_labels`
+  passed with 7 tests; `uv run pytest -q tests/library/test_codex_curate.py tests/library/test_live_context_cli.py`
+  passed with 118 tests; `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/api.test.ts`
+  passed with 72 tests; and `uv run ruff check src/vibemix/library/codex_curate.py tests/library/test_codex_curate.py`
+  passed.
+- Per-deck feature-delta context:
+  `DeckAudioCapture` now tracks latest per-deck feature descriptors and
+  bounded deltas, the socket/Viber/Gemini/UI paths carry
+  `deck_audio_features_context[...]` and `deck_audio_delta_context[...]`, and
+  `live_evidence.mix` is bounded at nine atoms so
+  `deck_audio_capture`, `deck_audio_features`, and `deck_audio_delta` survive
+  together. Refs are bounded at thirteen atoms so four MIDI refs plus nine mix
+  refs can coexist. Verification:
+  `uv run ruff check src/vibemix/audio/deck_capture.py src/vibemix/state/deck_context.py src/vibemix/runtime/ws_bus.py src/vibemix/__main__.py src/vibemix/library/codex_curate.py src/vibemix/agent/dj_cohost.py tests/audio/test_deck_capture.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/agent/test_dj_cohost.py`
+  passed;
+  `uv run pytest -q tests/audio/test_deck_capture.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py`
+  passed with 222 tests;
+  `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
+  passed with 59 tests;
+  `npm --prefix tauri/ui run build` passed; and `git diff --check` passed.
+- Historical deck-audio memory context:
+  session event rows, deterministic memory signatures, raw memory retrieval,
+  and Gemini recall query context now preserve deck-audio separation/features
+  and per-deck deltas as text fields. The memory signature version is
+  `v9-coach_line-deck-audio-context`, and the memory package still passes the
+  no-live-path / no-generation gates. Verification:
+  `uv run ruff check src/vibemix/runtime/coach.py src/vibemix/__main__.py src/vibemix/memory/ingest.py src/vibemix/memory/retrieval.py src/vibemix/agent/dj_cohost.py tests/runtime/test_coach.py tests/memory/test_ingest.py tests/memory/test_retrieval.py tests/agent/test_dj_cohost.py`
+  passed; and
+  `uv run pytest -q tests/memory/test_ingest.py tests/memory/test_retrieval.py tests/memory/test_no_live_path_import.py tests/memory/test_no_extraction.py tests/runtime/test_coach.py tests/agent/test_dj_cohost.py tests/library/test_codex_curate.py tests/library/test_live_context_cli.py`
+  passed with 179 tests.
+- Gemini Deck A/B Part window alignment:
+  when optional Deck A/B audio Parts are attached, the audio Part label,
+  `audio_window_context[...]`, and structured `audio_window_map` now agree on
+  the same P2/P3 deck references and 3s span. The context also carries
+  `audio_token_rate=32_per_second` plus bounded token estimates, matching the
+  official Gemini audio-token docs. Verification:
+  `uv run pytest -q tests/audio/test_deck_capture.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py`
+  passed with 228 tests; Ruff passed on the touched Python/test files; and
+  `git diff --check` passed.
+- Rekordbox deck-output routing hint:
+  `deck_capture` now parses local `rekordbox3.settings` `DEVICESETUP`
+  entries and can use the best external-mixer Deck A/B output pair when
+  `VIBEMIX_DECK_AUDIO_CHANNELS=auto` is explicitly set. On this machine the
+  current hint is `Deck A=0,1 / Deck B=2,3` from the Aggregate Device entry.
+  The same hint can appear in `deck_audio_separation_context[...]` as
+  `routing_hint=rekordbox_settings_A:0+1+B:2+3`, fenced by
+  `routing_hint_rule=output_routing_not_live_audio_proof`. The proof command's
+  `source_status` also reports the same `rekordbox_deck_routing_hint`, so a
+  missing-live-socket artifact still tells the operator that Vibemix found a
+  likely Deck A/B output route while keeping the live proof blockers intact.
+  Verification is included in the 228-test slice above, plus a local
+  `library live-context --json --timeout 0.2 --frames 1` sample showed the
+  hint in `source_status` with `readiness.diagnosis=live_socket_missing`.
+- Deck-audio-rich one-deck verifier guard:
+  `verify-live-reply` now has a regression for a readiness-ready live packet
+  containing configured deck-pair capture, active/silent deck capture evidence,
+  per-deck features, per-deck deltas, and a positive move grade, but only one
+  resolved deck identity. The deterministic verifier still reports
+  `claim_policy=blocked`, rejects "great transition / incoming deck landed"
+  language, and rejects move grades as unsupported. Verification:
+  `uv run pytest -q tests/library/test_live_context_cli.py::test_cmd_library_verify_live_reply_rejects_deck_audio_rich_single_deck_transition tests/library/test_live_context_cli.py::test_cmd_library_verify_live_reply_rejects_unsupported_transition_claim`
+  passed with 2 tests; and
+  `uv run pytest -q tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py`
+  passed with 170 tests.
+- Current live proof artifact:
+  `VIBEMIX_INPUT_DEVICE='BlackHole 16ch' VIBEMIX_DECK_AUDIO_CHANNELS=auto uv run python -m vibemix`
+  was booted from this tree, then
+  `uv run python -m vibemix library live-context --wait-ready 3 --interval 1 --json --out .planning/research/live-context-latest-proof.json`
+  was run while the live runtime was started from this tree with
+  `VIBEMIX_INPUT_DEVICE='BlackHole 16ch'` and
+  `VIBEMIX_DECK_AUDIO_CHANNELS=auto`. Auto used the local Rekordbox settings
+  hint (`A=0,1;B=2,3`) and opened a 4-channel stream. The artifact proves the
+  fresh socket transport: `ok=true`, `frames_seen=62`,
+  `flat_deck_frame_seen=true`, `session_snapshot_seen=true`, schema v2,
+  `missing_capabilities=[]`, configured deck-pair capture,
+  `deck_audio_separation_context[...]`, `deck_audio_features_context[...]`,
+  `audio_part_context[...]`, raw `audio_window_context[...]`, raw
+  `audio_window_map`, `audio_window_context_seen=true`,
+  `audio_window_map_seen=true`, `deck_audio_capture=A_silent+B_silent`, and
+  `deck_audio_features=A_silent_rms_0.000+B_silent_rms_0.000`. The same packet
+  now carries `deck_source_status.controller=present` plus
+  `controller_connection=disconnected`, raw `deck_lanes_context[...]`, raw
+  `deck_reference_context[...]`, raw `deck_source_context[...]`,
+  `deck_lane_context_seen=true`, `deck_reference_context_seen=true`,
+  `deck_source_context_seen=true`, `transition_gate_seen=true`,
+  `deck_lane_evidence_seen=true`, `deck_reference_evidence_seen=true`, and
+  `deck_source_evidence_seen=true` through
+  `deck_lanes=A_unknown_route_unknown+B_unknown_route_unknown`,
+  `deck_reference=deck1_A_unknown_route_unknown+deck2_B_unknown_route_unknown`,
+  and `deck_source=deck1_A_unknown_src_none+deck2_B_unknown_src_none`. That gives
+  Viber/Gemini a citable internal "Deck A/B lanes exist but identity/route are
+  unknown" receipt, while keeping `deck_lane_route_evidence_seen=false` and
+  `deck_reference_route_evidence_seen=false` so unknown routes cannot become a
+  transition verdict. It still exits non-zero because readiness is
+  `missing_physical_proof`: no resolved/citable deck row, no connected
+  controller posture, no recent controller move, no active deck audio lane, no
+  per-deck delta context/evidence, no audible master audio, no bounded
+  `audio_delta`, and no concrete route tiers. Local source diagnostics still
+  found the folder-cache library with 1547 tracks, rekordbox 7 installed, and
+  the live DB read policy disabled.
+  A verifier run against that packet rejected
+  `Great transition, clean handoff.` with `unsupported_live_outcome_claim` and
+  `proof_not_ready`, while keeping `transport_status=fresh_schema_v2`. A second
+  verifier run against a confession-style reply (`I need to correct the live
+  read...`) also returned the calm public replacement
+  `I caught the live move. The useful note is the sound change right there.`
+  The live runtime was stopped after sampling.
+  The runtime socket patch that made this proof possible:
+  configured Deck A/B capture now forces the P1 old/current/future time map
+  even on silent frames, so the advertised `audio_window_context` /
+  `audio_window_map` capability is backed by raw structured packet fields and
+  not only by a rendered preview fallback. Verification:
+  `uv run pytest -q tests/runtime/test_ws_bus_deck_state.py::test_configured_deck_pair_capture_forces_audio_window_on_silent_frame tests/runtime/test_ws_bus_deck_state.py::test_payload_marks_configured_deck_pair_capture tests/library/test_live_context_cli.py::test_viber_live_context_readiness_ignores_untrusted_audio_window_context`
+  passed with 3 tests;
+  `uv run pytest -q tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/state/test_deck_context.py`
+  passed with 183 tests; Ruff passed on the touched runtime/guard/test files;
+  and `git diff --check` passed.
+  Source-status and lane/reference follow-up verification:
+  `uv run pytest -q tests/state/test_deck_poller.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py`
+  passed with 206 tests; Ruff passed on the touched source-status files.
+  `uv run pytest -q tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py`
+  later passed with 186 tests after source-status-only frames gained safe
+  `deck_lanes_context[...]` / `deck_reference_context[...]` and matching
+  unknown-route evidence atoms; Ruff passed on the touched deck-context/runtime
+  files.
+
+- Deck Part audio-window bridge follow-up:
+  the Python Viber normalizer and the Library webview normalizer now accept and
+  preserve Deck A/B audio Part labels in `audio_window_context[...]` and
+  structured `audio_window_map`. The important shape is
+  `deckA_audio=P2`, `deckB_audio=P3`, `per_deck_audio=deck_pair_parts`,
+  `duplicate_audio=separate_deck_pair_parts`, and
+  `deck_audio_separation=deck_audio_separation_context`; the webview also
+  preserves `deck_part_span_s` and `deck_part_activity`. This closes a product
+  bridge gap where Python/Gemini could construct P2/P3 deck Part context, but
+  Viber chat through the Library UI would silently drop the Part-aware
+  `audio_window_map` and fall back to the old not-attached shape.
+  A second webview fix treats `audio_part_context` and
+  `deck_audio_separation_context` as volatile live fields, so a later frame
+  that no longer carries Deck A/B Parts clears stale P2/P3 role labels before a
+  Viber chat turn.
+  Verification:
+  `uv run pytest -q tests/library/test_codex_curate.py::test_chat_prompt_preserves_deck_pair_audio_window_map tests/library/test_codex_curate.py::test_chat_prompt_includes_bounded_live_deck_context_guard`
+  passed with 2 tests;
+  `uv run pytest -q tests/library/test_codex_curate.py tests/library/test_live_context_cli.py`
+  passed with 100 tests;
+  `uv run ruff check src/vibemix/library/codex_curate.py tests/library/test_codex_curate.py`
+  passed;
+  `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
+  passed with 62 tests; `npm --prefix tauri/ui run build` passed;
+  `uv run pytest -q tests/audio/test_deck_capture.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py`
+  passed with 230 tests after the setup-hint regression; and
+  `git diff --check` passed.
+
+- Rekordbox route setup hint:
+  `library live-context --json` now converts a local Rekordbox deck-output
+  routing hint into a concrete `setup_hint` while preserving the proof fence.
+  With the current local settings and no live socket, a sample
+  `uv run python -m vibemix library live-context --json --timeout 0.2 --frames 1`
+  exited non-zero as expected (`readiness.diagnosis=live_socket_missing`) but
+  returned `setup_hint.status=rekordbox_route_hint_found`,
+  `deck_channels=A=0,1;B=2,3`,
+  `recommended_env.VIBEMIX_INPUT_DEVICE=BlackHole 16ch`,
+  `recommended_env.VIBEMIX_DECK_AUDIO_CHANNELS=auto`, and
+  `rule=setup_hint_not_live_audio_proof`. This moves the remaining physical
+  proof from "infer the env from diagnostics" to a direct setup recipe without
+  letting route metadata satisfy live audio proof.
+  Verification:
+  `uv run pytest -q tests/library/test_live_context_cli.py::test_viber_setup_hint_turns_rekordbox_route_hint_into_env tests/library/test_live_context_cli.py::test_cmd_library_live_context_text_failure tests/library/test_live_context_cli.py::test_viber_source_status_reports_ws_port_listener`
+  passed with 3 tests;
+  `uv run pytest -q tests/library/test_live_context_cli.py tests/audio/test_deck_capture.py`
+  passed with 39 tests; and
+  `uv run ruff check src/vibemix/__main__.py tests/library/test_live_context_cli.py`
+  passed.
+
+- Too-narrow capture guard:
+  if `VIBEMIX_DECK_AUDIO_CHANNELS=auto` resolves a Deck A/B route that requires
+  more channels than the selected capture device or opened stream provides, the
+  runtime now fails closed as a setup block. It does not publish a partial
+  A-only deck map. The capture context records
+  `deck_audio_required_opened_channels=4` and either
+  `deck_audio_capture_reason=capture_device_too_few_channels` or
+  `deck_audio_capture_reason=opened_channels_too_few`; the rendered separation
+  packet includes `setup_block=...`, and readiness reports that the deck-pair
+  route hint requires a multichannel capture device/opened channels.
+  Verification:
+  `uv run pytest -q tests/audio/test_deck_capture.py::test_deck_audio_routing_auto_reports_too_narrow_capture_device tests/state/test_deck_context.py::test_deck_audio_separation_context_marks_too_narrow_auto_capture tests/library/test_live_context_cli.py::test_viber_live_context_readiness_names_too_narrow_deck_capture_device`
+  passed with 3 tests;
+  `uv run pytest -q tests/audio/test_deck_capture.py tests/state/test_deck_context.py tests/library/test_live_context_cli.py`
+  passed with 102 tests; and
+  `uv run ruff check src/vibemix/audio/deck_capture.py src/vibemix/state/deck_context.py src/vibemix/__main__.py tests/audio/test_deck_capture.py tests/state/test_deck_context.py tests/library/test_live_context_cli.py`
+  passed.
+
+- Per-deck historical recall gate:
+  `MIX_MOVE` memory recall now accepts either the existing global `audio_delta`
+  or the new per-deck capture delta evidence in
+  `audio_capture_context.deck_audio_deltas`. This preserves the cost gate
+  (`move` plus `sound changed`) while letting the system learn and compare
+  deck-local moves such as "Deck A RMS rose while Deck B fell" even when the
+  global master-delta detector is too coarse to fire. Heartbeats, moves without
+  sound evidence, and no-move events still avoid the embed path.
+  Verification:
+  `uv run pytest -q tests/memory/test_retrieval.py tests/memory/test_ingest.py`
+  passed with 17 tests;
+  `uv run pytest -q tests/memory/test_no_live_path_import.py tests/memory/test_no_extraction.py`
+  passed with 5 tests; and
+  `uv run pytest -q tests/audio/test_deck_capture.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_coach.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py tests/memory/test_retrieval.py tests/memory/test_ingest.py`
+  passed with 265 tests.
+
+- Both-lane active proof gate:
+  readiness now distinguishes "some captured deck audio is active" from "both
+  Deck A and Deck B are active." A configured capture with
+  `deck_audio_capture=A_active+B_silent` remains useful context, but it no
+  longer satisfies the proof-ready state for the full deck-pair hearing goal.
+  The Python proof gate adds `deck_audio_capture_both_active`, and the Library
+  UI live-read badge stays partial with the detail `both decks active` until a
+  `deck_audio_capture=A_active+B_active` receipt appears. This better matches
+  the product claim: "Viber/Gemini can hear each deck," not merely "one
+  captured deck lane is currently making sound."
+  Verification:
+  `uv run pytest -q tests/library/test_live_context_cli.py::test_viber_live_context_readiness_passes_for_deck_controller_audio_evidence tests/library/test_live_context_cli.py::test_viber_live_context_readiness_requires_both_deck_audio_lanes_active`
+  passed with 2 tests;
+  `npm --prefix tauri/ui test -- src/library/chat.test.ts` passed with 26
+  tests; `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
+  passed with 63 tests; and
+  `uv run pytest -q tests/audio/test_deck_capture.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_coach.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py tests/memory/test_retrieval.py tests/memory/test_ingest.py`
+  passed with 266 tests.
+
+- Library live-read UI parity:
+  the webview badge now mirrors the backend proof gate for deck identity and
+  provenance too. It will not show `armed` from deck-pair audio receipts alone;
+  both Deck A and Deck B must have resolved identities, citable `track_id`
+  values, trusted source provenance, and active captured audio. Missing proof is
+  presented as calm live-read status, keeping self-correction/confession
+  language out of the user-facing Viber response.
+  Verification:
+  `npm --prefix tauri/ui test -- src/library/chat.test.ts` passed with 27
+  tests; `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
+  passed with 64 tests; `npm --prefix tauri/ui run build` passed; the focused
+  Python public-reply scrub regressions in `tests/library/test_codex_curate.py`
+  passed with 3 tests; and `git diff --check` passed.
+
+- Gemini attached-audio contract cleanup:
+  the live Gemini prompt no longer says
+  `optional_later_parts_not_current_deck_audio` when Deck A/B audio Parts are
+  actually attached. The audio contract is now conditional:
+  `deck_audio_parts=not_attached` on P1-only turns, and
+  `deck_audio_parts=attached_configured_deck_pair_refs deckA_audio=P2
+  deckB_audio=P3 ... deck_parts_rule=reference_not_quality_verdict` when
+  configured deck-pair Parts ride beside the master mix. This keeps the nearby
+  context aligned with the real `contents` array: P1 is still the audience-truth
+  master/global mix, while P2/P3 are clean deck-reference audio for contribution
+  mapping, not transition scoring by themselves.
+  Follow-up hardening makes this true when other audio Parts are present too:
+  `audio_part_context[...]` now includes `part_order=...`, so a mic Part and/or
+  source-file lookahead can occupy P2/P3 while Deck A/B correctly shift to later
+  labels such as P4/P5. The final `AUDIO PART CONTRACT` now says
+  `deck_separation=deck_pair_parts` when deck Parts are actually attached,
+  instead of the contradictory old `deck_separation=structured_text_only`. The
+  Python and webview audio-part validators now keep the full P1+mic+lookahead+
+  Deck A/B contract under a 1400-char cap, preserving the `rule=...` tail instead
+  of truncating the strongest safety label. The validators now also require a
+  complete, non-conflicting Deck A/B map whenever
+  `per_deck_audio=deck_pair_parts`: both `deckA_part=P...` and `deckB_part=P...`
+  must be present, distinct, listed in `part_order=...`, and each label must map
+  only to its configured deck capture role. A label reused for mic/lookahead or a
+  partial one-deck deck-pair map is dropped before Viber/Gemini sees it. The same
+  distinct-label rule now applies to the time-window sibling too:
+  `audio_window_context[...]` and structured `audio_window_map` reject
+  `deckA_audio=P...` / `deckB_audio=P...` when both sides point at the same Part,
+  so the "old/current/action" map cannot silently collapse both decks onto one
+  audio reference. Renderer-side hardening now mirrors the validator: if an
+  upstream caller passes partial, colliding, or mic/lookahead-conflicting Deck
+  Part labels, `render_audio_part_context(...)`, `render_audio_window_context(...)`,
+  `render_audio_window_map(...)`, and the co-host's final `AUDIO PART CONTRACT`
+  fall back to `deck_audio_parts=not_attached` / `per_deck_audio=structured_text_only`
+  instead of emitting a contradictory deck-pair packet.
+  Verification:
+  `uv run pytest -q tests/agent/test_dj_cohost.py::test_llm_node_03a_fences_cold_p1_audio_with_claim_policy tests/agent/test_dj_cohost.py::test_llm_node_audio_map_reflects_configured_deck_pair_capture tests/agent/test_dj_cohost.py::test_llm_node_attaches_configured_deck_audio_parts_on_mix_move tests/agent/test_dj_cohost.py::test_llm_node_03b_places_deck_audio_map_next_to_audio_part`
+  passed with 4 tests; `uv run pytest -q tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py tests/agent/test_dj_cohost_cache_hit.py`
+  passed with 54 tests; and
+  `uv run ruff check src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost.py`
+  passed.
+  Latest focused verification for the part-order follow-up:
+  `uv run pytest -q tests/state/test_deck_context.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py tests/library/test_codex_curate.py tests/library/test_live_context_cli.py tests/runtime/test_ws_bus_deck_state.py`
+  later passed with 247 tests; `uv run ruff check src/vibemix/agent/dj_cohost.py src/vibemix/state/deck_context.py src/vibemix/library/codex_curate.py tests/agent/test_dj_cohost.py tests/state/test_deck_context.py tests/library/test_codex_curate.py tests/library/test_live_context_cli.py`
+  passed; `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
+  passed with 69 tests; and `npm --prefix tauri/ui run build` passed.
+
+- Supported-verdict proof state:
+  the live claim policy is no longer only a brake. It now has a
+  `supported_verdict` branch that allows transition/blend/handoff scoring only
+  when the current turn has recent move context, citable Deck A and Deck B rows,
+  trusted source provenance, both-active deck-pair audio capture,
+  per-deck feature receipts, deck/global audio-delta evidence, and a two-lane
+  pre/current `deck_audio_window` packet. Weaker two-deck cases still return
+  `candidate_not_verdict`, and one-deck/single-move cases still return `blocked`
+  or `watch_not_claim`. Gemini receives
+  `claim_policy[policy=supported_verdict rule=grounded_verdict_allowed]` in the
+  audio context map when the proof is strong; Viber keeps `move_grades` and a
+  quality reply only under the same strong live-evidence packet.
+  Verification:
+  `uv run pytest -q tests/state/test_deck_context.py::test_live_claim_guard_allows_verdict_with_citable_deck_pair_audio_delta tests/state/test_deck_context.py::test_live_claim_guard_keeps_candidate_when_deck_pair_audio_delta_missing tests/state/test_deck_context.py::test_deck_audio_context_marks_two_deck_route_as_candidate_support`
+  passed with 3 tests;
+  `uv run pytest -q tests/library/test_codex_curate.py::test_chat_with_codex_live_evidence_candidate_blocks_quality_grade tests/library/test_codex_curate.py::test_chat_with_codex_allows_quality_grade_with_strong_deck_pair_proof tests/library/test_codex_curate.py::test_chat_with_codex_corrects_candidate_quality_verdict`
+  passed with 3 tests;
+  `uv run pytest -q tests/agent/test_dj_cohost.py::test_llm_node_attaches_configured_deck_audio_parts_on_mix_move`
+  passed with 1 test;
+  `uv run pytest -q tests/state/test_deck_context.py tests/library/test_codex_curate.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py tests/agent/test_dj_cohost_cache_hit.py`
+  passed with 186 tests; and
+  `uv run ruff check src/vibemix/state/deck_context.py src/vibemix/library/codex_curate.py src/vibemix/agent/dj_cohost.py tests/state/test_deck_context.py tests/library/test_codex_curate.py tests/agent/test_dj_cohost.py`
+  passed.
+
+- Gemini per-turn audio-Part verdict boundary:
+  state-level deck-pair capture can be strong while the current Gemini request
+  still lacks actual Deck A/B audio Parts. The live cohost now treats that as
+  candidate-only for this turn: `_build_attached_audio_context_clause(...)`,
+  `should_defer_live_claim_stream(...)`, and `apply_live_claim_guard(...)` all
+  receive `deck_audio_parts_attached=False` unless the validated Deck A/B labels
+  are present and non-conflicting in the attached `contents` array. This keeps
+  `deck_audio_features_context` and `deck_audio_delta_context` useful as
+  context, while preventing Gemini from seeing or leaking
+  `claim_policy=supported_verdict` on P1-only turns. Public output becomes the
+  calm candidate-held line; the internal reason is
+  `deck_audio_parts_not_attached`.
+  Verification:
+  `uv run pytest -q tests/agent/test_dj_cohost.py::test_llm_node_downgrades_verdict_when_deck_audio_parts_not_attached tests/agent/test_dj_cohost.py::test_llm_node_attaches_configured_deck_audio_parts_on_mix_move tests/state/test_deck_context.py::test_live_claim_guard_requires_attached_deck_audio_parts_when_requested tests/state/test_deck_context.py::test_live_claim_guard_allows_verdict_with_citable_deck_pair_audio_delta`
+  passed with 4 tests; `uv run pytest -q tests/agent/test_dj_cohost.py tests/state/test_deck_context.py`
+  passed with 119 tests; and `uv run pytest -q tests/library/test_codex_curate.py tests/library/test_live_context_cli.py`
+  passed with 113 tests.
+
+- Supported-verdict UI wire:
+  the Library webview now gives the positive proof state a public label instead
+  of falling through to generic `ready`. A `supported_verdict` receipt renders
+  as `scoring grounded`, and when move grades are present and allowed the
+  artifact adds `move scoring grounded by live read`. The raw policy string
+  stays hidden from the user-facing chrome.
+  Verification:
+  `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
+  passed with 66 tests, and `npm --prefix tauri/ui run build` passed.
+
+- Trusted-source hardening for supported verdicts:
+  the state-level `supported_verdict` gate now uses the same trusted deck-source
+  allow-list semantics as the app surface (`rekordbox_xml`, `folder_cache`,
+  `screen_vision`, `numpy_key`, `nowplaying`). Arbitrary non-empty sources no
+  longer unlock scoring merely because they are not `unknown`; they stay
+  `candidate_not_verdict`. The Python Viber/backend and live-proof CLI now read
+  the same shared `DECK_CONTEXT_TRUSTED_SOURCES` constant instead of carrying
+  separate source lists, and the Viber chat regression covers an untrusted Deck
+  B source with otherwise strong Deck A/B audio evidence.
+  Verification:
+  `uv run pytest -q tests/state/test_deck_context.py::test_live_claim_guard_allows_verdict_with_citable_deck_pair_audio_delta tests/state/test_deck_context.py::test_live_claim_guard_requires_trusted_sources_for_supported_verdict tests/state/test_deck_context.py::test_live_claim_guard_keeps_candidate_when_deck_pair_audio_delta_missing`
+  passed with 3 tests;
+  `uv run pytest -q tests/library/test_codex_curate.py::test_chat_with_codex_allows_quality_grade_with_strong_deck_pair_proof tests/library/test_codex_curate.py::test_chat_with_codex_requires_trusted_sources_for_quality_grade tests/state/test_deck_context.py::test_live_claim_guard_requires_trusted_sources_for_supported_verdict`
+  passed with 3 tests;
+  `uv run pytest -q tests/state/test_deck_context.py tests/library/test_codex_curate.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_3part.py tests/agent/test_dj_cohost_cache_hit.py`
+  passed with 188 tests; and
+  `uv run ruff check src/vibemix/state/deck_context.py src/vibemix/library/codex_curate.py src/vibemix/agent/dj_cohost.py src/vibemix/__main__.py tests/state/test_deck_context.py tests/library/test_codex_curate.py tests/agent/test_dj_cohost.py`
+  passed; `git diff --check` passed.
+
+- Rust/Tauri command bridge parity:
+  the `library_chat` argument-shape test now includes
+  `deck_audio_features_context`, `deck_audio_delta_context`, and structured
+  `audio_window_map` in the serialized `--live-context` payload. This proves
+  the desktop command bridge preserves the full live-context packet and does not
+  accidentally pin an older pre-deck-audio contract.
+  Verification:
+  `cargo test --manifest-path tauri/src-tauri/Cargo.toml chat_library_args_preserve_time_aligned_audio_context`
+  passed, and the full `cargo test --manifest-path tauri/src-tauri/Cargo.toml`
+  run passed with 116 tests.
+
+- First-class pre/current deck-audio window receipts:
+  `deck_audio_window_context[...]` is now paired with a compact citable
+  `deck_audio_window=...` live-evidence atom. The atom records each deck lane's
+  pre/current RMS window (`A_active_pre_..._current_...`) without turning that
+  descriptor into a causal or quality verdict. Viber live-readiness, the Library
+  proof badge, and `supported_verdict` all require the receipt alongside
+  deck-pair capture, per-deck features, and per-deck deltas. MIX_MOVE recall can
+  also pass on `deck_audio_windows`, so historical memory learns from the
+  "move plus before/current audio changed" pattern without needing the public AI
+  to confess uncertainty or print raw proof diagnostics.
+  Verification:
+  `uv run pytest -q tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_coach.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/memory/test_retrieval.py`
+  passed with 228 tests;
+  `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/api.test.ts`
+  passed with 72 tests;
+  `uv run ruff check src/vibemix/state/deck_context.py src/vibemix/__main__.py src/vibemix/library/codex_curate.py src/vibemix/memory/retrieval.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_coach.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/memory/test_retrieval.py`
+  passed;
+  `npm --prefix tauri/ui run build` passed; and `git diff --check` passed.
+
+- EvidenceRegistry and prompt-citation parity for deck windows:
+  the 10 Hz `state_refresh_loop` now receives the shared deck capture context and
+  writes `deck_audio_capture=...`, `deck_audio_features=...`,
+  `deck_audio_delta=...`, and `deck_audio_window=...` into the
+  `EvidenceRegistry` through the same `live_mix_evidence_keys(...)` path used by
+  sockets and Viber. `AICoach.build_prompt(...)` also receives the deck capture
+  context, so `grounding_refs[...]` can render `[mix:deck_audio_window=...]` and
+  the live evidence line does not silently drop the per-deck receipt. This closes
+  the gap where the model could see structured deck context but lack a citable
+  registry reference for the exact before/current deck-lane audio.
+  Verification:
+  `uv run pytest -q tests/state/test_refresh.py::test_tick_registers_citable_deck_audio_window_evidence tests/state/test_refresh.py::test_18_02_state_refresh_loop_threads_registry_kwarg tests/state/test_deck_context.py::test_grounding_refs_render_registered_deck_audio_window_receipt tests/state/test_coach.py::test_evidence_line_renders_registered_deck_audio_window_ref tests/agent/test_dj_cohost.py::test_llm_node_audio_map_reflects_configured_deck_pair_capture tests/agent/test_dj_cohost.py::test_llm_node_03b_places_deck_audio_map_next_to_audio_part`
+  passed with 6 tests;
+  `uv run pytest -q tests/agent/test_dj_cohost.py tests/state/test_coach.py tests/state/test_deck_context.py tests/state/test_refresh.py`
+  passed with 242 tests;
+  `uv run pytest -q tests/runtime/test_coach.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py tests/memory/test_retrieval.py tests/test_main_smoke.py`
+  passed with 177 tests;
+  `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/api.test.ts`
+  passed with 72 tests; and focused Ruff checks passed.
+
+- Event-handoff timing for historical move memory:
+  `coach_loop` now attaches the shared `audio_capture_context` to `ev.extra`
+  immediately after detection, before `agent.set_next_event(ev)`. That ordering
+  is important because recall pre-dispatch runs inside `set_next_event`; a
+  MIX_MOVE should decide whether to embed based on the same per-deck windows and
+  deltas that Gemini will later see. The state tracer's live-evidence context
+  also renders with the deck capture context, so diagnostics do not drift from
+  the prompt/socket packet.
+  Verification:
+  `uv run pytest -q tests/runtime/test_coach.py::test_coach_event_log_carries_deck_move_audio_context`
+  passed; `uv run pytest -q tests/runtime/test_coach.py tests/agent/test_dj_cohost.py tests/state/test_coach.py tests/state/test_deck_context.py tests/state/test_refresh.py tests/memory/test_retrieval.py`
+  passed with 268 tests; focused Ruff checks passed; and `git diff --check`
+  passed.
+
+- Last-known deck identity as non-citable context:
+  a deck that was independently resolved earlier in the session can now ride
+  along as `source=last_known` when the controller is still connected and the
+  row is younger than 30 minutes. This is not an identity source and not a
+  transition-proof leg. Its confidence is capped at `0.29`, below the shared
+  resolved-deck floor, and the source-status packet declares
+  `last_known_rule=context_only_not_current_identity_proof`. Viber keeps the
+  label through live-context normalization so the prompt can preserve useful
+  human context, while the supported-verdict gate still requires current,
+  trusted Deck A/B sources plus audio proof. Public chat hygiene was also
+  tightened on both the Viber wrapper and shared Gemini/live-coach guard: if the
+  model emits self-confession, internal guard labels, or "doing something
+  stupid" style live-read language, the result boundary replaces it with calm
+  DJ-facing copy and keeps the reason in diagnostics.
+  Verification:
+  `uv run pytest -q tests/state/test_deck_poller.py tests/state/test_deck_context.py tests/runtime/test_ws_bus_deck_state.py tests/library/test_live_context_cli.py tests/library/test_codex_curate.py`
+  passed with 240 tests;
+  `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
+  passed with 72 tests;
+  focused Ruff checks passed; and `git diff --check` passed.
+
+- Audio Part cost visibility plus move-to-deck-window binding:
+  Gemini's audio context now names the expected token footprint in the same
+  bounded Part contract that labels P1, mic, lookahead, and Deck A/B audio.
+  The estimate uses the documented 32 audio tokens/sec rate; P1, mic,
+  lookahead, and deck-pair Parts each carry `*_tokens_est=...`, and the turn
+  carries `model_audio_tokens_est=...` in the prompt plus `audio_tokens_est` in
+  the `llm_invoke` event. This makes the cost shape inspectable instead of
+  implicit. The cache boundary remains: static persona/rules/profile live in
+  the Gemini context cache, while current audio Parts are short per-turn
+  volatile payload. The move-effect packet now binds deck-pair capture back to
+  the human action: when deck capture supplies deltas/windows, it renders
+  `deck_deltas=A:...+B:...` and
+  `deck_windows=A:active:pre_...:current_...+B:...` next to the recent move.
+  This gives Viber/Gemini the "twist knob -> deck lane audio changed" training
+  shape without claiming the move caused the change or that the transition was
+  good.
+  Verification:
+  `uv run pytest -q tests/state/test_deck_context.py tests/agent/test_dj_cohost.py tests/runtime/test_coach.py tests/library/test_codex_curate.py tests/library/test_live_context_cli.py`
+  passed with 267 tests;
+  `uv run pytest -q tests/audio/test_deck_capture.py tests/agent/test_dj_cohost_3part.py tests/agent/test_dj_cohost_cache_hit.py tests/state/test_coach.py tests/runtime/test_ws_bus_deck_state.py tests/state/test_refresh.py tests/memory/test_ingest.py tests/memory/test_retrieval.py`
+  passed with 173 tests;
+  `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/chat.test.ts`
+  passed with 72 tests;
+  focused Ruff checks passed; and `git diff --check` passed.

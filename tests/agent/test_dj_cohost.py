@@ -15,11 +15,16 @@ import json
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 from google.genai import types
 from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
-from vibemix.agent.dj_cohost import _build_recall_query_context
+from vibemix.agent.dj_cohost import (
+    _build_attached_audio_context_clause,
+    _build_recall_query_context,
+)
+from vibemix.audio import INPUT_SR_TARGET, AudioBuffer
 from vibemix.state import AICoach, Event, MusicState
 from vibemix.state.deck_state import DeckState, DeckTrack
 
@@ -83,7 +88,9 @@ def _deck_track(title: str, *, camelot: str = "8A") -> DeckTrack:
     )
 
 
-def _build_agent(mocker, tmp_path: Path) -> tuple[DJCoHostAgent, Any, _FakeRecorder, MusicState]:
+def _build_agent(
+    mocker, tmp_path: Path, **agent_kwargs
+) -> tuple[DJCoHostAgent, Any, _FakeRecorder, MusicState]:
     """Construct a DJCoHostAgent with the parent ``Agent.__init__`` mocked
     and a fake recorder pointing at tmp_path."""
     mocker.patch.object(Agent, "__init__", return_value=None)
@@ -99,6 +106,7 @@ def _build_agent(mocker, tmp_path: Path) -> tuple[DJCoHostAgent, Any, _FakeRecor
         recorder=recorder,
         llm_inst=mocker.MagicMock(),
         tts_inst=mocker.MagicMock(),
+        **agent_kwargs,
     )
     return agent, genai_client, recorder, state
 
@@ -313,10 +321,413 @@ def test_llm_node_03a_fences_cold_p1_audio_with_claim_policy(mocker, tmp_path) -
     assert "deckA_audio=not_attached" in prompt_text
     assert "deckB_audio=not_attached" in prompt_text
     assert "lane_aliases=deck1:A,deck2:B" in prompt_text
+
+
+def test_llm_node_audio_map_reflects_configured_deck_pair_capture(mocker, tmp_path) -> None:
+    audio_capture_context = {
+        "requested_device": "BlackHole 16ch",
+        "device_name": "BlackHole 16ch",
+        "input_channels": 16,
+        "opened_channels": 4,
+        "sample_rate": 48000,
+        "master_channels": "0,1,2,3",
+        "deck_channels": {"A": "0,1", "B": "2,3"},
+        "deck_audio_capture_enabled": True,
+    }
+    agent, gen_client, _, state = _build_agent(
+        mocker,
+        tmp_path,
+        audio_capture_context=audio_capture_context,
+    )
+    audio_capture_context["deck_audio_rms"] = {"A": 0.02, "B": 0.0}
+    audio_capture_context["deck_audio_features"] = {
+        "A": {"activity": "active", "rms": 0.02, "peak": 0.1, "zcr": 0.03},
+        "B": {"activity": "silent", "rms": 0.0, "peak": 0.0, "zcr": 0.0},
+    }
+    audio_capture_context["deck_audio_deltas"] = {
+        "A": ["rms_rose_100pct_strong"],
+        "B": ["rms_fell_50pct_strong"],
+    }
+    audio_capture_context["deck_audio_windows"] = {
+        "pre_s": [-6.0, -1.0],
+        "current_s": [-1.0, 0.0],
+        "A": {
+            "pre": {"activity": "active", "rms": 0.02, "peak": 0.1, "flux": 0.004},
+            "current": {"activity": "active", "rms": 0.04, "peak": 0.12, "flux": 0.009},
+            "delta": ["rms_rose_100pct_strong"],
+        },
+        "B": {
+            "pre": {"activity": "active", "rms": 0.03, "peak": 0.11, "flux": 0.006},
+            "current": {"activity": "silent", "rms": 0.0, "peak": 0.0, "flux": 0.001},
+            "delta": ["rms_fell_50pct_strong"],
+        },
+    }
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: multichannel")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    agent.set_next_event(Event(type="HEARTBEAT", state=state, extra={}))
+    _drive_llm_node(agent)
+
+    assert AICoach.build_prompt.call_args.kwargs["audio_capture_context"] is audio_capture_context
+    contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
+    prompt_text = contents[0]
+    assert "deck_audio_separation_context[" in prompt_text
+    assert "mode=deck_pair_capture_configured" in prompt_text
+    assert "deckA_audio=captured" in prompt_text
+    assert "deckB_audio=captured" in prompt_text
+    assert "per_deck_audio=captured_not_attached" in prompt_text
+    assert "deck_audio_activity=A_active+B_silent" in prompt_text
+    assert "deck_audio_features_context[" in prompt_text
+    assert "A_activity=active" in prompt_text
+    assert "B_activity=silent" in prompt_text
+    assert "deck_audio_delta_context[" in prompt_text
+    assert "A_delta=rms_rose_100pct_strong" in prompt_text
+    assert "deck_audio_window_context[" in prompt_text
+    assert "timeline=pre_action_current" in prompt_text
+    assert "A_current=active_rms_0.040" in prompt_text
+    assert "deck_audio_capture=A_active+B_silent" in prompt_text
+    assert "deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000" in prompt_text
+    assert "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong" in prompt_text
+    assert (
+        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_silent_pre_0.030_current_0.000"
+        in prompt_text
+    )
     assert "claim_policy[policy=requires_more_evidence" in prompt_text
     assert "rule=multi_deck_outcome_requires_live_support" in prompt_text
     assert "AUDIO PART CONTRACT: P1=live_global_mix isolated_decks=false" in prompt_text
+    assert "deck_audio_parts=not_attached" in prompt_text
+    assert "optional_later_parts_not_current_deck_audio" not in prompt_text
     assert "global mix, not isolated deck stems" in prompt_text
+
+
+def test_llm_node_downgrades_verdict_when_deck_audio_parts_not_attached(
+    mocker, tmp_path
+) -> None:
+    audio_capture_context = {
+        "requested_device": "BlackHole 16ch",
+        "device_name": "BlackHole 16ch",
+        "input_channels": 16,
+        "opened_channels": 4,
+        "sample_rate": 48000,
+        "master_channels": "0,1,2,3",
+        "deck_channels": {"A": "0,1", "B": "2,3"},
+        "deck_audio_capture_enabled": True,
+        "deck_audio_rms": {"A": 0.04, "B": 0.04},
+        "deck_audio_features": {
+            "A": {"activity": "active", "rms": 0.04, "peak": 0.2, "zcr": 0.03},
+            "B": {"activity": "active", "rms": 0.04, "peak": 0.18, "zcr": 0.04},
+        },
+        "deck_audio_deltas": {
+            "A": ["rms_rose_60pct_strong"],
+            "B": ["rms_rose_40pct_strong"],
+        },
+        "deck_audio_windows": {
+            "A": {
+                "pre": {"activity": "active", "rms": 0.025, "peak": 0.12},
+                "current": {"activity": "active", "rms": 0.04, "peak": 0.2},
+                "delta": ["rms_rose_60pct_strong"],
+            },
+            "B": {
+                "pre": {"activity": "active", "rms": 0.028, "peak": 0.13},
+                "current": {"activity": "active", "rms": 0.04, "peak": 0.18},
+                "delta": ["rms_rose_40pct_strong"],
+            },
+        },
+    }
+    agent, gen_client, recorder, state = _build_agent(
+        mocker,
+        tmp_path,
+        audio_capture_context=audio_capture_context,
+        deck_audio_parts_mode="auto",
+    )
+    state.audible_deck = "mix"
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_state = DeckState(
+        decks={"A": _deck_track("Deck Left"), "B": _deck_track("Deck Right", camelot="9A")}
+    )
+
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"RIFFMASTER")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: no deck parts")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["Great transition, that blend was clean."])
+    )
+
+    agent.set_next_event(Event(type="MIX_MOVE", state=state, extra={"moves": ["xfader→center"]}))
+    chunks = _drive_llm_node(agent)
+
+    contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
+    prompt_text = contents[0]
+    heard = "".join(chunks)
+    guard_events = [fields for kind, fields in recorder.events if kind == "live_claim_guard"]
+    assert len(contents) == 2
+    assert "claim_policy[policy=candidate_not_verdict" in prompt_text
+    assert "reason=deck_audio_parts_not_attached" in prompt_text
+    assert "rule=candidate_not_quality_verdict" in prompt_text
+    assert "claim_policy[policy=supported_verdict" not in prompt_text
+    assert "deck_audio_parts=not_attached" in prompt_text
+    assert "Great transition" not in heard
+    assert "transition setup" in heard
+    assert guard_events
+    assert guard_events[-1]["reason"] == "deck_audio_parts_not_attached"
+    assert "Great transition" in guard_events[-1]["raw_text"]
+    assert "Great transition" not in guard_events[-1]["corrected_text"]
+
+
+def test_llm_node_live_claim_guard_uses_event_audio_capture_context(mocker, tmp_path) -> None:
+    audio_capture_context = {
+        "deck_channels": {"A": "0,1", "B": "2,3"},
+        "deck_audio_capture_enabled": True,
+        "deck_audio_rms": {"A": 0.04, "B": 0.04},
+        "deck_audio_features": {
+            "A": {"activity": "active", "rms": 0.04, "peak": 0.2, "zcr": 0.03},
+            "B": {"activity": "active", "rms": 0.04, "peak": 0.18, "zcr": 0.04},
+        },
+        "deck_audio_deltas": {
+            "A": ["rms_rose_60pct_strong"],
+            "B": ["rms_rose_40pct_strong"],
+        },
+        "deck_audio_windows": {
+            "A": {
+                "pre": {"activity": "active", "rms": 0.025, "peak": 0.12},
+                "current": {"activity": "active", "rms": 0.04, "peak": 0.2},
+                "delta": ["rms_rose_60pct_strong"],
+            },
+            "B": {
+                "pre": {"activity": "active", "rms": 0.028, "peak": 0.13},
+                "current": {"activity": "active", "rms": 0.04, "peak": 0.18},
+                "delta": ["rms_rose_40pct_strong"],
+            },
+        },
+    }
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    state.audible_deck = "mix"
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_state = DeckState(
+        decks={"A": _deck_track("Deck Left"), "B": _deck_track("Deck Right", camelot="9A")}
+    )
+
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"RIFFMASTER")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: event capture")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["Great transition, that blend was clean."])
+    )
+
+    agent.set_next_event(
+        Event(
+            type="MIX_MOVE",
+            state=state,
+            extra={"moves": ["xfader→center"], "audio_capture_context": audio_capture_context},
+        )
+    )
+    chunks = _drive_llm_node(agent)
+
+    assert AICoach.build_prompt.call_args.kwargs["audio_capture_context"] is audio_capture_context
+    guard_events = [fields for kind, fields in recorder.events if kind == "live_claim_guard"]
+    assert "Great transition" not in "".join(chunks)
+    assert "transition setup" in "".join(chunks)
+    assert guard_events
+    assert guard_events[-1]["reason"] == "deck_audio_parts_not_attached"
+
+
+def test_llm_node_attaches_configured_deck_audio_parts_on_mix_move(mocker, tmp_path) -> None:
+    deck_a = AudioBuffer(seconds=4.0, sr=INPUT_SR_TARGET)
+    deck_b = AudioBuffer(seconds=4.0, sr=INPUT_SR_TARGET)
+    samples = int(INPUT_SR_TARGET * 3.0)
+    deck_a.push(np.full(samples, 1200, dtype=np.int16))
+    deck_b.push(np.full(samples, 900, dtype=np.int16))
+    audio_capture_context = {
+        "requested_device": "BlackHole 16ch",
+        "device_name": "BlackHole 16ch",
+        "input_channels": 16,
+        "opened_channels": 4,
+        "sample_rate": 48000,
+        "master_channels": "0,1,2,3",
+        "deck_channels": {"A": "0,1", "B": "2,3"},
+        "deck_audio_capture_enabled": True,
+        "deck_audio_rms": {"A": 0.04, "B": 0.04},
+        "deck_audio_features": {
+            "A": {"activity": "active", "rms": 0.04, "peak": 0.2, "zcr": 0.03},
+            "B": {"activity": "active", "rms": 0.04, "peak": 0.18, "zcr": 0.04},
+        },
+        "deck_audio_deltas": {
+            "A": ["rms_rose_60pct_strong"],
+            "B": ["rms_rose_40pct_strong"],
+        },
+        "deck_audio_windows": {
+            "A": {
+                "pre": {"activity": "active", "rms": 0.025, "peak": 0.12},
+                "current": {"activity": "active", "rms": 0.04, "peak": 0.2},
+                "delta": ["rms_rose_60pct_strong"],
+            },
+            "B": {
+                "pre": {"activity": "active", "rms": 0.028, "peak": 0.13},
+                "current": {"activity": "active", "rms": 0.04, "peak": 0.18},
+                "delta": ["rms_rose_40pct_strong"],
+            },
+        },
+    }
+    agent, gen_client, recorder, state = _build_agent(
+        mocker,
+        tmp_path,
+        audio_capture_context=audio_capture_context,
+        deck_audio_buffers={"A": deck_a, "B": deck_b},
+        deck_audio_parts_mode="auto",
+        deck_audio_part_seconds=3.0,
+    )
+    state.audible_deck = "mix"
+    state.deck_state = DeckState(
+        decks={"A": _deck_track("Deck Left"), "B": _deck_track("Deck Right", camelot="9A")}
+    )
+
+    def _pcm_to_wav(pcm, sample_rate, *args, **kwargs):
+        peak = int(np.abs(pcm).max()) if pcm.size else 0
+        if peak == 1200:
+            return b"RIFFDECKA"
+        if peak == 900:
+            return b"RIFFDECKB"
+        return b"RIFFUNKNOWN"
+
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"RIFFMASTER")
+    pcm_to_wav = mocker.patch("vibemix.agent.dj_cohost.pcm_to_wav", side_effect=_pcm_to_wav)
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: deck parts")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    agent.set_next_event(Event(type="MIX_MOVE", state=state, extra={"moves": ["xfader→center"]}))
+    _drive_llm_node(agent)
+
+    contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
+    prompt_text = contents[0]
+    audio_part_line = next(
+        line for line in prompt_text.splitlines() if line.startswith("audio_part_context[")
+    )
+    audio_window_line = next(
+        line for line in prompt_text.splitlines() if line.startswith("audio_window_context[")
+    )
+    audio_window_map_line = next(
+        line for line in prompt_text.splitlines() if line.startswith("audio_window_map[")
+    )
+    assert len(contents) == 4
+    assert contents[1].inline_data.data == b"RIFFMASTER"
+    assert contents[2].inline_data.data == b"RIFFDECKA"
+    assert contents[3].inline_data.data == b"RIFFDECKB"
+    assert pcm_to_wav.call_count == 2
+    assert "Additional attached deck audio:" in prompt_text
+    assert "P2 = captured Deck A audio (active)" in prompt_text
+    assert "P3 = captured Deck B audio (active)" in prompt_text
+    assert "P1 remains the audience-truth master mix" in prompt_text
+    assert "claim_policy[policy=supported_verdict" in prompt_text
+    assert "rule=grounded_verdict_allowed" in prompt_text
+    assert "deck_audio_parts=attached_configured_deck_pair_refs" in prompt_text
+    assert "part_order=P1,P2,P3" in prompt_text
+    assert "model_audio_tokens_est=384" in prompt_text
+    assert "deckA_audio=P2" in prompt_text
+    assert "deckB_audio=P3" in prompt_text
+    assert "deckA_activity=active" in prompt_text
+    assert "deckB_activity=active" in prompt_text
+    assert "deck_parts_rule=reference_not_quality_verdict" in prompt_text
+    assert "deck_separation=deck_pair_parts" in prompt_text
+    assert "optional_later_parts_not_current_deck_audio" not in prompt_text
+    assert "per_deck_audio=deck_pair_parts" in audio_part_line
+    assert "duplicate_audio=separate_deck_pair_parts" in audio_part_line
+    assert "deckA_part=P2" in audio_part_line
+    assert "deckB_part=P3" in audio_part_line
+    assert "P2=deckA_configured_capture" in audio_part_line
+    assert "P3=deckB_configured_capture" in audio_part_line
+    assert "P2_activity=deckA_active" in audio_part_line
+    assert "P3_activity=deckB_active" in audio_part_line
+    assert "P2_rule=deck_pair_capture_reference_not_quality_verdict" in audio_part_line
+    assert "deckA_audio=P2" in audio_window_line
+    assert "deckB_audio=P3" in audio_window_line
+    assert "per_deck_audio=deck_pair_parts" in audio_window_line
+    assert "deck_audio_separation=deck_audio_separation_context" in audio_window_line
+    assert "deck_part_span=-3.0..0.0" in audio_window_line
+    assert "deckA_activity=active" in audio_window_line
+    assert "deckB_activity=active" in audio_window_line
+    assert "deckA_audio=P2:-3.0..0.0" in audio_window_map_line
+    assert "deckB_audio=P3:-3.0..0.0" in audio_window_map_line
+    assert "per_deck_audio=deck_pair_parts" in audio_window_map_line
+    assert "duplicate_audio=separate_deck_pair_parts" in audio_window_map_line
+    attached = [fields for kind, fields in recorder.events if kind == "deck_audio_parts_attached"]
+    assert attached
+    assert attached[-1]["event"] == "MIX_MOVE"
+    assert attached[-1]["labels"] == "P2+P3"
+    invokes = [fields for kind, fields in recorder.events if kind == "llm_invoke"]
+    assert invokes[-1]["audio_tokens_est"] == 384
+    assert attached[-1]["activity"] == "A:active+B:active"
+
+
+def test_attached_audio_contract_orders_mic_lookahead_and_deck_parts() -> None:
+    state = _build_state()
+    state.audible_deck = "mix"
+    state.deck_state = DeckState(
+        decks={"A": _deck_track("Deck Left"), "B": _deck_track("Deck Right", camelot="9A")}
+    )
+
+    prompt = _build_attached_audio_context_clause(
+        state,
+        ["xfader→center"],
+        audio_capture_context={
+            "deck_audio_capture_enabled": True,
+            "deck_audio_rms": {"A": 0.04, "B": 0.04},
+            "deck_audio_features": {
+                "A": {"activity": "active", "rms": 0.04, "peak": 0.2, "zcr": 0.03},
+                "B": {"activity": "active", "rms": 0.04, "peak": 0.18, "zcr": 0.04},
+            },
+        },
+        mic_part_label="P2",
+        lookahead_part_label="P3",
+        deck_part_labels={"A": "P4", "B": "P5"},
+        deck_part_activity={"A": "active", "B": "active"},
+    )
+
+    assert "audio_part_context[" in prompt
+    assert "part_order=P1,P2,P3,P4,P5" in prompt
+    assert "P2=user_mic" in prompt
+    assert "P3=source_file_lookahead" in prompt
+    assert "deckA_part=P4" in prompt
+    assert "deckB_part=P5" in prompt
+    assert "deckA_audio=P4" in prompt
+    assert "deckB_audio=P5" in prompt
+    assert "AUDIO PART CONTRACT: P1=live_global_mix isolated_decks=false" in prompt
+    assert "deck_separation=deck_pair_parts" in prompt
+    assert "part_order=P1,P2,P3,P4,P5 deck_parts_rule=reference_not_quality_verdict" in prompt
+    assert "deck_separation=structured_text_only" not in prompt
+
+
+def test_attached_audio_contract_falls_back_on_conflicting_deck_part_labels() -> None:
+    state = _build_state()
+    state.audible_deck = "mix"
+    state.deck_state = DeckState(
+        decks={"A": _deck_track("Deck Left"), "B": _deck_track("Deck Right", camelot="9A")}
+    )
+
+    prompt = _build_attached_audio_context_clause(
+        state,
+        ["xfader→center"],
+        audio_capture_context={
+            "deck_audio_capture_enabled": True,
+            "deck_audio_rms": {"A": 0.04, "B": 0.04},
+        },
+        mic_part_label="P2",
+        deck_part_labels={"A": "P2", "B": "P3"},
+        deck_part_activity={"A": "active", "B": "active"},
+    )
+
+    assert "audio_part_context[" in prompt
+    assert "part_order=P1,P2" in prompt
+    assert "deckA_part=" not in prompt
+    assert "deckB_part=" not in prompt
+    assert "deck_audio_parts=not_attached" in prompt
+    assert "deck_separation=structured_text_only" in prompt
+    assert "deck_separation=deck_pair_parts" not in prompt
 
 
 def test_llm_node_03b_places_deck_audio_map_next_to_audio_part(mocker, tmp_path) -> None:
@@ -350,7 +761,26 @@ def test_llm_node_03b_places_deck_audio_map_next_to_audio_part(mocker, tmp_path)
         return_value=_async_iter(["ok"])
     )
 
-    ev = Event(type="MIX_MOVE", state=state, extra={"moves": ["A_low: flat→killed"]})
+    ev = Event(
+        type="MIX_MOVE",
+        state=state,
+        extra={
+            "moves": ["A_low: flat→killed"],
+            "audio_capture_context": {
+                "deck_channels": {"A": "0,1", "B": "2,3"},
+                "deck_audio_capture_enabled": True,
+                "deck_audio_rms": {"A": 0.02, "B": 0.0},
+                "deck_audio_features": {
+                    "A": {"activity": "active", "rms": 0.02, "peak": 0.1, "zcr": 0.03},
+                    "B": {"activity": "silent", "rms": 0.0, "peak": 0.0, "zcr": 0.0},
+                },
+                "deck_audio_deltas": {
+                    "A": ["rms_rose_100pct_strong"],
+                    "B": ["rms_fell_50pct_strong"],
+                },
+            },
+        },
+    )
     agent.set_next_event(ev)
     _drive_llm_node(agent)
 
@@ -361,6 +791,9 @@ def test_llm_node_03b_places_deck_audio_map_next_to_audio_part(mocker, tmp_path)
 
     assert len(contents) == 2
     assert prompt_text.startswith("EVIDENCE: base")
+    assert AICoach.build_prompt.call_args.kwargs["audio_capture_context"] is ev.extra[
+        "audio_capture_context"
+    ]
     assert audio_map_at < attached_at
     assert "context_feed_contract[" in prompt_text
     assert "surface=gemini_p1" in prompt_text
@@ -385,8 +818,11 @@ def test_llm_node_03b_places_deck_audio_map_next_to_audio_part(mocker, tmp_path)
     assert "rule=unresolved_deck_is_not_transition_evidence" in prompt_text
     assert "deck_audio_context[" in prompt_text
     assert "deck_audio_separation_context[" in prompt_text
-    assert "deckA_audio=not_captured" in prompt_text
-    assert "deckB_audio=not_captured" in prompt_text
+    assert "deckA_audio=captured" in prompt_text
+    assert "deckB_audio=captured" in prompt_text
+    assert "per_deck_audio=captured_not_attached" in prompt_text
+    assert "deck_audio_features_context[" in prompt_text
+    assert "deck_audio_delta_context[" in prompt_text
     assert "source=global_mix" in prompt_text
     assert "audio_window_context[" in prompt_text
     assert "P1=master_global_mix" in prompt_text
@@ -402,6 +838,8 @@ def test_llm_node_03b_places_deck_audio_map_next_to_audio_part(mocker, tmp_path)
     assert "deckA_audio=not_attached" in prompt_text
     assert "deckB_audio=not_attached" in prompt_text
     assert "AUDIO PART CONTRACT: P1=live_global_mix isolated_decks=false" in prompt_text
+    assert "deck_audio_parts=not_attached" in prompt_text
+    assert "optional_later_parts_not_current_deck_audio" not in prompt_text
     assert "deck_separation=structured_text_only" in prompt_text
     assert "audio_window_context=time_aligned" in prompt_text
     assert "deck_audio_separation_context=capture_capability" in prompt_text
@@ -790,7 +1228,26 @@ def test_llm_node_passes_recall_moments_to_diet_mix_move(mocker, tmp_path) -> No
         return_value=_async_iter(["ok"])
     )
 
-    ev = Event(type="MIX_MOVE", state=state, extra={"moves": ["A_low: flat→killed"]})
+    ev = Event(
+        type="MIX_MOVE",
+        state=state,
+        extra={
+            "moves": ["A_low: flat→killed"],
+            "audio_capture_context": {
+                "deck_channels": {"A": "0,1", "B": "2,3"},
+                "deck_audio_capture_enabled": True,
+                "deck_audio_rms": {"A": 0.02, "B": 0.0},
+                "deck_audio_features": {
+                    "A": {"activity": "active", "rms": 0.02, "peak": 0.1, "zcr": 0.03},
+                    "B": {"activity": "silent", "rms": 0.0, "peak": 0.0, "zcr": 0.0},
+                },
+                "deck_audio_deltas": {
+                    "A": ["rms_rose_100pct_strong"],
+                    "B": ["rms_fell_50pct_strong"],
+                },
+            },
+        },
+    )
     agent.set_next_event(ev)
     _drive_llm_node(agent)
 
@@ -810,7 +1267,60 @@ def test_recall_query_context_includes_time_aligned_audio_window() -> None:
     state.recent_moves = [(0.8, "A_low: flat→killed")]
     state.audio_delta = ["low energy fell 50% (strong)"]
 
-    ev = Event(type="MIX_MOVE", state=state, extra={"moves": ["A_low: flat→killed"]})
+    ev = Event(
+        type="MIX_MOVE",
+        state=state,
+        extra={
+            "moves": ["A_low: flat→killed"],
+            "audio_capture_context": {
+                "deck_channels": {"A": "0,1", "B": "2,3"},
+                "deck_audio_capture_enabled": True,
+                "deck_audio_rms": {"A": 0.02, "B": 0.0},
+                "deck_audio_features": {
+                    "A": {"activity": "active", "rms": 0.02, "peak": 0.1, "zcr": 0.03},
+                    "B": {"activity": "silent", "rms": 0.0, "peak": 0.0, "zcr": 0.0},
+                },
+                "deck_audio_deltas": {
+                    "A": ["rms_rose_100pct_strong"],
+                    "B": ["rms_fell_50pct_strong"],
+                },
+                "deck_audio_windows": {
+                    "pre_s": [-6.0, -1.0],
+                    "current_s": [-1.0, 0.0],
+                    "A": {
+                        "pre": {
+                            "activity": "active",
+                            "rms": 0.02,
+                            "peak": 0.1,
+                            "flux": 0.004,
+                        },
+                        "current": {
+                            "activity": "active",
+                            "rms": 0.04,
+                            "peak": 0.12,
+                            "flux": 0.009,
+                        },
+                        "delta": ["rms_rose_100pct_strong"],
+                    },
+                    "B": {
+                        "pre": {
+                            "activity": "active",
+                            "rms": 0.03,
+                            "peak": 0.11,
+                            "flux": 0.006,
+                        },
+                        "current": {
+                            "activity": "silent",
+                            "rms": 0.0,
+                            "peak": 0.0,
+                            "flux": 0.001,
+                        },
+                        "delta": ["rms_fell_50pct_strong"],
+                    },
+                },
+            },
+        },
+    )
 
     context = _build_recall_query_context(ev)
 
@@ -821,8 +1331,18 @@ def test_recall_query_context_includes_time_aligned_audio_window() -> None:
     assert "speed=no_extra_model_pass" in context
     assert "audio_window=audio_window_context[" in context
     assert "deck_ref=deck_reference_context[" in context
+    assert "deck_audio_separation=deck_audio_separation_context[" in context
+    assert "deck_audio_features=deck_audio_features_context[" in context
+    assert "A_activity=active" in context
+    assert "deck_audio_delta=deck_audio_delta_context[" in context
+    assert "A_delta=rms_rose_100pct_strong" in context
+    assert "deck_audio_window=deck_audio_window_context[" in context
+    assert "timeline=pre_action_current" in context
+    assert "A_current=active_rms_0.040" in context
     assert "deck_source=deck_source_context[" in context
     assert "second_deck=independent_source_required" in context
+    assert "deck_audio_capture=A_active+B_silent" in context
+    assert "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong" in context
     assert "deck1=A" in context
     assert "deck2=B" in context
     assert "P1=master_global_mix" in context

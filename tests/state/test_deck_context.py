@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
 from vibemix.state.deck_context import (
     apply_live_claim_guard,
     live_claim_policy,
@@ -15,7 +17,10 @@ from vibemix.state.deck_context import (
     normalize_audio_part_context_text,
     normalize_audio_window_context_text,
     normalize_deck_audio_context_text,
+    normalize_deck_audio_delta_context_text,
+    normalize_deck_audio_features_context_text,
     normalize_deck_audio_separation_context_text,
+    normalize_deck_audio_window_context_text,
     normalize_deck_lanes_context_text,
     normalize_deck_reference_context_text,
     normalize_deck_source_context_text,
@@ -25,7 +30,10 @@ from vibemix.state.deck_context import (
     render_audio_window_map,
     render_context_feed_contract,
     render_deck_audio_context,
+    render_deck_audio_delta_context,
+    render_deck_audio_features_context,
     render_deck_audio_separation_context,
+    render_deck_audio_window_context,
     render_deck_change_context,
     render_deck_context,
     render_deck_lane_context,
@@ -49,6 +57,7 @@ def _deck(
     camelot: str | None = "8A",
     confidence: float = 0.8,
     bpm: float = 128.0,
+    source: str = "rekordbox_xml",
 ) -> DeckTrack:
     return DeckTrack(
         title=title,
@@ -56,8 +65,52 @@ def _deck(
         bpm=bpm,
         camelot=camelot,
         confidence=confidence,
-        source="rekordbox_xml",
+        source=source,
     )
+
+
+def _deck_pair_audio_capture(
+    *,
+    both_active: bool = True,
+    with_delta: bool = True,
+    with_window: bool = True,
+) -> dict:
+    b_rms = 0.031 if both_active else 0.0
+    capture = {
+        "deck_audio_capture_enabled": True,
+        "deck_audio_rms": {"A": 0.024, "B": b_rms},
+        "deck_audio_features": {
+            "A": {"activity": "active", "rms": 0.024, "peak": 0.11, "zcr": 0.03},
+            "B": {
+                "activity": "active" if both_active else "silent",
+                "rms": b_rms,
+                "peak": 0.10 if both_active else 0.0,
+                "zcr": 0.04 if both_active else 0.0,
+            },
+        },
+    }
+    if with_delta:
+        capture["deck_audio_deltas"] = {
+            "A": ["rms_rose_60pct_strong"],
+            "B": ["rms_fell_20pct_slight"],
+        }
+    if with_window:
+        capture["deck_audio_windows"] = {
+            "A": {
+                "pre": {"activity": "active", "rms": 0.015, "peak": 0.08},
+                "current": {"activity": "active", "rms": 0.024, "peak": 0.11},
+                "delta": ["rms_rose_60pct_strong"],
+            },
+            "B": {
+                "pre": {"activity": "active" if both_active else "silent", "rms": b_rms},
+                "current": {
+                    "activity": "active" if both_active else "silent",
+                    "rms": b_rms,
+                },
+                "delta": ["rms_fell_20pct_slight"] if both_active else [],
+            },
+        }
+    return capture
 
 
 def test_empty_deck_state_emits_nothing() -> None:
@@ -300,10 +353,13 @@ def test_audio_part_context_labels_parts_without_claiming_deck_stems() -> None:
     assert "deck1=A" in out
     assert "deck2=B" in out
     assert "together_audio=P1" in out
+    assert "part_order=P1,P2,P3" in out
     assert "per_deck_audio=not_attached" in out
     assert "duplicate_audio=same_master_not_deck_split" in out
     assert "P2=user_mic" in out
     assert "P2_role=user_speech" in out
+    assert "P2_span=-8.0..0.0" in out
+    assert "P2_tokens_est=256" in out
     assert "P2_deck_audio=none" in out
     assert "P2_rule=not_deck_audio" in out
     assert "P3=source_file_lookahead" in out
@@ -312,6 +368,7 @@ def test_audio_part_context_labels_parts_without_claiming_deck_stems() -> None:
     assert "P3_span=0.0..+3.0" in out
     assert "P3_deck_audio=none" in out
     assert "P3_rule=forecast_only_not_current_live_evidence" in out
+    assert "model_audio_tokens_est=544" in out
     assert "rule=part_labels_not_outcome_verdict" in out
     assert "deckA_audio=attached" not in out
     assert "deckB_audio=attached" not in out
@@ -330,6 +387,117 @@ def test_audio_part_context_can_label_viber_live_context_without_fake_audio_part
     assert "P1_runtime_observed=true" in out
     assert "P1_deck_audio=global_mix_not_stems" in out
     assert "per_deck_audio=not_attached" in out
+    assert "model_audio_tokens_est=0" in out
+    assert normalize_audio_part_context_text(out) == out
+
+
+def test_audio_part_context_labels_configured_deck_pair_parts() -> None:
+    out = render_audio_part_context(
+        audio_seconds=6.0,
+        deck_part_labels={"A": "P2", "B": "P3"},
+        deck_part_activity={"A": "active", "B": "silent"},
+        deck_part_seconds=3.0,
+    )
+
+    assert "P1=live_global_mix" in out
+    assert "audio_token_rate=32_per_second" in out
+    assert "P1_tokens_est=192" in out
+    assert "part_order=P1,P2,P3" in out
+    assert "per_deck_audio=deck_pair_parts" in out
+    assert "duplicate_audio=separate_deck_pair_parts" in out
+    assert "deckA_part=P2" in out
+    assert "deckB_part=P3" in out
+    assert "P2=deckA_configured_capture" in out
+    assert "P3=deckB_configured_capture" in out
+    assert "P2_span=-3.0..0.0" in out
+    assert "P2_tokens_est=96" in out
+    assert "P2_activity=deckA_active" in out
+    assert "P3_activity=deckB_silent" in out
+    assert "model_audio_tokens_est=384" in out
+    assert "P2_rule=deck_pair_capture_reference_not_quality_verdict" in out
+    assert "P3_rule=deck_pair_capture_reference_not_quality_verdict" in out
+    assert normalize_audio_part_context_text(out) == out
+
+
+def test_audio_part_context_orders_deck_parts_after_mic_and_lookahead() -> None:
+    out = render_audio_part_context(
+        audio_seconds=6.0,
+        mic_part_label="P2",
+        lookahead_part_label="P3",
+        deck_part_labels={"A": "P4", "B": "P5"},
+        deck_part_activity={"A": "active", "B": "active"},
+        deck_part_seconds=3.0,
+    )
+
+    assert "part_order=P1,P2,P3,P4,P5" in out
+    assert "P2=user_mic" in out
+    assert "P3=source_file_lookahead" in out
+    assert "deckA_part=P4" in out
+    assert "deckB_part=P5" in out
+    assert "P4=deckA_configured_capture" in out
+    assert "P5=deckB_configured_capture" in out
+    assert normalize_audio_part_context_text(out) == out
+
+
+def test_audio_part_context_trust_validator_rejects_incomplete_deck_pair_map() -> None:
+    missing_b = (
+        "audio_part_context[surface=gemini_parts P1=live_global_mix "
+        "P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true "
+        "P1_deck_audio=global_mix_not_stems deck1=A deck2=B together_audio=P1 "
+        "part_order=P1,P2 per_deck_audio=deck_pair_parts "
+        "duplicate_audio=separate_deck_pair_parts deckA_part=P2 "
+        "P2=deckA_configured_capture P2_model_heard=true "
+        "P2_audience_heard=false P2_deck_audio=deckA_configured_capture "
+        "P2_rule=deck_pair_capture_reference_not_quality_verdict "
+        "rule=part_labels_not_outcome_verdict]"
+    )
+    colliding = (
+        "audio_part_context[surface=gemini_parts P1=live_global_mix "
+        "P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true "
+        "P1_deck_audio=global_mix_not_stems deck1=A deck2=B together_audio=P1 "
+        "part_order=P1,P2 per_deck_audio=deck_pair_parts "
+        "duplicate_audio=separate_deck_pair_parts deckA_part=P2 deckB_part=P2 "
+        "P2=deckA_configured_capture P2=deckB_configured_capture "
+        "P2_model_heard=true P2_audience_heard=false "
+        "P2_deck_audio=deckA_configured_capture "
+        "P2_rule=deck_pair_capture_reference_not_quality_verdict "
+        "rule=part_labels_not_outcome_verdict]"
+    )
+    role_conflict = (
+        "audio_part_context[surface=gemini_parts P1=live_global_mix "
+        "P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true "
+        "P1_deck_audio=global_mix_not_stems deck1=A deck2=B together_audio=P1 "
+        "part_order=P1,P2,P3 per_deck_audio=deck_pair_parts "
+        "duplicate_audio=separate_deck_pair_parts deckA_part=P2 "
+        "P2=deckA_configured_capture P2_model_heard=true "
+        "P2_audience_heard=false P2_deck_audio=deckA_configured_capture "
+        "P2_rule=deck_pair_capture_reference_not_quality_verdict deckB_part=P3 "
+        "P3=deckB_configured_capture P3_model_heard=true "
+        "P3_audience_heard=false P3_deck_audio=deckB_configured_capture "
+        "P3_rule=deck_pair_capture_reference_not_quality_verdict "
+        "P2=user_mic P2_deck_audio=none P2_rule=not_deck_audio "
+        "rule=part_labels_not_outcome_verdict]"
+    )
+
+    assert normalize_audio_part_context_text(missing_b) is None
+    assert normalize_audio_part_context_text(colliding) is None
+    assert normalize_audio_part_context_text(role_conflict) is None
+
+
+def test_audio_part_context_renderer_falls_back_on_conflicting_deck_part_labels() -> None:
+    out = render_audio_part_context(
+        audio_seconds=6.0,
+        mic_part_label="P2",
+        deck_part_labels={"A": "P2", "B": "P3"},
+        deck_part_activity={"A": "active", "B": "active"},
+        deck_part_seconds=3.0,
+    )
+
+    assert "part_order=P1,P2" in out
+    assert "per_deck_audio=not_attached" in out
+    assert "deckA_part=" not in out
+    assert "deckB_part=" not in out
+    assert "P2=user_mic" in out
     assert normalize_audio_part_context_text(out) == out
 
 
@@ -448,6 +616,101 @@ def test_audio_window_context_trust_validator_keeps_no_move_contract_intact() ->
     assert trusted == packet
     assert trusted.endswith("future=not_attached]")
     assert "move_anchor=none" in trusted
+
+
+def test_audio_window_context_can_reference_attached_deck_pair_parts() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.recent_moves = [(0.4, "A_low: flat->killed")]
+
+    packet = render_audio_window_context(
+        state,
+        ["A_low: flat->killed"],
+        audio_seconds=6.0,
+        deck_part_labels={"A": "P2", "B": "P3"},
+        deck_part_activity={"A": "active", "B": "silent"},
+        deck_part_seconds=3.0,
+    )
+
+    assert packet is not None
+    assert "deckA_audio=P2" in packet
+    assert "deckB_audio=P3" in packet
+    assert "per_deck_audio=deck_pair_parts" in packet
+    assert "duplicate_audio=separate_deck_pair_parts" in packet
+    assert "deck_audio_separation=deck_audio_separation_context" in packet
+    assert "deck_part_span=-3.0..0.0" in packet
+    assert "deckA_activity=active" in packet
+    assert "deckB_activity=silent" in packet
+    assert normalize_audio_window_context_text(packet) == packet
+
+
+def test_audio_window_context_rejects_colliding_deck_part_labels() -> None:
+    packet = (
+        "audio_window_context[P1=master_global_mix P1_heard=true "
+        "timeline=past_action_future together_audio=P1_global_mix decks_together=true "
+        "deckA_audio=P2 deckB_audio=P2 per_deck_audio=deck_pair_parts "
+        "duplicate_audio=separate_deck_pair_parts deck_separation=deck_lanes_context "
+        "deck_audio_separation=deck_audio_separation_context "
+        "lane_aliases=deck1:A,deck2:B pre=-6.0..-1.0 current=-1.0..0.0 "
+        "action=-1.0..0.0 rule=time_alignment_not_outcome_verdict "
+        "move_anchor=none future_heard=false future=not_attached]"
+    )
+
+    assert normalize_audio_window_context_text(packet) is None
+
+
+def test_audio_window_renderers_fall_back_on_conflicting_deck_part_labels() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+
+    text = render_audio_window_context(
+        state,
+        [],
+        audio_seconds=6.0,
+        mic_part_label="P2",
+        deck_part_labels={"A": "P2", "B": "P3"},
+        deck_part_activity={"A": "active", "B": "active"},
+        deck_part_seconds=3.0,
+    )
+    structured = render_audio_window_map(
+        state,
+        [],
+        audio_seconds=6.0,
+        mic_part_label="P2",
+        deck_part_labels={"A": "P2", "B": "P3"},
+        deck_part_activity={"A": "active", "B": "active"},
+        deck_part_seconds=3.0,
+    )
+
+    assert text is not None
+    assert "deckA_audio=not_attached" in text
+    assert "deckB_audio=not_attached" in text
+    assert "per_deck_audio=structured_text_only" in text
+    assert normalize_audio_window_context_text(text) == text
+    assert structured is not None
+    assert structured["deckA_audio"] == "not_attached"
+    assert structured["deckB_audio"] == "not_attached"
+    assert structured["per_deck_audio"] == "structured_text_only"
+
+
+def test_audio_window_map_can_reference_attached_deck_pair_parts() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+
+    out = render_audio_window_map(
+        state,
+        [],
+        audio_seconds=6.0,
+        deck_part_labels={"A": "P2", "B": "P3"},
+        deck_part_activity={"A": "active", "B": "silent"},
+        deck_part_seconds=3.0,
+    )
+
+    assert out is not None
+    assert out["deckA_audio"] == "P2"
+    assert out["deckB_audio"] == "P3"
+    assert out["per_deck_audio"] == "deck_pair_parts"
+    assert out["duplicate_audio"] == "separate_deck_pair_parts"
+    assert out["deck_audio_separation"] == "deck_audio_separation_context"
+    assert out["deck_part_span_s"] == [-3.0, 0.0]
+    assert out["deck_part_activity"] == {"A": "active", "B": "silent"}
 
 
 def test_live_deck_context_validators_reject_context_poor_packets() -> None:
@@ -665,6 +928,7 @@ def test_deck_source_context_labels_non_deck_nowplaying_blocker() -> None:
     state.controller_connected = True
     state.deck_state.source_status = {
         "controller": "present",
+        "controller_connection": "connected",
         "nowplaying": "blocked_non_deck_owner",
         "nowplaying_owner": "com.apple.webkit.gpu",
         "nowplaying_title": "seen",
@@ -677,12 +941,97 @@ def test_deck_source_context_labels_non_deck_nowplaying_blocker() -> None:
     assert out is not None
     assert "resolved=none" in out
     assert "controller=present" in out
+    assert "controller_connection=connected" in out
     assert "nowplaying=blocked_non_deck_owner" in out
     assert "nowplaying_owner=com.apple.webkit.gpu" in out
     assert "nowplaying_title=seen" in out
     assert "source_audible_deck=B" in out
     assert "resolution=blocked_non_deck_nowplaying" in out
     assert "source_status_rule=diagnostic_not_deck_identity" in out
+
+
+def test_deck_source_context_renders_source_status_without_deck_rows() -> None:
+    state = MusicState(audible=False, audible_deck="none")
+    state.deck_state.source_status = {
+        "controller": "present",
+        "controller_connection": "disconnected",
+        "nowplaying": "deck_candidate",
+        "nowplaying_title": "none",
+        "audible_deck": "none",
+        "resolution": "no_single_attributable_deck",
+    }
+
+    out = render_deck_source_context(state)
+    packet = live_evidence_packet(state, [])
+
+    assert out is not None
+    assert "resolved=none" in out
+    assert "unresolved=none" in out
+    assert "controller=present" in out
+    assert "controller_connection=disconnected" in out
+    assert "resolution=no_single_attributable_deck" in out
+    assert "source_status_rule=diagnostic_not_deck_identity" in out
+    assert "transition_block=no_resolved_decks" in packet["mix"]
+    assert "second_deck_identity=blocked" in packet["mix"]
+    assert "deck_lanes=A_unknown_route_unknown+B_unknown_route_unknown" in packet["mix"]
+    assert (
+        "deck_reference=deck1_A_unknown_route_unknown+deck2_B_unknown_route_unknown"
+        in packet["mix"]
+    )
+    assert "deck_source=deck1_A_unknown_src_none+deck2_B_unknown_src_none" in packet["mix"]
+
+
+def test_deck_source_context_renders_source_resolution_diagnostics() -> None:
+    state = MusicState(audible=False, audible_deck="A")
+    state.deck_state.source_status = {
+        "controller": "present",
+        "controller_connection": "connected",
+        "library": "present",
+        "library_tracks": "24",
+        "library_source": "folder_cache",
+        "library_match": "ambiguous_label",
+        "nowplaying": "deck_candidate",
+        "nowplaying_title": "seen",
+        "audible_deck": "A",
+        "resolution": "library_miss",
+        "second_deck_source": "suppressed_requires_independent_source",
+        "screen_vision": "disabled",
+    }
+
+    out = render_deck_source_context(state)
+
+    assert out is not None
+    assert "resolved=none" in out
+    assert "unresolved=A+B" in out
+    assert "library=present" in out
+    assert "library_tracks=24" in out
+    assert "library_source=folder_cache" in out
+    assert "library_match=ambiguous_label" in out
+    assert "second_deck_source=suppressed_requires_independent_source" in out
+    assert "screen_vision=disabled" in out
+    assert "source_status_rule=diagnostic_not_deck_identity" in out
+
+
+def test_deck_lane_reference_context_render_source_status_without_deck_rows() -> None:
+    state = MusicState()
+    state.deck_state.source_status = {
+        "controller": "present",
+        "controller_connection": "disconnected",
+        "resolution": "no_single_attributable_deck",
+    }
+
+    lanes = render_deck_lane_context(state)
+    reference = render_deck_reference_context(state)
+
+    assert lanes is not None
+    assert "A(identity=unknown route=unknown" in lanes
+    assert "B(identity=unknown route=unknown" in lanes
+    assert "lane_aliases=deck1:A,deck2:B" in lanes
+    assert "rule=per_lane_identity_route_control_not_outcome" in lanes
+    assert reference is not None
+    assert "deck1=A identity=unknown route=unknown" in reference
+    assert "deck2=B identity=unknown route=unknown" in reference
+    assert "rule=deck1_deck2_reference_not_outcome" in reference
 
 
 def test_deck_lane_context_keeps_low_confidence_identity_unresolved() -> None:
@@ -697,6 +1046,56 @@ def test_deck_lane_context_keeps_low_confidence_identity_unresolved() -> None:
     assert "A(identity=unresolved src=unknown conf=0.10 route=unknown" in out
     assert "B(identity=unknown route=unknown controls=unobserved)" in out
     assert "title='Maybe'" not in out
+
+
+def test_deck_lane_context_labels_last_known_identity_as_unverified() -> None:
+    state = MusicState(audible=True, audible_deck="B")
+    state.controller_connected = True
+    state.deck_a = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 127, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_state = DeckState(
+        decks={
+            "A": DeckTrack(
+                title="Strobe",
+                track_id="track-1",
+                camelot="8A",
+                bpm=128.0,
+                confidence=0.29,
+                source="last_known",
+            ),
+            "B": DeckTrack(
+                title="Signal",
+                track_id="track-2",
+                camelot="9A",
+                bpm=130.0,
+                confidence=0.8,
+                source="rekordbox_xml",
+            ),
+        },
+        source_status={
+            "last_known_sides": "A",
+            "last_known_rule": "context_only_not_current_identity_proof",
+        },
+    )
+
+    lanes = render_deck_lane_context(state)
+    reference = render_deck_reference_context(state)
+    deck_context = render_deck_context(state)
+    packet = live_evidence_packet(state, [])
+
+    assert lanes is not None
+    assert "A(identity=last_known_unverified" in lanes
+    assert "last_title='Strobe'" in lanes
+    assert "last_key=8A" in lanes
+    assert "B(identity=known title='Signal'" in lanes
+    assert reference is not None
+    assert "deck1=A identity=last_known_unverified src=last_known last_title='Strobe'" in reference
+    assert deck_context is not None
+    assert "resolved=B" in deck_context
+    assert "transition_block=single_resolved_deck" in deck_context
+    assert "deck_source=deck1_A_unresolved_src_last_known+deck2_B_known_src_rekordbox_xml" in packet[
+        "mix"
+    ]
 
 
 def test_deck_audio_context_marks_two_deck_route_as_candidate_support() -> None:
@@ -724,7 +1123,155 @@ def test_deck_audio_context_marks_two_deck_route_as_candidate_support() -> None:
     assert result.corrected is False
     assert result.policy == "candidate_not_verdict"
     assert verdict.corrected is True
-    assert "candidate" in verdict.text
+    assert "transition setup" in verdict.text
+
+
+def test_live_claim_guard_allows_verdict_with_citable_deck_pair_audio_delta() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A"),
+            "B": _deck("InB", camelot="9A"),
+        }
+    )
+    capture = _deck_pair_audio_capture()
+    moves = ["xfader→center"]
+
+    policy, reason = live_claim_policy(state, moves, audio_capture_context=capture)
+    result = apply_live_claim_guard(
+        "That was a great transition.",
+        state,
+        moves,
+        audio_capture_context=capture,
+    )
+
+    assert policy == "supported_verdict"
+    assert reason == "two_deck_audio_window_delta_proof"
+    assert should_defer_live_claim_stream(state, moves, audio_capture_context=capture) is True
+    assert result.corrected is False
+    assert result.policy == "supported_verdict"
+    assert result.text == "That was a great transition."
+
+
+def test_live_claim_guard_requires_attached_deck_audio_parts_when_requested() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A"),
+            "B": _deck("InB", camelot="9A"),
+        }
+    )
+    capture = _deck_pair_audio_capture()
+    moves = ["xfader→center"]
+
+    policy, reason = live_claim_policy(
+        state,
+        moves,
+        audio_capture_context=capture,
+        deck_audio_parts_attached=False,
+    )
+    result = apply_live_claim_guard(
+        "That was a great transition.",
+        state,
+        moves,
+        audio_capture_context=capture,
+        deck_audio_parts_attached=False,
+    )
+
+    assert policy == "candidate_not_verdict"
+    assert reason == "deck_audio_parts_not_attached"
+    assert should_defer_live_claim_stream(
+        state,
+        moves,
+        audio_capture_context=capture,
+        deck_audio_parts_attached=False,
+    ) is True
+    assert result.corrected is True
+    assert result.policy == "candidate_not_verdict"
+    assert result.reason == "deck_audio_parts_not_attached"
+    assert "transition setup" in result.text
+
+
+def test_live_claim_guard_keeps_candidate_when_deck_pair_audio_delta_missing() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A"),
+            "B": _deck("InB", camelot="9A"),
+        }
+    )
+    capture = _deck_pair_audio_capture(with_delta=False)
+    moves = ["xfader→center"]
+
+    result = apply_live_claim_guard(
+        "That was a great transition.",
+        state,
+        moves,
+        audio_capture_context=capture,
+    )
+
+    assert result.corrected is True
+    assert result.policy == "candidate_not_verdict"
+    assert "transition setup" in result.text
+
+
+def test_live_claim_guard_keeps_candidate_when_deck_audio_window_missing() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A"),
+            "B": _deck("InB", camelot="9A"),
+        }
+    )
+    capture = _deck_pair_audio_capture(with_window=False)
+    moves = ["xfader→center"]
+
+    policy, reason = live_claim_policy(state, moves, audio_capture_context=capture)
+    result = apply_live_claim_guard(
+        "That was a great transition.",
+        state,
+        moves,
+        audio_capture_context=capture,
+    )
+
+    assert policy == "candidate_not_verdict"
+    assert reason is None
+    assert result.corrected is True
+    assert result.policy == "candidate_not_verdict"
+    assert "transition setup" in result.text
+
+
+def test_live_claim_guard_requires_trusted_sources_for_supported_verdict() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A", source="rekordbox_xml"),
+            "B": _deck("InB", camelot="9A", source="beatport_scrape"),
+        }
+    )
+    capture = _deck_pair_audio_capture()
+    moves = ["xfader→center"]
+
+    result = apply_live_claim_guard(
+        "That was a great transition.",
+        state,
+        moves,
+        audio_capture_context=capture,
+    )
+
+    assert result.corrected is True
+    assert result.policy == "candidate_not_verdict"
+    assert "transition setup" in result.text
 
 
 def test_deck_audio_separation_context_marks_stereo_capture_as_global_mix_only() -> None:
@@ -742,6 +1289,7 @@ def test_deck_audio_separation_context_marks_stereo_capture_as_global_mix_only()
     assert "capture_device=BlackHole_2ch" in out
     assert "input_channels=2" in out
     assert "opened_channels=2" in out
+    assert "sample_rate=48000" in out
     assert "mode=global_mix_only" in out
     assert "current_capture=P1_global_mix" in out
     assert "gemini_audio=mono_downmix_of_capture" in out
@@ -759,13 +1307,294 @@ def test_deck_audio_separation_context_exposes_unopened_multichannel_capacity() 
             "input_channels": 16,
             "opened_channels": 2,
             "sample_rate": 48000,
+            "deck_audio_routing_hint": (
+                "rekordbox_deck_routing_hint[source=rekordbox_settings "
+                "deck_outputs=A:0,1+B:2,3 "
+                "rule=rekordbox_output_routing_hint_not_live_audio_proof]"
+            ),
         }
     )
 
     assert "device_capacity=multichannel_available" in out
     assert "mode=multichannel_device_available_but_runtime_opened_stereo" in out
+    assert "routing_hint=rekordbox_settings_A:0+1+B:2+3" in out
+    assert "routing_hint_rule=output_routing_not_live_audio_proof" in out
     assert "upgrade_path=multi_channel_deck_pair_capture" in out
     assert normalize_deck_audio_separation_context_text(out) == out
+
+
+def test_deck_audio_separation_context_marks_too_narrow_auto_capture() -> None:
+    out = render_deck_audio_separation_context(
+        {
+            "requested_device": "BlackHole 2ch",
+            "device_name": "BlackHole 2ch",
+            "input_channels": 2,
+            "opened_channels": 2,
+            "sample_rate": 48000,
+            "deck_audio_capture_enabled": False,
+            "deck_audio_capture_reason": "capture_device_too_few_channels",
+            "deck_audio_required_opened_channels": 4,
+            "deck_audio_routing_hint": (
+                "rekordbox_deck_routing_hint[source=rekordbox_settings "
+                "deck_outputs=A:0,1+B:2,3 "
+                "rule=rekordbox_output_routing_hint_not_live_audio_proof]"
+            ),
+        }
+    )
+
+    assert "device_capacity=stereo_or_less" in out
+    assert "mode=global_mix_only" in out
+    assert "required_opened_channels=4" in out
+    assert "capture_reason=capture_device_too_few_channels" in out
+    assert "setup_block=capture_device_too_few_channels" in out
+    assert "routing_hint=rekordbox_settings_A:0+1+B:2+3" in out
+    assert "deckA_audio=not_captured" in out
+    assert "deckB_audio=not_captured" in out
+    assert normalize_deck_audio_separation_context_text(out) == out
+
+
+def test_deck_audio_separation_context_marks_configured_deck_pair_capture() -> None:
+    out = render_deck_audio_separation_context(
+        {
+            "requested_device": "BlackHole 16ch",
+            "device_name": "BlackHole 16ch",
+            "input_channels": 16,
+            "opened_channels": 4,
+            "sample_rate": 48000,
+            "master_channels": "0,1,2,3",
+            "deck_channels": {"A": "0,1", "B": "2,3"},
+            "deck_audio_capture_enabled": True,
+            "deck_audio_rms": {"A": 0.02, "B": 0.0},
+        }
+    )
+
+    assert "mode=deck_pair_capture_configured" in out
+    assert "current_capture=P1_global_mix_plus_deck_pairs" in out
+    assert "deckA_audio=captured" in out
+    assert "deckB_audio=captured" in out
+    assert "per_deck_audio=captured_not_attached" in out
+    assert "isolated_decks=runtime_capture_available" in out
+    assert "deck_pairs=A:0,1+B:2,3" in out
+    assert "deck_audio_activity=A_active+B_silent" in out
+    assert normalize_deck_audio_separation_context_text(out) == out
+
+
+def test_deck_audio_features_context_labels_per_deck_measurements() -> None:
+    out = render_deck_audio_features_context(
+        {
+            "deck_channels": {"A": "0,1", "B": "2,3"},
+            "deck_audio_capture_enabled": True,
+            "deck_audio_features": {
+                "A": {
+                    "activity": "active",
+                    "rms": 0.0244,
+                    "peak": 0.11,
+                    "zcr": 0.045,
+                    "flux": 0.008,
+                    "crest": 4.51,
+                },
+                "B": {"activity": "silent", "rms": 0.0002, "peak": 0.002, "zcr": 0.0},
+            },
+        }
+    )
+
+    assert out is not None
+    assert out.startswith("deck_audio_features_context[")
+    assert "source=deck_pair_capture" in out
+    assert "per_deck_audio=captured_features" in out
+    assert "A_activity=active" in out
+    assert "A_rms=0.024" in out
+    assert "A_peak=0.110" in out
+    assert "A_zcr=0.045" in out
+    assert "A_flux=0.008" in out
+    assert "A_crest=4.5" in out
+    assert "B_activity=silent" in out
+    assert "B_rms=0.000" in out
+    assert "rule=deck_audio_features_not_outcome_verdict" in out
+    assert normalize_deck_audio_features_context_text(out) == out
+
+
+def test_deck_audio_features_context_requires_configured_capture() -> None:
+    assert (
+        render_deck_audio_features_context(
+            {
+                "deck_audio_capture_enabled": True,
+                "deck_audio_features": {"A": {"activity": "active", "rms": 0.02}},
+            }
+        )
+        is None
+    )
+
+
+def test_deck_audio_delta_context_labels_per_deck_feature_changes() -> None:
+    out = render_deck_audio_delta_context(
+        {
+            "deck_channels": {"A": "0,1", "B": "2,3"},
+            "deck_audio_capture_enabled": True,
+            "deck_audio_deltas": {
+                "A": ["rms_rose_100pct_strong", "peak_rose_80pct_strong"],
+                "B": ["rms_fell_50pct_strong"],
+            },
+        }
+    )
+
+    assert out is not None
+    assert out.startswith("deck_audio_delta_context[")
+    assert "source=deck_pair_capture" in out
+    assert "per_deck_delta=captured_feature_delta" in out
+    assert "A_delta=rms_rose_100pct_strong+peak_rose_80pct_strong" in out
+    assert "B_delta=rms_fell_50pct_strong" in out
+    assert "rule=deck_audio_delta_not_causal_proof" in out
+    assert normalize_deck_audio_delta_context_text(out) == out
+
+
+def test_deck_audio_delta_context_labels_no_clear_delta_when_lanes_are_stable() -> None:
+    out = render_deck_audio_delta_context(
+        {
+            "deck_channels": {"A": "0,1", "B": "2,3"},
+            "deck_audio_capture_enabled": True,
+            "deck_audio_features": {
+                "A": {"activity": "silent", "rms": 0.0, "peak": 0.0},
+                "B": {"activity": "silent", "rms": 0.0, "peak": 0.0},
+            },
+        }
+    )
+
+    assert out is not None
+    assert out.startswith("deck_audio_delta_context[")
+    assert "A_delta=no_clear_delta" in out
+    assert "B_delta=no_clear_delta" in out
+    assert "rule=deck_audio_delta_not_causal_proof" in out
+    assert normalize_deck_audio_delta_context_text(out) == out
+
+
+def test_deck_audio_window_context_labels_pre_and_current_deck_lanes() -> None:
+    out = render_deck_audio_window_context(
+        {
+            "deck_channels": {"A": "0,1", "B": "2,3"},
+            "deck_audio_capture_enabled": True,
+            "deck_audio_windows": {
+                "pre_s": [-6.0, -1.0],
+                "current_s": [-1.0, 0.0],
+                "A": {
+                    "pre": {"activity": "active", "rms": 0.02, "peak": 0.05, "flux": 0.004},
+                    "current": {
+                        "activity": "active",
+                        "rms": 0.04,
+                        "peak": 0.1,
+                        "flux": 0.009,
+                    },
+                    "delta": ["rms_rose_100pct_strong"],
+                },
+                "B": {
+                    "pre": {"activity": "active", "rms": 0.03, "peak": 0.09, "flux": 0.006},
+                    "current": {
+                        "activity": "silent",
+                        "rms": 0.001,
+                        "peak": 0.003,
+                        "flux": 0.001,
+                    },
+                    "delta": ["rms_fell_96pct_strong"],
+                },
+            },
+        }
+    )
+
+    assert out is not None
+    assert out.startswith("deck_audio_window_context[")
+    assert "source=deck_pair_capture" in out
+    assert "timeline=pre_action_current" in out
+    assert "pre=-6.0..-1.0" in out
+    assert "current=-1.0..0.0" in out
+    assert "A_pre=active_rms_0.020_peak_0.050_flux_0.004" in out
+    assert "A_current=active_rms_0.040_peak_0.100_flux_0.009" in out
+    assert "A_delta=rms_rose_100pct_strong" in out
+    assert "B_current=silent_rms_0.001_peak_0.003_flux_0.001" in out
+    assert "B_delta=rms_fell_96pct_strong" in out
+    assert "rule=deck_audio_window_not_causal_or_quality_verdict" in out
+    assert normalize_deck_audio_window_context_text(out) == out
+
+
+def test_deck_audio_window_context_rejects_quality_verdicts() -> None:
+    bad = (
+        "deck_audio_window_context[source=deck_pair_capture timeline=pre_action_current "
+        "per_deck_audio=captured_window_features A_current=active_rms_0.040 "
+        "quality_verdict=great_transition "
+        "rule=deck_audio_window_not_causal_or_quality_verdict]"
+    )
+
+    assert normalize_deck_audio_window_context_text(bad) is None
+
+
+def test_live_evidence_adds_captured_deck_audio_activity_without_identity_upgrade() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.controller_connected = True
+    state.deck_a = {"vol": 100, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 100, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+
+    packet = live_evidence_packet(
+        state,
+        audio_capture_context={
+            "deck_audio_capture_enabled": True,
+            "deck_audio_rms": {"A": 0.02, "B": 0.03},
+            "deck_audio_features": {
+                "A": {"activity": "active", "rms": 0.02},
+                "B": {"activity": "active", "rms": 0.03},
+            },
+            "deck_audio_deltas": {
+                "A": ["rms_rose_100pct_strong"],
+                "B": ["rms_fell_50pct_strong"],
+            },
+            "deck_audio_windows": {
+                "pre_s": (-6.0, -1.0),
+                "current_s": (-1.0, 0.0),
+                "A": {
+                    "pre": {"activity": "active", "rms": 0.02},
+                    "current": {"activity": "active", "rms": 0.04},
+                    "delta": ["rms_rose_100pct_strong"],
+                },
+                "B": {
+                    "pre": {"activity": "active", "rms": 0.03},
+                    "current": {"activity": "active", "rms": 0.02},
+                    "delta": ["rms_fell_50pct_strong"],
+                },
+            },
+        },
+    )
+
+    assert "deck_audio_capture=A_active+B_active" in packet["mix"]
+    assert "deck_audio_features=A_active_rms_0.020+B_active_rms_0.030" in packet["mix"]
+    assert "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong" in packet[
+        "mix"
+    ]
+    assert (
+        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_active_pre_0.030_current_0.020"
+    ) in packet["mix"]
+    assert "transition_block=no_resolved_decks" in packet["mix"]
+    assert "transition_candidate=two_resolved_decks_captured_audio" not in packet["mix"]
+
+
+def test_live_evidence_allows_candidate_when_two_resolved_decks_have_captured_audio() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.controller_connected = True
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("Left"),
+            "B": _deck("Right", camelot="9A"),
+        }
+    )
+
+    packet = live_evidence_packet(
+        state,
+        audio_capture_context={
+            "deck_audio_capture_enabled": True,
+            "deck_audio_rms": {"A": 0.02, "B": 0.03},
+        },
+    )
+
+    assert "deck_audio_capture=A_active+B_active" in packet["mix"]
+    assert "transition_candidate=two_resolved_decks_captured_audio" in packet["mix"]
 
 
 def test_deck_audio_separation_context_rejects_attached_stem_claim() -> None:
@@ -831,6 +1660,24 @@ def test_move_effect_context_maps_recent_move_to_dsp_delta() -> None:
     assert "rule=dsp_delta_not_causal_proof" in out
 
 
+def test_move_effect_context_maps_recent_move_to_deck_audio_windows() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+
+    out = render_move_effect_context(
+        state,
+        ["A_low: flat→killed"],
+        audio_delta_items=[],
+        audio_capture_context=_deck_pair_audio_capture(),
+    )
+
+    assert out is not None
+    assert "move_effect_context[" in out
+    assert "deck_deltas=A:rms_rose_60pct_strong+B:rms_fell_20pct_slight" in out
+    assert "deck_windows=A:active:pre_0.015:current_0.024:delta_rms_rose_60pct_strong" in out
+    assert "B:active:pre_0.031:current_0.031:delta_rms_fell_20pct_slight" in out
+    assert "rule=move_audio_timing_not_causal_or_quality_proof" in out
+
+
 def test_grounding_refs_render_only_registered_deck_move_atoms() -> None:
     state = MusicState(audible=True, audible_deck="A")
     state.set_start_at = time.time() - 42.0
@@ -870,6 +1717,51 @@ def test_grounding_refs_render_only_registered_deck_move_atoms() -> None:
     assert "[mix:deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none]" in out
     assert "[mix:move_effect=sub_energy_fell_50pct_strong]" in out
     assert render_grounding_ref_context(state, registry_snapshot={}) is None
+
+
+def test_grounding_refs_render_registered_deck_audio_window_receipt() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_a = {"vol": 112, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 96, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    audio_capture_context = {
+        "deck_audio_capture_enabled": True,
+        "deck_audio_rms": {"A": 0.04, "B": 0.02},
+        "deck_audio_features": {
+            "A": {"activity": "active", "rms": 0.04},
+            "B": {"activity": "active", "rms": 0.02},
+        },
+        "deck_audio_deltas": {
+            "A": ["rms_rose_100pct_strong"],
+            "B": ["rms_fell_33pct_clear"],
+        },
+        "deck_audio_windows": {
+            "A": {
+                "pre": {"activity": "active", "rms": 0.02},
+                "current": {"activity": "active", "rms": 0.04},
+            },
+            "B": {
+                "pre": {"activity": "active", "rms": 0.03},
+                "current": {"activity": "active", "rms": 0.02},
+            },
+        },
+    }
+    mix_keys = live_mix_evidence_keys(state, audio_capture_context=audio_capture_context)
+    expected = (
+        "deck_audio_window=A_active_pre_0.020_current_0.040+"
+        "B_active_pre_0.030_current_0.020"
+    )
+
+    out = render_grounding_ref_context(
+        state,
+        registry_snapshot={"mix": {key: (42.0,) for key in mix_keys}},
+        audio_capture_context=audio_capture_context,
+    )
+
+    assert expected in mix_keys
+    assert out is not None
+    assert f"[mix:{expected}]" in out
 
 
 def test_live_evidence_context_renders_deck_move_and_audio_categories() -> None:
@@ -989,7 +1881,7 @@ def test_live_claim_guard_corrects_move_effect_causal_verdict() -> None:
     assert result.corrected is True
     assert result.policy == "move_effect_not_verdict"
     assert result.reason == "dsp_delta_not_causal_proof"
-    assert "hold the cause/quality verdict" in result.text
+    assert "energy shifted right after it" in result.text
     assert "sub energy fell 50% (strong)" in result.summary
 
 
@@ -1004,7 +1896,7 @@ def test_live_claim_guard_corrects_bare_move_effect_quality_verdict() -> None:
     assert result.corrected is True
     assert result.policy == "move_effect_not_verdict"
     assert "That landed" not in result.text
-    assert "hold the cause/quality verdict" in result.text
+    assert "energy shifted right after it" in result.text
 
 
 def test_live_claim_guard_preserves_move_effect_correlation_disclaimer() -> None:
@@ -1081,7 +1973,7 @@ def test_live_claim_guard_corrects_multi_deck_outcome_category() -> None:
     assert result.corrected is True
     assert result.policy == "blocked"
     assert result.reason == "single_resolved_deck"
-    assert "hold the transition verdict" in result.text
+    assert "sound change right there" in result.text
     assert "resolved decks=A" in result.summary
     assert "second deck identity=unknown_or_suppressed" in result.summary
     assert "deck source=resolved=A unresolved=B" in result.summary
@@ -1117,15 +2009,40 @@ def test_live_claim_guard_generalizes_beyond_transition_word() -> None:
     assert all("recent control evidence: xfader→A-side" in result.summary for result in results)
 
 
-def test_live_claim_guard_preserves_self_correction() -> None:
+def test_live_claim_guard_normalizes_public_self_correction() -> None:
     state = MusicState(audible_deck="A")
     state.deck_state = DeckState(decks={"A": _deck("Strobe")})
     reply = "I can't call that a transition; this is only one deck."
 
     result = apply_live_claim_guard(reply, state)
 
-    assert result.corrected is False
-    assert result.text == reply
+    assert result.corrected is True
+    assert "can't call that a transition" not in result.text
+    assert "sound change right there" in result.text
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "My bad on the live read. I was wrong about what happened.",
+        "I'm doing something stupid about the live read.",
+        "resolved decks=none; live evidence gate: transition_block=no_resolved_decks",
+    ],
+)
+def test_live_claim_guard_normalizes_public_diagnostic_without_outcome_claim(reply: str) -> None:
+    state = MusicState(audible_deck="A")
+    state.deck_state = DeckState(decks={"A": _deck("Strobe")})
+
+    result = apply_live_claim_guard(reply, state)
+
+    assert result.corrected is True
+    lower = result.text.lower()
+    assert "my bad" not in lower
+    assert "wrong" not in lower
+    assert "stupid" not in lower
+    assert "resolved decks" not in lower
+    assert "live evidence gate" not in lower
+    assert "sound change right there" in result.text
 
 
 def test_live_claim_guard_corrects_disclaimer_with_fresh_blend_claim() -> None:
@@ -1137,7 +2054,7 @@ def test_live_claim_guard_corrects_disclaimer_with_fresh_blend_claim() -> None:
 
     assert result.corrected is True
     assert "blend was clean" not in result.text
-    assert "hold the transition verdict" in result.text
+    assert "sound change right there" in result.text
 
 
 def test_live_claim_guard_defers_mix_candidate_for_verdict_check() -> None:

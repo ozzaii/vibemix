@@ -122,3 +122,37 @@ A future wizard plan may discharge this KAAN-ACTION by:
   user through Audio MIDI Setup.
 
 For v9.0, the user follows this doc by hand if they need Recipe 2 or 3.
+
+## Recipe 4 — Deck-Pair Capture For Viber/Gemini
+
+**For:** advanced users who want the AI to hear Deck A and Deck B as separate
+references instead of only the master mix.
+
+Rekordbox external mixer mode can route deck outputs to separate output channel
+pairs. Vibemix can open a multichannel loopback input and map those pairs to
+deck lanes:
+
+- `VIBEMIX_INPUT_DEVICE='BlackHole 16ch'`
+- `VIBEMIX_DECK_AUDIO_CHANNELS='A=0,1;B=2,3'`
+
+When Rekordbox settings contain an external-mixer deck output route, Vibemix can
+use it as a setup hint with:
+
+- `VIBEMIX_DECK_AUDIO_CHANNELS=auto`
+
+The proof CLI also surfaces the same route as an explicit setup recipe. If it
+finds Deck A/B outputs in Rekordbox settings but no live deck-pair proof yet,
+the JSON includes `setup_hint` with `recommended_env`, for example:
+
+- `VIBEMIX_DECK_AUDIO_CHANNELS=auto`
+
+This remains a hint until audio is actually captured. The live proof still
+requires active Deck A and Deck B audio, resolved deck rows, recent controller
+evidence, and per-deck audio deltas before Viber/Gemini may score a transition.
+
+If `auto` finds a Deck A/B route and the live session is still on the default
+BlackHole 2ch input, Vibemix now tries to upgrade to BlackHole 16ch by itself.
+If you explicitly set `VIBEMIX_INPUT_DEVICE`, Vibemix respects that choice; a
+stereo-only explicit input reports a setup block instead of treating Deck A as
+captured and Deck B as missing. Use a multichannel loopback such as BlackHole
+16ch so the opened stream can include all routed deck channels.

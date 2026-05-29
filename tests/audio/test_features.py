@@ -15,6 +15,7 @@ from vibemix.audio import (
     energy_curve,
     estimate_bpm,
     long_arc_curve,
+    pcm_to_wav,
     snapshot_features,
     snapshot_wav,
 )
@@ -76,6 +77,14 @@ def test_snapshot_wav_riff_header_valid() -> None:
     wav = snapshot_wav(buf, seconds=1.0)
     assert wav[0:4] == b"RIFF"
     assert wav[8:12] == b"WAVE"
+
+
+def test_pcm_to_wav_uses_exact_pcm_slice() -> None:
+    """Callers can encode one already-sampled ring-buffer slice without resampling."""
+    samples = np.array([-1000, 0, 1000, 2000], dtype=np.int16)
+    wav = pcm_to_wav(samples, sample_rate=16000, normalize_peak_dbfs=None)
+    pcm = np.frombuffer(wav[44:], dtype=np.int16)
+    np.testing.assert_array_equal(pcm, samples)
 
 
 # ===== FEAT-05: peak-normalize int16 no overflow =====
