@@ -1,7 +1,7 @@
 /* step-profile-consent.ts — Phase 32 / PROFILE-05.
  *
- * New wizard step inserted between "controller" and "smoke-test":
- * STEP 4 / 4 · PROFILE. Asks the user whether to enable long-term profile
+ * Wizard step inserted between "skill-level" and "telemetry-consent":
+ * STEP 5 / 6 · PROFILE. Asks the user whether to enable long-term profile
  * learning. Default-OFF; the toggle is a single click; Continue advances
  * regardless of the toggle state.
  *
@@ -59,8 +59,8 @@ export function renderStepProfileConsent(
 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
-  heading.textContent = "STEP 4 / 5 · PROFILE";
-  withStepLeadGlyph(heading, 4);
+  heading.textContent = "STEP 5 / 6 · PROFILE";
+  withStepLeadGlyph(heading, 5);
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";

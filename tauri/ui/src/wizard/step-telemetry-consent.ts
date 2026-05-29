@@ -1,7 +1,7 @@
 /* step-telemetry-consent.ts — Phase 34 / SEC-08.
  *
  * Wizard step inserted between "profile-consent" and "smoke-test":
- * STEP 5 / 5 · TELEMETRY. Asks the user whether to share anonymous
+ * STEP 6 / 6 · TELEMETRY. Asks the user whether to share anonymous
  * diagnostics. Default-OFF (Pitfall P67).
  *
  * No dark patterns:
@@ -65,8 +65,8 @@ export function renderStepTelemetryConsent(
 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
-  heading.textContent = "STEP 5 / 5 · TELEMETRY";
-  withStepLeadGlyph(heading, 5);
+  heading.textContent = "STEP 6 / 6 · TELEMETRY";
+  withStepLeadGlyph(heading, 6);
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";

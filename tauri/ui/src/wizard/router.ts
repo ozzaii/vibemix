@@ -41,12 +41,17 @@ import {
   renderStepTelemetryConsent,
   type TelemetryConsentState,
 } from "./step-telemetry-consent.js";
+import {
+  renderStepSkillLevel,
+  type SkillLevelState,
+} from "./step-skill-level.js";
 
 export type WizardStep =
   | "intro"
   | "permissions"
   | "audio"
   | "controller"
+  | "skill-level"
   // Phase 49 — new step types for the one-click install chain.
   // Registered as types here; the render-switch below routes them.
   // Full integration into the step-strip ordering is plan-49-04 (Inno
@@ -64,6 +69,7 @@ export interface WizardState {
   step1: Step1State;
   step2: Step2State;
   step3: Step3State;
+  skillLevel: SkillLevelState;
   profileConsent: ProfileConsentState;
   telemetryConsent: TelemetryConsentState;
   smokeTest: SmokeTestState;
@@ -101,6 +107,12 @@ const DEFAULT_STATE: WizardState = {
     probeState: "listening",
     secondsLeft: 10,
     caughtLabel: undefined,
+  },
+  skillLevel: {
+    // Quick 260529-ifq — pre-select "intermediate" (the runtime default
+    // VIBEMIX_SKILL_LEVEL). Continue is always armed; the step is
+    // non-blocking, the user picks their actual level explicitly.
+    skill: "intermediate",
   },
   profileConsent: {
     // PROFILE-05 default-OFF — non-negotiable. The toggle MUST start
@@ -157,6 +169,7 @@ const STEP_ORDER: WizardStep[] = [
   "permissions",
   "audio",
   "controller",
+  "skill-level",
   "profile-consent",
   "telemetry-consent",
   "smoke-test",
@@ -176,6 +189,7 @@ function stepStripFor(current: WizardStep): HTMLElement {
     { id: "permissions", label: "permissions" },
     { id: "audio", label: "device" },
     { id: "controller", label: "controller" },
+    { id: "skill-level", label: "skill" },
     { id: "profile-consent", label: "profile" },
     { id: "telemetry-consent", label: "telemetry" },
   ];
@@ -243,8 +257,11 @@ export function back(): void {
     case "controller":
       advanceTo("audio");
       return;
-    case "profile-consent":
+    case "skill-level":
       advanceTo("controller");
+      return;
+    case "profile-consent":
+      advanceTo("skill-level");
       return;
     case "telemetry-consent":
       advanceTo("profile-consent");
@@ -459,7 +476,7 @@ export function renderCurrentStep(): void {
         void runMidiListen();
       }
       primary = renderStep3(wizardState.step3, {
-        onContinue: () => advanceTo("profile-consent"),
+        onContinue: () => advanceTo("skill-level"),
         onBack: () => back(),
         onListenAgain: () => {
           step3ListenStarted = false;
@@ -472,7 +489,7 @@ export function renderCurrentStep(): void {
             },
           });
         },
-        onSkip: () => advanceTo("profile-consent"),
+        onSkip: () => advanceTo("skill-level"),
       });
       if (
         wizardState.step3.probeState === "listening" &&
@@ -480,6 +497,30 @@ export function renderCurrentStep(): void {
       ) {
         scheduleCountdownTick();
       }
+      break;
+    case "skill-level":
+      primary = renderStepSkillLevel(wizardState.skillLevel, {
+        onContinue: () => {
+          // Quick 260529-ifq — fire-and-forget IPC so the sidecar persists
+          // the chosen level to config.json BEFORE the wizard exits. The
+          // wizard bus does NOT handle ipc.settings.set; this dedicated
+          // ipc.wizard.set_skill message is what lands extra["skill"], read
+          // at the next cold boot by apply_persona_config_to_env. The live
+          // Settings drawer is the full recovery path post-wizard.
+          void emitIpc("ipc.wizard.set_skill", {
+            skill: wizardState.skillLevel.skill,
+          }).catch((err) => {
+            // eslint-disable-next-line no-console
+            console.warn("[skill-level] set_skill emit failed:", err);
+          });
+          advanceTo("profile-consent");
+        },
+        onSelect: (next) =>
+          setState({
+            skillLevel: { ...wizardState.skillLevel, skill: next },
+          }),
+        onBack: () => back(),
+      });
       break;
     case "profile-consent":
       primary = renderStepProfileConsent(wizardState.profileConsent, {
@@ -822,9 +863,9 @@ async function runMidiListen(): Promise<void> {
         caughtLabel: label,
       },
     });
-    // Auto-advance after 1s per UI-SPEC §10. Phase 32 routes through the
-    // profile-consent step before the smoke-test surface.
-    setTimeout(() => advanceTo("profile-consent"), 1000);
+    // Auto-advance after 1s per UI-SPEC §10. Quick 260529-ifq inserts the
+    // skill-level step after controller (then profile-consent → smoke-test).
+    setTimeout(() => advanceTo("skill-level"), 1000);
   } catch (err) {
     if (!resolved) {
       console.warn("[step3] midi listen failed:", err);
@@ -965,8 +1006,8 @@ export function getDevSurface(): DevSurface {
           caughtLabel: ev.label,
         },
       });
-      // Phase 32 — Step 3 routes through profile-consent before smoke-test.
-      setTimeout(() => advanceTo("profile-consent"), 1000);
+      // Quick 260529-ifq — Step 3 routes through skill-level next.
+      setTimeout(() => advanceTo("skill-level"), 1000);
     },
     setStatusBar: (status) => setState({ statusBar: status }),
   };
