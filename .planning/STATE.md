@@ -79,6 +79,12 @@ See: `.planning/REQUIREMENTS.md` (16 v11.0 REQ-IDs across SKILL / COMP / MAST / 
 - **LiveKit-upgrade handoff** — `src/vibemix/__main__.py:1353` `turn_handling` + livekit-agents 1.5.8→1.5.14. Separate session, NOT yet committed. See memory `project_streaming_pipe_speedfix_livekit_upgrade_handoff`.
 - **Frontend wiring handoff** — `tauri/ui/*` rocker visual-sync, status-tick, pill hover-peek. Separate session. See memory `project_frontend_wiring_handoff`.
 
+## Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260529-ifq | Onboarding skill-level wizard step (beginner/intermediate/pro) + config.json clobber fix | 2026-05-29 | f74635fd | [260529-ifq-onboarding-skill-level-wizard-step](./quick/260529-ifq-onboarding-skill-level-wizard-step/) |
+
 ## Session Continuity
 
 **102-01 SHIPPED (2026-05-29):** DATA-01/02/03. `learn/progress.py` `SCHEMA_VERSION 1→2` with a forward-compatible 6-skill `skills` live-portion block; explicit `_migrate_v1_to_v2` upgrader (preserves lesson history, never wipes v1); idempotent v2 reload (Phase-103 live data not clobbered, keyed on `schema_version==1`); corrupt-recovery seeds an empty v2 block; IPC reset clears the in-memory skills ledger. Only the live-portion (`live_proof_count`/`mastered`/`first_mastered_at`) is stored — `learn_fill`/`competent` are DERIVED by the Wave-2 engine (zero dual-write drift). `__main__.py`/`profile.json` untouched. Commits `ad9fd4de`→`43a54aad`→`32e5fbfc`. `tests/learn` 461 passed. Shared-tree note: concurrent One Mind learn-island edits to `progress.py`/`ipc_handlers.py`/`test_progress_persistence.py` were absorbed (git commits whole files; all on-island + green).
