@@ -429,6 +429,18 @@
  * wordmark, clock, and window drag region (one app, not seven windows). */
 .surface--mounted .vmx-lib-titlebar { display: none; }
 
+/* Learn folds with its own titlebar carrying a 'LEARN' wordmark + a live clock —
+ * both duplicate the shell chrome (which already owns the wordmark and the only
+ * clock). Drop them like the session/library titlebars. Keep the controller-name
+ * slot, which is real context (which controller you're learning on), not chrome;
+ * but when no controller is detected (its `data-empty` flag) the bar would be an
+ * empty strip, so collapse the whole titlebar in that case. The `.learn-titlebar-*`
+ * classes are unique to the learn interior, so scoping to `.surface--mounted` can
+ * never touch the crate stub. */
+.surface--mounted .learn-titlebar-wordmark,
+.surface--mounted .learn-titlebar-clock { display: none; }
+.surface--mounted .learn-titlebar:has(.learn-titlebar-controller[data-empty="true"]) { display: none; }
+
 /* A stub surface's interior fills its region (overriding the centered stub). */
 .surface--stub.surface--mounted { align-items: stretch; justify-content: stretch; padding: 0; }
 .surface--mounted .surface-mount {
