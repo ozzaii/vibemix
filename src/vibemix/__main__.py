@@ -2221,6 +2221,12 @@ async def main() -> None:
             suggestion_service=suggestion_service,
             tracer=tracer,
             audio_capture_context=audio_capture_context,
+            # §EARNED-LIVE-MASTERED-VERIFY — the live event loop credits v11.0
+            # skill mastery only on a resolvable citation. Both handles already
+            # exist in main(): the registry the EventDetector writes into, and
+            # the LearnProgress loaded at boot (also passed to the LessonRuntime).
+            evidence_registry=evidence_registry,
+            learn_progress=_learn_progress,
         )
     )
 

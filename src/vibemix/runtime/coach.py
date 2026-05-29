@@ -91,6 +91,7 @@ if TYPE_CHECKING:
     from vibemix.runtime.cancel import CancelGate
     from vibemix.runtime.ttft import TTFTMeter
     from vibemix.runtime.ws_bus import IpcBus
+    from vibemix.state.evidence_registry import EvidenceRegistry
 
 # Plan 20-04 — periodic ipc.session.citation publish cadence (0.5Hz). Lower
 # than ipc.session.snapshot's 30Hz because slop_ratio + stripped_rate_15s
@@ -107,6 +108,64 @@ def _log_suggestion_error(fut: Any) -> None:
         return
     if exc is not None:
         print(f"\n[coach suggestion err] {exc}", file=sys.stderr)
+
+
+def _credit_live_skill_demo(
+    ev: Any,
+    state: MusicState,
+    *,
+    evidence_registry: EvidenceRegistry | None,
+    learn_progress: Any | None,
+) -> list[str]:
+    """Credit the v11.0 skill(s) a CITED live event demonstrates (the
+    ``§EARNED-LIVE-MASTERED-VERIFY`` backend wiring — finally giving the
+    until-now-orphaned ``learn/skill_recognizer.recognize`` a live call site).
+
+    The recognizer is the MAST-02/03 anti-slop spine: it maps ``ev.type`` to the
+    skill(s) it demonstrates over the REAL event taxonomy and grants Mastered
+    credit ONLY when an INJECTED citation predicate resolves — so a fabricated /
+    un-cited event moves no bar (Invariants #2 + #3). Here that predicate closes
+    over the live ``EvidenceRegistry`` written by ``EventDetector._fire`` for
+    THIS event a moment ago.
+
+    The session-relative ``t`` the registry was keyed with is NOT on the
+    ``Event`` (it carries only type/state/extra/priority); the detector wrote it
+    as ``max(0.0, now - state.set_start_at)`` (event_detector.py:508, wall
+    clock), so we recompute the same value here and pass it explicitly — the
+    ±1.0s ``has`` tolerance absorbs the few-ms gap since detect() returned.
+
+    Returns the skill ids whose ``live_proof_count`` actually advanced (``[]``
+    when the gate is off, the event maps to no skill, or its citation does not
+    resolve). NEVER raises — a skill-credit failure must never wedge the
+    reaction loop (belt-and-braces over recognize's own never-raises posture).
+    Persists the live-portion via ``save_progress`` only on a real credit;
+    imports are function-local to keep ``runtime/`` free of a top-level
+    ``learn/`` dependency.
+    """
+    if evidence_registry is None or learn_progress is None:
+        return []
+    try:
+        from datetime import UTC, datetime
+
+        from vibemix.learn.progress import save_progress
+        from vibemix.learn.skill_recognizer import recognize
+
+        set_start_at = float(getattr(state, "set_start_at", 0.0) or 0.0)
+        t_session = max(0.0, time.time() - set_start_at)
+        iso_now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        credited = recognize(
+            ev,
+            citation_check=lambda s, k, t: evidence_registry.has(s, k, t, tol=1.0),
+            progress=learn_progress,
+            now=iso_now,
+            event_t=t_session,
+        )
+        if credited:
+            save_progress(learn_progress)
+        return credited
+    except Exception as exc:  # never wedge the reaction loop on a credit failure
+        print(f"\n[coach skill-credit err] {exc}", file=sys.stderr)
+        return []
 
 
 async def coach_loop(
@@ -128,6 +187,8 @@ async def coach_loop(
     suggestion_service: Any | None = None,
     tracer: Any | None = None,
     audio_capture_context: dict[str, object] | None = None,
+    evidence_registry: EvidenceRegistry | None = None,
+    learn_progress: Any | None = None,
 ) -> None:
     """Polls MusicState for events at 10Hz. On event → prompt AI. Single
     in-flight generation at a time. Mic detection happens here against
@@ -318,6 +379,16 @@ async def coach_loop(
             ev.extra.setdefault("audio_capture_context", audio_capture_context)
 
         if ev is not None:
+            # §EARNED-LIVE-MASTERED-VERIFY — credit the v11.0 skill(s) this CITED
+            # live event demonstrates (no-op when Learn handles are absent, the
+            # event maps to no skill, or its citation does not resolve). Fires
+            # independent of whether this event also triggers an AI reaction.
+            _credit_live_skill_demo(
+                ev,
+                state,
+                evidence_registry=evidence_registry,
+                learn_progress=learn_progress,
+            )
             _tr(
                 "event",
                 "emit",
