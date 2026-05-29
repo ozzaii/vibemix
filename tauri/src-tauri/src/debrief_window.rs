@@ -20,7 +20,8 @@
 //!   6. Spawns a crash watcher that emits ``sidecar-debrief-crashed``
 //!      when the child exits early.
 
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
@@ -77,6 +78,57 @@ impl Default for DebriefSidecarHandle {
     }
 }
 
+fn resolve_debrief_session(root: &Path, session_dir: &str) -> Result<PathBuf, String> {
+    let trimmed = session_dir.trim();
+    let candidate: PathBuf = if trimmed.is_empty() {
+        latest_recording_dir(root)?
+    } else if PathBuf::from(trimmed).is_absolute() {
+        PathBuf::from(trimmed)
+    } else {
+        root.join(trimmed)
+    };
+    recordings::validate_under_root(&candidate, root)
+        .map_err(|e| format!("invalid session dir: {e}"))
+}
+
+fn latest_recording_dir(root: &Path) -> Result<PathBuf, String> {
+    let entries = fs::read_dir(root).map_err(|e| format!("recordings read: {e}"))?;
+    let mut latest: Option<(String, PathBuf)> = None;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("recordings entry: {e}"))?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if !is_session_dir_name(name) {
+            continue;
+        }
+        if latest
+            .as_ref()
+            .map(|(current, _)| name > current.as_str())
+            .unwrap_or(true)
+        {
+            latest = Some((name.to_string(), path));
+        }
+    }
+    latest
+        .map(|(_, path)| path)
+        .ok_or_else(|| "no recordings available".to_string())
+}
+
+fn is_session_dir_name(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    bytes.len() == 15
+        && bytes[8] == b'-'
+        && bytes
+            .iter()
+            .enumerate()
+            .all(|(idx, b)| idx == 8 || b.is_ascii_digit())
+}
+
 /// Open the debrief window for `session_dir`.
 ///
 /// `session_dir` may be either an absolute path under the recordings
@@ -97,13 +149,7 @@ pub async fn open_debrief_window(
 ) -> Result<(), String> {
     // 1. Validate the path BEFORE doing any work.
     let root = recordings::resolve_recordings_root()?;
-    let candidate: PathBuf = if PathBuf::from(&session_dir).is_absolute() {
-        PathBuf::from(&session_dir)
-    } else {
-        root.join(&session_dir)
-    };
-    let safe = recordings::validate_under_root(&candidate, &root)
-        .map_err(|e| format!("invalid session dir: {e}"))?;
+    let safe = resolve_debrief_session(&root, &session_dir)?;
     let safe_str = safe.to_string_lossy().to_string();
 
     // 2. Focus-existing — at most one debrief window at a time. When the
@@ -260,25 +306,29 @@ fn debrief_cli_args(base_args: &[String], safe_str: &str) -> Vec<String> {
     args
 }
 
-/// Minimal percent-encoder for a filesystem path destined for a URL
-/// query-string value. Covers the characters that would corrupt
-/// ``URLSearchParams`` decoding: space, +, %, ?, =, #, &.
+/// Minimal UTF-8 percent-encoder for a filesystem path destined for a URL
+/// query-string value. Covers ASCII delimiters that would corrupt
+/// ``URLSearchParams`` decoding and every non-ASCII byte.
 ///
 /// The full set of "unsafe" RFC 3986 chars is larger; this helper is
 /// purpose-built for the validated session-dir path (which already
 /// excludes the bulk of them via the canonicalization step).
 fn percent_encode_path(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
     for b in s.bytes() {
         match b {
-            b' ' => out.push_str("%20"),
-            b'+' => out.push_str("%2B"),
-            b'%' => out.push_str("%25"),
-            b'?' => out.push_str("%3F"),
-            b'=' => out.push_str("%3D"),
-            b'#' => out.push_str("%23"),
-            b'&' => out.push_str("%26"),
-            _ => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => {
+                out.push(b as char)
+            }
+            // Everything else, including UTF-8 continuation bytes, becomes a
+            // byte-level %XX escape. URLSearchParams decodes this back to the
+            // original Unicode string; casting raw bytes to char would not.
+            _ => {
+                out.push('%');
+                out.push(HEX[(b >> 4) as usize] as char);
+                out.push(HEX[(b & 0x0F) as usize] as char);
+            }
         }
     }
     out
@@ -299,6 +349,58 @@ fn kill_debrief_child(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn empty_session_dir_resolves_latest_recording_dir() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        fs::create_dir(root.join("20260513-210410")).unwrap();
+        fs::create_dir(root.join("notes")).unwrap();
+        fs::create_dir(root.join("20260515-112139")).unwrap();
+
+        let resolved = resolve_debrief_session(root, "").unwrap();
+
+        assert_eq!(
+            resolved,
+            root.join("20260515-112139").canonicalize().unwrap()
+        );
+    }
+
+    #[test]
+    fn empty_session_dir_errors_when_no_recordings_exist() {
+        let tmp = TempDir::new().unwrap();
+
+        let err = resolve_debrief_session(tmp.path(), "").unwrap_err();
+
+        assert!(err.contains("no recordings available"));
+    }
+
+    #[test]
+    fn empty_session_dir_ignores_non_timestamp_dirs() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        fs::create_dir(root.join("latest")).unwrap();
+        fs::create_dir(root.join("2026-05-15")).unwrap();
+
+        let err = resolve_debrief_session(root, "").unwrap_err();
+
+        assert!(err.contains("no recordings available"));
+    }
+
+    #[test]
+    fn explicit_session_dir_still_validates_under_root() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        fs::create_dir(root.join("20260515-112139")).unwrap();
+
+        let resolved = resolve_debrief_session(root, "20260515-112139").unwrap();
+
+        assert_eq!(
+            resolved,
+            root.join("20260515-112139").canonicalize().unwrap()
+        );
+    }
 
     #[test]
     fn percent_encode_path_handles_spaces() {
@@ -313,6 +415,14 @@ mod tests {
     #[test]
     fn percent_encode_path_handles_query_delimiters() {
         assert_eq!(percent_encode_path("a?b=c&d=e#f"), "a%3Fb%3Dc%26d%3De%23f");
+    }
+
+    #[test]
+    fn percent_encode_path_handles_utf8_bytes() {
+        assert_eq!(
+            percent_encode_path("/Users/ozai/Müzik/çağrı.mp3"),
+            "/Users/ozai/M%C3%BCzik/%C3%A7a%C4%9Fr%C4%B1.mp3"
+        );
     }
 
     #[test]

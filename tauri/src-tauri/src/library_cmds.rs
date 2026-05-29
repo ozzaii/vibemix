@@ -145,7 +145,11 @@ fn library_agent_backend() -> &'static str {
     LIBRARY_AGENT_BACKEND
 }
 
-fn chat_library_args(message: &str, history_json: Option<&str>) -> Vec<String> {
+fn chat_library_args(
+    message: &str,
+    history_json: Option<&str>,
+    live_context_json: Option<&str>,
+) -> Vec<String> {
     let backend = library_agent_backend();
     let mut args = vec![
         "library".to_string(),
@@ -158,6 +162,13 @@ fn chat_library_args(message: &str, history_json: Option<&str>) -> Vec<String> {
     if let Some(h) = history_json {
         args.push("--history".to_string());
         args.push(h.to_string());
+    }
+    if let Some(ctx) = live_context_json {
+        let trimmed = ctx.trim();
+        if !trimmed.is_empty() && trimmed != "null" {
+            args.push("--live-context".to_string());
+            args.push(trimmed.to_string());
+        }
     }
     args
 }
@@ -244,12 +255,30 @@ fn parse_model_progress_line(line: &str) -> Option<Value> {
     serde_json::from_str::<Value>(raw).ok()
 }
 
+/// Parse a live tool-tape line from the Codex MCP path.
+///
+/// Format (emitted by `codex_curate::_drain_tool_tape` on stderr):
+/// `[viber-tool] <name> <ok|err> <summary…>`. Surfaced to the conversation so
+/// the user watches each tool fire — search, sequence, create — as it happens.
+fn parse_viber_tool_line(line: &str) -> Option<Value> {
+    let rest = line.trim().strip_prefix("[viber-tool] ")?;
+    let mut parts = rest.splitn(3, ' ');
+    let name = parts.next()?.to_string();
+    let ok = parts.next().unwrap_or("ok") == "ok";
+    let summary = parts.next().unwrap_or("").to_string();
+    Some(serde_json::json!({ "tool": name, "ok": ok, "summary": summary }))
+}
+
 fn dispatch_model_progress_line(app: &AppHandle, line: &str) -> bool {
-    let Some(payload) = parse_model_progress_line(line) else {
-        return false;
-    };
-    let _ = app.emit("library://model-progress", payload);
-    true
+    if let Some(payload) = parse_model_progress_line(line) {
+        let _ = app.emit("library://model-progress", payload);
+        return true;
+    }
+    if let Some(payload) = parse_viber_tool_line(line) {
+        let _ = app.emit("library://viber-tool", payload);
+        return true;
+    }
+    false
 }
 
 /// Parse the stdout of a one-shot library command as JSON, surfacing a
@@ -272,6 +301,11 @@ fn parse_cli_json(stdout: &str, stderr: &str, code: i32) -> Result<Value, String
                 }
             }
         }
+        for stream in [stderr, stdout] {
+            if let Some(v) = parse_clarification_terminal(stream) {
+                return Ok(v);
+            }
+        }
         // The CLI's failure paths emit a JSON error object to stderr; surface
         // its `error` string when parseable, else the raw stderr tail.
         if let Some(v) = parse_first_json_value(stderr) {
@@ -282,8 +316,13 @@ fn parse_cli_json(stdout: &str, stderr: &str, code: i32) -> Result<Value, String
         let tail = stderr.trim().lines().last().unwrap_or("").to_string();
         return Err(format!("library CLI exited {code}: {tail}"));
     }
-    serde_json::from_str::<Value>(stdout.trim())
-        .map_err(|e| format!("library CLI returned non-JSON stdout: {e}"))
+    parse_first_json_value(stdout).ok_or_else(|| {
+        let detail = serde_json::from_str::<Value>(stdout.trim())
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| "empty stdout".to_string());
+        format!("library CLI returned non-JSON stdout: {detail}")
+    })
 }
 
 fn parse_first_json_value(raw: &str) -> Option<Value> {
@@ -301,6 +340,82 @@ fn is_agent_terminal_payload(v: &Value) -> bool {
     v.get("stop_reason")
         .and_then(|reason| reason.as_str())
         .is_some_and(|reason| !reason.is_empty())
+}
+
+fn parse_numbered_choice(line: &str) -> Option<String> {
+    let (number, choice) = line.split_once('.')?;
+    if number.is_empty() || !number.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let choice = choice.trim();
+    if choice.is_empty() {
+        None
+    } else {
+        Some(choice.to_string())
+    }
+}
+
+fn parse_clarification_terminal(raw: &str) -> Option<Value> {
+    const MARKER: &str = "[viber/codex] clarification_needed:";
+
+    let mut lines = raw.lines();
+    while let Some(line) = lines.next() {
+        let trimmed = line.trim();
+        let Some(suffix) = trimmed.strip_prefix(MARKER) else {
+            continue;
+        };
+
+        let mut question = suffix.trim().to_string();
+        let mut choices: Vec<String> = Vec::new();
+
+        for line in lines {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if trimmed.starts_with("Re-run with:") {
+                break;
+            }
+            if let Some(choice) = parse_numbered_choice(trimmed) {
+                choices.push(choice);
+                continue;
+            }
+            if question.is_empty() {
+                question = trimmed.to_string();
+            }
+        }
+
+        let rationale = if question.is_empty() {
+            "Viber needs one more detail before building the set.".to_string()
+        } else {
+            question.clone()
+        };
+
+        return Some(json!({
+            "theme": "",
+            "playlist": null,
+            "playlist_name": null,
+            "track_ids": [],
+            "rationale": rationale,
+            "iterations": 0,
+            "stop_reason": "clarification_needed",
+            "seen_track_ids": [],
+            "error": rationale,
+            "question": question,
+            "choices": choices,
+        }));
+    }
+
+    None
+}
+
+fn parse_library_models_json(stdout: &str, stderr: &str, code: i32) -> Result<Value, String> {
+    if code != 0 {
+        if let Some(v) = parse_first_json_value(stdout) {
+            return Ok(v);
+        }
+    }
+    parse_cli_json(stdout, stderr, code)
 }
 
 /// Map a raw search/similar CLI payload into the UI-facing response shape:
@@ -523,6 +638,18 @@ fn map_curate_result(raw: &Value) -> Value {
     // build-set UI can show the "Exported → <path>" line + import hint. Curate
     // never exports, so this is simply absent/null on the curate path.
     let export_path = raw.get("export_path").cloned().unwrap_or(Value::Null);
+    let question = raw.get("question").cloned().unwrap_or(Value::Null);
+    let choices = raw
+        .get("choices")
+        .and_then(|v| v.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(|s| Value::String(s.to_string())))
+                .collect::<Vec<Value>>()
+        })
+        .map(Value::Array)
+        .unwrap_or(Value::Null);
     json!({
         "name": name,
         "rationale": rationale,
@@ -530,6 +657,8 @@ fn map_curate_result(raw: &Value) -> Value {
         "tracks": tracks,
         "count": count,
         "export_path": export_path,
+        "question": question,
+        "choices": choices,
     })
 }
 
@@ -612,23 +741,34 @@ pub async fn library_build_set(
 /// Thin bridge over `vibemix library chat <message> --history <json> --json`.
 /// The Python CLI owns the agent/tool logic and returns `ChatResult.to_dict()`:
 /// `{ reply, tool_trace, playlist, export_path, seen_track_ids, iterations,
-/// stop_reason }`. The bridge intentionally does not reshape it so the frontend
-/// can consume the same DTO that backend tests pin.
+/// stop_reason, live_verification? }`. The bridge intentionally does not reshape
+/// it so the frontend can consume the same DTO that backend tests pin.
 #[tauri::command]
 pub async fn library_chat(
     app: AppHandle,
     message: String,
     history: Option<Value>,
+    live_context: Option<Value>,
 ) -> Result<Value, String> {
     let history_json = history
         .as_ref()
         .map(serde_json::to_string)
         .transpose()
         .map_err(|e| format!("invalid chat history: {e}"))?;
+    let live_context_json = match live_context.as_ref() {
+        Some(value) if !value.is_null() => {
+            Some(serde_json::to_string(value).map_err(|e| format!("invalid live context: {e}"))?)
+        }
+        _ => None,
+    };
 
     // Current test/demo default is local Codex; passing it through here also
     // trips build_library_command's shell-allow gate for the Codex MCP path.
-    let args = chat_library_args(&message, history_json.as_deref());
+    let args = chat_library_args(
+        &message,
+        history_json.as_deref(),
+        live_context_json.as_deref(),
+    );
     let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
 
     let (stdout, stderr, code) = run_library_to_completion(&app, &arg_refs).await?;
@@ -784,12 +924,7 @@ pub async fn library_models(
     let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
 
     let (stdout, stderr, code) = run_library_to_completion(&app, &arg_refs).await?;
-    if code != 0 {
-        if let Ok(v) = serde_json::from_str::<Value>(stdout.trim()) {
-            return Ok(v);
-        }
-    }
-    parse_cli_json(&stdout, &stderr, code)
+    parse_library_models_json(&stdout, &stderr, code)
 }
 
 /// `open_library_window` — open the second app window hosting the vibe engine.
@@ -1310,6 +1445,25 @@ mod tests {
     }
 
     #[test]
+    fn curate_result_preserves_clarification_prompt() {
+        let raw = json!({
+            "theme": "warehouse",
+            "stop_reason": "clarification_needed",
+            "playlist_name": null,
+            "track_ids": [],
+            "rationale": "Which direction should I take this?",
+            "question": "Which direction should I take this?",
+            "choices": ["Hypnotic", "Peak-time"]
+        });
+        let m = map_curate_result(&raw);
+        assert_eq!(m["stop_reason"], "clarification_needed");
+        assert_eq!(m["question"], "Which direction should I take this?");
+        assert_eq!(m["choices"][0], "Hypnotic");
+        assert_eq!(m["choices"][1], "Peak-time");
+        assert_eq!(m["count"], 0);
+    }
+
+    #[test]
     fn app_agent_backend_is_pinned_to_codex() {
         unsafe {
             std::env::set_var("VIBEMIX_LIBRARY_AGENT_BACKEND", "gemini");
@@ -1356,6 +1510,7 @@ mod tests {
         let args = chat_library_args(
             "Find 1 dark peak techno track.",
             Some(r#"[{"role":"you","text":"first"}]"#),
+            Some(r#"{"deck":"A","deck_state":{"A":{"title":"Strobe","confidence":0.8}}}"#),
         );
         assert_eq!(
             args,
@@ -1368,6 +1523,8 @@ mod tests {
                 "--json",
                 "--history",
                 r#"[{"role":"you","text":"first"}]"#,
+                "--live-context",
+                r#"{"deck":"A","deck_state":{"A":{"title":"Strobe","confidence":0.8}}}"#,
             ]
         );
         let refs: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -1375,13 +1532,145 @@ mod tests {
     }
 
     #[test]
+    fn chat_library_args_preserve_time_aligned_audio_context() {
+        let live_context = json!({
+            "live_context_schema_version": 2,
+            "live_context_capabilities": [
+                "deck_state",
+                "deck_source_status",
+                "audio_part_context",
+                "deck_audio_separation_context",
+                "audio_window_map",
+                "audio_delta",
+                "live_evidence"
+            ],
+            "deck": "A",
+            "recent_moves": ["A_low: cut->killed"],
+            "deck_source_context": concat!(
+                "deck_source_context[identity_state=MusicState.deck_state ",
+                "primary=nowplaying_controller_attribution_to_library_cache ",
+                "resolved=A unresolved=B sources=folder_cache live_db=not_read ",
+                "event_xml=diagnostic_only second_deck=independent_source_required ",
+                "rule=unresolved_deck_is_not_transition_evidence]"
+            ),
+            "audio_part_context": concat!(
+                "audio_part_context[surface=live_context P1=live_global_mix ",
+                "P1_model_heard=false P1_runtime_observed=true P1_audience_heard=true ",
+                "P1_span=-6.0..0.0 P1_deck_audio=global_mix_not_stems ",
+                "deck1=A deck2=B together_audio=P1 per_deck_audio=not_attached ",
+                "duplicate_audio=same_master_not_deck_split ",
+                "rule=part_labels_not_outcome_verdict]"
+            ),
+            "deck_audio_separation_context": concat!(
+                "deck_audio_separation_context[requested_device=BlackHole_2ch ",
+                "capture_device=BlackHole_2ch input_channels=2 opened_channels=2 ",
+                "sample_rate=48000 device_capacity=stereo_or_less mode=global_mix_only ",
+                "current_capture=P1_global_mix gemini_audio=mono_downmix_of_capture ",
+                "deckA_audio=not_captured deckB_audio=not_captured ",
+                "per_deck_audio=not_attached isolated_decks=false ",
+                "upgrade_path=multi_channel_deck_pair_capture ",
+                "rule=separation_capability_not_outcome]"
+            ),
+            "audio_window_context": concat!(
+                "audio_window_context[P1=master_global_mix pre=-6.0..-1.0 ",
+                "action=-1.0..0.0 move_anchor=A_low_cut_to_killed@-0.3s:inside_P1 ",
+                "P2=source_file_lookahead heard=false future=0.0..+3.0 ",
+                "future_rule=forecast_only_not_audience_evidence ",
+                "deckA_audio=not_attached deckB_audio=not_attached ",
+                "per_deck_audio=structured_text_only duplicate_audio=same_master_not_deck_split ",
+                "deck_separation=deck_lanes_context lane_aliases=deck1:A,deck2:B]"
+            ),
+        });
+        let live_context_json =
+            serde_json::to_string(&live_context).expect("live context serializes");
+
+        let args = chat_library_args("What did that EQ move do?", None, Some(&live_context_json));
+
+        assert_eq!(
+            args,
+            vec![
+                "library",
+                "chat",
+                "What did that EQ move do?",
+                "--backend",
+                "codex",
+                "--json",
+                "--live-context",
+                live_context_json.as_str(),
+            ]
+        );
+        let live_context_arg = args
+            .iter()
+            .position(|arg| arg == "--live-context")
+            .and_then(|index| args.get(index + 1))
+            .expect("live context arg should be present");
+        let parsed: Value =
+            serde_json::from_str(live_context_arg).expect("live context arg should parse");
+        assert_eq!(
+            parsed
+                .get("live_context_schema_version")
+                .and_then(Value::as_i64),
+            Some(2)
+        );
+        assert!(parsed
+            .get("live_context_capabilities")
+            .and_then(Value::as_array)
+            .expect("capabilities array")
+            .iter()
+            .any(|value| value.as_str() == Some("audio_window_map")));
+        assert!(parsed
+            .get("live_context_capabilities")
+            .and_then(Value::as_array)
+            .expect("capabilities array")
+            .iter()
+            .any(|value| value.as_str() == Some("audio_part_context")));
+        assert!(parsed
+            .get("live_context_capabilities")
+            .and_then(Value::as_array)
+            .expect("capabilities array")
+            .iter()
+            .any(|value| value.as_str() == Some("deck_audio_separation_context")));
+        assert!(parsed
+            .get("audio_part_context")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .contains("P1_model_heard=false"));
+        assert!(parsed
+            .get("audio_part_context")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .contains("P1_deck_audio=global_mix_not_stems"));
+        assert!(parsed
+            .get("deck_audio_separation_context")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .contains("deckA_audio=not_captured"));
+        assert!(parsed
+            .get("deck_audio_separation_context")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .contains("per_deck_audio=not_attached"));
+        assert!(parsed
+            .get("deck_source_context")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .contains("second_deck=independent_source_required"));
+        assert!(parsed
+            .get("deck_source_context")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .contains("rule=unresolved_deck_is_not_transition_evidence"));
+    }
+
+    #[test]
     fn chat_library_args_omit_empty_history_flag() {
-        let args = chat_library_args("hello", None);
+        let args = chat_library_args("hello", None, None);
         assert_eq!(
             args,
             vec!["library", "chat", "hello", "--backend", "codex", "--json"]
         );
         assert!(!args.iter().any(|arg| arg == "--history"));
+        assert!(!args.iter().any(|arg| arg == "--live-context"));
     }
 
     #[test]
@@ -1463,5 +1752,48 @@ mod tests {
             payload["error"],
             "Codex CLI not found. Install it and run codex login."
         );
+    }
+
+    #[test]
+    fn parse_cli_json_returns_structured_clarification_on_exit_11() {
+        let stderr = r#"[viber/codex] clarification_needed:
+  Which direction should I take this?
+
+  1. More hypnotic, lower vocal density
+  2. Brighter peak-time pressure
+
+  Re-run with: library curate "warehouse + <chosen option>"
+"#;
+        let payload = parse_cli_json("", stderr, 11).expect("clarification payload");
+        assert_eq!(payload["stop_reason"], "clarification_needed");
+        assert_eq!(payload["question"], "Which direction should I take this?");
+        assert_eq!(payload["choices"][0], "More hypnotic, lower vocal density");
+        assert_eq!(payload["choices"][1], "Brighter peak-time pressure");
+        assert_eq!(payload["track_ids"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn parse_cli_json_accepts_success_json_with_trailing_hint() {
+        let stdout = r#"{"ok":true,"count":2}
+[library] cache warm
+"#;
+
+        let payload = parse_cli_json(stdout, "", 0).expect("first JSON value");
+
+        assert_eq!(payload["ok"], true);
+        assert_eq!(payload["count"], 2);
+    }
+
+    #[test]
+    fn parse_library_models_json_keeps_failed_install_summary_with_trailing_hint() {
+        let stdout = r#"{"models":[],"required_ready":false,"all_ready":false,"install":{"target":"required","results":[],"ok":false}}
+[models] required setup failed
+"#;
+
+        let payload = parse_library_models_json(stdout, "", 1).expect("structured model result");
+
+        assert_eq!(payload["required_ready"], false);
+        assert_eq!(payload["install"]["target"], "required");
+        assert_eq!(payload["install"]["ok"], false);
     }
 }

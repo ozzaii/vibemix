@@ -21,7 +21,9 @@ mod config;
 mod debrief_window;
 mod debug_log;
 mod djay_ax;
+mod ear_test_cmds;
 mod hotkey;
+mod learn_e2e;
 mod learn_window;
 mod library_cmds;
 mod mascot_window;
@@ -83,6 +85,8 @@ fn main() {
             config::write_first_run_state,
             config::read_mascot_window_state,
             config::write_mascot_window_state,
+            config::read_bravoh_waitlist_opt_in,
+            config::write_bravoh_waitlist_opt_in,
             config::set_mascot_visible,
             config::set_mascot_click_through,
             permissions::open_screen_recording_settings,
@@ -94,6 +98,7 @@ fn main() {
             overlay::show_overlay_highlight,
             pill_window::set_pill_height,
             debrief_window::open_debrief_window,
+            ear_test_cmds::write_ear_test_log,
             // Phase 49 — wizard install-chain commands.
             wizard_cmds::run_companion_fetch,
             wizard_cmds::run_audio_config,
@@ -109,6 +114,7 @@ fn main() {
             library_cmds::library_embed_folder,
             library_cmds::open_library_window,
             learn_window::open_learn_window,
+            learn_e2e::record_learn_e2e_result,
         ])
         .manage(SidecarHandle::default())
         .manage(DebriefSidecarHandle::default())
@@ -143,19 +149,27 @@ fn main() {
                 }
             }
 
-            // Sidecar supervisor.
-            let sidecar_app = app_handle.clone();
-            let sidecar_log = log_path.clone();
-            tauri::async_runtime::spawn(async move {
-                let _ = sidecar::spawn_sidecar_with_watchdog(sidecar_app, wizard_mode, sidecar_log)
-                    .await;
-            });
+            // Sidecar supervisor. The launched Learn e2e smoke can provide an
+            // external test sidecar on :8765 so it can exercise the real Tauri
+            // bridge on macOS without booting live audio hardware.
+            if learn_e2e::external_sidecar_enabled() {
+                tracing::info!("sidecar supervisor skipped; using external e2e sidecar on :8765");
+            } else {
+                let sidecar_app = app_handle.clone();
+                let sidecar_log = log_path.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ =
+                        sidecar::spawn_sidecar_with_watchdog(sidecar_app, wizard_mode, sidecar_log)
+                            .await;
+                });
+            }
 
             // WS bus client.
             let ws_app = app_handle.clone();
             tauri::async_runtime::spawn(async move {
                 ws_client::run_ws_client(ws_app).await;
             });
+            learn_e2e::install_learn_autorun(&app_handle);
 
             // Phase 12 Wave 3 — register the default push-to-mute hotkey.
             // Fires on platform default (Cmd+Shift+M / Ctrl+Shift+M).

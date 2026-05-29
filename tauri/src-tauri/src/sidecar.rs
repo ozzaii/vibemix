@@ -38,19 +38,34 @@ const MAX_RESTARTS: u32 = 3;
 /// Tauri shell with BYO direct/proxy credentials. Library one-shot commands
 /// share this relay for auth and Codex home/binary discovery; the
 /// Library/Viber reasoning backend is pinned to local Codex by the bridge.
-pub(crate) const FORWARDED_ENV_KEYS: [&str; 11] = [
+pub(crate) const FORWARDED_ENV_KEYS: [&str; 16] = [
     "VIBEMIX_LLM_MODE",
     "GEMINI_API_KEY",
     "OPENROUTER_API_KEY",
     "VIBEMIX_PROXY_JWT",
     "VIBEMIX_PROXY_BASE_URL",
     "VIBEMIX_CLIENT_VERSION",
+    "VIBEMIX_INPUT_DEVICE",
+    "VIBEMIX_OUTPUT_DEVICE",
+    "VIBEMIX_MIC_DEVICE",
+    "VIBEMIX_AUTO_MASTER_INPUT",
+    "VIBEMIX_AUTO_MASTER_FALLBACK_DEVICE",
     "CODEX_HOME",
     "VIBEMIX_CODEX_BIN",
     "CODEX_BIN",
     "VIBEMIX_NODE_BIN",
     "NODE_BIN",
 ];
+
+fn sidecar_audio_env_defaults<F>(env: &F) -> Vec<(&'static str, String)>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    if env("VIBEMIX_INPUT_DEVICE").is_some() || env("VIBEMIX_AUTO_MASTER_INPUT").is_some() {
+        return Vec::new();
+    }
+    vec![("VIBEMIX_AUTO_MASTER_INPUT", "1".to_string())]
+}
 
 /// Target triple of the bundled sidecar. Matches the per-triple directory
 /// name produced by scripts/build_sidecar.py.
@@ -242,6 +257,9 @@ pub async fn spawn_sidecar_with_watchdog(
                         }
                     }
                 }
+                for (key, val) in sidecar_audio_env_defaults(&|k: &str| std::env::var(k).ok()) {
+                    cmd.env(key, val);
+                }
                 if wizard_mode {
                     cmd.arg("--wizard");
                 }
@@ -280,14 +298,8 @@ pub async fn spawn_sidecar_with_watchdog(
                 // Drain stdout + stderr into the rotating log on dedicated
                 // OS threads. std::process::Child::wait() consumes the
                 // handle, so the stdio takes happen BEFORE the wait future.
-                let stdout = child
-                    .stdout
-                    .take()
-                    .expect("Stdio::piped configured above");
-                let stderr = child
-                    .stderr
-                    .take()
-                    .expect("Stdio::piped configured above");
+                let stdout = child.stdout.take().expect("Stdio::piped configured above");
+                let stderr = child.stderr.take().expect("Stdio::piped configured above");
                 let log_stdout = log.clone();
                 std::thread::spawn(move || {
                     let reader = BufReader::new(stdout);
@@ -340,6 +352,9 @@ pub async fn spawn_sidecar_with_watchdog(
                             c = c.env(key, val);
                         }
                     }
+                }
+                for (key, val) in sidecar_audio_env_defaults(&|k: &str| std::env::var(k).ok()) {
+                    c = c.env(key, val);
                 }
 
                 let (mut rx, child) = match c.spawn() {
@@ -866,6 +881,11 @@ mod tests {
                 "VIBEMIX_PROXY_JWT",
                 "VIBEMIX_PROXY_BASE_URL",
                 "VIBEMIX_CLIENT_VERSION",
+                "VIBEMIX_INPUT_DEVICE",
+                "VIBEMIX_OUTPUT_DEVICE",
+                "VIBEMIX_MIC_DEVICE",
+                "VIBEMIX_AUTO_MASTER_INPUT",
+                "VIBEMIX_AUTO_MASTER_FALLBACK_DEVICE",
                 "CODEX_HOME",
                 "VIBEMIX_CODEX_BIN",
                 "CODEX_BIN",
@@ -873,6 +893,25 @@ mod tests {
                 "NODE_BIN",
             ]
         );
+    }
+
+    #[test]
+    fn sidecar_audio_env_defaults_enable_auto_master_when_unset() {
+        let env = fake_env(&[]);
+
+        assert_eq!(
+            sidecar_audio_env_defaults(&env),
+            vec![("VIBEMIX_AUTO_MASTER_INPUT", "1".to_string())]
+        );
+    }
+
+    #[test]
+    fn sidecar_audio_env_defaults_preserve_explicit_audio_choice() {
+        let explicit_input = fake_env(&[("VIBEMIX_INPUT_DEVICE", "BlackHole 16ch")]);
+        let explicit_auto = fake_env(&[("VIBEMIX_AUTO_MASTER_INPUT", "0")]);
+
+        assert!(sidecar_audio_env_defaults(&explicit_input).is_empty());
+        assert!(sidecar_audio_env_defaults(&explicit_auto).is_empty());
     }
 
     #[test]
