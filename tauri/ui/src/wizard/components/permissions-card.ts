@@ -41,7 +41,7 @@ const CSS = `
     overflow: hidden;
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.028), transparent 34%),
-      linear-gradient(90deg, rgba(255, 138, 61, 0.035), transparent 30%),
+      linear-gradient(90deg, rgba(255, 165, 223, 0.035), transparent 30%),
       rgba(0, 0, 0, 0.2);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.04),
@@ -54,7 +54,7 @@ const CSS = `
     pointer-events: none;
     background:
       repeating-linear-gradient(90deg, transparent 0 43px, rgba(214, 207, 199, 0.018) 43px 44px),
-      linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.06), transparent);
+      linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.06), transparent);
     opacity: 0.7;
     mask-image: linear-gradient(90deg, black 0%, black 88%, transparent 100%);
   }

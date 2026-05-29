@@ -73,7 +73,7 @@ const CSS = `
     pointer-events: none;
     border-radius: var(--rad-lg);
     background:
-      linear-gradient(90deg, transparent 0%, rgba(255, 138, 61, 0.12) 50%, transparent 100%),
+      linear-gradient(90deg, transparent 0%, rgba(255, 165, 223, 0.12) 50%, transparent 100%),
       repeating-linear-gradient(0deg, transparent 0 8px, rgba(214, 207, 199, 0.025) 8px 9px);
     mix-blend-mode: screen;
     opacity: 0.42;
@@ -95,7 +95,7 @@ const CSS = `
     background:
       radial-gradient(circle at 8px 8px, var(--silk-22) 0 2px, transparent 2.5px),
       radial-gradient(circle at calc(100% - 8px) 8px, var(--silk-12) 0 2px, transparent 2.5px),
-      radial-gradient(circle at 8px calc(100% - 8px), rgba(255, 138, 61, 0.18) 0 2px, transparent 2.5px),
+      radial-gradient(circle at 8px calc(100% - 8px), rgba(255, 165, 223, 0.18) 0 2px, transparent 2.5px),
       radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), var(--silk-12) 0 2px, transparent 2.5px);
   }
   .wizard-intro__field::after {
@@ -103,7 +103,7 @@ const CSS = `
     height: 1px;
     inset: auto;
     border-radius: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.34), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.34), transparent);
     box-shadow: none;
     transform: none;
     opacity: 0.48;
@@ -113,13 +113,13 @@ const CSS = `
     width: min(430px, 70vw);
     aspect-ratio: 1;
     border-radius: 50%;
-    border: 1px solid rgba(255, 138, 61, 0.12);
+    border: 1px solid rgba(255, 165, 223, 0.12);
     background:
-      radial-gradient(circle, transparent 0 35%, rgba(255, 138, 61, 0.045) 35.5% 36.5%, transparent 37% 57%, rgba(214, 207, 199, 0.055) 57.5% 58.5%, transparent 59%),
-      conic-gradient(from 24deg, transparent 0 62deg, rgba(255, 138, 61, 0.24) 72deg, transparent 92deg 360deg);
+      radial-gradient(circle, transparent 0 35%, rgba(255, 165, 223, 0.045) 35.5% 36.5%, transparent 37% 57%, rgba(214, 207, 199, 0.055) 57.5% 58.5%, transparent 59%),
+      conic-gradient(from 24deg, transparent 0 62deg, rgba(255, 165, 223, 0.24) 72deg, transparent 92deg 360deg);
     box-shadow:
       inset 0 0 42px rgba(0, 0, 0, 0.72),
-      0 0 44px rgba(255, 138, 61, 0.055);
+      0 0 44px rgba(255, 165, 223, 0.055);
     opacity: 0.78;
   }
   .wizard-intro__orbit span {
@@ -173,8 +173,8 @@ const CSS = `
   .wizard-intro__rail i:nth-child(3),
   .wizard-intro__rail i:nth-child(7),
   .wizard-intro__rail i:nth-child(10) {
-    background: rgba(255, 138, 61, 0.62);
-    box-shadow: 0 0 10px rgba(255, 138, 61, 0.22);
+    background: rgba(255, 165, 223, 0.62);
+    box-shadow: 0 0 10px rgba(255, 165, 223, 0.22);
   }
   .wizard-intro__telemetry {
     position: absolute;
@@ -200,8 +200,8 @@ const CSS = `
   }
   .wizard-intro__telemetry span:first-child {
     color: var(--amber);
-    border-color: rgba(255, 138, 61, 0.18);
-    text-shadow: 0 0 8px rgba(255, 138, 61, 0.24);
+    border-color: rgba(255, 165, 223, 0.18);
+    text-shadow: 0 0 8px rgba(255, 165, 223, 0.24);
   }
   .wizard-intro__hero {
     position: relative;
@@ -215,7 +215,7 @@ const CSS = `
     color: var(--silk);
     text-shadow:
       0 2px 8px rgba(0, 0, 0, 0.65),
-      0 0 32px rgba(255, 138, 61, 0.06);
+      0 0 32px rgba(255, 165, 223, 0.06);
   }
   .wizard-intro__hero::before {
     content: "";
@@ -283,14 +283,14 @@ const CSS = `
     min-width: 184px;
     padding: 15px 28px 14px;
     letter-spacing: 0;
-    border-color: rgba(255, 138, 61, 0.2);
+    border-color: rgba(255, 165, 223, 0.2);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.075),
       inset 0 -1px 0 var(--amber-40),
       inset 0 -8px 18px rgba(0, 0, 0, 0.32),
       inset 0 0 18px var(--amber-22),
       0 10px 22px rgba(0, 0, 0, 0.32),
-      0 0 0 1px rgba(255, 138, 61, 0.14);
+      0 0 0 1px rgba(255, 165, 223, 0.14);
   }
   /* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep. The intro carries a
    * single CTA ("Let's go"); the broad interactive selector union below

@@ -82,7 +82,7 @@ const CSS = `
     text-transform: uppercase;
     padding: 2px var(--sp-2);
     border-radius: var(--rad-sm);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
     border: 1px solid var(--amber-22);
     color: var(--amber);
     text-shadow: 0 0 4px var(--amber-22);
@@ -145,12 +145,12 @@ const CSS = `
     transition: background var(--motion-snap) ease-out, color var(--motion-snap) ease-out;
   }
   .cmp-dropdown-device__option:hover {
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
   }
   .cmp-dropdown-device__option[data-selected="true"] {
     color: var(--amber);
     text-shadow: 0 0 4px var(--amber-22);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
   }
   .cmp-dropdown-device__option .cmp-dropdown-device__glyph {
     color: var(--silk-65);

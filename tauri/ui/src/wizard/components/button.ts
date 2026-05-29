@@ -8,9 +8,10 @@
  * v5 anatomy:
  *   - idle: --glass-2 + --glass-edge 1px border, inset --glass-top top
  *     sheen + rgba(0,0,0,0.45) bottom hairline (mock §02 .btn).
- *   - armed: amber backlight via linear-gradient(180deg, rgba(255,138,61,0.09),
- *     rgba(255,138,61,0.025)) + --amber-40 inset bottom + --amber-22
- *     inner glow (mock §02 .btn.on internal backlight, no external halo).
+ *   - armed: rose backlight via linear-gradient(180deg, rgba(255, 165, 223,0.09),
+ *     rgba(255, 165, 223,0.025)) + --amber-40 inset bottom + --amber-22
+ *     inner glow (--amber aliases to --brand rose; mock §02 .btn.on internal
+ *     backlight, no external halo).
  *   - pressed-armed: --void-2 deep recess with inset shadows.
  *
  * Typography: Saira var(--type-display) wdth 85 wght 600 10px UPPERCASE
@@ -106,19 +107,19 @@ const CSS = `
   }
   /* Armed — internal amber bleed (mock §02 .btn.on) */
   .cmp-btn[data-variant="primary"][data-state="armed"] {
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
-    border-color: rgba(255, 138, 61, 0.14);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
+    border-color: rgba(255, 165, 223, 0.14);
     color: var(--amber);
     text-shadow: 0 0 4px var(--amber-65);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 var(--amber-40),
       inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.14);
+      0 0 0 1px rgba(255, 165, 223, 0.14);
   }
   .cmp-btn[data-variant="primary"][data-state="armed"]:hover,
   .cmp-btn[data-variant="primary"][data-state="hover-armed"] {
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.14) 0%, rgba(255, 138, 61, 0.04) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.14) 0%, rgba(255, 165, 223, 0.04) 100%);
     border-color: var(--amber);
     color: var(--amber);
     text-shadow: 0 0 6px var(--amber-65), 0 0 14px var(--amber-22);
@@ -126,7 +127,7 @@ const CSS = `
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
       inset 0 -1px 0 var(--amber-65),
       inset 0 0 18px var(--amber-40),
-      0 0 0 1px rgba(255, 138, 61, 0.22);
+      0 0 0 1px rgba(255, 165, 223, 0.22);
   }
   .cmp-btn[data-variant="primary"][data-state="armed"]:active,
   .cmp-btn[data-variant="primary"][data-state="pressed-armed"] {
@@ -140,7 +141,7 @@ const CSS = `
       inset 0 0 14px var(--amber-22);
   }
   .cmp-btn[data-variant="primary"][data-state="loading"] {
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.06) 0%, rgba(255, 138, 61, 0.018) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.06) 0%, rgba(255, 165, 223, 0.018) 100%);
     border-color: var(--amber-22);
     color: var(--amber);
     text-shadow: 0 0 4px var(--amber-22);

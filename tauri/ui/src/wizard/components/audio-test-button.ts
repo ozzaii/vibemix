@@ -136,7 +136,7 @@ const CSS = `
       var(--glow-soft);
   }
   .cmp-audio-test[data-state="playing"] .cmp-audio-test__cta {
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
     border-color: var(--amber-40);
     color: var(--amber);
     text-shadow: 0 0 4px var(--amber-65);

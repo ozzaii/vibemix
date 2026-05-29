@@ -50,7 +50,7 @@ const CSS = `
     background:
       radial-gradient(circle at 10px 10px, rgba(214, 207, 199, 0.2) 0 2px, transparent 2.5px),
       radial-gradient(circle at calc(100% - 10px) 10px, rgba(214, 207, 199, 0.12) 0 2px, transparent 2.5px),
-      linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.055), transparent);
+      linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.055), transparent);
     opacity: 0.78;
     mask-image: linear-gradient(180deg, black 0%, black 78%, transparent 100%);
   }
@@ -78,7 +78,7 @@ const CSS = `
     text-transform: uppercase;
     padding: 2px var(--sp-2);
     border-radius: var(--rad-sm);
-    background: rgba(255, 138, 61, 0.08);
+    background: rgba(255, 165, 223, 0.08);
     border: 1px solid var(--amber-22);
     color: var(--amber);
     line-height: 1;

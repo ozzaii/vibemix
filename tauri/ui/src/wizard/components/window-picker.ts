@@ -98,7 +98,7 @@ const CSS = `
     align-items: center;
     gap: var(--sp-4);
     padding: var(--sp-2) var(--sp-4);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
     border: 1px solid var(--amber-22);
     border-radius: var(--rad-sm);
     margin-bottom: var(--sp-4);

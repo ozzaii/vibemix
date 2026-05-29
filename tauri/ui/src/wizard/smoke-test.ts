@@ -55,7 +55,7 @@ const CSS = `
     width: 96px;
     height: 96px;
     border-radius: 50%;
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
     border: 1px solid var(--amber-40);
     box-shadow: var(--glow-soft), inset 0 0 14px var(--amber-22);
     display: flex;
