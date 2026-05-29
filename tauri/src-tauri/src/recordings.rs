@@ -58,7 +58,7 @@ pub(crate) fn resolve_recordings_root() -> Result<PathBuf, String> {
 /// macOS: `$HOME/Library/Application Support/vibemix`.
 /// Windows: `%APPDATA%/vibemix` (falls back to `$USERPROFILE/AppData/Roaming/vibemix`).
 /// Other (CI/Linux): `$XDG_CONFIG_HOME/vibemix` or `$HOME/.config/vibemix`.
-fn app_data_dir_matching_sidecar() -> Result<PathBuf, String> {
+pub(crate) fn app_data_dir_matching_sidecar() -> Result<PathBuf, String> {
     #[cfg(target_os = "macos")]
     {
         let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;

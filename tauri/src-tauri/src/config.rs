@@ -33,6 +33,8 @@
 //! on-demand if it doesn't exist (first toggle after a hidden launch),
 //! so enabling does NOT require an app restart.
 
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
@@ -128,6 +130,19 @@ pub enum PrimarySurface {
     Mascot,
     /// Neither in-set surface is created.
     None,
+}
+
+/// The ABSOLUTE path Rust passes to `tauri-plugin-store` for `config.json`.
+///
+/// WHY absolute: tauri-plugin-store resolves a RELATIVE `"config.json"` under
+/// the bundle-id AppData dir (`~/Library/Application Support/world.bravoh.vibemix/`),
+/// while the Python sidecar writes the literal `vibemix/config.json`. The two
+/// writers would touch DISJOINT files (the config split-brain). Passing the
+/// absolute `…/vibemix/config.json` forces the plugin onto the sidecar's dir so
+/// Rust + Python share ONE file. Delegates to the same helper `recordings.rs`
+/// already uses for the identical app-data-dir problem. (Quick 260529-m4m)
+pub(crate) fn config_store_path() -> Result<PathBuf, String> {
+    crate::recordings::app_data_dir_matching_sidecar().map(|d| d.join("config.json"))
 }
 
 /// Returns true when no `first_run_state` is recorded or when its
@@ -451,5 +466,50 @@ mod tests {
             serde_json::to_value(PrimarySurface::None).unwrap(),
             serde_json::json!("none")
         );
+    }
+
+    // Quick 260529-m4m — the config split-brain fix. config_store_path() must
+    // resolve under the SAME `vibemix/` app-data dir the Python sidecar writes,
+    // NOT the bundle-id `world.bravoh.vibemix/` dir tauri-plugin-store picks for
+    // a relative path. This test pins that.
+    #[test]
+    fn config_store_path_resolves_under_sidecar_vibemix_dir() {
+        // `std::env::set_var`/`var` is PROCESS-GLOBAL and Rust runs tests in
+        // parallel — save the prior HOME, set a temp HOME, assert, then restore.
+        // Leaving HOME mutated would corrupt any sibling test that reads it.
+        let prior_home = std::env::var("HOME").ok();
+        let tmp = tempfile::TempDir::new().expect("create temp HOME dir");
+        std::env::set_var("HOME", tmp.path());
+
+        let result = config_store_path();
+
+        // Restore HOME before any assertion can panic-unwind and skip the restore.
+        match prior_home {
+            Some(h) => std::env::set_var("HOME", h),
+            None => std::env::remove_var("HOME"),
+        }
+
+        let path = result.expect("config_store_path() returns Ok with HOME set");
+
+        // Always-true (every OS): the file lives at vibemix/config.json.
+        assert!(
+            path.ends_with("vibemix/config.json"),
+            "config path must end with vibemix/config.json, got {path:?}"
+        );
+
+        // macOS exact equality — the sidecar's literal location.
+        #[cfg(target_os = "macos")]
+        {
+            let expected = tmp
+                .path()
+                .join("Library")
+                .join("Application Support")
+                .join("vibemix")
+                .join("config.json");
+            assert_eq!(
+                path, expected,
+                "macOS config path must match the sidecar's vibemix/config.json"
+            );
+        }
     }
 }
