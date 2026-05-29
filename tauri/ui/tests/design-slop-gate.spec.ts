@@ -20,7 +20,10 @@ import { describe, expect, it } from "vitest";
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
 
 // The canonical brand fonts (tokens.css @font-face + the --type-* tokens).
-const ALLOWED_FONTS = ["Saira", "JetBrains Mono"];
+// Instrument Serif is the cohost hero / lead-track-name face (Phase-1b serif
+// slice, now vendored as latin + latin-ext WOFF2); Geist body/mono is the
+// remaining Phase-1b swap and joins this list when it lands.
+const ALLOWED_FONTS = ["Saira", "JetBrains Mono", "Instrument Serif"];
 // Generic / platform fonts that signal AI slop if used as a brand face.
 // (system-ui / ui-monospace / sans-serif / monospace are allowed ONLY as the
 // trailing fallback in a stack that starts with a brand font — see the
@@ -39,6 +42,23 @@ const BANNED_FONTS = [
   "Open Sans",
   "Lato",
 ];
+
+// Word-boundary match without a dynamic `new RegExp(...)`. The font names are
+// hardcoded constants (not user input), but a templated RegExp trips static
+// ReDoS scanners and a hardcoded boundary check is clearer regardless. Boundary
+// = the chars flanking the match are non-alphanumeric, so "Inter" never matches
+// inside a longer word.
+const WORD_CHAR = /[a-z0-9]/;
+function mentionsFont(decl: string, font: string): boolean {
+  const haystack = decl.toLowerCase();
+  const needle = font.toLowerCase();
+  for (let i = haystack.indexOf(needle); i !== -1; i = haystack.indexOf(needle, i + 1)) {
+    const before = i === 0 ? "" : haystack[i - 1] ?? "";
+    const after = haystack[i + needle.length] ?? "";
+    if (!WORD_CHAR.test(before) && !WORD_CHAR.test(after)) return true;
+  }
+  return false;
+}
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -77,7 +97,7 @@ describe("design-slop gate — no AI-slop fonts", () => {
 
   it("declares NO banned/generic brand font anywhere in src", () => {
     const offenders = FONT_DECLS.filter(({ decl }) =>
-      BANNED_FONTS.some((b) => new RegExp(`\\b${b}\\b`, "i").test(decl)),
+      BANNED_FONTS.some((b) => mentionsFont(decl, b)),
     );
     expect(
       offenders,

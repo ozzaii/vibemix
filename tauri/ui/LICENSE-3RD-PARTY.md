@@ -1,7 +1,8 @@
 # Third-Party Fonts — Vendored Under Their Respective Licenses
 
-vibemix ships 4 WOFF2 fonts bundled under `tauri/ui/public/fonts/` (1 Saira
-variable + 3 JetBrains Mono static). Vendoring them locally (rather than
+vibemix ships 6 WOFF2 fonts bundled under `tauri/ui/public/fonts/` (1 Saira
+variable + 3 JetBrains Mono static + 2 Instrument Serif static subsets).
+Vendoring them locally (rather than
 fetching from Google Fonts at runtime) is a hard requirement so the wizard
 renders correctly on first launch when the user has no network — and so
 production codesigning in Phase 18 can attest the exact binary contents.
@@ -69,6 +70,30 @@ numerics. The legacy WOFF2 files were deleted in the same commit.
   countdown timers) where the semibold mass reads as a chunky LED segment
   while keeping JetBrains Mono's clean letterforms.
 
+## Instrument Serif — Regular (400), latin subset
+
+- **File:** `tauri/ui/public/fonts/InstrumentSerif-Latin.woff2`
+- **Source:** Google Fonts — https://fonts.google.com/specimen/Instrument+Serif
+- **Subset shipped:** latin (`U+0000-00FF` + common punctuation/symbols)
+- **License:** SIL Open Font License 1.1 (OFL)
+- **Designer:** Rodrigo Fuenzalida (Instrument)
+- **SHA-256:** `60c06664b5a95c7de6cc3e00d1f9034d78bd1e40b564016b241674449a067d4d`
+- **Use in vibemix:** The one serif in the system, resolving `--type-serif`:
+  the co-host hero line ("listening for the mix…") and lead track names, set
+  large and quiet on the void. Replaces the Georgia system-serif fallback (the
+  "system font as brand face" slop tell named in DESIGN.md §3).
+
+## Instrument Serif — Regular (400), latin-ext subset
+
+- **File:** `tauri/ui/public/fonts/InstrumentSerif-Latin-Ext.woff2`
+- **Source:** Google Fonts — https://fonts.google.com/specimen/Instrument+Serif
+- **Subset shipped:** latin-ext (`U+0100-024F` and related diacritic ranges)
+- **License:** SIL Open Font License 1.1 (OFL)
+- **Designer:** Rodrigo Fuenzalida (Instrument)
+- **SHA-256:** `a8c4bd7cd7073180e740d2d83a616b5cb0845579b73207eeafeae8532e70c901`
+- **Use in vibemix:** Same role as the latin subset, covering accented track
+  names (the unicode-range split mirrors the upstream Google Fonts delivery).
+
 ---
 
 ## Audio Asset (Generated, Not Vendored)
@@ -112,14 +137,15 @@ numerics. The legacy WOFF2 files were deleted in the same commit.
 
 ## SIL Open Font License 1.1 — Summary
 
-All four vendored fonts ship under the SIL Open Font License 1.1. The OFL
+All six vendored fonts ship under the SIL Open Font License 1.1. The OFL
 permits redistribution as part of a software product so long as the font
 files themselves are not sold as a standalone product and the font name is
 not changed. Both conditions hold here:
 
 1. Fonts ship as part of the vibemix application — not sold separately.
 2. Filenames preserve upstream family names (`Saira-VariableFont_wdth,wght`,
-   `JetBrainsMono-Regular`, `JetBrainsMono-Medium`, `JetBrainsMono-SemiBold`).
+   `JetBrainsMono-Regular`, `JetBrainsMono-Medium`, `JetBrainsMono-SemiBold`,
+   `InstrumentSerif-Latin`, `InstrumentSerif-Latin-Ext`).
 
 Full OFL 1.1 text: https://scripts.sil.org/OFL_web
 

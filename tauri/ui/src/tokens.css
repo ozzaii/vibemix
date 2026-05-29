@@ -39,9 +39,10 @@
 /* === type — vendored Saira + JetBrains Mono (Geist/Instrument Serif = 1b) === *
  * SHA-256 attestations in LICENSE-3RD-PARTY.md. The tozpembe target type is
  * Geist Sans (body/UI) + Geist Mono (labels/numerics) + Instrument Serif
- * (cohost hero + lead track names); vendoring those WOFF2 is Phase 1b. Until
- * then --type-display/--type-body resolve to the vendored Saira and
- * --type-serif falls back to Georgia. */
+ * (cohost hero + lead track names). Instrument Serif is now vendored (the
+ * hero serif slice of Phase 1b), so --type-serif resolves in-face instead of
+ * the Georgia fallback; --type-display/--type-body still resolve to the
+ * vendored Saira until the Geist body/mono swap (remaining Phase-1b slice). */
 
 /* Saira — variable axes (wdth + wght). Single file, all weights+widths. */
 @font-face {
@@ -75,6 +76,29 @@
   font-weight: 600;
   font-style: normal;
   font-display: swap;
+}
+
+/* Instrument Serif — the cohost hero + lead track names. Two static subsets
+ * (latin, latin-ext) mirroring the upstream Google Fonts split, so accented
+ * track names render in-face while the hero is no longer the Georgia
+ * system-serif fallback (the named "system font as brand face" slop tell).
+ * SHA-256 attestations in LICENSE-3RD-PARTY.md. Geist Sans + Geist Mono (the
+ * --type-display/--type-body swap) remain the open Phase-1b body/mono slice. */
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/InstrumentSerif-Latin.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/InstrumentSerif-Latin-Ext.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 /* === v6 tozpembe design tokens (Forged Obsidian Chrome) =============== */
