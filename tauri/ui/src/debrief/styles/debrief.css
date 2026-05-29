@@ -60,8 +60,8 @@
 
 .vmx-debrief-root::before {
   background:
-    radial-gradient(circle at 72% 18%, rgba(255, 138, 61, 0.06), transparent 28%),
-    linear-gradient(90deg, transparent 0%, rgba(255, 138, 61, 0.035) 50%, transparent 100%),
+    radial-gradient(circle at 72% 18%, rgba(255, 165, 223, 0.06), transparent 28%),
+    linear-gradient(90deg, transparent 0%, rgba(255, 165, 223, 0.035) 50%, transparent 100%),
     repeating-linear-gradient(0deg, transparent 0 10px, rgba(214, 207, 199, 0.018) 10px 11px);
   opacity: 0.68;
   mask-image: linear-gradient(180deg, transparent 0%, black 16%, black 88%, transparent 100%);
@@ -70,8 +70,8 @@
 .vmx-debrief-root::after {
   inset: auto 24px 24px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.24), transparent);
-  box-shadow: 0 0 18px rgba(255, 138, 61, 0.1);
+  background: linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.24), transparent);
+  box-shadow: 0 0 18px rgba(255, 165, 223, 0.1);
 }
 
 .vmx-debrief-titlebar {
@@ -116,7 +116,7 @@
   text-transform: uppercase;
   color: var(--silk);
   line-height: 1;
-  text-shadow: 0 0 12px rgba(255, 138, 61, 0.12);
+  text-shadow: 0 0 12px rgba(255, 165, 223, 0.12);
 }
 
 .vmx-debrief-title::before {
@@ -125,7 +125,7 @@
   height: 7px;
   border-radius: 50%;
   background: var(--amber);
-  box-shadow: 0 0 12px rgba(255, 138, 61, 0.42);
+  box-shadow: 0 0 12px rgba(255, 165, 223, 0.42);
 }
 
 .vmx-debrief-titlebar__status {
@@ -156,7 +156,7 @@
 .vmx-debrief-titlebar__status span:first-child {
   color: var(--amber-pale);
   border-color: var(--amber-22);
-  background: rgba(255, 138, 61, 0.045);
+  background: rgba(255, 165, 223, 0.045);
 }
 
 .vmx-debrief-session {
@@ -222,8 +222,8 @@
   border: 1px solid rgba(214, 207, 199, 0.035);
   border-radius: var(--rad-md);
   background:
-    radial-gradient(circle at 73% 36%, rgba(255, 138, 61, 0.055), transparent 18%),
-    linear-gradient(90deg, transparent 0 22%, rgba(255, 138, 61, 0.035) 22.1%, transparent 22.3% 100%);
+    radial-gradient(circle at 73% 36%, rgba(255, 165, 223, 0.055), transparent 18%),
+    linear-gradient(90deg, transparent 0 22%, rgba(255, 165, 223, 0.035) 22.1%, transparent 22.3% 100%);
   opacity: 0.82;
 }
 
@@ -293,7 +293,7 @@
     0 18px 46px rgba(0, 0, 0, 0.2);
   max-height: 56vh;
   overflow: hidden auto;
-  scrollbar-color: rgba(255, 138, 61, 0.28) transparent;
+  scrollbar-color: rgba(255, 165, 223, 0.28) transparent;
 }
 
 .vmx-debrief-chapters {
@@ -309,7 +309,7 @@
   border: 1px solid rgba(255, 255, 255, 0.045);
   border-radius: var(--rad-sm);
   background:
-    linear-gradient(90deg, rgba(255, 138, 61, 0.08), transparent 36%),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.08), transparent 36%),
     repeating-linear-gradient(0deg, rgba(214, 207, 199, 0.05) 0 1px, transparent 1px 18px),
     rgba(0, 0, 0, 0.26);
   box-shadow:
@@ -326,7 +326,7 @@
   width: 100%;
   text-align: left;
   background:
-    linear-gradient(90deg, rgba(255, 138, 61, 0.035), transparent 34%),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.035), transparent 34%),
     rgba(0, 0, 0, 0.14);
   border: 1px solid rgba(214, 207, 199, 0.045);
   color: var(--silk-65);
@@ -349,7 +349,7 @@
   color: var(--amber);
   border-color: var(--amber-40);
   background:
-    linear-gradient(90deg, rgba(255, 138, 61, 0.085), transparent 42%),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.085), transparent 42%),
     rgba(0, 0, 0, 0.22);
   transform: translateX(2px);
   outline: none;
@@ -385,7 +385,7 @@
   background:
     radial-gradient(circle at 10px 10px, rgba(214, 207, 199, 0.18) 0 2px, transparent 2.5px),
     radial-gradient(circle at calc(100% - 10px) 10px, rgba(214, 207, 199, 0.1) 0 2px, transparent 2.5px),
-    linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.042), transparent);
+    linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.042), transparent);
   opacity: 0.72;
   mask-image: linear-gradient(180deg, black 0%, black 82%, transparent 100%);
 }
@@ -457,7 +457,7 @@
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.052), transparent),
+    linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.052), transparent),
     repeating-linear-gradient(90deg, transparent 0 18px, rgba(214, 207, 199, 0.026) 18px 19px);
   opacity: 0.7;
 }
@@ -528,8 +528,8 @@
   min-height: 5px;
   height: calc(var(--vmx-tick, 3) * 5px);
   border-radius: 1px;
-  background: linear-gradient(180deg, rgba(255, 138, 61, 0.52), rgba(255, 138, 61, 0.12));
-  box-shadow: 0 0 8px rgba(255, 138, 61, 0.12);
+  background: linear-gradient(180deg, rgba(255, 165, 223, 0.52), rgba(255, 165, 223, 0.12));
+  box-shadow: 0 0 8px rgba(255, 165, 223, 0.12);
 }
 
 .vmx-debrief-tldr-note {
@@ -587,9 +587,9 @@
   min-height: 8px;
   border-radius: 1px 1px 0 0;
   background:
-    linear-gradient(180deg, rgba(255, 138, 61, var(--vmx-bar-alpha)), rgba(214, 207, 199, 0.022)),
+    linear-gradient(180deg, rgba(255, 165, 223, var(--vmx-bar-alpha)), rgba(214, 207, 199, 0.022)),
     rgba(0, 0, 0, 0.2);
-  box-shadow: 0 0 10px rgba(255, 138, 61, 0.055);
+  box-shadow: 0 0 10px rgba(255, 165, 223, 0.055);
 }
 
 .vmx-debrief-region-layer {
@@ -643,7 +643,7 @@
 .vmx-debrief-timeline-readout span:first-child {
   color: var(--amber-pale);
   border-color: var(--amber-22);
-  background: rgba(255, 138, 61, 0.055);
+  background: rgba(255, 165, 223, 0.055);
 }
 
 .vmx-debrief-waveform {
@@ -677,8 +677,8 @@
   height: 74px;
   transform: translateY(-50%);
   background:
-    linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.16), transparent),
-    repeating-linear-gradient(90deg, rgba(255, 138, 61, 0.16) 0 2px, transparent 2px 13px);
+    linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.16), transparent),
+    repeating-linear-gradient(90deg, rgba(255, 165, 223, 0.16) 0 2px, transparent 2px 13px);
   opacity: 0.24;
   mask-image: radial-gradient(ellipse at center, black 0%, black 64%, transparent 100%);
 }
@@ -690,8 +690,8 @@
   right: 8%;
   top: 50%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.34), transparent);
-  box-shadow: 0 0 18px rgba(255, 138, 61, 0.12);
+  background: linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.34), transparent);
+  box-shadow: 0 0 18px rgba(255, 165, 223, 0.12);
 }
 
 .vmx-debrief-region {
@@ -702,9 +702,9 @@
   align-items: center;
   justify-content: center;
   background:
-    linear-gradient(180deg, rgba(255, 138, 61, 0.2), rgba(255, 138, 61, 0.095)),
+    linear-gradient(180deg, rgba(255, 165, 223, 0.2), rgba(255, 165, 223, 0.095)),
     rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(255, 138, 61, 0.34);
+  border: 1px solid rgba(255, 165, 223, 0.34);
   border-radius: var(--rad-sm);
   cursor: pointer;
   color: var(--silk);
@@ -728,7 +728,7 @@
 .vmx-debrief-region:hover,
 .vmx-debrief-region:focus-visible {
   background:
-    linear-gradient(180deg, rgba(255, 138, 61, 0.34), rgba(255, 138, 61, 0.14)),
+    linear-gradient(180deg, rgba(255, 165, 223, 0.34), rgba(255, 165, 223, 0.14)),
     rgba(0, 0, 0, 0.2);
   border-color: var(--amber);
   box-shadow: var(--glow-soft);
@@ -739,7 +739,7 @@
   color: var(--amber-pale);
   border-color: var(--amber);
   background:
-    linear-gradient(180deg, rgba(255, 138, 61, 0.42), rgba(255, 138, 61, 0.18)),
+    linear-gradient(180deg, rgba(255, 165, 223, 0.42), rgba(255, 165, 223, 0.18)),
     rgba(0, 0, 0, 0.24);
   box-shadow: var(--glow-soft);
   z-index: 3;
@@ -818,7 +818,7 @@
   padding: var(--sp-4);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 28%),
-    radial-gradient(circle at 92% 18%, rgba(255, 138, 61, 0.055), transparent 20%),
+    radial-gradient(circle at 92% 18%, rgba(255, 165, 223, 0.055), transparent 20%),
     rgba(0, 0, 0, 0.2);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.035),
@@ -834,7 +834,7 @@
   height: 4px;
   border-radius: 50%;
   background: rgba(214, 207, 199, 0.18);
-  box-shadow: 0 0 8px rgba(255, 138, 61, 0.12);
+  box-shadow: 0 0 8px rgba(255, 165, 223, 0.12);
 }
 
 .vmx-drill-title {
@@ -914,8 +914,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(255, 138, 61, 0.5);
-  box-shadow: 0 0 10px rgba(255, 138, 61, 0.22);
+  background: rgba(255, 165, 223, 0.5);
+  box-shadow: 0 0 10px rgba(255, 165, 223, 0.22);
 }
 
 .vmx-debrief-error-banner {
@@ -1026,7 +1026,7 @@
 
 .vmx-debrief-ear-test-toggle-btn {
   align-self: flex-start;
-  background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
   border: 1px solid var(--amber-40);
   color: var(--amber);
   padding: 9px 24px;
@@ -1042,14 +1042,14 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     inset 0 -1px 0 var(--amber-40),
     inset 0 0 14px var(--amber-22),
-    0 0 0 1px rgba(255, 138, 61, 0.14);
+    0 0 0 1px rgba(255, 165, 223, 0.14);
   transition: background var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
 }
 
 .vmx-debrief-ear-test-toggle-btn:hover,
 .vmx-debrief-ear-test-toggle-btn:focus-visible {
   border-color: var(--amber);
-  background: linear-gradient(180deg, rgba(255, 138, 61, 0.14) 0%, rgba(255, 138, 61, 0.04) 100%);
+  background: linear-gradient(180deg, rgba(255, 165, 223, 0.14) 0%, rgba(255, 165, 223, 0.04) 100%);
   outline: none;
 }
 
@@ -1143,7 +1143,7 @@
 
 .vmx-debrief-ear-test-submit {
   align-self: flex-start;
-  background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
   border: 1px solid var(--amber-40);
   color: var(--amber);
   padding: 9px 24px;
@@ -1159,14 +1159,14 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     inset 0 -1px 0 var(--amber-40),
     inset 0 0 14px var(--amber-22),
-    0 0 0 1px rgba(255, 138, 61, 0.14);
+    0 0 0 1px rgba(255, 165, 223, 0.14);
   transition: background var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
 }
 
 .vmx-debrief-ear-test-submit:hover,
 .vmx-debrief-ear-test-submit:focus-visible {
   border-color: var(--amber);
-  background: linear-gradient(180deg, rgba(255, 138, 61, 0.14) 0%, rgba(255, 138, 61, 0.04) 100%);
+  background: linear-gradient(180deg, rgba(255, 165, 223, 0.14) 0%, rgba(255, 165, 223, 0.04) 100%);
   outline: none;
 }
 
@@ -1327,8 +1327,8 @@
   .vmx-debrief-layout::before {
     inset: var(--sp-4);
     background:
-      radial-gradient(circle at 50% 24%, rgba(255, 138, 61, 0.052), transparent 22%),
-      linear-gradient(180deg, transparent 0 18%, rgba(255, 138, 61, 0.035) 18.1%, transparent 18.3% 100%);
+      radial-gradient(circle at 50% 24%, rgba(255, 165, 223, 0.052), transparent 22%),
+      linear-gradient(180deg, transparent 0 18%, rgba(255, 165, 223, 0.035) 18.1%, transparent 18.3% 100%);
   }
 
   .vmx-debrief-main {
@@ -1438,8 +1438,8 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: rgba(255, 138, 61, 0.74);
-    box-shadow: 0 0 10px rgba(255, 138, 61, 0.32);
+    background: rgba(255, 165, 223, 0.74);
+    box-shadow: 0 0 10px rgba(255, 165, 223, 0.32);
   }
 
   .vmx-debrief-verdict {
