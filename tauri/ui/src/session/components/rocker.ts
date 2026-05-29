@@ -88,23 +88,23 @@ const CSS = `
   /* --- rocker variant: pressed amber tile when active (used for BEG/INT/PRO etc.) --- */
   .vmx-rocker[data-variant="rocker"] .vmx-rocker__seg[data-active="true"] {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.095) 0%, rgba(255, 138, 61, 0.026) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.095) 0%, rgba(255, 165, 223, 0.026) 100%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 rgba(255, 138, 61, 0.30),
+      inset 0 -1px 0 rgba(255, 165, 223, 0.30),
       inset 0 0 9px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.13);
+      0 0 0 1px rgba(255, 165, 223, 0.13);
     text-shadow: 0 0 3px var(--amber-40);
   }
   /* --- interaction variant: same hardware state, not a second palette. --- */
   .vmx-rocker[data-variant="interaction"] .vmx-rocker__seg[data-active="true"] {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.085) 0%, rgba(255, 138, 61, 0.022) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.085) 0%, rgba(255, 165, 223, 0.022) 100%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.055),
-      inset 0 -1px 0 rgba(255, 138, 61, 0.28),
+      inset 0 -1px 0 rgba(255, 165, 223, 0.28),
       inset 0 0 8px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.12);
+      0 0 0 1px rgba(255, 165, 223, 0.12);
     text-shadow: 0 0 3px var(--amber-40);
   }
   /* Legacy LED prefix kept rendering for backward-compat with the

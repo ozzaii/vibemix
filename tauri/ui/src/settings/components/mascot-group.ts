@@ -124,12 +124,12 @@ const CSS = `
   [data-component="mascot-group"] .vmx-mascot-pill:hover { color: var(--silk); }
   [data-component="mascot-group"] .vmx-mascot-pill[data-active="true"] {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 var(--amber-40),
       inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.14);
+      0 0 0 1px rgba(255, 165, 223, 0.14);
     text-shadow: 0 0 4px var(--amber-65);
   }
   [data-component="mascot-group"] .vmx-mascot-pill:focus-visible {

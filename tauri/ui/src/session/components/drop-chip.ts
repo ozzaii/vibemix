@@ -25,14 +25,14 @@ const CSS = `
     align-items: center;
     gap: var(--sp-3);
     padding: 8px 12px 8px 14px;
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
     border: 1px solid var(--amber-40);
     border-radius: var(--rad-sm);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 var(--amber-40),
       inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.14);
+      0 0 0 1px rgba(255, 165, 223, 0.14);
     position: relative;
     /* 2026-05-19 /impeccable critique fix: dropped the panel-wide
      * vmx-drop-pulse animation. At 130 BPM the chip pulsed every

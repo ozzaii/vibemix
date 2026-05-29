@@ -84,13 +84,13 @@ const CSS = `
   .vmx-picker__row:focus-visible { outline: none; }
   .vmx-picker[data-open="true"] .vmx-picker__row {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
-    border-color: rgba(255, 138, 61, 0.14);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
+    border-color: rgba(255, 165, 223, 0.14);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 var(--amber-40),
       inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.14);
+      0 0 0 1px rgba(255, 165, 223, 0.14);
     text-shadow: 0 0 4px var(--amber-65);
   }
   .vmx-picker__icon {
@@ -157,7 +157,7 @@ const CSS = `
     text-transform: uppercase;
     padding: 3px 7px;
     border-radius: 1px;
-    background: rgba(255, 138, 61, 0.08);
+    background: rgba(255, 165, 223, 0.08);
     border: 1px solid var(--amber-22);
     color: var(--amber);
     line-height: 1;
@@ -261,14 +261,14 @@ const CSS = `
   .vmx-picker__opt:hover,
   .vmx-picker__opt:focus-visible {
     color: var(--amber);
-    background: rgba(255, 138, 61, 0.06);
+    background: rgba(255, 165, 223, 0.06);
     text-shadow: 0 0 4px var(--amber-22);
     box-shadow: var(--glow-faint);
   }
   .vmx-picker__opt:focus-visible { outline: none; }
   .vmx-picker__opt[data-selected="true"] {
     color: var(--amber);
-    background: rgba(255, 138, 61, 0.05);
+    background: rgba(255, 165, 223, 0.05);
     text-shadow: 0 0 4px var(--amber-22);
   }
   .vmx-picker__opt[data-selected="true"]::before {

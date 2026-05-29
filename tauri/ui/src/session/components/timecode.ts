@@ -55,7 +55,7 @@ const CSS = `
     position: absolute;
     left: 0; right: 0; bottom: -40%;
     height: 80%;
-    background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(255, 138, 61, 0.07), transparent 70%);
+    background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(255, 165, 223, 0.07), transparent 70%);
     pointer-events: none;
     z-index: 0;
   }
@@ -204,7 +204,7 @@ const CSS = `
     box-shadow:
       inset 0 2px 6px rgba(0, 0, 0, 0.9),
       inset 0 0 0 1px rgba(0, 0, 0, 0.55),
-      inset 0 0 18px rgba(255, 138, 61, 0.035),
+      inset 0 0 18px rgba(255, 165, 223, 0.035),
       0 0 0 1px rgba(255, 255, 255, 0.022);
     position: relative;
     overflow: hidden;
@@ -215,7 +215,7 @@ const CSS = `
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 30%, transparent 80%, rgba(255, 138, 61, 0.028) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 30%, transparent 80%, rgba(255, 165, 223, 0.028) 100%);
   }
   .vmx-timecode__display-lbl {
     font-family: var(--type-display);
@@ -236,7 +236,7 @@ const CSS = `
     font-size: 52px;
     line-height: 0.95;
     color: var(--silk);
-    text-shadow: 0 0 14px rgba(255, 138, 61, 0.32), 0 0 4px rgba(255, 138, 61, 0.45);
+    text-shadow: 0 0 14px rgba(255, 165, 223, 0.32), 0 0 4px rgba(255, 165, 223, 0.45);
     letter-spacing: -0.04em;
     display: block;
     user-select: none;

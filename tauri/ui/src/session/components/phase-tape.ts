@@ -55,7 +55,7 @@ const CSS = `
     box-shadow:
       inset 0 2px 6px rgba(0, 0, 0, 0.85),
       inset 0 0 0 1px rgba(0, 0, 0, 0.5),
-      inset 0 0 18px rgba(255, 138, 61, 0.025),
+      inset 0 0 18px rgba(255, 165, 223, 0.025),
       0 0 0 1px rgba(255, 255, 255, 0.018);
     overflow: hidden;
     font-family: var(--type-mono);
@@ -77,7 +77,7 @@ const CSS = `
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, transparent 28%, transparent 82%, rgba(255, 138, 61, 0.022) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, transparent 28%, transparent 82%, rgba(255, 165, 223, 0.022) 100%);
   }
   .vmx-phase-tape__lbl {
     position: absolute;
@@ -134,17 +134,17 @@ const CSS = `
   .vmx-phase-chunk[data-kind="groove"] {
     color: var(--silk-65);
     background:
-      linear-gradient(180deg, rgba(255, 138, 61, 0.045), rgba(255, 138, 61, 0.012)),
+      linear-gradient(180deg, rgba(255, 165, 223, 0.045), rgba(255, 165, 223, 0.012)),
       rgba(255, 255, 255, 0.025);
-    box-shadow: inset 0 0 0 1px rgba(255, 138, 61, 0.10);
+    box-shadow: inset 0 0 0 1px rgba(255, 165, 223, 0.10);
   }
   .vmx-phase-chunk[data-kind="build"] {
     color: var(--amber-pale);
     background:
       repeating-linear-gradient(
         45deg,
-        rgba(255, 138, 61, 0.18) 0 6px,
-        rgba(255, 138, 61, 0.28) 6px 12px
+        rgba(255, 165, 223, 0.18) 0 6px,
+        rgba(255, 165, 223, 0.28) 6px 12px
       );
     box-shadow:
       inset 0 0 0 1px var(--amber-40),
@@ -174,7 +174,7 @@ const CSS = `
    * is the ghost tell, not a slanted face. */
   .vmx-phase-chunk[data-kind="drop-ghost"] {
     border: 1px dashed var(--amber-40);
-    background: rgba(255, 138, 61, 0.04);
+    background: rgba(255, 165, 223, 0.04);
     color: var(--amber-pale);
     font-family: var(--type-display);
     font-variation-settings: "wdth" 100, "wght" 600;

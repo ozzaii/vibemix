@@ -42,7 +42,7 @@ const CSS = `
     box-shadow:
       inset 0 2px 6px rgba(0, 0, 0, 0.85),
       inset 0 0 0 1px rgba(0, 0, 0, 0.55),
-      inset 0 0 18px rgba(255, 138, 61, 0.022),
+      inset 0 0 18px rgba(255, 165, 223, 0.022),
       0 0 0 1px rgba(255, 255, 255, 0.022);
     overflow: hidden;
     overflow-x: auto;
@@ -78,7 +78,7 @@ const CSS = `
     flex-shrink: 0;
   }
   .vmx-event-chip[data-age="now"] {
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.10) 0%, rgba(255, 138, 61, 0.03) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.10) 0%, rgba(255, 165, 223, 0.03) 100%);
     border-color: var(--amber-40);
     color: var(--amber-pale);
     text-shadow: 0 0 4px var(--amber-22);
@@ -88,7 +88,7 @@ const CSS = `
       inset 0 0 12px var(--amber-22);
   }
   .vmx-event-chip[data-age="warm"] {
-    background: rgba(255, 138, 61, 0.05);
+    background: rgba(255, 165, 223, 0.05);
     border-color: var(--amber-22);
     color: var(--amber);
     text-shadow: 0 0 4px var(--amber-22);

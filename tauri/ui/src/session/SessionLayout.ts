@@ -316,23 +316,23 @@ const LAYOUT_CSS = `
     color: var(--amber-pale);
     border-color: var(--amber-40);
     background:
-      linear-gradient(180deg, rgba(255, 138, 61, 0.11), rgba(255, 138, 61, 0.025) 58%, rgba(0, 0, 0, 0.22)),
+      linear-gradient(180deg, rgba(255, 165, 223, 0.11), rgba(255, 165, 223, 0.025) 58%, rgba(0, 0, 0, 0.22)),
       rgba(2, 3, 6, 0.66);
     box-shadow:
       inset 0 1px 0 rgba(255, 251, 244, 0.040),
       inset 0 -1px 0 var(--amber-22),
-      inset 0 0 14px rgba(255, 138, 61, 0.10);
+      inset 0 0 14px rgba(255, 165, 223, 0.10);
   }
   .vmx-deck__controls button[data-primary="true"] {
     color: var(--amber-pale);
     border-color: var(--amber-22);
     background:
-      linear-gradient(180deg, rgba(255, 138, 61, 0.075), rgba(255, 138, 61, 0.018) 58%, rgba(0, 0, 0, 0.22)),
+      linear-gradient(180deg, rgba(255, 165, 223, 0.075), rgba(255, 165, 223, 0.018) 58%, rgba(0, 0, 0, 0.22)),
       rgba(2, 3, 6, 0.62);
     box-shadow:
       inset 0 1px 0 rgba(255, 251, 244, 0.034),
-      inset 0 -1px 0 rgba(255, 138, 61, 0.16),
-      inset 0 0 12px rgba(255, 138, 61, 0.060);
+      inset 0 -1px 0 rgba(255, 165, 223, 0.16),
+      inset 0 0 12px rgba(255, 165, 223, 0.060);
   }
   .vmx-deck__controls button[data-primary="true"]:hover {
     color: var(--amber);
@@ -383,7 +383,7 @@ const LAYOUT_CSS = `
     border: 1px solid rgba(214, 207, 199, 0.075);
     border-radius: var(--rad-sm);
     background:
-      radial-gradient(76% 80% at 16% 100%, rgba(255, 138, 61, 0.055), transparent 58%),
+      radial-gradient(76% 80% at 16% 100%, rgba(255, 165, 223, 0.055), transparent 58%),
       linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 28%, rgba(0, 0, 0, 0.30)),
       rgba(0, 0, 0, 0.23);
     box-shadow:
@@ -465,22 +465,22 @@ const LAYOUT_CSS = `
     padding: 5px 10px;
     background:
       linear-gradient(180deg, rgba(255, 251, 244, 0.026), transparent 44%, rgba(0, 0, 0, 0.22)),
-      rgba(255, 138, 61, 0.045);
+      rgba(255, 165, 223, 0.045);
     cursor: pointer;
     text-shadow: 0 0 5px var(--amber-22);
     box-shadow:
       inset 0 1px 0 rgba(255, 251, 244, 0.034),
       inset 0 -1px 0 var(--amber-22),
-      inset 0 0 12px rgba(255, 138, 61, 0.075);
+      inset 0 0 12px rgba(255, 165, 223, 0.075);
   }
   .vmx-receipt[data-arrived="true"] .vmx-cite { animation: vmx-ignite 380ms cubic-bezier(0.16, 1, 0.3, 1) 900ms both; }
-  .vmx-cite:hover { border-color: var(--amber-40); background: rgba(255, 138, 61, 0.09); }
+  .vmx-cite:hover { border-color: var(--amber-40); background: rgba(255, 165, 223, 0.09); }
   .vmx-cite:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
   @keyframes vmx-draw { to { transform: scaleX(1); } }
   @keyframes vmx-ignite {
     0% { opacity: 0; color: var(--silk-40); border-color: var(--glass-edge); background: transparent; text-shadow: none; box-shadow: none; }
-    55% { opacity: 1; color: var(--amber); border-color: var(--amber-65); background: rgba(255, 138, 61, 0.10); text-shadow: 0 0 8px var(--amber-65); box-shadow: var(--glow-soft); }
-    100% { opacity: 1; color: var(--amber-pale); border-color: var(--amber-22); background: rgba(255, 138, 61, 0.04); text-shadow: 0 0 6px var(--amber-22); box-shadow: none; }
+    55% { opacity: 1; color: var(--amber); border-color: var(--amber-65); background: rgba(255, 165, 223, 0.10); text-shadow: 0 0 8px var(--amber-65); box-shadow: var(--glow-soft); }
+    100% { opacity: 1; color: var(--amber-pale); border-color: var(--amber-22); background: rgba(255, 165, 223, 0.04); text-shadow: 0 0 6px var(--amber-22); box-shadow: none; }
   }
 
   /* --- FOOT: one steady master readout (BPM · key · live level) --- */
@@ -493,7 +493,7 @@ const LAYOUT_CSS = `
     border-radius: var(--rad-sm);
     background:
       linear-gradient(180deg, rgba(255, 251, 244, 0.018), transparent 42%),
-      linear-gradient(90deg, rgba(255, 138, 61, 0.018), transparent 38%, transparent 62%, rgba(72, 152, 255, 0.014)),
+      linear-gradient(90deg, rgba(255, 165, 223, 0.018), transparent 38%, transparent 62%, rgba(72, 152, 255, 0.014)),
       rgba(0, 0, 0, 0.24);
     box-shadow:
       inset 0 1px 0 rgba(255, 251, 244, 0.032),
@@ -551,7 +551,7 @@ const LAYOUT_CSS = `
   .vmx-statusrow {
     display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-5);
     background:
-      linear-gradient(90deg, rgba(255, 138, 61, 0.020), transparent 38%, transparent 62%, rgba(72, 152, 255, 0.016)),
+      linear-gradient(90deg, rgba(255, 165, 223, 0.020), transparent 38%, transparent 62%, rgba(72, 152, 255, 0.016)),
       rgba(0, 0, 0, 0.55);
     backdrop-filter: var(--blur-glass-light);
     -webkit-backdrop-filter: var(--blur-glass-light); border-top: 1px solid var(--glass-edge);

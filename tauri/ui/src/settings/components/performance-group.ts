@@ -18,8 +18,8 @@
  * v5 visual anatomy (lifts from SettingsDrawer.ts:198–222 button block):
  *   - Off state: var(--glass-3) recessed bg, var(--glass-edge) hairline,
  *     label var(--silk-65) silkscreen.
- *   - On state: linear-gradient(180deg, rgba(255,138,61,0.09),
- *     rgba(255,138,61,0.025)) amber backlight (mock-verbatim),
+ *   - On state: linear-gradient(180deg, rgba(255, 165, 223,0.09),
+ *     rgba(255, 165, 223,0.025)) amber backlight (mock-verbatim),
  *     1px var(--amber-40) border, inset 0 0 14px var(--amber-22) bloom,
  *     label var(--amber) with text-shadow 0 0 4px var(--amber-65).
  *
@@ -86,13 +86,13 @@ const CSS = `
   }
   [data-component="performance-group"] .vmx-perf-toggle[data-on="true"] {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
     border-color: var(--amber-40);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 var(--amber-40),
       inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.14);
+      0 0 0 1px rgba(255, 165, 223, 0.14);
     text-shadow: 0 0 4px var(--amber-65);
   }
   [data-component="performance-group"] .vmx-perf-toggle:focus-visible {

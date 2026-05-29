@@ -26,8 +26,8 @@ body {
      multiple fine grids here; that made the whole surface shimmer before
      the user had even made a decision. */
   background:
-    linear-gradient(90deg, rgba(255, 138, 61, 0.026), transparent 28%, transparent 78%, rgba(72, 152, 255, 0.016)),
-    radial-gradient(100% 82% at 8% -12%, rgba(255, 138, 61, 0.042), transparent 48%),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.026), transparent 28%, transparent 78%, rgba(72, 152, 255, 0.016)),
+    radial-gradient(100% 82% at 8% -12%, rgba(255, 165, 223, 0.042), transparent 48%),
     radial-gradient(78% 70% at 100% 110%, rgba(72, 152, 255, 0.020), transparent 58%),
     var(--void-1);
 }
@@ -144,7 +144,7 @@ body {
     radial-gradient(circle at 14px calc(100% - 14px), rgba(255, 251, 244, 0.045) 0 1px, rgba(0, 0, 0, 0.34) 1px 3px, transparent 4px),
     radial-gradient(circle at calc(100% - 14px) calc(100% - 14px), rgba(255, 251, 244, 0.045) 0 1px, rgba(0, 0, 0, 0.34) 1px 3px, transparent 4px),
     linear-gradient(180deg, rgba(255, 251, 244, 0.024), transparent 21%),
-    linear-gradient(90deg, rgba(255, 138, 61, 0.018), transparent 30%, transparent 72%, rgba(72, 152, 255, 0.012)),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.018), transparent 30%, transparent 72%, rgba(72, 152, 255, 0.012)),
     var(--glass-2);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.050),
@@ -306,15 +306,15 @@ body {
 .vmx-lib-modeswitch button[aria-selected="true"] {
   color: var(--amber-pale);
   background:
-    linear-gradient(180deg, rgba(255, 138, 61, 0.12), rgba(255, 138, 61, 0.030) 55%, rgba(0, 0, 0, 0.30)),
+    linear-gradient(180deg, rgba(255, 165, 223, 0.12), rgba(255, 165, 223, 0.030) 55%, rgba(0, 0, 0, 0.30)),
     var(--glass-1);
   border-color: var(--amber-22);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.052),
-    inset 0 -2px 0 rgba(255, 138, 61, 0.18),
-    inset 0 0 20px rgba(255, 138, 61, 0.14),
+    inset 0 -2px 0 rgba(255, 165, 223, 0.18),
+    inset 0 0 20px rgba(255, 165, 223, 0.14),
     0 1px 0 rgba(0, 0, 0, 0.78),
-    0 0 13px rgba(255, 138, 61, 0.072);
+    0 0 13px rgba(255, 165, 223, 0.072);
 }
 .vmx-lib-modeswitch button[aria-selected="true"]::after {
   background: var(--amber);
@@ -389,8 +389,8 @@ body {
     inset 0 2px 7px rgba(0, 0, 0, 0.68),
     inset 0 1px 0 rgba(255, 251, 244, 0.026),
     inset 0 -1px 0 rgba(0, 0, 0, 0.62),
-    inset 0 0 16px rgba(255, 138, 61, 0.075),
-    0 0 0 1px rgba(255, 138, 61, 0.12);
+    inset 0 0 16px rgba(255, 165, 223, 0.075),
+    0 0 0 1px rgba(255, 165, 223, 0.12);
 }
 .vmx-lib-qbox svg { flex: none; color: var(--silk-40); }
 .vmx-lib-qbox input {
@@ -433,7 +433,7 @@ body {
 .vmx-lib-dropzone:hover,
 .vmx-lib-dropzone.dragging {
   border-color: var(--amber-40);
-  background: rgba(255, 138, 61, 0.03);
+  background: rgba(255, 165, 223, 0.03);
 }
 .vmx-lib-dropzone .big { font-size: 13px; color: var(--silk-65); margin-bottom: 4px; }
 .vmx-lib-dropzone .seed {
@@ -449,7 +449,7 @@ body {
   border-radius: 50%;
   background:
     radial-gradient(circle at 35% 30%, rgba(255, 251, 244, 0.76), transparent 18%),
-    radial-gradient(circle at 50% 60%, var(--amber), rgba(255, 138, 61, 0.38) 54%, rgba(0, 0, 0, 0.78) 80%);
+    radial-gradient(circle at 50% 60%, var(--amber), rgba(255, 165, 223, 0.38) 54%, rgba(0, 0, 0, 0.78) 80%);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.26),
     inset 0 -1px 1px rgba(0, 0, 0, 0.72),
@@ -479,16 +479,16 @@ body {
 .vmx-lib-chip:hover {
   color: var(--amber);
   border-color: var(--amber-22);
-  background: rgba(255, 138, 61, 0.045);
+  background: rgba(255, 165, 223, 0.045);
 }
 .vmx-lib-chip[aria-pressed="true"] {
   color: var(--amber-pale);
   border-color: var(--amber-22);
-  background: rgba(255, 138, 61, 0.055);
+  background: rgba(255, 165, 223, 0.055);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.032),
     inset 0 -2px 0 var(--amber-22),
-    inset 0 0 12px rgba(255, 138, 61, 0.10),
+    inset 0 0 12px rgba(255, 165, 223, 0.10),
     0 1px 0 rgba(0, 0, 0, 0.62);
 }
 .vmx-lib-chip:active,
@@ -524,9 +524,9 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.044),
     inset 0 -2px 0 var(--amber-22),
-    inset 0 0 18px rgba(255, 138, 61, 0.085),
+    inset 0 0 18px rgba(255, 165, 223, 0.085),
     0 2px 0 rgba(0, 0, 0, 0.72),
-    0 0 18px rgba(255, 138, 61, 0.075);
+    0 0 18px rgba(255, 165, 223, 0.075);
 }
 .vmx-lib-run::before {
   content: "";
@@ -547,13 +547,13 @@ body {
   opacity: 0.8;
 }
 .vmx-lib-run:hover {
-  background: rgba(255, 138, 61, 0.08);
+  background: rgba(255, 165, 223, 0.08);
   border-color: var(--amber-40);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.050),
     inset 0 -1px 0 var(--amber-40),
-    inset 0 0 22px rgba(255, 138, 61, 0.12),
-    0 0 20px rgba(255, 138, 61, 0.10);
+    inset 0 0 22px rgba(255, 165, 223, 0.12),
+    0 0 20px rgba(255, 165, 223, 0.10);
 }
 .vmx-lib-run:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
 
@@ -630,16 +630,16 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.034),
     inset 0 -1px 0 var(--amber-22),
-    inset 0 0 12px rgba(255, 138, 61, 0.075);
+    inset 0 0 12px rgba(255, 165, 223, 0.075);
 }
 .vmx-lib-model-setup button[hidden] { display: none; }
 .vmx-lib-model-setup button:disabled { opacity: 0.5; cursor: default; }
 .vmx-lib-agent-setup {
   margin-top: 11px;
   padding: 11px 12px;
-  border: 1px solid rgba(255, 138, 61, 0.16);
+  border: 1px solid rgba(255, 165, 223, 0.16);
   border-radius: var(--rad-sm);
-  background: rgba(255, 138, 61, 0.026);
+  background: rgba(255, 165, 223, 0.026);
 }
 .vmx-lib-agent-setup[hidden] { display: none; }
 .vmx-lib-agent-setup .state {
@@ -681,7 +681,7 @@ body {
 }
 .vmx-lib-row:hover {
   background:
-    linear-gradient(90deg, rgba(255, 138, 61, 0.038), transparent 52%),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.038), transparent 52%),
     var(--glass-1);
   border-color: var(--glass-edge-up);
   box-shadow:
@@ -691,9 +691,9 @@ body {
 }
 .vmx-lib-row.top {
   background:
-    linear-gradient(90deg, rgba(255, 138, 61, 0.090), transparent 48%),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.090), transparent 48%),
     linear-gradient(180deg, rgba(255, 251, 244, 0.024), transparent 54%, rgba(0, 0, 0, 0.22)),
-    rgba(255, 138, 61, 0.018);
+    rgba(255, 165, 223, 0.018);
   border-color: var(--amber-22);
 }
 .vmx-lib-row.top::before {
@@ -861,20 +861,20 @@ body[data-mode="chat"] .vmx-lib-command-field {
   border: 1px solid rgba(214, 207, 199, 0.052);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 138, 61, 0.032), transparent 13%),
+    radial-gradient(circle at 50% 50%, rgba(255, 165, 223, 0.032), transparent 13%),
     radial-gradient(circle at 50% 50%, rgba(72, 152, 255, 0.018), transparent 48%),
     radial-gradient(circle at 50% 50%, transparent 0 62%, rgba(0, 0, 0, 0.32) 78%);
   box-shadow:
     inset 0 0 32px rgba(0, 0, 0, 0.62),
     inset 0 1px 0 rgba(255, 251, 244, 0.018),
-    0 0 34px rgba(255, 138, 61, 0.030);
+    0 0 34px rgba(255, 165, 223, 0.030);
 }
 .vmx-lib-field-orbit::before,
 .vmx-lib-field-orbit::after {
   content: "";
   position: absolute;
   inset: 14%;
-  border: 1px solid rgba(255, 138, 61, 0.038);
+  border: 1px solid rgba(255, 165, 223, 0.038);
   border-radius: 50%;
 }
 .vmx-lib-field-orbit::after {
@@ -889,7 +889,7 @@ body[data-mode="chat"] .vmx-lib-command-field {
   border-radius: 50%;
   background:
     radial-gradient(circle at 35% 30%, rgba(255, 251, 244, 0.72), transparent 18%),
-    radial-gradient(circle at 50% 58%, var(--amber), rgba(255, 138, 61, 0.35) 54%, rgba(0, 0, 0, 0.72) 80%);
+    radial-gradient(circle at 50% 58%, var(--amber), rgba(255, 165, 223, 0.35) 54%, rgba(0, 0, 0, 0.72) 80%);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.20),
     inset 0 -1px 1px rgba(0, 0, 0, 0.72),
@@ -959,7 +959,7 @@ body[data-mode="chat"] .vmx-lib-chat-thread {
   border: 1px solid rgba(214, 207, 199, 0.052);
   border-radius: var(--rad-sm);
   background:
-    radial-gradient(76% 80% at 12% 100%, rgba(255, 138, 61, 0.030), transparent 60%),
+    radial-gradient(76% 80% at 12% 100%, rgba(255, 165, 223, 0.030), transparent 60%),
     linear-gradient(180deg, rgba(255, 251, 244, 0.012), transparent 26%, rgba(0, 0, 0, 0.26)),
     rgba(0, 0, 0, 0.16);
   box-shadow:
@@ -1027,7 +1027,7 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
 .vmx-lib-chat-turn[data-role="viber"] {
   border-color: var(--amber-22);
   background:
-    linear-gradient(90deg, rgba(255, 138, 61, 0.060), transparent 44%),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.060), transparent 44%),
     linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 45%),
     rgba(0, 0, 0, 0.16);
 }
@@ -1100,7 +1100,7 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
 .vmx-lib-chat-tool[data-ok="true"] {
   border-color: var(--amber-22);
   background:
-    linear-gradient(90deg, rgba(255, 138, 61, 0.052), transparent 70%),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.052), transparent 70%),
     var(--void-3);
 }
 .vmx-lib-chat-tool[data-ok="true"] .gem {
@@ -1174,7 +1174,7 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   border-radius: 50%;
   background:
     radial-gradient(circle at 35% 30%, rgba(255, 251, 244, 0.76), transparent 18%),
-    radial-gradient(circle at 50% 60%, var(--amber), rgba(255, 138, 61, 0.38) 54%, rgba(0, 0, 0, 0.78) 80%);
+    radial-gradient(circle at 50% 60%, var(--amber), rgba(255, 165, 223, 0.38) 54%, rgba(0, 0, 0, 0.78) 80%);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.26),
     inset 0 -1px 1px rgba(0, 0, 0, 0.72),
@@ -1456,13 +1456,13 @@ body[data-mode="build"] .vmx-lib-rationale {
 .vmx-lib-curveseg[aria-pressed="true"] {
   color: var(--amber-pale);
   background:
-    linear-gradient(180deg, rgba(255, 138, 61, 0.12), rgba(255, 138, 61, 0.030) 55%, rgba(0, 0, 0, 0.30)),
+    linear-gradient(180deg, rgba(255, 165, 223, 0.12), rgba(255, 165, 223, 0.030) 55%, rgba(0, 0, 0, 0.30)),
     var(--glass-1);
   border-color: var(--amber-22);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.052),
-    inset 0 -2px 0 rgba(255, 138, 61, 0.18),
-    inset 0 0 18px rgba(255, 138, 61, 0.12);
+    inset 0 -2px 0 rgba(255, 165, 223, 0.18),
+    inset 0 0 18px rgba(255, 165, 223, 0.12);
 }
 .vmx-lib-curveseg:active { transform: translateY(1px); }
 
@@ -1474,7 +1474,7 @@ body[data-mode="build"] .vmx-lib-rationale {
   padding: 14px 15px;
   border-radius: var(--rad-sm);
   background:
-    linear-gradient(180deg, rgba(255, 138, 61, 0.045), transparent 46%, rgba(0, 0, 0, 0.22)),
+    linear-gradient(180deg, rgba(255, 165, 223, 0.045), transparent 46%, rgba(0, 0, 0, 0.22)),
     var(--void-3);
   border: 1px solid var(--amber-22);
   box-shadow:
@@ -1514,7 +1514,7 @@ body[data-mode="build"] .vmx-lib-rationale {
   border: 1px solid rgba(214, 207, 199, 0.060);
   border-radius: var(--rad-sm);
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 138, 61, 0.018), transparent 46%),
+    radial-gradient(circle at 50% 50%, rgba(255, 165, 223, 0.018), transparent 46%),
     linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 42%, rgba(0, 0, 0, 0.18)),
     rgba(0, 0, 0, 0.18);
   box-shadow:
@@ -1531,7 +1531,7 @@ body[data-mode="build"] .vmx-lib-rationale {
   border-radius: 50%;
   box-shadow:
     inset 0 0 22px rgba(0, 0, 0, 0.45),
-    0 0 18px rgba(255, 138, 61, 0.035);
+    0 0 18px rgba(255, 165, 223, 0.035);
   pointer-events: none;
 }
 .vmx-lib-scope svg { display: block; width: 100%; height: 100%; }

@@ -344,7 +344,7 @@ const CSS = `
   }
   .vmx-cohost__ts {
     /* 2026-05-19 /impeccable critique fix: dropped the
-     * rgba(255, 138, 61, 0.05) amber wash on every transcript
+     * rgba(255, 165, 223, 0.05) amber wash on every transcript
      * timestamp pill. Over a 30-line transcript that was a sustained
      * amber tint on the entire reading surface, drifting the cohost
      * panel toward "amber decoration" instead of "amber as rare
@@ -444,7 +444,7 @@ const CSS = `
     border: 1px solid var(--amber-40);
     border-radius: var(--rad-sm);
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 var(--amber-40),

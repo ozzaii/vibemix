@@ -126,7 +126,7 @@ const CSS = `
     font-weight: 500;
     font-size: 18px;
     color: var(--silk);
-    text-shadow: 0 0 6px rgba(255, 138, 61, 0.18);
+    text-shadow: 0 0 6px rgba(255, 165, 223, 0.18);
     letter-spacing: -0.01em;
     line-height: 1;
     -webkit-app-region: no-drag;

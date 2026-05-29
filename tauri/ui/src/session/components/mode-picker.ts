@@ -95,12 +95,12 @@ const CSS = `
   .vmx-mode-picker__seg:focus-visible { outline: none; }
   .vmx-mode-picker__seg[data-active="true"] {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.095) 0%, rgba(255, 138, 61, 0.026) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.095) 0%, rgba(255, 165, 223, 0.026) 100%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 rgba(255, 138, 61, 0.30),
+      inset 0 -1px 0 rgba(255, 165, 223, 0.30),
       inset 0 0 9px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.13);
+      0 0 0 1px rgba(255, 165, 223, 0.13);
     text-shadow: 0 0 3px var(--amber-40);
   }
 `;

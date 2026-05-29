@@ -102,9 +102,9 @@ const CSS = `
     box-shadow:
       inset 0 2px 6px rgba(0, 0, 0, 0.9),
       inset 0 0 0 1px rgba(0, 0, 0, 0.4),
-      inset 0 0 14px rgba(255, 138, 61, 0.04),
+      inset 0 0 14px rgba(255, 165, 223, 0.04),
       0 0 0 1px rgba(255, 255, 255, 0.02);
-    text-shadow: 0 0 6px rgba(255, 138, 61, 0.20);
+    text-shadow: 0 0 6px rgba(255, 165, 223, 0.20);
     user-select: none;
   }
   .vmx-retention__track-wrap {

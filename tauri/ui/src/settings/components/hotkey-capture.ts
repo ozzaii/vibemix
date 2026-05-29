@@ -82,7 +82,7 @@ const CSS = `
     box-shadow:
       inset 0 2px 6px rgba(0, 0, 0, 0.85),
       inset 0 0 0 1px rgba(0, 0, 0, 0.4),
-      inset 0 0 14px rgba(255, 138, 61, 0.04),
+      inset 0 0 14px rgba(255, 165, 223, 0.04),
       0 0 0 1px rgba(255, 255, 255, 0.02);
     font-family: var(--type-mono);
     font-variant-numeric: tabular-nums;
@@ -104,7 +104,7 @@ const CSS = `
       inset 0 2px 6px rgba(0, 0, 0, 0.85),
       inset 0 0 0 1px var(--amber-40),
       inset 0 0 18px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.18);
+      0 0 0 1px rgba(255, 165, 223, 0.18);
     text-shadow: 0 0 7px var(--amber-65), 0 0 16px var(--amber-40);
     animation: vmx-hotkey-capture-pulse 1200ms ease-in-out infinite;
   }
@@ -150,13 +150,13 @@ const CSS = `
   }
   .vmx-hotkey-capture[data-capture="true"] .vmx-hotkey-capture__rebind {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
-    border-color: rgba(255, 138, 61, 0.14);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
+    border-color: rgba(255, 165, 223, 0.14);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 var(--amber-40),
       inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.14);
+      0 0 0 1px rgba(255, 165, 223, 0.14);
     text-shadow: 0 0 4px var(--amber-65);
   }
   .vmx-hotkey-capture__error {

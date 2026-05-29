@@ -106,7 +106,7 @@ const CSS = `
     font-family: var(--type-body);
     background:
       linear-gradient(180deg, rgba(255, 251, 244, 0.030), transparent 18%),
-      linear-gradient(90deg, rgba(255, 138, 61, 0.026), transparent 18%),
+      linear-gradient(90deg, rgba(255, 165, 223, 0.026), transparent 18%),
       linear-gradient(180deg, rgba(12, 14, 22, 0.94), rgba(3, 4, 8, 0.97) 66%, rgba(1, 2, 5, 0.98)),
       var(--glass-1);
     backdrop-filter: var(--blur-glass);
@@ -114,7 +114,7 @@ const CSS = `
     border-left: 1px solid var(--glass-edge-up);
     box-shadow:
       inset 1px 0 0 rgba(255, 251, 244, 0.080),
-      inset 10px 0 22px rgba(255, 138, 61, 0.018),
+      inset 10px 0 22px rgba(255, 165, 223, 0.018),
       inset 0 -1px 0 rgba(0, 0, 0, 0.78),
       -18px 0 54px rgba(0, 0, 0, 0.68),
       -1px 0 0 rgba(255, 251, 244, 0.020);
@@ -133,7 +133,7 @@ const CSS = `
   }
   .vmx-settings-drawer::before {
     background:
-      linear-gradient(90deg, rgba(255, 138, 61, 0.075), transparent 18%),
+      linear-gradient(90deg, rgba(255, 165, 223, 0.075), transparent 18%),
       linear-gradient(180deg, rgba(214, 207, 199, 0.030), transparent 22%);
     opacity: 0.18;
     mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 88%, transparent 100%);
@@ -142,8 +142,8 @@ const CSS = `
     left: 1px;
     right: auto;
     width: 1px;
-    background: linear-gradient(180deg, transparent, rgba(255, 138, 61, 0.42) 44%, transparent);
-    box-shadow: 0 0 16px rgba(255, 138, 61, 0.18);
+    background: linear-gradient(180deg, transparent, rgba(255, 165, 223, 0.42) 44%, transparent);
+    box-shadow: 0 0 16px rgba(255, 165, 223, 0.18);
     opacity: 0.58;
   }
   /* z-index discipline kept as a defensive baseline even after the
@@ -251,7 +251,7 @@ const CSS = `
   .vmx-settings-drawer__close:focus-visible {
     color: var(--amber);
     border-color: var(--amber-40);
-    background: rgba(255, 138, 61, 0.06);
+    background: rgba(255, 165, 223, 0.06);
     box-shadow: var(--glow-faint);
   }
   .vmx-settings-drawer__body {
@@ -281,7 +281,7 @@ const CSS = `
     display: none;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
     border: 1px solid var(--amber-40);
     border-radius: var(--rad-sm);
     font-family: var(--type-display);
@@ -327,7 +327,7 @@ const CSS = `
   .vmx-settings-drawer__btn:focus-visible {
     color: var(--amber);
     border-color: var(--amber-40);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.06) 0%, rgba(255, 138, 61, 0.02) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.06) 0%, rgba(255, 165, 223, 0.02) 100%);
     box-shadow:
       inset 0 0 12px var(--amber-22),
       var(--glow-faint);

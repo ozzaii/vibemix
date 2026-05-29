@@ -85,7 +85,7 @@ const CSS = `
     text-transform: uppercase;
     padding: 2px var(--sp-2);
     border-radius: var(--rad-sm);
-    background: rgba(255, 138, 61, 0.08);
+    background: rgba(255, 165, 223, 0.08);
     border: 1px solid var(--amber-22);
     color: var(--amber);
     line-height: 1;
