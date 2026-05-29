@@ -11,6 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { mountDesktopShell, type MountedShell } from "../../src/shell/DesktopShell.js";
+import { SURFACES } from "../../src/shell/surfaces.js";
 
 let shell: MountedShell | null = null;
 let host: HTMLElement;
@@ -48,6 +49,21 @@ describe("sidebar brand mark", () => {
     // brand glyph, so the wordmark split must not displace it.
     expect(brand.querySelector(".sb-ear")).toBeTruthy();
     expect(brand.querySelector(".sb-wordmark")).toBeTruthy();
+  });
+
+  it("renders bespoke inline-SVG nav marks — one matched engraved set, not unicode fallback", () => {
+    shell = mountDesktopShell(host);
+    const glyphs = host.querySelectorAll<SVGElement>(".sb-nav-item .sb-glyph svg");
+    // One mark per surface, each a real <svg> (the unicode chars they replaced
+    // fell back to mismatched system symbol fonts).
+    expect(glyphs.length).toBe(SURFACES.length);
+    glyphs.forEach((svg) => {
+      // Shared grid + stroke weight + currentColor = a matched set that also
+      // inherits the nav's rose-on-active / warm-on-hover coloring.
+      expect(svg.getAttribute("viewBox")).toBe("0 0 24 24");
+      expect(svg.getAttribute("stroke-width")).toBe("1.75");
+      expect(svg.getAttribute("stroke")).toBe("currentColor");
+    });
   });
 
   it("carries a 'v' monogram so the brand survives the collapsed rail", () => {

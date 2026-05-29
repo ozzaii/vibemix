@@ -11,6 +11,13 @@
 // surface (session/library/learn/debrief/settings) wires in during a later
 // phase without moving the structure.
 
+import {
+  GLYPH_CRATE,
+  GLYPH_DEBRIEF,
+  GLYPH_DECK,
+  GLYPH_LEARN,
+  GLYPH_SETTINGS,
+} from "./glyphs.js";
 import type { SurfaceId } from "./shell-store.js";
 
 /**
@@ -32,7 +39,8 @@ export interface SurfaceDef {
   readonly label: string;
   /** Command-palette / Cmd+<kbd> accelerator. */
   readonly kbd: string;
-  /** Deck-engraved glyph (no icon library; hardware-feel marks per DESIGN.md). */
+  /** Bespoke engraved mark — an inline-SVG string from ./glyphs (no icon
+   * library; one matched hardware-feel set per DESIGN.md). */
   readonly glyph: string;
   /** One-line description shown in the palette and collapsed-rail tooltip. */
   readonly hint: string;
@@ -43,12 +51,12 @@ export interface SurfaceDef {
 }
 
 export const SURFACES: readonly SurfaceDef[] = [
-  { id: "deck", label: "Deck", kbd: "1", glyph: "◉", hint: "the live co-host", wire: "shell.surface.deck" },
+  { id: "deck", label: "Deck", kbd: "1", glyph: GLYPH_DECK, hint: "the live co-host", wire: "shell.surface.deck" },
   {
     id: "crate",
     label: "Crate",
     kbd: "2",
-    glyph: "▤",
+    glyph: GLYPH_CRATE,
     hint: "library and Viber",
     wire: "shell.surface.crate",
     empty: {
@@ -60,7 +68,7 @@ export const SURFACES: readonly SurfaceDef[] = [
     id: "learn",
     label: "Learn",
     kbd: "3",
-    glyph: "◈",
+    glyph: GLYPH_LEARN,
     hint: "lessons",
     wire: "shell.surface.learn",
     empty: {
@@ -72,7 +80,7 @@ export const SURFACES: readonly SurfaceDef[] = [
     id: "debrief",
     label: "Debrief",
     kbd: "4",
-    glyph: "◵",
+    glyph: GLYPH_DEBRIEF,
     hint: "post-set review",
     wire: "shell.surface.debrief",
     empty: {
@@ -84,7 +92,7 @@ export const SURFACES: readonly SurfaceDef[] = [
     id: "settings",
     label: "Settings",
     kbd: "5",
-    glyph: "⬡",
+    glyph: GLYPH_SETTINGS,
     hint: "setup and tuning",
     wire: "shell.surface.settings",
     empty: {

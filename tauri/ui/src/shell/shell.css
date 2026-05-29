@@ -207,10 +207,20 @@
 }
 .sb-nav-item .sb-glyph {
   flex: 0 0 20px;
-  text-align: center;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The bespoke SVG marks are sized in em, so font-size sets their box. */
+  font-size: 17px;
   color: var(--text-muted);
   transition: color 150ms var(--ease-brand);
+}
+/* Inline marks render as blocks (no text baseline gap) and inherit the glyph
+ * color via currentColor — so active = rose, hover = warm, with no extra rules. */
+.sb-glyph svg,
+.se-glyph svg,
+.pi-glyph svg {
+  display: block;
 }
 /* The active glyph is the one rose accent that says "this surface" — its
  * accelerator number wakes to --text-secondary too (it sat dead-muted before),
@@ -454,6 +464,8 @@
   text-align: center;
 }
 .se-glyph {
+  display: flex;
+  justify-content: center;
   margin-bottom: var(--sp-3);
   font-size: 42px;
   line-height: 1;
@@ -691,7 +703,14 @@
   font-size: 13px;
 }
 .palette-item[aria-selected="true"] { background: var(--brand-08); color: var(--text-primary); }
-.palette-item .pi-glyph { flex: 0 0 18px; text-align: center; color: var(--text-muted); }
+.palette-item .pi-glyph {
+  flex: 0 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--text-muted);
+}
 .palette-item .pi-label { flex: 1 1 auto; }
 .palette-item .pi-hint {
   font-family: var(--type-mono);
