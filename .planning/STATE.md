@@ -84,6 +84,7 @@ See: `.planning/REQUIREMENTS.md` (16 v11.0 REQ-IDs across SKILL / COMP / MAST / 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260529-ifq | Onboarding skill-level wizard step (beginner/intermediate/pro) + config.json clobber fix | 2026-05-29 | f74635fd | [260529-ifq-onboarding-skill-level-wizard-step](./quick/260529-ifq-onboarding-skill-level-wizard-step/) |
+| 260529-m4m | Converge config.json store path (Rust→sidecar `vibemix/` dir) + reload-harden all 5 writers | 2026-05-29 | 7780322c | [260529-m4m-converge-config-store-path](./quick/260529-m4m-converge-config-store-path/) |
 
 ## Session Continuity
 
