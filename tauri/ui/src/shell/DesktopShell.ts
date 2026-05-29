@@ -82,13 +82,16 @@ function buildPaletteActions(store: ShellStore): PaletteAction[] {
     id: `go.${surface.id}`,
     label: `Go to ${surface.label}`,
     hint: surface.hint,
+    // The same bare digit the sidebar nav shows — the palette teaches the
+    // surface accelerators it dropped before, in one consistent token.
+    accel: surface.kbd,
     glyph: surface.glyph,
     run: () => store.setActiveSurface(surface.id),
   }));
 
   const commands: PaletteAction[] = [
-    { id: "toggle.sidebar", label: "Toggle sidebar", hint: "Ctrl+\\", glyph: "‹", run: () => store.toggleCollapsed() },
-    { id: "toggle.panel", label: "Toggle grounding panel", hint: "Ctrl+]", glyph: "▸", run: () => store.togglePanel() },
+    { id: "toggle.sidebar", label: "Toggle sidebar", accel: "Ctrl+\\", glyph: "‹", run: () => store.toggleCollapsed() },
+    { id: "toggle.panel", label: "Toggle grounding panel", accel: "Ctrl+]", glyph: "▸", run: () => store.togglePanel() },
     {
       id: "sim.live",
       label: "Go live",

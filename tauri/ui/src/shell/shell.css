@@ -748,13 +748,37 @@
 /* The selected row's mark goes rose, same as the active nav glyph — the lit row
  * lights its icon too, instead of leaving it dead-muted while the row warms. */
 .palette-item[aria-selected="true"] .pi-glyph { color: var(--brand); }
-.palette-item .pi-label { flex: 1 1 auto; }
-.palette-item .pi-hint {
+/* …and its accelerator wakes a step, exactly as the active sidebar row brightens
+ * its .sb-kbd — so the "lit row lights its mark AND its shortcut" read is the
+ * same in the palette as in the nav. */
+.palette-item[aria-selected="true"] .pi-accel { color: var(--text-secondary); }
+.palette-item .pi-label { flex: 0 0 auto; }
+/* The inline description sits right after the label as a quiet subtitle (the
+ * Raycast "title · subtitle" read). It yields first when the row is tight —
+ * truncating with an ellipsis rather than shoving the accelerator off-row. */
+.palette-item .pi-desc {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+/* The accelerator pins to the right edge (margin-left:auto), so every row's
+ * shortcut lines up in a single column — the palette reads as a shortcut
+ * cheat-sheet. Bare mono, no keycap box: the same treatment as the sidebar
+ * .sb-kbd, so an accelerator looks identical wherever it appears. */
+.palette-item .pi-accel {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: var(--sp-3);
   font-family: var(--type-mono);
   font-size: 10px;
-  /* --text-muted: the accelerator hint is informational, must clear AA. */
+  /* --text-muted: informational, must clear AA on the panel surface. */
   color: var(--text-muted);
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .palette-empty {
   padding: var(--sp-4);

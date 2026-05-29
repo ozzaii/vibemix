@@ -13,7 +13,14 @@
 export interface PaletteAction {
   readonly id: string;
   readonly label: string;
+  /** A short descriptive subtitle, inline after the label (e.g. "the live
+   *  co-host"). NOT the shortcut — that is `accel`, in its own right-aligned
+   *  slot, so a description and a keybind never share one overloaded field. */
   readonly hint?: string;
+  /** The keyboard accelerator, shown right-aligned so the palette doubles as the
+   *  shortcut cheat-sheet (a bare digit for surfaces, matching the sidebar; a
+   *  chord like "Ctrl+]" for commands). Omitted when the action has no shortcut. */
+  readonly accel?: string;
   readonly glyph?: string;
   run(): void;
 }
@@ -92,7 +99,7 @@ export function createCommandPalette(
   const renderList = (): void => {
     const query = input.value.trim();
     filtered = actionsProvider().filter((action) =>
-      matches(query, `${action.label} ${action.hint ?? ""}`),
+      matches(query, `${action.label} ${action.hint ?? ""} ${action.accel ?? ""}`),
     );
     if (selected >= filtered.length) selected = Math.max(0, filtered.length - 1);
     list.replaceChildren();
@@ -114,10 +121,15 @@ export function createCommandPalette(
       // them out of the tab order so the input stays the dialog's only tab stop.
       row.tabIndex = -1;
       row.setAttribute("aria-selected", index === selected ? "true" : "false");
+      // Three slots: the mark, the label + its inline description, and the
+      // right-aligned accelerator. The description and accelerator each render
+      // ONLY when present, so a command with no shortcut shows no empty chip and
+      // a surface with no subtitle shows no dangling slot.
       row.innerHTML =
         `<span class="pi-glyph" aria-hidden="true">${action.glyph ?? "›"}</span>` +
         `<span class="pi-label">${action.label}</span>` +
-        `<span class="pi-hint">${action.hint ?? ""}</span>`;
+        (action.hint ? `<span class="pi-desc">${action.hint}</span>` : "") +
+        (action.accel ? `<span class="pi-accel">${action.accel}</span>` : "");
       row.addEventListener("mousemove", () => {
         if (selected !== index) {
           selected = index;
