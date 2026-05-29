@@ -139,13 +139,15 @@ const CSS = `
     background: var(--silk-65);
     box-shadow: 0 0 8px rgba(214, 207, 199, 0.28);
   }
+  /* A softer rose than the lead dot (nth-1 is full --amber, nth-2 silk) — three
+   * sparks in the brand palette, no stray blue (was a stale v5 --rave-cyan). */
   .wizard-intro__orbit span:nth-child(3) {
     left: 20%;
     bottom: 23%;
     width: 5px;
     height: 5px;
-    background: rgba(72, 152, 255, 0.68);
-    box-shadow: 0 0 10px rgba(72, 152, 255, 0.24);
+    background: var(--brand-50);
+    box-shadow: 0 0 10px var(--brand-22);
   }
   .wizard-intro__rail {
     position: absolute;
