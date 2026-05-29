@@ -362,7 +362,11 @@
   flex-direction: column;
   overflow: auto;
 }
-.surface.is-active { display: flex; }
+/* A surface settles in on activation instead of hard-swapping — a brief
+ * opacity + 6px rise on the ease-out-expo curve, the calm premium entrance an
+ * abrupt display flip never had. Compositor-only (no layout animation), runs
+ * once per switch, frozen under reduced motion. */
+.surface.is-active { display: flex; animation: surface-enter 220ms var(--ease-brand) both; }
 
 /* ── Deck surface — the home stage. Idle hero vs live line swap by state. ──
  * Stays `position: absolute; inset: 0` like every other .surface (base rule
@@ -758,13 +762,19 @@
   0%, 100% { transform: scale(1); opacity: 0.7; }
   50% { transform: scale(1.3); opacity: 1; }
 }
+/* Surface entry settle — fade + a short rise, once per activation. */
+@keyframes surface-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 @media (prefers-reduced-motion: reduce) {
   /* Only the genuinely animated marks need freezing: the breathing brand ear,
    * the collapsed-rail monogram that inherits its breath, the connection dot,
-   * and the live tail cursor. The LED seam and energy field are static by
-   * design (opacity only), so they are not listed. */
+   * the live tail cursor, and the surface entry settle. The LED seam and energy
+   * field are static by design (opacity only), so they are not listed. */
   .sb-ear,
   .sb-monogram,
   .conn-dot,
-  .tail-cursor { animation: none !important; }
+  .tail-cursor,
+  .surface.is-active { animation: none !important; }
 }
