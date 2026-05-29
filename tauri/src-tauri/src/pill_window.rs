@@ -394,6 +394,11 @@ fn save_pill_state(app: &AppHandle, state: &PillWindowState) -> Result<(), Strin
     let store = app
         .store(crate::config::config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
+    // Shared config.json with the Python sidecar (Quick 260529-m4m converged the
+    // store path). The pill is draggable in every live session — reload disk→cache
+    // first so a debounced geometry save can't clobber Python-written
+    // skill/mood/lens. Mirrors config::save_state.
+    let _ = store.reload();
     let value = serde_json::to_value(state).map_err(|e| format!("encode failed: {e}"))?;
     store.set(KEY_PILL_WINDOW, value);
     store

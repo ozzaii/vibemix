@@ -215,6 +215,10 @@ pub fn save_mascot_state(app: &AppHandle, state: &MascotWindowState) -> Result<(
     let store = app
         .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
+    // Shared config.json with the Python sidecar (Quick 260529-m4m converged the
+    // store path). reload disk→cache first so this save can't clobber Python-
+    // written keys (skill/mood/lens) made after boot — mirrors save_state.
+    let _ = store.reload();
     let value = serde_json::to_value(state).map_err(|e| format!("encode failed: {e}"))?;
     store.set(KEY_MASCOT_WINDOW, value);
     store
@@ -241,6 +245,9 @@ fn save_bool_key(app: &AppHandle, key: &str, value: bool) -> Result<(), String> 
     let store = app
         .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
+    // Shared config.json (Quick 260529-m4m) — reload before set so a bool toggle
+    // during a live session can't clobber Python-written keys. Mirrors save_state.
+    let _ = store.reload();
     store.set(key, serde_json::Value::Bool(value));
     store
         .save()
@@ -278,6 +285,10 @@ pub fn save_primary_surface(app: &AppHandle, surface: PrimarySurface) -> Result<
     let store = app
         .store(config_store_path()?)
         .map_err(|e| format!("store init failed: {e}"))?;
+    // Shared config.json (Quick 260529-m4m) — reload before set. No v1 caller yet,
+    // but hardened so a future mid-session surface flip can't clobber Python-
+    // written keys. Mirrors save_state.
+    let _ = store.reload();
     let value = serde_json::to_value(surface).map_err(|e| format!("encode failed: {e}"))?;
     store.set(KEY_PRIMARY_SURFACE, value);
     store
