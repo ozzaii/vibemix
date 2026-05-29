@@ -36,15 +36,13 @@ explicitly, not just the CLI behaviour.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
-
 from scripts.launch.check_no_tutor_slop import (
-    TUTOR_SLOP_BLOCKLIST,
     _CATEGORY,
     _COPY_FIELDS,
+    TUTOR_SLOP_BLOCKLIST,
     check_no_tutor_slop,
     main,
 )
@@ -86,6 +84,29 @@ def test_real_transcripts_dir_passes_the_gate() -> None:
         f"missing transcripts dir: {LIVE_TRANSCRIPTS_DIR}"
     )
     assert check_no_tutor_slop(LIVE_TRANSCRIPTS_DIR, quiet=True) == 0
+
+
+def test_real_transcripts_do_not_use_dash_as_sentence_glue() -> None:
+    """Spoken lesson copy stays terse: commas, colons, and periods, no em dashes."""
+    offenders: list[str] = []
+
+    def visit(value: object, path: str) -> None:
+        if isinstance(value, str):
+            if "—" in value or "–" in value:
+                offenders.append(f"{path}: {value}")
+            return
+        if isinstance(value, dict):
+            for key, child in value.items():
+                visit(child, f"{path}.{key}")
+            return
+        if isinstance(value, list):
+            for idx, child in enumerate(value):
+                visit(child, f"{path}[{idx}]")
+
+    for fixture in sorted(LIVE_TRANSCRIPTS_DIR.rglob("*.json")):
+        visit(json.loads(fixture.read_text(encoding="utf-8")), str(fixture))
+
+    assert offenders == []
 
 
 # ---------------------------------------------------------------------------

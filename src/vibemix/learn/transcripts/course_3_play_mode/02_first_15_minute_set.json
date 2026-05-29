@@ -1,13 +1,13 @@
 {
   "lesson_id": "L3.02",
   "title": "first 15-minute set",
-  "system_instruction_addendum": "FIRST 15-MIN SET ADDENDUM: A pre-sequenced pool is loaded from v8.2 build-a-set. Coach each transition. Cite [cue:] when forward calls are grounded.",
+  "system_instruction_addendum": "FIRST 15-MIN SET ADDENDUM: User brings a prepared five-track pool from build-a-set or their own queue. Coach each transition. Cite [cue:] when forward calls are grounded.",
   "proactive_lens_active": true,
   "exemplar_audio_forbidden": true,
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "i loaded a five-track pool from your library, sequenced on an energy curve. play it.",
+      "text": "open a prepared five-track pool from build-a-set or your own queue. play track one.",
       "tts_marker": "L302.beat0",
       "citations": []
     },
@@ -26,7 +26,7 @@
   "hints": [
     {
       "strike": 1,
-      "text": "open the queue, the five tracks are there in order.",
+      "text": "open the queue and pick the first track in your prepared pool.",
       "tts_marker": "L302.hint1"
     },
     {

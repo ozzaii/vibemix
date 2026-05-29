@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from vibemix.learn.curriculum import CURRICULUM, COURSE_FRAMES, LessonMeta
+from vibemix.learn.curriculum import COURSE_FRAMES, CURRICULUM, LessonMeta
 
 _REPO = Path(__file__).resolve().parent.parent.parent
 _BASE = _REPO / "src" / "vibemix" / "learn" / "transcripts" / "course_3_play_mode"
@@ -154,6 +154,23 @@ def test_l3_06_is_post_set_review() -> None:
     )
     assert data["proactive_lens_active"] is False
     assert data["exemplar_audio_forbidden"] is False
+
+
+def test_l3_04_capstone_does_not_promise_debrief_auto_open() -> None:
+    """The capstone can save session evidence, but auto-open is not wired."""
+    data = json.loads(
+        (_BASE / "04_first_30_minute_capstone.json").read_text(encoding="utf-8")
+    )
+    text = " ".join(
+        [data["system_instruction_addendum"]]
+        + [row["text"] for row in data["tutor_speak"]]
+        + [row["text"] for row in data["hints"]]
+    ).lower()
+
+    assert "post-set debrief" in text
+    assert "debrief opens" not in text
+    assert "opens automatically" not in text
+    assert "should have opened automatically" not in text
 
 
 def test_l3_05_declares_drill_shapes() -> None:

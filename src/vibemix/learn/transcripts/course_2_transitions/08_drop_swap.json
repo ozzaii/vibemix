@@ -1,7 +1,7 @@
 {
   "lesson_id": "L2.08",
   "title": "drop swap",
-  "system_instruction_addendum": "DROP SWAP ADDENDUM: A hard crossfader cut at the drop of deck b. Time it to the bar — early or late kills the drop.",
+  "system_instruction_addendum": "DROP SWAP ADDENDUM: A hard crossfader cut at the drop of deck b. Time it to the bar: early or late kills the drop.",
   "tutor_speak": [
     {
       "beat": 0,
@@ -24,12 +24,12 @@
   "hints": [
     {
       "strike": 1,
-      "text": "the bar before the drop is your runway — get your hand on the crossfader.",
+      "text": "the bar before the drop is your runway: get your hand on the crossfader.",
       "tts_marker": "L208.hint1"
     },
     {
       "strike": 2,
-      "text": "the throw is one motion — no fade, no slide.",
+      "text": "the throw is one motion: no fade, no slide.",
       "tts_marker": "L208.hint2"
     },
     {

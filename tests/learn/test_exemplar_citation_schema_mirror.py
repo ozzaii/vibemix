@@ -12,6 +12,7 @@ Flipped GREEN by Plan 93-05 — the atomic 4-site mirror commit landed
 ``CITATION_GRAMMAR_BLOCK``, and ``dj_cohost._build_citation_strip``.
 """
 from __future__ import annotations
+
 import re
 from pathlib import Path
 
@@ -84,8 +85,8 @@ def test_site_4_citation_strip_allow_list_includes_exemplar() -> None:
 def test_all_four_sites_lockstep() -> None:
     """Cross-validation: EVIDENCE_SOURCES is the source-of-truth — every
     source in the frozenset must appear in the grammar block."""
-    from vibemix.state.evidence_registry import EVIDENCE_SOURCES
     from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+    from vibemix.state.evidence_registry import EVIDENCE_SOURCES
     for source in EVIDENCE_SOURCES:
         assert f"[{source}:" in CITATION_GRAMMAR_BLOCK, (
             f"EVIDENCE_SOURCES drift: source {source!r} not in prompt grammar block"

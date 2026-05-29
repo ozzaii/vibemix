@@ -36,7 +36,6 @@ from vibemix.learn.curriculum import COURSE_FRAMES, CURRICULUM
 from vibemix.midi.registry import find_mapping
 from vibemix.prompts.matrix import build_system_instruction
 
-
 # ---------------------------------------------------------------------------
 # The four-forbidden-moves lock (TONE-04 — AST-gated)
 # ---------------------------------------------------------------------------

@@ -6,10 +6,8 @@ producer (debrief uses ``8766`` — that's the only allowed second listener; Lea
 shares 8765). A second ``websockets.serve`` anywhere under ``src/vibemix/learn/``
 would silently violate Invariant #4 (CLAUDE.md §Architecture).
 
-This is a STATIC grep gate — green day-one because ``src/vibemix/learn/`` does
-not yet exist (Plan 03 lands it). The moment the directory appears, every
-``.py`` inside it is scanned; the first ``websockets.serve`` outside a comment
-fails the gate red.
+This is a static grep gate: every ``.py`` inside ``src/vibemix/learn/`` is
+scanned, and the first ``websockets.serve`` outside a comment fails the gate.
 
 REQ-ID: RENDER-07 (one-socket invariant pin for the Learn island).
 
@@ -32,14 +30,13 @@ def test_no_websockets_serve_in_learn_subpackage() -> None:
     """Walk ``src/vibemix/learn/**/*.py`` and assert zero ``websockets.serve``
     references outside comment lines.
 
-    Trivially green when ``src/vibemix/learn/`` does not exist (Plan 03 lands
-    it). The forbidden substring must not appear in any line whose
-    ``lstrip()`` does NOT start with ``#`` (so the gate ignores
-    "do-not-use" warning comments).
+    The forbidden substring must not appear in any line whose ``lstrip()``
+    does NOT start with ``#`` (so the gate ignores "do-not-use" warning
+    comments).
     """
     learn_dir = _repo_root() / "src" / "vibemix" / "learn"
     if not learn_dir.exists():
-        # Plan 03 hasn't landed yet — invariant trivially holds.
+        # Partial checkout without Learn package — invariant trivially holds.
         return
 
     offenders: list[tuple[Path, int, str]] = []

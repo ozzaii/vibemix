@@ -28,6 +28,7 @@ from types import SimpleNamespace
 import pytest
 
 from vibemix.learn.audio_cue import ExemplarPlayer
+from vibemix.library.audio_decode import AudioDecodeError
 from vibemix.state.music_state import MusicState
 
 
@@ -133,5 +134,5 @@ def test_play_attempts_decode_when_guard_permits() -> None:
     # The play() call will raise/fail at decode; we don't care what
     # exact exception fires, only that SOMETHING happened past can_play
     # (vs. the silent return-None-without-attempting case).
-    with pytest.raises(Exception):
+    with pytest.raises((OSError, ValueError, AudioDecodeError)):
         player.play("/nonexistent/path.wav")

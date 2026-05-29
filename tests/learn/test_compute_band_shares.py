@@ -16,7 +16,7 @@ helper that the CLAP ingest path calls at ingest time to populate the
 The four ``*_share`` values sum to ~1.0 (within float epsilon — the
 existing ``audio/features.py:71-89`` rounding can drift the sum by ~0.01).
 
-Plan 93-02 fixture: synthetic WAV files written via stdlib ``wave`` (no PyAV
+Fixture note: synthetic WAV files are written via stdlib ``wave`` (no PyAV
 write-path dependency). The PyAV decoder in ``library/audio_decode.py``
 decodes WAV via FFmpeg the same way it decodes mp3/m4a/flac — the file
 extension does not gate decoder selection.
@@ -33,11 +33,10 @@ import numpy as np
 import pytest
 
 try:
-    from vibemix.learn.exemplar import compute_band_shares  # Plan 93-02
+    from vibemix.learn.exemplar import compute_band_shares
 except ImportError:
     pytest.skip(
-        "tests/learn/test_compute_band_shares.py awaiting Plan 93-02 — "
-        "compute_band_shares helper in src/vibemix/learn/exemplar.py.",
+        "compute_band_shares helper unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 93 Plan 03 — EXEMPLAR-04 ``load_audio_stereo()`` PyAV decode (RED-state stub).
+"""EXEMPLAR-04 ``load_audio_stereo()`` stereo decode regression tests.
 
 The existing ``library/audio_decode.py::load_audio_mono`` decodes to MONO
 float32. ``ExemplarPlayer`` needs STEREO float32 at the track's native
@@ -16,7 +16,6 @@ Contract (from 93-RESEARCH.md §Pattern 7):
     Empty / unreadable inputs raise ValueError("...no audio frames...").
 
 REQ-ID: EXEMPLAR-04 (stereo decode for headphone playback).
-Downstream plan that flips this skip: **Plan 93-03**.
 """
 from __future__ import annotations
 
@@ -28,11 +27,10 @@ import numpy as np
 import pytest
 
 try:
-    from vibemix.library.audio_decode import load_audio_stereo  # Plan 93-03
+    from vibemix.library.audio_decode import load_audio_stereo
 except ImportError:
     pytest.skip(
-        "tests/learn/test_load_audio_stereo.py awaiting Plan 93-03 — "
-        "load_audio_stereo PyAV extension in src/vibemix/library/audio_decode.py.",
+        "load_audio_stereo is unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 
@@ -65,7 +63,7 @@ def test_load_audio_stereo_returns_n2_float32(tmp_path: Path) -> None:
     upmix duplicates the single channel across both stereo channels.
     """
     fixture = _write_synthetic_wav(tmp_path / "mono_60hz.wav", 44100, 1.0)
-    samples, sr = load_audio_stereo(fixture)
+    samples, _sr = load_audio_stereo(fixture)
     assert samples.ndim == 2, (
         f"load_audio_stereo must return a 2-D array; got ndim={samples.ndim}"
     )

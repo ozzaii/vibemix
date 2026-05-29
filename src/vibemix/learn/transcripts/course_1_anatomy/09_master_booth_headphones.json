@@ -5,7 +5,7 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "three volume knobs sit in the master section — master to the room, booth to your monitor, headphones to your cue.",
+      "text": "three volume knobs sit in the master section: master to the room, booth to your monitor, headphones to your cue.",
       "tts_marker": "L109.beat0",
       "citations": []
     },
@@ -17,7 +17,7 @@
     },
     {
       "beat": 2,
-      "text": "anything above minus six on the meter is the red zone — that is clipping, not loudness.",
+      "text": "anything above minus six on the meter is the red zone: that is clipping, not loudness.",
       "tts_marker": "L109.beat2",
       "citations": []
     }

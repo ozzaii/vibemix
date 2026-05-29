@@ -5,13 +5,13 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "the transport row on each deck holds three buttons — play, cue, and sync.",
+      "text": "the transport row on each deck holds three buttons: play, cue, and sync.",
       "tts_marker": "L106.beat0",
       "citations": []
     },
     {
       "beat": 1,
-      "text": "press and hold the cue button on deck A — the track plays only while you hold it.",
+      "text": "press and hold the cue button on deck A: the track plays only while you hold it.",
       "tts_marker": "L106.beat1",
       "citations": []
     }
@@ -30,7 +30,7 @@
     },
     {
       "strike": 2,
-      "text": "press cue on deck A — hold it down for a moment.",
+      "text": "press cue on deck A: hold it down for a moment.",
       "tts_marker": "L106.hint2"
     },
     {

@@ -27,14 +27,11 @@ from __future__ import annotations
 import pytest
 
 try:
-    from vibemix.learn.prompts import build_tutor_system_instruction  # P92-03
-    from vibemix.learn.curriculum import COURSE_FRAMES, CURRICULUM, LessonMeta  # P92-03
+    from vibemix.learn.curriculum import COURSE_FRAMES, CURRICULUM, LessonMeta
+    from vibemix.learn.prompts import build_tutor_system_instruction
 except ImportError:
     pytest.skip(
-        "tests/learn/test_prompts.py awaits Plan 92-03 (LESSON-05 "
-        "build_tutor_system_instruction + curriculum.py). When prompts.py "
-        "+ curriculum.py land, this module-level skip flips to live "
-        "assertions.",
+        "Learn prompt composition unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 
@@ -62,7 +59,7 @@ def test_compose_order() -> None:
     course_frame_text = COURSE_FRAMES["course_0"]
     course_idx = instruction.find(course_frame_text)
     assert course_idx >= 0, (
-        f"COURSE_FRAMES['course_0'] text not found in instruction"
+        "COURSE_FRAMES['course_0'] text not found in instruction"
     )
 
     # Controller frame anchor — accept either the registry id OR the

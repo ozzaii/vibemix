@@ -11,7 +11,7 @@
     },
     {
       "beat": 1,
-      "text": "if you nail all five, course two unlocks. if not, the recital replays — no shame, no penalty.",
+      "text": "if you nail all five, course two unlocks. if not, the recital replays: no shame, no penalty.",
       "tts_marker": "L116.beat1",
       "citations": []
     }
@@ -116,7 +116,7 @@
   "hints": [
     {
       "strike": 1,
-      "text": "read the prompt at the top of the screen — perform that exact action.",
+      "text": "read the prompt at the top of the screen: perform that exact action.",
       "tts_marker": "L116.hint1"
     },
     {

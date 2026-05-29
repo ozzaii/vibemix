@@ -294,7 +294,11 @@ def _fallback_for_band(band: str) -> tuple[str, str, str] | None:
     bank_dir = _packaged_bank_dir() / band
     if not bank_dir.exists():
         return None
-    files = sorted(bank_dir.glob("*.mp3")) + sorted(bank_dir.glob("*.ogg"))
+    files = (
+        sorted(bank_dir.glob("*.mp3"))
+        + sorted(bank_dir.glob("*.ogg"))
+        + sorted(bank_dir.glob("*.wav"))
+    )
     if not files:
         return None
     path = files[0]
@@ -349,7 +353,7 @@ class ExemplarFinder:
     accepted").
     """
 
-    def __init__(self, *, registry: "EvidenceRegistry | None" = None) -> None:
+    def __init__(self, *, registry: EvidenceRegistry | None = None) -> None:
         self._registry = registry
         # Memoize the library lookup so multiple find() calls per session
         # don't re-instantiate / re-load the cache. None means "not loaded

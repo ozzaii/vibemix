@@ -55,6 +55,7 @@ Cardinal invariants:
 from __future__ import annotations
 
 import threading
+import time
 from typing import Any
 
 from vibemix.midi.profile import ControllerProfile
@@ -62,6 +63,19 @@ from vibemix.ui_bus.learn_messages import (
     LearnControllerDetected,
     LearnMidiPosition,
 )
+
+_BUTTON_EVENT_CONTROLS = {
+    "sync",
+    "loop_in",
+    "loop_out",
+    "hotcue",
+    "filter_fx",
+    "tap_tempo",
+}
+
+_BUTTON_EVENT_ALIASES = {
+    "filter_fx": "fx_echo",
+}
 
 
 class MidiMirror:
@@ -138,6 +152,7 @@ class MidiMirror:
         # future daemon-thread or Rust-direct caller works without rework.
         self._pending_detected: list[dict] = []
         self._detected_lock = threading.Lock()
+        self._last_event_at: float = time.time()
 
     # ------------------------------------------------------------------
     # Profile lifecycle (called from the port_watcher callback in __main__)
@@ -154,6 +169,7 @@ class MidiMirror:
         """
         self._profile = profile
         self._last_positions = {}
+        self._last_event_at = time.time()
 
     def unbind(self) -> None:
         """Called on ``('disconnected', port)`` — clears cached profile
@@ -165,6 +181,7 @@ class MidiMirror:
         """
         self._profile = None
         self._last_positions = {}
+        self._last_event_at = time.time()
 
     def current_profile(self) -> ControllerProfile | None:
         """Return the currently-bound :class:`ControllerProfile`, or ``None``
@@ -293,8 +310,9 @@ class MidiMirror:
 
         Wire shape (RESEARCH §Pattern 2):
 
-        * Deck-bound CC knobs/faders: ``"<field>:<deck>"`` → integer 0..127
-          (e.g. ``"eq_hi:A": 64``).
+        * Deck-bound CC knobs/faders/pulses: ``"<field>:<deck>"`` → integer
+          0..127 (e.g. ``"eq_hi:A": 64``). Relative jog wheels carry a neutral
+          baseline of 0 and receive a one-frame 127 pulse from the event ring.
         * Deck-bound buttons: ``"<field>:<deck>"`` → 0 / 1 (e.g.
           ``"play:A": 0``).
         * Master-section: bare ``"<field>"`` → integer 0..127 (e.g.
@@ -314,7 +332,7 @@ class MidiMirror:
                 # Defensive: the shape is documented above; skip stray keys.
                 continue
             # CC knobs/faders (0..127 native MIDI range).
-            for field in ("vol", "eq_low", "eq_mid", "eq_hi", "filter", "tempo"):
+            for field in ("vol", "eq_low", "eq_mid", "eq_hi", "filter", "tempo", "jog"):
                 if field in deck_dict:
                     out[f"{field}:{deck_letter}"] = int(deck_dict[field])
             # Booleans (0/1 — schema accepts integer in [0, 127], so True
@@ -325,7 +343,47 @@ class MidiMirror:
         # Master-section: xfader (bare field, no deck suffix).
         if "xfader" in snap:
             out["xfader"] = int(snap["xfader"])
+        self._add_button_event_pulses(out)
         return out
+
+    def _add_button_event_pulses(self, out: dict[str, int]) -> None:
+        """Project recent one-shot MIDI button events into this frame.
+
+        ``deck_snapshot()`` carries stable positions, which is right for knobs
+        and faders but loses momentary buttons such as sync, loop, and hotcue.
+        ControllerState already keeps a typed event ring; consume only new
+        note-on events and relative jog CC ticks, then expose a one-frame 127
+        pulse so the Learn UI can send a deterministic ``ipc.learn.ack`` while
+        a lesson is active.
+        """
+        events_since = getattr(self._cs, "events_since", None)
+        if not callable(events_since):
+            return
+        try:
+            events = list(events_since(self._last_event_at))
+        except Exception:
+            return
+        if not events:
+            return
+        self._last_event_at = max(
+            float(getattr(event, "at", self._last_event_at))
+            for event in events
+        )
+        for event in events:
+            kind = str(getattr(event, "kind", ""))
+            value = int(getattr(event, "value_raw", 0))
+            deck = getattr(event, "deck", None)
+            field = getattr(event, "field", None)
+            if kind == "cc" and field == "jog" and deck and value != 64:
+                out[f"jog:{deck}"] = 127
+                continue
+            if kind not in _BUTTON_EVENT_CONTROLS:
+                continue
+            if value <= 0:
+                continue
+            control = _BUTTON_EVENT_ALIASES.get(kind, kind)
+            key = f"{control}:{deck}" if deck else control
+            out[key] = 127
 
 
 __all__ = ["MidiMirror"]

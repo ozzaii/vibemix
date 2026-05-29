@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 93 Plan 03 — EXEMPLAR-01 + EXEMPLAR-02 ``ExemplarFinder.find()`` (RED-state stub).
+"""EXEMPLAR-01 + EXEMPLAR-02 ``ExemplarFinder.find()`` regression tests.
 
 ``ExemplarFinder.find(band, k=1, t_session=...)`` is the public engine API
 that the lesson runtime calls. It is **pure-compute** over the side-car
@@ -18,15 +18,11 @@ Contract (from 93-RESEARCH.md §Code Example 1):
     - When both library AND bank empty: returns ``[]`` (degraded install).
 
 REQ-ID: EXEMPLAR-01 + EXEMPLAR-02 (engine + kick-guard wiring + grounding).
-Downstream plan that flips this skip: **Plan 93-03**.
 """
 from __future__ import annotations
 
 import pytest
 
-# Plan 93-04 — module-level skip lifted; ExemplarFinder + ExemplarPick now ship
-# in src/vibemix/learn/exemplar.py. Direct imports replace the Plan 93-01
-# try/except guard. EvidenceRegistry imports unchanged (Phase 18 stable).
 from vibemix.learn.exemplar import ExemplarFinder, ExemplarPick
 from vibemix.state.evidence_registry import EvidenceRegistry
 
@@ -72,8 +68,7 @@ def test_find_falls_back_when_under_library_floor(
 
     finder = ExemplarFinder()
     picks = finder.find("low", k=1)
-    if not picks:
-        pytest.skip("Packaged bank not yet shipped — Plan 93-04 ships assets")
+    assert picks, "packaged low-band fallback must ship with the Learn module"
     assert (
         "Your library doesn't have a great example of this — listen to this one we packaged"
         in picks[0].reason
@@ -128,8 +123,7 @@ def test_find_synthetic_id_format_for_packaged_pick(
 
     finder = ExemplarFinder()
     picks = finder.find("low", k=1)
-    if not picks:
-        pytest.skip("Packaged bank not yet shipped — Plan 93-04 ships assets")
+    assert picks, "packaged low-band fallback must ship with the Learn module"
     assert picks[0].track_id.startswith("_packaged:low:"), (
         f"fallback track_id must start with '_packaged:low:', "
         f"got {picks[0].track_id!r}"

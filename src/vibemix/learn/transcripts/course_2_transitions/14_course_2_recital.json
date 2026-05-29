@@ -25,7 +25,7 @@
     {
       "from_lesson": "L2.03",
       "transition_type": "long_blend",
-      "prompt": "perform a long blend — fade the crossfader from deck a to deck b.",
+      "prompt": "perform a long blend: fade the crossfader from deck a to deck b.",
       "expected_action": {
         "type": "cc",
         "control": "xfader",
@@ -35,7 +35,7 @@
     {
       "from_lesson": "L2.04",
       "transition_type": "eq_swap",
-      "prompt": "perform an eq swap — cut deck a's low eq while you hold the crossfader steady.",
+      "prompt": "perform an eq swap: cut deck a's low eq while you hold the crossfader steady.",
       "expected_action": {
         "type": "cc",
         "control": "eq_low",
@@ -46,7 +46,7 @@
     {
       "from_lesson": "L2.05",
       "transition_type": "bassline_swap",
-      "prompt": "perform a bassline swap — raise deck b's low eq to full on a beat one.",
+      "prompt": "perform a bassline swap: raise deck b's low eq to full on a beat one.",
       "expected_action": {
         "type": "cc",
         "control": "eq_low",
@@ -57,7 +57,7 @@
     {
       "from_lesson": "L2.06",
       "transition_type": "filter_fade",
-      "prompt": "perform a filter fade — sweep deck a's filter knob to one extreme.",
+      "prompt": "perform a filter fade: sweep deck a's filter knob to one extreme.",
       "expected_action": {
         "type": "cc",
         "control": "filter",
@@ -68,7 +68,7 @@
     {
       "from_lesson": "L2.07",
       "transition_type": "echo_out",
-      "prompt": "perform an echo-out — tap echo on deck a.",
+      "prompt": "perform an echo-out: tap echo on deck a.",
       "expected_action": {
         "type": "button",
         "control": "fx_echo",
@@ -79,7 +79,7 @@
     {
       "from_lesson": "L2.08",
       "transition_type": "drop_swap",
-      "prompt": "perform a drop swap — throw the crossfader fully to deck b on a downbeat.",
+      "prompt": "perform a drop swap: throw the crossfader fully to deck b on a downbeat.",
       "expected_action": {
         "type": "cc",
         "control": "xfader",
@@ -89,7 +89,7 @@
     {
       "from_lesson": "L2.09",
       "transition_type": "loop_transition",
-      "prompt": "perform a loop transition — tap loop in on deck a.",
+      "prompt": "perform a loop transition: tap loop in on deck a.",
       "expected_action": {
         "type": "button",
         "control": "loop_in",
@@ -105,7 +105,7 @@
   "hints": [
     {
       "strike": 1,
-      "text": "read the prompt at the top of the screen — perform that exact transition.",
+      "text": "read the prompt at the top of the screen: perform that exact transition.",
       "tts_marker": "L214.hint1"
     },
     {

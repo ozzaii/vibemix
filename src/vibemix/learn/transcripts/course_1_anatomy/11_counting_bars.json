@@ -5,13 +5,13 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "a bar is four beats — count one, two, three, four.",
+      "text": "a bar is four beats: count one, two, three, four.",
       "tts_marker": "L111.beat0",
       "citations": []
     },
     {
       "beat": 1,
-      "text": "four bars in a row is a phrase — the unit most tracks build on.",
+      "text": "four bars in a row is a phrase: the unit most tracks build on.",
       "tts_marker": "L111.beat1",
       "citations": []
     },
@@ -30,12 +30,12 @@
   "hints": [
     {
       "strike": 1,
-      "text": "the one of each bar is the heaviest kick — that is your anchor.",
+      "text": "the one of each bar is the heaviest kick: that is your anchor.",
       "tts_marker": "L111.hint1"
     },
     {
       "strike": 2,
-      "text": "count out loud — one two three four, one two three four.",
+      "text": "count out loud: one two three four, one two three four.",
       "tts_marker": "L111.hint2"
     },
     {

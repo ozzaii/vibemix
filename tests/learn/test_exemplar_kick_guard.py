@@ -46,11 +46,10 @@ import numpy as np
 import pytest
 
 try:
-    from vibemix.learn.exemplar import _kick_correlation  # Plan 93-02
+    from vibemix.learn.exemplar import _kick_correlation
 except ImportError:
     pytest.skip(
-        "tests/learn/test_exemplar_kick_guard.py awaiting Plan 93-02 — "
-        "_kick_correlation helper in src/vibemix/learn/exemplar.py.",
+        "_kick_correlation helper unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 

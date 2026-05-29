@@ -27,9 +27,9 @@ import pytest
 
 try:
     from vibemix.learn.progress import (
+        _SKILL_IDS,
         SCHEMA_VERSION,
         LearnProgress,
-        _SKILL_IDS,
         _fresh_skills_block,
         load_progress,
         reset_progress,

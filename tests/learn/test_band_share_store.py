@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 93 Plan 02 — EXEMPLAR-01 ``band_share_store`` schema + upsert + top_for_band (RED-state stub).
+"""EXEMPLAR-01 ``band_share_store`` schema + ranking regression tests.
 
 The side-car ``band_shares`` table lives inside the EXISTING
 ``library-clap.db`` (single-DB lifecycle — same backup/rotate as the CLAP
@@ -21,7 +21,6 @@ The 5 tests pin the upsert + top-K + kick-guard + band-allowlist + ordering
 contract from 93-RESEARCH.md §Pattern 4.
 
 REQ-ID: EXEMPLAR-01 (band-share scalar persistence + ranker query).
-Downstream plan that flips this skip: **Plan 93-02**.
 """
 from __future__ import annotations
 
@@ -31,16 +30,14 @@ from pathlib import Path
 import pytest
 
 try:
-    from vibemix.learn.band_share_store import (  # Plan 93-02
+    from vibemix.learn.band_share_store import (
         init_schema,
-        open_default_db,
         top_for_band,
         upsert,
     )
 except ImportError:
     pytest.skip(
-        "tests/learn/test_band_share_store.py awaiting Plan 93-02 — "
-        "band_share_store.py (schema + upsert + top_for_band).",
+        "band_share_store.py unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 

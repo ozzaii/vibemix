@@ -1,7 +1,7 @@
 {
   "lesson_id": "L2.02",
   "title": "beatmatching with sync",
-  "system_instruction_addendum": "BEATMATCH SYNC ADDENDUM: Sync is the modern fast-path — press it and the BPMs match. Frame it as a tool, not a shortcut. The ear-version still matters for hardware without sync.",
+  "system_instruction_addendum": "BEATMATCH SYNC ADDENDUM: Sync is the modern fast-path: press it and the BPMs match. Frame it as a tool, not a shortcut. The ear-version still matters for hardware without sync.",
   "tutor_speak": [
     {
       "beat": 0,
@@ -11,7 +11,7 @@
     },
     {
       "beat": 1,
-      "text": "press sync on deck b — the bpm display jumps to match deck a.",
+      "text": "press sync on deck b: the bpm display jumps to match deck a.",
       "tts_marker": "L202.beat1",
       "citations": []
     }
@@ -30,7 +30,7 @@
     },
     {
       "strike": 2,
-      "text": "press it once — the deck snaps to deck a's tempo.",
+      "text": "press it once: the deck snaps to deck a's tempo.",
       "tts_marker": "L202.hint2"
     },
     {

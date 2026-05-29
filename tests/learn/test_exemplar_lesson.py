@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 94 Plan 03 — L1.14 ExemplarLessonController tests (TDD RED → GREEN).
+"""L1.14 ExemplarLessonController regression tests.
 
 The controller is an OBSERVER of LessonRuntime — it consumes the runtime
 + ExemplarFinder + ExemplarPlayer + ipc emit seam, but NEVER writes
@@ -34,20 +34,18 @@ REQ-ID: CURR-1.14 (EQ-as-Tutor marquee demo backend).
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 try:
-    from vibemix.learn.exemplar import ExemplarPick  # P93-04
-    from vibemix.learn.exemplar_lesson import ExemplarLessonController  # Plan 94-03
+    from vibemix.learn.exemplar import ExemplarFinder, ExemplarPick
+    from vibemix.learn.exemplar_lesson import ExemplarLessonController
 except ImportError:
     pytest.skip(
-        "tests/learn/test_exemplar_lesson.py awaiting Plan 94-03 "
-        "(ExemplarLessonController in src/vibemix/learn/exemplar_lesson.py). "
-        "When the module lands, this module-level skip flips to live "
-        "assertions.",
+        "ExemplarLessonController unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 
@@ -320,6 +318,49 @@ def test_degraded_install_emits_honest_null_speak_with_no_citation() -> None:
 
     # Player.play() must NEVER be called in the degraded-install branch.
     player.play.assert_not_called()
+
+
+def test_empty_packaged_bank_degrades_without_fake_audio(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    """An installed but empty packaged bank must degrade, not pretend audio exists."""
+    bank = tmp_path / "band_exemplars"
+    for band in ("sub", "low", "mid", "high"):
+        (bank / band).mkdir(parents=True)
+    (bank / "MANIFEST.json").write_text('{"schema_version": 1, "tracks": {}}')
+
+    monkeypatch.setattr(
+        "vibemix.learn.exemplar._packaged_bank_dir",
+        lambda: bank,
+    )
+    monkeypatch.setattr(
+        "vibemix.learn.exemplar.open_default_db",
+        lambda: nullcontext(None),
+    )
+    monkeypatch.setattr(
+        "vibemix.learn.exemplar.top_for_band",
+        lambda conn, band, k=3, max_kick_corr=0.8: [],
+    )
+
+    player = MagicMock(name="player")
+    emitted: list[dict] = []
+    controller = ExemplarLessonController(
+        finder=ExemplarFinder(),
+        player=player,
+        ipc_emit=emitted.append,
+    )
+    controller.start(script=_make_script(), lesson_id="L1.14")
+
+    types = _emitted_types(emitted)
+    assert "ipc.learn.exemplar_play" not in types
+    player.play.assert_not_called()
+
+    speak = next(e for e in emitted if e["type"] == "ipc.learn.tutor_speak")
+    assert speak["payload"]["citations"] == []
+    assert "i don't have an example of the low band ready right now" in speak[
+        "payload"
+    ]["text"]
 
 
 # ---------------------------------------------------------------------------

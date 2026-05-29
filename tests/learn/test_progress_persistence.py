@@ -168,6 +168,39 @@ def test_hint_strike_updates_unfinished_attempt() -> None:
     assert progress.lessons["L1.03"]["strikes_used"] == 2
 
 
+def test_practice_source_memory_tracks_hardware_and_screen() -> None:
+    """Progress remembers the learner's practice surface without UI clutter."""
+    progress = LearnProgress()
+
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "midi")
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "click")
+
+    assert progress.lessons["L1.03"] == {
+        "completed": False,
+        "completed_at": None,
+        "strikes_used": 0,
+        "practice_sources": {"hardware": 1, "screen": 1},
+        "last_practice_source": "screen",
+    }
+
+
+def test_hint_and_completion_preserve_practice_source_memory() -> None:
+    """Row rewrites must not erase the user's hardware/screen history."""
+    progress = LearnProgress()
+
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "midi")
+    progress.mark_hint_strike("course_1_anatomy", "L1.03", 2)
+    progress.mark_completed("course_1_anatomy", "L1.03", strikes_used=2)
+
+    assert progress.lessons["L1.03"]["completed"] is True
+    assert progress.lessons["L1.03"]["strikes_used"] == 2
+    assert progress.lessons["L1.03"]["practice_sources"] == {
+        "hardware": 1,
+        "screen": 0,
+    }
+    assert progress.lessons["L1.03"]["last_practice_source"] == "hardware"
+
+
 def test_mark_started_does_not_erase_completed_replay() -> None:
     """Replaying a completed lesson must not demote the completed row."""
     progress = LearnProgress()

@@ -11,7 +11,7 @@
     },
     {
       "beat": 1,
-      "text": "tap loop in on deck a — the deck holds the next four bars on repeat.",
+      "text": "tap loop in on deck a: the deck holds the next four bars on repeat.",
       "tts_marker": "L209.beat1",
       "citations": []
     },
@@ -36,7 +36,7 @@
     },
     {
       "strike": 2,
-      "text": "tap loop in once — the deck repeats from that moment.",
+      "text": "tap loop in once: the deck repeats from that moment.",
       "tts_marker": "L209.hint2"
     },
     {

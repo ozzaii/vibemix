@@ -25,11 +25,11 @@ from vibemix.learn.progress import LearnProgress, load_progress, save_progress
 from vibemix.learn.skill_tree import (
     COMPETENT_THRESHOLD,
     SKILL_MANIFEST,
-    SkillProgress,
-    SkillTree,
     WEIGHT_FIRST_TRY,
     WEIGHT_FLOOR,
     WEIGHT_WITH_STRIKES,
+    SkillProgress,
+    SkillTree,
     record_live_demo,
 )
 

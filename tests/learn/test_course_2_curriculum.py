@@ -47,7 +47,6 @@ import pytest
 
 from vibemix.learn.curriculum import COURSE_FRAMES, CURRICULUM
 
-
 # ---------------------------------------------------------------------------
 # Constants — the 14 lesson IDs Plan 95 lands.
 # ---------------------------------------------------------------------------

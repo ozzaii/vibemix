@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 92 Plan 02 — LESSON-04 advancement-gate predicates (RED-state stub).
+"""LESSON-04 advancement-gate predicate regression tests.
 
 Five small targeted tests covering the lesson-advancement decision
 points:
@@ -16,9 +16,6 @@ points:
 5. ``test_skip_after_dwell`` — sending ``skip`` after t=45 s
    transitions to ``advancing``.
 
-These predicates land in Plan 92-03's ``runtime.py``. Module-level
-skip names "Plan 92-03" so the executor knows when to flip.
-
 REQ-ID: LESSON-04 (advance gate + min-dwell + 3-strike escalation).
 """
 from __future__ import annotations
@@ -28,14 +25,11 @@ from unittest.mock import MagicMock
 import pytest
 
 try:
-    from vibemix.learn.runtime import LessonRuntime  # Plan 92-03
-    from vibemix.learn.state import LearnState        # Plan 92-03
+    from vibemix.learn.runtime import LessonRuntime
+    from vibemix.learn.state import LearnState
 except ImportError:
     pytest.skip(
-        "tests/learn/test_advancement_gates.py awaits Plan 92-03 "
-        "(LESSON-04 advancement gate predicates inside LessonRuntime). "
-        "When runtime.py + state.py land, this module-level skip flips "
-        "to live assertions.",
+        "LessonRuntime advancement gates unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 
@@ -170,6 +164,40 @@ def test_button_press() -> None:
         )
         is False
     ), "direction mismatch should be False"
+
+
+def test_action_matches_accepts_split_or_colon_deck_ids() -> None:
+    """Runtime matching accepts both wire shapes for deck-scoped controls."""
+    rt = _runtime_at_awaiting_action()
+
+    assert rt.action_matches(
+        {
+            "type": "cc",
+            "control": "vol",
+            "deck": "A",
+            "value": 127,
+            "prev_value": 60,
+        },
+        expected={
+            "type": "cc",
+            "control": "vol:A",
+            "min_delta": 38,
+        },
+    )
+
+    assert rt.action_matches(
+        {
+            "type": "button",
+            "control": "play:A",
+            "direction": "down",
+        },
+        expected={
+            "type": "button",
+            "control": "play",
+            "deck": "A",
+            "direction": "down",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

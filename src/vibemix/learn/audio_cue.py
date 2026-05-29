@@ -47,7 +47,8 @@ References:
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import sounddevice as sd
@@ -119,7 +120,7 @@ class ExemplarPlayer:
     so their tests stay green.
     """
 
-    def __init__(self, device_index: int, *, state: "MusicState | Any") -> None:
+    def __init__(self, device_index: int, *, state: MusicState | Any) -> None:
         """Construct an ExemplarPlayer.
 
         :param device_index: ``sd.OutputStream`` device index — usually a
@@ -224,7 +225,7 @@ class ExemplarPlayer:
             self._cursor = 0
             self._on_stop = on_stop
 
-        def _callback(outdata, frames, time_info, status):  # noqa: ANN001
+        def _callback(outdata, frames, time_info, status):
             # sd.OutputStream callback runs on the OS audio thread —
             # MUST be lock-protected against play()/stop() racing the
             # audio engine. Same threading model as

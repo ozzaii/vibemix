@@ -1,17 +1,17 @@
 {
   "lesson_id": "L2.13",
   "title": "diagnosing a train wreck",
-  "system_instruction_addendum": "TRAIN WRECK ADDENDUM: A train wreck has three named causes — off-phrase, off-key, off-bpm. State the cause you hear; do not soften it. Listening-only lesson.",
+  "system_instruction_addendum": "TRAIN WRECK ADDENDUM: A train wreck has three named causes: off-phrase, off-key, off-bpm. State the cause you hear; do not soften it. Listening-only lesson.",
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "a train wreck has three named causes — off-phrase, off-key, off-bpm. you usually hear one before the other two.",
+      "text": "a train wreck has three named causes: off-phrase, off-key, off-bpm. you usually hear one before the other two.",
       "tts_marker": "L213.beat0",
       "citations": []
     },
     {
       "beat": 1,
-      "text": "off-phrase sounds like two kicks fighting on different beats. off-key sounds like clashing chords. off-bpm sounds like the kicks drifting apart.",
+      "text": "off-phrase is kicks fighting different beats; off-key is clashing chords; off-bpm is kicks drifting apart.",
       "tts_marker": "L213.beat1",
       "citations": []
     },

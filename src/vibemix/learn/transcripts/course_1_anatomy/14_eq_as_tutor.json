@@ -1,11 +1,11 @@
 {
   "lesson_id": "L1.14",
   "title": "eq as tutor",
-  "system_instruction_addendum": "EQ AS TUTOR ADDENDUM: Cycle three EQ bands — low, mid, high. Cite the exemplar track once per band. Stay quiet while the user is sweeping the knob.",
+  "system_instruction_addendum": "EQ AS TUTOR ADDENDUM: Cycle three EQ bands: low, mid, high. Cite the exemplar track once per band. Stay quiet while the user is sweeping the knob.",
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "you've met every knob on your controller — now we use them on real music.",
+      "text": "you've met every knob on your controller: now we use them on real music.",
       "tts_marker": "L114.beat0",
       "citations": []
     },
@@ -76,7 +76,7 @@
     },
     {
       "strike": 3,
-      "text": "turn the EQ knob that matches the current band — sweep it from one extreme to the other.",
+      "text": "turn the EQ knob that matches the current band: sweep it from one extreme to the other.",
       "tts_marker": "L114.hint3"
     }
   ]

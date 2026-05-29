@@ -93,7 +93,8 @@ from __future__ import annotations
 import random
 import sys
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from vibemix.learn.progress import LearnProgress, save_progress
 from vibemix.ui_bus.learn_messages import (
@@ -103,7 +104,6 @@ from vibemix.ui_bus.learn_messages import (
     LearnProgressState,
     LearnTutorSpeak,
 )
-
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -155,6 +155,10 @@ def _midi_matches(midi: dict[str, Any], expected: dict[str, Any]) -> bool:
     if expected_type == "cc":
         if midi.get("control") != expected.get("control"):
             return False
+        expected_deck = expected.get("deck")
+        if expected_deck is not None and expected_deck != "":
+            if midi.get("deck") != expected_deck:
+                return False
         cur = int(midi.get("value", 0))
         prev = int(midi.get("prev_value", cur))
         min_delta = int(expected.get("min_delta", _CC_DEFAULT_MIN_DELTA))
@@ -607,7 +611,7 @@ class RecitalRuntime:
 
 
 __all__ = [
-    "RecitalRuntime",
     "_COURSE_2_DISTINCT_TYPES_REQUIRED",
     "_RECITAL_SUBSET_SIZE",
+    "RecitalRuntime",
 ]

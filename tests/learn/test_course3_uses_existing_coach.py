@@ -22,8 +22,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
-from typing import Iterable
-
+from collections.abc import Iterable
 
 # Function names that smell like prompt builders. Matched
 # case-insensitive via the lowercased name; substring match.

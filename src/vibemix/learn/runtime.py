@@ -74,21 +74,43 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from statemachine import State, StateMachine
 
 from vibemix.learn.curriculum import CURRICULUM
+from vibemix.learn.graduation import (
+    GraduationSummary,
+    build_graduation_summary,
+    build_graduation_tutor_line,
+    graduation_citations,
+)
+from vibemix.learn.lesson_flow import LessonFlow, LessonStep, build_lesson_flow
 from vibemix.learn.state import LearnState
+from vibemix.learn.teaching_loop import (
+    TeachingTurn,
+    plan_adaptive_turn,
+    plan_hint_turn,
+    plan_teaching_turn,
+)
+from vibemix.library.prepared_pool import (
+    MIN_PREPARED_POOL_TRACKS,
+    PreparedPool,
+    build_prepared_pool_prompt,
+)
 from vibemix.ui_bus.learn_messages import (
     LearnAdvance,
     LearnCompleteLesson,
     LearnHighlight,
     LearnLessonLoaded,
     LearnProgressState,
+    LearnTeachingLoopPayload,
+    LearnTeachingObservationPayload,
+    LearnTeachingVerificationPayload,
     LearnTutorSpeak,
 )
-
 
 # ---------------------------------------------------------------------------
 # CC drop default threshold — 30% of the 127 CC range
@@ -99,6 +121,189 @@ from vibemix.ui_bus.learn_messages import (
 # tempo / filter sweeps). When the lesson's expected_action omits
 # ``min_delta``, this default applies.
 _CC_DEFAULT_MIN_DELTA = 38
+_MISMATCH_HINT_THROTTLE_S = 1.5
+_CONTROL_LABELS = {
+    "cue": "cue",
+    "eq_hi": "high EQ",
+    "eq_low": "low EQ",
+    "eq_mid": "mid EQ",
+    "filter": "filter",
+    "filter_fx": "filter FX",
+    "fx_echo": "echo FX",
+    "headphone_cue": "headphone cue",
+    "hotcue": "hot cue",
+    "jog": "jog wheel",
+    "jog_touch": "jog wheel",
+    "jog_touched": "jog wheel",
+    "lesson_continue": "continue",
+    "loop_in": "loop in",
+    "loop_out": "loop out",
+    "master_vol": "master volume",
+    "play": "play",
+    "sync": "sync",
+    "tap_tempo": "tap tempo",
+    "tempo": "pitch fader",
+    "vol": "channel fader",
+    "xfader": "crossfader",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class _AdaptiveMismatchHint:
+    text: str
+    citations: tuple[str, ...]
+
+
+def _control_and_deck(action: dict[str, Any]) -> tuple[str, str]:
+    """Return normalized ``(control, deck)`` from either field style."""
+    control = str(action.get("control", "")).strip()
+    deck = str(action.get("deck", "") or "").strip()
+    if not deck and ":" in control:
+        control, _, parsed_deck = control.rpartition(":")
+        deck = parsed_deck.strip()
+    return control, deck
+
+
+def _observable_control_id(control: str, deck: str) -> str:
+    return f"{control}:{deck}" if deck else control
+
+
+def _format_evidence_time(t_session: float) -> str:
+    return f"{max(0.0, float(t_session)):.1f}"
+
+
+def _format_control_label(control: str, deck: str = "") -> str:
+    """Return a short learner-facing label for a MIDI control."""
+    control, parsed_deck = _control_and_deck(
+        {"control": control, "deck": deck}
+    )
+    deck = parsed_deck
+    label = _CONTROL_LABELS.get(control, control.replace("_", " ").strip())
+    if not label:
+        return ""
+    if deck:
+        return f"deck {deck} {label}"
+    return label
+
+
+def _int_field(row: dict[str, Any], field: str, default: int) -> int:
+    try:
+        return int(row.get(field, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _expected_action_verb(expected: dict[str, Any]) -> str:
+    expected_type = expected.get("type")
+    direction = str(expected.get("direction", "down") or "down")
+    if expected_type == "button":
+        return "release" if direction == "up" else "press"
+    return "move"
+
+
+def _mismatch_citations(
+    *,
+    expected_control: str,
+    expected_deck: str,
+    midi_control: str,
+    midi_deck: str,
+    source: str,
+    evidence_time: float,
+) -> tuple[str, ...]:
+    citations: list[str] = []
+    observed_id = _observable_control_id(midi_control, midi_deck)
+    expected_id = _observable_control_id(expected_control, expected_deck)
+    if observed_id:
+        observed_kind = "screen" if source == "click" else "midi"
+        if observed_kind == "midi":
+            citations.append(
+                f"[midi:{observed_id}@{_format_evidence_time(evidence_time)}]"
+            )
+        else:
+            citations.append(f"[screen:{observed_id}]")
+    if expected_id and f"[screen:{expected_id}]" not in citations:
+        citations.append(f"[screen:{expected_id}]")
+    return tuple(citations[:4])
+
+
+def _adaptive_mismatch_hint(
+    *,
+    expected: dict[str, Any],
+    midi: dict[str, Any],
+    evidence_time: float,
+) -> _AdaptiveMismatchHint:
+    """Build the deterministic hint for a guard-rejected action."""
+    expected_control, expected_deck = _control_and_deck(expected)
+    midi_control, midi_deck = _control_and_deck(midi)
+    expected_label = _format_control_label(expected_control, expected_deck)
+    observed_label = _format_control_label(midi_control, midi_deck)
+    expected_type = expected.get("type")
+    midi_type = midi.get("type")
+    source = str(midi.get("source", "midi") or "midi")
+    citations = _mismatch_citations(
+        expected_control=expected_control,
+        expected_deck=expected_deck,
+        midi_control=midi_control,
+        midi_deck=midi_deck,
+        source=source,
+        evidence_time=evidence_time,
+    )
+
+    if not expected_label:
+        return _AdaptiveMismatchHint(
+            text="use the highlighted control.",
+            citations=citations,
+        )
+
+    same_control = midi_control == expected_control
+    same_deck = not expected_deck or midi_deck == expected_deck
+    if same_control and not same_deck:
+        verb = _expected_action_verb(expected)
+        if expected_type == "button":
+            return _AdaptiveMismatchHint(
+                text=f"{verb} {expected_label}.",
+                citations=citations,
+            )
+        return _AdaptiveMismatchHint(
+            text=f"use {expected_label}.",
+            citations=citations,
+        )
+
+    if same_control:
+        verb = _expected_action_verb(expected)
+        if midi_type != expected_type:
+            return _AdaptiveMismatchHint(
+                text=f"{verb} {expected_label}.",
+                citations=citations,
+            )
+        if expected_type == "cc":
+            cur = _int_field(midi, "value", 0)
+            prev = _int_field(midi, "prev_value", cur)
+            min_delta = _int_field(expected, "min_delta", _CC_DEFAULT_MIN_DELTA)
+            if abs(cur - prev) < min_delta:
+                return _AdaptiveMismatchHint(
+                    text=f"move {expected_label} farther.",
+                    citations=citations,
+                )
+        if expected_type == "button":
+            return _AdaptiveMismatchHint(
+                text=f"{verb} {expected_label}.",
+                citations=citations,
+            )
+        return _AdaptiveMismatchHint(
+            text=f"use {expected_label}.",
+            citations=citations,
+        )
+
+    if observed_label:
+        return _AdaptiveMismatchHint(
+            text=f"that was {observed_label}. use {expected_label}.",
+            citations=citations,
+        )
+    return _AdaptiveMismatchHint(
+        text=f"use {expected_label}.",
+        citations=citations,
+    )
 
 
 class LessonRuntime(StateMachine):
@@ -155,7 +360,24 @@ class LessonRuntime(StateMachine):
         | hint_strike_2.to(advancing, cond="min_dwell_elapsed")
         | hint_strike_3.to(advancing, cond="min_dwell_elapsed")
     )
+    observer_complete = (
+        awaiting_action.to(completed)
+        | hint_strike_1.to(completed)
+        | hint_strike_2.to(completed)
+        | hint_strike_3.to(completed)
+    )
     finish = advancing.to(completed)
+
+    @property
+    def current_state(self) -> State:
+        """Compatibility shim without python-statemachine's deprecation noise.
+
+        Older Learn tests and diagnostics read ``runtime.current_state.id``.
+        Upstream now warns for its inherited property and prefers
+        ``current_state_value``; returning the same ``State`` object from our
+        subclass keeps that existing surface quiet and explicit.
+        """
+        return self.states_map[self.current_state_value]
 
     # ------------------------------------------------------------------
     # __init__
@@ -168,6 +390,11 @@ class LessonRuntime(StateMachine):
         controller_state: Any,
         ipc_router: Any,
         progress_store: Any,
+        evidence_registry: Any | None = None,
+        evidence_clock: Callable[[], float] | None = None,
+        prepared_pool_loader: Callable[[], PreparedPool | None] | None = None,
+        graduation_summary_loader: Callable[[Any], GraduationSummary | None] | None = None,
+        session_event_logger: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         """Build a LessonRuntime bound to its 5 collaborators.
 
@@ -188,14 +415,35 @@ class LessonRuntime(StateMachine):
                 in Plan 92-04). LessonRuntime calls
                 ``progress_store.mark_completed(course_id, lesson_id)``
                 + ``progress_store.snapshot()`` +
-                ``progress_store.dots_for_course(course_id)``. P92-03
+                ``progress_store.dots_for_course(course_id, current_lesson_id=...)``. P92-03
                 tests pass a Mock; the live wire-in is P92-04.
+            evidence_registry: Optional shared EvidenceRegistry. When
+                supplied, lesson highlights and learner actions are
+                recorded before tutor hints cite them.
+            evidence_clock: Optional session-time supplier for registry
+                writes. Live wiring passes ``MusicState.set_seconds``;
+                tests can pass a fixed clock for deterministic citations.
+            prepared_pool_loader: Optional Course 3 hook that returns the
+                newest real saved playlist/set-prep pool. None keeps the
+                runtime byte-identical for tests and installs without a pool.
+            graduation_summary_loader: Optional L3.06 hook that reads the
+                existing progress/profile/debrief seams. None uses the shipped
+                local storage readers.
+            session_event_logger: Optional existing session-recorder seam. Live
+                wiring passes ``VoiceRecorder.log_event`` through a fail-soft
+                adapter so Learn milestones land in ``events.jsonl`` for later
+                debrief/profile tooling.
         """
         self._learn = learn_state
         self._mirror = midi_mirror
         self._cs = controller_state
         self._ipc = ipc_router
         self._progress = progress_store
+        self._evidence_registry = evidence_registry
+        self._evidence_clock = evidence_clock
+        self._prepared_pool_loader = prepared_pool_loader
+        self._graduation_summary_loader = graduation_summary_loader
+        self._session_event_logger = session_event_logger
         # The wall-clock anchor for the 30 s strike escalation timer.
         # Reset on every ``on_enter_<state>`` callback for the states
         # that the tick_loop watches (awaiting_action, hint_strike_*).
@@ -221,7 +469,16 @@ class LessonRuntime(StateMachine):
         # to it. The observer NEVER writes LearnState; Invariant #1
         # remains bound to LessonRuntime alone (AST gate stays green).
         self._lesson_observers: dict[str, Any] = {}
+        self._active_flow: LessonFlow | None = None
+        self._active_step_index: int = 0
+        self._last_mismatch_hint_at: float = 0.0
         super().__init__()
+
+    @property
+    def current_step_id(self) -> str | None:
+        """Return the active structured-flow step id, if any."""
+        step = self._active_step()
+        return step.step_id if step is not None else None
 
     # ------------------------------------------------------------------
     # Plan 94-03 — per-lesson observer registry (CURR-1.14 / CURR-1.16)
@@ -274,6 +531,143 @@ class LessonRuntime(StateMachine):
             return None
         return self._lesson_observers.get(lesson_id)
 
+    def handle_observer_ack(self, midi: dict[str, Any]) -> bool:
+        """Let an active lesson observer consume a user action.
+
+        Observer lessons (EQ exemplar cycle + recitals) are multi-prompt
+        flows riding on top of the one-step lesson FSM. While one is
+        active, the observer owns ack matching; otherwise the outer
+        lesson-level ``expected_action`` would see a synthetic
+        ``lesson_continue`` or first-band action and prematurely advance
+        the whole lesson.
+
+        Returns ``True`` when an observer is active and the ack has been
+        handled or intentionally ignored. The caller should not also send
+        the ack through the normal FSM gate in that case.
+        """
+        if self.current_state.id not in (
+            "awaiting_action",
+            "hint_strike_1",
+            "hint_strike_2",
+            "hint_strike_3",
+        ):
+            return False
+        observer = self._active_observer()
+        if observer is None:
+            return False
+        try:
+            if observer.matches(midi):
+                self._mark_progress_practice_source(midi)
+                observer.ack(lesson_id=self._learn.current_lesson_id or "")
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] lesson observer ack failed: {exc!r}",
+                file=sys.stderr,
+            )
+        return True
+
+    def complete_observer_lesson(self, *, completed: bool = True) -> None:
+        """Move an observer-driven lesson to runtime completion.
+
+        Observer controllers emit their own ``ipc.learn.complete_lesson``
+        when a multi-prompt cycle ends. The live wiring intercepts that
+        envelope and calls this method so the canonical runtime still
+        persists lesson progress, emits a progress snapshot, and returns
+        to the completed state.
+        """
+        self.send("observer_complete", completed=completed)
+
+    def handle_step_ack(self, midi: dict[str, Any]) -> bool:
+        """Advance an authored lesson beat without completing the lesson.
+
+        Several beginner lessons are short dialogs driven by the
+        synthetic ``lesson_continue`` button. The outer FSM still sees
+        those lessons as one lesson, but the learner should receive every
+        authored ``tutor_speak`` beat, not only beat 0. When another beat
+        remains, consume the ack in-place, emit an advance pulse, repaint
+        the same expected action, and speak the next fixture line.
+        """
+        if self.current_state.id not in (
+            "awaiting_action",
+            "hint_strike_1",
+            "hint_strike_2",
+            "hint_strike_3",
+        ):
+            return False
+        lesson_id = self._learn.current_lesson_id
+        if lesson_id is None or lesson_id not in CURRICULUM:
+            return False
+        if self._active_observer() is not None:
+            return False
+
+        step = self._active_step()
+        if step is None:
+            return False
+        expected = step.expected_action
+        if expected.get("control") != "lesson_continue":
+            return False
+        if not self.action_matches(midi=midi, expected=expected):
+            return False
+
+        next_step = self._flow_step(self._active_step_index + 1)
+        if next_step is None:
+            return False
+
+        self._record_action_evidence(expected=expected, midi=midi, matched=True)
+        self._mark_progress_practice_source(midi)
+        self._active_step_index += 1
+        self._learn.current_beat_index = self._active_step_index
+        self._learn.strike_count = 0
+        self._state_entered_at = time.monotonic()
+        self._emit_advance(reason="action_matched")
+        self._emit_highlight(next_step.expected_action)
+        self._emit_step_tutor(next_step)
+        return True
+
+    def handle_mismatch_ack(self, midi: dict[str, Any]) -> bool:
+        """Emit one deterministic adaptive hint for a wrong user action.
+
+        A guard-rejected ``ack_action`` used to leave beginners with no
+        feedback: the highlighted control stayed lit, but the tutor said
+        nothing. This consumes mismatched acks before the FSM no-ops,
+        emits a short hint, and resets the strike timer so active
+        attempts do not immediately trigger a timed hint too.
+        """
+        if self.current_state.id not in (
+            "awaiting_action",
+            "hint_strike_1",
+            "hint_strike_2",
+            "hint_strike_3",
+        ):
+            return False
+        if self._active_observer() is not None:
+            return False
+        expected = self._current_expected_action()
+        if expected is None:
+            return False
+        if self.action_matches(midi=midi, expected=expected):
+            return False
+
+        now = time.monotonic()
+        self._state_entered_at = now
+        if now - self._last_mismatch_hint_at < _MISMATCH_HINT_THROTTLE_S:
+            return True
+        self._last_mismatch_hint_at = now
+        evidence_time = self._record_action_evidence(
+            expected=expected,
+            midi=midi,
+            matched=False,
+        )
+        self._mark_progress_practice_source(midi)
+        self._emit_adaptive_mismatch_hint(
+            expected=expected,
+            midi=midi,
+            evidence_time=evidence_time,
+        )
+        return True
+
     # ------------------------------------------------------------------
     # Guards — both predicates accept ``**kwargs`` because python-
     # statemachine forwards framework metadata (event_data, machine,
@@ -322,22 +716,24 @@ class LessonRuntime(StateMachine):
         # Lookup expected from the active lesson if the caller didn't
         # supply one. This is the FSM ``cond=`` path.
         if expected is None:
-            lesson_id = self._learn.current_lesson_id
-            if lesson_id is None or lesson_id not in CURRICULUM:
-                return False
-            expected = CURRICULUM[lesson_id].script.get("expected_action")
-            if not isinstance(expected, dict):
+            expected = self._current_expected_action()
+            if expected is None:
                 return False
 
         expected_type = expected.get("type")
         midi_type = midi.get("type")
         if midi_type != expected_type:
             return False
+        expected_control, expected_deck = _control_and_deck(expected)
+        midi_control, midi_deck = _control_and_deck(midi)
 
         # ---- CC delta branch -----------------------------------------
         if expected_type == "cc":
-            if midi.get("control") != expected.get("control"):
+            if midi_control != expected_control:
                 return False
+            if expected_deck is not None and expected_deck != "":
+                if midi_deck != expected_deck:
+                    return False
             cur = int(midi.get("value", 0))
             prev = int(midi.get("prev_value", cur))
             min_delta = int(expected.get("min_delta", _CC_DEFAULT_MIN_DELTA))
@@ -345,14 +741,13 @@ class LessonRuntime(StateMachine):
 
         # ---- Button branch -------------------------------------------
         if expected_type == "button":
-            if midi.get("control") != expected.get("control"):
+            if midi_control != expected_control:
                 return False
             if midi.get("direction") != expected.get("direction"):
                 return False
             # Only enforce deck match when both sides declared a deck.
-            expected_deck = expected.get("deck")
             if expected_deck is not None and expected_deck != "":
-                if midi.get("deck") != expected_deck:
+                if midi_deck != expected_deck:
                     return False
             return True
 
@@ -391,19 +786,22 @@ class LessonRuntime(StateMachine):
     # ------------------------------------------------------------------
     def on_ack_action(self, **kwargs: Any) -> None:
         self._last_was_match = True
+        midi = kwargs.get("midi")
+        if isinstance(midi, dict):
+            self._record_action_evidence(
+                expected=self._current_expected_action(),
+                midi=midi,
+                matched=True,
+            )
+            self._mark_progress_practice_source(midi)
 
-        # Plan 94-03 — forward the ack_action MIDI to a registered
-        # lesson observer (if any). The observer drives a parallel
-        # cycle (3-band exemplar walk for L1.14; 5-prompt recital for
-        # L1.16) that lives ALONGSIDE the FSM, not inside it. The
-        # runtime's main FSM still transitions to ``advancing`` per the
-        # normal contract; the observer's ack() emits its own cycle
-        # envelopes (exemplar_stop / exemplar_play / advance) so the UI
-        # can paint the per-band progression even though the runtime's
-        # main FSM only knows about lesson-level state.
+        # Defensive legacy path: the IPC handler normally gives active
+        # observers first claim on acks via handle_observer_ack(), which
+        # keeps multi-prompt observer lessons in awaiting_action until
+        # their own completion signal. This hook remains for direct
+        # runtime.send("ack_action", ...) callers in tests/devtools.
         observer = self._active_observer()
         if observer is not None:
-            midi = kwargs.get("midi")
             try:
                 if midi is not None and observer.matches(midi):
                     observer.ack(
@@ -419,6 +817,11 @@ class LessonRuntime(StateMachine):
 
     def on_skip(self, **_kwargs: Any) -> None:
         self._last_was_match = False
+
+    def on_observer_complete(
+        self, completed: bool = True, **_kwargs: Any
+    ) -> None:
+        self._last_was_match = completed
 
     # ------------------------------------------------------------------
     # State-entry callbacks — the sole-writer surface for LearnState
@@ -457,6 +860,8 @@ class LessonRuntime(StateMachine):
         self._learn.strike_count = 0
         self._learn.lesson_started_at = time.monotonic()
         self._state_entered_at = self._learn.lesson_started_at
+        self._active_flow = None
+        self._active_step_index = 0
 
         # WR-02 fix (P92 REVIEW): defend against an invalid lesson_id
         # reaching the CURRICULUM lookup. The boundary (ipc_handlers.py)
@@ -479,6 +884,18 @@ class LessonRuntime(StateMachine):
                 file=sys.stderr,
             )
             return
+        try:
+            self._active_flow = build_lesson_flow(lesson_id)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] build_lesson_flow failed for "
+                f"{lesson_id!r}: {exc!r}",
+                file=sys.stderr,
+            )
+            self._active_flow = None
+        self._mark_progress_started()
         # WR-03 fix (P92 REVIEW): the lesson_loaded schema requires
         # ``controller_id: {minLength: 1}`` — an empty-string fallback
         # made the envelope fail validation, which the broad except
@@ -499,7 +916,10 @@ class LessonRuntime(StateMachine):
         # progress store; tests mock it (returning a MagicMock that
         # iterates to empty tuple — schema-acceptable empty array).
         lesson = CURRICULUM[lesson_id]
-        dots = self._progress.dots_for_course(self._learn.current_course_id)
+        dots = self._progress.dots_for_course(
+            self._learn.current_course_id,
+            current_lesson_id=lesson_id,
+        )
         try:
             envelope = LearnLessonLoaded.make(
                 course_id=self._learn.current_course_id or "",
@@ -509,6 +929,13 @@ class LessonRuntime(StateMachine):
                 progress_dots=dots,
             ).to_dict()
             self._ipc.emit(envelope)
+            self._log_session_event(
+                "learn_lesson_loaded",
+                course_id=self._learn.current_course_id or "",
+                lesson_id=lesson_id,
+                title=lesson.title,
+                controller_id=controller_id,
+            )
         except Exception as exc:  # pragma: no cover — defensive
             # An invalid progress-dots payload should not wedge the FSM.
             # Surface the failure on stderr and continue; the HUD will
@@ -516,6 +943,7 @@ class LessonRuntime(StateMachine):
             import sys
 
             print(f"[learn.runtime] lesson_loaded emit failed: {exc!r}", file=sys.stderr)
+        self._emit_progress_snapshot()
 
     def on_enter_awaiting_action(self, **_kwargs: Any) -> None:
         """Paint the highlight on the expected control, then speak
@@ -541,27 +969,10 @@ class LessonRuntime(StateMachine):
             self._state_entered_at = time.monotonic()
             return
         lesson = CURRICULUM[lesson_id]
-        expected = lesson.script["expected_action"]
-        # Build the highlight envelope. ``LearnHighlight.make`` accepts
-        # a raw dict for ``expected_action`` and normalises it into a
-        # validated nested struct.
-        try:
-            highlight = LearnHighlight.make(
-                control_id=expected.get("control", ""),
-                deck=expected.get("deck", ""),
-                cue_color="amber",
-                cue_shape="pulse-ring",
-                annotation=expected.get("annotation", ""),
-                expected_action=expected,
-            ).to_dict()
-            self._ipc.emit(highlight)
-        except Exception as exc:  # pragma: no cover — defensive
-            import sys
+        expected = self._current_expected_action() or lesson.script["expected_action"]
+        self._emit_highlight(expected)
 
-            print(f"[learn.runtime] highlight emit failed: {exc!r}", file=sys.stderr)
-
-        # Speak beat 0 — text comes from the JSON fixture (TONE-02).
-        self._emit_tutor_beat(0)
+        self._emit_opening_tutor_beats(expected)
         # Reset the strike timer's state-entry anchor.
         self._state_entered_at = time.monotonic()
 
@@ -586,16 +997,19 @@ class LessonRuntime(StateMachine):
 
     def on_enter_hint_strike_1(self, **_kwargs: Any) -> None:
         self._learn.strike_count = 1
+        self._mark_progress_hint_strike()
         self._emit_hint(1)
         self._state_entered_at = time.monotonic()
 
     def on_enter_hint_strike_2(self, **_kwargs: Any) -> None:
         self._learn.strike_count = 2
+        self._mark_progress_hint_strike()
         self._emit_hint(2)
         self._state_entered_at = time.monotonic()
 
     def on_enter_hint_strike_3(self, **_kwargs: Any) -> None:
         self._learn.strike_count = 3
+        self._mark_progress_hint_strike()
         self._emit_hint(3)
         self._state_entered_at = time.monotonic()
 
@@ -612,16 +1026,7 @@ class LessonRuntime(StateMachine):
         observations per the test contract.
         """
         reason = "action_matched" if self._last_was_match else "user_skip"
-        try:
-            advance = LearnAdvance.make(
-                lesson_id=self._learn.current_lesson_id or "",
-                reason=reason,
-            ).to_dict()
-            self._ipc.emit(advance)
-        except Exception as exc:  # pragma: no cover — defensive
-            import sys
-
-            print(f"[learn.runtime] advance emit failed: {exc!r}", file=sys.stderr)
+        self._emit_advance(reason=reason)
 
         # Schedule the dwell-then-finish chain. No-op outside an async
         # loop (tests run synchronously); the live path (Plan 92-04
@@ -679,6 +1084,7 @@ class LessonRuntime(StateMachine):
             self._progress.mark_completed(
                 self._learn.current_course_id,
                 self._learn.current_lesson_id,
+                strikes_used=self._learn.strike_count,
             )
             # CR-02: persist to disk via atomic save (tmp + os.replace).
             # Skip save when progress_store isn't a real LearnProgress
@@ -699,29 +1105,19 @@ class LessonRuntime(StateMachine):
                 reason="completed" if self._last_was_match else "user_skip",
             ).to_dict()
             self._ipc.emit(done)
+            self._log_session_event(
+                "learn_lesson_completed",
+                course_id=self._learn.current_course_id or "",
+                lesson_id=self._learn.current_lesson_id or "",
+                reason=done.get("payload", {}).get("reason", ""),
+                strikes_used=self._learn.strike_count,
+            )
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 
             print(f"[learn.runtime] complete_lesson emit failed: {exc!r}", file=sys.stderr)
 
-        # Snapshot the progress store. Tests mock it (returning a
-        # MagicMock); the snapshot envelope's ``progress`` field is
-        # optional schema-side, so a non-dict-shaped Mock would fail
-        # validation. Be defensive: only emit when the snapshot is a
-        # dict-like mapping.
-        try:
-            snapshot = self._progress.snapshot()
-            if not isinstance(snapshot, dict):
-                snapshot = None
-            progress_env = LearnProgressState.make(
-                action="snapshot",
-                progress=snapshot,
-            ).to_dict()
-            self._ipc.emit(progress_env)
-        except Exception as exc:  # pragma: no cover — defensive
-            import sys
-
-            print(f"[learn.runtime] progress snapshot emit failed: {exc!r}", file=sys.stderr)
+        self._emit_progress_snapshot()
 
         # Plan 94-03 — tear down any registered lesson observer. The
         # observer's .stop() emits a final exemplar_stop (if a pick was
@@ -744,6 +1140,453 @@ class LessonRuntime(StateMachine):
     # ------------------------------------------------------------------
     # Helpers — tutor + hint emit sites
     # ------------------------------------------------------------------
+    def _mark_progress_started(self) -> None:
+        """Best-effort durable progress update for a started attempt."""
+        lesson_id = self._learn.current_lesson_id
+        course_id = self._learn.current_course_id
+        if not lesson_id or not course_id:
+            return
+        try:
+            from vibemix.learn.progress import LearnProgress, save_progress
+
+            if isinstance(self._progress, LearnProgress):
+                self._progress.mark_started(course_id, lesson_id)
+                save_progress(self._progress)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] mark_started failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _mark_progress_hint_strike(self) -> None:
+        """Best-effort durable progress update for live hint count."""
+        lesson_id = self._learn.current_lesson_id
+        course_id = self._learn.current_course_id
+        if not lesson_id or not course_id:
+            return
+        try:
+            from vibemix.learn.progress import LearnProgress, save_progress
+
+            if isinstance(self._progress, LearnProgress):
+                self._progress.mark_hint_strike(
+                    course_id,
+                    lesson_id,
+                    self._learn.strike_count,
+                )
+                save_progress(self._progress)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] mark_hint_strike failed: {exc!r}",
+                file=sys.stderr,
+            )
+        self._emit_progress_snapshot()
+
+    def _mark_progress_practice_source(self, midi: dict[str, Any]) -> None:
+        """Best-effort durable update for hardware/screen practice memory."""
+        lesson_id = self._learn.current_lesson_id
+        course_id = self._learn.current_course_id
+        if not lesson_id or not course_id:
+            return
+        try:
+            from vibemix.learn.progress import LearnProgress, save_progress
+
+            if isinstance(self._progress, LearnProgress):
+                self._progress.mark_practice_source(
+                    course_id,
+                    lesson_id,
+                    str(midi.get("source", "midi") or "midi"),
+                )
+                save_progress(self._progress)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] mark_practice_source failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _emit_progress_snapshot(self) -> None:
+        """Emit the current progress snapshot when it is schema-shaped."""
+        try:
+            snapshot = self._progress.snapshot()
+            if not isinstance(snapshot, dict):
+                snapshot = None
+            progress_env = LearnProgressState.make(
+                action="snapshot",
+                progress=snapshot,
+            ).to_dict()
+            self._ipc.emit(progress_env)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] progress snapshot emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _emit_highlight(self, expected: dict[str, Any]) -> None:
+        """Emit the current expected-action highlight."""
+        try:
+            highlight = LearnHighlight.make(
+                control_id=expected.get("control", ""),
+                deck=expected.get("deck", ""),
+                cue_color="amber",
+                cue_shape="pulse-ring",
+                annotation=expected.get("annotation", ""),
+                expected_action=expected,
+            ).to_dict()
+            self._ipc.emit(highlight)
+            control, deck = _control_and_deck(expected)
+            self._record_evidence(
+                source="screen",
+                key=_observable_control_id(control, deck),
+                t_session=self._evidence_time(),
+            )
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(f"[learn.runtime] highlight emit failed: {exc!r}", file=sys.stderr)
+
+    def _log_session_event(self, kind: str, **fields: Any) -> None:
+        """Best-effort bridge into the existing session recording spine."""
+        if self._session_event_logger is None:
+            return
+        try:
+            self._session_event_logger(kind, fields)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] session event log failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _current_step_id(self) -> str | None:
+        step = self._active_step()
+        return step.step_id if step is not None else None
+
+    def _log_tutor_speak_event(self, speak: dict[str, Any]) -> None:
+        payload = speak.get("payload") if isinstance(speak, dict) else None
+        if not isinstance(payload, dict):
+            return
+        self._log_session_event(
+            "learn_tutor_speak",
+            lesson_id=self._learn.current_lesson_id or "",
+            course_id=self._learn.current_course_id or "",
+            step_id=self._current_step_id(),
+            text=payload.get("text", ""),
+            tts_marker=payload.get("tts_marker", ""),
+            citations=payload.get("citations", []),
+            data_state=payload.get("data_state", ""),
+        )
+
+    def _evidence_time(self) -> float:
+        """Return session-relative time for lesson evidence writes."""
+        if self._evidence_clock is not None:
+            try:
+                return max(0.0, float(self._evidence_clock()))
+            except Exception as exc:  # pragma: no cover — defensive
+                import sys
+
+                print(
+                    f"[learn.runtime] evidence clock failed: {exc!r}",
+                    file=sys.stderr,
+                )
+        return max(0.0, time.monotonic() - self._learn.lesson_started_at)
+
+    def _record_evidence(
+        self,
+        *,
+        source: str,
+        key: str,
+        t_session: float,
+    ) -> None:
+        """Best-effort EvidenceRegistry write for a lesson observation."""
+        if self._evidence_registry is None or not key:
+            return
+        try:
+            self._evidence_registry.write(source, key, t_session)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] evidence write failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _record_action_evidence(
+        self,
+        *,
+        expected: dict[str, Any] | None,
+        midi: dict[str, Any],
+        matched: bool | None = None,
+    ) -> float:
+        """Record the observed learner action and expected highlight."""
+        t_session = self._evidence_time()
+        midi_control, midi_deck = _control_and_deck(midi)
+        observed_id = _observable_control_id(midi_control, midi_deck)
+        source = str(midi.get("source", "midi") or "midi")
+        observed_source = "screen" if source == "click" else "midi"
+        self._record_evidence(
+            source=observed_source,
+            key=observed_id,
+            t_session=t_session,
+        )
+        if expected is not None:
+            expected_control, expected_deck = _control_and_deck(expected)
+            expected_id = _observable_control_id(expected_control, expected_deck)
+            self._record_evidence(source="screen", key=expected_id, t_session=t_session)
+        else:
+            expected_id = None
+        self._log_session_event(
+            "learn_action_observed",
+            lesson_id=self._learn.current_lesson_id or "",
+            course_id=self._learn.current_course_id or "",
+            step_id=self._current_step_id(),
+            observed_control_id=observed_id,
+            expected_control_id=expected_id,
+            source=source,
+            matched=matched,
+            evidence_time=t_session,
+        )
+        return t_session
+
+    def _emit_advance(self, *, reason: str) -> None:
+        """Emit an advance pulse for the active lesson."""
+        try:
+            advance = LearnAdvance.make(
+                lesson_id=self._learn.current_lesson_id or "",
+                reason=reason,
+            ).to_dict()
+            self._ipc.emit(advance)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(f"[learn.runtime] advance emit failed: {exc!r}", file=sys.stderr)
+
+    def _teaching_loop_payload(self, turn: TeachingTurn) -> LearnTeachingLoopPayload:
+        """Convert a planned teaching turn into socket-safe metadata."""
+        observation = turn.observation
+        verification = turn.verification
+        return LearnTeachingLoopPayload(
+            stages=tuple(turn.loop),
+            turn_kind=turn.turn_kind,
+            route_path=turn.route.path,
+            observation=LearnTeachingObservationPayload(
+                lesson_id=observation.lesson_id,
+                step_id=observation.step_id,
+                kind=observation.kind,
+                control_id=observation.control_id,
+                input_surfaces=observation.input_surfaces,
+                backstage_lenses=observation.backstage_lenses,
+                strikes_used=observation.strikes_used,
+            ),
+            verification=LearnTeachingVerificationPayload(
+                kind=verification.kind,
+                control=verification.control,
+                deck=verification.deck,
+                observable_control_ids=verification.observable_control_ids,
+                input_surfaces=verification.input_surfaces,
+                direction=verification.direction,
+                min_delta=verification.min_delta,
+            ),
+        )
+
+    def _flow_step(self, index: int) -> LessonStep | None:
+        """Return a structured lesson step by index, if available."""
+        if self._active_flow is None:
+            return None
+        if index < 0 or index >= len(self._active_flow.steps):
+            return None
+        return self._active_flow.steps[index]
+
+    def _active_step(self) -> LessonStep | None:
+        """Return the active structured-flow step, if available."""
+        return self._flow_step(self._active_step_index)
+
+    def _step_for_tutor_beat(self, beat: int, total_beats: int) -> LessonStep | None:
+        """Return the structured step represented by a fixture tutor beat."""
+        expected = self._current_expected_action()
+        if expected is None:
+            return None
+        if expected.get("control") == "lesson_continue":
+            return self._flow_step(beat)
+        if beat == total_beats - 1:
+            return self._active_step()
+        return None
+
+    def _current_expected_action(self) -> dict[str, Any] | None:
+        """Return the expected action for the current structured step."""
+        step = self._active_step()
+        if step is not None:
+            return step.expected_action
+        lesson_id = self._learn.current_lesson_id
+        if lesson_id is None or lesson_id not in CURRICULUM:
+            return None
+        expected = CURRICULUM[lesson_id].script.get("expected_action")
+        return expected if isinstance(expected, dict) else None
+
+    def _emit_opening_tutor_beats(self, expected: dict[str, Any]) -> None:
+        """Speak the authored opening in the right lesson rhythm.
+
+        ``lesson_continue`` lessons advance beat-by-beat on the on-screen
+        continue button. Lessons with a real control action surface every
+        authored setup line immediately so the dock lands on the actionable
+        prompt before verification starts.
+        """
+        lesson_id = self._learn.current_lesson_id
+        if lesson_id is None or lesson_id not in CURRICULUM:
+            return
+        beats = CURRICULUM[lesson_id].script.get("tutor_speak", [])
+        if not isinstance(beats, list) or not beats:
+            return
+        if (
+            expected.get("control") == "lesson_continue"
+            and self._active_observer() is None
+        ):
+            self._learn.current_beat_index = 0
+            self._emit_tutor_beat(0)
+            self._emit_prepared_pool_prompt_if_needed()
+            self._emit_graduation_summary_if_needed()
+            return
+        for beat_idx, _row in enumerate(beats):
+            self._learn.current_beat_index = beat_idx
+            self._emit_tutor_beat(beat_idx)
+
+    def _emit_step_tutor(self, step: LessonStep) -> None:
+        """Emit tutor text from a compiled structured-flow step."""
+        lesson_id = self._learn.current_lesson_id or "unknown"
+        turn = plan_teaching_turn(
+            lesson_id=lesson_id,
+            step=step,
+            strikes_used=self._learn.strike_count,
+        )
+        try:
+            speak = LearnTutorSpeak.make(
+                text=turn.text,
+                tts_marker=turn.tts_marker,
+                citations=turn.citations,
+                data_state="active",
+                teaching_loop=self._teaching_loop_payload(turn),
+            ).to_dict()
+            self._ipc.emit(speak)
+            self._log_tutor_speak_event(speak)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(f"[learn.runtime] step tutor emit failed: {exc!r}", file=sys.stderr)
+
+    def _emit_prepared_pool_prompt_if_needed(self) -> None:
+        """Emit L3.02's deterministic prepared-pool line when grounded."""
+        if self._learn.current_lesson_id != "L3.02":
+            return
+        loader = self._prepared_pool_loader
+        if loader is None:
+            return
+        try:
+            pool = loader()
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] prepared pool lookup failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return
+        if pool is None or pool.track_count < MIN_PREPARED_POOL_TRACKS:
+            return
+        citations = self._prepared_pool_citations(pool)
+        try:
+            speak = LearnTutorSpeak.make(
+                text=build_prepared_pool_prompt(pool),
+                tts_marker="L302.prepared_pool",
+                citations=citations,
+                data_state="active",
+            ).to_dict()
+            self._ipc.emit(speak)
+            self._log_tutor_speak_event(speak)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] prepared pool tutor emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _emit_graduation_summary_if_needed(self) -> None:
+        """Emit L3.06's truthful progress/profile/debrief status line."""
+        if self._learn.current_lesson_id != "L3.06":
+            return
+        try:
+            if self._graduation_summary_loader is not None:
+                summary = self._graduation_summary_loader(self._progress)
+            else:
+                summary = build_graduation_summary(self._progress)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] graduation summary lookup failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return
+        if summary is None:
+            return
+        self._record_evidence(
+            source="screen",
+            key="learn-progress",
+            t_session=self._evidence_time(),
+        )
+        if summary.debrief_available:
+            self._record_evidence(
+                source="screen",
+                key="learn-debrief",
+                t_session=self._evidence_time(),
+            )
+        if summary.profile_available:
+            self._record_evidence(
+                source="screen",
+                key="learn-profile",
+                t_session=self._evidence_time(),
+            )
+        try:
+            speak = LearnTutorSpeak.make(
+                text=build_graduation_tutor_line(summary),
+                tts_marker="L306.graduation_status",
+                citations=graduation_citations(
+                    summary,
+                    registry_available=self._evidence_registry is not None,
+                ),
+                data_state="active",
+            ).to_dict()
+            self._ipc.emit(speak)
+            self._log_tutor_speak_event(speak)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] graduation status tutor emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _prepared_pool_citations(self, pool: PreparedPool) -> tuple[str, ...]:
+        registry = self._evidence_registry
+        if registry is None or not pool.tracks:
+            return ()
+        track_id = pool.tracks[0].track_id
+        if any(ch.isspace() or ch in ",]" for ch in track_id):
+            return ()
+        try:
+            if not registry.has("track", track_id, 0.0, tol=0.5):
+                return ()
+        except Exception:  # pragma: no cover — defensive
+            return ()
+        return (f"[track:{track_id}]",)
+
     def _emit_tutor_beat(self, beat: int) -> None:
         """Emit :class:`LearnTutorSpeak` with text read VERBATIM from
         the JSON fixture (TONE-02). The text is never LLM-generated at
@@ -762,14 +1605,28 @@ class LessonRuntime(StateMachine):
         if beat >= len(beats):
             return
         fixture = beats[beat]
+        step = self._step_for_tutor_beat(beat, len(beats))
+        turn = None
+        if step is not None:
+            turn = plan_teaching_turn(
+                lesson_id=lesson_id,
+                step=step,
+                strikes_used=self._learn.strike_count,
+            )
         try:
             speak = LearnTutorSpeak.make(
                 text=fixture["text"],
                 tts_marker=fixture["tts_marker"],
-                citations=tuple(fixture.get("citations", [])),
+                citations=turn.citations
+                if turn is not None
+                else tuple(fixture.get("citations", [])),
                 data_state="active",
+                teaching_loop=self._teaching_loop_payload(turn)
+                if turn is not None
+                else None,
             ).to_dict()
             self._ipc.emit(speak)
+            self._log_tutor_speak_event(speak)
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 
@@ -789,19 +1646,80 @@ class LessonRuntime(StateMachine):
         # ``strike`` is 1-indexed; hints[] is 0-indexed.
         if strike - 1 >= len(hints):
             return
+        step = self._active_step()
+        turn = None
+        if step is not None:
+            turn = plan_hint_turn(
+                lesson_id=lesson_id,
+                step=step,
+                strike=strike,
+            )
         hint = hints[strike - 1]
         try:
             speak = LearnTutorSpeak.make(
-                text=hint["text"],
-                tts_marker=hint["tts_marker"],
-                citations=tuple(hint.get("citations", [])),
+                text=turn.text if turn is not None else hint["text"],
+                tts_marker=turn.tts_marker if turn is not None else hint["tts_marker"],
+                citations=turn.citations
+                if turn is not None
+                else tuple(hint.get("citations", [])),
                 data_state="hint",
+                teaching_loop=self._teaching_loop_payload(turn)
+                if turn is not None
+                else None,
             ).to_dict()
             self._ipc.emit(speak)
+            self._log_tutor_speak_event(speak)
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 
             print(f"[learn.runtime] hint emit failed: {exc!r}", file=sys.stderr)
+
+    def _emit_adaptive_mismatch_hint(
+        self,
+        *,
+        expected: dict[str, Any],
+        midi: dict[str, Any],
+        evidence_time: float,
+    ) -> None:
+        """Emit a grounded hint for the specific wrong action observed."""
+        lesson_id = self._learn.current_lesson_id or "unknown"
+        hint = _adaptive_mismatch_hint(
+            expected=expected,
+            midi=midi,
+            evidence_time=evidence_time,
+        )
+        step = self._active_step()
+        turn = None
+        if step is not None:
+            turn = plan_adaptive_turn(
+                lesson_id=lesson_id,
+                step=step,
+                text=hint.text,
+                tts_marker=f"{lesson_id}.adapt.mismatch",
+                citations=hint.citations,
+                strikes_used=self._learn.strike_count,
+            )
+        try:
+            speak = LearnTutorSpeak.make(
+                text=turn.text if turn is not None else hint.text,
+                tts_marker=turn.tts_marker
+                if turn is not None
+                else f"{lesson_id}.adapt.mismatch",
+                citations=turn.citations if turn is not None else hint.citations,
+                data_state="hint",
+                teaching_loop=self._teaching_loop_payload(turn)
+                if turn is not None
+                else None,
+            ).to_dict()
+            self._ipc.emit(speak)
+            self._log_tutor_speak_event(speak)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] adaptive mismatch hint emit failed: {exc!r}",
+                file=sys.stderr,
+            )
 
     # ------------------------------------------------------------------
     # 1 Hz tick loop — strike escalation timer

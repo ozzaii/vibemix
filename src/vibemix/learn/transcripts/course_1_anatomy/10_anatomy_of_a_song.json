@@ -5,37 +5,37 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "a track moves through five sections — intro, build, drop, breakdown, outro.",
+      "text": "a track moves through five sections: intro, build, drop, breakdown, outro.",
       "tts_marker": "L110.beat0",
       "citations": []
     },
     {
       "beat": 1,
-      "text": "the intro is sparse — usually drums or a single element, easy to mix into.",
+      "text": "the intro is sparse: usually drums or a single element, easy to mix into.",
       "tts_marker": "L110.beat1",
       "citations": []
     },
     {
       "beat": 2,
-      "text": "the build pulls energy up — risers, snare rolls, the kick getting busier.",
+      "text": "the build pulls energy up: risers, snare rolls, the kick getting busier.",
       "tts_marker": "L110.beat2",
       "citations": []
     },
     {
       "beat": 3,
-      "text": "the drop is the loudest, fullest section — the part the crowd was waiting for.",
+      "text": "the drop is the loudest, fullest section: the part the crowd was waiting for.",
       "tts_marker": "L110.beat3",
       "citations": []
     },
     {
       "beat": 4,
-      "text": "the breakdown drops the kick — the chord or melody sustains over thin air.",
+      "text": "the breakdown drops the kick: the chord or melody sustains over thin air.",
       "tts_marker": "L110.beat4",
       "citations": []
     },
     {
       "beat": 5,
-      "text": "the outro thins out again — the place you mix out of.",
+      "text": "the outro thins out again: the place you mix out of.",
       "tts_marker": "L110.beat5",
       "citations": []
     }
@@ -48,7 +48,7 @@
   "hints": [
     {
       "strike": 1,
-      "text": "listen across the whole track first — the five sections will repeat.",
+      "text": "listen across the whole track first: the five sections will repeat.",
       "tts_marker": "L110.hint1"
     },
     {

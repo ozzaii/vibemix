@@ -33,7 +33,7 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from vibemix.learn.curriculum import CURRICULUM
+from vibemix.learn.curriculum import COURSE_REGISTRY, CURRICULUM, course_lesson_ids
 from vibemix.learn.progress import (
     LearnProgress,
     _fresh_skills_block,
@@ -97,13 +97,12 @@ def _lesson_completed(progress: LearnProgress, lesson_id: str) -> bool:
 
 
 def _course_unlocked(progress: LearnProgress, course_id: str) -> bool:
-    if course_id in {"course_0", "course_1_anatomy"}:
+    course = COURSE_REGISTRY.get(course_id)
+    if course is None:
+        return False
+    if course.unlock_gate is None:
         return True
-    if course_id == "course_2_transitions":
-        return progress.course_2_unlocked is True
-    if course_id == "course_3_play_mode":
-        return progress.course_3_unlocked is True
-    return False
+    return getattr(progress, course.unlock_gate, False) is True
 
 
 def _lesson_unlocked(
@@ -271,14 +270,9 @@ def register_learn_handlers(
                 file=sys.stderr,
             )
             return
-        # Find the first lesson in CURRICULUM with matching course_id.
-        # Dict iteration order is insertion order (Python 3.7+), which
-        # matches the ship order in curriculum.py.
-        first_lesson_id: str | None = None
-        for lesson_id, meta in CURRICULUM.items():
-            if meta.course_id == course_id:
-                first_lesson_id = lesson_id
-                break
+        # Resolve ship order through the curriculum registry helper instead of
+        # reimplementing the course walk at the IPC boundary.
+        first_lesson_id = next(iter(course_lesson_ids(course_id)), None)
         if first_lesson_id is None:
             print(
                 f"[learn.ipc] start_course {course_id!r} has no registered "
@@ -478,10 +472,13 @@ def register_learn_handlers(
                     f"[learn.ipc] save_progress (empty) failed: {exc!r}",
                     file=sys.stderr,
                 )
-            # Emit reset_ack. Prefer the sync adapter (same path the
-            # runtime uses) so the emit fires through the same
+            # Emit reset_ack with the emptied snapshot. Prefer the sync adapter
+            # (same path the runtime uses) so the emit fires through the same
             # plumbing; fall back to awaiting ipc_router.emit directly.
-            ack = LearnProgressState.make(action="reset_ack").to_dict()
+            ack = LearnProgressState.make(
+                action="reset_ack",
+                progress=progress.snapshot(),
+            ).to_dict()
             if ipc_adapter is not None:
                 try:
                     ipc_adapter.emit(ack)

@@ -19,13 +19,13 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "i'm going to introduce a problem in your mix. two drills. one at a time.",
+      "text": "i'm going to introduce two problems into your mix, one drill at a time.",
       "tts_marker": "L305.beat0",
       "citations": []
     },
     {
       "beat": 1,
-      "text": "when you hear it go off, bail out within four bars. echo-out, filter sweep, or hard cut. your choice.",
+      "text": "when you hear it go off, bail out within four bars: echo-out, filter sweep, or hard cut.",
       "tts_marker": "L305.beat1",
       "citations": []
     }

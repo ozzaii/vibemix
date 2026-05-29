@@ -11,13 +11,11 @@ forbidden tutor moves are:
 4. NO closing with an upbeat hook
 
 These rules are the v9.0 "Lesson One" tone contract — the AI tutor is
-proprioceptive scaffolding, not an edtech mascot. The runtime-side
-``check_no_tutor_slop.py`` blocklist with ≥20 tokens lands in Plan 94;
-this file pins the SYSTEM INSTRUCTION FIXTURE (the prompt that
-discourages those moves up-front).
+proprioceptive scaffolding, not an edtech mascot. This file pins the system
+instruction fixture that discourages those moves up-front.
 
-Two test functions — both gated on ``vibemix.learn.prompts``
-importing successfully (Plan 92-03 lands that module).
+Two test functions — both gated on ``vibemix.learn.prompts`` importing
+successfully for partial-build friendliness.
 
 REQ-ID: TONE-04.
 
@@ -32,9 +30,7 @@ try:
     from vibemix.learn.prompts import build_tutor_system_instruction
 except ImportError:
     pytest.skip(
-        "tests/learn/test_tutor_system_instruction_lock.py awaits Plan "
-        "92-03 (LESSON-05 build_tutor_system_instruction). When prompts.py "
-        "lands, this module-level skip flips to live assertions.",
+        "Learn prompt composition unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 

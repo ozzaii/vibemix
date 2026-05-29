@@ -5,7 +5,7 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "find deck A's play button — it's lit up on your controller.",
+      "text": "find deck A's play button: it's lit up on your controller.",
       "tts_marker": "L000.beat0",
       "citations": []
     }
@@ -29,7 +29,7 @@
     },
     {
       "strike": 3,
-      "text": "the play button is the bottom-row leftmost button on most controllers — press it now.",
+      "text": "the play button is the bottom-row leftmost button on most controllers: press it now.",
       "tts_marker": "L000.hint3"
     }
   ]

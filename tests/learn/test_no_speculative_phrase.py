@@ -27,8 +27,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
-from typing import Iterable
-
+from collections.abc import Iterable
 
 # Phrase-guessing primitives forbidden in src/vibemix/learn/.
 # The learn/ package consumes already-grounded phrase data via

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 92 Plan 02 — LessonRuntime end-to-end smoke (RED-state stub).
+"""LessonRuntime end-to-end smoke regression tests.
 
 End-to-end lifecycle of a single lesson:
 
@@ -17,30 +17,22 @@ End-to-end lifecycle of a single lesson:
 Plus a secondary test that the 45 s min-dwell guard rejects ``skip``
 before t=45 and accepts it after.
 
-This file is a STUB — Plan 92-03 ships ``LessonRuntime``, ``LearnState``,
-and the dispatch wiring. Module-level skip names "Plan 92-03" so the
-executor knows exactly when the skip flips. The test BODY shape is
-written against the contract from 92-CONTEXT.md §LessonRuntime
-architecture + 92-VALIDATION.md.
-
 REQ-ID: LESSON-01 (state machine + sole-writer enforcement) + LESSON-04
 (advance gate).
 """
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 try:
-    from vibemix.learn.runtime import LessonRuntime  # Plan 92-03
-    from vibemix.learn.state import LearnState        # Plan 92-03
+    from vibemix.learn.runtime import LessonRuntime
+    from vibemix.learn.state import LearnState
 except ImportError:
     pytest.skip(
-        "tests/learn/test_lesson_runtime_smoke.py awaits Plan 92-03 "
-        "(LESSON-01 LessonRuntime + LearnState). When runtime.py + "
-        "state.py land, this module-level skip flips to live "
-        "assertions.",
+        "LessonRuntime + LearnState unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 
@@ -91,6 +83,16 @@ def _emitted_envelope_types(ipc_router: MagicMock) -> list[str]:
     return types
 
 
+def _emitted_envelopes(ipc_router: MagicMock) -> list[dict]:
+    """Pull type-tagged dict envelopes from the runtime emit mock."""
+    envelopes: list[dict] = []
+    for call in ipc_router.emit.call_args_list:
+        args, _kwargs = call
+        if args and isinstance(args[0], dict) and "type" in args[0]:
+            envelopes.append(args[0])
+    return envelopes
+
+
 # ---------------------------------------------------------------------------
 # Test 1: full lifecycle
 # ---------------------------------------------------------------------------
@@ -139,6 +141,139 @@ def test_full_lifecycle() -> None:
             f"LessonRuntime full-lifecycle missing required emit "
             f"{required!r}. Saw: {emitted!r}"
         )
+
+
+def test_lesson_loaded_emits_full_course_progress_dots() -> None:
+    """Live HUD dots must include completed, current, and pending rows.
+
+    The frontend can render ``current`` and ``pending``, but the runtime
+    must send the complete course strip or the HUD opens with ``OF 0``.
+    """
+    from vibemix.learn.progress import LearnProgress
+
+    learn_state = LearnState()
+    ipc_router = MagicMock(name="ipc_router")
+    progress = LearnProgress()
+    progress.mark_completed("course_1_anatomy", "L1.01")
+    runtime = LessonRuntime(
+        learn_state=learn_state,
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc_router,
+        progress_store=progress,
+    )
+
+    runtime.send(
+        "load",
+        lesson_id="L1.03",
+        course_id="course_1_anatomy",
+        controller_id="pioneer_ddj_flx4",
+    )
+
+    loaded = next(
+        env
+        for env in _emitted_envelopes(ipc_router)
+        if env["type"] == "ipc.learn.lesson_loaded"
+    )
+    dots = loaded["payload"]["progress_dots"]
+    assert len(dots) == 16
+    by_id = {dot["lesson_id"]: dot["status"] for dot in dots}
+    assert by_id["L1.01"] == "completed"
+    assert by_id["L1.03"] == "current"
+    assert by_id["L1.04"] == "pending"
+
+
+def test_lesson_start_emits_in_progress_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Loading a lesson creates and persists an unfinished attempt row."""
+    from vibemix.learn.progress import LearnProgress, load_progress
+
+    target = tmp_path / "learn-progress.json"
+    monkeypatch.setattr(
+        "vibemix.learn.progress.progress_path",
+        lambda: target,
+    )
+    ipc_router = MagicMock(name="ipc_router")
+    progress = LearnProgress()
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc_router,
+        progress_store=progress,
+    )
+
+    runtime.send(
+        "load",
+        lesson_id="L1.03",
+        course_id="course_1_anatomy",
+        controller_id="pioneer_ddj_flx4",
+    )
+
+    progress_snapshots = [
+        env["payload"]["progress"]
+        for env in _emitted_envelopes(ipc_router)
+        if env["type"] == "ipc.learn.progress_state"
+    ]
+    assert progress_snapshots
+    assert progress_snapshots[-1]["lessons"]["L1.03"] == {
+        "completed": False,
+        "completed_at": None,
+        "strikes_used": 0,
+    }
+    assert target.exists()
+    reloaded, was_corrupt = load_progress()
+    assert was_corrupt is False
+    assert reloaded.lessons["L1.03"] == {
+        "completed": False,
+        "completed_at": None,
+        "strikes_used": 0,
+    }
+
+
+def test_hint_strike_updates_live_progress_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Timed hints turn the unfinished row into durable adaptation data."""
+    from vibemix.learn.progress import LearnProgress, load_progress
+
+    target = tmp_path / "learn-progress.json"
+    monkeypatch.setattr(
+        "vibemix.learn.progress.progress_path",
+        lambda: target,
+    )
+    ipc_router = MagicMock(name="ipc_router")
+    progress = LearnProgress()
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc_router,
+        progress_store=progress,
+    )
+
+    runtime.send(
+        "load",
+        lesson_id="L1.03",
+        course_id="course_1_anatomy",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    runtime.send("strike")
+
+    progress_snapshots = [
+        env["payload"]["progress"]
+        for env in _emitted_envelopes(ipc_router)
+        if env["type"] == "ipc.learn.progress_state"
+    ]
+    assert progress_snapshots[-1]["lessons"]["L1.03"]["strikes_used"] == 1
+    assert target.exists()
+    reloaded, was_corrupt = load_progress()
+    assert was_corrupt is False
+    assert reloaded.lessons["L1.03"]["strikes_used"] == 1
 
 
 # ---------------------------------------------------------------------------

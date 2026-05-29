@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 91 Plan 02 — MidiMirror unit tests (RED-state stubs).
+"""MidiMirror unit regression tests.
 
 Pins the three load-bearing behaviours of ``vibemix.learn.midi_mirror.MidiMirror``
-that Plan 03 must satisfy before flipping these from skip → green:
+that keep the Learn controller mirror responsive without flooding the bus:
 
 1. ``test_no_emit_when_steady`` — when the live ControllerState hasn't moved
    since the last ``snapshot()`` call, the next ``snapshot()`` returns
@@ -20,11 +20,6 @@ that Plan 03 must satisfy before flipping these from skip → green:
    control's integer LSB advances between snapshots, the emit fires and the
    payload's ``positions`` dict reflects the new value.
 
-RED-state discipline: the test FILE collects cleanly today, but the body
-SKIPS (via ``pytest.importorskip``) until Plan 03 lands
-``src/vibemix/learn/midi_mirror.py``. The moment that module appears, the
-tests run for real; the test file does NOT need to change.
-
 REQ-ID: RENDER-02 (MIDI mirror delta-suppression contract).
 """
 from __future__ import annotations
@@ -35,13 +30,10 @@ import pytest
 
 
 def _midi_mirror_module():
-    """Skip the calling test if Plan 03 hasn't landed
-    ``vibemix.learn.midi_mirror``. Per-test importorskip (not module-level)
-    so ``pytest --collect-only`` reports 3 items today — the acceptance
-    criterion in 91-02-PLAN.md."""
+    """Skip the calling test only in a partial build without MidiMirror."""
     return pytest.importorskip(
         "vibemix.learn.midi_mirror",
-        reason="Plan 91-03 lands src/vibemix/learn/midi_mirror.py",
+        reason="vibemix.learn.midi_mirror unavailable in this partial Learn build",
     )
 
 
@@ -162,3 +154,66 @@ def test_delta_emit_when_one_field_changes() -> None:
     assert frame is not None, "single-field delta must trigger emit"
     assert frame["type"] == "ipc.learn.midi_position"
     assert frame["payload"]["positions"]["eq_hi:A"] == 100
+
+
+def test_snapshot_projects_one_shot_button_events() -> None:
+    """Momentary buttons from ControllerState.events_since become pulses."""
+    midi_mirror_module = _midi_mirror_module()
+    positions = {"eq_hi:A": 64, "xfader": 64}
+    event = SimpleNamespace(
+        at=1_700_000_000.0,
+        kind="sync",
+        deck="B",
+        value_raw=127,
+    )
+    cs = _make_steady_controller_state(positions)
+    pending_events = [event]
+
+    def events_since(_t: float) -> list[SimpleNamespace]:
+        events = list(pending_events)
+        pending_events.clear()
+        return events
+
+    cs.events_since = events_since
+    profile = _make_profile()
+
+    mirror = midi_mirror_module.MidiMirror(controller_state=cs)
+    mirror.bind_profile(profile)
+
+    frame = mirror.snapshot()
+    assert frame is not None
+    assert frame["payload"]["positions"]["sync:B"] == 127
+
+
+def test_snapshot_projects_relative_jog_ticks_as_pulse_then_reset() -> None:
+    """Relative jog CC ticks become a one-frame jog pulse over the 0 baseline."""
+    midi_mirror_module = _midi_mirror_module()
+    positions = {"jog:A": 0, "xfader": 64}
+    event = SimpleNamespace(
+        at=1_700_000_000.0,
+        kind="cc",
+        deck="A",
+        field="jog",
+        value_raw=65,
+    )
+    cs = _make_steady_controller_state(positions)
+    pending_events = [event]
+
+    def events_since(_t: float) -> list[SimpleNamespace]:
+        events = list(pending_events)
+        pending_events.clear()
+        return events
+
+    cs.events_since = events_since
+    profile = _make_profile()
+
+    mirror = midi_mirror_module.MidiMirror(controller_state=cs)
+    mirror.bind_profile(profile)
+
+    frame = mirror.snapshot()
+    assert frame is not None
+    assert frame["payload"]["positions"]["jog:A"] == 127
+
+    reset = mirror.snapshot()
+    assert reset is not None
+    assert reset["payload"]["positions"]["jog:A"] == 0

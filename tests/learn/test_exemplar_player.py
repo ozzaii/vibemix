@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 93 Plan 03 — EXEMPLAR-04 ``ExemplarPlayer`` + ``_choose_gain_db`` (RED-state stub).
+"""EXEMPLAR-04 ``ExemplarPlayer`` + ``_choose_gain_db`` regression tests.
 
 ``ExemplarPlayer`` owns its OWN ``sd.OutputStream`` on a user-picked
 headphone device. It does NOT reuse ``audio.buffers.PlaybackQueue`` (which
@@ -14,12 +14,7 @@ Gain policy (from 93-RESEARCH.md §Pattern 6):
     - Below ``SILENT_RMS=0.012`` → default ``-12 dB`` (no special handling
       for "no master" state).
 
-P93 also lands the Course 3 active-session guard SCAFFOLDING (``can_play()``
-returns True for now; P96 wires the real guard against ``state.session_active``
-and ``state.audible_deck``).
-
 REQ-ID: EXEMPLAR-04 (dedicated headphone audio routing + gain policy).
-Downstream plan that flips this skip: **Plan 93-03**.
 """
 from __future__ import annotations
 
@@ -29,12 +24,11 @@ from unittest.mock import MagicMock
 import pytest
 
 try:
-    from vibemix.learn import audio_cue  # Plan 93-03
-    from vibemix.learn.audio_cue import ExemplarPlayer, _choose_gain_db  # Plan 93-03
+    from vibemix.learn import audio_cue
+    from vibemix.learn.audio_cue import ExemplarPlayer, _choose_gain_db
 except ImportError:
     pytest.skip(
-        "tests/learn/test_exemplar_player.py awaiting Plan 93-03 — "
-        "ExemplarPlayer + _choose_gain_db in src/vibemix/learn/audio_cue.py.",
+        "ExemplarPlayer + _choose_gain_db unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 

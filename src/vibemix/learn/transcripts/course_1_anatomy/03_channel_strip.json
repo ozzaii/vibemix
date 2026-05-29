@@ -1,11 +1,11 @@
 {
   "lesson_id": "L1.03",
   "title": "channel strip",
-  "system_instruction_addendum": "CHANNEL STRIP ADDENDUM: A channel strip is one deck's tone column — gain, three EQ knobs, fader. Name the parts as the user sweeps them. Stay quiet during the sweep.",
+  "system_instruction_addendum": "CHANNEL STRIP ADDENDUM: A channel strip is one deck's tone column: gain, three EQ knobs, fader. Name the parts as the user sweeps them. Stay quiet during the sweep.",
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "the channel strip is the vertical column above each deck — gain on top, three EQ knobs, fader at the bottom.",
+      "text": "the channel strip is the vertical column above each deck: gain on top, three EQ knobs, fader at the bottom.",
       "tts_marker": "L103.beat0",
       "citations": []
     },
@@ -30,7 +30,7 @@
     },
     {
       "strike": 2,
-      "text": "the top knob is the high EQ — it shapes the cymbals and shimmer.",
+      "text": "the top knob is the high EQ: it shapes the cymbals and shimmer.",
       "tts_marker": "L103.hint2"
     },
     {

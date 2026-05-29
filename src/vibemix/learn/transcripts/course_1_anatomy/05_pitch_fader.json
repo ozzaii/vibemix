@@ -5,13 +5,13 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "the pitch fader is the tall vertical slider on deck A — it nudges the BPM up or down as a percentage.",
+      "text": "the pitch fader is the tall vertical slider on deck A: it nudges the BPM up or down as a percentage.",
       "tts_marker": "L105.beat0",
       "citations": []
     },
     {
       "beat": 1,
-      "text": "shift it about a quarter of the throw — watch the tempo display change.",
+      "text": "shift it about a quarter of the throw: watch the tempo display change.",
       "tts_marker": "L105.beat1",
       "citations": []
     }

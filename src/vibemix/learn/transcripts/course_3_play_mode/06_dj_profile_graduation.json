@@ -7,13 +7,13 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "the debrief is open. it has your accumulated dj profile from every session vibemix watched.",
+      "text": "this is the handoff: progress, debrief, and dj profile. i will only name what is actually saved.",
       "tts_marker": "L306.beat0",
       "citations": []
     },
     {
       "beat": 1,
-      "text": "scroll through the profile. you finished the beginner module. the live co-host is open for you now.",
+      "text": "tap continue after you have looked. the live co-host is open for real sets now.",
       "tts_marker": "L306.beat1",
       "citations": []
     }
@@ -26,12 +26,12 @@
   "hints": [
     {
       "strike": 1,
-      "text": "the debrief window is on port 8766. it should have opened automatically.",
+      "text": "if no debrief is saved yet, finish a recorded set first. this lesson stays honest.",
       "tts_marker": "L306.hint1"
     },
     {
       "strike": 2,
-      "text": "the profile reads what's been recorded. don't take any single line as a verdict.",
+      "text": "profile only appears after consent is on and vibemix has enough cited session evidence.",
       "tts_marker": "L306.hint2"
     },
     {

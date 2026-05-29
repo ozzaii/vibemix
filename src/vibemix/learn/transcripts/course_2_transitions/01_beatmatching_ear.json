@@ -5,13 +5,13 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "sync stays off for this one. you'll hear the kicks drift in and out of phase — your job is to close the gap with the pitch fader.",
+      "text": "sync stays off for this one. you'll hear the kicks drift in and out of phase: your job is to close the gap with the pitch fader.",
       "tts_marker": "L201.beat0",
       "citations": []
     },
     {
       "beat": 1,
-      "text": "nudge deck b's pitch fader a touch — listen for the kicks pulling together or drifting apart.",
+      "text": "nudge deck b's pitch fader a touch: listen for the kicks pulling together or drifting apart.",
       "tts_marker": "L201.beat1",
       "citations": []
     }
@@ -30,7 +30,7 @@
     },
     {
       "strike": 2,
-      "text": "a tiny nudge is enough — the pitch fader is finer than it looks.",
+      "text": "a tiny nudge is enough: the pitch fader is finer than it looks.",
       "tts_marker": "L201.hint2"
     },
     {

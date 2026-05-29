@@ -1,11 +1,11 @@
 {
   "lesson_id": "L2.03",
   "title": "long blend",
-  "system_instruction_addendum": "LONG BLEND ADDENDUM: A 32-bar crossfader fade from deck a to deck b. State the bar count. Do not narrate the EQ swap — that is the next lesson.",
+  "system_instruction_addendum": "LONG BLEND ADDENDUM: A 32-bar crossfader fade from deck a to deck b. State the bar count. Do not narrate the EQ swap: that is the next lesson.",
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "the long blend is a thirty-two bar fade — slow, gradual, almost invisible.",
+      "text": "the long blend is a thirty-two bar fade: slow, gradual, almost invisible.",
       "tts_marker": "L203.beat0",
       "citations": []
     },
@@ -35,7 +35,7 @@
     },
     {
       "strike": 2,
-      "text": "thirty-two bars at one-twenty-eight bpm is about a minute — go slow.",
+      "text": "thirty-two bars at one-twenty-eight bpm is about a minute: go slow.",
       "tts_marker": "L203.hint2"
     },
     {

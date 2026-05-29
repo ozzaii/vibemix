@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Curriculum metadata — course frames + lesson dispatch.
+"""Curriculum metadata: course frames + lesson dispatch.
 
 Phase 92 (LESSON-05). Ships ONLY Course 0 (the "hello world" 1-step demo)
 for the press-play proof-of-life. Courses 1 / 2 / 3 add their entries in
@@ -7,11 +7,11 @@ P94 (anatomy) / P95 (transitions) / P96 (play mode) respectively.
 
 Two top-level tables:
 
-* :data:`COURSE_FRAMES` — short course-context paragraphs appended to the
+* :data:`COURSE_FRAMES`: short course-context paragraphs appended to the
   tutor system instruction so the LLM has the course frame in mind for
   every beat. Keyed by ``course_id`` (e.g. ``"course_0"``).
 
-* :data:`CURRICULUM` — per-lesson :class:`LessonMeta` records. Keyed by
+* :data:`CURRICULUM`: per-lesson :class:`LessonMeta` records. Keyed by
   ``lesson_id`` (e.g. ``"L0.00-press-play"``). Each :class:`LessonMeta`
   carries the lesson title, course pointer, ≤200-char system instruction
   addendum, and a ``transcript_path`` pointing at the hand-authored JSON
@@ -19,7 +19,7 @@ Two top-level tables:
 
 The :class:`LessonMeta.script` ``@property`` lazy-loads the JSON fixture
 on demand. Since :class:`LessonMeta` is ``frozen=True``, the property
-re-reads from disk each access — fine for P92 (1 read per lesson start);
+re-reads from disk each access: fine for P92 (1 read per lesson start);
 P94+ can layer ``functools.lru_cache`` on the property if needed.
 
 TONE-02 binding: the lesson script JSON files are the SOLE source of
@@ -27,28 +27,136 @@ TONE-02 binding: the lesson script JSON files are the SOLE source of
 ``tests/learn/test_scripts_are_fixtures.py`` rejects any code path that
 writes that field from a generative API call.
 
-# P94 adds L1.01..L1.16 (Course 1 — Anatomy), P95 adds L2.01..L2.14
-# (Course 2 — Transitions), P96 adds L3.01..L3.07 (Course 3 — Play Mode).
+# P94 adds L1.01..L1.16 (Course 1: Anatomy), P95 adds L2.01..L2.14
+# (Course 2: Transitions), P96 adds L3.01..L3.07 (Course 3: Play Mode).
 """
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, get_args
+
+CourseFrontstageMode = Literal[
+    "legacy_demo",
+    "practice_booth",
+    "live_play_mode",
+]
+
+CourseCapability = Literal[
+    "controller_state",
+    "cue_section_lookahead",
+    "debrief",
+    "dj_profile",
+    "evidence_registry",
+    "library_exemplars",
+    "library_suggestions",
+    "live_audio",
+    "on_screen_deck",
+    "prepared_pool",
+    "recital_observer",
+    "recovery_drill",
+    "session_recording",
+    "session_state",
+]
+
+COURSE_FRONTSTAGE_MODES: frozenset[CourseFrontstageMode] = frozenset(
+    get_args(CourseFrontstageMode)
+)
+COURSE_CAPABILITIES: frozenset[CourseCapability] = frozenset(
+    get_args(CourseCapability)
+)
+
+
+@dataclass(frozen=True)
+class CourseMeta:
+    """Per-course navigation and unlock metadata.
+
+    ``CURRICULUM`` remains the source of lesson rows. This registry is the
+    source for chooser labels and course gates so adding a course is not a
+    Python+TypeScript scavenger hunt. ``capabilities`` is the backstage
+    integration contract: the coded systems the course is allowed to depend
+    on while the frontstage still shows one calm prompt and one action.
+    """
+
+    label: str
+    hud_label: str
+    unlock_gate: str | None = None
+    lock_reason: str | None = None
+    beginner: bool = True
+    frontstage_mode: CourseFrontstageMode = "practice_booth"
+    capabilities: tuple[CourseCapability, ...] = (
+        "evidence_registry",
+        "controller_state",
+        "on_screen_deck",
+    )
+
+
+COURSE_REGISTRY: dict[str, CourseMeta] = {
+    "course_0": CourseMeta(
+        label="Course 0 · Press Play",
+        hud_label="COURSE 0 · PRESS PLAY",
+        beginner=False,
+        frontstage_mode="legacy_demo",
+    ),
+    "course_1_anatomy": CourseMeta(
+        label="Course 1 · Anatomy",
+        hud_label="COURSE 1 · ANATOMY",
+        capabilities=(
+            "evidence_registry",
+            "controller_state",
+            "on_screen_deck",
+            "library_exemplars",
+            "recital_observer",
+        ),
+    ),
+    "course_2_transitions": CourseMeta(
+        label="Course 2 · Transitions",
+        hud_label="COURSE 2 · TRANSITIONS",
+        unlock_gate="course_2_unlocked",
+        lock_reason="pass the course 1 recital to unlock transitions",
+        capabilities=(
+            "evidence_registry",
+            "controller_state",
+            "on_screen_deck",
+            "recital_observer",
+        ),
+    ),
+    "course_3_play_mode": CourseMeta(
+        label="Course 3 · Play Mode",
+        hud_label="COURSE 3 · PLAY-MODE",
+        unlock_gate="course_3_unlocked",
+        lock_reason="pass the course 2 recital to unlock play mode",
+        frontstage_mode="live_play_mode",
+        capabilities=(
+            "evidence_registry",
+            "controller_state",
+            "on_screen_deck",
+            "live_audio",
+            "cue_section_lookahead",
+            "prepared_pool",
+            "library_suggestions",
+            "session_state",
+            "session_recording",
+            "debrief",
+            "dj_profile",
+            "recovery_drill",
+        ),
+    ),
+}
 
 
 # ---------------------------------------------------------------------------
-# Course frames — appended into the tutor system instruction
+# Course frames: appended into the tutor system instruction
 # ---------------------------------------------------------------------------
 
 COURSE_FRAMES: dict[str, str] = {
     "course_0": (
-        "Course 0 is the hello-world tutorial — a one-lesson demo proving "
+        "Course 0 is the hello-world tutorial: a one-lesson demo proving "
         "the runtime end-to-end."
     ),
     "course_1_anatomy": (
-        "Course 1 is the anatomy walkthrough — a beginner meets their "
+        "Course 1 is the anatomy walkthrough: a beginner meets their "
         "controller, names every section (decks / mixer / transport / EQ), "
         "then hears the EQ bands demonstrated on a track from their own "
         "library. The user has no DJ vocabulary yet; ground every "
@@ -62,7 +170,7 @@ COURSE_FRAMES: dict[str, str] = {
         "observation in what the two decks are doing right now."
     ),
     "course_3_play_mode": (
-        "Course 3 is the play mode — the beginner runs a real set with "
+        "Course 3 is the play mode: the beginner runs a real set with "
         "vibemix coaching live. Forward calls land only when [cue:] "
         "anchors back the prediction; otherwise narration stays "
         "retrospective. No exemplar playback while a deck is audible "
@@ -83,12 +191,12 @@ class LessonMeta:
     """Per-lesson metadata record.
 
     Fields:
-        title: HUD title — lowercase, period-free (UI-SPEC).
+        title: HUD title: lowercase, period-free (UI-SPEC).
         course_id: Key into :data:`COURSE_FRAMES`.
         system_instruction_addendum: ≤200 char suffix appended to the
             tutor system instruction by
             :func:`vibemix.learn.prompts.build_tutor_system_instruction`.
-            Tested against the 200-char cap at composition time —
+            Tested against the 200-char cap at composition time:
             ``build_tutor_system_instruction`` raises ``ValueError`` when
             an entry exceeds the cap.
         transcript_path: Relative path under
@@ -124,7 +232,7 @@ class LessonMeta:
 
 
 # ---------------------------------------------------------------------------
-# Curriculum dispatch table — keyed by lesson_id
+# Curriculum dispatch table: keyed by lesson_id
 # ---------------------------------------------------------------------------
 
 CURRICULUM: dict[str, LessonMeta] = {
@@ -138,7 +246,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         transcript_path="hello_world/01_press_play.json",
     ),
     # ------------------------------------------------------------------
-    # P94 — Course 1 (Anatomy of a Deck): 16 lessons L1.01..L1.16.
+    # P94: Course 1 (Anatomy of a Deck): 16 lessons L1.01..L1.16.
     # Every addendum is byte-equal to the corresponding fixture's
     # ``system_instruction_addendum`` field (drift gate pinned by
     # Plan 94-02's test). Titles are lowercase + period-free per UI-SPEC.
@@ -157,7 +265,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         course_id="course_1_anatomy",
         system_instruction_addendum=(
             "MEET CONTROLLER ADDENDUM: Name the rendered controller's three "
-            "sections — left deck, mixer, right deck. Do not narrate "
+            "sections: left deck, mixer, right deck. Do not narrate "
             "features beyond the three sections."
         ),
         transcript_path="course_1_anatomy/02_meet_your_controller.json",
@@ -167,7 +275,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         course_id="course_1_anatomy",
         system_instruction_addendum=(
             "CHANNEL STRIP ADDENDUM: A channel strip is one deck's tone "
-            "column — gain, three EQ knobs, fader. Name the parts as the "
+            "column: gain, three EQ knobs, fader. Name the parts as the "
             "user sweeps them. Stay quiet during the sweep."
         ),
         transcript_path="course_1_anatomy/03_channel_strip.json",
@@ -218,7 +326,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         course_id="course_1_anatomy",
         system_instruction_addendum=(
             "HEADPHONE CUEING ADDENDUM: The cue button routes a deck to "
-            "the headphones only. Master and headphone cue can differ — "
+            "the headphones only. Master and headphone cue can differ: "
             "that is the point."
         ),
         transcript_path="course_1_anatomy/08_headphone_cueing.json",
@@ -258,7 +366,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         course_id="course_1_anatomy",
         system_instruction_addendum=(
             "SPOT BREAKDOWN EAR ADDENDUM: The breakdown is the energy "
-            "drop — usually the kick steps out and a sustained chord or "
+            "drop: usually the kick steps out and a sustained chord or "
             "vocal carries through. State the audible cue, not the bar "
             "number."
         ),
@@ -269,7 +377,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         course_id="course_1_anatomy",
         system_instruction_addendum=(
             "SPOT BREAKDOWN EYE ADDENDUM: The breakdown on the waveform "
-            "is a thinner section — less low end, taller mids. Point to "
+            "is a thinner section: less low end, taller mids. Point to "
             "the waveform, not the audio."
         ),
         transcript_path="course_1_anatomy/13_spot_breakdown_by_eye.json",
@@ -278,7 +386,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         title="eq as tutor",
         course_id="course_1_anatomy",
         system_instruction_addendum=(
-            "EQ AS TUTOR ADDENDUM: Cycle three EQ bands — low, mid, high. "
+            "EQ AS TUTOR ADDENDUM: Cycle three EQ bands: low, mid, high. "
             "Cite the exemplar track once per band. Stay quiet while the "
             "user is sweeping the knob."
         ),
@@ -305,7 +413,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         transcript_path="course_1_anatomy/16_course_1_recital.json",
     ),
     # ------------------------------------------------------------------
-    # P95 — Course 2 (Transitions): 14 lessons L2.01..L2.14.
+    # P95: Course 2 (Transitions): 14 lessons L2.01..L2.14.
     # Every addendum is byte-equal to the corresponding fixture's
     # ``system_instruction_addendum`` field. Titles are lowercase + period-
     # free per UI-SPEC. Mirror of the P94 Course 1 extension pattern.
@@ -325,7 +433,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         title="beatmatching with sync",
         course_id="course_2_transitions",
         system_instruction_addendum=(
-            "BEATMATCH SYNC ADDENDUM: Sync is the modern fast-path — "
+            "BEATMATCH SYNC ADDENDUM: Sync is the modern fast-path: "
             "press it and the BPMs match. Frame it as a tool, not a "
             "shortcut. The ear-version still matters for hardware without "
             "sync."
@@ -337,7 +445,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         course_id="course_2_transitions",
         system_instruction_addendum=(
             "LONG BLEND ADDENDUM: A 32-bar crossfader fade from deck a to "
-            "deck b. State the bar count. Do not narrate the EQ swap — "
+            "deck b. State the bar count. Do not narrate the EQ swap: "
             "that is the next lesson."
         ),
         transcript_path="course_2_transitions/03_long_blend.json",
@@ -388,7 +496,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         course_id="course_2_transitions",
         system_instruction_addendum=(
             "DROP SWAP ADDENDUM: A hard crossfader cut at the drop of "
-            "deck b. Time it to the bar — early or late kills the drop."
+            "deck b. Time it to the bar: early or late kills the drop."
         ),
         transcript_path="course_2_transitions/08_drop_swap.json",
     ),
@@ -437,8 +545,8 @@ CURRICULUM: dict[str, LessonMeta] = {
         title="diagnosing a train wreck",
         course_id="course_2_transitions",
         system_instruction_addendum=(
-            "TRAIN WRECK ADDENDUM: A train wreck has three named causes "
-            "— off-phrase, off-key, off-bpm. State the cause you hear; "
+            "TRAIN WRECK ADDENDUM: A train wreck has three named causes: "
+            "off-phrase, off-key, off-bpm. State the cause you hear; "
             "do not soften it. Listening-only lesson."
         ),
         transcript_path="course_2_transitions/13_diagnosing_train_wreck.json",
@@ -454,7 +562,7 @@ CURRICULUM: dict[str, LessonMeta] = {
         transcript_path="course_2_transitions/14_course_2_recital.json",
     ),
     # ------------------------------------------------------------------
-    # P96 — Course 3 (Play Mode): 6 lessons L3.01..L3.06.
+    # P96: Course 3 (Play Mode): 6 lessons L3.01..L3.06.
     # Every addendum is byte-equal to the corresponding fixture's
     # ``system_instruction_addendum`` field (drift gate pinned by
     # Plan 96-03's test). Titles are lowercase + period-free per UI-SPEC.
@@ -475,9 +583,9 @@ CURRICULUM: dict[str, LessonMeta] = {
         title="first 15-minute set",
         course_id="course_3_play_mode",
         system_instruction_addendum=(
-            "FIRST 15-MIN SET ADDENDUM: A pre-sequenced pool is loaded "
-            "from v8.2 build-a-set. Coach each transition. Cite [cue:] "
-            "when forward calls are grounded."
+            "FIRST 15-MIN SET ADDENDUM: User brings a prepared five-track "
+            "pool from build-a-set or their own queue. Coach each "
+            "transition. Cite [cue:] when forward calls are grounded."
         ),
         transcript_path="course_3_play_mode/02_first_15_minute_set.json",
     ),
@@ -496,8 +604,8 @@ CURRICULUM: dict[str, LessonMeta] = {
         course_id="course_3_play_mode",
         system_instruction_addendum=(
             "30-MIN CAPSTONE ADDENDUM: Full proactive co-pilot. Forward "
-            "calls ONLY on [cue:] evidence. Session is recorded; debrief "
-            "opens at end."
+            "calls ONLY on [cue:] evidence. Save session evidence for a "
+            "post-set debrief; do not promise auto-open."
         ),
         transcript_path="course_3_play_mode/04_first_30_minute_capstone.json",
     ),
@@ -522,3 +630,31 @@ CURRICULUM: dict[str, LessonMeta] = {
         transcript_path="course_3_play_mode/06_dj_profile_graduation.json",
     ),
 }
+
+
+def course_lesson_ids(course_id: str) -> tuple[str, ...]:
+    """Return lesson ids for ``course_id`` in authored curriculum order."""
+    return tuple(
+        lesson_id
+        for lesson_id, meta in CURRICULUM.items()
+        if meta.course_id == course_id
+    )
+
+
+def beginner_course_ids() -> tuple[str, ...]:
+    """Return course ids that belong to the shipped beginner module."""
+    return tuple(
+        course_id
+        for course_id, meta in COURSE_REGISTRY.items()
+        if meta.beginner
+    )
+
+
+def beginner_lesson_ids() -> tuple[str, ...]:
+    """Return the beginner lesson ids in authored module order."""
+    beginner_courses = set(beginner_course_ids())
+    return tuple(
+        lesson_id
+        for lesson_id, meta in CURRICULUM.items()
+        if meta.course_id in beginner_courses
+    )

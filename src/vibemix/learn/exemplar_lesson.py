@@ -72,7 +72,8 @@ from __future__ import annotations
 
 import sys
 import time
-from typing import Any, Callable, Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 from vibemix.learn.exemplar import ExemplarFinder, ExemplarPick
 from vibemix.ui_bus.learn_messages import (
@@ -82,7 +83,6 @@ from vibemix.ui_bus.learn_messages import (
     LearnExemplarStop,
     LearnTutorSpeak,
 )
-
 
 # ---------------------------------------------------------------------------
 # Constants (CONTEXT.md locks)
@@ -161,6 +161,10 @@ def _midi_matches(midi: dict[str, Any], expected: dict[str, Any]) -> bool:
     if expected_type == "cc":
         if midi.get("control") != expected.get("control"):
             return False
+        expected_deck = expected.get("deck")
+        if expected_deck is not None and expected_deck != "":
+            if midi.get("deck") != expected_deck:
+                return False
         cur = int(midi.get("value", 0))
         prev = int(midi.get("prev_value", cur))
         min_delta = int(expected.get("min_delta", _CC_DEFAULT_MIN_DELTA))

@@ -166,7 +166,7 @@ def test_iconic_dialog_uses_straight_apostrophes_not_curly() -> None:
     explicitly here so the error message is clear when (not if) it happens.
     """
     data = json.loads(_L1_01_FIXTURE.read_text(encoding="utf-8"))
-    for idx, expected in enumerate(_ICONIC_DIALOG_LINES):
+    for idx, _expected in enumerate(_ICONIC_DIALOG_LINES):
         actual = data["tutor_speak"][idx]["text"]
         assert "‘" not in actual, (
             f"line {idx} contains a curly opening single quote (U+2018) — "

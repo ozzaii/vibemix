@@ -5,7 +5,7 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "the camelot wheel is a clock face with twenty-four labels. every track has one — for example, 8a or 12b.",
+      "text": "the camelot wheel is a clock face with twenty-four labels. every track has one: for example, 8a or 12b.",
       "tts_marker": "L211.beat0",
       "citations": []
     },
@@ -35,7 +35,7 @@
     },
     {
       "strike": 2,
-      "text": "same number, different letter is a major/minor swap — sounds emotional, stays harmonic.",
+      "text": "same number, different letter is a major/minor swap: sounds emotional, stays harmonic.",
       "tts_marker": "L211.hint2"
     },
     {

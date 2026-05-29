@@ -49,9 +49,39 @@ from vibemix.learn.band_share_store import (
     top_for_band,
 )
 from vibemix.learn.band_share_store import upsert as upsert_band_shares
-from vibemix.learn.curriculum import COURSE_FRAMES, CURRICULUM, LessonMeta
+from vibemix.learn.curriculum import (
+    COURSE_FRAMES,
+    COURSE_REGISTRY,
+    CURRICULUM,
+    CourseMeta,
+    LessonMeta,
+    beginner_course_ids,
+    beginner_lesson_ids,
+    course_lesson_ids,
+)
+from vibemix.learn.curriculum_audit import audit_curriculum
 from vibemix.learn.exemplar import ExemplarFinder, ExemplarPick, compute_band_shares
 from vibemix.learn.exemplar_lesson import ExemplarLessonController
+from vibemix.learn.graduation import (
+    GraduationSummary,
+    build_graduation_summary,
+    build_graduation_tutor_line,
+    graduation_citations,
+)
+from vibemix.learn.lesson_flow import (
+    AdaptiveHint,
+    BackstageDrill,
+    BackstageLens,
+    LessonFlow,
+    LessonStep,
+    VerificationSpec,
+    build_all_beginner_flows,
+    build_lesson_flow,
+    input_surfaces_for_action,
+    observable_control_id,
+    primary_expected_action,
+    verification_for_action,
+)
 from vibemix.learn.midi_mirror import MidiMirror
 from vibemix.learn.progress import (
     SCHEMA_VERSION,
@@ -66,31 +96,73 @@ from vibemix.learn.recital import RecitalRuntime
 from vibemix.learn.runtime import LessonRuntime
 from vibemix.learn.settings import read_learn_headphone_device_index
 from vibemix.learn.state import LearnState
+from vibemix.learn.teaching_loop import (
+    LEARN_TUTOR_ROUTE,
+    TEACHING_LOOP_STAGES,
+    TeachingObservation,
+    TeachingTurn,
+    TutorRoute,
+    plan_adaptive_turn,
+    plan_hint_turn,
+    plan_teaching_turn,
+    resolve_tutor_route,
+)
 
 __all__ = [
     "BAND_SHARE_TABLE",
     "COURSE_FRAMES",
+    "COURSE_REGISTRY",
     "CURRICULUM",
+    "LEARN_TUTOR_ROUTE",
+    "SCHEMA_VERSION",
+    "TEACHING_LOOP_STAGES",
+    "AdaptiveHint",
+    "BackstageDrill",
+    "BackstageLens",
+    "CourseMeta",
     "ExemplarFinder",
     "ExemplarLessonController",
     "ExemplarPick",
     "ExemplarPlayer",
+    "GraduationSummary",
     "LearnProgress",
     "LearnState",
+    "LessonFlow",
     "LessonMeta",
     "LessonRuntime",
+    "LessonStep",
     "MidiMirror",
     "RecitalRuntime",
-    "SCHEMA_VERSION",
+    "TeachingObservation",
+    "TeachingTurn",
+    "TutorRoute",
+    "VerificationSpec",
+    "audit_curriculum",
+    "beginner_course_ids",
+    "beginner_lesson_ids",
+    "build_all_beginner_flows",
+    "build_graduation_summary",
+    "build_graduation_tutor_line",
+    "build_lesson_flow",
     "build_tutor_system_instruction",
     "compute_band_shares",
+    "course_lesson_ids",
+    "graduation_citations",
     "init_schema",
+    "input_surfaces_for_action",
     "load_progress",
+    "observable_control_id",
     "open_default_db",
+    "plan_adaptive_turn",
+    "plan_hint_turn",
+    "plan_teaching_turn",
+    "primary_expected_action",
     "progress_path",
     "read_learn_headphone_device_index",
     "reset_progress",
+    "resolve_tutor_route",
     "save_progress",
     "top_for_band",
     "upsert_band_shares",
+    "verification_for_action",
 ]

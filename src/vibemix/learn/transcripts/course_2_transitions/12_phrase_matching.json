@@ -5,13 +5,13 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "a phrase is four bars — sixteen beats. tracks build by stacking phrases.",
+      "text": "a phrase is four bars: sixteen beats. tracks build by stacking phrases.",
       "tts_marker": "L212.beat0",
       "citations": []
     },
     {
       "beat": 1,
-      "text": "bring deck b in on the beat one of deck a's next phrase — throw the crossfader on that downbeat.",
+      "text": "bring deck b in on the beat one of deck a's next phrase: throw the crossfader on that downbeat.",
       "tts_marker": "L212.beat1",
       "citations": []
     }
@@ -29,7 +29,7 @@
     },
     {
       "strike": 2,
-      "text": "the kick on the one is your anchor — that is where deck b should enter.",
+      "text": "the kick on the one is your anchor: that is where deck b should enter.",
       "tts_marker": "L212.hint2"
     },
     {

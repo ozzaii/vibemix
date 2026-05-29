@@ -1,11 +1,11 @@
 {
   "lesson_id": "L1.08",
   "title": "headphone cueing",
-  "system_instruction_addendum": "HEADPHONE CUEING ADDENDUM: The cue button routes a deck to the headphones only. Master and headphone cue can differ — that is the point.",
+  "system_instruction_addendum": "HEADPHONE CUEING ADDENDUM: The cue button routes a deck to the headphones only. Master and headphone cue can differ: that is the point.",
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "the headphone cue button routes a deck to your headphones only — the room hears master, you hear the cued deck.",
+      "text": "the headphone cue button routes a deck to your headphones only: the room hears master, you hear the cued deck.",
       "tts_marker": "L108.beat0",
       "citations": []
     },

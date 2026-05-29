@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Regression pins for Learn observer boot wiring.
+
+The EQ exemplar and recital classes are useful only if the live app registers
+them with ``LessonRuntime``. These tests intentionally inspect the startup
+source because ``vibemix.__main__.main`` owns a large hardware/audio boot graph
+that is not practical to instantiate in a unit test.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+MAIN_PATH = Path("src/vibemix/__main__.py")
+
+
+def _main_source() -> str:
+    return MAIN_PATH.read_text()
+
+
+def test_learn_special_lesson_observers_are_registered_in_main() -> None:
+    src = _main_source()
+
+    assert "from vibemix.learn.exemplar_lesson import ExemplarLessonController" in src
+    assert "from vibemix.learn.recital import RecitalRuntime" in src
+    assert 'lesson_runtime.register_lesson_observer(\n            "L1.14"' in src
+    assert 'lesson_runtime.register_lesson_observer(\n            "L1.16"' in src
+    assert 'lesson_runtime.register_lesson_observer(\n            "L2.14"' in src
+    assert "ExemplarFinder(registry=evidence_registry)" in src
+
+
+def test_observer_complete_envelopes_return_to_lesson_runtime() -> None:
+    src = _main_source()
+
+    assert "def _learn_observer_emit(msg: dict) -> None:" in src
+    assert "msg.get(\"type\") != \"ipc.learn.complete_lesson\"" in src
+    assert "lesson_runtime.complete_observer_lesson(" in src
+    assert "completed=reason == \"completed\"" in src
+
+
+def test_exemplar_observer_has_safe_noop_player_fallback() -> None:
+    src = _main_source()
+
+    assert "class _NoopLearnExemplarPlayer:" in src
+    assert "read_learn_headphone_device_index" in src
+    assert "from vibemix.learn.audio_cue import ExemplarPlayer" in src
+    assert "exemplar_player = ExemplarPlayer(" in src
+
+
+def test_lesson_runtime_uses_shared_evidence_registry_in_main() -> None:
+    src = _main_source()
+
+    assert "lesson_runtime = LessonRuntime(" in src
+    assert "evidence_registry=evidence_registry" in src
+    assert "evidence_clock=lambda: state.set_seconds" in src
+
+
+def test_lesson_runtime_uses_latest_prepared_pool_loader_in_main() -> None:
+    src = _main_source()
+
+    assert "load_latest_prepared_pool as _load_latest_prepared_pool" in src
+    assert "prepared_pool_loader=_load_latest_prepared_pool" in src

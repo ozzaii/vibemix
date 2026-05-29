@@ -1,11 +1,11 @@
 {
   "lesson_id": "L1.13",
   "title": "spot breakdown by eye",
-  "system_instruction_addendum": "SPOT BREAKDOWN EYE ADDENDUM: The breakdown on the waveform is a thinner section — less low end, taller mids. Point to the waveform, not the audio.",
+  "system_instruction_addendum": "SPOT BREAKDOWN EYE ADDENDUM: The breakdown on the waveform is a thinner section: less low end, taller mids. Point to the waveform, not the audio.",
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "the breakdown shows up on the waveform as a thin section — the low end thins out, the mids carry alone.",
+      "text": "the breakdown shows up on the waveform as a thin section: the low end thins out, the mids carry alone.",
       "tts_marker": "L113.beat0",
       "citations": []
     },
@@ -24,7 +24,7 @@
   "hints": [
     {
       "strike": 1,
-      "text": "the kick draws the tallest bars on the waveform — find where they shrink.",
+      "text": "the kick draws the tallest bars on the waveform: find where they shrink.",
       "tts_marker": "L113.hint1"
     },
     {

@@ -65,7 +65,6 @@ from vibemix.learn.recital import (
     RecitalRuntime,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers — Course 2 recital pool fixtures (mirrors L2.14 shape).
 # ---------------------------------------------------------------------------
@@ -320,14 +319,7 @@ def test_five_of_five_with_three_distinct_types_unlocks_course_3(
     entry subset with EXACTLY 3 distinct types (one transition type
     repeated to test the boundary condition).
     """
-    # Hand-craft a 5-entry subset with 3 distinct types: long_blend (x2),
-    # eq_swap (x2), filter_fade (x1).
-    target_subset = [
-        _COURSE_2_POOL[0],  # long_blend
-        _COURSE_2_POOL[1],  # eq_swap
-        _COURSE_2_POOL[5],  # drop_swap → wait, we want 3 distinct
-    ]
-    # Rebuild for clarity: 3 distinct types.
+    # Hand-craft a 5-entry subset with 3 distinct types.
     pinned = [
         _COURSE_2_POOL[0],  # long_blend
         _COURSE_2_POOL[5],  # drop_swap (different from long_blend even
@@ -479,7 +471,7 @@ def test_low_score_with_high_variety_still_fails() -> None:
     User performs 3 prompts correctly across 3 distinct transitions
     then gives up via skip_remaining(). Score=3 < 5 → fail.
     """
-    rt, emitted, progress, save = _build_c2_rt(seed=42)
+    rt, _emitted, progress, save = _build_c2_rt(seed=42)
     rt.start(script=_make_c2_script(), lesson_id="L2.14-course-2-recital")
     rt.ack(lesson_id="L2.14-course-2-recital")  # 1 scored
     rt.ack(lesson_id="L2.14-course-2-recital")  # 2 scored
@@ -566,7 +558,7 @@ def test_outcome_copy_substitutes_score_and_types_placeholders() -> None:
     the controller to a pass (5/5 + distinct types) AND verify the
     pass copy carries the substituted ``{types}`` count.
     """
-    rt, emitted, progress, _save = _build_c2_rt(seed=42)
+    rt, emitted, _progress, _save = _build_c2_rt(seed=42)
     rt.start(script=_make_c2_script(), lesson_id="L2.14-course-2-recital")
     for _ in range(_RECITAL_SUBSET_SIZE):
         rt.ack(lesson_id="L2.14-course-2-recital")

@@ -11,7 +11,7 @@
     },
     {
       "beat": 1,
-      "text": "tap the echo button on deck a — the tail decays while deck b plays clean.",
+      "text": "tap the echo button on deck a: the tail decays while deck b plays clean.",
       "tts_marker": "L207.beat1",
       "citations": []
     }
@@ -25,12 +25,12 @@
   "hints": [
     {
       "strike": 1,
-      "text": "the echo lives in the effects strip — on the flx4 it shares the pad row.",
+      "text": "the echo lives in the effects strip: on the flx4 it shares the pad row.",
       "tts_marker": "L207.hint1"
     },
     {
       "strike": 2,
-      "text": "tap it once to arm — the deck's tail starts repeating.",
+      "text": "tap it once to arm: the deck's tail starts repeating.",
       "tts_marker": "L207.hint2"
     },
     {

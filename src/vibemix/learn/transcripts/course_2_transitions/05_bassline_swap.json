@@ -25,7 +25,7 @@
   "hints": [
     {
       "strike": 1,
-      "text": "the swap happens in one motion — both knobs cross at the same moment.",
+      "text": "the swap happens in one motion: both knobs cross at the same moment.",
       "tts_marker": "L205.hint1"
     },
     {

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 94 Plan 03 — L1.16 Course 1 Recital tests (TDD RED → GREEN).
+"""L1.16 Course 1 Recital regression tests.
 
 RecitalRuntime is an OBSERVER of :class:`LessonRuntime` for the L1.16
 lesson. It reads ``recital_pool`` (≥5 entries) from the script, samples
@@ -56,16 +56,14 @@ from unittest.mock import MagicMock
 import pytest
 
 try:
-    from vibemix.learn.progress import LearnProgress  # P92-04
-    from vibemix.learn.recital import (  # Plan 94-03
+    from vibemix.learn.progress import LearnProgress
+    from vibemix.learn.recital import (
         _RECITAL_SUBSET_SIZE,
         RecitalRuntime,
     )
 except ImportError:
     pytest.skip(
-        "tests/learn/test_recital.py awaiting Plan 94-03 "
-        "(RecitalRuntime in src/vibemix/learn/recital.py). When the "
-        "module lands, this module-level skip flips to live assertions.",
+        "RecitalRuntime unavailable in this partial Learn build.",
         allow_module_level=True,
     )
 

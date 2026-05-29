@@ -1,19 +1,19 @@
 {
   "lesson_id": "L3.04",
   "title": "first 30-minute set capstone",
-  "system_instruction_addendum": "30-MIN CAPSTONE ADDENDUM: Full proactive co-pilot. Forward calls ONLY on [cue:] evidence. Session is recorded; debrief opens at end.",
+  "system_instruction_addendum": "30-MIN CAPSTONE ADDENDUM: Full proactive co-pilot. Forward calls ONLY on [cue:] evidence. Save session evidence for a post-set debrief; do not promise auto-open.",
   "proactive_lens_active": true,
   "exemplar_audio_forbidden": true,
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "thirty minutes. proactive co-pilot is on. forward calls land only when the audio gives me a cue to anchor.",
+      "text": "thirty minutes: proactive co-pilot is on. forward calls land only when the audio gives me a cue to anchor.",
       "tts_marker": "L304.beat0",
       "citations": []
     },
     {
       "beat": 1,
-      "text": "this is recorded. when you finish, the debrief opens with cited moments from the set.",
+      "text": "this session is being saved. after you finish, use the debrief surface to review cited moments from the set.",
       "tts_marker": "L304.beat1",
       "citations": []
     }
@@ -31,7 +31,7 @@
     },
     {
       "strike": 2,
-      "text": "you can pause and step away. the recording keeps going.",
+      "text": "you can pause and step away. session evidence keeps accumulating while the set continues.",
       "tts_marker": "L304.hint2"
     },
     {

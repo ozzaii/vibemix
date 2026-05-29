@@ -86,6 +86,45 @@ _SKILL_IDS: tuple[str, ...] = (
     "transitions",
     "phrasing_performance",
 )
+_PRACTICE_SOURCE_KEYS: tuple[str, ...] = ("hardware", "screen")
+
+
+def _practice_source_key(source: str | None) -> str | None:
+    """Normalize wire action sources into learner-facing practice surfaces."""
+    raw = str(source or "midi").strip().lower()
+    if raw in {"midi", "hardware", "controller"}:
+        return "hardware"
+    if raw in {"click", "screen", "onscreen", "on_screen"}:
+        return "screen"
+    return None
+
+
+def _practice_source_counts(raw: Any) -> dict[str, int]:
+    """Return a bounded hardware/screen count map from an arbitrary row value."""
+    counts = {key: 0 for key in _PRACTICE_SOURCE_KEYS}
+    if not isinstance(raw, dict):
+        return counts
+    for key in _PRACTICE_SOURCE_KEYS:
+        try:
+            counts[key] = max(0, int(raw.get(key, 0)))
+        except (TypeError, ValueError):
+            counts[key] = 0
+    return counts
+
+
+def _carry_practice_source_fields(
+    target: dict[str, Any],
+    existing: dict[str, Any] | None,
+) -> None:
+    """Preserve optional per-lesson practice-source memory across row rewrites."""
+    if not isinstance(existing, dict):
+        return
+    counts = _practice_source_counts(existing.get("practice_sources"))
+    if any(counts.values()):
+        target["practice_sources"] = counts
+    last_source = _practice_source_key(existing.get("last_practice_source"))
+    if last_source is not None:
+        target["last_practice_source"] = last_source
 
 
 def _fresh_skills_block() -> dict[str, dict[str, Any]]:
@@ -202,11 +241,17 @@ class LearnProgress:
         # marker = UTC; matches the timestamp shape elsewhere in the
         # project, e.g. ``recordings/storage.py``).
         iso = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        self.lessons[lesson_id] = {
+        existing = self.lessons.get(lesson_id)
+        row = {
             "completed": True,
             "completed_at": iso,
             "strikes_used": int(strikes_used),
         }
+        _carry_practice_source_fields(
+            row,
+            existing if isinstance(existing, dict) else None,
+        )
+        self.lessons[lesson_id] = row
 
     def mark_started(self, course_id: str, lesson_id: str) -> None:
         """Record that a lesson attempt has begun.
@@ -227,11 +272,41 @@ class LearnProgress:
                 strikes = max(0, min(3, int(existing.get("strikes_used", 0))))
             except (TypeError, ValueError):
                 strikes = 0
-        self.lessons[lesson_id] = {
+        row = {
             "completed": False,
             "completed_at": None,
             "strikes_used": strikes,
         }
+        _carry_practice_source_fields(
+            row,
+            existing if isinstance(existing, dict) else None,
+        )
+        self.lessons[lesson_id] = row
+
+    def mark_practice_source(
+        self,
+        course_id: str,
+        lesson_id: str,
+        source: str | None,
+    ) -> None:
+        """Remember whether the learner practiced on hardware or screen.
+
+        The Learn frontstage stays one prompt / one action. This data is
+        backstage: future debrief/profile/course logic can tell whether the
+        user is learning on a physical controller or using the on-screen deck,
+        without adding a new dashboard to the booth.
+        """
+        source_key = _practice_source_key(source)
+        if source_key is None:
+            return
+        self.mark_started(course_id, lesson_id)
+        row = self.lessons.get(lesson_id)
+        if not isinstance(row, dict):
+            return
+        counts = _practice_source_counts(row.get("practice_sources"))
+        counts[source_key] += 1
+        row["practice_sources"] = counts
+        row["last_practice_source"] = source_key
 
     def mark_hint_strike(
         self,

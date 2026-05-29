@@ -1,4 +1,45 @@
 {
   "schema_version": 1,
-  "tracks": {}
+  "tracks": {
+    "sub/vibemix_internal_sub_pulse.wav": {
+      "title": "Sub Pulse Practice Loop",
+      "artist": "vibemix internal sound design",
+      "source": "self-authored generated waveform",
+      "license": "Apache-2.0",
+      "duration_s": 5.0,
+      "sample_rate_hz": 22050,
+      "dominant_band": "sub",
+      "sha256": "fef218a73244062893143e2ceb00e332c4c8e08d99e49e66de558407c08e73c5"
+    },
+    "low/vibemix_internal_low_bass_gate.wav": {
+      "title": "Low Bass Gate Practice Loop",
+      "artist": "vibemix internal sound design",
+      "source": "self-authored generated waveform",
+      "license": "Apache-2.0",
+      "duration_s": 5.0,
+      "sample_rate_hz": 22050,
+      "dominant_band": "low",
+      "sha256": "c8aa0d1c75996f986792620315045497ddccbee2211ecdf0757bea066055879d"
+    },
+    "mid/vibemix_internal_mid_chord_body.wav": {
+      "title": "Mid Chord Body Practice Loop",
+      "artist": "vibemix internal sound design",
+      "source": "self-authored generated waveform",
+      "license": "Apache-2.0",
+      "duration_s": 5.0,
+      "sample_rate_hz": 22050,
+      "dominant_band": "mid",
+      "sha256": "035366690293506dc06bcd00b7661037613ed4be1a5adfa84a3e190c272bbbfe"
+    },
+    "high/vibemix_internal_high_hat_air.wav": {
+      "title": "High Hat Air Practice Loop",
+      "artist": "vibemix internal sound design",
+      "source": "self-authored generated waveform",
+      "license": "Apache-2.0",
+      "duration_s": 5.0,
+      "sample_rate_hz": 22050,
+      "dominant_band": "high",
+      "sha256": "7dcec4764229732452c409e7bcf218fa7ff806652ae169250a663cc988fb1beb"
+    }
+  }
 }

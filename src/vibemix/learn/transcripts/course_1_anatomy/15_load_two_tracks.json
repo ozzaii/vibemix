@@ -5,7 +5,7 @@
   "tutor_speak": [
     {
       "beat": 0,
-      "text": "two decks means two tracks loaded — one on each side.",
+      "text": "two decks means two tracks loaded: one on each side.",
       "tts_marker": "L115.beat0",
       "citations": []
     },
@@ -30,7 +30,7 @@
   "hints": [
     {
       "strike": 1,
-      "text": "the load buttons sit just above each jog wheel — one per deck.",
+      "text": "the load buttons sit just above each jog wheel: one per deck.",
       "tts_marker": "L115.hint1"
     },
     {
