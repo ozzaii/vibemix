@@ -79,3 +79,22 @@ def test_set_skill_is_fire_and_forget(fake_bus: FakeBus) -> None:
 
     # No-ack by design — nothing is emitted back to the renderer.
     assert fake_bus.emitted == []
+
+
+def test_set_skill_seeds_cold_boot_persona_env(fake_bus: FakeBus) -> None:
+    """Concrete end-to-end chain: the wizard write must be what the next cold
+    boot reads. Drive the handler, then run the SAME seed bridge __main__ runs
+    at startup (apply_persona_config_to_env) and assert it sets the env var the
+    co-host resolves its prompt cell from."""
+    from vibemix.runtime.config_store import load_config
+    from vibemix.runtime.settings import apply_persona_config_to_env
+
+    loop = WizardLoop(fake_bus)
+    loop.register_handlers()
+    _drive(fake_bus, _msg("pro"))
+
+    env: dict[str, str] = {}
+    applied = apply_persona_config_to_env(load_config(), environ=env)
+
+    assert applied.get("skill") == "pro"
+    assert env.get("VIBEMIX_SKILL_LEVEL") == "pro"
