@@ -63,6 +63,15 @@ const appDeps: SurfaceMountDeps = {
     mount.innerHTML = extractSurfaceMarkup(libraryHtmlRaw, ".vmx-lib-app");
     mountLibrary();
   },
+  // Learn exports a real mount(root) that builds its interior into the given
+  // element (and imports its own styles). The module's DOMContentLoaded
+  // auto-boot keys on #learn-root, which the shell never has, so it no-ops and
+  // this explicit call is the single mount. mountLearnWindow is idempotent
+  // (it disposes any prior mount first).
+  mountLearn: async (mount) => {
+    const { mountLearnWindow } = await import("../learn/learn-window.js");
+    mountLearnWindow(mount);
+  },
 };
 
 /**
