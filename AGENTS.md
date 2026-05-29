@@ -45,6 +45,48 @@ only state refresh writes `MusicState`; AI reactions must resolve through
 `vibemix.llm.model_router` or the existing library agent backend seams. For broad
 agent work, read `CLAUDE.md` and the active `.planning/research/` sweep notes first.
 
+## Full-Surface Wiring Sweep Notes
+
+When continuing the May 2026 full-app wiring sweep, keep the user's boundary:
+do not run GSD or the Learn beginner path unless explicitly asked. Avoid the
+beginner-path suites such as `tests/learn/test_ws_beginner_path.py`,
+`tests/learn/test_lesson_flow_contract.py`,
+`tauri/ui/tests/learn/test_beginner_path_contract.spec.ts`, and
+`tauri/ui/tests/learn/browser-python-beginner-path.pw.ts`.
+
+The durable handoff for the completed non-GSD, non-beginner sweep is
+`.planning/handoffs/2026-05-28-full-surface-wiring-sweep.md`. Read it before
+moving Claude/mock HTML into production or changing Viber, settings, research,
+ANLZ parsing, pill, or mock-transfer contracts.
+
+Mockup transfer is pinned through `tauri/ui/src/mock-transfer/contract.ts` and
+`tauri/ui/tests/mock-transfer-contract.spec.ts`. Any production `data-wire`
+anchor, static or runtime-created, must be contracted there before visual work
+from `mocks/iterations/` is moved into the live app. Keep Tauri IPC/event
+channels and Rust commands listed in the contract too, including session tray
+quit/mood events.
+
+For Viber/library work, preserve the grounded tool spine: `fetch_url` may only
+read URLs issued by `web_search` in the same run, empty fetched pages return an
+error, and non-finite search scores degrade to `0.0`. Viber clarification and
+tool-starvation stop reasons must propagate from Python through Rust commands
+and the library UI, including chat artifacts.
+
+For settings/session IPC, maintain parity across
+`src/vibemix/ui_bus/messages.py`, `tauri/ui/src/ipc/messages.schema.json`,
+generated TS/validator files, `src/vibemix/runtime/session_loop.py`, and
+`tauri/ui/src/session/ws-bridge.ts`. The current top-level IPC count is 78
+(`SessionSetMode` included); validate with
+`uv run python scripts/check_ipc_schema.py`.
+
+Useful non-GSD, non-beginner verification from the sweep:
+
+- `npm --prefix tauri/ui test -- tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui test -- tests/session/quit-guard.spec.ts tests/session/tray-mood.spec.ts tests/session/router-teardown.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `cargo test --manifest-path tauri/src-tauri/Cargo.toml`
+- `uv run pytest -q tests/library tests/intel tests/ipc tests/ui_bus tests/prompts/test_filter.py tests/prompts/test_negative_dict.py tests/state/test_refresh.py`
+
 ## Commit & Pull Request Guidelines
 
 Git history uses scoped Conventional Commit-style messages such as
