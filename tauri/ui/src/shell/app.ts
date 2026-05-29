@@ -26,6 +26,7 @@ import {
   type SurfaceMountDeps,
 } from "./surface-mounts.js";
 import { extractSurfaceMarkup } from "./scaffolds.js";
+import { wireActivation } from "./activation-bridge.js";
 import { routeSession } from "../session/router.js";
 import { closeSettings, openSettings } from "../settings/SettingsDrawer.js";
 
@@ -104,12 +105,16 @@ export async function mountShellApp(host: HTMLElement): Promise<MountedShellApp>
   const shell = mountDesktopShell(host);
   const surfaces = await mountSurfacesInto(host, appDeps);
   const unwireSettings = wireSettingsNav(shell);
+  // Feed the live session onto the shell's self-arranging activation +
+  // connection (energy field, connection dot, the grounding panel auto-open).
+  const unwireActivation = wireActivation(shell.store);
   vmxLog("[vmx:state]", "shell-app → mounted");
 
   return {
     shell,
     surfaces,
     teardown(): void {
+      unwireActivation();
       unwireSettings();
       surfaces.teardown();
       shell.teardown();
