@@ -31,21 +31,34 @@ import {
   librarySearch,
   librarySimilar,
   libraryStats,
+  normalizeLiveContextPayload,
   onEmbedDone,
   onEmbedProgress,
+  onLiveDeckContext,
+  onLiveMoveContext,
   onModelProgress,
+  onViberTool,
   type BuildSetResult,
   type CurateResult,
   type EmbedDone,
   type EmbedProgress,
   type EmbedStrategy,
   type EnergyCurve,
-  type LibraryStats,
+  type LibraryChatMoveGrade,
+  type LibraryChatPlaylist,
   type LibraryChatResult,
+  type LibraryChatToolTrace,
   type LibraryChatTurn,
+  type LibraryLiveDeck,
+  type LibraryLiveContext,
+  type LibraryLiveEvidence,
+  type LibraryLiveMidiEvidence,
+  type LibraryLiveVerification,
   type LibraryModelInstallTarget,
   type LibraryModelProgress,
+  type LibraryViberToolEvent,
   type LibraryModelsResult,
+  type LibraryStats,
   type SearchResult,
 } from "./api.js";
 import { renderScope } from "./scope.js";
@@ -99,8 +112,255 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function clarificationMarkup(
+  result: CurateResult,
+  rerunHint: string,
+): string | null {
+  if (result.stop_reason !== "clarification_needed") return null;
+  const question = (result.question || result.rationale || "").trim();
+  const choices = (result.choices || [])
+    .map((choice) => choice.trim())
+    .filter((choice) => choice.length > 0);
+  const choiceList =
+    choices.length > 0
+      ? `<ol class="vmx-lib-clarification-choices">${choices
+          .map((choice) => `<li>${esc(choice)}</li>`)
+          .join("")}</ol>`
+      : "";
+
+  return `<div class="vmx-lib-empty vmx-lib-clarification" data-wire="library.clarification">
+    <div class="vmx-lib-empty-kicker">Viber needs one detail</div>
+    <div class="vmx-lib-clarification-question">${esc(
+      question || "Choose the direction before building this set.",
+    )}</div>
+    ${choiceList}
+    <div class="vmx-lib-clarification-hint">${esc(rerunHint)}</div>
+  </div>`;
+}
+
 let latestStats: LibraryStats | null = null;
 let latestModels: LibraryModelsResult | null = null;
+let latestLiveContext: LibraryLiveContext | null = null;
+let latestRecentMoves: string[] = [];
+let latestMoveWindow: Array<{ label: string; seenAtMs: number }> = [];
+const LIVE_MOVE_CONTEXT_TTL_MS = 8_000;
+const LIVE_EVIDENCE_CAP = 8;
+const LIVE_EVIDENCE_REFS_CAP = 9;
+const LIVE_MIDI_EVIDENCE_CAP = 4;
+const LIVE_CONTEXT_TEXT_KEYS = [
+  "deck_lanes_context",
+  "deck_reference_context",
+  "deck_source_context",
+  "deck_audio_context",
+] as const;
+
+function baseLiveContext(
+  context: LibraryLiveContext | null,
+): Omit<LibraryLiveContext, "recent_moves"> | null {
+  if (!context) return null;
+  const { recent_moves: _recentMoves, ...base } = context;
+  return Object.keys(base).length > 0 ? base : null;
+}
+
+function compactLiveMoveWindow(nowMs = Date.now()): string[] {
+  const fresh = latestMoveWindow.filter(
+    (record) => nowMs - record.seenAtMs <= LIVE_MOVE_CONTEXT_TTL_MS,
+  );
+  const seen = new Set<string>();
+  const deduped: Array<{ label: string; seenAtMs: number }> = [];
+  for (const record of [...fresh].reverse()) {
+    if (seen.has(record.label)) continue;
+    seen.add(record.label);
+    deduped.push(record);
+  }
+  latestMoveWindow = deduped.reverse().slice(-6);
+  latestRecentMoves = latestMoveWindow.map((record) => record.label);
+  return latestRecentMoves;
+}
+
+function liveEvidencePriority(token: string): number {
+  if (token.startsWith("midi:")) return 0;
+  if (token.includes("deck_lanes=")) return 1;
+  if (token.includes("deck_reference=")) return 2;
+  if (token.includes("deck_source=")) return 3;
+  if (
+    token.includes("transition_block=") ||
+    token.includes("transition_watch=")
+  )
+    return 4;
+  if (token.includes("transition_candidate=")) return 5;
+  if (token.includes("second_deck_identity=")) return 6;
+  if (token.includes("move_scope=")) return 7;
+  if (token.includes("move_effect=") || token.includes("audio_delta="))
+    return 8;
+  if (token.includes("deck_audio_support=")) return 9;
+  if (token.includes("deck_route=")) return 10;
+  return 11;
+}
+
+function mergeLiveEvidenceTokens(
+  existing?: string[],
+  incoming?: string[],
+  cap = LIVE_EVIDENCE_CAP,
+): string[] | undefined {
+  const items: Array<{ priority: number; index: number; token: string }> = [];
+  const seen = new Set<string>();
+  let index = 0;
+  for (const list of [existing, incoming]) {
+    for (const raw of list ?? []) {
+      const token = raw.trim();
+      if (!token || seen.has(token)) continue;
+      seen.add(token);
+      items.push({ priority: liveEvidencePriority(token), index, token });
+      index += 1;
+    }
+  }
+  if (items.length === 0) return undefined;
+  if (items.length <= cap) return items.map((item) => item.token);
+  return [...items]
+    .sort((a, b) => a.priority - b.priority || a.index - b.index)
+    .slice(0, cap)
+    .sort((a, b) => a.index - b.index)
+    .map((item) => item.token);
+}
+
+function mergeLiveMidiEvidence(
+  existing?: LibraryLiveMidiEvidence[],
+  incoming?: LibraryLiveMidiEvidence[],
+): LibraryLiveMidiEvidence[] {
+  const items: LibraryLiveMidiEvidence[] = [];
+  const seen = new Set<string>();
+  for (const list of [existing, incoming]) {
+    for (const item of list ?? []) {
+      const ident = `${item.key}@${item.t.toFixed(1)}`;
+      if (seen.has(ident)) continue;
+      seen.add(ident);
+      items.push(item);
+    }
+  }
+  return items.slice(-LIVE_MIDI_EVIDENCE_CAP);
+}
+
+function mergeLiveEvidence(
+  existing?: LibraryLiveEvidence,
+  incoming?: LibraryLiveEvidence,
+): LibraryLiveEvidence | undefined {
+  const merged: LibraryLiveEvidence = {};
+  const mix = mergeLiveEvidenceTokens(existing?.mix, incoming?.mix);
+  if (mix) merged.mix = mix;
+  const refs = mergeLiveEvidenceTokens(
+    existing?.refs,
+    incoming?.refs,
+    LIVE_EVIDENCE_REFS_CAP,
+  );
+  if (refs) merged.refs = refs;
+  const midi = mergeLiveMidiEvidence(existing?.midi, incoming?.midi);
+  if (midi && midi.length > 0) merged.midi = midi;
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+function mergeAudioDelta(existing?: string[], incoming?: string[]): string[] | undefined {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const list of [existing, incoming]) {
+    for (const raw of list ?? []) {
+      const item = raw.trim();
+      if (!item || seen.has(item)) continue;
+      seen.add(item);
+      out.push(item);
+    }
+  }
+  return out.length > 0 ? out.slice(-4) : undefined;
+}
+
+function mergeLiveContext(
+  existing: LibraryLiveContext | null,
+  incoming: LibraryLiveContext,
+): LibraryLiveContext {
+  const normalizedIncoming = normalizeLiveContextPayload(incoming) ?? incoming;
+  if (normalizedIncoming.recent_moves && normalizedIncoming.recent_moves.length > 0) {
+    rememberLiveMoves(normalizedIncoming.recent_moves);
+  }
+  const oldBase = baseLiveContext(existing) ?? {};
+  const newBase = baseLiveContext(normalizedIncoming) ?? {};
+  const merged: LibraryLiveContext = { ...oldBase, ...newBase };
+  const oldMusic =
+    typeof oldBase.music === "number" && Number.isFinite(oldBase.music)
+      ? oldBase.music
+      : null;
+  const newMusic =
+    typeof newBase.music === "number" && Number.isFinite(newBase.music)
+      ? newBase.music
+      : null;
+  if (oldMusic !== null || newMusic !== null) {
+    merged.music = Math.max(oldMusic ?? 0, newMusic ?? 0);
+  }
+
+  if (newBase.deck_state !== undefined) {
+    merged.deck_state = newBase.deck_state;
+  } else if (oldBase.deck_state !== undefined) {
+    merged.deck_state = oldBase.deck_state;
+  }
+  if (newBase.deck_mixer !== undefined) {
+    merged.deck_mixer = newBase.deck_mixer;
+  } else if (oldBase.deck_mixer !== undefined) {
+    merged.deck_mixer = oldBase.deck_mixer;
+  }
+  if (merged.deck_mixer !== undefined) {
+    if (Object.keys(merged.deck_mixer.A ?? {}).length === 0) delete merged.deck_mixer.A;
+    if (Object.keys(merged.deck_mixer.B ?? {}).length === 0) delete merged.deck_mixer.B;
+    if (Object.keys(merged.deck_mixer).length === 0) delete merged.deck_mixer;
+  }
+  if (newBase.deck_source_status !== undefined) {
+    merged.deck_source_status = newBase.deck_source_status;
+  } else {
+    delete merged.deck_source_status;
+  }
+  for (const key of LIVE_CONTEXT_TEXT_KEYS) {
+    if (newBase[key] !== undefined) {
+      merged[key] = newBase[key];
+    } else {
+      delete merged[key];
+    }
+  }
+  const audioDelta = mergeAudioDelta(oldBase.audio_delta, newBase.audio_delta);
+  if (audioDelta) merged.audio_delta = audioDelta;
+  if (newBase.audio_window_context !== undefined) {
+    merged.audio_window_context = newBase.audio_window_context;
+  } else {
+    delete merged.audio_window_context;
+  }
+  if (newBase.audio_window_map !== undefined) {
+    merged.audio_window_map = newBase.audio_window_map;
+  } else {
+    delete merged.audio_window_map;
+  }
+  const liveEvidence = mergeLiveEvidence(
+    newBase.deck_state !== undefined ? undefined : oldBase.live_evidence,
+    newBase.live_evidence,
+  );
+  if (liveEvidence) merged.live_evidence = liveEvidence;
+  else delete merged.live_evidence;
+
+  return liveContextForChat(merged) ?? merged;
+}
+
+function rememberLiveMoves(moves: string[], nowMs = Date.now()): string[] {
+  moves
+    .map((move) => move.trim())
+    .filter((move) => move.length > 0)
+    .forEach((label) => latestMoveWindow.push({ label, seenAtMs: nowMs }));
+  return compactLiveMoveWindow(nowMs);
+}
+
+function liveContextForChat(
+  context: LibraryLiveContext | null,
+): LibraryLiveContext | null {
+  const moves = compactLiveMoveWindow();
+  const base = baseLiveContext(context);
+  if (base) return { ...base, recent_moves: moves };
+  return moves.length > 0 ? { recent_moves: moves } : null;
+}
 
 function renderResults(result: SearchResult, mode: LibraryMode): void {
   const el = $("vmx-lib-results");
@@ -146,7 +406,12 @@ function renderCurate(result: CurateResult): void {
   const el = $("vmx-lib-results");
   el.innerHTML = "";
   if (result.tracks.length === 0) {
-    el.innerHTML = `<div class="vmx-lib-empty">No set built (${esc(result.stop_reason)}). Try a different theme, or embed more tracks first.</div>`;
+    el.innerHTML =
+      clarificationMarkup(
+        result,
+        "Add one choice to the theme and run Viber again.",
+      ) ||
+      `<div class="vmx-lib-empty">No set built (${esc(result.stop_reason)}). Try a different theme, or embed more tracks first.</div>`;
   } else {
     result.tracks.forEach((t, i) => {
       const top = i === 0 ? " top" : "";
@@ -231,7 +496,12 @@ function renderBuildSet(result: BuildSetResult): void {
   const el = $("vmx-lib-results");
   el.innerHTML = "";
   if (result.tracks.length === 0) {
-    el.innerHTML = `<div class="vmx-lib-empty">No set built (${esc(result.stop_reason)}). Check AI setup, embed more tracks, or refine the brief.</div>`;
+    el.innerHTML =
+      clarificationMarkup(
+        result,
+        "Add one choice to the brief and run set prep again.",
+      ) ||
+      `<div class="vmx-lib-empty">No set built (${esc(result.stop_reason)}). Check AI setup, embed more tracks, or refine the brief.</div>`;
   } else {
     result.tracks.forEach((t, i) => {
       const top = i === 0 ? " top" : "";
@@ -293,14 +563,17 @@ function renderAgentIdle(mode: "curate" | "build"): void {
 function renderError(err: unknown): void {
   // Clear any stale curate set-notes so they never sit above a fresh error.
   clearRationale();
-  const msg =
-    err instanceof Error
-      ? err.message
-      : typeof err === "string"
-        ? err
-        : String(err);
+  const msg = errorMessage(err);
   const el = $("vmx-lib-results");
   el.innerHTML = `<div class="vmx-lib-error"><div class="vmx-lib-error-title">engine error</div><div class="vmx-lib-error-msg">${esc(msg)}</div></div>`;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error
+    ? err.message
+    : typeof err === "string"
+      ? err
+      : String(err);
 }
 
 function embeddingLabel(stats: LibraryStats): string {
@@ -329,6 +602,19 @@ function renderStats(stats: LibraryStats): void {
   if (engineLabelEl) engineLabelEl.textContent = embeddingLabel(stats);
   renderAgentSetup(stats);
   if (latestModels) renderModelSetup(latestModels);
+}
+
+function renderStatsError(err: unknown): void {
+  latestStats = null;
+  $("vmx-lib-stat-indexed").textContent = "·";
+  $("vmx-lib-stat-backend").textContent = "unavailable";
+  $("vmx-lib-stat-spent").textContent = "·";
+  $("vmx-lib-stat-failed").textContent = "·";
+  const engineLabelEl = document.getElementById("vmx-lib-engine-label");
+  if (engineLabelEl) engineLabelEl.textContent = "library stats unavailable";
+  renderAgentSetup(null);
+  // eslint-disable-next-line no-console
+  console.error("[vmx-lib] stats refresh failed:", err);
 }
 
 function installStatusLine(models: LibraryModelsResult): string | null {
@@ -470,6 +756,18 @@ function renderModelSetup(models: LibraryModelsResult): void {
   installBtn.textContent = view.installButtonText;
 }
 
+function renderModelSetupError(err: unknown): void {
+  latestModels = null;
+  const stateEl = $("vmx-lib-model-state");
+  const installBtn = $("vmx-lib-install-models") as HTMLButtonElement;
+  stateEl.textContent = `model check failed · ${errorMessage(err)}`;
+  installBtn.hidden = true;
+  installBtn.disabled = false;
+  delete installBtn.dataset.installTarget;
+  // eslint-disable-next-line no-console
+  console.error("[vmx-lib] model refresh failed:", err);
+}
+
 function agentSetupHint(stats: LibraryStats | null): string | null {
   if (!stats || stats.agent_ready !== false) return null;
   const backend = (stats.agent_backend ?? "codex").toLowerCase();
@@ -490,7 +788,8 @@ function renderAgentSetup(stats: LibraryStats | null): void {
 
 function setProgress(n: number, total: number, costEur: number, note: string): void {
   const pct = total > 0 ? (n / total) * 100 : 0;
-  ($("vmx-lib-progress-fill") as HTMLElement).style.width = `${pct.toFixed(1)}%`;
+  ($("vmx-lib-progress-fill") as HTMLElement).style.transform =
+    `scaleX(${Math.max(0, Math.min(1, pct / 100)).toFixed(3)})`;
   $("vmx-lib-prog-n").innerHTML = `${n}<small> / ${total}${note ? ` · ${esc(note)}` : ""}</small>`;
   $("vmx-lib-prog-cost").textContent = `~€${costEur.toFixed(2)}`;
 }
@@ -543,6 +842,7 @@ function ensureChatIntro(thread: HTMLElement): void {
 function renderChatBusy(): void {
   const tools = $("vmx-lib-chat-tools");
   tools.replaceChildren();
+  appendLiveProofStatusToolRow(tools, latestLiveContext);
   const row = document.createElement("div");
   row.className = "vmx-lib-chat-tool";
   row.dataset.ok = "true";
@@ -562,41 +862,289 @@ function renderChatBusy(): void {
   $("vmx-lib-scope-state").textContent = "working";
 }
 
+function proofDeckResolved(deck?: LibraryLiveDeck): boolean {
+  if (!deck) return false;
+  return (
+    (deck.confidence ?? 0) >= 0.3 &&
+    Boolean(deck.title || deck.track_id || deck.camelot)
+  );
+}
+
+function proofRouteTier(score: number): string {
+  if (score <= 0.04) return "muted";
+  if (score < 0.2) return "low";
+  if (score < 0.45) return "present";
+  return "dominant";
+}
+
+function proofXfaderFactor(side: "A" | "B", xfader: number): number {
+  if (side === "A") {
+    if (xfader >= 112) return 0;
+    if (xfader >= 80) return 0.3;
+    if (xfader >= 48) return 0.7;
+    return 1;
+  }
+  if (xfader < 16) return 0;
+  if (xfader < 48) return 0.3;
+  if (xfader <= 80) return 0.7;
+  return 1;
+}
+
+function proofRouteScores(context: LibraryLiveContext): Array<[string, number]> {
+  const mixer = context.deck_mixer;
+  if (!mixer?.connected) return [];
+  const xfader = Math.max(0, Math.min(127, Math.round(mixer.xfader ?? 64)));
+  return (["A", "B"] as const).map((side) => {
+    const row = mixer[side];
+    if (!row) return [side, 0];
+    const volume = Math.max(0, Math.min(127, Math.round(row.vol ?? 0))) / 127;
+    let score = volume * proofXfaderFactor(side, xfader);
+    if (volume < 0.1) score = 0;
+    return [side, Math.max(0, Math.min(1, score))];
+  });
+}
+
+function liveDeckIdentity(deck?: LibraryLiveDeck): string {
+  if (!deck) return "unknown";
+  return proofDeckResolved(deck) ? "known" : "unresolved";
+}
+
+function deckLaneSummary(context: LibraryLiveContext | null): string | null {
+  if (!context) return null;
+  const deckState = context.deck_state ?? {};
+  const scoreMap = new Map(proofRouteScores(context));
+  const aRoute = scoreMap.has("A") ? proofRouteTier(scoreMap.get("A") ?? 0) : "unknown";
+  const bRoute = scoreMap.has("B") ? proofRouteTier(scoreMap.get("B") ?? 0) : "unknown";
+  return `deck1 A=${liveDeckIdentity(deckState.A)}:${aRoute} / deck2 B=${liveDeckIdentity(deckState.B)}:${bRoute}`;
+}
+
+function hasLiveProofTransitionGate(context: LibraryLiveContext): boolean {
+  return (context.live_evidence?.mix ?? []).some(
+    (token) =>
+      token.includes("transition_block=") ||
+      token.includes("transition_watch=") ||
+      token.includes("transition_candidate="),
+  );
+}
+
+function liveProofStatus(
+  context: LibraryLiveContext | null,
+): { ok: boolean; state: string; detail: string } {
+  if (!context) {
+    return { ok: false, state: "not armed", detail: "waiting for live deck feed" };
+  }
+  const capabilities = new Set(context.live_context_capabilities ?? []);
+  const transportOk =
+    (context.live_context_schema_version ?? 0) >= 2 &&
+    [
+      "deck_source_status",
+      "audio_part_context",
+      "deck_audio_separation_context",
+      "audio_window_map",
+      "audio_delta",
+      "live_evidence",
+    ].every((capability) => capabilities.has(capability));
+  if (!transportOk) {
+    return { ok: false, state: "partial", detail: "transport stale" };
+  }
+  const missing: string[] = [];
+  if (!context.deck_lanes_context || !context.deck_reference_context) {
+    missing.push("lanes");
+  }
+  if (!context.deck_source_context || !context.deck_source_status) {
+    missing.push("source");
+  }
+  if (
+    !context.deck_audio_context ||
+    !context.deck_audio_separation_context ||
+    !context.audio_window_context ||
+    !context.audio_window_map
+  ) {
+    missing.push("audio map");
+  }
+  if (!hasLiveProofTransitionGate(context)) {
+    missing.push("gate");
+  }
+  if (missing.length > 0) {
+    return { ok: false, state: "partial", detail: missing.slice(0, 2).join(" + ") };
+  }
+  return { ok: true, state: "armed", detail: deckLaneSummary(context) ?? "deck lanes armed" };
+}
+
+function appendLiveProofStatusToolRow(
+  tools: HTMLElement,
+  context: LibraryLiveContext | null,
+): void {
+  const status = liveProofStatus(context);
+  const row = document.createElement("div");
+  row.className = "vmx-lib-chat-tool";
+  row.dataset.ok = String(status.ok);
+  row.dataset.proof = "true";
+  row.dataset.proofState = status.state.replace(/\s+/g, "_");
+  const gem = document.createElement("span");
+  gem.className = "gem";
+  const text = document.createElement("div");
+  const name = document.createElement("div");
+  name.className = "name";
+  name.textContent = "live proof";
+  const arg = document.createElement("div");
+  arg.className = "arg";
+  arg.textContent = `${status.state} · ${status.detail}`;
+  text.append(name, arg);
+  row.append(gem, text);
+  tools.append(row);
+}
+
+function renderChatIdleSide(): void {
+  const tools = $("vmx-lib-chat-tools");
+  if (tools.dataset.live === "true") return;
+  tools.replaceChildren();
+  appendLiveProofStatusToolRow(tools, latestLiveContext);
+  $("vmx-lib-chat-artifact").replaceChildren();
+  $("vmx-lib-scope-state").textContent =
+    liveProofStatus(latestLiveContext).ok ? "live proof armed" : "ready";
+}
+
+/** Append one live tool-tape row as Viber fires it (the agentic work made
+ *  visible). XSS-safe: textContent only, no innerHTML. The first event of a run
+ *  clears any placeholder ("thinking" / "no tools this turn"). */
+function appendLiveToolRow(e: LibraryViberToolEvent): void {
+  const tools = $("vmx-lib-chat-tools");
+  if (tools.dataset.live !== "true") {
+    tools.replaceChildren();
+    tools.dataset.live = "true";
+  }
+  const row = document.createElement("div");
+  row.className = "vmx-lib-chat-tool";
+  row.dataset.ok = String(e.ok);
+  const gem = document.createElement("span");
+  gem.className = "gem";
+  const text = document.createElement("div");
+  const name = document.createElement("div");
+  name.className = "name";
+  name.textContent = chatToolDisplayName(e.tool);
+  const arg = document.createElement("div");
+  arg.className = "arg";
+  arg.textContent = chatToolDisplayArg(e.tool, e.summary, e.ok);
+  text.append(name, arg);
+  row.append(gem, text);
+  tools.append(row);
+  tools.scrollTop = tools.scrollHeight;
+}
+
+function liveVerificationStateText(v: LibraryLiveVerification): string {
+  const transport =
+    v.transport_status === "fresh_schema_v2"
+      ? "fresh"
+      : v.transport_status === "missing_live_context"
+        ? "not armed"
+        : v.transport_status === "stale_or_pre_schema_v2"
+          ? "partial"
+          : "checked";
+  const policy =
+    v.claim_policy === "requires_more_evidence"
+      ? "needs proof"
+      : v.claim_policy === "blocked" || v.claim_policy === "watch_not_claim"
+        ? "verdict held"
+        : v.claim_policy === "candidate_not_verdict"
+          ? "candidate only"
+          : "ready";
+  const result = v.ok
+    ? v.guard_applied
+      ? "claim held"
+      : "checked"
+    : "needs proof";
+  return `${transport} · ${policy} · ${result}`;
+}
+
+function appendLiveVerificationToolRow(
+  tools: HTMLElement,
+  verification: LibraryLiveVerification,
+): void {
+  const row = document.createElement("div");
+  row.className = "vmx-lib-chat-tool";
+  row.dataset.ok = String(verification.ok);
+  row.dataset.proof = "true";
+  const gem = document.createElement("span");
+  gem.className = "gem";
+  const text = document.createElement("div");
+  const name = document.createElement("div");
+  name.className = "name";
+  name.textContent = "live proof";
+  const arg = document.createElement("div");
+  arg.className = "arg";
+  arg.textContent = liveVerificationStateText(verification);
+  text.append(name, arg);
+  row.append(gem, text);
+  tools.append(row);
+}
+
+function isInternalLiveProofTool(tool: LibraryChatToolTrace): boolean {
+  return tool.name === "live_context_required";
+}
+
+function chatToolDisplayName(name: string): string {
+  return name === "live_context_required" ? "live proof" : name;
+}
+
+function chatToolDisplayArg(
+  name: string,
+  arg: string,
+  ok: boolean,
+): string {
+  if (name === "live_context_required") return "not armed";
+  return arg || (ok ? "ok" : "failed");
+}
+
+function chatScopeStateText(result: LibraryChatResult): string {
+  if (isChatSetupStop(result.stop_reason)) return `setup · ${result.stop_reason}`;
+  if (result.stop_reason === "live_context_required") return "live proof needed";
+  return `${result.iterations} iter · ${result.stop_reason}`;
+}
+
 function renderChatSide(result: LibraryChatResult): void {
   const tools = $("vmx-lib-chat-tools");
   tools.replaceChildren();
-  if (result.tool_trace.length === 0) {
+  if (result.live_verification) {
+    appendLiveVerificationToolRow(tools, result.live_verification);
+  } else {
+    appendLiveProofStatusToolRow(tools, latestLiveContext);
+  }
+  if (result.tool_trace.length === 0 && !result.live_verification) {
     const empty = document.createElement("div");
     empty.className = "vmx-lib-chat-empty";
     empty.textContent = "no tools this turn";
     tools.append(empty);
-  } else {
-    result.tool_trace.forEach((tool) => {
-      const row = document.createElement("div");
-      row.className = "vmx-lib-chat-tool";
-      row.dataset.ok = String(tool.ok);
-      const gem = document.createElement("span");
-      gem.className = "gem";
-      const text = document.createElement("div");
-      const name = document.createElement("div");
-      name.className = "name";
-      name.textContent = tool.name;
-      const arg = document.createElement("div");
-      arg.className = "arg";
-      arg.textContent = tool.arg || (tool.ok ? "ok" : "failed");
-      text.append(name, arg);
-      row.append(gem, text);
-      tools.append(row);
-    });
+  }
+  if (result.tool_trace.length > 0) {
+    result.tool_trace
+      .filter(
+        (tool) => !(result.live_verification && isInternalLiveProofTool(tool)),
+      )
+      .forEach((tool) => {
+        const row = document.createElement("div");
+        row.className = "vmx-lib-chat-tool";
+        row.dataset.ok = String(tool.ok);
+        const gem = document.createElement("span");
+        gem.className = "gem";
+        const text = document.createElement("div");
+        const name = document.createElement("div");
+        name.className = "name";
+        name.textContent = chatToolDisplayName(tool.name);
+        const arg = document.createElement("div");
+        arg.className = "arg";
+        arg.textContent = chatToolDisplayArg(tool.name, tool.arg, tool.ok);
+        text.append(name, arg);
+        row.append(gem, text);
+        tools.append(row);
+      });
   }
 
   const artifact = $("vmx-lib-chat-artifact");
   artifact.replaceChildren();
   const card = chatArtifactCard(result);
   if (card) artifact.append(card);
-  $("vmx-lib-scope-state").textContent = isChatSetupStop(result.stop_reason)
-    ? `setup · ${result.stop_reason}`
-    : `${result.iterations} iter · ${result.stop_reason}`;
+  $("vmx-lib-scope-state").textContent = chatScopeStateText(result);
 }
 
 function isChatSetupStop(stopReason: string): boolean {
@@ -607,12 +1155,20 @@ function isChatSetupStop(stopReason: string): boolean {
   );
 }
 
+function isChatClarification(result: LibraryChatResult): boolean {
+  return result.stop_reason === "clarification_needed";
+}
+
 function chatArtifactCard(result: LibraryChatResult): HTMLElement | null {
   const setupStop = isChatSetupStop(result.stop_reason);
+  const clarification = isChatClarification(result);
   if (
     !setupStop &&
+    !clarification &&
+    !result.live_verification &&
     !result.playlist &&
     !result.export_path &&
+    result.move_grades.length === 0 &&
     result.seen_track_ids.length === 0
   ) {
     return null;
@@ -628,27 +1184,58 @@ function chatArtifactCard(result: LibraryChatResult): HTMLElement | null {
   label.textContent = result.playlist
     ? "playlist"
     : result.export_path
-      ? "export"
-      : setupStop
-        ? "setup"
-        : "receipts";
+        ? "export"
+        : clarification
+          ? "clarify"
+          : setupStop
+            ? "setup"
+            : result.live_verification
+              ? "live proof"
+            : result.move_grades.length > 0
+              ? "moves"
+              : "receipts";
   cap.append(led, label);
   card.append(cap);
 
+  if (clarification) {
+    card.dataset.wire = "library.chat-clarification";
+    appendChatCardLine(
+      card,
+      result.question || "Viber needs one detail before it can continue.",
+    );
+    (result.choices || []).forEach((choice, index) => {
+      appendChatCardLine(card, `${index + 1}. ${choice}`);
+    });
+  }
   if (setupStop) {
     appendChatCardLine(card, chatSetupTitle(result.stop_reason));
     if (result.reply) appendChatCardLine(card, result.reply);
+  }
+  if (result.live_verification) {
+    appendChatLiveVerificationLines(card, result.live_verification);
   }
   if (result.playlist) {
     appendChatCardLine(card, result.playlist.name);
     appendChatCardLine(card, `${result.playlist.track_ids.length} tracks`);
     if (result.playlist.m3u_path) appendChatCardLine(card, result.playlist.m3u_path);
+    appendChatSetBreakdown(card, result.playlist, result.move_grades);
   }
   if (result.export_path) appendChatCardLine(card, result.export_path);
+  result.move_grades.slice(0, 4).forEach((grade) => appendChatMoveGradeLine(card, grade));
   if (!result.playlist && result.seen_track_ids.length > 0) {
     appendChatCardLine(card, result.seen_track_ids.slice(0, 6).join(" · "));
   }
   return card;
+}
+
+function appendChatLiveVerificationLines(
+  card: HTMLElement,
+  verification: LibraryLiveVerification,
+): void {
+  appendChatCardLine(card, `live proof: ${liveVerificationStateText(verification)}`);
+  if (verification.move_grades_seen > 0 && !verification.move_grades_allowed) {
+    appendChatCardLine(card, "move grades held until live proof supports them");
+  }
 }
 
 function chatSetupTitle(stopReason: string): string {
@@ -663,6 +1250,135 @@ function appendChatCardLine(card: HTMLElement, text: string): void {
   line.className = "line";
   line.textContent = text;
   card.append(line);
+}
+
+/** The ordered "01. track" set view a built/curated playlist deserves — the
+ *  affordance the dedicated Curate/Build tabs used to own. The chat playlist
+ *  carries only track_ids (no titles), so titles are enriched from move_grades
+ *  when present and the bare id is the honest fallback otherwise (same no-
+ *  fabrication contract as renderCurate). Built with textContent, never HTML. */
+function appendChatSetBreakdown(
+  card: HTMLElement,
+  playlist: LibraryChatPlaylist,
+  moveGrades: LibraryChatMoveGrade[],
+): void {
+  if (playlist.track_ids.length === 0) return;
+  const titleById = new Map<string, string>();
+  moveGrades.forEach((grade) => {
+    if (grade.title) titleById.set(grade.track_id, grade.title);
+  });
+  const set = document.createElement("div");
+  set.className = "set";
+  set.dataset.wire = "library.chat-set-breakdown";
+  playlist.track_ids.forEach((id, i) => {
+    const row = document.createElement("div");
+    row.className = "setrow";
+    const rank = document.createElement("span");
+    rank.className = "rank";
+    rank.textContent = String(i + 1).padStart(2, "0");
+    const title = document.createElement("span");
+    title.className = "t";
+    title.textContent = titleById.get(id) || id;
+    row.append(rank, title);
+    set.append(row);
+  });
+  card.append(set);
+  if (playlist.dropped_ids.length > 0) {
+    appendChatCardLine(card, `${playlist.dropped_ids.length} dropped`);
+  }
+}
+
+function chatMoveGradeInt(
+  value: number | undefined,
+  min: number,
+  max: number,
+): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const next = Math.trunc(value);
+  if (next < min) return null;
+  return Math.min(next, max);
+}
+
+function chatMoveGradeProgressText(grade: LibraryChatMoveGrade): string {
+  const parts: string[] = [];
+  const level = chatMoveGradeInt(grade.level, 1, 999);
+  const levelXp = chatMoveGradeInt(grade.level_xp, 0, 999_999);
+  const nextLevelXp = chatMoveGradeInt(grade.next_level_xp, 1, 999_999);
+  if (level !== null) {
+    parts.push(
+      levelXp !== null && nextLevelXp !== null
+        ? `LV${level} ${levelXp}/${nextLevelXp}xp`
+        : `LV${level}`,
+    );
+  }
+  const streak = chatMoveGradeInt(grade.streak, 0, 999);
+  if (streak !== null && streak > 1) parts.push(`x${streak}`);
+  if (grade.level_up === true) {
+    const levelsGained = chatMoveGradeInt(grade.levels_gained, 0, 999);
+    parts.push(
+      levelsGained !== null && levelsGained > 1
+        ? `LEVEL UP x${levelsGained}`
+        : "LEVEL UP",
+    );
+  }
+  return parts.join(" / ");
+}
+
+function chatMoveGradeIntelState(grade: LibraryChatMoveGrade): "care" | "earned" | "overdrive" {
+  if (grade.level_up === true || grade.overdrive) return "overdrive";
+  if (grade.slug === "negative" || grade.slug === "mid") return "care";
+  return "earned";
+}
+
+function chatMoveGradeTitle(grade: LibraryChatMoveGrade): string {
+  if (grade.level_up === true || grade.overdrive) return "DJ KNOWS";
+  return grade.reason ? `DJ KNOWS · ${grade.reason}` : "DJ KNOWS";
+}
+
+function appendChatMoveGradeLine(card: HTMLElement, grade: LibraryChatMoveGrade): void {
+  const row = document.createElement("div");
+  row.className = "vmx-lib-chat-grade";
+  row.dataset.wire = "library.chat-move-grade";
+  row.dataset.moveGrade = grade.slug;
+  row.dataset.overdrive = grade.overdrive ? "true" : "false";
+  row.dataset.levelUp = grade.level_up === true ? "true" : "false";
+  row.dataset.intel = chatMoveGradeIntelState(grade);
+  const level = chatMoveGradeInt(grade.level, 1, 999);
+  if (level !== null) row.dataset.gradeLevel = String(level);
+  const totalXp = chatMoveGradeInt(grade.total_xp, 0, 999_999);
+  if (totalXp !== null) row.dataset.totalXp = String(totalXp);
+  row.title = chatMoveGradeTitle(grade);
+  row.setAttribute("aria-label", chatMoveGradeTitle(grade));
+
+  const label = document.createElement("span");
+  label.className = "grade-label";
+  label.textContent = grade.label;
+
+  const xp = document.createElement("span");
+  xp.className = "grade-xp";
+  xp.textContent = grade.xp > 0 ? `+${grade.xp}xp` : "0xp";
+
+  const title = document.createElement("span");
+  title.className = "grade-title";
+  title.textContent = grade.title || grade.track_id;
+
+  const meta = document.createElement("span");
+  meta.className = "grade-meta";
+  const progressText = chatMoveGradeProgressText(grade);
+  if (progressText) {
+    const progress = document.createElement("span");
+    progress.className = "grade-progress";
+    progress.textContent = progressText;
+    meta.append(progress);
+  }
+
+  const reason = document.createElement("span");
+  reason.className = "grade-reason";
+  reason.textContent = grade.reason;
+
+  meta.append(reason);
+  row.append(label, xp, title, meta);
+  card.append(row);
 }
 
 function renderChatError(err: unknown): void {
@@ -695,6 +1411,8 @@ function renderChatError(err: unknown): void {
 export function mountLibrary(): void {
   let state: LibraryState = initialLibraryState;
   let busy = false;
+  let runSeq = 0;
+  let cancelActiveRun: (() => void) | null = null;
 
   const qInput = $("vmx-lib-q") as HTMLInputElement;
   const folderInput = $("vmx-lib-folder") as HTMLInputElement;
@@ -741,19 +1459,44 @@ export function mountLibrary(): void {
       state.mode === "chat" ? "Grounding" : "Vibe scope";
     runBtn.textContent = runLabel(state.mode);
     echoEl.textContent = echoText(state);
-    if (state.mode === "chat") ensureChatIntro(chatThread);
+    if (state.mode === "chat") {
+      ensureChatIntro(chatThread);
+      if (!busy) renderChatIdleSide();
+    }
   }
 
   async function refreshStats(): Promise<void> {
-    renderStats(await libraryStats());
+    try {
+      renderStats(await libraryStats());
+    } catch (err) {
+      renderStatsError(err);
+    }
   }
 
   async function refreshModels(): Promise<void> {
-    renderModelSetup(await libraryModels());
+    try {
+      renderModelSetup(await libraryModels());
+    } catch (err) {
+      renderModelSetupError(err);
+    }
   }
 
   function currentInstallTarget(): LibraryModelInstallTarget {
     return modelInstallTargetFromDataset(installModelsBtn.dataset.installTarget);
+  }
+
+  function isCurrentRun(runId: number, mode: LibraryMode): boolean {
+    return runSeq === runId && state.mode === mode;
+  }
+
+  function cancelRun(): void {
+    if (!busy) return;
+    runSeq += 1;
+    busy = false;
+    runBtn.disabled = false;
+    const cancel = cancelActiveRun;
+    cancelActiveRun = null;
+    cancel?.();
   }
 
   async function installLocalModels(): Promise<void> {
@@ -787,34 +1530,45 @@ export function mountLibrary(): void {
 
   // ── run actions ──────────────────────────────────────────────────────────
 
-  async function runSearch(): Promise<void> {
+  async function runSearch(runId: number): Promise<void> {
     state = setQuery(state, qInput.value.trim() || state.query);
     echoEl.textContent = state.query;
-    renderResults(await librarySearch(state.query), "search");
+    const result = await librarySearch(state.query);
+    if (!isCurrentRun(runId, "search")) return;
+    renderResults(result, "search");
   }
 
-  async function runSimilar(): Promise<void> {
+  async function runSimilar(runId: number): Promise<void> {
     echoEl.textContent = state.seed;
-    renderResults(await librarySimilar(state.seed), "similar");
+    const result = await librarySimilar(state.seed);
+    if (!isCurrentRun(runId, "similar")) return;
+    renderResults(result, "similar");
   }
 
-  async function runCurate(): Promise<void> {
+  async function runCurate(runId: number): Promise<void> {
     state = setTheme(state, themeInput.value.trim() || state.theme);
     echoEl.textContent = state.theme;
     renderCurateLoading(state.theme); // working state before the (slow) agent call
-    renderCurate(await libraryCurate(state.theme));
+    const result = await libraryCurate(state.theme);
+    if (!isCurrentRun(runId, "curate")) return;
+    renderCurate(result);
   }
 
-  async function runBuildSet(): Promise<void> {
+  async function runBuildSet(runId: number): Promise<void> {
     state = setBrief(state, briefInput.value.trim() || state.brief);
     echoEl.textContent = state.brief;
     renderBuildSetLoading(state.brief); // working state before the (slow) agent call
-    renderBuildSet(await libraryBuildSet(state.brief, state.curve));
+    const result = await libraryBuildSet(state.brief, state.curve);
+    if (!isCurrentRun(runId, "build")) return;
+    renderBuildSet(result);
   }
 
-  async function runChat(): Promise<void> {
+  async function runChat(runId: number): Promise<void> {
     state = setChatMessage(state, chatInput.value.trim());
-    if (!state.chatMessage) return;
+    if (!state.chatMessage) {
+      renderChatIdleSide();
+      return;
+    }
     const message = state.chatMessage;
     const priorHistory = chatHistory.slice();
 
@@ -825,14 +1579,26 @@ export function mountLibrary(): void {
     echoEl.textContent = "conversation";
 
     const pending = appendChatTurn(chatThread, "viber", "", true);
+    cancelActiveRun = () => {
+      pending.remove();
+      const lastTurn = chatHistory[chatHistory.length - 1];
+      if (lastTurn?.role === "you" && lastTurn.text === message) {
+        chatHistory.pop();
+      }
+    };
     renderChatBusy();
     try {
-      const result = await libraryChat(message, priorHistory);
+      const liveContext = liveContextForChat(latestLiveContext);
+      const result = liveContext
+        ? await libraryChat(message, priorHistory, liveContext)
+        : await libraryChat(message, priorHistory);
+      if (!isCurrentRun(runId, "chat")) return;
       const reply = result.reply || "I came back empty.";
       setChatTurnText(pending, reply);
       chatHistory.push({ role: "viber", text: reply });
       renderChatSide(result);
     } catch (err) {
+      if (!isCurrentRun(runId, "chat")) return;
       // eslint-disable-next-line no-console
       console.error("[vmx-lib] chat failed:", err);
       const lastTurn = chatHistory[chatHistory.length - 1];
@@ -860,12 +1626,13 @@ export function mountLibrary(): void {
   /** Drive the ingest progress bar + log. If the bridge accepts the job, the
    *  Tauri `library://embed-*` events drive the UI. Otherwise (no bridge) we
    *  replay the real subset-run log so the surface is demoable. */
-  async function runIngest(): Promise<void> {
+  async function runIngest(runId: number): Promise<void> {
     state = setFolder(state, folderInput.value.trim() || state.folder);
     $("vmx-lib-loglist").innerHTML = "";
     setProgress(0, DEV_FALLBACK.embedLog.length, 0, "");
 
     const accepted = await libraryEmbedFolder(state.folder, state.strategy);
+    if (!isCurrentRun(runId, "ingest")) return;
     if (accepted) return; // bridge live — events take over via the listeners below
 
     // dev replay — step through the captured log on a timer
@@ -873,6 +1640,7 @@ export function mountLibrary(): void {
     const total = log.length;
     let i = 0;
     const tick = (): void => {
+      if (!isCurrentRun(runId, "ingest")) return;
       if (i >= total) {
         void refreshStats();
         busy = false;
@@ -895,17 +1663,28 @@ export function mountLibrary(): void {
     if (busy) return;
     busy = true;
     runBtn.disabled = true;
+    const runId = ++runSeq;
+    const modeAtStart = state.mode;
+    cancelActiveRun = null;
+    // Reset the live tool tape for the Viber/Codex modes that stream tool calls,
+    // so each run's tape starts clean (the listener repopulates it live).
+    if (modeAtStart === "chat" || modeAtStart === "curate" || modeAtStart === "build") {
+      const liveTools = $("vmx-lib-chat-tools");
+      liveTools.replaceChildren();
+      delete liveTools.dataset.live;
+    }
     try {
-      if (state.mode === "search") await runSearch();
-      else if (state.mode === "similar") await runSimilar();
-      else if (state.mode === "curate") await runCurate();
-      else if (state.mode === "build") await runBuildSet();
-      else if (state.mode === "chat") await runChat();
+      if (modeAtStart === "search") await runSearch(runId);
+      else if (modeAtStart === "similar") await runSimilar(runId);
+      else if (modeAtStart === "curate") await runCurate(runId);
+      else if (modeAtStart === "build") await runBuildSet(runId);
+      else if (modeAtStart === "chat") await runChat(runId);
       else {
-        await runIngest();
+        await runIngest(runId);
         return; // ingest manages its own busy lifecycle (events or replay)
       }
     } catch (err) {
+      if (!isCurrentRun(runId, modeAtStart)) return;
       // A REAL backend error (empty cache, missing key, bad strategy) — show it
       // honestly instead of masking it with fake data (anti-slop). The ingest
       // path lands here too on a real bridge error, so we must release its
@@ -913,14 +1692,15 @@ export function mountLibrary(): void {
       // eslint-disable-next-line no-console
       console.error("[vmx-lib] run failed:", err);
       renderError(err);
-      if (state.mode === "ingest") {
+      if (modeAtStart === "ingest") {
         busy = false;
         runBtn.disabled = false;
       }
     } finally {
-      if (state.mode !== "ingest") {
+      if (isCurrentRun(runId, modeAtStart) && modeAtStart !== "ingest") {
         busy = false;
         runBtn.disabled = false;
+        cancelActiveRun = null;
       }
     }
   }
@@ -959,6 +1739,7 @@ export function mountLibrary(): void {
     b.addEventListener("click", () => {
       const previousMode = state.mode;
       const mode = (b.dataset.mode ?? "search") as LibraryMode;
+      if (mode !== previousMode) cancelRun();
       state = setMode(state, mode);
       applyModeVisibility();
       // The set-notes block is shared by curate + build; only clear it when
@@ -1059,12 +1840,27 @@ export function mountLibrary(): void {
     if (state.mode === "similar") void run();
   });
 
+  // Live deck context from the app socket is a bounded hint for chat turns.
+  // It is not rendered here; it only prevents Viber from inventing transitions
+  // when the live state says one deck is resolved/audible.
+  void onLiveDeckContext((context: LibraryLiveContext) => {
+    latestLiveContext = mergeLiveContext(latestLiveContext, context);
+    if (state.mode === "chat" && !busy) renderChatIdleSide();
+  });
+  void onLiveMoveContext((moves: string[]) => {
+    rememberLiveMoves(moves);
+    latestLiveContext = liveContextForChat(latestLiveContext);
+    if (state.mode === "chat" && !busy) renderChatIdleSide();
+  });
+
   // ingest progress from the real bridge (no-op listeners in dev)
   void onEmbedProgress((p: EmbedProgress) => {
+    if (!busy || state.mode !== "ingest") return;
     appendLog(p.status, p.filename, p.cost_eur);
     setProgress(p.n, p.total, p.cost_eur, p.filename.replace(/\.[a-z0-9]+$/i, ""));
   });
   void onEmbedDone((d: EmbedDone) => {
+    if (!busy || state.mode !== "ingest") return;
     setProgress(d.total, d.total, d.cost_eur, "done");
     busy = false;
     runBtn.disabled = false;
@@ -1077,6 +1873,17 @@ export function mountLibrary(): void {
   void onModelProgress((p: LibraryModelProgress) => {
     if (!installModelsBtn.disabled) return;
     $("vmx-lib-model-state").textContent = modelProgressStateText(p);
+  });
+
+  // The live tool tape: each tool Viber fires (search, sequence, create) streams
+  // in as it happens, so a curate/build/chat run is a visible agentic process,
+  // not an opaque wait. No-op listener outside Tauri (dev/jsdom).
+  void onViberTool((e: LibraryViberToolEvent) => {
+    if (!busy) return;
+    if (state.mode !== "chat" && state.mode !== "curate" && state.mode !== "build") {
+      return;
+    }
+    appendLiveToolRow(e);
   });
 
   // initial paint

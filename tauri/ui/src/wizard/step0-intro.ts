@@ -235,11 +235,14 @@ const CSS = `
   .wizard-intro__wordmark {
     font-variation-settings: "wdth" 82, "wght" 800;
     font-size: 76px;
-    letter-spacing: 0;
-    text-transform: uppercase;
+    /* Lowercase, tight — the exact case of the persistent shell wordmark, set
+     * with the small negative tracking a large display lockup wants. NO
+     * text-transform: the syllables abut (gap 0) so "vibemix" reads as one
+     * tight word, the same brand mark scaled up, not an uppercase hero variant. */
+    letter-spacing: -0.02em;
     display: inline-flex;
     align-items: baseline;
-    gap: 1px;
+    gap: 0;
     filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.58));
   }
   /* The trademark, hero-scale: "VIBE" in ink, "MIX" lit in rose — the same

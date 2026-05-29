@@ -1,0 +1,204 @@
+// SPDX-License-Identifier: Apache-2.0
+// Learn should reuse the established Tauri IPC event bridge in production.
+// Browser/dev harnesses that only shim invoke still fall back to ws:8765.
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  subscribeIpc: vi.fn(),
+  listenTauri: vi.fn(),
+}));
+
+vi.mock("../../src/ipc/client.js", () => ({
+  subscribeIpc: mocks.subscribeIpc,
+}));
+
+vi.mock("../../src/tauri-runtime.js", () => ({
+  listenTauri: mocks.listenTauri,
+}));
+
+import { LearnWsClient } from "../../src/learn/ws-client";
+
+const REAL_WEBSOCKET = globalThis.WebSocket;
+
+type LearnEnvelope = {
+  type: string;
+  ts: string;
+  payload: Record<string, unknown>;
+};
+
+function installTauriEventBridge(): void {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", {
+    value: {},
+    configurable: true,
+  });
+  Object.defineProperty(window, "__TAURI_EVENT_PLUGIN_INTERNALS__", {
+    value: {},
+    configurable: true,
+  });
+}
+
+function installInvokeOnlyTauriShim(): void {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", {
+    value: {},
+    configurable: true,
+  });
+  Reflect.deleteProperty(window, "__TAURI_EVENT_PLUGIN_INTERNALS__");
+}
+
+function clearTauriShims(): void {
+  Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
+  Reflect.deleteProperty(window, "__TAURI_EVENT_PLUGIN_INTERNALS__");
+}
+
+describe("LearnWsClient Tauri bridge selection", () => {
+  beforeEach(() => {
+    clearTauriShims();
+    mocks.subscribeIpc.mockReset();
+    mocks.listenTauri.mockReset();
+    mocks.listenTauri.mockImplementation(async () => () => undefined);
+  });
+
+  afterEach(() => {
+    clearTauriShims();
+    (globalThis as unknown as { WebSocket: typeof REAL_WEBSOCKET }).WebSocket =
+      REAL_WEBSOCKET;
+  });
+
+  it("uses subscribeIpc in a real Tauri event-plugin runtime", async () => {
+    installTauriEventBridge();
+
+    const webSocketCtor = vi.fn();
+    class ThrowingWebSocket {
+      constructor(url: string) {
+        webSocketCtor(url);
+        throw new Error("Tauri bridge path must not open a browser WebSocket");
+      }
+    }
+    (globalThis as unknown as { WebSocket: unknown }).WebSocket = ThrowingWebSocket;
+
+    const callbacks = new Map<string, (envelope: LearnEnvelope) => void>();
+    const rawCallbacks = new Map<string, (event: { payload: unknown }) => void>();
+    const unlisteners = new Map<string, ReturnType<typeof vi.fn>>();
+    const course3LensUnlisten = vi.fn();
+    mocks.subscribeIpc.mockImplementation(
+      async (type: string, callback: (envelope: LearnEnvelope) => void) => {
+        callbacks.set(type, callback);
+        const unlisten = vi.fn();
+        unlisteners.set(type, unlisten);
+        return unlisten;
+      },
+    );
+    mocks.listenTauri.mockImplementation(
+      async (event: string, callback: (event: { payload: unknown }) => void) => {
+        if (event === "learn-course3-lens") {
+          rawCallbacks.set(event, callback);
+          return course3LensUnlisten;
+        }
+        return () => undefined;
+      },
+    );
+
+    const client = new LearnWsClient();
+    const openSpy = vi.fn();
+    const heard: CustomEvent[] = [];
+    const heardCourse3: CustomEvent[] = [];
+    const onTutor = (event: Event): void => {
+      heard.push(event as CustomEvent);
+    };
+    const onCourse3 = (event: Event): void => {
+      heardCourse3.push(event as CustomEvent);
+    };
+    window.addEventListener("ipc.learn.tutor_speak", onTutor);
+    window.addEventListener("learn.course3_lens", onCourse3);
+    client.addEventListener("open", openSpy);
+
+    try {
+      client.connect();
+      await vi.waitFor(() => {
+        expect(mocks.subscribeIpc).toHaveBeenCalledTimes(10);
+      });
+      await vi.waitFor(() => {
+        expect(openSpy).toHaveBeenCalledTimes(1);
+      });
+
+      expect(webSocketCtor).not.toHaveBeenCalled();
+      expect(mocks.listenTauri).toHaveBeenCalledWith(
+        "learn-course3-lens",
+        expect.any(Function),
+      );
+
+      callbacks.get("ipc.learn.tutor_speak")?.({
+        type: "ipc.learn.tutor_speak",
+        ts: "2026-05-28T00:00:00.000Z",
+        payload: {
+          text: "trim the highs",
+          tts_marker: "L1.02.step1",
+          citations: ["lesson:L1.02"],
+          data_state: "active",
+        },
+      });
+      const emitCourse3Lens = rawCallbacks.get("learn-course3-lens");
+      expect(emitCourse3Lens).toBeTypeOf("function");
+      if (!emitCourse3Lens) throw new Error("missing Course 3 lens listener");
+      emitCourse3Lens({
+        payload: {
+          music: 0.6,
+          course3_lens: {
+            session_active: true,
+            phrase_position_confidence: 0.88,
+            next_phrase_at: 64,
+            next_phrase_cue_id: "cue:track-a:phrase",
+          },
+        },
+      });
+
+      expect(heard).toHaveLength(1);
+      expect(heard[0]?.detail).toMatchObject({
+        text: "trim the highs",
+        data_state: "active",
+      });
+      expect(heardCourse3).toHaveLength(1);
+      expect(heardCourse3[0]?.detail).toMatchObject({
+        session_active: true,
+        phrase_position_confidence: 0.88,
+        next_phrase_at: 64,
+        next_phrase_cue_id: "cue:track-a:phrase",
+      });
+
+      client.close();
+      expect(unlisteners.get("ipc.learn.tutor_speak")).toHaveBeenCalledTimes(1);
+      expect(course3LensUnlisten).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener("ipc.learn.tutor_speak", onTutor);
+      window.removeEventListener("learn.course3_lens", onCourse3);
+      client.close();
+    }
+  });
+
+  it("falls back to direct ws:8765 when only invoke is shimmed", () => {
+    installInvokeOnlyTauriShim();
+
+    const urls: string[] = [];
+    class CapturingWebSocket {
+      onopen: ((event: Event) => void) | null = null;
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onclose: ((event: CloseEvent) => void) | null = null;
+      onerror: ((event: Event) => void) | null = null;
+      constructor(url: string) {
+        urls.push(url);
+      }
+      close(): void {}
+    }
+    (globalThis as unknown as { WebSocket: unknown }).WebSocket = CapturingWebSocket;
+
+    const client = new LearnWsClient();
+    try {
+      client.connect();
+      expect(mocks.subscribeIpc).not.toHaveBeenCalled();
+      expect(urls).toEqual(["ws://127.0.0.1:8765"]);
+    } finally {
+      client.close();
+    }
+  });
+});

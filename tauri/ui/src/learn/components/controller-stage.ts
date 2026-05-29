@@ -152,9 +152,8 @@ async function loadControllerSvg(controllerId: string): Promise<string> {
  *
  * The classification drives the render dispatch in :func:`applyPositionFrame`
  * — knobs ROTATE around their `data-cx`/`data-cy` pivot, faders TRANSLATE
- * along a linear axis (or, today, stay still and carry a `data-value`
- * marker until per-fader geometry lands — see CR-02 note below), and
- * buttons flip a `data-active` flag for the stylesheet to swap fill.
+ * their thumb along the rail inferred from the SVG geometry, and buttons
+ * flip a `data-active` flag for the stylesheet to swap fill.
  *
  * The dispatch lives in the renderer (rather than as a `data-control-type`
  * attribute on every SVG group) because the SVG-author surface is large
@@ -205,6 +204,76 @@ function classifyControl(controlId: string): "knob" | "fader" | "button" {
   return "knob";
 }
 
+function svgNumber(el: SVGElement, attr: string): number | null {
+  const raw = el.getAttribute(attr);
+  if (raw === null) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function clampMidiValue(value: number): number {
+  return Math.min(127, Math.max(0, value));
+}
+
+function formatDelta(value: number): string {
+  return String(Number(value.toFixed(2)));
+}
+
+function translateFaderThumb(
+  group: SVGGElement,
+  controlId: string,
+  value: number,
+): boolean {
+  const rects = Array.from(group.children).filter(
+    (child): child is SVGRectElement => child.localName === "rect",
+  );
+  if (rects.length < 2) return false;
+
+  const rail = rects[0] as SVGRectElement;
+  const thumb = rects[rects.length - 1] as SVGRectElement;
+  const ratio = clampMidiValue(value) / 127;
+  const railX = svgNumber(rail, "x");
+  const railY = svgNumber(rail, "y");
+  const railWidth = svgNumber(rail, "width");
+  const railHeight = svgNumber(rail, "height");
+  const thumbX = svgNumber(thumb, "x");
+  const thumbY = svgNumber(thumb, "y");
+  const thumbWidth = svgNumber(thumb, "width");
+  const thumbHeight = svgNumber(thumb, "height");
+  if (
+    railX === null ||
+    railY === null ||
+    railWidth === null ||
+    railHeight === null ||
+    thumbX === null ||
+    thumbY === null ||
+    thumbWidth === null ||
+    thumbHeight === null
+  ) {
+    return false;
+  }
+
+  const horizontal = controlId === "xfader";
+  let dx = 0;
+  let dy = 0;
+  if (horizontal) {
+    const travel = Math.max(0, railWidth - thumbWidth);
+    const targetX = railX + ratio * travel;
+    dx = targetX - thumbX;
+  } else {
+    const travel = Math.max(0, railHeight - thumbHeight);
+    const targetY = railY + (1 - ratio) * travel;
+    dy = targetY - thumbY;
+  }
+
+  thumb.setAttribute("data-fader-thumb", "true");
+  thumb.setAttribute(
+    "transform",
+    `translate(${formatDelta(dx)} ${formatDelta(dy)})`,
+  );
+  return true;
+}
+
 /**
  * Apply a midi_position frame to the live SVG. Walks `positions`,
  * finds the matching `<g data-control-id>` group, and mutates a
@@ -217,12 +286,10 @@ function classifyControl(controlId: string): "knob" | "fader" | "button" {
  *   where deg = (value/127)*270 - 135 (RESEARCH §Code Example 3). Maps
  *   the 7-bit MIDI range to the ±135° physical knob travel.
  * - **Fader** (vol:*, tempo:*, xfader): `data-value="<n>"` is set on the
- *   group. The rotation that the original implementation applied to
- *   faders was visually wrong (the whole fader tilted instead of the
- *   thumb translating); per CR-02 the rotation is suppressed entirely
- *   until per-fader geometry (axis + travel + thumb classmark) lands
- *   in a follow-up. Static-but-correct beats animated-but-wrong for
- *   the milestone bar.
+ *   group and the last direct child `<rect>` is treated as the thumb.
+ *   Its transform is translated along the first direct child `<rect>`
+ *   rail. This keeps the parent group stable for highlight/focus
+ *   while the visible thumb moves.
  * - **Button** (play:*, cue:*, sync:*, loop_in/out:*, hotcue:*,
  *   jog_touch:*, tap_tempo): `data-active="0|1"` — CSS handles the
  *   fill swap. Previously buttons inherited the rotation path because
@@ -253,6 +320,12 @@ export function applyPositionFrame(
         `[data-control-id="${resolvedKey}"]`,
       ) as SVGGElement | null;
     }
+    if (!group && rawKey.startsWith("jog:")) {
+      resolvedKey = rawKey.replace("jog:", "jog_touch:");
+      group = stage.querySelector(
+        `[data-control-id="${resolvedKey}"]`,
+      ) as SVGGElement | null;
+    }
     if (!group) continue;
 
     const controlType = classifyControl(resolvedKey);
@@ -269,13 +342,8 @@ export function applyPositionFrame(
       }
       // No pivot defined → silently skip (defensive — unknown rotary shape).
     } else if (controlType === "fader") {
-      // CR-02: faders translate along an axis, not rotate. Per-fader
-      // geometry (axis + travel + thumb class) is not yet on the SVG
-      // surface (66 groups across 10 controllers); until that lands, mark
-      // the value on the group so CSS / a future renderer pass can wire
-      // the visual position. The blocker is the rotating fader — making
-      // it static is the immediate fix.
       group.setAttribute("data-value", String(value));
+      translateFaderThumb(group, resolvedKey, value);
     } else {
       // Button — data-active 0/1 (CSS picks up the swap).
       group.setAttribute("data-active", value > 0 ? "1" : "0");
@@ -340,11 +408,11 @@ export class ControllerStage {
 /**
  * Phase 92 (RENDER-04) — paints a highlight on the target
  * `<g data-control-id>` group by swapping the `data-cue-color` +
- * `data-cue-shape` attributes. The CSS-variable cascade (P91 scaffolded
- * in `learn.css` lines 142-143) does the actual paint via
- * `currentColor → var(--learn-highlight)` for the color channel and via
- * the `<g class="cue-shape">::before` pseudo-element for the pulse-ring
- * animation.
+ * `data-cue-shape` attributes. The CSS-variable cascade in `learn.css`
+ * does the actual paint via `currentColor -> var(--learn-highlight)` for
+ * the color channel, then uses the cue-shape attribute to choose either a
+ * calm glow or a pulsed glow. The visual cue stays on the control group so
+ * existing SVG geometry remains the source of truth.
  *
  * Wire convention (matches P91 SVG `data-control-id` naming):
  *   - When `payload.deck` is set (A/B/C/D): selector targets
@@ -378,29 +446,20 @@ export interface HighlightPayload {
   expected_action?: object;
 }
 
+const ACTIVE_HIGHLIGHT = new WeakMap<HTMLElement, SVGGElement>();
+const CONTROL_GROUP_CACHE = new WeakMap<HTMLElement, Map<string, SVGGElement>>();
+
 export function applyHighlight(
   stage: HTMLElement,
   payload: HighlightPayload,
 ): void {
-  // Clear any prior highlight (single-active invariant). Walk both
-  // attribute keys defensively — they're set together, but the prior-
-  // highlight assertion in highlight-paint.test.ts counts groups by
-  // `[data-cue-color]` so the color attr is the canonical lit marker.
-  stage.querySelectorAll<SVGGElement>("[data-cue-color]").forEach((g) => {
-    g.removeAttribute("data-cue-color");
-    g.removeAttribute("data-cue-shape");
-    // Also drop the optional hint-intensify class so a prior hint state
-    // doesn't bleed into the new highlight target.
-    g.classList.remove("hint-active");
-  });
+  clearActiveHighlight(stage);
   // Resolve target id — bare control_id for master section, "<field>:<deck>"
   // for per-deck controls. Matches the SVG authoring convention from P91.
   const targetId = payload.deck
     ? `${payload.control_id}:${payload.deck}`
     : payload.control_id;
-  const target = stage.querySelector<SVGGElement>(
-    `[data-control-id="${targetId}"]`,
-  );
+  const target = findControlGroup(stage, targetId);
   if (!target) {
     // eslint-disable-next-line no-console
     console.warn(`[learn] highlight: control_id "${targetId}" not found`);
@@ -408,6 +467,15 @@ export function applyHighlight(
   }
   target.setAttribute("data-cue-color", payload.cue_color);
   target.setAttribute("data-cue-shape", payload.cue_shape);
+  ACTIVE_HIGHLIGHT.set(stage, target);
+}
+
+function controlIdCandidates(controlId: string): string[] {
+  const [head, deck] = controlId.split(":");
+  if (head === "jog" && deck) {
+    return [controlId, `jog_touch:${deck}`, `jog_touched:${deck}`];
+  }
+  return [controlId];
 }
 
 /**
@@ -417,22 +485,67 @@ export function applyHighlight(
  * a fresh `ipc.learn.highlight` envelope.
  */
 export function clearHighlight(stage: HTMLElement): void {
+  clearActiveHighlight(stage);
   stage.querySelectorAll<SVGGElement>("[data-cue-color]").forEach((g) => {
-    g.removeAttribute("data-cue-color");
-    g.removeAttribute("data-cue-shape");
-    g.classList.remove("hint-active");
+    clearHighlightElement(g);
   });
+}
+
+function clearActiveHighlight(stage: HTMLElement): void {
+  const active = ACTIVE_HIGHLIGHT.get(stage);
+  if (active && active.isConnected && stage.contains(active)) {
+    clearHighlightElement(active);
+    ACTIVE_HIGHLIGHT.delete(stage);
+    return;
+  }
+  ACTIVE_HIGHLIGHT.delete(stage);
+
+  const stale = stage.querySelectorAll<SVGGElement>("[data-cue-color]");
+  stale.forEach((g) => clearHighlightElement(g));
+}
+
+function clearHighlightElement(group: SVGGElement): void {
+  group.removeAttribute("data-cue-color");
+  group.removeAttribute("data-cue-shape");
+  group.classList.remove("hint-active");
+}
+
+function findControlGroup(
+  stage: HTMLElement,
+  targetId: string,
+): SVGGElement | null {
+  let cache = CONTROL_GROUP_CACHE.get(stage);
+  if (!cache) {
+    cache = new Map<string, SVGGElement>();
+    CONTROL_GROUP_CACHE.set(stage, cache);
+  }
+
+  const cached = cache.get(targetId);
+  if (cached && cached.isConnected && stage.contains(cached)) {
+    return cached;
+  }
+
+  for (const id of controlIdCandidates(targetId)) {
+    const target = stage.querySelector<SVGGElement>(
+      `[data-control-id="${id}"]`,
+    );
+    if (target) {
+      cache.set(targetId, target);
+      return target;
+    }
+  }
+  cache.delete(targetId);
+  return null;
 }
 
 /**
  * Phase 92 — toggle the `.hint-active` class on the currently-lit
  * `<g data-control-id>` group. Driven by the tutor-dock's
  * `data-state="hint"` transition. The CSS keyframe swap in `learn.css`
- * (the `learnPulseRingIntense` 600ms animation) replaces the calm
- * 1400ms breathing pulse with a snappier amplitude — a secondary
- * a11y channel signaling "the system is more actively guiding you now"
- * that a user perceives via peripheral vision while reading the
- * dock copy (UI-SPEC §Motion line 306).
+ * replaces the calm 1400ms breathing pulse with a snappier amplitude.
+ * This is a secondary a11y channel signaling "the system is more
+ * actively guiding you now" that a user perceives via peripheral vision
+ * while reading the dock copy (UI-SPEC §Motion line 306).
  *
  * If no group is lit, this is a silent no-op (the next highlight
  * envelope picks up the hint-intensity via the data-state attribute

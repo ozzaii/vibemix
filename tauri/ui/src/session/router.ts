@@ -20,7 +20,11 @@ import { mountSessionLayout, type Mounted } from "./SessionLayout.js";
 import { startRenderLoop, stopRenderLoop } from "./render-loop.js";
 import { mountSessionShortcuts } from "./session-shortcuts.js";
 import { installTrayMoodListener } from "./tray-mood.js";
-import { mountSettingsDrawer } from "../settings/SettingsDrawer.js";
+import {
+  mountSettingsDrawer,
+  openSettings,
+  unmountSettingsDrawer,
+} from "../settings/SettingsDrawer.js";
 import { vmxLog } from "../debug-log.js";
 
 let mounted: Mounted | null = null;
@@ -55,7 +59,7 @@ export async function routeSession(rootEl?: HTMLElement): Promise<void> {
 
   // Mount the layout. mountSessionLayout returns a Mounted handle the
   // render loop reads.
-  const m = mountSessionLayout(root);
+  const m = mountSessionLayout(root, undefined, { onOpenSettings: openSettings });
   mounted = m;
 
   // Mount the settings drawer + backdrop on top of the layout. Settings
@@ -93,9 +97,9 @@ export async function routeSession(rootEl?: HTMLElement): Promise<void> {
   unsubscribeTrayMood = await installTrayMoodListener();
 }
 
-/** Tear down the session — stop the rAF, unsubscribe IPC, drop the
- *  Mounted handle. The DOM is left in place; route.session() replaces
- *  the root's children on next mount. */
+/** Tear down the session — stop the rAF, unsubscribe IPC, unmount overlays,
+ *  and drop the Mounted handle. The session DOM is left in place;
+ *  route.session() replaces the root's children on next mount. */
 export async function teardownSession(): Promise<void> {
   vmxLog("[vmx:state]", "session-router → teardownSession");
   stopRenderLoop();
@@ -144,6 +148,7 @@ export async function teardownSession(): Promise<void> {
     }
     unsubscribeTrayMood = null;
   }
+  unmountSettingsDrawer();
   mounted = null;
 }
 

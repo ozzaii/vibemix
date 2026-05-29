@@ -19,21 +19,21 @@
     <link rel="stylesheet" href="/src/tokens.css" />
   </head>
   <body>
-    <div id="wizard-app" class="wizard-app">
-      <header class="titlebar" data-tauri-drag-region>
+    <div id="wizard-app" class="wizard-app" data-wire="session.shell">
+      <header class="titlebar" data-tauri-drag-region data-wire="session.titlebar">
         <div class="traffic-spacer" aria-hidden="true" data-tauri-drag-region></div>
         <div class="wordmark" data-tauri-drag-region>vibemix</div>
         <div class="clock" id="wizard-clock" aria-hidden="true" data-tauri-drag-region>00:00</div>
       </header>
-      <main class="wizard-content">
-        <div id="wizard-step-strip"></div>
+      <main class="wizard-content" data-wire="session.content">
+        <div id="wizard-step-strip" data-wire="wizard.step-strip"></div>
         <div class="wizard-grid">
-          <section id="wizard-primary" class="primary-panel-mount"></section>
+          <section id="wizard-primary" class="primary-panel-mount" data-wire="session.primary"></section>
         </div>
-        <div id="wizard-cta-row" class="cta-row"></div>
+        <div id="wizard-cta-row" class="cta-row" data-wire="wizard.cta"></div>
       </main>
-      <footer id="status-bar" class="status-bar"></footer>
-      <div id="crash-banner" hidden>
+      <footer id="status-bar" class="status-bar" data-wire="session.status"></footer>
+      <div id="crash-banner" data-wire="session.crash-banner" hidden>
         <span class="icon" aria-hidden="true">⚠</span>
         <div class="crash-text">
           <div class="heading">VIBEMIX-CORE STOPPED</div>

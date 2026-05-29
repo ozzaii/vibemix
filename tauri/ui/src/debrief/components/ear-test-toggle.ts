@@ -52,10 +52,15 @@ export interface EarTestMountPayload {
 }
 
 // Tauri IPC shim · keeps the file importable in dev/test without the
-// Tauri runtime.
+// Tauri runtime. Tauri 2 injects __TAURI_INTERNALS__ even when the
+// window.__TAURI__ global is disabled.
 interface TauriWindow {
+  __TAURI_INTERNALS__?: unknown;
   __TAURI__?: {
-    invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown>;
+    invoke?: (cmd: string, args: Record<string, unknown>) => Promise<unknown>;
+    core?: {
+      invoke?: (cmd: string, args: Record<string, unknown>) => Promise<unknown>;
+    };
   };
 }
 
@@ -265,9 +270,7 @@ async function handleSubmit(
 ): Promise<void> {
   // Prefer Tauri IPC when the runtime is present (the real desktop app
   // path). Fall back to the WS sink for dev / test contexts.
-  const tauri = (window as unknown as TauriWindow).__TAURI__;
-  if (tauri?.invoke) {
-    await tauri.invoke("write_ear_test_log", { payload: submission });
+  if (await submitViaTauri(submission)) {
     return;
   }
   if (options.wsSink) {
@@ -275,4 +278,22 @@ async function handleSubmit(
     return;
   }
   throw new Error("no submission channel · Tauri IPC and WS sink both absent");
+}
+
+async function submitViaTauri(submission: EarTestSubmission): Promise<boolean> {
+  const tauriWindow = window as unknown as TauriWindow;
+  if (tauriWindow.__TAURI_INTERNALS__) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("write_ear_test_log", { payload: submission });
+    return true;
+  }
+
+  const legacyInvoke =
+    tauriWindow.__TAURI__?.core?.invoke ?? tauriWindow.__TAURI__?.invoke;
+  if (legacyInvoke) {
+    await legacyInvoke("write_ear_test_log", { payload: submission });
+    return true;
+  }
+
+  return false;
 }

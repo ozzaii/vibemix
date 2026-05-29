@@ -11,7 +11,11 @@
 
 import { mountSessionLayout } from "./SessionLayout.js";
 import { startRenderLoop, stopRenderLoop } from "./render-loop.js";
-import { mountSettingsDrawer } from "../settings/SettingsDrawer.js";
+import {
+  mountSettingsDrawer,
+  openSettings,
+  unmountSettingsDrawer,
+} from "../settings/SettingsDrawer.js";
 import {
   setSessionState,
   appendTranscript,
@@ -179,6 +183,8 @@ function tick(): void {
  * Skips initSessionBridge() · pure-browser Vite dev has no Tauri runtime
  * to talk to. Instead, the local animator drives SessionState directly. */
 export async function routeSessionMock(rootEl?: HTMLElement): Promise<void> {
+  stopMock();
+
   const root =
     rootEl ??
     (document.getElementById("wizard-app") as HTMLElement | null) ??
@@ -196,7 +202,7 @@ export async function routeSessionMock(rootEl?: HTMLElement): Promise<void> {
   });
 
   // Mount layout + drawer.
-  const m = mountSessionLayout(root);
+  const m = mountSessionLayout(root, undefined, { onOpenSettings: openSettings });
   mountSettingsDrawer(document.body);
 
   // Seed a mid-set start so the dev demo's hero ELAPSED window reads
@@ -231,4 +237,5 @@ export function stopMock(): void {
     animatorHandle = null;
   }
   stopRenderLoop();
+  unmountSettingsDrawer();
 }

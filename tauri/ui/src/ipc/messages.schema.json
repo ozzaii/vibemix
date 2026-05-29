@@ -3438,7 +3438,19 @@
                     "properties": {
                       "completed": {"type": "boolean"},
                       "completed_at": {"type": ["string", "null"]},
-                      "strikes_used": {"type": "integer", "minimum": 0, "maximum": 3}
+                      "strikes_used": {"type": "integer", "minimum": 0, "maximum": 3},
+                      "practice_sources": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "hardware": {"type": "integer", "minimum": 0},
+                          "screen": {"type": "integer", "minimum": 0}
+                        }
+                      },
+                      "last_practice_source": {
+                        "type": ["string", "null"],
+                        "enum": ["hardware", "screen", null]
+                      }
                     }
                   }
                 },

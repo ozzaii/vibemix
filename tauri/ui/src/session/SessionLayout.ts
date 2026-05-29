@@ -18,11 +18,12 @@
  * "fault" (a dropped input — the offending status word lights red, the line
  * holds, the meter goes dead-flat).
  *
- * Mount once via `mountSessionLayout(root)`, then `renderSessionFrame(mounted,
- * next)` diffs + pokes textContent / CSS vars / data-attrs only — no rebuild on
- * the rAF hot path. Aliveness lives in the live meter (real RMS, smoothed) +
- * the type/receipt gesture; there is deliberately NO heartbeat dot and NO green
- * LEDs (status is silk-dim when fine, red only on a dropped input).
+ * Mount once via `mountSessionLayout(root, state, { onOpenSettings })`, then
+ * `renderSessionFrame(mounted, next)` diffs + pokes textContent / CSS vars /
+ * data-attrs only — no rebuild on the rAF hot path. Aliveness lives in the live
+ * meter (real RMS, smoothed) + the type/receipt gesture; there is deliberately
+ * NO heartbeat dot and NO green LEDs (status is silk-dim when fine, red only on
+ * a dropped input).
  *
  * The SessionState prop shape is the render-loop projection contract and is
  * UNCHANGED by this rebuild except optional action callbacks. Components are
@@ -158,6 +159,12 @@ export interface Mounted {
   lastNowTs: string | null;
   /** Chip click handler currently bound on the cite (re-bound on change). */
   citeChip: CitationChip | null;
+}
+
+export interface MountSessionLayoutOptions {
+  /** Router/mock entry point owns the settings drawer module. The layout only
+   *  receives the action so it stays a presentational surface. */
+  onOpenSettings?: () => void;
 }
 
 // Calm idle hero line shown in silent mode before the co-host's first reaction
@@ -670,13 +677,18 @@ registerStyle("vmx-session", LAYOUT_CSS);
 
 /** Build and mount the full live-session DOM tree. Returns a handle the
  *  renderer uses for hot updates. */
-export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState): Mounted {
+export function mountSessionLayout(
+  rootEl: HTMLElement,
+  initial?: SessionState,
+  options: MountSessionLayoutOptions = {},
+): Mounted {
   const state = initial ?? defaultState();
   let mountedHandle: Mounted | null = null;
 
   const root = document.createElement("div");
   root.className = "vmx-session";
   root.dataset.mode = "";
+  root.dataset.wire = "session.runtime";
 
   // Titlebar (reused) — gear opens the settings drawer.
   const titlebar = renderTitlebar({
@@ -684,10 +696,9 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
     rec: state.titlebar.rec,
     sys: state.titlebar.sys,
     clock: state.titlebar.clock,
-    onSettingsClick: () => {
-      void import("../settings/SettingsDrawer.js").then((m) => m.openSettings());
-    },
+    onSettingsClick: options.onOpenSettings,
   });
+  titlebar.dataset.wire = "session.titlebar";
   root.append(titlebar);
 
   // Phase 97 / ONBOARD-01 — mode picker bar between titlebar and stage.
@@ -696,6 +707,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   // so the picker survives state diffs without re-mounting.
   const modebar = document.createElement("div");
   modebar.className = "vmx-modebar";
+  modebar.dataset.wire = "session.mode-picker";
   const modePicker = renderModePicker({
     active: state.mode ?? "cohost",
     onChange: (m) => mountedHandle?.current.onModeChange?.(m),
@@ -707,8 +719,10 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   // Stage → the single deck.
   const stage = document.createElement("main");
   stage.className = "vmx-stage";
+  stage.dataset.wire = "session.stage";
   const deck = document.createElement("section");
   deck.className = "vmx-deck";
+  deck.dataset.wire = "session.primary";
   deck.tabIndex = 0;
   deck.setAttribute("aria-label", "co-host");
 
@@ -732,6 +746,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const vibeEngineBtn = document.createElement("button");
   vibeEngineBtn.type = "button";
   vibeEngineBtn.dataset.action = "vibe-engine";
+  vibeEngineBtn.dataset.wire = "session.vibe-engine";
   vibeEngineBtn.dataset.primary = "true";
   vibeEngineBtn.textContent = "vibe engine";
   vibeEngineBtn.setAttribute("aria-label", "open vibe engine");
@@ -772,6 +787,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   claim.className = "vmx-claim";
   const now = document.createElement("p");
   now.className = "vmx-now";
+  now.dataset.wire = "session.now-line";
   const receipt = document.createElement("div");
   receipt.className = "vmx-receipt";
   receipt.hidden = true;
@@ -781,6 +797,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const cite = document.createElement("button");
   cite.type = "button";
   cite.className = "vmx-cite";
+  cite.dataset.wire = "session.citation";
   receipt.append(rule, cite);
   claim.append(now, receipt);
   voice.append(ghost2, ghost1, claim);
@@ -795,6 +812,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const { wrap: keyWrap, value: key } = makeReadout("key", true);
   const fmeter = document.createElement("div");
   fmeter.className = "vmx-fmeter";
+  fmeter.dataset.wire = "session.meter";
   fmeter.setAttribute("aria-label", "master level");
   const meterFill = document.createElement("div");
   meterFill.className = "vmx-fmeter__fill";
@@ -810,6 +828,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   // --- status row
   const statusRow = document.createElement("footer");
   statusRow.className = "vmx-statusrow";
+  statusRow.dataset.wire = "session.status";
   const inputsEl = document.createElement("div");
   inputsEl.className = "vmx-statusrow__inputs";
   const inAudio = makeInput("audio");

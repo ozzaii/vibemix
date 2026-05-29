@@ -79,6 +79,13 @@ describe("pill waveform — PILL-03 contract", () => {
     expect(setWaveform(el, 99)).toBe(14);
   });
 
+  test("non-finite rms is treated as silence", () => {
+    const el = renderWaveform();
+    expect(setWaveform(el, Number.NaN)).toBe(0);
+    expect(el.dataset.litCount).toBe("0");
+    expect(setWaveform(el, Number.POSITIVE_INFINITY)).toBe(0);
+  });
+
   test("frontend-enforcement: zero hex literals in waveform CSS (token-only)", () => {
     expect(_CSS_FOR_TEST).not.toMatch(/#[0-9a-fA-F]{3,6}\b/);
   });

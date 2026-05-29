@@ -115,20 +115,16 @@ const CSS = `
     opacity: 0.6;
   }
   .vmx-statusbar__badge[data-state="ok"] { color: var(--silk-22); }
-  /* CONNECTING — amber dome, pulsing (mock .led + brandPulse cadence) */
+  /* CONNECTING — amber dome, solid (no pulse; one-amber-rule per panel) */
   .vmx-statusbar__badge[data-state="connecting"] .vmx-statusbar__led {
     background: var(--amber);
     box-shadow:
-      0 0 3px var(--amber),
-      0 0 6px rgba(255, 138, 61, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 0 2px var(--amber-65),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
       inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
-    animation: vmx-statusbar-pulse var(--motion-led-pulse) ease-in-out infinite;
+    opacity: 0.65;
   }
-  .vmx-statusbar__badge[data-state="connecting"] {
-    color: var(--amber);
-    text-shadow: 0 0 4px var(--amber-22);
-  }
+  .vmx-statusbar__badge[data-state="connecting"] { color: var(--amber-pale); }
   /* DOWN / DENIED — red dome */
   .vmx-statusbar__badge[data-state="down"] .vmx-statusbar__led,
   .vmx-statusbar__badge[data-state="denied"] .vmx-statusbar__led {
@@ -268,10 +264,6 @@ const CSS = `
       var(--glow-faint);
   }
   .vmx-statusbar__tooltip-btn:focus-visible { outline: none; }
-  @keyframes vmx-statusbar-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.45; }
-  }
 `;
 
 registerStyle("vmx-statusbar", CSS);

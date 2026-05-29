@@ -3,12 +3,8 @@
 //                    `role="button"` AND a non-empty `aria-label`. Pins the
 //                    a11y scaffolding the keyboard-nav + screen-reader tests
 //                    depend on.
-//
-// Phase 91 Plan 02 — RED-state. Parameterised over the 11 controller IDs;
-// each case skips until its SVG file lands (Plan 05 ships FLX4 + _generic
-// golden, Plan 06 ships the other 9). When all 11 SVGs are present, this
-// gate runs as 11 cases — each green when the SVG has every required ARIA
-// attribute on every interactive group.
+// Partial-build friendly: each case skips only when its SVG module is absent.
+// In this repo state, all 11 controller SVGs should run as live assertions.
 
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";

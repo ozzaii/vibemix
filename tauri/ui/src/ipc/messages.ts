@@ -986,6 +986,11 @@ export interface LearnProgressState {
           completed?: boolean;
           completed_at?: string | null;
           strikes_used?: number;
+          practice_sources?: {
+            hardware?: number;
+            screen?: number;
+          };
+          last_practice_source?: "hardware" | "screen" | null;
         };
       };
       course_2_unlocked?: boolean;

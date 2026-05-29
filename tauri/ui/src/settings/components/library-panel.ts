@@ -65,6 +65,7 @@ export async function renderLibraryPanel(
   ) as HTMLButtonElement;
   const status = root.querySelector(".vmx-library-status") as HTMLElement;
 
+  let disposed = false;
   const seenEventIds = new Set<number>();
   // Tauri Issue #14134 dedupe: cap to last N ids — Set iteration is
   // insertion-order so dropping `.values().next()` evicts the oldest.
@@ -83,17 +84,21 @@ export async function renderLibraryPanel(
   let unlistenDrop: (() => void) | null = null;
 
   function showProgress(): void {
+    if (disposed) return;
     progress.classList.remove("hidden");
     status.textContent = "";
   }
   function hideProgress(): void {
+    if (disposed) return;
     progress.classList.add("hidden");
   }
   function setStatus(text: string): void {
+    if (disposed) return;
     status.textContent = text;
   }
 
   async function beginImport(path: string): Promise<void> {
+    if (disposed) return;
     showProgress();
     fill.style.width = "0%";
     label.textContent = "Loading…";
@@ -109,6 +114,7 @@ export async function renderLibraryPanel(
       const unsub = await subscribeIpc<LibraryImportProgress>(
         "ipc.library.import_progress",
         (msg) => {
+          if (disposed) return;
           const p = msg.payload;
           const pct = p.total > 0 ? (p.done / p.total) * 100 : 0;
           fill.style.width = `${pct.toFixed(1)}%`;
@@ -132,15 +138,26 @@ export async function renderLibraryPanel(
           }
         },
       );
-      unsubProgress = unsub as unknown as () => void;
+      const disposeProgress = unsub as unknown as () => void;
+      if (disposed) {
+        try {
+          disposeProgress();
+        } catch {
+          /* ignore */
+        }
+      } else {
+        unsubProgress = disposeProgress;
+      }
     }
   }
 
   cancelBtn.addEventListener("click", () => {
+    if (disposed) return;
     void emitIpc("ipc.library.import_cancel", { schema_version: "1" });
   });
 
   pickBtn.addEventListener("click", () => {
+    if (disposed) return;
     // Drag-drop is the primary UX. A click-to-pick fallback requires
     // tauri-plugin-dialog which isn't bundled in v1 — show a prompt to
     // drag instead. (Phase 28.x can add the plugin if Kaan wants
@@ -154,6 +171,7 @@ export async function renderLibraryPanel(
     const { getCurrentWebview } = await import("@tauri-apps/api/webview");
     const webview = getCurrentWebview();
     const off = await webview.onDragDropEvent((event) => {
+      if (disposed) return;
       const payload = event.payload as
         | { type: "enter" | "over"; paths: string[] }
         | { type: "leave" }
@@ -182,7 +200,16 @@ export async function renderLibraryPanel(
         }
       }
     });
-    unlistenDrop = off as unknown as () => void;
+    const disposeDrop = off as unknown as () => void;
+    if (disposed) {
+      try {
+        disposeDrop();
+      } catch {
+        /* ignore */
+      }
+    } else {
+      unlistenDrop = disposeDrop;
+    }
   } catch (err) {
     // Tauri webview API unavailable (jsdom test env) — drop wiring skipped.
   }
@@ -190,6 +217,7 @@ export async function renderLibraryPanel(
   return {
     element: root,
     dispose(): void {
+      disposed = true;
       try {
         unlistenDrop?.();
       } catch {

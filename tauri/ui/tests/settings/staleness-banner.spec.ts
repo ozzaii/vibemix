@@ -10,13 +10,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const subscribers = new Map<string, (msg: unknown) => void>();
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
+type SubscribeImpl = (
+  type: string,
+  cb: (msg: unknown) => void,
+) => Promise<() => void>;
+let subscribeImpl: SubscribeImpl = async (type, cb) => {
+  subscribers.set(type, cb);
+  return () => subscribers.delete(type);
+};
 
 vi.mock("../../src/ipc/client.js", () => ({
-  subscribeIpc: vi.fn(
-    async (type: string, cb: (msg: unknown) => void) => {
-      subscribers.set(type, cb);
-      return () => subscribers.delete(type);
-    },
+  subscribeIpc: vi.fn((type: string, cb: (msg: unknown) => void) =>
+    subscribeImpl(type, cb),
   ),
   emitIpc: vi.fn(async (type: string, payload: Record<string, unknown>) => {
     emitted.push({ type, payload });
@@ -28,6 +33,10 @@ import { renderStalenessBanner } from "../../src/settings/components/staleness-b
 beforeEach(() => {
   subscribers.clear();
   emitted.length = 0;
+  subscribeImpl = async (type, cb) => {
+    subscribers.set(type, cb);
+    return () => subscribers.delete(type);
+  };
   document.body.replaceChildren();
 });
 
@@ -139,5 +148,58 @@ describe("staleness-banner — singular 'day' for age=1", () => {
 
     const ageEl = handle.element.querySelector(".vmx-staleness-age");
     expect(ageEl?.textContent).toBe("1 day");
+  });
+});
+
+describe("staleness-banner — dispose races", () => {
+  it("immediately unsubs when subscribe resolves after dispose", async () => {
+    let nudgeCb: ((msg: unknown) => void) | null = null;
+    let resolveSubscribe: ((fn: () => void) => void) | null = null;
+    let unlistenCalls = 0;
+    subscribeImpl = async (_type, cb) => {
+      nudgeCb = cb;
+      return await new Promise<() => void>((resolve) => {
+        resolveSubscribe = resolve;
+      });
+    };
+
+    const handle = renderStalenessBanner();
+    document.body.append(handle.element);
+    handle.dispose();
+
+    expect(nudgeCb).not.toBeNull();
+    const emitNudge = nudgeCb as unknown as (msg: unknown) => void;
+    emitNudge({
+      type: "ipc.library.staleness_nudge",
+      ts: "2026-05-15T12:00:00Z",
+      payload: { age_days: 99, snoozed_until_ts: null, schema_version: "1" },
+    });
+    expect(handle.element.classList.contains("hidden")).toBe(true);
+
+    expect(resolveSubscribe).not.toBeNull();
+    const finishSubscribe = resolveSubscribe as unknown as (fn: () => void) => void;
+    finishSubscribe(() => {
+      unlistenCalls += 1;
+    });
+    await _flushMicrotasks();
+
+    expect(unlistenCalls).toBe(1);
+  });
+
+  it("does not emit actions after dispose", () => {
+    const handle = renderStalenessBanner();
+    document.body.append(handle.element);
+    handle.dispose();
+
+    const dismissBtn = handle.element.querySelector(
+      ".vmx-staleness-dismiss",
+    ) as HTMLButtonElement;
+    const snoozeBtn = handle.element.querySelector(
+      ".vmx-staleness-snooze",
+    ) as HTMLButtonElement;
+    dismissBtn.click();
+    snoozeBtn.click();
+
+    expect(emitted).toEqual([]);
   });
 });

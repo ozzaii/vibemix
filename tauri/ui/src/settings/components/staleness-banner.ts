@@ -46,6 +46,9 @@ export function renderStalenessBanner(): StalenessBannerHandle {
     ".vmx-staleness-snooze",
   ) as HTMLButtonElement;
 
+  let disposed = false;
+  let unsub: (() => void) | null = null;
+
   const hide = (): void => {
     root.classList.add("hidden");
   };
@@ -55,6 +58,7 @@ export function renderStalenessBanner(): StalenessBannerHandle {
   };
 
   dismissBtn.addEventListener("click", () => {
+    if (disposed) return;
     void emitIpc("ipc.library.staleness_action", {
       action: "dismiss",
       schema_version: "1",
@@ -62,6 +66,7 @@ export function renderStalenessBanner(): StalenessBannerHandle {
     hide();
   });
   snoozeBtn.addEventListener("click", () => {
+    if (disposed) return;
     void emitIpc("ipc.library.staleness_action", {
       action: "snooze_7d",
       schema_version: "1",
@@ -69,19 +74,29 @@ export function renderStalenessBanner(): StalenessBannerHandle {
     hide();
   });
 
-  let unsub: (() => void) | null = null;
   void subscribeIpc<LibraryStalenessNudge>(
     "ipc.library.staleness_nudge",
     (msg) => {
+      if (disposed) return;
       show(msg.payload.age_days);
     },
   ).then((u) => {
-    unsub = u as unknown as () => void;
+    const disposeSubscription = u as unknown as () => void;
+    if (disposed) {
+      try {
+        disposeSubscription();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    unsub = disposeSubscription;
   });
 
   return {
     element: root,
     dispose(): void {
+      disposed = true;
       if (unsub) {
         try {
           unsub();

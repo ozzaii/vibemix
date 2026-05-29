@@ -17,7 +17,7 @@
 // photo-lift. Geometry viewBox-normalised to 1280×720 matching the
 // other 10 SVGs.
 
-export const GENERIC_CONTROLLER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-label="Generic DJ controller schematic" class="learn-controller-schematic">
+export const GENERIC_CONTROLLER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" class="learn-controller-schematic">
   <!-- Faceplate outline (decorative, dashed — "we don't know which model this is") -->
   <rect x="60" y="60" width="1160" height="600" rx="16" ry="16"
         stroke="currentColor" stroke-width="1.5" stroke-dasharray="8 6"

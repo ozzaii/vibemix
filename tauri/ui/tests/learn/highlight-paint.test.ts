@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // REQ-ID: RENDER-04 — `ipc.learn.highlight` → DOM paint latency ≤ 16 ms P95.
-//
-// Phase 92 Plan 05 — LIVE harness (flipped from Plan 92-02's RED-state
-// dynamic-import-gated stub). `applyHighlight` is now exported from
-// `controller-stage.ts`, so the previous `itLive() / it.skip` getter
-// pattern (which resolved at collect-time before `beforeAll` ran and
-// stayed skipped even when the export existed) is gone — a direct
-// static import gives both bodies a clean live run.
+// Live harness: `applyHighlight` is exported from `controller-stage.ts`, so a
+// direct static import gives these bodies a clean live run.
 //
 // Mirrors `tauri/ui/tests/learn/highlight-latency.test.ts` (P91) for the
 // jsdom + SVG-mount + 240-sample sweep contract; the difference is RENDER-04

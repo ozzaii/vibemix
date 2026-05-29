@@ -434,6 +434,7 @@
 }
 
 .vmx-debrief-tldr-player {
+  position: relative;
   min-height: 48px;
   display: grid;
   align-content: center;
@@ -441,6 +442,7 @@
   padding: var(--sp-3);
   border: 1px solid rgba(214, 207, 199, 0.065);
   border-radius: var(--rad-sm);
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent),
     rgba(0, 0, 0, 0.28);
@@ -449,10 +451,68 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.66);
 }
 
+.vmx-debrief-tldr-player::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.052), transparent),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(214, 207, 199, 0.026) 18px 19px);
+  opacity: 0.7;
+}
+
+.vmx-debrief-tldr-player > * {
+  position: relative;
+  z-index: 1;
+}
+
 .vmx-debrief-tldr-meta {
   margin: 0;
   font-size: 12px;
   color: var(--silk-40);
+}
+
+.vmx-debrief-tldr-hud {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.vmx-debrief-tldr-hud-cell {
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  align-content: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(214, 207, 199, 0.07);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+    rgba(0, 0, 0, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.62);
+}
+
+.vmx-debrief-tldr-hud-cell small {
+  color: var(--silk-40);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.vmx-debrief-tldr-hud-cell strong {
+  color: var(--silk);
+  font-family: var(--type-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vmx-debrief-tldr-mock-rail {
@@ -470,6 +530,12 @@
   border-radius: 1px;
   background: linear-gradient(180deg, rgba(255, 138, 61, 0.52), rgba(255, 138, 61, 0.12));
   box-shadow: 0 0 8px rgba(255, 138, 61, 0.12);
+}
+
+.vmx-debrief-tldr-note {
+  margin: 0;
+  color: var(--silk-40);
+  font-size: 12px;
 }
 
 .vmx-debrief-timeline-placeholder {
@@ -496,6 +562,88 @@
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-sm);
   overflow: hidden;
+}
+
+.vmx-debrief-signal-bed,
+.vmx-debrief-region-layer,
+.vmx-debrief-phase-rail,
+.vmx-debrief-timeline-readout {
+  position: absolute;
+  pointer-events: none;
+}
+
+.vmx-debrief-signal-bed {
+  inset: 22px 14px 52px;
+  display: grid;
+  grid-template-columns: repeat(96, minmax(1px, 1fr));
+  align-items: end;
+  gap: 2px;
+  opacity: 0.88;
+}
+
+.vmx-debrief-signal-bed span {
+  display: block;
+  height: var(--vmx-bar-h);
+  min-height: 8px;
+  border-radius: 1px 1px 0 0;
+  background:
+    linear-gradient(180deg, rgba(255, 138, 61, var(--vmx-bar-alpha)), rgba(214, 207, 199, 0.022)),
+    rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 10px rgba(255, 138, 61, 0.055);
+}
+
+.vmx-debrief-region-layer {
+  inset: 28px 14px 54px;
+  pointer-events: none;
+}
+
+.vmx-debrief-phase-rail {
+  left: 14px;
+  right: 14px;
+  bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--silk-22);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.vmx-debrief-timeline-readout {
+  right: 14px;
+  top: 14px;
+  display: flex;
+  gap: 6px;
+  max-width: min(520px, calc(100% - 28px));
+  justify-content: flex-end;
+  z-index: 4;
+}
+
+.vmx-debrief-timeline-readout span {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  max-width: 180px;
+  padding: 0 8px;
+  border: 1px solid rgba(214, 207, 199, 0.08);
+  border-radius: var(--rad-sm);
+  background: rgba(0, 0, 0, 0.46);
+  color: var(--silk-65);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.62);
+}
+
+.vmx-debrief-timeline-readout span:first-child {
+  color: var(--amber-pale);
+  border-color: var(--amber-22);
+  background: rgba(255, 138, 61, 0.055);
 }
 
 .vmx-debrief-waveform {
@@ -548,8 +696,8 @@
 
 .vmx-debrief-region {
   position: absolute;
-  top: 31%;
-  bottom: 23%;
+  top: var(--vmx-region-y, 42%);
+  height: var(--vmx-region-h, 26%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -572,6 +720,8 @@
    * amber box. 20/80: amber stays the ONLY accent — the glow is the
    * weakest amber-22 ring (matches the wizard hero CTA resting glow). */
   box-shadow: var(--glow-faint);
+  pointer-events: auto;
+  z-index: 2;
   transition: background var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out, box-shadow var(--motion-snap) ease-out;
 }
 
@@ -583,6 +733,16 @@
   border-color: var(--amber);
   box-shadow: var(--glow-soft);
   outline: none;
+}
+
+.vmx-debrief-region[data-active="true"] {
+  color: var(--amber-pale);
+  border-color: var(--amber);
+  background:
+    linear-gradient(180deg, rgba(255, 138, 61, 0.42), rgba(255, 138, 61, 0.18)),
+    rgba(0, 0, 0, 0.24);
+  box-shadow: var(--glow-soft);
+  z-index: 3;
 }
 
 /* P1-a uplift 1 — thin amber playhead. A 1px vertical amber rule that
@@ -1234,20 +1394,52 @@
   }
 
   .vmx-debrief-timeline {
-    grid-template-rows: auto minmax(250px, auto);
-    min-height: 300px;
+    grid-template-rows: auto minmax(310px, auto);
+    min-height: 360px;
   }
 
   .vmx-debrief-waveform {
-    min-height: 250px;
+    min-height: 310px;
+  }
+
+  .vmx-debrief-signal-bed {
+    inset: 30px 12px 48px;
+    gap: 1px;
+  }
+
+  .vmx-debrief-region-layer {
+    inset: 34px 12px 52px;
+  }
+
+  .vmx-debrief-timeline-readout {
+    left: 12px;
+    right: 12px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .vmx-debrief-timeline-readout span {
+    max-width: 100%;
+  }
+
+  .vmx-debrief-tldr-hud {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .vmx-debrief-region {
-    top: 31%;
-    bottom: 23%;
-    min-width: 26px;
+    min-width: 0;
     padding: 0 4px;
-    font-size: 10px;
+    color: transparent;
+    font-size: 0;
+  }
+
+  .vmx-debrief-region::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 138, 61, 0.74);
+    box-shadow: 0 0 10px rgba(255, 138, 61, 0.32);
   }
 
   .vmx-debrief-verdict {

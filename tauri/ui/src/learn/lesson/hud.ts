@@ -21,14 +21,13 @@
 // `ipc.learn.start_lesson { level: "replay" }`) is wired by
 // learn-window.ts; this component only renders the affordance.
 
+import { COURSE_REGISTRY, type CourseId } from "./curriculum-meta.js";
+
 /**
- * Display-name lookup for course chips. Course 0 (hello world) is the
- * P92 deliverable; courses 1-3 (anatomy / transitions / play-mode)
- * land in P94 / P95 / P96. Unknown course_ids fall back to a generic
- * `COURSE · <id>` rendering — keeps the surface forward-compatible
- * without coupling to fixture data.
+ * Legacy aliases and Course 0 labels that are outside the beginner chooser
+ * projection. Beginner course labels come from generated curriculum metadata.
  */
-const COURSE_DISPLAY: Readonly<Record<string, string>> = {
+const COURSE_DISPLAY_FALLBACKS: Readonly<Record<string, string>> = {
   course_0: "COURSE 0 · HELLO WORLD",
   course_1: "COURSE 1 · ANATOMY",
   course_2: "COURSE 2 · TRANSITIONS",
@@ -50,6 +49,8 @@ export interface LessonHudOpts {
 export interface LessonHudHandle extends HTMLDivElement {
   update(opts: Partial<LessonHudOpts>): void;
 }
+
+export const PENDING_DOT_TOOLTIP = "prerequisite lessons not yet complete.";
 
 /**
  * Build the lesson-HUD element. Returns the root `<div class="learn-hud">`
@@ -126,7 +127,9 @@ export function LessonHud(opts: LessonHudOpts): LessonHudHandle {
 }
 
 function courseDisplayFor(courseId: string): string {
-  const named = COURSE_DISPLAY[courseId];
+  const registryLabel = COURSE_REGISTRY[courseId as CourseId]?.hud_label;
+  if (registryLabel !== undefined) return registryLabel;
+  const named = COURSE_DISPLAY_FALLBACKS[courseId];
   if (named !== undefined) return named;
   return `COURSE · ${courseId.toUpperCase()}`;
 }
@@ -169,7 +172,25 @@ function renderDots(
     d.setAttribute("data-status", dot.status);
     d.setAttribute("data-lesson-id", dot.lesson_id);
     d.setAttribute("role", "listitem");
-    d.setAttribute("aria-label", `lesson ${dot.lesson_id}, ${dot.status}`);
+    d.setAttribute("aria-label", dotAriaLabel(dot));
+    if (dot.status === "current") {
+      d.setAttribute("aria-current", "step");
+    } else if (dot.status === "pending") {
+      d.setAttribute("aria-disabled", "true");
+      d.setAttribute("title", PENDING_DOT_TOOLTIP);
+    } else if (dot.status === "completed") {
+      d.setAttribute("title", "press to replay this lesson.");
+    }
     container.appendChild(d);
   }
+}
+
+function dotAriaLabel(dot: LessonHudProgressDot): string {
+  if (dot.status === "completed") {
+    return `lesson ${dot.lesson_id}, completed, press to replay`;
+  }
+  if (dot.status === "current") {
+    return `lesson ${dot.lesson_id}, current step`;
+  }
+  return `lesson ${dot.lesson_id}, pending, prerequisite lessons not yet complete`;
 }

@@ -21,6 +21,7 @@ import { DEV_FALLBACK, libraryBuildSet } from "./api.js";
 import type {
   BuildSetResult,
   LibraryChatResult,
+  LibraryLiveContext,
   LibraryModelInstallTarget,
   LibraryModelsResult,
   LibraryStats,
@@ -99,7 +100,13 @@ const buildMock = vi.fn<(brief: string, curve: string) => Promise<BuildSetResult
 const modelsMock =
   vi.fn<(install?: LibraryModelInstallTarget) => Promise<LibraryModelsResult>>();
 const chatMock =
-  vi.fn<(message: string, history: unknown[]) => Promise<LibraryChatResult>>();
+  vi.fn<
+    (
+      message: string,
+      history: unknown[],
+      liveContext?: LibraryLiveContext | null,
+    ) => Promise<LibraryChatResult>
+  >();
 const statsMock = vi.fn<() => Promise<LibraryStats>>();
 
 const STATS_READY: LibraryStats = {
@@ -244,6 +251,7 @@ const CHAT_OK: LibraryChatResult = {
   playlist: null,
   export_path: null,
   seen_track_ids: [],
+  move_grades: [],
   iterations: 1,
   stop_reason: "model_done",
 };
@@ -255,6 +263,7 @@ const CHAT_CODEX_MISSING: LibraryChatResult = {
   playlist: null,
   export_path: null,
   seen_track_ids: [],
+  move_grades: [],
   iterations: 0,
   stop_reason: "codex_not_installed",
 };
@@ -272,13 +281,23 @@ function doMockApi(): void {
       tracks: [],
       count: 0,
     })),
-    libraryChat: (message: string, history: unknown[]) => chatMock(message, history),
+    libraryChat: (
+      message: string,
+      history: unknown[],
+      liveContext?: LibraryLiveContext | null,
+    ) =>
+      liveContext === undefined
+        ? chatMock(message, history)
+        : chatMock(message, history, liveContext),
     libraryStats: () => statsMock(),
     libraryModels: (install?: LibraryModelInstallTarget) => modelsMock(install),
     libraryEmbedFolder: vi.fn(async () => false),
     onEmbedProgress: vi.fn(async () => () => {}),
     onEmbedDone: vi.fn(async () => () => {}),
     onModelProgress: vi.fn(async () => () => {}),
+    onLiveDeckContext: vi.fn(async () => () => {}),
+    onLiveMoveContext: vi.fn(async () => () => {}),
+    onViberTool: vi.fn(async () => () => {}),
     DEV_FALLBACK: { embedLog: [] },
   }));
 }
@@ -469,6 +488,32 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     );
     expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
       "codex login",
+    );
+  });
+
+  it("renders Viber clarification choices as an inline set-prep pause", async () => {
+    const clarification: BuildSetResult = {
+      name: "warehouse",
+      stop_reason: "clarification_needed",
+      rationale: "Which direction should I take this?",
+      question: "Which direction should I take this?",
+      choices: ["More hypnotic", "Brighter peak-time pressure"],
+      count: 0,
+      tracks: [],
+      export_path: null,
+    };
+    await runRealBuild(clarification);
+    const results = document.getElementById("vmx-lib-results") as HTMLElement;
+    const emptyEl = results.querySelector(".vmx-lib-clarification");
+    expect(emptyEl?.textContent).toContain("Viber needs one detail");
+    expect(emptyEl?.textContent).toContain("Which direction should I take this?");
+    expect(emptyEl?.textContent).toContain("Brighter peak-time pressure");
+    expect(emptyEl?.textContent).toContain(
+      "Add one choice to the brief and run set prep again.",
+    );
+    expect(document.querySelectorAll(".vmx-lib-row")).toHaveLength(0);
+    expect((document.getElementById("vmx-lib-export") as HTMLElement).style.display).toBe(
+      "none",
     );
   });
 

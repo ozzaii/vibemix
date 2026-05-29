@@ -65,12 +65,17 @@ function setClickThrough(value: boolean): void {
 }
 
 beforeEach(() => {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", {
+    value: {},
+    configurable: true,
+  });
   _resetSessionStateForTests();
   invokeMock.mockClear();
   document.body.replaceChildren();
 });
 
 afterEach(() => {
+  Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
   document.body.replaceChildren();
 });
 
@@ -319,6 +324,28 @@ describe("MascotGroup IPC wiring", () => {
     );
     expect(onSeg?.dataset.active).toBe("true");
     expect(offSeg?.dataset.active).toBe("false");
+  });
+
+  it("ignores malformed mascot window state without warning", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "read_mascot_window_state") return undefined;
+      return undefined;
+    });
+
+    const group = renderMascotGroup();
+    document.body.append(group);
+    await new Promise<void>((r) => setTimeout(r, 0));
+
+    const enableRocker = group.querySelector<HTMLElement>(
+      '.vmx-rocker[aria-label="enable mascot overlay"]',
+    );
+    expect(
+      enableRocker!.querySelector<HTMLElement>('.vmx-rocker__seg[data-id="off"]')
+        ?.dataset.active,
+    ).toBe("true");
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
 

@@ -8,11 +8,9 @@
  * fabricated "next track". Only ids the engine resolved in BOTH the vector store
  * AND the live library ever reach this renderer (Cardinal Invariant #2).
  *
- * 20/80 amber discipline (frontend-enforcement hard rule 2): the ONLY amber on
- * this card is the `↑` next-glyph — the single actionable signal "this is your
- * next move". Everything else is silk ink. Amber appears nowhere else on the
- * card. This is a deliberate reserved accent, the same role amber plays for the
- * resolved-key glyph on deck-chips.ts.
+ * 20/80 accent discipline: the ONLY amber on this card is the `↑` next-glyph,
+ * the single actionable signal "this is your next move". Earned move-grade
+ * data uses rose for the grade and gold only for the XP heat number.
  *
  * Cloned from deck-chips.ts: the same `registerStyle` once-per-scope injection,
  * the JetBrains-Mono tabular-nums data vocabulary via `var(--type-mono)` (never
@@ -23,6 +21,70 @@
  */
 
 import { registerStyle } from "../session/components/_style-registry.js";
+import {
+  PILL_MOVE_GRADE_VOCABULARY,
+  normalizePillMoveGradeSlug,
+  type MoveGradeSlug,
+} from "./move-grade-vocabulary.js";
+
+export type { MoveGradeSlug } from "./move-grade-vocabulary.js";
+
+export interface MoveGradeWire {
+  slug?: string;
+  label?: string;
+  xp?: number | null;
+  intensity?: number | null;
+  sentiment?: "negative" | "neutral" | "positive" | string;
+  reason?: string | null;
+  deserved?: boolean;
+  overdrive?: boolean;
+  confidence?: number | null;
+}
+
+export interface MoveGradeView {
+  slug: MoveGradeSlug;
+  label: string;
+  xp: number;
+  intensity: number;
+  reason: string;
+  deserved: boolean;
+  overdrive: boolean;
+}
+
+export interface MoveGradeProgressView {
+  streak: number;
+  totalXp: number;
+  lastXp: number;
+  earned: boolean;
+  heat: number;
+  level?: number;
+  levelXp?: number;
+  nextLevelXp?: number;
+  levelProgress?: number;
+  levelUp?: boolean;
+  levelsGained?: number;
+}
+
+export interface MoveGradeProgressWire {
+  streak?: number | null;
+  total_xp?: number | null;
+  totalXp?: number | null;
+  last_xp?: number | null;
+  lastXp?: number | null;
+  earned?: boolean | null;
+  heat?: number | null;
+  level?: number | null;
+  level_xp?: number | null;
+  levelXp?: number | null;
+  next_level_xp?: number | null;
+  nextLevelXp?: number | null;
+  level_progress?: number | null;
+  levelProgress?: number | null;
+  level_up?: boolean | null;
+  levelUp?: boolean | null;
+  levels_gained?: number | null;
+  levelsGained?: number | null;
+}
 
 export interface NextSuggestionTransitionWire {
   candidate_id?: string;
@@ -58,6 +120,7 @@ export interface NextSuggestionTransitionWire {
   source_anchor_s?: number | null;
   risk_flags?: string[];
   reasons?: string[];
+  move_grade?: MoveGradeWire | null;
 }
 
 export interface NextSuggestionDecisionWire {
@@ -93,10 +156,20 @@ export interface NextSuggestionAlternativeWire {
 export type NextSuggestionFeedbackKind = "accept" | "not_now" | "wrong_timing";
 
 export interface NextSuggestionRenderOptions {
+  density?: "full" | "peek";
   showAlternatives?: boolean;
+  showFeedback?: boolean;
   maxAlternatives?: number;
+  gradeProgress?: MoveGradeProgressView | null;
   onAlternativeSelect?: (alt: NextAlternativeView) => void;
+  onPrimaryAction?: () => void;
   onFeedback?: (kind: NextSuggestionFeedbackKind) => void;
+}
+
+export interface NextSuggestionFeedbackControl {
+  kind: NextSuggestionFeedbackKind;
+  text: string;
+  ariaLabel: string;
 }
 
 /** The `next_suggestion` wire payload — mirrors
@@ -113,6 +186,7 @@ export interface NextSuggestionWire {
   transition?: NextSuggestionTransitionWire | null;
   decision?: NextSuggestionDecisionWire | null;
   transition_alternatives?: NextSuggestionAlternativeWire[];
+  grade_progress?: MoveGradeProgressWire | null;
 }
 
 const CSS = `
@@ -157,6 +231,24 @@ const CSS = `
     color: var(--amber);
     font-variant-numeric: tabular-nums;
   }
+  .vmx-next-card__peek-action {
+    margin-left: auto;
+    padding: 1px 5px 0;
+    border: 1px solid var(--brand-22);
+    border-radius: 999px;
+    background: var(--brand-08);
+    color: var(--brand-glow);
+    font-size: 8px;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: inset 0 1px 0 var(--lg-spec-mid);
+  }
+  .vmx-next-card__peek-action[data-care="true"] {
+    border-color: var(--led-warn);
+    background: var(--glass-2);
+    color: var(--led-warn);
+  }
   /* The track title — the brightest silk ink on the card (hierarchy via tone +
    * size, NOT a second accent color). Truncates rather than wrapping the pill. */
   .vmx-next-card__title {
@@ -188,17 +280,157 @@ const CSS = `
     position: relative;
     width: fit-content;
     max-width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 0;
+    row-gap: 2px;
     padding-top: 1px;
     font-family: var(--type-mono);
     font-variant-numeric: tabular-nums;
     font-size: 10px;
     letter-spacing: 0.04em;
-    line-height: 1.2;
+    line-height: 1.25;
     color: var(--silk-65);
-    text-transform: lowercase;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+  .vmx-next-card__transition-bit {
+    white-space: nowrap;
+  }
+  .vmx-next-card__cue-rail {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 2px;
+    margin-top: 1px;
+    border-radius: 999px;
+    background: var(--glass-2);
+    overflow: hidden;
+  }
+  .vmx-next-card__cue-rail::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--brand), var(--gold));
+    opacity: 0.72;
+    transform: scaleX(var(--cue-rail-scale, 0));
+    transform-origin: left center;
+  }
+  .vmx-next-card__grade {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--sp-1);
+    min-width: 0;
+    padding-top: 1px;
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 9px;
+    line-height: 1.1;
+    text-transform: uppercase;
+    padding-bottom: 3px;
+  }
+  .vmx-next-card__grade::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--brand), var(--gold));
+    transform: scaleX(var(--grade-heat-scale, 0));
+    transform-origin: left center;
+    opacity: 0.64;
+  }
+  .vmx-next-card__grade-label {
+    position: relative;
+    color: var(--brand);
+    font-weight: 600;
+  }
+  .vmx-next-card__grade-xp {
+    position: relative;
+    color: var(--gold);
+  }
+  .vmx-next-card__grade-reason {
+    position: relative;
+    min-width: 0;
+    color: var(--silk-40);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .vmx-next-card[data-move-grade="negative"] .vmx-next-card__grade-label {
+    color: var(--led-fault);
+  }
+  .vmx-next-card[data-move-grade="negative"] .vmx-next-card__grade::after {
+    background: var(--led-fault);
+  }
+  .vmx-next-card[data-move-grade="mid"] .vmx-next-card__grade-label {
+    color: var(--silk-65);
+  }
+  .vmx-next-card[data-move-grade="clean"] .vmx-next-card__grade-label,
+  .vmx-next-card[data-move-grade="sexy"] .vmx-next-card__grade-label {
+    color: var(--brand);
+  }
+  .vmx-next-card[data-move-grade="bomb"] .vmx-next-card__grade-label,
+  .vmx-next-card[data-move-grade="lit_aff"] .vmx-next-card__grade-label {
+    color: var(--brand);
+  }
+  .vmx-next-card[data-grade-overdrive="true"] {
+    border-color: var(--brand-40);
+    box-shadow:
+      inset 0 1px 0 var(--lg-spec-mid),
+      inset 0 -1px 0 var(--lg-rim-void),
+      0 0 14px var(--brand-22);
+  }
+  .vmx-next-card[data-grade-level-up="true"] .vmx-next-card__combo-level {
+    color: var(--gold);
+    text-shadow: 0 0 10px var(--gold-glow);
+  }
+  .vmx-next-card__combo {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto auto minmax(28px, 1fr);
+    align-items: center;
+    gap: var(--sp-1);
+    min-width: 0;
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 9px;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--silk-40);
+  }
+  .vmx-next-card__combo-label {
+    color: var(--brand);
+  }
+  .vmx-next-card__combo-xp {
+    color: var(--gold);
+  }
+  .vmx-next-card__combo-level {
+    color: var(--silk-65);
+  }
+  .vmx-next-card__combo-rail {
+    position: relative;
+    min-width: 0;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--glass-2);
+    overflow: hidden;
+  }
+  .vmx-next-card__combo-rail::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--brand), var(--gold));
+    transform: scaleX(var(--combo-level-scale, var(--combo-heat-scale, 0)));
+    transform-origin: left center;
   }
   .vmx-next-card__alternatives {
     position: relative;
@@ -267,6 +499,32 @@ const CSS = `
   .vmx-next-card__feedback-btn:hover {
     background: var(--glass-2);
     color: var(--silk-65);
+  }
+  .vmx-next-card__feedback-btn[aria-pressed="true"],
+  .pill[data-feedback="accept"] .vmx-next-card__feedback-btn[data-feedback-kind="accept"],
+  .pill[data-feedback="not_now"] .vmx-next-card__feedback-btn[data-feedback-kind="not_now"],
+  .pill[data-feedback="wrong_timing"] .vmx-next-card__feedback-btn[data-feedback-kind="wrong_timing"] {
+    background: var(--brand-08);
+    border-color: var(--brand-40);
+    color: var(--brand);
+    box-shadow:
+      inset 0 1px 0 var(--lg-spec-mid),
+      0 0 10px var(--brand-22);
+  }
+  .vmx-next-card__feedback-btn[data-feedback-kind="not_now"][aria-pressed="true"],
+  .pill[data-feedback="not_now"] .vmx-next-card__feedback-btn[data-feedback-kind="not_now"] {
+    background: var(--glass-2);
+    border-color: var(--glass-edge-up);
+    color: var(--silk);
+    box-shadow: inset 0 1px 0 var(--lg-spec-mid);
+  }
+  .vmx-next-card__feedback-btn[data-feedback-kind="wrong_timing"][aria-pressed="true"],
+  .pill[data-feedback="wrong_timing"] .vmx-next-card__feedback-btn[data-feedback-kind="wrong_timing"] {
+    border-color: var(--led-warn);
+    color: var(--led-warn);
+    box-shadow:
+      inset 0 1px 0 var(--lg-spec-mid),
+      0 0 10px var(--glass-edge-up);
   }
   .vmx-next-card__feedback-btn:focus-visible {
     outline: 1px solid var(--silk-40);
@@ -368,6 +626,210 @@ export function nextDecisionText(
   return cleanDecisionText(d.spoken_text);
 }
 
+function nextPeekActionText(
+  d: NextSuggestionDecisionWire | null | undefined,
+  t: NextSuggestionTransitionWire | null | undefined,
+): string {
+  const bits: string[] = [];
+  const targetDeck = deckLabel(t?.target_deck);
+  if (targetDeck) bits.push(`load ${targetDeck}`);
+
+  const timing = cleanDecisionText(d?.timing_text);
+  if (timing) bits.push(timing);
+  else if (typeof t?.start_in_bars === "number" && Number.isFinite(t.start_in_bars)) {
+    const bars = Math.max(0, Math.round(t.start_in_bars));
+    bits.push(bars === 0 ? "now" : `in ${bars} ${bars === 1 ? "bar" : "bars"}`);
+  } else {
+    const posture = timingPostureText(t);
+    if (posture) bits.push(posture);
+  }
+
+  if (bits.length > 0) return bits.join(" · ");
+  return nextDecisionText(d, t) || nextTransitionText(t);
+}
+
+export function nextCueRailScale(t: NextSuggestionTransitionWire | null | undefined): number | null {
+  if (typeof t?.start_in_bars !== "number" || !Number.isFinite(t.start_in_bars)) return null;
+  const bars = Math.max(0, Math.round(t.start_in_bars));
+  if (bars <= 0) return 1;
+  const clampedBars = Math.min(16, bars);
+  return Math.max(0.08, Math.min(1, (17 - clampedBars) / 16));
+}
+
+export function nextSuggestionAriaLabel(
+  s: NextSuggestionWire,
+  options: Pick<NextSuggestionRenderOptions, "density" | "gradeProgress"> = {},
+): string {
+  const density = options.density ?? "full";
+  const isPeek = density === "peek";
+  const actionText = isPeek
+    ? nextPeekActionText(s.decision, s.transition)
+    : nextDecisionText(s.decision, s.transition) || nextTransitionText(s.transition);
+  const grade = nextMoveGrade(s);
+  const gradeProgress = grade ? nextMoveGradeProgress(s, options.gradeProgress ?? null) : null;
+  const parts = [`next: ${cleanDecisionText(s.title)}`];
+  if (!isPeek) {
+    const meta = nextMetaText(s);
+    if (meta) parts.push(meta);
+  }
+  if (actionText) parts.push(`action: ${actionText}`);
+  if (grade) {
+    parts.push(
+      grade.deserved
+        ? `grade: ${grade.label}, ${grade.xp} xp, ${grade.reason}`
+        : `care: ${grade.reason}`,
+    );
+  }
+  if (!isPeek && gradeProgress?.earned) {
+    parts.push(
+      `session: ${gradeProgress.totalXp} xp, combo ${Math.max(1, gradeProgress.streak)}`,
+    );
+  }
+  return parts.join(". ");
+}
+
+export function nextSuggestionPrimaryActionAriaLabel(
+  s: NextSuggestionWire,
+  options: Pick<NextSuggestionRenderOptions, "density" | "gradeProgress"> = {},
+): string {
+  const base = nextSuggestionAriaLabel(s, options);
+  const grade = nextMoveGrade(s);
+  const intent = nextSuggestionPrimaryActionText(grade) === "care"
+    ? "activate to accept with care"
+    : "activate to keep suggestion";
+  return `${base}. ${intent}`;
+}
+
+export function nextSuggestionPrimaryActionText(grade: MoveGradeView | null): "care" | "keep" {
+  return grade !== null && !grade.deserved ? "care" : "keep";
+}
+
+export function nextMoveGrade(
+  s: NextSuggestionWire | null | undefined,
+): MoveGradeView | null {
+  if (!s) return null;
+  return moveGradeViewFromTransition(s.transition);
+}
+
+export function nextMoveGradeProgress(
+  s: NextSuggestionWire | null | undefined,
+  fallback: MoveGradeProgressView | null = null,
+): MoveGradeProgressView | null {
+  const raw = s?.grade_progress;
+  if (!raw || typeof raw !== "object") return fallback;
+  const streak = clampInt(raw.streak, 0, 999, fallback?.streak ?? 0);
+  const totalXp = clampInt(raw.total_xp ?? raw.totalXp, 0, 999_999, fallback?.totalXp ?? 0);
+  const lastXp = clampInt(raw.last_xp ?? raw.lastXp, 0, 999, fallback?.lastXp ?? 0);
+  const heat = clampInt(raw.heat, 0, 100, fallback?.heat ?? 0);
+  const earned = typeof raw.earned === "boolean" ? raw.earned : streak > 0 && lastXp > 0;
+  const derivedLevel = pillXpLevel(totalXp);
+  const nextLevelXp = clampInt(
+    raw.next_level_xp ?? raw.nextLevelXp,
+    1,
+    999_999,
+    fallback?.nextLevelXp ?? derivedLevel.nextLevelXp,
+  );
+  const levelXp = clampInt(
+    raw.level_xp ?? raw.levelXp,
+    0,
+    nextLevelXp,
+    fallback?.levelXp ?? Math.min(derivedLevel.levelXp, nextLevelXp),
+  );
+  const levelProgress = clampInt(
+    raw.level_progress ?? raw.levelProgress,
+    0,
+    100,
+    fallback?.levelProgress ?? Math.round((levelXp / nextLevelXp) * 100),
+  );
+  const levelUp =
+    typeof raw.level_up === "boolean"
+      ? raw.level_up
+      : typeof raw.levelUp === "boolean"
+        ? raw.levelUp
+        : false;
+  return {
+    streak,
+    totalXp,
+    lastXp,
+    earned,
+    heat,
+    level: clampInt(raw.level, 1, 999, fallback?.level ?? derivedLevel.level),
+    levelXp,
+    nextLevelXp,
+    levelProgress,
+    levelUp,
+    levelsGained: clampInt(
+      raw.levels_gained ?? raw.levelsGained,
+      0,
+      999,
+      levelUp ? 1 : 0,
+    ),
+  };
+}
+
+export function nextSuggestionFeedbackControls(
+  grade: MoveGradeView | null,
+): NextSuggestionFeedbackControl[] {
+  const primaryAction = nextSuggestionPrimaryActionText(grade);
+  return [
+    {
+      kind: "accept",
+      text: primaryAction,
+      ariaLabel:
+        primaryAction === "care" ? "mark suggestion accepted with care" : "mark suggestion accepted",
+    },
+    {
+      kind: "not_now",
+      text: "later",
+      ariaLabel: "mark suggestion not now",
+    },
+    {
+      kind: "wrong_timing",
+      text: "timing",
+      ariaLabel: "mark suggestion timing wrong",
+    },
+  ];
+}
+
+export const PILL_XP_LEVEL_STEP = 250;
+
+export function pillXpLevel(totalXp: number): Required<
+  Pick<MoveGradeProgressView, "level" | "levelXp" | "nextLevelXp" | "levelProgress">
+> {
+  const total = clampInt(totalXp, 0, 999_999, 0);
+  const level = Math.min(999, Math.floor(total / PILL_XP_LEVEL_STEP) + 1);
+  const levelXp = total % PILL_XP_LEVEL_STEP;
+  return {
+    level,
+    levelXp,
+    nextLevelXp: PILL_XP_LEVEL_STEP,
+    levelProgress: Math.round((levelXp / PILL_XP_LEVEL_STEP) * 100),
+  };
+}
+
+export function moveGradeViewFromTransition(
+  t: NextSuggestionTransitionWire | null | undefined,
+): MoveGradeView | null {
+  const raw = t?.move_grade;
+  if (!raw || typeof raw !== "object") return null;
+  const slug = normalizePillMoveGradeSlug(raw.slug);
+  if (!slug) return null;
+  const vocabulary = PILL_MOVE_GRADE_VOCABULARY[slug];
+  const intensity = clampInt(raw.intensity, 0, 100, vocabulary.intensity);
+  return {
+    slug,
+    label: moveGradeLabel(raw.label, slug),
+    xp: clampInt(raw.xp, 0, 999, vocabulary.xp),
+    intensity,
+    reason: cleanDecisionText(raw.reason) || vocabulary.reason,
+    deserved:
+      typeof raw.deserved === "boolean"
+        ? raw.deserved
+        : vocabulary.deserved,
+    overdrive: typeof raw.overdrive === "boolean" ? raw.overdrive : vocabulary.overdrive,
+  };
+}
+
 function timingPostureText(t: NextSuggestionTransitionWire | null | undefined): string {
   if (!t) return "";
   const sourceSelection = cleanDecisionText(t.source_selection).toLowerCase();
@@ -378,6 +840,17 @@ function timingPostureText(t: NextSuggestionTransitionWire | null | undefined): 
     return "loop held";
   }
   return "";
+}
+
+function moveGradeLabel(raw: string | undefined, slug: MoveGradeSlug): string {
+  const label = cleanDecisionText(raw).toUpperCase();
+  if (!label) return PILL_MOVE_GRADE_VOCABULARY[slug].label;
+  return label.slice(0, 12);
+}
+
+function clampInt(raw: unknown, min: number, max: number, fallback: number): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(raw)));
 }
 
 export interface NextAlternativeView {
@@ -426,6 +899,7 @@ export function nextSuggestionRenderKey(
   if (!s) return "";
   const t = s.transition;
   const d = s.decision;
+  const p = s.grade_progress;
   return [
     s.track_id,
     s.title,
@@ -449,6 +923,24 @@ export function nextSuggestionRenderKey(
     t?.source_selection ?? "",
     t?.cue_slot ?? "",
     t?.start_in_bars ?? "",
+    t?.move_grade?.slug ?? "",
+    t?.move_grade?.label ?? "",
+    t?.move_grade?.xp ?? "",
+    t?.move_grade?.intensity ?? "",
+    t?.move_grade?.reason ?? "",
+    t?.move_grade?.deserved ?? "",
+    t?.move_grade?.overdrive ?? "",
+    p?.streak ?? "",
+    p?.total_xp ?? p?.totalXp ?? "",
+    p?.last_xp ?? p?.lastXp ?? "",
+    p?.earned ?? "",
+    p?.heat ?? "",
+    p?.level ?? "",
+    p?.level_xp ?? p?.levelXp ?? "",
+    p?.next_level_xp ?? p?.nextLevelXp ?? "",
+    p?.level_progress ?? p?.levelProgress ?? "",
+    p?.level_up ?? p?.levelUp ?? "",
+    p?.levels_gained ?? p?.levelsGained ?? "",
     ...(t?.risk_flags ?? []),
     d?.emitted ?? "",
     d?.validation_status ?? "",
@@ -470,6 +962,11 @@ export function nextSuggestionRenderKey(
       alt?.transition?.to_start_s ?? "",
       alt?.transition?.cue_slot ?? "",
       alt?.transition?.start_in_bars ?? "",
+      alt?.transition?.move_grade?.slug ?? "",
+      alt?.transition?.move_grade?.label ?? "",
+      alt?.transition?.move_grade?.xp ?? "",
+      alt?.transition?.move_grade?.intensity ?? "",
+      alt?.transition?.move_grade?.reason ?? "",
     ]),
   ].join("|");
 }
@@ -550,34 +1047,184 @@ export function renderNextSuggestion(
 ): HTMLDivElement | null {
   if (!s || !s.track_id || !s.title) return null; // honest silence
 
+  const density = options.density ?? "full";
+  const isPeek = density === "peek";
   const root = document.createElement("div");
   root.className = "vmx-next-card";
-  root.setAttribute("aria-label", "next track suggestion");
+  root.dataset.density = density;
+  root.dataset.wire = "pill.next-card";
+  const moveGrade = nextMoveGrade(s);
+  const gradeProgress = moveGrade ? nextMoveGradeProgress(s, options.gradeProgress ?? null) : null;
+  const assistiveLabel = isPeek && options.onPrimaryAction
+    ? nextSuggestionPrimaryActionAriaLabel(s, { density, gradeProgress })
+    : nextSuggestionAriaLabel(s, { density, gradeProgress });
+  root.setAttribute("aria-label", assistiveLabel);
+  if (isPeek && options.onPrimaryAction) {
+    root.dataset.interactive = "true";
+    root.tabIndex = 0;
+    root.setAttribute("role", "button");
+    root.setAttribute("aria-keyshortcuts", "Enter Space");
+    root.addEventListener("click", (ev) => {
+      if ((ev.target as HTMLElement | null)?.closest("button")) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      options.onPrimaryAction?.();
+    });
+    root.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      ev.preventDefault();
+      options.onPrimaryAction?.();
+    });
+  } else if (isPeek) {
+    root.setAttribute("role", "status");
+    root.setAttribute("aria-live", "polite");
+  }
+  if (moveGrade) {
+    root.dataset.moveGrade = moveGrade.slug;
+    root.dataset.gradeDeserved = moveGrade.deserved ? "true" : "false";
+    root.dataset.gradeOverdrive = moveGrade.overdrive ? "true" : "false";
+    root.style.setProperty("--grade-heat-scale", (moveGrade.intensity / 100).toFixed(2));
+    if (gradeProgress) {
+      root.dataset.gradeLevelUp = gradeProgress.levelUp ? "true" : "false";
+      root.style.setProperty("--combo-heat-scale", (gradeProgress.heat / 100).toFixed(2));
+      root.style.setProperty(
+        "--combo-level-scale",
+        ((gradeProgress.levelProgress ?? pillXpLevel(gradeProgress.totalXp).levelProgress) / 100)
+          .toFixed(2),
+      );
+    }
+  }
 
   const label = document.createElement("div");
   label.className = "vmx-next-card__label";
   const glyph = document.createElement("span");
   glyph.className = "vmx-next-card__glyph";
+  glyph.setAttribute("aria-hidden", "true");
   glyph.textContent = "↑"; // ↑ — the single amber actionable accent
-  label.append(glyph, document.createTextNode("next"));
+  const labelText = document.createElement("span");
+  labelText.textContent = "next";
+  label.append(glyph, labelText);
+  if (isPeek && options.onPrimaryAction) {
+    const primaryAction = nextSuggestionPrimaryActionText(moveGrade);
+    const action = document.createElement("span");
+    action.className = "vmx-next-card__peek-action";
+    action.dataset.care = primaryAction === "care" ? "true" : "false";
+    action.setAttribute("aria-hidden", "true");
+    action.textContent = primaryAction.toUpperCase();
+    label.append(action);
+  }
   root.append(label);
 
   const title = document.createElement("div");
   title.className = "vmx-next-card__title";
   title.textContent = s.title; // verbatim text node — never markup
+  title.setAttribute("title", s.title);
   root.append(title);
 
-  const meta = document.createElement("div");
-  meta.className = "vmx-next-card__meta";
-  meta.textContent = nextMetaText(s);
-  root.append(meta);
+  if (!isPeek) {
+    const meta = document.createElement("div");
+    meta.className = "vmx-next-card__meta";
+    meta.textContent = nextMetaText(s);
+    root.append(meta);
+  }
 
-  const actionText = nextDecisionText(s.decision, s.transition) || nextTransitionText(s.transition);
+  const actionText = isPeek
+    ? nextPeekActionText(s.decision, s.transition)
+    : nextDecisionText(s.decision, s.transition) || nextTransitionText(s.transition);
   if (actionText) {
     const transition = document.createElement("div");
     transition.className = "vmx-next-card__transition";
-    transition.textContent = actionText;
+    transition.setAttribute("title", actionText);
+    const bits = actionText.split(" · ").filter(Boolean);
+    if (bits.length === 0) {
+      transition.textContent = actionText;
+    } else {
+      bits.forEach((bit, index) => {
+        const item = document.createElement("span");
+        item.className = "vmx-next-card__transition-bit";
+        item.textContent = index === 0 ? bit : ` · ${bit}`;
+        transition.append(item);
+      });
+    }
     root.append(transition);
+
+    if (isPeek) {
+      const cueScale = nextCueRailScale(s.transition);
+      if (cueScale !== null) {
+        const rail = document.createElement("span");
+        rail.className = "vmx-next-card__cue-rail";
+        rail.setAttribute("aria-hidden", "true");
+        rail.style.setProperty("--cue-rail-scale", cueScale.toFixed(2));
+        root.append(rail);
+      }
+    }
+  }
+
+  if (moveGrade) {
+    const grade = document.createElement("div");
+    grade.className = "vmx-next-card__grade";
+    grade.dataset.wire = "pill.next-grade";
+
+    if (isPeek) {
+      const label = document.createElement("span");
+      label.className = "vmx-next-card__grade-label";
+      label.textContent = moveGrade.label;
+      grade.append(label);
+
+      const xp = document.createElement("span");
+      xp.className = "vmx-next-card__grade-xp";
+      xp.textContent = moveGrade.xp > 0 ? `+${moveGrade.xp}xp` : "0xp";
+      grade.append(xp);
+
+      if (!moveGrade.deserved) {
+        const reason = document.createElement("span");
+        reason.className = "vmx-next-card__grade-reason";
+        reason.textContent = moveGrade.reason;
+        reason.setAttribute("title", moveGrade.reason);
+        grade.append(reason);
+      }
+      root.append(grade);
+    } else {
+      const label = document.createElement("span");
+      label.className = "vmx-next-card__grade-label";
+      label.textContent = moveGrade.label;
+
+      const xp = document.createElement("span");
+      xp.className = "vmx-next-card__grade-xp";
+      xp.textContent = moveGrade.xp > 0 ? `+${moveGrade.xp}xp` : "0xp";
+
+      const reason = document.createElement("span");
+      reason.className = "vmx-next-card__grade-reason";
+      reason.textContent = moveGrade.reason;
+      reason.setAttribute("title", moveGrade.reason);
+      grade.append(label, xp, reason);
+      root.append(grade);
+    }
+  }
+
+  if (moveGrade && gradeProgress && gradeProgress.earned && !isPeek) {
+    const combo = document.createElement("div");
+    combo.className = "vmx-next-card__combo";
+    combo.dataset.wire = "pill.next-combo";
+
+    const label = document.createElement("span");
+    label.className = "vmx-next-card__combo-label";
+    label.textContent = `combo x${Math.max(1, gradeProgress.streak)}`;
+
+    const xp = document.createElement("span");
+    xp.className = "vmx-next-card__combo-xp";
+    xp.textContent = `${gradeProgress.totalXp}xp`;
+
+    const level = document.createElement("span");
+    level.className = "vmx-next-card__combo-level";
+    level.textContent = `lv ${gradeProgress.level ?? pillXpLevel(gradeProgress.totalXp).level}`;
+
+    const rail = document.createElement("span");
+    rail.className = "vmx-next-card__combo-rail";
+    rail.setAttribute("aria-hidden", "true");
+
+    combo.append(label, xp, level, rail);
+    root.append(combo);
   }
 
   if (options.showAlternatives !== false) {
@@ -585,6 +1232,7 @@ export function renderNextSuggestion(
     if (alternatives.length > 0) {
       const group = document.createElement("div");
       group.className = "vmx-next-card__alternatives";
+      group.dataset.wire = "pill.next-backups";
       group.setAttribute("aria-label", "backup transition options");
 
       const altLabel = document.createElement("div");
@@ -619,23 +1267,28 @@ export function renderNextSuggestion(
     }
   }
 
-  if (options.showAlternatives !== false && options.onFeedback) {
+  const showFeedback = options.showFeedback ?? (isPeek ? false : options.showAlternatives !== false);
+  if (showFeedback && options.onFeedback) {
     const group = document.createElement("div");
     group.className = "vmx-next-card__feedback";
+    group.dataset.wire = "pill.next-feedback";
     group.setAttribute("aria-label", "suggestion feedback");
-    const controls: Array<[NextSuggestionFeedbackKind, string, string]> = [
-      ["accept", "keep", "mark suggestion accepted"],
-      ["not_now", "later", "mark suggestion not now"],
-      ["wrong_timing", "timing", "mark suggestion timing wrong"],
-    ];
-    for (const [kind, text, label] of controls) {
+    for (const { kind, text, ariaLabel } of nextSuggestionFeedbackControls(moveGrade)) {
       const button = document.createElement("button");
       button.className = "vmx-next-card__feedback-btn";
       button.type = "button";
+      button.dataset.feedbackKind = kind;
       button.textContent = text;
-      button.setAttribute("aria-label", label);
+      button.setAttribute("aria-label", ariaLabel);
+      button.setAttribute("aria-pressed", "false");
       button.setAttribute("data-no-drag", "");
-      button.addEventListener("click", () => options.onFeedback?.(kind));
+      button.addEventListener("click", () => {
+        group
+          .querySelectorAll<HTMLButtonElement>(".vmx-next-card__feedback-btn")
+          .forEach((control) => control.setAttribute("aria-pressed", "false"));
+        button.setAttribute("aria-pressed", "true");
+        options.onFeedback?.(kind);
+      });
       group.append(button);
     }
     root.append(group);

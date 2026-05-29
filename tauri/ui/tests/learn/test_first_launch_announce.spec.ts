@@ -2,20 +2,20 @@
 //
 // REQ-ID: ONBOARD-02 — First-launch tutor announce-by-name.
 //
-// Pins the verbatim greeting "I see your <controller name> — let's go." on
+// Pins the verbatim greeting "I see your <controller name>. Let's go." on
 // the FIRST controller-connect event of an app run, then a fall-back to
 // the standard "<name> connected." text on subsequent reconnects. The
 // greeting carries the SECOND permitted "let's go." exception in the
 // v9.0 slop blocklist (the first was L1.01's iconic closer).
 //
-// Test surface is the aria-live region (#learn-sr-announcement) — same
+// Test surface is the aria-live region (#learn-sr-announcement), same
 // surface RENDER-03 verifies.
 
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
 import { mountLearnWindow } from "../../src/learn/learn-window";
 
-// LearnWsClient auto-connects in mountLearnWindow(); stub WebSocket to
-// keep the test hermetic. Mirrors test_controller_detected_mounts_svg.test.ts.
+// LearnWsClient uses the direct ws fallback in plain jsdom; stub WebSocket
+// to keep the test hermetic. Mirrors test_controller_detected_mounts_svg.test.ts.
 const RealWebSocket = globalThis.WebSocket;
 class StubWebSocket {
   static readonly CONNECTING = 0;
@@ -68,24 +68,24 @@ describe("first-launch tutor announce-by-name (ONBOARD-02)", () => {
     document.body.innerHTML = `<div id="learn-root"></div>`;
   });
 
-  it("first connect emits the verbatim 'I see your <name> — let's go.' greeting", () => {
+  it("first connect emits the verbatim 'I see your <name>. Let's go.' greeting", () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     mountLearnWindow(root);
     fireControllerDetected(true, "Pioneer DDJ-FLX4");
     const sr = root.querySelector("#learn-sr-announcement") as HTMLElement;
     expect(sr).not.toBeNull();
-    // Exact verbatim — em-dash, lowercase "let's go.", trailing period.
-    expect(sr.textContent).toBe("I see your Pioneer DDJ-FLX4 — let's go.");
+    // Exact verbatim: plain sentence break, trailing period.
+    expect(sr.textContent).toBe("I see your Pioneer DDJ-FLX4. Let's go.");
   });
 
   it("subsequent reconnects fall back to '<name> connected.' (no re-greeting)", () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     mountLearnWindow(root);
-    // First connect — greeting fires.
+    // First connect: greeting fires.
     fireControllerDetected(true, "Pioneer DDJ-FLX4");
     const sr = root.querySelector("#learn-sr-announcement") as HTMLElement;
-    expect(sr.textContent).toBe("I see your Pioneer DDJ-FLX4 — let's go.");
-    // Simulate disconnect → reconnect.
+    expect(sr.textContent).toBe("I see your Pioneer DDJ-FLX4. Let's go.");
+    // Simulate disconnect, then reconnect.
     fireControllerDetected(false, "Pioneer DDJ-FLX4");
     expect(sr.textContent).toBe("controller disconnected.");
     // Second connect — NO greeting, just the standard text.
@@ -103,7 +103,7 @@ describe("first-launch tutor announce-by-name (ONBOARD-02)", () => {
     );
     const sr = root.querySelector("#learn-sr-announcement") as HTMLElement;
     expect(sr.textContent).toBe(
-      "I see your Hercules DJControl Inpulse 300 MK2 — let's go.",
+      "I see your Hercules DJControl Inpulse 300 MK2. Let's go.",
     );
   });
 
@@ -123,7 +123,7 @@ describe("first-launch tutor announce-by-name (ONBOARD-02)", () => {
     fireControllerDetected(true, "Pioneer DDJ-FLX4");
     fireControllerDetected(true, "Pioneer DDJ-FLX4");
     const sr = root.querySelector("#learn-sr-announcement") as HTMLElement;
-    // The SECOND event overwrites to the standard text since the greeting
+    // The second event overwrites to the standard text since the greeting
     // has already been used this run.
     expect(sr.textContent).toBe("Pioneer DDJ-FLX4 connected.");
   });

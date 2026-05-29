@@ -59,6 +59,7 @@ export function LessonSkipButton(opts: LessonSkipOpts): LessonSkipHandle {
   const btn = document.createElement("button") as LessonSkipHandle;
   btn.type = "button";
   btn.className = "learn-skip";
+  btn.dataset.action = "skip-lesson";
   // innerHTML is intentional — the markup is static (no payload-derived
   // text) so XSS surface is nil. textContent equivalent would require
   // 3 separate element appends; the markup is plainer this way.
@@ -70,6 +71,7 @@ export function LessonSkipButton(opts: LessonSkipOpts): LessonSkipHandle {
   // handler share one source of truth.
   let unlocked = false;
   let timerId: ReturnType<typeof setTimeout> | null = null;
+  let suppressNextKeyboardClick = false;
 
   const minDwellMs =
     opts.minDwellMs !== undefined ? opts.minDwellMs : DEFAULT_MIN_DWELL_MS;
@@ -91,6 +93,10 @@ export function LessonSkipButton(opts: LessonSkipOpts): LessonSkipHandle {
   // (the browser maps key activations through click), so no extra
   // keydown listener is needed.
   const onClick = (ev: Event) => {
+    if (suppressNextKeyboardClick) {
+      suppressNextKeyboardClick = false;
+      return;
+    }
     if (!unlocked) {
       ev.preventDefault();
       ev.stopPropagation();
@@ -98,7 +104,18 @@ export function LessonSkipButton(opts: LessonSkipOpts): LessonSkipHandle {
     }
     opts.onSkip();
   };
+  const onKeyDown = (ev: KeyboardEvent) => {
+    if (ev.key !== " " && ev.key !== "Enter") return;
+    ev.preventDefault();
+    if (!unlocked) {
+      ev.stopPropagation();
+      return;
+    }
+    suppressNextKeyboardClick = true;
+    opts.onSkip();
+  };
   btn.addEventListener("click", onClick);
+  btn.addEventListener("keydown", onKeyDown);
 
   btn.unlock = () => {
     unlocked = true;
@@ -129,6 +146,8 @@ export function LessonSkipButton(opts: LessonSkipOpts): LessonSkipHandle {
       clearTimeout(timerId);
       timerId = null;
     }
+    btn.removeEventListener("click", onClick);
+    btn.removeEventListener("keydown", onKeyDown);
   };
 
   // Start lockout immediately on creation.

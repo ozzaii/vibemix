@@ -27,6 +27,7 @@ import {
 } from "./components/bravoh-waitlist-toggle.js";
 import { showErrorBanner } from "./components/error-banner.js";
 import { DebriefWsClient } from "./ws-client.js";
+import { parseDebriefBootUrl } from "./url-state.js";
 
 // Type-only re-export so external callers can reference the submission
 // shape via the debrief-window module surface (mirrors the
@@ -37,16 +38,8 @@ export type { EarTestSubmission };
 // Bootstrap
 // ---------------------------------------------------------------------------
 
-const params = new URLSearchParams(location.search);
-const rawSessionDir = params.get("session") ?? "";
-const isMockMode =
-  params.get("mock") === "1" ||
-  params.get("mock") === "true" ||
-  rawSessionDir === "mock";
-const sessionDir = isMockMode
-  ? "/tmp/vibemix-demo-session"
-  : decodeURIComponent(rawSessionDir);
-const sessionId = isMockMode ? "demo-session" : sessionDir.split("/").pop() ?? "session";
+const bootState = parseDebriefBootUrl(location.search);
+const { sessionDir, sessionId, isMockMode } = bootState;
 
 // Surface the session id in the titlebar.
 const titleEl = document.getElementById("vmx-debrief-session");
@@ -119,6 +112,7 @@ if (isMockMode) {
       end: c.end,
       label: c.label,
       citation_event_id: c.citation_event_id,
+      kind: c.kind,
     }));
     if (waveformEl && totalDurationS > 0) {
       mountTimelinePlaceholder(waveformEl, chapters, totalDurationS);
@@ -221,13 +215,8 @@ if (isMockMode) {
   // asynchronously over the ws bus, we delay the deep-link dispatch
   // until the FIRST chapter-list event has fired (so the timeline
   // exists in the DOM and can match the region).
-  const deepLinkEventId = params.get("deepLinkEventId");
-  const deepLinkTimestampS = params.get("deepLinkTimestampS");
-  if (deepLinkEventId && deepLinkTimestampS) {
-    const payload = {
-      eventId: decodeURIComponent(deepLinkEventId),
-      timestampS: Number(deepLinkTimestampS),
-    };
+  if (bootState.deepLink) {
+    const payload = bootState.deepLink;
     client.addEventListener("chapter-list", () => {
       // Fire on the next microtask so mountTimelinePlaceholder has had
       // a chance to attach its `vmx-debrief-deeplink` listener (same
@@ -300,6 +289,7 @@ function mountMockDebrief(): void {
         end: c.end,
         label: c.label,
         citation_event_id: c.citation_event_id,
+        kind: c.kind,
       })),
       totalDurationS,
     );
@@ -307,7 +297,7 @@ function mountMockDebrief(): void {
   if (tldrPanelEl) {
     renderVerdictLine(tldrPanelEl, buildVerdictText(chapters.length, totalDurationS));
   }
-  mountMockTldrPlayer();
+  mountMockTldrPlayer(totalDurationS, chapters.length);
   if (drillsEl) {
     mountDrillsPanel(drillsEl, [
       {
@@ -352,13 +342,30 @@ function mountMockDebrief(): void {
   }
 }
 
-function mountMockTldrPlayer(): void {
+function mountMockTldrPlayer(totalDurationS: number, regionCount: number): void {
   if (!tldrEl) return;
   tldrEl.textContent = "";
 
   const meta = document.createElement("p");
   meta.className = "vmx-debrief-tldr-meta";
-  meta.textContent = "74s recap queued";
+  meta.textContent = "74s recap queued · local render";
+
+  const hud = document.createElement("div");
+  hud.className = "vmx-debrief-tldr-hud";
+  for (const [label, value] of [
+    ["Regions", String(regionCount)],
+    ["Runtime", formatMockDuration(totalDurationS)],
+    ["Hash", "demo:7f4a"],
+  ] as const) {
+    const cell = document.createElement("span");
+    cell.className = "vmx-debrief-tldr-hud-cell";
+    const key = document.createElement("small");
+    key.textContent = label;
+    const readout = document.createElement("strong");
+    readout.textContent = value;
+    cell.append(key, readout);
+    hud.append(cell);
+  }
 
   const rail = document.createElement("div");
   rail.className = "vmx-debrief-tldr-mock-rail";
@@ -370,7 +377,16 @@ function mountMockTldrPlayer(): void {
     rail.append(tick);
   }
 
-  tldrEl.append(meta, rail);
+  const note = document.createElement("p");
+  note.className = "vmx-debrief-tldr-note";
+  note.textContent = "Fault line inspection armed.";
+
+  tldrEl.append(meta, hud, rail, note);
+}
+
+function formatMockDuration(totalS: number): string {
+  const minutes = Math.round(totalS / 60);
+  return `${minutes}m`;
 }
 
 // ---------------------------------------------------------------------------

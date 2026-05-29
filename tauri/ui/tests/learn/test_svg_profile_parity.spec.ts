@@ -9,7 +9,9 @@
 //   1. Forward: every `field` (+ optional `:deck`) in
 //      `src/vibemix/midi/profiles/<id>.json` has a matching
 //      `<g data-control-id>` in the SVG (skipped for `_generic`, which has
-//      no profile JSON — its parity is "labeled-zone text only").
+//      no profile JSON — its parity is "labeled-zone text only"). Relative
+//      jog CC movement is represented by the same platter hit-region as
+//      `jog_touch:<deck>`; the renderer maps `jog:<deck>` wire frames there.
 //   2. Reverse: every `<g data-control-id>` in the SVG resolves to a
 //      binding in the matching profile JSON.
 //
@@ -60,6 +62,10 @@ function profileControlIds(p: ProfileJSON): Set<string> {
     const field = binding.field ?? binding.kind;
     if (!field) return;
     const deck = binding.deck;
+    if (field === "jog" && deck) {
+      ids.add(`jog_touch:${deck}`);
+      return;
+    }
     ids.add(deck ? `${field}:${deck}` : field);
   };
   for (const c of Object.values(p.controls ?? {})) add(c);

@@ -24,11 +24,20 @@ import { describe, test, expect } from "vitest";
 import {
   nextDecisionText,
   nextAlternativeViews,
+  nextMoveGrade,
+  nextMoveGradeProgress,
+  pillXpLevel,
+  nextSuggestionFeedbackControls,
+  nextSuggestionAriaLabel,
+  nextSuggestionPrimaryActionAriaLabel,
+  nextSuggestionPrimaryActionText,
+  nextCueRailScale,
   nextSuggestionRenderKey,
   nextMetaText,
   nextTransitionText,
   renderNextSuggestion,
   _CSS_FOR_TEST,
+  type MoveGradeView,
   type NextSuggestionWire,
 } from "./next-suggestion.js";
 
@@ -55,6 +64,34 @@ describe("nextMetaText — artist · why (honest, drops empty artist)", () => {
   test("empty artist (folder track) → just the why, no dangling separator", () => {
     expect(nextMetaText({ artist: "", why: "similar vibe" })).toBe("similar vibe");
     expect(nextMetaText({ artist: "   ", why: "similar vibe" })).toBe("similar vibe");
+  });
+});
+
+describe("pillXpLevel — earned XP level readout", () => {
+  test("derives a bounded level from total transition XP", () => {
+    expect(pillXpLevel(0)).toEqual({
+      level: 1,
+      levelXp: 0,
+      nextLevelXp: 250,
+      levelProgress: 0,
+    });
+    expect(pillXpLevel(288)).toEqual({
+      level: 2,
+      levelXp: 38,
+      nextLevelXp: 250,
+      levelProgress: 15,
+    });
+  });
+});
+
+describe("nextCueRailScale — hover timing glance", () => {
+  test("maps structured bars into a bounded visual urgency rail", () => {
+    expect(nextCueRailScale(null)).toBeNull();
+    expect(nextCueRailScale({ start_in_bars: Number.NaN })).toBeNull();
+    expect(nextCueRailScale({ start_in_bars: 0 })).toBe(1);
+    expect(nextCueRailScale({ start_in_bars: 1 })).toBe(1);
+    expect(nextCueRailScale({ start_in_bars: 8 })).toBe(0.5625);
+    expect(nextCueRailScale({ start_in_bars: 24 })).toBe(0.08);
   });
 });
 
@@ -312,11 +349,35 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
   test("suggestion → a card with the `next ↑` label, title, and meta", () => {
     const card = renderNextSuggestion(_sugg())!;
     expect(card).not.toBeNull();
+    expect(card.dataset.wire).toBe("pill.next-card");
     expect(card.querySelector(".vmx-next-card__glyph")?.textContent).toBe("↑");
     expect(card.querySelector(".vmx-next-card__title")?.textContent).toBe("Strobe");
     expect(card.querySelector(".vmx-next-card__meta")?.textContent).toBe(
       "deadmau5 · similar vibe · 8a · 128",
     );
+  });
+
+  test("backup and feedback regions expose transfer anchors", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: { candidate_id: "tr_001" },
+        transition_alternatives: [
+          {
+            candidate_id: "tr_002",
+            rank: 2,
+            track_id: "t2",
+            title: "Backup Heat",
+            transition: { candidate_id: "tr_002", cue_slot: "B" },
+          },
+        ],
+      }),
+      {
+        onAlternativeSelect: () => {},
+        onFeedback: () => {},
+      },
+    )!;
+    expect(card.querySelector('[data-wire="pill.next-backups"]')).not.toBeNull();
+    expect(card.querySelector('[data-wire="pill.next-feedback"]')).not.toBeNull();
   });
 
   test("title is a TEXT node — no HTML injection from the wire (T-62-11 style)", () => {
@@ -356,6 +417,192 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     expect(card.querySelector(".vmx-next-card__transition")?.textContent).toBe(
       "load B · cue A · outro→intro · in 13 bars",
     );
+  });
+
+  test("action line renders no-break chunks for glanceable timing", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          from_role: "outro",
+          to_role: "intro",
+          cue_slot: "A",
+          start_in_bars: 8,
+        },
+      }),
+    )!;
+    const bits = Array.from(card.querySelectorAll(".vmx-next-card__transition-bit"));
+    expect(bits.map((bit) => bit.textContent)).toEqual([
+      "load B",
+      " · cue A",
+      " · outro→intro",
+      " · in 8 bars",
+    ]);
+  });
+
+  test("move grade renders as earned data, not markup", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          cue_slot: "A",
+          move_grade: {
+            slug: "lit_aff",
+            label: "LIT AFF",
+            xp: 100,
+            reason: "<img src=x>",
+            deserved: true,
+            overdrive: true,
+          },
+        },
+      }),
+    )!;
+    expect(card.dataset.moveGrade).toBe("lit_aff");
+    expect(card.dataset.gradeOverdrive).toBe("true");
+    expect(card.style.getPropertyValue("--grade-heat-scale")).toBe("1.00");
+    expect(card.querySelector('[data-wire="pill.next-grade"]')).not.toBeNull();
+    expect(card.querySelector(".vmx-next-card__grade-label")?.textContent).toBe("LIT AFF");
+    expect(card.querySelector(".vmx-next-card__grade-xp")?.textContent).toBe("+100xp");
+    expect(card.querySelector(".vmx-next-card__grade-reason")?.textContent).toBe(
+      "<img src=x>",
+    );
+    expect(card.querySelector(".vmx-next-card__grade-reason img")).toBeNull();
+  });
+
+  test("earned combo renders from supplied session progress only", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          cue_slot: "A",
+          move_grade: {
+            slug: "bomb",
+            label: "BOMB",
+            xp: 72,
+            intensity: 84,
+            reason: "big payoff",
+            deserved: true,
+          },
+        },
+      }),
+      {
+        gradeProgress: {
+          streak: 3,
+          totalXp: 188,
+          lastXp: 72,
+          earned: true,
+          heat: 84,
+        },
+      },
+    )!;
+
+    expect(card.style.getPropertyValue("--combo-heat-scale")).toBe("0.84");
+    expect(card.querySelector('[data-wire="pill.next-combo"]')).not.toBeNull();
+    expect(card.querySelector(".vmx-next-card__combo-label")?.textContent).toBe("combo x3");
+    expect(card.querySelector(".vmx-next-card__combo-xp")?.textContent).toBe("188xp");
+    expect(card.querySelector(".vmx-next-card__combo-level")?.textContent).toBe("lv 1");
+    expect(card.style.getPropertyValue("--combo-level-scale")).toBe("0.75");
+
+    const mid = renderNextSuggestion(
+      _sugg({
+        transition: {
+          move_grade: { slug: "mid", xp: 8, deserved: false },
+        },
+      }),
+      {
+        gradeProgress: {
+          streak: 0,
+          totalXp: 188,
+          lastXp: 0,
+          earned: false,
+          heat: 0,
+        },
+      },
+    )!;
+    expect(mid.querySelector('[data-wire="pill.next-combo"]')).toBeNull();
+  });
+
+  test("backend grade_progress wins over local fallback and supports snake_case", () => {
+    const suggestion = _sugg({
+      grade_progress: {
+        streak: 4,
+        total_xp: 288,
+        last_xp: 100,
+        earned: true,
+        heat: 100,
+        level_up: true,
+        levels_gained: 1,
+      },
+      transition: {
+        candidate_id: "tr_001",
+        cue_slot: "A",
+        move_grade: {
+          slug: "lit_aff",
+          label: "LIT AFF",
+          xp: 100,
+          intensity: 100,
+          reason: "everything clicks",
+          deserved: true,
+        },
+      },
+    });
+
+    expect(
+      nextMoveGradeProgress(suggestion, {
+        streak: 1,
+        totalXp: 28,
+        lastXp: 28,
+        earned: true,
+        heat: 48,
+      }),
+    ).toEqual({
+      streak: 4,
+      totalXp: 288,
+      lastXp: 100,
+      earned: true,
+      heat: 100,
+      level: 2,
+      levelXp: 38,
+      nextLevelXp: 250,
+      levelProgress: 15,
+      levelUp: true,
+      levelsGained: 1,
+    });
+
+    const card = renderNextSuggestion(suggestion, {
+      gradeProgress: {
+        streak: 1,
+        totalXp: 28,
+        lastXp: 28,
+        earned: true,
+        heat: 48,
+      },
+    })!;
+    expect(card.querySelector(".vmx-next-card__combo-label")?.textContent).toBe("combo x4");
+    expect(card.querySelector(".vmx-next-card__combo-xp")?.textContent).toBe("288xp");
+    expect(card.querySelector(".vmx-next-card__combo-level")?.textContent).toBe("lv 2");
+    expect(card.dataset.gradeLevelUp).toBe("true");
+    expect(card.style.getPropertyValue("--combo-heat-scale")).toBe("1.00");
+    expect(card.style.getPropertyValue("--combo-level-scale")).toBe("0.15");
+  });
+
+  test("nextMoveGrade ignores unknown grade slugs and normalises defaults", () => {
+    expect(nextMoveGrade(_sugg({ transition: { move_grade: { slug: "nope" } } }))).toBeNull();
+    expect(
+      nextMoveGrade(
+        _sugg({
+          transition: { move_grade: { slug: "clean", label: "", xp: Number.NaN } },
+        }),
+      ),
+    ).toMatchObject({ slug: "clean", label: "CLEAN", xp: 28, intensity: 48, deserved: true });
+    expect(
+      nextMoveGrade(
+        _sugg({
+          transition: { move_grade: { slug: "bomb", intensity: 84 } },
+        }),
+      ),
+    ).toMatchObject({ slug: "bomb", intensity: 84 });
   });
 
   test("accepted decision owns the action line over the raw transition countdown", () => {
@@ -499,14 +746,275 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     const buttons = Array.from(card.querySelectorAll(".vmx-next-card__feedback-btn"));
 
     expect(buttons.map((button) => button.textContent)).toEqual(["keep", "later", "timing"]);
+    expect(buttons.map((button) => (button as HTMLButtonElement).dataset.feedbackKind)).toEqual([
+      "accept",
+      "not_now",
+      "wrong_timing",
+    ]);
+    expect(buttons.map((button) => button.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "false",
+      "false",
+    ]);
     (buttons[1] as HTMLButtonElement).click();
     expect(feedback).toEqual(["not_now"]);
+    expect(buttons.map((button) => button.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "true",
+      "false",
+    ]);
 
     const peek = renderNextSuggestion(_sugg(), {
       showAlternatives: false,
       onFeedback: (kind) => feedback.push(kind),
     })!;
     expect(peek.querySelector(".vmx-next-card__feedback")).toBeNull();
+  });
+
+  test("feedback controls mark risky accepted moves as care", () => {
+    const negativeGrade: MoveGradeView = {
+      slug: "negative",
+      label: "NEG",
+      xp: 0,
+      intensity: 22,
+      reason: "key clash",
+      deserved: false,
+      overdrive: false,
+    };
+
+    expect(nextSuggestionFeedbackControls(null).map((control) => control.text)).toEqual([
+      "keep",
+      "later",
+      "timing",
+    ]);
+    expect(nextSuggestionFeedbackControls(negativeGrade)[0]).toMatchObject({
+      kind: "accept",
+      text: "care",
+      ariaLabel: "mark suggestion accepted with care",
+    });
+  });
+
+  test("primary action text mirrors the compact keep/care completion command", () => {
+    expect(nextSuggestionPrimaryActionText(null)).toBe("keep");
+    expect(
+      nextSuggestionPrimaryActionText({
+        slug: "negative",
+        label: "NEG",
+        xp: 0,
+        intensity: 22,
+        reason: "key clash",
+        deserved: false,
+        overdrive: false,
+      }),
+    ).toBe("care");
+  });
+
+  test("care feedback still sends the accept intent", () => {
+    const feedback: string[] = [];
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          move_grade: {
+            slug: "negative",
+            reason: "key clash",
+            deserved: false,
+          },
+        },
+      }),
+      { onFeedback: (kind) => feedback.push(kind) },
+    )!;
+    const buttons = Array.from(card.querySelectorAll(".vmx-next-card__feedback-btn"));
+
+    expect(buttons.map((button) => button.textContent)).toEqual(["care", "later", "timing"]);
+    expect((buttons[0] as HTMLButtonElement).dataset.feedbackKind).toBe("accept");
+    expect(buttons[0]?.getAttribute("aria-label")).toBe("mark suggestion accepted with care");
+    (buttons[0] as HTMLButtonElement).click();
+    expect(feedback).toEqual(["accept"]);
+  });
+
+  test("collapsed hover peek can opt into compact feedback without backups", () => {
+    const feedback: string[] = [];
+    const peek = renderNextSuggestion(
+      _sugg({
+        transition_alternatives: [
+          {
+            candidate_id: "tr_002",
+            rank: 2,
+            track_id: "t2",
+            title: "Backup Heat",
+            transition: { candidate_id: "tr_002", cue_slot: "B" },
+          },
+        ],
+      }),
+      {
+        showAlternatives: false,
+        showFeedback: true,
+        onFeedback: (kind) => feedback.push(kind),
+      },
+    )!;
+
+    expect(peek.querySelector(".vmx-next-card__alternatives")).toBeNull();
+    const buttons = Array.from(peek.querySelectorAll(".vmx-next-card__feedback-btn"));
+    expect(buttons.map((button) => button.textContent)).toEqual(["keep", "later", "timing"]);
+    (buttons[0] as HTMLButtonElement).click();
+    expect(feedback).toEqual(["accept"]);
+  });
+
+  test("collapsed hover peek can complete the suggestion without visible controls", () => {
+    const actions: string[] = [];
+    const peek = renderNextSuggestion(_sugg(), {
+      density: "peek",
+      showAlternatives: false,
+      showFeedback: false,
+      onPrimaryAction: () => actions.push("keep"),
+    })!;
+
+    expect(peek.dataset.interactive).toBe("true");
+    expect(peek.getAttribute("role")).toBe("button");
+    expect(peek.getAttribute("aria-label")).toBe(
+      "next: Strobe. activate to keep suggestion",
+    );
+    expect(peek.getAttribute("aria-keyshortcuts")).toBe("Enter Space");
+    expect(peek.tabIndex).toBe(0);
+    expect(peek.querySelector(".vmx-next-card__feedback")).toBeNull();
+    expect(peek.querySelector(".vmx-next-card__peek-action")?.textContent).toBe("KEEP");
+    expect(peek.querySelector(".vmx-next-card__peek-action")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+
+    peek.click();
+    peek.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    peek.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    expect(actions).toEqual(["keep", "keep", "keep"]);
+  });
+
+  test("collapsed hover primary action names care when the move is risky", () => {
+    const suggestion = _sugg({
+      transition: {
+        target_deck: "B",
+        start_in_bars: 4,
+        move_grade: {
+          slug: "negative",
+          label: "NEG",
+          xp: 0,
+          reason: "key clash",
+          deserved: false,
+        },
+      },
+    });
+    const expected = [
+      "next: Strobe",
+      "action: load B · in 4 bars",
+      "care: key clash",
+      "activate to accept with care",
+    ].join(". ");
+
+    expect(nextSuggestionPrimaryActionAriaLabel(suggestion, { density: "peek" })).toBe(
+      expected,
+    );
+    const peek = renderNextSuggestion(suggestion, {
+      density: "peek",
+      showAlternatives: false,
+      showFeedback: false,
+      onPrimaryAction: () => undefined,
+    })!;
+    expect(peek.dataset.interactive).toBe("true");
+    expect(peek.dataset.moveGrade).toBe("negative");
+    expect(peek.dataset.gradeDeserved).toBe("false");
+    expect(peek.getAttribute("aria-label")).toBe(expected);
+    expect(peek.getAttribute("role")).toBe("button");
+    expect(peek.querySelector(".vmx-next-card__peek-action")?.textContent).toBe("CARE");
+    expect(peek.querySelector(".vmx-next-card__peek-action")?.getAttribute("data-care")).toBe(
+      "true",
+    );
+  });
+
+  test("peek density keeps the hover drawer to a readable glance", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        artist: "very wordy crate source",
+        why: "similar vibe · harmonic but too long for a hover receipt",
+        transition: {
+          target_deck: "B",
+          cue_slot: "A",
+          from_role: "outro",
+          to_role: "intro",
+          start_in_bars: 8,
+          move_grade: {
+            slug: "bomb",
+            label: "BOMB",
+            xp: 72,
+            reason: "perfect phrase",
+            deserved: true,
+          },
+        },
+        decision: {
+          cue_slot: "A",
+          timing_text: "in 8 bars",
+          spoken_text: "load B · cue A · outro to intro · in 8 bars",
+        },
+      }),
+      {
+        density: "peek",
+        showAlternatives: false,
+        gradeProgress: {
+          streak: 3,
+          totalXp: 188,
+          lastXp: 72,
+          earned: true,
+          heat: 84,
+        },
+        onFeedback: () => undefined,
+      },
+    )!;
+
+    expect(card.dataset.density).toBe("peek");
+    expect(card.querySelector(".vmx-next-card__meta")).toBeNull();
+    expect(card.querySelector(".vmx-next-card__feedback")).toBeNull();
+    expect(card.querySelector(".vmx-next-card__alternatives")).toBeNull();
+    expect(card.querySelector(".vmx-next-card__transition")?.textContent).toBe(
+      "load B · in 8 bars",
+    );
+    expect(card.querySelector(".vmx-next-card__transition")?.getAttribute("title")).toBe(
+      "load B · in 8 bars",
+    );
+    expect(card.querySelector(".vmx-next-card__cue-rail")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    expect(
+      (card.querySelector(".vmx-next-card__cue-rail") as HTMLElement).style.getPropertyValue(
+        "--cue-rail-scale",
+      ),
+    ).toBe("0.56");
+    expect(card.querySelector(".vmx-next-card__grade-label")?.textContent).toBe("BOMB");
+    expect(card.querySelector(".vmx-next-card__grade-xp")?.textContent).toBe("+72xp");
+    expect(card.querySelector(".vmx-next-card__grade-reason")).toBeNull();
+    expect(card.querySelector(".vmx-next-card__combo")).toBeNull();
+  });
+
+  test("peek density keeps care reason for risky moves", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          target_deck: "B",
+          start_in_bars: 4,
+          move_grade: {
+            slug: "negative",
+            label: "NEG",
+            xp: 0,
+            reason: "key clash",
+            deserved: false,
+          },
+        },
+      }),
+      { density: "peek", showAlternatives: false },
+    )!;
+
+    const reason = card.querySelector(".vmx-next-card__grade-reason");
+    expect(card.querySelector(".vmx-next-card__grade-label")?.textContent).toBe("NEG");
+    expect(card.querySelector(".vmx-next-card__grade-xp")?.textContent).toBe("0xp");
+    expect(card.querySelector(".vmx-next-card__grade")?.textContent).toBe("NEG0xpkey clash");
+    expect(reason?.getAttribute("title")).toBe("key clash");
   });
 
   test("backup alternative titles are text nodes, never injected markup", () => {
@@ -531,6 +1039,28 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
   test("render key changes when the live transition countdown changes", () => {
     const a = _sugg({ transition: { cue_slot: "A", start_in_bars: 13 } });
     const b = _sugg({ transition: { cue_slot: "A", start_in_bars: 12 } });
+    expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
+  });
+
+  test("render key changes when the move grade changes", () => {
+    const a = _sugg({
+      transition: { move_grade: { slug: "clean", label: "CLEAN", xp: 28 } },
+    });
+    const b = _sugg({
+      transition: { move_grade: { slug: "bomb", label: "BOMB", xp: 72 } },
+    });
+    expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
+  });
+
+  test("render key changes when backend grade_progress changes", () => {
+    const a = _sugg({
+      grade_progress: { streak: 2, total_xp: 96, last_xp: 48, earned: true, heat: 66 },
+      transition: { move_grade: { slug: "sexy", label: "SEXY", xp: 48 } },
+    });
+    const b = _sugg({
+      grade_progress: { streak: 3, total_xp: 188, last_xp: 100, earned: true, heat: 100 },
+      transition: { move_grade: { slug: "sexy", label: "SEXY", xp: 48 } },
+    });
     expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
   });
 
@@ -586,9 +1116,66 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
   });
 
-  test("card is tagged for assistive tech", () => {
-    const card = renderNextSuggestion(_sugg())!;
-    expect(card.getAttribute("aria-label")).toBe("next track suggestion");
+  test("card carries a useful assistive label, not generic chrome copy", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          cue_slot: "A",
+          start_in_bars: 8,
+          move_grade: {
+            slug: "bomb",
+            label: "BOMB",
+            xp: 72,
+            reason: "phrase locks",
+            deserved: true,
+          },
+        },
+      }),
+      {
+        gradeProgress: {
+          streak: 3,
+          totalXp: 188,
+          lastXp: 72,
+          earned: true,
+          heat: 84,
+        },
+      },
+    )!;
+    expect(card.getAttribute("aria-label")).toBe(
+      "next: Strobe. deadmau5 · similar vibe · 8a · 128. action: load B · cue A · in 8 bars. grade: BOMB, 72 xp, phrase locks. session: 188 xp, combo 3",
+    );
+    expect(card.querySelector(".vmx-next-card__glyph")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    expect(card.querySelector(".vmx-next-card__title")?.getAttribute("title")).toBe("Strobe");
+  });
+
+  test("peek assistive label stays compact and calls out care reasons", () => {
+    const suggestion = _sugg({
+      transition: {
+        target_deck: "B",
+        start_in_bars: 4,
+        move_grade: {
+          slug: "negative",
+          label: "NEG",
+          xp: 0,
+          reason: "key clash",
+          deserved: false,
+        },
+      },
+    });
+
+    expect(nextSuggestionAriaLabel(suggestion, { density: "peek" })).toBe(
+      "next: Strobe. action: load B · in 4 bars. care: key clash",
+    );
+    const card = renderNextSuggestion(suggestion, { density: "peek" })!;
+    expect(card.getAttribute("aria-label")).toBe(
+      "next: Strobe. action: load B · in 4 bars. care: key clash",
+    );
+    expect(card.getAttribute("role")).toBe("status");
+    expect(card.getAttribute("aria-live")).toBe("polite");
   });
 });
 
@@ -608,7 +1195,7 @@ describe("next-suggestion CSS — frontend-enforcement (token-only, 20/80 amber)
     for (const d of decls) expect(d).toMatch(/var\(--type-mono\)/);
   });
 
-  test("20/80 — the ONLY amber is the next-glyph; title is silk, not a 2nd accent", () => {
+  test("20/80 — amber stays on the next glyph; grade heat uses rose/gold tokens", () => {
     const glyphRule = _CSS_FOR_TEST.match(/\.vmx-next-card__glyph\s*\{[^}]*\}/);
     expect(glyphRule).not.toBeNull();
     expect(glyphRule![0]).toMatch(/var\(--amber\)/);
@@ -617,5 +1204,28 @@ describe("next-suggestion CSS — frontend-enforcement (token-only, 20/80 amber)
     expect(titleRule).not.toBeNull();
     expect(titleRule![0]).not.toMatch(/var\(--amber/); // hierarchy via silk tone
     expect(titleRule![0]).toMatch(/var\(--silk\)/);
+
+    const gradeLabelRule = _CSS_FOR_TEST.match(/\.vmx-next-card__grade-label\s*\{[^}]*\}/);
+    expect(gradeLabelRule).not.toBeNull();
+    expect(gradeLabelRule![0]).toMatch(/var\(--brand\)/);
+    expect(gradeLabelRule![0]).not.toMatch(/var\(--amber/);
+
+    const gradeXpRule = _CSS_FOR_TEST.match(/\.vmx-next-card__grade-xp\s*\{[^}]*\}/);
+    expect(gradeXpRule).not.toBeNull();
+    expect(gradeXpRule![0]).toMatch(/var\(--gold\)/);
+  });
+
+  test("action line keeps deck and cue case visible and can wrap timing", () => {
+    const transitionRule = _CSS_FOR_TEST.match(/\.vmx-next-card__transition\s*\{[^}]*\}/);
+    expect(transitionRule).not.toBeNull();
+    expect(transitionRule![0]).toMatch(/flex-wrap:\s*wrap/);
+    expect(transitionRule![0]).toMatch(/white-space:\s*normal/);
+    expect(transitionRule![0]).not.toMatch(/text-transform:\s*lowercase/);
+    expect(transitionRule![0]).not.toMatch(/text-overflow:\s*ellipsis/);
+    const transitionBitRule = _CSS_FOR_TEST.match(
+      /\.vmx-next-card__transition-bit\s*\{[^}]*\}/,
+    );
+    expect(transitionBitRule).not.toBeNull();
+    expect(transitionBitRule![0]).toMatch(/white-space:\s*nowrap/);
   });
 });

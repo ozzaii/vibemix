@@ -54,6 +54,7 @@ export interface RecordingBrowserHandle {
   root: HTMLElement;
   setSessions(sessions: RecordingSummary[]): void;
   setUsage(usage: RecordingsUsage): void;
+  dispose(): void;
 }
 
 export interface RecordingBrowserProps {
@@ -448,6 +449,19 @@ export function renderRecordingBrowser(
     },
     setUsage(usage: RecordingsUsage): void {
       usageLine.textContent = formatUsageLine(usage);
+    },
+    dispose(): void {
+      if (activeObserver) {
+        activeObserver.disconnect();
+        activeObserver = null;
+      }
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.toastEl.remove();
+        pending = null;
+      }
+      rowHandles = [];
+      currentSessions = [];
     },
   };
 }

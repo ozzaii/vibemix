@@ -204,7 +204,7 @@ const CSS = `
     font-size: 9px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--silk-40);
+    color: var(--silk-65);
     line-height: 1;
     padding: 0 2px;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);

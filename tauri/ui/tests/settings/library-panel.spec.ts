@@ -9,16 +9,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const dragHandlers: Array<(event: { id: number; payload: unknown }) => void> = [];
 const subscribers = new Map<string, (msg: unknown) => void>();
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
+type SubscribeImpl = (
+  type: string,
+  cb: (msg: unknown) => void,
+) => Promise<() => void>;
+let subscribeImpl: SubscribeImpl = async (type, cb) => {
+  subscribers.set(type, cb);
+  return () => subscribers.delete(type);
+};
 
 vi.mock("../../src/ipc/client.js", () => ({
   emitIpc: vi.fn(async (type: string, payload: Record<string, unknown>) => {
     emitted.push({ type, payload });
   }),
-  subscribeIpc: vi.fn(
-    async (type: string, cb: (msg: unknown) => void) => {
-      subscribers.set(type, cb);
-      return () => subscribers.delete(type);
-    },
+  subscribeIpc: vi.fn((type: string, cb: (msg: unknown) => void) =>
+    subscribeImpl(type, cb),
   ),
 }));
 
@@ -42,6 +47,10 @@ beforeEach(() => {
   dragHandlers.length = 0;
   subscribers.clear();
   emitted.length = 0;
+  subscribeImpl = async (type, cb) => {
+    subscribers.set(type, cb);
+    return () => subscribers.delete(type);
+  };
   document.body.replaceChildren();
 });
 
@@ -198,5 +207,57 @@ describe("library-panel — dispose unsubscribes", () => {
       (e) => e.type === "ipc.library.import",
     );
     expect(importCalls).toHaveLength(0);
+  });
+
+  it("immediately unsubs when progress subscribe resolves after dispose", async () => {
+    let progressCb: (msg: unknown) => void = (_msg: unknown) => {
+      throw new Error("expected progress subscription callback");
+    };
+    let resolveSubscribe: (fn: () => void) => void = (_fn: () => void) => {
+      throw new Error("expected delayed subscription resolver");
+    };
+    let sawProgressCb = false;
+    let sawResolveSubscribe = false;
+    let unlistenCalls = 0;
+    const onImportComplete = vi.fn();
+    subscribeImpl = async (_type, cb) => {
+      progressCb = cb;
+      return await new Promise<() => void>((resolve) => {
+        resolveSubscribe = resolve;
+        sawProgressCb = true;
+        sawResolveSubscribe = true;
+      });
+    };
+
+    const handle = await renderLibraryPanel({ onImportComplete });
+    document.body.append(handle.element);
+    dispatchDrop(70, ["/lib.xml"]);
+    await _flush();
+
+    handle.dispose();
+    expect(sawProgressCb).toBe(true);
+    progressCb({
+      type: "ipc.library.import_progress",
+      ts: "2026-05-15T12:00:00Z",
+      payload: {
+        total: 10,
+        done: 10,
+        current_track_name: "Late Track",
+        cache_hits: 4,
+        cancelled: false,
+        schema_version: "1",
+      },
+    });
+    expect(sawResolveSubscribe).toBe(true);
+    resolveSubscribe(() => {
+      unlistenCalls += 1;
+    });
+    await _flush();
+
+    expect(unlistenCalls).toBe(1);
+    expect(onImportComplete).not.toHaveBeenCalled();
+    expect(handle.element.querySelector(".vmx-library-status")?.textContent).not.toContain(
+      "tracks indexed",
+    );
   });
 });

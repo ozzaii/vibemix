@@ -15,6 +15,8 @@ import { registerStyle } from "../../session/components/_style-registry.js";
 export interface SettingsGroupProps {
   header: string;
   children: HTMLElement | HTMLElement[];
+  /** Stable mock-transfer / integration anchor. Defaults to settings.group.<header>. */
+  wireId?: string;
   /** Optional UPPER-pill on the right of the header (e.g. "CFG"). */
   badge?: string;
   /** Optional footer slot (e.g. inline error message). */
@@ -30,7 +32,7 @@ const CSS = `
    * single 1px rule. No card fill, no drop shadow — rows on hairlines. */
   .vmx-settings-group {
     position: relative;
-    border-top: 1px solid var(--glass-edge);
+    border-top: 1px solid rgba(214, 207, 199, 0.060);
   }
   .vmx-settings-group:first-child {
     border-top: 0;
@@ -41,14 +43,24 @@ const CSS = `
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    padding: var(--sp-4) var(--sp-4) var(--sp-2);
-    font-family: var(--type-display);
+    padding: 22px var(--sp-4) 12px;
+    font-family: var(--type-body);
     font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 9px;
-    letter-spacing: 0.28em;
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--silk-40);
+    color: rgba(214, 207, 199, 0.72);
     line-height: 1;
+  }
+  .vmx-settings-group__header::after {
+    content: "";
+    position: absolute;
+    left: var(--sp-4);
+    right: var(--sp-4);
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(214, 207, 199, 0.16), transparent 42%);
+    opacity: 0.18;
   }
   .vmx-settings-group__badge {
     font-family: var(--type-mono);
@@ -64,10 +76,10 @@ const CSS = `
     text-shadow: 0 0 4px var(--amber-22);
   }
   .vmx-settings-group__body {
-    padding: 0 var(--sp-4) var(--sp-4);
+    padding: 0 var(--sp-4) 24px;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
   }
   .vmx-settings-group__footer {
     padding: 8px var(--sp-4);
@@ -115,12 +127,22 @@ const CSS = `
 
 registerStyle("vmx-settings-group", CSS);
 
+function groupWireId(header: string): string {
+  const slug = header
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `settings.group.${slug || "section"}`;
+}
+
 export function renderSettingsGroup(props: SettingsGroupProps): HTMLElement {
   const root = document.createElement("section");
   root.className = "vmx-settings-group";
+  root.dataset.wire = props.wireId ?? groupWireId(props.header);
 
   const head = document.createElement("div");
   head.className = "vmx-settings-group__header";
+  head.dataset.wire = `${root.dataset.wire}.header`;
   const title = document.createElement("span");
   title.textContent = props.header;
   head.append(title);
@@ -134,6 +156,7 @@ export function renderSettingsGroup(props: SettingsGroupProps): HTMLElement {
 
   const body = document.createElement("div");
   body.className = "vmx-settings-group__body";
+  body.dataset.wire = `${root.dataset.wire}.body`;
   const kids = Array.isArray(props.children) ? props.children : [props.children];
   for (const k of kids) body.append(k);
   root.append(body);
@@ -141,6 +164,7 @@ export function renderSettingsGroup(props: SettingsGroupProps): HTMLElement {
   if (props.footer) {
     const footer = document.createElement("div");
     footer.className = "vmx-settings-group__footer";
+    footer.dataset.wire = `${root.dataset.wire}.footer`;
     footer.append(props.footer);
     root.append(footer);
   }

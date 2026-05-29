@@ -42,9 +42,17 @@ import {
   _resetSessionStateForTests,
   getSessionState,
 } from "../../src/session/state.js";
-import { applySettingsState } from "../../src/session/ws-bridge.js";
+import {
+  applySettingsState,
+  SETTINGS_FIELDS,
+} from "../../src/session/ws-bridge.js";
+import schema from "../../src/ipc/messages.schema.json";
 
 beforeEach(() => {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", {
+    value: {},
+    configurable: true,
+  });
   invokeMock.mockClear();
   listenMock.mockClear();
   _resetDrawerForTests();
@@ -55,6 +63,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
   _resetDrawerForTests();
   _resetSettingsUIStateForTests();
   _resetSessionStateForTests();
@@ -63,6 +72,26 @@ afterEach(() => {
 });
 
 describe("Phase 12 — session + drawer integration", () => {
+  it("keeps the settings helper allowlist in sync with the schema enum", () => {
+    const schemaFields =
+      schema.definitions.SettingsSet.properties.payload.properties.field.enum;
+    expect([...SETTINGS_FIELDS]).toEqual(schemaFields);
+  });
+
+  it("titlebar gear opens the mounted settings drawer through the router action", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    mountSessionLayout(host, undefined, { onOpenSettings: openSettings });
+    mountSettingsDrawer(document.body);
+
+    const gear = host.querySelector<HTMLButtonElement>(".vmx-titlebar__settings");
+    expect(gear).toBeTruthy();
+    gear?.click();
+
+    expect(getSettingsUIState().open).toBe(true);
+    expect(gear?.dataset.active).toBe("true");
+  });
+
   it("applies lighter-blur preference from settings.state without a boot request", () => {
     applySettingsState({
       voice: "kore",
@@ -89,6 +118,115 @@ describe("Phase 12 — session + drawer integration", () => {
       lighter_blur: false,
     });
     expect(document.documentElement.getAttribute("data-blur-perf")).toBeNull();
+  });
+
+  it("applies persisted top-level mode from settings.state", () => {
+    applySettingsState({
+      voice: "kore",
+      mode: "hype",
+      genre: "techno",
+      output_device_id: null,
+      output_profile: "hp",
+      retention_days: 7,
+      push_to_mute_hotkey: "cmd+shift+m",
+      muted: false,
+      lighter_blur: false,
+      "session.mode": "build",
+    });
+    expect(getSessionState().mode).toBe("build");
+
+    applySettingsState({
+      voice: "kore",
+      mode: "hype",
+      genre: "techno",
+      output_device_id: null,
+      output_profile: "hp",
+      retention_days: 7,
+      push_to_mute_hotkey: "cmd+shift+m",
+      muted: false,
+      lighter_blur: false,
+      "session.mode": "bogus",
+    });
+    expect(getSessionState().mode).toBe("build");
+  });
+
+  it("applies shared lens and headphone settings from settings.state", () => {
+    applySettingsState({
+      voice: "kore",
+      mode: "hype",
+      genre: "techno",
+      output_device_id: null,
+      output_profile: "hp",
+      retention_days: 7,
+      push_to_mute_hotkey: "cmd+shift+m",
+      muted: false,
+      lighter_blur: false,
+      lens: "critique",
+      "learn.headphone_device_index": 4,
+    });
+    expect(getSessionState().settings.lens).toBe("critique");
+    expect(getSessionState().settings.learn_headphone_device_index).toBe(4);
+
+    applySettingsState({
+      voice: "kore",
+      mode: "hype",
+      genre: "techno",
+      output_device_id: null,
+      output_profile: "hp",
+      retention_days: 7,
+      push_to_mute_hotkey: "cmd+shift+m",
+      muted: false,
+      lighter_blur: false,
+      lens: "bogus",
+      "learn.headphone_device_index": -1,
+    });
+    expect(getSessionState().settings.lens).toBe("critique");
+    expect(getSessionState().settings.learn_headphone_device_index).toBe(4);
+  });
+
+  it("drawer lens rocker emits ipc.settings.set with lens", async () => {
+    mountSettingsDrawer(document.body);
+    applySettingsState({
+      voice: "kore",
+      mode: "hype",
+      genre: "techno",
+      output_device_id: null,
+      output_profile: "hp",
+      retention_days: 7,
+      push_to_mute_hotkey: "cmd+shift+m",
+      muted: false,
+      lighter_blur: false,
+      lens: "hype",
+    });
+
+    openSettings();
+    invokeMock.mockClear();
+
+    const critiqueBtn = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '.vmx-settings-drawer .vmx-rocker__seg',
+      ),
+    ).find((el) => el.dataset.id === "critique");
+    expect(critiqueBtn).toBeTruthy();
+    critiqueBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const settingsSetCall = invokeMock.mock.calls.find((c) => {
+      const args = c[1] as { message?: { type?: string; payload?: unknown } };
+      return (
+        args?.message?.type === "ipc.settings.set" &&
+        (args.message.payload as { field?: string }).field === "lens"
+      );
+    });
+    expect(settingsSetCall).toBeDefined();
+    const payload = (
+      settingsSetCall![1] as {
+        message: { payload: { field: string; value: unknown } };
+      }
+    ).message.payload;
+    expect(payload).toEqual({ field: "lens", value: "critique" });
   });
 
   it("boots session → opens drawer → emits ipc.settings.set on rocker change → close preserves state", async () => {

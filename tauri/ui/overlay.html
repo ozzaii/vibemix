@@ -62,25 +62,176 @@
          safety net. */
       .ring {
         position: absolute;
-        inset: 4px;
+        inset: 6px;
+        color: var(--ring-color, var(--amber));
         border-radius: 18px;
-        border: 3px solid var(--ring-color, var(--amber));
-        box-shadow:
-          0 0 12px 2px var(--ring-color, var(--amber)),
-          inset 0 0 8px 1px var(--ring-color, var(--amber));
         opacity: 0;
-        animation: ring-pulse var(--ring-duration, 1300ms) ease-in-out 1 forwards;
+        transform: scale(0.985);
+        filter: drop-shadow(0 0 6px currentColor);
+        animation: focus-aperture var(--ring-duration, 1300ms) cubic-bezier(0.22, 1, 0.36, 1) 1 forwards;
       }
-      @keyframes ring-pulse {
-        0%   { opacity: 0; transform: scale(0.96); }
-        15%  { opacity: 1; transform: scale(1.0); }
-        77%  { opacity: 1; transform: scale(1.0); }
-        100% { opacity: 0; transform: scale(1.04); }
+      .ring::before,
+      .ring::after {
+        content: "";
+        position: absolute;
+        pointer-events: none;
+      }
+      .ring::before {
+        inset: 8px;
+        border: 1px solid currentColor;
+        border-radius: 13px;
+        opacity: 0.12;
+        box-shadow:
+          inset 0 0 18px currentColor,
+          0 0 18px currentColor;
+      }
+      .ring::after {
+        inset: 0;
+        border-radius: inherit;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 251, 244, 0.26),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.46);
+        opacity: 0.72;
+      }
+      .corner {
+        position: absolute;
+        width: 52px;
+        height: 52px;
+      }
+      .corner::before,
+      .corner::after {
+        content: "";
+        position: absolute;
+        background: currentColor;
+        box-shadow:
+          0 0 8px currentColor,
+          inset 0 1px 0 rgba(255, 251, 244, 0.34);
+      }
+      .corner::before {
+        width: 44px;
+        height: 2px;
+      }
+      .corner::after {
+        width: 2px;
+        height: 44px;
+      }
+      .corner--tl { left: 0; top: 0; }
+      .corner--tl::before,
+      .corner--tl::after { left: 0; top: 0; }
+      .corner--tr { right: 0; top: 0; }
+      .corner--tr::before,
+      .corner--tr::after { right: 0; top: 0; }
+      .corner--bl { left: 0; bottom: 0; }
+      .corner--bl::before,
+      .corner--bl::after { left: 0; bottom: 0; }
+      .corner--br { right: 0; bottom: 0; }
+      .corner--br::before,
+      .corner--br::after { right: 0; bottom: 0; }
+      .scan,
+      .rail,
+      .bead {
+        position: absolute;
+        pointer-events: none;
+      }
+      .scan {
+        opacity: 0.34;
+        background: currentColor;
+        box-shadow: 0 0 10px currentColor;
+      }
+      .scan--x {
+        left: 18px;
+        right: 18px;
+        top: 50%;
+        height: 1px;
+        transform: translateY(-18px);
+        mask-image: linear-gradient(90deg, transparent, black 18%, black 82%, transparent);
+        animation: aperture-scan-x var(--ring-duration, 1300ms) cubic-bezier(0.22, 1, 0.36, 1) 1 forwards;
+      }
+      .scan--y {
+        top: 18px;
+        bottom: 18px;
+        left: 50%;
+        width: 1px;
+        transform: translateX(16px);
+        opacity: 0.18;
+        mask-image: linear-gradient(180deg, transparent, black 18%, black 82%, transparent);
+        animation: aperture-scan-y var(--ring-duration, 1300ms) cubic-bezier(0.22, 1, 0.36, 1) 1 forwards;
+      }
+      .rail {
+        left: 68px;
+        right: 68px;
+        height: 10px;
+        background:
+          repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 12px);
+        mask-image: linear-gradient(90deg, transparent, black 18%, black 82%, transparent);
+        opacity: 0.34;
+      }
+      .rail--top { top: 1px; }
+      .rail--bottom { bottom: 1px; }
+      .bead {
+        width: 6px;
+        height: 6px;
+        border-radius: 1px;
+        background: currentColor;
+        box-shadow:
+          0 0 9px currentColor,
+          inset 0 1px 0 rgba(255, 251, 244, 0.42);
+      }
+      .bead--lead {
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      .bead--tail {
+        right: 0;
+        top: 50%;
+        opacity: 0.56;
+        transform: translateY(-50%);
+      }
+      @keyframes focus-aperture {
+        0%   { opacity: 0; transform: scale(0.985); }
+        14%  { opacity: 1; transform: scale(1); }
+        76%  { opacity: 0.94; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1.012); }
+      }
+      @keyframes aperture-scan-x {
+        0%   { transform: translateY(-18px); opacity: 0; }
+        18%  { opacity: 0.34; }
+        74%  { opacity: 0.30; }
+        100% { transform: translateY(18px); opacity: 0; }
+      }
+      @keyframes aperture-scan-y {
+        0%   { transform: translateX(16px); opacity: 0; }
+        18%  { opacity: 0.18; }
+        74%  { opacity: 0.16; }
+        100% { transform: translateX(-16px); opacity: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ring {
+          animation-name: focus-aperture;
+        }
+        .scan--x,
+        .scan--y {
+          animation: none;
+          transform: none;
+          opacity: 0.16;
+        }
       }
     </style>
   </head>
-  <body>
-    <div class="ring" id="ring"></div>
+  <body data-wire="overlay.shell">
+    <div class="ring" id="ring" data-wire="overlay.ring" aria-hidden="true">
+      <span class="corner corner--tl" data-wire="overlay.corner.tl"></span>
+      <span class="corner corner--tr" data-wire="overlay.corner.tr"></span>
+      <span class="corner corner--bl" data-wire="overlay.corner.bl"></span>
+      <span class="corner corner--br" data-wire="overlay.corner.br"></span>
+      <span class="scan scan--x" data-wire="overlay.scan-x"></span>
+      <span class="scan scan--y" data-wire="overlay.scan-y"></span>
+      <span class="rail rail--top"></span>
+      <span class="rail rail--bottom"></span>
+      <span class="bead bead--lead"></span>
+      <span class="bead bead--tail"></span>
+    </div>
     <script type="module" src="/src/overlay/overlay-runtime.ts"></script>
   </body>
 </html>

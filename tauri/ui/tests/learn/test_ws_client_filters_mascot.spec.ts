@@ -102,6 +102,99 @@ describe("test_ws_client_filters_mascot.spec.ts (CR-03 regression guard)", () =>
     }
   });
 
+  it("flat mascot frame can still expose the Course 3 lens without warnings", () => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const client = new LearnWsClient();
+    const heard: CustomEvent[] = [];
+    const listener = (e: Event) => heard.push(e as CustomEvent);
+    window.addEventListener("learn.course3_lens", listener);
+    try {
+      dispatchInto(
+        client,
+        JSON.stringify({
+          music: 0.4,
+          audible: true,
+          bpm: 126,
+          course3_lens: {
+            session_active: true,
+            phrase_position_confidence: 1.4,
+            next_phrase_at: 96.25,
+            next_phrase_cue_id: "cue:track-a:phrase",
+            audio_active: true,
+            deck_attributed: true,
+            deck_track_citable: true,
+            cue_ready: true,
+            blockers: [],
+          },
+        }),
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(heard).toHaveLength(1);
+      expect(heard[0]?.detail).toEqual({
+        session_active: true,
+        phrase_position_confidence: 1,
+        next_phrase_at: 96.25,
+        next_phrase_cue_id: "cue:track-a:phrase",
+        audio_active: true,
+        deck_attributed: true,
+        deck_track_citable: true,
+        cue_ready: true,
+        blockers: [],
+      });
+    } finally {
+      window.removeEventListener("learn.course3_lens", listener);
+      client.close();
+    }
+  });
+
+  it("preserves a Course 3 operator action from the flat frame", () => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const client = new LearnWsClient();
+    const heard: CustomEvent[] = [];
+    const listener = (e: Event) => heard.push(e as CustomEvent);
+    window.addEventListener("learn.course3_lens", listener);
+    try {
+      dispatchInto(
+        client,
+        JSON.stringify({
+          music: 0,
+          audible: false,
+          course3_lens: {
+            session_active: false,
+            phrase_position_confidence: 0,
+            next_phrase_at: null,
+            next_phrase_cue_id: null,
+            audio_active: false,
+            deck_attributed: false,
+            deck_track_citable: false,
+            cue_ready: false,
+            blockers: ["waiting_for_audio"],
+            operator_action: {
+              prompt:
+                "Play a real Rekordbox library track through BlackHole 2ch @ 48000Hz with channel and master faders up.",
+              route: "BlackHole 2ch @ 48000Hz",
+              steps: [
+                "Stop unrelated media or make Rekordbox the active playing source.",
+              ],
+            },
+          },
+        }),
+      );
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(heard).toHaveLength(1);
+      expect(heard[0]?.detail.operator_action).toEqual({
+        prompt:
+          "Play a real Rekordbox library track through BlackHole 2ch @ 48000Hz with channel and master faders up.",
+        route: "BlackHole 2ch @ 48000Hz",
+        steps: ["Stop unrelated media or make Rekordbox the active playing source."],
+      });
+    } finally {
+      window.removeEventListener("learn.course3_lens", listener);
+      client.close();
+    }
+  });
+
   it("ipc.status.tick + ipc.mascot.mood_change envelopes silently dropped", () => {
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const client = new LearnWsClient();

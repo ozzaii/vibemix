@@ -47,7 +47,14 @@ import {
   getSessionState,
   setSessionState,
 } from "./state.js";
-import type { LevelPair, MascotMood, MetersTriple, SkillLevel } from "./state.js";
+import type {
+  LevelPair,
+  MascotMood,
+  MetersTriple,
+  SessionMode,
+  SharedLens,
+  SkillLevel,
+} from "./state.js";
 import type { PhaseChunk } from "./components/phase-tape.js";
 import type { MidiEvent } from "./components/event-ribbon.js";
 import type { CitationChip } from "./components/citation-strip.js";
@@ -109,6 +116,8 @@ interface WireSettingsStatePayload {
   //     persisted in ConfigStore.extra; absent on pre-skill disk state, so
   //     we narrow defensively and keep the current value when it's missing.
   skill?: SkillLevel | string;
+  lens?: SharedLens | string | null;
+  "learn.headphone_device_index"?: number | null;
   // --- Phase 13 (mascot overlay) additions — sidecar wires these in Plan
   //     13-05; until then they arrive as undefined and we keep the
   //     SessionState defaults. Narrowed defensively in applySettingsState
@@ -121,6 +130,10 @@ interface WireSettingsStatePayload {
   //     write the field is absent; ws-bridge keeps the SessionState
   //     default (false → full v5 visual contract).
   lighter_blur?: boolean;
+  // --- Phase 97 (ONBOARD-01) — top-level app mode. The sidecar persists
+  //     this under ConfigStore.extra["session.mode"] and echoes it on
+  //     settings.state so cold boot lights the last-picked segment.
+  "session.mode"?: SessionMode | string | null;
 }
 
 interface WireMutePayload {
@@ -152,13 +165,10 @@ interface WireCohostReactionPayload {
 }
 
 // WR-04 in 14-REVIEW.md — keep this allowlist in sync with the
-// SettingsSet schema enum at messages.schema.json:529 and the Python
-// SettingsSetPayload.field Literal at src/vibemix/ui_bus/messages.py.
-// All three must list the same 10 fields. Today mascot-group.ts
-// bypasses sendSettings via direct emitIpc for mood + click_through,
-// but any future caller using sendSettings would hit the runtime
-// `unknown field` throw without this entry.
-const SETTINGS_FIELDS = [
+// SettingsSet schema enum and the Python SettingsSetPayload.field Literal.
+// Some older controls still bypass sendSettings via direct emitIpc; this
+// list is the guard for every drawer-side caller that uses the helper.
+export const SETTINGS_FIELDS = [
   "voice",
   "mode",
   "genre",
@@ -166,10 +176,12 @@ const SETTINGS_FIELDS = [
   "output_profile",
   "retention_days",
   "push_to_mute_hotkey",
-  "mood",            // Plan 13-05
-  "click_through",   // Plan 13-05
-  "lighter_blur",    // Plan 14-04
-  "skill",           // 2026-05-25 — persona-level (beginner/intermediate/pro)
+  "mood",
+  "click_through",
+  "lighter_blur",
+  "skill",
+  "lens",
+  "learn.headphone_device_index",
 ] as const;
 export type SettingsField = (typeof SETTINGS_FIELDS)[number];
 
@@ -364,6 +376,22 @@ function narrowMood(value: unknown, fallback: MascotMood): MascotMood {
     : fallback;
 }
 
+/** Whitelist of valid top-level modes — anything else from the wire keeps
+ *  the current picker segment lit. */
+const VALID_SESSION_MODES: readonly SessionMode[] = [
+  "cohost",
+  "learn",
+  "build",
+  "debrief",
+];
+
+function narrowSessionMode(value: unknown, fallback: SessionMode): SessionMode {
+  if (typeof value !== "string") return fallback;
+  return (VALID_SESSION_MODES as readonly string[]).includes(value)
+    ? (value as SessionMode)
+    : fallback;
+}
+
 /** Whitelist of valid skill levels — anything else from the wire (or a
  *  pre-skill sidecar that omits the field) keeps the current value. */
 const VALID_SKILLS: readonly SkillLevel[] = ["beginner", "intermediate", "pro"];
@@ -372,6 +400,16 @@ function narrowSkill(value: unknown, fallback: SkillLevel): SkillLevel {
   if (typeof value !== "string") return fallback;
   return (VALID_SKILLS as readonly string[]).includes(value)
     ? (value as SkillLevel)
+    : fallback;
+}
+
+/** Whitelist of valid shared persona lenses. */
+const VALID_LENSES: readonly SharedLens[] = ["hype", "critique", "tutor"];
+
+function narrowLens(value: unknown, fallback: SharedLens): SharedLens {
+  if (typeof value !== "string") return fallback;
+  return (VALID_LENSES as readonly string[]).includes(value)
+    ? (value as SharedLens)
     : fallback;
 }
 
@@ -385,7 +423,8 @@ export function applySettingsState(p: WireSettingsStatePayload): void {
   // Preserve current Phase 13 fields if the sidecar hasn't sent them yet
   // (Plan 13-05 extends the sidecar payload). Defensive narrowing keeps a
   // rogue future-string from poisoning the MascotMood union.
-  const current = getSessionState().settings;
+  const state = getSessionState();
+  const current = state.settings;
   const lighterBlur =
     typeof p.lighter_blur === "boolean" ? p.lighter_blur : current.lighter_blur;
   applyBlurPerfPreference(lighterBlur);
@@ -394,11 +433,20 @@ export function applySettingsState(p: WireSettingsStatePayload): void {
       voice: p.voice,
       mode: p.mode,
       skill: narrowSkill(p.skill, current.skill),
+      lens: narrowLens(p.lens, current.lens),
       genre: p.genre,
       output_device_id: p.output_device_id,
       output_profile: p.output_profile,
       retention_days: p.retention_days,
       push_to_mute_hotkey: p.push_to_mute_hotkey,
+      learn_headphone_device_index:
+        typeof p["learn.headphone_device_index"] === "number" &&
+        Number.isInteger(p["learn.headphone_device_index"]) &&
+        p["learn.headphone_device_index"] >= 0
+          ? p["learn.headphone_device_index"]
+          : p["learn.headphone_device_index"] === null
+            ? null
+            : current.learn_headphone_device_index,
       mood: narrowMood(p.mood, current.mood),
       click_through:
         typeof p.click_through === "boolean"
@@ -407,6 +455,7 @@ export function applySettingsState(p: WireSettingsStatePayload): void {
       lighter_blur: lighterBlur,
     },
     muted: p.muted,
+    mode: narrowSessionMode(p["session.mode"], state.mode ?? "cohost"),
   });
 }
 

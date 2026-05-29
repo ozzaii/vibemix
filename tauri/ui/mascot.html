@@ -81,14 +81,14 @@
       }
     </style>
   </head>
-  <body style="background: transparent; margin: 0; padding: 0; overflow: hidden;" data-tauri-drag-region>
-    <div class="mascot-window" data-tauri-drag-region>
-      <div class="border-anim slow rev" aria-hidden="true"></div>
-      <div class="mascot-window__top-label">
+  <body style="background: transparent; margin: 0; padding: 0; overflow: hidden;" data-tauri-drag-region data-wire="mascot.shell">
+    <div class="mascot-window" data-tauri-drag-region data-wire="mascot.host">
+      <div class="border-anim slow rev" data-wire="mascot.hidden-sweep" aria-hidden="true"></div>
+      <div class="mascot-window__top-label" data-wire="mascot.hidden-label">
         <span class="mascot-window__caption">OVERLAY · STICKY · ALL SPACES · 320×420</span>
       </div>
-      <canvas id="mascot-canvas" aria-hidden="true"></canvas>
-      <div class="mascot-window__state-caption" aria-hidden="true">idle · bop-to-beat</div>
+      <canvas id="mascot-canvas" data-wire="mascot.canvas" aria-hidden="true"></canvas>
+      <div class="mascot-window__state-caption" data-wire="mascot.hidden-state" aria-hidden="true">idle · bop-to-beat</div>
     </div>
     <script type="module" src="/src/mascot/index.ts"></script>
   </body>

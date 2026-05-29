@@ -16,6 +16,9 @@ export function invokeTauri<T = unknown>(
   cmd: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
+  if (!hasTauriInternals()) {
+    return Promise.reject(new Error("Tauri runtime unavailable"));
+  }
   return tauriInvoke<T>(cmd, args);
 }
 
@@ -24,4 +27,10 @@ export function listenTauri<T>(
   handler: Parameters<typeof tauriListen<T>>[1],
 ): Promise<UnlistenFn> {
   return tauriListen<T>(event, handler).catch(() => () => {});
+}
+
+function hasTauriInternals(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as Window & { __TAURI_INTERNALS__?: unknown };
+  return typeof w.__TAURI_INTERNALS__ === "object" && w.__TAURI_INTERNALS__ !== null;
 }

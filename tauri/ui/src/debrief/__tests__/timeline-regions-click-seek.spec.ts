@@ -7,6 +7,8 @@ import { mountTimelinePlaceholder } from "../components/timeline.js";
 
 afterEach(() => {
   document.body.replaceChildren();
+  vi.clearAllTimers();
+  vi.useRealTimers();
 });
 
 const chapters = [
@@ -68,5 +70,49 @@ describe("timeline placeholder", () => {
     document.body.append(div);
     mountTimelinePlaceholder(div, [], 0);
     expect(div.textContent).toContain("No regions to render");
+  });
+
+  it("deep-link highlights exact citation ids with percent signs", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    mountTimelinePlaceholder(
+      div,
+      [
+        {
+          id: "track-percent",
+          start: 12,
+          end: 40,
+          label: "Kick handoff",
+          citation_event_id: "ev:KICK@%",
+        },
+      ],
+      60,
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("vmx-debrief-deeplink", {
+        detail: { eventId: "ev:KICK@%", timestampS: 12 },
+      }),
+    );
+
+    expect(
+      div
+        .querySelector(".vmx-debrief-region--highlight")
+        ?.getAttribute("data-citation-event-id"),
+    ).toBe("ev:KICK@%");
+  });
+
+  it("ignores deep-links with non-finite timestamps", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    mountTimelinePlaceholder(div, chapters, 900);
+
+    window.dispatchEvent(
+      new CustomEvent("vmx-debrief-deeplink", {
+        detail: { timestampS: Number.NaN },
+      }),
+    );
+
+    expect(div.querySelector(".vmx-debrief-region--highlight")).toBeNull();
   });
 });

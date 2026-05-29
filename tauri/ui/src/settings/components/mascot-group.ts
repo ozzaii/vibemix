@@ -71,12 +71,12 @@ const CSS = `
   [data-component="mascot-group"] {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-md);
+    gap: var(--sp-3);
   }
   [data-component="mascot-group"] .vmx-mascot-row {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-sm);
+    gap: var(--sp-2);
   }
   [data-component="mascot-group"] .vmx-mascot-row__label {
     font-family: var(--type-display);
@@ -148,6 +148,18 @@ interface MascotGroupHandle {
   refresh: () => void;
 }
 
+interface MascotWindowStateWire {
+  visible: boolean;
+}
+
+function isMascotWindowStateWire(value: unknown): value is MascotWindowStateWire {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    typeof (value as Record<string, unknown>).visible === "boolean"
+  );
+}
+
 /** Mount the MASCOT settings group. Pure-function; subscribers to
  *  SessionState are NOT installed here — the drawer's `refresh()` already
  *  rebuilds the whole body on settings/UI diffs (see SettingsDrawer.ts).
@@ -194,10 +206,10 @@ function buildMascotGroup(): MascotGroupHandle {
   // enabled the mascot, flip the rocker to ON without rebuilding.
   void (async () => {
     try {
-      const state = await invoke<{ visible: boolean }>(
+      const state = await invoke<unknown>(
         "read_mascot_window_state",
       );
-      if (state.visible) {
+      if (isMascotWindowStateWire(state) && state.visible) {
         visRocker
           .querySelectorAll<HTMLElement>(".vmx-rocker__seg")
           .forEach((seg) => {

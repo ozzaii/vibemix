@@ -22,23 +22,22 @@ body {
   background: var(--void);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
-  /* deep void with one faint amber light bleeding from the top-left,
-     like a booth lamp — the only warm source in the room. */
+  /* Deep void with one faint booth light. The library used to carry
+     multiple fine grids here; that made the whole surface shimmer before
+     the user had even made a decision. */
   background:
-    linear-gradient(90deg, rgba(255, 138, 61, 0.040), transparent 24%, transparent 76%, rgba(72, 152, 255, 0.026)),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.010) 0 1px, transparent 1px 26px),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.006) 0 1px, transparent 1px 18px),
-    radial-gradient(120% 90% at 8% -10%, rgba(255, 138, 61, 0.055), transparent 46%),
-    radial-gradient(80% 70% at 100% 110%, rgba(72, 152, 255, 0.028), transparent 55%),
+    linear-gradient(90deg, rgba(255, 138, 61, 0.026), transparent 28%, transparent 78%, rgba(72, 152, 255, 0.016)),
+    radial-gradient(100% 82% at 8% -12%, rgba(255, 138, 61, 0.042), transparent 48%),
+    radial-gradient(78% 70% at 100% 110%, rgba(72, 152, 255, 0.020), transparent 58%),
     var(--void-1);
 }
 
 .vmx-lib-label {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--silk-40);
+  color: var(--silk-65);
 }
 .vmx-lib-mono {
   font-family: var(--type-mono);
@@ -170,9 +169,9 @@ body {
   position: absolute;
   inset: 0;
   background:
-    repeating-linear-gradient(90deg, transparent 0 33px, rgba(214, 207, 199, 0.010) 33px 34px),
-    repeating-linear-gradient(0deg, transparent 0 23px, rgba(214, 207, 199, 0.007) 23px 24px);
-  opacity: 0.36;
+    repeating-linear-gradient(90deg, transparent 0 72px, rgba(214, 207, 199, 0.010) 72px 73px),
+    linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.28));
+  opacity: 0.24;
   pointer-events: none;
   mix-blend-mode: screen;
   z-index: 0;
@@ -182,7 +181,7 @@ body {
   min-width: 0;
   border-radius: 0;
   background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.012), transparent 36%, rgba(0, 0, 0, 0.18)),
+    linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 30%, rgba(0, 0, 0, 0.20)),
     rgba(0, 0, 0, 0.080);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -228,7 +227,7 @@ body {
   bottom: -1px;
   height: 1px;
   background: linear-gradient(90deg, var(--amber-22), transparent 54%);
-  opacity: 0.68;
+  opacity: 0.44;
 }
 .vmx-lib-panel-hd .vmx-lib-label { flex: 1; }
 .vmx-lib-panel-bd {
@@ -238,8 +237,7 @@ body {
   overflow: auto;
   padding: 16px 18px 18px;
   background:
-    repeating-linear-gradient(0deg, transparent 0 27px, rgba(255, 251, 244, 0.006) 27px 28px),
-    linear-gradient(180deg, transparent 0, rgba(0, 0, 0, 0.12) 100%);
+    linear-gradient(180deg, transparent 0, rgba(0, 0, 0, 0.18) 100%);
 }
 .vmx-lib-panel-bd::-webkit-scrollbar { width: 8px; }
 .vmx-lib-panel-bd::-webkit-scrollbar-thumb {
@@ -250,8 +248,8 @@ body {
 /* ── left console: mode switch + query ──────────────────── */
 .vmx-lib-modeswitch {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 5px;
   padding: 6px;
   background:
@@ -265,15 +263,10 @@ body {
     inset 0 -1px 0 rgba(0, 0, 0, 0.72);
   overflow: hidden;
 }
+/* The 3×2 grid separators assumed six equal cells; the conversation-first
+   layout (one wide hero + a compact tool strip) doesn't want them. */
 .vmx-lib-modeswitch::before {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  background:
-    repeating-linear-gradient(90deg, transparent 0 calc(33.333% - 3px), rgba(0, 0, 0, 0.52) calc(33.333% - 3px) calc(33.333% + 1px)),
-    repeating-linear-gradient(0deg, transparent 0 calc(50% - 3px), rgba(0, 0, 0, 0.52) calc(50% - 3px) calc(50% + 1px));
-  pointer-events: none;
-  z-index: 0;
+  content: none;
 }
 .vmx-lib-modeswitch button {
   position: relative;
@@ -282,9 +275,9 @@ body {
   font-family: var(--type-body);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--silk-40);
+  color: var(--silk-65);
   min-height: 44px;
   background:
     linear-gradient(180deg, rgba(255, 251, 244, 0.024), rgba(0, 0, 0, 0.22)),
@@ -307,7 +300,7 @@ body {
   width: 18px;
   height: 2px;
   border-radius: 1px;
-  background: var(--silk-12);
+  background: var(--silk-22);
   transform: translateX(-50%);
 }
 .vmx-lib-modeswitch button[aria-selected="true"] {
@@ -335,6 +328,30 @@ body {
   box-shadow:
     inset 0 2px 5px rgba(0, 0, 0, 0.62),
     inset 0 1px 0 rgba(255, 251, 244, 0.018);
+}
+
+/* Conversation-first hierarchy: Viber is the wide hero on the top row; the two
+   kept power tools (Build, Ingest) split the row below as a compact strip —
+   "talk to Viber; these are the instruments worth a direct grab." `flex-basis:
+   100%` forces the wrap; the rest are flex:1. The `.vmx-lib-modeswitch button`
+   selector still matches every mode, so the search/similar/curate wiring + tests
+   stay intact even though those tabs now live inside the conversation. */
+.vmx-lib-modeswitch button[data-mode="chat"] {
+  flex: 1 0 100%;
+  min-height: 50px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+}
+.vmx-lib-modeswitch button:not([data-mode="chat"]) {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 36px;
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  color: var(--silk-40);
+}
+.vmx-lib-modeswitch button:not([data-mode="chat"])[aria-selected="true"] {
+  color: var(--amber-pale);
 }
 
 .vmx-lib-field { margin-top: 18px; }
@@ -385,7 +402,7 @@ body {
   font-family: var(--type-body);
   font-size: 14px;
 }
-.vmx-lib-qbox input::placeholder { color: var(--silk-22); }
+.vmx-lib-qbox input::placeholder { color: var(--silk-40); }
 .vmx-lib-chatbox { align-items: stretch; }
 .vmx-lib-chatbox textarea {
   flex: 1;
@@ -399,7 +416,7 @@ body {
   font-size: 14px;
   line-height: 1.5;
 }
-.vmx-lib-chatbox textarea::placeholder { color: var(--silk-22); }
+.vmx-lib-chatbox textarea::placeholder { color: var(--silk-40); }
 
 .vmx-lib-dropzone {
   margin-top: 14px;
@@ -445,7 +462,7 @@ body {
   font-family: var(--type-mono);
   font-size: 11px;
   letter-spacing: 0.05em;
-  color: var(--silk-65);
+  color: var(--silk);
   background:
     linear-gradient(180deg, rgba(255, 251, 244, 0.020), rgba(0, 0, 0, 0.18)),
     var(--void-3);
@@ -491,7 +508,7 @@ body {
   font-family: var(--type-body);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--amber);
   background:
@@ -650,9 +667,7 @@ body {
   cursor: default;
   border: 1px solid rgba(255, 251, 244, 0.040);
   background:
-    radial-gradient(circle at 10px 10px, rgba(255, 251, 244, 0.050) 0 1px, transparent 2px),
-    repeating-linear-gradient(90deg, transparent 0 13px, rgba(255, 251, 244, 0.006) 13px 14px),
-    linear-gradient(180deg, rgba(255, 251, 244, 0.020), transparent 52%, rgba(0, 0, 0, 0.24)),
+    linear-gradient(180deg, rgba(255, 251, 244, 0.026), transparent 46%, rgba(0, 0, 0, 0.28)),
     rgba(0, 0, 0, 0.16);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.030),
@@ -666,8 +681,7 @@ body {
 }
 .vmx-lib-row:hover {
   background:
-    linear-gradient(90deg, rgba(255, 138, 61, 0.040), transparent 44%),
-    repeating-linear-gradient(90deg, transparent 0 11px, rgba(255, 251, 244, 0.006) 11px 12px),
+    linear-gradient(90deg, rgba(255, 138, 61, 0.038), transparent 52%),
     var(--glass-1);
   border-color: var(--glass-edge-up);
   box-shadow:
@@ -711,7 +725,7 @@ body {
 .vmx-lib-row .rank {
   font-family: var(--type-mono);
   font-size: 12px;
-  color: var(--silk-40);
+  color: var(--silk-65);
   text-align: center;
   padding: 8px 0;
   border: 1px solid rgba(214, 207, 199, 0.060);
@@ -725,8 +739,8 @@ body {
 }
 .vmx-lib-row.top .rank { color: var(--amber); }
 .vmx-lib-row .title {
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 15.5px;
+  font-weight: 600;
   color: var(--silk);
   white-space: nowrap;
   overflow: hidden;
@@ -735,10 +749,10 @@ body {
 .vmx-lib-row.top .title { color: var(--amber-pale); text-shadow: 0 0 8px var(--amber-22); }
 .vmx-lib-row .meta {
   font-family: var(--type-mono);
-  font-size: 10.5px;
-  color: var(--silk-40);
-  margin-top: 3px;
-  letter-spacing: 0.05em;
+  font-size: 11px;
+  color: var(--silk-65);
+  margin-top: 4px;
+  letter-spacing: 0.02em;
 }
 .vmx-lib-row .score { text-align: right; }
 .vmx-lib-row .score .num {
@@ -773,10 +787,58 @@ body {
 .vmx-lib-meter i.dim { background: var(--amber-22); }
 
 .vmx-lib-empty {
-  padding: 32px 12px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--silk-40);
+  position: relative;
+  max-width: 520px;
+  margin: clamp(24px, 5vh, 54px) auto;
+  padding: 18px 18px 18px 38px;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--silk-65);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(180deg, rgba(255, 251, 244, 0.018), transparent 46%, rgba(0, 0, 0, 0.24)),
+    rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.58);
+}
+.vmx-lib-empty::before {
+  content: "";
+  position: absolute;
+  left: 17px;
+  top: 22px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: var(--glow-faint);
+}
+.vmx-lib-empty-kicker {
+  margin-bottom: 8px;
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.vmx-lib-clarification-question {
+  color: var(--silk-90);
+  font-weight: 650;
+}
+.vmx-lib-clarification-choices {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+  padding-left: 22px;
+}
+.vmx-lib-clarification-choices li::marker {
+  color: var(--amber);
+  font-weight: 800;
+}
+.vmx-lib-clarification-hint {
+  color: var(--silk-58);
 }
 
 /* Center well: a composed idle field so chat mode never reads as an empty app. */
@@ -789,19 +851,18 @@ body[data-mode="chat"] .vmx-lib-command-field {
   display: grid;
   place-items: center;
   pointer-events: none;
-  opacity: 0.68;
+  opacity: 0.28;
   z-index: 0;
 }
 .vmx-lib-field-orbit {
   position: relative;
-  width: min(430px, 78%);
+  width: min(360px, 62%);
   aspect-ratio: 1;
   border: 1px solid rgba(214, 207, 199, 0.052);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 138, 61, 0.040), transparent 11%),
-    radial-gradient(circle at 50% 50%, rgba(72, 152, 255, 0.030), transparent 44%),
-    repeating-radial-gradient(circle at 50% 50%, transparent 0 42px, rgba(214, 207, 199, 0.020) 42px 43px),
+    radial-gradient(circle at 50% 50%, rgba(255, 138, 61, 0.032), transparent 13%),
+    radial-gradient(circle at 50% 50%, rgba(72, 152, 255, 0.018), transparent 48%),
     radial-gradient(circle at 50% 50%, transparent 0 62%, rgba(0, 0, 0, 0.32) 78%);
   box-shadow:
     inset 0 0 32px rgba(0, 0, 0, 0.62),
@@ -813,12 +874,12 @@ body[data-mode="chat"] .vmx-lib-command-field {
   content: "";
   position: absolute;
   inset: 14%;
-  border: 1px solid rgba(255, 138, 61, 0.052);
+  border: 1px solid rgba(255, 138, 61, 0.038);
   border-radius: 50%;
 }
 .vmx-lib-field-orbit::after {
   inset: 31%;
-  border-color: rgba(214, 207, 199, 0.058);
+  border-color: rgba(214, 207, 199, 0.040);
   box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.56);
 }
 .vmx-lib-field-orbit span {
@@ -890,7 +951,7 @@ body[data-mode="chat"] .vmx-lib-panel:nth-child(2) .vmx-lib-panel-bd {
 body[data-mode="chat"] .vmx-lib-chat-thread {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   flex: 1;
   min-height: 0;
   justify-content: flex-end;
@@ -898,9 +959,8 @@ body[data-mode="chat"] .vmx-lib-chat-thread {
   border: 1px solid rgba(214, 207, 199, 0.052);
   border-radius: var(--rad-sm);
   background:
-    radial-gradient(76% 80% at 12% 100%, rgba(255, 138, 61, 0.040), transparent 58%),
-    repeating-linear-gradient(90deg, transparent 0 36px, rgba(214, 207, 199, 0.006) 36px 37px),
-    linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 28%, rgba(0, 0, 0, 0.22)),
+    radial-gradient(76% 80% at 12% 100%, rgba(255, 138, 61, 0.030), transparent 60%),
+    linear-gradient(180deg, rgba(255, 251, 244, 0.012), transparent 26%, rgba(0, 0, 0, 0.26)),
     rgba(0, 0, 0, 0.16);
   box-shadow:
     inset 0 2px 14px rgba(0, 0, 0, 0.64),
@@ -916,8 +976,7 @@ body[data-mode="chat"] .vmx-lib-chat-side {
   flex: 1;
   min-height: 0;
   background:
-    repeating-linear-gradient(90deg, transparent 0 28px, rgba(214, 207, 199, 0.006) 28px 29px),
-    linear-gradient(180deg, rgba(255, 251, 244, 0.008), transparent 36%, rgba(0, 0, 0, 0.16));
+    linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 36%, rgba(0, 0, 0, 0.18));
 }
 body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   content: "side rack idle";
@@ -928,7 +987,7 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   line-height: 1.6;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--silk-22);
+  color: var(--silk-40);
 }
 .vmx-lib-chat-tools:empty::before,
 .vmx-lib-chat-artifact:empty::before {
@@ -939,7 +998,7 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   line-height: 1.6;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--silk-22);
+  color: var(--silk-40);
 }
 .vmx-lib-chat-tools:empty::before {
   content: "trace idle";
@@ -955,8 +1014,7 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-sm);
   background:
-    repeating-linear-gradient(90deg, transparent 0 24px, rgba(214, 207, 199, 0.007) 24px 25px),
-    linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 45%, rgba(0, 0, 0, 0.22)),
+    linear-gradient(180deg, rgba(255, 251, 244, 0.020), transparent 42%, rgba(0, 0, 0, 0.24)),
     rgba(0, 0, 0, 0.18);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.024),
@@ -982,15 +1040,15 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   font-size: 9.5px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--silk-40);
+  color: var(--silk-65);
 }
 .vmx-lib-chat-turn[data-role="viber"] .who {
   color: var(--amber);
 }
 .vmx-lib-chat-turn .body {
-  color: var(--silk-65);
-  font-size: 14px;
-  line-height: 1.62;
+  color: var(--silk);
+  font-size: 15px;
+  line-height: 1.55;
   white-space: pre-wrap;
 }
 .vmx-lib-chat-turn[data-role="viber"] .body {
@@ -1048,6 +1106,22 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
 .vmx-lib-chat-tool[data-ok="true"] .gem {
   background: var(--amber);
   box-shadow: var(--glow-soft);
+}
+.vmx-lib-chat-tool[data-proof="true"] {
+  border-color: rgba(214, 207, 199, 0.12);
+  background:
+    linear-gradient(90deg, rgba(160, 190, 255, 0.055), transparent 70%),
+    var(--void-3);
+}
+.vmx-lib-chat-tool[data-proof="true"][data-ok="true"] {
+  border-color: var(--amber-22);
+}
+.vmx-lib-chat-tool[data-proof="true"][data-ok="false"] {
+  border-color: rgba(255, 89, 89, 0.28);
+}
+.vmx-lib-chat-tool[data-proof="true"][data-ok="false"] .gem {
+  background: var(--led-fault);
+  box-shadow: 0 0 10px rgba(255, 89, 89, 0.22);
 }
 .vmx-lib-chat-tool .name {
   font-family: var(--type-mono);
@@ -1116,6 +1190,132 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
 .vmx-lib-chat-card .line:last-child {
   border-bottom: 0;
 }
+.vmx-lib-chat-card .set {
+  display: flex;
+  flex-direction: column;
+}
+.vmx-lib-chat-card .setrow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--silk-12);
+}
+.vmx-lib-chat-card .setrow:last-child {
+  border-bottom: 0;
+}
+.vmx-lib-chat-card .setrow .rank {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+.vmx-lib-chat-card .setrow .t {
+  font-size: 12px;
+  color: var(--silk-65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vmx-lib-chat-grade {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 3px 8px;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--silk-12);
+  background: rgba(255, 251, 244, 0.012);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  line-height: 1.25;
+  text-transform: uppercase;
+  transition:
+    background var(--motion-snap) var(--ease-brand),
+    border-color var(--motion-snap) var(--ease-brand),
+    box-shadow var(--motion-snap) var(--ease-brand);
+}
+.vmx-lib-chat-grade:hover {
+  background:
+    linear-gradient(90deg, var(--brand-12), transparent 74%),
+    rgba(255, 251, 244, 0.018);
+}
+.vmx-lib-chat-grade[data-intel="earned"]:hover {
+  box-shadow: inset 0 0 0 1px var(--brand-22);
+}
+.vmx-lib-chat-grade[data-intel="care"]:hover {
+  background:
+    linear-gradient(90deg, var(--glass-2), transparent 74%),
+    rgba(255, 251, 244, 0.014);
+  box-shadow: inset 0 0 0 1px var(--glass-edge-up);
+}
+.vmx-lib-chat-grade[data-overdrive="true"] {
+  background:
+    linear-gradient(90deg, var(--brand-08), transparent 72%),
+    rgba(255, 251, 244, 0.014);
+}
+.vmx-lib-chat-grade[data-level-up="true"] {
+  background:
+    linear-gradient(90deg, var(--gold-glow), var(--brand-08) 42%, transparent 82%),
+    rgba(255, 251, 244, 0.018);
+  box-shadow: inset 0 0 0 1px var(--gold-glow);
+}
+.vmx-lib-chat-grade .grade-label {
+  color: var(--amber);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.vmx-lib-chat-grade .grade-xp {
+  color: var(--gold);
+  white-space: nowrap;
+}
+.vmx-lib-chat-grade .grade-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--silk);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vmx-lib-chat-grade .grade-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.vmx-lib-chat-grade .grade-progress {
+  flex: 0 0 auto;
+  color: var(--gold);
+  text-shadow: 0 0 10px var(--gold-glow);
+  white-space: nowrap;
+}
+.vmx-lib-chat-grade[data-level-up="true"] .grade-progress {
+  color: var(--gold);
+  font-weight: 700;
+}
+.vmx-lib-chat-grade .grade-reason {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  color: var(--silk-40);
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+.vmx-lib-chat-grade[data-move-grade="negative"] .grade-label {
+  color: var(--led-fault);
+}
+.vmx-lib-chat-grade[data-move-grade="mid"] .grade-label {
+  color: var(--silk-65);
+}
+.vmx-lib-chat-grade[data-intel="care"] .grade-xp {
+  color: var(--silk-40);
+  text-shadow: none;
+}
+.vmx-lib-chat-grade:last-child {
+  border-bottom: 0;
+}
 .vmx-lib-chat-empty {
   font-size: 12px;
   line-height: 1.5;
@@ -1128,6 +1328,16 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
 @keyframes vmx-lib-receipt-draw {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
+}
+@keyframes vmx-lib-grade-level-up {
+  from { opacity: 0.72; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vmx-lib-chat-grade[data-level-up="true"] {
+    animation: vmx-lib-grade-level-up var(--motion-step) var(--ease-brand) both;
+  }
 }
 
 /* Real backend error — surfaced honestly instead of masking with fake data.
@@ -1203,7 +1413,7 @@ body[data-mode="build"] .vmx-lib-rationale {
   font-size: 14px;
   line-height: 1.5;
 }
-.vmx-lib-briefbox textarea::placeholder { color: var(--silk-22); }
+.vmx-lib-briefbox textarea::placeholder { color: var(--silk-40); }
 
 /* energy-curve segmented selector — a single inset rail of LED segments, the
    active one lit amber. Built from the .vmx-lib-modeswitch material (the same
@@ -1304,9 +1514,8 @@ body[data-mode="build"] .vmx-lib-rationale {
   border: 1px solid rgba(214, 207, 199, 0.060);
   border-radius: var(--rad-sm);
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 138, 61, 0.020), transparent 45%),
-    repeating-linear-gradient(90deg, transparent 0 20px, rgba(214, 207, 199, 0.008) 20px 21px),
-    repeating-linear-gradient(0deg, transparent 0 20px, rgba(214, 207, 199, 0.008) 20px 21px),
+    radial-gradient(circle at 50% 50%, rgba(255, 138, 61, 0.018), transparent 46%),
+    linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 42%, rgba(0, 0, 0, 0.18)),
     rgba(0, 0, 0, 0.18);
   box-shadow:
     inset 0 2px 12px rgba(0, 0, 0, 0.66),
@@ -1328,16 +1537,16 @@ body[data-mode="build"] .vmx-lib-rationale {
 .vmx-lib-scope svg { display: block; width: 100%; height: 100%; }
 .vmx-lib-ringlabel {
   font-family: var(--type-mono);
-  font-size: 8.5px;
-  fill: var(--silk-22);
-  letter-spacing: 0.1em;
+  font-size: 9px;
+  fill: var(--silk-40);
+  letter-spacing: 0.06em;
 }
 .vmx-lib-dot-near { filter: drop-shadow(0 0 5px var(--amber-40)); }
 .vmx-lib-dot-origin { filter: drop-shadow(0 0 7px var(--amber-65)); }
 
 .vmx-lib-legend {
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--glass-edge);
   display: flex;
   flex-direction: column;
@@ -1347,8 +1556,8 @@ body[data-mode="build"] .vmx-lib-rationale {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
-  color: var(--silk-65);
+  font-size: 12.5px;
+  color: var(--silk);
 }
 .vmx-lib-legend .ln .sw { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .vmx-lib-legend .ln .sw.origin { background: var(--amber); box-shadow: var(--glow-soft); }
@@ -1361,7 +1570,7 @@ body[data-mode="build"] .vmx-lib-rationale {
   color: var(--silk-40);
 }
 .vmx-lib-scope-note { margin-top: 14px; font-size: 11.5px; line-height: 1.5; color: var(--silk-40); }
-.vmx-lib-scope-note b { color: var(--silk-65); font-weight: 500; }
+.vmx-lib-scope-note b { color: var(--silk); font-weight: 500; }
 
 /* sonar ping on the origin dot */
 @keyframes vmx-lib-ping {
@@ -1389,10 +1598,12 @@ body[data-mode="ingest"] .vmx-lib-qecho { display: none; }
 .vmx-lib-progress i {
   position: absolute;
   inset: 0;
-  width: 0%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
   background: linear-gradient(90deg, var(--amber-deep), var(--amber));
   box-shadow: var(--glow-soft);
-  transition: width 0.3s ease-out;
+  transition: transform 0.3s ease-out;
 }
 .vmx-lib-proghead {
   display: flex;
@@ -1444,6 +1655,7 @@ body[data-mode="ingest"] .vmx-lib-qecho { display: none; }
   .vmx-lib-row.settled { transition: none; }
   .vmx-lib-seed-ping { animation: none; }
   .vmx-lib-brand .dot { animation: none; }
+  .vmx-lib-chat-grade { transition: none; }
 }
 
 @media (max-width: 1120px) {

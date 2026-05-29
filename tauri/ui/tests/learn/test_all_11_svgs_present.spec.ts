@@ -2,13 +2,10 @@
 // REQ-ID: RENDER-01 — All 11 controllers have SVG files at
 //                    `tauri/ui/src/learn/controllers/<id>.svg.ts` — 10
 //                    specific (Pioneer, Numark, Hercules) + 1 `_generic`
-//                    fallback. Wave 0 ships the test contract; Plan 05
-//                    lands FLX4 + _generic, Plan 06 lands the other 9.
+//                    fallback.
 //
-// Phase 91 Plan 02 — RED-state per-ID. Each missing SVG becomes a `it.skip`
-// with a TODO note pointing the next executor at the right plan. When
-// Plan 05/06 land an SVG, the corresponding case auto-promotes from skip
-// to assertion (the loop checks file presence at registration time).
+// Partial-build friendly: a missing SVG becomes `it.skip`; in this repo state
+// all expected SVG modules should exist and run as live assertions.
 
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";

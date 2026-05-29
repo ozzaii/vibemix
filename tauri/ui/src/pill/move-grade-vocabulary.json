@@ -1,0 +1,56 @@
+{
+  "negative": {
+    "label": "NEG",
+    "xp": 0,
+    "intensity": 0,
+    "reason": "risk too high",
+    "deserved": false,
+    "overdrive": false,
+    "sentiment": "negative"
+  },
+  "mid": {
+    "label": "MID",
+    "xp": 8,
+    "intensity": 24,
+    "reason": "works with care",
+    "deserved": false,
+    "overdrive": false,
+    "sentiment": "neutral"
+  },
+  "clean": {
+    "label": "CLEAN",
+    "xp": 28,
+    "intensity": 48,
+    "reason": "clean fit",
+    "deserved": true,
+    "overdrive": false,
+    "sentiment": "positive"
+  },
+  "sexy": {
+    "label": "SEXY",
+    "xp": 48,
+    "intensity": 66,
+    "reason": "smooth blend",
+    "deserved": true,
+    "overdrive": false,
+    "sentiment": "positive"
+  },
+  "bomb": {
+    "label": "BOMB",
+    "xp": 72,
+    "intensity": 84,
+    "reason": "big payoff",
+    "deserved": true,
+    "overdrive": false,
+    "sentiment": "positive"
+  },
+  "lit_aff": {
+    "label": "LIT AFF",
+    "xp": 100,
+    "intensity": 100,
+    "reason": "everything clicks",
+    "deserved": true,
+    "overdrive": true,
+    "sentiment": "positive"
+  }
+}

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Plan 29-05 Task 2 — TLDR audio player (HTML5 audio + duration display).
 
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { setTimelinePlayhead } from "./timeline.js";
 
 export interface TldrPayload {
@@ -27,6 +28,11 @@ export interface TldrPlayerOptions {
   sessionDurationS?: number;
 }
 
+interface TauriAssetWindow {
+  __TAURI_INTERNALS__?: unknown;
+  __TAURI__?: { core?: { convertFileSrc?: (s: string) => string } };
+}
+
 export function mountTldrPlayer(
   container: HTMLElement,
   payload: TldrPayload,
@@ -39,6 +45,23 @@ export function mountTldrPlayer(
   duration.className = "vmx-debrief-tldr-meta";
   duration.textContent = `${Math.round(payload.duration_s)}s • ${payload.mime_type}`;
 
+  const hud = document.createElement("div");
+  hud.className = "vmx-debrief-tldr-hud";
+  for (const [label, value] of [
+    ["Summary", `${Math.round(payload.duration_s)}s`],
+    ["Format", payload.mime_type],
+    ["Hash", shortHash(payload.tldr_sha256)],
+  ] as const) {
+    const cell = document.createElement("span");
+    cell.className = "vmx-debrief-tldr-hud-cell";
+    const key = document.createElement("small");
+    key.textContent = label;
+    const readout = document.createElement("strong");
+    readout.textContent = value;
+    cell.append(key, readout);
+    hud.append(cell);
+  }
+
   const audio = document.createElement("audio");
   audio.controls = true;
   audio.preload = "metadata";
@@ -46,9 +69,8 @@ export function mountTldrPlayer(
 
   // The Rust shell passes the session-dir absolute path via the URL
   // query; we point the <audio> src at asset://<host>/<abs_path>.
-  // convertFileSrc handles the platform-specific prefix; we use it lazily
-  // (the @tauri-apps/api/core dynamic import keeps the module testable
-  // without Tauri runtime present).
+  // buildAssetUrl uses convertFileSrc only when the desktop runtime is present,
+  // keeping browser dev and unit tests on the deterministic fallback URL.
   const url = buildAssetUrl(`${sessionDirAbs}/${payload.audio_relative_path}`);
   audio.src = url;
 
@@ -71,7 +93,7 @@ export function mountTldrPlayer(
     audio.addEventListener("ended", () => sync(false));
   }
 
-  container.append(duration, audio);
+  container.append(duration, hud, audio);
 }
 
 /**
@@ -130,18 +152,22 @@ function formatDuration(totalS: number): string {
   return `${Math.round(totalS)}S`;
 }
 
+function shortHash(value: string): string {
+  return value ? value.slice(0, 10) : "pending";
+}
+
 function buildAssetUrl(path: string): string {
-  // In production, `@tauri-apps/api/core::convertFileSrc` renders
-  // `asset://localhost/<encoded path>`. The function-level import keeps
-  // unit tests synchronous; the imports below are static so vitest can
-  // hook them.
+  // In production, `@tauri-apps/api/core::convertFileSrc` renders the
+  // platform-correct asset URL even when the window.__TAURI__ global is
+  // disabled. The fallback keeps browser dev and unit tests synchronous.
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const core = (window as unknown as {
-      __TAURI__?: { core?: { convertFileSrc?: (s: string) => string } };
-    }).__TAURI__?.core;
-    if (core?.convertFileSrc) {
-      return core.convertFileSrc(path);
+    const tauriWindow = window as unknown as TauriAssetWindow;
+    if (tauriWindow.__TAURI_INTERNALS__) {
+      return convertFileSrc(path);
+    }
+    const legacyConvert = tauriWindow.__TAURI__?.core?.convertFileSrc;
+    if (legacyConvert) {
+      return legacyConvert(path);
     }
   } catch {
     // fall through

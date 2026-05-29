@@ -23,7 +23,7 @@
 //   - buttons:  play:A play:B cue:A cue:B sync:A sync:B
 //     jog_touch:A jog_touch:B loop_in:A loop_in:B loop_out:A loop_out:B
 
-export const PIONEER_DDJ_400_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-label="Pioneer DDJ-400 schematic" class="learn-controller-schematic">
+export const PIONEER_DDJ_400_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" class="learn-controller-schematic">
   <!-- Faceplate outline (non-interactive, decorative) -->
   <rect x="60" y="60" width="1160" height="600" rx="16" ry="16"
         stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.55"/>

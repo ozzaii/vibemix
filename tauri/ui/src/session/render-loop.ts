@@ -32,6 +32,7 @@ import type { CitationChip } from "./components/citation-strip.js";
 
 let rafHandle: number | null = null;
 let mountedRef: Mounted | null = null;
+let modeChangeSeq = 0;
 
 /** Wave 6 (H9) — handler for the "↻ RETRY" button rendered in the cohost
  *  foot after grounding has been false for >5s. There's no dedicated
@@ -70,6 +71,13 @@ function openVibeEngineHandler(): void {
   });
 }
 
+function openModeSurface(mode: "cohost" | "learn" | "build" | "debrief"): Promise<unknown> {
+  if (mode === "learn") return invoke("open_learn_window");
+  if (mode === "build") return invoke("open_library_window");
+  if (mode === "debrief") return invoke("open_debrief_window", { sessionDir: "" });
+  return Promise.resolve();
+}
+
 /** 2026-05-26 /impeccable critique P1 — in-deck mood cycle. Advances the
  *  co-host mood HYPE → TEACH → COACH → HYPE and writes it through the same
  *  real, already-wired knob the settings drawer uses
@@ -94,18 +102,38 @@ function cohostMoodCycleHandler(): void {
  *  the singleton SessionState IMMEDIATELY (the optimistic-repaint half
  *  was already done by the picker's click handler flipping data-active;
  *  this propagates the change into state so subsequent re-renders read
- *  the new mode), THEN fires `ipc.session.set_mode` so the sidecar
- *  persists. Fire-and-forget — the optimistic repaint is authoritative
- *  for the user-visible state; the wire round-trip is pure persistence. */
+ *  the new mode). Surface modes open their matching windows first; only after
+ *  that succeeds does the handler fire `ipc.session.set_mode` so the sidecar
+ *  persists. If the owning window fails to open, revert the optimistic local
+ *  mode instead of leaving the app claiming a surface the user cannot see. */
 function modeChangeHandler(mode: "cohost" | "learn" | "build" | "debrief"): void {
+  const previousMode = getSessionState().mode ?? "cohost";
+  if (mode === previousMode) return;
+  const seq = ++modeChangeSeq;
   // 1. Local state write — keeps the singleton in sync with the DOM.
   setSessionState({ mode });
-  // 2. Wire envelope — sidecar persists via ConfigStore.extra under
-  //    "session.mode" so the next launch boots into the last-picked mode.
-  void emitIpc("ipc.session.set_mode", { mode }).catch((err: unknown) => {
-    // eslint-disable-next-line no-console
-    console.warn("[render-loop] set_mode emitIpc failed:", err);
-  });
+  void (async () => {
+    try {
+      await openModeSurface(mode);
+    } catch (err: unknown) {
+      if (seq !== modeChangeSeq || getSessionState().mode !== mode) return;
+      // eslint-disable-next-line no-console
+      console.warn("[render-loop] mode surface open failed:", err);
+      setSessionState({ mode: previousMode });
+      return;
+    }
+
+    if (seq !== modeChangeSeq || getSessionState().mode !== mode) return;
+
+    // 2. Wire envelope — sidecar persists via ConfigStore.extra under
+    //    "session.mode" so the next launch boots into the last-picked mode.
+    try {
+      await emitIpc("ipc.session.set_mode", { mode });
+    } catch (err: unknown) {
+      // eslint-disable-next-line no-console
+      console.warn("[render-loop] set_mode emitIpc failed:", err);
+    }
+  })();
 }
 
 /** Phase 44-03 / LAUNCH-02 — chip-click handler. Invokes the Tauri
@@ -136,11 +164,9 @@ function cohostOpenAllHandler(): void {
 function cohostChipClickHandler(chip: CitationChip): void {
   // For now the live session passes the empty session_dir (TODO: thread
   // through SessionSnapshot.session_dir once Phase 45 wires it). The
-  // Rust side's `validate_under_root` rejects empty paths today, so the
-  // chip-click in a live session window logs an error and is a no-op
-  // until the wiring is complete. Recorded-session chip-clicks (when
-  // the debrief window is the chip-clicker's parent, v2.x) carry the
-  // session_dir already.
+  // Rust command resolves an empty session_dir to the latest validated
+  // recording directory, so live chips and the "see all" button share
+  // the same current-session fallback.
   void invoke("open_debrief_window", {
     sessionDir: "",
     deepLink: {
@@ -517,6 +543,7 @@ function trackFrameTime(dtMs: number): void {
 export const _internals = {
   tick,
   projectToLayoutState,
+  modeChangeHandler,
   formatHotkey,
   formatWallClock,
   formatElapsed,

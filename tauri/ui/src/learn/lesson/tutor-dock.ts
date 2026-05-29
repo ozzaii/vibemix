@@ -18,14 +18,15 @@
 //   - On new tutor_speak (data_state="hint"):
 //       data-state="hint" set on root → dock height 120 → 160 px.
 //       hint italic line APPENDS below .now (does not replace .now).
+//       cite chip updates if the hint carries grounded control evidence.
 //   - On .advance():
 //       prior .now → .g1; .now cleared. Hint lines cleared.
 //   - On .hide():
 //       data-state="idle"; all text cleared.
 //
-// Citations array in the P92 hello-world lesson is `[]` — so the cite
-// chip never renders in P92. The receipt rule still draws, just
-// terminates blunt. P94 lights the chip once exemplar citations exist.
+// Citations light the existing cite chip. Teaching and hint turns often cite
+// the highlighted screen control; exemplar and track atoms reuse the same
+// compact chip without adding a second teaching surface.
 //
 // SR announcements: writes payload.text to a shared
 // `#learn-sr-announcement` aria-live region (P91 wires the region on
@@ -39,16 +40,46 @@ export interface TutorSpeakPayload {
   data_state: "active" | "hint";
 }
 
+export interface TutorAdvanceFeedback {
+  label: string;
+  count: number;
+  sourceLabel?: string;
+}
+
 export interface TutorSpeakHandle extends HTMLDivElement {
   /** Apply a new tutor_speak envelope. Handles the active/hint fork. */
   show(payload: TutorSpeakPayload): void;
   /** Cycle current → g1 (called on ipc.learn.advance — no new line yet). */
-  advance(): void;
+  advance(feedback?: TutorAdvanceFeedback): void;
   /** Collapse dock + clear all text (called on idle / complete). */
   hide(): void;
 }
 
 const SR_REGION_ID = "learn-sr-announcement";
+const CITATION_CONTROL_LABELS: Record<string, string> = {
+  cue: "cue",
+  eq_hi: "high EQ",
+  eq_low: "low EQ",
+  eq_mid: "mid EQ",
+  filter: "filter",
+  filter_fx: "filter FX",
+  fx_echo: "echo FX",
+  headphone_cue: "headphone cue",
+  hotcue: "hot cue",
+  jog: "jog wheel",
+  jog_touch: "jog wheel",
+  jog_touched: "jog wheel",
+  lesson_continue: "continue",
+  loop_in: "loop in",
+  loop_out: "loop out",
+  master_vol: "master volume",
+  play: "play",
+  sync: "sync",
+  tap_tempo: "tap tempo",
+  tempo: "pitch fader",
+  vol: "channel fader",
+  xfader: "crossfader",
+};
 
 /**
  * Build the tutor-speak dock element. Returns the root `<div>` with
@@ -81,6 +112,9 @@ export function TutorSpeakDock(): TutorSpeakHandle {
   const rule = document.createElement("span");
   rule.className = "rule";
   receipt.appendChild(rule);
+  const takePulse = document.createElement("span");
+  takePulse.className = "take-pulse";
+  receipt.appendChild(takePulse);
   const cite = document.createElement("span");
   cite.className = "cite";
   receipt.appendChild(cite);
@@ -105,7 +139,9 @@ export function TutorSpeakDock(): TutorSpeakHandle {
       line.className = "hint-line";
       line.textContent = payload.text;
       hintLines.appendChild(line);
-      sr.textContent = `hint: ${payload.text}`;
+      renderCitation(payload.citations, cite);
+      sr.setAttribute("aria-live", "assertive");
+      sr.textContent = payload.text;
       return;
     }
     // ACTIVE path — shuffle ghosts down, set new .now, draw receipt.
@@ -116,6 +152,8 @@ export function TutorSpeakDock(): TutorSpeakHandle {
     now.textContent = payload.text;
     // Clear prior hint lines — each new active beat starts hint-free.
     hintLines.textContent = "";
+    takePulse.removeAttribute("data-active");
+    takePulse.textContent = "";
     // Re-trigger the rise animation by removing+re-adding the class so
     // the keyframe restarts (CSS doesn't replay an animation on the
     // same class unless we force a reflow). Pattern lifted from the
@@ -129,20 +167,12 @@ export function TutorSpeakDock(): TutorSpeakHandle {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     void rule.offsetWidth;
     rule.classList.add("rule");
-    // Cite chip — light only when citations non-empty. For P92's
-    // hello-world lesson, citations=[] so the chip stays hidden +
-    // the receipt rule terminates blunt.
-    if (payload.citations.length > 0) {
-      cite.textContent = `◂ ${formatCitation(payload.citations[0]!)}`;
-      cite.setAttribute("data-active", "true");
-    } else {
-      cite.textContent = "";
-      cite.removeAttribute("data-active");
-    }
+    renderCitation(payload.citations, cite);
+    sr.setAttribute("aria-live", "polite");
     sr.textContent = payload.text;
   };
 
-  root.advance = () => {
+  root.advance = (feedback?: TutorAdvanceFeedback) => {
     // The runtime confirmed the user matched the expected action; the
     // current beat recedes into ghost memory. The next active beat
     // arrives on the following ipc.learn.tutor_speak.
@@ -150,6 +180,23 @@ export function TutorSpeakDock(): TutorSpeakHandle {
     g1.textContent = now.textContent;
     now.textContent = "";
     hintLines.textContent = "";
+    if (feedback) {
+      const segments = [
+        feedback.label,
+        feedback.sourceLabel,
+        String(feedback.count).padStart(2, "0"),
+      ].filter((segment): segment is string => Boolean(segment));
+      const receiptText = segments.join(" · ");
+      takePulse.textContent = receiptText;
+      takePulse.setAttribute("aria-label", `matched ${receiptText}`);
+      takePulse.setAttribute("data-active", "true");
+      sr.setAttribute("aria-live", "polite");
+      sr.textContent = `matched ${receiptText}`;
+    } else {
+      takePulse.removeAttribute("data-active");
+      takePulse.removeAttribute("aria-label");
+      takePulse.textContent = "";
+    }
     cite.removeAttribute("data-active");
     cite.textContent = "";
   };
@@ -160,6 +207,9 @@ export function TutorSpeakDock(): TutorSpeakHandle {
     g1.textContent = "";
     now.textContent = "";
     hintLines.textContent = "";
+    takePulse.removeAttribute("data-active");
+    takePulse.removeAttribute("aria-label");
+    takePulse.textContent = "";
     cite.removeAttribute("data-active");
     cite.textContent = "";
   };
@@ -167,18 +217,54 @@ export function TutorSpeakDock(): TutorSpeakHandle {
   return root;
 }
 
+function renderCitation(
+  citations: ReadonlyArray<string>,
+  cite: HTMLSpanElement,
+): void {
+  if (citations.length > 0) {
+    cite.textContent = `◂ ${formatCitation(citations[0]!)}`;
+    cite.setAttribute("data-active", "true");
+    return;
+  }
+  cite.textContent = "";
+  cite.removeAttribute("data-active");
+}
+
 /**
  * Translate a wire-shape citation token into the chip's display form.
  *
- * P92 hello-world citations=[] so this branch is dormant; the formatter
- * exists so when P93's exemplar engine starts emitting citations
- * (e.g. `[exemplar:track_1234]` or `[track:abc]`), the chip text reads
- * cleanly without a follow-up refactor.
+ * Control, exemplar, and track citations share the same compact chip grammar
+ * so grounded coaching remains one line instead of turning into a log panel.
  */
 function formatCitation(c: string): string {
-  // Drop bracket wrappers; collapse the source-prefix delimiter to space.
+  // Drop bracket wrappers, remove optional @time from time-keyed sources,
+  // then collapse source/body separators into a compact chip label.
   const inner = c.replace(/^\[|\]$/g, "");
-  return inner.replace(":", " ").toUpperCase();
+  const separator = inner.indexOf(":");
+  if (separator < 0) return inner.toUpperCase();
+  const source = inner.slice(0, separator);
+  const body = inner.slice(separator + 1).replace(/@[0-9]+(?:\.[0-9]+)?$/, "");
+  const displayBody =
+    source === "midi" || source === "screen"
+      ? formatControlCitationBody(body)
+      : body.replace(/[:_]+/g, " ");
+  return `${source} ${displayBody}`.trim().toUpperCase();
+}
+
+function formatControlCitationBody(body: string): string {
+  const [control, deck] = splitControlBody(body);
+  const label =
+    CITATION_CONTROL_LABELS[control] ?? control.replace(/[_:]+/g, " ");
+  if (!deck) return label;
+  return `deck ${deck} ${label}`;
+}
+
+function splitControlBody(body: string): [control: string, deck: string] {
+  const separator = body.lastIndexOf(":");
+  if (separator < 0) return [body, ""];
+  const deck = body.slice(separator + 1);
+  if (!/^[A-D]$/.test(deck)) return [body, ""];
+  return [body.slice(0, separator), deck];
 }
 
 /**
@@ -197,6 +283,7 @@ function ensureSrRegion(): HTMLElement {
   const created = document.createElement("div");
   created.id = SR_REGION_ID;
   created.className = "learn-sr-announcement";
+  created.setAttribute("data-sr-region", "tutor");
   created.setAttribute("aria-live", "polite");
   created.setAttribute("aria-atomic", "true");
   if (document.body) {

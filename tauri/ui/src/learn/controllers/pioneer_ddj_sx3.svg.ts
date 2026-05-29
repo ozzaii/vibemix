@@ -26,7 +26,7 @@
 //   - buttons: play/cue/sync/jog_touch per A,B,C,D
 //                + hotcue:A + hotcue:B  (18 buttons)
 
-export const PIONEER_DDJ_SX3_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-label="Pioneer DDJ-SX3 schematic" class="learn-controller-schematic">
+export const PIONEER_DDJ_SX3_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" class="learn-controller-schematic">
   <!-- Faceplate outline -->
   <rect x="40" y="60" width="1200" height="600" rx="16" ry="16"
         stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.55"/>

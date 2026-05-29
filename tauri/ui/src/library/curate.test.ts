@@ -118,6 +118,9 @@ function doMockApi(): void {
     onEmbedProgress: vi.fn(async () => () => {}),
     onEmbedDone: vi.fn(async () => () => {}),
     onModelProgress: vi.fn(async () => () => {}),
+    onLiveDeckContext: vi.fn(async () => () => {}),
+    onLiveMoveContext: vi.fn(async () => () => {}),
+    onViberTool: vi.fn(async () => () => {}),
     // DEV_FALLBACK is consumed by the ingest replay; keep the real embedLog shape.
     DEV_FALLBACK: { embedLog: [] },
   }));
@@ -282,5 +285,27 @@ describe("curate — real renderCurate path (jsdom, via mountLibrary)", () => {
     expect(emptyEl?.textContent).toContain("no_create");
     expect(document.querySelectorAll(".vmx-lib-row")).toHaveLength(0);
     expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("0 in set");
+  });
+
+  it("renders Viber clarification choices as an inline no-set state", async () => {
+    const clarification: CurateResult = {
+      name: "warehouse",
+      stop_reason: "clarification_needed",
+      rationale: "Which direction should I take this?",
+      question: "Which direction should I take this?",
+      choices: ["More hypnotic", "Brighter peak-time pressure"],
+      count: 0,
+      tracks: [],
+    };
+    await runRealCurate(clarification);
+    const results = document.getElementById("vmx-lib-results") as HTMLElement;
+    const emptyEl = results.querySelector(".vmx-lib-clarification");
+    expect(emptyEl?.textContent).toContain("Viber needs one detail");
+    expect(emptyEl?.textContent).toContain("Which direction should I take this?");
+    expect(emptyEl?.textContent).toContain("More hypnotic");
+    expect(emptyEl?.textContent).toContain(
+      "Add one choice to the theme and run Viber again.",
+    );
+    expect(document.querySelectorAll(".vmx-lib-row")).toHaveLength(0);
   });
 });

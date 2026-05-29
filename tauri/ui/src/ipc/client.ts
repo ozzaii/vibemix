@@ -155,6 +155,7 @@ const _SUB_THROTTLE_MS = 2000;
 const _HIGH_FREQ_TYPES = new Set([
   "ipc.status.tick",
   "ipc.session.snapshot",
+  "ipc.learn.midi_position",
 ]);
 
 function logSubscribedFrame(type: string, msg: unknown): void {

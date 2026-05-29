@@ -52,6 +52,7 @@ import {
   mountSettingsDrawer,
   onDeleteRecording,
   openSettings,
+  unmountSettingsDrawer,
 } from "../../src/settings/SettingsDrawer.js";
 import {
   _resetSettingsUIStateForTests,
@@ -59,6 +60,10 @@ import {
   setRecordingsSlice,
   setSettingsUIState,
 } from "../../src/settings/state.js";
+import {
+  SETTINGS_RUNTIME_WIRES,
+  wireSelector,
+} from "../../src/mock-transfer/contract.js";
 
 beforeEach(() => {
   _resetSettingsUIStateForTests();
@@ -86,6 +91,32 @@ describe("mountSettingsDrawer", () => {
     expect(
       document.querySelectorAll(".vmx-settings-drawer__modal-slot").length,
     ).toBe(1);
+  });
+
+  it("exposes transfer anchors for the drawer shell", () => {
+    mountSettingsDrawer(document.body);
+    for (const wire of SETTINGS_RUNTIME_WIRES) {
+      expect(
+        document.querySelectorAll(wireSelector(wire)).length,
+        `${wire} should mount exactly once`,
+      ).toBe(1);
+    }
+  });
+
+  it("unmountSettingsDrawer removes shell nodes and resets open state", () => {
+    mountSettingsDrawer(document.body);
+    openSettings();
+    expect(getSettingsUIState().open).toBe(true);
+
+    unmountSettingsDrawer();
+
+    expect(getSettingsUIState().open).toBe(false);
+    expect(document.querySelector(".vmx-settings-backdrop")).toBeNull();
+    expect(document.querySelector(".vmx-settings-drawer")).toBeNull();
+    expect(document.querySelector(".vmx-settings-drawer__modal-slot")).toBeNull();
+
+    mountSettingsDrawer(document.body);
+    expect(document.querySelectorAll(".vmx-settings-drawer").length).toBe(1);
   });
 
   it("is idempotent — a second call does not duplicate nodes", () => {

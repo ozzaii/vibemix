@@ -48,6 +48,10 @@ export interface CitationChip {
 
 export interface CitationStripProps {
   chips: CitationChip[];
+  /** Default preserves the transcript contract (`[verb @ mm:ss]`). The pill
+   *  variant drops bracket grammar so the floating overlay reads as hardware
+   *  receipts, not chat-log text. */
+  variant?: "default" | "pill";
   /** Click handler — invoked with the FULL chip dict so the caller
    *  has `timestamp_s` for the debrief deep-link without re-lookup. */
   onChipClick: (chip: CitationChip) => void;
@@ -136,6 +140,14 @@ export function formatMmSs(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+export function citationChipText(
+  chip: Pick<CitationChip, "verb" | "timestamp_s">,
+  variant: CitationStripProps["variant"] = "default",
+): string {
+  const mmss = formatMmSs(chip.timestamp_s);
+  return variant === "pill" ? `${chip.verb} · ${mmss}` : `[${chip.verb} @ ${mmss}]`;
+}
+
 /**
  * Render the chip strip. Returns `null` (NOT an empty container) when
  * `chips` is empty — the caller can `if (strip) reactionEl.append(strip)`
@@ -145,8 +157,10 @@ export function renderCitationStrip(
   props: CitationStripProps,
 ): HTMLDivElement | null {
   if (props.chips.length === 0) return null;
+  const variant = props.variant ?? "default";
   const root = document.createElement("div");
   root.className = "vmx-citation-strip";
+  root.dataset.variant = variant;
   root.setAttribute("aria-label", "evidence citations");
   for (const chip of props.chips) {
     const btn = document.createElement("button");
@@ -155,7 +169,7 @@ export function renderCitationStrip(
     btn.dataset.eventId = chip.event_id;
     btn.dataset.timestampS = String(chip.timestamp_s);
     const mmss = formatMmSs(chip.timestamp_s);
-    btn.textContent = `[${chip.verb} @ ${mmss}]`;
+    btn.textContent = citationChipText(chip, variant);
     btn.setAttribute(
       "aria-label",
       `evidence: ${chip.verb} at ${mmss} · click to open debrief`,

@@ -111,7 +111,8 @@ export function renderWaveform(): HTMLElement {
  * Returns the number of lit bars (for tests).
  */
 export function setWaveform(el: HTMLElement, rms: number, _peak?: number | null): number {
-  const clamped = Math.max(0, Math.min(1, rms));
+  const safeRms = Number.isFinite(rms) ? rms : 0;
+  const clamped = Math.max(0, Math.min(1, safeRms));
   const litCount = Math.round(clamped * BAR_COUNT);
   if (el.dataset.litCount !== String(litCount)) {
     el.dataset.litCount = String(litCount);

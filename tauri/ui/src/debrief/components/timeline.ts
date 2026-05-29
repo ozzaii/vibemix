@@ -23,6 +23,8 @@ export interface TimelineSeekEvent extends CustomEvent {
   detail: { time: number; citation_event_id: string };
 }
 
+let activeDeepLinkListener: EventListener | null = null;
+
 export function mountTimelinePlaceholder(
   container: HTMLElement,
   chapters: TimelineChapter[],
@@ -43,9 +45,10 @@ export function mountTimelinePlaceholder(
   const signalBed = document.createElement("div");
   signalBed.className = "vmx-debrief-signal-bed";
   signalBed.setAttribute("aria-hidden", "true");
+  const firstChapter = chapters[0]!;
   for (let i = 0; i < 96; i += 1) {
     const bar = document.createElement("span");
-    const chapter = chapters[Math.floor((i / 96) * chapters.length)] ?? chapters[0];
+    const chapter = chapters[Math.floor((i / 96) * chapters.length)] ?? firstChapter;
     const chapterSpan = Math.max(1, chapter.end - chapter.start);
     const normalizedSpan = Math.min(1, chapterSpan / Math.max(1, totalDurationS));
     const pulse =
@@ -81,8 +84,7 @@ export function mountTimelinePlaceholder(
 
   container.append(signalBed, phaseRail, regionLayer, readout);
 
-  for (let i = 0; i < chapters.length; i += 1) {
-    const c = chapters[i];
+  for (const [i, c] of chapters.entries()) {
     const region = document.createElement("button");
     region.type = "button";
     region.className = "vmx-debrief-region";
@@ -105,8 +107,8 @@ export function mountTimelinePlaceholder(
       `Seek to ${c.label} at ${formatTime(c.start)}`,
     );
     const inspect = (): void => {
-      for (const active of regionLayer.querySelectorAll<HTMLElement>(
-        ".vmx-debrief-region[data-active='true']",
+      for (const active of Array.from(
+        regionLayer.querySelectorAll<HTMLElement>(".vmx-debrief-region[data-active='true']"),
       )) {
         delete active.dataset.active;
       }
@@ -166,7 +168,11 @@ export function mountTimelinePlaceholder(
     // Tolerance fallback — pick the nearest region whose start is within
     // ±2.0s of the requested timestamp_s (matches the debrief-mode
     // tolerance band on EvidenceRegistry.has()).
-    if (!region && typeof detail.timestampS === "number") {
+    if (
+      !region &&
+      typeof detail.timestampS === "number" &&
+      Number.isFinite(detail.timestampS)
+    ) {
       let bestDelta = Number.POSITIVE_INFINITY;
       let bestEl: HTMLElement | null = null;
       for (const c of chapters) {
@@ -181,23 +187,24 @@ export function mountTimelinePlaceholder(
       region = bestEl;
     }
     if (!region) return;
-    region.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    region.scrollIntoView?.({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
     region.classList.add("vmx-debrief-region--highlight");
     window.setTimeout(() => {
       region!.classList.remove("vmx-debrief-region--highlight");
     }, TIMELINE_DEEP_LINK_HIGHLIGHT_MS);
   };
 
-  // Store the listener on the container so subsequent mounts can detach
-  // the previous handler (the debrief window currently only mounts the
-  // timeline once, but the dataset key keeps the pattern safe under
-  // hot-reload). The `as any` cast keeps the dataset-key write off the
-  // public TS surface.
-  const existing = (container as unknown as { __vmxDeepLink?: EventListener })
-    .__vmxDeepLink;
-  if (existing) window.removeEventListener("vmx-debrief-deeplink", existing);
-  (container as unknown as { __vmxDeepLink?: EventListener }).__vmxDeepLink =
-    onDeepLink;
+  // Keep a single window-scoped deep-link listener. The debrief app only
+  // shows one active timeline, and this prevents stale remounts from
+  // keeping detached DOM nodes alive.
+  if (activeDeepLinkListener) {
+    window.removeEventListener("vmx-debrief-deeplink", activeDeepLinkListener);
+  }
+  activeDeepLinkListener = onDeepLink;
   window.addEventListener("vmx-debrief-deeplink", onDeepLink);
 }
 

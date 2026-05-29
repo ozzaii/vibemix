@@ -14,7 +14,7 @@
  * glob), pure DOM assertions against the rendered HTMLElement.
  */
 import { describe, test, expect, vi } from "vitest";
-import { renderPicker, type PickerOption } from "./picker.js";
+import { disposePicker, renderPicker, type PickerOption } from "./picker.js";
 
 const OPTS: PickerOption[] = [
   { id: "house", label: "house" },
@@ -85,5 +85,23 @@ describe("picker — optimistic select (dead-dropdown fix)", () => {
     const { opts } = mount();
     expect(opts[0]!.dataset.selected).toBe("true"); // house
     expect(opts[1]!.dataset.selected).toBe("false");
+  });
+
+  test("dispose closes the popover and removes global listeners", () => {
+    const documentRemove = vi.spyOn(document, "removeEventListener");
+    const windowRemove = vi.spyOn(window, "removeEventListener");
+    const { root, row } = mount();
+
+    row.click();
+    expect(root.dataset.open).toBe("true");
+    disposePicker(root);
+
+    expect(root.dataset.open).toBe("false");
+    expect(documentRemove).toHaveBeenCalledWith("click", expect.any(Function));
+    expect(windowRemove).toHaveBeenCalledWith("scroll", expect.any(Function), true);
+    expect(windowRemove).toHaveBeenCalledWith("resize", expect.any(Function));
+
+    documentRemove.mockRestore();
+    windowRemove.mockRestore();
   });
 });

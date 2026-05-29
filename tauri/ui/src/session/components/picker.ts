@@ -36,6 +36,10 @@ export interface PickerProps {
   onChange?: (id: string) => void;
 }
 
+interface DisposablePickerElement extends HTMLElement {
+  __vmxDisposePicker?: () => void;
+}
+
 const CSS = `
   .vmx-picker {
     position: relative;
@@ -45,7 +49,7 @@ const CSS = `
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    height: 40px;
+    height: 42px;
     padding: 0 12px 0 10px;
     background: var(--glass-2);
     backdrop-filter: var(--blur-glass-display);
@@ -56,7 +60,7 @@ const CSS = `
       inset 0 1px 0 rgba(255, 255, 255, 0.035),
       inset 0 -1px 0 rgba(0, 0, 0, 0.45);
     cursor: pointer;
-    color: var(--silk-65);
+    color: var(--silk);
     transition: color var(--motion-snap) ease-out,
                 border-color var(--motion-snap) ease-out,
                 background var(--motion-snap) ease-out,
@@ -132,8 +136,8 @@ const CSS = `
     min-width: 0;
     font-family: var(--type-body);
     font-variation-settings: "wdth" 95, "wght" 500;
-    font-size: 12px;
-    letter-spacing: 0.04em;
+    font-size: 13px;
+    letter-spacing: 0.02em;
     line-height: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -161,7 +165,7 @@ const CSS = `
   }
   .vmx-picker__chev {
     font-family: var(--type-mono);
-    color: var(--silk-40);
+    color: var(--silk-65);
     font-size: 10px;
     line-height: 1;
     transition: color var(--motion-snap) ease-out,
@@ -293,7 +297,7 @@ const CSS = `
 registerStyle("vmx-picker", CSS);
 
 export function renderPicker(props: PickerProps): HTMLElement {
-  const root = document.createElement("div");
+  const root = document.createElement("div") as DisposablePickerElement;
   root.className = "vmx-picker";
   root.dataset.open = "false";
   root.setAttribute("aria-label", props.label);
@@ -439,12 +443,22 @@ export function renderPicker(props: PickerProps): HTMLElement {
   // still a DOM descendant of `root`), `root.contains(e.target)` continues
   // to match clicks inside the open popover, so an option click does NOT
   // self-dismiss before its own handler runs.
-  document.addEventListener("click", (e) => {
+  const onDocumentClick = (e: MouseEvent): void => {
     if (root.dataset.open !== "true") return;
     if (!(e.target instanceof Node) || !root.contains(e.target)) {
       closeList();
     }
-  });
+  };
+  document.addEventListener("click", onDocumentClick);
+
+  root.__vmxDisposePicker = () => {
+    closeList();
+    document.removeEventListener("click", onDocumentClick);
+  };
 
   return root;
+}
+
+export function disposePicker(el: HTMLElement): void {
+  (el as DisposablePickerElement).__vmxDisposePicker?.();
 }

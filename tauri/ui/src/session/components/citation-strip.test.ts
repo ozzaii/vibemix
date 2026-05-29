@@ -28,6 +28,7 @@ import { describe, test, expect, beforeEach, vi } from "vitest";
 import {
   renderCitationStrip,
   formatMmSs,
+  citationChipText,
   type CitationChip,
   _CSS_FOR_TEST,
 } from "./citation-strip.js";
@@ -63,6 +64,18 @@ describe("citation-strip — LAUNCH-02 contract", () => {
     expect(chips[0]?.textContent).toBe("[kick swap @ 0:45]");
     // 153.6s → 2:33 (153 / 60 = 2 min 33 sec, integer-truncated).
     expect(chips[1]?.textContent).toBe("[layer drop @ 2:33]");
+  });
+
+  test("2b — pill variant drops transcript brackets for hardware receipts", () => {
+    const root = renderCitationStrip({
+      chips: SAMPLE_CHIPS,
+      variant: "pill",
+      onChipClick: vi.fn(),
+    });
+    const chips = root!.querySelectorAll<HTMLButtonElement>(".vmx-citation-chip");
+    expect(root?.dataset.variant).toBe("pill");
+    expect(chips[0]?.textContent).toBe("kick swap · 0:45");
+    expect(chips[1]?.textContent).toBe("layer drop · 2:33");
   });
 
   test("3 — click handler invokes onChipClick with the matching chip", () => {
@@ -148,4 +161,12 @@ describe("formatMmSs — chip timestamp formatter", () => {
     expect(formatMmSs(3600)).toBe("60:00"));
   test("negative → 0:00 (defensive — clamp)", () =>
     expect(formatMmSs(-5)).toBe("0:00"));
+});
+
+describe("citationChipText — surface-specific receipt copy", () => {
+  test("default keeps transcript grammar; pill removes bracket noise", () => {
+    const chip = { verb: "echo out", timestamp_s: 64 };
+    expect(citationChipText(chip)).toBe("[echo out @ 1:04]");
+    expect(citationChipText(chip, "pill")).toBe("echo out · 1:04");
+  });
 });

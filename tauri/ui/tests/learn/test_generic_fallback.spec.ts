@@ -4,10 +4,7 @@
 //                    instead of factual control geometry, so any user who
 //                    plugs in an unrecognised controller still sees a
 //                    legible Learn surface they can navigate.
-//
-// Phase 91 Plan 02 — RED-state. The `_generic.svg.ts` module lands in
-// Plan 05; until then this case skips with a note pointing the next
-// executor at the right plan.
+// Partial-build friendly: skips only when the generic SVG module is absent.
 
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
@@ -24,7 +21,7 @@ describe("test_generic_fallback.spec.ts (RENDER-01)", () => {
   const testFn = GENERIC_EXISTS ? it : it.skip;
   testFn("_generic.svg.ts exports GENERIC_CONTROLLER_SVG with labeled zones", () => {
     const moduleSource = fs.readFileSync(GENERIC_SVG_PATH, "utf8");
-    // Plan 05 exports a named constant; check both common shapes.
+    // Named export the renderer imports for unknown controllers.
     const hasNamedExport = /export\s+const\s+GENERIC_CONTROLLER_SVG\s*=/.test(
       moduleSource,
     );

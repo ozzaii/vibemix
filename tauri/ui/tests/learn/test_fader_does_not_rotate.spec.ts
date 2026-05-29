@@ -9,17 +9,20 @@
 // existing highlight-latency test only exercised eq_hi:A (a knob), so the
 // regression was invisible to CI.
 //
-// This spec pins the CR-02 fix: faders must NOT receive a `rotate(...)`
-// transform; the renderer dispatches by control-id prefix (`classifyControl`)
-// and emits a `data-value` marker on the group instead. Knobs continue to
-// rotate. Buttons continue to set `data-active`.
-//
-// When per-fader geometry (data-axis / data-travel / class="thumb") lands in
-// a follow-up, this spec stays valid — the assertion is "no rotate on the
-// group", which is true whether faders translate the thumb or stay static.
+// This spec pins the CR-02 fix and its follow-up: faders must NOT receive a
+// `rotate(...)` transform on the parent group, but the visible thumb should
+// translate along the rail. Knobs continue to rotate. Buttons continue to set
+// `data-active`.
 
 import { describe, it, expect } from "vitest";
 import { applyPositionFrame } from "../../src/learn/components/controller-stage";
+
+function lastRect(group: SVGGElement): SVGRectElement {
+  const rects = Array.from(group.querySelectorAll(":scope > rect"));
+  const thumb = rects[rects.length - 1];
+  expect(thumb).not.toBeUndefined();
+  return thumb as SVGRectElement;
+}
 
 function makeStage(): HTMLElement {
   // Tiny synthetic SVG covering one of each control-type. We use the FLX4
@@ -51,7 +54,7 @@ function makeStage(): HTMLElement {
       <g data-control-id="play:A" data-cx="200" data-cy="430">
         <rect x="170" y="410" width="60" height="40"/>
       </g>
-      <!-- Jog-touch button (wire spelling jog_touched:A must normalise) -->
+      <!-- Jog-touch button (wire spellings jog_touched:A and jog:A must normalise) -->
       <g data-control-id="jog_touch:A" data-cx="265" data-cy="280">
         <circle cx="265" cy="280" r="100"/>
       </g>
@@ -72,6 +75,9 @@ describe("test_fader_does_not_rotate.spec.ts (CR-02 regression guard)", () => {
     expect(g.getAttribute("transform") ?? "").not.toMatch(/rotate/);
     // The CR-02 fix: data-value carries the wire value for CSS / follow-up.
     expect(g.getAttribute("data-value")).toBe("100");
+    const thumb = lastRect(g);
+    expect(thumb.getAttribute("data-fader-thumb")).toBe("true");
+    expect(thumb.getAttribute("transform")).toMatch(/^translate\(0 -/);
   });
 
   it("xfader — crossfader gets data-value, never a rotate transform", () => {
@@ -83,17 +89,23 @@ describe("test_fader_does_not_rotate.spec.ts (CR-02 regression guard)", () => {
     expect(g).not.toBeNull();
     expect(g.getAttribute("transform") ?? "").not.toMatch(/rotate/);
     expect(g.getAttribute("data-value")).toBe("32");
+    const thumb = lastRect(g);
+    expect(thumb.getAttribute("data-fader-thumb")).toBe("true");
+    expect(thumb.getAttribute("transform")).toMatch(/^translate\(-/);
   });
 
-  it("tempo:A — pitch fader gets data-value, never a rotate transform", () => {
+  it("tempo:A — pitch fader thumb translates, never rotating the group", () => {
     const stage = makeStage();
-    applyPositionFrame(stage, { "tempo:A": 64 });
+    applyPositionFrame(stage, { "tempo:A": 127 });
     const g = stage.querySelector(
       '[data-control-id="tempo:A"]',
     ) as SVGGElement;
     expect(g).not.toBeNull();
     expect(g.getAttribute("transform") ?? "").not.toMatch(/rotate/);
-    expect(g.getAttribute("data-value")).toBe("64");
+    expect(g.getAttribute("data-value")).toBe("127");
+    const thumb = lastRect(g);
+    expect(thumb.getAttribute("data-fader-thumb")).toBe("true");
+    expect(thumb.getAttribute("transform")).toBe("translate(0 -92)");
   });
 
   it("eq_hi:A — knob STILL rotates (the working path is preserved)", () => {
@@ -135,5 +147,19 @@ describe("test_fader_does_not_rotate.spec.ts (CR-02 regression guard)", () => {
     expect(g).not.toBeNull();
     expect(g.getAttribute("transform") ?? "").not.toMatch(/rotate/);
     expect(g.getAttribute("data-active")).toBe("1");
+  });
+
+  it("jog:A relative-move wire-key normalises to jog_touch:A pulse", () => {
+    const stage = makeStage();
+    applyPositionFrame(stage, { "jog:A": 127 });
+    const g = stage.querySelector(
+      '[data-control-id="jog_touch:A"]',
+    ) as SVGGElement;
+    expect(g).not.toBeNull();
+    expect(g.getAttribute("transform") ?? "").not.toMatch(/rotate/);
+    expect(g.getAttribute("data-active")).toBe("1");
+
+    applyPositionFrame(stage, { "jog:A": 0 });
+    expect(g.getAttribute("data-active")).toBe("0");
   });
 });

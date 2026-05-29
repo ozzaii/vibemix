@@ -180,8 +180,15 @@ export function applyFrame(state: PillState, frame: PillFrame, now: number): Pil
 
   if (isReaction) {
     // WRITER — enter (or re-extend) expand.
+    const cohostStatus = frame.cohostStatus ?? state.cohostStatus;
+    const voiceRms = typeof frame.voiceRms === "number" ? frame.voiceRms : state.voiceRms;
+    const voicePeak =
+      frame.voicePeak === undefined ? state.voicePeak : frame.voicePeak;
     return {
       ...state,
+      cohostStatus,
+      voiceRms,
+      voicePeak,
       mode: "expand",
       collapseAt: now + EXPAND_MS,
       reactionText: frame.text ?? "",

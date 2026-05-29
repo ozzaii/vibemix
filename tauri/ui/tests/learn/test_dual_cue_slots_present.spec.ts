@@ -2,13 +2,11 @@
 // REQ-ID: RENDER-05 — Every `<g data-control-id>` in every learn SVG carries
 //                    TWO empty child slots `<g class="cue-color"></g>` and
 //                    `<g class="cue-shape"></g>` — the dual-channel cue
-//                    scaffolding. P91 ships the SLOTS; P92 lights them on
+//                    scaffolding. Learn lights them on
 //                    `ipc.learn.highlight`.
 //
-// Phase 91 Plan 02 — RED-state. Annotated `expect: stub-only` because the
-// actual paint test (`test_a11y_highlight_dual_cue.spec.ts`) ships in P92.
-// Parameterised over the 11 controllers; each case skips until its SVG
-// lands (Plan 05+06).
+// Partial-build friendly: each case skips only when its SVG module is absent.
+// The separate highlight-paint tests prove the slots are lit at runtime.
 
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
@@ -43,8 +41,7 @@ describe("test_dual_cue_slots_present.spec.ts (RENDER-05)", () => {
     testFn(
       `${controllerId} — every <g data-control-id> has cue-color + cue-shape slots`,
       () => {
-        // expect: stub-only — pins the SLOT scaffolding (P91 ships empty
-        // slots, P92 lights them via `ipc.learn.highlight`).
+        // Pins the slot scaffolding that runtime highlights fill.
         const moduleSource = fs.readFileSync(svgPath, "utf8");
         const m = moduleSource.match(/=\s*`([\s\S]*?)`/);
         const svgString = m?.[1] ?? "";

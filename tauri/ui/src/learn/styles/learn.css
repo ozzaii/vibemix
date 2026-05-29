@@ -22,7 +22,8 @@
   display: grid;
   grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
   height: 100vh;
-  width: 100vw;
+  width: 100%;
+  max-width: 100vw;
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -37,11 +38,16 @@
   --learn-highlight: var(--amber);
 }
 
+#learn-root > * {
+  min-width: 0;
+}
+
 /* --- Titlebar (56px, mirrors wizard/debrief recipe) --- */
 .learn-titlebar {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
+  width: 100%;
   padding: 0 var(--sp-5);
   background:
     linear-gradient(180deg, rgba(18, 20, 28, 0.88), rgba(4, 5, 9, 0.82)),
@@ -120,6 +126,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   padding: var(--sp-7);
   overflow: hidden;
   min-height: 0;
@@ -146,6 +153,28 @@
 /* Interactive control hit-regions — focus ring + accessibility cursor. */
 .learn-stage svg [data-control-id] {
   cursor: pointer;
+  pointer-events: bounding-box;
+}
+
+.learn-stage svg [data-control-id][data-cue-color] {
+  color: var(--learn-highlight);
+  filter: drop-shadow(0 0 4px var(--amber-22));
+}
+
+.learn-stage svg [data-control-id][data-cue-color="amber"] {
+  --learn-highlight: var(--amber);
+}
+
+.learn-stage svg [data-control-id][data-cue-color="warning"] {
+  --learn-highlight: var(--led-warn);
+}
+
+.learn-stage svg [data-control-id][data-cue-shape="pulse-ring"] {
+  animation: learnCueGlowPulse var(--motion-led-pulse) ease-in-out infinite;
+}
+
+.learn-stage svg [data-control-id][data-cue-shape="static-glow"] {
+  filter: drop-shadow(0 0 6px var(--amber-40));
 }
 
 .learn-stage svg [data-control-id]:focus-visible {
@@ -157,6 +186,18 @@
 .learn-stage svg [data-control-id][data-active="1"] rect,
 .learn-stage svg [data-control-id][data-active="1"] circle {
   fill: var(--silk);
+}
+
+.learn-stage svg [data-control-id][data-value] rect[data-fader-thumb="true"] {
+  fill: currentColor;
+  opacity: 0.42;
+  transition: transform 90ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .learn-stage svg [data-control-id][data-value] rect[data-fader-thumb="true"] {
+    transition: none;
+  }
 }
 
 /* --- Empty state --- */
@@ -191,11 +232,262 @@
   margin: 0;
 }
 
+/* --- Practice booth prompt (frontstage, map stays opt-in) --- */
+.learn-booth-panel {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--statusbar-h) + var(--sp-5));
+  transform: translateX(-50%);
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    "kicker kicker"
+    "pulse pulse"
+    "primary secondary";
+  gap: var(--sp-2);
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-3);
+  background:
+    linear-gradient(180deg, rgba(18, 20, 28, 0.88), rgba(4, 5, 9, 0.82)),
+    rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
+}
+
+.learn-booth-panel[data-visible="false"] {
+  display: none;
+}
+
+.learn-booth-kicker {
+  grid-area: kicker;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  text-align: center;
+}
+
+.learn-booth-pulse {
+  grid-area: pulse;
+  min-height: 20px;
+  max-width: min(420px, calc(100vw - var(--sp-8)));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--silk-65);
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 100, "wght" 400;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.learn-booth-pulse[data-state="success"] {
+  color: var(--amber-pale);
+}
+
+.learn-booth-pulse.is-fresh {
+  animation: learnBoothPulseIn 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.learn-booth-primary,
+.learn-booth-secondary,
+.learn-screen-action,
+.learn-progress-list-head button {
+  height: 32px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--rad-sm);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .learn-booth-panel {
+    bottom: calc(var(--statusbar-h) + 92px + var(--sp-3));
+    width: min(280px, calc(100vw - var(--sp-6)));
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: var(--sp-2);
+  }
+
+  .learn-booth-primary,
+  .learn-booth-secondary {
+    height: auto;
+    min-height: 42px;
+    padding: var(--sp-2);
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: normal;
+  }
+
+  .learn-booth-pulse {
+    max-width: 100%;
+    white-space: normal;
+  }
+}
+
+.learn-booth-primary,
+.learn-screen-action {
+  border: 1px solid var(--amber-65);
+  background: var(--amber-22);
+  color: var(--silk);
+}
+
+.learn-booth-primary {
+  grid-area: primary;
+}
+
+.learn-booth-secondary,
+.learn-progress-list-head button {
+  border: 1px solid var(--glass-edge);
+  background: transparent;
+  color: var(--silk-65);
+}
+
+.learn-booth-secondary {
+  grid-area: secondary;
+}
+
+.learn-booth-primary:hover,
+.learn-booth-primary:focus-visible,
+.learn-booth-secondary:hover,
+.learn-booth-secondary:focus-visible,
+.learn-screen-action:hover,
+.learn-screen-action:focus-visible,
+.learn-progress-list-head button:hover,
+.learn-progress-list-head button:focus-visible {
+  outline: none;
+  color: var(--silk);
+  border-color: var(--amber-65);
+  box-shadow: var(--glow-faint);
+}
+
+.learn-screen-action {
+  position: fixed;
+  right: var(--sp-5);
+  bottom: calc(var(--statusbar-h) + var(--sp-5));
+  z-index: 22;
+  height: auto;
+  min-height: 32px;
+  max-width: min(260px, calc(100vw - var(--sp-6)));
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.learn-screen-action[hidden] {
+  display: none;
+}
+
+/* --- Exemplar chip (library-backed listening state) --- */
+.learn-exemplar-chip {
+  position: fixed;
+  left: var(--sp-5);
+  top: calc(var(--titlebar-h) + var(--sp-4));
+  z-index: 22;
+  display: inline-grid;
+  grid-template-columns: 8px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: min(520px, calc(100vw - var(--sp-8)));
+  height: 32px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(180deg, rgba(18, 20, 28, 0.9), rgba(4, 5, 9, 0.86)),
+    rgba(0, 0, 0, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.64);
+  color: var(--silk-65);
+  pointer-events: none;
+}
+
+#learn-root.lesson-mode .learn-exemplar-chip {
+  top: calc(var(--titlebar-h) + 56px + var(--sp-4));
+}
+
+.learn-exemplar-chip[hidden] {
+  display: none;
+}
+
+.learn-exemplar-chip[data-active="true"] {
+  border-color: var(--amber-22);
+}
+
+.learn-exemplar-chip__led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--silk-22);
+}
+
+.learn-exemplar-chip[data-active="true"] .learn-exemplar-chip__led {
+  background: var(--amber);
+  box-shadow: 0 0 5px var(--amber-40);
+  animation: learnBreathe var(--motion-led-pulse) ease-in-out infinite;
+}
+
+.learn-exemplar-chip__label,
+.learn-exemplar-chip__meta {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.learn-exemplar-chip__label {
+  color: var(--silk-65);
+}
+
+.learn-exemplar-chip__track {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--silk);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.learn-exemplar-chip__meta {
+  color: var(--silk-40);
+}
+
+@media (max-width: 760px) {
+  .learn-exemplar-chip {
+    left: var(--sp-3);
+    right: var(--sp-3);
+    max-width: none;
+    grid-template-columns: 8px auto minmax(0, 1fr);
+  }
+
+  .learn-exemplar-chip__meta {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .learn-exemplar-chip[data-active="true"] .learn-exemplar-chip__led {
+    animation: none;
+  }
+}
+
 /* --- Status bar (40px bottom rail) --- */
 .learn-status-bar {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  width: 100%;
   gap: var(--sp-3);
   padding: 0 var(--sp-5);
   background:
@@ -258,6 +550,18 @@
 
 .learn-status-hint {
   color: var(--silk-40);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.learn-status-hint[data-course3-lens="listening"] {
+  color: var(--silk-65);
+}
+
+.learn-status-hint[data-course3-lens="armed"],
+.learn-status-hint[data-operator-action="active"] {
+  color: var(--amber-pale);
 }
 
 /* --- Unplugged toast --- */
@@ -466,7 +770,7 @@
 .tutor-dock .now {
   font-family: var(--type-display);
   font-variation-settings: "wdth" 92, "wght" 600;
-  font-size: clamp(24px, 2.6vw, 32px);
+  font-size: 28px;
   line-height: 1.06;
   letter-spacing: 0.003em;
   color: var(--silk);
@@ -515,6 +819,24 @@
   display: none;
 }
 
+.tutor-dock .receipt .take-pulse {
+  display: none;
+}
+
+.tutor-dock .receipt .take-pulse[data-active] {
+  display: inline-block;
+  flex: 0 0 auto;
+  color: var(--silk-65);
+  border: 1px solid var(--amber-22);
+  background: var(--amber-22);
+  padding: 2px var(--sp-2);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  line-height: 1.2;
+  border-radius: var(--rad-sm);
+  animation: learnTakePulseIn 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .tutor-dock .receipt .cite[data-active] {
   display: inline-block;
   color: var(--amber-pale);
@@ -555,19 +877,41 @@
   }
 }
 
-/* --- Pulse-ring intensify in hint state (UI-SPEC §Motion line 306) --- */
-.learn-stage svg [data-control-id].hint-active .cue-shape::before {
-  animation: learnPulseRingIntense 600ms ease-in-out infinite;
+@keyframes learnTakePulseIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-@keyframes learnPulseRingIntense {
+@keyframes learnBoothPulseIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Cue-shape intensity in hint state (UI-SPEC §Motion line 306) --- */
+.learn-stage svg [data-control-id].hint-active[data-cue-shape="pulse-ring"] {
+  animation: learnCueGlowPulse 600ms ease-in-out infinite;
+}
+
+@keyframes learnCueGlowPulse {
   0%,
   100% {
-    transform: scale(0.86);
-    opacity: 0.6;
+    filter: drop-shadow(0 0 2px var(--amber-22));
+    opacity: 0.86;
   }
   50% {
-    transform: scale(1.10);
+    filter: drop-shadow(0 0 7px var(--amber-40));
     opacity: 1;
   }
 }
@@ -679,6 +1023,11 @@
     animation: none;
   }
 
+  .tutor-dock .receipt .take-pulse[data-active],
+  .learn-booth-pulse.is-fresh {
+    animation: none;
+  }
+
   .learn-stage svg [data-control-id].hint-active .cue-shape::before {
     animation: none;
   }
@@ -687,15 +1036,16 @@
 /* ---------------------------------------------------------------------------
  * Phase 97 / ONBOARD-05 — Lesson progress-list (vmx-progress-list).
  *
- * Renders the 36-lesson curriculum grouped by course (Anatomy / Transitions
- * / Play-Mode). Per-lesson row = dot + title + lesson_id-head. Dots:
+ * Renders the 36-lesson curriculum as a course accordion. The relevant
+ * course opens; other courses stay summarized until expanded. Per-lesson
+ * row = dot + title + lesson_id-head. Dots:
  *   empty       → transparent + silk-22 outline
  *   in-progress → silk-40 solid
  *   completed   → amber solid + faint glow
  *
  * Mounts into the learn-window when no lesson is currently active (HUD-
- * collapsed state). Empty-state hint "no controller? plug one in" pops as
- * a dashed banner above the list when no controller is detected.
+ * collapsed state). A screen-deck readiness hint pops as a dashed banner
+ * above the list when no physical controller is detected.
  * ------------------------------------------------------------------------- */
 
 .vmx-progress-list {
@@ -721,6 +1071,25 @@
   flex-direction: column;
   gap: var(--sp-1);
 }
+.vmx-progress-list__group-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 0 0 var(--sp-1);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--silk-22);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vmx-progress-list__group-toggle:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  border-radius: var(--rad-sm);
+}
 .vmx-progress-list__group-label {
   font-family: var(--type-display);
   font-variation-settings: "wdth" 85, "wght" 600;
@@ -729,12 +1098,25 @@
   text-transform: uppercase;
   color: var(--silk-65);
   margin: 0;
-  padding-bottom: var(--sp-1);
-  border-bottom: 1px solid var(--silk-22);
+}
+.vmx-progress-list__group-summary {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+}
+.vmx-progress-list__group-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.vmx-progress-list__group-body[hidden] {
+  display: none;
 }
 .vmx-progress-list__lesson {
   display: grid;
-  grid-template-columns: 14px 1fr auto;
+  grid-template-columns: 14px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-1) var(--sp-2);
@@ -752,6 +1134,14 @@
               color var(--motion-snap) ease-out,
               box-shadow var(--motion-snap) ease-out;
 }
+.vmx-progress-list__lesson[data-recommended="true"] {
+  border-color: var(--amber-22);
+}
+.vmx-progress-list__lesson[data-locked="true"] {
+  color: var(--silk-22);
+  cursor: default;
+  opacity: 0.62;
+}
 .vmx-progress-list__lesson:hover,
 .vmx-progress-list__lesson:focus-visible {
   background: var(--glass-3);
@@ -759,6 +1149,19 @@
   color: var(--silk);
   outline: none;
   box-shadow: var(--glow-faint);
+}
+.vmx-progress-list__lesson[data-locked="true"]:hover,
+.vmx-progress-list__lesson[data-locked="true"]:focus-visible {
+  background: transparent;
+  border-color: transparent;
+  color: var(--silk-22);
+  box-shadow: none;
+}
+.vmx-progress-list__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .vmx-progress-list__dot {
   display: inline-block;
@@ -778,6 +1181,30 @@
   background: var(--amber);
   box-shadow: 0 0 4px var(--amber-40);
 }
+.vmx-progress-list__lesson[data-locked="true"] .vmx-progress-list__dot {
+  background: transparent;
+  border: 1px solid var(--silk-12);
+  box-shadow: none;
+}
+.vmx-progress-list__tag {
+  border: 1px solid var(--silk-12);
+  border-radius: var(--rad-sm);
+  color: var(--silk-40);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  padding: 3px 5px;
+  text-transform: uppercase;
+}
+.vmx-progress-list__lesson[data-recommended="true"] .vmx-progress-list__tag {
+  border-color: var(--amber-22);
+  color: var(--amber-pale);
+}
+.vmx-progress-list__lesson[data-locked="true"] .vmx-progress-list__tag {
+  border-color: var(--silk-12);
+  color: var(--silk-22);
+}
 .vmx-progress-list__lesson-id {
   font-family: var(--type-mono);
   font-size: 11px;
@@ -789,14 +1216,49 @@
  * active; hidden via data-visible="false" once a lesson loads. The HUD
  * + tutor-dock take over the surface during a lesson. */
 .learn-progress-list-host {
+  position: fixed;
+  top: calc(var(--titlebar-h) + var(--sp-4));
+  right: var(--sp-4);
+  bottom: calc(var(--statusbar-h) + var(--sp-4));
+  z-index: 30;
   display: block;
-  max-height: 50vh;
+  width: min(360px, calc(100vw - var(--sp-8)));
   overflow: hidden;
-  border-top: 1px solid var(--silk-22);
-  background: var(--void);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  background:
+    linear-gradient(180deg, rgba(18, 20, 28, 0.96), rgba(4, 5, 9, 0.94)),
+    var(--void);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
 }
 .learn-progress-list-host[data-visible="false"] {
   display: none;
+}
+
+.learn-progress-list-shell {
+  display: grid;
+  grid-template-rows: 48px 1fr;
+  height: 100%;
+  min-height: 0;
+}
+
+.learn-progress-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-4);
+  border-bottom: 1px solid var(--glass-edge);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--silk-65);
+}
+
+#learn-progress-list-body {
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Phase 97 / ONBOARD-07 + RENDER-08 — trademark disclaimer footer. */
@@ -805,6 +1267,7 @@
   font-size: 10px;
   color: var(--silk-40);
   line-height: 1.5;
+  width: 100%;
   padding: var(--sp-2) var(--sp-3);
   border-top: 1px solid var(--silk-22);
   text-align: center;

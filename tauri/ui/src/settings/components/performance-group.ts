@@ -36,6 +36,7 @@ const CSS = `
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+    font-family: var(--type-body);
   }
   [data-component="performance-group"] .vmx-perf-row {
     display: flex;
@@ -44,17 +45,17 @@ const CSS = `
     gap: var(--sp-4);
   }
   [data-component="performance-group"] .vmx-perf-row__label {
-    font-family: var(--type-display);
+    font-family: var(--type-body);
     font-variation-settings: "wdth" 85, "wght" 500;
-    font-size: 10px;
-    letter-spacing: 0.22em;
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: var(--silk-40);
+    color: var(--silk-65);
     line-height: 1;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   [data-component="performance-group"] .vmx-perf-toggle {
-    font-family: var(--type-display);
+    font-family: var(--type-mono);
     font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 10px;
     letter-spacing: 0.22em;

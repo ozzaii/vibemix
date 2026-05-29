@@ -64,6 +64,10 @@ export type MascotMood = "hype-man" | "teacher" | "coach";
  *  the write surface. Mirrors the wire enum the sidecar persists. */
 export type SkillLevel = "beginner" | "intermediate" | "pro";
 
+/** Shared persona lens. This is the higher-level selector used by both
+ *  co-host prompt resolution and Viber/curator instruction building. */
+export type SharedLens = "hype" | "critique" | "tutor";
+
 /** Phase 97 / ONBOARD-01 — top-level vibemix mode.
  *
  *   cohost  — live co-host (the v4-era hype/coach surface; default).
@@ -84,11 +88,15 @@ export interface SettingsView {
    *  ipc.settings.state; written from the settings drawer. Default
    *  "intermediate" (the v4-tuned, load-bearing cell). */
   skill: SkillLevel;
+  /** Shared co-host + curator lens. Persisted in ConfigStore.extra["lens"].
+   *  Default "hype" preserves the live co-host cold path. */
+  lens: SharedLens;
   genre: string;
   output_device_id: string | null;
   output_profile: "hp" | "spk";
   retention_days: number;
   push_to_mute_hotkey: string;
+  learn_headphone_device_index: number | null;
   // --- Phase 13 (mascot overlay) additions --------------------------------
   /** Personality preset — drives Gemini voice + clip-pool + vocab. Default
    *  per CONTEXT.md Area 4 = "hype-man". */
@@ -198,11 +206,13 @@ function makeDefault(): SessionState {
       voice: "kore",
       mode: "hype",
       skill: "intermediate",
+      lens: "hype",
       genre: "techno",
       output_device_id: null,
       output_profile: "hp",
       retention_days: 30,
       push_to_mute_hotkey: "cmd+shift+m",
+      learn_headphone_device_index: null,
       mood: "hype-man",
       click_through: false,
       lighter_blur: false,

@@ -24,8 +24,8 @@ const MOUNT_TIMEOUT_MS = 2000;
 const SETTLE_INITIAL_DELAY_MS = 20;
 const SETTLE_POLL_INTERVAL_MS = 10;
 
-// LearnWsClient auto-connects to ws://127.0.0.1:8765 in mountLearnWindow().
-// In jsdom there's no real server; the undici-backed WebSocket fires a
+// LearnWsClient falls back to ws://127.0.0.1:8765 in plain jsdom.
+// There is no real server; the undici-backed WebSocket fires a
 // connect-failed error AFTER the test completes (Uncaught Exception in
 // vitest). Stub WebSocket with a no-op double for this file so we test
 // the mount path purely, not the network seam (which is exercised by
@@ -121,7 +121,7 @@ describe("test_controller_detected_mounts_svg.test.ts (RENDER-01)", () => {
     }
   });
 
-  it("ipc.learn.controller_detected{connected:false} clears the stage", async () => {
+  it("ipc.learn.controller_detected{connected:false} falls back to the on-screen deck", async () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);
     try {
@@ -142,7 +142,7 @@ describe("test_controller_detected_mounts_svg.test.ts (RENDER-01)", () => {
         MOUNT_TIMEOUT_MS,
       );
       expect(mounted.found).toBe(true);
-      // Then disconnect → the stage clears.
+      // Then disconnect → physical mirror clears, but practice remains usable.
       window.dispatchEvent(
         new CustomEvent("ipc.learn.controller_detected", {
           detail: {
@@ -153,9 +153,10 @@ describe("test_controller_detected_mounts_svg.test.ts (RENDER-01)", () => {
           },
         }),
       );
-      // Settle one microtask so the disconnect handler runs.
+      // Settle one microtask so the fallback deck render runs.
       await new Promise((r) => setTimeout(r, 20));
-      expect(root.querySelector('[data-control-id="eq_hi:A"]')).toBeNull();
+      expect(root.querySelector('[data-control-id="eq_hi:A"]')).not.toBeNull();
+      expect(root.textContent).toContain("on-screen deck");
     } finally {
       ws.close();
     }

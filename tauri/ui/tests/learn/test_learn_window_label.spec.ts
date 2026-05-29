@@ -10,9 +10,8 @@
 //                    caught at the vitest layer too — the label is
 //                    referenced from TS in the IPC envelope window-topic
 //                    routing.
-//
-// Phase 91 Plan 02 — RED-state. The `learn_window.rs` file lands in
-// Plan 04; until then this test SKIPS.
+// Partial-build friendly: skips only when the Rust Learn window module is
+// absent.
 
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
@@ -22,6 +21,11 @@ const REPO_ROOT = path.resolve(__dirname, "../../../..");
 const LEARN_WINDOW_RS = path.join(
   REPO_ROOT,
   "tauri/src-tauri/src/learn_window.rs",
+);
+const MAIN_RS = path.join(REPO_ROOT, "tauri/src-tauri/src/main.rs");
+const CAPABILITIES_DEFAULT = path.join(
+  REPO_ROOT,
+  "tauri/src-tauri/capabilities/default.json",
 );
 
 describe("test_learn_window_label.spec.ts (RENDER-07)", () => {
@@ -40,5 +44,18 @@ describe("test_learn_window_label.spec.ts (RENDER-07)", () => {
     // Belt-and-braces: lowercase + no spaces.
     expect(label).toBe(label.toLowerCase());
     expect(label).not.toContain(" ");
+  });
+
+  testFn("open_learn_window is registered and loads learn.html", () => {
+    const learnWindowSource = fs.readFileSync(LEARN_WINDOW_RS, "utf8");
+    const mainSource = fs.readFileSync(MAIN_RS, "utf8");
+    const capabilities = JSON.parse(
+      fs.readFileSync(CAPABILITIES_DEFAULT, "utf8"),
+    ) as { windows?: string[] };
+
+    expect(mainSource).toContain("learn_window::open_learn_window");
+    expect(learnWindowSource).toContain("#[tauri::command]");
+    expect(learnWindowSource).toContain('WebviewUrl::App("learn.html".into())');
+    expect(capabilities.windows).toContain("learn");
   });
 });

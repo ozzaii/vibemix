@@ -67,27 +67,54 @@
     </style>
   </head>
   <body style="background: transparent; margin: 0; padding: 0; overflow: hidden;">
-    <div class="pill" id="pill" data-state="idle">
-      <!-- Top 28px = drag strip (62-UI-SPEC §Drag handle). -->
-      <div class="pill__drag" id="pill-drag" aria-hidden="true">
+    <div
+      class="pill"
+      id="pill"
+      data-state="idle"
+      data-open="false"
+      data-wire="pill.shell"
+      tabindex="0"
+      role="group"
+      aria-label="vibemix cohost pill"
+    >
+      <!-- Top rail = drag strip. It overlays the compact face so the pill does
+           not waste vertical space on a blank forehead. -->
+      <div class="pill__drag" id="pill-drag" data-wire="pill.drag" aria-hidden="true">
         <div class="pill__grab"></div>
       </div>
-      <!-- Collapsed row: state dot + state label + waveform mount. -->
-      <div class="pill__row">
-        <div class="pill__dot" id="pill-dot" aria-hidden="true"></div>
+      <!-- Collapsed face: state dot + state label + grade + waveform mount. -->
+      <div class="pill__row" data-wire="pill.row">
+        <div class="pill__dot" id="pill-dot" data-wire="pill.intelligence" aria-hidden="true"></div>
         <!-- a11y: the dot + waveform are aria-hidden decoration, so the dynamic
              state caption is the ONLY screen-reader signal of IDLE→LISTENING→
              SPEAKING. role=status + aria-live=polite announces the co-host
              starting/stopping without interrupting (UI-REVIEW minor a11y rec). -->
-        <div class="pill__label" id="pill-label" role="status" aria-live="polite">IDLE</div>
-        <div class="pill__wave" id="pill-wave"></div>
+        <div class="pill__label" id="pill-label" data-wire="pill.state-label" role="status" aria-live="polite">IDLE</div>
+        <div class="pill__grade" id="pill-grade" data-wire="pill.grade" aria-live="polite"></div>
+        <span class="pill__level" id="pill-level" data-wire="pill.level" aria-live="polite"></span>
+        <div class="pill__wave" id="pill-wave" data-wire="pill.wave"></div>
       </div>
-      <span class="pill__notch" aria-hidden="true"></span>
+      <div class="pill__burst" id="pill-burst" data-wire="pill.burst" aria-hidden="true"></div>
+      <div class="pill__overdrive" id="pill-overdrive" data-wire="pill.overdrive" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <span class="pill__streak" id="pill-streak" data-wire="pill.streak" aria-hidden="true"></span>
+      <span class="pill__notch" data-wire="pill.notch" aria-hidden="true"></span>
       <!-- Expand panel: reaction text + citation strip mount (62-04);
            deck-context chips mount (62-05). -->
-      <div class="pill__expand" id="pill-expand">
-        <div class="pill__reaction" id="pill-reaction"></div>
-        <div class="pill__decks" id="pill-decks"></div>
+      <div class="pill__expand" id="pill-expand" data-wire="pill.expand">
+        <canvas class="pill__fx" id="pill-fx" aria-hidden="true"></canvas>
+        <div
+          class="pill__reaction"
+          id="pill-reaction"
+          data-wire="pill.reaction"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        ></div>
+        <div class="pill__decks" id="pill-decks" data-wire="pill.decks"></div>
       </div>
       <!-- Collapsed-hover PEEK card mount (Phase-1b). The next-track suggestion
            surfaces here on pointer-hover of the COLLAPSED pill, as a small
@@ -95,7 +122,7 @@
            rest; revealed under .pill[data-peek="true"] (CSS). Honest silence:
            index.ts renders NOTHING here when there is no grounded suggestion.
            [data-no-drag] so hovering the card never starts a window drag. -->
-      <div class="pill__peek" id="pill-peek" data-no-drag aria-live="polite"></div>
+      <div class="pill__peek" id="pill-peek" data-wire="pill.peek" data-no-drag aria-live="polite"></div>
     </div>
     <script type="module" src="/src/pill/index.ts"></script>
   </body>

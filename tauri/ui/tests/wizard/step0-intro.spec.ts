@@ -1,10 +1,14 @@
 /* Impeccable Wave 1.2 (2026-05-14) — wizard intro hero spec.
  *
- * Pins the brand-handshake first paint: three-line hero (VIBEMIX /
+ * Pins the brand-handshake first paint: three-line hero (vibemix /
  * DJ FRIEND / IN YOUR EAR) + single armed CTA. The hero is the
  * answer to the impeccable critique's [P0] "wizard has no hero
  * moment" — if a future refactor accidentally collapses the
- * intro back to a generic settings dialog, this spec catches it. */
+ * intro back to a generic settings dialog, this spec catches it.
+ *
+ * The wordmark is LOWERCASE, identical in case to the persistent shell
+ * sidebar wordmark — one trademark from first paint, not an uppercase hero
+ * variant that contradicts the lowercase chrome mark. */
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -21,22 +25,22 @@ afterEach(() => {
 });
 
 describe("wizard intro hero (impeccable Wave 1.2)", () => {
-  it("renders three-line hero with the vibe·MIX two-tone trademark + DJ FRIEND + slogan", () => {
+  it("renders three-line hero with the lowercase vibe·mix two-tone trademark + DJ FRIEND + slogan", () => {
     const rendered = renderStep0Intro({ onBegin: () => {} });
     host().append(rendered);
 
     const wordmark = rendered.querySelector<HTMLElement>(".wizard-intro__wordmark");
-    // The hero carries the SAME trademark logic as the shell sidebar (rose on
-    // the "mix" syllable, not a v5-era lead "V"), so the first impression and
-    // the persistent chrome read as one brand.
+    // The hero carries the SAME trademark as the shell sidebar: lowercase, rose
+    // on the "mix" syllable. Same case, same split — the first impression and
+    // the persistent chrome are one wordmark, not an uppercase hero variant.
     const vibe = rendered.querySelector<HTMLElement>(".wizard-intro__wordmark-vibe");
     const mix = rendered.querySelector<HTMLElement>(".wizard-intro__wordmark-mix");
     const phrase = rendered.querySelector<HTMLElement>(".wizard-intro__phrase");
     const slogan = rendered.querySelector<HTMLElement>(".wizard-intro__slogan");
 
-    expect(wordmark?.textContent).toBe("VIBEMIX");
-    expect(vibe?.textContent).toBe("VIBE");
-    expect(mix?.textContent).toBe("MIX");
+    expect(wordmark?.textContent).toBe("vibemix");
+    expect(vibe?.textContent).toBe("vibe");
+    expect(mix?.textContent).toBe("mix");
     expect(phrase?.textContent).toBe("DJ FRIEND");
     expect(slogan?.textContent?.toLowerCase()).toContain("in your ear");
   });

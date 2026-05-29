@@ -1,14 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // REQ-ID: LESSON-04 / A11Y — 45 s min-dwell visual + aria contract.
-//
-// Phase 92 Plan 02 — RED-state. The 45 s anti-speedrun floor is invisible
-// by design (no countdown timer surfaced — countdowns train rushing), but
-// the disabled "i got it" button must communicate WHY it's disabled to
-// motor-impaired + screen-reader users (Pitfall 5 mitigation per
-// 92-RESEARCH.md §Pitfall 5).
-//
-// Plan 92-05 lands the LearnWindow + skip-button locked state. This spec
-// pins the aria contract per UI-SPEC §Copywriting line 364:
+// The 45 s anti-speedrun floor is invisible by design (no countdown timer
+// surfaced, countdowns train rushing), but the disabled "i got it" button
+// must communicate why it is disabled to motor-impaired + screen-reader users.
+// This spec pins the aria contract per UI-SPEC §Copywriting line 364:
 //
 //   "at least 45 seconds per lesson — that's the floor."  (verbatim tooltip)
 //
@@ -16,34 +11,60 @@
 // `data-min-dwell-locked="true"`. Silent unlock at t=45 s — no animation,
 // no toast, no SR announcement.
 
-import { describe, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { LessonSkipButton } from "../../src/learn/lesson/skip-button";
 
 describe("test_min_dwell_aria.spec.ts (LESSON-04 a11y)", () => {
-  it.todo(
-    "skip button at t<45s has aria-disabled='true' + data-min-dwell-locked='true' (Plan 92-05)",
-    // TODO: Plan 92-05 executor — once LearnWindow + skip-button land:
-    //   1. Mount LearnWindow with a loaded lesson at t=0 (just after begin).
-    //   2. Query the skip-button selector (Plan 92-05 to settle the
-    //      canonical selector; expected: `[data-action="skip-lesson"]`).
-    //   3. Assert `aria-disabled === "true"` AND
-    //      `data-min-dwell-locked === "true"`.
-    //   4. Hover the button; assert the tooltip element renders
-    //      "at least 45 seconds per lesson — that's the floor." verbatim.
-    //   5. Advance the dwell clock to t=46 s (test-mode hook on the
-    //      LessonRuntime singleton OR a synthetic CustomEvent that mirrors
-    //      Plan 92-05's clock advance API).
-    //   6. Assert `aria-disabled` removed AND tooltip no longer shows.
-    //   7. CRITICAL: the unlock at t=45 must NOT fire an aria-live
-    //      announcement — silent unlock is the pedagogy floor (Pitfall 5).
-    //      Assert that the `#learn-sr-announcement` region's textContent
-    //      did NOT change during the t=44 → t=46 transition.
-  );
+  afterEach(() => {
+    vi.useRealTimers();
+    document.body.replaceChildren();
+  });
 
-  it.todo(
-    "tooltip 'at least 45 seconds per lesson — that's the floor.' present (Plan 92-05)",
-  );
+  it("skip button at t<45s has aria-disabled and min-dwell lock state", () => {
+    vi.useFakeTimers();
+    const onSkip = vi.fn();
+    const btn = LessonSkipButton({ onSkip });
+    document.body.append(btn);
 
-  it.todo(
-    "silent unlock at t=45s — no aria-live announcement (Plan 92-05)",
-  );
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+    expect(btn.getAttribute("data-min-dwell-locked")).toBe("true");
+    btn.click();
+    expect(onSkip).not.toHaveBeenCalled();
+
+    btn.dispose();
+  });
+
+  it("tooltip copy is present during the dwell lock", () => {
+    vi.useFakeTimers();
+    const btn = LessonSkipButton({ onSkip: vi.fn() });
+    document.body.append(btn);
+
+    expect(btn.title).toBe("at least 45 seconds per lesson — that's the floor.");
+
+    btn.dispose();
+  });
+
+  it("silent unlock at t=45s removes lock state without aria-live text", () => {
+    vi.useFakeTimers();
+    const sr = document.createElement("div");
+    sr.id = "learn-sr-announcement";
+    sr.setAttribute("aria-live", "polite");
+    sr.textContent = "find the play button.";
+    document.body.append(sr);
+    const onSkip = vi.fn();
+    const btn = LessonSkipButton({ onSkip });
+    document.body.append(btn);
+
+    vi.advanceTimersByTime(45_000);
+
+    expect(btn.hasAttribute("aria-disabled")).toBe(false);
+    expect(btn.hasAttribute("data-min-dwell-locked")).toBe(false);
+    expect(btn.hasAttribute("title")).toBe(false);
+    expect(sr.textContent).toBe("find the play button.");
+    btn.click();
+    expect(onSkip).toHaveBeenCalledTimes(1);
+
+    btn.dispose();
+  });
 });

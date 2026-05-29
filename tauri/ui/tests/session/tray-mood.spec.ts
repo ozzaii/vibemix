@@ -41,6 +41,10 @@ let capturedHandler: ((event: { payload: unknown }) => void) | null = null;
 let unlistenSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", {
+    value: {},
+    configurable: true,
+  });
   invokeMock.mockClear();
   capturedHandler = null;
   unlistenSpy = vi.fn();
@@ -54,6 +58,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
   vi.clearAllMocks();
 });
 

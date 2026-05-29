@@ -10,7 +10,8 @@
  *             clickable to dismiss)
  *           - `.vmx-settings-drawer`   (slide-over, z-index 50)
  *         Both initially `display: none` / `translateX(100%)`. The shell
- *         calls `openSettings()` to slide in, `closeSettings()` to slide out.
+ *         calls `openSettings()` to slide in, `closeSettings()` to slide out,
+ *         and `unmountSettingsDrawer()` on route/mock teardown.
  *
  * State sources:
  *   - getSessionState().settings — current values for each picker / rocker.
@@ -35,7 +36,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { registerStyle } from "../session/components/_style-registry.js";
-import { renderPicker } from "../session/components/picker.js";
+import { disposePicker, renderPicker } from "../session/components/picker.js";
 import { renderRocker } from "../session/components/rocker.js";
 import { getSessionState } from "../session/state.js";
 import { sendSettings, type SettingsField } from "../session/ws-bridge.js";
@@ -432,6 +433,7 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   const backdrop = document.createElement("div");
   backdrop.className = "vmx-settings-backdrop";
   backdrop.dataset.open = "false";
+  backdrop.dataset.wire = "settings.backdrop";
   backdrop.addEventListener("click", () => {
     closeSettings();
   });
@@ -440,6 +442,7 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   drawer.className = "vmx-settings-drawer";
   drawer.dataset.open = "false";
   drawer.dataset.settling = "false";
+  drawer.dataset.wire = "settings.drawer";
   drawer.setAttribute("aria-label", "settings");
   drawer.setAttribute("role", "complementary");
 
@@ -452,6 +455,7 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   // Header
   const header = document.createElement("div");
   header.className = "vmx-settings-drawer__header";
+  header.dataset.wire = "settings.header";
   const title = document.createElement("span");
   title.className = "vmx-settings-drawer__title";
   title.textContent = "SETTINGS";
@@ -459,6 +463,7 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   const close = document.createElement("button");
   close.type = "button";
   close.className = "vmx-settings-drawer__close";
+  close.dataset.wire = "settings.close";
   close.setAttribute("aria-label", "close settings");
   close.innerHTML = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M1 1L13 13M13 1L1 13"/></svg>';
   close.addEventListener("click", (e) => {
@@ -471,10 +476,12 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   // Body — built inside refresh() so settings/state changes hydrate.
   const body = document.createElement("div");
   body.className = "vmx-settings-drawer__body";
+  body.dataset.wire = "settings.body";
   drawer.append(body);
 
   const modalSlot = document.createElement("div");
   modalSlot.className = "vmx-settings-drawer__modal-slot";
+  modalSlot.dataset.wire = "settings.modal-slot";
 
   root.append(backdrop);
   root.append(drawer);
@@ -585,6 +592,43 @@ export function closeSettings(): void {
   mountedHandle.refresh();
 }
 
+/** Remove the singleton drawer from the DOM and drop its global listeners.
+ *
+ * Route/session teardown calls this so the body overlay, document keydown
+ * listener, picker resources, and settling timer do not survive a route bounce
+ * or dev mock restart. */
+export function unmountSettingsDrawer(): void {
+  if (settleClearTimer !== null) {
+    clearTimeout(settleClearTimer);
+    settleClearTimer = null;
+  }
+
+  setGearArmed(false);
+
+  const handle = mountedHandle;
+  mountedHandle = null;
+
+  if (handle) {
+    bodyRenderId += 1;
+    disposeDrawerBodyResources();
+    handle.unsubscribe();
+    try {
+      handle.backdrop.remove();
+      handle.drawer.remove();
+      handle.modalSlot.remove();
+    } catch {
+      /* DOM already gone */
+    }
+  }
+
+  setSettingsUIState({
+    open: false,
+    hotkeyCaptureMode: false,
+    confirmDialog: null,
+  });
+  lastLoadAt = 0;
+}
+
 /** Reflect drawer open/close on the titlebar gear so it lights amber while
  *  the drawer is open. Queried by class (not imported) to keep the
  *  session/settings module boundary clean; no-op if the titlebar isn't
@@ -596,23 +640,7 @@ function setGearArmed(armed: boolean): void {
 
 /** Test-only — tear down the singleton so a fresh vitest case can mount. */
 export function _resetDrawerForTests(): void {
-  if (settleClearTimer !== null) {
-    clearTimeout(settleClearTimer);
-    settleClearTimer = null;
-  }
-  if (mountedHandle) {
-    mountedHandle.unsubscribe();
-    try {
-      mountedHandle.backdrop.remove();
-      mountedHandle.drawer.remove();
-      mountedHandle.modalSlot.remove();
-    } catch {
-      /* DOM already gone */
-    }
-  }
-  mountedHandle = null;
-  recordingBrowserHandle = null;
-  lastLoadAt = 0;
+  unmountSettingsDrawer();
 }
 
 // ---------------------------------------------------------------------------
@@ -627,13 +655,45 @@ let retentionHandle: RetentionSliderHandle | null = null;
 // so the loadRecordings() async resolver can push results into the live
 // component without rebuilding it on every refresh tick.
 let recordingBrowserHandle: RecordingBrowserHandle | null = null;
+let bodyRenderId = 0;
+let bodyDisposers: Array<() => void> = [];
 // Debounce window for drawer-open list refresh (Plan 15-05 §Task 2): a
 // flickering re-open within 1s reuses the in-memory slice instead of
 // firing a new recordings.list IPC.
 let lastLoadAt = 0;
 const LIST_DEBOUNCE_MS = 1000;
 
+function rememberPicker(el: HTMLElement): HTMLElement {
+  bodyDisposers.push(() => disposePicker(el));
+  return el;
+}
+
+function withWire<T extends HTMLElement>(el: T, wire: string): T {
+  el.dataset.wire = wire;
+  return el;
+}
+
+function disposeDrawerBodyResources(): void {
+  for (const dispose of bodyDisposers.splice(0)) {
+    try {
+      dispose();
+    } catch {
+      /* ignore */
+    }
+  }
+  hotkeyHandle = null;
+  retentionHandle = null;
+  recordingBrowserHandle = null;
+}
+
+function beginDrawerBodyRender(): number {
+  bodyRenderId += 1;
+  disposeDrawerBodyResources();
+  return bodyRenderId;
+}
+
 function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
+  const renderId = beginDrawerBodyRender();
   body.replaceChildren();
 
   const settings = getSessionState().settings;
@@ -644,7 +704,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   personaBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-4);";
 
   // Voice picker
-  personaBody.append(
+  const voicePicker = rememberPicker(
     renderPicker({
       label: "VOICE",
       value: settings.voice,
@@ -655,43 +715,70 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
       },
     }),
   );
+  personaBody.append(withWire(voicePicker, "settings.persona.voice"));
 
   // Mode rocker
-  personaBody.append(
+  const modeRocker = renderRocker({
+    ariaLabel: "interaction mode",
+    options: [
+      { id: "hype", label: "HYPE" },
+      { id: "coach", label: "COACH" },
+    ],
+    active: settings.mode,
+    variant: "interaction",
+    onChange: (id) => {
+      void sendSettingsField("mode", id);
+    },
+  });
+  personaBody.append(withWire(modeRocker, "settings.persona.mode"));
+
+  const lensWrap = document.createElement("div");
+  lensWrap.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
+  lensWrap.dataset.wire = "settings.persona.lens";
+  const lensLabel = document.createElement("div");
+  lensLabel.className = "vmx-settings-drawer__label";
+  lensLabel.textContent = "LENS";
+  lensWrap.append(lensLabel);
+  lensWrap.append(
     renderRocker({
-      ariaLabel: "interaction mode",
+      ariaLabel: "shared persona lens",
       options: [
         { id: "hype", label: "HYPE" },
-        { id: "coach", label: "COACH" },
+        { id: "critique", label: "CRITIQUE" },
+        { id: "tutor", label: "TUTOR" },
       ],
-      active: settings.mode,
-      variant: "interaction",
+      active: settings.lens,
+      variant: "rocker",
       onChange: (id) => {
-        void sendSettingsField("mode", id);
+        void sendSettingsField("lens", id);
       },
     }),
   );
+  personaBody.append(lensWrap);
 
   // Genre dropdown with reload overlay
   const genreWrap = document.createElement("div");
   genreWrap.className = "vmx-settings-drawer__genre-wrap";
+  genreWrap.dataset.wire = "settings.persona.genre";
   genreWrap.append(
-    renderPicker({
-      label: "GENRE",
-      value: settings.genre,
-      autoPill: false,
-      options: GENRE_OPTIONS.map((g) => ({ id: g, label: g })),
-      onChange: (id) => {
-        setSettingsUIState({ pendingGenreReload: true });
-        void sendSettingsField("genre", id);
-        // Overlay auto-dismisses after 250ms — sidecar profile reloads
-        // are fast (we're not waiting for a confirmation; the live
-        // session keeps rendering through this).
-        window.setTimeout(() => {
-          setSettingsUIState({ pendingGenreReload: false });
-        }, 250);
-      },
-    }),
+    rememberPicker(
+      renderPicker({
+        label: "GENRE",
+        value: settings.genre,
+        autoPill: false,
+        options: GENRE_OPTIONS.map((g) => ({ id: g, label: g })),
+        onChange: (id) => {
+          setSettingsUIState({ pendingGenreReload: true });
+          void sendSettingsField("genre", id);
+          // Overlay auto-dismisses after 250ms — sidecar profile reloads
+          // are fast (we're not waiting for a confirmation; the live
+          // session keeps rendering through this).
+          window.setTimeout(() => {
+            setSettingsUIState({ pendingGenreReload: false });
+          }, 250);
+        },
+      }),
+    ),
   );
   const overlay = document.createElement("div");
   overlay.className = "vmx-settings-drawer__reload-overlay";
@@ -705,21 +792,20 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   // mirror and the drawer owns every persona write. Sends the wire enum
   // verbatim; the sidecar echoes ipc.settings.state which re-syncs the
   // deck readout.
-  personaBody.append(
-    renderRocker({
-      ariaLabel: "skill level",
-      options: [
-        { id: "beginner", label: "BEG" },
-        { id: "intermediate", label: "INT" },
-        { id: "pro", label: "PRO" },
-      ],
-      active: settings.skill,
-      variant: "rocker",
-      onChange: (id) => {
-        void sendSettingsField("skill", id);
-      },
-    }),
-  );
+  const skillRocker = renderRocker({
+    ariaLabel: "skill level",
+    options: [
+      { id: "beginner", label: "BEG" },
+      { id: "intermediate", label: "INT" },
+      { id: "pro", label: "PRO" },
+    ],
+    active: settings.skill,
+    variant: "rocker",
+    onChange: (id) => {
+      void sendSettingsField("skill", id);
+    },
+  });
+  personaBody.append(withWire(skillRocker, "settings.persona.skill"));
 
   body.append(
     renderSettingsGroup({
@@ -733,27 +819,29 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   const outputBody = document.createElement("div");
   outputBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-4);";
   outputBody.append(
-    renderPicker({
-      label: "DEVICE",
-      value: settings.output_device_id ?? "default",
-      autoPill: !settings.output_device_id,
-      options: [
-        { id: "auto", label: "default" },
-        // Real device list is populated by the sidecar at boot and lives
-        // off ipc.settings.state; the picker here lets the user fall
-        // back to "auto" or pick a known id. v1 ships with a "auto"
-        // default — Phase 15 expands.
-        ...(settings.output_device_id
-          ? [{ id: settings.output_device_id, label: settings.output_device_id }]
-          : []),
-      ],
-      onChange: (id) => {
-        void sendSettingsField(
-          "output_device_id",
-          id === "auto" ? null : id,
-        );
-      },
-    }),
+    rememberPicker(
+      renderPicker({
+        label: "DEVICE",
+        value: settings.output_device_id ?? "default",
+        autoPill: !settings.output_device_id,
+        options: [
+          { id: "auto", label: "default" },
+          // Real device list is populated by the sidecar at boot and lives
+          // off ipc.settings.state; the picker here lets the user fall
+          // back to "auto" or pick a known id. v1 ships with a "auto"
+          // default — Phase 15 expands.
+          ...(settings.output_device_id
+            ? [{ id: settings.output_device_id, label: settings.output_device_id }]
+            : []),
+        ],
+        onChange: (id) => {
+          void sendSettingsField(
+            "output_device_id",
+            id === "auto" ? null : id,
+          );
+        },
+      }),
+    ),
   );
   outputBody.append(
     renderRocker({
@@ -831,7 +919,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     : recSlice.error !== null
     ? { sessions: recSlice.usage.sessions, bytes_total: -2 }
     : recSlice.usage;
-  recordingBrowserHandle = renderRecordingBrowser({
+  const recBrowser = renderRecordingBrowser({
     initialSessions: recSlice.sessions,
     initialUsage,
     onReplay: () => {
@@ -843,7 +931,9 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
       void onDeleteRecording(session_dir);
     },
   });
-  recordingBody.append(recordingBrowserHandle.root);
+  recordingBrowserHandle = recBrowser;
+  bodyDisposers.push(() => recBrowser.dispose());
+  recordingBody.append(recBrowser.root);
 
   body.append(
     renderSettingsGroup({
@@ -859,12 +949,25 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   libraryBody.style.cssText =
     "display:flex; flex-direction:column; gap: var(--sp-2);";
   const stalenessHandle = renderStalenessBanner();
+  bodyDisposers.push(() => stalenessHandle.dispose());
   libraryBody.append(stalenessHandle.element);
   // Library panel is async; mount a placeholder + swap when ready.
   const libraryPanelSlot = document.createElement("div");
   libraryBody.append(libraryPanelSlot);
   void renderLibraryPanel().then((handle) => {
+    if (renderId !== bodyRenderId || !libraryPanelSlot.isConnected) {
+      handle.dispose();
+      return;
+    }
+    bodyDisposers.push(() => handle.dispose());
     libraryPanelSlot.replaceWith(handle.element);
+  }).catch((err: unknown) => {
+    if (renderId !== bodyRenderId || !libraryPanelSlot.isConnected) return;
+    const fallback = document.createElement("div");
+    fallback.className = "vmx-library-status";
+    fallback.setAttribute("role", "status");
+    fallback.textContent = `Library panel unavailable: ${String(err)}`;
+    libraryPanelSlot.replaceWith(fallback);
   });
   body.append(
     renderSettingsGroup({
