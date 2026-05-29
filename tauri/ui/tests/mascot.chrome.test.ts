@@ -181,14 +181,18 @@ describe("mascot overlay chrome (Wave 4 — 14-05)", () => {
       expect(ts).toMatch(/resolveCssColor\(["']--silk["']/);
     });
 
-    it("uses v5 hex literals (#ff8a3d, #d6cfc7, #3d424c) — the only 3 hex literals outside tokens.css", () => {
-      // #ff8a3d + #d6cfc7 are resolveCssColor fallbacks (CSS-resolution
-      // failure path). #3d424c is the coach-branch direct constructor
-      // argument — load-bearing for visual distinction from teacher.
+    it("uses brand hex literals (#FFA5DF, #d6cfc7, #3d424c) — the only 3 hex literals outside tokens.css", () => {
+      // #FFA5DF (rose) + #d6cfc7 (silk) are resolveCssColor fallbacks
+      // (CSS-resolution failure path) — they must track what --amber/--silk
+      // actually resolve to, NOT the retired v5 amber. #3d424c is the
+      // coach-branch direct constructor argument — load-bearing for visual
+      // distinction from teacher.
       const ts = readFileSync(MASCOT_INDEX_TS_PATH, "utf-8");
-      expect(ts).toContain("#ff8a3d");
+      expect(ts).toContain("#FFA5DF");
       expect(ts).toContain("#d6cfc7");
       expect(ts).toContain("#3d424c");
+      // The retired v5 amber must not survive as a stale fallback.
+      expect(ts).not.toContain("#ff8a3d");
     });
 
     it("carries zero stale --phosphor references or #ffa12e hex", () => {

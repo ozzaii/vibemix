@@ -479,14 +479,16 @@ async function boot(): Promise<void> {
    * mascot window's reduced stylesheet at boot, or jsdom-stripped during
    * tests).
    *
-   * Phase 14 Plan 14-05 — fallback hexes track the v5 token VALUES
-   * (--amber #ff8a3d, --silk #d6cfc7) from tokens.css, duplicated here
-   * only as literal-string defaults for THREE.Color when CSS resolution
-   * fails. The coach branch uses a flat slate hex (#3d424c) directly
+   * Fallback hexes track the RESOLVED token values (--amber -> rose #FFA5DF
+   * now that it aliases --brand; --silk #d6cfc7) from tokens.css, duplicated
+   * here only as literal-string defaults for THREE.Color when CSS resolution
+   * fails. They must match what the token resolves to, or the failure path
+   * paints an off-brand color (the retired v5 amber was exactly that stale
+   * mismatch). The coach branch uses a flat slate hex (#3d424c) directly
    * because --silk-40's alpha channel is dropped by THREE.Color (see
    * WR-02 in 14-REVIEW.md). tokens.css remains the single
    * source-of-truth for accent paint at the CSS layer; these three hex
-   * literals (#ff8a3d, #d6cfc7, #3d424c) are the only hex literals
+   * literals (#FFA5DF, #d6cfc7, #3d424c) are the only hex literals
    * permitted outside tokens.css (audit gate).
    */
   function resolveCssColor(varName: string, fallback: string): Color {
@@ -507,12 +509,12 @@ async function boot(): Promise<void> {
     const profile = MOOD_PROFILES[mood];
 
     // Step 2 — pick destination-mood tint.
-    //   hype-man → amber (warm) — v5 --amber
-    //   teacher  → silk (cream-leaning) — v5 --silk
+    //   hype-man → rose (warm) — --amber aliases --brand
+    //   teacher  → silk (cream-leaning) — --silk
     //   coach    → slate constant (distinct from teacher's silk)
     let color: Color;
     if (mood === "hype-man") {
-      color = resolveCssColor("--amber", "#ff8a3d");
+      color = resolveCssColor("--amber", "#FFA5DF");
     } else if (mood === "teacher") {
       color = resolveCssColor("--silk", "#d6cfc7");
     } else {
@@ -524,7 +526,7 @@ async function boot(): Promise<void> {
       // coach + teacher visually indistinguishable. The hex literal here
       // approximates --silk-40 composited over --void-2 (#05070b) while
       // preserving the intended slate cast — kept as a documented
-      // audit-gate exception (alongside #ff8a3d and #d6cfc7).
+      // audit-gate exception (alongside #FFA5DF and #d6cfc7).
       color = new Color("#3d424c");
     }
 
