@@ -33,7 +33,11 @@ export function createSidebar(store: ShellStore): HTMLElement {
   // color the way the ear and the active nav glyph do.
   brand.innerHTML =
     '<span class="sb-ear" aria-hidden="true"></span>' +
-    '<span class="sb-wordmark"><span class="wm-vibe">vibe</span><span class="wm-mix">mix</span></span>';
+    '<span class="sb-wordmark"><span class="wm-vibe">vibe</span><span class="wm-mix">mix</span></span>' +
+    // Collapsed-rail mark: the wordmark hides at 72px, so a rose "v" monogram
+    // keeps the identity (and becomes the lone breathing sign-of-life). It is
+    // aria-hidden — the wordmark text stays the accessible brand name.
+    '<span class="sb-monogram" aria-hidden="true">v</span>';
 
   const nav = document.createElement("nav");
   nav.className = "sb-nav";

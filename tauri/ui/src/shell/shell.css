@@ -159,6 +159,18 @@
 .sb-brand .wm-vibe { color: var(--text-primary); }
 .sb-brand .wm-mix { color: var(--brand); }
 
+/* Collapsed-rail monogram — hidden while the wordmark shows; it only appears at
+ * 72px (see the collapsed block below), where it carries the identity AND the
+ * breath. Rose, in the wordmark face, so it reads as the same brand mark shrunk. */
+.sb-brand .sb-monogram {
+  display: none;
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 92, "wght" 700;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--brand);
+}
+
 .sb-nav {
   flex: 1 1 auto;
   display: flex;
@@ -178,11 +190,19 @@
   font-size: 13px;
   letter-spacing: 0.01em;
   white-space: nowrap;
+  /* Reset the <button> UA default (center) so the label reads left, flush with
+   * its glyph as one unit — the glyph keeps its own centered box below. */
+  text-align: left;
   transition: background 150ms var(--ease-brand), color 150ms var(--ease-brand);
 }
+/* Hover warms the WHOLE row in lockstep — bg, label, and glyph together. Before,
+ * the glyph stayed dead-muted while the row lit, so the icon read half-asleep. */
 .sb-nav-item:hover { background: var(--brand-04); color: var(--text-secondary); }
+.sb-nav-item:hover .sb-glyph { color: var(--text-secondary); }
 .sb-nav-item[aria-current="true"] {
-  background: var(--brand-08);
+  /* A touch more fill than hover (-10 vs -04) so "you are here" reads at a glance,
+   * not just on the glyph. */
+  background: var(--brand-10);
   color: var(--text-primary);
 }
 .sb-nav-item .sb-glyph {
@@ -190,8 +210,13 @@
   text-align: center;
   font-size: 14px;
   color: var(--text-muted);
+  transition: color 150ms var(--ease-brand);
 }
+/* The active glyph is the one rose accent that says "this surface" — its
+ * accelerator number wakes to --text-secondary too (it sat dead-muted before),
+ * but stays ink so the rose budget on the active row is exactly one mark. */
 .sb-nav-item[aria-current="true"] .sb-glyph { color: var(--brand); }
+.sb-nav-item[aria-current="true"] .sb-kbd { color: var(--text-secondary); }
 .sb-nav-item .sb-label { flex: 1 1 auto; }
 .sb-nav-item .sb-kbd {
   font-family: var(--type-mono);
@@ -201,6 +226,7 @@
    * ~4.6:1 and below on lighter surfaces). */
   color: var(--text-muted);
   letter-spacing: 0.06em;
+  transition: color 150ms var(--ease-brand);
 }
 
 .sb-foot {
@@ -245,11 +271,22 @@
   box-shadow: 0 0 10px var(--brand-65), 0 0 3px var(--brand);
 }
 
-/* Collapsed rail — labels + kbd hide, glyphs center, brand wordmark hides. */
+/* Collapsed rail — labels + kbd hide, glyphs center, the wordmark gives way to
+ * the "v" monogram. The leading ear hides too: the monogram becomes the single
+ * collapsed brand mark (and carries the breath), so a dot + a letter don't stack
+ * in the narrow rail. */
 #shell-root[data-collapsed="true"] .sb-label,
 #shell-root[data-collapsed="true"] .sb-kbd,
 #shell-root[data-collapsed="true"] .sb-wordmark,
+#shell-root[data-collapsed="true"] .sb-brand .sb-ear,
 #shell-root[data-collapsed="true"] .sb-cohost-label { display: none; }
+#shell-root[data-collapsed="true"] .sb-monogram { display: block; }
+/* Not-live, the collapsed monogram inherits the breath the ear had — the lone
+ * sign-of-life on the rail. Steadies when live (deck tail cursor takes over). */
+#shell-root[data-collapsed="true"]:not([data-state="live"]) .sb-monogram {
+  animation: shell-breathe 2.4s var(--ease-brand) infinite;
+}
+#shell-root[data-collapsed="true"][data-conn="reconnecting"] .sb-monogram { animation: none; }
 #shell-root[data-collapsed="true"] .sb-nav-item { justify-content: center; padding: 0; }
 #shell-root[data-collapsed="true"] .sb-brand { justify-content: center; padding: 0; }
 /* Collapsed, the co-host foot pill is just its lit ear, centered — drop the
@@ -683,9 +720,11 @@
 }
 @media (prefers-reduced-motion: reduce) {
   /* Only the genuinely animated marks need freezing: the breathing brand ear,
-   * the connection dot, and the live tail cursor. The LED seam and energy
-   * field are static by design (opacity only), so they are not listed. */
+   * the collapsed-rail monogram that inherits its breath, the connection dot,
+   * and the live tail cursor. The LED seam and energy field are static by
+   * design (opacity only), so they are not listed. */
   .sb-ear,
+  .sb-monogram,
   .conn-dot,
   .tail-cursor { animation: none !important; }
 }

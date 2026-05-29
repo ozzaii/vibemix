@@ -49,4 +49,15 @@ describe("sidebar brand mark", () => {
     expect(brand.querySelector(".sb-ear")).toBeTruthy();
     expect(brand.querySelector(".sb-wordmark")).toBeTruthy();
   });
+
+  it("carries a 'v' monogram so the brand survives the collapsed rail", () => {
+    shell = mountDesktopShell(host);
+    // When the rail collapses to 72px the wordmark hides; without a monogram the
+    // brand would degrade to a bare dot and the identity would vanish. The
+    // monogram is the collapsed-state mark (decorative — the wordmark text is the
+    // accessible name), so it must be aria-hidden.
+    const mono = host.querySelector<HTMLElement>(".sb-brand .sb-monogram");
+    expect(mono?.textContent).toBe("v");
+    expect(mono?.getAttribute("aria-hidden")).toBe("true");
+  });
 });
