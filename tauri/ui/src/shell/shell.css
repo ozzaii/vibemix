@@ -727,7 +727,11 @@
   justify-content: center;
   font-size: 16px;
   color: var(--text-muted);
+  transition: color 120ms var(--ease-brand);
 }
+/* The selected row's mark goes rose, same as the active nav glyph — the lit row
+ * lights its icon too, instead of leaving it dead-muted while the row warms. */
+.palette-item[aria-selected="true"] .pi-glyph { color: var(--brand); }
 .palette-item .pi-label { flex: 1 1 auto; }
 .palette-item .pi-hint {
   font-family: var(--type-mono);
