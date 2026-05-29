@@ -616,6 +616,10 @@
 .panel-section { margin-bottom: var(--sp-5); }
 .panel-section:last-child { margin-bottom: 0; }
 .panel-section + .panel-section { padding-top: var(--sp-4); border-top: 1px solid var(--border-subtle); }
+/* Receipt prints in on the live transition (JS adds --enter once) — slots
+ * settle with a short stagger as the drawer slides in. Reuses surface-enter. */
+.panel-section--enter { animation: surface-enter 260ms var(--ease-brand) both; }
+.panel-section--enter:nth-child(2) { animation-delay: 80ms; }
 .panel-label {
   display: flex;
   align-items: center;
@@ -795,5 +799,6 @@
   .tail-cursor,
   .surface.is-active,
   .shell-palette.is-open,
-  .shell-palette.is-open .palette-panel { animation: none !important; }
+  .shell-palette.is-open .palette-panel,
+  .panel-section--enter { animation: none !important; }
 }

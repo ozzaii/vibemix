@@ -55,4 +55,21 @@ describe("grounding panel receipt", () => {
     expect(placeholders).not.toContain("—");
     expect(placeholders.every((p) => (p?.length ?? 0) > 1)).toBe(true);
   });
+
+  it("prints the receipt in ONLY on the live transition, not on re-renders while live", () => {
+    shell = mountDesktopShell(host);
+    shell.store.setActivation("live");
+    // Going live: the receipt slots carry the one-shot entry class (they
+    // materialize/print in as the drawer arrives).
+    const printed = Array.from(host.querySelectorAll(".panel-section"));
+    expect(printed.length).toBe(2);
+    expect(printed.every((s) => s.classList.contains("panel-section--enter"))).toBe(true);
+
+    // A later re-render while STILL live (e.g. switching surfaces) rebuilds the
+    // receipt but must NOT replay the entry — it was already on screen.
+    shell.store.setActiveSurface("crate");
+    const rerendered = Array.from(host.querySelectorAll(".panel-section"));
+    expect(rerendered.length).toBe(2);
+    expect(rerendered.some((s) => s.classList.contains("panel-section--enter"))).toBe(false);
+  });
 });

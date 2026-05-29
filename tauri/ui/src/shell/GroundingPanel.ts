@@ -24,8 +24,15 @@ export function createGroundingPanel(store: ShellStore): HTMLElement {
 
   aside.append(head, body);
 
+  // Tracks the prior activation so the receipt "prints in" ONLY on the
+  // idle/listening -> live transition, not on every re-render (the store fires
+  // render() on any state change — surface switch, collapse — and a receipt
+  // that re-animated on each of those would flicker).
+  let prevActivation: string | null = null;
+
   const render = (): void => {
     const { activation } = store.getState();
+    const justWentLive = activation === "live" && prevActivation !== "live";
     if (activation === "live") {
       // Live, the panel is a RECEIPT, not a promise: two labeled slots the
       // co-host fills as it reacts. Honest placeholders until real citations +
@@ -45,9 +52,17 @@ export function createGroundingPanel(store: ShellStore): HTMLElement {
         // suggestion engine calls it (trust-the-audio, invariant #3).
         '<p class="panel-placeholder">Nothing cued yet.</p>' +
         "</div>";
+      // One-shot entry: the slots print in as the drawer arrives. Only on the
+      // transition — a re-render while already live rebuilds them without it.
+      if (justWentLive) {
+        Array.from(body.querySelectorAll(".panel-section")).forEach((section) => {
+          section.classList.add("panel-section--enter");
+        });
+      }
     } else {
       body.textContent = "Nothing to ground yet. I cite what the deck does, the moment it does it.";
     }
+    prevActivation = activation;
   };
   store.subscribe(render);
   render();
