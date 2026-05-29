@@ -11,9 +11,10 @@ test functions (same pattern as ``tests/state/test_refresh.py``).
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 
 from vibemix.runtime.coach import coach_loop
+from vibemix.state import Event
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -209,7 +210,89 @@ def test_coach_03_event_fire_path(
         track="Some Track",
         track_conf=0.85,
         phase="peak",
+        context_feed_contract=ANY,
     )
+    event_payload = fake_recorder.log_event.call_args.kwargs
+    assert "context_feed_contract[" in event_payload["context_feed_contract"]
+    assert "speed=no_extra_model_pass" in event_payload["context_feed_contract"]
+
+
+def test_coach_event_log_carries_deck_move_audio_context(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    music_state.audible = True
+    music_state.audible_deck = "A"
+    music_state.phase = "groove"
+    music_state.controller_connected = True
+    music_state.xfader = 0
+    music_state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    music_state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    music_state.recent_moves = [(0.5, "A_low: flat→killed (big twist)")]
+    music_state.audio_delta = ["sub energy fell 50% (strong)"]
+    ev = Event(
+        type="MIX_MOVE",
+        state=music_state,
+        extra={"moves": ["A_low: flat→killed (big twist)"]},
+    )
+    fake_event_detector.detect.return_value = ev
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            asyncio.Event(),
+            {"in_flight": False},
+            stop_event,
+        )
+    )
+
+    event_calls = [
+        call for call in fake_recorder.log_event.call_args_list if call.args[:1] == ("event",)
+    ]
+    assert event_calls
+    payload = event_calls[-1].kwargs
+    assert payload["context_feed_contract"].startswith("context_feed_contract[")
+    assert "surface=session_event" in payload["context_feed_contract"]
+    assert "history=past_comparison_not_live_proof" in payload["context_feed_contract"]
+    assert "cache=static_persona_rules_only" in payload["context_feed_contract"]
+    assert "speed=no_extra_model_pass" in payload["context_feed_contract"]
+    assert payload["deck_lane_context"].startswith("deck_lanes_context[")
+    assert "B(identity=unknown" in payload["deck_lane_context"]
+    assert payload["deck_reference_context"].startswith("deck_reference_context[")
+    assert "deck1=A" in payload["deck_reference_context"]
+    assert "deck2=B" in payload["deck_reference_context"]
+    assert "audio=P1_global_mix" in payload["deck_reference_context"]
+    assert payload["deck_source_context"].startswith("deck_source_context[")
+    assert "second_deck=independent_source_required" in payload["deck_source_context"]
+    assert "rule=unresolved_deck_is_not_transition_evidence" in payload["deck_source_context"]
+    assert payload["deck_audio_context"].startswith("deck_audio_context[")
+    assert payload["audio_window_context"].startswith("audio_window_context[")
+    assert (
+        "move_anchor=A_low:_flat_to_killed_big_twist@-0.5s:inside_P1"
+        in payload["audio_window_context"]
+    )
+    assert payload["audio_delta"] == ["sub energy fell 50% (strong)"]
+    assert "live_evidence[" in payload["live_evidence_context"]
+    assert "mix:deck_audio_support=single_deck_A" in payload["live_evidence_context"]
+    assert "mix:move_effect=sub_energy_fell_50pct_strong" in payload["live_evidence_context"]
+    assert "move_context[" in payload["move_context"]
+    assert "deck_change_context[" in payload["deck_change_context"]
+    assert "move_effect_context[" in payload["move_effect_context"]
 
 
 # ---------------------------------------------------------------------------

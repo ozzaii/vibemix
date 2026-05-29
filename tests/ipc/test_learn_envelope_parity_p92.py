@@ -33,6 +33,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
+from vibemix.learn.progress import LearnProgress
 from vibemix.ui_bus.learn_messages import (
     LearnAck,
     LearnAdvance,
@@ -47,7 +48,6 @@ from vibemix.ui_bus.learn_messages import (
     LearnTutorSpeak,
 )
 from vibemix.ui_bus.messages import _VALIDATOR
-
 
 # ---------------------------------------------------------------------------
 # Per-envelope round-trip via parametric matrix
@@ -170,6 +170,25 @@ def test_envelope_roundtrip(
     _VALIDATOR.validate(wire)
 
 
+def test_progress_state_accepts_current_progress_schema() -> None:
+    """The shared IPC schema must accept the live v2 LearnProgress snapshot."""
+    progress = LearnProgress()
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "midi")
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "click")
+    env = LearnProgressState.make(
+        action="snapshot",
+        progress=progress.to_dict(),
+    )
+    wire = json.loads(env.to_json())
+
+    assert wire["payload"]["progress"]["schema_version"] == 2
+    assert "skills" in wire["payload"]["progress"]
+    lesson = wire["payload"]["progress"]["lessons"]["L1.03"]
+    assert lesson["practice_sources"] == {"hardware": 1, "screen": 1}
+    assert lesson["last_practice_source"] == "screen"
+    _VALIDATOR.validate(wire)
+
+
 # ---------------------------------------------------------------------------
 # Schema-side count parity: 13 Learn refs in the shared oneOf list
 # ---------------------------------------------------------------------------
@@ -192,10 +211,10 @@ def _load_schema() -> dict:
 def test_oneof_count_parity_matches_dataclass_count() -> None:
     """13 Learn-prefixed $refs in the schema's oneOf list (2 P91 + 11 P92).
 
-    Mirrors the Plan 92-01 SUMMARY count-parity gate (77 wrappers ↔ 77
-    oneOf entries); this test slices that gate down to the Learn-only
-    subset so a future P93+ envelope that bumps the overall count won't
-    silently mask a Learn-side regression.
+    Mirrors the overall count-parity gate, now 78 wrappers against 78
+    oneOf entries; this test slices that gate down to the Learn-only
+    subset so a future Learn envelope cannot silently mask a Learn-side
+    regression.
     """
     schema = _load_schema()
     learn_refs = [

@@ -31,7 +31,9 @@ def _claim(
     claim_type: str,
     *,
     value: Any = "ok",
+    status: str = "allowed",
     forbidden: tuple[str, ...] = (),
+    reason_codes: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     return {
         "claim_id": claim_id,
@@ -41,10 +43,10 @@ def _claim(
         "unit": None,
         "scope": "transition",
         "confidence": 0.9,
-        "status": "allowed",
+        "status": status,
         "allowed_phrases": (),
         "forbidden_phrases": forbidden,
-        "reason_codes": (),
+        "reason_codes": reason_codes,
     }
 
 
@@ -120,6 +122,194 @@ def test_timing_refusal_right_now_does_not_require_current_position_claim() -> N
     )
 
     assert result.accepted
+
+
+def test_combo_phrase_requires_grade_progress_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "move_grade"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            spoken_text="Next LIT AFF move, combo x3.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_grade_progress" in result.errors
+
+
+def test_xp_phrase_requires_grade_progress_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "move_grade"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            spoken_text="Next LIT AFF move, +100 xp.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_grade_progress" in result.errors
+
+
+def test_level_phrase_requires_grade_progress_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "move_grade"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            spoken_text="Next LIT AFF move, lv 2.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_grade_progress" in result.errors
+
+
+def test_level_up_phrase_requires_grade_progress_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "move_grade"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            spoken_text="Next LIT AFF move, level up.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_grade_progress" in result.errors
+
+
+def test_combo_phrase_accepts_grade_progress_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(
+            _claim("clm_ctx_001_000", "move_grade"),
+            _claim("clm_ctx_001_001", "grade_progress", value=3),
+        )
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            spoken_text="Next LIT AFF move, combo x3.",
+            cited_claim_ids=("clm_ctx_001_000", "clm_ctx_001_001"),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
+def test_xp_phrase_accepts_grade_progress_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(
+            _claim("clm_ctx_001_000", "move_grade"),
+            _claim("clm_ctx_001_001", "grade_progress", value=1),
+        )
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            spoken_text="Next LIT AFF move, +100 xp.",
+            cited_claim_ids=("clm_ctx_001_000", "clm_ctx_001_001"),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
+def test_level_phrase_accepts_grade_progress_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(
+            _claim("clm_ctx_001_000", "move_grade"),
+            _claim("clm_ctx_001_001", "grade_progress", value=2),
+        )
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            spoken_text="Next LIT AFF move, level 2.",
+            cited_claim_ids=("clm_ctx_001_000", "clm_ctx_001_001"),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
+def test_level_up_phrase_accepts_grade_progress_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(
+            _claim("clm_ctx_001_000", "move_grade"),
+            _claim(
+                "clm_ctx_001_001",
+                "grade_progress",
+                value=2,
+                reason_codes=("level_up:true",),
+            ),
+        )
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            spoken_text="Next LIT AFF move, level up.",
+            cited_claim_ids=("clm_ctx_001_000", "clm_ctx_001_001"),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
+def test_level_up_phrase_rejects_grade_progress_without_level_up_reason() -> None:
+    envelope = _envelope(
+        claim_summary=(
+            _claim("clm_ctx_001_000", "move_grade"),
+            _claim("clm_ctx_001_001", "grade_progress", value=2),
+        )
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            spoken_text="Next LIT AFF move, level up.",
+            cited_claim_ids=("clm_ctx_001_000", "clm_ctx_001_001"),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "grade_progress_level_up_value_mismatch:clm_ctx_001_001" in result.errors
 
 
 def test_drop_it_now_is_timing_action_not_section_role_claim() -> None:
@@ -223,6 +413,45 @@ def test_role_specific_copy_requires_matching_section_role_value() -> None:
 
     assert not result.accepted
     assert "section_role_value_mismatch:clm_ctx_001_000:drop" in result.errors
+
+
+def test_unhedged_role_copy_rejects_hedged_section_role_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(_claim("clm_ctx_001_000", "section_role", value="drop", status="hedged"),)
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="This is the main drop.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "section_role_requires_hedged_language:clm_ctx_001_000:drop" in result.errors
+
+
+def test_hedged_role_copy_accepts_hedged_section_role_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(_claim("clm_ctx_001_000", "section_role", value="drop", status="hedged"),)
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="Likely drop.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
 
 
 def test_role_specific_copy_requires_section_role_not_only_boundary() -> None:

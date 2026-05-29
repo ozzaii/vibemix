@@ -18,6 +18,8 @@ behind a kwarg.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from vibemix.state import AICoach, Event, MusicState
@@ -26,6 +28,7 @@ from vibemix.state.coach import (
     PROMPT_TOKEN_CAP_ACK,
     PROMPT_TOKEN_CAP_FULL,
 )
+from vibemix.state.deck_state import DeckState, DeckTrack
 
 # 4 chars/token proxy — pyproject.toml has no tiktoken dep, so we use the
 # cl100k empirical baseline ratio.
@@ -133,7 +136,8 @@ def test_diet_true_mix_move_under_cap_with_moves_inline(mocker):
     out = AICoach.build_prompt(ev, diet=True)
     assert _tokens(out) <= PROMPT_TOKEN_CAP_ACK
     # Moves list is still in the task tail (the MIX_MOVE task formats it).
-    assert "A move just landed [A_low: cut→killed (big twist), xfader→A-side]" in out
+    assert "A controller move was observed [A_low: cut→killed (big twist), xfader→A-side]" in out
+    assert "did it land" not in out
 
 
 def test_diet_true_layer_arrival_under_cap(mocker):
@@ -166,9 +170,8 @@ def test_diet_true_drops_history_fields(mocker):
     assert "recent_tracks:" not in out
 
 
-def test_diet_true_keeps_5_required_fields(mocker):
-    """The 5-field compact evidence_line keeps hearing/track/deck/set_time/
-    recent_moves."""
+def test_diet_true_keeps_required_grounding_fields(mocker):
+    """The compact evidence_line keeps core hearing/track/deck/time/move grounding."""
     mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
     ev = _ev("MIX_MOVE", _populated_state(), extra={"moves": ["A_play→ON"]})
     out = AICoach.build_prompt(ev, diet=True)
@@ -177,6 +180,91 @@ def test_diet_true_keeps_5_required_fields(mocker):
     assert "deck=A" in out
     assert "set_time=" in out
     assert "recent_moves[8s]:" in out
+
+
+def test_diet_true_mix_move_keeps_deck_context_for_single_deck_guard(mocker):
+    """MIX_MOVE uses the diet path, so the one-deck transition guard must
+    survive the compact prompt."""
+    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    state = _populated_state()
+    state.deck_state = DeckState(
+        decks={
+            "A": DeckTrack(
+                title="Strobe",
+                camelot="8A",
+                bpm=128.0,
+                confidence=0.8,
+                source="rekordbox_xml",
+            )
+        }
+    )
+    ev = _ev("MIX_MOVE", state, extra={"moves": ["A_play→ON"]})
+
+    out = AICoach.build_prompt(ev, diet=True)
+
+    assert "deck_context[" in out
+    assert "deck_lanes_context[" in out
+    assert "move_context[" in out
+    assert "scope=single_deck_move_A" in out
+    assert "transition_block=single_resolved_deck" in out
+    assert out.count("live_evidence[") == 1
+    assert "do NOT call this a transition or blend" in out
+    assert _tokens(out) <= PROMPT_TOKEN_CAP_ACK
+
+
+def test_diet_true_mix_move_can_include_compact_recall_context(mocker):
+    """Hot MIX_MOVE recall stays diet-sized but shows the past signature."""
+    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    state = _populated_state()
+    state.audio_delta = ["low energy fell 50% (strong)"]
+    ev = _ev("MIX_MOVE", state, extra={"moves": ["A_low: flat→killed"]})
+    survivors = [
+        SimpleNamespace(
+            record_id="20260520-2200:7",
+            signature=(
+                "coach_line | track=Strobe | phase=groove | deck=A | "
+                "event=MIX_MOVE | move_effect=move_effect_context[rule=dsp_delta_not_causal_proof] "
+                "| audio_delta=low energy fell 50% (strong) | said: heard the low cut thin out"
+            ),
+        )
+    ]
+
+    out = AICoach.build_prompt(ev, recall_moments=survivors, diet=True)
+
+    assert "FROM A PAST SESSION" in out
+    assert "[recall:20260520-2200:7]" in out
+    assert "low energy fell 50% (strong)" in out
+    assert "in the live audio" in out
+    assert _tokens(out) <= PROMPT_TOKEN_CAP_ACK
+
+
+def test_diet_true_mix_move_sanitizes_compact_recall_context(mocker):
+    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    state = _populated_state()
+    state.audio_delta = ["low energy fell 50% (strong)"]
+    ev = _ev("MIX_MOVE", state, extra={"moves": ["A_low: flat->killed"]})
+    survivors = [
+        SimpleNamespace(
+            record_id="20260520-2200:7",
+            signature=(
+                "coach_line | event=MIX_MOVE "
+                "| audio_window=audio_window_context[P1=master_global_mix "
+                "deckA_audio=attached deckB_audio=stem isolated_decks=true] "
+                "| said: That was a great transition."
+            ),
+        )
+    ]
+
+    out = AICoach.build_prompt(ev, recall_moments=survivors, diet=True)
+
+    assert "FROM A PAST SESSION" in out
+    assert "deckA_audio=attached" not in out
+    assert "deckB_audio=stem" not in out
+    assert "isolated_decks=true" not in out
+    assert "great transition" not in out.lower()
+    assert "audio_window=omitted_untrusted_audio_window" in out
+    assert "said: omitted_past_live_outcome_claim" in out
+    assert _tokens(out) <= PROMPT_TOKEN_CAP_ACK
 
 
 # ---------- diet=True drops the | event=TYPE tag ----------

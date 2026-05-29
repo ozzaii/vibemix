@@ -10,8 +10,8 @@ One parametrized row per bundled controller profile. Each row:
 2. Iterates every CC binding in ``profile.controls.values()`` and pushes one
    synthetic ``control_change`` per binding through ``handle_msg``. Value is
    axis-dependent: 80 for unipolar (mid-high range), 90 for bipolar (off-
-   center positive), 127 fallback for any other axis (boolean is not in the
-   _VALID_AXES set today but the fallback keeps the test forward-compatible).
+   center positive), 65 for relative encoders, 64 fallback for any other axis
+   (keeps the test forward-compatible).
 3. Iterates every NOTE binding in ``profile.buttons.values()`` and pushes one
    synthetic ``note_on`` per binding through ``handle_msg``.
 4. Asserts at least one event surfaced via ``events_since(0.0)``. The
@@ -42,7 +42,6 @@ import pytest
 
 from vibemix.midi import load_profile
 from vibemix.midi.state import ControllerState
-
 
 # THE ten. Mirror of test_profile_contracts.py::_BUNDLED_IDS — if you add a
 # profile to one of these files, add it to BOTH. The plan-level rule:
@@ -81,10 +80,11 @@ def _value_for_axis(axis: str) -> int:
       _knob_label 'flat' tier so an event lands in 'boost'.
     - bipolar (tempo / xfader / filter, center=64): 90 — off-center positive,
       well past the 73 boundary into the 'boost' tier on the bipolar axes.
+    - relative (jog encoders): 65 — one forward tick around the 64 center.
     - any other (forward-compat for axes added beyond _VALID_AXES): 64 — a
       safe mid-range fallback.
     """
-    return {"unipolar": 80, "bipolar": 90}.get(axis, 64)
+    return {"unipolar": 80, "bipolar": 90, "relative": 65}.get(axis, 64)
 
 
 # ---------- The smoke ----------

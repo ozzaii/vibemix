@@ -9,9 +9,9 @@ Covers:
 - ``list_profiles()`` returns sorted profile stems including FLX4.
 - Hand-written schema validator rejects missing `id`, empty `port_name_hints`,
   unknown `axis`, out-of-range `cc`.
-- DDJ-FLX4 JSON encodes the v4 ``_CC_MAP`` (13 entries) + ``_NOTE_MAP``
-  (12 entries) byte-equivalently — every (channel, cc) and (channel, note)
-  pair from v4 must appear with matching field/kind.
+- DDJ-FLX4 JSON encodes the v4 ``_CC_MAP`` (13 entries) + the live-discovered
+  relative jog-move CCs + ``_NOTE_MAP`` (12 entries) — every (channel, cc) and
+  (channel, note) pair must appear with matching field/kind.
 - Axis assignments match v4 semantics (unipolar for vol/eq, bipolar for
   tempo/filter/xfader).
 """
@@ -40,6 +40,10 @@ _V4_CC_MAP = {
     (6, 0x17): ("A", "filter"),
     (6, 0x18): ("B", "filter"),
     (6, 0x1F): ("M", "xfader"),
+}
+_LIVE_JOG_CC_MAP = {
+    (0, 0x21): ("A", "jog"),
+    (1, 0x21): ("B", "jog"),
 }
 _V4_NOTE_MAP = {
     (0, 0x0B): ("A", "play"),
@@ -144,6 +148,7 @@ def test_schema_validator_rejects_unknown_axis():
     msg = str(exc.value)
     assert "unipolar" in msg
     assert "bipolar" in msg
+    assert "relative" in msg
 
 
 def test_schema_validator_rejects_cc_out_of_range():
@@ -173,8 +178,14 @@ def test_pioneer_ddj_flx4_json_encodes_v4_cc_map_byte_equivalent():
         assert json_lookup[v4_key] == v4_val, (
             f"DDJ-FLX4 JSON CC entry {v4_key} = {json_lookup[v4_key]} drifted from v4 = {v4_val}"
         )
-    # JSON must not introduce extra CC entries Wave 1 doesn't expect.
-    assert set(json_lookup.keys()) == set(_V4_CC_MAP.keys())
+    for jog_key, jog_val in _LIVE_JOG_CC_MAP.items():
+        assert jog_key in json_lookup, (
+            f"DDJ-FLX4 JSON missing live jog CC entry {jog_key} -> {jog_val}"
+        )
+        assert json_lookup[jog_key] == jog_val
+    # JSON must not introduce extra CC entries beyond the v4 map + hardware-
+    # sniffed relative jog ticks.
+    assert set(json_lookup.keys()) == set(_V4_CC_MAP.keys()) | set(_LIVE_JOG_CC_MAP.keys())
 
 
 def test_pioneer_ddj_flx4_json_buttons_section_lists_all_v4_notes():
@@ -214,4 +225,5 @@ def test_pioneer_ddj_flx4_json_axis_assignments_match_v4_semantics():
     for deck in ("A", "B"):
         assert by_field[(deck, "tempo")] == "bipolar"
         assert by_field[(deck, "filter")] == "bipolar"
+        assert by_field[(deck, "jog")] == "relative"
     assert by_field[("M", "xfader")] == "bipolar"

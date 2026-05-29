@@ -14,7 +14,8 @@ Pins:
 - deck_snapshot keys derive from profile.decks (FLX4 → A, B; synthetic 4-deck
   → A, B, C, D).
 - MidiEvent.magnitude semantics: unipolar = (v - prev)/127, bipolar =
-  (v - 64)/63 (signed; clamp to [-1.0, 1.0]).
+  (v - 64)/63, relative = ±1.0 for non-center encoder ticks (signed; clamp
+  to [-1.0, 1.0]).
 - Buttons emit MidiEvent without magnitude.
 - Unmapped CCs are silent.
 - v4 byte-equivalence preserved for moves_since(), _knob_label, _xfader_label,
@@ -159,6 +160,29 @@ def test_handle_msg_bipolar_tempo_emits_signed_magnitude():
     assert events[2].magnitude is not None and events[2].magnitude <= -1.0
 
 
+def test_handle_msg_relative_jog_emits_pulse_baseline_event_and_move():
+    cs = ControllerState(profile=_flx4())
+    cs.handle_msg(_cc(0, 0x21, 65))
+    cs.handle_msg(_cc(1, 0x21, 63))
+
+    snap = cs.deck_snapshot()
+    assert snap["A"]["jog"] == 0
+    assert snap["B"]["jog"] == 0
+
+    events = [e for e in cs.events_since(0.0) if e.kind == "cc" and e.field == "jog"]
+    assert len(events) == 2
+    assert events[0].deck == "A"
+    assert events[0].value_raw == 65
+    assert events[0].magnitude == 1.0
+    assert events[1].deck == "B"
+    assert events[1].value_raw == 63
+    assert events[1].magnitude == -1.0
+
+    labels = [label for _, label in cs.moves_since(0.0)]
+    assert "A_jog nudge forward" in labels
+    assert "B_jog nudge back" in labels
+
+
 def test_handle_msg_button_emits_event_without_magnitude():
     cs = ControllerState(profile=_flx4())
     cs.handle_msg(_note_on(0, 11, velocity=127))  # play_a
@@ -272,8 +296,8 @@ def test_moves_ring_drops_entries_older_than_12s(mocker):
 
 def test_controller_state_lookup_tables_built_from_profile():
     cs = ControllerState(profile=_flx4())
-    # 13 cc entries from FLX4 profile.
-    assert len(cs._cc_lookup) == 13
+    # 13 legacy CC entries + 2 live-discovered relative jog tick entries.
+    assert len(cs._cc_lookup) == 15
     # 12 note entries.
     assert len(cs._note_lookup) == 12
     # Validate one binding identity.

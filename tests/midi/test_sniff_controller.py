@@ -3,6 +3,7 @@
 No live MIDI required. mido is mocked via sys.modules patch so this runs on
 macOS CI without `python-rtmidi` install issues (per 23-01 plan spec).
 """
+
 from __future__ import annotations
 
 import importlib
@@ -14,15 +15,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Module loader — re-imports sniff_controller fresh with a stubbed mido so
 # each test gets a clean slate.
 # ---------------------------------------------------------------------------
 
-SCRIPT_PATH = (
-    Path(__file__).resolve().parents[2] / "scripts" / "sniff_controller.py"
-)
+SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "sniff_controller.py"
 
 
 def _fresh_module(fake_mido: types.ModuleType | None = None):
@@ -34,9 +32,7 @@ def _fresh_module(fake_mido: types.ModuleType | None = None):
         )
     # Stub `mido` in sys.modules so the script's `import mido` resolves to ours.
     sys.modules["mido"] = fake_mido  # type: ignore[assignment]
-    spec = importlib.util.spec_from_file_location(
-        "sniff_controller_under_test", SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("sniff_controller_under_test", SCRIPT_PATH)
     module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
     spec.loader.exec_module(module)  # type: ignore[union-attr]
     return module
@@ -171,9 +167,30 @@ def test_summarize_aggregates_unique_cc_and_notes_sorted():
         {"type": "cc", "channel": 0, "data1": 7, "data1_hex": "0x07", "data2": 64, "ts": 0.0},
         {"type": "cc", "channel": 0, "data1": 11, "data1_hex": "0x0b", "data2": 64, "ts": 0.1},
         {"type": "cc", "channel": 0, "data1": 7, "data1_hex": "0x07", "data2": 65, "ts": 0.2},
-        {"type": "note_on", "channel": 0, "data1": 0x60, "data1_hex": "0x60", "data2": 127, "ts": 0.3},
-        {"type": "note_on", "channel": 0, "data1": 0x58, "data1_hex": "0x58", "data2": 127, "ts": 0.4},
-        {"type": "note_off", "channel": 0, "data1": 0x60, "data1_hex": "0x60", "data2": 0, "ts": 0.5},
+        {
+            "type": "note_on",
+            "channel": 0,
+            "data1": 0x60,
+            "data1_hex": "0x60",
+            "data2": 127,
+            "ts": 0.3,
+        },
+        {
+            "type": "note_on",
+            "channel": 0,
+            "data1": 0x58,
+            "data1_hex": "0x58",
+            "data2": 127,
+            "ts": 0.4,
+        },
+        {
+            "type": "note_off",
+            "channel": 0,
+            "data1": 0x60,
+            "data1_hex": "0x60",
+            "data2": 0,
+            "ts": 0.5,
+        },
     ]
     summary = mod.summarize(frames, duration_s=1.0)
     assert summary["summary"] is True
@@ -255,3 +272,35 @@ def test_main_ambiguous_port_exits_nonzero(capsys):
     # Both ambiguous candidates should be surfaced
     assert "Port 1" in (captured.out + captured.err)
     assert "Port 2" in (captured.out + captured.err)
+
+
+def test_main_callback_mode_captures_callback_frames(capsys):
+    class CallbackPort:
+        def __init__(self, callback):
+            self._callback = callback
+
+        def __enter__(self):
+            self._callback(_mock_cc(channel=0, control=7, value=90))
+            self._callback(_mock_note_on(channel=0, note=11, velocity=127))
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def _open_input(_name, callback=None):
+        assert callback is not None
+        return CallbackPort(callback)
+
+    fake = types.SimpleNamespace(
+        get_input_names=lambda: ["DDJ-FLX4"],
+        open_input=_open_input,
+    )
+    mod = _fresh_module(fake)
+    rc = mod.main(["--port", "FLX4", "--seconds", "0", "--mode", "callback"])
+    captured = capsys.readouterr()
+
+    assert rc == 0
+    lines = [json.loads(line) for line in captured.out.splitlines()]
+    assert [line["type"] for line in lines[:2]] == ["cc", "note_on"]
+    assert lines[-1]["summary"] is True
+    assert lines[-1]["frames"] == 2

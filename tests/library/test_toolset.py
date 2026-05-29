@@ -224,6 +224,60 @@ def test_dispatch_errors_never_raise(toolset):
     assert "error" in toolset.dispatch("does_not_exist", {})
 
 
+def test_research_fetch_requires_prior_web_search_url(toolset, monkeypatch):
+    from vibemix.library import web_research as web_research_mod
+
+    def fake_search(query, k=5):
+        return {
+            "query": query,
+            "results": [
+                {
+                    "title": "Source",
+                    "url": "https://label.example/release",
+                    "snippet": "grounded",
+                    "score": 0.9,
+                },
+                {"title": "Dropped", "url": "", "snippet": "", "score": 0.1},
+            ],
+        }
+
+    def fake_fetch(url):
+        return {"url": url, "title": "Source", "text": "readable page text"}
+
+    monkeypatch.setattr(web_research_mod, "web_search", fake_search)
+    monkeypatch.setattr(web_research_mod, "fetch_url", fake_fetch)
+
+    search = toolset.web_search({"query": "artist label context"})
+    assert search["results"][0]["url"] == "https://label.example/release"
+
+    ok = toolset.fetch_url({"url": "https://label.example/release"})
+    assert ok == {
+        "url": "https://label.example/release",
+        "title": "Source",
+        "text": "readable page text",
+    }
+
+    rejected = toolset.fetch_url({"url": "https://unissued.example/article"})
+    assert "error" in rejected
+    assert "web_search this run" in rejected["error"]
+
+
+def test_research_error_does_not_issue_fetchable_url(toolset, monkeypatch):
+    from vibemix.library import web_research as web_research_mod
+
+    monkeypatch.setattr(
+        web_research_mod,
+        "web_search",
+        lambda query, k=5: {"error": "web_search unavailable"},
+    )
+
+    out = toolset.web_search({"query": "scene context"})
+    assert "error" in out
+    rejected = toolset.fetch_url({"url": "https://example.com/not-issued"})
+    assert "error" in rejected
+    assert "not returned by web_search" in rejected["error"]
+
+
 def test_smart_hot_cues_rejects_unseen_track(toolset):
     out = toolset.smart_hot_cues({"track_id": "t000"})
 

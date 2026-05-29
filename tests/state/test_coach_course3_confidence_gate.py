@@ -18,9 +18,9 @@ from __future__ import annotations
 import dataclasses
 
 from vibemix.state.coach import (
-    AICoach,
     _COUNT_IN_BPM_FLOOR,
     _COUNT_IN_PHRASE_FLOOR,
+    AICoach,
     _count_in_eligible,
 )
 from vibemix.state.music_state import MusicState
@@ -39,6 +39,7 @@ def test_musicstate_default_extension_safe() -> None:
     assert s.session_active is False
     assert s.phrase_position_confidence == 0.0
     assert s.next_phrase_at is None
+    assert s.next_phrase_cue_id is None
 
 
 def test_evidence_line_cold_state_emits_no_lens_marker() -> None:
@@ -117,6 +118,20 @@ def test_count_in_eligible_when_all_floors_pass() -> None:
     assert "lens=count_in_eligible[next@42.5]" in line, (
         f"forward-looking marker shape wrong: {line!r}"
     )
+
+
+def test_count_in_marker_includes_cue_anchor_when_registered() -> None:
+    s = dataclasses.replace(
+        MusicState(),
+        session_active=True,
+        bpm_confidence=0.95,
+        phrase_position_confidence=0.9,
+        next_phrase_at=42.5,
+        next_phrase_cue_id="phrase_boundary@42.5",
+    )
+    line = AICoach.evidence_line(s)
+    assert "lens=count_in_eligible[next@42.5]" in line
+    assert "cue_anchor=phrase_boundary@42.5" in line
 
 
 def test_count_in_at_exact_floor_passes() -> None:

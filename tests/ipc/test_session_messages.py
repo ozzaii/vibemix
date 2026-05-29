@@ -17,6 +17,7 @@ file specifically pins:
 from __future__ import annotations
 
 import json
+from typing import get_args, get_type_hints
 
 import jsonschema
 import pytest
@@ -26,12 +27,13 @@ from vibemix.ui_bus import (
     LevelPair,
     MetersTriple,
     SessionMute,
+    SessionSetMode,
     SessionSnapshot,
     SettingsSet,
     SettingsState,
     StatusRecheck,
 )
-from vibemix.ui_bus.messages import _SCHEMA
+from vibemix.ui_bus.messages import _SCHEMA, SettingsSetPayload, SettingsStatePayload
 
 
 def _validate(d: dict) -> None:
@@ -110,6 +112,19 @@ def test_session_mute_rejects_extra_field() -> None:
 
 
 # ---------------------------------------------------------------------------
+# SessionSetMode — top-level app mode picker
+# ---------------------------------------------------------------------------
+
+
+def test_session_set_mode_roundtrip() -> None:
+    msg = SessionSetMode.make(mode="build")
+    parsed = json.loads(msg.to_json())
+    _validate(parsed)
+    assert parsed["type"] == "ipc.session.set_mode"
+    assert parsed["payload"] == {"mode": "build"}
+
+
+# ---------------------------------------------------------------------------
 # SettingsSet — enum enforcement on `field`
 # ---------------------------------------------------------------------------
 
@@ -125,6 +140,13 @@ def test_session_mute_rejects_extra_field() -> None:
         ("output_profile", "spk"),
         ("retention_days", 14),
         ("push_to_mute_hotkey", "ctrl+shift+m"),
+        ("mood", "teacher"),
+        ("click_through", True),
+        ("lighter_blur", True),
+        ("skill", "pro"),
+        ("lens", "critique"),
+        ("learn.headphone_device_index", 2),
+        ("learn.headphone_device_index", None),
     ],
 )
 def test_settings_set_accepts_known_field(field: str, value: object) -> None:
@@ -145,6 +167,14 @@ def test_settings_set_rejects_unknown_field() -> None:
         _validate(parsed)
 
 
+def test_settings_set_field_literal_matches_schema_enum() -> None:
+    schema_enum = _SCHEMA["definitions"]["SettingsSet"]["properties"]["payload"]["properties"][
+        "field"
+    ]["enum"]
+    literal = list(get_args(get_type_hints(SettingsSetPayload)["field"]))
+    assert literal == schema_enum
+
+
 # ---------------------------------------------------------------------------
 # SettingsState — enum enforcement on `mode` + `output_profile`
 # ---------------------------------------------------------------------------
@@ -160,12 +190,36 @@ def test_settings_state_full_roundtrip() -> None:
         retention_days=30,
         push_to_mute_hotkey="ctrl+shift+m",
         muted=True,
+        mood="coach",
+        click_through=True,
+        skill="pro",
+        lens="critique",
+        learn_headphone_device_index=2,
+        session_mode="build",
     )
     parsed = json.loads(msg.to_json())
     _validate(parsed)
     assert parsed["payload"]["mode"] == "hype"
     assert parsed["payload"]["output_profile"] == "spk"
     assert parsed["payload"]["muted"] is True
+    assert parsed["payload"]["lens"] == "critique"
+    assert parsed["payload"]["learn.headphone_device_index"] == 2
+    assert parsed["payload"]["session.mode"] == "build"
+
+
+def test_settings_state_payload_fields_match_schema_properties() -> None:
+    schema_fields = set(
+        _SCHEMA["definitions"]["SettingsState"]["properties"]["payload"]["properties"]
+    )
+    python_fields = {
+        "session.mode"
+        if field == "session_mode"
+        else "learn.headphone_device_index"
+        if field == "learn_headphone_device_index"
+        else field
+        for field in get_type_hints(SettingsStatePayload)
+    }
+    assert python_fields == schema_fields
 
 
 def test_settings_state_rejects_invalid_mode() -> None:

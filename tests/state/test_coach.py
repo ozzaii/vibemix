@@ -13,8 +13,11 @@ is fed to evidence_line and the output is asserted to NOT contain ``phase=``.
 from __future__ import annotations
 
 import inspect
+import time
 
 from vibemix.state import AICoach, Event, MusicState
+from vibemix.state.deck_context import midi_evidence_key
+from vibemix.state.deck_state import DeckState, DeckTrack
 
 # ---------- Class shape ----------
 
@@ -144,6 +147,38 @@ def test_evidence_line_recall_block_after_corpus_footer():
         "[recall:20260520-2200:7] that filter sweep into the drop was clean"
         " || [recall:20260520-2200:12] you rode the groove a touch long here"
     )
+
+
+def test_evidence_line_sanitizes_historical_recall_audio_window_and_verdict():
+    from vibemix.memory.store import Record
+
+    state = MusicState()
+    records = [
+        Record(
+            record_id="20260520-2200:33",
+            session_id="20260520-2200",
+            ts=300.0,
+            kind="coach_line",
+            signature=(
+                "coach_line | event=MIX_MOVE "
+                "| audio_window=audio_window_context[P1=master_global_mix "
+                "deckA_audio=attached deckB_audio=stem isolated_decks=true] "
+                "| audio_delta=low energy fell 50% (strong) "
+                "| said: That was a great transition."
+            ),
+            score=0.8,
+        )
+    ]
+
+    out = AICoach.evidence_line(state, recall_moments=records)
+
+    assert "[recall:20260520-2200:33]" in out
+    assert "deckA_audio=attached" not in out
+    assert "deckB_audio=stem" not in out
+    assert "isolated_decks=true" not in out
+    assert "great transition" not in out.lower()
+    assert "audio_window=omitted_untrusted_audio_window" in out
+    assert "said: omitted_past_live_outcome_claim" in out
 
 
 def test_evidence_line_recall_empty_no_block():
@@ -372,6 +407,55 @@ def test_evidence_line_recent_moves_rendering():
     )
 
 
+def test_evidence_line_renders_registered_move_grounding_refs():
+    state = MusicState(
+        audible=True,
+        rms=0.05,
+        bpm=120.0,
+        recent_moves=[(2.0, "A_low: flat→killed (big twist)")],
+    )
+    state.set_start_at = time.time() - 44.0
+    key = midi_evidence_key("A_low: flat→killed (big twist)")
+    out = AICoach.evidence_line(
+        state,
+        registry_snapshot={
+            "midi": {key: (42.0,)},
+            "mix": {"move_scope=single_deck_move_A": (44.0,)},
+        },
+    )
+
+    assert f"grounding_refs[[midi:{key}@42.0]" in out
+    assert "[mix:move_scope=single_deck_move_A]" in out
+    assert "live_evidence[" in out
+    assert "mix:move_scope=single_deck_move_A" in out
+
+
+def test_evidence_line_renders_live_evidence_categories_for_gemini():
+    state = MusicState(
+        audible=True,
+        audible_deck="A",
+        rms=0.05,
+        bpm=120.0,
+        recent_moves=[(0.8, "A_low: flat→killed (big twist)")],
+    )
+    state.set_start_at = time.time() - 20.0
+    state.controller_connected = True
+    state.xfader = 0
+    state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_state = DeckState(decks={"A": DeckTrack(title="OutA", camelot="8A", confidence=0.8)})
+    state.audio_delta = ["sub energy fell 50% (strong)"]
+
+    out = AICoach.evidence_line(state)
+
+    assert "live_evidence[" in out
+    assert "mix:deck_audio_support=single_deck_A" in out
+    assert "mix:transition_block=single_resolved_deck" in out
+    assert "mix:move_scope=single_deck_move_A" in out
+    assert "mix:move_effect=sub_energy_fell_50pct_strong" in out
+    assert "rule=evidence_categories_not_quality_verdict" in out
+
+
 def test_evidence_line_recent_moves_filtered_by_age():
     """Moves with age > 8.0 are filtered out (v4:1362)."""
     state = MusicState(
@@ -443,10 +527,7 @@ def test_task_kaan_spoke_exact_string():
     blew past the budget and the clause was just noise. Reactions stay
     short by `style:` rules in the system instruction, not per-prompt budget."""
     out = AICoach.task_for_event(_ev("KAAN_SPOKE"))
-    assert (
-        out
-        == "Kaan just SPOKE — answer him directly, friend tone. Short. Not a music reaction."
-    )
+    assert out == "Kaan just SPOKE — answer him directly, friend tone. Short. Not a music reaction."
 
 
 def test_task_manual_exact_string():
@@ -502,16 +583,49 @@ def test_task_mix_move_LOAD_BEARING_anti_slop_clause():
     out = AICoach.task_for_event(
         _ev("MIX_MOVE", {"moves": ["A_play→ON", "A_low: cut→killed (big twist)"]})
     )
-    assert "A move just landed [A_play→ON, A_low: cut→killed (big twist)]" in out
+    assert "A controller move was observed [A_play→ON, A_low: cut→killed (big twist)]" in out
     # The move-second is a change point — ground on the audible before→after there.
     assert "CHANGE point" in out
     # The knob-ban is GONE; naming an EQ/filter is now explicitly allowed.
     assert "Do NOT name faders/EQs/knobs/decks/controls" not in out
     assert "Name the EQ" in out
+    assert "audio_window_context[" in out
+    assert "deck_change_context[" in out
+    assert "A_low(now=flat route=unknown)" in out
+    # Deck + audio route + move/change/effect context gate transition/blend language.
+    assert (
+        "Use deck_context, deck_reference_context, deck_source_context, "
+        "deck_audio_context, audio_window_context, "
+        "deck_change_context, move_effect_context, live_evidence, and "
+        "move_context as the hard deck gate"
+    ) in out
+    assert "live_evidence[" in out
+    assert "do NOT call this a transition or blend" in out
     # The model decides what matters this moment.
     assert "you decide what matters" in out
     # Silence path still present.
     assert "output a single space to stay silent" in out
+
+
+def test_task_mix_move_includes_move_effect_context_when_dsp_delta_is_grounded():
+    state = MusicState(audible=True, rms=0.12, onset_density=3.0)
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
+    state.prev_perceive = {
+        "rms": 0.10,
+        "sub": 0.24,
+        "low": 0.32,
+        "mid": 0.30,
+        "high": 0.20,
+        "onset_density": 2.0,
+    }
+
+    out = AICoach.task_for_event(
+        Event(type="MIX_MOVE", state=state, extra={"moves": ["A_low: flat→killed"]})
+    )
+
+    assert "move_effect_context[" in out
+    assert "sub energy fell 50% (strong)" in out
+    assert "rule=dsp_delta_not_causal_proof" in out
 
 
 def test_task_heartbeat_LOAD_BEARING_anti_silence_clause():
@@ -542,9 +656,7 @@ def test_task_fallback_unknown_type():
 
 
 def test_task_acid_line_entry_grounds_on_formant_and_q():
-    out = AICoach.task_for_event(
-        _ev("ACID_LINE_ENTRY", {"formant_hz": 820.5, "resonance_q": 4.2})
-    )
+    out = AICoach.task_for_event(_ev("ACID_LINE_ENTRY", {"formant_hz": 820.5, "resonance_q": 4.2}))
     assert out != "React naturally."
     assert "820.5" in out
     assert "4.2" in out
@@ -785,8 +897,8 @@ def test_18_02_evidence_line_appends_corpus_footer_when_snapshot_present():
     state = MusicState()
     snapshot = {
         "ev": {"HEARTBEAT": (10.0, 80.0), "MIX_MOVE": (45.0,)},  # 3 obs
-        "aud": {"rms": (5.0, 6.0, 7.0, 8.0), "bpm": (5.0,)},     # 5 obs
-        "mix": {"phase=drop": (45.0,)},                           # 1 obs
+        "aud": {"rms": (5.0, 6.0, 7.0, 8.0), "bpm": (5.0,)},  # 5 obs
+        "mix": {"phase=drop": (45.0,)},  # 1 obs
     }
     out = AICoach.evidence_line(state, registry_snapshot=snapshot)
     assert "evidence_corpus[ev=3,aud=5,mix=1]" in out
@@ -937,9 +1049,7 @@ def test_transition_recall_fragment_appears():
         ev = _ev(type_)
         out = AICoach.build_prompt(ev, recall_moments=survivors)
         # Phase 65 evidence_line PAST-tense fence rides along (already green).
-        assert "FROM A PAST SESSION" in out, (
-            f"missing Phase 65 PAST-tense fence on {type_}"
-        )
+        assert "FROM A PAST SESSION" in out, f"missing Phase 65 PAST-tense fence on {type_}"
         # Transition-shape fragment unique marker — pinned at Wave 0 from
         # 66-RESEARCH.md TRANSITION_SHAPE_RECALL_FRAGMENT_TPL.
         assert "in the live audio" in out, (
@@ -1146,9 +1256,7 @@ def test_transition_wins_track_change_overlap():
     ev = _ev("TRACK_CHANGE", {"prev_track": "X", "new_track": "Y"})
     out = AICoach.build_prompt(ev, recall_moments=survivors)
     # Transition fragment marker MUST appear on the TRACK_CHANGE overlap.
-    assert "in the live audio" in out, (
-        "transition-shape fragment must win on TRACK_CHANGE"
-    )
+    assert "in the live audio" in out, "transition-shape fragment must win on TRACK_CHANGE"
     # Vocabulary fragment marker MUST NOT appear — only one fragment per turn.
     assert "echo your own past words" not in out, (
         "vocabulary fragment leaked into a TRACK_CHANGE turn — transition "

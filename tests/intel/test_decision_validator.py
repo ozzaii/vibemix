@@ -117,6 +117,30 @@ def test_validator_accepts_issued_select_decision() -> None:
     assert result.accepted
 
 
+def test_validator_accepts_move_grade_claim_for_selected_candidate() -> None:
+    envelope = _envelope()
+    result = validate_agent_decision(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            candidate_id="tr_001",
+            cue_slot="A",
+            timing_text="in 16 bars",
+            spoken_text="Next CLEAN move: t2 cue A in 16 bars.",
+            cited_claims=("move_grade",),
+            cited_claim_ids=(
+                _claim_id(envelope, "move_grade"),
+                _claim_id(envelope, "cue_slot"),
+                _claim_id(envelope, "bars_until_event"),
+            ),
+            confidence=0.9,
+        ),
+    )
+
+    assert result.accepted
+
+
 def test_validator_accepts_section_role_copy_when_claim_backed() -> None:
     envelope = _envelope()
     result = validate_agent_decision(

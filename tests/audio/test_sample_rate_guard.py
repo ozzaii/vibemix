@@ -20,7 +20,10 @@ import pytest
 
 from vibemix.audio.constants import INPUT_SR_NATIVE
 from vibemix.audio.errors import SampleRateMismatchError
-from vibemix.platform._audio_macos import assert_device_sample_rate
+from vibemix.platform._audio_macos import (
+    assert_device_sample_rate,
+    set_device_nominal_sample_rate,
+)
 
 _MODULE = "vibemix.platform._audio_macos"
 
@@ -62,6 +65,28 @@ def test_input_guard_passes_on_48000_device_without_attempting_fix():
     assert result is None
     assert not fix.called  # already correct — no fix attempt
     assert not popen.called  # no Audio MIDI Setup pop
+
+
+def test_programmatic_rate_fix_falls_back_to_swift_when_pyobjc_fails():
+    with (
+        mock.patch(f"{_MODULE}._set_device_nominal_sample_rate_pyobjc", return_value=False) as pyobjc,
+        mock.patch(f"{_MODULE}._set_device_nominal_sample_rate_swift", return_value=True) as swift,
+    ):
+        result = set_device_nominal_sample_rate("BlackHole 2ch", 48000)
+
+    assert result is True
+    pyobjc.assert_called_once_with("BlackHole 2ch", 48000)
+    swift.assert_called_once_with("BlackHole 2ch", 48000)
+
+
+def test_programmatic_rate_fix_reports_false_when_both_paths_fail():
+    with (
+        mock.patch(f"{_MODULE}._set_device_nominal_sample_rate_pyobjc", return_value=False),
+        mock.patch(f"{_MODULE}._set_device_nominal_sample_rate_swift", return_value=False),
+    ):
+        result = set_device_nominal_sample_rate("BlackHole 2ch", 48000)
+
+    assert result is False
 
 
 def test_input_path_is_guarded_at_input_sr_native():

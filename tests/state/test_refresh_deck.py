@@ -21,6 +21,7 @@ from unittest.mock import MagicMock
 from tests.audio.conftest import int16_sine
 from vibemix.audio import AudioBuffer
 from vibemix.state import MusicState
+from vibemix.state.deck_context import midi_evidence_key
 from vibemix.state.deck_state import DeckTrack
 from vibemix.state.refresh import _tick_once
 
@@ -64,14 +65,23 @@ def _deck_source(decks: dict[str, DeckTrack]) -> MagicMock:
             for s, d in decks.items()
         }
     m.snapshot.side_effect = _snap
+    m.source_snapshot.return_value = {}
     return m
 
 
-def _tick(state, *, deck_source=None, evidence_registry=None, now=1000.0):
+def _tick(
+    state,
+    *,
+    deck_source=None,
+    evidence_registry=None,
+    now=1000.0,
+    controller_state=None,
+    evidence_dedupe=None,
+):
     return _tick_once(
         state,
         _audible_buf(),
-        _ctrl_mock(),
+        controller_state or _ctrl_mock(),
         _track_mock(),
         now=now,
         last_audible_high=999.0,
@@ -80,6 +90,7 @@ def _tick(state, *, deck_source=None, evidence_registry=None, now=1000.0):
         last_bpm_at=999.0,
         deck_source=deck_source,
         evidence_registry=evidence_registry,
+        evidence_dedupe=evidence_dedupe,
     )
 
 
@@ -97,6 +108,24 @@ def test_deck_snapshot_copied_into_state():
     assert "A" in state.deck_state.decks
     assert state.deck_state.decks["A"].title == "Strobe"
     assert state.deck_state.updated_at == 1000.0
+
+
+def test_deck_source_status_copied_into_state():
+    state = MusicState()
+    ds = _deck_source({})
+    ds.source_snapshot.return_value = {
+        "nowplaying": "blocked_non_deck_owner",
+        "nowplaying_owner": "com.apple.webkit.gpu",
+        "resolution": "blocked_non_deck_nowplaying",
+    }
+
+    _tick(state, deck_source=ds)
+
+    assert state.deck_state.source_status == {
+        "nowplaying": "blocked_non_deck_owner",
+        "nowplaying_owner": "com.apple.webkit.gpu",
+        "resolution": "blocked_non_deck_nowplaying",
+    }
 
 
 def test_camelot_normalized_inside_tick():
@@ -195,6 +224,43 @@ def test_registry_write_failure_does_not_kill_tick():
     # Should NOT raise.
     _tick(state, deck_source=ds, evidence_registry=reg)
     assert "A" in state.deck_state.decks  # the copy still landed
+
+
+def test_live_grounding_evidence_writes_move_route_and_audio_delta_once():
+    state = MusicState(audible=True, set_start_at=990.0)
+    state.prev_perceive = {
+        "rms": 0.9,
+        "sub": 0.9,
+        "low": 0.9,
+        "mid": 0.9,
+        "high": 0.9,
+        "onset_density": 9.0,
+    }
+    reg = MagicMock()
+    dedupe: set[str] = set()
+    ctrl = _ctrl_mock()
+    ctrl.moves_since.side_effect = [
+        [(0.4, "A_low: flat→killed (big twist)")],
+        [(0.5, "A_low: flat→killed (big twist)")],
+    ]
+
+    _tick(state, evidence_registry=reg, controller_state=ctrl, evidence_dedupe=dedupe)
+    first_delta = list(state.audio_delta)
+    _tick(
+        state,
+        evidence_registry=reg,
+        controller_state=ctrl,
+        evidence_dedupe=dedupe,
+        now=1000.1,
+    )
+
+    writes = [c.args for c in reg.write.call_args_list]
+    move_key = midi_evidence_key("A_low: flat→killed (big twist)")
+    assert ("midi", move_key, 9.6) in writes
+    assert ("mix", "deck_audio_support=single_deck_A", 10.0) in writes
+    assert first_delta
+    assert any(args[0] == "mix" and str(args[1]).startswith("move_effect=") for args in writes)
+    assert len([args for args in writes if args[:2] == ("midi", move_key)]) == 1
 
 
 # ---------------------------------------------------------------------- #

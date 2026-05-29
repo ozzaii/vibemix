@@ -21,6 +21,8 @@ import numpy as np
 
 from vibemix.runtime.suggestion import (
     SuggestionService,
+    _next_grade_progress,
+    _public_grade_progress,
     resolve_controller_mix_context,
     resolve_live_timing,
     resolve_seed,
@@ -92,6 +94,57 @@ def _cue_from_row(row):
         end_s=None,
         number=int(row.get("number", -1)),
     )
+
+
+def _grade_suggestion(slug: str = "lit_aff", xp: int = 100) -> dict:
+    return {
+        "track_id": "a",
+        "transition": {
+            "candidate_id": "tr_001",
+            "from_track_id": "s",
+            "to_track_id": "a",
+            "from_section_id": "s#s000",
+            "to_section_id": "a#s000",
+            "cue_slot": "A",
+            "move_grade": {
+                "slug": slug,
+                "xp": xp,
+                "deserved": slug not in {"mid", "negative"},
+                "intensity": 100,
+            },
+        },
+    }
+
+
+def test_grade_progress_marks_level_up_when_earned_xp_crosses_threshold():
+    progress = _next_grade_progress(
+        {"total_xp": 188, "streak": 2},
+        _grade_suggestion("lit_aff", 100),
+    )
+
+    public = _public_grade_progress(progress)
+
+    assert public["earned"] is True
+    assert public["total_xp"] == 288
+    assert public["level"] == 2
+    assert public["level_xp"] == 38
+    assert public["level_up"] is True
+    assert public["levels_gained"] == 1
+
+
+def test_grade_progress_keeps_level_up_false_below_threshold():
+    progress = _next_grade_progress(
+        {"total_xp": 24, "streak": 1},
+        _grade_suggestion("clean", 24),
+    )
+
+    public = _public_grade_progress(progress)
+
+    assert public["earned"] is True
+    assert public["total_xp"] == 48
+    assert public["level"] == 1
+    assert public["level_up"] is False
+    assert public["levels_gained"] == 0
 
 
 def _apply_replay_frame(state: MusicState, frame: dict) -> None:
@@ -470,12 +523,36 @@ def test_compute_from_state_threads_live_bar_timing_into_transition():
     assert out["transition"]["start_in_bars"] == 13
     assert out["transition"]["timing_basis"] == "section_playhead"
     assert out["transition"]["timing_anchor"] == "source_section_end"
+    move_grade = out["transition"]["move_grade"]
+    progress = out["grade_progress"]
+    if move_grade["deserved"]:
+        assert progress["earned"] is True
+        assert progress["streak"] == 1
+        assert progress["last_xp"] == move_grade["xp"]
+        assert progress["total_xp"] == move_grade["xp"]
+        assert progress["heat"] >= move_grade["intensity"]
+        assert progress["level"] >= 1
+        assert progress["next_level_xp"] == 250
+        assert 0 <= progress["level_progress"] <= 100
+        assert isinstance(progress["level_up"], bool)
+        assert progress["levels_gained"] >= 0
+    else:
+        assert progress["earned"] is False
+        assert progress["streak"] == 0
+        assert progress["last_xp"] == 0
+        assert progress["level_up"] is False
+        assert progress["levels_gained"] == 0
+
+    refreshed_once = svc.refresh_from_state(state, now=10.0, min_interval_s=0.0)
+    assert refreshed_once is not None
+    assert refreshed_once["grade_progress"] == progress
 
     envelope = svc.context_for_state(state, packet_id="ctx_live_001")
 
     assert envelope is not None
     assert envelope.packet_id == "ctx_live_001"
     assert envelope.current["active_track_id"] == "s"
+    assert envelope.current["grade_progress"] == progress
     assert envelope.candidates[0]["to_track_id"] == "a"
     assert envelope.candidates[0]["recommended_cue_slot"] == "A"
     assert {"cue_slot", "section_role", "bars_until_event"} <= {
@@ -497,10 +574,16 @@ def test_compute_from_state_threads_live_bar_timing_into_transition():
     assert decision.final_decision.candidate_id == "tr_001"
     assert decision.final_decision.cue_slot == "A"
     assert decision.final_decision.timing_text == "in 13 bars"
+    assert decision.final_decision.spoken_text.startswith("Next ")
+    assert "move:" in decision.final_decision.spoken_text
     assert "cue A at 0:00" in decision.final_decision.spoken_text
-    assert {"cue_slot", "section_role", "section_boundary", "bars_until_event"} <= set(
-        decision.final_decision.cited_claims
-    )
+    assert {
+        "cue_slot",
+        "section_role",
+        "section_boundary",
+        "bars_until_event",
+        "move_grade",
+    } <= set(decision.final_decision.cited_claims)
 
     payload = svc.decision_payload_for_state(
         state,

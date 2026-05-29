@@ -25,29 +25,28 @@ Run it (with the FLX4 plugged in):
 
 from __future__ import annotations
 
+import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
 
 
-# reason: real Pioneer DDJ-FLX4 over USB required — no MIDI hardware on hosted
-# runners. Live discharge rides KAAN-ACTION-LEGAL.md §V7-LIVE-03.
+# Real Pioneer DDJ-FLX4 over USB required — skipped when absent.
+# Live discharge rides KAAN-ACTION-LEGAL.md §V7-LIVE-03.
 @pytest.mark.macos_audio
-@pytest.mark.xfail(
-    strict=False,
-    reason="real DDJ-FLX4 USB required — see §V7-LIVE-03",
-)
 def test_flx4_live_resolves_and_decodes():
     """Smoke + LIVE-DRIVE RECIPE for Kaan's FLX4 hardware sign-off (BRINGUP-03).
 
     AUTOMATED CHECK (this test body):
-        Enumerate real MIDI input ports via ``MidiMacOS().list_input_ports()``.
-        If a port matching "FLX4" is present, assert ``find_mapping(port).id ==
+        Enumerate real MIDI input ports in a subprocess via the standalone
+        sniff CLI's ``--list`` mode. Keeping ``python-rtmidi`` out of the pytest
+        process prevents a CoreMIDI abort from killing the whole runner. If a
+        port matching "FLX4" is present, assert ``find_mapping(port).id ==
         "pioneer_ddj_flx4"`` — the real device binds the right profile from
-        ``midi/profiles/`` (the canonical live path). If no FLX4 is plugged,
-        ``pytest.skip``.
+        ``midi/profiles/``. If no FLX4 is plugged, ``pytest.skip``.
 
     ─────────────────────────────────────────────────────────────────────────
     LIVE-DRIVE RECIPE — run these steps by hand once, with a real FLX4 (Kaan):
@@ -92,17 +91,26 @@ def test_flx4_live_resolves_and_decodes():
     Kaan-action; this test automates only the resolve check above.
     """
     from vibemix.midi.registry import find_mapping
-    from vibemix.platform import MidiMacOS
 
-    backend = MidiMacOS()
-    # Real MIDI enumeration can raise when no rtmidi backend is available (no
-    # device, headless CI, or another test having poisoned mido's lazy backend
-    # import). For an opt-in live recipe that needs real hardware, that means
-    # "skip", never "fail".
+    repo_root = Path(__file__).resolve().parent.parent
+    cmd = [sys.executable, str(repo_root / "scripts" / "sniff_controller.py"), "--list"]
     try:
-        ports = backend.list_input_ports()
-    except Exception as exc:  # noqa: BLE001 — any enumeration failure → skip
-        pytest.skip(f"MIDI enumeration unavailable ({exc!r}) — plug the DDJ-FLX4 to run this live")
+        proc = subprocess.run(
+            cmd,
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        pytest.skip(f"MIDI enumeration timed out: {exc!r}")
+    if proc.returncode != 0:
+        pytest.skip(
+            "MIDI enumeration unavailable "
+            f"(exit={proc.returncode}, stderr={proc.stderr.strip()!r})"
+        )
+    ports = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
     flx4_ports = [p for p in ports if "FLX4" in p]
     if not flx4_ports:
         pytest.skip("no FLX4 connected — plug the DDJ-FLX4 over USB to run this live")

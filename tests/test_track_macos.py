@@ -140,6 +140,26 @@ def test_track_macos_poll_carries_raw_elapsed_position(mocker):
     assert info["duration_sec"] == 420.0
 
 
+def test_track_info_carries_nowplaying_client_bundle_id(mocker):
+    raw = {
+        "kMRMediaRemoteNowPlayingInfoTitle": "Strobe",
+        "kMRMediaRemoteNowPlayingInfoArtist": "Deadmau5",
+        "kMRMediaRemoteNowPlayingInfoClientBundleIdentifier": "com.pioneerdj.rekordbox",
+    }
+    mocker.patch(
+        "vibemix.platform._track_macos.subprocess.check_output",
+        side_effect=[
+            b"Strobe\nDeadmau5\n",
+            json.dumps(raw).encode(),
+        ],
+    )
+
+    ti = TrackInfo()
+    ti.poll_once()
+
+    assert ti.snapshot()["client_bundle_id"] == "com.pioneerdj.rekordbox"
+
+
 def test_track_macos_poll_returns_none_when_unavailable(mocker):
     """No title resolved → poll() returns None."""
     mocker.patch(

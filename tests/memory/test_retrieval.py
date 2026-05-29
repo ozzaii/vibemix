@@ -61,6 +61,7 @@ Both auto-cover ``retrieval.py`` the moment Plan 65-03 lands it.
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -70,6 +71,8 @@ from vibemix.memory.retrieval import (
     RECALL_SIMILARITY_FLOOR,
     RECALL_TOP_K,
     MemoryRecall,
+    build_recall_query,
+    should_recall_event,
 )
 from vibemix.memory.store import MemoryStore
 
@@ -147,6 +150,7 @@ def test_heartbeat_never_retrieves(tmp_path: Path) -> None:
     """
     assert "HEARTBEAT" not in RECALL_EVENT_GATE
     assert _TRACK_AWARE in RECALL_EVENT_GATE
+    assert "MIX_MOVE" in RECALL_EVENT_GATE
 
     query = _unit(1)
     embedder = _SpyEmbedder(query)
@@ -159,6 +163,103 @@ def test_heartbeat_never_retrieves(tmp_path: Path) -> None:
     assert embedder.calls == 0
     # Nothing latched for the prompt builder to pull.
     assert recall.get_latest() == []
+
+
+def test_mix_move_recall_requires_move_and_audio_delta() -> None:
+    """MIX_MOVE history costs an embed only when move+sound evidence exists."""
+    state = SimpleNamespace(
+        audible_track="Track A",
+        phase="groove",
+        audible_deck="A",
+        audio_delta=[],
+    )
+    no_delta = SimpleNamespace(
+        type="MIX_MOVE",
+        state=state,
+        extra={"moves": ["A_low: flat→killed"]},
+    )
+    assert should_recall_event(no_delta) is False
+
+    state.audio_delta = ["low energy fell 50% (strong)"]
+    hot = SimpleNamespace(
+        type="MIX_MOVE",
+        state=state,
+        extra={"moves": ["A_low: flat→killed"]},
+    )
+    assert should_recall_event(hot) is True
+
+    no_move = SimpleNamespace(
+        type="MIX_MOVE",
+        state=state,
+        extra={"moves": []},
+    )
+    assert should_recall_event(no_move) is False
+    assert should_recall_event(SimpleNamespace(type="HEARTBEAT", state=state, extra={})) is False
+
+
+def test_recall_query_includes_live_move_context_when_supplied() -> None:
+    """Recall query mirrors ingest's move/effect fields when caller has them."""
+    ev = SimpleNamespace(
+        type="MIX_MOVE",
+        state=SimpleNamespace(
+            audible_track="Strobe",
+            phase="groove",
+            audible_deck="A",
+        ),
+        extra={
+            "context_feed_contract": (
+                "context_feed_contract[surface=session_event labels=deck1:A,deck2:B "
+                "history=past_comparison_not_live_proof cache=static_persona_rules_only "
+                "speed=no_extra_model_pass]"
+            ),
+            "deck_lane_context": "deck_lanes_context[A(identity=known) | B(identity=unknown)]",
+            "deck_reference_context": (
+                "deck_reference_context[(deck1=A identity=known route=dominant) "
+                "(deck2=B identity=unknown route=muted) audio=P1_global_mix]"
+            ),
+            "deck_source_context": (
+                "deck_source_context[identity_state=MusicState.deck_state resolved=A "
+                "unresolved=B second_deck=independent_source_required]"
+            ),
+            "deck_audio_context": "deck_audio_context[source=global_mix support=single_deck_A]",
+            "audio_window_context": (
+                "audio_window_context[P1=master_global_mix P1_heard=true "
+                "timeline=past_action_future action=-1.0..0.0 "
+                "deckA_audio=not_attached rule=time_alignment_not_outcome_verdict]"
+            ),
+            "live_evidence_context": "live_evidence[mix=transition_block=single_resolved_deck]",
+            "move_context": "move_context[scope=single_deck_move_A]",
+            "move_effect_context": "move_effect_context[rule=dsp_delta_not_causal_proof]",
+            "audio_delta": ["low energy fell 50% (strong)"],
+        },
+    )
+
+    query = build_recall_query(ev)
+
+    assert query.startswith("coach_line | track=Strobe | phase=groove | deck=A | event=MIX_MOVE")
+    assert "context_feed=context_feed_contract[surface=session_event labels=deck1:A,deck2:B" in query
+    assert "history=past_comparison_not_live_proof" in query
+    assert "cache=static_persona_rules_only" in query
+    assert "speed=no_extra_model_pass" in query
+    assert "deck_lane=deck_lanes_context[A(identity=known) / B(identity=unknown)]" in query
+    assert (
+        "deck_ref=deck_reference_context[(deck1=A identity=known route=dominant) "
+        "(deck2=B identity=unknown route=muted) audio=P1_global_mix]" in query
+    )
+    assert (
+        "deck_source=deck_source_context[identity_state=MusicState.deck_state resolved=A "
+        "unresolved=B second_deck=independent_source_required]" in query
+    )
+    assert "deck_audio=deck_audio_context[source=global_mix support=single_deck_A]" in query
+    assert "audio_window=audio_window_context[P1=master_global_mix P1_heard=true" in query
+    assert "timeline=past_action_future" in query
+    assert "action=-1.0..0.0" in query
+    assert "deckA_audio=not_attached" in query
+    assert "rule=time_alignment_not_outcome_verdict" in query
+    assert "live_evidence=live_evidence[mix=transition_block=single_resolved_deck]" in query
+    assert "move=move_context[scope=single_deck_move_A]" in query
+    assert "move_effect=move_effect_context[rule=dsp_delta_not_causal_proof]" in query
+    assert "audio_delta=low energy fell 50% (strong)" in query
 
 
 # ---------------------------------------------------------------------------

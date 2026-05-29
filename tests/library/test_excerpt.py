@@ -40,8 +40,18 @@ def _cue(
     number: int = -1,
     end_s: float | None = None,
     name: str = "",
+    source: str = "dj",
+    confidence: float | None = None,
 ) -> CuePoint:
-    return CuePoint(name=name, type=type, start_s=start_s, end_s=end_s, number=number)
+    return CuePoint(
+        name=name,
+        type=type,
+        start_s=start_s,
+        end_s=end_s,
+        number=number,
+        source=source,
+        confidence=confidence,
+    )
 
 
 def _track(cues: tuple[CuePoint, ...], *, duration_s: float = 300.0) -> TrackEntry:
@@ -167,6 +177,30 @@ def test_loop_cues_are_usable():
     anchors = anchors_for_track(track)
     assert len(anchors) == 1
     assert anchors[0].source == "dj"
+
+
+def test_materialized_anlz_cues_keep_source_confidence_and_label():
+    from vibemix.library.excerpt import anchors_for_track
+
+    track = _track(
+        (
+            _cue(
+                type="cue",
+                start_s=32.0,
+                end_s=64.0,
+                number=1,
+                name="BUILD",
+                source="anlz",
+                confidence=0.82,
+            ),
+        )
+    )
+    anchors = anchors_for_track(track)
+
+    assert len(anchors) == 1
+    assert anchors[0].source == "anlz"
+    assert anchors[0].confidence == pytest.approx(0.82)
+    assert anchors[0].label == "build"
 
 
 def test_max_cues_cap():

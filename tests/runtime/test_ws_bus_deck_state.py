@@ -35,6 +35,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from vibemix.runtime.ws_bus import ws_broadcast
 from vibemix.state import MusicState
+from vibemix.state.deck_context import midi_evidence_key
 from vibemix.state.deck_state import DeckState, DeckTrack
 
 _REAL_SLEEP = asyncio.sleep
@@ -47,7 +48,9 @@ def _build_mock_server() -> MagicMock:
     return server
 
 
-def _capture_payload(state: MusicState, mocker) -> dict:
+def _capture_payload(
+    state: MusicState, mocker, *, audio_capture_context: dict | None = None
+) -> dict:
     """Drive ws_broadcast through one tick + capture the first outbound mascot
     payload as a parsed dict. Same approach as test_ws_bus_genre_fields."""
     mock_server = _build_mock_server()
@@ -90,7 +93,15 @@ def _capture_payload(state: MusicState, mocker) -> dict:
     mocker.patch("vibemix.runtime.ws_bus.asyncio.sleep", side_effect=fast_sleep)
 
     async def driver():
-        bg = asyncio.create_task(ws_broadcast(fake_levels, state, manual_trigger, stop_event))
+        bg = asyncio.create_task(
+            ws_broadcast(
+                fake_levels,
+                state,
+                manual_trigger,
+                stop_event,
+                audio_capture_context=audio_capture_context,
+            )
+        )
         await _REAL_SLEEP(0)
         await _REAL_SLEEP(0)
         handler = serve_mock.await_args.args[0]
@@ -119,29 +130,344 @@ def test_payload_includes_populated_deck_state(mocker):
         decks={
             "A": DeckTrack(
                 title="Strobe",
+                track_id="track-1",
                 camelot="8A",
                 key="Am",
                 bpm=128.0,
                 confidence=0.8,
+                source="rekordbox_xml",
             )
-        }
+        },
+        source_status={
+            "controller": "present",
+            "nowplaying": "blocked_non_deck_owner",
+            "nowplaying_owner": "com.apple.webkit.gpu",
+            "resolution": "blocked_non_deck_nowplaying",
+        },
     )
 
     payload = _capture_payload(state, mocker)
 
-    assert "deck_state" in payload, (
-        f"missing 'deck_state' — got keys: {sorted(payload.keys())}"
-    )
+    assert payload["live_context_schema_version"] == 2
+    assert set(payload["live_context_capabilities"]) >= {
+        "deck_source_status",
+        "audio_part_context",
+        "deck_audio_separation_context",
+        "audio_window_map",
+        "audio_delta",
+        "live_evidence",
+    }
+    assert "deck_state" in payload, f"missing 'deck_state' — got keys: {sorted(payload.keys())}"
     assert "A" in payload["deck_state"], (
         f"deck 'A' missing — got {sorted(payload['deck_state'].keys())}"
     )
     deck_a = payload["deck_state"]["A"]
     assert deck_a["title"] == "Strobe"
+    assert deck_a["track_id"] == "track-1"
     assert deck_a["camelot"] == "8A"
     assert deck_a["key"] == "Am"
     assert deck_a["bpm"] == 128.0
     # confidence rides too (the consumer can dim a low-confidence chip).
     assert deck_a["confidence"] == 0.8
+    assert deck_a["source"] == "rekordbox_xml"
+
+
+def test_payload_includes_bounded_deck_mixer_posture(mocker):
+    """Per-deck controller posture rides the same flat live frame for Viber."""
+    state = MusicState()
+    state.audible = True
+    state.audible_deck = "A"
+    state.deck_confidence = 0.75
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_a = {
+        "vol": 110,
+        "eq_low": 2,
+        "eq_mid": 64,
+        "eq_hi": 127,
+        "filter": 64,
+        "play": True,
+    }
+    state.deck_b = {
+        "vol": 72,
+        "eq_low": 64,
+        "eq_mid": 64,
+        "eq_hi": 64,
+        "filter": 92,
+        "play": False,
+    }
+
+    payload = _capture_payload(state, mocker)
+
+    assert payload["deck_mixer"] == {
+        "connected": True,
+        "xfader": 64,
+        "deck_confidence": 0.75,
+        "A": {
+            "vol": 110,
+            "eq_low": 2,
+            "eq_mid": 64,
+            "eq_hi": 127,
+            "filter": 64,
+            "play": True,
+        },
+        "B": {
+            "vol": 72,
+            "eq_low": 64,
+            "eq_mid": 64,
+            "eq_hi": 64,
+            "filter": 92,
+            "play": False,
+        },
+    }
+
+
+def test_payload_includes_bounded_deck_context_maps(mocker):
+    """The flat live frame carries direct deck1/deck2 maps for Viber/Gemini."""
+    state = MusicState()
+    state.audible = True
+    state.audible_deck = "A"
+    state.controller_connected = True
+    state.xfader = 0
+    state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_state = DeckState(
+        decks={
+            "A": DeckTrack(
+                title="Strobe",
+                track_id="track-1",
+                camelot="8A",
+                confidence=0.82,
+                source="rekordbox_xml",
+            )
+        },
+        source_status={
+            "controller": "present",
+            "nowplaying": "blocked_non_deck_owner",
+            "nowplaying_owner": "com.apple.webkit.gpu",
+            "resolution": "blocked_non_deck_nowplaying",
+        },
+    )
+
+    payload = _capture_payload(state, mocker)
+
+    assert payload["deck_lanes_context"].startswith("deck_lanes_context[")
+    assert "lane_aliases=deck1:A,deck2:B" in payload["deck_lanes_context"]
+    assert "rule=per_lane_identity_route_control_not_outcome" in payload["deck_lanes_context"]
+
+    assert payload["deck_reference_context"].startswith("deck_reference_context[")
+    assert "deck1=A" in payload["deck_reference_context"]
+    assert "deck2=B" in payload["deck_reference_context"]
+    assert "audio=P1_global_mix" in payload["deck_reference_context"]
+    assert "per_deck_audio=not_attached" in payload["deck_reference_context"]
+    assert "isolated_decks=false" in payload["deck_reference_context"]
+    assert "rule=deck1_deck2_reference_not_outcome" in payload["deck_reference_context"]
+
+    assert payload["deck_source_context"].startswith("deck_source_context[")
+    assert "identity_state=MusicState.deck_state" in payload["deck_source_context"]
+    assert "resolved=A" in payload["deck_source_context"]
+    assert "unresolved=B" in payload["deck_source_context"]
+    assert "nowplaying=blocked_non_deck_owner" in payload["deck_source_context"]
+    assert "nowplaying_owner=com.apple.webkit.gpu" in payload["deck_source_context"]
+    assert "resolution=blocked_non_deck_nowplaying" in payload["deck_source_context"]
+    assert "second_deck=independent_source_required" in payload["deck_source_context"]
+    assert "rule=unresolved_deck_is_not_transition_evidence" in payload["deck_source_context"]
+    assert payload["deck_source_status"] == {
+        "controller": "present",
+        "nowplaying": "blocked_non_deck_owner",
+        "nowplaying_owner": "com.apple.webkit.gpu",
+        "resolution": "blocked_non_deck_nowplaying",
+    }
+
+    assert payload["deck_audio_context"].startswith("deck_audio_context[")
+    assert "source=global_mix" in payload["deck_audio_context"]
+    assert "isolated_decks=false" in payload["deck_audio_context"]
+    assert "support=single_deck_A" in payload["deck_audio_context"]
+    assert "rule=audio_heard_must_be_mapped_through_deck_context" in payload["deck_audio_context"]
+    assert payload["deck_audio_separation_context"].startswith("deck_audio_separation_context[")
+    assert "deckA_audio=not_captured" in payload["deck_audio_separation_context"]
+    assert "deckB_audio=not_captured" in payload["deck_audio_separation_context"]
+    assert "per_deck_audio=not_attached" in payload["deck_audio_separation_context"]
+
+
+def test_payload_includes_bounded_audio_delta(mocker):
+    """DSP deltas ride the flat frame for Viber move-effect grounding."""
+    state = MusicState()
+    state.audible = True
+    state.rms = 0.12
+    state.onset_density = 3.0
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
+    state.prev_perceive = {
+        "rms": 0.10,
+        "sub": 0.24,
+        "low": 0.32,
+        "mid": 0.30,
+        "high": 0.20,
+        "onset_density": 2.0,
+    }
+
+    payload = _capture_payload(state, mocker)
+
+    assert payload["audio_delta"] == [
+        "sub energy fell 50% (strong)",
+        "low energy fell 50% (strong)",
+        "mid energy rose 33% (clear)",
+        "high energy rose 60% (strong)",
+    ]
+
+
+def test_payload_includes_bounded_live_evidence_refs(mocker):
+    """Structured live evidence rides beside prose context for Viber grounding."""
+    mocker.patch("vibemix.state.music_state.time.time", return_value=1010.0)
+    state = MusicState()
+    state.set_start_at = 1000.0
+    state.audible = True
+    state.audible_deck = "A"
+    state.controller_connected = True
+    state.xfader = 0
+    state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_state = DeckState(
+        decks={
+            "A": DeckTrack(
+                title="Strobe",
+                camelot="8A",
+                confidence=0.8,
+                source="rekordbox_xml",
+            )
+        }
+    )
+    state.recent_moves = [(0.5, "A_low: flat→killed (big twist)")]
+    state.audio_delta = ["sub energy fell 50% (strong)"]
+
+    payload = _capture_payload(state, mocker)
+
+    assert payload["recent_moves"] == ["A_low: flat→killed (big twist)"]
+    assert payload["audio_window_context"].startswith("audio_window_context[")
+    assert "P1=master_global_mix" in payload["audio_window_context"]
+    assert (
+        "move_anchor=A_low:_flat_to_killed_big_twist@-0.5s:inside_P1"
+        in payload["audio_window_context"]
+    )
+    assert "deckA_audio=not_attached" in payload["audio_window_context"]
+    assert payload["audio_part_context"].startswith("audio_part_context[")
+    assert "surface=live_context" in payload["audio_part_context"]
+    assert "P1=live_global_mix" in payload["audio_part_context"]
+    assert "P1_model_heard=false" in payload["audio_part_context"]
+    assert "P1_runtime_observed=true" in payload["audio_part_context"]
+    assert "P1_deck_audio=global_mix_not_stems" in payload["audio_part_context"]
+    assert "per_deck_audio=not_attached" in payload["audio_part_context"]
+    assert payload["audio_window_map"]["p1"] == "master_global_mix"
+    assert payload["audio_window_map"]["pre_s"] == [-6.0, -1.0]
+    assert payload["audio_window_map"]["action_s"] == [-1.0, 0.0]
+    assert payload["audio_window_map"]["deckA_audio"] == "not_attached"
+    assert payload["audio_window_map"]["deckB_audio"] == "not_attached"
+    assert payload["audio_window_map"]["duplicate_audio"] == "same_master_not_deck_split"
+    assert payload["audio_window_map"]["move_anchors"][0]["relation"] == "inside_P1"
+    assert payload["audio_window_map"]["future"]["span"] == "not_attached"
+    move_key = midi_evidence_key("A_low: flat→killed (big twist)")
+    evidence = payload["live_evidence"]
+    assert evidence["midi"] == [{"key": move_key, "t": 9.5}]
+    assert "deck_audio_support=single_deck_A" in evidence["mix"]
+    assert "transition_block=single_resolved_deck" in evidence["mix"]
+    assert "second_deck_identity=unknown_or_suppressed" in evidence["mix"]
+    assert "deck_lanes=A_known_route_dominant+B_unknown_route_muted" in evidence["mix"]
+    assert (
+        "deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted" in evidence["mix"]
+    )
+    assert "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none" in evidence["mix"]
+    assert "move_effect=sub_energy_fell_50pct_strong" in evidence["mix"]
+    assert f"midi:{move_key}@9.5" in evidence["refs"]
+    assert "mix:transition_block=single_resolved_deck" in evidence["refs"]
+    assert "mix:second_deck_identity=unknown_or_suppressed" in evidence["refs"]
+    assert "mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted" in evidence["refs"]
+    assert (
+        "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted"
+        in evidence["refs"]
+    )
+    assert (
+        "mix:deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none"
+        in evidence["refs"]
+    )
+
+
+def test_payload_includes_capture_separation_context_for_multichannel_devices(mocker):
+    state = MusicState()
+    state.controller_connected = True
+
+    payload = _capture_payload(
+        state,
+        mocker,
+        audio_capture_context={
+            "requested_device": "BlackHole 16ch",
+            "device_name": "BlackHole 16ch",
+            "input_channels": 16,
+            "opened_channels": 2,
+            "sample_rate": 48000,
+        },
+    )
+
+    ctx = payload["deck_audio_separation_context"]
+    assert "capture_device=BlackHole_16ch" in ctx
+    assert "input_channels=16" in ctx
+    assert "opened_channels=2" in ctx
+    assert "device_capacity=multichannel_available" in ctx
+    assert "mode=multichannel_device_available_but_runtime_opened_stereo" in ctx
+    assert "current_capture=P1_global_mix" in ctx
+    assert "deckA_audio=not_captured" in ctx
+    assert "deckB_audio=not_captured" in ctx
+
+
+def test_payload_includes_audio_window_map_without_recent_moves(mocker):
+    """Cold controller frames still publish the P1 timing contract."""
+    state = MusicState()
+    state.controller_connected = True
+    state.deck_a = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.recent_moves = []
+
+    payload = _capture_payload(state, mocker)
+
+    assert payload["live_context_schema_version"] == 2
+    assert "audio_window_map" in payload["live_context_capabilities"]
+    assert "audio_part_context" in payload["live_context_capabilities"]
+    assert "deck_audio_separation_context" in payload["live_context_capabilities"]
+    assert "audio_part_context" in payload
+    assert payload["audio_window_context"].startswith("audio_window_context[")
+    assert "move_anchor=none" in payload["audio_window_context"]
+    assert payload["audio_window_map"]["p1"] == "master_global_mix"
+    assert payload["audio_window_map"]["move_anchors"] == []
+    assert payload["audio_window_map"]["rule"] == "time_alignment_not_outcome_verdict"
+
+
+def test_payload_marks_controller_reference_without_resolved_decks(mocker):
+    """The runtime producer itself blocks transition claims when deck identity is cold."""
+    state = MusicState()
+    state.audible = False
+    state.audible_deck = "mix"
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_a = {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 72, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+
+    payload = _capture_payload(state, mocker)
+
+    assert payload["deck_state"] == {}
+    evidence = payload["live_evidence"]
+    assert "transition_block=no_resolved_decks" in evidence["mix"]
+    assert "second_deck_identity=blocked" in evidence["mix"]
+    assert "deck_lanes=A_unknown_route_dominant+B_unknown_route_present" in evidence["mix"]
+    assert (
+        "deck_reference=deck1_A_unknown_route_dominant+deck2_B_unknown_route_present"
+        in evidence["mix"]
+    )
+    assert "deck_source=deck1_A_unknown_src_none+deck2_B_unknown_src_none" in evidence["mix"]
+    assert "mix:transition_block=no_resolved_decks" in evidence["refs"]
+    assert (
+        "mix:deck_reference=deck1_A_unknown_route_dominant+deck2_B_unknown_route_present"
+        in evidence["refs"]
+    )
+    assert "mix:deck_source=deck1_A_unknown_src_none+deck2_B_unknown_src_none" in evidence["refs"]
 
 
 def test_payload_unresolved_deck_is_honest_null(mocker):

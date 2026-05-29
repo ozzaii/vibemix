@@ -27,29 +27,37 @@ from vibemix.state.deck_poller import (
 )
 from vibemix.state.deck_state import DeckTrack
 
-
 # ---------------------------------------------------------------------- #
 # Test fixtures — a tiny in-memory RekordboxLibrary (no XML parse, no DB) #
 # ---------------------------------------------------------------------- #
 
 
-def _entry(track_id: str, title: str, *, key: str = "Am", bpm: float = 128.0) -> TrackEntry:
+def _entry(
+    track_id: str,
+    title: str,
+    *,
+    artist: str = "Artist",
+    key: str = "Am",
+    bpm: float = 128.0,
+    filepath: str = "",
+) -> TrackEntry:
     return TrackEntry(
         track_id=track_id,
         title=title,
-        artist="Artist",
+        artist=artist,
         album="",
         bpm=bpm,
         key=key,
         duration_s=300.0,
         cues=(),
-        filepath="",
+        filepath=filepath,
     )
 
 
 def _lib(*entries: TrackEntry) -> RekordboxLibrary:
     lib = RekordboxLibrary()
     lib.tracks = {e.track_id: e for e in entries}
+    lib.xml_path = "/tmp/collection.xml"
     return lib
 
 
@@ -78,11 +86,17 @@ class _FakeController:
 
 
 class _FakeTrackInfo:
-    def __init__(self, title: str = ""):
+    def __init__(self, title: str = "", *, client_bundle_id: str | None = None):
         self._title = title
+        self._client_bundle_id = client_bundle_id
 
     def snapshot(self) -> dict:
-        return {"title": self._title, "prev_title": "", "title_changed_at": 0.0}
+        return {
+            "title": self._title,
+            "prev_title": "",
+            "title_changed_at": 0.0,
+            "client_bundle_id": self._client_bundle_id,
+        }
 
 
 # ---------------------------------------------------------------------- #
@@ -91,14 +105,18 @@ class _FakeTrackInfo:
 
 
 def test_snapshot_returns_dict_of_decktrack():
-    p = DeckPoller(library=_lib(), controller=_FakeController(_ctrl_snap()), track_info=_FakeTrackInfo())
+    p = DeckPoller(
+        library=_lib(), controller=_FakeController(_ctrl_snap()), track_info=_FakeTrackInfo()
+    )
     snap = p.snapshot()
     assert isinstance(snap, dict)
     assert all(isinstance(v, DeckTrack) for v in snap.values())
 
 
 def test_poller_has_own_lock():
-    p = DeckPoller(library=_lib(), controller=_FakeController(_ctrl_snap()), track_info=_FakeTrackInfo())
+    p = DeckPoller(
+        library=_lib(), controller=_FakeController(_ctrl_snap()), track_info=_FakeTrackInfo()
+    )
     assert isinstance(p._lock, type(threading.Lock()))
 
 
@@ -143,6 +161,20 @@ def test_xml_match_resolves_deck_with_rekordbox_source():
     assert dt.bpm == pytest.approx(128.0)
     assert dt.source == "rekordbox_xml"
     assert dt.confidence >= XML_CONF_FLOOR
+
+
+def test_folder_cache_match_carries_folder_source(tmp_path):
+    lib = _lib(_entry("folder:abc", "Strobe", key="", bpm=0.0))
+    lib.xml_path = str(tmp_path)
+    p = DeckPoller(
+        library=lib,
+        controller=_FakeController(_ctrl_snap()),
+        track_info=_FakeTrackInfo("Strobe"),
+    )
+
+    p.poll_once()
+
+    assert p.snapshot()["A"].source == "folder_cache"
 
 
 def test_camelot_left_none_in_poller():
@@ -199,6 +231,110 @@ def test_xml_match_is_case_insensitive_on_title():
     p.poll_once()
     snap = p.snapshot()
     assert "A" in snap and snap["A"].track_id == "1"
+
+
+def test_nowplaying_artist_title_resolves_against_rekordbox_title_and_artist():
+    """TrackInfo emits "Artist - Title"; cached Rekordbox rows store fields separately."""
+    lib = _lib(_entry("1", "Strobe", artist="Deadmau5", key="Am"))
+    p = DeckPoller(
+        library=lib,
+        controller=_FakeController(_ctrl_snap()),
+        track_info=_FakeTrackInfo("Deadmau5 - Strobe"),
+    )
+
+    p.poll_once()
+
+    snap = p.snapshot()
+    assert "A" in snap
+    assert snap["A"].track_id == "1"
+    assert snap["A"].source == "rekordbox_xml"
+
+
+def test_non_deck_nowplaying_source_does_not_resolve_deck_identity():
+    """A browser/global player title must not become a deck identity."""
+    lib = _lib(_entry("1", "Strobe", artist="Deadmau5", key="Am"))
+    p = DeckPoller(
+        library=lib,
+        controller=_FakeController(_ctrl_snap()),
+        track_info=_FakeTrackInfo(
+            "Deadmau5 - Strobe",
+            client_bundle_id="com.apple.WebKit.GPU",
+        ),
+    )
+
+    p.poll_once()
+
+    assert p.snapshot() == {}
+    status = p.source_snapshot()
+    assert status["nowplaying"] == "blocked_non_deck_owner"
+    assert status["nowplaying_owner"] == "com.apple.webkit.gpu"
+    assert status["resolution"] == "blocked_non_deck_nowplaying"
+
+
+def test_dj_nowplaying_source_can_resolve_deck_identity():
+    lib = _lib(_entry("1", "Strobe", artist="Deadmau5", key="Am"))
+    p = DeckPoller(
+        library=lib,
+        controller=_FakeController(_ctrl_snap()),
+        track_info=_FakeTrackInfo(
+            "Deadmau5 - Strobe",
+            client_bundle_id="com.pioneerdj.rekordbox",
+        ),
+    )
+
+    p.poll_once()
+
+    assert p.snapshot()["A"].track_id == "1"
+    status = p.source_snapshot()
+    assert status["nowplaying"] == "deck_candidate"
+    assert status["resolution"] == "library_match"
+    assert status["resolved_side"] == "A"
+
+
+def test_ambiguous_bare_title_abstains_but_artist_title_disambiguates():
+    lib = _lib(
+        _entry("1", "Strobe", artist="Deadmau5", key="Am"),
+        _entry("2", "Strobe", artist="Other Artist", key="Em"),
+    )
+    ambiguous = DeckPoller(
+        library=lib,
+        controller=_FakeController(_ctrl_snap()),
+        track_info=_FakeTrackInfo("Strobe"),
+    )
+    disambiguated = DeckPoller(
+        library=lib,
+        controller=_FakeController(_ctrl_snap()),
+        track_info=_FakeTrackInfo("Deadmau5 - Strobe"),
+    )
+
+    ambiguous.poll_once()
+    disambiguated.poll_once()
+
+    assert ambiguous.snapshot() == {}
+    assert disambiguated.snapshot()["A"].track_id == "1"
+
+
+def test_nowplaying_filename_stem_resolves_folder_cache_row(tmp_path):
+    lib = _lib(
+        _entry(
+            "folder:1",
+            "Clean Metadata Title",
+            artist="",
+            filepath=str(tmp_path / "Rave Tool 01.wav"),
+        )
+    )
+    lib.xml_path = str(tmp_path)
+    p = DeckPoller(
+        library=lib,
+        controller=_FakeController(_ctrl_snap()),
+        track_info=_FakeTrackInfo("Rave Tool 01"),
+    )
+
+    p.poll_once()
+
+    snap = p.snapshot()
+    assert snap["A"].track_id == "folder:1"
+    assert snap["A"].source == "folder_cache"
 
 
 # ---------------------------------------------------------------------- #
@@ -278,7 +414,9 @@ def test_raising_track_info_does_not_escape():
 def test_no_library_at_all_degrades_to_unknown():
     """A None library (user never imported collection.xml) → no XML matches,
     honest unknown, no crash."""
-    p = DeckPoller(library=None, controller=_FakeController(_ctrl_snap()), track_info=_FakeTrackInfo("X"))
+    p = DeckPoller(
+        library=None, controller=_FakeController(_ctrl_snap()), track_info=_FakeTrackInfo("X")
+    )
     p.poll_once()
     snap = p.snapshot()
     for dt in snap.values():

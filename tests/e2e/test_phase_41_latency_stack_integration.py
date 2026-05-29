@@ -108,6 +108,7 @@ def test_router_resolves_all_paths() -> None:
             "google/gemini-3.1-flash-tts-preview",
             None,
         ),
+        "learn_tutor": ("gemini-3.5-flash", ServiceTier.STANDARD),
         "debrief": ("gemini-3.5-flash", ServiceTier.FLEX),
         "debrief_tts": ("gemini-3-flash-tts-preview", ServiceTier.FLEX),
         "library_auto_tag": ("gemini-3.5-flash", ServiceTier.FLEX),

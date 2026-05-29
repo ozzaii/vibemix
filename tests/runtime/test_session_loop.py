@@ -265,7 +265,11 @@ def test_mute_clear_failure_does_not_crash(fake_bus: FakeBus) -> None:
 
 
 def test_settings_get_emits_current_state(fake_bus: FakeBus) -> None:
-    cfg = ConfigStore(voice="puck", mode="hype")
+    cfg = ConfigStore(
+        voice="puck",
+        mode="hype",
+        extra={"lens": "critique", "learn.headphone_device_index": 3},
+    )
     loop = SessionLoop(fake_bus, config_store=cfg)
     loop.register_handlers()
     _drive(
@@ -279,7 +283,45 @@ def test_settings_get_emits_current_state(fake_bus: FakeBus) -> None:
     state = fake_bus.emitted_by_type("ipc.settings.state")[-1]["payload"]
     assert state["voice"] == "puck"
     assert state["mode"] == "hype"
+    assert state["lens"] == "critique"
+    assert state["learn.headphone_device_index"] == 3
     assert state["muted"] is False
+
+
+def test_settings_get_sanitizes_corrupt_config_values(fake_bus: FakeBus) -> None:
+    defaults = ConfigStore()
+    cfg = ConfigStore()
+    cfg.voice = 42  # type: ignore[assignment]
+    cfg.mode = "storm"  # type: ignore[assignment]
+    cfg.genre = None  # type: ignore[assignment]
+    cfg.output_device_id = 42  # type: ignore[assignment]
+    cfg.output_profile = "club"  # type: ignore[assignment]
+    cfg.retention_days = "forever"  # type: ignore[assignment]
+    cfg.push_to_mute_hotkey = ""  # type: ignore[assignment]
+    cfg.lighter_blur = "yes"  # type: ignore[assignment]
+    cfg.extra["lens"] = "bogus"
+    cfg.extra["learn.headphone_device_index"] = True
+    loop = SessionLoop(fake_bus, config_store=cfg)
+    loop.register_handlers()
+    _drive(
+        fake_bus,
+        {
+            "type": "ipc.settings.get",
+            "ts": "2026-05-12T08:00:00+00:00",
+            "payload": {},
+        },
+    )
+    state = fake_bus.emitted_by_type("ipc.settings.state")[-1]["payload"]
+    assert state["voice"] == defaults.voice
+    assert state["mode"] == defaults.mode
+    assert state["genre"] == defaults.genre
+    assert state["output_device_id"] is None
+    assert state["output_profile"] == defaults.output_profile
+    assert state["retention_days"] == defaults.retention_days
+    assert state["push_to_mute_hotkey"] == defaults.push_to_mute_hotkey
+    assert state["lighter_blur"] == defaults.lighter_blur
+    assert state["lens"] is None
+    assert state["learn.headphone_device_index"] is None
 
 
 def test_settings_set_success_emits_fresh_state(fake_bus: FakeBus) -> None:
@@ -487,9 +529,7 @@ def test_invalid_inbound_emits_ipc_error_when_wrapped(fake_bus: FakeBus) -> None
     loop.register_handlers()
     # Wrap the settings.set handler with validation.
     inner = fake_bus.handlers["ipc.settings.set"]
-    fake_bus.handlers["ipc.settings.set"] = loop._wrap_with_validation(
-        inner, "ipc.settings.set"
-    )
+    fake_bus.handlers["ipc.settings.set"] = loop._wrap_with_validation(inner, "ipc.settings.set")
     # A payload missing the required ``field`` violates the schema.
     bad_msg = {
         "type": "ipc.settings.set",
@@ -516,6 +556,7 @@ def test_snapshot_loop_emits_multiple_frames(fake_bus: FakeBus) -> None:
 
     async def run_briefly():
         loop = SessionLoop(fake_bus)
+
         # Fire the stop after a few intervals so the loop emits 2-3 frames
         # then exits cleanly.
         async def stop_soon():

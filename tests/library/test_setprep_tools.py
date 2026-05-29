@@ -314,6 +314,8 @@ def test_transition_slate_issues_grounded_candidates(toolset):
     assert candidate["cue_slot"] == "A"
     assert candidate["start_in_bars"] == 16
     assert candidate["semantic_basis"] == "track_vector_fallback"
+    assert candidate["move_grade"]["slug"] in {"clean", "sexy", "bomb", "lit_aff"}
+    assert candidate["move_grade"]["xp"] > 0
     assert "tr_001" in toolset.issued_transition_candidates
 
 

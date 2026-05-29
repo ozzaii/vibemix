@@ -21,6 +21,33 @@ def test_negative_dict_01_at_least_forty_phrases() -> None:
     )
 
 
+def test_negative_dict_10_covers_stop_slop_additions() -> None:
+    """Stop-slop bucket — at least 5 representative phrases lifted from
+    hardikpandya/stop-slop @ 8da1f030 (MIT)."""
+    expected = [
+        "here's the thing",
+        "let me be clear",
+        "at the end of the day",
+        "fundamentally",
+        "circle back",
+    ]
+    lowered = [p.lower() for p in NEGATIVE_PHRASES]
+    for needle in expected:
+        assert needle.lower() in lowered, f"missing stop-slop phrase: {needle!r}"
+
+
+def test_negative_dict_11_no_single_adverb_false_positives() -> None:
+    """Single common adverbs (really/just/actually/honestly) must NOT be banned —
+    they would false-positive on natural DJ-friend speech and nuke whole turns
+    via filter_for_slop's whole-turn suppression policy."""
+    lowered = [p.lower() for p in NEGATIVE_PHRASES]
+    dangerous_singles = ["really", "just", "actually", "honestly", "literally", "simply"]
+    for adverb in dangerous_singles:
+        assert adverb not in lowered, (
+            f"{adverb!r} in NEGATIVE_PHRASES would silence natural DJ-friend speech"
+        )
+
+
 def test_negative_dict_02_is_tuple() -> None:
     """Tuple (immutable) — runtime guarantee against mutation."""
     assert isinstance(NEGATIVE_PHRASES, tuple)

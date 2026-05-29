@@ -28,7 +28,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 from google.genai import types
 from livekit.agents import Agent
 
@@ -37,7 +36,6 @@ from vibemix.agent import DJCoHostAgent
 from vibemix.audio import INPUT_SR_TARGET, AudioBuffer
 from vibemix.audio.lookahead import LookaheadProvider
 from vibemix.state import AICoach, Event, MusicState
-
 
 # ---------- helpers (mirror tests/agent/test_dj_cohost_mic_part.py) ----------
 
@@ -123,10 +121,14 @@ def _build_lookahead_mock(wav: bytes | None, meta: dict | None = None) -> Lookah
     swapped on the instance — no subprocess invocations during tests.
     """
     provider = LookaheadProvider()
-    payload_meta = meta if meta is not None else (
-        {"ok": True, "reason": "ok", "title": "fixture", "file": "/tmp/x.mp3"}
-        if wav is not None
-        else {"ok": False, "reason": "no file", "title": "fixture", "file": None}
+    payload_meta = (
+        meta
+        if meta is not None
+        else (
+            {"ok": True, "reason": "ok", "title": "fixture", "file": "/tmp/x.mp3"}
+            if wav is not None
+            else {"ok": False, "reason": "no file", "title": "fixture", "file": None}
+        )
     )
     provider.snapshot_wav = lambda: (wav, payload_meta)
     return provider
@@ -142,9 +144,7 @@ def test_part_count_1_no_mic_no_lookahead(mocker, tmp_path) -> None:
     plan's new lookahead=None default. Both Part 2 and Part 3 paths short
     out at the instance-presence gate.
     """
-    agent, gen_client, _, state = _build_agent(
-        mocker, tmp_path, mic_audio_buf=None, lookahead=None
-    )
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path, mic_audio_buf=None, lookahead=None)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"RIFFFAKEWAVMIX")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
@@ -191,6 +191,19 @@ def test_part_count_2_lookahead_only(mocker, tmp_path) -> None:
     assert "NOT YET HEARD BY AUDIENCE" in text, (
         f"locked Q2 label missing from prompt suffix: ...{text[-200:]!r}"
     )
+    assert "audio_window_context[" in text
+    assert "audio_window_map[" in text
+    assert "audio_part_context[" in text
+    assert "deck_audio_separation_context[" in text
+    assert "deckA_audio=not_captured" in text
+    assert "P2=source_file_lookahead" in text
+    assert "P2_model_heard=true" in text
+    assert "P2_audience_heard=false" in text
+    assert "P2_deck_audio=none" in text
+    assert "future=P2:0.0..+3.0" in text
+    assert "future_heard=false" in text
+    assert "future=0.0..+3.0" in text
+    assert "future_rule=forecast_only_not_audience_evidence" in text
     # Lookahead Part is at index 2 (after text + Part 1); mime audio/wav.
     lookahead_part = contents[2]
     assert isinstance(lookahead_part, types.Part)
@@ -233,11 +246,15 @@ def test_part_count_2_mic_only(mocker, tmp_path) -> None:
     _drive_llm_node(agent)
 
     contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
-    assert len(contents) == 3, (
-        f"expected 3 elements (text + P1 mix + P2 mic), got {len(contents)}"
-    )
+    assert len(contents) == 3, f"expected 3 elements (text + P1 mix + P2 mic), got {len(contents)}"
     text = contents[0]
     assert "P2 =" in text
+    assert "audio_part_context[" in text
+    assert "deck_audio_separation_context[" in text
+    assert "P2=user_mic" in text
+    assert "P2_role=user_speech" in text
+    assert "P2_deck_audio=none" in text
+    assert "P2_rule=not_deck_audio" in text
     assert "NOT YET HEARD" not in text, (
         f"NOT YET HEARD label leaked into mic-only path: ...{text[-200:]!r}"
     )
@@ -278,14 +295,24 @@ def test_part_count_3_mic_and_lookahead(mocker, tmp_path) -> None:
     _drive_llm_node(agent)
 
     contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
-    assert len(contents) == 4, (
-        f"expected 4 elements (text + P1 + P2 + P3), got {len(contents)}"
-    )
+    assert len(contents) == 4, f"expected 4 elements (text + P1 + P2 + P3), got {len(contents)}"
     text = contents[0]
     assert "P3 =" in text, f"P3 label missing from prompt: ...{text[-200:]!r}"
     assert "NOT YET HEARD BY AUDIENCE" in text, (
         f"locked Q2 label missing from 3-Part prompt: ...{text[-200:]!r}"
     )
+    assert "audio_window_context[" in text
+    assert "audio_part_context[" in text
+    assert "deck_audio_separation_context[" in text
+    assert "P2=user_mic" in text
+    assert "P2_deck_audio=none" in text
+    assert "P3=source_file_lookahead" in text
+    assert "P3_model_heard=true" in text
+    assert "P3_audience_heard=false" in text
+    assert "P3_deck_audio=none" in text
+    assert "P3_rule=forecast_only_not_current_live_evidence" in text
+    assert "future_heard=false" in text
+    assert "future=0.0..+3.0" in text
     # Part 3 is the lookahead WAV bytes.
     lookahead_part = contents[3]
     assert isinstance(lookahead_part, types.Part)

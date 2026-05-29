@@ -19,7 +19,9 @@ from google.genai import types
 from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
+from vibemix.agent.dj_cohost import _build_recall_query_context
 from vibemix.state import AICoach, Event, MusicState
+from vibemix.state.deck_state import DeckState, DeckTrack
 
 # ---------- helpers ----------
 
@@ -68,6 +70,17 @@ def _build_state() -> MusicState:
     s.rms = 0.05
     s.bpm = 128.0
     return s
+
+
+def _deck_track(title: str, *, camelot: str = "8A") -> DeckTrack:
+    return DeckTrack(
+        title=title,
+        track_id=title.lower().replace(" ", "-"),
+        bpm=128.0,
+        camelot=camelot,
+        confidence=0.9,
+        source="rekordbox_xml",
+    )
 
 
 def _build_agent(mocker, tmp_path: Path) -> tuple[DJCoHostAgent, Any, _FakeRecorder, MusicState]:
@@ -247,6 +260,156 @@ def test_llm_node_03_screen_jpeg_none_unconditional(mocker, tmp_path) -> None:
     # Source file contains the literal v4:1502 anti-hallucination comment
     src = Path("src/vibemix/agent/dj_cohost.py").read_text()
     assert "# Single-modality: audio only. Screen + MIDI metadata caused hallucination." in src
+
+
+def test_llm_node_03a_fences_cold_p1_audio_with_claim_policy(mocker, tmp_path) -> None:
+    """Even a cold deck state gets an audio map beside P1, not an empty suffix."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    state.audible = False
+    state.audible_deck = "none"
+    state.audible_track = ""
+    state.audible_track_confidence = 0.0
+    state.controller_connected = False
+    state.deck_state = DeckState()
+    state.recent_moves = []
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: cold")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
+    prompt_text = contents[0]
+    audio_map_at = prompt_text.index("AUDIO CONTEXT MAP FOR ATTACHED P1")
+    attached_at = prompt_text.index("Attached: P1")
+
+    assert audio_map_at < attached_at
+    assert "context_feed_contract[" in prompt_text
+    assert "surface=gemini_p1" in prompt_text
+    assert "history=past_comparison_not_live_proof" in prompt_text
+    assert "cache=static_persona_rules_only" in prompt_text
+    assert "per_turn=small_text+single_P1_audio" in prompt_text
+    assert "speed=no_extra_model_pass" in prompt_text
+    assert "audio_part_context[" in prompt_text
+    assert "surface=gemini_parts" in prompt_text
+    assert "P1=live_global_mix" in prompt_text
+    assert "P1_model_heard=true" in prompt_text
+    assert "P1_runtime_observed=true" in prompt_text
+    assert "P1_deck_audio=global_mix_not_stems" in prompt_text
+    assert "per_deck_audio=not_attached" in prompt_text
+    assert "rule=part_labels_not_outcome_verdict" in prompt_text
+    assert "deck_audio_separation_context[" in prompt_text
+    assert "deckA_audio=not_captured" in prompt_text
+    assert "deckB_audio=not_captured" in prompt_text
+    assert "current_capture=P1_global_mix" in prompt_text
+    assert "audio_window_context[" in prompt_text
+    assert "audio_window_map[" in prompt_text
+    assert "P1=master_global_mix" in prompt_text
+    assert "move_anchor=none" in prompt_text
+    assert "deckA_audio=not_attached" in prompt_text
+    assert "deckB_audio=not_attached" in prompt_text
+    assert "lane_aliases=deck1:A,deck2:B" in prompt_text
+    assert "claim_policy[policy=requires_more_evidence" in prompt_text
+    assert "rule=multi_deck_outcome_requires_live_support" in prompt_text
+    assert "AUDIO PART CONTRACT: P1=live_global_mix isolated_decks=false" in prompt_text
+    assert "global mix, not isolated deck stems" in prompt_text
+
+
+def test_llm_node_03b_places_deck_audio_map_next_to_audio_part(mocker, tmp_path) -> None:
+    """Deck/live gates are repeated adjacent to Gemini's P1 audio Part."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    state.controller_connected = True
+    state.audible_deck = "A"
+    state.deck_a = {
+        "vol": 110,
+        "eq_low": 0,
+        "eq_mid": 64,
+        "eq_hi": 64,
+        "filter": 64,
+        "play": True,
+    }
+    state.deck_b = {
+        "vol": 0,
+        "eq_low": 64,
+        "eq_mid": 64,
+        "eq_hi": 64,
+        "filter": 64,
+        "play": False,
+    }
+    state.xfader = 0
+    state.deck_state = DeckState(decks={"A": _deck_track("Strobe")})
+    state.recent_moves = [(1.5, "A_low: flat→killed")]
+    state.audio_delta = ["low energy fell 50% (strong)"]
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: base")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    ev = Event(type="MIX_MOVE", state=state, extra={"moves": ["A_low: flat→killed"]})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
+    prompt_text = contents[0]
+    audio_map_at = prompt_text.index("AUDIO CONTEXT MAP FOR ATTACHED P1")
+    attached_at = prompt_text.index("Attached: P1")
+
+    assert len(contents) == 2
+    assert prompt_text.startswith("EVIDENCE: base")
+    assert audio_map_at < attached_at
+    assert "context_feed_contract[" in prompt_text
+    assert "surface=gemini_p1" in prompt_text
+    assert "labels=deck1:A,deck2:B" in prompt_text
+    assert "volatile=deck_state+deck_mixer+recent_moves+audio_delta+audio_window" in prompt_text
+    assert "audio_part_context[" in prompt_text
+    assert "surface=gemini_parts" in prompt_text
+    assert "P1=live_global_mix" in prompt_text
+    assert "P1_model_heard=true" in prompt_text
+    assert "P1_runtime_observed=true" in prompt_text
+    assert "P1_span=-6.0..0.0" in prompt_text
+    assert "P1_deck_audio=global_mix_not_stems" in prompt_text
+    assert "rule=part_labels_not_outcome_verdict" in prompt_text
+    assert "deck_lanes_context[" in prompt_text
+    assert "B=unknown:muted" in prompt_text
+    assert "deck_reference_context[" in prompt_text
+    assert "deck1=A" in prompt_text
+    assert "deck2=B" in prompt_text
+    assert "audio=P1_global_mix" in prompt_text
+    assert "deck_source_context[" in prompt_text
+    assert "second_deck=independent_source_required" in prompt_text
+    assert "rule=unresolved_deck_is_not_transition_evidence" in prompt_text
+    assert "deck_audio_context[" in prompt_text
+    assert "deck_audio_separation_context[" in prompt_text
+    assert "deckA_audio=not_captured" in prompt_text
+    assert "deckB_audio=not_captured" in prompt_text
+    assert "source=global_mix" in prompt_text
+    assert "audio_window_context[" in prompt_text
+    assert "P1=master_global_mix" in prompt_text
+    assert "P1_heard=true" in prompt_text
+    assert "timeline=past_action_future" in prompt_text
+    assert "pre=-6.0..-1.0" in prompt_text
+    assert "current=-1.0..0.0" in prompt_text
+    assert "action=-1.0..0.0" in prompt_text
+    assert "move_anchor=A_low:_flat_to_killed@-1.5s:inside_P1" in prompt_text
+    assert "anchors=A_low:_flat_to_killed@-1.5s:inside_P1" in prompt_text
+    assert "future_heard=false" in prompt_text
+    assert "future=not_attached" in prompt_text
+    assert "deckA_audio=not_attached" in prompt_text
+    assert "deckB_audio=not_attached" in prompt_text
+    assert "AUDIO PART CONTRACT: P1=live_global_mix isolated_decks=false" in prompt_text
+    assert "deck_separation=structured_text_only" in prompt_text
+    assert "audio_window_context=time_aligned" in prompt_text
+    assert "deck_audio_separation_context=capture_capability" in prompt_text
+    assert "live_evidence[" in prompt_text
+    assert "move_effect_context[" in prompt_text
+    assert "claim_policy[policy=blocked reason=single_resolved_deck" in prompt_text
+    assert "global mix, not isolated deck stems" in prompt_text
+    assert "Transition/blend/drop/handoff/bridge claims require" in prompt_text
 
 
 def test_llm_node_04_per_invocation_dump_folder(mocker, tmp_path) -> None:
@@ -551,9 +714,7 @@ def test_u_evidence_registry_kwarg_accepted_and_grammar_in_system_instruction(
     assert "encouraged, not required" in agent2._gen_cfg.system_instruction
 
 
-def test_v_llm_node_calls_build_prompt_with_snapshot_when_registry_wired(
-    mocker, tmp_path
-) -> None:
+def test_v_llm_node_calls_build_prompt_with_snapshot_when_registry_wired(mocker, tmp_path) -> None:
     """Test V — when registry wired AND pre-loaded, llm_node calls
     AICoach.build_prompt with kwarg ``registry_snapshot=`` containing the
     loaded observation."""
@@ -583,6 +744,90 @@ def test_v_llm_node_calls_build_prompt_with_snapshot_when_registry_wired(
     assert "ev" in snap
     assert "TRACK_CHANGE@30.0" in snap["ev"]
     assert snap["ev"]["TRACK_CHANGE@30.0"] == (30.0,)
+
+
+def test_llm_node_passes_recall_moments_to_diet_mix_move(mocker, tmp_path) -> None:
+    """MIX_MOVE can use hot historical move memory without leaving diet mode."""
+    from vibemix.state import EvidenceRegistry
+
+    class _StubRecord:
+        record_id = "20260520-2200:7"
+        signature = (
+            "coach_line | event=MIX_MOVE | move_effect=move_effect_context[rule=dsp_delta_not_causal_proof] "
+            "| audio_delta=low energy fell 50% (strong) | said: heard the low cut thin out"
+        )
+        session_id = "20260520-2200"
+        ts = 42.0
+
+    class _StubRecall:
+        def get_latest(self) -> list:
+            return [_StubRecord()]
+
+        def clear(self, bump_generation: bool = True) -> None:
+            pass
+
+    mocker.patch.object(Agent, "__init__", return_value=None)
+    state = _build_state()
+    state.audio_delta = ["low energy fell 50% (strong)"]
+    recorder = _FakeRecorder(tmp_path)
+    registry = EvidenceRegistry()
+    gen_client = mocker.MagicMock()
+    agent = DJCoHostAgent(
+        genai_client=gen_client,
+        clean_audio_buf=mocker.MagicMock(),
+        screen_buf=mocker.MagicMock(),
+        state=state,
+        recorder=recorder,
+        llm_inst=mocker.MagicMock(),
+        tts_inst=mocker.MagicMock(),
+        evidence_registry=registry,
+        recall=_StubRecall(),
+        recall_enabled=True,
+    )
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    ev = Event(type="MIX_MOVE", state=state, extra={"moves": ["A_low: flat→killed"]})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    kwargs = AICoach.build_prompt.call_args.kwargs
+    assert kwargs["diet"] is True
+    assert kwargs["recall_moments"][0].record_id == "20260520-2200:7"
+
+
+def test_recall_query_context_includes_time_aligned_audio_window() -> None:
+    state = _build_state()
+    state.audible = True
+    state.audible_deck = "A"
+    state.controller_connected = True
+    state.xfader = 0
+    state.deck_a = {"vol": 110, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.recent_moves = [(0.8, "A_low: flat→killed")]
+    state.audio_delta = ["low energy fell 50% (strong)"]
+
+    ev = Event(type="MIX_MOVE", state=state, extra={"moves": ["A_low: flat→killed"]})
+
+    context = _build_recall_query_context(ev)
+
+    assert "context_feed=context_feed_contract[" in context
+    assert "surface=gemini_recall_query" in context
+    assert "history=past_comparison_not_live_proof" in context
+    assert "cache=static_persona_rules_only" in context
+    assert "speed=no_extra_model_pass" in context
+    assert "audio_window=audio_window_context[" in context
+    assert "deck_ref=deck_reference_context[" in context
+    assert "deck_source=deck_source_context[" in context
+    assert "second_deck=independent_source_required" in context
+    assert "deck1=A" in context
+    assert "deck2=B" in context
+    assert "P1=master_global_mix" in context
+    assert "move_anchor=A_low:_flat_to_killed@-0.8s:inside_P1" in context
+    assert "deckA_audio=not_attached" in context
 
 
 def test_w_llm_node_passes_none_snapshot_when_no_registry(mocker, tmp_path) -> None:
@@ -652,9 +897,7 @@ def test_x_llm_node_takes_fresh_snapshot_per_turn(mocker, tmp_path) -> None:
 # ---------- Plan 18-03 Task 3 — cross-package smoke test (Test Y) ----------
 
 
-def test_y_full_prompt_path_evidence_corpus_and_grammar_block_smoke(
-    mocker, tmp_path
-) -> None:
+def test_y_full_prompt_path_evidence_corpus_and_grammar_block_smoke(mocker, tmp_path) -> None:
     """Test Y — END-TO-END smoke (GROUND-02 + GROUND-03):
 
     Plan 18-01 (registry instantiation) →
@@ -722,9 +965,7 @@ def test_y_full_prompt_path_evidence_corpus_and_grammar_block_smoke(
         captured["config"] = kwargs["config"]
         return _async_iter(["[ev:TRACK_CHANGE@30.0] track flipped — heavier"])
 
-    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
-        side_effect=_capturing_stream
-    )
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_capturing_stream)
 
     agent.set_next_event(ev)
     _drive_llm_node(agent)
@@ -742,8 +983,7 @@ def test_y_full_prompt_path_evidence_corpus_and_grammar_block_smoke(
     # GenerateContentConfig). Verify via the v1.0 fail-open phrase.
     sys_instr: str = captured["config"].system_instruction
     assert "encouraged, not required" in sys_instr, (
-        "CITATION_GRAMMAR_BLOCK missing from system_instruction — "
-        "Plan 18-03 Task 1 wiring broken"
+        "CITATION_GRAMMAR_BLOCK missing from system_instruction — Plan 18-03 Task 1 wiring broken"
     )
     # Grammar surface check — at least one EBNF source form is in the system
     # instruction so Gemini can pattern-match against it.
@@ -1029,9 +1269,7 @@ def test_ttft_set_next_event_no_meter_does_nothing(mocker, tmp_path) -> None:
     assert agent._pending_event is ev
 
 
-def test_ttft_llm_node_records_first_chunk_on_first_non_empty(
-    mocker, tmp_path
-) -> None:
+def test_ttft_llm_node_records_first_chunk_on_first_non_empty(mocker, tmp_path) -> None:
     """Plan 19-05: llm_node calls meter.record_first_chunk exactly once on the
     first non-empty chunk yield (not per-chunk)."""
     meter = mocker.MagicMock()
@@ -1054,9 +1292,7 @@ def test_ttft_llm_node_records_first_chunk_on_first_non_empty(
 # ---------- Phase 66 review WR-04 regression — set_s_at_event threading ----------
 
 
-def test_record_said_uses_event_fired_set_seconds_when_provided(
-    mocker, tmp_path
-) -> None:
+def test_record_said_uses_event_fired_set_seconds_when_provided(mocker, tmp_path) -> None:
     """Phase 66 WR-05 (regression for WR-04) — when ``_record_said`` is called
     with ``set_s_at_event=<captured-at-event-time>``, the [M:SS] stamp baked
     into ``_ai_text_history`` MUST reflect that captured value, NOT the live
@@ -1093,9 +1329,7 @@ def test_record_said_uses_event_fired_set_seconds_when_provided(
     assert "clean reply text" in entry
 
 
-def test_record_said_legacy_fallback_uses_live_state_set_seconds(
-    mocker, tmp_path
-) -> None:
+def test_record_said_legacy_fallback_uses_live_state_set_seconds(mocker, tmp_path) -> None:
     """Phase 66 WR-05 (regression for WR-04 — fallback half) — when
     ``_record_said`` is called WITHOUT ``set_s_at_event`` (or with None), it
     falls back to live ``self._state.set_seconds`` (the legacy pre-WR-04
@@ -1127,8 +1361,7 @@ def test_record_said_legacy_fallback_uses_live_state_set_seconds(
     # Both entries reflect live state.set_seconds (12.5s → [0:12]) — the
     # documented legacy multi-second-drift behavior the fallback preserves.
     assert agent._ai_text_history[0].startswith("[0:12]"), (
-        f"expected legacy live-state stamp [0:12]; got "
-        f"{agent._ai_text_history[0]!r}"
+        f"expected legacy live-state stamp [0:12]; got {agent._ai_text_history[0]!r}"
     )
     assert agent._ai_text_history[1].startswith("[0:12]"), (
         f"expected legacy live-state stamp [0:12] for explicit-None; got "
@@ -1136,9 +1369,7 @@ def test_record_said_legacy_fallback_uses_live_state_set_seconds(
     )
 
 
-def test_llm_node_threads_event_fired_set_seconds_to_record_said(
-    mocker, tmp_path
-) -> None:
+def test_llm_node_threads_event_fired_set_seconds_to_record_said(mocker, tmp_path) -> None:
     """Phase 66 WR-05 (regression for WR-04 — end-to-end) — drive ``llm_node``
     with a clock that advances DURING the stream (event fires at 10.0s,
     _record_said is reached at 12.5s after stream + lint + bus emit). The
@@ -1202,8 +1433,6 @@ def test_llm_node_threads_event_fired_set_seconds_to_record_said(
 # NO lens is set (cold path), the existing env/DEFAULT_* resolution is unchanged
 # → byte-identical to today. xfail-strict until Plan 03.
 # ---------------------------------------------------------------------------
-
-import pytest  # noqa: E402
 
 import vibemix.agent.dj_cohost as dj_mod  # noqa: E402
 from vibemix.prompts.matrix import build_system_instruction  # noqa: E402

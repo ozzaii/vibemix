@@ -31,7 +31,6 @@ import re
 
 from vibemix.prompts.matrix import build_parts_description
 
-
 # ---------------------------------------------------------------------------
 # 4 scenarios — one per boolean permutation of (has_mic_part, has_lookahead_part).
 # ---------------------------------------------------------------------------
@@ -130,11 +129,21 @@ def test_ears_are_the_referee_in_all_variants() -> None:
     above is grounded context." — the v4 anti-slop refrain preserved from
     Plan 40-01's prompt-suffix wording.
     """
-    refrain = (
-        "Your ears are the referee — the evidence above is grounded context."
-    )
+    refrain = "Your ears are the referee — the evidence above is grounded context."
     for has_mic, has_look in [(False, False), (False, True), (True, False), (True, True)]:
         out = build_parts_description(7, has_mic, has_look)
         assert out.rstrip().endswith(refrain), (
             f"variant (mic={has_mic}, look={has_look}) missing refrain: ...{out[-100:]!r}"
         )
+
+
+def test_audio_part_contract_names_p1_as_global_mix_not_deck_stems() -> None:
+    """Every Gemini audio suffix must keep P1's limitation explicit."""
+    for has_mic, has_look in [(False, False), (False, True), (True, False), (True, True)]:
+        out = build_parts_description(7, has_mic, has_look)
+        assert "P1 = last 7s of live BlackHole audio" in out
+        assert "global mix, not isolated deck stems" in out
+        if has_mic:
+            assert "not deck audio" in out
+        if has_look:
+            assert "it is not current live deck audio" in out

@@ -142,6 +142,8 @@ def test_compile_transition_context_exposes_score_components_without_vectors() -
     assert candidate["from_camelot"] == "8A"
     assert candidate["to_camelot"] == "8A"
     assert "semantic" in candidate["scores"]
+    assert candidate["move_grade"]["slug"] in {"clean", "sexy", "bomb", "lit_aff"}
+    assert candidate["move_grade"]["deserved"] is True
     assert "vector" not in candidate
     assert envelope.allowed_actions == ("select", "hold", "suppress", "ask")
     assert {claim["type"] for claim in envelope.claim_summary} >= {
@@ -155,6 +157,7 @@ def test_compile_transition_context_exposes_score_components_without_vectors() -
         "phrase_fit",
         "cue_operability",
         "cue_slot",
+        "move_grade",
     }
     role_claims = [claim for claim in envelope.claim_summary if claim["type"] == "section_role"]
     assert {(claim["subject_id"], claim["value"]) for claim in role_claims} >= {
@@ -165,6 +168,51 @@ def test_compile_transition_context_exposes_score_components_without_vectors() -
         claim for claim in envelope.claim_summary if claim["type"] == "track_identity"
     ]
     assert {(claim["subject_id"], claim["value"]) for claim in identity_claims} >= {("t2", "t2")}
+
+
+def test_compile_transition_context_issues_grade_progress_claim_from_current() -> None:
+    source = _section("t1#s000", "t1", "outro", "F")
+    destination = _section("t2#s000", "t2", "intro", "A")
+    slate = score_transition_slate(
+        TransitionScoringInput(source=source, destinations=(destination,))
+    )
+
+    envelope = compile_transition_context(
+        packet_id="ctx_001",
+        mode="live",
+        intent="live_next_pill",
+        current={
+            "active_track_id": "t1",
+            "grade_progress": {
+                "streak": 3,
+                "total_xp": 200,
+                "last_xp": 100,
+                "earned": True,
+                "heat": 100,
+                "level": 2,
+                "level_up": True,
+                "levels_gained": 1,
+            },
+        },
+        candidates=slate,
+    )
+
+    progress_claims = [
+        claim for claim in envelope.claim_summary if claim["type"] == "grade_progress"
+    ]
+    assert len(progress_claims) == 1
+    claim = progress_claims[0]
+    assert claim["subject_id"] == "live_session"
+    assert claim["value"] == 3
+    assert claim["unit"] == "streak"
+    assert "combo x3" in claim["allowed_phrases"]
+    assert "deserved +100 xp" in claim["allowed_phrases"]
+    assert "level up" in claim["allowed_phrases"]
+    assert "lv 2" in claim["allowed_phrases"]
+    assert "total_xp:200" in claim["reason_codes"]
+    assert "level:2" in claim["reason_codes"]
+    assert "level_up:true" in claim["reason_codes"]
+    assert "levels_gained:1" in claim["reason_codes"]
 
 
 def test_compile_suggestion_context_filters_candidates_with_private_identifiers() -> None:

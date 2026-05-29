@@ -60,9 +60,13 @@ def _snapshot(
     include_candidates: bool = True,
     prepared_target_track_id: str | None = None,
     source_loop_recent: bool = False,
+    grade_progress: dict | None = None,
+    destination_overrides: dict | None = None,
 ) -> RuntimeInputSnapshot:
     source = _section("t1#s000", "t1", "outro", "F")
     destination = _section("t2#s000", "t2", "intro", "A")
+    if destination_overrides:
+        destination = replace(destination, **destination_overrides)
     live_position = (
         LivePosition(
             remaining_bars=16,
@@ -84,17 +88,20 @@ def _snapshot(
             live_position=live_position if mode == "live" else None,
         )
     )
+    current = {
+        "track_id": "t1" if current_track else None,
+        "blend_suppressed": blend,
+        "prepared_target_track_id": prepared_target_track_id,
+        "source_loop_recent": source_loop_recent,
+        "playhead_confidence": live_position.playhead_confidence,
+    }
+    if grade_progress is not None:
+        current["grade_progress"] = grade_progress
     envelope = compile_transition_context(
         packet_id="ctx_001",
         mode=mode,  # type: ignore[arg-type]
         intent="live_next_pill" if mode == "live" else "transition_slate",
-        current={
-            "track_id": "t1" if current_track else None,
-            "blend_suppressed": blend,
-            "prepared_target_track_id": prepared_target_track_id,
-            "source_loop_recent": source_loop_recent,
-            "playhead_confidence": live_position.playhead_confidence,
-        },
+        current=current,
         candidates=slate,
     )
     return RuntimeInputSnapshot("snap_001", envelope)
@@ -120,6 +127,8 @@ def test_live_pill_uses_deterministic_path_by_default() -> None:
     assert result.emitted
     assert result.final_decision.candidate_id == "tr_001"
     assert result.final_decision.timing_text == "in 16 bars"
+    assert result.final_decision.spoken_text.startswith("Next ")
+    assert "move:" in result.final_decision.spoken_text
     assert "cue A at 0:00" in result.final_decision.spoken_text
     assert "outro into intro" in result.final_decision.spoken_text
     claim_types = {
@@ -127,9 +136,100 @@ def test_live_pill_uses_deterministic_path_by_default() -> None:
         for claim in snapshot.envelope.claim_summary
         if claim["claim_id"] in result.final_decision.cited_claim_ids
     }
-    assert {"track_identity", "section_role", "section_boundary"}.issubset(claim_types)
+    assert {"track_identity", "section_role", "section_boundary", "move_grade"}.issubset(
+        claim_types
+    )
     assert set(result.final_decision.cited_claims) == claim_types
     assert result.trace.decision_source == "deterministic"
+
+
+def test_live_pill_mentions_backend_combo_when_earned() -> None:
+    result = decide(
+        "live",
+        "live_next_pill",
+        _snapshot(
+            grade_progress={
+                "streak": 3,
+                "total_xp": 300,
+                "last_xp": 100,
+                "earned": True,
+                "heat": 100,
+                "level": 2,
+                "level_up": True,
+                "levels_gained": 1,
+            }
+        ),
+    )
+
+    assert result.emitted is True
+    assert "level up" in result.final_decision.spoken_text
+    assert "deserved +100 xp" in result.final_decision.spoken_text
+    assert "combo x3" in result.final_decision.spoken_text
+    assert "lv 2" in result.final_decision.spoken_text
+    assert result.final_decision.spoken_text.index(
+        "level up"
+    ) < result.final_decision.spoken_text.index("deserved +100 xp")
+    assert result.final_decision.spoken_text.index(
+        "deserved +100 xp"
+    ) < result.final_decision.spoken_text.index("combo x3")
+    assert "grade_progress" in result.final_decision.cited_claims
+    assert result.validation_result.accepted is True
+
+
+def test_live_pill_mentions_backend_xp_on_first_earned_move() -> None:
+    result = decide(
+        "live",
+        "live_next_pill",
+        _snapshot(
+            grade_progress={
+                "streak": 1,
+                "total_xp": 100,
+                "last_xp": 100,
+                "earned": True,
+                "heat": 100,
+            }
+        ),
+    )
+
+    assert result.emitted is True
+    assert "combo x" not in result.final_decision.spoken_text
+    assert "deserved +100 xp" in result.final_decision.spoken_text
+    assert "grade_progress" in result.final_decision.cited_claims
+    assert result.validation_result.accepted is True
+
+
+def test_live_pill_marks_negative_grade_as_care_without_xp() -> None:
+    result = decide(
+        "live",
+        "live_next_pill",
+        _snapshot(destination_overrides={"camelot": "2A"}),
+    )
+
+    assert result.emitted is True
+    assert result.final_decision.spoken_text.startswith("Risky move: use care, ")
+    assert "xp" not in result.final_decision.spoken_text
+    assert "combo" not in result.final_decision.spoken_text
+    assert "level up" not in result.final_decision.spoken_text
+    assert "move_grade" in result.final_decision.cited_claims
+    assert "grade_progress" not in result.final_decision.cited_claims
+    assert result.validation_result.accepted is True
+
+
+def test_live_pill_marks_mid_grade_as_care_without_xp() -> None:
+    result = decide(
+        "live",
+        "live_next_pill",
+        _snapshot(destination_overrides={"camelot": None}),
+    )
+
+    assert result.emitted is True
+    assert result.final_decision.spoken_text.startswith("Next MID move: use care, ")
+    assert "xp" not in result.final_decision.spoken_text
+    assert "combo" not in result.final_decision.spoken_text
+    assert "level up" not in result.final_decision.spoken_text
+    assert "move_grade" in result.final_decision.cited_claims
+    assert "grade_progress" not in result.final_decision.cited_claims
+    assert result.validation_result.accepted is True
 
 
 def test_live_pill_suppresses_when_target_identity_claim_is_missing() -> None:
@@ -251,7 +351,8 @@ def test_live_pill_degrades_bad_model_text_to_deterministic_copy() -> None:
 
     assert model.called is True
     assert result.decision_source == "model_degraded_to_deterministic"
-    assert result.final_decision.spoken_text.startswith("Next good entry")
+    assert result.final_decision.spoken_text.startswith("Next ")
+    assert "move:" in result.final_decision.spoken_text
     assert result.final_decision.cited_claim_ids
     assert result.emitted
 

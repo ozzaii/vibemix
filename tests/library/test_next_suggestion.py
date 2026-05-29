@@ -183,6 +183,14 @@ def test_suggestion_includes_set_aware_transition_when_cues_exist(library):
     assert s.transition["cue_source"] == "dj"
     assert s.transition["cue_confidence"] == 1.0
     assert s.transition["start_in_bars"] is None  # no live playhead confidence yet
+    assert s.transition["move_grade"]["slug"] in {
+        "mid",
+        "clean",
+        "sexy",
+        "bomb",
+        "lit_aff",
+    }
+    assert s.transition["move_grade"]["label"]
     assert "enter cue A" not in s.why  # the dedicated transition line owns actions
 
 
@@ -211,12 +219,26 @@ def test_set_aware_transition_can_promote_lower_embedding_candidate(library):
     assert s.transition["to_track_id"] == "t2"
     assert s.transition["selection_basis"] == "section_transition"
     assert s.transition["selection_score"] > 0
+    assert s.transition["move_grade"]["slug"] in {
+        "mid",
+        "clean",
+        "sexy",
+        "bomb",
+        "lit_aff",
+    }
     assert s.transition["scores"]["semantic"] >= 0.0
     assert s.transition_alternatives[0]["selected"] is True
     assert s.transition_alternatives[0]["track_id"] == "t2"
     assert s.transition_alternatives[0]["candidate_id"] == "tr_001"
     assert s.transition_alternatives[0]["transition"]["candidate_id"] == "tr_001"
     assert s.transition_alternatives[0]["transition"]["to_track_id"] == "t2"
+    assert s.transition_alternatives[0]["transition"]["move_grade"]["slug"] in {
+        "mid",
+        "clean",
+        "sexy",
+        "bomb",
+        "lit_aff",
+    }
     assert len(s.transition_alternatives) <= 3
     assert len({alt["candidate_id"] for alt in s.transition_alternatives}) == len(
         s.transition_alternatives

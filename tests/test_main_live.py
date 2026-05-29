@@ -8,7 +8,7 @@ subprocess, lets it run for ~5 seconds with real BlackHole + DDJ-FLX4 +
 AI Capture devices, then sends SIGINT and asserts:
 
 1. Process exits cleanly within 10s (no orphan threads or stuck loops).
-2. A new ``recordings/<YYYYMMDD-HHMMSS>/`` session directory appears.
+2. A new ``app_data_dir()/recordings/<YYYYMMDD-HHMMSS>/`` session directory appears.
 
 To run manually:
     VIBEMIX_LIVE_SMOKE=1 uv run pytest -m macos_audio tests/test_main_live.py
@@ -21,19 +21,16 @@ import signal
 import subprocess
 import sys
 import time
-from pathlib import Path
 
 import pytest
 
+from vibemix.runtime.config_store import app_data_dir
 
-# reason: live full-stack smoke — gated on VIBEMIX_LIVE_SMOKE=1 env + real
-# BlackHole/FLX4/AI-Capture devices on Kaan's Mac. Live discharge rides
+
+# Live full-stack smoke — gated on VIBEMIX_LIVE_SMOKE=1 env + real
+# BlackHole/FLX4 devices on Kaan's Mac. Live discharge rides
 # KAAN-ACTION-LEGAL.md §V7-LIVE-04.
 @pytest.mark.macos_audio
-@pytest.mark.xfail(
-    strict=False,
-    reason="VIBEMIX_LIVE_SMOKE=1 + real BlackHole/FLX4 — see §V7-LIVE-04",
-)
 def test_live_startup_shutdown():
     """LIVE-01: live smoke — Kaan-only opt-in via env var."""
     if not os.environ.get("VIBEMIX_LIVE_SMOKE"):
@@ -42,7 +39,7 @@ def test_live_startup_shutdown():
             "VIBEMIX_LIVE_SMOKE=1 uv run pytest -m macos_audio tests/test_main_live.py"
         )
 
-    rec_dir = Path("recordings")
+    rec_dir = app_data_dir() / "recordings"
     pre_existing = set()
     if rec_dir.is_dir():
         pre_existing = {p.name for p in rec_dir.iterdir() if p.is_dir()}

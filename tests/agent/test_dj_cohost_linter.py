@@ -21,12 +21,12 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
 from vibemix.coach import CitationLinter, StrippedRateTracker
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState
+from vibemix.state.deck_state import DeckState, DeckTrack
 
 # --------------------------------------------------------------------------
 # Helpers (mirrored from tests/agent/test_dj_cohost.py)
@@ -63,6 +63,17 @@ def _build_state() -> MusicState:
     s.rms = 0.05
     s.bpm = 128.0
     return s
+
+
+def _deck(title: str, *, camelot: str = "8A") -> DeckTrack:
+    return DeckTrack(
+        title=title,
+        track_id=title.lower().replace(" ", "-"),
+        bpm=128.0,
+        camelot=camelot,
+        confidence=0.8,
+        source="rekordbox_xml",
+    )
 
 
 def _build_agent_legacy(mocker, tmp_path: Path):
@@ -193,6 +204,107 @@ def test_valid_response_passes_through_when_wired(mocker, tmp_path) -> None:
     playback.push.assert_not_called()
 
 
+def test_live_claim_guard_corrects_single_deck_transition_claim(mocker, tmp_path) -> None:
+    """Wired path: one resolved deck blocks all multi-deck outcome synonyms."""
+    registry = EvidenceRegistry()
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.controller_connected = True
+    state.xfader = 0
+    state.deck_a = {"vol": 112, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_state = DeckState(decks={"A": _deck("Strobe")})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["That was a great transition into the drop."])
+    )
+
+    agent.set_next_event(Event(type="HEARTBEAT", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert len(chunks) == 1
+    assert "hold the transition verdict" in chunks[0]
+    assert "deck lanes=A=known:dominant / B=unknown:muted" not in chunks[0]
+    assert "second_deck=independent_source_required" not in chunks[0]
+    assert "rule=unresolved_deck_is_not_transition_evidence" not in chunks[0]
+    assert "great transition" not in chunks[0]
+    kinds = [k for k, _ in recorder.events]
+    assert "live_claim_guard" in kinds
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert "second_deck=independent_source_required" in guard_log["summary"]
+    assert "citation_strip" not in kinds
+    assert tracker.rate() == 0.0
+    playback.push.assert_not_called()
+
+
+def test_live_claim_guard_defers_watch_only_stream_before_correction(mocker, tmp_path) -> None:
+    """Watch-only crossfader evidence should not leak the raw streamed head."""
+    registry = EvidenceRegistry()
+    agent, gen, recorder, state, _, _, _ = _build_agent_wired(mocker, tmp_path, registry)
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A"),
+            "B": _deck("InB", camelot="9A"),
+        }
+    )
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["Nice ", "handoff, that bridge worked."])
+    )
+
+    agent.set_next_event(Event(type="MIX_MOVE", state=state, extra={"moves": ["xfader→A-side"]}))
+    chunks = _drive(agent)
+
+    assert len(chunks) == 1
+    assert chunks[0].startswith("I'll hold the transition verdict")
+    assert all("Nice " not in chunk for chunk in chunks)
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["policy"] == "watch_not_claim"
+    assert guard_log["reason"] == "two_deck_move_single_audible"
+    assert "Nice handoff" in guard_log["raw_text"]
+
+
+def test_live_claim_guard_corrects_move_effect_verdict(mocker, tmp_path) -> None:
+    """DSP deltas may ground a change, not a causal/quality verdict."""
+    registry = EvidenceRegistry()
+    agent, gen, recorder, state, _, _, _ = _build_agent_wired(mocker, tmp_path, registry)
+    state.audible = True
+    state.audible_deck = "A"
+    state.rms = 0.12
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
+    state.prev_perceive = {
+        "rms": 0.10,
+        "sub": 0.24,
+        "low": 0.32,
+        "mid": 0.30,
+        "high": 0.20,
+        "onset_density": 2.0,
+    }
+    state.deck_state = DeckState(decks={"A": _deck("OutA", camelot="8A")})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["Your low cut cleaned the mix."])
+    )
+
+    agent.set_next_event(
+        Event(type="MIX_MOVE", state=state, extra={"moves": ["A_low: flat→killed"]})
+    )
+    chunks = _drive(agent)
+
+    assert len(chunks) == 1
+    assert "hold the cause/quality verdict" in chunks[0]
+    assert "low cut cleaned" not in chunks[0]
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["policy"] == "move_effect_not_verdict"
+    assert guard_log["reason"] == "dsp_delta_not_causal_proof"
+    assert "Your low cut cleaned" in guard_log["raw_text"]
+
+
 # --------------------------------------------------------------------------
 # (c) Invalid response strips silently (ack-bank substitution retired)
 # --------------------------------------------------------------------------
@@ -318,9 +430,10 @@ def test_fabricated_recall_strips_turn(mocker, tmp_path) -> None:
     assert chunks  # yielded mid-stream
     kinds = [k for k, _ in recorder.events]
     assert "streaming_cancel" in kinds
-    assert next(
-        f for k, f in recorder.events if k == "streaming_cancel"
-    )["reason"] == "citation_failure"
+    assert (
+        next(f for k, f in recorder.events if k == "streaming_cancel")["reason"]
+        == "citation_failure"
+    )
     playback.push.assert_called()
     # citation_strip logged; the fabricated reaction text is captured (silenced).
     assert "citation_strip" in kinds
@@ -342,9 +455,7 @@ def test_fabricated_recall_strips_turn(mocker, tmp_path) -> None:
 # --------------------------------------------------------------------------
 
 
-def test_fabricated_recall_strips_turn_n_plus_1_with_empty_recall(
-    mocker, tmp_path
-) -> None:
+def test_fabricated_recall_strips_turn_n_plus_1_with_empty_recall(mocker, tmp_path) -> None:
     """Phase 65 review iter-3 BLOCKER regression — every turn rescopes its
     own ``recall`` registrations, so a fabricated ``[recall:<id>]`` that
     matches a PRIOR turn's registration must still strip on a turn whose
@@ -376,6 +487,7 @@ def test_fabricated_recall_strips_turn_n_plus_1_with_empty_recall(
     the existence-only branch and the turn would EMIT. That emit IS the
     cross-turn poisoning hole this fix closes.
     """
+
     # Stub recall service: returns [A, B] on first get_latest(), [] on second.
     class _StubRecord:
         def __init__(self, record_id: str, signature: str) -> None:
@@ -459,10 +571,7 @@ def test_fabricated_recall_strips_turn_n_plus_1_with_empty_recall(
     # → fabricated id strips the turn.
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
         return_value=_async_iter(
-            [
-                f"remember [recall:{record_a.record_id}] when [ev:KICK_SWAP@45.2] "
-                "killed it"
-            ]
+            [f"remember [recall:{record_a.record_id}] when [ev:KICK_SWAP@45.2] killed it"]
         )
     )
     ev2 = Event(type="HEARTBEAT", state=state, extra={})
@@ -481,19 +590,14 @@ def test_fabricated_recall_strips_turn_n_plus_1_with_empty_recall(
         "turn N+1 must log citation_strip for the fabricated recall"
     )
     assert "streaming_cancel" in new_kinds, (
-        "turn N+1 must fire streaming_cancel — head was in-flight when "
-        "the linter failed"
+        "turn N+1 must fire streaming_cancel — head was in-flight when the linter failed"
     )
-    strip_log = next(
-        f for k, f in recorder.events[pre_strip_events:] if k == "citation_strip"
-    )
+    strip_log = next(f for k, f in recorder.events[pre_strip_events:] if k == "citation_strip")
     assert f"[recall:{record_a.record_id}]" in strip_log["raw_text"]
     assert ("recall", record_a.record_id) in strip_log["missing"] or [
         "recall",
         record_a.record_id,
-    ] in strip_log["missing"], (
-        "strip log must name the fabricated prior-turn recall id"
-    )
+    ] in strip_log["missing"], "strip log must name the fabricated prior-turn recall id"
     # Snapshot invariant: turn N+1's empty recall_moments → no "recall" key
     # (or empty dict under "recall") in the registry snapshot. Pre-fix this
     # would still contain {A, B} → the failing case.
@@ -629,7 +733,7 @@ def test_history_appended_on_bypass_not_on_strip(mocker, tmp_path) -> None:
     """_ai_text_history grows on bypass (text was emitted) but NOT on strip
     (no text emitted = nothing to repeat)."""
     registry = EvidenceRegistry()
-    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+    agent, gen, _recorder, state, _, tracker, _playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -776,10 +880,7 @@ def test_cooldown_suppresses_back_to_back_recalls_COPILOT02(mocker, tmp_path) ->
     gen = genai_client
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
         return_value=_async_iter(
-            [
-                f"that [ev:KICK_SWAP@45.2] hit — like "
-                f"[recall:{record_a.record_id}] last set"
-            ]
+            [f"that [ev:KICK_SWAP@45.2] hit — like [recall:{record_a.record_id}] last set"]
         )
     )
     ev1 = Event(type="TRACK_CHANGE", state=state, extra={})

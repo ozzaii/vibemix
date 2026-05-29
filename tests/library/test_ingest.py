@@ -18,6 +18,7 @@ Honest-green posture (the hard CLAUDE.md gate):
 
 from __future__ import annotations
 
+import pickle
 import sqlite3
 import urllib.parse
 from pathlib import Path
@@ -514,6 +515,7 @@ def test_anlz_index_drives_windows_and_has_separate_cache(isolated_cache, tmp_pa
     """A later ANLZ match must not reuse an earlier no-structure whole-track vector."""
     from vibemix.library import ingest as ingest_mod
     from vibemix.library.ingest import ingest_source
+    from vibemix.library.section_builder import sections_for_entry
 
     f = tmp_path / "anlz.mp3"
     f.write_bytes(b"ANLZ-AUDIO" * 8)
@@ -555,6 +557,18 @@ def test_anlz_index_drives_windows_and_has_separate_cache(isolated_cache, tmp_pa
     assert anlz_embedder.calls == []
     assert len(anlz_embedder.byte_calls) == 4
     assert sliced[:2] == [(0.0, 32.0), (32.0, 32.0)]
+    with isolated_cache.open("rb") as fh:
+        blob = pickle.load(fh)
+    cached_track = blob.tracks["50"]
+    assert [cue.source for cue in cached_track.cues] == ["anlz", "anlz"]
+    assert [cue.name for cue in cached_track.cues] == ["INTRO", "DROP"]
+    assert cached_track.cues[0].confidence == pytest.approx(0.84)
+    sections = sections_for_entry(cached_track)
+    assert sections[0].source == "anlz"
+    assert sections[0].source_detail == "pssi"
+    assert sections[0].cue_source == "anlz"
+    assert sections[0].cue_confidence == pytest.approx(0.84)
+    assert sections[0].role == "intro"
 
     resumed_embedder = FakeClapEmbedder()
     resumed = ingest_source(
@@ -605,6 +619,11 @@ def test_ingest_keeps_dj_cues_ahead_of_anlz(isolated_cache, tmp_path, monkeypatc
     assert embedder.calls == []
     assert len(embedder.byte_calls) == 2
     assert sliced[0] == (10.0, 80.0)
+    with isolated_cache.open("rb") as fh:
+        blob = pickle.load(fh)
+    cached_track = blob.tracks["60"]
+    assert len(cached_track.cues) == 1
+    assert cached_track.cues[0].source == "dj"
 
 
 def test_cue_strategy_version_namespaces_cache(isolated_cache, tmp_path):

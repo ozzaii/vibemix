@@ -142,6 +142,7 @@ def test_valid_mode_persists_to_extra_and_emits_settings_state(
         f"expected exactly 1 settings.state echo for valid mode={mode}; got: "
         f"{[m['type'] for m in fake_bus.emitted]}"
     )
+    assert states[0]["payload"]["session.mode"] == mode
     # No ipc.error emitted on the valid path
     errors = fake_bus.emitted_by_type("ipc.error")
     assert errors == [], f"valid mode={mode!r} unexpectedly emitted: {errors}"

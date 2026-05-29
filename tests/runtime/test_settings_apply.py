@@ -35,7 +35,13 @@ import pytest
 
 from vibemix.runtime import config_store as cs_mod
 from vibemix.runtime.config_store import ConfigStore
-from vibemix.runtime.settings import GENRE_OVERLAY_S, SettingsApplier
+from vibemix.runtime.settings import (
+    GENRE_OVERLAY_S,
+    GenreProfileLoader,
+    SettingsApplier,
+    apply_persona_config_to_env,
+    resolve_genre_profile_name,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +165,16 @@ def test_mode_happy_path(store, event_detector):
     assert store.mode == "hype"
 
 
+def test_mode_apply_exports_env_for_next_agent_build(store, event_detector, monkeypatch):
+    monkeypatch.delenv("VIBEMIX_MODE", raising=False)
+    applier = SettingsApplier(config_store=store, event_detector=event_detector)
+    success, error = _apply(applier, "mode", "coach")
+    assert (success, error) == (True, None)
+    import os
+
+    assert os.environ["VIBEMIX_MODE"] == "coach"
+
+
 def test_mode_missing_hook_persists_with_warning(store, caplog):
     """No live event_detector hook → persist + succeed (deferred-live)."""
     applier = SettingsApplier(config_store=store)
@@ -175,6 +191,32 @@ def test_mode_invalid_value(store, event_detector):
     success, error = _apply(applier, "mode", "chill")
     assert success is False
     event_detector.set_mode.assert_not_called()
+
+
+def test_apply_persona_config_to_env_seeds_prompt_resolver_env():
+    env: dict[str, str] = {}
+    store = ConfigStore(
+        mode="coach",
+        extra={"skill": "pro", "mood": "teacher"},
+    )
+    applied = apply_persona_config_to_env(store, env)
+    assert applied == {"mode": "coach", "skill": "pro", "mood": "teacher"}
+    assert env == {
+        "VIBEMIX_MODE": "coach",
+        "VIBEMIX_SKILL_LEVEL": "pro",
+        "VIBEMIX_MOOD": "teacher",
+    }
+
+
+def test_apply_persona_config_to_env_ignores_invalid_extra_values():
+    env: dict[str, str] = {}
+    store = ConfigStore(
+        mode="hype",
+        extra={"skill": "wizard", "mood": "storm"},
+    )
+    applied = apply_persona_config_to_env(store, env)
+    assert applied == {"mode": "hype"}
+    assert env == {"VIBEMIX_MODE": "hype"}
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +266,52 @@ def test_genre_invalid_value(store, genre_loader):
     success, error = _apply(applier, "genre", "")
     assert success is False
     genre_loader.reload.assert_not_called()
+
+
+def test_live_genre_profile_loader_maps_drawer_dnb_to_dsp_profile():
+    from vibemix.state.genre import (
+        get_active_profile,
+        is_auto_enabled,
+        set_active_profile,
+        set_auto_enabled,
+    )
+
+    set_active_profile(None)
+    set_auto_enabled(True)
+    try:
+        GenreProfileLoader().reload("dnb")
+        active = get_active_profile()
+        assert active is not None
+        assert active.name == "drum_and_bass"
+        assert is_auto_enabled() is False
+    finally:
+        set_active_profile(None)
+        set_auto_enabled(True)
+
+
+def test_live_genre_profile_loader_generic_reenables_auto_detection():
+    from vibemix.state.genre import (
+        get_active_profile,
+        is_auto_enabled,
+        set_active_profile,
+        set_auto_enabled,
+    )
+
+    set_active_profile("techno")
+    set_auto_enabled(False)
+    try:
+        GenreProfileLoader().reload("edm-generic")
+        assert get_active_profile() is None
+        assert is_auto_enabled() is True
+    finally:
+        set_active_profile(None)
+        set_auto_enabled(True)
+
+
+def test_resolve_genre_profile_name_accepts_profile_names_and_ui_aliases():
+    assert resolve_genre_profile_name("techno") == "techno"
+    assert resolve_genre_profile_name("tech-house") == "house"
+    assert resolve_genre_profile_name("hip-hop") is None
 
 
 # ---------------------------------------------------------------------------

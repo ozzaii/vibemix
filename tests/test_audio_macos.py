@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 from pytest_mock import MockerFixture
 
@@ -62,6 +63,10 @@ def test_assert_device_sample_rate_raises_on_mismatch(mocker: MockerFixture) -> 
     mocker.patch(
         "vibemix.platform._audio_macos.sd.query_devices",
         return_value={"default_samplerate": 44100.0, "name": "BlackHole 2ch"},
+    )
+    mocker.patch(
+        "vibemix.platform._audio_macos.set_device_nominal_sample_rate",
+        return_value=False,
     )
     with pytest.raises(SampleRateMismatchError, match=r"44100Hz.*48000Hz") as exc_info:
         assert_device_sample_rate(device_index=2, expected=48000)
@@ -209,6 +214,118 @@ def test_find_device_master_input_raises_when_blackhole_absent(
     assert "blackhole-2ch" in str(exc.value)
 
 
+def test_find_device_honors_explicit_blackhole_variant(
+    mocker: MockerFixture,
+    make_backend,
+) -> None:
+    """An explicit BlackHole variant request is not rewritten to 2ch."""
+    devices = [
+        {"name": "BlackHole 2ch", "max_input_channels": 2, "max_output_channels": 2},
+        {"name": "BlackHole 16ch", "max_input_channels": 16, "max_output_channels": 16},
+    ]
+    mocker.patch("vibemix.platform._audio_macos.sd.query_devices", return_value=devices)
+    backend = make_backend()
+
+    assert backend.find_device("BlackHole 16ch", "input") == 1
+
+
+def test_find_device_auto_master_input_chooses_live_48k_variant(
+    mocker: MockerFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    make_backend,
+) -> None:
+    """Auto master finder follows the actual live signal, not the static 2ch default."""
+    devices = [
+        {
+            "name": "BlackHole 2ch",
+            "max_input_channels": 2,
+            "max_output_channels": 2,
+            "default_samplerate": 44100.0,
+        },
+        {
+            "name": "BlackHole 16ch",
+            "max_input_channels": 16,
+            "max_output_channels": 16,
+            "default_samplerate": 48000.0,
+        },
+    ]
+    mocker.patch("vibemix.platform._audio_macos.sd.query_devices", return_value=devices)
+
+    def fake_rec(frames, *, samplerate, channels, dtype, device, blocking):
+        del samplerate, dtype, blocking
+        value = 0.05 if device == 1 else 0.0
+        return np.full((frames, channels), value, dtype=np.float32)
+
+    mocker.patch("vibemix.platform._audio_macos.sd.rec", side_effect=fake_rec)
+    monkeypatch.setenv("VIBEMIX_AUTO_MASTER_INPUT", "1")
+
+    backend = make_backend()
+    assert backend.find_device("BlackHole 2ch", "input") == 1
+
+
+def test_find_device_auto_master_input_falls_back_to_48k_variant_when_silent(
+    mocker: MockerFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    make_backend,
+) -> None:
+    """Auto mode prefers a usable 48 kHz BlackHole over a 44.1 kHz exact default."""
+    devices = [
+        {
+            "name": "BlackHole 2ch",
+            "max_input_channels": 2,
+            "max_output_channels": 2,
+            "default_samplerate": 44100.0,
+        },
+        {
+            "name": "BlackHole 16ch",
+            "max_input_channels": 16,
+            "max_output_channels": 16,
+            "default_samplerate": 48000.0,
+        },
+    ]
+    mocker.patch("vibemix.platform._audio_macos.sd.query_devices", return_value=devices)
+    mocker.patch(
+        "vibemix.platform._audio_macos.sd.rec",
+        return_value=np.zeros((64, 2), dtype=np.float32),
+    )
+    monkeypatch.setenv("VIBEMIX_AUTO_MASTER_INPUT", "1")
+
+    backend = make_backend()
+    assert backend.find_device("BlackHole 2ch", "input") == 1
+
+
+def test_find_device_auto_master_input_uses_preferred_fallback_when_silent(
+    mocker: MockerFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    make_backend,
+) -> None:
+    """The proof runner can keep auto mode while hinting Rekordbox's route."""
+    devices = [
+        {
+            "name": "BlackHole 2ch",
+            "max_input_channels": 2,
+            "max_output_channels": 2,
+            "default_samplerate": 48000.0,
+        },
+        {
+            "name": "BlackHole 16ch",
+            "max_input_channels": 16,
+            "max_output_channels": 16,
+            "default_samplerate": 48000.0,
+        },
+    ]
+    mocker.patch("vibemix.platform._audio_macos.sd.query_devices", return_value=devices)
+    mocker.patch(
+        "vibemix.platform._audio_macos.sd.rec",
+        return_value=np.zeros((64, 2), dtype=np.float32),
+    )
+    monkeypatch.setenv("VIBEMIX_AUTO_MASTER_INPUT", "1")
+    monkeypatch.setenv("VIBEMIX_AUTO_MASTER_FALLBACK_DEVICE", "BlackHole 2ch")
+
+    backend = make_backend()
+    assert backend.find_device("BlackHole 2ch", "input") == 0
+
+
 # ===== RATE-07: AudioMacOS satisfies @runtime_checkable AudioBackend =====
 
 
@@ -221,19 +338,33 @@ def test_audio_macos_is_audio_backend(make_backend) -> None:
 # ===== RATE-08/09/10: pre-open guard fires for all stream openers =====
 
 
-def test_open_passthrough_output_pre_open_guard(mocker: MockerFixture, make_backend) -> None:
-    """Passthrough output respects pre-open sample-rate guard."""
+def test_open_passthrough_output_resamples_instead_of_raising(
+    mocker: MockerFixture,
+    make_backend,
+) -> None:
+    """Passthrough output opens at the device rate when output is 44.1 kHz."""
     mocker.patch(
         "vibemix.platform._audio_macos.sd.query_devices",
         return_value={"default_samplerate": 44100.0, "name": "Speakers"},
     )
-    out_mock = mocker.patch("vibemix.platform._audio_macos.sd.OutputStream")
+    fake_stream = MagicMock()
+    fake_stream.samplerate = 44100
+    out_mock = mocker.patch(
+        "vibemix.platform._audio_macos.sd.OutputStream",
+        return_value=fake_stream,
+    )
     backend = make_backend()
-    with pytest.raises(SampleRateMismatchError):
-        backend.open_passthrough_output(
-            0, sample_rate=48000, channels=2, block_size=256, callback=lambda *a: None
-        )
-    assert out_mock.call_count == 0
+    handle = backend.open_passthrough_output(
+        0, sample_rate=48000, channels=2, block_size=480, callback=lambda *a: None
+    )
+
+    assert handle is not None
+    out_mock.assert_called_once()
+    call_kwargs = out_mock.call_args.kwargs
+    assert call_kwargs["samplerate"] == 44100
+    assert call_kwargs["blocksize"] == 441
+    assert callable(call_kwargs["callback"])
+    fake_stream.start.assert_called_once()
 
 
 def test_open_voice_output_resamples_instead_of_raising(

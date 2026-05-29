@@ -16,11 +16,15 @@ Test strategy:
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from tests.audio.conftest import int16_sine
 from vibemix.audio import AudioBuffer
+from vibemix.library.rekordbox import CuePoint, TrackEntry
 from vibemix.state import MusicState, state_refresh_loop
+from vibemix.state.coach import AICoach
+from vibemix.state.deck_state import DeckTrack
 from vibemix.state.refresh import _tick_once
 
 
@@ -68,6 +72,25 @@ def _track_position_mock(title: str = "", position_s: float = 0.0) -> MagicMock:
         "playback_rate": 1.0,
     }
     return m
+
+
+def _section_entry(
+    *,
+    track_id: str = "track-1",
+    title: str = "Cue Test",
+    cues=(),
+) -> TrackEntry:
+    return TrackEntry(
+        track_id=track_id,
+        title=title,
+        artist="",
+        album="",
+        bpm=120.0,
+        key="Am",
+        duration_s=180.0,
+        cues=tuple(cues),
+        filepath="",
+    )
 
 
 # ---------- Import surface ----------
@@ -160,6 +183,365 @@ def test_tick_writes_audio_features():
     # last_audible_high set on the rising edge.
     assert last_high == 1000.0
     assert last_low == 0.0
+
+
+def test_tick_sets_course3_session_active_only_with_audible_deck() -> None:
+    state = MusicState()
+    buf = _audible_buf()
+    learn = SimpleNamespace(current_course_id="course_3_play_mode")
+
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+        learn_state=learn,
+    )
+
+    assert state.audible is True
+    assert state.audible_deck == "A"
+    assert state.session_active is True
+
+
+def test_tick_keeps_course3_graduation_review_out_of_live_lens() -> None:
+    state = MusicState()
+    state.phrase_position_confidence = 0.9
+    state.next_phrase_at = 123.0
+    state.next_phrase_cue_id = "phrase_boundary@123.0"
+    buf = _audible_buf()
+    learn = SimpleNamespace(
+        current_course_id="course_3_play_mode",
+        current_lesson_id="L3.06",
+    )
+
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+        learn_state=learn,
+    )
+
+    assert state.audible is True
+    assert state.audible_deck == "A"
+    assert state.session_active is False
+    assert state.phrase_position_confidence == 0.0
+    assert state.next_phrase_at is None
+    assert state.next_phrase_cue_id is None
+
+
+def test_tick_course3_live_clears_stale_phrase_until_source_exists() -> None:
+    state = MusicState()
+    state.phrase_position_confidence = 0.9
+    state.next_phrase_at = 123.0
+    state.next_phrase_cue_id = "phrase_boundary@123.0"
+    buf = _audible_buf()
+    learn = SimpleNamespace(current_course_id="course_3_play_mode")
+
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+        learn_state=learn,
+    )
+
+    assert state.session_active is True
+    assert state.phrase_position_confidence == 0.0
+    assert state.next_phrase_at is None
+    assert state.next_phrase_cue_id is None
+
+
+def test_tick_course3_live_uses_dj_cue_sections_for_phrase_anchor() -> None:
+    state = MusicState()
+    state.set_start_at = 900.0
+    entry = _section_entry(
+        cues=(
+            CuePoint(name="intro", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="breakdown", type="cue", start_s=64.0, end_s=None, number=2),
+        )
+    )
+    section_source = SimpleNamespace(lookup_by_id=lambda track_id: entry)
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        "A": DeckTrack(
+            title=entry.title,
+            track_id=entry.track_id,
+            bpm=entry.bpm,
+            key=entry.key,
+            confidence=0.95,
+            source="rekordbox_xml",
+        )
+    }
+    registry = EvidenceRegistry()
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _ctrl_mock(),
+        _track_position_mock(title=entry.title, position_s=56.0),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=120.0,
+        last_bpm_at=999.0,
+        learn_state=SimpleNamespace(current_course_id="course_3_play_mode"),
+        deck_source=deck_source,
+        section_source=section_source,
+        evidence_registry=registry,
+    )
+
+    assert state.session_active is True
+    assert state.phrase_position_confidence == 0.85
+    assert state.next_phrase_at == 108.0
+    assert state.next_phrase_cue_id == "track-1:breakdown@64.0"
+    assert registry.snapshot()["cue"]["track-1:breakdown@64.0"] == (108.0,)
+
+    state.bpm_confidence = 0.95
+    line = AICoach.evidence_line(state)
+    assert "lens=count_in_eligible[next@108.0]" in line
+    assert "cue_anchor=track-1:breakdown@64.0" in line
+
+
+def _mix_ctrl_mock() -> MagicMock:
+    m = _ctrl_mock()
+    m.deck_snapshot.return_value = {
+        "A": {"vol": 127, "play": True, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+        "B": {"vol": 127, "play": True, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+        "xfader": 64,
+        "connected": True,
+    }
+    return m
+
+
+def test_tick_course3_mix_uses_unambiguous_title_match_for_phrase_anchor() -> None:
+    state = MusicState()
+    state.set_start_at = 900.0
+    entry_a = _section_entry(track_id="track-a", title="Outgoing")
+    entry_b = _section_entry(
+        track_id="track-b",
+        title="Incoming",
+        cues=(
+            CuePoint(name="intro", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="breakdown", type="cue", start_s=64.0, end_s=None, number=2),
+        ),
+    )
+    entries = {"track-a": entry_a, "track-b": entry_b}
+    section_source = SimpleNamespace(lookup_by_id=lambda track_id: entries.get(track_id))
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        "A": DeckTrack(
+            title=entry_a.title,
+            track_id=entry_a.track_id,
+            bpm=entry_a.bpm,
+            key=entry_a.key,
+            confidence=0.95,
+            source="rekordbox_xml",
+        ),
+        "B": DeckTrack(
+            title=entry_b.title,
+            track_id=entry_b.track_id,
+            bpm=entry_b.bpm,
+            key=entry_b.key,
+            confidence=0.95,
+            source="rekordbox_xml",
+        ),
+    }
+    registry = EvidenceRegistry()
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _mix_ctrl_mock(),
+        _track_position_mock(title=entry_b.title, position_s=56.0),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=120.0,
+        last_bpm_at=999.0,
+        learn_state=SimpleNamespace(current_course_id="course_3_play_mode"),
+        deck_source=deck_source,
+        section_source=section_source,
+        evidence_registry=registry,
+    )
+
+    assert state.audible_deck == "mix"
+    assert state.session_active is True
+    assert state.phrase_position_confidence == 0.75
+    assert state.next_phrase_at == 108.0
+    assert state.next_phrase_cue_id == "track-b:breakdown@64.0"
+    assert registry.snapshot()["cue"]["track-b:breakdown@64.0"] == (108.0,)
+
+
+def test_tick_course3_mix_refuses_ambiguous_title_match_for_phrase_anchor() -> None:
+    state = MusicState()
+    entry_a = _section_entry(track_id="track-a", title="Same Title")
+    entry_b = _section_entry(
+        track_id="track-b",
+        title="Same Title",
+        cues=(CuePoint(name="breakdown", type="cue", start_s=64.0, end_s=None, number=2),),
+    )
+    entries = {"track-a": entry_a, "track-b": entry_b}
+    section_source = SimpleNamespace(lookup_by_id=lambda track_id: entries.get(track_id))
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        side: DeckTrack(
+            title=entry.title,
+            track_id=entry.track_id,
+            bpm=entry.bpm,
+            key=entry.key,
+            confidence=0.95,
+            source="rekordbox_xml",
+        )
+        for side, entry in (("A", entry_a), ("B", entry_b))
+    }
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _mix_ctrl_mock(),
+        _track_position_mock(title="Same Title", position_s=56.0),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=120.0,
+        last_bpm_at=999.0,
+        learn_state=SimpleNamespace(current_course_id="course_3_play_mode"),
+        deck_source=deck_source,
+        section_source=section_source,
+        evidence_registry=EvidenceRegistry(),
+    )
+
+    assert state.audible_deck == "mix"
+    assert state.session_active is True
+    assert state.phrase_position_confidence == 0.0
+    assert state.next_phrase_at is None
+    assert state.next_phrase_cue_id is None
+
+
+def test_tick_course3_cue_registry_write_is_change_only() -> None:
+    state = MusicState()
+    state.set_start_at = 900.0
+    entry = _section_entry(
+        cues=(
+            CuePoint(name="intro", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="breakdown", type="cue", start_s=64.0, end_s=None, number=2),
+        )
+    )
+    section_source = SimpleNamespace(lookup_by_id=lambda track_id: entry)
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        "A": DeckTrack(
+            title=entry.title,
+            track_id=entry.track_id,
+            bpm=entry.bpm,
+            key=entry.key,
+            confidence=0.95,
+            source="rekordbox_xml",
+        )
+    }
+    registry = EvidenceRegistry()
+    kwargs = dict(
+        audio_buf=_audible_buf(),
+        controller_state=_ctrl_mock(),
+        track_info=_track_position_mock(title=entry.title, position_s=56.0),
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=120.0,
+        last_bpm_at=999.0,
+        learn_state=SimpleNamespace(current_course_id="course_3_play_mode"),
+        deck_source=deck_source,
+        section_source=section_source,
+        evidence_registry=registry,
+    )
+
+    _tick_once(state, now=1000.0, **kwargs)
+    _tick_once(state, now=1000.1, **kwargs)
+
+    assert registry.snapshot()["cue"]["track-1:breakdown@64.0"] == (108.0,)
+
+
+def test_tick_course3_live_ignores_fallback_sections_for_forward_anchor() -> None:
+    state = MusicState()
+    entry = _section_entry(cues=())
+    section_source = SimpleNamespace(lookup_by_id=lambda track_id: entry)
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        "A": DeckTrack(
+            title=entry.title,
+            track_id=entry.track_id,
+            bpm=entry.bpm,
+            key=entry.key,
+            confidence=0.95,
+            source="rekordbox_xml",
+        )
+    }
+    registry = EvidenceRegistry()
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _ctrl_mock(),
+        _track_position_mock(title=entry.title, position_s=56.0),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=120.0,
+        last_bpm_at=999.0,
+        learn_state=SimpleNamespace(current_course_id="course_3_play_mode"),
+        deck_source=deck_source,
+        section_source=section_source,
+        evidence_registry=registry,
+    )
+
+    assert state.session_active is True
+    assert state.phrase_position_confidence == 0.0
+    assert state.next_phrase_at is None
+    assert state.next_phrase_cue_id is None
+    assert "cue" not in registry.snapshot()
+
+
+def test_tick_clears_course3_lens_when_not_in_course3() -> None:
+    state = MusicState()
+    state.session_active = True
+    state.phrase_position_confidence = 0.9
+    state.next_phrase_at = 123.0
+    state.next_phrase_cue_id = "phrase_boundary@123.0"
+    buf = _audible_buf()
+    learn = SimpleNamespace(current_course_id="course_2_transitions")
+
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+        learn_state=learn,
+    )
+
+    assert state.session_active is False
+    assert state.phrase_position_confidence == 0.0
+    assert state.next_phrase_at is None
+    assert state.next_phrase_cue_id is None
 
 
 def test_tick_bpm_gate_skips_when_silent():
@@ -1037,6 +1419,41 @@ def test_18_02_per_tick_aud_writes_when_audible():
         assert len(aud[k]) == 1, f"{k} has {len(aud[k])} observations, expected 1"
         # t_session = now - set_start_at = 1000.0 - 900.0 = 100.0
         assert abs(aud[k][0] - 100.0) < 0.001
+
+
+def test_tick_registers_citable_deck_source_evidence_from_deck_snapshot() -> None:
+    """A real tick must make deck-source truth citable for live Viber/Gemini context."""
+    registry = EvidenceRegistry()
+    state = MusicState()
+    state.set_start_at = 900.0
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        "A": DeckTrack(
+            title="Source Proof",
+            track_id="track-source-proof",
+            bpm=124.0,
+            key="Am",
+            confidence=0.95,
+            source="rekordbox_xml",
+        )
+    }
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=900.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=999.5,
+        evidence_registry=registry,
+        deck_source=deck_source,
+    )
+
+    expected = "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none"
+    assert registry.snapshot()["mix"][expected] == (100.0,)
 
 
 def test_18_02_aud_NOT_written_when_silent():

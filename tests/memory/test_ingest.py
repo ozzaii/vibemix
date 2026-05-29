@@ -57,17 +57,17 @@ from pathlib import Path
 import numpy as np
 
 from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
-from vibemix.memory.store import MemoryStore
 
 # RED edge — does NOT exist until 64-02. Collection raises
 # ModuleNotFoundError: No module named 'vibemix.memory.ingest'. That is the
 # pinned Wave-0 contract; 64-02 implements these identifiers verbatim.
-from vibemix.memory.ingest import (  # noqa: E402
+from vibemix.memory.ingest import (
     SIG_TEMPLATE_VERSION,
     build_coach_line_signature,
     ingest_session,
     run_ingest_sweep,
 )
+from vibemix.memory.store import MemoryStore
 
 
 def _vec(seed: int) -> np.ndarray:
@@ -118,21 +118,41 @@ def _write_session(session_dir: Path) -> None:
     """
     session_dir.mkdir(parents=True, exist_ok=True)
     lines = [
-        {"t": 12.0, "kind": "event", "type": "TRACK_CHANGE", "track": _TRACK,
-         "phase": "low", "deck": "B"},
+        {
+            "t": 12.0,
+            "kind": "event",
+            "type": "TRACK_CHANGE",
+            "track": _TRACK,
+            "phase": "low",
+            "deck": "B",
+        },
         # Emitted reaction #1 — leading [chill] tag + inline [aud:rms@..] citation.
-        {"t": 13.5, "kind": "ai_text",
-         "text": "[chill] that high-mid guitar chord is [aud:rms@96.0] "
-                 "sitting perfectly inside the pocket."},
-        {"t": 36.0, "kind": "event", "type": "PHASE", "track": _TRACK,
-         "phase": "groove", "deck": "B"},
+        {
+            "t": 13.5,
+            "kind": "ai_text",
+            "text": "[chill] that high-mid guitar chord is [aud:rms@96.0] "
+            "sitting perfectly inside the pocket.",
+        },
+        {
+            "t": 36.0,
+            "kind": "event",
+            "type": "PHASE",
+            "track": _TRACK,
+            "phase": "groove",
+            "deck": "B",
+        },
         # Emitted reaction #2 — leading [chill] tag, NO real citation (legit empty).
-        {"t": 37.2, "kind": "ai_text",
-         "text": "[chill] nice, the groove just locked in — keep riding it."},
+        {
+            "t": 37.2,
+            "kind": "ai_text",
+            "text": "[chill] nice, the groove just locked in — keep riding it.",
+        },
         # SILENCED — never heard by the DJ; ingest MUST skip this.
-        {"t": 41.0, "kind": "citation_strip",
-         "raw_text": "[hype] you fabricated a [aud:rms@10.0] drop that "
-                     "never happened"},
+        {
+            "t": 41.0,
+            "kind": "citation_strip",
+            "raw_text": "[hype] you fabricated a [aud:rms@10.0] drop that never happened",
+        },
     ]
     with session_dir.joinpath("events.jsonl").open("w", encoding="utf-8") as f:
         for obj in lines:
@@ -154,8 +174,7 @@ def test_signature_deterministic() -> None:
     identical reactions at different times still cache-hit).
     """
     ctx = {"track": _TRACK, "phase": "groove", "deck": "B", "type": "PHASE"}
-    text = ("[chill] riding the build with [aud:rms@96.0] and "
-            "[ev:PHASE@36.0] locked")
+    text = "[chill] riding the build with [aud:rms@96.0] and [ev:PHASE@36.0] locked"
 
     sig_a = build_coach_line_signature(text, ctx)
     sig_b = build_coach_line_signature(text, ctx)
@@ -170,6 +189,14 @@ def test_signature_deterministic() -> None:
     assert "deck=B" in sig_a
     assert "event=PHASE" in sig_a
     assert f"track={_TRACK}" in sig_a
+    assert "context_feed=none" in sig_a
+    assert "deck_lane=none" in sig_a
+    assert "deck_audio=none" in sig_a
+    assert "audio_window=none" in sig_a
+    assert "live_evidence=none" in sig_a
+    assert "move=none" in sig_a
+    assert "move_effect=none" in sig_a
+    assert "audio_delta=none" in sig_a
     # `t` (the on-disk timestamp) is NOT in the embedded text.
     assert "36.0" not in sig_a.split("said:")[0] or "ev:PHASE@36.0" in sig_a
     # The two citation tokens are present and sorted (aud before ev).
@@ -187,7 +214,66 @@ def test_signature_deterministic() -> None:
     assert "go go go" in sig_missing
 
     # Template version is the pinned constant 64-02 must expose.
-    assert SIG_TEMPLATE_VERSION == "v1-coach_line"
+    assert SIG_TEMPLATE_VERSION == "v8-coach_line-context-feed"
+
+
+def test_signature_includes_live_deck_move_context() -> None:
+    ctx = {
+        "track": _TRACK,
+        "phase": "groove",
+        "deck": "A",
+        "type": "MIX_MOVE",
+        "context_feed_contract": (
+            "context_feed_contract[surface=session_event labels=deck1:A,deck2:B "
+            "history=past_comparison_not_live_proof cache=static_persona_rules_only "
+            "speed=no_extra_model_pass]"
+        ),
+        "deck_lane_context": "deck_lanes_context[A(identity=known) | B(identity=unknown)]",
+        "deck_reference_context": (
+            "deck_reference_context[(deck1=A identity=known route=dominant) "
+            "(deck2=B identity=unknown route=muted) audio=P1_global_mix]"
+        ),
+        "deck_source_context": (
+            "deck_source_context[identity_state=MusicState.deck_state resolved=A "
+            "unresolved=B second_deck=independent_source_required]"
+        ),
+        "deck_audio_context": "deck_audio_context[source=global_mix support=single_deck_A]",
+        "audio_window_context": (
+            "audio_window_context[P1=master_global_mix P1_heard=true "
+            "timeline=past_action_future action=-1.0..0.0 deckA_audio=not_attached "
+            "rule=time_alignment_not_outcome_verdict]"
+        ),
+        "live_evidence_context": "live_evidence[mix=transition_block=single_resolved_deck]",
+        "move_context": "move_context[scope=single_deck_move_A]",
+        "move_effect_context": "move_effect_context[rule=dsp_delta_not_causal_proof]",
+        "audio_delta": ["sub energy fell 50% (strong)", "low energy fell 50% (strong)"],
+    }
+
+    sig = build_coach_line_signature("heard it tighten [midi:A_low@42.0]", ctx)
+
+    assert "context_feed=context_feed_contract[surface=session_event labels=deck1:A,deck2:B" in sig
+    assert "history=past_comparison_not_live_proof" in sig
+    assert "cache=static_persona_rules_only" in sig
+    assert "speed=no_extra_model_pass" in sig
+    assert "deck_lane=deck_lanes_context[A(identity=known) / B(identity=unknown)]" in sig
+    assert (
+        "deck_ref=deck_reference_context[(deck1=A identity=known route=dominant) "
+        "(deck2=B identity=unknown route=muted) audio=P1_global_mix]" in sig
+    )
+    assert (
+        "deck_source=deck_source_context[identity_state=MusicState.deck_state resolved=A "
+        "unresolved=B second_deck=independent_source_required]" in sig
+    )
+    assert "deck_audio=deck_audio_context[source=global_mix support=single_deck_A]" in sig
+    assert "audio_window=audio_window_context[P1=master_global_mix P1_heard=true" in sig
+    assert "timeline=past_action_future" in sig
+    assert "action=-1.0..0.0" in sig
+    assert "deckA_audio=not_attached" in sig
+    assert "rule=time_alignment_not_outcome_verdict" in sig
+    assert "live_evidence=live_evidence[mix=transition_block=single_resolved_deck]" in sig
+    assert "move=move_context[scope=single_deck_move_A]" in sig
+    assert "move_effect=move_effect_context[rule=dsp_delta_not_causal_proof]" in sig
+    assert "audio_delta=sub energy fell 50% (strong); low energy fell 50% (strong)" in sig
 
 
 def test_ingest_emits_coach_lines(tmp_path: Path) -> None:
@@ -283,12 +369,8 @@ def test_embed_cache_hit() -> None:
     counter is unchanged across the cache hit.
     """
     ctx = {"track": _TRACK, "phase": "groove", "deck": "B", "type": "PHASE"}
-    sig = build_coach_line_signature(
-        "[chill] same line, same bytes [aud:rms@96.0]", ctx
-    )
-    sig_again = build_coach_line_signature(
-        "[chill] same line, same bytes [aud:rms@96.0]", ctx
-    )
+    sig = build_coach_line_signature("[chill] same line, same bytes [aud:rms@96.0]", ctx)
+    sig_again = build_coach_line_signature("[chill] same line, same bytes [aud:rms@96.0]", ctx)
     # Determinism precondition — identical inputs → identical signature bytes.
     assert sig == sig_again
 

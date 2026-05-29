@@ -123,6 +123,49 @@ def test_midi_common_listener_finds_port_and_dispatches(monkeypatch):
     assert not t.is_alive()
 
 
+def test_midi_common_listener_prefers_backend_callback():
+    msg = SimpleNamespace(type="control_change", channel=0, control=0x13, value=120)
+    port = _FakePort([])
+    callback_holder: dict[str, object] = {}
+
+    def _open_input(name, callback=None):
+        callback_holder["name"] = name
+        callback_holder["callback"] = callback
+        return port
+
+    fake_mido = SimpleNamespace(
+        get_input_names=lambda: ["DDJ-FLX4 Bus 1"],
+        open_input=_open_input,
+    )
+    cs = _RecordingControllerState()
+    stop_event = threading.Event()
+
+    t = _midi_common.spawn_listener(cs, stop_event, "DDJ-FLX4", fake_mido)
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        if cs.connected_to:
+            break
+        time.sleep(0.005)
+
+    callback = callback_holder.get("callback")
+    assert callable(callback)
+    callback(msg)
+
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        if cs.handled:
+            break
+        time.sleep(0.005)
+    stop_event.set()
+    t.join(timeout=1.0)
+
+    assert callback_holder["name"] == "DDJ-FLX4 Bus 1"
+    assert cs.connected_to == "DDJ-FLX4 Bus 1"
+    assert cs.handled == [msg]
+    assert port.closed is True
+    assert not t.is_alive()
+
+
 # ---------- Test 2: no port match → retry loop, no side effects ----------
 
 

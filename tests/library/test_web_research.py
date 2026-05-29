@@ -36,7 +36,7 @@ class FakeClient:
         self._response = response
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
-    def post(self, url: str, json: dict[str, Any]) -> FakeResponse:  # noqa: A002
+    def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
         self.calls.append((url, json))
         return self._response
 
@@ -74,6 +74,21 @@ def test_web_search_success_maps_truncates_drops_urlless(monkeypatch) -> None:
     url, body = client.calls[0]
     assert url == "https://api.tavily.com/search"
     assert body == {"api_key": "x", "query": "techno labels", "max_results": 5}
+
+
+@pytest.mark.parametrize("score_in", ["nan", float("nan"), "inf", float("inf")])
+def test_web_search_nonfinite_score_degrades_to_zero(monkeypatch, score_in) -> None:
+    monkeypatch.setenv("TAVILY_API_KEY", "x")
+    client = FakeClient(
+        FakeResponse(
+            200,
+            {"results": [{"title": "Source", "url": "https://a.com", "score": score_in}]},
+        )
+    )
+
+    out = web_research.web_search("techno labels", client=client)
+
+    assert out["results"][0]["score"] == 0.0
 
 
 def test_web_search_missing_key(monkeypatch) -> None:
@@ -131,6 +146,25 @@ def test_fetch_url_success(monkeypatch) -> None:
     url, body = client.calls[0]
     assert url == "https://api.tavily.com/extract"
     assert body == {"api_key": "x", "urls": ["https://a.com"]}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"results": []},
+        {"results": [{}]},
+        {"results": [{"title": "Page", "raw_content": ""}]},
+        {"results": [{"title": "Page", "raw_content": "   "}]},
+    ],
+)
+def test_fetch_url_empty_extract_is_error(monkeypatch, payload) -> None:
+    monkeypatch.setenv("TAVILY_API_KEY", "x")
+    client = FakeClient(FakeResponse(200, payload))
+
+    out = web_research.fetch_url("https://a.com", client=client)
+
+    assert "error" in out
+    assert "no extractable content" in out["error"]
 
 
 def test_fetch_url_bad_scheme(monkeypatch) -> None:

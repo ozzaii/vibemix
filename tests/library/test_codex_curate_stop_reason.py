@@ -42,6 +42,7 @@ import pytest
 from vibemix.library.codex_curate import (
     CodexCurateResult,
     build_set_with_codex,
+    chat_with_codex,
     curate_with_codex,
 )
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
@@ -108,9 +109,7 @@ def _runner_with_side_channel(
             if isinstance(side_channel_payload, str):
                 Path(sr_path).write_text(side_channel_payload, encoding="utf-8")
             else:
-                Path(sr_path).write_text(
-                    json.dumps(side_channel_payload), encoding="utf-8"
-                )
+                Path(sr_path).write_text(json.dumps(side_channel_payload), encoding="utf-8")
 
         return subprocess.CompletedProcess(argv, returncode, stdout="", stderr=stderr)
 
@@ -166,18 +165,15 @@ def test_curate_propagates_starvation_via_side_channel(library):
         f"won over out.json); got {res.stop_reason!r}"
     )
     assert res.error == "library has 0 tracks — run `library ingest` first", (
-        f'error must carry the hint string from the side-channel payload; '
-        f"got {res.error!r}"
+        f"error must carry the hint string from the side-channel payload; got {res.error!r}"
     )
     # Side-channel short-circuit MUST happen BEFORE out.json parse —
     # otherwise we'd see track_ids=['t000'] from the out.json payload.
     assert res.track_ids == [], (
-        f"track_ids must be empty (short-circuit before parse); "
-        f"got {res.track_ids!r}"
+        f"track_ids must be empty (short-circuit before parse); got {res.track_ids!r}"
     )
     assert res.playlist_name is None, (
-        f"playlist_name must be None (short-circuit before persist); "
-        f"got {res.playlist_name!r}"
+        f"playlist_name must be None (short-circuit before persist); got {res.playlist_name!r}"
     )
 
 
@@ -248,8 +244,7 @@ def test_no_side_channel_no_regression(library, monkeypatch, tmp_path):
     )
 
     assert res.stop_reason == "created", (
-        f'absent side-channel must hit the normal "created" path; '
-        f"got {res.stop_reason!r}"
+        f'absent side-channel must hit the normal "created" path; got {res.stop_reason!r}'
     )
     assert res.track_ids == ["t000", "t001"]
     assert res.playlist_name == "Normal"
@@ -287,8 +282,7 @@ def test_malformed_side_channel_falls_through(library, monkeypatch, tmp_path):
 
     # Malformed file → fall-through → normal parse path.
     assert res.stop_reason == "created", (
-        f"malformed side-channel must fall through to existing parse "
-        f"logic; got {res.stop_reason!r}"
+        f"malformed side-channel must fall through to existing parse logic; got {res.stop_reason!r}"
     )
     assert res.track_ids == ["t000"]
 
@@ -447,8 +441,7 @@ def test_uniform_propagation_build_set_path():
         f'"no tracks matched"; got {real_payload.get("hint")!r}'
     )
     assert "too-narrow-theme" in real_payload["hint"], (
-        f"Case B hint must interpolate the theme string; "
-        f"got {real_payload.get('hint')!r}"
+        f"Case B hint must interpolate the theme string; got {real_payload.get('hint')!r}"
     )
 
     runner = _runner_with_side_channel(
@@ -469,16 +462,14 @@ def test_uniform_propagation_build_set_path():
     # top of the seal block). The seal still proves "uniform shape across
     # both wrappers" — same dataclass, same propagation contract.
     assert isinstance(res, CodexCurateResult), (
-        f"build_set_with_codex must return CodexCurateResult; "
-        f"got {type(res).__name__}"
+        f"build_set_with_codex must return CodexCurateResult; got {type(res).__name__}"
     )
     assert res.stop_reason == "tool_starvation", (
         f'stop_reason must propagate as "tool_starvation"; got {res.stop_reason!r}'
     )
     assert res.error is not None
     assert "no tracks matched" in res.error, (
-        f"hint substring must round-trip through set-prep wrapper; "
-        f"got error={res.error!r}"
+        f"hint substring must round-trip through set-prep wrapper; got error={res.error!r}"
     )
     assert "too-narrow-theme" in res.error, (
         f"theme interpolation must reach the wrapper; got error={res.error!r}"
@@ -533,9 +524,7 @@ def test_to_dict_serializes_starvation_shape():
     assert d["theme"] == "x"
     # Default values must remain stable — empty list / None for the
     # starvation surface (no partial playlist written).
-    assert d["track_ids"] == [], (
-        f"track_ids default must remain []; got {d.get('track_ids')!r}"
-    )
+    assert d["track_ids"] == [], f"track_ids default must remain []; got {d.get('track_ids')!r}"
     assert d["playlist_name"] is None
     assert d["m3u_path"] is None
 
@@ -652,15 +641,12 @@ def test_uniform_clarification_propagation_curate_path():
         f"wrapper must return CodexCurateResult; got {type(res).__name__}"
     )
     assert res.stop_reason == "clarification_needed", (
-        f'stop_reason must propagate as "clarification_needed"; '
-        f"got {res.stop_reason!r}"
+        f'stop_reason must propagate as "clarification_needed"; got {res.stop_reason!r}'
     )
     assert res.question == question, (
         f"question must round-trip through wrapper; got {res.question!r}"
     )
-    assert res.choices == choices, (
-        f"choices must round-trip through wrapper; got {res.choices!r}"
-    )
+    assert res.choices == choices, f"choices must round-trip through wrapper; got {res.choices!r}"
     # Cleared-output contract (same as tool_starvation surface).
     assert res.track_ids == []
     assert res.playlist_name is None
@@ -707,8 +693,7 @@ def test_uniform_clarification_propagation_build_set_path():
     )
 
     assert isinstance(res, CodexCurateResult), (
-        f"build_set_with_codex must return CodexCurateResult; "
-        f"got {type(res).__name__}"
+        f"build_set_with_codex must return CodexCurateResult; got {type(res).__name__}"
     )
     assert res.stop_reason == "clarification_needed"
     assert res.question == question
@@ -723,6 +708,88 @@ def test_uniform_clarification_propagation_build_set_path():
     assert d["choices"] == choices
     assert d["track_ids"] == []
     assert d["export_path"] is None
+
+
+def test_uniform_clarification_propagation_chat_path():
+    """SEAL: conversational Viber reads the same clarification side-channel.
+
+    Chat uses the same MCP server and toolset as curate/build-set. If it does
+    not pass ``VIBEMIX_STOP_REASON_FILE`` through to Codex, a valid
+    ``request_clarification`` tool call disappears into the MCP child and the
+    desktop chat surface can only see a stale/empty out.json. This pins the
+    parent-process propagation for conversational Viber too.
+    """
+    lib = _RekordboxLibrary()
+    lib.tracks = {f"t{i:03d}": _track(f"t{i:03d}") for i in range(5)}
+
+    question = "Which room are we aiming at?"
+    choices = ["headphones", "club", "festival"]
+    real_payload = _make_real_clarification_payload(lib, question, choices)
+
+    runner = _runner_with_side_channel(
+        side_channel_payload=real_payload,
+        out_payload={
+            "reply": "stale answer",
+            "tools_used": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        },
+    )
+
+    res = chat_with_codex(
+        "make it uplifting",
+        lib,
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert res.stop_reason == "clarification_needed"
+    assert res.question == question
+    assert res.choices == choices
+    assert "1. headphones" in res.reply
+    assert res.tool_trace == [{"name": "request_clarification", "arg": question, "ok": True}]
+
+    d = res.to_dict()
+    assert d["stop_reason"] == "clarification_needed"
+    assert d["question"] == question
+    assert d["choices"] == choices
+    assert d["reply"].startswith(question)
+    assert d["playlist"] is None
+    assert d["seen_track_ids"] == []
+
+
+def test_chat_propagates_starvation_via_side_channel(library):
+    """Conversational Viber also short-circuits tool-starvation terminals."""
+    runner = _runner_with_side_channel(
+        side_channel_payload={
+            "reason": "tool_starvation",
+            "hint": "search_vibe returned empty three times",
+            "tool": "search_vibe",
+            "consecutive": 3,
+        },
+        out_payload={
+            "reply": "stale answer",
+            "tools_used": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        },
+    )
+
+    res = chat_with_codex(
+        "find anything",
+        library,
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert res.stop_reason == "tool_starvation"
+    assert res.error == "search_vibe returned empty three times"
+    assert res.to_dict()["reply"] == "search_vibe returned empty three times"
+    assert res.to_dict()["iterations"] == 0
 
 
 def test_to_dict_serializes_clarification_shape():
@@ -793,9 +860,7 @@ def test_to_dict_serializes_clarification_shape():
     assert dc["track_ids"] == ["t1"]
 
 
-def test_clarification_side_channel_propagation_with_real_writer(
-    monkeypatch, tmp_path
-):
+def test_clarification_side_channel_propagation_with_real_writer(monkeypatch, tmp_path):
     """SEAL: real toolset writes side-channel + wrapper reads.
 
     Wires the FULL chain: real toolset.request_clarification handler writes
@@ -827,9 +892,7 @@ def test_clarification_side_channel_propagation_with_real_writer(
             monkeypatch.setenv("VIBEMIX_STOP_REASON_FILE", sr_path)
             # Real handler call writes the side-channel via _write_side_channel.
             toolset = _LibraryToolset(_MagicMock(), _MagicMock(), empty_lib)
-            toolset.request_clarification(
-                {"question": question, "choices": choices}
-            )
+            toolset.request_clarification({"question": question, "choices": choices})
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
     res = curate_with_codex(
@@ -842,8 +905,7 @@ def test_clarification_side_channel_propagation_with_real_writer(
 
     # Wrapper picked up the toolset-written side-channel file.
     assert res.stop_reason == "clarification_needed", (
-        f"real-writer chain must end in clarification_needed; "
-        f"got {res.stop_reason!r}"
+        f"real-writer chain must end in clarification_needed; got {res.stop_reason!r}"
     )
     assert res.question == question
     assert res.choices == choices

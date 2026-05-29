@@ -88,3 +88,42 @@ def test_filter_08_each_bucket_phrase_triggers_suppression(phrase: str) -> None:
     text, matches = filter_for_slop(f"Yo, {phrase}, that drop hit")
     assert text == "<silence/>"
     assert len(matches) >= 1
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "here's the thing",
+        "let me be clear",
+        "at the end of the day",
+        "fundamentally",
+        "circle back",
+        "the stakes are high",
+    ],
+)
+def test_filter_09_stop_slop_additions_trigger_suppression(phrase: str) -> None:
+    """Stop-slop bucket (hardikpandya/stop-slop, MIT) phrases also suppress."""
+    text, matches = filter_for_slop(f"Yo, {phrase}, that drop hit")
+    assert text == "<silence/>"
+    assert len(matches) >= 1
+
+
+@pytest.mark.parametrize(
+    "clean_text",
+    [
+        "really feeling that kick",
+        "just let it breathe",
+        "actually try the low-pass",
+        "honestly that breakdown's clean",
+        "literally chef's kiss",
+        "simply hold the loop",
+    ],
+)
+def test_filter_10_natural_adverbs_do_not_false_positive(clean_text: str) -> None:
+    """Natural DJ-friend speech with common adverbs must NOT trigger whole-turn
+    suppression — the curation rule for stop-slop additions is "multi-word or
+    professorial-only" so single-word adverbs like 'really'/'just'/'actually'
+    stay author-side, not runtime."""
+    text, matches = filter_for_slop(clean_text)
+    assert text == clean_text, f"false positive on natural speech: matches={matches}"
+    assert matches == []

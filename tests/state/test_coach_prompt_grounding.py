@@ -39,8 +39,7 @@ def _grounded_state(*, bpm: float = 128.0, rms: float = 0.06) -> MusicState:
 # track=unknown | deck=none | set_time=0:00 | recent_moves[8s]: NONE). The
 # additive deck_state field must NOT perturb this.
 _BASELINE_SILENT = (
-    "hearing[silent] | track=unknown | deck=none | set_time=0:00 | "
-    "recent_moves[8s]: NONE"
+    "hearing[silent] | track=unknown | deck=none | set_time=0:00 | recent_moves[8s]: NONE"
 )
 
 
@@ -63,8 +62,16 @@ def test_resolved_deck_state_renders_deck_block():
     a grounded decks[...] block — title, Camelot, bpm."""
     populated = _grounded_state()
     populated.deck_state = DeckState(
-        decks={"A": DeckTrack(title="Strobe", key="Am", camelot="8A",
-                              bpm=128.0, confidence=0.8, source="rekordbox_xml")},
+        decks={
+            "A": DeckTrack(
+                title="Strobe",
+                key="Am",
+                camelot="8A",
+                bpm=128.0,
+                confidence=0.8,
+                source="rekordbox_xml",
+            )
+        },
         updated_at=12.5,
     )
     line = AICoach.evidence_line(populated)
@@ -76,8 +83,11 @@ def test_populated_but_unresolved_deck_state_renders_unknown():
     confidence) renders honest decks=unknown — never a fabricated key."""
     populated = _grounded_state()
     populated.deck_state = DeckState(
-        decks={"A": DeckTrack(title="Mystery", key=None, camelot=None,
-                              bpm=0.0, confidence=0.0, source="unknown")},
+        decks={
+            "A": DeckTrack(
+                title="Mystery", key=None, camelot=None, bpm=0.0, confidence=0.0, source="unknown"
+            )
+        },
         updated_at=12.5,
     )
     line = AICoach.evidence_line(populated)
@@ -102,12 +112,20 @@ def _two_deck_state(*, a_camelot: str, b_camelot: str, a_bpm: float, b_bpm: floa
     return DeckState(
         decks={
             "A": DeckTrack(
-                title="OutA", key="x", camelot=a_camelot, bpm=a_bpm,
-                confidence=0.8, source="rekordbox_xml",
+                title="OutA",
+                key="x",
+                camelot=a_camelot,
+                bpm=a_bpm,
+                confidence=0.8,
+                source="rekordbox_xml",
             ),
             "B": DeckTrack(
-                title="InB", key="y", camelot=b_camelot, bpm=b_bpm,
-                confidence=0.8, source="rekordbox_xml",
+                title="InB",
+                key="y",
+                camelot=b_camelot,
+                bpm=b_bpm,
+                confidence=0.8,
+                source="rekordbox_xml",
             ),
         },
         updated_at=12.5,
@@ -119,9 +137,7 @@ def test_s1_two_resolved_decks_emit_compatible_blend_relation():
     (Camelot arrow + BPM delta + harmonic verdict) — the brain no longer has to
     infer compatibility from two bare keys."""
     populated = _grounded_state()
-    populated.deck_state = _two_deck_state(
-        a_camelot="8A", b_camelot="9A", a_bpm=128.0, b_bpm=130.0
-    )
+    populated.deck_state = _two_deck_state(a_camelot="8A", b_camelot="9A", a_bpm=128.0, b_bpm=130.0)
     line = AICoach.evidence_line(populated)
     assert "blend[8A→9A, +2 BPM harmonic-ok]" in line
 
@@ -130,9 +146,7 @@ def test_s1_clashing_decks_flagged_harmonic_clash():
     """A real Camelot clash is stated as such — closes the 'brain calls a clash
     a smooth mix' failure deterministically."""
     populated = _grounded_state()
-    populated.deck_state = _two_deck_state(
-        a_camelot="8A", b_camelot="3A", a_bpm=128.0, b_bpm=128.0
-    )
+    populated.deck_state = _two_deck_state(a_camelot="8A", b_camelot="3A", a_bpm=128.0, b_bpm=128.0)
     line = AICoach.evidence_line(populated)
     assert "harmonic-clash" in line
     assert "blend[8A→3A, same BPM harmonic-clash]" in line
@@ -143,9 +157,39 @@ def test_s1_single_deck_emits_no_blend_relation():
     existing single-deck deck block."""
     populated = _grounded_state()
     populated.deck_state = DeckState(
-        decks={"A": DeckTrack(title="Strobe", key="Am", camelot="8A",
-                              bpm=128.0, confidence=0.8, source="rekordbox_xml")},
+        decks={
+            "A": DeckTrack(
+                title="Strobe",
+                key="Am",
+                camelot="8A",
+                bpm=128.0,
+                confidence=0.8,
+                source="rekordbox_xml",
+            )
+        },
         updated_at=12.5,
     )
     line = AICoach.evidence_line(populated)
     assert "blend[" not in line
+
+
+def test_s1_single_deck_emits_transition_block_context():
+    """A resolved single deck gives Gemini an explicit no-transition guard."""
+    populated = _grounded_state()
+    populated.deck_state = DeckState(
+        decks={
+            "A": DeckTrack(
+                title="Strobe",
+                key="Am",
+                camelot="8A",
+                bpm=128.0,
+                confidence=0.8,
+                source="rekordbox_xml",
+            )
+        },
+        updated_at=12.5,
+    )
+    line = AICoach.evidence_line(populated)
+    assert "deck_context[" in line
+    assert "deck_lanes_context[" in line
+    assert "transition_block=single_resolved_deck" in line

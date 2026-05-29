@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -47,6 +48,21 @@ def _track(tid: str) -> TrackEntry:
     )
 
 
+def _fresh_live_transport() -> dict:
+    return {
+        "live_context_schema_version": 2,
+        "live_context_capabilities": [
+            "deck_state",
+            "deck_source_status",
+            "audio_part_context",
+            "deck_audio_separation_context",
+            "audio_window_map",
+            "audio_delta",
+            "live_evidence",
+        ],
+    }
+
+
 @pytest.fixture
 def library() -> RekordboxLibrary:
     lib = RekordboxLibrary()
@@ -68,6 +84,31 @@ def _runner_writing(payload, *, returncode=0, stderr="", raw=None):
         return subprocess.CompletedProcess(argv, returncode, stdout="", stderr=stderr)
 
     return runner
+
+
+def _write_memory_db(path: Path, signatures: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute(
+            "CREATE TABLE moments ("
+            "record_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, "
+            "ts REAL NOT NULL, kind TEXT NOT NULL, signature TEXT NOT NULL)"
+        )
+        for idx, signature in enumerate(signatures):
+            conn.execute(
+                "INSERT INTO moments VALUES (?, ?, ?, ?, ?)",
+                (
+                    f"20260520-220000:{idx}",
+                    "20260520-220000",
+                    float(idx),
+                    "coach_line",
+                    signature,
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # -- pure helpers ----------------------------------------------------------- #
@@ -126,11 +167,614 @@ def test_chat_prompt_threads_history_and_rules():
     assert "never raw cue payloads" in p
 
 
+def test_chat_prompt_omits_stale_viber_live_outcome_from_history():
+    p = chat_prompt(
+        "what actually happened?",
+        history=[
+            {"role": "you", "text": "was that good?"},
+            {"role": "viber", "text": "Great transition, that blend was clean."},
+        ],
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.9}},
+        },
+    )
+
+    assert "Great transition" not in p
+    assert "blend was clean" not in p
+    assert "prior Viber live outcome claim omitted" in p
+    assert "CHAT HISTORY RULE" in p
+    assert "multi_deck_outcome=blocked" in p
+
+
+def test_chat_prompt_keeps_viber_self_correction_in_history():
+    p = chat_prompt(
+        "ok, what should I do now?",
+        history=[
+            {
+                "role": "viber",
+                "text": "I saw a deck A low move, but I can't call it a transition.",
+            },
+        ],
+        live_context={
+            "deck": "A",
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.9}},
+        },
+    )
+
+    assert "I saw a deck A low move" in p
+    assert "can't call it a transition" in p
+    assert "prior Viber live outcome claim omitted" not in p
+
+
 def test_chat_prompt_does_not_advertise_gemini_youtube_tool():
     p = chat_prompt("any external references?")
 
     assert "ingest_youtube" not in p
     assert "YouTube claim" not in p
+
+
+def test_chat_prompt_includes_bounded_live_deck_context_guard():
+    p = chat_prompt(
+        "was that transition good?",
+        live_context={
+            "live_context_schema_version": 2,
+            "live_context_capabilities": [
+                "deck_state",
+                "deck_source_status",
+                "audio_part_context",
+                "deck_audio_separation_context",
+                "audio_window_map",
+                "audio_delta",
+                "live_evidence",
+            ],
+            "deck": "A",
+            "audible": True,
+            "phase": "groove",
+            "bpm": 128.0,
+            "deck_state": {
+                "A": {
+                    "title": "Strobe",
+                    "track_id": "t000",
+                    "camelot": "8A",
+                    "bpm": 128.0,
+                    "confidence": 0.82,
+                    "source": "rekordbox_xml",
+                }
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 64,
+                "deck_confidence": 0.82,
+                "A": {
+                    "vol": 110,
+                    "eq_low": 2,
+                    "eq_mid": 64,
+                    "eq_hi": 127,
+                    "filter": 64,
+                    "play": True,
+                },
+                "B": {
+                    "vol": 72,
+                    "eq_low": 64,
+                    "eq_mid": 64,
+                    "eq_hi": 64,
+                    "filter": 92,
+                    "play": False,
+                },
+            },
+            "deck_source_status": {
+                "controller": "present",
+                "nowplaying": "blocked_non_deck_owner",
+                "nowplaying_owner": "com.apple.WebKit.GPU",
+                "resolution": "blocked_non_deck_nowplaying",
+            },
+            "audio_window_map": {
+                "p1": "master_global_mix",
+                "p1_heard": True,
+                "timeline": "past_action_future",
+                "together_audio": "P1_global_mix",
+                "decks_together": True,
+                "deckA_audio": "not_attached",
+                "deckB_audio": "not_attached",
+                "per_deck_audio": "structured_text_only",
+                "duplicate_audio": "same_master_not_deck_split",
+                "deck_separation": "deck_lanes_context",
+                "lane_aliases": "deck1:A,deck2:B",
+                "pre_s": [-6.0, -1.0],
+                "current_s": [-1.0, 0.0],
+                "action_s": [-1.0, 0.0],
+                "move_anchors": [
+                    {
+                        "label": "A_low: flat->killed",
+                        "token": "A_low:_flat-_killed",
+                        "age_s": 1.5,
+                        "relation": "inside_P1",
+                    }
+                ],
+                "future": {"heard": False, "span": "not_attached"},
+                "rule": "time_alignment_not_outcome_verdict",
+            },
+        },
+    )
+
+    assert "CURRENT LIVE DECK CONTEXT" in p
+    assert "live_context[" in p
+    assert "live_context_transport[" in p
+    assert "schema=2" in p
+    assert (
+        "capabilities=deck_state,deck_source_status,audio_part_context,"
+        "deck_audio_separation_context,audio_window_map,audio_delta,live_evidence"
+    ) in p
+    assert "status=fresh_schema_v2" in p
+    assert "rule=transport_receipt_not_musical_evidence" in p
+    assert "deck_context[" in p
+    assert "deck_lanes_context[" in p
+    assert "deck_reference_context[" in p
+    assert "deck1=A" in p
+    assert "deck2=B" in p
+    assert "audio=P1_global_mix" in p
+    assert "per_deck_audio=not_attached" in p
+    assert "deck_source_context[" in p
+    assert "nowplaying=blocked_non_deck_owner" in p
+    assert "nowplaying_owner=com.apple.webkit.gpu" in p
+    assert "resolution=blocked_non_deck_nowplaying" in p
+    assert "source_status_rule=diagnostic_not_deck_identity" in p
+    assert "second_deck=independent_source_required" in p
+    assert "rule=unresolved_deck_is_not_transition_evidence" in p
+    assert "mixer_context[" in p
+    assert "deck_audio_context[" in p
+    assert "deck_audio_separation_context[" in p
+    assert "deckA_audio=not_captured" in p
+    assert "deckB_audio=not_captured" in p
+    assert "source=global_mix" in p
+    assert "isolated_decks=false" in p
+    assert "audio_part_context[" in p
+    assert "surface=viber_live_context" in p
+    assert "P1=live_global_mix" in p
+    assert "P1_model_heard=false" in p
+    assert "P1_runtime_observed=true" in p
+    assert "P1_deck_audio=global_mix_not_stems" in p
+    assert "audio_window_context[" in p
+    assert "P1=master_global_mix" in p
+    assert "future=not_attached" in p
+    assert "audio_window_map[" in p
+    assert "old=pre_s" in p
+    assert "current=current_s" in p
+    assert "anchors=A_low:_flat-_killed@-1.5s:inside_P1" in p
+    assert "deckA_audio=not_attached" in p
+    assert "deckB_audio=not_attached" in p
+    assert "duplicate_audio=same_master_not_deck_split" in p
+    assert "lane_aliases=deck1:A,deck2:B" in p
+    assert "A(vol=open low=killed" in p
+    assert "B(vol=mid low=flat" in p
+    assert "deck=A" in p
+    assert "resolved=A" in p
+    assert "src=rekordbox_xml" in p
+    assert "second_deck_identity=unknown_or_suppressed" in p
+    assert "identity_rule=do_not_invent_unresolved_decks" in p
+    assert "B(identity=unknown" in p
+    assert "transition_block=single_resolved_deck" in p
+    assert "claim_policy[" in p
+    assert "multi_deck_outcome=blocked" in p
+    assert "control_to_music_outcome=do_not_infer" in p
+    assert "do not praise or claim a transition/blend" in p
+
+
+def test_chat_prompt_marks_stale_live_transport_as_partial_for_active_questions():
+    p = chat_prompt(
+        "was that a transition?",
+        live_context={
+            "deck": "B",
+            "audible": False,
+            "deck_state": {},
+            "deck_mixer": {
+                "connected": True,
+                "A": {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 127, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "live_evidence": {
+                "mix": [
+                    "transition_block=no_resolved_decks",
+                    "deck_reference=deck1_A_unknown_route_muted+deck2_B_unknown_route_dominant",
+                ]
+            },
+        },
+    )
+
+    assert "CURRENT LIVE DECK CONTEXT" in p
+    assert "live_context_transport[" in p
+    assert "schema=missing" in p
+    assert (
+        "missing=audio_delta,audio_part_context,audio_window_map,"
+        "deck_audio_separation_context,deck_source_status,live_evidence"
+    ) in p
+    assert "status=stale_or_pre_schema_v2" in p
+    assert "Transport is stale_or_pre_schema_v2" in p
+    assert "must be restarted/resampled before a reliable live verdict" in p
+
+
+def test_chat_prompt_marks_library_request_live_context_as_silent_guard():
+    p = chat_prompt(
+        "find me dark rolling hypnotic techno",
+        live_context={
+            "deck": "mix",
+            "audible": True,
+            "deck_state": {},
+            "deck_mixer": {"connected": True},
+        },
+    )
+
+    assert "CURRENT LIVE DECK CONTEXT" in p
+    assert "LIVE CONTEXT USE: silent_guard" in p
+    assert "do not mention live_context" in p
+    assert "resolved decks" in p
+    assert "answer the requested library job with grounded tool results" in p
+
+
+def test_chat_prompt_marks_current_live_question_as_active_context():
+    p = chat_prompt(
+        "was that a transition?",
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.9}},
+        },
+    )
+
+    assert "LIVE CONTEXT USE: active_live_context" in p
+    assert "asking about the current live deck/move/audio moment" in p
+
+
+def test_chat_prompt_marks_two_loaded_single_audible_as_watch_not_claim_without_moves():
+    p = chat_prompt(
+        "did I do a good transition?",
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {
+                "A": {"title": "Left", "confidence": 0.9},
+                "B": {"title": "Right", "confidence": 0.9},
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 32,
+                "deck_confidence": 0.82,
+                "A": {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+        },
+    )
+
+    assert "deck_audio_context[" in p
+    assert "support=single_deck_A" in p
+    assert "transition_watch=two_resolved_decks_single_audible_A" in p
+    assert "multi_deck_outcome=watch_not_claim" in p
+
+
+def test_chat_prompt_lets_live_evidence_block_override_candidate_route():
+    p = chat_prompt(
+        "did I do a good transition?",
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {
+                "A": {"title": "Left", "confidence": 0.9},
+                "B": {"title": "Right", "confidence": 0.9},
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 64,
+                "A": {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 72, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "live_evidence": {
+                "mix": ["transition_block=single_deck_move"],
+                "refs": ["mix:transition_block=single_deck_move"],
+            },
+        },
+    )
+
+    assert "transition_candidate=two_resolved_decks_mixing" in p
+    assert "live_evidence[" in p
+    assert "mix:transition_block=single_deck_move" in p
+    assert "multi_deck_outcome=blocked" in p
+
+
+def test_chat_prompt_prioritizes_live_evidence_safety_refs_under_cap():
+    p = chat_prompt(
+        "what happened?",
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {
+                "A": {
+                    "title": "Strobe",
+                    "track_id": "track-1",
+                    "camelot": "8A",
+                    "confidence": 0.82,
+                    "source": "rekordbox_xml",
+                }
+            },
+            "live_evidence": {
+                "mix": [
+                    *(f"noise_{index}=kept" for index in range(8)),
+                    "deck_lanes=A_known_route_dominant+B_unknown_route_muted",
+                    "deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
+                    "transition_block=single_resolved_deck",
+                ],
+                "refs": [
+                    *(f"mix:noise_{index}=kept" for index in range(8)),
+                    "midi:A_low_cut_to_killed@42.0",
+                ],
+            },
+        },
+    )
+
+    assert "deck_lanes=A_known_route_dominant+B_unknown_route_muted" in p
+    assert "deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted" in p
+    assert "transition_block=single_resolved_deck" in p
+    assert "mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted" in p
+    assert "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted" in p
+    assert "mix:transition_block=single_resolved_deck" in p
+    assert "multi_deck_outcome=blocked" in p
+
+
+def test_chat_prompt_includes_recent_move_context_guard():
+    p = chat_prompt(
+        "did I blend?",
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {
+                "A": {"title": "Strobe", "confidence": 0.82},
+                "B": {"title": "Ghost", "confidence": 0.82},
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 64,
+                "A": {"vol": 110, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 8},
+                "B": {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "audio_delta": [
+                "sub energy fell 50% (strong)",
+                "low energy fell 50% (strong)",
+            ],
+            "live_evidence": {
+                "mix": [
+                    "deck_audio_support=single_deck_A",
+                    "transition_block=single_deck_move",
+                    "move_effect=sub_energy_fell_50pct_strong",
+                ],
+                "midi": [{"key": "A_low_cut_to_killed", "t": 42.0}],
+                "refs": [
+                    "midi:A_low_cut_to_killed@42.0",
+                    "mix:transition_block=single_deck_move",
+                ],
+            },
+            "recent_moves": ["A_low: cut->killed", "A_filter: open->closed"],
+        },
+    )
+
+    assert "recent_moves[A_low: cut->killed | A_filter: open->closed]" in p
+    assert "move_context[" in p
+    assert "scope=single_deck_move_A" in p
+    assert "controls=eq_kill+filter+low" in p
+    assert "transition_block=single_deck_move" in p
+    assert "deck_change_context[" in p
+    assert "audio_window_context[" in p
+    assert "move_anchor=A_low:_cut-_killed@age_unknown" in p
+    assert "support=single_deck_A" in p
+    assert "A_low(now=killed route=dominant)" in p
+    assert "move_effect_context[" in p
+    assert "sub energy fell 50% (strong)" in p
+    assert "rule=dsp_delta_not_causal_proof" in p
+    assert "live_evidence[" in p
+    assert "refs=midi:A_low_cut_to_killed@42.0,mix:transition_block=single_deck_move" in p
+    assert "mix:move_scope=single_deck_move_A" in p
+    assert "rule=evidence_categories_not_quality_verdict" in p
+    assert "multi_deck_outcome=blocked" in p
+
+
+def test_chat_prompt_recomputes_untrusted_audio_window_context():
+    p = chat_prompt(
+        "what happened on deck one?",
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.9}},
+            "recent_moves": ["A_low: flat->killed"],
+            "audio_window_context": (
+                "audio_window_context[P1=master_global_mix "
+                "deckA_audio=attached deckB_audio=stem isolated_decks=true]"
+            ),
+        },
+    )
+
+    assert "deckA_audio=attached" not in p
+    assert "deckB_audio=stem" not in p
+    assert "isolated_decks=true" not in p
+    assert "audio_window_context[" in p
+    assert "deckA_audio=not_attached" in p
+    assert "deckB_audio=not_attached" in p
+    assert "duplicate_audio=same_master_not_deck_split" in p
+    assert "lane_aliases=deck1:A,deck2:B" in p
+
+
+def test_chat_prompt_marks_crossfader_mix_as_watch_not_claim_when_single_audible():
+    p = chat_prompt(
+        "was that a transition?",
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {
+                "A": {"title": "Left", "confidence": 0.9},
+                "B": {"title": "Right", "confidence": 0.9},
+            },
+            "recent_moves": ["xfader->center"],
+        },
+    )
+
+    assert "move_context[" in p
+    assert "scope=cross_deck_move" in p
+    assert "transition_watch=two_deck_move_single_audible" in p
+    assert "multi_deck_outcome=watch_not_claim" in p
+    assert "transition_candidate=two_deck_move_audible_mix" not in p
+
+
+def test_chat_prompt_sanitizes_live_context_and_keeps_master_music_scalar():
+    p = chat_prompt(
+        "what is loaded?",
+        live_context={
+            "deck": "B",
+            "music": 0.9,
+            "mic": 0.7,
+            "recording_path": "/Users/ozai/private/take.wav",
+            "deck_state": {
+                "A": {
+                    "title": "Left",
+                    "source": "/Users/ozai/private/injected",
+                    "filepath": "/Users/ozai/private/left.mp3",
+                    "confidence": 0.9,
+                },
+                "Z": {"title": "Injected", "confidence": 1.0},
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 200,
+                "deck_confidence": 2.0,
+                "A": {"vol": 999, "eq_low": -10, "play": True, "secret": "drop me"},
+                "Z": {"vol": 127},
+            },
+            "live_evidence": {
+                "mix": ["transition_block=single_resolved_deck", "/Users/ozai/private/take.wav"],
+                "midi": [
+                    {"key": "A_low_cut_to_killed", "t": 7.25},
+                    {"key": "bad key with spaces / path", "t": 8.0},
+                ],
+                "refs": ["mix:transition_block=single_resolved_deck", "bad ref with spaces"],
+            },
+        },
+    )
+
+    assert "Left" in p
+    assert "mixer_context[" in p
+    assert "xfader=full-B" in p
+    assert "A(vol=full low=killed" in p
+    assert "Injected" not in p
+    assert "recording_path" not in p
+    assert "/Users/ozai/private" not in p
+    assert "injected" not in p
+    assert "music=0.900" in p
+    assert "mic=0.7" not in p
+    assert "secret" not in p
+    assert "live_evidence[" in p
+    assert "mix:transition_block=single_resolved_deck" in p
+    assert "A_low_cut_to_killed@7.2" in p
+    assert "bad key" not in p
+    assert "bad_ref" not in p
+
+
+def test_chat_prompt_preserves_explicit_empty_live_deck_clear():
+    p = chat_prompt(
+        "what is loaded now?",
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "none",
+            "audible": False,
+            "deck_state": {},
+            "deck_mixer": {},
+        },
+    )
+
+    assert "CURRENT LIVE DECK CONTEXT" in p
+    assert "live_context[deck=none audible=false resolved=none" in p
+    assert "context_feed_contract[" in p
+    assert "surface=viber_text" in p
+    assert "history=past_comparison_not_live_proof" in p
+    assert "cache=static_persona_rules_only" in p
+    assert "per_turn=small_text_live_context" in p
+    assert "speed=no_extra_model_pass" in p
+    assert "transition_block=no_resolved_decks" in p
+    assert "audio_window_context[" in p
+    assert "P1=master_global_mix" in p
+    assert "deckA_audio=not_attached" in p
+    assert "deckB_audio=not_attached" in p
+    assert "lane_aliases=deck1:A,deck2:B" in p
+    assert "decks[" not in p
+    assert "multi_deck_outcome=blocked" in p
+
+
+def test_chat_with_codex_corrects_outcome_after_empty_live_deck_clear(library):
+    runner = _runner_writing(
+        {
+            "reply": "Great transition.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "move_grades": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "none",
+            "audible": False,
+            "deck_state": {},
+            "deck_mixer": {},
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "Great transition" not in res.reply
+    assert "hold the transition verdict" in res.reply
+    assert "resolved decks=none" not in res.reply
+    assert "won't call that a transition" not in res.reply
+
+
+def test_chat_with_codex_blocks_stale_transport_outcome_claim(library):
+    runner = _runner_writing(
+        {
+            "reply": "Great transition, that blend was clean.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "move_grades": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {
+                "A": {"title": "Left", "confidence": 0.9},
+                "B": {"title": "Right", "confidence": 0.9},
+            },
+            "recent_moves": ["xfader->center"],
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "Great transition" not in res.reply
+    assert "blend was clean" not in res.reply
+    assert "Refresh the live session first" in res.reply
+    assert "stale_or_pre_schema_v2" not in res.reply
+    assert "schema-v2 deck/source/audio lanes" not in res.reply
 
 
 def test_codex_chat_result_to_dict_matches_chat_shape():
@@ -146,9 +790,32 @@ def test_codex_chat_result_to_dict_matches_chat_shape():
         "playlist": None,
         "export_path": None,
         "seen_track_ids": ["t000"],
+        "move_grades": [],
         "iterations": 1,
         "stop_reason": "model_done",
     }
+
+
+def test_codex_chat_result_to_dict_surfaces_live_verification():
+    verification = {
+        "ok": True,
+        "violations": [],
+        "reply": "I'll hold the transition verdict until live deck proof is stronger.",
+        "corrected": False,
+        "corrected_reply": None,
+        "claim_policy": "blocked",
+        "transport_status": "fresh_schema_v2",
+        "move_grades_allowed": False,
+        "move_grades_seen": 0,
+        "guard_applied": True,
+        "guard_violations": ["unsupported_live_outcome_claim"],
+    }
+    out = CodexChatResult(
+        reply="I'll hold the transition verdict until live deck proof is stronger.",
+        live_verification=verification,
+    ).to_dict()
+
+    assert out["live_verification"] == verification
 
 
 def test_codex_chat_result_to_dict_prefers_rich_tool_trace():
@@ -166,6 +833,34 @@ def test_codex_chat_result_to_dict_prefers_rich_tool_trace():
         {"name": "create_playlist", "arg": "Dark Fuse", "ok": True},
     ]
     assert out["iterations"] == 2
+
+
+def test_codex_chat_result_to_dict_surfaces_move_grade_receipts():
+    grade = {
+        "candidate_id": "tr_001",
+        "track_id": "t000",
+        "title": "Tt000",
+        "slug": "lit_aff",
+        "label": "LIT AFF",
+        "xp": 100,
+        "reason": "everything clicks",
+        "overdrive": True,
+        "streak": 4,
+        "total_xp": 288,
+        "level": 2,
+        "level_xp": 38,
+        "next_level_xp": 250,
+        "level_up": True,
+        "levels_gained": 1,
+    }
+    out = CodexChatResult(
+        reply="this one is lit",
+        tools_used=["transition_slate"],
+        track_ids=["t000"],
+        move_grades=[grade],
+    ).to_dict()
+
+    assert out["move_grades"] == [grade]
 
 
 def test_codex_chat_result_to_dict_surfaces_terminal_artifacts(tmp_path):
@@ -199,6 +894,724 @@ def test_chat_with_codex_not_installed(library, tmp_path):
 
     assert res.stop_reason == "codex_not_installed"
     assert "Codex CLI not found" in (res.error or "")
+
+
+def test_chat_with_codex_live_question_without_context_fails_closed(library, tmp_path):
+    def runner(*_args, **_kw):
+        raise AssertionError("live context guard should not call Codex")
+
+    res = chat_with_codex(
+        "was that transition good?",
+        library,
+        codex_path=str(tmp_path / "missing-codex"),
+        _runner=runner,
+    )
+
+    assert (
+        res.reply == "Live proof is not armed, so I won't judge that transition or deck move yet."
+    )
+    assert res.stop_reason == "live_context_required"
+    assert res.tool_trace == [
+        {"name": "live_context_required", "arg": "live proof not armed", "ok": False}
+    ]
+    assert res.live_verification is not None
+    assert res.live_verification["ok"] is True
+    assert res.live_verification["transport_status"] == "missing_live_context"
+    assert res.live_verification["claim_policy"] == "requires_more_evidence"
+    assert res.live_verification["move_grades_allowed"] is False
+    assert res.live_verification["guard_applied"] is False
+
+
+def test_chat_with_codex_passes_live_context_into_codex_prompt(library):
+    captured: dict[str, str] = {}
+
+    def runner(argv, **kw):
+        captured["prompt"] = argv[-1]
+        Path(_out_path_from_argv(argv)).write_text(
+            json.dumps(
+                {
+                    "reply": "That is one deck, not a transition.",
+                    "tools_used": [],
+                    "tool_trace": [],
+                    "track_ids": [],
+                    "playlist": None,
+                    "export_path": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    res = chat_with_codex(
+        "did I blend?",
+        library,
+        live_context={
+            "deck": "A",
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.8}},
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert res.stop_reason == "model_done"
+    assert "CURRENT LIVE DECK CONTEXT" in captured["prompt"]
+    assert "transition_block=single_resolved_deck" in captured["prompt"]
+
+
+def test_chat_with_codex_adds_historical_move_context_from_memory(library, tmp_path, monkeypatch):
+    import vibemix.library.codex_curate as codex_mod
+
+    memory_db = tmp_path / "memory.db"
+    _write_memory_db(
+        memory_db,
+        [
+            (
+                "coach_line | track=Strobe | phase=groove | deck=A | event=MIX_MOVE "
+                "| move=move_context[scope=single_deck_move_A] "
+                "| audio_window=audio_window_context[P1=master_global_mix "
+                "move_anchor=A_low:_flat-_killed@age_unknown deckA_audio=not_attached] "
+                "| move_effect=move_effect_context[rule=dsp_delta_not_causal_proof] "
+                "| audio_delta=low energy fell 50% (strong) "
+                "| said: heard the low cut thin out"
+            ),
+            "coach_line | track=Other | phase=build | deck=B | event=PHASE | said: not a move",
+        ],
+    )
+    monkeypatch.setattr(codex_mod, "_memory_db_candidates", lambda: [memory_db])
+    captured: dict[str, str] = {}
+
+    def runner(argv, **kw):
+        captured["prompt"] = argv[-1]
+        Path(_out_path_from_argv(argv)).write_text(
+            json.dumps(
+                {
+                    "reply": "I see the low cut evidence, not a transition.",
+                    "tools_used": [],
+                    "tool_trace": [],
+                    "track_ids": [],
+                    "playlist": None,
+                    "export_path": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    res = codex_mod.chat_with_codex(
+        "what did that low cut do?",
+        library,
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.9}},
+            "recent_moves": ["A_low: flat->killed"],
+            "audio_delta": ["low energy fell 50% (strong)"],
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert res.stop_reason == "model_done"
+    assert "HISTORICAL MOVE CONTEXT" in captured["prompt"]
+    assert "history_move[id=20260520-220000:0" in captured["prompt"]
+    assert "low energy fell 50% (strong)" in captured["prompt"]
+    assert "audio_window_context[P1=master_global_mix" in captured["prompt"]
+    assert "not live proof" in captured["prompt"]
+    assert "cannot upgrade the current live claim policy" in captured["prompt"]
+
+
+def test_chat_prompt_prefers_historical_move_with_same_deck_lane_context(tmp_path, monkeypatch):
+    import vibemix.library.codex_curate as codex_mod
+
+    memory_db = tmp_path / "memory.db"
+    _write_memory_db(
+        memory_db,
+        [
+            (
+                "coach_line | track=Strobe | phase=groove | deck=A | event=MIX_MOVE "
+                "| live_evidence=live_evidence[mix=deck_lanes=A_known_route_dominant+B_unknown_route_muted] "
+                "| audio_window=audio_window_context[P1=master_global_mix "
+                "move_anchor=A_low:_flat-_killed@age_unknown deckA_audio=not_attached] "
+                "| move=move_context[scope=single_deck_move_A] "
+                "| move_effect=move_effect_context[rule=dsp_delta_not_causal_proof] "
+                "| audio_delta=low energy fell 50% (strong) | said: same lane posture"
+            ),
+            (
+                "coach_line | track=Strobe | phase=groove | deck=A | event=MIX_MOVE "
+                "| live_evidence=live_evidence[mix=deck_lanes=A_known_route_muted+B_unknown_route_dominant] "
+                "| audio_window=audio_window_context[P1=master_global_mix "
+                "move_anchor=A_low:_flat-_killed@-9.0s:before_P1 deckA_audio=not_attached] "
+                "| move=move_context[scope=single_deck_move_A] "
+                "| move_effect=move_effect_context[rule=dsp_delta_not_causal_proof] "
+                "| audio_delta=low energy fell 50% (strong) | said: different lane posture"
+            ),
+        ],
+    )
+    monkeypatch.setattr(codex_mod, "_memory_db_candidates", lambda: [memory_db])
+
+    prompt = codex_mod.chat_prompt(
+        "what did that low cut do?",
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.9}},
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 32,
+                "A": {"vol": 110, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "recent_moves": ["A_low: flat->killed"],
+            "audio_delta": ["low energy fell 50% (strong)"],
+            "live_evidence": {
+                "mix": ["deck_lanes=A_known_route_dominant+B_unknown_route_muted"],
+                "refs": ["mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted"],
+            },
+        },
+    )
+
+    assert "HISTORICAL MOVE CONTEXT" in prompt
+    assert prompt.index("history_move[id=20260520-220000:0") < prompt.index(
+        "history_move[id=20260520-220000:1"
+    )
+
+
+def test_chat_prompt_prefers_historical_move_with_same_deck_source_context(tmp_path, monkeypatch):
+    import vibemix.library.codex_curate as codex_mod
+
+    memory_db = tmp_path / "memory.db"
+    _write_memory_db(
+        memory_db,
+        [
+            (
+                "coach_line | track=Strobe | phase=groove | deck=A | event=MIX_MOVE "
+                "| deck_source=deck_source_context[identity_state=MusicState.deck_state "
+                "resolved=A unresolved=B sources=folder_cache "
+                "second_deck=independent_source_required "
+                "rule=unresolved_deck_is_not_transition_evidence] "
+                "| audio_delta=low energy fell 50% (strong) | said: same source ladder"
+            ),
+            (
+                "coach_line | track=Strobe | phase=groove | deck=A | event=MIX_MOVE "
+                "| deck_source=deck_source_context[identity_state=MusicState.deck_state "
+                "resolved=A unresolved=B sources=screen_vision "
+                "second_deck=independent_source_required "
+                "rule=unresolved_deck_is_not_transition_evidence] "
+                "| audio_delta=low energy fell 50% (strong) | said: different source ladder"
+            ),
+        ],
+    )
+    monkeypatch.setattr(codex_mod, "_memory_db_candidates", lambda: [memory_db])
+
+    prompt = codex_mod.chat_prompt(
+        "what did that low cut do?",
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {
+                "A": {
+                    "title": "Strobe",
+                    "track_id": "track-1",
+                    "confidence": 0.9,
+                    "source": "folder_cache",
+                }
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 32,
+                "A": {"vol": 110, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "recent_moves": ["A_low: flat->killed"],
+            "audio_delta": ["low energy fell 50% (strong)"],
+        },
+    )
+
+    assert "HISTORICAL MOVE CONTEXT" in prompt
+    assert prompt.index("history_move[id=20260520-220000:0") < prompt.index(
+        "history_move[id=20260520-220000:1"
+    )
+
+
+def test_chat_prompt_sanitizes_historical_move_memory_stem_and_outcome_claims(
+    tmp_path,
+    monkeypatch,
+):
+    import vibemix.library.codex_curate as codex_mod
+
+    memory_db = tmp_path / "memory.db"
+    _write_memory_db(
+        memory_db,
+        [
+            (
+                "coach_line | event=MIX_MOVE "
+                "| audio_window=audio_window_context[P1=master_global_mix "
+                "deckA_audio=attached deckB_audio=stem isolated_decks=true] "
+                "| audio_delta=low energy fell 50% (strong) "
+                "| said: That was a great transition."
+            )
+        ],
+    )
+    monkeypatch.setattr(codex_mod, "_memory_db_candidates", lambda: [memory_db])
+
+    prompt = codex_mod.chat_prompt(
+        "what did that low cut do?",
+        live_context={
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.9}},
+            "recent_moves": ["A_low: flat->killed"],
+            "audio_delta": ["low energy fell 50% (strong)"],
+        },
+    )
+
+    assert "HISTORICAL MOVE CONTEXT" in prompt
+    assert "deckA_audio=attached" not in prompt
+    assert "deckB_audio=stem" not in prompt
+    assert "isolated_decks=true" not in prompt
+    assert "great transition" not in prompt.lower()
+    assert "audio_window=omitted_untrusted_audio_window" in prompt
+    assert "said: omitted_past_live_outcome_claim" in prompt
+    assert "cannot upgrade the current live claim policy" in prompt
+
+
+def test_chat_prompt_skips_historical_move_context_without_audio_delta(tmp_path, monkeypatch):
+    import vibemix.library.codex_curate as codex_mod
+
+    memory_db = tmp_path / "memory.db"
+    _write_memory_db(
+        memory_db,
+        [
+            (
+                "coach_line | track=Strobe | phase=groove | deck=A | event=MIX_MOVE "
+                "| audio_delta=low energy fell 50% (strong) | said: low cut"
+            )
+        ],
+    )
+    monkeypatch.setattr(codex_mod, "_memory_db_candidates", lambda: [memory_db])
+
+    prompt = codex_mod.chat_prompt(
+        "what happened?",
+        live_context={
+            "deck": "A",
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.9}},
+            "recent_moves": ["A_low: flat->killed"],
+        },
+    )
+
+    assert "CURRENT LIVE DECK CONTEXT" in prompt
+    assert "HISTORICAL MOVE CONTEXT" not in prompt
+
+
+def test_chat_with_codex_corrects_unsupported_multi_deck_outcome_claim(library):
+    runner = _runner_writing(
+        {
+            "reply": "Great transition, that blend was clean.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.8}},
+            "recent_moves": ["A_low: cut->killed"],
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "Great transition" not in res.reply
+    assert "hold the transition verdict" in res.reply
+    assert "I need to correct that live read" not in res.reply
+    assert "resolved decks=A" not in res.reply
+    assert "deck lanes=A=known" not in res.reply
+    assert "second_deck=independent_source_required" not in res.reply
+    assert "rule=unresolved_deck_is_not_transition_evidence" not in res.reply
+    assert "won't call that a transition" not in res.reply
+    assert res.live_verification is not None
+    assert res.live_verification["ok"] is True
+    assert res.live_verification["transport_status"] == "fresh_schema_v2"
+    assert res.live_verification["claim_policy"] == "blocked"
+    assert res.live_verification["guard_applied"] is True
+    assert "unsupported_live_outcome_claim" in res.live_verification["guard_violations"]
+    assert res.to_dict()["live_verification"]["ok"] is True
+
+
+def test_chat_with_codex_suppresses_live_correction_for_library_request(library):
+    runner = _runner_writing(
+        {
+            "reply": (
+                "I need to correct the live read: I only have audible deck mix; "
+                "resolved decks=none; live evidence gate: transition_block=no_resolved_decks, "
+                "so I won't call that a transition."
+            ),
+            "tools_used": ["discover_pool", "search_vibe", "sequence_set"],
+            "tool_trace": [
+                {"name": "discover_pool", "arg": "dark rolling hypnotic techno", "ok": True},
+                {"name": "search_vibe", "arg": "dark rolling hypnotic techno", "ok": True},
+                {"name": "sequence_set", "arg": "peak_time", "ok": True},
+            ],
+            "track_ids": ["t000", "t001"],
+            "move_grades": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "find me dark rolling hypnotic techno",
+        library,
+        live_context={
+            "deck": "mix",
+            "audible": True,
+            "deck_state": {},
+            "deck_mixer": {"connected": True},
+            "live_evidence": {
+                "mix": ["transition_block=no_resolved_decks"],
+                "refs": ["mix:transition_block=no_resolved_decks"],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "correct the live read" not in res.reply
+    assert "resolved decks" not in res.reply
+    assert "won't call that a transition" not in res.reply
+    assert res.reply == "Found 2 grounded library candidates for that vibe."
+    assert res.track_ids == ["t000", "t001"]
+    assert res.tools_used == ["discover_pool", "search_vibe", "sequence_set"]
+
+
+def test_chat_with_codex_uses_shared_guard_for_transition_synonyms(library):
+    runner = _runner_writing(
+        {
+            "reply": "Nice switch; the incoming track came in clean.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "deck_state": {
+                "A": {"title": "Left", "confidence": 0.9},
+                "B": {"title": "Right", "confidence": 0.9},
+            },
+            "recent_moves": ["xfader->A-side"],
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "Nice switch" not in res.reply
+    assert "incoming track came in clean" not in res.reply
+    assert "hold the transition verdict" in res.reply
+    assert "recent control evidence: xfader->A-side" not in res.reply
+
+
+def test_chat_with_codex_corrects_candidate_quality_verdict(library):
+    runner = _runner_writing(
+        {
+            "reply": "That was a great transition.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "audible": True,
+            "deck_state": {
+                "A": {"title": "Left", "confidence": 0.9},
+                "B": {"title": "Right", "confidence": 0.9},
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 64,
+                "A": {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 72, "eq_low": 8, "eq_mid": 64, "eq_hi": 64, "filter": 92},
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "great transition" not in res.reply.lower()
+    assert "transition candidate" in res.reply
+    assert "hold the quality grade" in res.reply
+
+
+def test_chat_with_codex_live_evidence_block_overrides_candidate_correction(library):
+    runner = _runner_writing(
+        {
+            "reply": "That was a great transition.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "audible": True,
+            "deck_state": {
+                "A": {"title": "Left", "confidence": 0.9},
+                "B": {"title": "Right", "confidence": 0.9},
+            },
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 64,
+                "A": {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 72, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "live_evidence": {
+                "mix": ["transition_block=single_deck_move"],
+                "refs": ["mix:transition_block=single_deck_move"],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "great transition" not in res.reply.lower()
+    assert "transition or blend candidate" not in res.reply
+    assert "hold the transition verdict" in res.reply
+    assert "live evidence gate: transition_block=single_deck_move" not in res.reply
+
+
+def test_chat_with_codex_live_evidence_candidate_blocks_quality_grade(library):
+    runner = _runner_writing(
+        {
+            "reply": "Great transition, clean handoff.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "move_grades": [
+                {
+                    "candidate_id": "tr_001",
+                    "track_id": "t000",
+                    "title": "Tt000",
+                    "slug": "lit_aff",
+                    "label": "LIT AFF",
+                    "xp": 100,
+                    "reason": "not enough live proof",
+                    "overdrive": True,
+                }
+            ],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "live_evidence": {
+                "mix": ["transition_candidate=two_deck_move_audible_mix"],
+                "refs": ["mix:transition_candidate=two_deck_move_audible_mix"],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "Great transition" not in res.reply
+    assert "transition candidate" in res.reply
+    assert "hold the quality grade" in res.reply
+    assert "live evidence gate: transition_candidate=two_deck_move_audible_mix" not in res.reply
+    assert res.move_grades == []
+    assert res.track_ids == []
+
+
+def test_chat_with_codex_drops_move_grade_when_live_policy_blocks_current_claim(library):
+    runner = _runner_writing(
+        {
+            "reply": "Great transition, that bridge was clean.",
+            "tools_used": ["transition_slate", "compile_musical_context"],
+            "tool_trace": [
+                {"name": "transition_slate", "arg": "current live move", "ok": True},
+                {"name": "compile_musical_context", "arg": "tr_001", "ok": True},
+            ],
+            "track_ids": [],
+            "move_grades": [
+                {
+                    "candidate_id": "tr_001",
+                    "track_id": "t000",
+                    "title": "Tt000",
+                    "slug": "lit_aff",
+                    "label": "LIT AFF",
+                    "xp": 100,
+                    "reason": "everything clicks",
+                    "overdrive": True,
+                }
+            ],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.8}},
+            "recent_moves": ["A_low: cut->killed"],
+            "live_evidence": {
+                "mix": ["transition_block=single_resolved_deck"],
+                "refs": ["mix:transition_block=single_resolved_deck"],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "Great transition" not in res.reply
+    assert "hold the transition verdict" in res.reply
+    assert res.move_grades == []
+    assert res.track_ids == []
+
+
+def test_chat_with_codex_corrects_move_effect_causal_verdict(library):
+    runner = _runner_writing(
+        {
+            "reply": "Your low cut cleaned the mix.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "did that low cut fix it?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Left", "confidence": 0.9}},
+            "deck_mixer": {
+                "connected": True,
+                "xfader": 32,
+                "A": {"vol": 110, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+                "B": {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+            },
+            "audio_delta": ["sub energy fell 50% (strong)", "low energy fell 50% (strong)"],
+            "recent_moves": ["A_low: flat->killed"],
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "low cut cleaned" not in res.reply
+    assert "hold the cause/quality verdict" in res.reply
+    assert "sub energy fell 50% (strong)" not in res.reply
+
+
+def test_chat_with_codex_keeps_self_corrected_transition_disclaimer(library):
+    runner = _runner_writing(
+        {
+            "reply": "I saw a deck A low move, but I can't call it a transition.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.8}},
+            "recent_moves": ["A_low: cut->killed"],
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert res.reply == "I saw a deck A low move, but I can't call it a transition."
+
+
+def test_chat_with_codex_corrects_disclaimer_with_fresh_blend_claim(library):
+    runner = _runner_writing(
+        {
+            "reply": "I can't call that a transition, but that blend was clean.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "was that good?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "deck_state": {"A": {"title": "Strobe", "confidence": 0.8}},
+            "recent_moves": ["A_low: cut->killed"],
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "blend was clean" not in res.reply
+    assert "hold the transition verdict" in res.reply
+    assert "I need to correct that live read" not in res.reply
+    assert "deck lanes=A=known" not in res.reply
+    assert "won't call that a transition" not in res.reply
 
 
 def test_chat_with_codex_surfaces_created_playlist_artifact(library, tmp_path):
@@ -248,6 +1661,53 @@ def test_chat_with_codex_surfaces_created_playlist_artifact(library, tmp_path):
         "dropped_ids": ["GHOST"],
     }
     assert res.to_dict()["playlist"]["m3u_path"] == str(m3u)
+
+
+def test_chat_with_codex_prefers_authoritative_tool_tape(library):
+    def runner(argv, **kw):
+        event_path = kw["env"]["VIBEMIX_TOOL_EVENTS_FILE"]
+        Path(event_path).write_text(
+            json.dumps(
+                {
+                    "tool": "search_vibe",
+                    "arg": "dark rolling techno; k=5",
+                    "ok": True,
+                    "summary": "4 tracks",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        Path(_out_path_from_argv(argv)).write_text(
+            json.dumps(
+                {
+                    "reply": "I found a grounded lane.",
+                    "tools_used": [],
+                    "tool_trace": [
+                        {"name": "made_up_tool", "arg": "model self-report", "ok": True}
+                    ],
+                    "track_ids": [],
+                    "move_grades": [],
+                    "playlist": None,
+                    "export_path": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    res = chat_with_codex(
+        "find me something dark",
+        library,
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert res.tools_used == ["search_vibe"]
+    assert res.tool_trace == [
+        {"name": "search_vibe", "arg": "dark rolling techno; k=5; 4 tracks", "ok": True}
+    ]
 
 
 def test_chat_with_codex_drops_phantom_playlist_artifact(library):
@@ -314,6 +1774,89 @@ def test_chat_with_codex_surfaces_export_path_when_file_exists(library, tmp_path
     assert res.export_path == str(export_xml)
     assert res.to_dict()["tool_trace"][2]["arg"] == "set.xml"
     assert res.to_dict()["export_path"] == str(export_xml)
+
+
+def test_chat_with_codex_surfaces_grounded_move_grade_receipts(library):
+    runner = _runner_writing(
+        {
+            "reply": "That bridge is LIT AFF.",
+            "tools_used": ["transition_slate", "compile_musical_context"],
+            "tool_trace": [
+                {"name": "transition_slate", "arg": "bridge candidates", "ok": True},
+                {"name": "compile_musical_context", "arg": "tr_001", "ok": True},
+            ],
+            "track_ids": [],
+            "move_grades": [
+                {
+                    "candidate_id": "tr_001",
+                    "track_id": "t000",
+                    "title": "Tt000",
+                    "slug": "lit_aff",
+                    "label": "LIT AFF",
+                    "xp": 100,
+                    "reason": "everything clicks",
+                    "overdrive": True,
+                    "streak": 4,
+                    "total_xp": 288,
+                    "level": 2,
+                    "level_xp": 38,
+                    "next_level_xp": 250,
+                    "level_up": True,
+                    "levels_gained": 1,
+                },
+                {
+                    "candidate_id": "tr_999",
+                    "track_id": "GHOST",
+                    "title": "Ghost",
+                    "slug": "lit_aff",
+                    "label": "LIT AFF",
+                    "xp": 100,
+                    "reason": "not grounded",
+                    "overdrive": True,
+                    "streak": 99,
+                    "total_xp": 999,
+                    "level": 4,
+                    "level_xp": 249,
+                    "next_level_xp": 250,
+                    "level_up": True,
+                    "levels_gained": 2,
+                },
+            ],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "what bridges from this?",
+        library,
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert res.track_ids == ["t000"]
+    assert res.move_grades == [
+        {
+            "candidate_id": "tr_001",
+            "track_id": "t000",
+            "title": "Tt000",
+            "slug": "lit_aff",
+            "label": "LIT AFF",
+            "xp": 100,
+            "reason": "everything clicks",
+            "overdrive": True,
+            "streak": 4,
+            "total_xp": 288,
+            "level": 2,
+            "level_xp": 38,
+            "next_level_xp": 250,
+            "level_up": True,
+            "levels_gained": 1,
+        }
+    ]
+    assert res.to_dict()["move_grades"][0]["label"] == "LIT AFF"
+    assert res.to_dict()["move_grades"][0]["level_up"] is True
 
 
 def test_build_argv_injects_mcp_config_and_schema(tmp_path):

@@ -194,3 +194,28 @@ def test_chunk_text_hard_split_oversized_paragraph():
     parts = chunk_text(big, max_chars=10)
     assert all(len(p) <= 10 for p in parts)
     assert "".join(parts) == big
+
+
+def test_retrieve_dim_mismatch_fails_loud_not_silent():
+    """Field-hardening guard. The toolset wires ONE embedder for everything; if
+    the audio/CLAP embedder (512-d) is used against a Gemini text store (1536-d),
+    the dims don't match. That must surface an ACTIONABLE error naming both dims
+    + the cause — NOT a silent ``results: []`` that masks the wiring bug as an
+    'empty knowledge base' (undebuggable in the field; this is exactly how the
+    RAG tool died in production)."""
+    emb = FakeEmbedder()
+    store = _build_store(emb)
+    store_dim = store.dim
+    assert store_dim is not None
+
+    class WrongSpaceEmbedder:  # a different embedding space + dimension
+        def embed_text(self, text: str) -> np.ndarray:
+            return np.ones(store_dim + 7, dtype=np.float32)
+
+    out = retrieve_dj_knowledge(store, "EQ the bass", embedder=WrongSpaceEmbedder(), k=3)
+
+    assert "error" in out, f"expected a loud error, got: {out}"
+    msg = out["error"]
+    assert str(store_dim) in msg and str(store_dim + 7) in msg, msg  # both dims named
+    assert "embedder" in msg.lower(), msg
+    assert not out.get("results"), "must NOT return a silent empty success"

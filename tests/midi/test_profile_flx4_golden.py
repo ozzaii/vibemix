@@ -4,12 +4,13 @@
 The LOAD-BEARING test of Phase 9: feeding the same MIDI byte stream through
 ``ControllerState(load_profile('pioneer_ddj_flx4'))`` must yield byte-equal
 ``deck_snapshot()`` and ``moves_since(0)`` results as v4's hardcoded
-``_CC_MAP`` + ``_NOTE_MAP`` (the IP Kaan validated on his rig 2026-05-11).
+``_CC_MAP`` + ``_NOTE_MAP`` (the IP Kaan validated on his rig 2026-05-11),
+plus the 2026-05-28 live-discovered jog-wheel relative CCs.
 
-If this test fails, the FLX4 JSON has drifted from v4's hardcoded constants.
-Either fix the JSON to match v4 (preferred — v4 is the canonical reference)
-or document why a deliberate divergence is intentional. Phase 9 Wave 1's
-contract is byte-for-byte preservation.
+If this test fails, the FLX4 JSON has drifted from the preserved v4 constants
+or from the live hardware proof for jog movement. Phase 9 Wave 1's contract is
+byte-for-byte preservation for the original controls; the relative jog CCs are
+an intentional additive mapping.
 """
 
 from __future__ import annotations
@@ -35,6 +36,10 @@ _V4_CC_MAP = {
     (6, 0x18): ("B", "filter"),
     (6, 0x1F): ("M", "xfader"),
 }
+_LIVE_JOG_CC_MAP = {
+    (0, 0x21): ("A", "jog"),
+    (1, 0x21): ("B", "jog"),
+}
 _V4_NOTE_MAP = {
     (0, 0x0B): ("A", "play"),
     (1, 0x0B): ("B", "play"),
@@ -59,7 +64,8 @@ def _flx4_state() -> ControllerState:
 
 def test_pioneer_flx4_profile_internal_lookup_byte_equivalent_to_v4():
     """ControllerState built from the FLX4 profile has _cc_lookup +
-    _note_lookup tables equivalent to v4's hardcoded constants 1:1."""
+    _note_lookup tables equivalent to v4's hardcoded constants, with the
+    additive live-discovered relative jog CCs."""
     cs = _flx4_state()
 
     # Build (channel, cc) -> (deck or 'M', field) from the state's lookup.
@@ -67,7 +73,7 @@ def test_pioneer_flx4_profile_internal_lookup_byte_equivalent_to_v4():
     for key, binding in cs._cc_lookup.items():
         deck = binding.deck if binding.deck is not None else "M"
         cc_actual[key] = (deck, binding.field)
-    assert cc_actual == _V4_CC_MAP
+    assert cc_actual == (_V4_CC_MAP | _LIVE_JOG_CC_MAP)
 
     note_actual: dict[tuple[int, int], tuple[str, str]] = {}
     for key, binding in cs._note_lookup.items():
