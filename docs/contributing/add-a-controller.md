@@ -72,7 +72,7 @@ Open the new file and fill in:
 | `channel`  | int  | `0`–`15` (MIDI channel, zero-indexed)                                |
 | `cc`       | int  | `0`–`127` (controls only)                                            |
 | `note`     | int  | `0`–`127` (buttons only)                                             |
-| `axis`     | str  | `"unipolar"` (knobs/faders, 0–127) or `"bipolar"` (tempo / filter / xfader, centered at 64) — controls only |
+| `axis`     | str  | `"unipolar"` (knobs/faders, 0–127), `"bipolar"` (tempo / filter / xfader, centered at 64), or `"relative"` (encoder ticks around center, such as jog wheels emitting 63/65) — controls only |
 | `deck`     | str  | `"A"`, `"B"`, `"C"`, `"D"`, or `null` for master-section (xfader)    |
 | `field`    | str  | Logical name like `"vol"`, `"eq_hi"`, `"eq_mid"`, `"eq_low"`, `"tempo"`, `"filter"`, `"xfader"` — controls only |
 
@@ -150,10 +150,11 @@ capture tool for full session recordings (226 lines, JSONL output) — useful
 for reverse-engineering an undocumented mapping. The lightweight
 `discover_midi_port.py` here is the right tool for Step 1. They coexist.
 
-**Where do `axis: unipolar` vs `bipolar` matter?** Coach prompts. Bipolar
+**Where do `axis: unipolar`, `bipolar`, and `relative` matter?** Coach prompts. Bipolar
 CCs (centered at 64) decode to signed offsets from center; unipolar (0–127)
-decode to absolute positions. Get this wrong and the AI mis-narrates your
-moves — a tempo nudge gets described as a fader sweep.
+decode to absolute positions; relative encoders decode as signed ticks. Get
+this wrong and the AI mis-narrates your moves — a tempo nudge gets described
+as a fader sweep, or a jog tick looks like a tiny knob wobble.
 
 **Can I add a controller that's already bundled?** No — duplicate
 `(channel, cc)` or `(channel, note)` pairs across `_BUNDLED_IDS` would shadow

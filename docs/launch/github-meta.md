@@ -8,13 +8,13 @@ This file is the single source-of-truth for the vibemix repo's GitHub-side metad
 ## Description (≤350 chars)
 
 ```
-Open-source AI co-host for live DJ sets. Listens to your master output, watches your DJ software, reads MIDI controller actions, and talks back as hype-man or coach. Gemini-grounded — never AI slop. macOS one-click install (Windows ships with v0.1.0 stable). Bravoh's first OSS release.
+Open-source AI co-host for live DJ sets. Listens to your master output, watches your DJ software, reads MIDI controller actions, and talks back as hype-man or coach. Evidence-grounded — never AI slop. macOS one-click install (Windows ships with v0.1.0 stable). Bravoh's first OSS release.
 ```
 
 ## Homepage URL
 
 ```
-https://altidus.world/vibemix?utm_source=github&utm_medium=oss&utm_campaign=vibemix_launch
+https://bravoh.ai/vibemix?utm_source=github&utm_medium=oss&utm_campaign=vibemix_launch
 ```
 
 ## Topics (10 — locked)
@@ -24,7 +24,7 @@ GitHub allows up to 20 topics; we ship exactly 10 to keep the surface signal-den
 ```
 dj
 ai
-gemini
+multimodal
 tauri
 open-source
 mascot

@@ -42,7 +42,8 @@ Profile JSONs validate against `src/vibemix/midi/profile.py::_parse_profile` (ha
   "controls": {
     "vol_a":    {"kind": "cc", "channel": 0, "cc": 19, "axis": "unipolar", "deck": "A",  "field": "vol"},
     "filter_a": {"kind": "cc", "channel": 6, "cc": 23, "axis": "bipolar",  "deck": "A",  "field": "filter"},
-    "xfader":   {"kind": "cc", "channel": 6, "cc": 31, "axis": "bipolar",  "deck": null, "field": "xfader"}
+    "xfader":   {"kind": "cc", "channel": 6, "cc": 31, "axis": "bipolar",  "deck": null, "field": "xfader"},
+    "jog_a":    {"kind": "cc", "channel": 0, "cc": 33, "axis": "relative", "deck": "A",  "field": "jog"}
   },
   "buttons": {
     "play_a": {"kind": "play", "channel": 0, "note": 11, "deck": "A"},
@@ -58,7 +59,7 @@ Fields (validated by `_parse_profile`):
 - `display_name` — what the calibration wizard + README grid show.
 - `port_name_hints` — **non-empty list** of substrings matched against `mido.get_input_names()` output for auto-detection (FLX4 reports as `"DDJ-FLX4"` on macOS and `"FLX4"` on Windows — list both).
 - `decks` — list of deck IDs the controller exposes (typically `["A", "B"]`; some four-deck units use `["A", "B", "C", "D"]`).
-- `controls` — continuous-value bindings (faders, knobs, jog wheels, EQs, filters, crossfader). Each value carries `kind: "cc"` (today the only supported `kind`), `channel` (0-15), `cc` (CC number 0-127), `axis` (`unipolar` / `bipolar` — affects how the magnitude is normalized), `deck` (deck ID from `decks` or `null` for global controls), and `field` (semantic field name — `vol` / `eq_low` / `eq_mid` / `eq_hi` / `tempo` / `filter` / `xfader` etc.).
+- `controls` — continuous-value bindings (faders, knobs, jog wheels, EQs, filters, crossfader). Each value carries `kind: "cc"` (today the only supported `kind`), `channel` (0-15), `cc` (CC number 0-127), `axis` (`unipolar` / `bipolar` / `relative` — affects how the magnitude is normalized), `deck` (deck ID from `decks` or `null` for global controls), and `field` (semantic field name — `vol` / `eq_low` / `eq_mid` / `eq_hi` / `tempo` / `filter` / `xfader` / `jog` etc.). Use `relative` for encoder-style controls that emit ticks around center, such as jog wheels reporting 63/65 instead of an absolute position.
 - `buttons` — note-message bindings (play, cue, sync, hot cues, loop tools, jog touch). Each value carries `kind` (the semantic event — `play` / `cue` / `sync` / `jog_touch` / `loop_in` / `loop_out`), `channel`, `note` (note number 0-127), and `deck`.
 - `notes` — optional one-line string surfaced in diagnostics + the contributor PR review.
 
