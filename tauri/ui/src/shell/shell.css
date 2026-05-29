@@ -451,6 +451,16 @@
 }
 .surface--deck .vmx-session { height: 100%; } /* fill the stage, not the viewport */
 .surface--deck .vmx-titlebar { display: none; } /* shell chrome owns the titlebar */
+/* Suppress the folded session's own mode-picker row (COHOST/LEARN/BUILD/DEBRIEF).
+ * In the standalone window it was the surface switcher; folded into the shell the
+ * sidebar IS the surface switcher (deck↔cohost, crate↔build, learn, debrief — the
+ * same axis), so leaving the modebar visible is a redundant second nav. Worse, its
+ * onChange runs openModeSurface() which spawns the STANDALONE library/learn/debrief
+ * windows — clicking BUILD here would open a detached library window while the shell
+ * shows the in-frame crate (two surfaces). Hiding the modebar removes that only
+ * trigger; the sidebar (with Cmd+1..5 + palette) reaches every surface. Mirrors the
+ * .vmx-titlebar suppression above — additive CSS, no edit to the session module. */
+.surface--deck .vmx-modebar { display: none; }
 
 /* ── Grounding panel — contextual right drawer. ──────────────────────────── */
 .shell-panel {
