@@ -38,19 +38,19 @@ The product is unapologetic about being for DJs. No onboarding-tour overlays, no
 
 1. **Real DJ friend in your ear, no AI slop.** Every reaction is tied to real evidence (audio + MIDI + screen + now-playing). If reactions feel scripted, late, hallucinated, or generic, the product has failed regardless of how polished the UI is.
 
-2. **Grounded over clever.** Every UI surface must feel like Pioneer-grade hardware in idle mode — a CDJ-3000 sitting at rest, breathing. Not a software widget pretending to be hardware via faux-3D bevels; tactility comes from inset hairlines, void backgrounds, and one amber light per panel.
+2. **Grounded over clever.** Every UI surface must feel like Pioneer-grade hardware in idle mode — a CDJ-3000 sitting at rest, breathing. Not a software widget pretending to be hardware via faux-3D bevels; tactility comes from inset hairlines, warm-void backgrounds, and one soft-rose light per panel.
 
-3. **Restraint is the point.** The screen is mostly void. Only what matters cuts through. The 20/80 rule is enforced through tokens — silk text and glass surfaces own 80% of any view; amber is the rare deck-light. If more than one panel is sweeping, breathing, or pulsing at the same time, the design is failing.
+3. **Restraint is the point.** The screen is mostly void. Only what matters cuts through. The 20/80 rule is enforced through tokens — ink text and glass surfaces own 80% of any view; soft-rose is the rare deck-light. If more than one panel is sweeping, breathing, or pulsing at the same time, the design is failing.
 
 4. **Hardware tactility.** Type set in Saira condensed display + JetBrains Mono numerics. Hairline 1px borders. Faint inset bezels (the "deck top + deck bottom" inner shadow). The opposite of soft Material-3 elevation or floating-card SaaS.
 
-5. **Sign-of-life, not flashlight.** Motion is restrained breathing — the amber border sweep is 22 seconds, the LED pulse is 1.4 seconds. Never sweeping marketing-tier choreography, never spring-bouncy, never elastic. `prefers-reduced-motion` freezes the sweep entirely.
+5. **Sign-of-life, not flashlight.** Motion is restrained breathing — the rose border sweep is 22 seconds, the LED pulse is 1.4 seconds. Never sweeping marketing-tier choreography, never spring-bouncy, never elastic. `prefers-reduced-motion` freezes the sweep entirely.
 
 ## Accessibility & Inclusion
 
-- `prefers-reduced-motion: reduce` freezes the amber border-sweep and downgrades glass blurs to half-strength. Honored at the token layer in `tokens.css`.
+- `prefers-reduced-motion: reduce` freezes the rose border-sweep and downgrades glass blurs to half-strength. Honored at the token layer in `tokens.css`.
 - Runtime performance escape hatch: Settings → Performance → "Lighter blur" sets `html[data-blur-perf="on"]`, which downgrades all three blur strengths for low-GPU machines (older Intel Macs, Windows laptops with integrated GPUs).
 - Type scale: 14px body, hierarchy through Saira's variable `wdth` (75–125) + `wght` (300–800) axes plus uppercase label tracking. No reliance on color alone for hierarchy.
-- Contrast: silk (`#d6cfc7`) on void (`#000`) is ~14:1. Amber (`#ff8a3d`) on void is ~7:1. Status LEDs read against their own glass surfaces, never as text-on-text.
-- Focus ring: 2px amber outline + 2px offset + `--glow-soft` shadow. Visible on every interactive control via `:focus-visible`.
+- Contrast: ink (`#F2EFF1`) on warm void (`#1A1618`) is ~16:1. Soft-rose (`#FFA5DF`) on void is ~10:1. Status LEDs read against their own glass surfaces, never as text-on-text.
+- Focus ring: 2px rose outline + 2px offset + `--glow-soft` shadow. Visible on every interactive control via `:focus-visible`.
 - Mascot is `aria-hidden="true"` — purely decorative, never carries information the cohost transcript doesn't already say.

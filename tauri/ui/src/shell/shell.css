@@ -1,0 +1,585 @@
+/* shell.css — the cohesive DesktopShell composition (tozpembe).
+ *
+ * Ports Bravoh's "recessed stage" model into vanilla TS + Tauri: fixed sidebar
+ * furniture, an offset main region pushed by margin (not a flex gap) so the
+ * stage recesses BENEATH the chrome, a contextual right grounding panel, a
+ * Cmd+K palette, and a quiet floating status. Every branded color comes from
+ * tokens.css via var(--token) (the anti-slop guard): the chrome/sidebar/panel
+ * fills read the --scrim-* void tints, so only pure-black structural rgba
+ * (drop shadows, the recess-edge gradient, and the palette backdrop scrim) is
+ * inlined; no branded color is ever hardcoded here.
+ *
+ * Stacking is governed by the --z-* ladder declared on #shell-root below (the
+ * single source; no ad-hoc z-index literals anywhere in this file), so the
+ * layer order is reviewable in one place.
+ *
+ * State is driven by data-attributes on #shell-root (the optimistic-repaint
+ * model from CLAUDE.md): data-collapsed / data-panel / data-state / and a
+ * per-surface .is-active class. The store flips these locally on click; any
+ * round-trip stays authoritative and self-corrects.
+ */
+
+#shell-root {
+  --sidebar-w: var(--sidebar-expanded);
+  --panel-cur: 0px;
+  /* Governed stacking ladder — the single source for every shell layer.
+   * Inherited by all descendants (the palette/footer live under #shell-root),
+   * so each rule reads var(--z-*) instead of a bare literal. */
+  --z-base: 0;       /* surface floor + deck energy field */
+  --z-stage: 1;      /* deck stage, above its energy field */
+  --z-recess: 2;     /* the recessed-main leading-edge shadow */
+  --z-footer: 20;    /* floating session status */
+  --z-sidebar: 40;   /* fixed sidebar slab */
+  --z-panel: 50;     /* contextual grounding drawer */
+  --z-palette: 1000; /* Cmd+K command palette */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--void-0);
+  color: var(--text-primary);
+  font-family: var(--type-body);
+}
+#shell-root[data-collapsed="true"] { --sidebar-w: var(--sidebar-collapsed); }
+#shell-root[data-panel="open"]     { --panel-cur: var(--panel-w); }
+
+/* ── Top chrome — slim drag bar (28px). The brand mark lives in the sidebar;
+ *    this is just the window grip + a mono clock. ─────────────────────────── */
+.shell-chrome {
+  flex: 0 0 var(--chrome-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-3);
+  background: var(--scrim-chrome);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: var(--chrome-highlight);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.shell-chrome .traffic-spacer {
+  width: 72px;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+.shell-chrome .shell-clock {
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* ── Body — the fixed-furniture / swappable-interior frame ───────────────── */
+.shell-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Sidebar — fixed slab, never in flow. Width animates on collapse. ─────── */
+.shell-sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+  background: var(--scrim-furniture);
+  border-right: 1px solid var(--border-subtle);
+  box-shadow: var(--chrome-highlight);
+  transition: width 200ms var(--ease-brand);
+  overflow: hidden;
+  z-index: var(--z-sidebar);
+}
+/* The rose LED seam along the right edge. STATIC: a faint machined-lip rose
+ * gradient, no crawl. The One-Rose rule allows exactly one breathing mark per
+ * panel, and the brand ear (below) is the sidebar's sole sign-of-life — so the
+ * seam is held still rather than animated against it. */
+.shell-sidebar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, var(--brand-22), transparent);
+  opacity: 0.5;
+}
+
+.sb-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 52px;
+  padding: 0 var(--sp-4);
+  flex: 0 0 auto;
+}
+/* Both ears (brand mark + co-host foot pill) are lit rose dots; the box
+ * styling is bare so it applies to either. */
+.sb-ear {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 6px var(--brand-40);
+  flex: 0 0 auto;
+}
+/* The brand ear breathes only while NOT live: it signals "co-host awake,
+ * waiting". Once live, the deck's tail cursor is the screen's single breathing
+ * sign-of-life, so the ear steadies to a static lit dot (PRODUCT principle 3:
+ * never two breathing marks on screen at once). */
+#shell-root:not([data-state="live"]) .sb-brand .sb-ear {
+  animation: shell-breathe 2.4s var(--ease-brand) infinite;
+}
+/* Reconnecting takes attention priority: the conn-dot pulses, so the brand ear
+ * yields its breath here too — keeps exactly one breathing mark on screen in
+ * every reachable state (live -> tail cursor, reconnecting -> conn-dot, else
+ * -> brand ear). */
+#shell-root[data-conn="reconnecting"] .sb-brand .sb-ear { animation: none; }
+.sb-brand .sb-wordmark {
+  /* The shell's single wordmark — matches the brand wordmark treatment
+   * (condensed Saira, uppercase, 700) used in the titlebar, not a lowercase
+   * one-off. Uppercase gets a touch of positive tracking (Tracking-by-Case). */
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 700;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.sb-nav {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px; /* deliberately tight (sub --sp-1): a dense nav stack, not airy rows */
+  padding: var(--sp-2);
+  overflow: hidden;
+}
+.sb-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 38px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-sm);
+  color: var(--text-tertiary);
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transition: background 150ms var(--ease-brand), color 150ms var(--ease-brand);
+}
+.sb-nav-item:hover { background: var(--brand-04); color: var(--text-secondary); }
+.sb-nav-item[aria-current="true"] {
+  background: var(--brand-08);
+  color: var(--text-primary);
+}
+.sb-nav-item .sb-glyph {
+  flex: 0 0 20px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.sb-nav-item[aria-current="true"] .sb-glyph { color: var(--brand); }
+.sb-nav-item .sb-label { flex: 1 1 auto; }
+.sb-nav-item .sb-kbd {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  /* --text-muted (not --text-disabled): the accelerator is informational, so
+   * it must clear 4.5:1 on the sidebar fill (muted = 7.09:1; disabled fell to
+   * ~4.6:1 and below on lighter surfaces). */
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+}
+
+.sb-foot {
+  flex: 0 0 auto;
+  padding: var(--sp-3);
+  border-top: 1px solid var(--border-subtle);
+}
+.sb-cohost {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 32px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-sm);
+  background: var(--brand-04);
+  border: 1px solid var(--brand-12);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Collapsed rail — labels + kbd hide, glyphs center, brand wordmark hides. */
+#shell-root[data-collapsed="true"] .sb-label,
+#shell-root[data-collapsed="true"] .sb-kbd,
+#shell-root[data-collapsed="true"] .sb-wordmark,
+#shell-root[data-collapsed="true"] .sb-cohost-label { display: none; }
+#shell-root[data-collapsed="true"] .sb-nav-item { justify-content: center; padding: 0; }
+#shell-root[data-collapsed="true"] .sb-brand { justify-content: center; padding: 0; }
+/* Collapsed, the co-host foot pill is just its lit ear, centered — drop the
+ * chip box so a lone dot doesn't sit in an empty pill. */
+#shell-root[data-collapsed="true"] .sb-cohost {
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+}
+
+.sb-collapse {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-2);
+  /* 24px minimum hit target (WCAG 2.5.8); the glyph stays centered. */
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 150ms var(--ease-brand), background 150ms var(--ease-brand);
+}
+/* Reveal on hover OR keyboard focus — a Tab user must be able to see the
+ * control the rose focus ring lands on (it is opacity:0 at rest). */
+.shell-sidebar:hover .sb-collapse,
+.sb-collapse:focus-visible { opacity: 1; }
+.sb-collapse:hover { background: var(--brand-08); color: var(--text-primary); }
+
+/* ── Main — recessed stage. Margins, not a flex gap, do the offset. ──────── */
+.shell-main {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin-left: var(--sidebar-w);
+  margin-right: var(--panel-cur);
+  transition: margin 300ms var(--ease-brand);
+  overflow: hidden;
+}
+/* The 48px inset shadow that makes the sidebar read as a raised slab. */
+.shell-main::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 48px;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.18) 0%, transparent 100%);
+  z-index: var(--z-recess);
+}
+
+.shell-surfaces { position: absolute; inset: 0; }
+.surface {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  overflow: auto;
+}
+.surface.is-active { display: flex; }
+
+/* ── Deck surface — the home stage. Idle hero vs live line swap by state. ── */
+.surface--deck { position: relative; align-items: center; justify-content: center; padding: var(--sp-6); }
+.deck-stage { position: relative; z-index: var(--z-stage); max-width: 720px; width: 100%; text-align: center; }
+
+/* Subliminal energy field — a pure rose deck-light bloom rising from below
+ * (tozpembe is rose-primary; no gold here, gold is the rare heat accent). It
+ * NEVER breathes: activation only ramps its opacity, so the tail cursor stays
+ * the single rhythmic sign-of-life on the stage (PRODUCT.md principle 3 + 5).
+ * Kept under the "name the color and it's too strong" threshold. */
+.deck-energy {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-base);
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(130% 80% at 50% 122%, var(--brand-16), transparent 62%);
+  transition: opacity 600ms var(--ease-brand);
+}
+#shell-root[data-state="listening"] .deck-energy { opacity: 0.5; }
+#shell-root[data-state="live"] .deck-energy { opacity: 0.85; }
+
+/* The tail cursor — the co-host's "speaking" mark, and the ONLY motion on the
+ * deck when live. An eased fade on the LED-pulse cadence, not a hard square
+ * flash. Steady-on (no fade) under reduced motion. */
+.tail-cursor {
+  display: none;
+  width: 0.5ch;
+  height: 0.92em;
+  margin-left: 0.14em;
+  vertical-align: -0.06em;
+  background: var(--brand);
+  border-radius: 1px;
+  box-shadow: 0 0 8px var(--brand-40);
+}
+#shell-root[data-state="live"] .tail-cursor {
+  display: inline-block;
+  /* The documented LED-pulse cadence (--motion-led-pulse, 1400ms), token-driven
+   * so it stays the one cadence the design names. */
+  animation: tail-blink var(--motion-led-pulse) var(--ease-brand) infinite;
+}
+@keyframes tail-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.18; }
+}
+.deck-idle,
+.deck-live-line {
+  font-family: var(--type-serif);
+  font-size: clamp(30px, 5vw, 58px);
+  line-height: 1.1;
+  font-weight: 400;
+}
+.deck-idle { color: var(--text-tertiary); }
+.deck-live-line { color: var(--text-primary); display: none; }
+.deck-scene {
+  margin-top: var(--sp-5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  font-family: var(--type-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  opacity: 0.4;
+  transition: opacity 300ms var(--ease-brand);
+}
+.scene-chip {
+  padding: 2px var(--sp-2); /* 2px vertical is a deliberate sub-scale chip inset */
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-subtle);
+}
+.scene-chip--gold { color: var(--gold); border-color: var(--gold-glow); }
+
+#shell-root[data-state="idle"] .deck-live-line { display: none; }
+#shell-root[data-state="idle"] .deck-idle { display: block; }
+#shell-root[data-state="listening"] .deck-scene { opacity: 0.9; }
+#shell-root[data-state="live"] .deck-idle { display: none; }
+#shell-root[data-state="live"] .deck-live-line { display: block; }
+#shell-root[data-state="live"] .deck-scene { opacity: 1; }
+
+/* Surface empty state (crate/learn/debrief/settings) — a powered deck at rest:
+ * one dim engraved glyph, the state in serif, one grounded co-host line. No
+ * card, no hero metric, no CTA grid (PRODUCT.md anti-references). */
+.surface--stub { align-items: center; justify-content: center; }
+.surface-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 420px;
+  padding: var(--sp-6);
+  text-align: center;
+}
+.se-glyph {
+  margin-bottom: var(--sp-3);
+  font-size: 42px;
+  line-height: 1;
+  /* The faintest element in the empty state (dimmer than title + sub), but the
+   * --text-disabled token alone carries that — no extra opacity, so it never
+   * vanishes on a dim display. Decorative + aria-hidden. */
+  color: var(--text-disabled);
+}
+.se-title {
+  margin: 0; /* it is an <h2>; flex gap owns the spacing, not UA heading margin */
+  font-family: var(--type-serif);
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--text-secondary);
+}
+.se-sub {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ── Grounding panel — contextual right drawer. ──────────────────────────── */
+.shell-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--panel-w);
+  background: var(--scrim-panel);
+  border-left: 1px solid var(--border-default);
+  box-shadow:
+    inset 2px 0 0 var(--brand-06),
+    -14px 0 60px rgba(0, 0, 0, 0.5);
+  transform: translateX(100%);
+  transition: transform 250ms var(--ease-brand);
+  z-index: var(--z-panel);
+  display: flex;
+  flex-direction: column;
+}
+#shell-root[data-panel="open"] .shell-panel { transform: none; }
+.panel-head {
+  flex: 0 0 auto;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-4);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--brand);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.panel-body {
+  flex: 1 1 auto;
+  padding: var(--sp-4);
+  overflow: auto;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+/* Live receipt slots: a mono label over an honest placeholder line. */
+.panel-section { margin-bottom: var(--sp-5); }
+.panel-section:last-child { margin-bottom: 0; }
+.panel-label {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--sp-2);
+}
+.panel-placeholder {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* ── Footer — quiet floating session status. ─────────────────────────────── */
+.shell-footer {
+  position: absolute;
+  right: var(--sp-3);
+  bottom: var(--sp-2);
+  z-index: var(--z-footer);
+  display: flex;
+  align-items: center;
+  min-height: 24px; /* WCAG 2.5.8 hit target; the dot+label center within it */
+  gap: 6px; /* deliberately tight (sub --sp-1): dot hugs its label */
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.shell-footer .conn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-disabled);
+}
+/* Steady lit when connected — a stable power LED, not a breath. The deck tail
+ * cursor owns the live breathing, so a connected dot does NOT animate; only
+ * "reconnecting" pulses for attention. Keeps one breathing mark on screen. */
+#shell-root[data-conn="connected"] .conn-dot {
+  background: var(--led-ok);
+  box-shadow: 0 0 5px var(--led-ok);
+}
+#shell-root[data-conn="reconnecting"] .conn-dot {
+  background: var(--led-warn);
+  animation: shell-pulse 1.5s var(--ease-brand) infinite;
+}
+#shell-root[data-conn="disconnected"] .conn-dot { background: var(--text-disabled); opacity: 0.7; }
+
+/* ── Command palette ─────────────────────────────────────────────────────── */
+.shell-palette {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-palette);
+  display: none;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 14vh;
+  background: rgba(0, 0, 0, 0.6);
+}
+.shell-palette.is-open { display: flex; }
+.palette-panel {
+  width: min(640px, 92vw);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-md);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.55), var(--chrome-highlight);
+  overflow: hidden;
+}
+.palette-input {
+  flex: 0 0 auto;
+  height: 48px;
+  padding: 0 var(--sp-4);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-family: var(--type-body);
+  font-size: 15px;
+  outline: none;
+}
+.palette-input::placeholder { color: var(--text-disabled); }
+.palette-list { flex: 1 1 auto; overflow: auto; padding: 6px; } /* tight list inset (sub --sp-2) */
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 44px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.palette-item[aria-selected="true"] { background: var(--brand-08); color: var(--text-primary); }
+.palette-item .pi-glyph { flex: 0 0 18px; text-align: center; color: var(--text-muted); }
+.palette-item .pi-label { flex: 1 1 auto; }
+.palette-item .pi-hint {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  /* --text-muted: the accelerator hint is informational, must clear AA. */
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+.palette-empty {
+  padding: var(--sp-4);
+  /* "Nothing matches." is real body copy — muted clears 4.5:1 on the panel
+   * surface where --text-disabled does not. */
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ── Motion ──────────────────────────────────────────────────────────────── */
+@keyframes shell-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@keyframes shell-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Only the genuinely animated marks need freezing: the breathing brand ear,
+   * the connection dot, and the live tail cursor. The LED seam and energy
+   * field are static by design (opacity only), so they are not listed. */
+  .sb-ear,
+  .conn-dot,
+  .tail-cursor { animation: none !important; }
+}

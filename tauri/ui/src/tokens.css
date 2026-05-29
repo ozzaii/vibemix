@@ -1,40 +1,47 @@
 /* tokens.css — design system source-of-truth.
  *
- * v5 CDJ WHISPER direction (2026-05-12, shim deleted 2026-05-13).
- * Replaces the prior FL-Studio retro-tactile direction. The mock at
- * `mocks/vibemix-direction-final.html` is the visual contract.
+ * v6 "TOZPEMBE / Forged Obsidian Chrome" direction (2026-05-28).
+ * Supersedes the v5 "CDJ Whisper" direction (cool void + single amber).
+ * The visual contract is `mocks/vibemix-bravoh-grade-pink.html`; the system
+ * is vibemix's port of Bravoh's "Forged Obsidian Chrome v21.0" (see
+ * `docs/design/bravoh-design-language.md` + `vibemix-translation-layer.md`).
  *
- * Structure of this file:
- *   1. Vendored @font-face declarations (Saira variable wdth+wght +
- *      JetBrains Mono Regular/Medium/SemiBold) — local WOFF2 paths,
- *      no Google Fonts remote @import. SHA-256 attestations in
- *      tauri/ui/LICENSE-3RD-PARTY.md.
- *   2. :root — v5 design tokens (void / glass / silk / amber / rave /
- *      led / blur-glass / glow / type / radius / spacing / layout /
- *      motion budget). NO backward-compat shim; the cascade flip is
- *      complete (Phase 14 Waves 1-4 migrated every consumer to v5
- *      primitives, Wave 5 deleted the shim — this commit).
- *   3. Perf-fallback block — prefers-reduced-motion + the runtime
- *      escape hatch html[data-blur-perf="on"] toggled by the
- *      Settings → Performance → "Lighter blur" pill (Plan 14-04).
- *   4. Reset + v5 body background (cinematic vignette + restrained
- *      rave washes + multi-layer film grain).
- *   5. `.border-anim` utility — the slow amber light traveling around
- *      panel perimeters. Critique 2026-05-14: restricted to the session
- *      deck only (one CDJ, one breathing light). Wizard primary-panel +
- *      cohost previously carried duplicate sweeps — removed.
- *   6. Wizard frame layout (structural — kept verbatim from Phase 11,
- *      just retoned to v5 glass).
+ * What changed from v5:
+ *   - Void warmed: cold blue-black (#000-#11141c) -> warm rose-shifted
+ *     near-black ladder (#1A1618-#474144).
+ *   - Accent re-pointed: amber #ff8a3d -> soft-rose brand #FFA5DF, used as a
+ *     low-alpha wash via an explicit ladder, never a fill.
+ *   - Heat added: gold #e8c47a, reserved for Camelot / heat / energy-delta
+ *     numerics only (the one quarantined second hue).
+ *   - Text promoted: silk #d6cfc7 -> ink #F2EFF1 with semantic naming.
+ *   - Shell geometry + BPM-locked motion tokens added for the cohesive
+ *     DesktopShell composition.
  *
- * Anti-pattern guard: components MUST NOT declare hex colors. They
- * read var(--token) exclusively. Only this file is allowed to
- * contain `#xxxxxx`.
+ * MIGRATION CONTRACT: every v5 token NAME is preserved as a deprecated alias
+ * pointing at the new palette, so the 100+ existing consumers re-tone for
+ * free. New code uses the canonical tozpembe tokens (--void-N / --ink-N /
+ * --brand* / --gold* / --surface-* / --text-* / --border-*).
+ *
+ * FOLLOW-UPS (tracked, not done here):
+ *   - 1b FONTS: vendor Geist + Geist Mono + Instrument Serif WOFF2 offline,
+ *     swap --type-display/--type-body to Geist and wire --type-serif's file.
+ *     This pass keeps Saira + JetBrains Mono (already vendored) active; the
+ *     hero serif falls back to Georgia until the WOFF2 lands.
+ *   - POLYCHROME: the v5 meter/mood polychrome (green/magenta/blue) is kept
+ *     defined so meter + rocker stay intact; collapsing it into rose + gold
+ *     per the translation doc is a follow-up. The meter "warm" band now reads
+ *     rose (it aliases --amber); safe stays green, clip stays magenta.
+ *
+ * Anti-pattern guard: components MUST NOT declare hex colors. They read
+ * var(--token) exclusively. Only this file is allowed to contain `#xxxxxx`.
  */
 
-/* === v5 type — vendored Saira + JetBrains Mono ========================= *
- * Source: mocks/vibemix-direction-final.html replicating Google Fonts CSS
- * for Saira + JBM. Substituted for vendored WOFF2 paths so the wizard
- * renders offline. SHA-256 attestations in LICENSE-3RD-PARTY.md. */
+/* === type — vendored Saira + JetBrains Mono (Geist/Instrument Serif = 1b) === *
+ * SHA-256 attestations in LICENSE-3RD-PARTY.md. The tozpembe target type is
+ * Geist Sans (body/UI) + Geist Mono (labels/numerics) + Instrument Serif
+ * (cohost hero + lead track names); vendoring those WOFF2 is Phase 1b. Until
+ * then --type-display/--type-body resolve to the vendored Saira and
+ * --type-serif falls back to Georgia. */
 
 /* Saira — variable axes (wdth + wght). Single file, all weights+widths. */
 @font-face {
@@ -70,132 +77,205 @@
   font-display: swap;
 }
 
-/* === v5 design tokens (CDJ Whisper) ==================================== */
+/* === v6 tozpembe design tokens (Forged Obsidian Chrome) =============== */
 :root {
-  /* --- Void stack — five cool blacks, slight blue undertone --- */
-  --void:    #000000;
-  --void-1:  #020205;
-  --void-2:  #05070b;
-  --void-3:  #0a0c12;
-  --void-4:  #11141c;
+  /* ─── CANONICAL: void ladder — warm rose-shifted near-blacks ───────── */
+  --void-0:  #1A1618;
+  --void-5:  #221D20;
+  --void-8:  #282326;
+  --void-10: #302A2E;
+  --void-12: #352F33;
+  --void-15: #3D373A;
+  --void-20: #474144;
+  --void-25: #524C4F;
 
-  /* --- Glass surfaces — darker than v4 (deck dominates, glass seals) --- */
-  --glass-1:       rgba(8, 10, 16, 0.78);    /* primary panel */
-  --glass-2:       rgba(12, 14, 22, 0.62);   /* secondary panel */
-  --glass-3:       rgba(2, 3, 6, 0.88);      /* recessed (display window, mood track) */
-  --glass-edge:    rgba(255, 255, 255, 0.065);
-  --glass-edge-up: rgba(255, 255, 255, 0.110);
-  --glass-top:     rgba(255, 255, 255, 0.055);
+  /* ─── CANONICAL: ink ladder — warm off-whites ──────────────────────── */
+  --ink-100: #F2EFF1;
+  --ink-80:  #D8D4D7;
+  --ink-60:  #C5C0C3;
+  --ink-40:  #ADA8AB;
+  --ink-20:  #8A858A;
 
-  /* --- Silk text --- */
-  --silk:    #d6cfc7;
-  --silk-65: rgba(214, 207, 199, 0.65);
-  --silk-40: rgba(214, 207, 199, 0.40);
-  --silk-22: rgba(214, 207, 199, 0.22);
-  --silk-12: rgba(214, 207, 199, 0.12);
+  /* ─── CANONICAL: brand — soft rose, spent as low-alpha wash ────────── */
+  --brand:       #FFA5DF;
+  --brand-glow:  #FFB8E8;
+  --brand-press: #B070A0;
+  --brand-03: rgba(255, 165, 223, 0.03);
+  --brand-04: rgba(255, 165, 223, 0.04);
+  --brand-05: rgba(255, 165, 223, 0.05);
+  --brand-06: rgba(255, 165, 223, 0.06);
+  --brand-08: rgba(255, 165, 223, 0.08);
+  --brand-10: rgba(255, 165, 223, 0.10);
+  --brand-12: rgba(255, 165, 223, 0.12);
+  --brand-16: rgba(255, 165, 223, 0.16);
+  --brand-18: rgba(255, 165, 223, 0.18);
+  --brand-22: rgba(255, 165, 223, 0.22);
+  --brand-30: rgba(255, 165, 223, 0.30);
+  --brand-35: rgba(255, 165, 223, 0.35);
+  --brand-40: rgba(255, 165, 223, 0.40);
+  --brand-50: rgba(255, 165, 223, 0.50);
+  --brand-65: rgba(255, 165, 223, 0.65);
+  --brand-78: rgba(255, 165, 223, 0.78);
 
-  /* --- Amber accent — primary deck-light --- */
-  --amber:      #ff8a3d;
-  --amber-deep: #ff5a1a;
-  --amber-pale: #ffb88a;
-  --amber-22:   rgba(255, 138, 61, 0.22);
-  --amber-40:   rgba(255, 138, 61, 0.40);
-  --amber-65:   rgba(255, 138, 61, 0.65);
+  /* ─── CANONICAL: gold heat — Camelot / heat / energy-delta numerics ── */
+  --gold:      #e8c47a;
+  --gold-soft: rgba(232, 196, 122, 0.55);
+  --gold-glow: rgba(232, 196, 122, 0.30);
 
-  /* --- Night-rave ambient body washes (atmospheric only, never on chrome) --- */
+  /* ─── CANONICAL: semantic text ─────────────────────────────────────── */
+  --text-primary:   var(--ink-100);
+  --text-secondary: var(--ink-80);
+  --text-tertiary:  var(--ink-60);
+  --text-muted:     var(--ink-40);
+  --text-disabled:  var(--ink-20);
+
+  /* ─── CANONICAL: borders — warm-white, quieter than brand ──────────── */
+  --border-subtle:  rgba(255, 220, 240, 0.08);
+  --border-default: rgba(255, 220, 240, 0.12);
+  --border-strong:  rgba(255, 220, 240, 0.18);
+  --border-focus:   var(--brand);
+
+  /* ─── CANONICAL: surfaces — 4-level elevation (void/base/raised/float) ─ */
+  --surface-void:   var(--void-0);
+  --surface-base:   var(--void-5);
+  --surface-raised: var(--void-10);
+  --surface-float:  var(--void-20);
+
+  /* ─── CANONICAL: shell scrims — warm-void chrome fills at fixed alpha ──
+   * The opaque-ish furniture fills (chrome bar, sidebar slab, grounding
+   * panel) live here so shell.css reads them via var() instead of inlining
+   * raw rgba; the RGB triplets match --void-5 / --void-8 and re-tone with
+   * the void ladder. */
+  --scrim-chrome:    rgba(34, 29, 32, 0.55);   /* slim top drag chrome (void-5 tint) */
+  --scrim-furniture: rgba(34, 29, 32, 0.98);   /* sidebar slab        (void-5 tint) */
+  --scrim-panel:     rgba(40, 35, 38, 0.98);   /* grounding panel     (void-8 tint) */
+
+  /* ─── CANONICAL: material — chrome highlight + specular + shadows ──── */
+  /* The signature "light catching a machined lip": a 0.5px warm-rose top edge. */
+  --chrome-highlight: inset 0 0.5px 0 rgba(255, 200, 235, 0.07);
+  --grad-specular: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 30%, transparent 50%, rgba(0, 0, 0, 0.18) 100%);
+  --rim-brand:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px var(--brand-08);
+  --shadow-inset:
+    inset 0 1px 0 rgba(0, 0, 0, 0.35),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-pressed:
+    inset 0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.025);
+  --shadow-float:
+    0 12px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --text-3d:
+    0 1px 0 rgba(176, 112, 160, 0.18),
+    0 2px 0 rgba(40, 35, 38, 0.55),
+    0 4px 16px rgba(26, 22, 24, 0.55);
+  --text-emboss:
+    0 1px 0 rgba(0, 0, 0, 0.45),
+    0 -1px 0 rgba(255, 255, 255, 0.04);
+
+  /* ─── CANONICAL: shell geometry (the cohesive DesktopShell) ────────── */
+  --chrome-h: 28px;
+  --sidebar-collapsed: 72px;
+  --sidebar-expanded: 260px;
+  --sidebar-w: var(--sidebar-expanded);
+  --panel-w: 280px;
+  --r-sm: 6px;
+  --r-md: 10px;
+
+  /* ─── CANONICAL: motion — one ease + BPM-locked beats ──────────────── */
+  --ease-brand: cubic-bezier(0.16, 1, 0.3, 1);
+  --bpm-beat: 461ms;   /* ~130 BPM, drives playhead + pulse */
+  --bpm-bar:  1846ms;
+
+  /* ═══════════════════════════════════════════════════════════════════ *
+   * LEGACY ALIASES — v5 token names re-pointed at the tozpembe palette.
+   * Kept so existing consumers re-tone without edits. Prefer the
+   * canonical tokens above in new code.
+   * ═══════════════════════════════════════════════════════════════════ */
+
+  /* Void stack alias (v5 used --void / --void-1..4 cool blacks) */
+  --void:    var(--void-0);
+  --void-1:  var(--void-5);
+  --void-2:  var(--void-8);
+  --void-3:  var(--void-10);
+  --void-4:  var(--void-20);
+
+  /* Glass surfaces — warmed translucent panels (vibemix keeps blur) */
+  --glass-1:       rgba(40, 35, 38, 0.80);   /* primary panel  (~void-8)  */
+  --glass-2:       rgba(48, 42, 46, 0.62);   /* secondary panel (~void-10) */
+  --glass-3:       rgba(26, 22, 24, 0.88);   /* recessed window (~void-0)  */
+  --glass-edge:    var(--border-default);
+  --glass-edge-up: var(--border-strong);
+  --glass-top:     rgba(255, 220, 240, 0.055);
+
+  /* Silk text alias -> ink */
+  --silk:    var(--ink-100);
+  --silk-65: rgba(242, 239, 241, 0.65);
+  --silk-40: rgba(242, 239, 241, 0.40);
+  --silk-22: rgba(242, 239, 241, 0.22);
+  --silk-12: rgba(242, 239, 241, 0.12);
+  --silk-06: rgba(242, 239, 241, 0.06);
+  --silk-025: rgba(242, 239, 241, 0.025);
+
+  /* Amber accent alias -> rose brand. The v5 deck-light is now rose. */
+  --amber:      var(--brand);
+  --amber-deep: var(--brand-press);
+  --amber-pale: var(--brand-glow);
+  --amber-22:   var(--brand-22);
+  --amber-40:   var(--brand-40);
+  --amber-65:   var(--brand-65);
+  --amber-78:   var(--brand-78);
+
+  /* Night-rave ambient washes (v5; body no longer paints them, kept for opt-in) */
   --rave-magenta: rgba(192, 56, 224, 0.055);
   --rave-pink:    rgba(255, 92, 188, 0.038);
   --rave-cyan:    rgba(72, 152, 255, 0.042);
   --rave-purple:  rgba(118, 56, 224, 0.030);
   --rave-teal:    rgba(64, 220, 200, 0.022);
 
-  /* --- Status LEDs --- */
+  /* Status LEDs (functional, component-scope, quiet) */
   --led-ok:    #6dd44a;
   --led-warn:  #f4c542;
   --led-fault: #d4413a;
 
-  /* --- Glass blurs --- */
+  /* Glass blurs */
   --blur-glass:         blur(32px) saturate(140%);
   --blur-glass-light:   blur(16px) saturate(120%);
   --blur-glass-display: blur(6px)  saturate(105%);
 
-  /* --- Glow — restrained (v5 cut ~40% from v4) --- */
-  --glow-faint:  0 0 5px var(--amber-22);
-  --glow-soft:   0 0 6px var(--amber-40), 0 0 14px var(--amber-22);
-  --glow-strong: 0 0 8px var(--amber-65), 0 0 18px var(--amber-22);
+  /* Glow alias -> rose */
+  --glow-faint:  0 0 5px var(--brand-22);
+  --glow-soft:   0 0 6px var(--brand-40), 0 0 14px var(--brand-22);
+  --glow-strong: 0 0 8px var(--brand-65), 0 0 18px var(--brand-22);
 
-  /* === Liquid Glass material (2026-05-25, ADDITIVE — pill pilot) ========== *
-   * Evolves the existing "sealed-glass" reads (--glass-1/2/3, --glass-top,
-   * the inset top-seam) into a TRUE liquid-glass material WITHOUT becoming
-   * iOS-light frosted slop. Apple's Liquid Glass (iOS 26 / macOS Tahoe) is
-   * defined materially by: LENSING (light concentrated/bent at edges, not
-   * scattered like flat blur), SPECULAR HIGHLIGHTS (a bright top-lit edge that
-   * responds to light), ADAPTIVE TRANSLUCENCY, and DEPTH LAYERING — reserved
-   * for the floating navigation layer, NEVER painted onto content.
-   *
-   * vibemix's reading of that: the pill is exactly that floating nav layer,
-   * sitting on the DARK anodised void substrate. So liquid glass here = a
-   * cool phosphor-silk SPECULAR light raked across a near-opaque dark-glass
-   * lozenge, with the top edge catching the most light and the bottom edge
-   * receding into the void (a piece of smoked glass under a single overhead
-   * stage light, not a frosted iOS panel). Amber is UNTOUCHED — the specular
-   * light is NEUTRAL/STRUCTURAL silk, never a second accent (20/80 holds).
-   *
-   * Anti-slop guards baked into the values:
-   *   - NO pure #fff / #000 — highlights are silk-tinted, chroma reduced at the
-   *     extremes (warm silk rgb 255,251,244 capped ≤ 12% alpha), shadows are
-   *     blue-black void, not neutral grey.
-   *   - ONE backdrop-filter layer only (the consumer uses --blur-glass-light);
-   *     the lensing/specular is done with cheap layered box-shadows + a single
-   *     conic/linear pseudo-sweep — no SVG displacement (Safari/Firefox can't
-   *     feed SVG into backdrop-filter anyway, and the GPU cost is the iOS-26
-   *     13%-battery problem we must not import into an always-on-top overlay).
-   *   - reduced-motion + low-power fallbacks live in the @media block below
-   *     (mirrors the existing --blur-glass downgrade pattern). */
-
-  /* Specular light — cool-warm silk, the "overhead stage light" hitting glass.
-   * NOT white: a faintly warm silk so it reads as light on anodised metal, not
-   * a frosted iOS sheen. Three intensities for the top-edge rake. */
-  --lg-spec-hi:   rgba(255, 251, 244, 0.12);  /* brightest catch — top-edge crown */
-  --lg-spec-mid:  rgba(255, 251, 244, 0.06);  /* upper-face fall-off */
-  --lg-spec-lo:   rgba(255, 251, 244, 0.025); /* lower-face residue (near gone) */
-  /* Edge lensing — the rim where light concentrates. A 1px outer rim-light
-   * (top-lit) + the deep void recess at the bottom = the "lens" read. */
-  --lg-rim-light: rgba(255, 251, 244, 0.16);  /* concentrated top rim catch */
-  --lg-rim-void:  rgba(2, 3, 8, 0.55);        /* bottom rim recess into void (tinted to void hue, never pure #000) */
-
-  /* Depth shadow — the floating-layer drop. Blue-black (matches the void
-   * undertone), soft + wide so the lozenge reads as hovering over the desktop,
-   * not stamped onto it. Two-stop: a tight contact + a wide ambient. */
-  --lg-depth: 0 2px 8px rgba(2, 3, 8, 0.5), 0 12px 32px rgba(2, 3, 8, 0.42);
-
-  /* Lens blur — the single backdrop layer. Slightly MORE saturated than the
-   * stock glass-light so the desktop colour bleeding through reads as bent
-   * light (lensing concentrates colour) rather than washed-out frost. Still
-   * one layer, still downgraded under reduced-motion / low-power. */
+  /* === Liquid Glass material (pill floating-layer; warm silk specular) === */
+  --lg-spec-hi:   rgba(255, 251, 244, 0.12);
+  --lg-spec-mid:  rgba(255, 251, 244, 0.06);
+  --lg-spec-lo:   rgba(255, 251, 244, 0.025);
+  --lg-rim-light: rgba(255, 251, 244, 0.16);
+  --lg-rim-void:  rgba(20, 16, 18, 0.55);   /* bottom rim recess, warm void tint */
+  --lg-depth: 0 2px 8px rgba(16, 12, 14, 0.5), 0 12px 32px rgba(16, 12, 14, 0.42);
   --lg-lens-blur: blur(18px) saturate(135%);
-
-  /* The composed liquid-glass shadow stack — drop this on a floating surface
-   * for the full read in one declaration:
-   *   top specular crown + upper rake + bottom void recess + outer depth.
-   * Consumers still own their backdrop-filter (one layer) + background fill. */
   --lg-surface-shadow:
     inset 0 1px 0 var(--lg-rim-light),
     inset 0 6px 12px -8px var(--lg-spec-hi),
     inset 0 -1px 0 var(--lg-rim-void),
     var(--lg-depth);
 
-  /* --- Type --- */
+  /* --- Type --- (Geist/Instrument Serif swap = Phase 1b) */
   --type-display: 'Saira', system-ui, sans-serif;
   --type-body:    'Saira', system-ui, sans-serif;
   --type-mono:    'JetBrains Mono', ui-monospace, monospace;
+  --type-serif:   'Instrument Serif', Georgia, serif;  /* cohost hero + lead track names */
 
-  /* --- Radius --- */
+  /* --- Radius (v5) --- */
   --rad-sm: 2px;
   --rad-md: 6px;
   --rad-lg: 10px;
 
-  /* --- Spacing scale (v5: 4 → 96 in 8 steps) --- */
+  /* --- Spacing scale (4 -> 96 in 8 steps) --- */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -204,21 +284,13 @@
   --sp-6: 40px;
   --sp-7: 64px;
   --sp-8: 96px;
-  /* Named spacing aliases — historic call-sites in session/* expect these.
-   * Resolve to the numeric scale so the CSS cascade doesn't silently
-   * fall back to 0 on undefined tokens. */
   --sp-sm: var(--sp-2);
   --sp-md: var(--sp-4);
 
-  /* --- Status alias — REC pill in titlebar + drop-chip read --rec
-   * (UI-SPEC vocabulary); resolve to the fault LED so the indicator
-   * renders red instead of falling back to transparent. */
+  /* REC pill / drop-chip -> fault LED */
   --rec: var(--led-fault);
 
-  /* --- Layout & Grid (retained from Phase 11; Wave 5 collapsed the
-   *                    mascot column — the wizard-grid is now single-
-   *                    column, the mascot overlay window owns its own
-   *                    surface) --- */
+  /* --- Layout & Grid --- */
   --container-max: 896px;
   --col-primary: 560px;
   --gap-col: 32px;
@@ -227,115 +299,52 @@
   --statusbar-h: 40px;
   --cta-margin-bottom: 24px;
 
-  /* --- meter spectrum — VIS-03 (Phase 43 Plan 43-04) ---
-   * Semantic tokens for the hardware-LED-strip meter render.
-   * meter.ts had 14 inline rgba() literals before VIS-03; the scrub
-   * lifted each to a named token here so the meter CSS is fully
-   * token-driven (asserted by meter.test.ts Test 6). Names follow
-   * the existing alpha-suffix convention (`-NN` = NN% alpha).
-   *
-   * Void shades — frame inset shadows + label text-shadow. Reuse
-   * across any inset-bezel surface that needs the same recess feel. */
-  --void-85: rgba(0, 0, 0, 0.85);     /* meter frame deep inset shadow */
-  --void-70: rgba(0, 0, 0, 0.7);      /* meter label text-shadow */
-  --void-50: rgba(0, 0, 0, 0.5);      /* meter frame mid inset shadow */
-  /* Silk highlights — sub-silk-12 intensities for resting-state seg
-   * texture (the LED ladder must still feel like a ladder when dark). */
-  --silk-06: rgba(214, 207, 199, 0.06);   /* resting seg gradient peak */
-  --silk-025: rgba(214, 207, 199, 0.025); /* resting seg gradient flanks */
-  /* Segment highlight insets — white tints at 1.8% → 35% for lit
-   * segments + peak lozenge top edge. Semantic name = "seg-hi" so
-   * future seg variants can branch off the same family. */
-  --seg-hi-018: rgba(255, 255, 255, 0.018); /* resting seg inset hairline */
-  --seg-hi-022: rgba(255, 255, 255, 0.022); /* meter frame outer ring */
-  --seg-hi-12:  rgba(255, 255, 255, 0.12);  /* warm seg inset highlight */
-  --seg-hi-15:  rgba(255, 255, 255, 0.15);  /* safe seg inset highlight */
-  --seg-hi-18:  rgba(255, 255, 255, 0.18);  /* clip seg inset highlight */
-  --peak-hi-35: rgba(255, 255, 255, 0.35);  /* peak lozenge top edge highlight */
-  /* Amber gradient stop — second-stop alpha mix for the warm seg
-   * gradient. Polychrome migration (2026-05-19) dropped the safe and
-   * clip amber stops; those zones now read green and magenta via the
-   * --meter-* spectrum block below. */
-  --amber-78:      rgba(255, 138, 61, 0.78); /* warm gradient stop B */
+  /* --- meter — void/silk inset tokens (re-toned to ink alpha) --- */
+  --void-85: rgba(0, 0, 0, 0.85);
+  --void-70: rgba(0, 0, 0, 0.7);
+  --void-50: rgba(0, 0, 0, 0.5);
+  --seg-hi-018: rgba(255, 255, 255, 0.018);
+  --seg-hi-022: rgba(255, 255, 255, 0.022);
+  --seg-hi-12:  rgba(255, 255, 255, 0.12);
+  --seg-hi-15:  rgba(255, 255, 255, 0.15);
+  --seg-hi-18:  rgba(255, 255, 255, 0.18);
+  --peak-hi-35: rgba(255, 255, 255, 0.35);
 
-  /* --- meter polychrome spectrum — decision #2 (2026-05-19) ---
-   * Pioneer-mapping the safe → warm → clip ladder to green → amber →
-   * magenta. The single polychrome surface in v5 — every other surface
-   * stays silk/amber/glass per the One-Amber Rule. This breaks the
-   * second-order category-reflex ("AI tool with dark mode + one amber"
-   * = Linear/Vercel/Railway family) by binding a third color into the
-   * surface a DJ glances at the most: the master meter strip.
-   *
-   * Names mirror the existing --amber-NN / --amber-pale-NN convention
-   * so meter.ts stays token-only (the VIS-03 zero-rgba()-literal
-   * contract still holds — meter.test.ts test #6).
-   *
-   * Mood block polychrome (HYPE/TEACH/COACH) follows; those tokens land
-   * in a sibling block when that surface is rebuilt. */
-  /* Safe (segments 1-5) — green family, anchored to --led-ok */
-  --meter-safe:        #6dd44a;                       /* base lit color */
-  --meter-safe-pale:   #9de882;                       /* gradient stop A (top) */
-  --meter-safe-pale-70: rgba(157, 232, 130, 0.7);     /* gradient stop B (bottom) */
-  --meter-safe-22:     rgba(109, 212, 74, 0.22);      /* outer glow alpha */
-  /* Warm (segments 6-13) — amber family, reuses existing --amber / --amber-78 / --amber-40 */
-  /* Clip (segments 14-16) — magenta family */
-  --meter-clip:        #ff2d8f;                       /* base lit color (gradient stop A) */
-  --meter-clip-deep:   #d91464;                       /* deep magenta base */
-  --meter-clip-deep-85: rgba(217, 20, 100, 0.85);     /* gradient stop B */
-  --meter-clip-22:     rgba(255, 45, 143, 0.22);      /* outer glow alpha (inner stop) */
-  --meter-clip-40:     rgba(255, 45, 143, 0.40);      /* outer glow alpha (outer stop) */
+  /* --- meter polychrome (v5; kept defined — collapse to rose+gold is a
+   *     follow-up. The "warm" band aliases --amber and now reads rose). --- */
+  --meter-safe:        #6dd44a;
+  --meter-safe-pale:   #9de882;
+  --meter-safe-pale-70: rgba(157, 232, 130, 0.7);
+  --meter-safe-22:     rgba(109, 212, 74, 0.22);
+  --meter-clip:        #ff2d8f;
+  --meter-clip-deep:   #d91464;
+  --meter-clip-deep-85: rgba(217, 20, 100, 0.85);
+  --meter-clip-22:     rgba(255, 45, 143, 0.22);
+  --meter-clip-40:     rgba(255, 45, 143, 0.40);
   --meter-clip-glow:   0 0 6px var(--meter-clip-40), 0 0 14px var(--meter-clip-22);
 
-  /* --- mood polychrome — decision #2 / part 2 (2026-05-19) ---
-   * Companion to the meter polychrome block. The rocker "interaction"
-   * variant (HYPE / TEACH / COACH on the session deck mood block AND
-   * HYPE / COACH on the settings drawer mode selector) gets a per-id
-   * active color so the persona surface earns its information density.
-   *
-   * Mapping:
-   *   HYPE   → magenta — reuses --meter-clip family (party / push)
-   *   TEACH  → green   — reuses --meter-safe family (instruction / steady)
-   *   COACH  → blue    — anchored to --rave-cyan base hue (analytical / cool)
-   *
-   * Active rocker tiles ARE the only place mood color is rendered. The
-   * inactive segments stay silk-40 + amber on hover/focus per the rocker
-   * baseline. Switching mood swaps the lit color; nothing else moves. */
-  /* HYPE — magenta family (shares meter-clip namespace) */
+  /* --- mood polychrome (v5; kept defined — collapse to rose+gold later) --- */
   --mood-hype:    var(--meter-clip);
   --mood-hype-22: var(--meter-clip-22);
   --mood-hype-40: var(--meter-clip-40);
   --mood-hype-65: rgba(255, 45, 143, 0.65);
-  /* TEACH — green family (shares meter-safe + led-ok namespace) */
   --mood-teach:    var(--meter-safe);
   --mood-teach-22: var(--meter-safe-22);
   --mood-teach-40: rgba(109, 212, 74, 0.40);
   --mood-teach-65: rgba(109, 212, 74, 0.65);
-  /* COACH — blue family (anchored to --rave-cyan base hue, full alpha) */
   --mood-coach:    #4898ff;
   --mood-coach-22: rgba(72, 152, 255, 0.22);
   --mood-coach-40: rgba(72, 152, 255, 0.40);
   --mood-coach-65: rgba(72, 152, 255, 0.65);
 
-  /* --- citation-strip — LAUNCH-02 (Phase 44 Plan 44-03) ---
-   * Semantic tokens for the live UI citation chip surface. Each AI
-   * reaction in the cohost stream renders a tiny `[<verb> @ <mm:ss>]`
-   * chip per cited evidence event. The chip is a click-target →
-   * opens debrief window scrolled to the timestamp. Resting state =
-   * restrained (faint glow, low-alpha amber); hover/focus = soft glow.
-   * 20/80 rule: chips inherit the strip's small surface footprint;
-   * the dominant tone stays silk/glass, the chip carries the only
-   * amber accent in the cohost transcript body.
-   *
-   * Anti-slop principle (frontend-enforcement skill): chip color
-   * MUST come from these tokens — components never declare amber hex.
-   * If a future variant needs a different accent, it lands here. */
-  --c-citation-chip-fg: var(--amber-pale);
-  --c-citation-chip-bg: rgba(255, 138, 61, 0.04); /* subtle amber wash on glass */
-  --c-citation-chip-border: var(--amber-22);
-  --c-citation-chip-border-hover: var(--amber-40);
-  --c-citation-chip-bg-hover: rgba(255, 138, 61, 0.09); /* press-up amber wash */
+  /* --- citation-strip — re-toned amber -> rose --- */
+  --c-citation-chip-fg: var(--brand-glow);
+  --c-citation-chip-bg: rgba(255, 165, 223, 0.05);
+  --c-citation-chip-border: var(--brand-22);
+  --c-citation-chip-border-hover: var(--brand-40);
+  --c-citation-chip-bg-hover: rgba(255, 165, 223, 0.10);
 
-  /* --- Motion budget (retained from Phase 11 + v5 border sweep) --- */
+  /* --- Motion budget (v5) + tozpembe ease --- */
   --motion-snap: 150ms;
   --motion-transition: 200ms;
   --motion-step: 250ms;
@@ -343,25 +352,16 @@
   --motion-rings-audio: 1500ms;
   --motion-rings-listen: 2000ms;
   --motion-dseg-tick: 1000ms;
-  --motion-border-sweep: 22s;   /* slow amber light around panel perimeter */
+  --motion-border-sweep: 22s;   /* slow brand light around panel perimeter */
 }
 
 /* === Perf fallback — accessibility + user-toggled lighter blur ======== */
-/* Two paths swap the heavy v5 blurs for lighter variants:
- *   1. prefers-reduced-motion: reduce — OS-level accessibility (also
- *      freezes the .border-anim sweep).
- *   2. html[data-blur-perf="on"] — runtime escape hatch set by main.ts at
- *      boot when the user has enabled Settings → Performance → Lighter
- *      blur. The Settings drawer toggle that writes this attribute lands
- *      in Plan 14-04; this plan ships the CSS path so 14-04 has wiring. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --blur-glass:         blur(16px);
     --blur-glass-light:   blur(8px);
     --blur-glass-display: blur(4px);
     --motion-border-sweep: 0s;
-    /* Liquid-glass lens drops to a cheap blur (no saturate boost) — the
-     * specular box-shadows + fill still carry the material read statically. */
     --lg-lens-blur:       blur(10px);
   }
   .border-anim { animation: none; opacity: 0.6; }
@@ -371,7 +371,6 @@ html[data-blur-perf="on"] {
   --blur-glass:         blur(16px);
   --blur-glass-light:   blur(8px);
   --blur-glass-display: blur(4px);
-  /* Low-power escape hatch: same lens-blur downgrade as reduced-motion. */
   --lg-lens-blur:       blur(10px);
 }
 
@@ -387,7 +386,7 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  color: var(--silk);
+  color: var(--text-primary);
   font-family: var(--type-body);
   font-weight: 400;
   font-variation-settings: "wdth" 100, "wght" 400;
@@ -399,24 +398,18 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Pure CDJ void (2026-05-26 "The Deck Speaks" rebuild — Kaan ratified).
- * The five --rave-* aurora washes were cut: two independent /impeccable
- * critiques flagged them as "neither felt nor absent" hedged slop on a
- * surface whose whole point is restraint. The floor is now a cinematic
- * vignette + deep cold linear base only; the film grain (body::before)
- * still carries the physical-material feel. The --rave-* tokens remain
- * defined above for any opt-in consumer, but the body no longer paints
- * them. */
+/* Warm tozpembe void floor (v6). Replaces the v5 cold blue-black gradient
+ * with a warm rose-shifted near-black: a cinematic vignette over the void
+ * ladder. Film grain (body::before) carries the physical-material feel. */
 body {
-  background-color: var(--void);
+  background-color: var(--void-0);
   background-image:
-    radial-gradient(ellipse 92% 78% at 50% 42%, transparent 0%, rgba(0, 0, 0, 0.55) 72%, rgba(0, 0, 0, 0.92) 100%),
-    linear-gradient(180deg, #04050b 0%, #000000 52%, #030206 100%);
+    radial-gradient(ellipse 92% 78% at 50% 38%, transparent 0%, rgba(10, 8, 9, 0.55) 72%, rgba(0, 0, 0, 0.92) 100%),
+    linear-gradient(180deg, #221D20 0%, #1A1618 52%, #161214 100%);
   background-attachment: fixed;
 }
 
-/* v5 multi-layer film grain — coarser dust + fine grain, overlay-blended.
- * v4 scanlines are gone; v5 read is glass + film, not CRT. */
+/* multi-layer film grain — coarser dust + fine grain, overlay-blended. */
 body::before {
   content: "";
   position: fixed;
@@ -431,17 +424,10 @@ body::before {
 }
 
 /* === Animated border utility =========================================== */
-/* A slow amber light traveling around the panel perimeter — like the
- * gentle pulse on the front of a real CDJ-3000 sitting idle. Use as the
- * first child of the session deck panel only — NOT on every glass tile
- * (the critique 2026-05-14 found 3+ concurrent sweeps reading as anxiety
- * rather than sign-of-life):
- *   <div class="border-anim"></div>
- * Modifiers:
- *   .slow → 32s (use on secondary panels)
- *   .rev  → reverse direction (pair with adjacent panels so they
- *           don't sync visually)
- * The panel needs `position: relative` and `overflow: hidden`. */
+/* A slow brand light traveling around the panel perimeter — like the gentle
+ * pulse on the front of a real CDJ-3000 sitting idle. Session deck only
+ * (critique 2026-05-14: 3+ concurrent sweeps read as anxiety). The panel
+ * needs `position: relative` and `overflow: hidden`. */
 @keyframes borderSweep {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
@@ -455,9 +441,9 @@ body::before {
     from 0deg at 50% 50%,
     transparent 0%,
     transparent 30%,
-    rgba(255, 138, 61, 0.28) 45%,
-    rgba(255, 220, 180, 0.42) 50%,
-    rgba(255, 138, 61, 0.28) 55%,
+    rgba(255, 165, 223, 0.28) 45%,
+    rgba(255, 184, 232, 0.45) 50%,
+    rgba(255, 165, 223, 0.28) 55%,
     transparent 70%,
     transparent 100%
   );
@@ -478,23 +464,10 @@ body::before {
 .border-anim.slow { animation-duration: 32s; }
 .border-anim.rev  { animation-direction: reverse; }
 
-/* === Glass-tile utility (CDJ Whisper distilled) ======================== *
- * ONE recipe for every glass surface in the app. The base class is
- * `.vmx-tile`; density variants ride on the `data-tile` attribute so
- * we don't collide with the Phase 14 legacy-token regex (which still
- * pattern-matches "--panel"). Variants:
- *   .vmx-tile                    — base (border + glass + sheen + hairline)
- *   .vmx-tile[data-tile="hero"]  — adds deep drop shadow + 1px outer ring
- *   .vmx-tile[data-tile="alert"] — adds amber border + amber-22 inset glow
- *                                  + outer glow-soft (banner/alert state)
- * The row form is just `.vmx-tile` with a height set by the component.
- *
- * Pre-distill: this recipe was duplicated across primary-panel,
- * blackhole-banner, permissions-card, and a thinner cousin in
- * performance-group's button. Critique 2026-05-14 collapsed them into
- * this single source. Components now only own their internal CSS
- * (header text, body padding, internal row layout) — the glass shell
- * comes from this utility. */
+/* === Glass-tile utility ================================================ *
+ * ONE recipe for every glass surface. Base `.vmx-tile`; density variants on
+ * the `data-tile` attribute. Components own only their internal CSS; the
+ * glass shell comes from this utility. */
 .vmx-tile {
   position: relative;
   background: var(--glass-2);
@@ -525,17 +498,9 @@ body::before {
 .vmx-tile > * { position: relative; z-index: 1; }
 
 /* === Glass-streak utility ============================================== *
- * A faint diagonal glass-fingerprint sheen that drifts across the panel
- * face. Lifted from the v5 mock `.session::after` — promoted to a
- * shared utility so any glass surface can opt-in by dropping a
- * `<span class="vmx-glass-streak" aria-hidden="true"></span>` as a child
- * (parent must be `position: relative` + `overflow: hidden`).
- * Sits beneath component content at z-index 0; the panel body should
- * position its children at z-index 1+.
- *
- * v5-distill 2026-05-14: usage trimmed to the session/cohost panels only.
- * Wizard-side tiles no longer sprinkle it (texture-as-decoration was
- * reading as AI-defaultism per critique). */
+ * A faint diagonal glass-fingerprint sheen. Opt-in via a child
+ * `<span class="vmx-glass-streak" aria-hidden="true"></span>` (parent must be
+ * `position: relative` + `overflow: hidden`). Session/cohost panels only. */
 .vmx-glass-streak {
   content: "";
   position: absolute;
@@ -559,10 +524,10 @@ body::before {
   transform: rotate(8deg);
 }
 
-/* === Focus ring (v5 amber) ============================================= */
+/* === Focus ring (v6 rose) ============================================== */
 *:focus { outline: none; }
 *:focus-visible {
-  outline: 2px solid var(--amber);
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
   box-shadow: var(--glow-soft);
 }
@@ -578,7 +543,7 @@ button {
 
 button[disabled] { cursor: not-allowed; }
 
-/* === Wizard frame layout (structural — retoned to v5 glass) ============ */
+/* === Wizard frame layout (structural — retoned to v6 warm void) ======== */
 .wizard-app {
   display: grid;
   grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
@@ -586,11 +551,11 @@ button[disabled] { cursor: not-allowed; }
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  color: var(--silk);
+  color: var(--text-primary);
   background:
-    linear-gradient(180deg, rgba(17, 20, 28, 0.94) 0%, rgba(5, 7, 11, 0.98) 42%, rgba(2, 2, 5, 1) 100%),
-    repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.025) 0 1px, transparent 1px 76px),
-    var(--void-1);
+    linear-gradient(180deg, rgba(48, 42, 46, 0.94) 0%, rgba(26, 22, 24, 0.98) 42%, rgba(20, 16, 18, 1) 100%),
+    repeating-linear-gradient(90deg, rgba(242, 239, 241, 0.022) 0 1px, transparent 1px 76px),
+    var(--void-5);
 }
 
 .wizard-app::before {
@@ -600,8 +565,8 @@ button[disabled] { cursor: not-allowed; }
   z-index: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg, transparent 0%, rgba(255, 138, 61, 0.045) 50%, transparent 100%),
-    repeating-linear-gradient(0deg, transparent 0 10px, rgba(214, 207, 199, 0.018) 10px 11px);
+    linear-gradient(90deg, transparent 0%, var(--brand-04) 50%, transparent 100%),
+    repeating-linear-gradient(0deg, transparent 0 10px, rgba(242, 239, 241, 0.018) 10px 11px);
   opacity: 0.62;
   mask-image: linear-gradient(180deg, transparent 0%, black 18%, black 84%, transparent 100%);
 }
@@ -615,8 +580,8 @@ button[disabled] { cursor: not-allowed; }
   z-index: 0;
   height: 1px;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.26), transparent);
-  box-shadow: 0 0 18px rgba(255, 138, 61, 0.12);
+  background: linear-gradient(90deg, transparent, var(--brand-22), transparent);
+  box-shadow: 0 0 18px var(--brand-12);
 }
 
 .wizard-app > * {
@@ -630,13 +595,13 @@ button[disabled] { cursor: not-allowed; }
   justify-content: space-between;
   padding: 0 var(--sp-5);
   background:
-    linear-gradient(180deg, rgba(18, 20, 28, 0.88), rgba(4, 5, 9, 0.82)),
+    linear-gradient(180deg, rgba(40, 35, 38, 0.88), rgba(20, 16, 18, 0.82)),
     rgba(0, 0, 0, 0.55);
   backdrop-filter: var(--blur-glass-light);
   -webkit-backdrop-filter: var(--blur-glass-light);
   border-bottom: 1px solid var(--glass-edge);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 1px 0 rgba(255, 220, 240, 0.045),
     inset 0 -1px 0 rgba(0, 0, 0, 0.74),
     0 10px 26px rgba(0, 0, 0, 0.28);
   -webkit-app-region: drag; /* Tauri custom titlebar drag region */
@@ -649,9 +614,9 @@ button[disabled] { cursor: not-allowed; }
   font-size: 18px;
   letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--silk);
+  color: var(--text-primary);
   line-height: 1;
-  text-shadow: 0 0 12px rgba(255, 138, 61, 0.12);
+  text-shadow: 0 0 12px var(--brand-12);
 }
 
 .titlebar .traffic-spacer {
@@ -673,7 +638,7 @@ button[disabled] { cursor: not-allowed; }
   z-index: 1;
   display: grid;
   grid-template-rows: var(--stepstrip-h) minmax(0, 1fr) auto;
-  padding: 0 32px var(--cta-margin-bottom); /* 32px — no v5 equivalent, mock-verbatim */
+  padding: 0 32px var(--cta-margin-bottom);
   overflow: hidden;
   min-height: 0;
 }
@@ -682,17 +647,6 @@ button[disabled] { cursor: not-allowed; }
   min-width: 0;
 }
 
-/* v5 reclaims the embedded mascot corner — the wizard is single-column
- * and the mascot lives in its own overlay window (Phase 13).
- *
- * `overflow-y: auto` + `min-height: 0` make the middle grid row the
- * scroll container when a step's content (Step 2 with BlackHole banner +
- * device dropdown + audio test + window picker) exceeds viewport height.
- * Without these, the wizard window cropped the bottom of the step body
- * and the "Yes, sounded clean" confirm row became unreachable on the
- * default 980×700 Tauri window size. The parent (.wizard-content) keeps
- * `overflow: hidden` so the titlebar + status bar + step strip stay
- * pinned; only the step body scrolls. */
 .wizard-grid {
   display: grid;
   grid-template-columns: var(--col-primary);
@@ -707,9 +661,6 @@ button[disabled] { cursor: not-allowed; }
   scrollbar-gutter: stable;
 }
 
-/* Restrained CDJ-Whisper scrollbar — visible only when scrolling is
- * actually required. WebKit + Blink only; Firefox falls back to the
- * system scrollbar. Width matches the v5 1px hairline language. */
 .wizard-grid::-webkit-scrollbar {
   width: 6px;
 }
@@ -717,11 +668,11 @@ button[disabled] { cursor: not-allowed; }
   background: transparent;
 }
 .wizard-grid::-webkit-scrollbar-thumb {
-  background: var(--silk-22, rgba(232, 224, 213, 0.18));
+  background: var(--silk-22);
   border-radius: 3px;
 }
 .wizard-grid::-webkit-scrollbar-thumb:hover {
-  background: var(--silk-40, rgba(232, 224, 213, 0.4));
+  background: var(--silk-40);
 }
 
 .cta-row {
@@ -736,13 +687,13 @@ button[disabled] { cursor: not-allowed; }
   justify-content: space-between;
   padding: 0 var(--sp-5);
   background:
-    linear-gradient(180deg, rgba(4, 5, 9, 0.82), rgba(1, 2, 5, 0.9)),
+    linear-gradient(180deg, rgba(20, 16, 18, 0.82), rgba(12, 9, 11, 0.9)),
     rgba(0, 0, 0, 0.55);
   backdrop-filter: var(--blur-glass-light);
   -webkit-backdrop-filter: var(--blur-glass-light);
   border-top: 1px solid var(--glass-edge);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 1px 0 rgba(255, 220, 240, 0.045),
     0 -10px 26px rgba(0, 0, 0, 0.24);
 }
 
@@ -756,7 +707,7 @@ button[disabled] { cursor: not-allowed; }
   }
 }
 
-/* === Crash banner (UI-SPEC §13) — retoned to v5 glass ================== */
+/* === Crash banner (UI-SPEC §13) — retoned to v6 ======================== */
 #crash-banner[hidden] { display: none !important; }
 #crash-banner {
   position: absolute;
@@ -768,7 +719,7 @@ button[disabled] { cursor: not-allowed; }
   align-items: center;
   gap: var(--sp-4);
   padding: var(--sp-4) var(--sp-5);
-  background: linear-gradient(180deg, rgba(37, 24, 28, 0.7), rgba(26, 16, 20, 0.7)); /* mock-verbatim — destructive banner amber/red tint */
+  background: linear-gradient(180deg, rgba(48, 30, 36, 0.72), rgba(34, 20, 26, 0.72)); /* destructive banner tint */
   backdrop-filter: var(--blur-glass-light);
   -webkit-backdrop-filter: var(--blur-glass-light);
   border-top: 1px solid var(--led-fault);
@@ -787,7 +738,7 @@ button[disabled] { cursor: not-allowed; }
   font-size: 11px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--silk);
+  color: var(--text-primary);
 }
 #crash-banner .body {
   font-family: var(--type-mono);
@@ -805,22 +756,22 @@ button[disabled] { cursor: not-allowed; }
   letter-spacing: 0.22em;
   text-transform: uppercase;
   padding: 9px 24px;
-  border: 1px solid var(--amber-40);
+  border: 1px solid var(--brand-40);
   border-radius: var(--rad-sm);
-  color: var(--amber);
-  background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  color: var(--brand);
+  background: linear-gradient(180deg, var(--brand-16) 0%, var(--brand-04) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -1px 0 var(--amber-40),
-    inset 0 0 14px var(--amber-22),
-    0 0 0 1px rgba(255, 138, 61, 0.14);
-  text-shadow: 0 0 4px var(--amber-65);
+    inset 0 1px 0 rgba(255, 220, 240, 0.06),
+    inset 0 -1px 0 var(--brand-40),
+    inset 0 0 14px var(--brand-22),
+    0 0 0 1px var(--brand-12);
+  text-shadow: 0 0 4px var(--brand-65);
   cursor: pointer;
   min-width: 144px;
 }
 #crash-banner button#crash-restart:hover {
-  border-color: var(--amber);
-  background: linear-gradient(180deg, rgba(255, 138, 61, 0.14) 0%, rgba(255, 138, 61, 0.04) 100%);
+  border-color: var(--brand);
+  background: linear-gradient(180deg, var(--brand-22) 0%, var(--brand-06) 100%);
 }
 
 @keyframes crash-enter {

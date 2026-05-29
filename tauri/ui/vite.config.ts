@@ -86,6 +86,12 @@ export default defineConfig({
     target: "es2022",
     minify: "esbuild",
     sourcemap: true,
+    // The mascot webview is a standalone local-app entry that owns the
+    // Three.js renderer. Keeping it as one page-specific bundle avoids
+    // pulling Three into the main session path; the current minified mascot
+    // JS is ~608 kB / ~158 kB gzip, so the default 500 kB web-page warning
+    // is noisy rather than actionable for this Tauri surface.
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       input: {
         main: resolve(projectRoot, "index.html"),
@@ -119,6 +125,13 @@ export default defineConfig({
         // spawned WebviewWindow inherits the default-capabilities surface
         // (mirrors debrief/pill/library precedent).
         learn: resolve(projectRoot, "learn.html"),
+        // v6 tozpembe — the cohesive DesktopShell window. Folds the opaque
+        // surfaces (Deck/Crate/Learn/Debrief/Settings) into one app shell:
+        // fixed sidebar + recessed main + grounding panel + Cmd+K palette +
+        // floating status. Structure-only in this phase (surfaces are
+        // keep-alive placeholders with data-wire anchors); no backend wiring.
+        // See docs/design/vibemix-translation-layer.md.
+        shell: resolve(projectRoot, "shell.html"),
       },
     },
   },

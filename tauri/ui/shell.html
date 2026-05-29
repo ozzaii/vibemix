@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>vibemix</title>
+    <!--
+      Cohesive DesktopShell — tozpembe / Forged Obsidian Chrome (v6).
+
+      The one-app composition that folds the opaque surfaces (Deck / Crate /
+      Learn / Debrief / Settings) into a single window: fixed sidebar, offset
+      recessed main with keep-alive surfaces, contextual grounding panel, Cmd+K
+      palette, and a quiet floating status. See docs/design/vibemix-translation-
+      layer.md. Backend wiring is intentionally absent in this skeleton; the
+      surface data-wire anchors mark where real surfaces mount later.
+    -->
+    <link rel="stylesheet" href="/src/tokens.css" />
+    <link rel="stylesheet" href="/src/shell/shell.css" />
+  </head>
+  <body>
+    <div id="shell-root"></div>
+    <script type="module" src="/src/shell/index.ts"></script>
+  </body>
+</html>
