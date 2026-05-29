@@ -26,23 +26,6 @@ import jsonschema
 import pytest
 
 from vibemix.ui_bus import (
-    # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn module envelopes.
-    LearnControllerDetected,
-    LearnMidiPosition,
-    # Phase 92 LESSON-01..LESSON-06 / TONE-02 / TONE-04 / RENDER-04 — Learn
-    # lesson-runtime envelopes + AI highlight contract.
-    LearnAck,
-    LearnAdvance,
-    LearnCompleteLesson,
-    LearnExemplarPlay,
-    LearnExemplarStop,
-    LearnHighlight,
-    LearnLessonLoaded,
-    LearnProgressDot,
-    LearnProgressState,
-    LearnStartCourse,
-    LearnStartLesson,
-    LearnTutorSpeak,
     CalibrationAudioResult,
     CalibrationDeviceList,
     CalibrationListDevices,
@@ -66,10 +49,30 @@ from vibemix.ui_bus import (
     DebriefEventTimeline,
     DebriefSessionLoaded,
     DebriefTldrAudio,
-    DrillPayload,
     DeviceInfo,
+    DrillPayload,
     IpcBoot,
     IpcError,
+    # Phase 92 LESSON-01..LESSON-06 / TONE-02 / TONE-04 / RENDER-04 — Learn
+    # lesson-runtime envelopes + AI highlight contract.
+    LearnAck,
+    LearnAdvance,
+    LearnCompleteLesson,
+    # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn module envelopes.
+    LearnControllerDetected,
+    LearnExemplarPlay,
+    LearnExemplarStop,
+    LearnHighlight,
+    LearnLessonLoaded,
+    LearnMidiPosition,
+    LearnProgressDot,
+    LearnProgressState,
+    LearnStartCourse,
+    LearnStartLesson,
+    LearnTeachingLoopPayload,
+    LearnTeachingObservationPayload,
+    LearnTeachingVerificationPayload,
+    LearnTutorSpeak,
     LevelPair,
     LibraryConfidence,
     LibraryImport,
@@ -82,9 +85,6 @@ from vibemix.ui_bus import (
     LibraryStalenessAction,
     LibraryStalenessNudge,
     MascotMoodChange,
-    SessionCitation,
-    SessionCohostReaction,
-    SessionOverlayHighlight,
     MetersTriple,
     PermissionCheck,
     PermissionState,
@@ -97,15 +97,19 @@ from vibemix.ui_bus import (
     ProfileSetConsent,
     ProfileView,
     ProfileViewResult,
-    RecordingSummary,
     RecordingsDelete,
     RecordingsDeleteAck,
     RecordingsEvents,
     RecordingsEventsResult,
     RecordingsList,
     RecordingsListResult,
+    RecordingSummary,
     RecordingsUsage,
+    SessionCitation,
+    SessionCohostReaction,
     SessionMute,
+    SessionOverlayHighlight,
+    SessionSetMode,
     SessionSnapshot,
     SettingsGet,
     SettingsSet,
@@ -114,6 +118,7 @@ from vibemix.ui_bus import (
     StatusTick,
     WindowInfo,
     WizardDone,
+    WizardSetSkill,
     WizardStart,
 )
 from vibemix.ui_bus.messages import _SCHEMA
@@ -213,6 +218,7 @@ def _make_examples() -> list[tuple[str, object]]:
                 target_window_id="win-42",
             ),
         ),
+        ("WizardSetSkill", WizardSetSkill.make(skill="intermediate")),
         # Phase 12 wrappers
         (
             "SessionSnapshot",
@@ -225,6 +231,7 @@ def _make_examples() -> list[tuple[str, object]]:
             ),
         ),
         ("SessionMute", SessionMute.make_toggle()),
+        ("SessionSetMode", SessionSetMode.make(mode="build")),
         ("SettingsSet", SettingsSet.make(field="voice", value="kore")),
         ("SettingsGet", SettingsGet.make()),
         (
@@ -664,9 +671,10 @@ def test_example_count_matches_schema_oneof() -> None:
     LearnStartCourse / LearnStartLesson / LearnCompleteLesson /
     LearnLessonLoaded / LearnHighlight / LearnAdvance / LearnAck /
     LearnTutorSpeak / LearnExemplarPlay / LearnExemplarStop /
-    LearnProgressState) → 77.
+    LearnProgressState) → 77. Phase 97 adds SessionSetMode → 78.
+    Quick 260529-ifq adds WizardSetSkill (onboarding skill-level step) → 79.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 77
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 79
 
 
 @pytest.mark.parametrize(
@@ -683,12 +691,61 @@ def test_wrapper_roundtrip_validates_against_schema(name: str, message: object) 
     jsonschema.validate(parsed, _SCHEMA)
 
 
+def test_tutor_speak_accepts_optional_teaching_loop_metadata() -> None:
+    message = LearnTutorSpeak.make(
+        text="press play.",
+        tts_marker="L101.beat0",
+        citations=(),
+        data_state="active",
+        teaching_loop=LearnTeachingLoopPayload(
+            stages=("observe", "decide", "teach", "verify", "adapt"),
+            turn_kind="teach",
+            route_path="learn_tutor",
+            observation=LearnTeachingObservationPayload(
+                lesson_id="L1.01",
+                step_id="L1.01.beat.0",
+                kind="practice",
+                control_id="lesson_continue",
+                input_surfaces=("screen",),
+                backstage_lenses=("evidence_registry",),
+                strikes_used=0,
+            ),
+            verification=LearnTeachingVerificationPayload(
+                kind="button_press",
+                control="lesson_continue",
+                deck="",
+                observable_control_ids=("lesson_continue",),
+                input_surfaces=("screen",),
+                direction="down",
+                min_delta=0,
+            ),
+        ),
+    )
+
+    parsed = json.loads(message.to_json())
+    jsonschema.validate(parsed, _SCHEMA)
+    assert parsed["payload"]["teaching_loop"]["turn_kind"] == "teach"
+
+
+def test_tutor_speak_omits_teaching_loop_when_absent() -> None:
+    parsed = json.loads(
+        LearnTutorSpeak.make(
+            text="press play.",
+            tts_marker="L101.beat0",
+            citations=(),
+            data_state="active",
+        ).to_json()
+    )
+
+    assert "teaching_loop" not in parsed["payload"]
+
+
 def test_schema_self_validates_against_draft7() -> None:
     """Sanity: the schema file itself is conformant Draft-07."""
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_77() -> None:
+def test_schema_oneof_count_is_79() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
     7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35;
@@ -705,15 +762,20 @@ def test_schema_oneof_count_is_77() -> None:
     LearnStartLesson / LearnCompleteLesson / LearnLessonLoaded /
     LearnHighlight / LearnAdvance / LearnAck / LearnTutorSpeak /
     LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 77.
+    Phase 97 adds SessionSetMode → 78. Quick 260529-ifq adds WizardSetSkill
+    (onboarding skill-level step) → 79.
 
     ``definitions`` count grows alongside oneOf since every new wrapper
     adds one entry to both. ``LevelPair`` is a shared helper ref'd from
     ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message
     (so it counts in ``definitions`` but not in ``oneOf``); the skew
-    between the two counts stays at 1.
+    between the two counts is 2 after adding the payload-only
+    ``LearnTeachingLoop`` helper for ``LearnTutorSpeak`` metadata
+    (``WizardSetSkill``'s payload is inlined, not a separate definition,
+    so it adds 1 to both counts and the skew stays 2).
     """
-    assert len(_SCHEMA["oneOf"]) == 77
-    assert len(_SCHEMA["definitions"]) == 78
+    assert len(_SCHEMA["oneOf"]) == 79
+    assert len(_SCHEMA["definitions"]) == 81
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

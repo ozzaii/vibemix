@@ -33,8 +33,7 @@ from vibemix.runtime.config_store import ConfigStore
 from vibemix.runtime.settings import SettingsApplier
 from vibemix.runtime.ws_bus import ws_broadcast
 from vibemix.state import MusicState
-from vibemix.ui_bus import MascotMoodChange, MascotMoodChangePayload, validate_message
-
+from vibemix.ui_bus import MascotMoodChange, validate_message
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -127,7 +126,9 @@ def test_count_parity_holds_after_addition():
     runtime envelopes — LearnStartCourse / LearnStartLesson /
     LearnCompleteLesson / LearnLessonLoaded / LearnHighlight /
     LearnAdvance / LearnAck / LearnTutorSpeak / LearnExemplarPlay /
-    LearnExemplarStop / LearnProgressState). The check_ipc_schema.py
+    LearnExemplarStop / LearnProgressState). Phase 97 adds SessionSetMode
+    to 78. Quick 260529-ifq adds WizardSetSkill (onboarding skill-level
+    step) → 79. The check_ipc_schema.py
     invariant is what fails the CI build if either side regresses, so we
     assert it here directly. Introspection must filter on the ``type``
     field annotation starting with ``Literal["ipc.`` so nested
@@ -168,9 +169,9 @@ def test_count_parity_holds_after_addition():
     schema = json.loads(schema_path.read_text())
     oneof_count = len(schema["oneOf"])
 
-    assert wrapper_count == oneof_count == 77, (
+    assert wrapper_count == oneof_count == 79, (
         f"count parity violated: wrappers={wrapper_count} vs oneOf={oneof_count}; "
-        "expected both 77 after Plan 92-01"
+        "expected both 79 after WizardSetSkill"
     )
 
 

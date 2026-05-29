@@ -62,6 +62,9 @@
       "$ref": "#/definitions/WizardDone"
     },
     {
+      "$ref": "#/definitions/WizardSetSkill"
+    },
+    {
       "$ref": "#/definitions/SessionSnapshot"
     },
     {
@@ -950,6 +953,41 @@
         }
       }
     },
+    "WizardSetSkill": {
+      "$comment": "Shell -> sidecar. Onboarding skill-level step. Fire-and-forget; sidecar persists config.json extra.skill so the next cold boot seeds VIBEMIX_SKILL_LEVEL.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "ts",
+        "payload"
+      ],
+      "properties": {
+        "type": {
+          "const": "ipc.wizard.set_skill"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "skill"
+          ],
+          "properties": {
+            "skill": {
+              "enum": [
+                "beginner",
+                "intermediate",
+                "pro"
+              ]
+            }
+          }
+        }
+      }
+    },
     "SessionSnapshot": {
       "$comment": "Phase 12 \u2014 Sidecar \u2192 shell @ 30Hz. Live session state snapshot driving meters, transcript, phase tape, drop chip, MIDI event ribbon. UX-08.",
       "type": "object",
@@ -1340,6 +1378,7 @@
                 "click_through",
                 "lighter_blur",
                 "skill",
+                "lens",
                 "learn.headphone_device_index"
               ]
             },
@@ -1389,7 +1428,7 @@
       }
     },
     "SettingsState": {
-      "$comment": "Phase 12 \u2014 Sidecar \u2192 shell. Full settings snapshot \u2014 emitted on boot, on ipc.settings.get, and after any ipc.settings.set ack. IN-03 in 14-REVIEW.md added optional mood + click_through so the SettingsSet enum's 10 fields can all round-trip through a SettingsState snapshot \u2014 required list stays at the 9 always-emitted fields so existing emit paths and tests stay green.",
+      "$comment": "Phase 12 \u2014 Sidecar \u2192 shell. Full settings snapshot \u2014 emitted on boot, on ipc.settings.get, and after any ipc.settings.set ack. Optional extra-backed settings round-trip through this snapshot; required list stays at the always-emitted fields so existing emit paths and tests stay green.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -1491,6 +1530,22 @@
                     "beginner",
                     "intermediate",
                     "pro"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lens": {
+              "$comment": "Phase 79 LENS-02 - optional shared persona lens. Null means the field is absent from ConfigStore.extra and each surface uses its own cold-path default.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "hype",
+                    "critique",
+                    "tutor"
                   ]
                 },
                 {
@@ -3081,7 +3136,7 @@
           "additionalProperties": false,
           "required": ["lesson_id", "level"],
           "properties": {
-            "lesson_id": {"type": "string", "pattern": "^L[0-9]+\\.[0-9]+-.+$"},
+            "lesson_id": {"type": "string", "pattern": "^L[0-9]+\\.[0-9]+(?:-.+)?$"},
             "level": {"type": "string", "enum": ["fresh", "replay"]}
           }
         }
@@ -3100,7 +3155,7 @@
           "additionalProperties": false,
           "required": ["lesson_id", "reason"],
           "properties": {
-            "lesson_id": {"type": "string", "pattern": "^L[0-9]+\\.[0-9]+-.+$"},
+            "lesson_id": {"type": "string", "pattern": "^L[0-9]+\\.[0-9]+(?:-.+)?$"},
             "reason": {"type": "string", "enum": ["completed", "user_skip"]}
           }
         }
@@ -3209,6 +3264,7 @@
             "control_id": {"type": "string", "minLength": 1},
             "source": {"type": "string", "enum": ["midi", "click"]},
             "value": {"type": "integer", "minimum": 0, "maximum": 127},
+            "prev_value": {"type": "integer", "minimum": 0, "maximum": 127},
             "direction": {"type": "string", "enum": ["", "up", "down"]}
           }
         }
@@ -3234,7 +3290,71 @@
               "items": {"type": "string", "pattern": "^\\[(track|exemplar|cue|ev|aud|midi|screen|mix|tend|key|recall):.+\\]$"},
               "maxItems": 4
             },
-            "data_state": {"type": "string", "enum": ["active", "hint"]}
+            "data_state": {"type": "string", "enum": ["active", "hint"]},
+            "teaching_loop": {"$ref": "#/definitions/LearnTeachingLoop"}
+          }
+        }
+      }
+    },
+    "LearnTeachingLoop": {
+      "$comment": "Optional backstage observe → decide → teach → verify → adapt metadata for LearnTutorSpeak. Ignored by the calm frontstage, used by proof/dev tooling.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stages", "turn_kind", "route_path", "observation", "verification"],
+      "properties": {
+        "stages": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["observe", "decide", "teach", "verify", "adapt"]},
+          "minItems": 5,
+          "maxItems": 5
+        },
+        "turn_kind": {"type": "string", "enum": ["teach", "hint", "adapt"]},
+        "route_path": {"type": "string", "minLength": 1, "maxLength": 64},
+        "observation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lesson_id", "step_id", "kind", "control_id", "input_surfaces", "backstage_lenses", "strikes_used"],
+          "properties": {
+            "lesson_id": {"type": "string", "minLength": 1, "maxLength": 64},
+            "step_id": {"type": "string", "minLength": 1, "maxLength": 96},
+            "kind": {"type": "string", "minLength": 1, "maxLength": 32},
+            "control_id": {"type": "string", "minLength": 1, "maxLength": 64},
+            "input_surfaces": {
+              "type": "array",
+              "items": {"type": "string", "enum": ["hardware", "screen"]},
+              "minItems": 1,
+              "maxItems": 2
+            },
+            "backstage_lenses": {
+              "type": "array",
+              "items": {"type": "string"},
+              "maxItems": 12
+            },
+            "strikes_used": {"type": "integer", "minimum": 0, "maximum": 3}
+          }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "control", "deck", "observable_control_ids", "input_surfaces", "direction", "min_delta"],
+          "properties": {
+            "kind": {"type": "string", "enum": ["button_press", "cc_delta"]},
+            "control": {"type": "string", "minLength": 1, "maxLength": 64},
+            "deck": {"type": "string", "maxLength": 8},
+            "observable_control_ids": {
+              "type": "array",
+              "items": {"type": "string", "minLength": 1, "maxLength": 64},
+              "minItems": 1,
+              "maxItems": 4
+            },
+            "input_surfaces": {
+              "type": "array",
+              "items": {"type": "string", "enum": ["hardware", "screen"]},
+              "minItems": 1,
+              "maxItems": 2
+            },
+            "direction": {"type": "string", "enum": ["", "up", "down"]},
+            "min_delta": {"type": "integer", "minimum": 0, "maximum": 127}
           }
         }
       }
@@ -3298,7 +3418,7 @@
               "additionalProperties": false,
               "required": ["schema_version", "courses", "lessons"],
               "properties": {
-                "schema_version": {"type": "integer", "minimum": 1, "maximum": 1},
+                "schema_version": {"type": "integer", "minimum": 1, "maximum": 2},
                 "courses": {
                   "type": "object",
                   "additionalProperties": {
@@ -3323,7 +3443,20 @@
                   }
                 },
                 "course_2_unlocked": {"type": "boolean"},
-                "course_3_unlocked": {"type": "boolean"}
+                "course_3_unlocked": {"type": "boolean"},
+                "skills": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["live_proof_count", "mastered", "first_mastered_at"],
+                    "properties": {
+                      "live_proof_count": {"type": "integer", "minimum": 0},
+                      "mastered": {"type": "boolean"},
+                      "first_mastered_at": {"type": ["string", "null"]}
+                    }
+                  }
+                }
               }
             }
           }

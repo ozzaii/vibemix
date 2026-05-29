@@ -23,6 +23,7 @@ export type VibemixIPCMessages =
   | CalibrationSmokeTestDone
   | WizardStart
   | WizardDone
+  | WizardSetSkill
   | SessionSnapshot
   | SessionMute
   | SessionCitation
@@ -229,6 +230,13 @@ export interface WizardDone {
     target_window_id: string | null;
   };
 }
+export interface WizardSetSkill {
+  type: "ipc.wizard.set_skill";
+  ts: string;
+  payload: {
+    skill: "beginner" | "intermediate" | "pro";
+  };
+}
 export interface SessionSnapshot {
   type: "ipc.session.snapshot";
   ts: string;
@@ -311,6 +319,7 @@ export interface SettingsSet {
       | "click_through"
       | "lighter_blur"
       | "skill"
+      | "lens"
       | "learn.headphone_device_index";
     value: string | number | boolean | null;
   };
@@ -336,6 +345,7 @@ export interface SettingsState {
     mood?: ("hype-man" | "teacher" | "coach") | null;
     click_through?: boolean | null;
     skill?: ("beginner" | "intermediate" | "pro") | null;
+    lens?: ("hype" | "critique" | "tutor") | null;
     "learn.headphone_device_index"?: number | null;
     "session.mode"?: ("cohost" | "learn" | "build" | "debrief") | null;
   };
@@ -861,6 +871,7 @@ export interface LearnAck {
     control_id: string;
     source: "midi" | "click";
     value?: number;
+    prev_value?: number;
     direction?: "" | "up" | "down";
   };
 }
@@ -875,6 +886,68 @@ export interface LearnTutorSpeak {
      */
     citations: [] | [string] | [string, string] | [string, string, string] | [string, string, string, string];
     data_state: "active" | "hint";
+    teaching_loop?: LearnTeachingLoop;
+  };
+}
+export interface LearnTeachingLoop {
+  /**
+   * @minItems 5
+   * @maxItems 5
+   */
+  stages: [
+    "observe" | "decide" | "teach" | "verify" | "adapt",
+    "observe" | "decide" | "teach" | "verify" | "adapt",
+    "observe" | "decide" | "teach" | "verify" | "adapt",
+    "observe" | "decide" | "teach" | "verify" | "adapt",
+    "observe" | "decide" | "teach" | "verify" | "adapt"
+  ];
+  turn_kind: "teach" | "hint" | "adapt";
+  route_path: string;
+  observation: {
+    lesson_id: string;
+    step_id: string;
+    kind: string;
+    control_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 2
+     */
+    input_surfaces: ["hardware" | "screen"] | ["hardware" | "screen", "hardware" | "screen"];
+    /**
+     * @maxItems 12
+     */
+    backstage_lenses:
+      | []
+      | [string]
+      | [string, string]
+      | [string, string, string]
+      | [string, string, string, string]
+      | [string, string, string, string, string]
+      | [string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string, string, string, string];
+    strikes_used: number;
+  };
+  verification: {
+    kind: "button_press" | "cc_delta";
+    control: string;
+    deck: string;
+    /**
+     * @minItems 1
+     * @maxItems 4
+     */
+    observable_control_ids: [string] | [string, string] | [string, string, string] | [string, string, string, string];
+    /**
+     * @minItems 1
+     * @maxItems 2
+     */
+    input_surfaces: ["hardware" | "screen"] | ["hardware" | "screen", "hardware" | "screen"];
+    direction: "" | "up" | "down";
+    min_delta: number;
   };
 }
 export interface LearnExemplarPlay {
@@ -917,6 +990,13 @@ export interface LearnProgressState {
       };
       course_2_unlocked?: boolean;
       course_3_unlocked?: boolean;
+      skills?: {
+        [k: string]: {
+          live_proof_count: number;
+          mastered: boolean;
+          first_mastered_at: string | null;
+        };
+      };
     };
   };
 }

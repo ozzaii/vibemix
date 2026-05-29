@@ -249,6 +249,11 @@ class WizardDonePayload:
     target_window_id: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class WizardSetSkillPayload:
+    skill: Literal["beginner", "intermediate", "pro"]
+
+
 # ---------------------------------------------------------------------------
 # Phase 12 — session + settings payload structs
 # ---------------------------------------------------------------------------
@@ -323,6 +328,11 @@ class SessionMutePayload:
 
 
 @dataclass(frozen=True, slots=True)
+class SessionSetModePayload:
+    mode: Literal["cohost", "learn", "build", "debrief"]
+
+
+@dataclass(frozen=True, slots=True)
 class SettingsSetPayload:
     field: Literal[
         "voice",
@@ -336,6 +346,8 @@ class SettingsSetPayload:
         "click_through",
         "lighter_blur",
         "skill",
+        "lens",
+        "learn.headphone_device_index",
     ]
     value: str | int | bool | None
 
@@ -357,16 +369,20 @@ class SettingsStatePayload:
     muted: bool
     lighter_blur: bool
     # IN-03 in 14-REVIEW.md — optional fields so the SettingsSet enum's
-    # 10 fields can round-trip through SettingsState. Default None
-    # preserves the wire shape callers had before Phase 14 (the
-    # schema's `additionalProperties: false` rejects keys that are
-    # literally None when serialized; the wrapper's to_json strips None
-    # via _strip_none_optionals — see SettingsState.make).
+    # extra-backed fields can round-trip through SettingsState. Default None maps to
+    # JSON null, which the schema accepts for pre-wiring / unavailable state.
     mood: Literal["hype-man", "teacher", "coach"] | None = None
     click_through: bool | None = None
     # 2026-05-25 — optional persona level so the skill field round-trips
     # through a SettingsState snapshot (same None-strip contract as mood).
     skill: Literal["beginner", "intermediate", "pro"] | None = None
+    lens: Literal["hype", "critique", "tutor"] | None = None
+    # Phase 93 — dotted schema key mirrored by SettingsState.to_json.
+    learn_headphone_device_index: int | None = None
+    # Phase 97 — top-level app mode persisted under ConfigStore.extra
+    # key "session.mode". Python dataclass fields cannot contain a dot,
+    # so SettingsState.to_json renames this to the schema's dotted key.
+    session_mode: Literal["cohost", "learn", "build", "debrief"] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -788,6 +804,29 @@ class WizardDone:
         return _serialize(self)
 
 
+@dataclass(frozen=True, slots=True)
+class WizardSetSkill:
+    """Shell → sidecar. Onboarding skill-level step fires this on Continue so
+    the sidecar persists ``extra["skill"]`` to config.json BEFORE the wizard
+    exits — the next cold boot seeds ``VIBEMIX_SKILL_LEVEL`` from it
+    (apply_persona_config_to_env). Fire-and-forget; no ack."""
+
+    type: Literal["ipc.wizard.set_skill"]
+    ts: str
+    payload: WizardSetSkillPayload
+
+    @classmethod
+    def make(cls, *, skill: str) -> WizardSetSkill:
+        return cls(
+            type="ipc.wizard.set_skill",
+            ts=_now_iso(),
+            payload=WizardSetSkillPayload(skill=skill),  # type: ignore[arg-type]
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
 # ---------------------------------------------------------------------------
 # Phase 12 wrapper dataclasses
 # ---------------------------------------------------------------------------
@@ -871,13 +910,35 @@ class SessionMute:
 
 
 @dataclass(frozen=True, slots=True)
+class SessionSetMode:
+    type: Literal["ipc.session.set_mode"]
+    ts: str
+    payload: SessionSetModePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        mode: Literal["cohost", "learn", "build", "debrief"],
+    ) -> SessionSetMode:
+        return cls(
+            type="ipc.session.set_mode",
+            ts=_now_iso(),
+            payload=SessionSetModePayload(mode=mode),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
 class SettingsSet:
     type: Literal["ipc.settings.set"]
     ts: str
     payload: SettingsSetPayload
 
     @classmethod
-    def make(cls, *, field: str, value: str | int | None) -> SettingsSet:
+    def make(cls, *, field: str, value: str | int | bool | None) -> SettingsSet:
         return cls(
             type="ipc.settings.set",
             ts=_now_iso(),
@@ -927,6 +988,9 @@ class SettingsState:
         mood: Literal["hype-man", "teacher", "coach"] | None = None,
         click_through: bool | None = None,
         skill: Literal["beginner", "intermediate", "pro"] | None = None,
+        lens: Literal["hype", "critique", "tutor"] | None = None,
+        learn_headphone_device_index: int | None = None,
+        session_mode: Literal["cohost", "learn", "build", "debrief"] | None = None,
     ) -> SettingsState:
         return cls(
             type="ipc.settings.state",
@@ -944,11 +1008,19 @@ class SettingsState:
                 mood=mood,
                 click_through=click_through,
                 skill=skill,
+                lens=lens,
+                learn_headphone_device_index=learn_headphone_device_index,
+                session_mode=session_mode,
             ),
         )
 
     def to_json(self) -> str:
-        return _serialize(self)
+        d = _tuples_to_lists(asdict(self))
+        payload = d["payload"]
+        payload["learn.headphone_device_index"] = payload.pop("learn_headphone_device_index")
+        payload["session.mode"] = payload.pop("session_mode")
+        _validate(d)
+        return json.dumps(d, separators=(",", ":"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -1836,9 +1908,7 @@ class LibraryStalenessNudge:
     payload: LibraryStalenessNudgePayload
 
     @classmethod
-    def make(
-        cls, *, age_days: int, snoozed_until_ts: float | None
-    ) -> LibraryStalenessNudge:
+    def make(cls, *, age_days: int, snoozed_until_ts: float | None) -> LibraryStalenessNudge:
         return cls(
             type="ipc.library.staleness_nudge",
             ts=_now_iso(),
@@ -1903,9 +1973,7 @@ class LibrarySimilarResult:
         return cls(
             type="ipc.library.similar_result",
             ts=_now_iso(),
-            payload=LibrarySimilarResultPayload(
-                track_id=track_id, results=tuple(results)
-            ),
+            payload=LibrarySimilarResultPayload(track_id=track_id, results=tuple(results)),
         )
 
     def to_json(self) -> str:
@@ -1990,9 +2058,7 @@ class ProfileViewResult:
         return cls(
             type="ipc.profile.view_result",
             ts=_now_iso(),
-            payload=ProfileViewResultPayload(
-                profile=profile, bytes=bytes, consent=consent
-            ),
+            payload=ProfileViewResultPayload(profile=profile, bytes=bytes, consent=consent),
         )
 
     def to_json(self) -> str:
@@ -2032,9 +2098,7 @@ class ProfileRegenerateResult:
         return cls(
             type="ipc.profile.regenerate_result",
             ts=_now_iso(),
-            payload=ProfileRegenerateResultPayload(
-                ok=ok, profile=profile, error=error
-            ),
+            payload=ProfileRegenerateResultPayload(ok=ok, profile=profile, error=error),
         )
 
     def to_json(self) -> str:

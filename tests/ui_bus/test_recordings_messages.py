@@ -37,8 +37,8 @@ from vibemix.ui_bus import (
     RecordingsEventsResult,
     RecordingsList,
     RecordingsListResult,
-    RecordingsUsage,
     RecordingSummary,
+    RecordingsUsage,
     validate_message,
 )
 from vibemix.ui_bus.messages import _SCHEMA
@@ -265,7 +265,7 @@ def test_recordings_events_result_accepts_empty_events_array() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_count_parity_at_77() -> None:
+def test_count_parity_at_79() -> None:
     """Phase 15 Plan 01 bumped the IPC count 27 → 34 (+7 recordings.* families);
     Phase 20-04 added SessionCitation → 35; Phase 24-02 added
     SessionOverlayHighlight → 36; Phase 25 Plan 25-03 added 3 DEBRIEF
@@ -285,6 +285,8 @@ def test_count_parity_at_77() -> None:
     LearnStartLesson / LearnCompleteLesson / LearnLessonLoaded /
     LearnHighlight / LearnAdvance / LearnAck / LearnTutorSpeak /
     LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 77.
+    Phase 97 adds SessionSetMode → 78. Quick 260529-ifq adds WizardSetSkill
+    (onboarding skill-level step) → 79.
     Both sides — schema oneOf and Python wrapper dataclasses — must match
     exactly.
 
@@ -321,8 +323,8 @@ def test_count_parity_at_77() -> None:
                 seen.add(obj)
                 wrapper_count += 1
 
-    assert len(_SCHEMA["oneOf"]) == 77, "schema oneOf count should be 77 after Plan 92-01"
-    assert wrapper_count == 77, f"wrapper count {wrapper_count} != 77"
+    assert len(_SCHEMA["oneOf"]) == 79, "schema oneOf count should be 79 after WizardSetSkill"
+    assert wrapper_count == 79, f"wrapper count {wrapper_count} != 79"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

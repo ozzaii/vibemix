@@ -22,15 +22,15 @@ are required CI gates per RESEARCH Pattern 3 / D-Area-1.3.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
+from typing import get_args, get_type_hints
 
 import jsonschema
 
 # Import the wrapper module + bring it into local scope for introspection.
 from vibemix.ui_bus import (
-    ChapterRegionPayload,
-    DrillPayload,
     CalibrationAudioResult,
     CalibrationDeviceList,
     CalibrationListDevices,
@@ -44,6 +44,7 @@ from vibemix.ui_bus import (
     CalibrationStartMidiListen,
     CalibrationUserHeardTone,
     CalibrationWindowList,
+    ChapterRegionPayload,
     DebriefChapterList,
     DebriefCitationSummary,
     DebriefCitationTooltip,
@@ -54,6 +55,7 @@ from vibemix.ui_bus import (
     DebriefSessionLoaded,
     DebriefTldrAudio,
     DeviceInfo,
+    DrillPayload,
     IpcBoot,
     IpcError,
     LearnAck,
@@ -93,18 +95,19 @@ from vibemix.ui_bus import (
     ProfileSetConsent,
     ProfileView,
     ProfileViewResult,
-    RecordingSummary,
     RecordingsDelete,
     RecordingsDeleteAck,
     RecordingsEvents,
     RecordingsEventsResult,
     RecordingsList,
     RecordingsListResult,
+    RecordingSummary,
     RecordingsUsage,
     SessionCitation,
     SessionCohostReaction,
     SessionMute,
     SessionOverlayHighlight,
+    SessionSetMode,
     SessionSnapshot,
     SettingsGet,
     SettingsSet,
@@ -113,6 +116,7 @@ from vibemix.ui_bus import (
     StatusTick,
     WindowInfo,
     WizardDone,
+    WizardSetSkill,
     WizardStart,
 )
 from vibemix.ui_bus import learn_messages as ui_bus_learn_messages
@@ -121,6 +125,7 @@ from vibemix.ui_bus import messages as ui_bus_messages
 # Resolve the schema relative to this script — fails loud if it moves.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SCHEMA_PATH = _REPO_ROOT / "tauri" / "ui" / "src" / "ipc" / "messages.schema.json"
+_WS_BRIDGE_PATH = _REPO_ROOT / "tauri" / "ui" / "src" / "session" / "ws-bridge.ts"
 
 
 def _minimal_examples() -> list[tuple[str, object]]:
@@ -173,9 +178,7 @@ def _minimal_examples() -> list[tuple[str, object]]:
         ),
         (
             "CalibrationMidiEvent",
-            CalibrationMidiEvent.make(
-                control_label="Deck A Play", raw="note_on ch=0 note=44"
-            ),
+            CalibrationMidiEvent.make(control_label="Deck A Play", raw="note_on ch=0 note=44"),
         ),
         ("CalibrationMidiTimeout", CalibrationMidiTimeout.make()),
         ("CalibrationListWindows", CalibrationListWindows.make()),
@@ -196,9 +199,7 @@ def _minimal_examples() -> list[tuple[str, object]]:
         ("CalibrationSmokeTestStarted", CalibrationSmokeTestStarted.make()),
         (
             "CalibrationSmokeTestDone",
-            CalibrationSmokeTestDone.make(
-                transcript="yo we're live, deck spins when you are"
-            ),
+            CalibrationSmokeTestDone.make(transcript="yo we're live, deck spins when you are"),
         ),
         ("WizardStart", WizardStart.make()),
         (
@@ -209,6 +210,7 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 target_window_id="win-42",
             ),
         ),
+        ("WizardSetSkill", WizardSetSkill.make(skill="intermediate")),
         # Phase 12 wrappers
         (
             "SessionSnapshot",
@@ -221,6 +223,7 @@ def _minimal_examples() -> list[tuple[str, object]]:
             ),
         ),
         ("SessionMute", SessionMute.make_toggle()),
+        ("SessionSetMode", SessionSetMode.make(mode="build")),
         ("SettingsSet", SettingsSet.make(field="voice", value="kore")),
         ("SettingsGet", SettingsGet.make()),
         (
@@ -264,9 +267,7 @@ def _minimal_examples() -> list[tuple[str, object]]:
         ("RecordingsDelete", RecordingsDelete.make(session_dir="20260513-210410")),
         (
             "RecordingsDeleteAck",
-            RecordingsDeleteAck.make(
-                session_dir="20260513-210410", ok=True, error=None
-            ),
+            RecordingsDeleteAck.make(session_dir="20260513-210410", ok=True, error=None),
         ),
         ("RecordingsUsage", RecordingsUsage.make(sessions=12, bytes_total=3656838349)),
         # Phase 20-04 — citation diagnostics
@@ -330,9 +331,7 @@ def _minimal_examples() -> list[tuple[str, object]]:
         ),
         (
             "DebriefCitationSummary",
-            DebriefCitationSummary.make(
-                total=120, valid=95, stripped=20, bypassed=5
-            ),
+            DebriefCitationSummary.make(total=120, valid=95, stripped=20, bypassed=5),
         ),
         (
             "DebriefEventTimeline",
@@ -487,9 +486,7 @@ def _minimal_examples() -> list[tuple[str, object]]:
         ("ProfileRegenerate", ProfileRegenerate.make()),
         (
             "ProfileRegenerateResult",
-            ProfileRegenerateResult.make(
-                ok=False, profile=None, error="consent_off"
-            ),
+            ProfileRegenerateResult.make(ok=False, profile=None, error="consent_off"),
         ),
         ("ProfileDelete", ProfileDelete.make()),
         ("ProfileDeleteAck", ProfileDeleteAck.make(ok=True, error=None)),
@@ -676,6 +673,48 @@ def _count_wrapper_dataclasses() -> int:
     return count
 
 
+def _settings_set_schema_fields(schema: dict) -> list[str]:
+    return schema["definitions"]["SettingsSet"]["properties"]["payload"]["properties"]["field"][
+        "enum"
+    ]
+
+
+def _settings_set_python_fields() -> list[str]:
+    hints = get_type_hints(ui_bus_messages.SettingsSetPayload)
+    return list(get_args(hints["field"]))
+
+
+def _settings_state_schema_fields(schema: dict) -> list[str]:
+    return list(
+        schema["definitions"]["SettingsState"]["properties"]["payload"]["properties"].keys()
+    )
+
+
+def _settings_state_python_fields() -> list[str]:
+    hints = get_type_hints(ui_bus_messages.SettingsStatePayload)
+    mapped: list[str] = []
+    for field_name in hints:
+        if field_name == "session_mode":
+            mapped.append("session.mode")
+        elif field_name == "learn_headphone_device_index":
+            mapped.append("learn.headphone_device_index")
+        else:
+            mapped.append(field_name)
+    return mapped
+
+
+def _settings_bridge_fields() -> list[str]:
+    text = _WS_BRIDGE_PATH.read_text(encoding="utf-8")
+    match = re.search(
+        r"export const SETTINGS_FIELDS = \[(?P<body>.*?)\] as const;",
+        text,
+        flags=re.S,
+    )
+    if match is None:
+        raise RuntimeError(f"SETTINGS_FIELDS not found in {_WS_BRIDGE_PATH}")
+    return re.findall(r'"([^"]+)"', match.group("body"))
+
+
 def main() -> int:
     if not _SCHEMA_PATH.exists():
         print(f"FAIL: schema not found at {_SCHEMA_PATH}", file=sys.stderr)
@@ -700,7 +739,7 @@ def main() -> int:
             jsonschema.validate(parsed, schema)
         except jsonschema.ValidationError as e:
             errors.append(f"{name}: schema validation failed — {e.message}")
-        except Exception as e:  # noqa: BLE001 — show every failure mode
+        except Exception as e:
             errors.append(f"{name}: {type(e).__name__} — {e}")
     if errors:
         print("FAIL: dataclass→schema roundtrip errors:", file=sys.stderr)
@@ -722,12 +761,47 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    print(
-        f"OK: count parity — {oneof_count} oneOf entries == {wrapper_count} "
-        f"wrapper dataclasses"
-    )
+    print(f"OK: count parity — {oneof_count} oneOf entries == {wrapper_count} wrapper dataclasses")
 
-    # 3) Belt-and-braces — every example must also map to one of the schema's
+    # 3) Field-enum parity for settings. The wrapper roundtrip only tests a
+    # representative value, so a valid runtime setting can drift out of the
+    # schema/Python/TS allowlists unless we compare the whole enum.
+    settings_schema_fields = _settings_set_schema_fields(schema)
+    settings_python_fields = _settings_set_python_fields()
+    settings_bridge_fields = _settings_bridge_fields()
+    if settings_schema_fields != settings_python_fields:
+        print(
+            "FAIL: SettingsSet field drift — schema enum does not match "
+            "SettingsSetPayload.field Literal.",
+            file=sys.stderr,
+        )
+        print(f"  schema: {settings_schema_fields}", file=sys.stderr)
+        print(f"  python: {settings_python_fields}", file=sys.stderr)
+        return 1
+    if settings_schema_fields != settings_bridge_fields:
+        print(
+            "FAIL: SettingsSet field drift — schema enum does not match ws-bridge SETTINGS_FIELDS.",
+            file=sys.stderr,
+        )
+        print(f"  schema: {settings_schema_fields}", file=sys.stderr)
+        print(f"  bridge: {settings_bridge_fields}", file=sys.stderr)
+        return 1
+    print("OK: SettingsSet field enum parity")
+
+    state_schema_fields = sorted(_settings_state_schema_fields(schema))
+    state_python_fields = sorted(_settings_state_python_fields())
+    if state_schema_fields != state_python_fields:
+        print(
+            "FAIL: SettingsState payload drift — schema properties do not match "
+            "SettingsStatePayload fields.",
+            file=sys.stderr,
+        )
+        print(f"  schema: {state_schema_fields}", file=sys.stderr)
+        print(f"  python: {state_python_fields}", file=sys.stderr)
+        return 1
+    print("OK: SettingsState payload parity")
+
+    # 4) Belt-and-braces — every example must also map to one of the schema's
     # oneOf branches. The roundtrip above proves it implicitly; this prints
     # the human-friendly tally so CI logs are useful.
     if n_ok != oneof_count:

@@ -134,6 +134,11 @@ class WizardLoop:
         self.bus.register_handler(
             "ipc.profile.set_consent", self._on_profile_set_consent
         )
+        # Quick 260529-ifq — onboarding skill-level step. Fires on Continue so
+        # the chosen persona level persists to config.json BEFORE the wizard
+        # exits; the next cold boot seeds VIBEMIX_SKILL_LEVEL from it
+        # (apply_persona_config_to_env).
+        self.bus.register_handler("ipc.wizard.set_skill", self._on_wizard_set_skill)
 
     async def boot(self) -> None:
         """Emit ``ipc.boot {ready: true}`` so the Tauri shell can render
@@ -460,6 +465,33 @@ class WizardLoop:
             # Non-fatal: the renderer's toggle is the source of truth; the
             # user can retry from Settings → Profile after the wizard.
             log.warning("profile.set_consent persistence failed: %s", e)
+
+    async def _on_wizard_set_skill(self, msg: dict) -> None:
+        """Quick 260529-ifq — persist the onboarding skill level to config.json.
+
+        Writes ``ConfigStore.extra["skill"]`` so the next cold boot's
+        ``apply_persona_config_to_env`` seeds ``VIBEMIX_SKILL_LEVEL`` and the
+        co-host builds the matching prompt cell. Fire-and-forget (no ack);
+        the live Settings drawer (``ipc.settings.set {skill}``) is the full
+        recovery path post-wizard. The valid set is duplicated inline — the
+        wizard stays import-light (same rationale as ``settings.py`` keeping
+        ``_VALID_SKILLS`` off the heavy ``dj_cohost`` import).
+        """
+        try:
+            from vibemix.runtime.config_store import load_config, save_config
+
+            payload = msg.get("payload", {})
+            skill = payload.get("skill")
+            if skill not in {"beginner", "intermediate", "pro"}:
+                log.warning("wizard.set_skill rejected invalid skill: %r", skill)
+                return
+            store = load_config()
+            store.extra["skill"] = skill
+            save_config(store)
+            log.info("wizard skill persisted: %s", skill)
+        except Exception as e:
+            # Non-fatal: the live Settings drawer can re-set skill post-wizard.
+            log.warning("wizard.set_skill persistence failed: %s", e)
 
     # ------------------------------------------------------------------
     # Background loops

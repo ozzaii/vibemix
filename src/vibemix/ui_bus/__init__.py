@@ -16,6 +16,42 @@ and the CI gate ``scripts/check_ipc_schema.py``.
 
 from __future__ import annotations
 
+from vibemix.ui_bus.learn_messages import (
+    # Phase 92 TONE-02 / TONE-04 / LESSON-01..LESSON-06 / RENDER-04 —
+    # lesson-runtime envelopes + the AI highlight contract.
+    LearnAck,
+    LearnAckPayload,
+    LearnAdvance,
+    LearnAdvancePayload,
+    LearnCompleteLesson,
+    LearnCompleteLessonPayload,
+    # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn module envelopes.
+    LearnControllerDetected,
+    LearnControllerDetectedPayload,
+    LearnExemplarPlay,
+    LearnExemplarPlayPayload,
+    LearnExemplarStop,
+    LearnExemplarStopPayload,
+    LearnExpectedAction,
+    LearnHighlight,
+    LearnHighlightPayload,
+    LearnLessonLoaded,
+    LearnLessonLoadedPayload,
+    LearnMidiPosition,
+    LearnMidiPositionPayload,
+    LearnProgressDot,
+    LearnProgressState,
+    LearnProgressStatePayload,
+    LearnStartCourse,
+    LearnStartCoursePayload,
+    LearnStartLesson,
+    LearnStartLessonPayload,
+    LearnTeachingLoopPayload,
+    LearnTeachingObservationPayload,
+    LearnTeachingVerificationPayload,
+    LearnTutorSpeak,
+    LearnTutorSpeakPayload,
+)
 from vibemix.ui_bus.messages import (
     # Wrapper dataclasses — one per schema oneOf entry (19 total)
     CalibrationAudioResult,
@@ -132,6 +168,8 @@ from vibemix.ui_bus.messages import (
     SessionMutePayload,
     # Phase 24-02 — overlay-highlight
     SessionOverlayHighlight,
+    SessionSetMode,
+    SessionSetModePayload,
     SessionSnapshot,
     SessionSnapshotPayload,
     SettingsGet,
@@ -149,41 +187,10 @@ from vibemix.ui_bus.messages import (
     WindowInfo,
     WizardDone,
     WizardDonePayload,
+    WizardSetSkill,
+    WizardSetSkillPayload,
     WizardStart,
     WizardStartPayload,
-)
-from vibemix.ui_bus.learn_messages import (
-    # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn module envelopes.
-    LearnControllerDetected,
-    LearnControllerDetectedPayload,
-    LearnMidiPosition,
-    LearnMidiPositionPayload,
-    # Phase 92 TONE-02 / TONE-04 / LESSON-01..LESSON-06 / RENDER-04 —
-    # lesson-runtime envelopes + the AI highlight contract.
-    LearnAck,
-    LearnAckPayload,
-    LearnAdvance,
-    LearnAdvancePayload,
-    LearnCompleteLesson,
-    LearnCompleteLessonPayload,
-    LearnExemplarPlay,
-    LearnExemplarPlayPayload,
-    LearnExemplarStop,
-    LearnExemplarStopPayload,
-    LearnExpectedAction,
-    LearnHighlight,
-    LearnHighlightPayload,
-    LearnLessonLoaded,
-    LearnLessonLoadedPayload,
-    LearnProgressDot,
-    LearnProgressState,
-    LearnProgressStatePayload,
-    LearnStartCourse,
-    LearnStartCoursePayload,
-    LearnStartLesson,
-    LearnStartLessonPayload,
-    LearnTutorSpeak,
-    LearnTutorSpeakPayload,
 )
 from vibemix.ui_bus.schemas.citation import SessionCitationPayload
 from vibemix.ui_bus.schemas.cohost_reaction import (
@@ -245,6 +252,8 @@ __all__ = [
     "WindowInfo",
     "WizardDone",
     "WizardDonePayload",
+    "WizardSetSkill",
+    "WizardSetSkillPayload",
     "WizardStart",
     "WizardStartPayload",
     # Phase 12
@@ -355,6 +364,9 @@ __all__ = [
     "LearnStartCoursePayload",
     "LearnStartLesson",
     "LearnStartLessonPayload",
+    "LearnTeachingLoopPayload",
+    "LearnTeachingObservationPayload",
+    "LearnTeachingVerificationPayload",
     "LearnTutorSpeak",
     "LearnTutorSpeakPayload",
     # Phase 32 — long-term DJ profile (PROFILE-04/05/07)
@@ -373,6 +385,8 @@ __all__ = [
     "ProfileViewResultPayload",
     "SessionMute",
     "SessionMutePayload",
+    "SessionSetMode",
+    "SessionSetModePayload",
     "SessionSnapshot",
     "SessionSnapshotPayload",
     "SettingsGet",
