@@ -19,7 +19,7 @@
  *
  * Each case drives :hover via `page.locator(...).hover()` and confirms
  * the computed `box-shadow` matches `var(--glow-faint)` (resolved value
- * `rgba(255, 138, 61, 0.22) 0px 0px 5px` per tokens.css:101+123). The
+ * `rgba(255, 165, 223, 0.22) 0px 0px 5px`, the tozpembe rose brand). The
  * spec also exercises `:focus-visible` via keyboard `Tab` to confirm
  * keyboard parity — anti-dark-pattern hygiene for the consent steps.
  *
@@ -35,7 +35,7 @@
  */
 import { test, expect } from "@playwright/test";
 
-const GLOW_FAINT_BOX_SHADOW = /rgba\(255,\s*138,\s*61,\s*0\.22\)\s*0px\s*0px\s*5px/;
+const GLOW_FAINT_BOX_SHADOW = /rgba\(255,\s*165,\s*223,\s*0\.22\)\s*0px\s*0px\s*5px/;
 
 test.describe("VIS-02 hover-glow — wizard intro (Plan 43-03)", () => {
   test.beforeEach(async ({ page }) => {
@@ -190,7 +190,7 @@ test.describe("VIS-02 hover-glow — settings drawer (Plan 43-03)", () => {
     const shadow = await btn.evaluate(
       (el) => getComputedStyle(el).boxShadow,
     );
-    // __btn keeps its inset amber bleed; assertion is that --glow-faint
+    // __btn keeps its inset rose bleed; assertion is that --glow-faint
     // is present in the comma-separated stack (not the sole shadow).
     expect(shadow).toMatch(GLOW_FAINT_BOX_SHADOW);
   });
