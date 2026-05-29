@@ -30,6 +30,18 @@ the Rust `write_first_run_state` → `save_state` serialized the **stale boot ca
 `store.reload()` before the terminal save merges on-disk keys into the cache. This also
 hardens the pre-existing latent clobber of Python-written `mood`/`lens`.
 
+> **Correction (Quick 260529-m4m, 2026-05-29):** this "clobber" was a PHANTOM at the time
+> of THIS task. On-disk reality was a SPLIT-BRAIN — Rust's `app.store("config.json")`
+> resolved under `…/world.bravoh.vibemix/config.json` while Python wrote
+> `…/vibemix/config.json`, so the Rust save could NOT touch the Python-written `skill`
+> (different files). The skill feature worked regardless (Python is self-consistent in its
+> own file); the `save_state` reload was harmless but **not load-bearing**. Quick
+> **260529-m4m** then CONVERGED the paths (Rust → the sidecar's `vibemix/` dir via
+> `config::config_store_path()`), so the two writers now share ONE file — at which point the
+> clobber became REAL and the reload became load-bearing, extended to all 5 Rust writers
+> (`save_state` + `save_mascot_state`/`save_bool_key`/`save_primary_surface`/`save_pill_state`).
+> The split-brain was discovered by `ls`-ing both app-data dirs during 260529-m4m.
+
 ## Verification (all green)
 
 - vitest: 139 files / 1301 tests (incl. new `test_step_skill_level.spec.ts`, 8 specs).
