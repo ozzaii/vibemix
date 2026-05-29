@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m20 · Studio Console Knurled</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..700&family=Roboto+Mono:wght@400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --console-0:#1A1815;--console-2:#22201C;--console-4:#2B2823;--console-6:#363128;--console-8:#423B30;
+  --aluminum:#7A7368;--aluminum-light:#9A938A;
+  --ink-0:rgba(245,238,224,0.96);--ink-1:rgba(245,238,224,0.78);--ink-2:rgba(245,238,224,0.50);--ink-3:rgba(245,238,224,0.28);--ink-4:rgba(245,238,224,0.14);
+  --neve-red:#D44A2A;--neve-red-dim:#A0381E;--neve-red-glow:0 0 8px #D44A2A,0 0 16px rgba(212,74,42,0.45);
+  --vu-amber:#E8A040;--vu-amber-glow:0 0 6px rgba(232,160,64,0.5);
+  --vu-green:#5AD080;--vu-green-glow:0 0 6px rgba(90,208,128,0.5);
+  --border:rgba(245,238,224,0.10);--border-strong:rgba(245,238,224,0.22);
+  --chrome-h:28px;--sb-w:228px;--panel-w:282px;
+  --spring:cubic-bezier(0.16,1,0.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--console-0);color:var(--ink-1);font-family:'Geist',-apple-system,sans-serif;font-weight:500;font-size:13px;letter-spacing:-0.005em;overflow:hidden}
+body{display:flex;flex-direction:column;position:relative}
+body::before{content:'';position:fixed;inset:0;background-image:repeating-linear-gradient(0deg,rgba(245,238,224,0.014) 0,rgba(245,238,224,0.014) 1px,transparent 1px,transparent 3px);pointer-events:none;z-index:0}
+.chrome{height:var(--chrome-h);background:linear-gradient(180deg,#2D2925 0%,#1F1C18 100%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag;z-index:5;box-shadow:inset 0 1px 0 rgba(245,238,224,0.08)}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:11px;height:11px;border-radius:50%;background:transparent;border:1.5px solid rgba(245,238,224,0.40)}
+.tl span:nth-child(1){border-color:#FF5F57}.tl span:nth-child(2){border-color:#FEBC2E}.tl span:nth-child(3){border-color:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:700 10px/1 'Geist Mono';color:var(--ink-2);letter-spacing:0.18em;text-transform:uppercase}
+.chrome-meta b{color:var(--neve-red);text-shadow:0 0 6px rgba(212,74,42,0.4)}
+.row{flex:1;display:flex;position:relative;min-height:0;z-index:2}
+/* sidebar — channel strip */
+.sb{width:var(--sb-w);background:linear-gradient(180deg,#22201C 0%,#1A1815 100%);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:18px 0 14px;position:relative;z-index:3;box-shadow:inset -1px 0 0 rgba(0,0,0,0.30),inset 1px 0 0 rgba(245,238,224,0.06)}
+.brand{padding:0 14px 16px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.brand-row{display:flex;align-items:center;gap:10px}
+.brand-knob{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 30% 25%,#9A938A,#5A5348 70%,#3A332B);border:1px solid #1A1815;position:relative;box-shadow:inset 0 1px 0 rgba(245,238,224,0.30),inset 0 -1px 0 rgba(0,0,0,0.40),0 2px 4px rgba(0,0,0,0.40)}
+.brand-knob::before{content:'';position:absolute;left:50%;top:50%;width:2px;height:14px;background:var(--neve-red);transform:translate(-50%,-50%) rotate(36deg);transform-origin:center 8px;box-shadow:0 0 4px var(--neve-red);border-radius:1px}
+.brand-knob::after{content:'';position:absolute;inset:5px;border-radius:50%;background:repeating-conic-gradient(from 0deg,rgba(0,0,0,0.2) 0deg 4deg,transparent 4deg 8deg);mix-blend-mode:multiply;opacity:0.6}
+.brand-name{font:700 18px/1 'Geist';color:var(--ink-0);letter-spacing:-0.034em;text-transform:uppercase}
+.brand-strap{font:700 9px/1 'Geist Mono';color:var(--neve-red);letter-spacing:0.18em;text-transform:uppercase;margin-top:10px;display:flex;align-items:center;gap:7px;text-shadow:0 0 6px rgba(212,74,42,0.5)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--neve-red);box-shadow:var(--neve-red-glow);animation:beat 1.4s var(--spring) infinite}
+@keyframes beat{0%,100%{opacity:0.7}50%{opacity:1}}
+.sect{font:700 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase;padding:14px 14px 8px;display:flex;align-items:center;gap:8px}
+.sect::before{content:'';width:14px;height:1px;background:var(--neve-red);box-shadow:0 0 4px rgba(212,74,42,0.4)}
+.nav{display:flex;flex-direction:column;gap:1px}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 14px;font:600 12px/1 'Geist Mono';color:var(--ink-1);cursor:pointer;letter-spacing:0.04em;text-transform:uppercase;position:relative;transition:all 200ms var(--spring)}
+.ni:hover{color:var(--ink-0);background:rgba(245,238,224,0.04)}
+.ni.active{color:var(--ink-0);background:linear-gradient(90deg,rgba(212,74,42,0.14),transparent)}
+.ni.active::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;background:var(--neve-red);box-shadow:var(--neve-red-glow)}
+.ni-num{font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.04em;width:18px;font-variant-numeric:tabular-nums}
+.ni.active .ni-num{color:var(--neve-red)}
+.ni-shortcut{margin-left:auto;font:500 9px/1 'Geist Mono';color:var(--ink-4);letter-spacing:0.04em}
+.sess{padding:10px 14px;cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative;border-bottom:1px solid var(--border)}
+.sess:hover{background:rgba(245,238,224,0.03)}
+.sess.active{background:linear-gradient(90deg,rgba(212,74,42,0.10),transparent)}
+.sess.active::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;background:var(--neve-red);box-shadow:var(--neve-red-glow)}
+.sess-name{font:600 12px/1.15 'Geist';color:var(--ink-0);letter-spacing:-0.005em;text-transform:uppercase}
+.sess-meta{font:500 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.sb-foot{margin-top:auto;padding:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:11px}
+.persona{display:flex;gap:0;border:1px solid var(--border-strong);background:var(--console-2);border-radius:0;overflow:hidden;box-shadow:inset 0 1px 0 rgba(245,238,224,0.08),0 1px 2px rgba(0,0,0,0.5)}
+.persona-pill{flex:1;padding:9px 0;background:transparent;font:700 10px/1 'Geist Mono';color:var(--ink-2);letter-spacing:0.10em;text-transform:uppercase;cursor:pointer;text-align:center;border-right:1px solid var(--border);transition:all 200ms var(--spring)}
+.persona-pill:last-child{border-right:0}
+.persona-pill:hover{color:var(--ink-0)}
+.persona-pill.active{background:linear-gradient(180deg,var(--neve-red),var(--neve-red-dim));color:var(--ink-0);font-weight:800;box-shadow:0 0 12px rgba(212,74,42,0.5),inset 0 1px 0 rgba(255,255,255,0.25)}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:12px 13px;background:linear-gradient(180deg,#2A2520 0%,#1F1B17 100%);border:1px solid var(--neve-red);border-radius:4px;cursor:pointer;transition:all 280ms var(--spring);position:relative;box-shadow:0 0 16px rgba(212,74,42,0.18),inset 0 1px 0 rgba(245,238,224,0.08)}
+.ch-dot{width:8px;height:8px;border-radius:50%;background:var(--neve-red);box-shadow:var(--neve-red-glow);animation:beat 1.2s var(--spring) infinite}
+.ch-text{flex:1}
+.ch-state{font:700 11px/1 'Geist Mono';color:var(--neve-red);letter-spacing:0.10em;text-transform:uppercase;text-shadow:0 0 6px rgba(212,74,42,0.5)}
+.ch-mode{font:600 11px/1.1 'Geist';color:var(--ink-1);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
+/* stage — desk panel */
+.stage{flex:1;position:relative;background:var(--console-0);overflow:hidden}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.40) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:24px;z-index:2;display:flex;flex-direction:column;gap:20px}
+/* knob row */
+.knob-row{display:grid;grid-template-columns:repeat(5,1fr);gap:0;background:linear-gradient(180deg,#2D2925 0%,#22201C 100%);border:1px solid var(--border-strong);box-shadow:inset 0 1px 0 rgba(245,238,224,0.08),0 4px 16px rgba(0,0,0,0.4);padding:20px 0}
+.kr-cell{padding:0 22px;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:11px}
+.kr-cell:last-child{border-right:0}
+.kr-label{font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase}
+.knob{width:56px;height:56px;border-radius:50%;background:radial-gradient(circle at 30% 25%,#9A938A,#5A5348 65%,#3A332B);border:1px solid #1A1815;position:relative;box-shadow:inset 0 1px 0 rgba(245,238,224,0.30),inset 0 -2px 0 rgba(0,0,0,0.40),0 3px 6px rgba(0,0,0,0.45)}
+.knob::after{content:'';position:absolute;inset:7px;border-radius:50%;background:repeating-conic-gradient(from 0deg,rgba(0,0,0,0.18) 0deg 3deg,transparent 3deg 6deg);mix-blend-mode:multiply;opacity:0.65}
+.knob-pointer{position:absolute;left:50%;top:6px;width:3px;height:18px;background:var(--neve-red);border-radius:1.5px;transform-origin:center 22px;box-shadow:0 0 6px var(--neve-red);z-index:2}
+.knob.k1 .knob-pointer{transform:translateX(-50%) rotate(-28deg)}
+.knob.k2 .knob-pointer{transform:translateX(-50%) rotate(72deg)}
+.knob.k3 .knob-pointer{transform:translateX(-50%) rotate(110deg)}
+.knob.k4 .knob-pointer{transform:translateX(-50%) rotate(-58deg)}
+.knob.k5 .knob-pointer{transform:translateX(-50%) rotate(0deg)}
+.kr-value{font:700 14px/1 'Roboto Mono';color:var(--ink-0);font-variant-numeric:tabular-nums;letter-spacing:0.02em}
+.kr-cell.alt .kr-value{color:var(--neve-red);text-shadow:0 0 6px rgba(212,74,42,0.4)}
+.kr-cell.amber .kr-value{color:var(--vu-amber);text-shadow:var(--vu-amber-glow)}
+.kr-cell.green .kr-value{color:var(--vu-green);text-shadow:var(--vu-green-glow)}
+/* hero — master section */
+.master{background:linear-gradient(180deg,#22201C 0%,#1A1815 100%);border:1px solid var(--border-strong);padding:28px 36px 28px;position:relative;box-shadow:inset 0 1px 0 rgba(245,238,224,0.06),0 4px 16px rgba(0,0,0,0.4)}
+.master::before{content:'MASTER · CO-HOST';position:absolute;top:-9px;left:18px;background:var(--console-0);padding:0 8px;font:700 10px/1 'Geist Mono';color:var(--neve-red);letter-spacing:0.18em;text-shadow:0 0 4px rgba(212,74,42,0.4)}
+.master-kicker{font:700 10px/1 'Geist Mono';color:var(--neve-red);letter-spacing:0.18em;text-transform:uppercase;margin-bottom:18px;display:flex;align-items:center;gap:10px;text-shadow:0 0 6px rgba(212,74,42,0.4)}
+.master-kicker::before{content:'LIVE';padding:4px 7px;background:var(--neve-red);color:var(--ink-0);font:700 9px/1 'Geist Mono';letter-spacing:0.16em;box-shadow:0 0 12px rgba(212,74,42,0.5)}
+.master-line{font:500 clamp(34px,4vw,52px)/1.16 'Geist';color:var(--ink-0);letter-spacing:-0.028em;max-width:920px}
+.master-line em{font-style:normal;color:var(--neve-red);font-weight:700;text-shadow:0 0 24px rgba(212,74,42,0.50),0 0 12px rgba(212,74,42,0.30)}
+.cite{display:inline-block;vertical-align:0.42em;font:700 0.20em/1 'Geist Mono';font-style:normal;color:var(--ink-0);background:var(--neve-red);letter-spacing:0.14em;padding:4px 8px;font-variant-numeric:tabular-nums;margin-left:0.18em;cursor:pointer;text-transform:uppercase;box-shadow:0 0 12px rgba(212,74,42,0.4)}
+.cite:hover{background:var(--vu-amber);color:var(--console-0)}
+/* fader & VU row */
+.faderbank{display:grid;grid-template-columns:1fr 240px;gap:18px}
+.fader-strip{background:linear-gradient(180deg,#22201C 0%,#1A1815 100%);border:1px solid var(--border-strong);padding:16px 24px;display:flex;align-items:center;gap:18px;box-shadow:inset 0 1px 0 rgba(245,238,224,0.06)}
+.fader-l{font:700 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase}
+.fader-track{flex:1;height:30px;position:relative;background:linear-gradient(180deg,#0F0D0A,#1A1815);border-radius:2px;box-shadow:inset 0 2px 4px rgba(0,0,0,0.6)}
+.fader-fill{position:absolute;left:0;top:50%;transform:translateY(-50%);height:6px;width:82%;background:linear-gradient(90deg,var(--vu-green) 0%,var(--vu-amber) 60%,var(--neve-red) 100%);border-radius:2px;box-shadow:0 0 8px rgba(212,74,42,0.3)}
+.fader-cap{position:absolute;left:82%;top:50%;width:14px;height:22px;background:linear-gradient(180deg,#9A938A,#5A5348);border:1px solid #1A1815;border-radius:2px;transform:translate(-50%,-50%);box-shadow:0 2px 4px rgba(0,0,0,0.45),inset 0 1px 0 rgba(255,255,255,0.25)}
+.fader-cap::after{content:'';position:absolute;top:50%;left:2px;right:2px;height:2px;background:var(--neve-red);transform:translateY(-50%);box-shadow:0 0 4px var(--neve-red)}
+.fader-n{font:700 12px/1 'Roboto Mono';color:var(--ink-1);font-variant-numeric:tabular-nums;letter-spacing:0.04em;min-width:40px;text-align:right}
+.fader-n b{color:var(--neve-red);text-shadow:0 0 4px rgba(212,74,42,0.4)}
+.vu{background:linear-gradient(180deg,#22201C 0%,#1A1815 100%);border:1px solid var(--border-strong);padding:14px 18px;display:flex;flex-direction:column;gap:8px;box-shadow:inset 0 1px 0 rgba(245,238,224,0.06)}
+.vu-l{font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase;display:flex;justify-content:space-between}
+.vu-meter{height:24px;background:linear-gradient(90deg,var(--vu-green) 0%,var(--vu-green) 60%,var(--vu-amber) 60%,var(--vu-amber) 85%,var(--neve-red) 85%,var(--neve-red) 100%);border-radius:1px;position:relative;box-shadow:inset 0 1px 2px rgba(0,0,0,0.5);overflow:hidden}
+.vu-meter::after{content:'';position:absolute;right:0;top:0;bottom:0;width:25%;background:rgba(26,24,21,0.85)}
+.vu-meter::before{content:'';position:absolute;inset:0;background-image:repeating-linear-gradient(90deg,transparent 0,transparent 7%,rgba(26,24,21,0.45) 7%,rgba(26,24,21,0.45) 7.5%);pointer-events:none}
+.vu-scale{display:flex;justify-content:space-between;font:700 8px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.06em;font-variant-numeric:tabular-nums}
+/* phrase rail */
+.phrase{background:linear-gradient(180deg,#22201C 0%,#1A1815 100%);border:1px solid var(--border-strong);padding:14px 22px;display:flex;align-items:center;gap:18px;box-shadow:inset 0 1px 0 rgba(245,238,224,0.06)}
+.ph-l{font:700 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase}
+.ph-n{font:700 12px/1 'Roboto Mono';color:var(--ink-1);font-variant-numeric:tabular-nums}
+.ph-bar{flex:1;display:grid;grid-template-columns:repeat(16,1fr);gap:1px;height:18px;background:#0F0D0A;padding:2px;border-radius:1px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.6)}
+.ph-cell{background:#1F1D1A;border-radius:1px}
+.ph-cell.fired{background:linear-gradient(180deg,var(--neve-red),var(--neve-red-dim));box-shadow:0 0 4px rgba(212,74,42,0.5)}
+.ph-cell.current{background:linear-gradient(180deg,#FF7050,var(--neve-red));box-shadow:0 0 12px var(--neve-red),0 0 4px var(--neve-red);animation:beat 1.2s var(--spring) infinite}
+/* dispatch */
+.dispatch{display:grid;grid-template-columns:200px 1fr 220px;background:linear-gradient(180deg,#22201C 0%,#1A1815 100%);border:1px solid var(--border-strong);box-shadow:inset 0 1px 0 rgba(245,238,224,0.06),0 4px 16px rgba(0,0,0,0.4)}
+.dis-stamp{padding:18px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:6px;background:linear-gradient(180deg,rgba(212,74,42,0.12),rgba(212,74,42,0.03));position:relative}
+.dis-stamp::before{content:'';position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--neve-red);box-shadow:var(--neve-red-glow);animation:beat 1.2s var(--spring) infinite}
+.dis-stamp-l{font:700 10px/1 'Geist Mono';color:var(--neve-red);letter-spacing:0.18em;text-transform:uppercase;text-shadow:0 0 6px rgba(212,74,42,0.4)}
+.dis-stamp-v{font:700 30px/1 'Geist';color:var(--ink-0);letter-spacing:-0.024em;font-variant-numeric:tabular-nums}
+.dis-stamp-s{font:700 10px/1 'Geist Mono';color:var(--ink-1);letter-spacing:0.10em;text-transform:uppercase}
+.dis-body{padding:18px 22px;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.dis-head{font:600 15px/1.3 'Geist';color:var(--ink-0);letter-spacing:-0.005em;text-transform:uppercase}
+.dis-text{font:500 12px/1.5 'Geist Mono';color:var(--ink-2);letter-spacing:0.02em}
+.dis-text b{color:var(--neve-red);font-weight:700;text-shadow:0 0 4px rgba(212,74,42,0.4)}
+.dis-wave{padding:18px 20px;border-left:1px solid var(--border);display:flex;align-items:center;gap:1.5px;background:#0F0D0A;box-shadow:inset 0 0 12px rgba(0,0,0,0.5)}
+.dis-wave span{flex:1;background:linear-gradient(180deg,var(--vu-amber),var(--neve-red));box-shadow:0 0 3px rgba(232,160,64,0.4)}
+.dis-wave span:nth-child(1){height:30%}.dis-wave span:nth-child(2){height:55%}.dis-wave span:nth-child(3){height:85%}.dis-wave span:nth-child(4){height:70%}.dis-wave span:nth-child(5){height:45%}.dis-wave span:nth-child(6){height:65%}.dis-wave span:nth-child(7){height:90%}.dis-wave span:nth-child(8){height:60%}.dis-wave span:nth-child(9){height:38%}.dis-wave span:nth-child(10){height:55%}.dis-wave span:nth-child(11){height:75%}.dis-wave span:nth-child(12){height:40%}.dis-wave span:nth-child(13){height:65%}.dis-wave span:nth-child(14){height:30%}
+/* queue */
+.queue{background:linear-gradient(180deg,#22201C 0%,#1A1815 100%);border:1px solid var(--border-strong);box-shadow:inset 0 1px 0 rgba(245,238,224,0.06)}
+.queue-head{padding:14px 22px;background:linear-gradient(180deg,#2D2925 0%,#22201C 100%);border-bottom:1px solid var(--border-strong);display:flex;align-items:center;justify-content:space-between}
+.queue-head-l{font:700 11px/1 'Geist Mono';color:var(--neve-red);letter-spacing:0.18em;text-transform:uppercase;display:flex;align-items:center;gap:9px;text-shadow:0 0 4px rgba(212,74,42,0.4)}
+.queue-head-l::before{content:'▶';color:var(--neve-red);font-size:10px}
+.queue-head-r{font:600 10px/1 'Geist Mono';color:var(--ink-2);letter-spacing:0.14em;text-transform:uppercase}
+.q-row{display:grid;grid-template-columns:50px 1fr 80px 60px 30px;gap:18px;padding:14px 22px;border-bottom:1px solid var(--border);cursor:pointer;align-items:center;transition:all 200ms var(--spring)}
+.q-row:last-child{border-bottom:0}
+.q-row:hover{background:rgba(245,238,224,0.03)}
+.q-row.lead{padding:22px 22px;grid-template-rows:auto auto;background:linear-gradient(90deg,rgba(212,74,42,0.08),transparent 70%);border-bottom:1px solid var(--neve-red)}
+.q-num{font:700 11px/1 'Geist Mono';color:var(--ink-2);letter-spacing:0.04em;font-variant-numeric:tabular-nums;align-self:start;padding-top:6px}
+.q-row.lead .q-num{color:var(--neve-red);font-size:13px;text-shadow:0 0 4px rgba(212,74,42,0.4)}
+.q-body{display:flex;flex-direction:column;gap:3px}
+.q-name{font:600 14px/1.15 'Geist';color:var(--ink-0);letter-spacing:-0.005em;text-transform:uppercase}
+.q-row.lead .q-name{font:700 22px/1.04 'Geist';letter-spacing:-0.018em}
+.q-artist{font:500 11px/1 'Geist Mono';color:var(--ink-2);letter-spacing:0.04em;text-transform:uppercase}
+.q-reason{grid-column:2/-1;font:500 13px/1.5 'Geist';color:var(--ink-1);margin-top:10px;letter-spacing:-0.005em;max-width:580px;padding:8px 14px;background:rgba(212,74,42,0.06);border-left:3px solid var(--neve-red)}
+.q-bpm{font:700 14px/1 'Roboto Mono';color:var(--ink-0);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right}
+.q-cam{font:700 14px/1 'Roboto Mono';color:var(--neve-red);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right;text-shadow:0 0 4px rgba(212,74,42,0.4)}
+.q-chev{color:var(--ink-3);font-size:14px;text-align:center}
+.q-row:hover .q-chev{color:var(--neve-red)}
+/* panel */
+.panel{width:var(--panel-w);background:linear-gradient(180deg,#22201C 0%,#1A1815 100%);border-left:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;flex-shrink:0;z-index:2;overflow-y:auto;box-shadow:inset 1px 0 0 rgba(245,238,224,0.06)}
+.p-section{font:700 10px/1 'Geist Mono';color:var(--neve-red);letter-spacing:0.20em;text-transform:uppercase;padding:11px 22px;background:linear-gradient(180deg,#2D2925 0%,#22201C 100%);border-top:1px solid var(--border);border-bottom:1px solid var(--border-strong);display:flex;align-items:center;gap:8px;text-shadow:0 0 4px rgba(212,74,42,0.4)}
+.p-section:first-child{border-top:0}
+.p-section::before{content:'■';color:var(--neve-red);font-size:7px}
+.p-card{padding:14px 22px;border-bottom:1px solid var(--border);cursor:pointer;transition:all 200ms var(--spring)}
+.p-card:hover{background:rgba(245,238,224,0.03)}
+.p-cite{font:700 10px/1 'Geist Mono';color:var(--neve-red);letter-spacing:0.10em;font-variant-numeric:tabular-nums;margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;gap:7px;text-shadow:0 0 4px rgba(212,74,42,0.3)}
+.p-cite::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--neve-red);box-shadow:0 0 6px var(--neve-red)}
+.p-text{font:500 13px/1.5 'Geist';color:var(--ink-1);letter-spacing:-0.005em}
+.p-text b{color:var(--ink-0);font-weight:600}
+.p-attr{display:block;margin-top:8px;font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.14em;text-transform:uppercase}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:10px 16px;background:linear-gradient(180deg,#2A2520 0%,#1A1815 100%);color:var(--neve-red);font:700 10px/1 'Geist Mono';letter-spacing:0.18em;text-transform:uppercase;z-index:60;border:1px solid var(--neve-red);text-shadow:0 0 4px rgba(212,74,42,0.4);box-shadow:0 0 16px rgba(212,74,42,0.18),inset 0 1px 0 rgba(245,238,224,0.06)}
+.studio-status::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--neve-red);box-shadow:var(--neve-red-glow);animation:beat 1.2s var(--spring) infinite}
+</style>
+</head>
+<body>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">VBM-CONSOLE · <b>REC</b> · 22:14</div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="brand"><div class="brand-row"><div class="brand-knob"></div><div class="brand-name">VIBEMIX</div></div><div class="brand-strap"><span class="dot"></span>recording</div></div>
+    <div class="sect">channels</div>
+    <nav class="nav">
+      <div class="ni active"><span class="ni-num">01</span>Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni"><span class="ni-num">02</span>Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni"><span class="ni-num">03</span>Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni"><span class="ni-num">04</span>Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni"><span class="ni-num">05</span>Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tonight</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · 01:47</div></div>
+    <div class="sess"><div class="sess-name">Backroom warmup</div><div class="sess-meta">19:30 · 02:30</div></div>
+    <div class="sb-foot">
+      <div class="persona"><div class="persona-pill active">Hype</div><div class="persona-pill">Coach</div><div class="persona-pill">Tutor</div></div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">REC · ON</div><div class="ch-mode">hype · phrase 14/16</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll">
+      <div class="knob-row">
+        <div class="kr-cell"><div class="kr-label">BPM</div><div class="knob k1"><div class="knob-pointer"></div></div><div class="kr-value">130.0</div></div>
+        <div class="kr-cell alt"><div class="kr-label">KEY</div><div class="knob k2"><div class="knob-pointer"></div></div><div class="kr-value">8A→9A</div></div>
+        <div class="kr-cell amber"><div class="kr-label">HEAT</div><div class="knob k3"><div class="knob-pointer"></div></div><div class="kr-value">0.78</div></div>
+        <div class="kr-cell green"><div class="kr-label">PHRASE</div><div class="knob k4"><div class="knob-pointer"></div></div><div class="kr-value">14/16</div></div>
+        <div class="kr-cell"><div class="kr-label">TIME</div><div class="knob k5"><div class="knob-pointer"></div></div><div class="kr-value">47:12</div></div>
+      </div>
+      <div class="master">
+        <div class="master-kicker">live read · 02:14</div>
+        <div class="master-line">That low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></div>
+      </div>
+      <div class="faderbank">
+        <div class="fader-strip">
+          <span class="fader-l">phrase fader</span>
+          <div class="fader-track"><div class="fader-fill"></div><div class="fader-cap"></div></div>
+          <span class="fader-n"><b>14</b>/16</span>
+        </div>
+        <div class="vu">
+          <div class="vu-l"><span>VU · OUT</span><span>L · R</span></div>
+          <div class="vu-meter"></div>
+          <div class="vu-scale"><span>-20</span><span>-12</span><span>-6</span><span>0</span><span>+3</span></div>
+        </div>
+      </div>
+      <div class="phrase">
+        <span class="ph-l">phrase</span>
+        <span class="ph-n">12</span>
+        <div class="ph-bar">
+          <span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span>
+          <span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span>
+          <span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span>
+          <span class="ph-cell fired"></span><span class="ph-cell current"></span><span class="ph-cell"></span><span class="ph-cell"></span>
+        </div>
+        <span class="ph-n">16</span>
+      </div>
+      <div class="dispatch">
+        <div class="dis-stamp"><div class="dis-stamp-l">KICK 60Hz</div><div class="dis-stamp-v">+3.2dB</div><div class="dis-stamp-s">4 BARS · LOCKED</div></div>
+        <div class="dis-body"><div class="dis-head">Sub-bass crest detected.</div><div class="dis-text"><b>Sub-bass gain rose 3.2 dB</b> across four bars (02:11 → 02:15). Hi-hat ghost gained definition. Floor committed at phrase 13.</div></div>
+        <div class="dis-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="queue">
+        <div class="queue-head"><div class="queue-head-l">queue · next up</div><div class="queue-head-r">3 ready · armed</div></div>
+        <div class="q-row lead">
+          <div class="q-num">01</div>
+          <div class="q-body"><div class="q-name">Vox Dust ii</div><div class="q-artist">SHRIM · the dust album</div></div>
+          <div class="q-bpm">130</div>
+          <div class="q-cam">9A</div>
+          <div class="q-chev">▶</div>
+          <div class="q-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up.</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">02</div>
+          <div class="q-body"><div class="q-name">Marrow (VTSS rmx)</div><div class="q-artist">Tygapaw · Marrow</div></div>
+          <div class="q-bpm">132</div>
+          <div class="q-cam">10A</div>
+          <div class="q-chev">▶</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">03</div>
+          <div class="q-body"><div class="q-name">Sleeper</div><div class="q-artist">Forester · Untitled.05</div></div>
+          <div class="q-bpm">128</div>
+          <div class="q-cam">8A</div>
+          <div class="q-chev">▶</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">evidence bus</div>
+    <div class="p-card"><div class="p-cite">02:14 · KICK 60Hz</div><div class="p-text">Low-end opened. <b>Sub gain rose 3.2 dB</b> across four bars.<span class="p-attr">CITE LOCKED</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · PHRASE 12</div><div class="p-text">Filter sweep started, <b>hi-band fell 8 dB</b>.<span class="p-attr">CITE LOCKED</span></div></div>
+    <div class="p-section">next cue</div>
+    <div class="p-card"><div class="p-cite">02:30 · DROP-IN</div><div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">0.91 CONF</span></div></div>
+  </aside>
+</div>
+<div class="studio-status">REC · 47:12</div>
+</body>
+</html>

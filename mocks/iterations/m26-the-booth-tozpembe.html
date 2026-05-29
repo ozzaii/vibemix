@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · the booth · tozpembe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400..800&family=Space+Grotesk:wght@500..700&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════ THE BOOTH ═══════════════════════════════
+   vibemix Session surface. The screen is a presence, not a dashboard.
+   The co-host's voice is a living time-stream: the line it is saying now is
+   lit and large; the lines it just said recede up and dim. One word leans
+   tozpembe, and that word's receipt lights up in the ledger. The AI shows
+   its work — anti-slop made visible.
+   Palette locked: #1A1618 surface · #FFA5DF tozpembe (sprinkle, 20) · #E8C47A gold heat.
+   ════════════════════════════════════════════════════════════════════════ */
+:root{
+  /* warm obsidian, never #000 */
+  --void:#1A1618; --void-1:#1E1A1C; --void-2:#231E21; --void-3:#2A2428; --void-4:#332B30;
+  /* warm silk ink, never pure white */
+  --silk-0:rgba(255,250,253,0.95); --silk-1:rgba(255,250,253,0.72); --silk-2:rgba(255,250,253,0.46); --silk-3:rgba(255,250,253,0.26); --silk-4:rgba(255,250,253,0.13);
+  /* tozpembe — the heartbeat, sprinkled */
+  --rose:#FFA5DF; --rose-soft:#FFC4EC;
+  --rose-04:rgba(255,165,223,0.04); --rose-08:rgba(255,165,223,0.08); --rose-12:rgba(255,165,223,0.12); --rose-16:rgba(255,165,223,0.16); --rose-22:rgba(255,165,223,0.22); --rose-32:rgba(255,165,223,0.32);
+  /* gold — heat only, the rarest light */
+  --gold:#E8C47A; --gold-16:rgba(232,196,122,0.16); --gold-26:rgba(232,196,122,0.26);
+  --hair:rgba(255,250,253,0.07); --hair-up:rgba(255,250,253,0.13);
+  --chrome-h:34px; --rail-w:64px; --ledger-w:300px; --status-h:40px;
+  --beat:462ms;            /* 130 BPM, one beat */
+  --ease:cubic-bezier(0.16,1,0.3,1);
+  --ease-quart:cubic-bezier(0.165,0.84,0.44,1);
+  --voice:'Hanken Grotesk',-apple-system,system-ui,sans-serif;
+  --mark:'Space Grotesk',var(--voice);
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+html,body{height:100%;background:var(--void);color:var(--silk-1);font-family:var(--voice);font-size:14px;letter-spacing:-0.006em;overflow:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+body{display:flex;flex-direction:column;position:relative}
+::selection{background:var(--rose);color:var(--void)}
+
+/* one ambient: a low rose floor-glow, far back, static. The room, not a wash. */
+.floor-glow{position:fixed;left:50%;bottom:-12%;width:78vw;height:46vh;transform:translateX(-50%);pointer-events:none;z-index:0;background:radial-gradient(ellipse 50% 50% at center, var(--rose-08) 0%, transparent 70%);filter:blur(50px)}
+/* faint physical grain */
+.grain{position:fixed;inset:0;pointer-events:none;z-index:98;opacity:0.02;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ─────────────────────────── chrome ─────────────────────────── */
+.chrome{height:var(--chrome-h);flex-shrink:0;display:flex;align-items:center;padding:0 16px;position:relative;z-index:20;-webkit-app-region:drag;border-bottom:1px solid var(--hair);background:rgba(26,22,24,0.6);backdrop-filter:blur(20px)}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl i{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--silk-3)}
+.tl i:nth-child(1){border-color:#FF5F57}.tl i:nth-child(2){border-color:#FEBC2E}.tl i:nth-child(3){border-color:#28C840}
+.mark{position:absolute;left:50%;transform:translateX(-50%);font-family:var(--mark);font-weight:600;font-size:13px;letter-spacing:0.02em;color:var(--silk-0);display:flex;align-items:baseline;gap:7px}
+.mark u{text-decoration:none;color:var(--rose)}
+.chrome-r{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--silk-3);letter-spacing:0.06em;font-variant-numeric:tabular-nums;-webkit-app-region:no-drag;display:flex;align-items:center;gap:8px}
+.kbd{font-family:var(--mono);font-size:10px;color:var(--silk-2);border:1px solid var(--hair-up);border-radius:5px;padding:3px 7px;letter-spacing:0.04em}
+
+/* ─────────────────────────── body grid ─────────────────────────── */
+.shell{flex:1;display:grid;grid-template-columns:var(--rail-w) 1fr var(--ledger-w);min-height:0;position:relative;z-index:10}
+
+/* left: a thin instrument rail, not a nav list */
+.rail{border-right:1px solid var(--hair);display:flex;flex-direction:column;align-items:center;padding:18px 0 14px;gap:4px}
+.rail-mark{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 32% 30%, var(--rose-soft), var(--rose) 62%, #D98BC2);box-shadow:0 0 16px var(--rose-32), inset 0 1px 0 rgba(255,255,255,0.45);margin-bottom:14px;flex-shrink:0}
+.ricon{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:var(--silk-2);cursor:pointer;font-size:17px;transition:color 200ms var(--ease),background 200ms var(--ease);position:relative}
+.ricon:hover{color:var(--silk-0);background:var(--rose-04)}
+.ricon.on{color:var(--rose);background:var(--rose-08)}
+.ricon.on::before{content:'';position:absolute;left:-12px;top:11px;bottom:11px;width:2px;background:var(--rose);border-radius:0 2px 2px 0;box-shadow:0 0 8px var(--rose-32)}
+.rail-sp{flex:1}
+.rail-tag{font-family:var(--mono);font-size:8px;color:var(--silk-3);letter-spacing:0.2em;writing-mode:vertical-rl;text-orientation:mixed;text-transform:uppercase;opacity:0.6;margin-bottom:6px}
+
+/* center: the booth */
+.booth{position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.booth::before{content:'';position:absolute;inset:0 0 auto;height:64px;background:linear-gradient(180deg,var(--void),transparent);pointer-events:none;z-index:6}
+
+/* transport ribbon */
+.transport{flex-shrink:0;margin:16px 40px 0;padding:13px 18px;display:grid;grid-template-columns:auto 1fr auto;gap:20px;align-items:center;border:1px solid var(--hair);border-radius:13px;background:var(--void-1);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
+.tp-track{display:flex;flex-direction:column;gap:3px;min-width:0}
+.tp-name{font-weight:600;font-size:13px;color:var(--silk-0);letter-spacing:-0.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tp-artist{font-family:var(--mono);font-size:10px;color:var(--silk-2);letter-spacing:0.04em}
+.wave{display:flex;align-items:center;gap:2px;height:30px;position:relative;padding:0 2px}
+.wave i{flex:1;background:var(--silk-4);border-radius:1px;transition:background 200ms var(--ease)}
+.wave i.past{background:var(--silk-2)}
+.wave i.head{background:var(--rose);box-shadow:0 0 8px var(--rose);width:2.5px;flex:none}
+.tp-meta{display:flex;gap:16px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tp-cell{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.tp-cell b{font-size:14px;font-weight:500;color:var(--silk-0);letter-spacing:0.02em}
+.tp-cell s{font-size:8px;text-decoration:none;color:var(--silk-3);letter-spacing:0.18em;text-transform:uppercase}
+.tp-cell.live b{color:var(--rose)}
+.tp-cell.heat b{color:var(--gold)}
+
+/* the voice time-stream */
+.stream{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-end;padding:40px 40px 8px;gap:0}
+.line{padding:9px 0;transition:opacity 400ms var(--ease)}
+.line .ts{font-family:var(--mono);font-size:10px;color:var(--silk-3);letter-spacing:0.1em;font-variant-numeric:tabular-nums;display:block;margin-bottom:7px}
+.line p{letter-spacing:-0.02em;text-wrap:balance}
+.line em{font-style:normal;color:var(--rose);font-weight:inherit}
+/* past lines recede + dim */
+.line.past-2 p{font-weight:500;font-size:19px;line-height:1.32;color:var(--silk-3)}
+.line.past-1 p{font-weight:500;font-size:23px;line-height:1.3;color:var(--silk-2)}
+/* the now line: the hero */
+.line.now{padding-top:16px}
+.line.now .ts{color:var(--rose);margin-bottom:11px;display:flex;align-items:center;gap:9px}
+.line.now .ts .dot{width:7px;height:7px;border-radius:50%;background:var(--rose);box-shadow:0 0 9px var(--rose);animation:pulse var(--beat) steps(2,jump-none) infinite}
+@keyframes pulse{50%{opacity:0.45}}
+.line.now p{font-weight:600;font-size:clamp(32px,3.6vw,50px);line-height:1.08;color:var(--silk-0)}
+.line.now em{font-weight:700;position:relative}
+.line.now em::after{content:'';position:absolute;left:0;right:0;bottom:0.06em;height:2px;background:var(--rose);box-shadow:0 0 10px var(--rose-32);border-radius:2px}
+/* the receipt chip — clicking jumps to the ledger entry */
+.receipt{display:inline-flex;align-items:center;gap:7px;vertical-align:middle;margin-left:14px;padding:6px 11px 6px 9px;border:1px solid var(--rose-32);border-radius:999px;background:var(--rose-08);font-family:var(--mono);font-size:11px;letter-spacing:0.04em;color:var(--rose-soft);cursor:pointer;font-variant-numeric:tabular-nums;transition:all 220ms var(--ease);transform:translateY(-0.18em)}
+.receipt::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--rose);box-shadow:0 0 6px var(--rose)}
+.receipt:hover{background:var(--rose);color:var(--void);border-color:var(--rose)}
+.receipt:hover::before{background:var(--void);box-shadow:none}
+
+/* next-up: one confident card, anchored at the bottom of the booth */
+.next{flex-shrink:0;margin:8px 40px 16px;padding:16px 20px;border:1px solid var(--hair);border-radius:14px;background:var(--void-1);display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;cursor:pointer;transition:border-color 240ms var(--ease),background 240ms var(--ease)}
+.next:hover{border-color:var(--rose-32);background:var(--void-2)}
+.next-badge{font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--rose);writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);align-self:stretch;display:flex;align-items:center;padding:2px 0;border-right:1px solid var(--hair)}
+.next-body{min-width:0}
+.next-title{font-weight:600;font-size:17px;color:var(--silk-0);letter-spacing:-0.012em;display:flex;align-items:baseline;gap:9px}
+.next-title em{font-style:normal;color:var(--rose);font-weight:700}
+.next-reason{font-size:13px;color:var(--silk-1);line-height:1.45;margin-top:5px;max-width:62ch}
+.next-stats{display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.next-stats .row{display:flex;gap:7px;align-items:baseline}
+.next-stats s{text-decoration:none;font-size:8px;color:var(--silk-3);letter-spacing:0.16em;text-transform:uppercase}
+.next-stats b{font-size:13px;font-weight:500;color:var(--silk-0)}
+.next-stats b.match{color:var(--rose)}
+
+/* right: the receipts ledger */
+.ledger{border-left:1px solid var(--hair);display:flex;flex-direction:column;min-height:0;background:rgba(30,26,28,0.4)}
+.ledger-h{flex-shrink:0;padding:18px 20px 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--hair)}
+.ledger-h .t{font-family:var(--mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--silk-2)}
+.ledger-h .c{font-family:var(--mono);font-size:10px;color:var(--silk-3);letter-spacing:0.06em}
+.ledger-s{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.rcpt{padding:13px 14px;border:1px solid var(--hair);border-radius:12px;background:var(--void-1);transition:border-color 220ms var(--ease),transform 220ms var(--ease);cursor:pointer}
+.rcpt:hover{border-color:var(--hair-up);transform:translateX(-2px)}
+.rcpt-cite{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;color:var(--silk-2);letter-spacing:0.06em;font-variant-numeric:tabular-nums;margin-bottom:9px}
+.rcpt-cite::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--silk-3)}
+.rcpt-txt{font-size:13px;line-height:1.45;color:var(--silk-1)}
+.rcpt-txt b{color:var(--silk-0);font-weight:600;font-family:var(--mono);font-size:12px;letter-spacing:0.02em}
+.rcpt-foot{margin-top:10px;font-family:var(--mono);font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:var(--silk-3)}
+/* the receipt that matches the now-line is lit */
+.rcpt.lit{border-color:var(--rose-32);background:var(--rose-08)}
+.rcpt.lit .rcpt-cite{color:var(--rose-soft)}
+.rcpt.lit .rcpt-cite::before{background:var(--rose);box-shadow:0 0 6px var(--rose)}
+.rcpt.lit .rcpt-foot{color:var(--rose)}
+.ledger-pred{flex-shrink:0;padding:14px;border-top:1px solid var(--hair)}
+.pred-h{font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--silk-3);margin-bottom:10px}
+.pred{padding:13px 14px;border:1px dashed var(--hair-up);border-radius:12px}
+.pred-cite{font-family:var(--mono);font-size:10px;color:var(--gold);letter-spacing:0.06em;margin-bottom:7px;font-variant-numeric:tabular-nums}
+.pred-txt{font-size:12px;line-height:1.4;color:var(--silk-1)}
+.pred-conf{margin-top:9px;display:flex;align-items:center;gap:8px}
+.pred-bar{flex:1;height:3px;border-radius:2px;background:var(--void-4);overflow:hidden}
+.pred-bar i{display:block;height:100%;width:91%;background:var(--gold);border-radius:2px}
+.pred-conf s{text-decoration:none;font-family:var(--mono);font-size:10px;color:var(--gold);font-variant-numeric:tabular-nums}
+
+/* persona dock — floats bottom-left, tactile */
+.persona{position:absolute;left:calc(var(--rail-w) + 40px);bottom:84px;z-index:14;display:flex;align-items:center;gap:1px;padding:3px;border:1px solid var(--hair);border-radius:11px;background:rgba(26,22,24,0.78);backdrop-filter:blur(20px)}
+.persona b{font-family:var(--mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--silk-2);padding:8px 14px;border-radius:8px;cursor:pointer;transition:all 200ms var(--ease)}
+.persona b:hover{color:var(--silk-0)}
+.persona b.on{background:var(--rose);color:var(--void);font-weight:600}
+
+/* status bar */
+.status{height:var(--status-h);flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 18px;border-top:1px solid var(--hair);font-family:var(--mono);font-size:10px;color:var(--silk-2);letter-spacing:0.06em;position:relative;z-index:20;background:rgba(26,22,24,0.6);backdrop-filter:blur(20px)}
+.status .live{display:flex;align-items:center;gap:7px;color:var(--rose)}
+.status .live i{width:6px;height:6px;border-radius:50%;background:var(--rose);box-shadow:0 0 8px var(--rose)}
+.status .sep{color:var(--silk-4)}
+.status .r{margin-left:auto;display:flex;gap:16px;font-variant-numeric:tabular-nums}
+.status .r b{color:var(--silk-1);font-weight:400}
+
+/* polish */
+:focus{outline:0}
+:focus-visible{outline:0;box-shadow:0 0 0 2px var(--void),0 0 0 4px var(--rose);border-radius:10px}
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--rose-16);border-radius:5px;border:2px solid var(--void)}
+::-webkit-scrollbar-thumb:hover{background:var(--rose-32)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:0.01ms!important}}
+</style>
+</head>
+<body>
+<div class="floor-glow"></div>
+
+<div class="chrome">
+  <div class="tl"><i></i><i></i><i></i></div>
+  <div class="mark">vibemix<u>·</u></div>
+  <div class="chrome-r"><span class="kbd">⌘K</span></div>
+</div>
+
+<div class="shell">
+  <!-- instrument rail -->
+  <aside class="rail">
+    <div class="rail-mark"></div>
+    <div class="ricon on" title="Session">◉</div>
+    <div class="ricon" title="Library">▦</div>
+    <div class="ricon" title="Debrief">◷</div>
+    <div class="ricon" title="Learn">✦</div>
+    <div class="rail-sp"></div>
+    <div class="rail-tag">on air</div>
+    <div class="ricon" title="Settings">⚙</div>
+  </aside>
+
+  <!-- the booth -->
+  <main class="booth">
+    <div class="transport">
+      <div class="tp-track">
+        <div class="tp-name">Concrete (original mix)</div>
+        <div class="tp-artist">Anetha · deck a</div>
+      </div>
+      <div class="wave">
+        <i class="past"></i><i class="past"></i><i class="past"></i><i class="past"></i><i class="past"></i><i class="past"></i><i class="past"></i><i class="past"></i><i class="past"></i><i class="past"></i><i class="past"></i><i class="head"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+      <div class="tp-meta">
+        <div class="tp-cell live"><b>130.0</b><s>bpm</s></div>
+        <div class="tp-cell"><b>8A→9A</b><s>key</s></div>
+        <div class="tp-cell heat"><b>0.78</b><s>heat</s></div>
+        <div class="tp-cell"><b>14/16</b><s>phrase</s></div>
+      </div>
+    </div>
+
+    <div class="stream">
+      <div class="line past-2"><span class="ts">02:01</span><p>Clean swap on the downbeat. The crowd didn't blink, that's the good kind of invisible.</p></div>
+      <div class="line past-1"><span class="ts">02:09</span><p>You pulled the highs out at the right second. Room's leaning in now, hold the tension.</p></div>
+      <div class="line now">
+        <span class="ts"><span class="dot"></span>live · 02:14</span>
+        <p>That low end <em>just opened up</em>. Keep him on the kick one more 16, then ride the filter back up.<span class="receipt">02:14 · 60Hz</span></p>
+      </div>
+    </div>
+
+    <div class="persona">
+      <b class="on">Hype</b><b>Coach</b><b>Tutor</b>
+    </div>
+
+    <div class="next">
+      <div class="next-badge">next up</div>
+      <div class="next-body">
+        <div class="next-title">Vox Dust <em>ii</em> <span style="font-family:var(--mono);font-size:11px;color:var(--silk-2);letter-spacing:0.04em;font-weight:400">SHRIM</span></div>
+        <div class="next-reason">Same hi-hat ghost as the breakdown you just rode, a half step up. He'll feel the family inside two bars, no hard cut needed.</div>
+      </div>
+      <div class="next-stats">
+        <div class="row"><s>bpm</s><b class="match">130</b></div>
+        <div class="row"><s>key</s><b class="match">9A</b></div>
+        <div class="row"><s>fit</s><b>0.94</b></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- receipts ledger -->
+  <aside class="ledger">
+    <div class="ledger-h"><span class="t">receipts</span><span class="c">3 cited</span></div>
+    <div class="ledger-s">
+      <div class="rcpt lit">
+        <div class="rcpt-cite">02:14 · sub band</div>
+        <div class="rcpt-txt">Low end opened. <b>+3.2 dB</b> at 60 Hz across four bars, kick now carrying the floor.</div>
+        <div class="rcpt-foot">backs the live read</div>
+      </div>
+      <div class="rcpt">
+        <div class="rcpt-cite">02:09 · hi band</div>
+        <div class="rcpt-txt">Filter sweep. <b>−8 dB</b> above 4 kHz, tension building as designed.</div>
+        <div class="rcpt-foot">cite locked</div>
+      </div>
+      <div class="rcpt">
+        <div class="rcpt-cite">02:01 · track change</div>
+        <div class="rcpt-txt">Deck A took over on the downbeat. <b>0 ms</b> phase drift, beatgrid clean.</div>
+        <div class="rcpt-foot">cite locked</div>
+      </div>
+    </div>
+    <div class="ledger-pred">
+      <div class="pred-h">reading ahead</div>
+      <div class="pred">
+        <div class="pred-cite">02:30 · drop-in</div>
+        <div class="pred-txt">Incoming downbeat lands at phrase 16. BPM held, the swap window is open.</div>
+        <div class="pred-conf"><span class="pred-bar"><i></i></span><s>0.91</s></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="status">
+  <span class="live"><i></i>ON AIR</span>
+  <span class="sep">·</span>
+  <span>BlackHole 2ch</span>
+  <span class="sep">·</span>
+  <span>DDJ-FLX4 linked</span>
+  <div class="r"><span><b>hype</b> mode</span><span>session <b>47:12</b></span><span>22:14 CET</span></div>
+</div>
+
+<div class="grain"></div>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · 26 mocks · index</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1A1618;color:rgba(255,250,253,0.85);font-family:'Geist',sans-serif;font-size:14px;letter-spacing:-0.005em;padding:48px 64px;min-height:100vh}
+.head{margin-bottom:48px;padding-bottom:24px;border-bottom:1px solid rgba(255,220,240,0.10)}
+h1{font:italic 400 56px/0.95 'Instrument Serif';color:#fff;letter-spacing:-0.024em;margin-bottom:14px}
+.sub{font:500 12px/1.4 'Geist Mono';color:rgba(255,250,253,0.55);letter-spacing:0.06em;text-transform:uppercase;max-width:680px}
+.sub b{color:#FFA5DF;font-weight:600}
+section{margin-bottom:48px}
+.cat{display:flex;align-items:baseline;gap:14px;margin-bottom:20px;padding-bottom:8px;border-bottom:1px solid rgba(255,220,240,0.10)}
+.cat-num{font:500 11px/1 'Geist Mono';color:#FFA5DF;letter-spacing:0.18em;text-transform:uppercase}
+.cat-title{font:italic 400 26px/1 'Instrument Serif';color:#fff;letter-spacing:-0.018em}
+.cat-tag{font:500 10px/1 'Geist Mono';color:rgba(255,250,253,0.40);letter-spacing:0.10em;text-transform:uppercase;margin-left:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+a.mock{display:flex;flex-direction:column;gap:5px;padding:18px 20px;background:#221D20;border:1px solid rgba(255,220,240,0.08);border-radius:10px;text-decoration:none;color:inherit;transition:all 200ms cubic-bezier(0.16,1,0.3,1);position:relative}
+a.mock:hover{background:#282326;border-color:rgba(255,165,223,0.30);transform:translateY(-1px)}
+a.mock.top3{border-color:#FFA5DF;background:linear-gradient(180deg,rgba(255,165,223,0.10),rgba(255,165,223,0.02))}
+a.mock.top3::before{content:'TOP 3';position:absolute;top:8px;right:8px;font:600 8px/1 'Geist Mono';color:#1A1618;background:#FFA5DF;padding:3px 6px;border-radius:3px;letter-spacing:0.10em}
+.m-num{font:500 10px/1 'Geist Mono';color:#FFA5DF;letter-spacing:0.06em}
+.m-title{font:italic 400 18px/1.2 'Instrument Serif';color:#fff;letter-spacing:-0.012em}
+.m-note{font:500 11px/1.4 'Geist Mono';color:rgba(255,250,253,0.50);letter-spacing:0.02em;margin-top:2px}
+.m-score{display:flex;align-items:center;gap:5px;margin-top:6px;font:500 10px/1 'Geist Mono';color:rgba(255,250,253,0.40);letter-spacing:0.06em}
+.m-score b{color:#fff}
+.m-bar{flex:1;height:3px;background:rgba(255,220,240,0.08);border-radius:1px;overflow:hidden}
+.m-bar i{display:block;height:100%;background:linear-gradient(90deg,#FFA5DF,rgba(255,165,223,0.6));border-radius:1px}
+.s32 .m-bar i{width:80%}.s33 .m-bar i{width:82.5%}.s34 .m-bar i{width:85%}.s35 .m-bar i{width:87.5%}.s36 .m-bar i{width:90%}.s37 .m-bar i{width:92.5%}.s38 .m-bar i{width:95%}
+.foot{margin-top:64px;padding-top:24px;border-top:1px solid rgba(255,220,240,0.10);font:500 11px/1.5 'Geist Mono';color:rgba(255,250,253,0.55);letter-spacing:0.04em;max-width:720px}
+.foot b{color:#FFA5DF}
+</style>
+</head>
+<body>
+<div class="head">
+  <h1>26 mocks for vibemix</h1>
+  <div class="sub">5 categories × 5 directions · all bespoke, none generated · top 3 selected for Apple-engineer polish. The brief: <b>real DJ friend in your ear, no AI slop · young, charismatic · 20/80</b>.</div>
+</div>
+<section>
+  <div class="cat"><div class="cat-num">A</div><div class="cat-title">Editorial</div><div class="cat-tag">typographic + magazine voice</div></div>
+  <div class="grid">
+    <a class="mock s33" href="m01-editorial-italic-serif.html"><div class="m-num">m01</div><div class="m-title">Instrument Serif Premium</div><div class="m-note">italic display serif · soft rose · the safe baseline</div><div class="m-score"><div class="m-bar"><i></i></div><b>33</b>/40</div></a>
+    <a class="mock s36 top3" href="m02-magazine-cover-fraunces.html"><div class="m-num">m02</div><div class="m-title">Magazine Cover Fraunces</div><div class="m-note">drop-cap T · broken grid · dispatch byline · top pick</div><div class="m-score"><div class="m-bar"><i></i></div><b>36</b>/40</div></a>
+    <a class="mock s33" href="m03-newsprint-broadsheet.html"><div class="m-num">m03</div><div class="m-title">Newsprint Broadsheet</div><div class="m-note">cream paper · two-column · pull-quote · classic but old</div><div class="m-score"><div class="m-bar"><i></i></div><b>33</b>/40</div></a>
+    <a class="mock s35" href="m04-wide-editorial-bricolage.html"><div class="m-num">m04</div><div class="m-title">Wide Editorial Bricolage</div><div class="m-note">variable wdth axis · lowercase · phrase 16-cell rail</div><div class="m-score"><div class="m-bar"><i></i></div><b>35</b>/40</div></a>
+    <a class="mock s34" href="m05-photographic-cover.html"><div class="m-num">m05</div><div class="m-title">Photographic Cover</div><div class="m-note">mesh-gradient hero · feature essay below · cinematic</div><div class="m-score"><div class="m-bar"><i></i></div><b>34</b>/40</div></a>
+  </div>
+</section>
+<section>
+  <div class="cat"><div class="cat-num">B</div><div class="cat-title">Brutalist</div><div class="cat-tag">raw mono + terminal + print</div></div>
+  <div class="grid">
+    <a class="mock s33" href="m06-berlin-concrete-mono.html"><div class="m-num">m06</div><div class="m-title">Berlin Concrete Mono</div><div class="m-note">orange #FF3D00 mark · grid texture · sharp boxes</div><div class="m-score"><div class="m-bar"><i></i></div><b>33</b>/40</div></a>
+    <a class="mock s35" href="m07-terminal-crt-amber.html"><div class="m-num">m07</div><div class="m-title">Terminal CRT Amber</div><div class="m-note">phosphor amber · green-mono cites · scanlines + flicker</div><div class="m-score"><div class="m-bar"><i></i></div><b>35</b>/40</div></a>
+    <a class="mock s33" href="m08-markdown-notes-mono.html"><div class="m-num">m08</div><div class="m-title">Markdown Notes Mono</div><div class="m-note">Obsidian-esque · YAML frontmatter · code blocks</div><div class="m-score"><div class="m-bar"><i></i></div><b>33</b>/40</div></a>
+    <a class="mock s35" href="m09-blueprint-schematic.html"><div class="m-num">m09</div><div class="m-title">Blueprint Schematic</div><div class="m-note">cyan drafting · DWG/SEC/DIM labels · NOTE callouts</div><div class="m-score"><div class="m-bar"><i></i></div><b>35</b>/40</div></a>
+    <a class="mock s36" href="m10-risograph-print.html"><div class="m-num">m10</div><div class="m-title">Risograph Print</div><div class="m-note">cream + bright pink + yellow · halftone + offset register</div><div class="m-score"><div class="m-bar"><i></i></div><b>36</b>/40</div></a>
+  </div>
+</section>
+<section>
+  <div class="cat"><div class="cat-num">C</div><div class="cat-title">Atmospheric</div><div class="cat-tag">glass + light + depth + ambient</div></div>
+  <div class="grid">
+    <a class="mock s36" href="m11-vision-frosted-glass.html"><div class="m-num">m11</div><div class="m-title">Vision Frosted Glass</div><div class="m-note">aurora 4-layer · 50px glass blur · premium visionOS feel</div><div class="m-score"><div class="m-bar"><i></i></div><b>36</b>/40</div></a>
+    <a class="mock s37" href="m12-tokyo-midnight-neon.html"><div class="m-num">m12</div><div class="m-title">Tokyo Midnight Neon</div><div class="m-note">JP brand mark · sharp magenta+cyan+amber · grid floor</div><div class="m-score"><div class="m-bar"><i></i></div><b>37</b>/40</div></a>
+    <a class="mock s34" href="m13-aurora-ambient-fog.html"><div class="m-num">m13</div><div class="m-title">Aurora Ambient Fog</div><div class="m-note">drifting fog mesh · italic Fraunces · sine-wave phrase</div><div class="m-score"><div class="m-bar"><i></i></div><b>34</b>/40</div></a>
+    <a class="mock s35" href="m14-volumetric-light-shaft.html"><div class="m-num">m14</div><div class="m-title">Volumetric Light Shaft</div><div class="m-note">3 directional beams · dust particles · cinematic</div><div class="m-score"><div class="m-bar"><i></i></div><b>35</b>/40</div></a>
+    <a class="mock s33" href="m15-subzero-ice-frosted.html"><div class="m-num">m15</div><div class="m-title">Sub-Zero Ice Frosted</div><div class="m-note">cool cyan + ice blue + crystal frost · premium clinical</div><div class="m-score"><div class="m-bar"><i></i></div><b>33</b>/40</div></a>
+  </div>
+</section>
+<section>
+  <div class="cat"><div class="cat-num">D</div><div class="cat-title">Analog</div><div class="cat-tag">tape + vinyl + hardware + tactile</div></div>
+  <div class="grid">
+    <a class="mock s36" href="m16-cassette-mixtape-sepia.html"><div class="m-num">m16</div><div class="m-title">Cassette Mixtape Sepia</div><div class="m-note">Caveat handwriting · side A/B · felt-tip annotations</div><div class="m-score"><div class="m-bar"><i></i></div><b>36</b>/40</div></a>
+    <a class="mock s37 top3" href="m17-vinyl-sleeve-12inch.html"><div class="m-num">m17</div><div class="m-title">Vinyl Sleeve 12"</div><div class="m-note">rotating record + sleeve frame · gold/burgundy · DJ authentic · top pick</div><div class="m-score"><div class="m-bar"><i></i></div><b>37</b>/40</div></a>
+    <a class="mock s36" href="m18-cdj-hardware.html"><div class="m-num">m18</div><div class="m-title">CDJ Hardware Faithful</div><div class="m-note">VT323 LED amber/blue/green · brushed steel · Pioneer</div><div class="m-score"><div class="m-bar"><i></i></div><b>36</b>/40</div></a>
+    <a class="mock s35" href="m19-tape-splice-physical.html"><div class="m-num">m19</div><div class="m-title">Tape Splice Physical</div><div class="m-note">Anton + Special Elite · polygon tape clips · hard shadows</div><div class="m-score"><div class="m-bar"><i></i></div><b>35</b>/40</div></a>
+    <a class="mock s35" href="m20-studio-console-knurled.html"><div class="m-num">m20</div><div class="m-title">Studio Console Knurled</div><div class="m-note">CSS knurled metal knobs · VU meter · fader strip · Neve red</div><div class="m-score"><div class="m-bar"><i></i></div><b>35</b>/40</div></a>
+  </div>
+</section>
+<section>
+  <div class="cat"><div class="cat-num">E</div><div class="cat-title">Kinetic</div><div class="cat-tag">motion + energy + BPM-alive</div></div>
+  <div class="grid">
+    <a class="mock s37" href="m21-boiler-room-broadcast.html"><div class="m-num">m21</div><div class="m-title">Boiler Room Broadcast</div><div class="m-note">ON-AIR ticker · lower-thirds · BPM-locked blink</div><div class="m-score"><div class="m-bar"><i></i></div><b>37</b>/40</div></a>
+    <a class="mock s37" href="m22-acid-lemon-punk.html"><div class="m-num">m22</div><div class="m-title">Acid Lemon Punk</div><div class="m-note">Bungee + lemon+magenta+cyan · hard 4px borders + 6-8px hard shadows</div><div class="m-score"><div class="m-bar"><i></i></div><b>37</b>/40</div></a>
+    <a class="mock s36 top3" href="m23-bpm-geometric-pulse.html"><div class="m-num">m23</div><div class="m-title">BPM Geometric Pulse</div><div class="m-note">floating geometry pulsing at BPM · metronome pip row · ring phrase · top pick</div><div class="m-score"><div class="m-bar"><i></i></div><b>36</b>/40</div></a>
+    <a class="mock s35" href="m24-liquid-mercury-chrome.html"><div class="m-num">m24</div><div class="m-title">Liquid Mercury Chrome</div><div class="m-note">iridescent gradient text · mercury orb · Y2K specular</div><div class="m-score"><div class="m-bar"><i></i></div><b>35</b>/40</div></a>
+    <a class="mock s36" href="m25-club-led-pulse-train.html"><div class="m-num">m25</div><div class="m-title">Club LED Pulse Train</div><div class="m-note">4-corner LED strips animating · multi-color phrase cells</div><div class="m-score"><div class="m-bar"><i></i></div><b>36</b>/40</div></a>
+    <a class="mock s37" href="m26-the-booth-tozpembe.html"><div class="m-num">m26</div><div class="m-title">The Booth Tozpembe</div><div class="m-note">living co-host time-stream · grounded ledger · rose/gold heat</div><div class="m-score"><div class="m-bar"><i></i></div><b>37</b>/40</div></a>
+  </div>
+</section>
+<div class="foot">
+  <p><b>TOP 3 selected:</b> m02 Magazine Cover Fraunces (Editorial voice · drop-cap signature) · m17 Vinyl Sleeve 12" (DJ authenticity · rotating record · gold + burgundy) · m23 BPM Geometric Pulse (Forged Obsidian rose direction · all motion BPM-locked · the pulse alive).</p>
+  <p style="margin-top:14px">Each of the top 3 will be polished to Apple-engineer-grade: real focus rings · keyboard navigation cues · spring-physics hover · `prefers-reduced-motion` respect · custom selection color · weight-axis breathing · pixel-perfect optical alignment · zero broken states.</p>
+</div>
+</body>
+</html>

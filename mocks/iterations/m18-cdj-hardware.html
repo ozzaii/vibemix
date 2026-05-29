@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m18 · CDJ Hardware Faithful</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400..700&family=Geist:wght@400..700&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{
+  --steel-0:#0A0B0D;--steel-2:#13151A;--steel-4:#1C1F26;--steel-6:#272B35;--steel-8:#343945;
+  --brushed:#3A3F4B;
+  --ink-0:rgba(232,238,250,0.96);--ink-1:rgba(232,238,250,0.78);--ink-2:rgba(232,238,250,0.50);--ink-3:rgba(232,238,250,0.28);--ink-4:rgba(232,238,250,0.14);
+  --led-amber:#FFA630;--led-amber-glow:0 0 8px #FFA630,0 0 16px rgba(255,166,48,0.45);
+  --led-blue:#5AB8FF;--led-blue-glow:0 0 8px #5AB8FF,0 0 16px rgba(90,184,255,0.45);
+  --led-green:#5AFFA8;--led-green-glow:0 0 8px #5AFFA8,0 0 16px rgba(90,255,168,0.45);
+  --led-red:#FF5A5A;
+  --border:rgba(232,238,250,0.10);--border-strong:rgba(232,238,250,0.22);
+  --chrome-h:28px;--sb-w:228px;--panel-w:284px;
+  --spring:cubic-bezier(0.16,1,0.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--steel-0);color:var(--ink-1);font-family:'Geist',-apple-system,sans-serif;font-weight:500;font-size:13px;letter-spacing:0;overflow:hidden}
+body{display:flex;flex-direction:column;position:relative}
+/* brushed-steel texture */
+body::before{content:'';position:fixed;inset:0;background-image:repeating-linear-gradient(90deg,rgba(232,238,250,0.014) 0,rgba(232,238,250,0.014) 1px,transparent 1px,transparent 3px);pointer-events:none;z-index:0}
+.chrome{height:var(--chrome-h);background:linear-gradient(180deg,#1F242D 0%,#13161B 100%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag;z-index:5;box-shadow:inset 0 1px 0 rgba(232,238,250,0.08)}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:11px;height:11px;border-radius:50%;background:transparent;border:1.5px solid rgba(232,238,250,0.35)}
+.tl span:nth-child(1){border-color:#FF5F57}.tl span:nth-child(2){border-color:#FEBC2E}.tl span:nth-child(3){border-color:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:700 10px/1 'Geist Mono';color:var(--led-amber);letter-spacing:0.18em;text-transform:uppercase;text-shadow:var(--led-amber-glow)}
+.row{flex:1;display:flex;position:relative;min-height:0;z-index:2}
+/* sidebar — pioneer side panel */
+.sb{width:var(--sb-w);background:linear-gradient(180deg,#13161B 0%,#0A0B0D 100%);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:18px 0 14px;position:relative;z-index:3;box-shadow:inset 1px 0 0 rgba(232,238,250,0.06)}
+.brand{padding:0 14px 18px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.brand-row{display:flex;align-items:center;gap:10px}
+.brand-mark{width:32px;height:32px;background:linear-gradient(180deg,#272B35 0%,#13161B 100%);border:1px solid var(--border-strong);border-radius:4px;display:flex;align-items:center;justify-content:center;font:700 14px/1 'Geist Mono';color:var(--led-amber);text-shadow:var(--led-amber-glow);box-shadow:inset 0 1px 0 rgba(232,238,250,0.10)}
+.brand-name{font:700 18px/1 'Geist';color:var(--ink-0);letter-spacing:-0.034em;text-transform:uppercase}
+.brand-strap{font:700 9px/1 'Geist Mono';color:var(--led-amber);letter-spacing:0.20em;text-transform:uppercase;margin-top:10px;display:flex;align-items:center;gap:7px;text-shadow:var(--led-amber-glow)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--led-amber);box-shadow:var(--led-amber-glow);animation:beat 1.4s var(--spring) infinite}
+@keyframes beat{0%,100%{opacity:0.7}50%{opacity:1}}
+.sect{font:700 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase;padding:14px 14px 8px;display:flex;align-items:center;gap:8px}
+.sect::before{content:'■';color:var(--led-amber);font-size:6px}
+.nav{display:flex;flex-direction:column;gap:1px}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 14px;font:600 12px/1 'Geist Mono';color:var(--ink-1);cursor:pointer;letter-spacing:0.04em;text-transform:uppercase;position:relative;transition:all 200ms var(--spring)}
+.ni:hover{color:var(--ink-0);background:rgba(232,238,250,0.04)}
+.ni.active{color:var(--led-amber);background:linear-gradient(90deg,rgba(255,166,48,0.10),transparent);text-shadow:0 0 6px rgba(255,166,48,0.5)}
+.ni.active::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;background:var(--led-amber);box-shadow:0 0 8px var(--led-amber)}
+.ni-num{font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.04em;width:18px;font-variant-numeric:tabular-nums}
+.ni.active .ni-num{color:var(--led-amber)}
+.ni-shortcut{margin-left:auto;font:500 9px/1 'Geist Mono';color:var(--ink-4);letter-spacing:0.04em}
+.sess{padding:10px 14px;cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative;border-bottom:1px solid var(--border);transition:all 200ms var(--spring)}
+.sess:hover{background:rgba(232,238,250,0.03)}
+.sess.active{background:linear-gradient(90deg,rgba(255,166,48,0.08),transparent)}
+.sess.active::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;background:var(--led-amber);box-shadow:0 0 8px var(--led-amber)}
+.sess-name{font:600 12px/1.15 'Geist';color:var(--ink-0);letter-spacing:-0.005em;text-transform:uppercase}
+.sess-meta{font:500 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.sb-foot{margin-top:auto;padding:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:11px}
+.persona{display:flex;gap:0;border:1px solid var(--border-strong);background:var(--steel-2);border-radius:4px;overflow:hidden;box-shadow:inset 0 1px 0 rgba(232,238,250,0.08)}
+.persona-pill{flex:1;padding:9px 0;background:transparent;font:700 10px/1 'Geist Mono';color:var(--ink-2);letter-spacing:0.10em;text-transform:uppercase;cursor:pointer;text-align:center;border-right:1px solid var(--border);transition:all 200ms var(--spring)}
+.persona-pill:last-child{border-right:0}
+.persona-pill:hover{color:var(--ink-0);background:rgba(232,238,250,0.04)}
+.persona-pill.active{background:linear-gradient(180deg,#FFA630,#E08820);color:var(--steel-0);font-weight:800;box-shadow:0 0 12px rgba(255,166,48,0.5),inset 0 1px 0 rgba(255,255,255,0.30)}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:12px 13px;background:linear-gradient(180deg,#1A1D24 0%,#0F1116 100%);border:1px solid var(--led-amber);border-radius:4px;cursor:pointer;transition:all 280ms var(--spring);position:relative;box-shadow:0 0 16px rgba(255,166,48,0.18),inset 0 1px 0 rgba(232,238,250,0.06)}
+.cohost-pill:hover{box-shadow:0 0 24px rgba(255,166,48,0.32)}
+.cohost-pill::after{content:'CDJ-VBM 3000';position:absolute;top:-7px;left:8px;background:var(--steel-2);padding:0 5px;font:700 8px/1 'Geist Mono';color:var(--led-amber);letter-spacing:0.16em;text-shadow:0 0 4px rgba(255,166,48,0.5)}
+.ch-dot{width:8px;height:8px;border-radius:50%;background:var(--led-amber);box-shadow:var(--led-amber-glow);animation:beat 1.2s var(--spring) infinite}
+.ch-text{flex:1}
+.ch-state{font:700 11px/1 'Geist Mono';color:var(--led-amber);letter-spacing:0.10em;text-transform:uppercase;text-shadow:0 0 6px rgba(255,166,48,0.5)}
+.ch-mode{font:500 11px/1.1 'Geist';color:var(--ink-1);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
+/* stage — control panel */
+.stage{flex:1;position:relative;background:var(--steel-0);overflow:hidden}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.50) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:24px;z-index:2;display:flex;flex-direction:column;gap:20px}
+/* status panel — 7-segment readouts */
+.panel-row{display:grid;grid-template-columns:repeat(5,1fr);gap:0;background:linear-gradient(180deg,#13161B 0%,#0A0B0D 100%);border:1px solid var(--border-strong);box-shadow:inset 0 1px 0 rgba(232,238,250,0.06),0 4px 16px rgba(0,0,0,0.4)}
+.pr-cell{padding:18px 20px;border-right:1px solid var(--border);position:relative;display:flex;flex-direction:column;gap:7px}
+.pr-cell:last-child{border-right:0}
+.pr-cell::before{content:'';position:absolute;top:6px;right:6px;width:5px;height:5px;border-radius:50%;background:var(--ink-4);box-shadow:inset 0 1px 1px rgba(0,0,0,0.3)}
+.pr-cell.on::before{background:var(--led-amber);box-shadow:var(--led-amber-glow),inset 0 1px 1px rgba(0,0,0,0.3)}
+.pr-cell.alt::before{background:var(--led-blue);box-shadow:var(--led-blue-glow),inset 0 1px 1px rgba(0,0,0,0.3)}
+.pr-cell.alt2::before{background:var(--led-green);box-shadow:var(--led-green-glow),inset 0 1px 1px rgba(0,0,0,0.3)}
+.pr-label{font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase}
+.pr-value{font:400 28px/1 'VT323';color:var(--led-amber);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-shadow:0 0 8px rgba(255,166,48,0.6),0 0 16px rgba(255,166,48,0.3)}
+.pr-cell.alt .pr-value{color:var(--led-blue);text-shadow:0 0 8px rgba(90,184,255,0.6),0 0 16px rgba(90,184,255,0.3)}
+.pr-cell.alt2 .pr-value{color:var(--led-green);text-shadow:0 0 8px rgba(90,255,168,0.6),0 0 16px rgba(90,255,168,0.3)}
+.pr-sub{font:600 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.08em;text-transform:uppercase}
+/* hero — display screen */
+.screen{background:linear-gradient(180deg,#040506 0%,#0A0C10 100%);border:1px solid var(--border-strong);border-radius:0;padding:32px 36px;position:relative;box-shadow:inset 0 2px 8px rgba(0,0,0,0.6),inset 0 0 0 1px rgba(232,238,250,0.04),0 0 24px rgba(255,166,48,0.10)}
+.screen::before{content:'DECK A · DISPLAY';position:absolute;top:-8px;left:18px;background:var(--steel-2);padding:0 7px;font:700 9px/1 'Geist Mono';color:var(--led-amber);letter-spacing:0.18em;text-shadow:0 0 4px rgba(255,166,48,0.5)}
+.screen::after{content:'';position:absolute;inset:0;background-image:repeating-linear-gradient(0deg,rgba(0,0,0,0.15) 0,rgba(0,0,0,0.15) 1px,transparent 1px,transparent 2px);pointer-events:none}
+.screen-kicker{position:relative;z-index:1;font:700 10px/1 'Geist Mono';color:var(--led-amber);letter-spacing:0.16em;text-transform:uppercase;margin-bottom:18px;display:flex;align-items:center;gap:10px;text-shadow:0 0 8px rgba(255,166,48,0.5)}
+.screen-kicker::before{content:'CO-HOST';padding:4px 7px;background:var(--led-amber);color:var(--steel-0);font:700 9px/1 'Geist Mono';letter-spacing:0.14em;box-shadow:0 0 12px rgba(255,166,48,0.5)}
+.screen-line{font:400 clamp(28px,3.4vw,40px)/1.25 'VT323';color:var(--led-amber);letter-spacing:0.02em;max-width:920px;position:relative;z-index:1;text-shadow:0 0 12px rgba(255,166,48,0.5),0 0 24px rgba(255,166,48,0.3)}
+.screen-line em{font-style:normal;color:var(--led-blue);text-shadow:0 0 12px rgba(90,184,255,0.6),0 0 24px rgba(90,184,255,0.4)}
+.cite{display:inline-block;vertical-align:0.32em;font:400 0.36em/1 'VT323';color:var(--led-green);letter-spacing:0.04em;padding:3px 7px;border:1px solid var(--led-green);font-variant-numeric:tabular-nums;margin-left:0.18em;cursor:pointer;transition:all 200ms var(--spring);background:rgba(90,255,168,0.08);text-shadow:0 0 8px rgba(90,255,168,0.6);text-transform:uppercase;font-style:normal}
+.cite:hover{background:var(--led-green);color:var(--steel-0);text-shadow:none}
+/* phrase strip */
+.phrase{background:linear-gradient(180deg,#13161B 0%,#0A0B0D 100%);border:1px solid var(--border-strong);padding:14px 22px;display:flex;align-items:center;gap:18px;box-shadow:inset 0 1px 0 rgba(232,238,250,0.06)}
+.ph-l{font:700 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase}
+.ph-n{font:400 16px/1 'VT323';color:var(--led-amber);font-variant-numeric:tabular-nums;text-shadow:0 0 6px rgba(255,166,48,0.5);letter-spacing:0.04em}
+.ph-bar{flex:1;display:grid;grid-template-columns:repeat(16,1fr);gap:1px;height:28px}
+.ph-cell{background:var(--steel-4);border-top:1px solid var(--steel-8);border-bottom:1px solid var(--steel-0);box-shadow:inset 0 1px 1px rgba(0,0,0,0.3)}
+.ph-cell.fired{background:linear-gradient(180deg,var(--led-amber),#C07020);box-shadow:0 0 6px rgba(255,166,48,0.5),inset 0 1px 0 rgba(255,255,255,0.20)}
+.ph-cell.current{background:linear-gradient(180deg,var(--led-amber),#FFD060);box-shadow:0 0 16px var(--led-amber),0 0 6px var(--led-amber),inset 0 1px 0 rgba(255,255,255,0.4);animation:beat 1.2s var(--spring) infinite}
+/* dispatch */
+.dispatch{display:grid;grid-template-columns:200px 1fr 220px;background:linear-gradient(180deg,#13161B 0%,#0A0B0D 100%);border:1px solid var(--border-strong);box-shadow:inset 0 1px 0 rgba(232,238,250,0.06),0 4px 16px rgba(0,0,0,0.4)}
+.dis-stamp{padding:18px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:6px;background:linear-gradient(180deg,rgba(255,166,48,0.10),rgba(255,166,48,0.02));position:relative}
+.dis-stamp::before{content:'';position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--led-amber);box-shadow:var(--led-amber-glow);animation:beat 1.2s var(--spring) infinite}
+.dis-stamp-l{font:700 10px/1 'Geist Mono';color:var(--led-amber);letter-spacing:0.18em;text-transform:uppercase;text-shadow:0 0 6px rgba(255,166,48,0.5)}
+.dis-stamp-v{font:400 32px/1 'VT323';color:var(--led-amber);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-shadow:0 0 10px rgba(255,166,48,0.6),0 0 20px rgba(255,166,48,0.3)}
+.dis-stamp-s{font:700 10px/1 'Geist Mono';color:var(--ink-1);letter-spacing:0.10em;text-transform:uppercase}
+.dis-body{padding:18px 22px;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.dis-head{font:600 15px/1.3 'Geist';color:var(--ink-0);letter-spacing:-0.005em;text-transform:uppercase}
+.dis-text{font:500 12px/1.5 'Geist Mono';color:var(--ink-2);letter-spacing:0.02em}
+.dis-text b{color:var(--led-amber);font-weight:700;text-shadow:0 0 4px rgba(255,166,48,0.4)}
+.dis-wave{padding:18px 20px;border-left:1px solid var(--border);display:flex;align-items:center;gap:1px;background:var(--steel-0);box-shadow:inset 0 0 12px rgba(0,0,0,0.5)}
+.dis-wave span{flex:1;background:var(--led-amber);box-shadow:0 0 4px rgba(255,166,48,0.4)}
+.dis-wave span:nth-child(1){height:30%}.dis-wave span:nth-child(2){height:55%}.dis-wave span:nth-child(3){height:85%}.dis-wave span:nth-child(4){height:70%}.dis-wave span:nth-child(5){height:45%}.dis-wave span:nth-child(6){height:65%}.dis-wave span:nth-child(7){height:90%}.dis-wave span:nth-child(8){height:60%}.dis-wave span:nth-child(9){height:38%}.dis-wave span:nth-child(10){height:55%}.dis-wave span:nth-child(11){height:75%}.dis-wave span:nth-child(12){height:40%}.dis-wave span:nth-child(13){height:65%}.dis-wave span:nth-child(14){height:30%}
+/* queue */
+.queue{background:linear-gradient(180deg,#13161B 0%,#0A0B0D 100%);border:1px solid var(--border-strong);box-shadow:inset 0 1px 0 rgba(232,238,250,0.06)}
+.queue-head{padding:14px 22px;background:linear-gradient(180deg,#1A1D24 0%,#13161B 100%);border-bottom:1px solid var(--border-strong);display:flex;align-items:center;justify-content:space-between}
+.queue-head-l{font:700 11px/1 'Geist Mono';color:var(--led-amber);letter-spacing:0.18em;text-transform:uppercase;display:flex;align-items:center;gap:9px;text-shadow:0 0 6px rgba(255,166,48,0.5)}
+.queue-head-l::before{content:'▶';color:var(--led-amber);font-size:10px}
+.queue-head-r{font:600 10px/1 'Geist Mono';color:var(--ink-2);letter-spacing:0.14em;text-transform:uppercase}
+.q-row{display:grid;grid-template-columns:60px 1fr 80px 60px 30px;gap:18px;padding:14px 22px;border-bottom:1px solid var(--border);cursor:pointer;align-items:center;transition:all 200ms var(--spring)}
+.q-row:last-child{border-bottom:0}
+.q-row:hover{background:rgba(232,238,250,0.03)}
+.q-row.lead{padding:22px 22px;grid-template-rows:auto auto;background:linear-gradient(90deg,rgba(255,166,48,0.08),transparent 70%);border-bottom:1px solid var(--led-amber)}
+.q-num{font:700 11px/1 'Geist Mono';color:var(--ink-2);letter-spacing:0.04em;font-variant-numeric:tabular-nums;align-self:start;padding-top:6px}
+.q-row.lead .q-num{color:var(--led-amber);font-size:13px;text-shadow:0 0 6px rgba(255,166,48,0.5)}
+.q-body{display:flex;flex-direction:column;gap:3px}
+.q-name{font:600 14px/1.15 'Geist';color:var(--ink-0);letter-spacing:-0.005em;text-transform:uppercase}
+.q-row.lead .q-name{font:700 22px/1.04 'Geist';letter-spacing:-0.018em}
+.q-artist{font:500 11px/1 'Geist Mono';color:var(--ink-2);letter-spacing:0.04em;text-transform:uppercase}
+.q-reason{grid-column:2/-1;font:500 13px/1.5 'Geist Mono';color:var(--ink-1);margin-top:10px;letter-spacing:0.02em;max-width:580px;padding:8px 14px;background:var(--steel-2);border:1px solid var(--border);border-left:3px solid var(--led-amber)}
+.q-bpm{font:400 18px/1 'VT323';color:var(--led-amber);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right;text-shadow:0 0 6px rgba(255,166,48,0.5)}
+.q-cam{font:400 18px/1 'VT323';color:var(--led-blue);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right;text-shadow:0 0 6px rgba(90,184,255,0.5)}
+.q-chev{color:var(--ink-3);font-size:14px;text-align:center}
+.q-row:hover .q-chev{color:var(--led-amber)}
+/* panel */
+.panel{width:var(--panel-w);background:linear-gradient(180deg,#13161B 0%,#0A0B0D 100%);border-left:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;flex-shrink:0;z-index:2;overflow-y:auto;box-shadow:inset 1px 0 0 rgba(232,238,250,0.06)}
+.p-section{font:700 10px/1 'Geist Mono';color:var(--led-amber);letter-spacing:0.20em;text-transform:uppercase;padding:11px 22px;background:linear-gradient(180deg,#1A1D24 0%,#13161B 100%);border-top:1px solid var(--border);border-bottom:1px solid var(--border-strong);display:flex;align-items:center;gap:8px;text-shadow:0 0 6px rgba(255,166,48,0.5)}
+.p-section:first-child{border-top:0}
+.p-section::before{content:'■';color:var(--led-amber);font-size:7px}
+.p-card{padding:14px 22px;border-bottom:1px solid var(--border);cursor:pointer;transition:all 200ms var(--spring)}
+.p-card:hover{background:rgba(232,238,250,0.03)}
+.p-cite{font:700 10px/1 'Geist Mono';color:var(--led-amber);letter-spacing:0.10em;font-variant-numeric:tabular-nums;margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;gap:7px;text-shadow:0 0 4px rgba(255,166,48,0.4)}
+.p-cite::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--led-amber);box-shadow:0 0 6px var(--led-amber)}
+.p-text{font:500 13px/1.5 'Geist Mono';color:var(--ink-1);letter-spacing:0.02em}
+.p-text b{color:var(--led-amber);font-weight:700}
+.p-attr{display:block;margin-top:8px;font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.14em;text-transform:uppercase}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:10px 16px;background:linear-gradient(180deg,#1A1D24 0%,#0F1116 100%);color:var(--led-amber);font:700 10px/1 'Geist Mono';letter-spacing:0.18em;text-transform:uppercase;z-index:60;border:1px solid var(--led-amber);text-shadow:0 0 6px rgba(255,166,48,0.5);box-shadow:0 0 16px rgba(255,166,48,0.18),inset 0 1px 0 rgba(232,238,250,0.06)}
+.studio-status::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--led-amber);box-shadow:var(--led-amber-glow);animation:beat 1.2s var(--spring) infinite}
+</style>
+</head>
+<body>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">CDJ-VBM 3000 · DECK A · 22:14</div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="brand"><div class="brand-row"><div class="brand-mark">V</div><div class="brand-name">VIBEMIX</div></div><div class="brand-strap"><span class="dot"></span>play · active</div></div>
+    <div class="sect">surfaces</div>
+    <nav class="nav">
+      <div class="ni active"><span class="ni-num">01</span>SESSION<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni"><span class="ni-num">02</span>LIBRARY<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni"><span class="ni-num">03</span>DEBRIEF<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni"><span class="ni-num">04</span>LEARN<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni"><span class="ni-num">05</span>SETTINGS<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tracklist</div>
+    <div class="sess active"><div class="sess-name">VELVET UNDERGROUND</div><div class="sess-meta">22:14 · 01:47</div></div>
+    <div class="sess"><div class="sess-name">BACKROOM WARMUP</div><div class="sess-meta">19:30 · 02:30</div></div>
+    <div class="sb-foot">
+      <div class="persona"><div class="persona-pill active">Hype</div><div class="persona-pill">Coach</div><div class="persona-pill">Tutor</div></div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">PLAY · ON</div><div class="ch-mode">hype · phrase 14/16</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll">
+      <div class="panel-row">
+        <div class="pr-cell on"><div class="pr-label">BPM</div><div class="pr-value">130.0</div><div class="pr-sub">held · 4 bars</div></div>
+        <div class="pr-cell alt"><div class="pr-label">KEY</div><div class="pr-value">8A → 9A</div><div class="pr-sub">camelot</div></div>
+        <div class="pr-cell on"><div class="pr-label">HEAT</div><div class="pr-value">0.78</div><div class="pr-sub">rising</div></div>
+        <div class="pr-cell alt2"><div class="pr-label">PHRASE</div><div class="pr-value">14/16</div><div class="pr-sub">2 to fold</div></div>
+        <div class="pr-cell on"><div class="pr-label">TIME</div><div class="pr-value">47:12</div><div class="pr-sub">runtime</div></div>
+      </div>
+      <div class="screen">
+        <div class="screen-kicker">live read · 02:14</div>
+        <div class="screen-line">That low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></div>
+      </div>
+      <div class="phrase">
+        <span class="ph-l">phrase</span>
+        <span class="ph-n">12</span>
+        <div class="ph-bar">
+          <span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span>
+          <span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span>
+          <span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span>
+          <span class="ph-cell fired"></span><span class="ph-cell current"></span><span class="ph-cell"></span><span class="ph-cell"></span>
+        </div>
+        <span class="ph-n">16</span>
+      </div>
+      <div class="dispatch">
+        <div class="dis-stamp"><div class="dis-stamp-l">KICK 60Hz</div><div class="dis-stamp-v">+3.2dB</div><div class="dis-stamp-s">4 bars · locked</div></div>
+        <div class="dis-body"><div class="dis-head">Sub-bass crest detected.</div><div class="dis-text"><b>Sub-bass gain rose 3.2 dB</b> across four bars (02:11 → 02:15). Hi-hat ghost gained definition. Floor committed at phrase 13.</div></div>
+        <div class="dis-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="queue">
+        <div class="queue-head"><div class="queue-head-l">queue · next up</div><div class="queue-head-r">3 ready · loaded</div></div>
+        <div class="q-row lead">
+          <div class="q-num">01</div>
+          <div class="q-body"><div class="q-name">Vox Dust ii</div><div class="q-artist">SHRIM · the dust album</div></div>
+          <div class="q-bpm">130</div>
+          <div class="q-cam">9A</div>
+          <div class="q-chev">▶</div>
+          <div class="q-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up. He'll feel it inside two bars.</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">02</div>
+          <div class="q-body"><div class="q-name">Marrow (VTSS rmx)</div><div class="q-artist">Tygapaw · Marrow</div></div>
+          <div class="q-bpm">132</div>
+          <div class="q-cam">10A</div>
+          <div class="q-chev">▶</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">03</div>
+          <div class="q-body"><div class="q-name">Sleeper</div><div class="q-artist">Forester · Untitled.05</div></div>
+          <div class="q-bpm">128</div>
+          <div class="q-cam">8A</div>
+          <div class="q-chev">▶</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">evidence locker</div>
+    <div class="p-card"><div class="p-cite">02:14 · KICK 60Hz</div><div class="p-text">Low-end opened. <b>Sub gain rose 3.2 dB</b> across four bars.<span class="p-attr">CITE LOCKED</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · PHRASE 12</div><div class="p-text">Filter sweep started, <b>hi-band fell 8 dB</b>.<span class="p-attr">CITE LOCKED</span></div></div>
+    <div class="p-section">predict · next cue</div>
+    <div class="p-card"><div class="p-cite">02:30 · DROP-IN</div><div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">0.91 CONF</span></div></div>
+  </aside>
+</div>
+<div class="studio-status">LIVE · 47:12</div>
+</body>
+</html>

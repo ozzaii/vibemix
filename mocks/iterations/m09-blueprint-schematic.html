@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m09 · Blueprint Schematic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400..800&family=Archivo+Narrow:wght@400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#0E2138;--paper-2:#152A44;--paper-3:#1B324E;--paper-4:#234059;
+  --grid:rgba(140,200,255,0.05);--grid-strong:rgba(140,200,255,0.12);
+  --line:#7FB6FF;--line-glow:#A8CEFF;
+  --line-30:rgba(127,182,255,0.30);--line-50:rgba(127,182,255,0.50);
+  --line-15:rgba(127,182,255,0.15);
+  --warn:#FFD050;
+  --rouge:#FF7AB6;--rouge-30:rgba(255,122,182,0.30);
+  --green:#7AFFB6;
+  --ink-0:rgba(220,240,255,0.96);--ink-1:rgba(220,240,255,0.78);--ink-2:rgba(220,240,255,0.52);--ink-3:rgba(220,240,255,0.30);--ink-4:rgba(220,240,255,0.14);
+  --border:rgba(127,182,255,0.18);--border-strong:rgba(127,182,255,0.36);
+  --chrome-h:28px;--sb-w:224px;--panel-w:268px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--paper);color:var(--ink-1);font-family:'Archivo Narrow',sans-serif;font-weight:500;font-size:13px;letter-spacing:0.01em;overflow:hidden}
+body{display:flex;flex-direction:column;position:relative}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--grid-strong) 1px,transparent 1px),linear-gradient(90deg,var(--grid-strong) 1px,transparent 1px);background-size:96px 96px;pointer-events:none;z-index:0}
+.chrome{height:var(--chrome-h);background:var(--paper-2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag;z-index:3}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:11px;height:11px;border-radius:50%;background:transparent;border:1px solid var(--border-strong)}
+.tl span:nth-child(1){border-color:#FF5F57}.tl span:nth-child(2){border-color:#FEBC2E}.tl span:nth-child(3){border-color:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:700 10px/1 'Inconsolata';color:var(--line);letter-spacing:0.20em;text-transform:uppercase}
+.chrome-meta b{color:var(--line-glow)}
+.row{flex:1;display:flex;position:relative;min-height:0;z-index:2}
+/* sidebar — drawing index */
+.sb{width:var(--sb-w);background:var(--paper-2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:18px 0 14px;position:relative;z-index:3}
+.title-block{padding:0 16px 16px;border-bottom:1px solid var(--border);margin-bottom:14px;position:relative}
+.tb-rule{height:1px;background:var(--line);margin-bottom:9px;box-shadow:0 0 4px var(--line-50)}
+.tb-name{font:700 22px/0.95 'Archivo Narrow';color:var(--ink-0);letter-spacing:0.04em;text-transform:uppercase}
+.tb-strap{font:500 10px/1 'Inconsolata';color:var(--line);margin-top:7px;letter-spacing:0.12em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.tb-dot{width:6px;height:6px;border-radius:50%;background:var(--line);box-shadow:0 0 8px var(--line-50);animation:pulse 1.7s linear infinite}
+@keyframes pulse{0%,100%{opacity:0.65;transform:scale(1)}50%{opacity:1;transform:scale(1.18)}}
+.sect{font:700 10px/1 'Inconsolata';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase;padding:14px 16px 8px;display:flex;align-items:center;gap:8px}
+.sect::before{content:'▸';color:var(--line);font-weight:700}
+.nav{display:flex;flex-direction:column}
+.ni{display:flex;align-items:center;gap:11px;padding:8px 16px;font:600 12px/1 'Archivo Narrow';color:var(--ink-1);cursor:pointer;letter-spacing:0.06em;text-transform:uppercase;position:relative;transition:all 200ms linear}
+.ni:hover{background:var(--line-15);color:var(--ink-0)}
+.ni.active{background:var(--line-15);color:var(--line-glow)}
+.ni.active::before{content:'';position:absolute;left:0;top:7px;bottom:7px;width:3px;background:var(--line);box-shadow:0 0 6px var(--line-50)}
+.ni-num{font:700 9px/1 'Inconsolata';color:var(--line);letter-spacing:0.02em;width:24px;font-variant-numeric:tabular-nums}
+.ni-shortcut{margin-left:auto;font:500 9px/1 'Inconsolata';color:var(--ink-4);letter-spacing:0.02em}
+.sess{padding:10px 16px;cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative;border-bottom:1px dashed var(--border)}
+.sess:hover{background:var(--line-15)}
+.sess.active{background:var(--line-15)}
+.sess.active::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;background:var(--line);box-shadow:0 0 6px var(--line-50)}
+.sess-name{font:700 12px/1.15 'Archivo Narrow';color:var(--ink-0);letter-spacing:0.04em;text-transform:uppercase}
+.sess-meta{font:500 10px/1 'Inconsolata';color:var(--ink-3);letter-spacing:0.04em;font-variant-numeric:tabular-nums}
+.sb-foot{margin-top:auto;padding:14px 16px 0;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;padding-top:14px}
+.persona{display:flex;gap:0;border:1px solid var(--line);background:var(--paper-3)}
+.persona-pill{flex:1;padding:9px 0;font:700 10px/1 'Inconsolata';color:var(--ink-2);letter-spacing:0.10em;text-transform:uppercase;cursor:pointer;text-align:center;border-right:1px solid var(--line)}
+.persona-pill:last-child{border-right:0}
+.persona-pill:hover{color:var(--line-glow);background:var(--line-15)}
+.persona-pill.active{background:var(--line);color:var(--paper);font-weight:800}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--paper-3);border:1px solid var(--line);cursor:pointer;position:relative}
+.cohost-pill::before{content:'STATUS';position:absolute;top:-7px;left:8px;background:var(--paper-2);padding:0 6px;font:700 9px/1 'Inconsolata';color:var(--line);letter-spacing:0.16em}
+.ch-dot{width:8px;height:8px;border-radius:50%;background:var(--line);box-shadow:0 0 10px var(--line-50);animation:pulse 1.6s linear infinite}
+.ch-text{flex:1}
+.ch-state{font:700 11px/1 'Inconsolata';color:var(--ink-0);letter-spacing:0.10em;text-transform:uppercase}
+.ch-mode{font:500 11px/1.1 'Archivo Narrow';color:var(--ink-1);margin-top:2px;letter-spacing:0.06em;text-transform:uppercase}
+/* stage — drafting board */
+.stage{flex:1;position:relative;background:var(--paper);overflow:hidden}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.35) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:24px;z-index:2;display:flex;flex-direction:column;gap:20px}
+/* drawing title block */
+.dtb{display:grid;grid-template-columns:1fr 200px;border:1px solid var(--line);background:var(--paper-2)}
+.dtb-l{padding:14px 18px;border-right:1px solid var(--line);display:flex;align-items:center;gap:18px}
+.dtb-mark{font:700 24px/0.9 'Archivo Narrow';color:var(--line-glow);letter-spacing:0.04em}
+.dtb-strap{display:flex;flex-direction:column;gap:3px}
+.dtb-strap-1{font:700 12px/1 'Archivo Narrow';color:var(--ink-0);letter-spacing:0.12em;text-transform:uppercase}
+.dtb-strap-2{font:500 10px/1 'Inconsolata';color:var(--line);letter-spacing:0.10em;text-transform:uppercase}
+.dtb-r{padding:14px 18px;display:flex;flex-direction:column;gap:4px}
+.dtb-r-row{display:flex;justify-content:space-between;font:500 10px/1 'Inconsolata';color:var(--ink-2);letter-spacing:0.06em;font-variant-numeric:tabular-nums}
+.dtb-r-row b{color:var(--ink-0);font-weight:700}
+.dtb-r-row .v-line{color:var(--line)}
+.dtb-r-row .v-warn{color:var(--warn)}
+/* spec table */
+.spec{display:grid;grid-template-columns:repeat(5,1fr);background:var(--paper-2);border:1px solid var(--line)}
+.spec-cell{padding:14px 16px;border-right:1px solid var(--line);position:relative}
+.spec-cell:last-child{border-right:0}
+.spec-cell::before{content:'';position:absolute;top:4px;right:4px;width:5px;height:5px;border:1px solid var(--line);transform:rotate(45deg)}
+.spec-label{font:700 9px/1 'Inconsolata';color:var(--line);letter-spacing:0.18em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.spec-label::before{content:'A.0';color:var(--ink-3);letter-spacing:0.04em;font-weight:500}
+.spec-value{font:700 22px/1 'Archivo Narrow';color:var(--ink-0);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.spec-cell.warn .spec-value{color:var(--warn)}
+.spec-cell.rouge .spec-value{color:var(--rouge)}
+.spec-cell.line .spec-value{color:var(--line-glow)}
+.spec-sub{font:500 9px/1 'Inconsolata';color:var(--ink-3);margin-top:5px;letter-spacing:0.10em;text-transform:uppercase}
+/* hero — schematic callout */
+.section{position:relative;background:var(--paper-2);border:1px solid var(--line);padding:36px 36px 32px;min-height:280px}
+.section::before{content:'SEC. A-A';position:absolute;top:-9px;left:18px;background:var(--paper);padding:0 7px;font:700 10px/1 'Inconsolata';color:var(--line);letter-spacing:0.18em}
+.section::after{content:'SCALE 1:1';position:absolute;top:-9px;right:18px;background:var(--paper);padding:0 7px;font:700 10px/1 'Inconsolata';color:var(--line);letter-spacing:0.18em}
+.callout-pin{position:absolute;width:14px;height:14px;border-radius:50%;background:var(--paper);border:2px solid var(--line);box-shadow:0 0 8px var(--line-50)}
+.callout-pin.p1{top:48px;left:32px}
+.callout-pin.p1::after{content:'01';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:700 8px/1 'Inconsolata';color:var(--line);letter-spacing:0;text-shadow:0 0 4px var(--line-50)}
+.section-kicker{font:700 10px/1 'Inconsolata';color:var(--line);letter-spacing:0.20em;text-transform:uppercase;margin:0 0 18px 24px;display:flex;align-items:center;gap:10px}
+.section-kicker::before{content:'01';color:var(--line-glow);background:var(--paper);padding:3px 6px;border:1px solid var(--line);font:700 9px/1 'Inconsolata';letter-spacing:0.04em}
+.section-line{font:600 clamp(30px,3.6vw,46px)/1.24 'Archivo Narrow';color:var(--ink-0);letter-spacing:0;max-width:920px;text-transform:none}
+.section-line em{font-style:normal;color:var(--line-glow);text-decoration:underline;text-decoration-color:var(--line);text-decoration-thickness:2px;text-underline-offset:0.14em;font-weight:700}
+.cite{display:inline-block;vertical-align:0.42em;font:700 0.22em/1 'Inconsolata';color:var(--paper);letter-spacing:0.14em;padding:3px 7px;background:var(--line);font-variant-numeric:tabular-nums;margin-left:0.20em;cursor:pointer;text-transform:uppercase;font-weight:800}
+.cite:hover{background:var(--line-glow)}
+.section-dim{display:flex;align-items:center;gap:14px;margin-top:28px;padding-top:18px;border-top:1px dashed var(--line)}
+.dim-label{font:700 10px/1 'Inconsolata';color:var(--line);letter-spacing:0.18em;text-transform:uppercase}
+.dim-arrow{flex:1;height:1px;background:var(--line);position:relative}
+.dim-arrow::before,.dim-arrow::after{content:'';position:absolute;top:-3px;width:0;height:0;border-top:3.5px solid transparent;border-bottom:3.5px solid transparent}
+.dim-arrow::before{left:0;border-right:6px solid var(--line)}
+.dim-arrow::after{right:0;border-left:6px solid var(--line)}
+.dim-num{font:700 14px/1 'Inconsolata';color:var(--ink-0);letter-spacing:0.04em;font-variant-numeric:tabular-nums}
+.dim-num small{color:var(--ink-3);font-weight:500;margin-left:4px}
+/* phrase bar */
+.dim-row{background:var(--paper-2);border:1px solid var(--line);padding:14px 22px;display:flex;align-items:center;gap:18px;position:relative}
+.dim-row::before{content:'DIM. 02';position:absolute;top:-8px;left:14px;background:var(--paper);padding:0 7px;font:700 9px/1 'Inconsolata';color:var(--line);letter-spacing:0.18em}
+.dim-bar{flex:1;display:grid;grid-template-columns:repeat(16,1fr);gap:1px;height:20px}
+.dim-cell{background:var(--paper-4);border:1px solid var(--paper-4);position:relative}
+.dim-cell.fired{background:var(--line);border-color:var(--line);box-shadow:0 0 4px var(--line-50)}
+.dim-cell.current{background:var(--line-glow);border-color:var(--line-glow);box-shadow:0 0 8px var(--line-50)}
+.dim-num-2{font:700 11px/1 'Inconsolata';color:var(--ink-0);letter-spacing:0.04em;font-variant-numeric:tabular-nums}
+/* evidence — detail callout */
+.det{display:grid;grid-template-columns:180px 1fr 200px;background:var(--paper-2);border:1px solid var(--line);position:relative}
+.det::before{content:'DETAIL 03';position:absolute;top:-9px;left:18px;background:var(--paper);padding:0 7px;font:700 10px/1 'Inconsolata';color:var(--line);letter-spacing:0.18em}
+.det-stamp{padding:18px 16px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:5px;background:var(--line);color:var(--paper)}
+.det-stamp-l{font:700 10px/1 'Inconsolata';letter-spacing:0.18em;text-transform:uppercase;opacity:0.85}
+.det-stamp-v{font:800 28px/1 'Archivo Narrow';letter-spacing:0;font-variant-numeric:tabular-nums}
+.det-stamp-s{font:700 10px/1 'Inconsolata';letter-spacing:0.10em;opacity:0.85}
+.det-body{padding:18px 22px;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.det-body-headline{font:600 14px/1.3 'Archivo Narrow';color:var(--ink-0);letter-spacing:0.04em;text-transform:uppercase}
+.det-body-text{font:500 12px/1.5 'Inconsolata';color:var(--ink-1);letter-spacing:0.02em}
+.det-body-text b{color:var(--line-glow);font-weight:700}
+.det-wave{padding:18px 16px;border-left:1px solid var(--line);display:flex;align-items:center;gap:2px}
+.det-wave span{flex:1;background:var(--line);box-shadow:0 0 3px var(--line-50)}
+.det-wave span:nth-child(1){height:30%}.det-wave span:nth-child(2){height:55%}.det-wave span:nth-child(3){height:85%}.det-wave span:nth-child(4){height:70%}.det-wave span:nth-child(5){height:45%}.det-wave span:nth-child(6){height:65%}.det-wave span:nth-child(7){height:90%}.det-wave span:nth-child(8){height:60%}.det-wave span:nth-child(9){height:38%}.det-wave span:nth-child(10){height:55%}.det-wave span:nth-child(11){height:75%}.det-wave span:nth-child(12){height:40%}.det-wave span:nth-child(13){height:65%}.det-wave span:nth-child(14){height:30%}
+/* sheet listing — next up */
+.sheet{background:var(--paper-2);border:1px solid var(--line);position:relative}
+.sheet::before{content:'SHEET 04 · QUEUE';position:absolute;top:-9px;left:18px;background:var(--paper);padding:0 7px;font:700 10px/1 'Inconsolata';color:var(--line);letter-spacing:0.18em}
+.sheet-head{padding:14px 22px;background:var(--line-15);border-bottom:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between}
+.sheet-head-l{font:700 14px/1 'Archivo Narrow';color:var(--ink-0);letter-spacing:0.08em;text-transform:uppercase}
+.sheet-head-r{font:700 10px/1 'Inconsolata';color:var(--line);letter-spacing:0.14em;text-transform:uppercase}
+.s-row{display:grid;grid-template-columns:60px 1fr 80px 60px 32px;gap:18px;padding:14px 22px;border-bottom:1px dashed var(--line);cursor:pointer;align-items:center}
+.s-row:last-child{border-bottom:0}
+.s-row:hover{background:var(--line-15)}
+.s-row.lead{padding:22px 22px;grid-template-rows:auto auto;background:linear-gradient(90deg,var(--line-15),transparent 70%);border-bottom:1px solid var(--line)}
+.s-num{font:700 12px/1 'Inconsolata';color:var(--line);letter-spacing:0.04em;font-variant-numeric:tabular-nums;align-self:start;padding-top:3px;display:flex;align-items:center;gap:4px}
+.s-num::before{content:'#';color:var(--ink-3);font-weight:500}
+.s-row.lead .s-num{color:var(--line-glow);font-size:14px}
+.s-body{display:flex;flex-direction:column;gap:3px}
+.s-name{font:700 14px/1.15 'Archivo Narrow';color:var(--ink-0);letter-spacing:0.04em;text-transform:uppercase}
+.s-row.lead .s-name{font:700 22px/1.04 'Archivo Narrow';letter-spacing:0.02em}
+.s-artist{font:500 11px/1 'Inconsolata';color:var(--ink-2);letter-spacing:0.04em}
+.s-reason{grid-column:2/-1;font:500 12px/1.55 'Inconsolata';color:var(--ink-1);margin-top:10px;letter-spacing:0.02em;max-width:580px;padding:8px 14px;border:1px dashed var(--line);background:var(--paper-3);position:relative}
+.s-reason::before{content:'NOTE';position:absolute;top:-7px;left:10px;background:var(--paper-2);padding:0 5px;font:700 9px/1 'Inconsolata';color:var(--line);letter-spacing:0.16em}
+.s-bpm{font:700 13px/1 'Inconsolata';color:var(--ink-0);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right}
+.s-cam{font:700 13px/1 'Inconsolata';color:var(--rouge);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right}
+.s-chev{font:700 14px/1 'Archivo Narrow';color:var(--ink-3);text-align:center}
+.s-row:hover .s-chev{color:var(--line)}
+/* panel */
+.panel{width:var(--panel-w);background:var(--paper-2);border-left:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;flex-shrink:0;z-index:2;overflow-y:auto}
+.p-section{font:700 10px/1 'Inconsolata';color:var(--line);letter-spacing:0.20em;text-transform:uppercase;padding:11px 22px;background:var(--line-15);border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.p-section:first-child{border-top:0}
+.p-section::before{content:'A.0';color:var(--ink-3);font-weight:500;letter-spacing:0.04em}
+.p-card{padding:14px 22px;border-bottom:1px dashed var(--line);cursor:pointer;position:relative}
+.p-card:hover{background:var(--line-15)}
+.p-cite{font:700 10px/1 'Inconsolata';color:var(--line-glow);letter-spacing:0.10em;font-variant-numeric:tabular-nums;margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.p-cite::before{content:'◇';color:var(--line);font-size:10px}
+.p-text{font:500 12px/1.5 'Inconsolata';color:var(--ink-1);letter-spacing:0.02em}
+.p-text b{color:var(--line-glow);font-weight:700}
+.p-attr{display:block;margin-top:8px;font:700 9px/1 'Inconsolata';color:var(--ink-3);letter-spacing:0.16em;text-transform:uppercase}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:9px 14px;background:var(--paper-2);color:var(--ink-0);font:700 10px/1 'Inconsolata';letter-spacing:0.14em;text-transform:uppercase;z-index:60;border:1px solid var(--line);box-shadow:0 0 18px rgba(127,182,255,0.18)}
+.studio-status::before{content:'';width:7px;height:7px;background:var(--line);border-radius:50%;box-shadow:0 0 8px var(--line-50)}
+.studio-status b{color:var(--line-glow);font-weight:800}
+</style>
+</head>
+<body>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">VIBEMIX · DWG. 047 · REV <b>14</b></div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="title-block"><div class="tb-rule"></div><div class="tb-name">vibemix</div><div class="tb-strap"><span class="tb-dot"></span>signal live</div></div>
+    <div class="sect">drawings</div>
+    <nav class="nav">
+      <div class="ni active"><span class="ni-num">A.01</span>Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni"><span class="ni-num">A.02</span>Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni"><span class="ni-num">A.03</span>Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni"><span class="ni-num">A.04</span>Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni"><span class="ni-num">A.05</span>Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tonight</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · 01:47</div></div>
+    <div class="sess"><div class="sess-name">Backroom Warmup</div><div class="sess-meta">19:30 · 02:30</div></div>
+    <div class="sb-foot">
+      <div class="persona"><div class="persona-pill active">Hype</div><div class="persona-pill">Coach</div><div class="persona-pill">Tutor</div></div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">On Air</div><div class="ch-mode">Hype · Phrase 14/16</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll">
+      <div class="dtb">
+        <div class="dtb-l">
+          <div class="dtb-mark">VBM</div>
+          <div class="dtb-strap"><div class="dtb-strap-1">Set Drawing 047</div><div class="dtb-strap-2">Velvet Underground · Berlin</div></div>
+        </div>
+        <div class="dtb-r">
+          <div class="dtb-r-row"><span>SHEET</span><b>04 / 12</b></div>
+          <div class="dtb-r-row"><span>REVISION</span><b>14</b></div>
+          <div class="dtb-r-row"><span>DRAWN</span><span class="v-line">vibemix.co-host</span></div>
+          <div class="dtb-r-row"><span>DATE</span><b>22:14 CET</b></div>
+        </div>
+      </div>
+      <div class="spec">
+        <div class="spec-cell"><div class="spec-label">BPM</div><div class="spec-value">130.0</div><div class="spec-sub">±0.0 BPM</div></div>
+        <div class="spec-cell line"><div class="spec-label">KEY</div><div class="spec-value">8A → 9A</div><div class="spec-sub">CAMELOT</div></div>
+        <div class="spec-cell warn"><div class="spec-label">HEAT</div><div class="spec-value">0.78</div><div class="spec-sub">RISING</div></div>
+        <div class="spec-cell"><div class="spec-label">PHRASE</div><div class="spec-value">14 / 16</div><div class="spec-sub">2 TO FOLD</div></div>
+        <div class="spec-cell rouge"><div class="spec-label">PERSONA</div><div class="spec-value">HYPE</div><div class="spec-sub">EARS OPEN</div></div>
+      </div>
+      <div class="section">
+        <div class="callout-pin p1"></div>
+        <div class="section-kicker">co-host · live read</div>
+        <div class="section-line">That low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></div>
+        <div class="section-dim">
+          <span class="dim-label">duration</span>
+          <div class="dim-arrow"></div>
+          <span class="dim-num">2.7 <small>SEC</small></span>
+        </div>
+      </div>
+      <div class="dim-row">
+        <span class="dim-num-2">12</span>
+        <div class="dim-bar">
+          <span class="dim-cell fired"></span><span class="dim-cell fired"></span><span class="dim-cell fired"></span><span class="dim-cell fired"></span>
+          <span class="dim-cell fired"></span><span class="dim-cell fired"></span><span class="dim-cell fired"></span><span class="dim-cell fired"></span>
+          <span class="dim-cell fired"></span><span class="dim-cell fired"></span><span class="dim-cell fired"></span><span class="dim-cell fired"></span>
+          <span class="dim-cell fired"></span><span class="dim-cell current"></span><span class="dim-cell"></span><span class="dim-cell"></span>
+        </div>
+        <span class="dim-num-2">16</span>
+      </div>
+      <div class="det">
+        <div class="det-stamp"><div class="det-stamp-l">KICK 60Hz</div><div class="det-stamp-v">+3.2dB</div><div class="det-stamp-s">4 BARS LOCKED</div></div>
+        <div class="det-body"><div class="det-body-headline">Sub-bass crest detected</div><div class="det-body-text"><b>Sub-bass gain rose 3.2 dB</b> across four bars (02:11 → 02:15). Hi-hat ghost gained definition. Floor committed at phrase 13.</div></div>
+        <div class="det-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="sheet">
+        <div class="sheet-head"><div class="sheet-head-l">Next up · queue</div><div class="sheet-head-r">3 selections · sheet 04</div></div>
+        <div class="s-row lead">
+          <div class="s-num">01</div>
+          <div class="s-body"><div class="s-name">Vox Dust II</div><div class="s-artist">SHRIM · the dust album</div></div>
+          <div class="s-bpm">130</div>
+          <div class="s-cam">9A</div>
+          <div class="s-chev">▶</div>
+          <div class="s-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up. He'll feel it inside two bars.</div>
+        </div>
+        <div class="s-row">
+          <div class="s-num">02</div>
+          <div class="s-body"><div class="s-name">Marrow (VTSS rmx)</div><div class="s-artist">Tygapaw · Marrow</div></div>
+          <div class="s-bpm">132</div>
+          <div class="s-cam">10A</div>
+          <div class="s-chev">▶</div>
+        </div>
+        <div class="s-row">
+          <div class="s-num">03</div>
+          <div class="s-body"><div class="s-name">Sleeper</div><div class="s-artist">Forester · Untitled.05</div></div>
+          <div class="s-bpm">128</div>
+          <div class="s-cam">8A</div>
+          <div class="s-chev">▶</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">evidence</div>
+    <div class="p-card"><div class="p-cite">02:14 · Kick 60Hz</div><div class="p-text">Low-end opened. <b>Sub gain rose 3.2 dB</b> across four bars.<span class="p-attr">cite locked</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · Phrase 12</div><div class="p-text">Filter sweep started, <b>hi-band fell 8 dB</b>.<span class="p-attr">cite locked</span></div></div>
+    <div class="p-section">predict</div>
+    <div class="p-card"><div class="p-cite">02:30 · Drop-in</div><div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">0.91 conf</span></div></div>
+  </aside>
+</div>
+<div class="studio-status">DWG. LIVE · <b>47:12</b></div>
+</body>
+</html>

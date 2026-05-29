@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m24 · Liquid Mercury Chrome</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#0C0E14;--void-2:#161922;--void-4:#1F232E;--void-6:#2B303D;
+  --ink-0:#F5F8FF;--ink-1:rgba(245,248,255,0.78);--ink-2:rgba(245,248,255,0.50);--ink-3:rgba(245,248,255,0.28);--ink-4:rgba(245,248,255,0.14);
+  --mercury-1:#E0E6F0;--mercury-2:#A0AEC5;--mercury-3:#6B7A95;--mercury-4:#3D4658;
+  --iri-pink:#FFB8D8;--iri-blue:#B8D8FF;--iri-violet:#D8B8FF;--iri-mint:#B8FFE0;
+  --accent:#FFA5DF;--accent-glow:0 0 16px #FFA5DF;
+  --border:rgba(245,248,255,0.10);--border-strong:rgba(245,248,255,0.22);
+  --chrome-h:28px;--sb-w:222px;--panel-w:276px;
+  --spring:cubic-bezier(0.16,1,0.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--void);color:var(--ink-1);font-family:'Inter',-apple-system,sans-serif;font-feature-settings:"ss01","ss03","cv11";font-size:13px;letter-spacing:-0.008em;overflow:hidden}
+body{display:flex;flex-direction:column;position:relative}
+/* iridescent atmosphere */
+.atmos{position:fixed;inset:0;pointer-events:none;z-index:0;background:
+  radial-gradient(ellipse 60% 50% at 20% 30%,rgba(255,184,216,0.16) 0%,transparent 55%),
+  radial-gradient(ellipse 50% 60% at 80% 70%,rgba(184,216,255,0.16) 0%,transparent 55%),
+  radial-gradient(ellipse 80% 60% at 50% 100%,rgba(216,184,255,0.10) 0%,transparent 60%);
+  filter:blur(40px)}
+.chrome{height:var(--chrome-h);background:linear-gradient(180deg,rgba(31,35,46,0.85) 0%,rgba(22,25,34,0.85) 100%);backdrop-filter:blur(40px) saturate(160%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag;z-index:5;box-shadow:inset 0 1px 0 rgba(255,255,255,0.10)}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:12px;height:12px;border-radius:50%}
+.tl span:nth-child(1){background:#FF5F57}.tl span:nth-child(2){background:#FEBC2E}.tl span:nth-child(3){background:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:500 11px/1 'Inter';color:var(--ink-2);letter-spacing:-0.005em}
+.chrome-meta b{color:var(--ink-0);font-weight:600}
+.row{flex:1;display:flex;position:relative;min-height:0;z-index:2}
+/* sidebar — liquid chrome panel */
+.sb{width:var(--sb-w);background:linear-gradient(180deg,rgba(31,35,46,0.55) 0%,rgba(22,25,34,0.55) 100%);backdrop-filter:blur(40px) saturate(160%);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:20px 14px 14px;position:relative;z-index:3;box-shadow:inset 0 1px 0 rgba(255,255,255,0.10)}
+.brand{padding:0 6px 18px;border-bottom:1px solid var(--border);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.brand-orb{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 30% 25%,var(--iri-pink) 0%,var(--mercury-1) 35%,var(--mercury-2) 60%,var(--mercury-3) 80%,var(--mercury-4) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,0.5),inset 0 -2px 4px rgba(0,0,0,0.30),0 4px 16px rgba(255,165,223,0.30);position:relative}
+.brand-orb::after{content:'';position:absolute;top:12%;left:18%;width:34%;height:24%;background:linear-gradient(180deg,rgba(255,255,255,0.55),transparent);border-radius:50%;filter:blur(2px)}
+.brand-wd{display:flex;flex-direction:column;gap:2px}
+.brand-name{font:600 15px/1 'Inter';color:var(--ink-0);letter-spacing:-0.022em}
+.brand-strap{font:500 10px/1 'JetBrains Mono';color:var(--accent);letter-spacing:0.12em;text-transform:uppercase;display:flex;align-items:center;gap:5px;text-shadow:0 0 10px rgba(255,165,223,0.4)}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);animation:pulse 1.8s var(--spring) infinite}
+@keyframes pulse{0%,100%{opacity:0.7;transform:scale(1)}50%{opacity:1;transform:scale(1.2)}}
+.sect{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase;padding:14px 6px 8px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 12px;font:500 13px/1 'Inter';color:var(--ink-1);cursor:pointer;letter-spacing:-0.012em;border-radius:10px;transition:all 200ms var(--spring);position:relative}
+.ni:hover{color:var(--ink-0);background:rgba(255,255,255,0.04)}
+.ni.active{color:var(--ink-0);background:linear-gradient(135deg,rgba(255,184,216,0.18),rgba(184,216,255,0.08));box-shadow:inset 0 1px 0 rgba(255,255,255,0.12),inset 0 0 0 1px rgba(255,255,255,0.10)}
+.ni.active::before{content:'';position:absolute;left:3px;top:9px;bottom:9px;width:2px;background:linear-gradient(180deg,var(--iri-pink),var(--iri-violet));border-radius:2px;box-shadow:0 0 8px rgba(255,184,216,0.5)}
+.ni-shortcut{margin-left:auto;font:500 10px/1 'JetBrains Mono';color:var(--ink-4);letter-spacing:0.02em}
+.sess{padding:10px 12px;cursor:pointer;border-radius:10px;transition:all 200ms var(--spring);display:flex;flex-direction:column;gap:3px;position:relative}
+.sess:hover{background:rgba(255,255,255,0.03)}
+.sess.active{background:linear-gradient(135deg,rgba(255,184,216,0.14),rgba(184,216,255,0.06));box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),inset 0 0 0 1px rgba(255,255,255,0.08)}
+.sess.active::before{content:'';position:absolute;left:3px;top:10px;bottom:10px;width:2px;background:linear-gradient(180deg,var(--iri-pink),var(--iri-violet));border-radius:2px;box-shadow:0 0 8px rgba(255,184,216,0.5)}
+.sess-name{font:500 13px/1.15 'Inter';color:var(--ink-0);letter-spacing:-0.012em}
+.sess-meta{font:500 10px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.sb-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:11px}
+.persona{display:flex;gap:1px;background:rgba(0,0,0,0.18);padding:2px;border-radius:10px;border:1px solid var(--border)}
+.persona-pill{flex:1;padding:8px 0;background:transparent;font:500 10px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.10em;text-transform:uppercase;cursor:pointer;text-align:center;border-radius:8px;transition:all 200ms var(--spring)}
+.persona-pill:hover{color:var(--ink-0)}
+.persona-pill.active{background:linear-gradient(180deg,var(--mercury-1),var(--mercury-2));color:var(--void);font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,0.50),0 2px 8px rgba(0,0,0,0.30)}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:12px 13px;background:linear-gradient(135deg,rgba(255,184,216,0.20),rgba(184,216,255,0.10));backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.20);border-radius:14px;cursor:pointer;position:relative;overflow:hidden;box-shadow:0 6px 28px rgba(255,184,216,0.18),inset 0 1px 0 rgba(255,255,255,0.20)}
+.cohost-pill::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.55),transparent)}
+.ch-dot{width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 30% 30%,var(--iri-pink),var(--mercury-2));box-shadow:0 0 14px rgba(255,184,216,0.5)}
+.ch-text{flex:1}
+.ch-state{font:500 11px/1.1 'Inter';color:var(--ink-0);letter-spacing:-0.005em}
+.ch-mode{font:500 11px/1.15 'Inter';color:var(--ink-1);letter-spacing:-0.005em;margin-top:2px}
+/* stage */
+.stage{flex:1;position:relative;background:transparent;overflow:hidden}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.25) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:72px 64px 80px;z-index:2;display:flex;flex-direction:column;gap:32px}
+/* mercury pill — scene */
+.scene{display:inline-flex;align-items:center;gap:18px;padding:13px 22px;background:linear-gradient(135deg,rgba(31,35,46,0.65),rgba(22,25,34,0.65));backdrop-filter:blur(40px) saturate(160%);border:1px solid rgba(255,255,255,0.12);border-radius:14px;align-self:flex-start;box-shadow:0 8px 32px rgba(0,0,0,0.30),inset 0 1px 0 rgba(255,255,255,0.14)}
+.scene-l{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase}
+.scene-chip{display:flex;align-items:baseline;gap:5px;font:500 13px/1 'JetBrains Mono';color:var(--ink-1);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.scene-chip small{font-size:9px;color:var(--ink-3);letter-spacing:0.14em;text-transform:uppercase}
+.scene-chip.pink{color:var(--iri-pink);text-shadow:0 0 10px rgba(255,184,216,0.4)}
+.scene-chip.blue{color:var(--iri-blue);text-shadow:0 0 10px rgba(184,216,255,0.4)}
+.scene-chip.violet{color:var(--iri-violet);text-shadow:0 0 10px rgba(216,184,255,0.4)}
+.scene-sep{width:3px;height:3px;border-radius:50%;background:var(--ink-4)}
+/* hero — liquid card */
+.hero{position:relative;padding:48px 48px 44px;background:linear-gradient(135deg,rgba(31,35,46,0.55),rgba(22,25,34,0.65));backdrop-filter:blur(50px) saturate(160%);border:1px solid rgba(255,255,255,0.10);border-radius:28px;box-shadow:0 24px 80px rgba(0,0,0,0.40),inset 0 1px 0 rgba(255,255,255,0.14)}
+.hero::before{content:'';position:absolute;top:0;left:8%;right:8%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.50),transparent)}
+.hero::after{content:'';position:absolute;inset:-1px;border-radius:28px;background:linear-gradient(135deg,rgba(255,184,216,0.30),transparent 30%,transparent 70%,rgba(184,216,255,0.25));pointer-events:none;mix-blend-mode:overlay;opacity:0.6}
+.hero-kicker{font:500 11px/1 'JetBrains Mono';color:var(--iri-pink);letter-spacing:0.18em;text-transform:uppercase;margin-bottom:22px;display:flex;align-items:center;gap:10px;text-shadow:0 0 10px rgba(255,184,216,0.4)}
+.hero-kicker::before{content:'';width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 30% 30%,var(--iri-pink),var(--mercury-2));box-shadow:0 0 12px rgba(255,184,216,0.5);animation:pulse 1.6s var(--spring) infinite}
+.hero-line{font:500 clamp(40px,4.8vw,62px)/1.16 'Inter';color:var(--ink-0);letter-spacing:-0.030em;max-width:920px}
+.hero-line em{font-style:normal;font-weight:600;background:linear-gradient(135deg,var(--iri-pink),var(--iri-violet),var(--iri-blue));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 24px rgba(255,184,216,0.4))}
+.cite{display:inline-block;vertical-align:0.42em;font:600 0.20em/1 'JetBrains Mono';font-style:normal;color:var(--void);letter-spacing:0.10em;padding:4px 10px;background:linear-gradient(180deg,var(--mercury-1),var(--mercury-2));border-radius:999px;font-variant-numeric:tabular-nums;margin-left:0.18em;cursor:pointer;text-transform:uppercase;box-shadow:inset 0 1px 0 rgba(255,255,255,0.50),0 4px 12px rgba(0,0,0,0.30);font-weight:700}
+.cite:hover{background:linear-gradient(180deg,var(--iri-pink),var(--iri-violet));color:var(--void)}
+/* phrase orbs */
+.orb-track{display:flex;align-items:center;gap:18px;padding:18px 24px;background:linear-gradient(135deg,rgba(31,35,46,0.55),rgba(22,25,34,0.55));backdrop-filter:blur(40px);border:1px solid rgba(255,255,255,0.10);border-radius:18px;box-shadow:0 8px 32px rgba(0,0,0,0.30),inset 0 1px 0 rgba(255,255,255,0.10)}
+.ot-l{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase}
+.ot-n{font:500 12px/1 'JetBrains Mono';color:var(--ink-1);font-variant-numeric:tabular-nums}
+.ot-bar{flex:1;display:flex;align-items:center;justify-content:space-between;height:24px}
+.orb{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.08);transition:all 200ms var(--spring)}
+.orb.fired{background:radial-gradient(circle at 30% 30%,var(--iri-pink) 0%,var(--mercury-2) 70%);box-shadow:0 0 6px rgba(255,184,216,0.5),inset 0 1px 0 rgba(255,255,255,0.4)}
+.orb.current{width:24px;height:24px;background:radial-gradient(circle at 30% 30%,var(--iri-pink) 0%,var(--iri-violet) 50%,var(--mercury-2) 90%);box-shadow:0 0 24px rgba(255,184,216,0.6),0 0 8px rgba(216,184,255,0.5),inset 0 1px 0 rgba(255,255,255,0.5);animation:pulse 1.4s var(--spring) infinite}
+.orb.next{background:rgba(255,255,255,0.05)}
+/* dispatch */
+.dispatch{display:grid;grid-template-columns:auto 1fr auto;gap:24px;padding:22px 26px;background:linear-gradient(135deg,rgba(31,35,46,0.55),rgba(22,25,34,0.55));backdrop-filter:blur(40px) saturate(160%);border:1px solid rgba(255,255,255,0.10);border-radius:22px;cursor:pointer;transition:all 280ms var(--spring);align-items:center;max-width:760px;box-shadow:0 12px 40px rgba(0,0,0,0.35),inset 0 1px 0 rgba(255,255,255,0.10)}
+.dispatch:hover{border-color:rgba(255,184,216,0.30)}
+.dis-meta{display:flex;flex-direction:column;gap:5px}
+.dis-tag{font:500 10px/1 'JetBrains Mono';color:var(--iri-pink);letter-spacing:0.14em;text-transform:uppercase;text-shadow:0 0 8px rgba(255,184,216,0.4)}
+.dis-num{font:500 30px/1 'Inter';color:var(--ink-0);letter-spacing:-0.024em;font-variant-numeric:tabular-nums;background:linear-gradient(180deg,var(--ink-0) 0%,var(--mercury-2) 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 6px rgba(255,255,255,0.20))}
+.dis-wave{display:flex;align-items:center;gap:2px;height:32px}
+.dis-wave span{flex:1;background:linear-gradient(180deg,var(--iri-pink),var(--iri-violet));border-radius:1px;opacity:0.85}
+.dis-wave span:nth-child(1){height:30%}.dis-wave span:nth-child(2){height:55%}.dis-wave span:nth-child(3){height:85%}.dis-wave span:nth-child(4){height:70%}.dis-wave span:nth-child(5){height:45%}.dis-wave span:nth-child(6){height:65%}.dis-wave span:nth-child(7){height:90%}.dis-wave span:nth-child(8){height:60%}.dis-wave span:nth-child(9){height:38%}.dis-wave span:nth-child(10){height:55%}.dis-wave span:nth-child(11){height:75%}.dis-wave span:nth-child(12){height:40%}.dis-wave span:nth-child(13){height:65%}.dis-wave span:nth-child(14){height:30%}.dis-wave span:nth-child(15){height:50%}.dis-wave span:nth-child(16){height:42%}.dis-wave span:nth-child(17){height:68%}.dis-wave span:nth-child(18){height:35%}.dis-wave span:nth-child(19){height:55%}.dis-wave span:nth-child(20){height:45%}
+.dis-detail{font:500 11px/1.4 'JetBrains Mono';color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums}
+.dis-detail b{color:var(--ink-0);font-weight:600}
+/* queue */
+.queue{padding:6px;background:linear-gradient(135deg,rgba(31,35,46,0.55),rgba(22,25,34,0.55));backdrop-filter:blur(40px) saturate(160%);border:1px solid rgba(255,255,255,0.10);border-radius:24px;box-shadow:0 12px 40px rgba(0,0,0,0.35),inset 0 1px 0 rgba(255,255,255,0.10)}
+.queue-head{padding:14px 20px;display:flex;align-items:baseline;justify-content:space-between}
+.queue-title{font:600 22px/1 'Inter';color:var(--ink-0);letter-spacing:-0.024em}
+.queue-sub{font:500 11px/1 'JetBrains Mono';color:var(--iri-pink);letter-spacing:0.16em;text-transform:uppercase;text-shadow:0 0 8px rgba(255,184,216,0.4)}
+.q-row{display:grid;grid-template-columns:36px 1fr 70px 50px 28px;gap:18px;padding:14px 18px;border-radius:18px;cursor:pointer;align-items:center;transition:all 200ms var(--spring)}
+.q-row:hover{background:rgba(255,255,255,0.04)}
+.q-row.lead{padding:20px 18px;grid-template-rows:auto auto;background:linear-gradient(135deg,rgba(255,184,216,0.16),rgba(184,216,255,0.06));box-shadow:inset 0 1px 0 rgba(255,255,255,0.12),inset 0 0 0 1px rgba(255,255,255,0.08)}
+.q-num{font:500 11px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.04em;font-variant-numeric:tabular-nums;align-self:start;padding-top:6px}
+.q-row.lead .q-num{color:var(--iri-pink);font-size:14px;font-weight:600;text-shadow:0 0 8px rgba(255,184,216,0.4)}
+.q-body{display:flex;flex-direction:column;gap:4px}
+.q-name{font:500 15px/1.2 'Inter';color:var(--ink-0);letter-spacing:-0.018em}
+.q-row.lead .q-name{font:600 26px/1.04 'Inter';letter-spacing:-0.026em;background:linear-gradient(135deg,var(--ink-0),var(--mercury-1));-webkit-background-clip:text;background-clip:text;color:transparent}
+.q-artist{font:500 11px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.02em}
+.q-reason{grid-column:2/-1;font:500 16px/1.45 'Inter';color:var(--ink-1);margin-top:8px;letter-spacing:-0.012em;max-width:620px}
+.q-bpm{font:500 13px/1 'JetBrains Mono';color:var(--ink-1);font-variant-numeric:tabular-nums;text-align:right;letter-spacing:0.04em}
+.q-cam{font:500 13px/1 'JetBrains Mono';color:var(--iri-pink);font-variant-numeric:tabular-nums;text-align:right;letter-spacing:0.04em;text-shadow:0 0 8px rgba(255,184,216,0.4)}
+.q-chev{color:var(--ink-3);font-size:13px;text-align:center}
+.q-row:hover .q-chev{color:var(--iri-pink)}
+/* panel */
+.panel{width:var(--panel-w);background:linear-gradient(135deg,rgba(31,35,46,0.55),rgba(22,25,34,0.55));backdrop-filter:blur(40px) saturate(160%);border-left:1px solid var(--border);padding:72px 18px 18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex-shrink:0;z-index:2;box-shadow:inset 0 1px 0 rgba(255,255,255,0.10)}
+.p-section{font:500 10px/1 'JetBrains Mono';color:var(--iri-pink);letter-spacing:0.18em;text-transform:uppercase;padding:0 6px 9px;border-bottom:1px solid var(--border);text-shadow:0 0 8px rgba(255,184,216,0.4)}
+.p-card{padding:14px 16px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;cursor:pointer;transition:all 200ms var(--spring)}
+.p-card:hover{background:rgba(255,255,255,0.05);border-color:var(--border-strong)}
+.p-card.brand{background:linear-gradient(135deg,rgba(255,184,216,0.14),rgba(184,216,255,0.04));border-color:rgba(255,255,255,0.16)}
+.p-cite{font:500 10px/1 'JetBrains Mono';color:var(--iri-pink);letter-spacing:0.10em;font-variant-numeric:tabular-nums;margin-bottom:8px;display:flex;align-items:center;gap:7px;text-shadow:0 0 8px rgba(255,184,216,0.4)}
+.p-cite::before{content:'';width:6px;height:6px;border-radius:50%;background:radial-gradient(circle at 30% 30%,var(--iri-pink),var(--mercury-2));box-shadow:0 0 8px rgba(255,184,216,0.4)}
+.p-text{font:500 14px/1.45 'Inter';color:var(--ink-1);letter-spacing:-0.005em}
+.p-text b{color:var(--ink-0);font-weight:600}
+.p-attr{display:block;margin-top:8px;font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.14em;text-transform:uppercase}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:11px 18px;background:linear-gradient(135deg,rgba(31,35,46,0.75),rgba(22,25,34,0.75));backdrop-filter:blur(40px) saturate(160%);border:1px solid rgba(255,255,255,0.20);border-radius:999px;font:500 11px/1 'Inter';color:var(--ink-0);letter-spacing:-0.005em;z-index:60;box-shadow:0 12px 40px rgba(0,0,0,0.40),inset 0 1px 0 rgba(255,255,255,0.16)}
+.studio-status::before{content:'';width:7px;height:7px;border-radius:50%;background:radial-gradient(circle at 30% 30%,var(--iri-pink),var(--mercury-2));box-shadow:0 0 12px rgba(255,184,216,0.5)}
+</style>
+</head>
+<body>
+<div class="atmos"></div>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">vibemix · <b>Velvet Underground</b> · 22:14</div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="brand"><div class="brand-orb"></div><div class="brand-wd"><div class="brand-name">vibemix</div><div class="brand-strap"><span class="dot"></span>flowing</div></div></div>
+    <div class="sect">surfaces</div>
+    <nav class="nav">
+      <div class="ni active">Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni">Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni">Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni">Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni">Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tonight</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · 1h 47m</div></div>
+    <div class="sess"><div class="sess-name">Backroom warmup</div><div class="sess-meta">19:30 · 2h 30m</div></div>
+    <div class="sb-foot">
+      <div class="persona"><div class="persona-pill active">Hype</div><div class="persona-pill">Coach</div><div class="persona-pill">Tutor</div></div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">On Air</div><div class="ch-mode">hype, ears open</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll">
+      <div class="scene">
+        <span class="scene-l">scene</span>
+        <span class="scene-chip"><small>bpm</small>130.0</span>
+        <span class="scene-sep"></span>
+        <span class="scene-chip pink"><small>key</small>8A → 9A</span>
+        <span class="scene-sep"></span>
+        <span class="scene-chip violet"><small>heat</small>0.78</span>
+        <span class="scene-sep"></span>
+        <span class="scene-chip blue"><small>phrase</small>14 / 16</span>
+      </div>
+      <div class="hero">
+        <div class="hero-kicker">live read · 02:14</div>
+        <h1 class="hero-line">That low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></h1>
+      </div>
+      <div class="orb-track">
+        <span class="ot-l">phrase</span>
+        <span class="ot-n">12</span>
+        <div class="ot-bar">
+          <span class="orb fired"></span><span class="orb fired"></span><span class="orb fired"></span><span class="orb fired"></span>
+          <span class="orb fired"></span><span class="orb fired"></span><span class="orb fired"></span><span class="orb fired"></span>
+          <span class="orb fired"></span><span class="orb fired"></span><span class="orb fired"></span><span class="orb fired"></span>
+          <span class="orb fired"></span><span class="orb current"></span><span class="orb next"></span><span class="orb next"></span>
+        </div>
+        <span class="ot-n">16</span>
+      </div>
+      <div class="dispatch">
+        <div class="dis-meta"><div class="dis-tag">kick 60Hz</div><div class="dis-num">+3.2dB</div></div>
+        <div class="dis-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="dis-detail">02:11 → 02:15<br><b>4 bars · locked</b></div>
+      </div>
+      <div class="queue">
+        <div class="queue-head"><div class="queue-title">Next up</div><div class="queue-sub">— DJ queue · 3 ready</div></div>
+        <div class="q-row lead">
+          <div class="q-num">01</div>
+          <div class="q-body"><div class="q-name">Vox Dust ii</div><div class="q-artist">SHRIM · the dust album</div></div>
+          <div class="q-bpm">130</div>
+          <div class="q-cam">9A</div>
+          <div class="q-chev">›</div>
+          <div class="q-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up. He'll feel it inside two bars.</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">02</div>
+          <div class="q-body"><div class="q-name">Marrow (VTSS remix)</div><div class="q-artist">Tygapaw · Marrow</div></div>
+          <div class="q-bpm">132</div>
+          <div class="q-cam">10A</div>
+          <div class="q-chev">›</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">03</div>
+          <div class="q-body"><div class="q-name">Sleeper</div><div class="q-artist">Forester · Untitled.05</div></div>
+          <div class="q-bpm">128</div>
+          <div class="q-cam">8A</div>
+          <div class="q-chev">›</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">cited evidence</div>
+    <div class="p-card brand"><div class="p-cite">02:14 · kick 60Hz</div><div class="p-text">Low-end opened. <b>Sub-bass rose 3.2 dB</b> across four bars.<span class="p-attr">citation locked</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · phrase 12</div><div class="p-text">Filter sweep started, <b>hi-band fell 8 dB</b>.<span class="p-attr">citation locked</span></div></div>
+    <div class="p-section" style="margin-top:8px">likely next cue</div>
+    <div class="p-card"><div class="p-cite">02:30 · drop-in</div><div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">predicted</span></div></div>
+  </aside>
+</div>
+<div class="studio-status">Studio live · 47:12</div>
+</body>
+</html>

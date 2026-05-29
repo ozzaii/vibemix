@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m03 · Newsprint Broadsheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=Geist+Mono:wght@400..700&family=Geist:wght@400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper-0:#F2EBDF;--paper-2:#E8E0D1;--paper-4:#DCD2BF;--paper-8:#CFC4AD;
+  --ink-1:#1B1815;--ink-2:#2C2722;--ink-3:#403832;--ink-4:#665B51;--ink-5:#8C8174;--ink-6:#B5A99A;
+  --rule:#1B1815;--rule-fade:rgba(27,24,21,0.18);
+  --rouge:#B83A4A;--rouge-soft:#D9748A;--rouge-bg:rgba(184,58,74,0.06);
+  --shell:#1A1715;--shell-2:#231F1C;--shell-3:#2D2925;
+  --shell-ink:rgba(242,235,223,0.86);--shell-ink-2:rgba(242,235,223,0.55);--shell-ink-3:rgba(242,235,223,0.30);
+  --shell-border:rgba(242,235,223,0.10);
+  --chrome-h:28px;--sb-w:228px;--panel-w:280px;
+  --spring:cubic-bezier(0.16,1,0.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--shell);color:var(--ink-1);font-family:'Source Serif 4',Georgia,serif;font-variation-settings:"opsz" 16;overflow:hidden}
+body{display:flex;flex-direction:column}
+.chrome{height:var(--chrome-h);background:linear-gradient(180deg,#1F1B19 0%,#161311 100%);border-bottom:1px solid var(--shell-border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:12px;height:12px;border-radius:50%}
+.tl span:nth-child(1){background:#FF5F57}.tl span:nth-child(2){background:#FEBC2E}.tl span:nth-child(3){background:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:500 10px/1 'Geist Mono';color:var(--shell-ink-3);letter-spacing:0.20em;text-transform:uppercase}
+.row{flex:1;display:flex;position:relative;min-height:0;background:var(--shell)}
+/* sidebar — desk box */
+.sb{width:var(--sb-w);background:var(--shell);color:var(--shell-ink);display:flex;flex-direction:column;padding:22px 14px 14px;flex-shrink:0;border-right:1px solid var(--shell-border);position:relative;z-index:3}
+.masthead{padding-bottom:18px;border-bottom:3px double rgba(242,235,223,0.18);margin-bottom:18px}
+.mh-title{font:600 28px/0.9 'Source Serif 4';font-variation-settings:"opsz" 60;letter-spacing:-0.02em;color:#F2EBDF}
+.mh-strap{font:italic 400 11px/1.2 'Source Serif 4';font-variation-settings:"opsz" 8;color:var(--shell-ink-2);margin-top:6px;letter-spacing:0.02em}
+.dl{display:flex;gap:6px;margin-top:9px;align-items:center;font:500 9px/1 'Geist Mono';color:var(--rouge-soft);letter-spacing:0.14em;text-transform:uppercase}
+.dl-dot{width:5px;height:5px;border-radius:50%;background:var(--rouge);box-shadow:0 0 8px rgba(184,58,74,0.6);animation:pulse 1.7s var(--spring) infinite}
+@keyframes pulse{0%,100%{opacity:0.6;transform:scale(1)}50%{opacity:1;transform:scale(1.2)}}
+.sect{font:700 9px/1 'Geist Mono';color:var(--shell-ink-3);letter-spacing:0.22em;text-transform:uppercase;padding:16px 4px 8px;display:flex;align-items:center;gap:8px}
+.sect::after{content:'';flex:1;height:1px;background:var(--shell-border)}
+.nav{display:flex;flex-direction:column}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 8px;font:500 14px/1 'Source Serif 4';font-variation-settings:"opsz" 24;color:var(--shell-ink);cursor:pointer;transition:all 200ms var(--spring);border-bottom:1px solid var(--shell-border);position:relative}
+.ni:last-child{border-bottom:0}
+.ni:hover{color:#F2EBDF}
+.ni.active{color:#F2EBDF}
+.ni.active::before{content:'▸';color:var(--rouge);font-size:10px;position:absolute;left:-4px}
+.ni-shortcut{margin-left:auto;font:500 9px/1 'Geist Mono';color:var(--shell-ink-3);letter-spacing:0.04em}
+.sess{padding:9px 6px;cursor:pointer;border-bottom:1px solid var(--shell-border);display:flex;flex-direction:column;gap:3px;transition:all 200ms var(--spring);position:relative}
+.sess:hover{padding-left:10px}
+.sess.active{padding-left:10px}
+.sess.active::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;background:var(--rouge)}
+.sess-name{font:600 14px/1.1 'Source Serif 4';font-variation-settings:"opsz" 24;color:#F2EBDF;letter-spacing:-0.005em}
+.sess-meta{font:italic 400 11px/1.1 'Source Serif 4';font-variation-settings:"opsz" 8;color:var(--shell-ink-2)}
+.sb-foot{margin-top:auto;padding-top:14px;border-top:3px double rgba(242,235,223,0.18);display:flex;flex-direction:column;gap:11px}
+.persona{display:flex;gap:1px;border:1px solid var(--shell-border)}
+.persona-pill{flex:1;padding:9px 0;font:700 9px/1 'Geist Mono';color:var(--shell-ink-2);letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;text-align:center;transition:all 200ms var(--spring);background:var(--shell-2)}
+.persona-pill:hover{color:#F2EBDF}
+.persona-pill.active{background:#F2EBDF;color:var(--ink-1)}
+.bullhorn{padding:11px 12px;background:var(--shell-2);border-left:3px solid var(--rouge);display:flex;align-items:center;gap:10px;cursor:pointer;transition:all 240ms var(--spring)}
+.bullhorn:hover{background:var(--shell-3)}
+.bh-mark{font:700 11px/1 'Geist Mono';color:var(--rouge-soft);letter-spacing:0.10em}
+.bh-body{flex:1}
+.bh-state{font:700 10px/1 'Geist Mono';color:#F2EBDF;letter-spacing:0.10em;text-transform:uppercase}
+.bh-mode{font:italic 400 11px/1.1 'Source Serif 4';font-variation-settings:"opsz" 8;color:var(--shell-ink-2);margin-top:2px}
+/* stage — broadsheet paper */
+.stage{flex:1;position:relative;background:var(--paper-0);overflow:hidden;color:var(--ink-1)}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.18) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage::after{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:0.16;mix-blend-mode:multiply;pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:64px 80px 80px;z-index:2}
+.flag{display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:6px;border-bottom:4px solid var(--ink-1);margin-bottom:4px}
+.flag-name{font:700 60px/0.85 'Source Serif 4';font-variation-settings:"opsz" 60;color:var(--ink-1);letter-spacing:-0.04em}
+.flag-edition{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.flag-vol{font:500 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase;font-variant-numeric:tabular-nums}
+.flag-date{font:italic 400 13px/1 'Source Serif 4';font-variation-settings:"opsz" 8;color:var(--ink-3)}
+.dateline{display:flex;align-items:center;gap:12px;padding:6px 0 14px;border-bottom:1px solid var(--ink-1);margin-bottom:24px;font:500 11px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.12em;font-variant-numeric:tabular-nums}
+.dateline-loc{color:var(--ink-1);font-weight:700;letter-spacing:0.18em;text-transform:uppercase}
+.dateline-sep{width:3px;height:3px;border-radius:50%;background:var(--ink-3)}
+.dateline-rouge{color:var(--rouge);font-weight:700}
+.head-block{margin-bottom:36px}
+.head-kicker{font:700 11px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.20em;text-transform:uppercase;margin-bottom:14px}
+.head{font:400 64px/1.04 'Source Serif 4';font-variation-settings:"opsz" 60,"wght" 500;color:var(--ink-1);letter-spacing:-0.022em;max-width:980px}
+.head em{font-style:italic;font-variation-settings:"opsz" 60,"wght" 480;color:var(--rouge)}
+.head .drop{font:400 90px/0.85 'Source Serif 4';font-variation-settings:"opsz" 60,"wght" 460;color:var(--ink-1);float:left;margin:6px 8px 0 -2px}
+.cite{font:600 0.20em 'Geist Mono';font-style:normal;vertical-align:0.55em;color:var(--ink-3);letter-spacing:0.12em;padding:2px 6px;border:1px solid var(--ink-3);font-variant-numeric:tabular-nums;margin-left:0.18em;cursor:pointer;transition:all 200ms var(--spring);text-transform:uppercase}
+.cite:hover{background:var(--ink-1);color:var(--paper-0);border-color:var(--ink-1)}
+.subdeck{font:italic 400 19px/1.45 'Source Serif 4';font-variation-settings:"opsz" 24;color:var(--ink-3);max-width:780px;margin-top:18px;letter-spacing:0.005em}
+.byline{font:500 11px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.10em;text-transform:uppercase;margin-top:16px;display:flex;align-items:center;gap:10px}
+.byline b{color:var(--ink-1);font-weight:700}
+.byline-sep{width:3px;height:3px;border-radius:50%;background:var(--ink-3)}
+.col-area{display:grid;grid-template-columns:1fr 1fr;gap:36px;margin-bottom:36px;padding-top:18px;border-top:1px solid var(--ink-1)}
+.col-area::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--rule-fade)}
+.col-area{position:relative}
+.body-col{font:400 15.5px/1.55 'Source Serif 4';font-variation-settings:"opsz" 16;color:var(--ink-2);letter-spacing:0.005em;text-align:justify;hyphens:auto}
+.body-col p{margin-bottom:11px;text-indent:1.2em}
+.body-col p:first-child{text-indent:0}
+.body-col p:first-child::first-letter{font:600 56px/0.85 'Source Serif 4';font-variation-settings:"opsz" 60;float:left;margin:6px 8px 0 0;color:var(--rouge)}
+.body-col strong{font-weight:600;color:var(--ink-1)}
+.body-col em{font-style:italic;color:var(--rouge);font-weight:500}
+/* pull quote — print classic */
+.pull{margin:36px 0;padding:20px 0;border-top:3px double var(--ink-1);border-bottom:3px double var(--ink-1);text-align:center}
+.pull-text{font:italic 400 28px/1.25 'Source Serif 4';font-variation-settings:"opsz" 60;color:var(--ink-1);letter-spacing:-0.015em;max-width:680px;margin:0 auto}
+.pull-attrib{font:700 10px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.22em;text-transform:uppercase;margin-top:14px}
+/* dispatch — wire copy */
+.wire{padding:22px 0 18px;border-top:1px solid var(--ink-1);border-bottom:1px solid var(--ink-1);margin-bottom:36px;display:grid;grid-template-columns:140px 1fr;gap:24px;align-items:start}
+.wire-stamp{font:700 10px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.18em;text-transform:uppercase;padding-top:4px}
+.wire-stamp b{display:block;color:var(--ink-1);font:600 26px/0.9 'Source Serif 4';font-variation-settings:"opsz" 60;letter-spacing:-0.02em;margin-top:4px;font-variant-numeric:tabular-nums}
+.wire-body p{font:400 14.5px/1.5 'Source Serif 4';font-variation-settings:"opsz" 16;color:var(--ink-2);margin-bottom:8px;letter-spacing:0.005em}
+.wire-body strong{color:var(--ink-1);font-weight:600}
+.wire-wave{display:flex;align-items:center;gap:2px;height:18px;margin-top:10px}
+.wire-wave span{width:2.5px;background:var(--ink-1);border-radius:0.5px;opacity:0.62}
+.wire-wave span:nth-child(odd){opacity:0.85}
+.wire-wave span:nth-child(1){height:35%}.wire-wave span:nth-child(2){height:60%}.wire-wave span:nth-child(3){height:85%}.wire-wave span:nth-child(4){height:70%}.wire-wave span:nth-child(5){height:45%}.wire-wave span:nth-child(6){height:65%}.wire-wave span:nth-child(7){height:90%}.wire-wave span:nth-child(8){height:60%}.wire-wave span:nth-child(9){height:38%}.wire-wave span:nth-child(10){height:55%}.wire-wave span:nth-child(11){height:75%}.wire-wave span:nth-child(12){height:40%}.wire-wave span:nth-child(13){height:65%}.wire-wave span:nth-child(14){height:30%}.wire-wave span:nth-child(15){height:50%}.wire-wave span:nth-child(16){height:42%}.wire-wave span:nth-child(17){height:68%}.wire-wave span:nth-child(18){height:35%}
+/* listings — next up as classified */
+.listings{padding-top:18px;border-top:4px solid var(--ink-1)}
+.listings-flag{display:flex;align-items:baseline;gap:18px;padding-bottom:14px;border-bottom:1px solid var(--ink-1);margin-bottom:18px}
+.listings-title{font:600 32px/0.95 'Source Serif 4';font-variation-settings:"opsz" 60;color:var(--ink-1);letter-spacing:-0.022em}
+.listings-sub{font:700 10px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.20em;text-transform:uppercase}
+.listing{display:grid;grid-template-columns:30px 1fr 60px 40px;gap:18px;padding:14px 0;border-bottom:1px solid var(--rule-fade);cursor:pointer;align-items:center;transition:all 200ms var(--spring)}
+.listing:hover{background:rgba(184,58,74,0.05);padding-left:8px}
+.listing.lead{padding:20px 0;grid-template-rows:auto auto}
+.l-num{font:700 12px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.06em;font-variant-numeric:tabular-nums;align-self:start;padding-top:4px}
+.listing.lead .l-num{color:var(--rouge);font-size:15px}
+.l-name{font:600 16px/1.2 'Source Serif 4';font-variation-settings:"opsz" 24;color:var(--ink-1);letter-spacing:-0.005em}
+.listing.lead .l-name{font:600 26px/1.05 'Source Serif 4';font-variation-settings:"opsz" 60;letter-spacing:-0.018em}
+.l-artist{font:italic 400 12px/1.3 'Source Serif 4';font-variation-settings:"opsz" 8;color:var(--ink-3);margin-top:3px}
+.l-reason{grid-column:2/-1;font:400 14.5px/1.5 'Source Serif 4';font-variation-settings:"opsz" 16;color:var(--ink-2);margin-top:8px;letter-spacing:0.005em;max-width:620px;font-style:italic}
+.l-bpm{font:700 12px/1 'Geist Mono';color:var(--ink-1);letter-spacing:0.04em;font-variant-numeric:tabular-nums;text-align:right}
+.l-cam{font:700 12px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.04em;font-variant-numeric:tabular-nums;text-align:right}
+/* panel — late edition */
+.panel{width:var(--panel-w);background:var(--paper-0);border-left:1px solid var(--ink-1);padding:64px 22px 22px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex-shrink:0;z-index:2;color:var(--ink-1);position:relative}
+.panel::before{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:0.13;mix-blend-mode:multiply;pointer-events:none}
+.panel>*{position:relative;z-index:1}
+.p-flag{font:700 12px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.20em;text-transform:uppercase;padding-bottom:8px;border-bottom:3px double var(--ink-1)}
+.p-card{padding:12px 0;border-bottom:1px solid var(--rule-fade);cursor:pointer;transition:all 200ms var(--spring)}
+.p-card:hover{padding-left:6px}
+.p-cite{font:700 10px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.10em;font-variant-numeric:tabular-nums;margin-bottom:6px;text-transform:uppercase}
+.p-text{font:italic 400 14.5px/1.45 'Source Serif 4';font-variation-settings:"opsz" 16;color:var(--ink-2);letter-spacing:0.005em}
+.p-attr{display:block;margin-top:8px;font:700 9px/1 'Geist Mono';color:var(--ink-4);letter-spacing:0.14em;text-transform:uppercase;font-style:normal}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:8px 14px;background:var(--ink-1);color:var(--paper-0);font:700 10px/1 'Geist Mono';letter-spacing:0.16em;text-transform:uppercase;z-index:60;box-shadow:0 6px 24px rgba(0,0,0,0.4)}
+.studio-status::before{content:'';width:7px;height:7px;background:var(--rouge);border-radius:50%}
+</style>
+</head>
+<body>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">vibemix · the broadsheet</div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="masthead"><div class="mh-title">vibemix</div><div class="mh-strap">the listening DJ's record</div><div class="dl"><span class="dl-dot"></span>on the wire</div></div>
+    <div class="sect">Desk</div>
+    <nav class="nav">
+      <div class="ni active">Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni">Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni">Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni">Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni">Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">Tonight's run</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · 1h 47m on the wire</div></div>
+    <div class="sess"><div class="sess-name">Backroom warmup</div><div class="sess-meta">19:30 · 2h 30m, filed</div></div>
+    <div class="sb-foot">
+      <div class="persona">
+        <div class="persona-pill active">Hype</div>
+        <div class="persona-pill">Coach</div>
+        <div class="persona-pill">Tutor</div>
+      </div>
+      <div class="bullhorn"><div class="bh-mark">▸</div><div class="bh-body"><div class="bh-state">filing live</div><div class="bh-mode">hype desk, room open</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll">
+      <div class="flag">
+        <div class="flag-name">VIBEMIX</div>
+        <div class="flag-edition"><div class="flag-vol">VOL. 47 · NO. 14</div><div class="flag-date">Wednesday, Late Edition</div></div>
+      </div>
+      <div class="dateline">
+        <span class="dateline-loc">BERLIN · 22:14</span><span class="dateline-sep"></span>
+        <span>BPM <b style="color:var(--ink-1)">130</b></span><span class="dateline-sep"></span>
+        <span class="dateline-rouge">KEY 8A → 9A</span><span class="dateline-sep"></span>
+        <span>HEAT <b style="color:var(--ink-1)">0.78</b></span><span class="dateline-sep"></span>
+        <span>PHRASE 14 / 16</span>
+      </div>
+      <div class="head-block">
+        <div class="head-kicker">live read · 02:14</div>
+        <h1 class="head"><span class="drop">T</span>hat low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></h1>
+        <div class="subdeck">A four-bar sub-bass crest confirms the room has leaned in. The kick's earned the next eight before the filter break.</div>
+        <div class="byline"><span>BY <b>VIBEMIX CO-HOST</b></span><span class="byline-sep"></span><span>FILED 02:14 CET</span><span class="byline-sep"></span><span>DESK: HYPE</span></div>
+      </div>
+      <div class="col-area">
+        <div class="body-col">
+          <p>The opening salvo of <strong>SHRIM's</strong> "Vox Dust I" had set a sturdy floor by phrase 8, where the kick locked at 130 BPM and the room found its <em>weight</em>. By 02:11, the sub-bass began its quiet rise — three decibels, then four — and the front of the floor adjusted, leaning into the bin and finding new air.</p>
+          <p>By 02:13 the gain reached 3.2 dB above its starting reference and the hi-hat ghost — that whisper just behind the snare — gained definition. The phrase, by then, had reached its fourteenth bar of sixteen, and the room had committed.</p>
+          <p>This is the moment a careful DJ rides — not pushes, not pulls. The receipt below this column files the evidence; the dispatch on the right names the next move.</p>
+        </div>
+        <div class="body-col">
+          <p>The sister observation, filed from the evidence locker, marks the <strong>filter sweep</strong> that began at phrase 12 — a deliberate trim of the high band by eight decibels that opened the floor's hearing toward the kick's territory.</p>
+          <p>The two events stack: a filter-down preceded a sub-up, and the floor's <em>attention dropped two stories</em>. The co-host's call — to hold the kick through phrase 16 — is not a flourish. It is the natural <em>cadence</em> of the room.</p>
+          <p>The set list to the south of this fold has been refreshed. SHRIM's "Vox Dust II" leads it, half a step up in key, identical at the kick. Two further selections follow, both within the room's current breath.</p>
+        </div>
+      </div>
+      <div class="pull">
+        <div class="pull-text">"He's been on this kick for three bars — it's earned its breath."</div>
+        <div class="pull-attrib">— vibemix · 02:14 · hype desk</div>
+      </div>
+      <div class="wire">
+        <div class="wire-stamp">From the wire<b>02:14</b></div>
+        <div class="wire-body">
+          <p><strong>EVIDENCE</strong> — Kick 60Hz. Sub-bass gain rose 3.2 dB across four bars. Hi-hat ghost gained definition. Phrase 12 → 14.</p>
+          <p><strong>READING</strong> — Floor weight committed at phrase 13; lean into next 8 before filter return.</p>
+          <div class="wire-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+      </div>
+      <section class="listings">
+        <div class="listings-flag"><div class="listings-title">Next up</div><div class="listings-sub">queue · set list · classified</div></div>
+        <div class="listing lead">
+          <div class="l-num">01</div>
+          <div><div class="l-name">Vox Dust II</div><div class="l-artist">SHRIM, the dust album, 2025</div></div>
+          <div class="l-bpm">130</div>
+          <div class="l-cam">9A</div>
+          <div class="l-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up. He'll feel it inside two bars.</div>
+        </div>
+        <div class="listing">
+          <div class="l-num">02</div>
+          <div><div class="l-name">Marrow (VTSS remix)</div><div class="l-artist">Tygapaw, Marrow, 2024</div></div>
+          <div class="l-bpm">132</div>
+          <div class="l-cam">10A</div>
+        </div>
+        <div class="listing">
+          <div class="l-num">03</div>
+          <div><div class="l-name">Sleeper</div><div class="l-artist">Forester, Untitled.05, 2025</div></div>
+          <div class="l-bpm">128</div>
+          <div class="l-cam">8A</div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-flag">Late edition</div>
+    <div class="p-card"><div class="p-cite">02:14 · Kick 60Hz</div><div class="p-text">Low-end opened — sub-bass gain rose 3.2 dB across four bars and held the room.<span class="p-attr">— Citation locked</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · Phrase 12</div><div class="p-text">Filter sweep started, hi-band fell 8 dB, room leaned forward.<span class="p-attr">— Citation locked</span></div></div>
+    <div class="p-flag" style="margin-top:14px">Wire predictions</div>
+    <div class="p-card"><div class="p-cite">02:30 · Drop-in</div><div class="p-text">Incoming downbeat at phrase 16, BPM held — don't break it.<span class="p-attr">— From the desk</span></div></div>
+  </aside>
+</div>
+<div class="studio-status">on the wire · 47:12</div>
+</body>
+</html>

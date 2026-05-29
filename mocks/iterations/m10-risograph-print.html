@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m10 · Risograph Print</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400..700&family=Anton&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cream:#F2EAD6;--cream-2:#E8DFC5;--cream-3:#DAD0B3;--cream-shade:#C4B894;
+  --ink:#1A2138;--ink-2:#283248;--ink-3:#3B4459;
+  --riso-pink:#FF4081;--riso-pink-soft:#FF89B0;
+  --riso-blue:#0A60D5;
+  --riso-yellow:#FFD83A;
+  --paper-noise:rgba(0,0,0,0.06);
+  --border:rgba(26,33,56,0.12);--border-strong:rgba(26,33,56,0.30);
+  --chrome-h:28px;--sb-w:222px;--panel-w:264px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--cream);color:var(--ink);font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:13px;letter-spacing:-0.005em;overflow:hidden}
+body{display:flex;flex-direction:column;position:relative}
+/* paper texture */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 280 280' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:0.18;mix-blend-mode:multiply;pointer-events:none;z-index:1}
+.chrome{height:var(--chrome-h);background:var(--ink);border-bottom:0;display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag;z-index:5;color:var(--cream)}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:11px;height:11px;border-radius:50%;background:transparent;border:1.5px solid rgba(242,234,214,0.7)}
+.tl span:nth-child(1){border-color:#FF5F57}.tl span:nth-child(2){border-color:#FEBC2E}.tl span:nth-child(3){border-color:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:700 10px/1 'JetBrains Mono';color:var(--riso-pink-soft);letter-spacing:0.24em;text-transform:uppercase}
+.row{flex:1;display:flex;position:relative;min-height:0;z-index:2}
+/* sidebar — print colophon */
+.sb{width:var(--sb-w);background:var(--ink);color:var(--cream);display:flex;flex-direction:column;flex-shrink:0;padding:20px 0 14px;position:relative;z-index:3}
+.colophon{padding:0 16px 18px;margin-bottom:14px;position:relative;border-bottom:3px solid var(--riso-pink)}
+.col-name{font:400 38px/0.84 'Anton';color:var(--cream);letter-spacing:0.02em;text-transform:uppercase}
+.col-name::after{content:'·';color:var(--riso-pink);margin-left:2px;font-size:42px;line-height:0}
+.col-strap{font:600 10px/1 'JetBrains Mono';color:var(--riso-pink-soft);margin-top:9px;letter-spacing:0.16em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.dot{width:8px;height:8px;background:var(--riso-pink);border-radius:50%;box-shadow:0 0 0 2px var(--ink),0 0 0 3px var(--riso-pink)}
+.sect{font:700 10px/1 'JetBrains Mono';color:rgba(242,234,214,0.42);letter-spacing:0.22em;text-transform:uppercase;padding:13px 16px 8px;display:flex;align-items:center;gap:8px}
+.sect::before{content:'';width:14px;height:1px;background:var(--riso-pink)}
+.nav{display:flex;flex-direction:column}
+.ni{display:flex;align-items:center;gap:11px;padding:9px 16px;font:600 13px/1 'Space Grotesk';color:rgba(242,234,214,0.78);cursor:pointer;letter-spacing:-0.005em;position:relative;text-transform:uppercase;font-weight:600}
+.ni:hover{color:var(--cream);background:rgba(255,64,129,0.10)}
+.ni.active{color:var(--cream);background:var(--riso-pink)}
+.ni-num{font:700 9px/1 'JetBrains Mono';color:rgba(242,234,214,0.36);letter-spacing:0;width:22px;font-variant-numeric:tabular-nums}
+.ni.active .ni-num{color:rgba(242,234,214,0.85)}
+.ni-shortcut{margin-left:auto;font:500 9px/1 'JetBrains Mono';color:rgba(242,234,214,0.30);letter-spacing:0.04em}
+.sess{padding:9px 16px;cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative;border-bottom:1px dashed rgba(242,234,214,0.10)}
+.sess:hover{background:rgba(255,64,129,0.08)}
+.sess.active{background:rgba(255,64,129,0.16)}
+.sess.active::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:4px;background:var(--riso-pink)}
+.sess-name{font:600 13px/1.15 'Space Grotesk';color:var(--cream);letter-spacing:-0.005em}
+.sess-meta{font:500 10px/1 'JetBrains Mono';color:rgba(242,234,214,0.42);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.sb-foot{margin-top:auto;padding:14px 16px;border-top:3px solid var(--riso-pink);display:flex;flex-direction:column;gap:10px}
+.persona{display:flex;gap:1px;background:var(--riso-pink);border:1px solid var(--riso-pink)}
+.persona-pill{flex:1;padding:9px 0;background:var(--ink);font:700 10px/1 'JetBrains Mono';color:rgba(242,234,214,0.55);letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;text-align:center}
+.persona-pill:hover{color:var(--cream)}
+.persona-pill.active{background:var(--cream);color:var(--riso-pink);font-weight:800}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--riso-pink);color:var(--cream);cursor:pointer;position:relative}
+.cohost-pill::before{content:'';position:absolute;inset:-3px;background:transparent;border:2px solid var(--riso-pink);opacity:0.4;transform:translate(3px,3px)}
+.ch-dot{width:8px;height:8px;background:var(--cream);border-radius:50%;box-shadow:0 0 0 2px var(--riso-pink)}
+.ch-text{flex:1}
+.ch-state{font:800 11px/1 'JetBrains Mono';color:var(--cream);letter-spacing:0.10em;text-transform:uppercase}
+.ch-mode{font:600 11px/1.1 'Space Grotesk';color:var(--cream);margin-top:2px;letter-spacing:-0.005em;opacity:0.88}
+/* stage — print page */
+.stage{flex:1;position:relative;background:var(--cream);overflow:hidden;color:var(--ink)}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.18) 0%,transparent 100%);pointer-events:none;z-index:1}
+/* halftone overlay */
+.stage::after{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at center,var(--riso-pink) 0.8px,transparent 1.6px);background-size:14px 14px;opacity:0.07;mix-blend-mode:multiply;pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:36px 56px 60px;z-index:2;display:flex;flex-direction:column;gap:32px}
+/* registration crosses */
+.reg{position:absolute;width:18px;height:18px}
+.reg::before,.reg::after{content:'';position:absolute;background:var(--riso-pink);opacity:0.6}
+.reg::before{left:50%;top:0;width:1.5px;height:100%;transform:translateX(-50%)}
+.reg::after{top:50%;left:0;height:1.5px;width:100%;transform:translateY(-50%)}
+.reg.r1{top:16px;left:24px}
+.reg.r2{top:16px;right:24px}
+/* magazine header — print zine */
+.zine-head{display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:14px;border-bottom:4px solid var(--ink);position:relative}
+.zine-head::after{content:'';position:absolute;bottom:-9px;left:0;width:100%;height:1px;background:var(--ink)}
+.zine-title{font:400 80px/0.84 'Anton';color:var(--ink);letter-spacing:0.014em;text-transform:uppercase;position:relative}
+.zine-title::after{content:'VIBEMIX';position:absolute;top:3px;left:3px;color:var(--riso-pink);z-index:-1;mix-blend-mode:multiply}
+.zine-meta{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.zine-issue{font:700 12px/1 'JetBrains Mono';color:var(--ink);letter-spacing:0.18em;text-transform:uppercase;background:var(--riso-yellow);padding:4px 8px;display:inline-block}
+.zine-date{font:600 11px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.08em;text-transform:uppercase;margin-top:4px}
+/* stats strip */
+.strip{display:grid;grid-template-columns:repeat(5,1fr);gap:0;background:var(--ink);color:var(--cream);position:relative}
+.strip::after{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at center,var(--riso-pink) 0.8px,transparent 1.6px);background-size:8px 8px;opacity:0.15;mix-blend-mode:screen;pointer-events:none}
+.strip-cell{padding:16px 18px;border-right:1px solid rgba(242,234,214,0.18);display:flex;flex-direction:column;gap:5px;position:relative;z-index:1}
+.strip-cell:last-child{border-right:0}
+.strip-label{font:700 9px/1 'JetBrains Mono';color:var(--riso-pink-soft);letter-spacing:0.20em;text-transform:uppercase}
+.strip-value{font:400 26px/1 'Anton';color:var(--cream);letter-spacing:0.014em;font-variant-numeric:tabular-nums;text-transform:uppercase}
+.strip-cell.pink .strip-value{color:var(--riso-pink-soft)}
+.strip-cell.yel .strip-value{color:var(--riso-yellow)}
+.strip-sub{font:600 10px/1 'JetBrains Mono';color:rgba(242,234,214,0.55);letter-spacing:0.06em;text-transform:uppercase}
+/* hero slab — overprint */
+.hero{position:relative;background:transparent;padding:28px 0 24px}
+.hero-kicker{font:800 11px/1 'JetBrains Mono';color:var(--cream);background:var(--ink);padding:5px 10px;letter-spacing:0.20em;text-transform:uppercase;display:inline-flex;align-items:center;gap:8px;margin-bottom:24px}
+.hero-kicker::after{content:'02:14';color:var(--riso-pink-soft);font-weight:700}
+.hero-line{font:600 clamp(40px,4.8vw,64px)/1.04 'Space Grotesk';color:var(--ink);letter-spacing:-0.028em;max-width:980px;position:relative}
+.hero-line em{font-style:normal;color:var(--riso-pink);font-weight:700;position:relative;display:inline-block;background:var(--riso-yellow);padding:0 8px 2px;margin:0 2px;box-shadow:3px 3px 0 0 var(--riso-pink)}
+.hero-line em::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at center,var(--ink) 0.5px,transparent 1px);background-size:5px 5px;opacity:0.18;mix-blend-mode:multiply;pointer-events:none}
+.cite{display:inline-block;vertical-align:0.42em;font:800 0.22em/1 'JetBrains Mono';font-style:normal;color:var(--cream);letter-spacing:0.14em;padding:4px 9px;background:var(--ink);font-variant-numeric:tabular-nums;margin-left:0.20em;cursor:pointer;text-transform:uppercase;position:relative}
+.cite::before{content:'';position:absolute;inset:-2px -2px -2px -2px;background:var(--riso-pink);z-index:-1;transform:translate(2px,2px)}
+.cite:hover{background:var(--riso-pink)}
+.hero-strap{font:600 17px/1.4 'Space Grotesk';color:var(--ink-2);max-width:680px;margin-top:22px;letter-spacing:-0.005em;border-left:4px solid var(--riso-pink);padding-left:14px}
+/* rule line — print divider */
+.print-rule{display:flex;align-items:center;gap:14px;font:800 10px/1 'JetBrains Mono';color:var(--riso-pink);letter-spacing:0.22em;text-transform:uppercase}
+.print-rule::before,.print-rule::after{content:'';flex:1;height:3px;background:var(--ink);position:relative}
+.print-rule::before{background:linear-gradient(90deg,var(--ink) 70%,var(--riso-pink) 70%)}
+.print-rule::after{background:linear-gradient(90deg,var(--riso-pink) 30%,var(--ink) 30%)}
+/* phrase bar — print blocks */
+.phr{display:flex;align-items:center;gap:16px}
+.phr-l{font:800 11px/1 'JetBrains Mono';color:var(--ink);letter-spacing:0.18em;text-transform:uppercase}
+.phr-n{font:700 12px/1 'JetBrains Mono';color:var(--ink);font-variant-numeric:tabular-nums}
+.phr-bar{flex:1;display:grid;grid-template-columns:repeat(16,1fr);gap:3px;height:26px}
+.phr-cell{background:var(--cream-shade);border:1.5px solid var(--ink-3);transition:all 200ms linear}
+.phr-cell.fired{background:var(--riso-pink);border-color:var(--ink)}
+.phr-cell.current{background:var(--ink);border-color:var(--ink);box-shadow:3px 3px 0 0 var(--riso-pink)}
+/* dispatch — print block */
+.dispatch{display:grid;grid-template-columns:200px 1fr 200px;background:var(--cream);border:3px solid var(--ink);position:relative}
+.dispatch::before{content:'';position:absolute;inset:6px 6px 6px 6px;border:1.5px dashed var(--riso-pink);pointer-events:none}
+.dis-stamp{padding:22px 18px;border-right:3px solid var(--ink);display:flex;flex-direction:column;gap:5px;background:var(--riso-pink);color:var(--cream);position:relative}
+.dis-stamp-l{font:800 10px/1 'JetBrains Mono';letter-spacing:0.18em;text-transform:uppercase}
+.dis-stamp-v{font:400 36px/1 'Anton';letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-transform:uppercase}
+.dis-stamp-s{font:700 10px/1 'JetBrains Mono';letter-spacing:0.10em;text-transform:uppercase;opacity:0.88}
+.dis-body{padding:22px 22px;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.dis-body-head{font:700 15px/1.3 'Space Grotesk';color:var(--ink);letter-spacing:-0.012em;text-transform:uppercase}
+.dis-body-text{font:600 12px/1.5 'Space Grotesk';color:var(--ink-2);letter-spacing:-0.005em}
+.dis-body-text b{color:var(--ink);font-weight:800}
+.dis-wave{padding:22px 18px;border-left:3px solid var(--ink);display:flex;align-items:center;gap:3px;background:var(--riso-yellow)}
+.dis-wave span{flex:1;background:var(--ink)}
+.dis-wave span:nth-child(1){height:30%}.dis-wave span:nth-child(2){height:55%}.dis-wave span:nth-child(3){height:85%}.dis-wave span:nth-child(4){height:70%}.dis-wave span:nth-child(5){height:45%}.dis-wave span:nth-child(6){height:65%}.dis-wave span:nth-child(7){height:90%}.dis-wave span:nth-child(8){height:60%}.dis-wave span:nth-child(9){height:38%}.dis-wave span:nth-child(10){height:55%}.dis-wave span:nth-child(11){height:75%}.dis-wave span:nth-child(12){height:40%}.dis-wave span:nth-child(13){height:65%}.dis-wave span:nth-child(14){height:30%}
+/* queue — set list as zine page */
+.queue{background:var(--cream);border:3px solid var(--ink);position:relative}
+.queue-banner{background:var(--ink);color:var(--cream);padding:14px 22px;display:flex;align-items:center;justify-content:space-between;font:700 12px/1 'JetBrains Mono';letter-spacing:0.18em;text-transform:uppercase}
+.queue-banner-r{color:var(--riso-pink-soft)}
+.q-row{display:grid;grid-template-columns:48px 1fr 70px 50px 28px;gap:16px;padding:16px 22px;border-bottom:2px dashed var(--ink-3);cursor:pointer;align-items:center}
+.q-row:last-child{border-bottom:0}
+.q-row:hover{background:rgba(255,64,129,0.10)}
+.q-row.lead{padding:24px 22px;grid-template-rows:auto auto;background:linear-gradient(90deg,rgba(255,216,58,0.4),transparent 70%)}
+.q-row.lead:hover{background:linear-gradient(90deg,rgba(255,216,58,0.6),transparent 70%)}
+.q-num{font:700 12px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.04em;font-variant-numeric:tabular-nums;align-self:start;padding-top:3px;background:var(--ink);color:var(--cream);padding:5px 7px;width:fit-content;text-align:center}
+.q-row.lead .q-num{background:var(--riso-pink);color:var(--cream);font-size:14px}
+.q-body{display:flex;flex-direction:column;gap:3px}
+.q-name{font:700 16px/1.15 'Space Grotesk';color:var(--ink);letter-spacing:-0.012em;text-transform:uppercase}
+.q-row.lead .q-name{font:400 30px/1.02 'Anton';color:var(--ink);letter-spacing:0.012em;text-transform:uppercase}
+.q-artist{font:600 11px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.04em;text-transform:uppercase}
+.q-reason{grid-column:2/-1;font:600 13px/1.55 'Space Grotesk';color:var(--ink-2);margin-top:10px;letter-spacing:-0.005em;max-width:580px;padding:10px 14px;background:var(--riso-yellow);border:2px solid var(--ink);position:relative;font-style:italic}
+.q-reason::before{content:'NOTE';position:absolute;top:-9px;left:8px;background:var(--ink);color:var(--cream);padding:2px 6px;font:800 9px/1 'JetBrains Mono';letter-spacing:0.16em;font-style:normal}
+.q-bpm{font:700 14px/1 'JetBrains Mono';color:var(--ink);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right}
+.q-cam{font:700 14px/1 'JetBrains Mono';color:var(--riso-pink);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right}
+.q-chev{font:800 16px/1 'Space Grotesk';color:var(--ink-3);text-align:center}
+.q-row:hover .q-chev{color:var(--riso-pink);transform:translateX(2px)}
+/* panel */
+.panel{width:var(--panel-w);background:var(--cream-2);border-left:3px solid var(--ink);padding:18px 0;display:flex;flex-direction:column;flex-shrink:0;z-index:2;overflow-y:auto;color:var(--ink);position:relative}
+.panel::after{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at center,var(--riso-pink) 0.8px,transparent 1.6px);background-size:10px 10px;opacity:0.10;mix-blend-mode:multiply;pointer-events:none}
+.panel>*{position:relative;z-index:1}
+.p-section{font:800 11px/1 'JetBrains Mono';color:var(--cream);background:var(--ink);letter-spacing:0.20em;text-transform:uppercase;padding:11px 20px;display:flex;align-items:center;gap:8px}
+.p-section::before{content:'■';color:var(--riso-pink-soft)}
+.p-card{padding:14px 20px;border-bottom:2px dashed var(--ink-3);cursor:pointer}
+.p-card:hover{background:rgba(255,64,129,0.10)}
+.p-cite{font:800 10px/1 'JetBrains Mono';color:var(--riso-pink);letter-spacing:0.10em;font-variant-numeric:tabular-nums;margin-bottom:8px;text-transform:uppercase}
+.p-text{font:600 13px/1.5 'Space Grotesk';color:var(--ink-2);letter-spacing:-0.005em}
+.p-text b{color:var(--ink);font-weight:800}
+.p-attr{display:block;margin-top:8px;font:800 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.16em;text-transform:uppercase}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:9px 14px;background:var(--ink);color:var(--cream);font:800 10px/1 'JetBrains Mono';letter-spacing:0.18em;text-transform:uppercase;z-index:60;border:0;box-shadow:3px 3px 0 0 var(--riso-pink)}
+.studio-status::before{content:'';width:9px;height:9px;background:var(--riso-pink);border-radius:50%;box-shadow:0 0 0 2px var(--ink),0 0 0 3px var(--riso-pink)}
+</style>
+</head>
+<body>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">VIBEMIX ZINE · ISSUE 47 · OVERPRINT</div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="colophon"><div class="col-name">vibemix</div><div class="col-strap"><span class="dot"></span>print run live</div></div>
+    <div class="sect">surfaces</div>
+    <nav class="nav">
+      <div class="ni active"><span class="ni-num">01</span>Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni"><span class="ni-num">02</span>Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni"><span class="ni-num">03</span>Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni"><span class="ni-num">04</span>Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni"><span class="ni-num">05</span>Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tonight</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · 01:47</div></div>
+    <div class="sess"><div class="sess-name">Backroom Warmup</div><div class="sess-meta">19:30 · 02:30</div></div>
+    <div class="sb-foot">
+      <div class="persona"><div class="persona-pill active">Hype</div><div class="persona-pill">Coach</div><div class="persona-pill">Tutor</div></div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">on press</div><div class="ch-mode">hype · phrase 14/16</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll">
+      <div class="reg r1"></div>
+      <div class="reg r2"></div>
+      <div class="zine-head">
+        <div class="zine-title">VIBEMIX</div>
+        <div class="zine-meta"><div class="zine-issue">Issue 047 · live</div><div class="zine-date">22:14 · Berlin · Wed</div></div>
+      </div>
+      <div class="strip">
+        <div class="strip-cell"><div class="strip-label">BPM</div><div class="strip-value">130.0</div><div class="strip-sub">held 4 bars</div></div>
+        <div class="strip-cell pink"><div class="strip-label">KEY</div><div class="strip-value">8A → 9A</div><div class="strip-sub">camelot</div></div>
+        <div class="strip-cell yel"><div class="strip-label">HEAT</div><div class="strip-value">0.78</div><div class="strip-sub">rising</div></div>
+        <div class="strip-cell"><div class="strip-label">PHRASE</div><div class="strip-value">14 / 16</div><div class="strip-sub">2 to fold</div></div>
+        <div class="strip-cell pink"><div class="strip-label">PERSONA</div><div class="strip-value">HYPE</div><div class="strip-sub">ears open</div></div>
+      </div>
+      <section class="hero">
+        <div class="hero-kicker">co-host live read</div>
+        <h1 class="hero-line">That low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></h1>
+        <div class="hero-strap">A four-bar sub-bass crest at +3.2 dB. The room committed at phrase 13. Eight bars of kick before the filter return.</div>
+      </section>
+      <div class="print-rule"><span>evidence</span></div>
+      <div class="phr">
+        <span class="phr-l">phrase</span>
+        <span class="phr-n">12</span>
+        <div class="phr-bar">
+          <span class="phr-cell fired"></span><span class="phr-cell fired"></span><span class="phr-cell fired"></span><span class="phr-cell fired"></span>
+          <span class="phr-cell fired"></span><span class="phr-cell fired"></span><span class="phr-cell fired"></span><span class="phr-cell fired"></span>
+          <span class="phr-cell fired"></span><span class="phr-cell fired"></span><span class="phr-cell fired"></span><span class="phr-cell fired"></span>
+          <span class="phr-cell fired"></span><span class="phr-cell current"></span><span class="phr-cell"></span><span class="phr-cell"></span>
+        </div>
+        <span class="phr-n">16</span>
+      </div>
+      <div class="dispatch">
+        <div class="dis-stamp"><div class="dis-stamp-l">KICK 60Hz</div><div class="dis-stamp-v">+3.2dB</div><div class="dis-stamp-s">4 bars · locked</div></div>
+        <div class="dis-body"><div class="dis-body-head">Sub-bass crest detected</div><div class="dis-body-text"><b>Sub-bass gain rose 3.2 dB</b> across four bars (02:11 → 02:15). Hi-hat ghost gained definition. The floor committed at phrase 13.</div></div>
+        <div class="dis-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="print-rule"><span>next up</span></div>
+      <div class="queue">
+        <div class="queue-banner"><span>Set list · queue</span><span class="queue-banner-r">3 ready · live</span></div>
+        <div class="q-row lead">
+          <div class="q-num">01</div>
+          <div class="q-body"><div class="q-name">Vox Dust II</div><div class="q-artist">SHRIM · the dust album</div></div>
+          <div class="q-bpm">130</div>
+          <div class="q-cam">9A</div>
+          <div class="q-chev">▶</div>
+          <div class="q-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up. He'll feel it inside two bars.</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">02</div>
+          <div class="q-body"><div class="q-name">Marrow (VTSS rmx)</div><div class="q-artist">Tygapaw · Marrow</div></div>
+          <div class="q-bpm">132</div>
+          <div class="q-cam">10A</div>
+          <div class="q-chev">▶</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">03</div>
+          <div class="q-body"><div class="q-name">Sleeper</div><div class="q-artist">Forester · Untitled.05</div></div>
+          <div class="q-bpm">128</div>
+          <div class="q-cam">8A</div>
+          <div class="q-chev">▶</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">evidence</div>
+    <div class="p-card"><div class="p-cite">02:14 · Kick 60Hz</div><div class="p-text">Low-end opened. <b>Sub gain rose 3.2 dB</b> across four bars.<span class="p-attr">cite locked</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · Phrase 12</div><div class="p-text">Filter sweep started, <b>hi-band fell 8 dB</b>.<span class="p-attr">cite locked</span></div></div>
+    <div class="p-section">predict</div>
+    <div class="p-card"><div class="p-cite">02:30 · Drop-in</div><div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">0.91 conf</span></div></div>
+  </aside>
+</div>
+<div class="studio-status">on press · 47:12</div>
+</body>
+</html>

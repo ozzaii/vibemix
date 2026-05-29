@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m22 · Acid Lemon Punk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400..700&family=Bungee&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A0A0A;--ink-2:#1A1A1A;--ink-3:#262626;
+  --lemon:#E8FF1F;--lemon-2:#F8FF60;
+  --lime:#7AFF40;
+  --magenta:#FF1F88;
+  --cyan:#1FE8FF;
+  --paper:#F8F4DE;
+  --paper-shade:#E8E0BC;
+  --border:rgba(10,10,10,0.20);
+  --chrome-h:28px;--sb-w:228px;--panel-w:272px;
+  --bpm-beat:461ms;
+  --spring:cubic-bezier(0.16,1,0.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Space Grotesk',-apple-system,sans-serif;font-weight:500;font-size:13px;letter-spacing:-0.005em;overflow:hidden}
+body{display:flex;flex-direction:column;position:relative}
+/* halftone yellow background dots */
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at center,var(--lemon) 1px,transparent 2px);background-size:12px 12px;opacity:0.18;pointer-events:none;z-index:0}
+.chrome{height:var(--chrome-h);background:var(--ink);border-bottom:4px solid var(--lemon);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag;z-index:5;color:var(--paper)}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:11px;height:11px;border-radius:50%;background:transparent;border:1.5px solid rgba(248,244,222,0.45)}
+.tl span:nth-child(1){border-color:#FF5F57}.tl span:nth-child(2){border-color:var(--lemon)}.tl span:nth-child(3){border-color:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:400 14px/1 'Bungee';color:var(--lemon);letter-spacing:0.04em;text-transform:uppercase}
+.row{flex:1;display:flex;position:relative;min-height:0;z-index:2}
+/* sidebar */
+.sb{width:var(--sb-w);background:var(--ink);color:var(--paper);display:flex;flex-direction:column;flex-shrink:0;padding:18px 0 14px;position:relative;z-index:3;border-right:4px solid var(--lemon)}
+.brand{padding:0 16px 18px;border-bottom:4px solid var(--magenta);margin-bottom:14px}
+.brand-name{font:400 32px/0.85 'Bungee';color:var(--lemon);letter-spacing:0.018em;text-transform:uppercase}
+.brand-strap{font:800 10px/1 'JetBrains Mono';color:var(--magenta);margin-top:9px;letter-spacing:0.18em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.dot{width:9px;height:9px;background:var(--magenta);box-shadow:0 0 10px var(--magenta);animation:zap var(--bpm-beat) steps(2) infinite}
+@keyframes zap{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(0.9)}}
+.sect{font:800 10px/1 'JetBrains Mono';color:rgba(248,244,222,0.45);letter-spacing:0.22em;text-transform:uppercase;padding:14px 16px 8px;display:flex;align-items:center;gap:8px}
+.sect::before{content:'⚡';color:var(--lemon);font-size:11px}
+.nav{display:flex;flex-direction:column}
+.ni{display:flex;align-items:center;gap:11px;padding:10px 16px;font:700 13px/1 'Space Grotesk';color:rgba(248,244,222,0.80);cursor:pointer;letter-spacing:-0.005em;text-transform:uppercase;position:relative;transition:all 180ms var(--spring)}
+.ni:hover{color:var(--paper);background:rgba(248,244,222,0.06)}
+.ni.active{background:var(--lemon);color:var(--ink);font-weight:800}
+.ni-shortcut{margin-left:auto;font:600 9px/1 'JetBrains Mono';color:rgba(248,244,222,0.32);letter-spacing:0.04em}
+.ni.active .ni-shortcut{color:rgba(10,10,10,0.55)}
+.sess{padding:10px 16px;cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative;border-bottom:2px dashed rgba(248,244,222,0.10)}
+.sess:hover{background:rgba(248,244,222,0.05)}
+.sess.active{background:var(--magenta);color:var(--paper)}
+.sess-name{font:700 13px/1.15 'Space Grotesk';color:var(--paper);letter-spacing:-0.005em;text-transform:uppercase}
+.sess.active .sess-name{color:var(--ink)}
+.sess-meta{font:600 10px/1 'JetBrains Mono';color:rgba(248,244,222,0.45);letter-spacing:0.04em;font-variant-numeric:tabular-nums}
+.sess.active .sess-meta{color:var(--ink)}
+.sb-foot{margin-top:auto;padding:14px 16px;border-top:4px solid var(--lime);display:flex;flex-direction:column;gap:10px}
+.persona{display:flex;gap:0;border:2px solid var(--lemon)}
+.persona-pill{flex:1;padding:9px 0;background:var(--ink);font:800 10px/1 'JetBrains Mono';color:rgba(248,244,222,0.55);letter-spacing:0.10em;text-transform:uppercase;cursor:pointer;text-align:center;border-right:2px solid var(--lemon)}
+.persona-pill:last-child{border-right:0}
+.persona-pill:hover{color:var(--lemon);background:rgba(232,255,31,0.08)}
+.persona-pill.active{background:var(--lemon);color:var(--ink);font-weight:800}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--magenta);color:var(--paper);cursor:pointer;position:relative;box-shadow:3px 3px 0 0 var(--lemon)}
+.ch-dot{width:9px;height:9px;border-radius:50%;background:var(--lemon);box-shadow:0 0 12px var(--lemon)}
+.ch-text{flex:1}
+.ch-state{font:800 11px/1 'JetBrains Mono';color:var(--paper);letter-spacing:0.14em;text-transform:uppercase}
+.ch-mode{font:700 12px/1.1 'Space Grotesk';color:var(--paper);margin-top:2px;letter-spacing:-0.005em;opacity:0.95}
+/* stage */
+.stage{flex:1;position:relative;background:var(--paper);overflow:hidden;color:var(--ink)}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.10) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:32px 56px 60px;z-index:2;display:flex;flex-direction:column;gap:28px}
+/* zigzag stat strip */
+.strip{display:flex;gap:0;background:var(--ink);border:4px solid var(--ink);box-shadow:6px 6px 0 0 var(--lemon)}
+.s-cell{flex:1;padding:18px 22px;border-right:2px solid var(--lemon);display:flex;flex-direction:column;gap:5px;background:var(--ink)}
+.s-cell:last-child{border-right:0}
+.s-cell:nth-child(2){background:var(--magenta);color:var(--paper)}
+.s-cell:nth-child(3){background:var(--lemon);color:var(--ink)}
+.s-cell:nth-child(4){background:var(--cyan);color:var(--ink)}
+.s-label{font:800 9px/1 'JetBrains Mono';letter-spacing:0.20em;text-transform:uppercase;opacity:0.78}
+.s-value{font:400 28px/1 'Bungee';letter-spacing:0.014em;font-variant-numeric:tabular-nums;text-transform:uppercase}
+.s-cell:first-child .s-value,.s-cell:last-child .s-value{color:var(--lemon)}
+.s-sub{font:700 9px/1 'JetBrains Mono';letter-spacing:0.10em;text-transform:uppercase;opacity:0.78}
+/* hero — acid splash */
+.hero{position:relative;padding:36px 36px 32px;background:var(--lemon);border:4px solid var(--ink);box-shadow:8px 8px 0 0 var(--magenta)}
+.hero::before{content:'';position:absolute;top:14px;right:14px;width:60px;height:60px;background:var(--magenta);border-radius:50%;border:3px solid var(--ink);box-shadow:3px 3px 0 0 var(--ink)}
+.hero::after{content:'!';position:absolute;top:14px;right:14px;width:60px;height:60px;display:flex;align-items:center;justify-content:center;font:400 32px/1 'Bungee';color:var(--ink)}
+.hero-kicker{display:inline-flex;align-items:center;gap:10px;padding:6px 12px;background:var(--ink);color:var(--lemon);font:400 12px/1 'Bungee';letter-spacing:0.04em;text-transform:uppercase;margin-bottom:22px}
+.hero-line{font:700 clamp(40px,4.8vw,62px)/1.08 'Space Grotesk';color:var(--ink);letter-spacing:-0.028em;max-width:920px;text-transform:uppercase}
+.hero-line em{font-style:normal;color:var(--magenta);font-weight:800;text-decoration:underline wavy var(--ink);text-decoration-thickness:4px;text-underline-offset:0.14em;font-family:'Bungee';font-weight:400}
+.cite{display:inline-block;vertical-align:0.40em;font:400 0.30em/1 'Bungee';font-style:normal;color:var(--paper);background:var(--ink);letter-spacing:0.04em;padding:4px 8px;font-variant-numeric:tabular-nums;margin-left:0.18em;cursor:pointer;text-transform:uppercase;box-shadow:3px 3px 0 0 var(--magenta)}
+.cite:hover{background:var(--magenta);box-shadow:3px 3px 0 0 var(--ink)}
+.hero-strap{font:600 17px/1.4 'Space Grotesk';color:var(--ink);max-width:680px;margin-top:22px;letter-spacing:-0.005em}
+/* phrase blocks */
+.phrase{display:flex;align-items:center;gap:14px;padding:14px 20px;background:var(--ink);color:var(--paper)}
+.ph-l{font:400 14px/1 'Bungee';color:var(--lemon);letter-spacing:0.04em;text-transform:uppercase}
+.ph-n{font:800 12px/1 'JetBrains Mono';color:var(--paper);font-variant-numeric:tabular-nums}
+.ph-bar{flex:1;display:grid;grid-template-columns:repeat(16,1fr);gap:3px;height:24px}
+.ph-cell{background:rgba(248,244,222,0.10)}
+.ph-cell.fired{background:var(--lemon)}
+.ph-cell.current{background:var(--magenta);box-shadow:0 0 12px var(--magenta);animation:zap var(--bpm-beat) steps(2) infinite}
+/* dispatch */
+.dispatch{display:grid;grid-template-columns:200px 1fr 200px;background:var(--paper-shade);border:4px solid var(--ink);box-shadow:8px 8px 0 0 var(--lime);position:relative}
+.dis-stamp{padding:20px 18px;border-right:4px solid var(--ink);display:flex;flex-direction:column;gap:5px;background:var(--magenta);color:var(--paper)}
+.dis-stamp-l{font:800 10px/1 'JetBrains Mono';letter-spacing:0.18em;text-transform:uppercase}
+.dis-stamp-v{font:400 32px/1 'Bungee';letter-spacing:0.014em;font-variant-numeric:tabular-nums;text-transform:uppercase}
+.dis-stamp-s{font:800 10px/1 'JetBrains Mono';letter-spacing:0.10em;text-transform:uppercase;opacity:0.85}
+.dis-body{padding:20px 22px;display:flex;flex-direction:column;gap:8px;justify-content:center}
+.dis-head{font:400 22px/1.1 'Bungee';color:var(--ink);letter-spacing:0.014em;text-transform:uppercase}
+.dis-text{font:600 13px/1.5 'Space Grotesk';color:var(--ink);letter-spacing:-0.005em}
+.dis-text b{background:var(--lemon);padding:0 4px;font-weight:800}
+.dis-wave{padding:20px 18px;border-left:4px solid var(--ink);display:flex;align-items:center;gap:2px;background:var(--ink)}
+.dis-wave span{flex:1;background:var(--lemon)}
+.dis-wave span:nth-child(odd){background:var(--magenta)}
+.dis-wave span:nth-child(1){height:30%}.dis-wave span:nth-child(2){height:55%}.dis-wave span:nth-child(3){height:85%}.dis-wave span:nth-child(4){height:70%}.dis-wave span:nth-child(5){height:45%}.dis-wave span:nth-child(6){height:65%}.dis-wave span:nth-child(7){height:90%}.dis-wave span:nth-child(8){height:60%}.dis-wave span:nth-child(9){height:38%}.dis-wave span:nth-child(10){height:55%}.dis-wave span:nth-child(11){height:75%}.dis-wave span:nth-child(12){height:40%}.dis-wave span:nth-child(13){height:65%}.dis-wave span:nth-child(14){height:30%}
+/* queue */
+.queue-head{padding:16px 22px;background:var(--magenta);color:var(--paper);display:flex;align-items:center;justify-content:space-between;border:4px solid var(--ink);border-bottom:0;box-shadow:6px 6px 0 0 var(--lemon)}
+.qh-l{font:400 26px/1 'Bungee';letter-spacing:0.014em;text-transform:uppercase}
+.qh-r{font:800 11px/1 'JetBrains Mono';color:var(--lemon);letter-spacing:0.18em;text-transform:uppercase;text-shadow:0 0 6px rgba(232,255,31,0.5)}
+.q-row{display:grid;grid-template-columns:50px 1fr 80px 60px;gap:18px;padding:16px 22px;background:var(--paper);border:4px solid var(--ink);border-top:0;border-bottom:2px dashed var(--ink);cursor:pointer;align-items:center;box-shadow:6px 6px 0 0 var(--lemon)}
+.q-row:nth-child(3){box-shadow:6px 6px 0 0 var(--cyan)}
+.q-row:nth-child(4){box-shadow:6px 6px 0 0 var(--lime)}
+.q-row:last-child{border-bottom:4px solid var(--ink)}
+.q-row:hover{background:var(--lemon)}
+.q-row.lead{padding:22px 22px;grid-template-rows:auto auto;background:var(--lemon)}
+.q-row.lead:hover{background:var(--lemon-2)}
+.q-num{font:400 22px/1 'Bungee';color:var(--magenta);letter-spacing:0.014em;font-variant-numeric:tabular-nums;align-self:start;padding-top:3px;text-transform:uppercase}
+.q-body{display:flex;flex-direction:column;gap:3px}
+.q-name{font:700 16px/1.15 'Space Grotesk';color:var(--ink);letter-spacing:-0.005em;text-transform:uppercase}
+.q-row.lead .q-name{font:400 32px/1.04 'Bungee';letter-spacing:0.014em}
+.q-artist{font:700 11px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.04em;text-transform:uppercase}
+.q-reason{grid-column:2/-1;font:600 14px/1.45 'Space Grotesk';color:var(--ink);margin-top:10px;letter-spacing:-0.005em;max-width:580px;padding:10px 14px;background:var(--paper);border:2px solid var(--ink);box-shadow:3px 3px 0 0 var(--magenta);font-style:italic}
+.q-bpm{font:400 18px/1 'Bungee';color:var(--ink);letter-spacing:0.014em;font-variant-numeric:tabular-nums;text-align:right;text-transform:uppercase}
+.q-cam{font:400 18px/1 'Bungee';color:var(--magenta);letter-spacing:0.014em;font-variant-numeric:tabular-nums;text-align:right;text-transform:uppercase}
+/* panel */
+.panel{width:var(--panel-w);background:var(--ink);color:var(--paper);border-left:4px solid var(--lemon);padding:0;display:flex;flex-direction:column;flex-shrink:0;z-index:2;overflow-y:auto}
+.p-section{font:400 22px/1 'Bungee';color:var(--ink);background:var(--lemon);letter-spacing:0.014em;padding:11px 22px;display:flex;align-items:center;gap:9px;text-transform:uppercase}
+.p-section::before{content:'★';color:var(--magenta);font-size:14px}
+.p-card{padding:14px 22px;border-bottom:2px dashed rgba(248,244,222,0.15);cursor:pointer;transition:all 180ms var(--spring)}
+.p-card:hover{background:rgba(232,255,31,0.08)}
+.p-cite{font:800 10px/1 'JetBrains Mono';color:var(--lemon);letter-spacing:0.12em;font-variant-numeric:tabular-nums;margin-bottom:8px;text-transform:uppercase;text-shadow:0 0 6px rgba(232,255,31,0.4)}
+.p-text{font:600 13px/1.5 'Space Grotesk';color:var(--paper);letter-spacing:-0.005em}
+.p-text b{background:var(--magenta);color:var(--paper);padding:0 4px;font-weight:800}
+.p-attr{display:block;margin-top:8px;font:800 9px/1 'JetBrains Mono';color:rgba(248,244,222,0.45);letter-spacing:0.16em;text-transform:uppercase}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:10px 16px;background:var(--lemon);color:var(--ink);font:400 14px/1 'Bungee';letter-spacing:0.04em;text-transform:uppercase;z-index:60;border:3px solid var(--ink);box-shadow:5px 5px 0 0 var(--magenta)}
+.studio-status::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--magenta);animation:zap var(--bpm-beat) steps(2) infinite}
+</style>
+</head>
+<body>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">VIBEMIX ⚡ ACID ⚡ 22:14</div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="brand"><div class="brand-name">VIBEMIX</div><div class="brand-strap"><span class="dot"></span>acid live</div></div>
+    <div class="sect">channels</div>
+    <nav class="nav">
+      <div class="ni active">Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni">Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni">Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni">Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni">Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tonight</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · 01:47</div></div>
+    <div class="sess"><div class="sess-name">Backroom warmup</div><div class="sess-meta">19:30 · 02:30</div></div>
+    <div class="sb-foot">
+      <div class="persona"><div class="persona-pill active">Hype</div><div class="persona-pill">Coach</div><div class="persona-pill">Tutor</div></div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">live</div><div class="ch-mode">hype · 14/16</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll">
+      <div class="strip">
+        <div class="s-cell"><div class="s-label">BPM</div><div class="s-value">130</div><div class="s-sub">held 4 bars</div></div>
+        <div class="s-cell"><div class="s-label">KEY</div><div class="s-value">8A→9A</div><div class="s-sub">half-step</div></div>
+        <div class="s-cell"><div class="s-label">HEAT</div><div class="s-value">0.78</div><div class="s-sub">rising</div></div>
+        <div class="s-cell"><div class="s-label">PHR</div><div class="s-value">14/16</div><div class="s-sub">2 to fold</div></div>
+        <div class="s-cell"><div class="s-label">RUN</div><div class="s-value">47:12</div><div class="s-sub">on wire</div></div>
+      </div>
+      <div class="hero">
+        <div class="hero-kicker">live read · 02:14</div>
+        <h1 class="hero-line">That low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></h1>
+        <div class="hero-strap">A four-bar sub-bass crest at +3.2 dB. The room committed at phrase 13. Eight bars of kick before the filter return.</div>
+      </div>
+      <div class="phrase">
+        <span class="ph-l">phrase</span>
+        <span class="ph-n">12</span>
+        <div class="ph-bar">
+          <span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span>
+          <span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span>
+          <span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span><span class="ph-cell fired"></span>
+          <span class="ph-cell fired"></span><span class="ph-cell current"></span><span class="ph-cell"></span><span class="ph-cell"></span>
+        </div>
+        <span class="ph-n">16</span>
+      </div>
+      <div class="dispatch">
+        <div class="dis-stamp"><div class="dis-stamp-l">KICK 60Hz</div><div class="dis-stamp-v">+3.2dB</div><div class="dis-stamp-s">4 BARS · LOCKED</div></div>
+        <div class="dis-body"><div class="dis-head">Sub-bass crest!</div><div class="dis-text"><b>Sub-bass gain rose 3.2 dB</b> across four bars (02:11 → 02:15). Hi-hat ghost gained definition. Floor committed at phrase 13.</div></div>
+        <div class="dis-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div>
+        <div class="queue-head"><div class="qh-l">Next up!</div><div class="qh-r">3 ready</div></div>
+        <div class="q-row lead">
+          <div class="q-num">01</div>
+          <div class="q-body"><div class="q-name">Vox Dust ii</div><div class="q-artist">SHRIM · the dust album</div></div>
+          <div class="q-bpm">130</div>
+          <div class="q-cam">9A</div>
+          <div class="q-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up.</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">02</div>
+          <div class="q-body"><div class="q-name">Marrow (VTSS rmx)</div><div class="q-artist">Tygapaw · Marrow</div></div>
+          <div class="q-bpm">132</div>
+          <div class="q-cam">10A</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">03</div>
+          <div class="q-body"><div class="q-name">Sleeper</div><div class="q-artist">Forester · Untitled.05</div></div>
+          <div class="q-bpm">128</div>
+          <div class="q-cam">8A</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">evidence!</div>
+    <div class="p-card"><div class="p-cite">02:14 · kick 60Hz</div><div class="p-text">Low-end opened — <b>sub gain rose 3.2 dB</b> across four bars.<span class="p-attr">cite locked</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · phrase 12</div><div class="p-text">Filter sweep started, <b>hi-band fell 8 dB</b>.<span class="p-attr">cite locked</span></div></div>
+    <div class="p-section">next!</div>
+    <div class="p-card"><div class="p-cite">02:30 · drop-in</div><div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">0.91 conf</span></div></div>
+  </aside>
+</div>
+<div class="studio-status">live ⚡ 47:12</div>
+</body>
+</html>

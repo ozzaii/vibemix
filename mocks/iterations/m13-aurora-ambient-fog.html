@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m13 · Aurora Ambient Fog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400..600&family=JetBrains+Mono:wght@400..500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void-0:#0D0F18;--void-3:#141622;--void-6:#1C1F2D;
+  --ink-0:rgba(248,246,255,0.96);--ink-1:rgba(248,246,255,0.75);--ink-2:rgba(248,246,255,0.50);--ink-3:rgba(248,246,255,0.28);--ink-4:rgba(248,246,255,0.12);
+  --rose:#FFB6E3;--rose-soft:#FFD1EF;--rose-deep:#FF82C8;
+  --teal:#A7F3E9;--teal-soft:#D5F8F2;
+  --violet:#C4B8FF;--violet-soft:#DBD3FF;
+  --gold:#F8E5A8;--gold-soft:#FCF2D0;
+  --border:rgba(248,246,255,0.06);--border-strong:rgba(248,246,255,0.16);
+  --chrome-h:28px;--sb-w:212px;--panel-w:268px;
+  --spring:cubic-bezier(0.16,1,0.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--void-0);color:var(--ink-1);font-family:'Inter',-apple-system,sans-serif;letter-spacing:-0.008em;overflow:hidden}
+body{display:flex;flex-direction:column;position:relative}
+/* ambient gradient mesh — slowly drifting */
+.fog-1{position:fixed;inset:-10%;pointer-events:none;z-index:0;background:radial-gradient(ellipse 50% 50% at 20% 25%,rgba(255,182,227,0.42),transparent 60%);filter:blur(60px);animation:drift-a 28s ease-in-out infinite}
+.fog-2{position:fixed;inset:-10%;pointer-events:none;z-index:0;background:radial-gradient(ellipse 55% 45% at 75% 30%,rgba(167,243,233,0.30),transparent 65%);filter:blur(80px);animation:drift-b 32s ease-in-out infinite}
+.fog-3{position:fixed;inset:-10%;pointer-events:none;z-index:0;background:radial-gradient(ellipse 40% 60% at 60% 80%,rgba(196,184,255,0.28),transparent 55%);filter:blur(70px);animation:drift-c 36s ease-in-out infinite}
+.fog-4{position:fixed;inset:-10%;pointer-events:none;z-index:0;background:radial-gradient(ellipse 35% 35% at 15% 75%,rgba(248,229,168,0.18),transparent 60%);filter:blur(60px);animation:drift-d 40s ease-in-out infinite}
+@keyframes drift-a{0%,100%{transform:translate(0,0)}50%{transform:translate(4%,3%)}}
+@keyframes drift-b{0%,100%{transform:translate(0,0)}50%{transform:translate(-3%,4%)}}
+@keyframes drift-c{0%,100%{transform:translate(0,0)}50%{transform:translate(5%,-3%)}}
+@keyframes drift-d{0%,100%{transform:translate(0,0)}50%{transform:translate(-4%,-2%)}}
+.veil{position:fixed;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse 130% 110% at 50% 50%,transparent 30%,rgba(13,15,24,0.45) 100%);mix-blend-mode:multiply}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:99;opacity:0.04;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.chrome{height:var(--chrome-h);background:rgba(13,15,24,0.50);backdrop-filter:blur(30px) saturate(140%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag;z-index:5}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:11px;height:11px;border-radius:50%;background:transparent;border:1.5px solid rgba(248,246,255,0.30)}
+.tl span:nth-child(1){border-color:#FF5F57}.tl span:nth-child(2){border-color:#FEBC2E}.tl span:nth-child(3){border-color:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:400 12px/1 'Fraunces';font-variation-settings:"opsz" 14;color:var(--ink-2);letter-spacing:0;font-style:italic}
+.row{flex:1;display:flex;position:relative;min-height:0;z-index:2}
+/* sidebar — no chrome, all ambient */
+.sb{width:var(--sb-w);background:rgba(13,15,24,0.35);backdrop-filter:blur(40px) saturate(140%);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:24px 16px 16px;position:relative;z-index:3}
+.brand{padding:0 4px 22px;margin-bottom:18px;border-bottom:1px solid var(--border)}
+.brand-mark{font:400 28px/0.9 'Fraunces';font-variation-settings:"opsz" 144,"wght" 380;color:var(--ink-0);letter-spacing:-0.04em;font-style:italic}
+.brand-strap{font:400 11px/1 'Fraunces';font-variation-settings:"opsz" 9;color:var(--rose);font-style:italic;margin-top:8px;letter-spacing:0.04em;display:flex;align-items:center;gap:7px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--rose);box-shadow:0 0 14px var(--rose);animation:breath 2.6s ease-in-out infinite}
+@keyframes breath{0%,100%{opacity:0.5;transform:scale(0.9)}50%{opacity:1;transform:scale(1.2)}}
+.sect{font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase;padding:18px 4px 8px}
+.nav{display:flex;flex-direction:column;gap:3px}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 10px;font:400 14px/1 'Fraunces';font-variation-settings:"opsz" 36,"wght" 420;color:var(--ink-1);cursor:pointer;letter-spacing:-0.005em;border-radius:8px;transition:all 240ms var(--spring);position:relative;font-style:italic}
+.ni:hover{color:var(--ink-0);background:rgba(248,246,255,0.04)}
+.ni.active{color:var(--ink-0);background:rgba(255,182,227,0.10)}
+.ni.active::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:2px;background:var(--rose);border-radius:2px;box-shadow:0 0 10px var(--rose)}
+.ni-shortcut{margin-left:auto;font:500 9px/1 'JetBrains Mono';color:var(--ink-4);letter-spacing:0.04em;font-style:normal}
+.sess{padding:10px 10px;cursor:pointer;border-radius:8px;transition:all 240ms var(--spring);display:flex;flex-direction:column;gap:3px;position:relative}
+.sess:hover{background:rgba(248,246,255,0.03)}
+.sess.active{background:rgba(255,182,227,0.08)}
+.sess.active::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:2px;background:var(--rose);border-radius:2px;box-shadow:0 0 10px var(--rose)}
+.sess-name{font:400 14px/1.15 'Fraunces';font-variation-settings:"opsz" 36;color:var(--ink-0);letter-spacing:-0.012em;font-style:italic}
+.sess-meta{font:400 11px/1 'Fraunces';font-variation-settings:"opsz" 9;color:var(--ink-2);font-style:italic}
+.sb-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:11px}
+.persona{display:flex;gap:1px;background:rgba(248,246,255,0.04);padding:2px;border-radius:8px}
+.persona-pill{flex:1;padding:8px 0;background:transparent;font:400 12px/1 'Fraunces';font-variation-settings:"opsz" 24;color:var(--ink-2);letter-spacing:0;cursor:pointer;text-align:center;border-radius:6px;transition:all 200ms var(--spring);font-style:italic}
+.persona-pill:hover{color:var(--ink-0)}
+.persona-pill.active{background:rgba(255,182,227,0.40);color:var(--void-0);font-weight:500;box-shadow:inset 0 1px 0 rgba(255,255,255,0.30)}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:13px 14px;background:linear-gradient(135deg,rgba(255,182,227,0.20),rgba(167,243,233,0.10));backdrop-filter:blur(20px);border:1px solid rgba(255,182,227,0.22);border-radius:14px;cursor:pointer;transition:all 280ms var(--spring);position:relative;overflow:hidden;box-shadow:0 6px 28px rgba(255,182,227,0.16)}
+.cohost-pill:hover{border-color:rgba(255,182,227,0.40);box-shadow:0 8px 36px rgba(255,182,227,0.25)}
+.cohost-pill::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.40),transparent)}
+.ch-dot{width:9px;height:9px;border-radius:50%;background:var(--rose);box-shadow:0 0 18px var(--rose);animation:breath 2.4s ease-in-out infinite}
+.ch-text{flex:1}
+.ch-state{font:400 12px/1.1 'Fraunces';font-variation-settings:"opsz" 24;color:var(--ink-0);letter-spacing:-0.005em;font-style:italic}
+.ch-mode{font:400 11px/1.2 'Fraunces';font-variation-settings:"opsz" 9;color:var(--ink-1);font-style:italic;margin-top:2px}
+/* stage — open ambient */
+.stage{flex:1;position:relative;background:transparent;overflow:hidden}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.18) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:80px 80px 80px;z-index:2;display:flex;flex-direction:column;gap:48px}
+/* scene as breath */
+.breath{display:flex;flex-direction:column;gap:8px}
+.breath-label{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase}
+.breath-row{display:flex;align-items:baseline;gap:24px;flex-wrap:wrap}
+.breath-chip{display:flex;align-items:baseline;gap:6px;font:400 17px/1 'Fraunces';font-variation-settings:"opsz" 24;color:var(--ink-1);font-style:italic;letter-spacing:-0.005em;font-variant-numeric:tabular-nums}
+.breath-chip small{font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.16em;text-transform:uppercase;font-style:normal}
+.breath-chip.rose{color:var(--rose);text-shadow:0 0 18px rgba(255,182,227,0.45)}
+.breath-chip.teal{color:var(--teal);text-shadow:0 0 18px rgba(167,243,233,0.40)}
+.breath-chip.gold{color:var(--gold);text-shadow:0 0 18px rgba(248,229,168,0.40)}
+/* hero — text floating on aurora */
+.hero{position:relative}
+.hero-kicker{font:400 14px/1 'Fraunces';font-variation-settings:"opsz" 18;color:var(--rose);font-style:italic;letter-spacing:0;margin-bottom:22px;text-shadow:0 0 18px rgba(255,182,227,0.50);display:flex;align-items:center;gap:10px}
+.hero-kicker::before{content:'·';font-size:32px;line-height:0;color:var(--rose-soft)}
+.hero-line{font:400 clamp(46px,5.8vw,76px)/1.10 'Fraunces';font-variation-settings:"opsz" 144,"wght" 360;color:var(--ink-0);letter-spacing:-0.024em;max-width:980px;text-shadow:0 2px 32px rgba(0,0,0,0.45),0 0 60px rgba(255,182,227,0.18)}
+.hero-line em{font-style:italic;color:var(--rose);text-shadow:0 0 40px rgba(255,182,227,0.65),0 0 20px rgba(255,182,227,0.45)}
+.cite{display:inline-block;vertical-align:0.42em;font:600 0.18em/1 'JetBrains Mono';font-style:normal;color:var(--teal);letter-spacing:0.10em;padding:5px 10px;background:rgba(167,243,233,0.08);border:1px solid rgba(167,243,233,0.30);border-radius:999px;font-variant-numeric:tabular-nums;margin-left:0.18em;cursor:pointer;transition:all 240ms var(--spring);text-transform:uppercase;text-shadow:0 0 12px rgba(167,243,233,0.5);backdrop-filter:blur(8px)}
+.cite:hover{background:rgba(167,243,233,0.20);border-color:var(--teal)}
+.hero-whisper{font:400 18px/1.5 'Fraunces';font-variation-settings:"opsz" 24;color:var(--ink-2);max-width:680px;margin-top:28px;letter-spacing:-0.005em;font-style:italic}
+/* phrase as breathing wave */
+.wave-line{display:flex;align-items:center;gap:18px}
+.wave-l{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase}
+.wave-n{font:400 14px/1 'Fraunces';font-variation-settings:"opsz" 24;color:var(--ink-1);font-style:italic;font-variant-numeric:tabular-nums}
+.wave-track{flex:1;height:48px;position:relative}
+.wave-track svg{width:100%;height:100%;display:block}
+.wave-track path{stroke:var(--rose);stroke-width:1.5;fill:none;filter:drop-shadow(0 0 8px var(--rose))}
+.wave-track .pulse{fill:var(--rose);filter:drop-shadow(0 0 16px var(--rose));animation:breath 1.6s ease-in-out infinite}
+/* dispatch — minimal whisper card */
+.dispatch{display:grid;grid-template-columns:auto 1fr auto;gap:24px;padding:24px 28px;background:rgba(13,15,24,0.50);backdrop-filter:blur(30px) saturate(140%);border:1px solid rgba(255,182,227,0.20);border-radius:24px;cursor:pointer;transition:all 320ms var(--spring);align-items:center;max-width:760px;box-shadow:0 16px 56px rgba(13,15,24,0.45),inset 0 1px 0 rgba(255,255,255,0.08),0 0 64px rgba(255,182,227,0.10)}
+.dispatch:hover{border-color:rgba(255,182,227,0.40);transform:translateY(-1px);box-shadow:0 20px 64px rgba(13,15,24,0.55),inset 0 1px 0 rgba(255,255,255,0.10),0 0 80px rgba(255,182,227,0.18)}
+.dis-meta{display:flex;flex-direction:column;gap:5px}
+.dis-tag{font:500 10px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.16em;text-transform:uppercase;text-shadow:0 0 8px rgba(255,182,227,0.4)}
+.dis-num{font:400 36px/1 'Fraunces';font-variation-settings:"opsz" 144,"wght" 380;color:var(--ink-0);letter-spacing:-0.024em;font-variant-numeric:tabular-nums;font-style:italic}
+.dis-wave{display:flex;align-items:center;gap:2px;height:34px}
+.dis-wave span{flex:1;background:var(--rose);border-radius:1px;opacity:0.7;box-shadow:0 0 4px rgba(255,182,227,0.4)}
+.dis-wave span:nth-child(1){height:30%}.dis-wave span:nth-child(2){height:55%}.dis-wave span:nth-child(3){height:85%}.dis-wave span:nth-child(4){height:70%}.dis-wave span:nth-child(5){height:45%}.dis-wave span:nth-child(6){height:65%}.dis-wave span:nth-child(7){height:90%}.dis-wave span:nth-child(8){height:60%}.dis-wave span:nth-child(9){height:38%}.dis-wave span:nth-child(10){height:55%}.dis-wave span:nth-child(11){height:75%}.dis-wave span:nth-child(12){height:40%}.dis-wave span:nth-child(13){height:65%}.dis-wave span:nth-child(14){height:30%}.dis-wave span:nth-child(15){height:50%}.dis-wave span:nth-child(16){height:42%}.dis-wave span:nth-child(17){height:68%}.dis-wave span:nth-child(18){height:35%}
+.dis-detail{font:400 12px/1.4 'Fraunces';font-variation-settings:"opsz" 14;color:var(--ink-2);text-align:right;font-style:italic;font-variant-numeric:tabular-nums}
+.dis-detail b{color:var(--ink-0);font-weight:500}
+/* queue — gentle list */
+.queue-title{font:400 36px/1 'Fraunces';font-variation-settings:"opsz" 144,"wght" 360;color:var(--ink-0);letter-spacing:-0.022em;font-style:italic;margin-bottom:24px;display:flex;align-items:baseline;gap:18px}
+.queue-title small{font:500 11px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.20em;text-transform:uppercase;font-style:normal;text-shadow:0 0 10px rgba(255,182,227,0.4)}
+.q-row{display:grid;grid-template-columns:40px 1fr 70px 50px;gap:18px;padding:18px 0;border-bottom:1px solid var(--border);cursor:pointer;align-items:center;transition:all 240ms var(--spring)}
+.q-row:hover{background:linear-gradient(90deg,rgba(255,182,227,0.04),transparent 70%);padding-left:14px}
+.q-row.lead{padding:28px 0;grid-template-rows:auto auto;border-bottom:1px solid rgba(255,182,227,0.22)}
+.q-row.lead:hover{background:linear-gradient(90deg,rgba(255,182,227,0.08),transparent 70%);padding-left:14px}
+.q-num{font:400 14px/1 'Fraunces';font-variation-settings:"opsz" 24;color:var(--ink-3);font-style:italic;font-variant-numeric:tabular-nums;align-self:start;padding-top:8px}
+.q-row.lead .q-num{color:var(--rose);font-size:18px;text-shadow:0 0 10px rgba(255,182,227,0.4)}
+.q-body{display:flex;flex-direction:column;gap:4px}
+.q-name{font:400 18px/1.2 'Fraunces';font-variation-settings:"opsz" 36;color:var(--ink-0);letter-spacing:-0.012em;font-style:italic}
+.q-row.lead .q-name{font:400 34px/1.05 'Fraunces';font-variation-settings:"opsz" 144,"wght" 400;letter-spacing:-0.024em}
+.q-artist{font:500 11px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.02em}
+.q-reason{grid-column:2/-1;font:400 17px/1.5 'Fraunces';font-variation-settings:"opsz" 24;color:var(--ink-1);margin-top:10px;letter-spacing:-0.005em;max-width:640px;font-style:italic}
+.q-bpm{font:400 16px/1 'Fraunces';font-variation-settings:"opsz" 24;color:var(--ink-1);font-style:italic;font-variant-numeric:tabular-nums;text-align:right}
+.q-cam{font:400 16px/1 'Fraunces';font-variation-settings:"opsz" 24;color:var(--rose);font-style:italic;font-variant-numeric:tabular-nums;text-align:right}
+/* panel */
+.panel{width:var(--panel-w);background:rgba(13,15,24,0.35);backdrop-filter:blur(40px) saturate(140%);border-left:1px solid var(--border);padding:80px 20px 20px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;flex-shrink:0;z-index:2}
+.p-section{font:500 10px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.20em;text-transform:uppercase;padding:0 6px 9px;border-bottom:1px solid var(--border);text-shadow:0 0 8px rgba(255,182,227,0.4)}
+.p-card{padding:0;cursor:pointer;transition:all 240ms var(--spring)}
+.p-card:hover{padding-left:6px}
+.p-cite{font:500 10px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.10em;font-variant-numeric:tabular-nums;margin-bottom:8px;display:flex;align-items:center;gap:7px;text-shadow:0 0 8px rgba(255,182,227,0.4)}
+.p-cite::before{content:'·';font-size:24px;line-height:0;color:var(--rose)}
+.p-text{font:400 15px/1.45 'Fraunces';font-variation-settings:"opsz" 24;color:var(--ink-1);letter-spacing:-0.005em;font-style:italic}
+.p-attr{display:block;margin-top:8px;font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.14em;text-transform:uppercase;font-style:normal}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:11px 18px;background:rgba(13,15,24,0.55);backdrop-filter:blur(30px);border:1px solid rgba(255,182,227,0.30);border-radius:999px;font:400 13px/1 'Fraunces';font-variation-settings:"opsz" 14;color:var(--ink-0);letter-spacing:0;font-style:italic;z-index:60;box-shadow:0 8px 32px rgba(13,15,24,0.45),0 0 32px rgba(255,182,227,0.15)}
+.studio-status::before{content:'';width:7px;height:7px;background:var(--rose);border-radius:50%;box-shadow:0 0 12px var(--rose)}
+</style>
+</head>
+<body>
+<div class="fog-1"></div>
+<div class="fog-2"></div>
+<div class="fog-3"></div>
+<div class="fog-4"></div>
+<div class="veil"></div>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">vibemix · velvet underground</div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="brand"><div class="brand-mark">vibemix</div><div class="brand-strap"><span class="dot"></span>listening</div></div>
+    <div class="sect">surfaces</div>
+    <nav class="nav">
+      <div class="ni active">Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni">Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni">Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni">Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni">Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tonight</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · an hour deep</div></div>
+    <div class="sess"><div class="sess-name">Backroom warmup</div><div class="sess-meta">19:30 · earlier</div></div>
+    <div class="sb-foot">
+      <div class="persona"><div class="persona-pill active">hype</div><div class="persona-pill">coach</div><div class="persona-pill">tutor</div></div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">on the air</div><div class="ch-mode">ears open</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll">
+      <div class="breath">
+        <div class="breath-label">scene</div>
+        <div class="breath-row">
+          <span class="breath-chip"><small>bpm</small>130.0</span>
+          <span class="breath-chip rose"><small>key</small>8A → 9A</span>
+          <span class="breath-chip gold"><small>heat</small>0.78</span>
+          <span class="breath-chip"><small>phrase</small>14 / 16</span>
+        </div>
+      </div>
+      <div class="hero">
+        <div class="hero-kicker">a live read at 02:14</div>
+        <h1 class="hero-line">That low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></h1>
+        <div class="hero-whisper">A four-bar sub-bass crest at +3.2 dB. The room committed at phrase 13. Eight bars of kick before the filter return.</div>
+      </div>
+      <div class="wave-line">
+        <span class="wave-l">phrase</span>
+        <span class="wave-n">12</span>
+        <div class="wave-track">
+          <svg viewBox="0 0 600 48" preserveAspectRatio="none">
+            <path d="M0 24 C 60 20, 100 28, 140 24 S 220 16, 260 24 S 340 32, 380 22 S 460 14, 500 26 L 500 26"/>
+            <circle class="pulse" cx="500" cy="26" r="6"/>
+          </svg>
+        </div>
+        <span class="wave-n">16</span>
+      </div>
+      <div class="dispatch">
+        <div class="dis-meta"><div class="dis-tag">kick 60Hz</div><div class="dis-num">+3.2dB</div></div>
+        <div class="dis-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="dis-detail">02:11 → 02:15<br><b>four bars</b></div>
+      </div>
+      <div>
+        <h2 class="queue-title">Next up <small>— the queue</small></h2>
+        <div class="q-row lead">
+          <div class="q-num">i</div>
+          <div class="q-body"><div class="q-name">Vox Dust ii</div><div class="q-artist">SHRIM · the dust album</div></div>
+          <div class="q-bpm">130</div>
+          <div class="q-cam">9A</div>
+          <div class="q-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up. He'll feel it inside two bars.</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">ii</div>
+          <div class="q-body"><div class="q-name">Marrow (VTSS remix)</div><div class="q-artist">Tygapaw · Marrow</div></div>
+          <div class="q-bpm">132</div>
+          <div class="q-cam">10A</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">iii</div>
+          <div class="q-body"><div class="q-name">Sleeper</div><div class="q-artist">Forester · Untitled.05</div></div>
+          <div class="q-bpm">128</div>
+          <div class="q-cam">8A</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">cited evidence</div>
+    <div class="p-card"><div class="p-cite">02:14 · kick 60Hz</div><div class="p-text">Low-end opened — sub-bass rose 3.2 dB across four bars and held the room.<span class="p-attr">citation locked</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · phrase 12</div><div class="p-text">Filter sweep started, hi-band fell 8 dB.<span class="p-attr">citation locked</span></div></div>
+    <div class="p-section" style="margin-top:8px">likely next cue</div>
+    <div class="p-card"><div class="p-cite">02:30 · drop-in</div><div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">predicted</span></div></div>
+  </aside>
+</div>
+<div class="grain"></div>
+<div class="studio-status">on the air, 47:12 in</div>
+</body>
+</html>

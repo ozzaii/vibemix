@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m02 · Magazine Cover Fraunces</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,200..900,0..100;1,9..144,200..900,0..100&family=Geist+Mono:wght@400..600&family=Geist:wght@400..600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6EFE6;
+  --void-0:#171311;--void-5:#1F1A18;--void-8:#27201C;--void-10:#2F2722;--void-12:#372D27;
+  --ink-0:rgba(248,242,234,0.97);--ink-1:rgba(248,242,234,0.78);--ink-2:rgba(248,242,234,0.54);--ink-3:rgba(248,242,234,0.32);--ink-4:rgba(248,242,234,0.14);
+  --rouge:#E94976;--rouge-soft:#FFA5DF;
+  --rouge-08:rgba(233,73,118,0.08);--rouge-15:rgba(233,73,118,0.15);--rouge-30:rgba(233,73,118,0.30);--rouge-60:rgba(233,73,118,0.60);
+  --gold:#D4A24A;--gold-15:rgba(212,162,74,0.15);
+  --border:rgba(248,242,234,0.10);--border-strong:rgba(248,242,234,0.18);
+  --chrome-h:28px;--sb-w:212px;--panel-w:264px;
+  --spring:cubic-bezier(0.16,1,0.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--void-0);color:var(--ink-1);font-family:'Geist',-apple-system,sans-serif;letter-spacing:-0.005em;overflow:hidden}
+body{display:flex;flex-direction:column}
+.chrome{height:var(--chrome-h);background:linear-gradient(180deg,#211B19 0%,#1A1614 100%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:12px;height:12px;border-radius:50%}
+.tl span:nth-child(1){background:#FF5F57}.tl span:nth-child(2){background:#FEBC2E}.tl span:nth-child(3){background:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:500 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.16em;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.chrome-issue{color:var(--rouge);font:700 10px/1 'Geist Mono';letter-spacing:0.18em}
+.row{flex:1;display:flex;position:relative;min-height:0}
+/* sidebar — masthead of magazine */
+.sb{width:var(--sb-w);background:var(--void-0);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:24px 16px 16px;position:relative;z-index:3}
+.masthead{padding:0 4px 22px;border-bottom:2px solid var(--rouge-30);margin-bottom:18px;position:relative}
+.masthead::after{content:'';position:absolute;bottom:-5px;left:0;width:36%;height:1px;background:var(--rouge)}
+.mh-label{font:700 9px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.22em;text-transform:uppercase;margin-bottom:8px}
+.mh-name{font:400 32px/0.9 'Fraunces';font-variation-settings:"opsz" 144,"SOFT" 100,"wght" 500;color:var(--ink-0);letter-spacing:-0.04em;font-style:italic}
+.mh-strap{font:italic 400 11px/1.2 'Fraunces';font-variation-settings:"opsz" 9;color:var(--ink-2);margin-top:7px;letter-spacing:0.01em}
+.sect{font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase;padding:16px 4px 8px;display:flex;align-items:center;gap:8px}
+.sect::after{content:'';flex:1;height:1px;background:var(--border)}
+.nav{display:flex;flex-direction:column;gap:1px}
+.ni{display:flex;align-items:center;gap:10px;padding:8px 8px;font:500 13px/1 'Fraunces';font-variation-settings:"opsz" 36;color:var(--ink-1);cursor:pointer;transition:all 200ms var(--spring);border-radius:4px;position:relative}
+.ni:hover{color:var(--ink-0);background:var(--rouge-08)}
+.ni.active{color:var(--ink-0);background:var(--rouge-08)}
+.ni.active::before{content:'';position:absolute;left:-16px;top:0;bottom:0;width:3px;background:var(--rouge)}
+.ni-num{font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.04em;width:22px;font-variant-numeric:tabular-nums}
+.ni.active .ni-num{color:var(--rouge)}
+.ni-shortcut{margin-left:auto;font:500 9px/1 'Geist Mono';color:var(--ink-4);letter-spacing:0.04em}
+.sess{padding:9px 8px;cursor:pointer;border-radius:4px;transition:all 200ms var(--spring);position:relative;display:flex;flex-direction:column;gap:3px}
+.sess:hover{background:var(--rouge-08)}
+.sess.active{background:var(--rouge-08)}
+.sess.active::before{content:'';position:absolute;left:-16px;top:9px;bottom:9px;width:3px;background:var(--rouge)}
+.sess-num{font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.04em}
+.sess.active .sess-num{color:var(--rouge)}
+.sess-name{font:italic 400 14px/1.15 'Fraunces';font-variation-settings:"opsz" 36;color:var(--ink-0);letter-spacing:-0.005em}
+.sess-meta{font:500 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.04em}
+.all-bookmark{font:italic 400 12px/1 'Fraunces';color:var(--ink-3);padding:9px 8px;cursor:pointer;transition:color 200ms var(--spring);display:flex;align-items:center;gap:6px}
+.all-bookmark:hover{color:var(--ink-1)}
+.sb-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px}
+.persona{display:flex;gap:1px;background:var(--border);padding:1px;border-radius:6px;overflow:hidden}
+.persona-pill{flex:1;padding:8px 0;background:var(--void-5);font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.10em;text-transform:uppercase;cursor:pointer;text-align:center;transition:all 200ms var(--spring)}
+.persona-pill:hover{color:var(--ink-1)}
+.persona-pill.active{background:var(--rouge);color:#fff;letter-spacing:0.16em}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:11px 12px;background:linear-gradient(180deg,rgba(233,73,118,0.10),rgba(233,73,118,0.04));border:1px solid var(--rouge-15);border-radius:8px;cursor:pointer;transition:all 240ms var(--spring);position:relative;overflow:hidden}
+.cohost-pill:hover{border-color:var(--rouge-30)}
+.cohost-pill::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent)}
+.ch-dot{width:7px;height:7px;border-radius:50%;background:var(--rouge);box-shadow:0 0 12px var(--rouge-60),0 0 4px var(--rouge);animation:pulse 1.6s var(--spring) infinite}
+@keyframes pulse{0%,100%{opacity:0.65;transform:scale(1)}50%{opacity:1;transform:scale(1.18)}}
+.ch-text{flex:1;display:flex;flex-direction:column;gap:1px}
+.ch-state{font:700 10px/1 'Geist Mono';color:var(--ink-0);letter-spacing:0.10em;text-transform:uppercase}
+.ch-mode{font:italic 11px/1.1 'Fraunces';font-variation-settings:"opsz" 9;color:var(--ink-2)}
+/* stage — magazine cover */
+.stage{flex:1;position:relative;background:var(--void-0);overflow:hidden}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.25) 0%,transparent 100%);pointer-events:none;z-index:1}
+.atmos{position:absolute;inset:0;background:radial-gradient(ellipse 1100px 700px at 20% 0%,rgba(233,73,118,0.045),transparent 65%),radial-gradient(ellipse 700px 500px at 90% 90%,rgba(212,162,74,0.03),transparent 60%);pointer-events:none}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:88px 80px 80px 88px;z-index:2}
+/* magazine cover-line */
+.cover-line{display:flex;align-items:baseline;gap:24px;margin-bottom:36px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.cover-issue{font:700 10px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.20em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.cover-issue::after{content:'';width:24px;height:1px;background:var(--rouge);display:inline-block}
+.cover-date{font:italic 400 12px/1 'Fraunces';font-variation-settings:"opsz" 9;color:var(--ink-3)}
+.cover-tags{display:flex;gap:14px;margin-left:auto;font:500 10px/1 'Geist Mono';color:var(--ink-2);letter-spacing:0.06em}
+.cover-tags span{display:flex;align-items:center;gap:5px;font-variant-numeric:tabular-nums}
+.cover-tags .dot{width:3px;height:3px;border-radius:50%;background:var(--ink-3)}
+.cover-tags .v-rouge{color:var(--rouge-soft);font-weight:600}
+.cover-tags .v-gold{color:var(--gold);font-weight:600}
+/* hero — broken grid pull-quote */
+.hero{display:grid;grid-template-columns:1fr 200px;gap:48px;margin-bottom:60px;position:relative}
+.hero-pillar{position:relative}
+.hero-kicker{font:700 11px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.20em;text-transform:uppercase;margin-bottom:24px;display:flex;align-items:center;gap:10px}
+.hero-kicker::before{content:'CO-HOST';padding:3px 8px;background:var(--rouge);color:#fff;border-radius:2px;font:700 9px/1 'Geist Mono';letter-spacing:0.14em}
+.hero-line{font:400 clamp(52px,6vw,84px)/1.02 'Fraunces';font-variation-settings:"opsz" 144,"wght" 380,"SOFT" 100;color:var(--ink-0);letter-spacing:-0.028em;max-width:780px}
+.hero-line .drop{font:400 clamp(108px,11vw,156px)/0.82 'Fraunces';font-variation-settings:"opsz" 144,"wght" 320,"SOFT" 100;color:var(--rouge);float:left;margin:0.04em 0.08em 0 -0.06em;font-style:italic;text-shadow:0 18px 60px rgba(233,73,118,0.20)}
+.hero-line em{font-style:italic;font-variation-settings:"opsz" 144,"wght" 380,"SOFT" 100;color:var(--rouge-soft);position:relative}
+.hero-line em::after{content:'';position:absolute;left:0;right:0;bottom:0.02em;height:0.08em;background:var(--rouge);opacity:0.30;border-radius:1px}
+.cite{font:600 0.20em 'Geist Mono';font-style:normal;vertical-align:0.50em;color:var(--rouge);letter-spacing:0.12em;padding:3px 7px;border:1px solid var(--rouge-30);border-radius:2px;font-variant-numeric:tabular-nums;margin-left:0.18em;cursor:pointer;transition:all 200ms var(--spring);text-transform:uppercase}
+.cite:hover{background:var(--rouge);color:#fff;border-color:var(--rouge)}
+/* hero column right — meta column */
+.hero-col{padding-top:50px;display:flex;flex-direction:column;gap:18px}
+.col-label{font:700 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.col-row{display:flex;justify-content:space-between;font:500 11px/1 'Geist Mono';color:var(--ink-1);letter-spacing:0.04em;font-variant-numeric:tabular-nums}
+.col-row b{color:var(--ink-0);font-weight:600}
+.col-row .v-rouge{color:var(--rouge-soft)}
+.col-row .v-gold{color:var(--gold)}
+.col-quote{font:italic 400 14px/1.45 'Fraunces';font-variation-settings:"opsz" 36;color:var(--ink-2);padding-top:14px;border-top:1px solid var(--border);letter-spacing:0.005em}
+.col-quote .attrib{display:block;margin-top:8px;font:500 9px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.14em;text-transform:uppercase;font-style:normal}
+/* phrase ruler */
+.ruler{display:flex;align-items:center;gap:12px;margin-bottom:60px;max-width:780px}
+.ruler-bar{flex:1;height:2px;background:linear-gradient(90deg,rgba(233,73,118,0.0),rgba(233,73,118,0.4) 65%,rgba(233,73,118,0.25) 100%);position:relative;border-radius:1px}
+.ruler-tick{position:absolute;top:-3px;width:1px;height:8px;background:var(--ink-4)}
+.ruler-tick:nth-child(1){left:0%}.ruler-tick:nth-child(2){left:25%}.ruler-tick:nth-child(3){left:50%}.ruler-tick:nth-child(4){left:75%}
+.ruler-head{position:absolute;top:-5px;left:65%;width:12px;height:12px;border-radius:50%;background:var(--rouge);box-shadow:0 0 0 3px var(--void-0),0 0 18px var(--rouge-60),0 2px 0 rgba(0,0,0,0.5)}
+.ruler-num{font:500 10px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.06em;font-variant-numeric:tabular-nums}
+/* dispatch — receipt as press-byline */
+.dispatch{display:flex;align-items:flex-start;gap:18px;padding:20px 22px 18px;background:var(--void-5);border-top:2px solid var(--rouge);border-radius:2px;max-width:580px;position:relative;cursor:pointer;transition:all 280ms var(--spring)}
+.dispatch:hover{background:var(--void-8)}
+.dispatch-byline{font:700 9px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.20em;text-transform:uppercase;writing-mode:vertical-rl;transform:rotate(180deg);padding-right:4px}
+.dispatch-body{flex:1;display:flex;flex-direction:column;gap:8px}
+.dispatch-head{font:italic 400 17px/1.2 'Fraunces';font-variation-settings:"opsz" 36;color:var(--ink-0);letter-spacing:-0.005em}
+.dispatch-meta{font:500 11px/1.4 'Geist Mono';color:var(--ink-2);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.dispatch-wave{display:flex;align-items:center;gap:1.5px;height:18px;margin-top:6px}
+.dispatch-wave span{width:2px;background:var(--rouge);border-radius:0.5px;opacity:0.7}
+.dispatch-wave span:nth-child(1){height:30%}.dispatch-wave span:nth-child(2){height:55%}.dispatch-wave span:nth-child(3){height:85%}.dispatch-wave span:nth-child(4){height:70%}.dispatch-wave span:nth-child(5){height:40%}.dispatch-wave span:nth-child(6){height:60%}.dispatch-wave span:nth-child(7){height:90%}.dispatch-wave span:nth-child(8){height:60%}.dispatch-wave span:nth-child(9){height:35%}.dispatch-wave span:nth-child(10){height:50%}.dispatch-wave span:nth-child(11){height:75%}.dispatch-wave span:nth-child(12){height:45%}.dispatch-wave span:nth-child(13){height:65%}.dispatch-wave span:nth-child(14){height:30%}.dispatch-wave span:nth-child(15){height:55%}.dispatch-wave span:nth-child(16){height:38%}
+/* next up — index page */
+.idx{margin-top:80px;max-width:920px}
+.idx-head{display:flex;align-items:baseline;gap:18px;padding-bottom:14px;border-bottom:2px solid var(--rouge-30);margin-bottom:24px;position:relative}
+.idx-head::after{content:'';position:absolute;bottom:-3px;left:0;width:80px;height:1px;background:var(--rouge)}
+.idx-title{font:italic 400 30px/1 'Fraunces';font-variation-settings:"opsz" 144,"wght" 420,"SOFT" 80;color:var(--ink-0);letter-spacing:-0.018em}
+.idx-sub{font:700 10px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.18em;text-transform:uppercase}
+.idx-cards{display:flex;flex-direction:column;gap:1px;background:var(--border)}
+.idx-card{display:grid;grid-template-columns:42px 1fr 80px 60px;gap:18px;padding:18px 6px;background:var(--void-0);cursor:pointer;align-items:center;transition:all 200ms var(--spring);position:relative}
+.idx-card:hover{background:var(--void-5);padding-left:14px}
+.idx-card.lead{padding:24px 6px;grid-template-rows:auto auto;background:linear-gradient(180deg,rgba(233,73,118,0.08),rgba(233,73,118,0.02))}
+.idx-card.lead:hover{background:linear-gradient(180deg,rgba(233,73,118,0.12),rgba(233,73,118,0.04))}
+.idx-num{font:700 11px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.06em;font-variant-numeric:tabular-nums;align-self:start;padding-top:6px}
+.idx-card.lead .idx-num{color:var(--rouge);font-size:14px}
+.idx-name{font:500 14px/1.2 'Geist';color:var(--ink-0);letter-spacing:-0.005em}
+.idx-card.lead .idx-name{font:italic 400 26px/1.1 'Fraunces';font-variation-settings:"opsz" 144,"wght" 400,"SOFT" 80;letter-spacing:-0.018em;color:var(--ink-0)}
+.idx-artist{font:500 11px/1.3 'Geist Mono';color:var(--ink-2);letter-spacing:0.02em;margin-top:3px}
+.idx-reason{grid-column:2/-1;font:italic 400 15px/1.45 'Fraunces';font-variation-settings:"opsz" 36;color:var(--ink-2);margin-top:6px;letter-spacing:0.005em;max-width:560px}
+.idx-bpm{font:700 12px/1 'Geist Mono';color:var(--ink-1);letter-spacing:0.04em;font-variant-numeric:tabular-nums;text-align:right}
+.idx-cam{font:700 12px/1 'Geist Mono';color:var(--rouge-soft);letter-spacing:0.04em;font-variant-numeric:tabular-nums;text-align:right}
+/* right panel */
+.panel{width:var(--panel-w);background:var(--void-0);border-left:1px solid var(--border);padding:96px 22px 22px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;flex-shrink:0;z-index:2}
+.p-section{font:700 9px/1 'Geist Mono';color:var(--rouge);letter-spacing:0.22em;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.p-card{padding:14px 0;border-bottom:1px solid var(--border)}
+.p-cite{font:500 10px/1 'Geist Mono';color:var(--rouge-soft);letter-spacing:0.06em;font-variant-numeric:tabular-nums;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.p-cite::before{content:'⁞';color:var(--rouge);font-size:14px}
+.p-text{font:italic 400 15px/1.4 'Fraunces';font-variation-settings:"opsz" 36;color:var(--ink-1);letter-spacing:0.005em}
+.p-attr{display:block;margin-top:6px;font:500 9px/1 'Geist Mono';color:var(--ink-3);letter-spacing:0.10em;text-transform:uppercase;font-style:normal}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:99;opacity:0.045;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 1500px 900px at 50% 30%,transparent,rgba(0,0,0,0.55));z-index:50}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:8px 14px;background:rgba(31,26,24,0.88);backdrop-filter:blur(20px) saturate(140%);border:1px solid var(--border-strong);border-radius:2px;font:700 10px/1 'Geist Mono';color:var(--ink-1);letter-spacing:0.14em;text-transform:uppercase;z-index:60;box-shadow:0 8px 32px rgba(0,0,0,0.45)}
+.studio-status::before{content:'';width:7px;height:7px;background:var(--rouge);border-radius:50%;box-shadow:0 0 8px var(--rouge-60)}
+
+/* ════════════════════ APPLE-ENGINEER POLISH PASS ════════════════════ */
+:root{--bpm-beat:461ms;--bpm-bar:1846ms;--spring-snap:cubic-bezier(0.34,1.56,0.64,1);--spring-soft:cubic-bezier(0.16,1,0.3,1);--ease-out-quart:cubic-bezier(0.165,0.84,0.44,1);--focus-ring:0 0 0 2px var(--void-0),0 0 0 4px var(--rouge)}
+html{scroll-behavior:smooth}
+*{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+::selection{background:var(--rouge);color:var(--void-0);text-shadow:none}
+:focus{outline:0}
+:focus-visible{outline:0;box-shadow:var(--focus-ring);border-radius:4px;transition:box-shadow 120ms var(--ease-out-quart)}
+.ni:focus-visible,.sess:focus-visible,.persona-pill:focus-visible{box-shadow:inset var(--focus-ring),0 0 0 2px var(--rouge)}
+.cite:focus-visible{box-shadow:0 0 0 3px var(--rouge),0 0 0 5px var(--void-0)}
+/* hover lift with spring physics — only on interactive cards */
+.dispatch,.idx-card,.p-card,.sess{transition:background 280ms var(--spring-soft),border-color 280ms var(--spring-soft),transform 380ms var(--spring-snap),padding-left 280ms var(--spring-soft),box-shadow 280ms var(--spring-soft)}
+.dispatch:hover{transform:translateY(-2px)}
+.idx-card:hover{transform:translateX(2px)}
+.p-card:hover{transform:translateX(3px)}
+/* active press */
+.ni:active,.sess:active,.persona-pill:active,.dispatch:active,.idx-card:active,.p-card:active,.cite:active{transform:scale(0.985);transition:transform 80ms var(--ease-out-quart)}
+/* variable-axis font breathing on nav hover — Fraunces opsz subtly grows */
+.ni{transition:all 240ms var(--spring-soft),font-variation-settings 320ms var(--spring-soft)}
+.ni:hover,.sess:hover{font-variation-settings:"opsz" 48,"wght" 480,"SOFT" 80}
+/* text-wrap balance for hero — prevents orphans */
+.hero-line,.idx-title,.queue-title{text-wrap:balance}
+.head-block,.subdeck,.hero-strap,.q-reason,.idx-reason{text-wrap:pretty}
+/* BPM-locked pulse for the live indicator */
+.ear-dot,.dl-dot,.ch-dot,.studio-status::before{animation:bpm-pulse var(--bpm-beat) cubic-bezier(0.4,0,0.6,1) infinite}
+@keyframes bpm-pulse{0%,100%{opacity:0.7;transform:scale(1)}50%{opacity:1;transform:scale(1.15)}}
+/* phrase ruler-head subtly breathes at BPM */
+.ruler-head{animation:bpm-pulse var(--bpm-beat) cubic-bezier(0.4,0,0.6,1) infinite}
+/* smooth cite chip pop on hover */
+.cite{transition:all 240ms var(--spring-snap);transform-origin:center}
+.cite:hover{transform:translateY(-0.04em) scale(1.04)}
+/* drop-cap subtle warm halo on intersection-hover within hero */
+.hero:hover .hero-line .drop{filter:drop-shadow(0 16px 32px rgba(233,73,118,0.30))}
+/* cursor refinement */
+.ni,.sess,.persona-pill,.cohost-pill,.dispatch,.idx-card,.p-card,.cite,.all-bookmark{cursor:pointer}
+/* respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;scroll-behavior:auto !important}
+  .ear-dot,.dl-dot,.ch-dot,.studio-status::before,.ruler-head{animation:none}
+}
+/* tonal scrollbar */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(233,73,118,0.18);border-radius:5px;border:2px solid var(--void-0)}
+::-webkit-scrollbar-thumb:hover{background:rgba(233,73,118,0.30)}
+/* skip-link for keyboard users (offscreen until focused) */
+.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+.skip-link:focus{position:fixed;left:18px;top:42px;width:auto;height:auto;padding:9px 14px;background:var(--rouge);color:#fff;z-index:200;font:700 11px/1 'Geist Mono';letter-spacing:0.14em;text-transform:uppercase;text-decoration:none;border-radius:3px}
+/* optical fix — cite chip vertical-align off by 0.04em */
+.cite{vertical-align:0.52em}
+/* progressive disclosure — panel scroll fade-in */
+.panel{scroll-padding-top:8px}
+/* selection color refinement on text */
+.cohost-line::selection,.head::selection,.pull-text::selection{background:var(--rouge-soft);color:var(--void-0)}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#stage-scroll">Skip to content</a>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta"><span class="chrome-issue">Issue 047</span><span>·</span><span>Session</span></div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="masthead"><div class="mh-label">Co-host quarterly</div><div class="mh-name">vibemix</div><div class="mh-strap">A magazine for the listening DJ.</div></div>
+    <div class="sect">Sections</div>
+    <nav class="nav">
+      <div class="ni active"><span class="ni-num">01</span>Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni"><span class="ni-num">02</span>Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni"><span class="ni-num">03</span>Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni"><span class="ni-num">04</span>Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni"><span class="ni-num">05</span>Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">Tonight's run</div>
+    <div class="sess active"><div class="sess-num">A1</div><div class="sess-name">Velvet Underground set</div><div class="sess-meta">22:14 · 1h 47m</div></div>
+    <div class="sess"><div class="sess-num">A2</div><div class="sess-name">Backroom warmup</div><div class="sess-meta">19:30 · 2h 30m</div></div>
+    <div class="all-bookmark">── archives ›</div>
+    <div class="sb-foot">
+      <div class="persona">
+        <div class="persona-pill active">Hype</div>
+        <div class="persona-pill">Coach</div>
+        <div class="persona-pill">Tutor</div>
+      </div>
+      <div class="cohost-pill">
+        <span class="ch-dot"></span>
+        <div class="ch-text"><div class="ch-state">On the wire</div><div class="ch-mode">hype mode, ears open</div></div>
+      </div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="atmos"></div>
+    <div class="stage-scroll" id="stage-scroll" tabindex="-1">
+      <div class="cover-line">
+        <span class="cover-issue">Issue 047 · Tonight</span>
+        <span class="cover-date">Wed · 22:14 CET</span>
+        <div class="cover-tags">
+          <span>BPM <b style="color:var(--ink-0)">130</b></span><span class="dot"></span>
+          <span class="v-rouge">8A → 9A</span><span class="dot"></span>
+          <span class="v-gold">HEAT 0.78</span><span class="dot"></span>
+          <span>PHRASE 14/16</span>
+        </div>
+      </div>
+      <div class="hero">
+        <div class="hero-pillar">
+          <div class="hero-kicker"><span>02:14</span><span style="color:var(--ink-3)">live read</span></div>
+          <div class="hero-line"><span class="drop">T</span>hat low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></div>
+        </div>
+        <div class="hero-col">
+          <div class="col-label">Scene</div>
+          <div class="col-row"><span>BPM</span><b>130.0</b></div>
+          <div class="col-row"><span>Key</span><span class="v-rouge"><b>8A → 9A</b></span></div>
+          <div class="col-row"><span>Heat</span><span class="v-gold"><b>0.78</b></span></div>
+          <div class="col-row"><span>Phrase</span><b>14 / 16</b></div>
+          <div class="col-quote">"He's been on this kick for three bars — it's earned its breath."<span class="attrib">— vibemix · 02:14</span></div>
+        </div>
+      </div>
+      <div class="ruler">
+        <span class="ruler-num">12</span>
+        <div class="ruler-bar"><span class="ruler-tick"></span><span class="ruler-tick"></span><span class="ruler-tick"></span><span class="ruler-tick"></span><div class="ruler-head"></div></div>
+        <span class="ruler-num">16</span>
+      </div>
+      <div class="dispatch">
+        <div class="dispatch-byline">Dispatch</div>
+        <div class="dispatch-body">
+          <div class="dispatch-head">Kick 60Hz · sub gain +3.2 dB across four bars</div>
+          <div class="dispatch-meta">02:11 → 02:15 · evidence locked · phrase 12 → 14</div>
+          <div class="dispatch-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+      </div>
+      <section class="idx">
+        <div class="idx-head"><div class="idx-title">Next up</div><div class="idx-sub">Set list · queue</div></div>
+        <div class="idx-cards">
+          <div class="idx-card lead">
+            <div class="idx-num">01</div>
+            <div>
+              <div class="idx-name">Vox Dust ii</div>
+              <div class="idx-artist">SHRIM · the dust album</div>
+            </div>
+            <div class="idx-bpm">130</div>
+            <div class="idx-cam">9A</div>
+            <div class="idx-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up. He'll feel it inside two bars.</div>
+          </div>
+          <div class="idx-card">
+            <div class="idx-num">02</div>
+            <div><div class="idx-name">Marrow (VTSS remix)</div><div class="idx-artist">Tygapaw · pres. Marrow</div></div>
+            <div class="idx-bpm">132</div>
+            <div class="idx-cam">10A</div>
+          </div>
+          <div class="idx-card">
+            <div class="idx-num">03</div>
+            <div><div class="idx-name">Sleeper</div><div class="idx-artist">Forester · Untitled.05</div></div>
+            <div class="idx-bpm">128</div>
+            <div class="idx-cam">8A</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">Evidence locker</div>
+    <div class="p-card"><div class="p-cite">02:14 · Kick 60Hz</div><div class="p-text">Low-end opened up — sub gain rose 3.2 dB across four bars and held the room.<span class="p-attr">Citation locked</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · Phrase 12</div><div class="p-text">Filter sweep started, hi-band fell 8 dB, the room leaned forward.<span class="p-attr">Citation locked</span></div></div>
+    <div class="p-section" style="margin-top:14px">Likely next move</div>
+    <div class="p-card"><div class="p-cite">02:30 · Drop-in</div><div class="p-text">Incoming downbeat at phrase 16, BPM held. Don't break it.<span class="p-attr">Predicted</span></div></div>
+  </aside>
+</div>
+<div class="grain"></div>
+<div class="vignette"></div>
+<div class="studio-status">Studio live · 47:12</div>
+</body>
+</html>

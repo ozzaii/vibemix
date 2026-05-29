@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>vibemix — premium sexy session (sketch)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    /* ====================================================================
+       PREMIUM SEXY SESSION — sketch / not production
+       --------------------------------------------------------------------
+       The thesis: vibemix's moat is grounded AI. Every other AI UI today is
+       text chips and gradient text. Vibemix should be the only one where
+       the AI literally DRAWS its evidence with each reaction.
+
+       Reference triangulation (not Pioneer alone):
+         Apple Liquid Glass · Stripe Press editorial · Pioneer hardware ·
+         Linear focal density · cinematic ambient motion.
+
+       Differences from v5 CDJ Whisper:
+         1. Asymmetric Z-anchor composition (hero upper-left, not centered)
+         2. Cite-chip = drawn evidence (mini-waveform of cited 200ms,
+            inline). The graphic IS the receipt, not a label.
+         3. Variable-axis breathing on cohost line — wght responds to AI
+            confidence. Type lives. Apple does this with SF Pro on
+            visionOS; we do it with Saira on the deck.
+         4. BPM-synced ambient — status-row amber pulse syncs the actual
+            detected BPM. The room is in time with itself.
+         5. Mood-curve body tint — barely-perceptible OKLCH drift on the
+            void atmosphere as mood vector moves. Subliminal.
+         6. Hung punctuation + drop cap on cohost line. Editorial.
+         7. Visible restart in fault. Subagent P0 fold-in.
+         8. Gemini badge present. Subagent P1 fold-in.
+         9. Hotkey hint surfaced on rail. Subagent P1 fold-in.
+       ==================================================================== */
+
+    @import url('https://fonts.googleapis.com/css2?family=Saira:wdth,wght@75..125,300..800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      /* OKLCH-aware void stack (anti-pure-black at perception level via
+         vignette + grain; literal floor stays #000 per anti-slop ignore). */
+      --void:     #000000;
+      --void-1:   oklch(8% 0.005 270);
+      --void-2:   oklch(11% 0.008 260);
+      --void-3:   oklch(14% 0.010 250);
+
+      --silk:     #d6cfc7;
+      --silk-80:  rgba(214, 207, 199, 0.80);
+      --silk-65:  rgba(214, 207, 199, 0.65);
+      --silk-40:  rgba(214, 207, 199, 0.40);
+      --silk-22:  rgba(214, 207, 199, 0.22);
+      --silk-12:  rgba(214, 207, 199, 0.12);
+
+      --amber:        oklch(73% 0.18 55);
+      --amber-pale:   oklch(83% 0.13 60);
+      --amber-deep:   oklch(63% 0.20 45);
+      --amber-22:     oklch(73% 0.18 55 / 0.22);
+      --amber-40:     oklch(73% 0.18 55 / 0.40);
+      --amber-65:     oklch(73% 0.18 55 / 0.65);
+
+      /* Status spectrum — never as fills, always as 1px+glow indicators */
+      --led-ok:    oklch(72% 0.16 145);
+      --led-warn:  oklch(80% 0.15 90);
+      --led-fault: oklch(60% 0.20 25);
+
+      --glass-1:  oklch(11% 0.008 260 / 0.78);
+      --glass-2:  oklch(12% 0.010 255 / 0.62);
+      --glass-3:  oklch(7% 0.005 265 / 0.88);
+      --glass-edge: rgba(255, 255, 255, 0.065);
+      --glass-top:  rgba(255, 255, 255, 0.055);
+
+      --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+      --sp-5: 24px; --sp-6: 40px; --sp-7: 64px; --sp-8: 96px;
+
+      --type-display: "Saira", system-ui, sans-serif;
+      --type-body:    "Saira", system-ui, sans-serif;
+      --type-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+      /* BPM-synced motion budget — overridden by JS in production from
+         the live MusicState BPM. 128bpm = 0.469s per beat = the pulse base. */
+      --bpm-beat: 0.469s;        /* 128bpm default */
+      --bpm-bar:  1.875s;        /* 4 beats */
+      --bpm-phrase: 30s;         /* 8 bars at 128bpm */
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :root { --bpm-beat: 0s; --bpm-bar: 0s; --bpm-phrase: 0s; }
+    }
+
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      background: var(--void);
+      color: var(--silk);
+      font-family: var(--type-body);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+      /* Mood-curve body tint — barely perceptible OKLCH drift. In
+         production this animates with the detected mood vector. */
+      background-image:
+        radial-gradient(60% 40% at 22% 18%, oklch(40% 0.08 290 / 0.06), transparent 60%),
+        radial-gradient(50% 35% at 84% 78%, oklch(50% 0.06 200 / 0.04), transparent 60%),
+        radial-gradient(40% 30% at 70% 10%, oklch(45% 0.07 30 / 0.025), transparent 60%);
+      animation: mood-drift 90s ease-in-out infinite alternate;
+    }
+    @keyframes mood-drift {
+      from { background-position: 0% 0%, 0% 0%, 0% 0%; }
+      to   { background-position: 4% -3%, -3% 4%, 2% 2%; }
+    }
+    /* Film grain — physical material */
+    body::before {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 99;
+      background-image:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence baseFrequency='0.82' numOctaves='2' seed='9'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.025 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      mix-blend-mode: overlay;
+    }
+
+    /* ============================================================
+       LAYOUT — asymmetric Z-anchor, NOT centered
+       Hero cohost line sits upper-third-left (Z-pattern primary
+       reading anchor). Deck readouts in lower-right. Negative
+       space along the diagonal IS material — Apple Vision tier
+       breathing room.
+       ============================================================ */
+    .app {
+      position: relative;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: clamp(20px, 2.5vh, 32px) clamp(28px, 4vw, 56px);
+      gap: clamp(16px, 2vh, 24px);
+    }
+
+    /* ============================================================
+       TITLEBAR — minimal chrome, drag region
+       ============================================================ */
+    .head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--sp-5);
+    }
+    .mark {
+      font-family: var(--type-display);
+      font-variation-settings: "wdth" 85, "wght" 700;
+      font-size: 14px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--silk);
+    }
+    .mark::after {
+      content: "·";
+      margin-left: 0.4em;
+      color: var(--amber);
+      animation: beat var(--bpm-beat) ease-out infinite;
+    }
+    @keyframes beat {
+      0%   { opacity: 1; text-shadow: 0 0 6px var(--amber-65), 0 0 12px var(--amber-22); }
+      40%  { opacity: 0.85; text-shadow: 0 0 4px var(--amber-40); }
+      100% { opacity: 0.6; text-shadow: none; }
+    }
+    .head-meta {
+      display: flex;
+      gap: var(--sp-5);
+      align-items: baseline;
+      font-family: var(--type-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: var(--silk-40);
+      text-transform: uppercase;
+    }
+    .head-meta b { color: var(--silk); font-weight: 500; font-feature-settings: "tnum"; }
+    .head-meta .led { display: inline-flex; align-items: center; gap: 6px; }
+    .head-meta .led::before {
+      content: "";
+      width: 5px; height: 5px; border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 4px currentColor;
+    }
+    .led--ok    { color: var(--led-ok); }
+    .led--warn  { color: var(--led-warn); }
+    .led--fault { color: var(--led-fault); }
+    .led--amber { color: var(--amber); }
+
+    /* ============================================================
+       STAGE — the hero is OFF-CENTER. The Z-anchor.
+       ============================================================ */
+    .stage {
+      display: grid;
+      grid-template-columns: minmax(0, 64fr) minmax(0, 36fr);
+      grid-template-rows: auto 1fr;
+      gap: clamp(40px, 7vh, 96px) clamp(32px, 5vw, 72px);
+      align-items: start;
+    }
+
+    /* The cohost line — variable-axis breathing with AI confidence.
+       In production --conf is updated 30Hz from the grounding score.
+       Here we animate it to show the effect. */
+    .voice {
+      grid-column: 1;
+      grid-row: 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-4);
+      --conf: 0.85;
+    }
+    .voice-ghost {
+      font-size: 16px;
+      font-variation-settings: "wdth" 100, "wght" 400;
+      color: var(--silk-22);
+      font-style: italic;
+      letter-spacing: -0.005em;
+      max-width: 32ch;
+    }
+    .voice-now {
+      font-family: var(--type-display);
+      /* Variable-axis breathing — wght responds to AI confidence */
+      font-variation-settings: "wdth" calc(82 + var(--conf) * 8),
+                               "wght" calc(380 + var(--conf) * 200);
+      font-size: clamp(34px, 4.2vw, 56px);
+      line-height: 1.06;
+      letter-spacing: -0.018em;
+      color: var(--silk);
+      max-width: 22ch;
+      text-wrap: balance;
+      animation: breathe-confidence var(--bpm-phrase) ease-in-out infinite alternate;
+      /* Hung punctuation — apostrophes/quotes float into negative space */
+      hanging-punctuation: first last;
+    }
+    /* The drop cap — editorial restraint. The first letter sits at
+       18pt taller and 0.8 baseline relative to the rest of the line.
+       Stripe Press / NYT Magazine register. */
+    .voice-now::first-letter {
+      font-variation-settings: "wdth" 75, "wght" calc(580 + var(--conf) * 200);
+      letter-spacing: -0.04em;
+      margin-right: 0.02em;
+    }
+    .voice-now em {
+      font-style: italic;
+      font-variation-settings: "wdth" 110, "wght" 480;
+      color: var(--silk);
+    }
+    @keyframes breathe-confidence {
+      from { font-variation-settings: "wdth" 88, "wght" 540; }
+      to   { font-variation-settings: "wdth" 92, "wght" 580; }
+    }
+
+    /* ============================================================
+       THE RECEIPT — premium-sexy crown jewel
+       The cite-chip DRAWS the cited audio moment.
+       This is the moat made visible.
+       ============================================================ */
+    .receipt {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-3);
+      align-self: flex-start;
+      padding: 6px var(--sp-3) 6px var(--sp-2);
+      background: linear-gradient(180deg,
+        rgba(255, 138, 61, 0.06) 0%,
+        rgba(255, 138, 61, 0.015) 100%),
+        var(--glass-3);
+      border: 1px solid var(--amber-22);
+      border-radius: 4px;
+      box-shadow:
+        inset 0 1px 0 var(--glass-top),
+        inset 0 0 12px var(--amber-22),
+        0 0 0 1px rgba(255, 138, 61, 0.08),
+        0 8px 24px rgba(0, 0, 0, 0.4);
+      font-family: var(--type-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--amber);
+      cursor: pointer;
+      transition: border-color 240ms ease-out, box-shadow 240ms ease-out;
+      position: relative;
+      overflow: hidden;
+      animation: receipt-rise 900ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards 600ms;
+    }
+    .receipt:hover {
+      border-color: var(--amber-65);
+      box-shadow:
+        inset 0 1px 0 var(--glass-top),
+        inset 0 0 16px var(--amber-40),
+        0 0 0 1px rgba(255, 138, 61, 0.18),
+        0 12px 32px rgba(0, 0, 0, 0.5);
+    }
+    @keyframes receipt-rise {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    /* The mini-waveform — the drawn evidence */
+    .receipt-evidence {
+      width: 72px;
+      height: 20px;
+      display: block;
+      flex-shrink: 0;
+      animation: evidence-draw 1100ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards 700ms;
+    }
+    @keyframes evidence-draw {
+      from { clip-path: inset(0 100% 0 0); }
+      to   { clip-path: inset(0 0 0 0); }
+    }
+    .receipt-evidence .wave-fill {
+      fill: var(--amber-65);
+      stroke: var(--amber);
+      stroke-width: 0.5;
+    }
+    .receipt-evidence .wave-band {
+      fill: var(--led-fault);
+      opacity: 0.85;
+    }
+    .receipt-evidence .wave-grid {
+      stroke: var(--silk-12);
+      stroke-width: 0.5;
+    }
+    .receipt-label {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      line-height: 1;
+    }
+    .receipt-kind {
+      font-size: 9px;
+      letter-spacing: 0.22em;
+      color: var(--amber-pale);
+      font-weight: 500;
+    }
+    .receipt-stamp {
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      text-transform: none;
+      color: var(--silk-65);
+      font-family: var(--type-mono);
+      font-feature-settings: "tnum";
+      font-variant-numeric: tabular-nums;
+    }
+    .receipt-stamp b { color: var(--silk); font-weight: 500; }
+
+    /* ============================================================
+       DECK READOUT BLOCK — lower-right Z-anchor closing
+       BPM + key + meter + section read as instrument panel
+       ============================================================ */
+    .deck {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-5);
+      padding: var(--sp-5) var(--sp-5) var(--sp-5);
+      background: var(--glass-1);
+      border: 1px solid var(--glass-edge);
+      border-radius: 6px;
+      box-shadow:
+        inset 0 1px 0 var(--glass-top),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+        0 16px 36px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.018);
+      position: relative;
+      overflow: hidden;
+    }
+    /* Cursor-angle specular response — Apple Liquid Glass tier.
+       In production a JS hook updates --mx/--my from pointermove. */
+    .deck::before {
+      content: "";
+      position: absolute;
+      inset: -50%;
+      background: radial-gradient(
+        circle at calc(var(--mx, 50%) * 1%) calc(var(--my, 30%) * 1%),
+        rgba(255, 255, 255, 0.04) 0%,
+        transparent 35%
+      );
+      pointer-events: none;
+      transition: background 240ms ease-out;
+    }
+
+    .deck-track {
+      display: flex; flex-direction: column; gap: var(--sp-2);
+    }
+    .deck-label {
+      font-family: var(--type-display);
+      font-variation-settings: "wdth" 85, "wght" 600;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--silk-40);
+    }
+    .deck-title {
+      font-family: var(--type-display);
+      font-variation-settings: "wdth" 100, "wght" 500;
+      font-size: 17px;
+      line-height: 1.2;
+      color: var(--silk);
+      letter-spacing: -0.008em;
+      text-wrap: balance;
+      max-width: 18ch;
+    }
+    .deck-artist {
+      font-size: 12px;
+      color: var(--silk-65);
+      letter-spacing: 0;
+      font-style: italic;
+    }
+    .deck-readouts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-3) var(--sp-5);
+    }
+    .deck-row {
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .deck-row-label {
+      font-family: var(--type-mono);
+      font-size: 9px;
+      letter-spacing: 0.22em;
+      color: var(--silk-40);
+      text-transform: uppercase;
+    }
+    .deck-row-value {
+      font-family: var(--type-mono);
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--silk);
+      font-feature-settings: "tnum", "ss01";
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0;
+      line-height: 1;
+    }
+    .deck-row-value small {
+      font-size: 11px;
+      color: var(--silk-40);
+      margin-left: 4px;
+      font-weight: 400;
+    }
+
+    /* Master meter — BPM-synced breath */
+    .meter {
+      height: 24px;
+      background: var(--void-2);
+      border: 1px solid var(--glass-edge);
+      border-radius: 2px;
+      box-shadow:
+        inset 0 1px 0 rgba(0, 0, 0, 0.55),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.025);
+      position: relative;
+      overflow: hidden;
+    }
+    .meter::after {
+      content: "";
+      position: absolute;
+      left: 1px; right: 60%; top: 1px; bottom: 1px;
+      background: linear-gradient(90deg,
+        var(--amber-deep) 0%,
+        var(--amber) 70%,
+        var(--amber-pale) 100%
+      );
+      box-shadow: 0 0 8px var(--amber-40);
+      animation: meter-breath var(--bpm-bar) ease-in-out infinite;
+    }
+    @keyframes meter-breath {
+      0%, 100% { right: 62%; }
+      50%      { right: 48%; }
+    }
+
+    /* Section glyph — phrase-aware structural readout.
+       intro · build · breakdown · DROP · outro */
+    .section-track {
+      display: flex;
+      gap: 3px;
+      padding-top: var(--sp-2);
+    }
+    .section-track-seg {
+      flex: 1;
+      height: 4px;
+      background: var(--silk-12);
+      border-radius: 1px;
+      transition: background 480ms ease-out;
+    }
+    .section-track-seg[data-active] {
+      background: var(--amber);
+      box-shadow: 0 0 6px var(--amber-65);
+    }
+    .section-track-seg[data-past] {
+      background: var(--silk-40);
+    }
+
+    /* ============================================================
+       RAIL — keyboard-first controls, hotkey hint surfaced
+       Subagent P1 fold-in: hotkey discoverability
+       ============================================================ */
+    .rail {
+      grid-column: 1;
+      grid-row: 2;
+      align-self: end;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-4);
+      max-width: 64ch;
+    }
+
+    .rail-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+    }
+    .rail-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px 8px 12px;
+      background: var(--glass-2);
+      border: 1px solid var(--glass-edge);
+      border-radius: 4px;
+      box-shadow:
+        inset 0 1px 0 var(--glass-top),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+      font-family: var(--type-display);
+      font-variation-settings: "wdth" 85, "wght" 600;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--silk-65);
+      cursor: pointer;
+      transition: color 200ms ease-out, border-color 200ms ease-out;
+    }
+    .rail-btn:hover { color: var(--silk); border-color: var(--silk-22); }
+    .rail-btn[data-active] {
+      color: var(--amber);
+      border-color: var(--amber-40);
+      box-shadow:
+        inset 0 1px 0 var(--glass-top),
+        inset 0 -1px 0 var(--amber-22),
+        inset 0 0 10px var(--amber-22);
+      text-shadow: 0 0 4px var(--amber-65);
+    }
+    .rail-btn .kbd {
+      font-family: var(--type-mono);
+      font-size: 9px;
+      letter-spacing: 0;
+      text-transform: none;
+      padding: 2px 5px;
+      border: 1px solid var(--silk-22);
+      border-radius: 2px;
+      color: var(--silk-40);
+      background: var(--void-2);
+      line-height: 1;
+    }
+
+    /* Restart affordance — visible-by-default in fault mode.
+       Subagent P0 fold-in. */
+    [data-mode="fault"] .restart {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: linear-gradient(180deg,
+        rgba(212, 65, 58, 0.18) 0%,
+        rgba(212, 65, 58, 0.06) 100%);
+      border: 1px solid var(--led-fault);
+      border-radius: 4px;
+      color: var(--led-fault);
+      font-family: var(--type-display);
+      font-variation-settings: "wdth" 85, "wght" 700;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      animation: fault-breath 1.4s ease-in-out infinite;
+    }
+    @keyframes fault-breath {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(212, 65, 58, 0.0), inset 0 0 8px rgba(212, 65, 58, 0.0); }
+      50%      { box-shadow: 0 0 0 2px rgba(212, 65, 58, 0.2), inset 0 0 14px rgba(212, 65, 58, 0.25); }
+    }
+    .restart { display: none; }
+
+    /* ============================================================
+       STATUS FOOT — instrument panel readout strip
+       Includes the new gemini badge (P1 fold-in)
+       ============================================================ */
+    .foot {
+      display: flex;
+      align-items: center;
+      gap: clamp(20px, 3vw, 40px);
+      padding-top: var(--sp-3);
+      border-top: 1px solid var(--silk-12);
+      font-family: var(--type-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: var(--silk-40);
+      text-transform: uppercase;
+    }
+    .foot b { color: var(--silk); font-weight: 500; font-feature-settings: "tnum"; }
+    .foot-leds {
+      display: flex;
+      gap: var(--sp-4);
+      align-items: center;
+    }
+    .foot-led {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 240ms ease-out;
+    }
+    .foot-led::before {
+      content: "";
+      width: 5px; height: 5px; border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 5px currentColor;
+    }
+    .foot-led--ok    { color: var(--led-ok); }
+    .foot-led--warn  { color: var(--led-warn); }
+    .foot-led--fault { color: var(--led-fault); }
+    .foot-led--off   { color: var(--silk-22); }
+    .foot-led--off::before { box-shadow: none; }
+    .foot-spacer { flex: 1; }
+    .foot-clock { color: var(--silk-65); font-feature-settings: "tnum"; }
+
+    /* Demo helpers — switch the demo state to see fault mode */
+    .demo-toggles {
+      position: fixed;
+      bottom: var(--sp-4);
+      right: var(--sp-4);
+      z-index: 1000;
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      background: var(--glass-3);
+      border: 1px solid var(--glass-edge);
+      border-radius: 4px;
+      font-family: var(--type-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .demo-toggles button {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--silk-40);
+      padding: 4px 8px;
+      cursor: pointer;
+      border-radius: 2px;
+      font: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+    }
+    .demo-toggles button[data-on] { border-color: var(--amber-40); color: var(--amber); }
+  </style>
+</head>
+<body data-mode="live">
+  <div class="app">
+    <header class="head">
+      <div class="mark">vibemix</div>
+      <div class="head-meta">
+        <span class="led led--amber">persona <b>hype</b></span>
+        <span class="led led--ok">reading the room</span>
+        <span><b>23:32</b></span>
+      </div>
+    </header>
+
+    <main class="stage">
+      <!-- VOICE: asymmetric Z-anchor upper-left -->
+      <section class="voice">
+        <p class="voice-ghost">nice clean drop, crowd's with you</p>
+        <p class="voice-now">That breakdown is landing <em>exactly</em> where it should.</p>
+
+        <!-- THE RECEIPT — drawn evidence -->
+        <button class="receipt" aria-label="grounded in low-mid clash at 1:28">
+          <svg class="receipt-evidence" viewBox="0 0 72 20" aria-hidden="true">
+            <!-- baseline grid -->
+            <line class="wave-grid" x1="0" y1="10" x2="72" y2="10" />
+            <!-- 200ms waveform of the cited moment, peak symmetric -->
+            <path class="wave-fill" d="M0,10 L2,9.5 L4,10.5 L6,9 L8,11 L10,8 L12,12 L14,7 L16,13 L18,5 L20,15 L22,3 L24,17 L26,2 L28,18 L30,3 L32,17 L34,4 L36,16 L38,5 L40,15 L42,7 L44,13 L46,8 L48,12 L50,9 L52,11 L54,9.5 L56,10.5 L58,10 L60,10.2 L62,9.8 L64,10.1 L66,9.9 L68,10 L70,10 L72,10 L72,20 L0,20 Z" />
+            <!-- the clash band — red 1px tick at the cited frequency band -->
+            <rect class="wave-band" x="22" y="1" width="14" height="2" />
+          </svg>
+          <span class="receipt-label">
+            <span class="receipt-kind">low-mid clash</span>
+            <span class="receipt-stamp">at <b>1:28</b> · 200ms</span>
+          </span>
+        </button>
+      </section>
+
+      <!-- DECK READOUT BLOCK: lower-right Z-anchor -->
+      <aside class="deck" onmousemove="this.style.setProperty('--mx', (event.offsetX / this.offsetWidth * 100));this.style.setProperty('--my', (event.offsetY / this.offsetHeight * 100));">
+        <div class="deck-track">
+          <span class="deck-label">deck a · now playing</span>
+          <div class="deck-title">Reflective Patterns</div>
+          <div class="deck-artist">Korai Modul</div>
+        </div>
+
+        <div class="deck-readouts">
+          <div class="deck-row">
+            <span class="deck-row-label">bpm</span>
+            <span class="deck-row-value">128.0</span>
+          </div>
+          <div class="deck-row">
+            <span class="deck-row-label">key</span>
+            <span class="deck-row-value">5A<small>Bm</small></span>
+          </div>
+          <div class="deck-row">
+            <span class="deck-row-label">elapsed</span>
+            <span class="deck-row-value">1:28<small>/ 6:12</small></span>
+          </div>
+          <div class="deck-row">
+            <span class="deck-row-label">energy</span>
+            <span class="deck-row-value">0.78<small>↑</small></span>
+          </div>
+        </div>
+
+        <div class="deck-track">
+          <span class="deck-label">master · 0.62 rms</span>
+          <div class="meter" aria-label="master output meter"></div>
+        </div>
+
+        <div class="deck-track">
+          <span class="deck-label">section</span>
+          <div class="section-track">
+            <div class="section-track-seg" data-past title="intro"></div>
+            <div class="section-track-seg" data-past title="build"></div>
+            <div class="section-track-seg" data-active title="breakdown"></div>
+            <div class="section-track-seg" title="drop"></div>
+            <div class="section-track-seg" title="outro"></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- RAIL: keyboard-first, hotkey hints visible -->
+      <div class="rail">
+        <div class="rail-actions">
+          <button class="rail-btn" data-active>
+            persona <span class="kbd">⌘⇧P</span>
+          </button>
+          <button class="rail-btn">
+            library <span class="kbd">⌘L</span>
+          </button>
+          <button class="rail-btn">
+            mute <span class="kbd">⌘⇧M</span>
+          </button>
+          <button class="restart">
+            ◂ restart cohost
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <footer class="foot">
+      <div class="foot-leds">
+        <span class="foot-led foot-led--ok">audio</span>
+        <span class="foot-led foot-led--ok">screen</span>
+        <span class="foot-led foot-led--ok">midi</span>
+        <span class="foot-led foot-led--ok">gemini</span>
+        <span class="foot-led foot-led--off">rekordbox</span>
+      </div>
+      <div class="foot-spacer"></div>
+      <span>hp default · kore · techno</span>
+      <span class="foot-clock">128.0 bpm · 5A · 1:28</span>
+    </footer>
+  </div>
+
+  <div class="demo-toggles">
+    <button data-on onclick="document.body.dataset.mode='live';this.parentElement.querySelectorAll('button').forEach(b=>b.removeAttribute('data-on'));this.setAttribute('data-on','')">live</button>
+    <button onclick="document.body.dataset.mode='silent';this.parentElement.querySelectorAll('button').forEach(b=>b.removeAttribute('data-on'));this.setAttribute('data-on','')">silent</button>
+    <button onclick="document.body.dataset.mode='fault';this.parentElement.querySelectorAll('button').forEach(b=>b.removeAttribute('data-on'));this.setAttribute('data-on','')">fault</button>
+  </div>
+</body>
+</html>

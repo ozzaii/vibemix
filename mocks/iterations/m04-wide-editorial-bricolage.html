@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m04 · Wide Editorial Sans</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void-0:#0F1012;--void-3:#16181B;--void-6:#1D2024;--void-9:#23272C;--void-12:#2B3036;
+  --pewter:#3A4047;--steel:#5A6068;
+  --ink-0:rgba(238,242,247,0.96);--ink-1:rgba(238,242,247,0.78);--ink-2:rgba(238,242,247,0.54);--ink-3:rgba(238,242,247,0.32);--ink-4:rgba(238,242,247,0.16);
+  --brand:#FFA5DF;--brand-04:rgba(255,165,223,0.04);--brand-12:rgba(255,165,223,0.12);--brand-22:rgba(255,165,223,0.22);--brand-50:rgba(255,165,223,0.50);
+  --gold:#E8C47A;--gold-22:rgba(232,196,122,0.22);
+  --hot:#FF3D6A;
+  --border:rgba(238,242,247,0.08);--border-strong:rgba(238,242,247,0.16);
+  --chrome-h:28px;--sb-w:228px;--panel-w:292px;
+  --spring:cubic-bezier(0.16,1,0.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--void-0);color:var(--ink-1);font-family:'Bricolage Grotesque',-apple-system,sans-serif;font-variation-settings:"wdth" 100,"opsz" 16,"wght" 420;letter-spacing:-0.005em;overflow:hidden}
+body{display:flex;flex-direction:column}
+.chrome{height:var(--chrome-h);background:linear-gradient(180deg,#1A1D21 0%,#13161A 100%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:12px;height:12px;border-radius:50%}
+.tl span:nth-child(1){background:#FF5F57}.tl span:nth-child(2){background:#FEBC2E}.tl span:nth-child(3){background:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:500 11px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.04em}
+.row{flex:1;display:flex;position:relative;min-height:0}
+/* sidebar */
+.sb{width:var(--sb-w);background:var(--void-3);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:22px 16px 16px;position:relative;z-index:3}
+.brand-row{padding:0 4px 22px;border-bottom:1px solid var(--border);margin-bottom:18px;display:flex;align-items:center;justify-content:space-between}
+.brand-wd{font:500 24px/1 'Bricolage Grotesque';font-variation-settings:"wdth" 75,"opsz" 96,"wght" 700;color:var(--ink-0);letter-spacing:-0.04em;text-transform:lowercase}
+.brand-state{display:flex;align-items:center;gap:5px;font:500 9px/1 'JetBrains Mono';color:var(--brand);letter-spacing:0.10em;text-transform:uppercase}
+.brand-state .dot{width:6px;height:6px;border-radius:50%;background:var(--brand);box-shadow:0 0 10px var(--brand-50);animation:pulse 1.8s var(--spring) infinite}
+@keyframes pulse{0%,100%{opacity:0.65;transform:scale(1)}50%{opacity:1;transform:scale(1.18)}}
+.sect{font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase;padding:18px 4px 9px}
+.nav{display:flex;flex-direction:column;gap:1px}
+.ni{display:flex;align-items:center;gap:11px;padding:9px 10px;font:500 14px/1 'Bricolage Grotesque';font-variation-settings:"wdth" 92,"opsz" 24,"wght" 500;color:var(--ink-1);cursor:pointer;transition:all 200ms var(--spring);border-radius:6px;position:relative;letter-spacing:-0.01em}
+.ni:hover{color:var(--ink-0);background:rgba(238,242,247,0.04)}
+.ni.active{color:var(--ink-0);background:var(--void-6);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
+.ni.active::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:2px;background:var(--brand);border-radius:0 2px 2px 0;box-shadow:0 0 10px var(--brand-50)}
+.ni-shortcut{margin-left:auto;font:500 9px/1 'JetBrains Mono';color:var(--ink-4);letter-spacing:0.04em}
+.sess{padding:10px 10px;cursor:pointer;border-radius:6px;transition:all 200ms var(--spring);display:flex;flex-direction:column;gap:4px;position:relative}
+.sess:hover{background:rgba(238,242,247,0.03)}
+.sess.active{background:var(--void-6)}
+.sess.active::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:2px;background:var(--brand);border-radius:0 2px 2px 0;box-shadow:0 0 10px var(--brand-50)}
+.sess-name{font:500 14px/1.15 'Bricolage Grotesque';font-variation-settings:"wdth" 90,"opsz" 24,"wght" 600;color:var(--ink-0);letter-spacing:-0.012em}
+.sess-meta{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.sb-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:11px}
+.persona{display:flex;gap:1px;background:var(--border);padding:1px;border-radius:8px;overflow:hidden}
+.persona-pill{flex:1;padding:9px 0;background:var(--void-6);font:500 10px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.10em;text-transform:uppercase;cursor:pointer;text-align:center;transition:all 200ms var(--spring)}
+.persona-pill:hover{color:var(--ink-0)}
+.persona-pill.active{background:var(--ink-0);color:var(--void-0);font-weight:700}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:11px 13px;background:linear-gradient(180deg,rgba(255,165,223,0.08),rgba(255,165,223,0.02));border:1px solid var(--brand-12);border-radius:10px;cursor:pointer;transition:all 240ms var(--spring);position:relative;overflow:hidden}
+.cohost-pill:hover{border-color:var(--brand-22)}
+.cohost-pill::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent)}
+.ch-dot{width:8px;height:8px;border-radius:50%;background:var(--brand);box-shadow:0 0 14px var(--brand-50)}
+.ch-text{flex:1}
+.ch-state{font:500 10px/1.1 'JetBrains Mono';color:var(--ink-0);letter-spacing:0.10em;text-transform:uppercase}
+.ch-mode{font:500 13px/1.15 'Bricolage Grotesque';font-variation-settings:"wdth" 90,"opsz" 18;color:var(--ink-1);letter-spacing:-0.005em;margin-top:2px}
+/* stage */
+.stage{flex:1;position:relative;background:var(--void-0);overflow:hidden}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.22) 0%,transparent 100%);pointer-events:none;z-index:1}
+.atmos{position:absolute;inset:0;background:radial-gradient(ellipse 1300px 700px at 60% 25%,rgba(255,165,223,0.04),transparent 65%),radial-gradient(ellipse 900px 500px at 15% 90%,rgba(232,196,122,0.025),transparent 60%);pointer-events:none}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:80px 80px 80px;z-index:2}
+.scene{display:flex;align-items:center;gap:18px;margin-bottom:48px}
+.scene-label{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase}
+.scene-chip{display:flex;align-items:baseline;gap:5px;font:500 13px/1 'JetBrains Mono';color:var(--ink-1);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.scene-chip small{font-size:9px;color:var(--ink-3);letter-spacing:0.14em;text-transform:uppercase}
+.scene-chip.cam{color:var(--brand)}
+.scene-chip.heat{color:var(--gold)}
+.scene-sep{width:3px;height:3px;border-radius:50%;background:var(--ink-4)}
+/* hero — wide-axis display */
+.hero-block{margin-bottom:48px}
+.hero-kicker{font:500 11px/1 'JetBrains Mono';color:var(--brand);letter-spacing:0.20em;text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.hero-kicker::before{content:'';display:block;width:36px;height:1px;background:var(--brand)}
+.hero{font:400 clamp(56px,7vw,108px)/0.94 'Bricolage Grotesque';font-variation-settings:"wdth" 78,"opsz" 96,"wght" 540;color:var(--ink-0);letter-spacing:-0.038em;max-width:1100px;text-transform:lowercase}
+.hero em{font-style:normal;font-variation-settings:"wdth" 82,"opsz" 96,"wght" 580;color:var(--brand);position:relative;display:inline-block}
+.hero em::after{content:'';position:absolute;left:0;right:0;bottom:0.04em;height:0.04em;background:var(--brand);opacity:0.55;border-radius:1px}
+.cite{display:inline-block;vertical-align:0.62em;font:600 0.16em/1 'JetBrains Mono';color:var(--brand);letter-spacing:0.14em;padding:4px 8px;border:1px solid var(--brand);border-radius:3px;font-variant-numeric:tabular-nums;margin-left:0.18em;cursor:pointer;transition:all 200ms var(--spring);text-transform:uppercase;background:rgba(255,165,223,0.08)}
+.cite:hover{background:var(--brand);color:var(--void-0)}
+.hero-strap{font:500 18px/1.4 'Bricolage Grotesque';font-variation-settings:"wdth" 100,"opsz" 18;color:var(--ink-2);max-width:680px;margin-top:24px;letter-spacing:-0.005em}
+/* phrase rail — measure-bar */
+.rail{display:flex;align-items:center;gap:14px;margin-bottom:48px;max-width:1100px}
+.rail-num{font:500 11px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.04em;font-variant-numeric:tabular-nums}
+.rail-bar{flex:1;display:grid;grid-template-columns:repeat(16,1fr);gap:2px;height:24px;align-items:center}
+.rail-tick{height:6px;background:var(--void-9);border-radius:1px;transition:all 200ms var(--spring)}
+.rail-tick.fired{height:18px;background:linear-gradient(180deg,var(--brand),rgba(255,165,223,0.45));box-shadow:0 0 6px var(--brand-22)}
+.rail-tick.current{height:24px;background:var(--brand);box-shadow:0 0 12px var(--brand-50),0 0 4px var(--brand)}
+.rail-tick.next{height:8px;background:var(--void-12)}
+/* receipt — wide pill */
+.dispatch{display:flex;align-items:center;gap:20px;padding:18px 22px;background:linear-gradient(180deg,var(--void-6) 0%,var(--void-3) 100%);border:1px solid var(--border);border-radius:14px;max-width:620px;box-shadow:0 14px 44px rgba(0,0,0,0.45),inset 0 1px 0 rgba(255,255,255,0.04);position:relative;cursor:pointer;transition:all 280ms var(--spring)}
+.dispatch:hover{border-color:var(--brand-22);transform:translateY(-1px)}
+.dispatch::before{content:'';position:absolute;left:0;top:14px;bottom:14px;width:3px;background:linear-gradient(180deg,var(--brand),transparent);border-radius:0 2px 2px 0}
+.dispatch-meta{display:flex;flex-direction:column;gap:3px}
+.dispatch-tag{font:500 10px/1 'JetBrains Mono';color:var(--brand);letter-spacing:0.16em;text-transform:uppercase}
+.dispatch-num{font:600 28px/1 'Bricolage Grotesque';font-variation-settings:"wdth" 78,"opsz" 60,"wght" 600;color:var(--ink-0);letter-spacing:-0.025em;font-variant-numeric:tabular-nums}
+.dispatch-wave{flex:1;display:flex;align-items:center;gap:2px;height:32px}
+.dispatch-wave span{flex:1;background:var(--brand);border-radius:1px;opacity:0.78}
+.dispatch-wave span:nth-child(1){height:30%}.dispatch-wave span:nth-child(2){height:55%}.dispatch-wave span:nth-child(3){height:85%}.dispatch-wave span:nth-child(4){height:70%}.dispatch-wave span:nth-child(5){height:45%}.dispatch-wave span:nth-child(6){height:65%}.dispatch-wave span:nth-child(7){height:90%}.dispatch-wave span:nth-child(8){height:60%}.dispatch-wave span:nth-child(9){height:38%}.dispatch-wave span:nth-child(10){height:55%}.dispatch-wave span:nth-child(11){height:75%}.dispatch-wave span:nth-child(12){height:40%}.dispatch-wave span:nth-child(13){height:65%}.dispatch-wave span:nth-child(14){height:30%}.dispatch-wave span:nth-child(15){height:50%}.dispatch-wave span:nth-child(16){height:42%}.dispatch-wave span:nth-child(17){height:68%}.dispatch-wave span:nth-child(18){height:35%}.dispatch-wave span:nth-child(19){height:55%}.dispatch-wave span:nth-child(20){height:45%}
+.dispatch-detail{font:500 11px/1.3 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.02em;text-align:right}
+.dispatch-detail b{color:var(--ink-0);font-weight:700}
+/* next up — card stack, no boring grid */
+.queue{margin-top:80px;max-width:1100px}
+.queue-head{display:flex;align-items:baseline;gap:18px;margin-bottom:24px}
+.queue-title{font:500 44px/0.92 'Bricolage Grotesque';font-variation-settings:"wdth" 78,"opsz" 96,"wght" 540;color:var(--ink-0);letter-spacing:-0.034em;text-transform:lowercase}
+.queue-sub{font:500 11px/1 'JetBrains Mono';color:var(--brand);letter-spacing:0.18em;text-transform:uppercase}
+.q-card{display:grid;grid-template-columns:48px 1fr 80px 60px 24px;gap:18px;padding:18px 8px;border-top:1px solid var(--border);cursor:pointer;align-items:center;transition:all 200ms var(--spring)}
+.q-card:hover{padding-left:18px;background:linear-gradient(90deg,var(--brand-04),transparent)}
+.q-card:last-child{border-bottom:1px solid var(--border)}
+.q-card.lead{padding:28px 8px;grid-template-rows:auto auto;background:linear-gradient(90deg,rgba(255,165,223,0.06),transparent 70%);border-top:1px solid var(--brand-22)}
+.q-card.lead:hover{padding-left:18px;background:linear-gradient(90deg,rgba(255,165,223,0.10),transparent 70%)}
+.q-num{font:500 11px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.06em;font-variant-numeric:tabular-nums;align-self:start;padding-top:6px}
+.q-card.lead .q-num{color:var(--brand);font-size:14px;font-weight:600}
+.q-body{display:flex;flex-direction:column;gap:4px}
+.q-name{font:500 16px/1.2 'Bricolage Grotesque';font-variation-settings:"wdth" 92,"opsz" 24,"wght" 600;color:var(--ink-0);letter-spacing:-0.015em}
+.q-card.lead .q-name{font:500 36px/1.04 'Bricolage Grotesque';font-variation-settings:"wdth" 78,"opsz" 60,"wght" 600;letter-spacing:-0.028em}
+.q-artist{font:500 11px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.02em}
+.q-reason{grid-column:2/-1;font:500 17px/1.4 'Bricolage Grotesque';font-variation-settings:"wdth" 100,"opsz" 18;color:var(--ink-2);margin-top:10px;letter-spacing:-0.005em;max-width:680px}
+.q-bpm{font:500 13px/1 'JetBrains Mono';color:var(--ink-1);letter-spacing:0.04em;font-variant-numeric:tabular-nums;text-align:right}
+.q-cam{font:500 13px/1 'JetBrains Mono';color:var(--brand);letter-spacing:0.04em;font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+.q-chev{font:500 14px/1 'Bricolage Grotesque';color:var(--ink-3);text-align:center;transition:transform 200ms var(--spring)}
+.q-card:hover .q-chev{transform:translateX(3px);color:var(--brand)}
+/* panel */
+.panel{width:var(--panel-w);background:var(--void-3);border-left:1px solid var(--border);padding:80px 22px 22px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex-shrink:0;z-index:2}
+.p-section{font:500 10px/1 'JetBrains Mono';color:var(--brand);letter-spacing:0.20em;text-transform:uppercase;padding-bottom:9px;border-bottom:1px solid var(--border)}
+.p-card{padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:all 200ms var(--spring)}
+.p-card:hover{padding-left:6px}
+.p-cite{font:500 10px/1 'JetBrains Mono';color:var(--brand);letter-spacing:0.06em;font-variant-numeric:tabular-nums;margin-bottom:8px}
+.p-text{font:500 15px/1.4 'Bricolage Grotesque';font-variation-settings:"wdth" 100,"opsz" 16;color:var(--ink-1);letter-spacing:-0.005em}
+.p-attr{display:block;margin-top:7px;font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.14em;text-transform:uppercase}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:99;opacity:0.04;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:9px 14px;background:rgba(29,32,36,0.9);backdrop-filter:blur(20px) saturate(140%);border:1px solid var(--border-strong);border-radius:999px;font:500 10px/1 'JetBrains Mono';color:var(--ink-1);letter-spacing:0.12em;text-transform:uppercase;z-index:60;box-shadow:0 8px 32px rgba(0,0,0,0.45)}
+.studio-status::before{content:'';width:7px;height:7px;background:var(--brand);border-radius:50%;box-shadow:0 0 10px var(--brand-50)}
+</style>
+</head>
+<body>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">vibemix / session / live</div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="brand-row"><div class="brand-wd">vibemix</div><div class="brand-state"><span class="dot"></span>live</div></div>
+    <div class="sect">surfaces</div>
+    <nav class="nav">
+      <div class="ni active">Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni">Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni">Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni">Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni">Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tonight</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · 1h 47m</div></div>
+    <div class="sess"><div class="sess-name">Backroom warmup</div><div class="sess-meta">19:30 · 2h 30m</div></div>
+    <div class="sb-foot">
+      <div class="persona">
+        <div class="persona-pill active">Hype</div>
+        <div class="persona-pill">Coach</div>
+        <div class="persona-pill">Tutor</div>
+      </div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">on air · 47:12</div><div class="ch-mode">hype mode, ears open</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="atmos"></div>
+    <div class="stage-scroll">
+      <div class="scene">
+        <span class="scene-label">scene</span>
+        <span class="scene-chip"><small>bpm</small>130.0</span>
+        <span class="scene-sep"></span>
+        <span class="scene-chip cam"><small>key</small>8A → 9A</span>
+        <span class="scene-sep"></span>
+        <span class="scene-chip heat"><small>heat</small>0.78</span>
+        <span class="scene-sep"></span>
+        <span class="scene-chip"><small>phrase</small>14 / 16</span>
+      </div>
+      <div class="hero-block">
+        <div class="hero-kicker">live read · 02:14</div>
+        <h1 class="hero">that low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></h1>
+        <div class="hero-strap">A four-bar sub-bass crest at +3.2 dB. The room committed at phrase 13. Eight bars of kick before the filter return.</div>
+      </div>
+      <div class="rail">
+        <span class="rail-num">12</span>
+        <div class="rail-bar">
+          <span class="rail-tick fired"></span><span class="rail-tick fired"></span><span class="rail-tick fired"></span><span class="rail-tick fired"></span>
+          <span class="rail-tick fired"></span><span class="rail-tick fired"></span><span class="rail-tick fired"></span><span class="rail-tick fired"></span>
+          <span class="rail-tick fired"></span><span class="rail-tick fired"></span><span class="rail-tick fired"></span><span class="rail-tick fired"></span>
+          <span class="rail-tick fired"></span><span class="rail-tick current"></span><span class="rail-tick next"></span><span class="rail-tick next"></span>
+        </div>
+        <span class="rail-num">16</span>
+      </div>
+      <div class="dispatch">
+        <div class="dispatch-meta"><div class="dispatch-tag">kick 60Hz</div><div class="dispatch-num">+3.2dB</div></div>
+        <div class="dispatch-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="dispatch-detail">02:11 → 02:15<br><b>4 bars · locked</b></div>
+      </div>
+      <section class="queue">
+        <div class="queue-head"><div class="queue-title">next up</div><div class="queue-sub">— dj queue · 3 selections ready</div></div>
+        <div class="q-card lead">
+          <div class="q-num">01</div>
+          <div class="q-body"><div class="q-name">Vox Dust ii</div><div class="q-artist">SHRIM · the dust album</div></div>
+          <div class="q-bpm">130</div>
+          <div class="q-cam">9A</div>
+          <div class="q-chev">›</div>
+          <div class="q-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up. He'll feel it inside two bars.</div>
+        </div>
+        <div class="q-card">
+          <div class="q-num">02</div>
+          <div class="q-body"><div class="q-name">Marrow (VTSS remix)</div><div class="q-artist">Tygapaw · Marrow</div></div>
+          <div class="q-bpm">132</div>
+          <div class="q-cam">10A</div>
+          <div class="q-chev">›</div>
+        </div>
+        <div class="q-card">
+          <div class="q-num">03</div>
+          <div class="q-body"><div class="q-name">Sleeper</div><div class="q-artist">Forester · Untitled.05</div></div>
+          <div class="q-bpm">128</div>
+          <div class="q-cam">8A</div>
+          <div class="q-chev">›</div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">cited evidence</div>
+    <div class="p-card"><div class="p-cite">02:14 · kick 60Hz</div><div class="p-text">Low-end opened up. Sub-bass gain rose 3.2 dB across four bars.<span class="p-attr">citation locked</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · phrase 12</div><div class="p-text">Filter sweep started, hi-band fell 8 dB.<span class="p-attr">citation locked</span></div></div>
+    <div class="p-section" style="margin-top:14px">likely next cue</div>
+    <div class="p-card"><div class="p-cite">02:30 · drop-in</div><div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">predicted</span></div></div>
+  </aside>
+</div>
+<div class="grain"></div>
+<div class="studio-status"><span></span>studio live · 47:12</div>
+</body>
+</html>

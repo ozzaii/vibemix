@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m06 · Berlin Concrete Mono</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300..800&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --con-0:#1A1A1A;--con-2:#222222;--con-4:#2A2A2A;--con-6:#333333;--con-8:#3D3D3D;--con-10:#494949;
+  --ink-0:#F2F2F0;--ink-1:rgba(242,242,240,0.78);--ink-2:rgba(242,242,240,0.52);--ink-3:rgba(242,242,240,0.30);--ink-4:rgba(242,242,240,0.14);
+  --mark:#FF3D00;--mark-15:rgba(255,61,0,0.15);--mark-30:rgba(255,61,0,0.30);
+  --border:rgba(242,242,240,0.10);--border-strong:rgba(242,242,240,0.22);
+  --chrome-h:28px;--sb-w:220px;--panel-w:264px;
+  --no-easing:linear;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--con-0);color:var(--ink-1);font-family:'JetBrains Mono',monospace;font-weight:400;font-size:13px;letter-spacing:0;overflow:hidden}
+body{display:flex;flex-direction:column}
+.chrome{height:var(--chrome-h);background:var(--con-2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:12px;height:12px;border-radius:50%}
+.tl span:nth-child(1){background:#FF5F57}.tl span:nth-child(2){background:#FEBC2E}.tl span:nth-child(3){background:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.14em;text-transform:uppercase}
+.row{flex:1;display:flex;position:relative;min-height:0}
+/* sidebar — file cabinet */
+.sb{width:var(--sb-w);background:var(--con-2);border-right:2px solid var(--con-0);display:flex;flex-direction:column;flex-shrink:0;padding:16px 0;position:relative;z-index:3}
+.sb::before{content:'';position:absolute;top:16px;bottom:16px;right:0;width:1px;background:var(--border)}
+.brand{padding:0 14px 18px;border-bottom:2px solid var(--con-0);margin:0 0 16px}
+.brand-name{font:800 22px/1 'JetBrains Mono';color:var(--ink-0);letter-spacing:-0.04em;text-transform:lowercase}
+.brand-strap{font:500 9px/1 'JetBrains Mono';color:var(--mark);letter-spacing:0.18em;text-transform:uppercase;margin-top:8px;display:flex;align-items:center;gap:7px}
+.dot{width:6px;height:6px;background:var(--mark);box-shadow:0 0 8px rgba(255,61,0,0.6)}
+.sect{font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase;padding:14px 14px 8px;display:flex;align-items:center;gap:7px}
+.sect::before{content:'§';color:var(--mark);font-weight:700}
+.nav{display:flex;flex-direction:column}
+.ni{display:flex;align-items:center;gap:11px;padding:9px 14px;font:600 13px/1 'JetBrains Mono';color:var(--ink-1);cursor:pointer;text-transform:uppercase;letter-spacing:0.04em;position:relative;transition:none}
+.ni:hover{background:var(--con-4);color:var(--ink-0)}
+.ni.active{background:var(--mark);color:var(--ink-0);font-weight:700}
+.ni-num{font:700 10px/1 'JetBrains Mono';width:18px;font-variant-numeric:tabular-nums}
+.ni-shortcut{margin-left:auto;font:400 9px/1 'JetBrains Mono';opacity:0.7}
+.sess{padding:11px 14px;cursor:pointer;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:3px;position:relative}
+.sess:hover{background:var(--con-4)}
+.sess.active{background:var(--con-4);color:var(--ink-0)}
+.sess.active::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--mark)}
+.sess-name{font:700 12px/1.15 'JetBrains Mono';color:var(--ink-0);letter-spacing:-0.005em;text-transform:uppercase}
+.sess-meta{font:400 10px/1.1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.sb-foot{margin-top:auto;padding:14px;border-top:2px solid var(--con-0);display:flex;flex-direction:column;gap:9px}
+.persona{display:flex;gap:0}
+.persona-pill{flex:1;padding:9px 0;background:var(--con-4);font:700 9px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.10em;text-transform:uppercase;cursor:pointer;text-align:center;border:1px solid var(--con-0)}
+.persona-pill:hover{background:var(--con-6);color:var(--ink-0)}
+.persona-pill.active{background:var(--ink-0);color:var(--con-0)}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--con-4);border:1px solid var(--mark);cursor:pointer;position:relative}
+.cohost-pill::before{content:'STATUS';position:absolute;top:-7px;left:8px;background:var(--con-2);padding:0 5px;font:700 8px/1 'JetBrains Mono';color:var(--mark);letter-spacing:0.16em}
+.ch-dot{width:7px;height:7px;background:var(--mark);box-shadow:0 0 8px rgba(255,61,0,0.6)}
+.ch-text{flex:1}
+.ch-state{font:700 11px/1 'JetBrains Mono';color:var(--ink-0);letter-spacing:0.04em;text-transform:uppercase}
+.ch-mode{font:400 11px/1.1 'JetBrains Mono';color:var(--ink-2);margin-top:2px;text-transform:uppercase;letter-spacing:0.02em}
+/* stage — concrete slab */
+.stage{flex:1;position:relative;background:var(--con-0);overflow:hidden}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.4) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage::after{content:'';position:absolute;inset:0;background-image:repeating-linear-gradient(0deg,rgba(255,255,255,0.012) 0,rgba(255,255,255,0.012) 1px,transparent 1px,transparent 24px),repeating-linear-gradient(90deg,rgba(255,255,255,0.012) 0,rgba(255,255,255,0.012) 1px,transparent 1px,transparent 24px);pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:24px;z-index:2;display:flex;flex-direction:column;gap:24px}
+/* block: metadata bar */
+.bar{display:grid;grid-template-columns:repeat(5,1fr);gap:0;background:var(--con-2);border:1px solid var(--border)}
+.bar-cell{padding:14px 16px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:4px}
+.bar-cell:last-child{border-right:0}
+.bar-label{font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase}
+.bar-value{font:700 22px/1 'JetBrains Mono';color:var(--ink-0);letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.bar-cell.mark .bar-value{color:var(--mark)}
+.bar-sub{font:400 10px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.04em}
+/* block: hero — concrete slab text */
+.slab{background:var(--con-2);border:1px solid var(--border);padding:36px 36px 40px;position:relative}
+.slab::before{content:'';position:absolute;top:0;left:0;width:6px;height:60px;background:var(--mark)}
+.slab-kicker{display:flex;align-items:center;gap:10px;font:700 11px/1 'JetBrains Mono';color:var(--mark);letter-spacing:0.16em;text-transform:uppercase;margin-bottom:18px}
+.slab-kicker::after{content:'';flex:1;height:1px;background:var(--border)}
+.slab-line{font:400 clamp(38px,4.6vw,58px)/1.18 'JetBrains Mono';color:var(--ink-0);letter-spacing:-0.022em;max-width:920px}
+.slab-line em{font-style:normal;background:var(--mark);color:var(--ink-0);padding:0 6px;margin:0 2px;font-weight:600}
+.cite{display:inline-block;vertical-align:0.55em;font:700 0.20em/1 'JetBrains Mono';color:var(--mark);letter-spacing:0.14em;padding:3px 7px;border:1px solid var(--mark);font-variant-numeric:tabular-nums;margin-left:0.18em;cursor:pointer;text-transform:uppercase}
+.cite:hover{background:var(--mark);color:var(--ink-0)}
+.slab-meta{display:flex;gap:32px;margin-top:24px;padding-top:18px;border-top:1px solid var(--border);font:500 11px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.06em;text-transform:uppercase}
+.slab-meta b{color:var(--ink-0);font-weight:700}
+.slab-meta .mark{color:var(--mark);font-weight:700}
+/* block: phrase grid */
+.grid-line{display:flex;align-items:center;gap:14px;background:var(--con-2);border:1px solid var(--border);padding:18px 24px}
+.gl-label{font:700 11px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.16em;text-transform:uppercase}
+.gl-cells{flex:1;display:grid;grid-template-columns:repeat(16,1fr);gap:2px;height:32px}
+.gl-cell{background:var(--con-6);position:relative}
+.gl-cell.fired{background:var(--con-10)}
+.gl-cell.fired::after{content:'';position:absolute;bottom:0;left:0;right:0;height:20%;background:var(--mark)}
+.gl-cell.current{background:var(--mark);box-shadow:0 0 12px rgba(255,61,0,0.4)}
+.gl-num{font:500 11px/1 'JetBrains Mono';color:var(--ink-2);font-variant-numeric:tabular-nums}
+/* dispatch — evidence block */
+.evi{display:grid;grid-template-columns:200px 1fr 220px;gap:0;background:var(--con-2);border:1px solid var(--border)}
+.evi-stamp{padding:18px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:6px;background:var(--mark);color:var(--ink-0)}
+.evi-stamp-label{font:700 10px/1 'JetBrains Mono';letter-spacing:0.18em;text-transform:uppercase;opacity:0.85}
+.evi-stamp-num{font:700 32px/1 'JetBrains Mono';letter-spacing:-0.025em;font-variant-numeric:tabular-nums}
+.evi-stamp-sub{font:500 10px/1 'JetBrains Mono';letter-spacing:0.04em;opacity:0.85}
+.evi-body{padding:18px 24px;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.evi-body-headline{font:600 15px/1.3 'JetBrains Mono';color:var(--ink-0);letter-spacing:-0.01em}
+.evi-body-detail{font:400 11px/1.4 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.02em}
+.evi-wave{padding:18px 24px;border-left:1px solid var(--border);display:flex;align-items:center;gap:2px}
+.evi-wave span{flex:1;background:var(--mark);opacity:0.85}
+.evi-wave span:nth-child(odd){opacity:1}
+.evi-wave span:nth-child(1){height:30%}.evi-wave span:nth-child(2){height:55%}.evi-wave span:nth-child(3){height:85%}.evi-wave span:nth-child(4){height:70%}.evi-wave span:nth-child(5){height:45%}.evi-wave span:nth-child(6){height:65%}.evi-wave span:nth-child(7){height:90%}.evi-wave span:nth-child(8){height:60%}.evi-wave span:nth-child(9){height:38%}.evi-wave span:nth-child(10){height:55%}.evi-wave span:nth-child(11){height:75%}.evi-wave span:nth-child(12){height:40%}.evi-wave span:nth-child(13){height:65%}.evi-wave span:nth-child(14){height:30%}
+/* queue */
+.queue{background:var(--con-2);border:1px solid var(--border);display:flex;flex-direction:column}
+.queue-head{padding:14px 20px;background:var(--con-4);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.queue-head-l{font:700 12px/1 'JetBrains Mono';color:var(--ink-0);letter-spacing:0.18em;text-transform:uppercase;display:flex;align-items:center;gap:9px}
+.queue-head-l::before{content:'▶';color:var(--mark);font-size:9px}
+.queue-head-r{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.14em;text-transform:uppercase}
+.q-row{display:grid;grid-template-columns:60px 1fr 80px 60px 40px;gap:18px;padding:16px 20px;border-bottom:1px solid var(--border);cursor:pointer;align-items:center}
+.q-row:hover{background:var(--con-4)}
+.q-row:last-child{border-bottom:0}
+.q-row.lead{padding:24px 20px;grid-template-rows:auto auto;background:linear-gradient(90deg,rgba(255,61,0,0.06),transparent 70%)}
+.q-row.lead:hover{background:linear-gradient(90deg,rgba(255,61,0,0.10),transparent 70%)}
+.q-num{font:700 12px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.04em;font-variant-numeric:tabular-nums;align-self:start;padding-top:3px}
+.q-row.lead .q-num{color:var(--mark);font-size:14px;font-weight:700}
+.q-body{display:flex;flex-direction:column;gap:3px}
+.q-name{font:700 14px/1.15 'JetBrains Mono';color:var(--ink-0);letter-spacing:-0.005em;text-transform:uppercase}
+.q-row.lead .q-name{font:700 22px/1.04 'JetBrains Mono';letter-spacing:-0.015em}
+.q-artist{font:400 11px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.02em}
+.q-reason{grid-column:2/-1;font:400 13px/1.45 'JetBrains Mono';color:var(--ink-2);margin-top:10px;letter-spacing:0.005em;max-width:580px;padding-left:0}
+.q-bpm{font:700 13px/1 'JetBrains Mono';color:var(--ink-1);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right}
+.q-cam{font:700 13px/1 'JetBrains Mono';color:var(--mark);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right}
+.q-chev{font:700 14px/1 'JetBrains Mono';color:var(--ink-3);text-align:center}
+.q-row:hover .q-chev{color:var(--mark)}
+/* panel */
+.panel{width:var(--panel-w);background:var(--con-2);border-left:2px solid var(--con-0);padding:24px 0;display:flex;flex-direction:column;flex-shrink:0;z-index:2;overflow-y:auto}
+.p-section{font:700 11px/1 'JetBrains Mono';color:var(--mark);letter-spacing:0.20em;text-transform:uppercase;padding:12px 20px;background:var(--con-4);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.p-section:first-child{border-top:0}
+.p-card{padding:16px 20px;border-bottom:1px solid var(--border);cursor:pointer}
+.p-card:hover{background:var(--con-4)}
+.p-cite{font:700 10px/1 'JetBrains Mono';color:var(--mark);letter-spacing:0.10em;font-variant-numeric:tabular-nums;margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.p-cite::before{content:'■';font-size:6px}
+.p-text{font:500 13px/1.5 'JetBrains Mono';color:var(--ink-1);letter-spacing:-0.005em}
+.p-attr{display:block;margin-top:8px;font:700 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.16em;text-transform:uppercase}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:9px 14px;background:var(--mark);color:var(--ink-0);font:700 10px/1 'JetBrains Mono';letter-spacing:0.16em;text-transform:uppercase;z-index:60}
+.studio-status::before{content:'';width:7px;height:7px;background:var(--ink-0);box-shadow:0 0 8px var(--ink-0)}
+</style>
+</head>
+<body>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">vibemix / brutal / 22:14</div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="brand"><div class="brand-name">vibemix</div><div class="brand-strap"><span class="dot"></span>signal live</div></div>
+    <div class="sect">surfaces</div>
+    <nav class="nav">
+      <div class="ni active"><span class="ni-num">01</span>Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni"><span class="ni-num">02</span>Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni"><span class="ni-num">03</span>Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni"><span class="ni-num">04</span>Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni"><span class="ni-num">05</span>Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tonight</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · 01:47</div></div>
+    <div class="sess"><div class="sess-name">Backroom warmup</div><div class="sess-meta">19:30 · 02:30</div></div>
+    <div class="sb-foot">
+      <div class="persona"><div class="persona-pill active">Hype</div><div class="persona-pill">Coach</div><div class="persona-pill">Tutor</div></div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">on air</div><div class="ch-mode">hype · ears open</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll">
+      <div class="bar">
+        <div class="bar-cell"><div class="bar-label">BPM</div><div class="bar-value">130.0</div><div class="bar-sub">held 4 bars</div></div>
+        <div class="bar-cell mark"><div class="bar-label">key</div><div class="bar-value">8A → 9A</div><div class="bar-sub">camelot · half-step</div></div>
+        <div class="bar-cell mark"><div class="bar-label">heat</div><div class="bar-value">0.78</div><div class="bar-sub">+0.04 in 4 bars</div></div>
+        <div class="bar-cell"><div class="bar-label">phrase</div><div class="bar-value">14/16</div><div class="bar-sub">2 bars to fold</div></div>
+        <div class="bar-cell"><div class="bar-label">runtime</div><div class="bar-value">47:12</div><div class="bar-sub">on the wire</div></div>
+      </div>
+      <div class="slab">
+        <div class="slab-kicker">co-host · live read · 02:14</div>
+        <div class="slab-line">That low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></div>
+        <div class="slab-meta"><span>fired <b>02:14</b></span><span>persona <b>hype</b></span><span class="mark">cited · kick 60Hz</span><span>phrase 14/16</span></div>
+      </div>
+      <div class="grid-line">
+        <span class="gl-num">12</span>
+        <span class="gl-label">phrase</span>
+        <div class="gl-cells">
+          <span class="gl-cell fired"></span><span class="gl-cell fired"></span><span class="gl-cell fired"></span><span class="gl-cell fired"></span>
+          <span class="gl-cell fired"></span><span class="gl-cell fired"></span><span class="gl-cell fired"></span><span class="gl-cell fired"></span>
+          <span class="gl-cell fired"></span><span class="gl-cell fired"></span><span class="gl-cell fired"></span><span class="gl-cell fired"></span>
+          <span class="gl-cell fired"></span><span class="gl-cell current"></span><span class="gl-cell"></span><span class="gl-cell"></span>
+        </div>
+        <span class="gl-num">16</span>
+      </div>
+      <div class="evi">
+        <div class="evi-stamp"><div class="evi-stamp-label">evidence</div><div class="evi-stamp-num">+3.2dB</div><div class="evi-stamp-sub">kick 60Hz · 4 bars</div></div>
+        <div class="evi-body"><div class="evi-body-headline">Sub-bass gain rose 3.2 dB across four bars.</div><div class="evi-body-detail">02:11 → 02:15 · phrase 12 → 14 · hi-hat ghost gained definition · room committed at phrase 13</div></div>
+        <div class="evi-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="queue">
+        <div class="queue-head"><div class="queue-head-l">queue · next up</div><div class="queue-head-r">3 selections ready</div></div>
+        <div class="q-row lead">
+          <div class="q-num">01</div>
+          <div class="q-body"><div class="q-name">Vox Dust ii</div><div class="q-artist">SHRIM · the dust album</div></div>
+          <div class="q-bpm">130</div>
+          <div class="q-cam">9A</div>
+          <div class="q-chev">▶</div>
+          <div class="q-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up. He'll feel it inside two bars.</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">02</div>
+          <div class="q-body"><div class="q-name">Marrow (VTSS rmx)</div><div class="q-artist">Tygapaw · Marrow</div></div>
+          <div class="q-bpm">132</div>
+          <div class="q-cam">10A</div>
+          <div class="q-chev">▶</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">03</div>
+          <div class="q-body"><div class="q-name">Sleeper</div><div class="q-artist">Forester · Untitled.05</div></div>
+          <div class="q-bpm">128</div>
+          <div class="q-cam">8A</div>
+          <div class="q-chev">▶</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">evidence locker</div>
+    <div class="p-card"><div class="p-cite">02:14 · kick 60Hz</div><div class="p-text">Low-end opened. Sub gain rose 3.2 dB across four bars.<span class="p-attr">citation locked</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · phrase 12</div><div class="p-text">Filter sweep started, hi-band fell 8 dB.<span class="p-attr">citation locked</span></div></div>
+    <div class="p-section">next move · predicted</div>
+    <div class="p-card"><div class="p-cite">02:30 · drop-in</div><div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">predicted · high confidence</span></div></div>
+  </aside>
+</div>
+<div class="studio-status">live · 47:12</div>
+</body>
+</html>

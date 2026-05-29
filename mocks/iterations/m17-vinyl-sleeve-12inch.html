@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m17 · Vinyl Sleeve 12"</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Serif+Text&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void-0:#0B0907;--void-3:#15120E;--void-6:#1F1A14;--void-9:#2A231B;
+  --paper-0:#E8DEC9;--paper-2:#DCD0B8;
+  --ink-0:rgba(232,222,201,0.96);--ink-1:rgba(232,222,201,0.78);--ink-2:rgba(232,222,201,0.52);--ink-3:rgba(232,222,201,0.30);--ink-4:rgba(232,222,201,0.14);
+  --gold:#D4A75B;--gold-soft:#E8C384;
+  --burgundy:#8B3A4A;--burgundy-soft:#B85A6E;
+  --rose:#D4738F;
+  --indigo:#3A3658;
+  --border:rgba(232,222,201,0.10);--border-strong:rgba(232,222,201,0.22);
+  --chrome-h:28px;--sb-w:218px;--panel-w:280px;
+  --spring:cubic-bezier(0.16,1,0.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--void-0);color:var(--ink-1);font-family:'DM Serif Text',Georgia,serif;font-weight:400;font-size:14px;letter-spacing:0;overflow:hidden}
+body{display:flex;flex-direction:column;position:relative}
+.chrome{height:var(--chrome-h);background:#0B0907;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag;z-index:5}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:11px;height:11px;border-radius:50%;background:transparent;border:1.5px solid rgba(232,222,201,0.40)}
+.tl span:nth-child(1){border-color:#FF5F57}.tl span:nth-child(2){border-color:#FEBC2E}.tl span:nth-child(3){border-color:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:500 11px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase}
+.row{flex:1;display:flex;position:relative;min-height:0;z-index:2}
+/* sidebar — record store rack */
+.sb{width:var(--sb-w);background:#0B0907;display:flex;flex-direction:column;flex-shrink:0;padding:20px 0 14px;border-right:1px solid var(--border);position:relative;z-index:3}
+.label{padding:14px 16px;background:var(--burgundy);color:var(--paper-0);position:relative;margin:0 0 16px;border-bottom:1px solid var(--gold)}
+.label::before{content:'';position:absolute;top:50%;right:14px;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at center,#0B0907 18%,var(--gold) 18%,var(--gold) 24%,#0B0907 24%);transform:translateY(-50%)}
+.label-cat{font:500 9px/1 'JetBrains Mono';color:var(--gold-soft);letter-spacing:0.20em;text-transform:uppercase}
+.label-name{font:italic 400 24px/0.95 'DM Serif Display';color:var(--paper-0);letter-spacing:-0.018em;margin-top:6px}
+.label-strap{font:italic 400 11px/1 'DM Serif Display';color:var(--gold-soft);margin-top:5px;letter-spacing:0;display:flex;align-items:center;gap:6px}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold);animation:rev 2.4s linear infinite}
+@keyframes rev{0%,100%{opacity:0.7}50%{opacity:1}}
+.sect{font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.22em;text-transform:uppercase;padding:14px 16px 8px;display:flex;align-items:center;gap:8px}
+.sect::before{content:'';width:14px;height:1px;background:var(--gold)}
+.nav{display:flex;flex-direction:column}
+.ni{display:flex;align-items:center;gap:11px;padding:9px 16px;font:italic 400 16px/1 'DM Serif Display';color:var(--ink-1);cursor:pointer;letter-spacing:-0.005em;position:relative;transition:all 200ms var(--spring)}
+.ni:hover{color:var(--ink-0);background:rgba(232,222,201,0.04)}
+.ni.active{color:var(--ink-0);background:rgba(212,167,91,0.10)}
+.ni.active::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.ni-shortcut{margin-left:auto;font:500 9px/1 'JetBrains Mono';color:var(--ink-4);letter-spacing:0.04em;font-style:normal}
+.sess{padding:9px 16px;cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative;border-bottom:1px solid var(--border)}
+.sess:hover{background:rgba(232,222,201,0.03)}
+.sess.active{background:rgba(212,167,91,0.08)}
+.sess.active::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;background:var(--gold)}
+.sess-name{font:italic 400 16px/1.1 'DM Serif Display';color:var(--ink-0);letter-spacing:-0.012em}
+.sess-meta{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.04em;font-variant-numeric:tabular-nums}
+.sb-foot{margin-top:auto;padding:14px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:11px}
+.persona{display:flex;gap:0;border:1px solid var(--gold);overflow:hidden;border-radius:2px}
+.persona-pill{flex:1;padding:9px 0;background:transparent;font:600 10px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;text-align:center;border-right:1px solid var(--gold)}
+.persona-pill:last-child{border-right:0}
+.persona-pill:hover{color:var(--gold-soft);background:rgba(212,167,91,0.06)}
+.persona-pill.active{background:var(--gold);color:var(--void-0);font-weight:700}
+.cohost-pill{display:flex;align-items:center;gap:10px;padding:12px 13px;background:var(--void-3);border:1px solid var(--gold);border-radius:6px;cursor:pointer;transition:all 280ms var(--spring);position:relative;box-shadow:0 0 24px rgba(212,167,91,0.18),inset 0 1px 0 rgba(232,222,201,0.08)}
+.cohost-pill::after{content:'';position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at center,var(--void-0) 22%,var(--gold) 22%,var(--gold) 28%,var(--void-0) 28%);animation:spin 3s linear infinite}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.ch-dot{width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold)}
+.ch-text{flex:1}
+.ch-state{font:600 11px/1 'JetBrains Mono';color:var(--gold);letter-spacing:0.10em;text-transform:uppercase;text-shadow:0 0 6px rgba(212,167,91,0.4)}
+.ch-mode{font:italic 400 13px/1.1 'DM Serif Display';color:var(--ink-1);margin-top:2px;letter-spacing:-0.005em}
+/* stage — record store gallery */
+.stage{flex:1;position:relative;background:var(--void-0);overflow:hidden}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(0,0,0,0.40) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:54px 64px 80px;z-index:2;display:flex;flex-direction:column;gap:32px}
+/* sleeve hero — 12" frame */
+.sleeve-row{display:grid;grid-template-columns:360px 1fr;gap:48px;align-items:start}
+.sleeve{position:relative;aspect-ratio:1/1;background:linear-gradient(135deg,#2A1A22 0%,#3D2A30 50%,#1F1418 100%);border:1px solid var(--gold);box-shadow:0 24px 60px rgba(0,0,0,0.50),inset 0 0 0 1px rgba(232,222,201,0.12);overflow:hidden}
+.sleeve::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 30% 30%,rgba(212,167,91,0.20) 0%,transparent 50%),radial-gradient(circle at 80% 70%,rgba(212,115,143,0.18) 0%,transparent 60%),radial-gradient(circle at 50% 60%,rgba(58,54,88,0.30) 0%,transparent 70%)}
+.sleeve::after{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:0.20;mix-blend-mode:overlay}
+.sleeve-cat{position:absolute;top:20px;left:20px;font:600 9px/1 'JetBrains Mono';color:var(--gold-soft);letter-spacing:0.22em;text-transform:uppercase;z-index:2;text-shadow:0 1px 4px rgba(0,0,0,0.6)}
+.sleeve-side{position:absolute;top:20px;right:20px;font:600 9px/1 'JetBrains Mono';color:var(--gold-soft);letter-spacing:0.18em;text-transform:uppercase;z-index:2;text-shadow:0 1px 4px rgba(0,0,0,0.6);padding:4px 8px;background:rgba(11,9,7,0.55);backdrop-filter:blur(8px);border:1px solid var(--gold)}
+.sleeve-title{position:absolute;left:20px;right:20px;bottom:64px;z-index:2}
+.sleeve-title-1{font:italic 400 38px/0.92 'DM Serif Display';color:var(--paper-0);letter-spacing:-0.022em;text-shadow:0 2px 8px rgba(0,0,0,0.5)}
+.sleeve-title-2{font:600 10px/1 'JetBrains Mono';color:var(--gold);letter-spacing:0.16em;text-transform:uppercase;margin-top:12px;text-shadow:0 1px 4px rgba(0,0,0,0.6)}
+.sleeve-stamp{position:absolute;left:20px;right:20px;bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;font:500 10px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.08em;text-transform:uppercase;z-index:2}
+.sleeve-stamp b{color:var(--gold)}
+.sleeve-record{position:absolute;right:-90px;top:50%;transform:translateY(-50%);width:340px;height:340px;border-radius:50%;background:radial-gradient(circle at center,var(--gold) 7%,#1A1612 7.5%,#15110E 12%,#1A1612 13%,#15110E 18%,#1A1612 19%,#15110E 24%,#1A1612 25%,#15110E 32%,#1A1612 33%,#15110E 100%);box-shadow:-12px 0 24px rgba(0,0,0,0.5),inset 0 0 0 1px rgba(212,167,91,0.18);animation:spin 8s linear infinite;opacity:0.92}
+/* right column — info + cohost line */
+.sleeve-info{display:flex;flex-direction:column;gap:18px;padding-top:8px}
+.si-cat{font:600 10px/1 'JetBrains Mono';color:var(--gold);letter-spacing:0.20em;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.si-cat::after{content:'';flex:1;height:1px;background:var(--gold);opacity:0.4}
+.si-grid{display:grid;grid-template-columns:auto 1fr;gap:8px 18px;font:500 11px/1.4 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.04em;font-variant-numeric:tabular-nums}
+.si-grid b{color:var(--ink-0);font-weight:600}
+.si-grid .v-gold{color:var(--gold)}
+.si-grid .v-rose{color:var(--rose)}
+.cohost-line{font:italic 400 clamp(28px,3vw,38px)/1.25 'DM Serif Display';color:var(--ink-0);letter-spacing:-0.018em;border-top:1px solid var(--border);padding-top:24px}
+.cohost-line em{font-style:italic;color:var(--gold);text-shadow:0 0 24px rgba(212,167,91,0.5)}
+.cite{display:inline-block;vertical-align:0.42em;font:600 0.22em/1 'JetBrains Mono';color:var(--paper-0);letter-spacing:0.14em;padding:3px 7px;border:1px solid var(--gold);background:rgba(212,167,91,0.10);font-variant-numeric:tabular-nums;margin-left:0.18em;cursor:pointer;transition:all 200ms var(--spring);text-transform:uppercase;font-style:normal}
+.cite:hover{background:var(--gold);color:var(--void-0)}
+/* phrase bar — vinyl groove */
+.groove{display:flex;align-items:center;gap:18px;padding:18px 24px;background:var(--void-3);border:1px solid var(--border);border-radius:6px;position:relative}
+.g-l{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase}
+.g-n{font:600 11px/1 'JetBrains Mono';color:var(--ink-1);font-variant-numeric:tabular-nums}
+.g-bar{flex:1;display:grid;grid-template-columns:repeat(16,1fr);gap:2px;height:22px;align-items:center}
+.g-cell{height:8px;background:var(--void-9);border-radius:1px}
+.g-cell.fired{height:18px;background:var(--gold);box-shadow:0 0 6px rgba(212,167,91,0.4)}
+.g-cell.current{height:22px;background:var(--gold-soft);box-shadow:0 0 16px var(--gold),0 0 4px var(--gold-soft);animation:rev 1.2s linear infinite}
+/* dispatch */
+.dispatch{display:grid;grid-template-columns:180px 1fr 200px;background:var(--void-3);border:1px solid var(--gold);border-radius:6px;cursor:pointer;transition:all 280ms var(--spring);max-width:760px;position:relative;box-shadow:0 12px 36px rgba(0,0,0,0.4),inset 0 1px 0 rgba(232,222,201,0.06)}
+.dispatch:hover{box-shadow:0 16px 48px rgba(0,0,0,0.45),0 0 36px rgba(212,167,91,0.20)}
+.dis-stamp{padding:20px 18px;border-right:1px solid var(--gold);display:flex;flex-direction:column;gap:5px;background:var(--burgundy);color:var(--paper-0)}
+.dis-stamp-l{font:600 10px/1 'JetBrains Mono';letter-spacing:0.18em;text-transform:uppercase;opacity:0.88}
+.dis-stamp-v{font:italic 400 28px/1 'DM Serif Display';letter-spacing:-0.020em;font-variant-numeric:tabular-nums}
+.dis-stamp-s{font:600 10px/1 'JetBrains Mono';letter-spacing:0.10em;text-transform:uppercase;opacity:0.85}
+.dis-body{padding:20px 22px;display:flex;flex-direction:column;gap:8px;justify-content:center}
+.dis-head{font:italic 400 18px/1.25 'DM Serif Display';color:var(--ink-0);letter-spacing:-0.012em}
+.dis-text{font:500 12px/1.5 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.02em}
+.dis-text b{color:var(--ink-0);font-weight:600}
+.dis-wave{padding:20px 18px;border-left:1px solid var(--gold);display:flex;align-items:center;gap:2px;background:var(--void-6)}
+.dis-wave span{flex:1;background:var(--gold);opacity:0.85}
+.dis-wave span:nth-child(1){height:30%}.dis-wave span:nth-child(2){height:55%}.dis-wave span:nth-child(3){height:85%}.dis-wave span:nth-child(4){height:70%}.dis-wave span:nth-child(5){height:45%}.dis-wave span:nth-child(6){height:65%}.dis-wave span:nth-child(7){height:90%}.dis-wave span:nth-child(8){height:60%}.dis-wave span:nth-child(9){height:38%}.dis-wave span:nth-child(10){height:55%}.dis-wave span:nth-child(11){height:75%}.dis-wave span:nth-child(12){height:40%}.dis-wave span:nth-child(13){height:65%}.dis-wave span:nth-child(14){height:30%}
+/* b-side */
+.bside-head{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid var(--gold);margin-bottom:22px}
+.bside-title{font:italic 400 42px/0.95 'DM Serif Display';color:var(--ink-0);letter-spacing:-0.024em}
+.bside-sub{font:600 10px/1 'JetBrains Mono';color:var(--gold);letter-spacing:0.20em;text-transform:uppercase}
+.q-row{display:grid;grid-template-columns:60px 60px 1fr 70px 50px;gap:18px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer;align-items:center;transition:all 240ms var(--spring)}
+.q-row:hover{background:linear-gradient(90deg,rgba(212,167,91,0.06),transparent 70%);padding-left:8px}
+.q-row.lead{padding:22px 0;grid-template-rows:auto auto;border-bottom:1px solid var(--gold)}
+.q-num{font:600 11px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.04em;font-variant-numeric:tabular-nums;align-self:start;padding-top:8px}
+.q-row.lead .q-num{color:var(--gold);font-size:13px;font-weight:700}
+.q-art{width:60px;height:60px;background:linear-gradient(135deg,#3A1F2A,#2A1A22);border:1px solid var(--border);position:relative;align-self:start}
+.q-art::before{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.q-art::after{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 50% 50%,transparent 5%,rgba(232,222,201,0.04) 5.5%,transparent 6%,transparent 11%,rgba(232,222,201,0.04) 11.5%,transparent 12%,transparent 17%,rgba(232,222,201,0.04) 17.5%,transparent 18%)}
+.q-row.lead .q-art{width:72px;height:72px}
+.q-row:nth-child(3) .q-art{background:linear-gradient(135deg,#2A3A1F,#1A2A14)}
+.q-row:nth-child(4) .q-art{background:linear-gradient(135deg,#3A2A1F,#2A1F14)}
+.q-body{display:flex;flex-direction:column;gap:3px}
+.q-name{font:italic 400 16px/1.15 'DM Serif Display';color:var(--ink-0);letter-spacing:-0.012em}
+.q-row.lead .q-name{font:italic 400 30px/1.04 'DM Serif Display';letter-spacing:-0.024em}
+.q-artist{font:600 11px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.02em;text-transform:uppercase}
+.q-reason{grid-column:3/-1;font:italic 400 17px/1.45 'DM Serif Display';color:var(--ink-1);margin-top:8px;letter-spacing:-0.005em;max-width:580px;padding-left:14px;border-left:2px solid var(--gold)}
+.q-bpm{font:600 13px/1 'JetBrains Mono';color:var(--ink-1);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right}
+.q-cam{font:600 13px/1 'JetBrains Mono';color:var(--burgundy-soft);letter-spacing:0.02em;font-variant-numeric:tabular-nums;text-align:right}
+/* panel */
+.panel{width:var(--panel-w);background:var(--void-0);border-left:1px solid var(--border);padding:54px 0;display:flex;flex-direction:column;flex-shrink:0;z-index:2;overflow-y:auto}
+.p-section{font:600 10px/1 'JetBrains Mono';color:var(--gold);letter-spacing:0.20em;text-transform:uppercase;padding:11px 22px;background:var(--void-3);border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.p-section:first-child{border-top:0}
+.p-section::before{content:'';width:20px;height:1px;background:var(--gold)}
+.p-card{padding:14px 22px;border-bottom:1px dashed var(--border);cursor:pointer;transition:all 200ms var(--spring)}
+.p-card:hover{background:rgba(212,167,91,0.06)}
+.p-cite{font:600 10px/1 'JetBrains Mono';color:var(--gold);letter-spacing:0.10em;font-variant-numeric:tabular-nums;margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;gap:7px;text-shadow:0 0 6px rgba(212,167,91,0.3)}
+.p-cite::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gold)}
+.p-text{font:italic 400 15px/1.45 'DM Serif Display';color:var(--ink-1);letter-spacing:-0.005em}
+.p-text b{color:var(--ink-0);font-weight:600;font-style:normal;font-family:'JetBrains Mono';font-size:13px}
+.p-attr{display:block;margin-top:8px;font:600 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.14em;text-transform:uppercase;font-style:normal}
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:9px;padding:10px 16px;background:var(--void-3);color:var(--gold);font:600 10px/1 'JetBrains Mono';letter-spacing:0.18em;text-transform:uppercase;z-index:60;border:1px solid var(--gold);border-radius:4px;box-shadow:0 0 18px rgba(212,167,91,0.18)}
+.studio-status::before{content:'';width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at center,var(--void-0) 24%,var(--gold) 24%);animation:spin 3s linear infinite}
+
+/* ════════════════════ APPLE-ENGINEER POLISH PASS ════════════════════ */
+:root{--bpm-beat:461ms;--bpm-bar:1846ms;--spring-snap:cubic-bezier(0.34,1.56,0.64,1);--spring-soft:cubic-bezier(0.16,1,0.3,1);--ease-out-quart:cubic-bezier(0.165,0.84,0.44,1);--focus-ring:0 0 0 2px var(--void-0),0 0 0 4px var(--gold)}
+html{scroll-behavior:smooth}
+*{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+::selection{background:var(--gold);color:var(--void-0);text-shadow:none}
+.cohost-line::selection,.sleeve-title-1::selection{background:var(--rose);color:var(--void-0)}
+:focus{outline:0}
+:focus-visible{outline:0;box-shadow:var(--focus-ring);border-radius:4px;transition:box-shadow 120ms var(--ease-out-quart)}
+/* card-level focus rings */
+.ni:focus-visible,.sess:focus-visible,.persona-pill:focus-visible{box-shadow:inset 0 0 0 2px var(--gold)}
+.cite:focus-visible{box-shadow:0 0 0 3px var(--gold),0 0 0 5px var(--void-0)}
+.q-row:focus-visible,.p-card:focus-visible{box-shadow:inset 0 0 0 1px var(--gold),inset 4px 0 0 var(--gold)}
+/* spring transitions */
+.q-row,.p-card,.sess,.dispatch{transition:background 280ms var(--spring-soft),border-color 280ms var(--spring-soft),transform 380ms var(--spring-snap),padding-left 280ms var(--spring-soft),box-shadow 280ms var(--spring-soft)}
+.q-row:hover{transform:translateX(2px)}
+.p-card:hover{transform:translateX(3px)}
+.dispatch:hover{transform:translateY(-2px)}
+/* active press */
+.ni:active,.sess:active,.persona-pill:active,.q-row:active,.p-card:active,.cite:active,.dispatch:active{transform:scale(0.985);transition:transform 80ms var(--ease-out-quart)}
+/* text wrap balance */
+.cohost-line,.queue-title,.bside-title,.sleeve-title-1{text-wrap:balance}
+.sleeve-stamp,.q-reason{text-wrap:pretty}
+/* BPM-locked groove pulse */
+.dot,.tb-dot,.ch-dot,.studio-status::before,.g-cell.current,.bh-mark{animation-timing-function:cubic-bezier(0.4,0,0.6,1)}
+.dot,.tb-dot,.ch-dot{animation:dj-pulse var(--bpm-beat) infinite}
+@keyframes dj-pulse{0%,100%{opacity:0.7;transform:scale(1)}50%{opacity:1;transform:scale(1.15)}}
+/* sleeve rotates faster on hover — DJ scratching */
+.sleeve-row .sleeve:hover .sleeve-record{animation-duration:2s}
+.sleeve-record{transition:filter 280ms var(--spring-soft)}
+.sleeve-row .sleeve:hover .sleeve-record{filter:drop-shadow(-16px 0 36px rgba(212,167,91,0.45))}
+/* cite chip pop */
+.cite{transition:all 240ms var(--spring-snap);transform-origin:center}
+.cite:hover{transform:translateY(-0.04em) scale(1.04)}
+.cite:hover::after{content:' ↗';margin-left:2px;opacity:0.7}
+/* cursor */
+.ni,.sess,.persona-pill,.cohost-pill,.q-row,.p-card,.cite,.dispatch,.sleeve{cursor:pointer}
+.sleeve{cursor:grab}
+.sleeve:active{cursor:grabbing}
+/* prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;scroll-behavior:auto !important}
+}
+/* tonal scrollbar */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(212,167,91,0.20);border-radius:5px;border:2px solid var(--void-0)}
+::-webkit-scrollbar-thumb:hover{background:rgba(212,167,91,0.36)}
+/* skip-link */
+.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+.skip-link:focus{position:fixed;left:18px;top:42px;width:auto;height:auto;padding:9px 14px;background:var(--gold);color:var(--void-0);z-index:200;font:700 11px/1 'JetBrains Mono';letter-spacing:0.14em;text-transform:uppercase;text-decoration:none;border-radius:3px}
+/* loading skeleton for q-row art (subtle) — variable position via cycling animation */
+.q-art::before{transition:transform 380ms var(--spring-snap)}
+.q-row:hover .q-art::before{transform:translate(-50%,-50%) scale(1.4);box-shadow:0 0 12px rgba(212,167,91,0.5)}
+/* optical fix on serif italics */
+.sleeve-title-1,.cohost-line{letter-spacing:-0.024em}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#stage-scroll">Skip to content</a>
+<div class="chrome"><div class="tl"><span></span><span></span><span></span></div><div class="chrome-meta">VIBEMIX RECORDS · CAT. 047 · A1</div></div>
+<div class="row">
+  <aside class="sb">
+    <div class="label"><div class="label-cat">cat. 047</div><div class="label-name">vibemix</div><div class="label-strap"><span class="dot"></span>spinning</div></div>
+    <div class="sect">surfaces</div>
+    <nav class="nav">
+      <div class="ni active">Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni">Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni">Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni">Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni">Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tonight's pressings</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · 01:47</div></div>
+    <div class="sess"><div class="sess-name">Backroom warmup</div><div class="sess-meta">19:30 · 02:30</div></div>
+    <div class="sb-foot">
+      <div class="persona"><div class="persona-pill active">Hype</div><div class="persona-pill">Coach</div><div class="persona-pill">Tutor</div></div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">on the platter</div><div class="ch-mode">hype, ears open</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll" id="stage-scroll" tabindex="-1">
+      <div class="sleeve-row">
+        <div class="sleeve">
+          <div class="sleeve-cat">VBM-047 · Side A1</div>
+          <div class="sleeve-side">A1</div>
+          <div class="sleeve-record"></div>
+          <div class="sleeve-title"><div class="sleeve-title-1">Velvet Underground</div><div class="sleeve-title-2">— a wednesday-night berlin set</div></div>
+          <div class="sleeve-stamp"><span>VBM-047 / 33⅓ RPM</span><span><b>02:14</b> / 47:12</span></div>
+        </div>
+        <div class="sleeve-info">
+          <div class="si-cat">notes from the inner sleeve</div>
+          <div class="si-grid">
+            <span>BPM</span><b>130.0</b>
+            <span>KEY</span><span class="v-gold"><b>8A → 9A</b></span>
+            <span>HEAT</span><span class="v-rose"><b>0.78</b></span>
+            <span>PHRASE</span><b>14 / 16</b>
+            <span>RUNTIME</span><b>47:12</b>
+          </div>
+          <div class="cohost-line">That low-end <em>just opened up</em> — keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></div>
+        </div>
+      </div>
+      <div class="groove">
+        <span class="g-l">groove</span>
+        <span class="g-n">12</span>
+        <div class="g-bar">
+          <span class="g-cell fired"></span><span class="g-cell fired"></span><span class="g-cell fired"></span><span class="g-cell fired"></span>
+          <span class="g-cell fired"></span><span class="g-cell fired"></span><span class="g-cell fired"></span><span class="g-cell fired"></span>
+          <span class="g-cell fired"></span><span class="g-cell fired"></span><span class="g-cell fired"></span><span class="g-cell fired"></span>
+          <span class="g-cell fired"></span><span class="g-cell current"></span><span class="g-cell"></span><span class="g-cell"></span>
+        </div>
+        <span class="g-n">16</span>
+      </div>
+      <div class="dispatch">
+        <div class="dis-stamp"><div class="dis-stamp-l">kick 60Hz</div><div class="dis-stamp-v">+3.2dB</div><div class="dis-stamp-s">4 bars · locked</div></div>
+        <div class="dis-body"><div class="dis-head">Sub-bass crest, four bars deep.</div><div class="dis-text"><b>Sub-bass gain rose 3.2 dB</b> across four bars (02:11 → 02:15). The floor committed at phrase 13.</div></div>
+        <div class="dis-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div>
+        <div class="bside-head"><div class="bside-title">B-side · next up</div><div class="bside-sub">— 3 tracks queued for spin</div></div>
+        <div class="q-row lead">
+          <div class="q-num">B1</div>
+          <div class="q-art"></div>
+          <div class="q-body"><div class="q-name">Vox Dust ii</div><div class="q-artist">SHRIM · the dust album</div></div>
+          <div class="q-bpm">130</div>
+          <div class="q-cam">9A</div>
+          <div class="q-reason">The dust on this one mirrors the breakdown you just rode — same hi-hat ghost, half-step up.</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">B2</div>
+          <div class="q-art"></div>
+          <div class="q-body"><div class="q-name">Marrow (VTSS rmx)</div><div class="q-artist">Tygapaw · Marrow</div></div>
+          <div class="q-bpm">132</div>
+          <div class="q-cam">10A</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">B3</div>
+          <div class="q-art"></div>
+          <div class="q-body"><div class="q-name">Sleeper</div><div class="q-artist">Forester · Untitled.05</div></div>
+          <div class="q-bpm">128</div>
+          <div class="q-cam">8A</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">liner notes</div>
+    <div class="p-card"><div class="p-cite">02:14 · kick 60Hz</div><div class="p-text">Low-end opened — sub-bass rose <b>3.2 dB</b> across four bars.<span class="p-attr">cite locked</span></div></div>
+    <div class="p-card"><div class="p-cite">02:09 · phrase 12</div><div class="p-text">Filter sweep started, <b>hi-band fell 8 dB</b>.<span class="p-attr">cite locked</span></div></div>
+    <div class="p-section">b-side preview</div>
+    <div class="p-card"><div class="p-cite">02:30 · drop-in</div><div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">0.91 conf</span></div></div>
+  </aside>
+</div>
+<div class="studio-status">spinning · 47:12</div>
+</body>
+</html>

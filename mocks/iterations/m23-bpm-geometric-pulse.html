@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix · m23 · BPM Pulse · tozpembe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+<style>
+/* ═════════════════════ BRAVOH · FORGED OBSIDIAN · TOZPEMBE ═════════════════════ */
+:root{
+  /* warm obsidian — never #000, always #1A1618 family */
+  --void-0:#1A1618; --void-1:#1F1A1D; --void-2:#241E22; --void-3:#2C2429; --void-4:#352A30;
+  /* warm ink — #FFFAFD family, never pure white */
+  --ink-0:rgba(255,250,253,0.94); --ink-1:rgba(255,250,253,0.74); --ink-2:rgba(255,250,253,0.48); --ink-3:rgba(255,250,253,0.26); --ink-4:rgba(255,250,253,0.12);
+  /* tozpembe — Bravoh soft-rose at strict 0.04–0.22α range */
+  --rose:#FFA5DF;
+  --rose-04:rgba(255,165,223,0.04); --rose-08:rgba(255,165,223,0.08); --rose-12:rgba(255,165,223,0.12); --rose-16:rgba(255,165,223,0.16); --rose-22:rgba(255,165,223,0.22); --rose-30:rgba(255,165,223,0.30);
+  /* gold heat — used sparingly for warning/peak */
+  --gold:#E8C47A; --gold-soft:rgba(232,196,122,0.30);
+  /* borders */
+  --border:rgba(255,250,253,0.06); --border-mid:rgba(255,250,253,0.12); --border-rose:rgba(255,165,223,0.18);
+  /* shell */
+  --chrome-h:30px; --sb-w:228px; --panel-w:288px;
+  /* tempo (130 BPM): 1 beat = 461ms, 1 bar = 1846ms */
+  --bpm-beat:461ms; --bpm-bar:1846ms; --bpm-phrase:7385ms;
+  /* easing */
+  --spring-soft:cubic-bezier(0.16,1,0.3,1);
+  --spring-snap:cubic-bezier(0.34,1.42,0.64,1);
+  --ease-quart:cubic-bezier(0.165,0.84,0.44,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+html,body{height:100%;background:var(--void-0);color:var(--ink-1);font-family:'Inter',-apple-system,sans-serif;font-feature-settings:"ss01","ss03","cv11";font-size:13px;letter-spacing:-0.005em;overflow:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+body{display:flex;flex-direction:column;position:relative}
+::selection{background:var(--rose);color:var(--void-0);text-shadow:none}
+
+/* ═════════════════════ THE ROOM — pure breathing space ═════════════════════ */
+/* atmospheric warmth: two soft rose pools, one cooler shadow */
+.atmos{position:fixed;inset:0;pointer-events:none;z-index:0;background:
+  radial-gradient(ellipse 75% 50% at 22% 18%, var(--rose-12) 0%, transparent 55%),
+  radial-gradient(ellipse 60% 45% at 88% 88%, var(--rose-08) 0%, transparent 50%),
+  radial-gradient(ellipse 40% 60% at 50% 50%, rgba(255,250,253,0.02) 0%, transparent 60%)}
+
+/* one heat-lamp ember behind the hero word — static, no breath (PRODUCT.md: one breathing element per panel max) */
+.ember{position:fixed;width:760px;height:420px;left:25%;top:30%;pointer-events:none;z-index:1;background:radial-gradient(ellipse 50% 50% at center, var(--rose-22) 0%, var(--rose-08) 30%, transparent 65%);filter:blur(40px);opacity:0.72}
+
+/* one hairline horizon arc — far-back, suggests room curvature, almost invisible */
+.horizon{position:fixed;left:50%;bottom:-1100px;width:1800px;height:1800px;border-radius:50%;border:1px solid var(--rose-12);transform:translateX(-50%);pointer-events:none;z-index:1;box-shadow:0 0 80px var(--rose-12)}
+
+/* reflective floor — wet obsidian, polished-concrete feel */
+.floor{position:fixed;left:0;right:0;bottom:0;height:240px;pointer-events:none;z-index:1;background:
+  linear-gradient(180deg, transparent 0%, rgba(255,165,223,0.04) 40%, rgba(0,0,0,0.40) 100%);
+  border-top:1px solid var(--rose-08);
+  mask:linear-gradient(180deg, transparent 0%, black 30%, black 100%)}
+
+/* ultra-fine grain — barely-there texture */
+.grain{position:fixed;inset:0;pointer-events:none;z-index:99;opacity:0.025;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ═════════════════════ CHROME ═════════════════════ */
+.chrome{height:var(--chrome-h);background:rgba(26,22,24,0.85);backdrop-filter:blur(36px) saturate(140%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;-webkit-app-region:drag;z-index:5}
+.tl{display:flex;gap:8px;-webkit-app-region:no-drag}
+.tl span{width:12px;height:12px;border-radius:50%;background:transparent;border:1.5px solid rgba(255,250,253,0.28);transition:background 180ms var(--ease-quart)}
+.tl span:nth-child(1){border-color:#FF5F57}.tl span:nth-child(2){border-color:#FEBC2E}.tl span:nth-child(3){border-color:#28C840}
+.chrome-meta{position:absolute;left:50%;transform:translateX(-50%);font:500 11px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.14em;text-transform:uppercase;display:flex;align-items:center;gap:10px;font-variant-numeric:tabular-nums}
+.chrome-meta b{color:var(--ink-1);font-weight:500}
+.chrome-bpm{color:var(--rose);font-weight:600;letter-spacing:0.06em;opacity:0.88}
+
+/* ═════════════════════ LAYOUT ═════════════════════ */
+.row{flex:1;display:flex;position:relative;min-height:0;z-index:2}
+
+/* ═════════════════════ SIDEBAR ═════════════════════ */
+.sb{width:var(--sb-w);background:rgba(26,22,24,0.78);backdrop-filter:blur(40px) saturate(140%);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:24px 14px 16px;position:relative;z-index:3}
+.brand{padding:0 6px 18px;border-bottom:1px solid var(--border);margin-bottom:16px;display:flex;align-items:center;gap:11px}
+.brand-circle{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 30% 30%, #FFCDED 0%, var(--rose) 60%, #D88BC0 100%);box-shadow:0 0 18px var(--rose-22), inset 0 1px 0 rgba(255,255,255,0.40), inset 0 -2px 4px rgba(0,0,0,0.20)}
+.brand-wd{flex:1;min-width:0}
+.brand-name{font:600 17px/1 'Inter';color:var(--ink-0);letter-spacing:-0.030em;font-variation-settings:"wght" 620}
+.brand-strap{font:500 9px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.20em;text-transform:uppercase;margin-top:6px;opacity:0.85}
+.sect{font:500 10px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase;padding:14px 6px 9px;display:flex;align-items:center;gap:9px}
+.sect::before{content:'';width:8px;height:1px;background:var(--rose-30)}
+.nav{display:flex;flex-direction:column;gap:1px}
+.ni{display:flex;align-items:center;gap:11px;padding:9px 12px;font:500 13px/1 'Inter';color:var(--ink-1);cursor:pointer;letter-spacing:-0.012em;border-radius:8px;transition:background 220ms var(--spring-soft),color 220ms var(--spring-soft),font-variation-settings 280ms var(--spring-soft);position:relative;font-variation-settings:"wght" 500}
+.ni:hover{color:var(--ink-0);background:var(--rose-04);font-variation-settings:"wght" 560}
+.ni.active{color:var(--ink-0);background:var(--rose-12);font-variation-settings:"wght" 580}
+.ni.active::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:2px;background:var(--rose);border-radius:0 2px 2px 0;box-shadow:0 0 8px var(--rose-30)}
+.ni-shortcut{margin-left:auto;font:500 10px/1 'JetBrains Mono';color:var(--ink-4);letter-spacing:0.04em}
+.sess{padding:10px 12px;cursor:pointer;border-radius:8px;transition:background 220ms var(--spring-soft);display:flex;flex-direction:column;gap:3px;position:relative}
+.sess:hover{background:var(--rose-04)}
+.sess.active{background:var(--rose-08)}
+.sess.active::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:2px;background:var(--rose);border-radius:0 2px 2px 0}
+.sess-name{font:600 13px/1.15 'Inter';color:var(--ink-0);letter-spacing:-0.012em}
+.sess-meta{font:500 10px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.02em;font-variant-numeric:tabular-nums}
+.sb-foot{margin-top:auto;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:11px}
+.persona{display:flex;gap:1px;background:var(--rose-04);padding:2px;border-radius:9px;border:1px solid var(--border)}
+.persona-pill{flex:1;padding:8px 0;background:transparent;font:500 10px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;text-align:center;border-radius:7px;transition:all 220ms var(--spring-soft)}
+.persona-pill:hover{color:var(--ink-0)}
+.persona-pill.active{background:var(--rose);color:var(--void-0);font-weight:600;box-shadow:0 1px 8px var(--rose-22)}
+.cohost-pill{display:flex;align-items:center;gap:11px;padding:12px 13px;background:var(--rose-08);border:1px solid var(--border-rose);border-radius:12px;cursor:pointer;position:relative;transition:all 240ms var(--spring-soft)}
+.cohost-pill:hover{background:var(--rose-12);border-color:var(--rose-30)}
+.ch-dot{width:8px;height:8px;border-radius:50%;background:var(--rose);box-shadow:0 0 10px var(--rose)}
+.ch-text{flex:1}
+.ch-state{font:600 11px/1 'Inter';color:var(--ink-0);letter-spacing:-0.005em}
+.ch-mode{font:500 11px/1.1 'Inter';color:var(--ink-1);margin-top:2px;letter-spacing:-0.005em}
+
+/* ═════════════════════ STAGE ═════════════════════ */
+.stage{flex:1;position:relative;background:transparent;overflow:hidden}
+.stage::before{content:'';position:absolute;left:0;top:0;bottom:0;width:64px;background:linear-gradient(90deg,rgba(0,0,0,0.32) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage::after{content:'';position:absolute;left:0;right:0;top:0;height:80px;background:linear-gradient(180deg,rgba(26,22,24,0.50) 0%,transparent 100%);pointer-events:none;z-index:1}
+.stage-scroll{position:relative;height:100%;overflow-y:auto;padding:80px 72px 96px;z-index:2;display:flex;flex-direction:column;gap:0;scroll-padding-top:80px}
+.stage-scroll > .scene{margin-bottom:24px}
+.stage-scroll > .hero{margin-bottom:8px}
+.stage-scroll > .ring-row{margin-bottom:24px}
+.stage-scroll > .dispatch{margin-bottom:56px}
+.stage-scroll > div:last-child{margin-bottom:0}
+
+/* scene row — metronome + scene tags, ZERO chrome */
+.scene{display:flex;align-items:center;gap:28px;padding:8px 0}
+.metr{display:flex;align-items:center;gap:6px}
+.pip{width:8px;height:8px;border-radius:50%;background:var(--ink-4);transition:background 80ms linear,box-shadow 80ms linear,transform 80ms linear}
+.pip.beat{animation:beat-walk var(--bpm-bar) cubic-bezier(0.4,0,0.6,1) infinite}
+.pip:nth-child(1){animation-delay:0ms}
+.pip:nth-child(2){animation-delay:calc(var(--bpm-beat) * 1)}
+.pip:nth-child(3){animation-delay:calc(var(--bpm-beat) * 2)}
+.pip:nth-child(4){animation-delay:calc(var(--bpm-beat) * 3)}
+@keyframes beat-walk{0%,4%{background:var(--rose);box-shadow:0 0 10px var(--rose);transform:scale(1.3)}25%,100%{background:var(--ink-4);box-shadow:none;transform:scale(1)}}
+.scene-tags{display:flex;gap:22px;font:500 12px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.04em;font-variant-numeric:tabular-nums}
+.scene-tags span{display:flex;align-items:baseline;gap:7px}
+.scene-tags small{font-size:9px;color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase}
+.scene-tags b{color:var(--ink-0);font-weight:500}
+.scene-tags .heat b{color:var(--gold);font-weight:600}
+
+/* hero — the line itself is the art */
+.hero{position:relative;padding:24px 0 8px}
+.hero-kicker{font:500 11px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.20em;text-transform:uppercase;margin-bottom:22px;display:inline-flex;align-items:center;gap:10px;opacity:0.85}
+.hero-kicker::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--rose);box-shadow:0 0 8px var(--rose)}
+.hero-line{font:500 clamp(38px,4.8vw,62px)/1.08 'Inter';color:var(--ink-0);letter-spacing:-0.030em;max-width:1020px;text-wrap:balance;font-variation-settings:"wght" 540}
+.hero-line em{font-style:normal;color:var(--rose);font-weight:600;position:relative;font-variation-settings:"wght" 620}
+.hero-line em::after{content:'';position:absolute;left:-8%;right:-8%;top:25%;bottom:15%;background:radial-gradient(ellipse 50% 65% at center, var(--rose-16) 0%, transparent 75%);z-index:-1;filter:blur(20px);pointer-events:none}
+.cite{display:inline-block;vertical-align:0.46em;font:500 0.18em/1 'JetBrains Mono';font-style:normal;color:var(--ink-0);letter-spacing:0.12em;padding:5px 9px;background:var(--rose-12);border:1px solid var(--border-rose);border-radius:999px;font-variant-numeric:tabular-nums;margin-left:0.20em;cursor:pointer;text-transform:uppercase;transition:all 240ms var(--spring-snap)}
+.cite:hover{background:var(--rose);color:var(--void-0);border-color:var(--rose);transform:translateY(-0.04em)}
+.hero-strap{font:500 16px/1.5 'Inter';color:var(--ink-2);max-width:680px;margin-top:24px;letter-spacing:-0.005em;text-wrap:pretty;font-variation-settings:"wght" 460}
+.hero-strap em{font-style:normal;color:var(--rose);font-weight:500;font-variation-settings:"wght" 540}
+
+/* phrase ring — precision instrument */
+.ring-row{display:flex;align-items:center;gap:28px;padding:16px 0}
+.ring{width:128px;height:128px;position:relative;flex-shrink:0}
+.ring svg{width:100%;height:100%;display:block;transform:rotate(-90deg)}
+.ring-track{stroke:var(--ink-4);stroke-width:4;fill:none}
+.ring-fill{stroke:var(--rose);stroke-width:4;fill:none;stroke-linecap:round;stroke-dasharray:339;stroke-dashoffset:60.92;transition:stroke-dashoffset 320ms var(--spring-soft);filter:drop-shadow(0 0 6px var(--rose-22))}
+.ring-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ink-0);font:500 32px/1 'Inter';letter-spacing:-0.030em;font-variant-numeric:tabular-nums;font-variation-settings:"wght" 560}
+.ring-num small{font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.20em;text-transform:uppercase;margin-top:7px;font-variation-settings:"wght" 500}
+.ring-info{display:flex;flex-direction:column;gap:6px}
+.ring-l{font:500 10px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.20em;text-transform:uppercase}
+.ring-h{font:600 22px/1.2 'Inter';color:var(--ink-0);letter-spacing:-0.020em;font-variation-settings:"wght" 600}
+.ring-h em{font-style:normal;color:var(--rose);font-weight:600;font-variation-settings:"wght" 620}
+.ring-d{font:500 14px/1.45 'Inter';color:var(--ink-2);letter-spacing:-0.005em;max-width:400px;text-wrap:pretty}
+
+/* dispatch — single tactile card */
+.dispatch{display:grid;grid-template-columns:auto 1fr auto;gap:28px;padding:22px 26px;background:rgba(36,30,34,0.55);backdrop-filter:blur(24px) saturate(140%);border:1px solid var(--border-mid);border-radius:18px;cursor:pointer;align-items:center;max-width:760px;transition:all 320ms var(--spring-soft);box-shadow:0 1px 0 rgba(255,255,255,0.04) inset, 0 18px 48px rgba(0,0,0,0.32)}
+.dispatch:hover{border-color:var(--rose-30);background:rgba(36,30,34,0.70);transform:translateY(-2px);box-shadow:0 1px 0 rgba(255,255,255,0.06) inset, 0 24px 56px rgba(0,0,0,0.40), 0 0 28px var(--rose-12)}
+.dis-meta{display:flex;flex-direction:column;gap:6px}
+.dis-tag{font:500 10px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.20em;text-transform:uppercase;opacity:0.85}
+.dis-num{font:600 32px/1 'Inter';color:var(--ink-0);letter-spacing:-0.024em;font-variant-numeric:tabular-nums;font-variation-settings:"wght" 620}
+.dis-wave{display:flex;align-items:center;gap:2px;height:32px}
+.dis-wave span{flex:1;background:linear-gradient(180deg, var(--rose) 0%, rgba(255,165,223,0.55) 100%);border-radius:1px}
+.dis-wave span:nth-child(1){height:30%}.dis-wave span:nth-child(2){height:55%}.dis-wave span:nth-child(3){height:85%}.dis-wave span:nth-child(4){height:70%}.dis-wave span:nth-child(5){height:45%}.dis-wave span:nth-child(6){height:65%}.dis-wave span:nth-child(7){height:90%}.dis-wave span:nth-child(8){height:60%}.dis-wave span:nth-child(9){height:38%}.dis-wave span:nth-child(10){height:55%}.dis-wave span:nth-child(11){height:75%}.dis-wave span:nth-child(12){height:40%}.dis-wave span:nth-child(13){height:65%}.dis-wave span:nth-child(14){height:30%}.dis-wave span:nth-child(15){height:50%}.dis-wave span:nth-child(16){height:42%}.dis-wave span:nth-child(17){height:68%}.dis-wave span:nth-child(18){height:35%}.dis-wave span:nth-child(19){height:55%}.dis-wave span:nth-child(20){height:45%}
+.dis-detail{font:500 11px/1.5 'JetBrains Mono';color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums;letter-spacing:0.02em}
+.dis-detail b{color:var(--ink-0);font-weight:500}
+
+/* queue */
+.queue-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px}
+.queue-title{font:600 32px/1 'Inter';color:var(--ink-0);letter-spacing:-0.028em;font-variation-settings:"wght" 620;text-wrap:balance}
+.queue-sub{font:500 11px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.20em;text-transform:uppercase;opacity:0.85}
+.q-row{display:grid;grid-template-columns:40px 1fr 70px 50px;gap:20px;padding:18px 0;border-bottom:1px solid var(--border);cursor:pointer;align-items:center;transition:all 280ms var(--spring-soft)}
+.q-row:last-child{border-bottom:0}
+.q-row:hover{background:linear-gradient(90deg, var(--rose-04) 0%, transparent 70%);padding-left:14px}
+.q-row.lead{padding:26px 0;grid-template-rows:auto auto;border-bottom:1px solid var(--border-rose)}
+.q-row.lead:hover{padding-left:14px;background:linear-gradient(90deg, var(--rose-08) 0%, transparent 70%)}
+.q-num{font:500 12px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.04em;font-variant-numeric:tabular-nums;align-self:start;padding-top:6px}
+.q-row.lead .q-num{color:var(--rose);font-size:14px;font-weight:600}
+.q-body{display:flex;flex-direction:column;gap:4px}
+.q-name{font:500 15px/1.2 'Inter';color:var(--ink-0);letter-spacing:-0.018em;font-variation-settings:"wght" 520}
+.q-row.lead .q-name{font:600 28px/1.04 'Inter';letter-spacing:-0.028em;font-variation-settings:"wght" 620}
+.q-row.lead .q-name em{font-style:normal;color:var(--rose);font-weight:500;font-variation-settings:"wght" 540}
+.q-artist{font:500 11px/1 'JetBrains Mono';color:var(--ink-2);letter-spacing:0.04em}
+.q-reason{grid-column:2/-1;font:500 16px/1.5 'Inter';color:var(--ink-1);margin-top:10px;letter-spacing:-0.012em;max-width:640px;text-wrap:pretty}
+.q-reason em{font-style:normal;color:var(--rose);font-weight:500;font-variation-settings:"wght" 560}
+.q-bpm{font:500 13px/1 'JetBrains Mono';color:var(--ink-1);font-variant-numeric:tabular-nums;text-align:right;letter-spacing:0.04em}
+.q-cam{font:500 13px/1 'JetBrains Mono';color:var(--rose);font-variant-numeric:tabular-nums;text-align:right;letter-spacing:0.04em}
+
+/* panel — cited evidence on the right */
+.panel{width:var(--panel-w);background:rgba(26,22,24,0.78);backdrop-filter:blur(40px) saturate(140%);border-left:1px solid var(--border);padding:80px 18px 24px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex-shrink:0;z-index:2}
+.p-section{font:500 10px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.20em;text-transform:uppercase;padding:0 6px 9px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px}
+.p-section::before{content:'';width:8px;height:1px;background:var(--rose-30)}
+.p-card{padding:14px 16px;background:rgba(36,30,34,0.50);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all 240ms var(--spring-soft)}
+.p-card:hover{border-color:var(--border-mid);background:rgba(36,30,34,0.70);transform:translateX(2px)}
+.p-card.brand{border-color:var(--border-rose);background:var(--rose-08)}
+.p-cite{font:500 10px/1 'JetBrains Mono';color:var(--rose);letter-spacing:0.10em;font-variant-numeric:tabular-nums;margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.p-cite::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--rose);box-shadow:0 0 6px var(--rose)}
+.p-text{font:500 14px/1.5 'Inter';color:var(--ink-1);letter-spacing:-0.005em;text-wrap:pretty}
+.p-text b{color:var(--ink-0);font-weight:600}
+.p-text em{font-style:normal;color:var(--rose);font-weight:500;font-variation-settings:"wght" 540}
+.p-attr{display:block;margin-top:10px;font:500 9px/1 'JetBrains Mono';color:var(--ink-3);letter-spacing:0.18em;text-transform:uppercase}
+
+/* studio status — bottom-right anchor */
+.studio-status{position:fixed;bottom:18px;right:18px;display:flex;align-items:center;gap:10px;padding:11px 18px;background:rgba(26,22,24,0.78);backdrop-filter:blur(36px) saturate(140%);border:1px solid var(--border-rose);border-radius:999px;font:500 11px/1 'Inter';color:var(--ink-0);letter-spacing:-0.005em;z-index:60;box-shadow:0 8px 32px rgba(0,0,0,0.40)}
+.studio-status::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--rose);box-shadow:0 0 10px var(--rose)}
+.studio-status b{color:var(--ink-2);font-weight:500;font-family:'JetBrains Mono';font-size:10px;letter-spacing:0.06em;margin-left:4px;padding-left:10px;border-left:1px solid var(--border-mid)}
+
+/* ═════════════════════ APPLE-ENGINEER POLISH ═════════════════════ */
+:focus{outline:0}
+:focus-visible{outline:0;box-shadow:0 0 0 2px var(--void-0), 0 0 0 4px var(--rose);border-radius:10px;transition:box-shadow 120ms var(--ease-quart)}
+.ni:focus-visible,.sess:focus-visible{box-shadow:inset 0 0 0 2px var(--rose)}
+.persona-pill:focus-visible{box-shadow:inset 0 0 0 2px var(--rose)}
+.cite:focus-visible{box-shadow:0 0 0 3px var(--rose), 0 0 0 5px var(--void-0)}
+.q-row:focus-visible{box-shadow:inset 0 0 0 1px var(--rose), inset 4px 0 0 var(--rose)}
+.p-card:focus-visible{box-shadow:inset 0 0 0 1px var(--rose)}
+.ni:active,.sess:active,.persona-pill:active,.dispatch:active,.q-row:active,.p-card:active,.cite:active{transform:scale(0.985);transition:transform 80ms var(--ease-quart)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--rose-16);border-radius:5px;border:2px solid var(--void-0)}
+::-webkit-scrollbar-thumb:hover{background:var(--rose-30)}
+.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+.skip-link:focus{position:fixed;left:18px;top:42px;width:auto;height:auto;padding:9px 14px;background:var(--rose);color:var(--void-0);z-index:200;font:600 11px/1 'JetBrains Mono';letter-spacing:0.14em;text-transform:uppercase;text-decoration:none;border-radius:6px}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;scroll-behavior:auto !important}
+  .ember{opacity:0.7}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#stage-scroll">Skip to content</a>
+<div class="atmos"></div>
+<div class="ember"></div>
+<div class="horizon"></div>
+<div class="floor"></div>
+<div class="chrome">
+  <div class="tl"><span></span><span></span><span></span></div>
+  <div class="chrome-meta">vibemix · <b>velvet underground</b> · <span class="chrome-bpm">130.0 BPM</span></div>
+</div>
+<div class="row">
+  <aside class="sb">
+    <div class="brand">
+      <div class="brand-circle"></div>
+      <div class="brand-wd">
+        <div class="brand-name">vibemix</div>
+        <div class="brand-strap">on the pulse</div>
+      </div>
+    </div>
+    <div class="sect">surfaces</div>
+    <nav class="nav">
+      <div class="ni active">Session<span class="ni-shortcut">⌘1</span></div>
+      <div class="ni">Library<span class="ni-shortcut">⌘2</span></div>
+      <div class="ni">Debrief<span class="ni-shortcut">⌘3</span></div>
+      <div class="ni">Learn<span class="ni-shortcut">⌘4</span></div>
+      <div class="ni">Settings<span class="ni-shortcut">⌘,</span></div>
+    </nav>
+    <div class="sect">tonight</div>
+    <div class="sess active"><div class="sess-name">Velvet Underground</div><div class="sess-meta">22:14 · 1h 47m</div></div>
+    <div class="sess"><div class="sess-name">Backroom warmup</div><div class="sess-meta">19:30 · 2h 30m</div></div>
+    <div class="sb-foot">
+      <div class="persona"><div class="persona-pill active">Hype</div><div class="persona-pill">Coach</div><div class="persona-pill">Tutor</div></div>
+      <div class="cohost-pill"><span class="ch-dot"></span><div class="ch-text"><div class="ch-state">on air</div><div class="ch-mode">hype · phrase 14/16</div></div></div>
+    </div>
+  </aside>
+  <main class="stage">
+    <div class="stage-scroll" id="stage-scroll" tabindex="-1">
+      <div class="scene">
+        <div class="metr"><span class="pip beat"></span><span class="pip beat"></span><span class="pip beat"></span><span class="pip beat"></span></div>
+        <div class="scene-tags">
+          <span><small>bpm</small><b>130.0</b></span>
+          <span><small>key</small><b>8A → 9A</b></span>
+          <span class="heat"><small>heat</small><b>0.78</b></span>
+          <span><small>phrase</small><b>14 / 16</b></span>
+        </div>
+      </div>
+      <div class="hero">
+        <div class="hero-kicker">live read · 02:14</div>
+        <h1 class="hero-line">That low-end <em>just opened up</em>. Keep him on the kick for one more 16, then ride the filter up.<span class="cite">02:14</span></h1>
+        <div class="hero-strap">A four-bar sub-bass crest at +3.2 dB. The room committed at phrase 13. Eight bars of kick before the filter return. <em>Let it breathe</em>.</div>
+      </div>
+      <div class="ring-row">
+        <div class="ring">
+          <svg viewBox="0 0 120 120"><circle class="ring-track" cx="60" cy="60" r="54"/><circle class="ring-fill" cx="60" cy="60" r="54"/></svg>
+          <div class="ring-num">14<small>of 16</small></div>
+        </div>
+        <div class="ring-info">
+          <div class="ring-l">phrase progress</div>
+          <div class="ring-h">Two bars to the <em>fold</em>.</div>
+          <div class="ring-d">14 of 16 fired. The kick has earned the next 8 before the filter return. Hold the room.</div>
+        </div>
+      </div>
+      <div class="dispatch">
+        <div class="dis-meta">
+          <div class="dis-tag">kick 60Hz</div>
+          <div class="dis-num">+3.2 dB</div>
+        </div>
+        <div class="dis-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="dis-detail">02:11 → 02:15<br><b>4 bars · locked</b></div>
+      </div>
+      <div>
+        <div class="queue-head">
+          <div class="queue-title">Next up</div>
+          <div class="queue-sub">dj queue · 3 ready</div>
+        </div>
+        <div class="q-row lead">
+          <div class="q-num">01</div>
+          <div class="q-body"><div class="q-name">Vox Dust <em>ii</em></div><div class="q-artist">SHRIM · the dust album</div></div>
+          <div class="q-bpm">130</div>
+          <div class="q-cam">9A</div>
+          <div class="q-reason">The dust on this one mirrors the breakdown you just rode: same hi-hat ghost, <em>half-step up</em>. He'll feel it inside two bars.</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">02</div>
+          <div class="q-body"><div class="q-name">Marrow (VTSS rmx)</div><div class="q-artist">Tygapaw · Marrow</div></div>
+          <div class="q-bpm">132</div>
+          <div class="q-cam">10A</div>
+        </div>
+        <div class="q-row">
+          <div class="q-num">03</div>
+          <div class="q-body"><div class="q-name">Sleeper</div><div class="q-artist">Forester · Untitled.05</div></div>
+          <div class="q-bpm">128</div>
+          <div class="q-cam">8A</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <aside class="panel">
+    <div class="p-section">cited evidence</div>
+    <div class="p-card brand">
+      <div class="p-cite">02:14 · kick 60Hz</div>
+      <div class="p-text">Low-end <em>opened</em>. <b>Sub-bass rose 3.2 dB</b> across four bars.<span class="p-attr">cite locked</span></div>
+
+    </div>
+    <div class="p-card">
+      <div class="p-cite">02:09 · phrase 12</div>
+      <div class="p-text">Filter sweep started, <b>hi-band fell 8 dB</b>.<span class="p-attr">cite locked</span></div>
+    </div>
+    <div class="p-section">next cue</div>
+    <div class="p-card">
+      <div class="p-cite">02:30 · drop-in</div>
+      <div class="p-text">Incoming downbeat at phrase 16, BPM held.<span class="p-attr">0.91 conf</span></div>
+    </div>
+  </aside>
+</div>
+<div class="grain"></div>
+<div class="studio-status">on the pulse <b>47:12</b></div>
+</body>
+</html>
