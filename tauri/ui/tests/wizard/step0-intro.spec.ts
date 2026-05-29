@@ -21,17 +21,22 @@ afterEach(() => {
 });
 
 describe("wizard intro hero (impeccable Wave 1.2)", () => {
-  it("renders three-line hero with amber V-lead + DJ FRIEND + slogan", () => {
+  it("renders three-line hero with the vibe·MIX two-tone trademark + DJ FRIEND + slogan", () => {
     const rendered = renderStep0Intro({ onBegin: () => {} });
     host().append(rendered);
 
     const wordmark = rendered.querySelector<HTMLElement>(".wizard-intro__wordmark");
-    const lead = rendered.querySelector<HTMLElement>(".wizard-intro__wordmark-lead");
+    // The hero carries the SAME trademark logic as the shell sidebar (rose on
+    // the "mix" syllable, not a v5-era lead "V"), so the first impression and
+    // the persistent chrome read as one brand.
+    const vibe = rendered.querySelector<HTMLElement>(".wizard-intro__wordmark-vibe");
+    const mix = rendered.querySelector<HTMLElement>(".wizard-intro__wordmark-mix");
     const phrase = rendered.querySelector<HTMLElement>(".wizard-intro__phrase");
     const slogan = rendered.querySelector<HTMLElement>(".wizard-intro__slogan");
 
     expect(wordmark?.textContent).toBe("VIBEMIX");
-    expect(lead?.textContent).toBe("V");
+    expect(vibe?.textContent).toBe("VIBE");
+    expect(mix?.textContent).toBe("MIX");
     expect(phrase?.textContent).toBe("DJ FRIEND");
     expect(slogan?.textContent?.toLowerCase()).toContain("in your ear");
   });

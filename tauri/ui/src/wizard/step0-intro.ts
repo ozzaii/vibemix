@@ -240,13 +240,14 @@ const CSS = `
     gap: 1px;
     filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.58));
   }
-  /* The "V" gets the amber lead. Single accent moment per DESIGN.md §5.
-   * 2026-05-19 /impeccable critique fix: dropped the second outer
-   * glow (0 0 28px var(--amber-22)). Two stacked outer halos on a
-   * single 68px character was the closest the wizard came to
-   * splash-screen feel — DESIGN.md §4 reserves the larger halo for
-   * primary action button hover/press. Single 12px halo is enough. */
-  .wizard-intro__wordmark-lead {
+  /* The trademark, hero-scale: "VIBE" in ink, "MIX" lit in rose — the same
+   * logic the shell sidebar carries, so the brand reads as one thing from the
+   * first paint. The lit syllable keeps a single 12px halo (DESIGN.md §4
+   * reserves the larger halo for primary-action hover/press; no second halo). */
+  .wizard-intro__wordmark-vibe {
+    color: var(--silk);
+  }
+  .wizard-intro__wordmark-mix {
     color: var(--amber);
     font-variation-settings: "wdth" 82, "wght" 800;
     text-shadow: 0 0 12px var(--amber-40);
@@ -407,12 +408,16 @@ export function renderStep0Intro(cb: Step0IntroCallbacks): HTMLElement {
 
   const wordmark = document.createElement("span");
   wordmark.className = "wizard-intro__wordmark";
-  const wordmarkLead = document.createElement("span");
-  wordmarkLead.className = "wizard-intro__wordmark-lead";
-  wordmarkLead.textContent = "V";
-  const wordmarkRest = document.createElement("span");
-  wordmarkRest.textContent = "IBEMIX";
-  wordmark.append(wordmarkLead, wordmarkRest);
+  // Same trademark logic as the shell sidebar (vibe in ink, mix lit in rose),
+  // here at hero scale + uppercase — so the first impression and the persistent
+  // chrome read as one brand, not two different wordmarks.
+  const wordmarkVibe = document.createElement("span");
+  wordmarkVibe.className = "wizard-intro__wordmark-vibe";
+  wordmarkVibe.textContent = "VIBE";
+  const wordmarkMix = document.createElement("span");
+  wordmarkMix.className = "wizard-intro__wordmark-mix";
+  wordmarkMix.textContent = "MIX";
+  wordmark.append(wordmarkVibe, wordmarkMix);
 
   const phrase = document.createElement("span");
   phrase.className = "wizard-intro__phrase";
