@@ -11,6 +11,12 @@
 // owned by concurrent sessions.
 
 import "./shell.css"; // bundle the shell styles when loaded via index.html (shell.html also links them)
+import "../library/library.css"; // the crate interior's styles (library.html links these separately)
+
+// The library/Viber page markup, lifted from its own entry `?raw` so the
+// injected scaffold never drifts from library.html (they are edited together by
+// the surface's owner).
+import libraryHtmlRaw from "../../library.html?raw";
 
 import { vmxLog } from "../debug-log.js";
 import { mountDesktopShell, type MountedShell } from "./DesktopShell.js";
@@ -19,6 +25,7 @@ import {
   type MountedSurfaces,
   type SurfaceMountDeps,
 } from "./surface-mounts.js";
+import { extractSurfaceMarkup } from "./scaffolds.js";
 import { routeSession } from "../session/router.js";
 import { closeSettings, openSettings } from "../settings/SettingsDrawer.js";
 
@@ -45,6 +52,16 @@ const appDeps: SurfaceMountDeps = {
   mountDeck: async (stage) => {
     await routeSession(stage);
     markDeckMounted(stage);
+  },
+  // The crate is the library/Viber surface. Its module self-boots against fixed
+  // ids from library.html, so: import the module first (its auto-boot guard
+  // finds no #vmx-lib-runbtn yet and no-ops), then inject the page scaffold and
+  // mount explicitly — exactly one mount, zero edits to the (concurrently owned)
+  // library module.
+  mountCrate: async (mount) => {
+    const { mountLibrary } = await import("../library/index.js");
+    mount.innerHTML = extractSurfaceMarkup(libraryHtmlRaw, ".vmx-lib-app");
+    mountLibrary();
   },
 };
 
