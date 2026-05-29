@@ -33,12 +33,17 @@ export function createGroundingPanel(store: ShellStore): HTMLElement {
       // going live materializes a receipt rather than swapping one line.
       body.innerHTML =
         '<div class="panel-section">' +
-        '<div class="panel-label">Cited</div>' +
+        // The armed dot: a static lit mark (NOT a breath — the deck tail cursor
+        // owns the one live breath) that says grounding is live and listening,
+        // so the receipt reads alive before the first citation lands.
+        '<div class="panel-label"><span class="panel-armed" aria-hidden="true"></span>Cited</div>' +
         '<p class="panel-placeholder">Listening for the next move.</p>' +
         "</div>" +
         '<div class="panel-section">' +
         '<div class="panel-label">What\'s next</div>' +
-        '<p class="panel-placeholder">—</p>' +
+        // Honest co-host voice, never a dead dash: nothing is cued until the
+        // suggestion engine calls it (trust-the-audio, invariant #3).
+        '<p class="panel-placeholder">Nothing cued yet.</p>' +
         "</div>";
     } else {
       body.textContent = "Nothing to ground yet. I cite what the deck does, the moment it does it.";

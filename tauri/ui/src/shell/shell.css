@@ -602,16 +602,33 @@
   font-size: 13px;
   color: var(--text-tertiary);
 }
-/* Live receipt slots: a mono label over an honest placeholder line. */
+/* Live receipt slots: a mono label over an honest placeholder line. A faint
+ * top hairline turns the stack into stamped receipt rows (the first row owns the
+ * head's border, so it skips its own). */
 .panel-section { margin-bottom: var(--sp-5); }
 .panel-section:last-child { margin-bottom: 0; }
+.panel-section + .panel-section { padding-top: var(--sp-4); border-top: 1px solid var(--border-subtle); }
 .panel-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
   font-family: var(--type-mono);
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: var(--sp-2);
+}
+/* Armed indicator on the Cited slot — a small static lit dot (the receipt is
+ * live and listening). Static by design: the deck tail cursor is the screen's
+ * one breathing mark (PRODUCT principle 3). */
+.panel-armed {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 6px var(--brand-40);
+  flex: 0 0 auto;
 }
 .panel-placeholder {
   margin: 0;
