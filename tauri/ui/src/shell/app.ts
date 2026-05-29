@@ -36,23 +36,16 @@ export interface MountedShellApp {
   teardown(): void;
 }
 
-/** Flag the deck region as carrying a mounted interior so shell.css lets the
- *  full session fill the stage (overriding the placeholder's centered 720px). */
-function markDeckMounted(stage: HTMLElement): void {
-  stage.closest(".surface")?.classList.add("surface--mounted");
-}
-
 /**
  * The live interior deps. The deck IS the live session: routeSession mounts the
  * session layout onto the deck stage AND wires the ws bridge, render loop,
  * settings drawer, and tray/quit listeners. The shell chrome supersedes the
- * session's own titlebar (suppressed in shell.css). Crate + Learn fold in via
- * follow-up commits (their deps are added incrementally).
+ * session's own titlebar, and shell.css fills the stage with it — both keyed on
+ * the mounted .vmx-session, so no post-mount flag is needed.
  */
 const appDeps: SurfaceMountDeps = {
   mountDeck: async (stage) => {
     await routeSession(stage);
-    markDeckMounted(stage);
   },
   // The crate is the library/Viber surface. Its module self-boots against fixed
   // ids from library.html, so: import the module first (its auto-boot guard

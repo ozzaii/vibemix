@@ -419,9 +419,8 @@
  * state untouched. */
 .surface--mounted .surface-empty { display: none; }
 
-/* Suppress each folded surface's own window titlebar / drag chrome — the shell
- * chrome owns the wordmark, clock, and window drag region. */
-.surface--mounted .vmx-titlebar,
+/* Suppress the folded library's own window titlebar — the shell chrome owns the
+ * wordmark, clock, and window drag region (one app, not seven windows). */
 .surface--mounted .vmx-lib-titlebar { display: none; }
 
 /* A stub surface's interior fills its region (overriding the centered stub). */
@@ -435,16 +434,23 @@
   overflow: auto;
 }
 
-/* The deck: the live session fills the stage (no centered 720px placeholder). */
-.surface--deck.surface--mounted { align-items: stretch; justify-content: stretch; padding: 0; }
-.surface--deck.surface--mounted .deck-stage {
+/* The deck: the live session was built to fill the whole window (height:100vh,
+ * its own titlebar). Folded onto the deck stage it must fill its CONTAINER and
+ * shed its window titlebar (the shell provides chrome). Keyed on the session's
+ * presence (`:has`) rather than a JS flag, so the fill holds even while the
+ * session's async ws/Tauri wiring is still mounting. */
+.surface--deck:has(.vmx-session) { align-items: stretch; justify-content: stretch; padding: 0; }
+.surface--deck:has(.vmx-session) .deck-stage {
   max-width: none;
+  width: 100%;
   height: 100%;
   text-align: left;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
+.surface--deck .vmx-session { height: 100%; } /* fill the stage, not the viewport */
+.surface--deck .vmx-titlebar { display: none; } /* shell chrome owns the titlebar */
 
 /* ── Grounding panel — contextual right drawer. ──────────────────────────── */
 .shell-panel {

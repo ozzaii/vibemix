@@ -163,6 +163,9 @@ async function boot(): Promise<void> {
     // first-run check) so the folded app can be eyeballed in pure Vite dev.
     if (params.get("dev") === "shell") {
       vmxLog("[vmx:state]", "boot → shell app (dev=shell)");
+      // Shed the static #wizard-app skeleton so it doesn't push the shell off
+      // the fold (mirrors the production boot path below).
+      document.getElementById("wizard-app")?.remove();
       const { mountShellApp } = await import("./shell/app.js");
       const host = document.createElement("div");
       document.body.appendChild(host);
