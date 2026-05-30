@@ -36,7 +36,12 @@
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
-  background: var(--void-0);
+  /* The void is LIT (2026-05-30 level-up): one soft rose key-light top-left
+   * (the co-host's presence), a faint gold counter-warmth, a top sheen, a
+   * gentle floor vignette. Replaces the flat var(--void-0) fill that read as
+   * unfinished dark-mode. The token carries the whole machined-obsidian scene. */
+  background: var(--scene-lit);
+  background-attachment: fixed;
   color: var(--text-primary);
   font-family: var(--type-body);
 }
@@ -86,9 +91,15 @@
   width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
-  background: var(--scrim-furniture);
-  border-right: 1px solid var(--border-subtle);
-  box-shadow: var(--chrome-highlight);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0%, transparent 12%, transparent 100%),
+    var(--scrim-furniture);
+  border-right: 1px solid var(--border-default);
+  /* The sidebar is a raised furniture slab: a machined top lip + a real shadow
+   * cast onto the recessed stage to its right (2026-05-30 level-up). */
+  box-shadow:
+    var(--chrome-highlight),
+    8px 0 28px rgba(0, 0, 0, 0.34);
   transition: width 200ms var(--ease-brand);
   overflow: hidden;
   z-index: var(--z-sidebar);
@@ -352,9 +363,11 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: 48px;
+  width: 64px;
   pointer-events: none;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.18) 0%, transparent 100%);
+  /* Deepened (2026-05-30): the recessed-stage edge needs a real falloff so the
+   * sidebar slab reads as raised ABOVE the stage, not flush with it. */
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.10) 38%, transparent 100%);
   z-index: var(--z-recess);
 }
 

@@ -24,18 +24,47 @@ export interface SettingsGroupProps {
 }
 
 const CSS = `
-  /* "The Deck Speaks" rebuild (2026-05-26): the drawer is ALREADY one glass
-   * surface, so a group is no longer a glass card stacked inside it (the old
-   * --glass-2 face + drop-shadow + recessed --glass-3 body read as cards-in-a-
-   * card). A group is now a hairline-divided SECTION on the drawer's void: a
-   * quiet silk label, then its controls, separated from the next section by a
-   * single 1px rule. No card fill, no drop shadow — rows on hairlines. */
+  /* Forged-Obsidian level-up (2026-05-30): the prior "rows on hairlines" group
+   * read as a flat wireframe list — the owner's "saçmalık" verdict. A group is
+   * now a LIT RECESSED MODULE on the drawer void: a faintly-raised machined slab
+   * with a top sheen + a crisp leading hairline catching the room's rose light,
+   * a milled inset floor so the controls sit DOWN inside it, and a header with
+   * real presence (a brand tick, a strong tracked Saira label, a hairline rule
+   * with a rose ignition at its origin). Spacing rhythm varies between header,
+   * body and footer — no monotone padding. Material reads via tokens only. */
   .vmx-settings-group {
     position: relative;
-    border-top: 1px solid rgba(214, 207, 199, 0.060);
+    margin: 14px 0;
+    border-radius: var(--rad-md);
+    border: 1px solid var(--border-default);
+    background:
+      linear-gradient(180deg, rgba(255, 222, 242, 0.022) 0%, transparent 14%, transparent 100%),
+      linear-gradient(180deg, var(--void-10) 0%, var(--void-5) 100%);
+    box-shadow:
+      inset 0 1px 0 var(--glass-top),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.014),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+      0 1px 0 rgba(255, 255, 255, 0.025),
+      0 8px 22px rgba(0, 0, 0, 0.34);
+    overflow: hidden;
+  }
+  /* The leading rose seam — a vertical brand light down the left edge, the same
+   * sign-of-life the grounding panel carries (mock §grounding). Subliminal at
+   * rest; never a >1px colored stripe. */
+  .vmx-settings-group::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 12%;
+    bottom: 12%;
+    width: 1px;
+    pointer-events: none;
+    background: linear-gradient(180deg, transparent, var(--brand-22) 46%, transparent);
+    box-shadow: 0 0 10px var(--brand-08);
+    opacity: 0.55;
   }
   .vmx-settings-group:first-child {
-    border-top: 0;
+    margin-top: 0;
   }
   .vmx-settings-group__header {
     position: relative;
@@ -43,53 +72,91 @@ const CSS = `
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    padding: 22px var(--sp-4) 12px;
-    font-family: var(--type-body);
+    padding: 16px var(--sp-4) 13px var(--sp-5);
+    font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 10.5px;
-    letter-spacing: 0.22em;
+    font-size: 11px;
+    letter-spacing: 0.26em;
     text-transform: uppercase;
-    color: rgba(214, 207, 199, 0.72);
+    color: var(--text-muted);
     line-height: 1;
+    text-shadow: var(--text-emboss);
+    background:
+      linear-gradient(180deg, rgba(255, 222, 242, 0.020) 0%, transparent 60%),
+      rgba(0, 0, 0, 0.18);
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.40);
   }
+  /* Brand tick before the label — the section's heartbeat dot, same vocabulary
+   * as the grounding panel-section-label (mock §1084-1095). */
+  .vmx-settings-group__header > span:first-child {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+  }
+  .vmx-settings-group__header > span:first-child::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--brand);
+    box-shadow: 0 0 6px var(--brand-50);
+    flex-shrink: 0;
+  }
+  /* The header floor hairline — bright at its rose origin, fading across. */
   .vmx-settings-group__header::after {
     content: "";
     position: absolute;
-    left: var(--sp-4);
+    left: var(--sp-5);
     right: var(--sp-4);
     bottom: 0;
     height: 1px;
-    background: linear-gradient(90deg, rgba(214, 207, 199, 0.16), transparent 42%);
-    opacity: 0.18;
+    background: linear-gradient(90deg, var(--brand-22) 0%, var(--border-subtle) 18%, transparent 64%);
+    opacity: 0.7;
   }
   .vmx-settings-group__badge {
     font-family: var(--type-mono);
     font-size: 9px;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    padding: 2px var(--sp-2);
+    padding: 3px var(--sp-2);
     border-radius: var(--rad-sm);
-    background: rgba(255, 165, 223, 0.08);
-    border: 1px solid var(--amber-22);
-    color: var(--amber);
+    background: linear-gradient(180deg, var(--brand-12) 0%, var(--brand-04) 100%);
+    border: 1px solid var(--brand-22);
+    color: var(--brand);
     line-height: 1;
-    text-shadow: 0 0 4px var(--amber-22);
+    text-shadow: 0 0 4px var(--brand-22);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 222, 242, 0.10),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.40);
   }
+  /* Milled inset floor — the controls sit DOWN inside the recessed module.
+   * Taller top breathing room than the tight bottom seat = internal rhythm. */
   .vmx-settings-group__body {
-    padding: 0 var(--sp-4) 24px;
+    padding: 20px var(--sp-5) 22px;
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, transparent 30%);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.28);
+  }
+  /* Mono numerics inside any group read in warm ink, tabular — the hardware
+   * readout vocabulary (gold stays quarantined to Camelot/heat/energy). */
+  .vmx-settings-group__body :is(output, .vmx-mono, [data-numeric]) {
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
   }
   .vmx-settings-group__footer {
-    padding: 8px var(--sp-4);
-    border-top: 1px solid rgba(212, 65, 58, 0.25);
-    background: rgba(212, 65, 58, 0.05);
+    padding: 10px var(--sp-5);
+    border-top: 1px solid rgba(212, 65, 58, 0.28);
+    background: linear-gradient(180deg, rgba(212, 65, 58, 0.07) 0%, rgba(212, 65, 58, 0.03) 100%);
     font-family: var(--type-mono);
     font-size: 11px;
     color: var(--led-fault);
     line-height: 1.35;
     text-shadow: 0 0 4px rgba(212, 65, 58, 0.18);
+    box-shadow: inset 0 1px 0 rgba(212, 65, 58, 0.10);
   }
 
   /* P1-b finding #2 — two-stage mechanical slide-in: STAGE 2 (the settle).

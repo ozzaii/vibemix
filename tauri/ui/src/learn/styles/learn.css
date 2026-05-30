@@ -132,6 +132,27 @@
   min-height: 0;
 }
 
+/* The one rose key-light in the booth — a soft top-left wash + a faint gold
+ * counter-warmth, so the schematic reads as a precision instrument lit on a
+ * desk rather than a flat grey ghost on void. Subliminal per the scene-lit
+ * rule; the stroke contrast below does the readable lifting. */
+.learn-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(72% 60% at 30% 18%, var(--brand-06) 0%, transparent 56%),
+    radial-gradient(64% 56% at 84% 96%, var(--gold-glow) 0%, transparent 60%);
+  opacity: 0.55;
+}
+
+.learn-stage > * {
+  position: relative;
+  z-index: 1;
+}
+
 @media (max-width: 1280px) {
   .learn-stage {
     padding: var(--sp-5);
@@ -144,10 +165,18 @@
   max-width: 100%;
   max-height: 100%;
   /* The default stroke + fill color the SVG inherits via currentColor.
-   * Silk-22 reads as "neutral inactive instrument under low light".
-   * P92's highlight pattern flips this to var(--learn-highlight) on
-   * the highlighted <g> group. */
-  color: var(--silk-22);
+   * Lifted from silk-22 (a barely-there ghost) to silk-40: at silk-22 the
+   * booth line-art vanished into the void and read as unfinished. silk-40 +
+   * the drop-shadow below makes it a crisp lit schematic — a real DJ-booth
+   * diagram, not a faint grey trace. P92's highlight pattern still flips
+   * this to var(--learn-highlight) on the highlighted <g> group. */
+  color: var(--silk-40);
+  /* A precision-schematic depth: a tight contact shadow that lifts the
+   * strokes off the void floor + a faint rose rim from the key-light. */
+  filter:
+    drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5))
+    drop-shadow(0 6px 18px rgba(0, 0, 0, 0.4))
+    drop-shadow(0 0 22px var(--brand-06));
 }
 
 /* Interactive control hit-regions — focus ring + accessibility cursor. */
@@ -207,21 +236,30 @@
   align-items: center;
   justify-content: center;
   gap: var(--sp-4);
-  color: var(--silk-22);
+  color: var(--silk-40);
+  text-align: center;
 }
 
+/* The plug glyph reads as a lit instrument outline, not a dead grey trace —
+ * lifted to silk-40 + a faint rose key-light so it sits ON the lit void. */
 .learn-empty-state-glyph {
-  color: var(--silk-22);
+  color: var(--silk-40);
+  filter: drop-shadow(0 0 16px var(--brand-06));
 }
 
+/* The surface headline when idle — promoted to the Instrument Serif hero so it
+ * carries real hierarchy on the lit void (mirrors the cohost-slab hero), not a
+ * flat Saira label. Warm ink with the brand-tinted 3D depth the void promises. */
 .learn-empty-state-heading {
-  font-family: var(--type-display);
-  font-variation-settings: "wdth" 85, "wght" 700;
-  font-size: 28px;
-  letter-spacing: 0.06em;
+  font-family: var(--type-serif);
+  font-weight: 400;
+  font-size: clamp(40px, 5vw, 64px);
+  line-height: 1.04;
+  letter-spacing: -0.012em;
   text-transform: lowercase;
-  color: var(--silk);
+  color: var(--text-primary);
   margin: 0;
+  text-shadow: var(--text-3d);
 }
 
 .learn-empty-state-body {
@@ -248,13 +286,23 @@
   gap: var(--sp-2);
   align-items: center;
   justify-content: center;
-  padding: var(--sp-3);
+  padding: var(--sp-4);
+  /* The lit raised CTA module — a top sheen over the warm-void fill + a real
+   * machined lip + an ambient drop, so NEXT PRACTICE sits ABOVE the booth as a
+   * piece of hardware, not a flat tooltip. The single hero affordance of the
+   * idle surface, so it earns the lit float. */
   background:
-    linear-gradient(180deg, rgba(18, 20, 28, 0.88), rgba(4, 5, 9, 0.82)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0%, transparent 18%, transparent 100%),
+    linear-gradient(180deg, rgba(40, 35, 38, 0.92), rgba(20, 16, 18, 0.88)),
     rgba(0, 0, 0, 0.55);
-  border: 1px solid var(--glass-edge);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--border-default);
   border-radius: var(--rad-md);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    var(--shadow-hero);
 }
 
 .learn-booth-panel[data-visible="false"] {
@@ -263,11 +311,12 @@
 
 .learn-booth-kicker {
   grid-area: kicker;
-  font-family: var(--type-mono);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
   font-size: 10px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--silk-40);
+  color: var(--silk-65);
   text-align: center;
 }
 
@@ -298,14 +347,23 @@
 .learn-booth-secondary,
 .learn-screen-action,
 .learn-progress-list-head button {
-  height: 32px;
-  padding: 0 var(--sp-3);
+  position: relative;
+  height: 34px;
+  padding: 0 var(--sp-4);
   border-radius: var(--rad-sm);
-  font-family: var(--type-mono);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
   font-size: 11px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   cursor: pointer;
+  overflow: hidden;
+  transition:
+    filter 0.3s var(--ease-brand),
+    box-shadow 0.3s var(--ease-brand),
+    border-color 0.3s var(--ease-brand),
+    background 0.3s var(--ease-brand),
+    color 0.2s var(--ease-brand);
 }
 
 @media (max-width: 760px) {
@@ -332,22 +390,49 @@
   }
 }
 
+/* START — the lit primary. Rose gradient + machined top-highlight + a specular
+ * sweep line (::before) + the embossed brand label, so it reads as the one
+ * powered button on the module (cohost-pill recipe). */
 .learn-booth-primary,
 .learn-screen-action {
-  border: 1px solid var(--amber-65);
-  background: var(--amber-22);
-  color: var(--silk);
+  border: 1px solid var(--brand-40);
+  background: linear-gradient(180deg, var(--brand-16) 0%, var(--brand-04) 100%);
+  color: var(--brand);
+  text-shadow: var(--text-emboss);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 240, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 18px var(--brand-08),
+    0 6px 18px rgba(176, 112, 160, 0.18),
+    0 10px 24px rgba(0, 0, 0, 0.32);
+}
+
+.learn-booth-primary::before,
+.learn-screen-action::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  pointer-events: none;
 }
 
 .learn-booth-primary {
   grid-area: primary;
 }
 
+/* CHOOSE LESSON — the ghost secondary. A quiet recessed hardware tile: an inset
+ * lip + a subtle floor fill, distinctly subordinate to the lit START. */
 .learn-booth-secondary,
 .learn-progress-list-head button {
-  border: 1px solid var(--glass-edge);
-  background: transparent;
+  border: 1px solid var(--border-default);
+  background: linear-gradient(180deg, var(--void-12) 0%, var(--void-8) 100%);
   color: var(--silk-65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
 }
 
 .learn-booth-secondary {
@@ -356,16 +441,32 @@
 
 .learn-booth-primary:hover,
 .learn-booth-primary:focus-visible,
+.learn-screen-action:hover,
+.learn-screen-action:focus-visible {
+  outline: none;
+  color: var(--brand-glow);
+  border-color: var(--brand);
+  filter: brightness(1.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 240, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 22px var(--brand-12),
+    0 6px 18px rgba(176, 112, 160, 0.24),
+    0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
 .learn-booth-secondary:hover,
 .learn-booth-secondary:focus-visible,
-.learn-screen-action:hover,
-.learn-screen-action:focus-visible,
 .learn-progress-list-head button:hover,
 .learn-progress-list-head button:focus-visible {
   outline: none;
   color: var(--silk);
-  border-color: var(--amber-65);
-  box-shadow: var(--glow-faint);
+  border-color: var(--brand-40);
+  background: linear-gradient(180deg, var(--void-15) 0%, var(--void-10) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    var(--glow-faint);
 }
 
 .learn-screen-action {
@@ -1031,6 +1132,16 @@
   .learn-stage svg [data-control-id].hint-active .cue-shape::before {
     animation: none;
   }
+
+  /* The lit CTA buttons gained a filter/box-shadow ease above — freeze the
+   * brightness/glow transition so reduced-motion users get an instant state
+   * swap (the color + edge change still convey the affordance). */
+  .learn-booth-primary,
+  .learn-booth-secondary,
+  .learn-screen-action,
+  .learn-progress-list-head button {
+    transition: none;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1224,12 +1335,16 @@
   display: block;
   width: min(360px, calc(100vw - var(--sp-8)));
   overflow: hidden;
-  border: 1px solid var(--glass-edge);
+  border: 1px solid var(--border-default);
   border-radius: var(--rad-md);
   background:
-    linear-gradient(180deg, rgba(18, 20, 28, 0.96), rgba(4, 5, 9, 0.94)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0%, transparent 16%, transparent 100%),
+    linear-gradient(180deg, rgba(40, 35, 38, 0.96), rgba(20, 16, 18, 0.94)),
     var(--void);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    var(--shadow-hero);
 }
 .learn-progress-list-host[data-visible="false"] {
   display: none;

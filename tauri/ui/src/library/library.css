@@ -33,11 +33,13 @@ body {
 }
 
 .vmx-lib-label {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--silk-65);
+  color: var(--text-muted);
 }
 .vmx-lib-mono {
   font-family: var(--type-mono);
@@ -303,18 +305,19 @@ body {
   background: var(--silk-22);
   transform: translateX(-50%);
 }
+/* Active mode = recessed-lit hardware (the persona-chip recipe): the cell sinks
+   into the track, rose rim ignites, label embosses. Reads as a pressed key. */
 .vmx-lib-modeswitch button[aria-selected="true"] {
-  color: var(--amber-pale);
+  color: var(--brand);
   background:
-    linear-gradient(180deg, rgba(255, 165, 223, 0.12), rgba(255, 165, 223, 0.030) 55%, rgba(0, 0, 0, 0.30)),
-    var(--glass-1);
-  border-color: var(--amber-22);
+    radial-gradient(ellipse at top, var(--void-0) 0%, var(--void-12) 100%);
+  border-color: transparent;
+  text-shadow: var(--text-emboss);
   box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.052),
-    inset 0 -2px 0 rgba(255, 165, 223, 0.18),
-    inset 0 0 20px rgba(255, 165, 223, 0.14),
-    0 1px 0 rgba(0, 0, 0, 0.78),
-    0 0 13px rgba(255, 165, 223, 0.072);
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 0 0 1px var(--brand-22),
+    inset 0 0 14px var(--brand-04);
 }
 .vmx-lib-modeswitch button[aria-selected="true"]::after {
   background: var(--amber);
@@ -384,14 +387,15 @@ body {
   pointer-events: none;
 }
 .vmx-lib-qbox:focus-within {
-  border-color: var(--amber-40);
+  border-color: var(--brand-40);
   box-shadow:
     inset 0 2px 7px rgba(0, 0, 0, 0.68),
-    inset 0 1px 0 rgba(255, 251, 244, 0.026),
+    inset 0 1px 0 rgba(255, 255, 255, 0.026),
     inset 0 -1px 0 rgba(0, 0, 0, 0.62),
-    inset 0 0 16px rgba(255, 165, 223, 0.075),
-    0 0 0 1px rgba(255, 165, 223, 0.12);
+    inset 0 0 18px var(--brand-10),
+    0 0 0 1px var(--brand-22);
 }
+.vmx-lib-qbox:focus-within svg { color: var(--brand); }
 .vmx-lib-qbox svg { flex: none; color: var(--silk-40); }
 .vmx-lib-qbox input {
   flex: 1;
@@ -497,6 +501,8 @@ body {
   transform: translateY(1px);
 }
 
+/* The primary action — the one lit button. Full specular treatment: a top
+   highlight line, a rose-graded fill, an embossed label. The hero control. */
 .vmx-lib-run {
   position: relative;
   margin-top: auto;
@@ -505,35 +511,40 @@ body {
   justify-content: center;
   gap: 9px;
   width: 100%;
-  font-family: var(--type-body);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--brand);
   background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.038), transparent 42%, rgba(0, 0, 0, 0.24)),
-    var(--glass-1);
-  border: 1px solid var(--amber-22);
+    linear-gradient(180deg, var(--brand-16) 0%, var(--brand-04) 100%);
+  border: 1px solid var(--brand-40);
   border-radius: var(--rad-sm);
   min-height: 54px;
   padding: 15px 0;
   cursor: pointer;
-  transition: 0.2s;
+  transition: filter 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.12s;
   overflow: hidden;
+  text-shadow: var(--text-emboss);
   box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.044),
-    inset 0 -2px 0 var(--amber-22),
-    inset 0 0 18px rgba(255, 165, 223, 0.085),
-    0 2px 0 rgba(0, 0, 0, 0.72),
-    0 0 18px rgba(255, 165, 223, 0.075);
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 var(--brand-40),
+    inset 0 0 18px var(--brand-08),
+    0 1px 0 rgba(255, 255, 255, 0.04),
+    0 6px 18px rgba(176, 112, 160, 0.18),
+    0 12px 28px rgba(0, 0, 0, 0.35);
 }
+/* The specular top line — a swept highlight catching the machined lip. */
 .vmx-lib-run::before {
   content: "";
   position: absolute;
-  inset: 1px 1px auto;
-  height: 40%;
-  background: linear-gradient(180deg, rgba(255, 251, 244, 0.035), transparent);
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   pointer-events: none;
 }
 .vmx-lib-run::after {
@@ -543,17 +554,19 @@ body {
   right: 20px;
   bottom: 6px;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--amber-40), transparent);
+  background: linear-gradient(90deg, transparent, var(--brand-50), transparent);
   opacity: 0.8;
 }
 .vmx-lib-run:hover {
-  background: rgba(255, 165, 223, 0.08);
-  border-color: var(--amber-40);
+  filter: brightness(1.12);
+  border-color: var(--brand);
+  background: linear-gradient(180deg, var(--brand-22) 0%, var(--brand-06) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.050),
-    inset 0 -1px 0 var(--amber-40),
-    inset 0 0 22px rgba(255, 165, 223, 0.12),
-    0 0 20px rgba(255, 165, 223, 0.10);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 var(--brand-50),
+    inset 0 0 24px var(--brand-12),
+    0 6px 20px rgba(176, 112, 160, 0.22),
+    0 12px 30px rgba(0, 0, 0, 0.38);
 }
 .vmx-lib-run:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
 
@@ -568,41 +581,47 @@ body {
 }
 .vmx-lib-stat {
   min-height: 68px;
-  padding: 10px;
-  border: 1px solid rgba(214, 207, 199, 0.065);
+  padding: 11px 12px;
+  border: 1px solid var(--border-default);
   border-radius: var(--rad-sm);
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.56), rgba(255, 251, 244, 0.010) 56%, rgba(0, 0, 0, 0.38)),
-    rgba(0, 0, 0, 0.20);
+    linear-gradient(180deg, rgba(0, 0, 0, 0.56), rgba(255, 255, 255, 0.012) 56%, rgba(0, 0, 0, 0.38)),
+    var(--void-0);
   box-shadow:
     inset 0 2px 8px rgba(0, 0, 0, 0.68),
-    inset 0 1px 0 rgba(255, 251, 244, 0.018),
+    inset 0 1px 0 rgba(255, 255, 255, 0.020),
     inset 0 -1px 0 rgba(0, 0, 0, 0.68);
 }
 .vmx-lib-stat .k {
-  font-size: 10px;
-  letter-spacing: 0.2em;
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--silk-40);
-  margin-bottom: 5px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
 }
 .vmx-lib-stat .v {
   font-family: var(--type-mono);
   font-size: 18px;
-  color: var(--silk);
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
 }
 .vmx-lib-stat .v small { font-size: 11px; color: var(--silk-40); }
-.vmx-lib-stat .v.amber { color: var(--amber); }
+.vmx-lib-stat .v.amber { color: var(--brand); text-shadow: 0 0 10px var(--brand-22); }
 .vmx-lib-stat .v.backend { font-size: 13px; letter-spacing: 0; }
 .vmx-lib-model-setup {
   margin-top: 14px;
-  padding: 12px;
-  border: 1px solid rgba(214, 207, 199, 0.065);
+  padding: 12px 13px;
+  border: 1px solid var(--border-default);
   border-radius: var(--rad-sm);
   background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 46%, rgba(0, 0, 0, 0.20)),
-    rgba(0, 0, 0, 0.14);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 46%, rgba(0, 0, 0, 0.20)),
+    var(--void-0);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.018),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
@@ -616,35 +635,48 @@ body {
 }
 .vmx-lib-model-setup button {
   min-width: 104px;
-  border: 1px solid var(--amber-22);
+  border: 1px solid var(--brand-40);
   border-radius: var(--rad-sm);
   background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.030), transparent 44%, rgba(0, 0, 0, 0.22)),
-    var(--glass-1);
-  color: var(--amber-pale);
-  font: 600 10px var(--type-body);
-  letter-spacing: 0.14em;
+    linear-gradient(180deg, var(--brand-16) 0%, var(--brand-04) 100%);
+  color: var(--brand);
+  font: 600 10px var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
+  text-shadow: var(--text-emboss);
   padding: 9px 10px;
   cursor: pointer;
+  transition: filter 0.18s, background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.12s;
   box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.034),
-    inset 0 -1px 0 var(--amber-22),
-    inset 0 0 12px rgba(255, 165, 223, 0.075);
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 var(--brand-40),
+    inset 0 0 12px var(--brand-08),
+    0 4px 12px rgba(176, 112, 160, 0.14);
+}
+.vmx-lib-model-setup button:hover:not(:disabled) {
+  filter: brightness(1.1);
+  border-color: var(--brand);
+  background: linear-gradient(180deg, var(--brand-22) 0%, var(--brand-06) 100%);
 }
 .vmx-lib-model-setup button[hidden] { display: none; }
 .vmx-lib-model-setup button:disabled { opacity: 0.5; cursor: default; }
 .vmx-lib-agent-setup {
   margin-top: 11px;
   padding: 11px 12px;
-  border: 1px solid rgba(255, 165, 223, 0.16);
+  border: 1px solid var(--brand-18);
   border-radius: var(--rad-sm);
-  background: rgba(255, 165, 223, 0.026);
+  background:
+    linear-gradient(180deg, var(--brand-06), transparent 60%),
+    var(--brand-03);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
 }
 .vmx-lib-agent-setup[hidden] { display: none; }
 .vmx-lib-agent-setup .state {
   margin-top: 5px;
-  color: var(--amber);
+  color: var(--brand);
   font-size: 11px;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -665,14 +697,14 @@ body {
   padding: 13px 14px;
   border-radius: var(--rad-sm);
   cursor: default;
-  border: 1px solid rgba(255, 251, 244, 0.040);
+  border: 1px solid var(--border-subtle);
   background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.026), transparent 46%, rgba(0, 0, 0, 0.28)),
-    rgba(0, 0, 0, 0.16);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 46%, rgba(0, 0, 0, 0.28)),
+    var(--void-5);
   box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.030),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.62),
-    0 1px 0 rgba(0, 0, 0, 0.62);
+    inset 0 1px 0 rgba(255, 255, 255, 0.026),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    var(--shadow-raised);
   transition: background 0.16s, border-color 0.16s, box-shadow 0.16s;
 }
 .vmx-lib-row + .vmx-lib-row { margin-top: 3px; }
@@ -691,10 +723,15 @@ body {
 }
 .vmx-lib-row.top {
   background:
-    linear-gradient(90deg, rgba(255, 165, 223, 0.090), transparent 48%),
-    linear-gradient(180deg, rgba(255, 251, 244, 0.024), transparent 54%, rgba(0, 0, 0, 0.22)),
-    rgba(255, 165, 223, 0.018);
-  border-color: var(--amber-22);
+    linear-gradient(90deg, var(--brand-12), transparent 50%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.026), transparent 54%, rgba(0, 0, 0, 0.22)),
+    var(--void-8);
+  border-color: var(--brand-22);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 18px var(--brand-04),
+    var(--shadow-raised);
 }
 .vmx-lib-row.top::before {
   display: none;
@@ -951,23 +988,41 @@ body[data-mode="chat"] .vmx-lib-panel:nth-child(2) .vmx-lib-panel-bd {
 body[data-mode="chat"] .vmx-lib-chat-thread {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
   flex: 1;
   min-height: 0;
   justify-content: flex-end;
-  padding: clamp(18px, 3vw, 42px);
-  border: 1px solid rgba(214, 207, 199, 0.052);
-  border-radius: var(--rad-sm);
+  padding: clamp(20px, 3vw, 46px) clamp(20px, 3vw, 48px) clamp(22px, 3.4vw, 50px);
+  /* A lit recessed display slab (the deck's .vmx-voice material), NOT a flat
+     dark box. A soft rose key-light pools at the bottom where Viber's newest
+     line sits, so the console reads as currently speaking. */
+  border: 1px solid var(--border-default);
+  border-radius: var(--rad-md);
   background:
-    radial-gradient(76% 80% at 12% 100%, rgba(255, 165, 223, 0.030), transparent 60%),
-    linear-gradient(180deg, rgba(255, 251, 244, 0.012), transparent 26%, rgba(0, 0, 0, 0.26)),
-    rgba(0, 0, 0, 0.16);
+    radial-gradient(94% 62% at 50% 112%, var(--brand-08), transparent 58%),
+    radial-gradient(70% 70% at 8% 102%, rgba(232, 196, 122, 0.018), transparent 56%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.020) 0%, transparent 14%, transparent 64%, rgba(0, 0, 0, 0.30) 100%),
+    var(--glass-3);
   box-shadow:
-    inset 0 2px 14px rgba(0, 0, 0, 0.64),
-    inset 0 1px 0 rgba(255, 251, 244, 0.018),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.70);
+    inset 0 2px 16px rgba(0, 0, 0, 0.66),
+    inset 0 1px 0 var(--glass-top),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.014),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.72),
+    inset 0 -28px 60px -28px var(--brand-06);
   position: relative;
   z-index: 1;
+  overflow: hidden;
+}
+/* The lit upper seam — a quiet rose hairline catching the slab's machined lip,
+   echoing the .vmx-lib-frame::before edge so the console reads as one rack. */
+body[data-mode="chat"] .vmx-lib-chat-thread::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, var(--brand-22), transparent 38%, transparent 74%, var(--silk-12));
+  pointer-events: none;
+  z-index: 2;
 }
 body[data-mode="chat"] .vmx-lib-chat-side {
   display: flex;
@@ -981,130 +1036,211 @@ body[data-mode="chat"] .vmx-lib-chat-side {
 body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   content: "side rack idle";
   display: block;
-  padding: 10px 0;
+  padding: 11px 12px;
   font-family: var(--type-mono);
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 600;
   line-height: 1.6;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--silk-40);
+  color: var(--silk-22);
 }
 .vmx-lib-chat-tools:empty::before,
 .vmx-lib-chat-artifact:empty::before {
   display: block;
-  padding: 10px 0;
+  padding: 11px 12px;
   font-family: var(--type-mono);
-  font-size: 10.5px;
+  font-size: 9.5px;
+  font-weight: 600;
   line-height: 1.6;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--silk-40);
+  color: var(--silk-22);
 }
 .vmx-lib-chat-tools:empty::before {
   content: "trace idle";
 }
 .vmx-lib-chat-artifact:empty::before {
   content: "artifact idle";
-  border-top: 1px solid var(--glass-edge);
+  border-top: 1px solid var(--border-subtle);
 }
+/* A console transcript, NOT a chatbot. Turns carry no per-turn box by default:
+   Viber's voice flows as a lit stream, the user's line reads as a recessed
+   terminal input. The signature is light + a single hairline, never a bubble. */
 .vmx-lib-chat-turn {
   position: relative;
-  padding: 14px 15px;
-  max-width: min(690px, 100%);
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--rad-sm);
-  background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.020), transparent 42%, rgba(0, 0, 0, 0.24)),
-    rgba(0, 0, 0, 0.18);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.024),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.58);
+  padding: 2px 0 0;
+  max-width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   animation: vmx-lib-chat-rise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.vmx-lib-chat-thread .vmx-lib-chat-turn {
+/* One column, top-to-bottom — a transcript, not a left/right chat. Viber spans
+   the stream; the user line is a narrower recessed input in the SAME column,
+   subordinate by material (mono, recessed, smaller), never by side-alignment. */
+.vmx-lib-chat-thread .vmx-lib-chat-turn[data-role="viber"] {
   width: 100%;
 }
-.vmx-lib-chat-turn[data-role="viber"] {
-  border-color: var(--amber-22);
-  background:
-    linear-gradient(90deg, rgba(255, 165, 223, 0.060), transparent 44%),
-    linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 45%),
-    rgba(0, 0, 0, 0.16);
+.vmx-lib-chat-thread .vmx-lib-chat-turn[data-role="user"] {
+  align-self: flex-start;
 }
+
+/* ── Viber (the co-host speaking): a lit console stream, no box ── */
+.vmx-lib-chat-turn[data-role="viber"] {
+  position: relative;
+  padding-left: 17px;
+}
+/* The lit margin rule — Viber's "currently lit channel" marker. One quiet rose
+   bar down the left of the stream, the sign-of-life, not a side-stripe border. */
+.vmx-lib-chat-turn[data-role="viber"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  width: 1px;
+  background: linear-gradient(180deg, var(--brand-50), var(--brand-12) 70%, transparent);
+  box-shadow: 0 0 6px var(--brand-22);
+}
+
+/* ── User (subordinate, terminal-input feel): mono-tinged, recessed ── */
+.vmx-lib-chat-turn[data-role="user"] {
+  padding: 11px 14px;
+  max-width: min(620px, 92%);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.014), transparent 40%),
+    var(--void-85);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.62),
+    inset 0 1px 0 rgba(255, 255, 255, 0.018),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+}
+
 .vmx-lib-chat-turn .who {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
   font-family: var(--type-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.24em;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: var(--silk-65);
+  color: var(--silk-40);
 }
+/* Viber's WHO label: a tiny mono uppercase rose tag — the channel ident. */
 .vmx-lib-chat-turn[data-role="viber"] .who {
-  color: var(--amber);
+  color: var(--brand);
+  text-shadow: var(--text-emboss);
 }
+.vmx-lib-chat-turn[data-role="user"] .who {
+  margin-bottom: 5px;
+  color: var(--silk-22);
+}
+.vmx-lib-chat-turn[data-role="user"] .who::before {
+  content: "> ";
+  color: var(--silk-40);
+}
+
 .vmx-lib-chat-turn .body {
   color: var(--silk);
   font-size: 15px;
   line-height: 1.55;
   white-space: pre-wrap;
 }
+/* Viber speaks warmer + larger — it is the co-host's voice, the read line. */
 .vmx-lib-chat-turn[data-role="viber"] .body {
-  color: var(--silk);
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 1.62;
+  letter-spacing: -0.002em;
 }
+.vmx-lib-chat-turn[data-role="user"] .body {
+  font-family: var(--type-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  color: var(--silk-65);
+}
+/* The signature: a single quiet lit hairline closing Viber's line — the
+   receipt the slab draws, not a bubble underline. */
 .vmx-lib-chat-turn[data-role="viber"] .body::after {
   content: "";
   display: block;
-  width: min(220px, 48%);
+  width: min(240px, 50%);
   height: 1px;
-  margin-top: 9px;
-  background: linear-gradient(90deg, var(--amber-65), transparent);
+  margin-top: 12px;
+  background: linear-gradient(90deg, var(--brand-65), var(--brand-12) 56%, transparent);
+  box-shadow: 0 0 5px var(--brand-12);
   transform-origin: left;
   animation: vmx-lib-receipt-draw 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 .vmx-lib-chat-turn[data-pending="true"] .body::after {
   width: 8px;
-  background: var(--amber);
-  box-shadow: var(--glow-faint);
+  background: var(--brand);
+  box-shadow: var(--glow-soft);
   animation: vmx-lib-breathe 1s ease-in-out infinite;
 }
+/* The trace = an instrument readout. A recessed rack of channel rows, each a
+   diode + a mono label, crisp edges carrying the hierarchy. Not a chat log. */
 .vmx-lib-chat-tools {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--rad-md);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.58), rgba(255, 255, 255, 0.010) 56%, rgba(0, 0, 0, 0.42)),
+    var(--void-0);
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.66),
+    inset 0 1px 0 rgba(255, 255, 255, 0.022),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.70);
 }
 .vmx-lib-chat-tool {
   display: grid;
   grid-template-columns: 8px minmax(0, 1fr);
-  gap: 10px;
+  gap: 11px;
   align-items: center;
-  padding: 9px 10px;
-  border-radius: var(--rad-md);
-  border: 1px solid var(--glass-edge);
+  padding: 8px 10px;
+  border-radius: var(--rad-sm);
+  border: 1px solid var(--border-subtle);
   background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 46%),
-    var(--void-3);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.016), transparent 46%, rgba(0, 0, 0, 0.20)),
+    var(--void-5);
   box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.020),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.58);
+    inset 0 1px 0 rgba(255, 255, 255, 0.022),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
 }
 .vmx-lib-chat-tool .gem {
   width: 6px;
   height: 6px;
   border-radius: 1px;
   transform: rotate(45deg);
-  background: var(--silk-40);
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.40), transparent 42%),
+    var(--silk-40);
+  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.5);
 }
 .vmx-lib-chat-tool[data-ok="true"] {
-  border-color: var(--amber-22);
+  border-color: var(--brand-22);
   background:
-    linear-gradient(90deg, rgba(255, 165, 223, 0.052), transparent 70%),
-    var(--void-3);
+    linear-gradient(90deg, var(--brand-08), transparent 68%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 50%),
+    var(--void-5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.026),
+    inset 0 -1px 0 var(--brand-12),
+    inset 0 0 12px var(--brand-04);
 }
 .vmx-lib-chat-tool[data-ok="true"] .gem {
-  background: var(--amber);
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.55), transparent 40%),
+    var(--brand);
   box-shadow: var(--glow-soft);
 }
 .vmx-lib-chat-tool[data-proof="true"] {
@@ -1125,16 +1261,25 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
 }
 .vmx-lib-chat-tool .name {
   font-family: var(--type-mono);
-  font-size: 11px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
   color: var(--silk);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.vmx-lib-chat-tool[data-ok="true"] .name {
+  color: var(--brand-glow);
+  text-shadow: var(--text-emboss);
+}
 .vmx-lib-chat-tool .arg {
-  margin-top: 2px;
+  margin-top: 3px;
   font-family: var(--type-mono);
   font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
   color: var(--silk-40);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1144,29 +1289,49 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   border-top: 1px solid var(--glass-edge);
   padding-top: 14px;
 }
+/* The artifact = a premium lit readout card (a built set / playlist receipt).
+   Crisp machined edges, a lit caption header, real labels. Gold reserved for
+   key/BPM/energy numerics only — everywhere else stays rose + ink. */
 .vmx-lib-chat-card {
-  border: 1px solid var(--glass-edge);
+  border: 1px solid var(--border-default);
   border-radius: var(--rad-md);
   background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 40%),
-    var(--void-3);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0%, transparent 16%, transparent 100%),
+    var(--glass-1);
   box-shadow:
     inset 0 1px 0 var(--glass-top),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.012),
     inset 0 -1px 0 rgba(0, 0, 0, 0.58),
-    inset 0 0 16px rgba(0, 0, 0, 0.30);
+    var(--shadow-raised);
   overflow: hidden;
 }
 .vmx-lib-chat-card .cap {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--glass-edge);
+  gap: 9px;
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--border-default);
+  background:
+    linear-gradient(180deg, var(--brand-06), transparent 70%),
+    rgba(0, 0, 0, 0.22);
   font-family: var(--type-mono);
   font-size: 10px;
-  letter-spacing: 0.18em;
+  font-weight: 600;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--brand);
+  text-shadow: var(--text-emboss);
+}
+.vmx-lib-chat-card .cap::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--brand-40), transparent 56%);
+  opacity: 0.7;
 }
 .vmx-lib-chat-card .cap .led {
   width: 7px;
@@ -1181,9 +1346,10 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
     var(--glow-faint);
 }
 .vmx-lib-chat-card .line {
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--silk-12);
-  font-size: 12px;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12.5px;
+  line-height: 1.55;
   color: var(--silk-65);
   word-break: break-word;
 }
@@ -1196,25 +1362,32 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
 }
 .vmx-lib-chat-card .setrow {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 26px minmax(0, 1fr);
   align-items: baseline;
-  gap: 10px;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--silk-12);
+  gap: 11px;
+  padding: 8px 13px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background var(--motion-snap) var(--ease-brand);
+}
+.vmx-lib-chat-card .setrow:hover {
+  background: linear-gradient(90deg, var(--brand-06), transparent 72%);
 }
 .vmx-lib-chat-card .setrow:last-child {
   border-bottom: 0;
 }
+/* The slot index is a numeric — gold, the one quarantined heat hue. */
 .vmx-lib-chat-card .setrow .rank {
   font-family: var(--type-mono);
   font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--amber);
+  letter-spacing: 0.04em;
+  color: var(--gold);
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 6px var(--gold-glow);
+  text-align: right;
 }
 .vmx-lib-chat-card .setrow .t {
-  font-size: 12px;
-  color: var(--silk-65);
+  font-size: 12.5px;
+  color: var(--silk);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1317,9 +1490,21 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   border-bottom: 0;
 }
 .vmx-lib-chat-empty {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--silk-40);
+  position: relative;
+  padding-left: 17px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--silk-65);
+}
+.vmx-lib-chat-empty::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  width: 1px;
+  background: linear-gradient(180deg, var(--brand-40), var(--brand-12) 60%, transparent);
+  box-shadow: 0 0 5px var(--brand-12);
 }
 @keyframes vmx-lib-chat-rise {
   from { opacity: 0; transform: translateY(7px); }
@@ -1372,17 +1557,20 @@ body[data-mode="curate"] .vmx-lib-rationale,
 body[data-mode="build"] .vmx-lib-rationale {
   display: block;
   margin-bottom: 16px;
-  padding: 14px 15px;
-  border-radius: var(--rad-sm);
+  padding: 15px 16px;
+  border-radius: var(--rad-md);
   background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 46%, rgba(0, 0, 0, 0.20)),
-    var(--void-3);
-  border: 1px solid var(--glass-edge);
+    linear-gradient(90deg, var(--brand-06), transparent 56%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.020), transparent 40%, rgba(0, 0, 0, 0.20)),
+    var(--glass-1);
+  border: 1px solid var(--border-default);
   box-shadow:
     inset 0 1px 0 var(--glass-top),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.58);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.012),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    var(--shadow-raised);
 }
-.vmx-lib-rationale .vmx-lib-label { color: var(--amber); margin-bottom: 9px; display: block; }
+.vmx-lib-rationale .vmx-lib-label { color: var(--brand); text-shadow: var(--text-emboss); margin-bottom: 10px; display: block; }
 .vmx-lib-rationale .body {
   font-size: 13px;
   line-height: 1.6;
@@ -1454,15 +1642,16 @@ body[data-mode="build"] .vmx-lib-rationale {
 }
 .vmx-lib-curveseg:hover:not([aria-pressed="true"]) { color: var(--silk-65); }
 .vmx-lib-curveseg[aria-pressed="true"] {
-  color: var(--amber-pale);
+  color: var(--brand);
   background:
-    linear-gradient(180deg, rgba(255, 165, 223, 0.12), rgba(255, 165, 223, 0.030) 55%, rgba(0, 0, 0, 0.30)),
-    var(--glass-1);
-  border-color: var(--amber-22);
+    radial-gradient(ellipse at top, var(--void-0) 0%, var(--void-12) 100%);
+  border-color: transparent;
+  text-shadow: var(--text-emboss);
   box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.052),
-    inset 0 -2px 0 rgba(255, 165, 223, 0.18),
-    inset 0 0 18px rgba(255, 165, 223, 0.12);
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 0 0 1px var(--brand-22),
+    inset 0 0 14px var(--brand-04);
 }
 .vmx-lib-curveseg:active { transform: translateY(1px); }
 
@@ -1471,15 +1660,17 @@ body[data-mode="build"] .vmx-lib-rationale {
    hint sits quiet below. Not a banner, not a toast — a hardware readout. */
 .vmx-lib-export {
   margin-bottom: 16px;
-  padding: 14px 15px;
-  border-radius: var(--rad-sm);
+  padding: 15px 16px;
+  border-radius: var(--rad-md);
   background:
-    linear-gradient(180deg, rgba(255, 165, 223, 0.045), transparent 46%, rgba(0, 0, 0, 0.22)),
-    var(--void-3);
-  border: 1px solid var(--amber-22);
+    linear-gradient(180deg, var(--brand-10), transparent 46%, rgba(0, 0, 0, 0.22)),
+    var(--glass-1);
+  border: 1px solid var(--brand-22);
   box-shadow:
     inset 0 1px 0 var(--glass-top),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.58),
+    inset 0 0 14px var(--brand-04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    var(--shadow-raised),
     var(--glow-faint);
 }
 .vmx-lib-export .hd { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }

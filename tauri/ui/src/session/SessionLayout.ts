@@ -380,66 +380,117 @@ const LAYOUT_CSS = `
     width: auto;
     min-height: 0;
     padding: clamp(24px, 4vw, 48px);
-    border: 1px solid rgba(214, 207, 199, 0.075);
-    border-radius: var(--rad-sm);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-md);
+    /* The deck display — a lit machined slab, not an empty dark box (2026-05-30
+     * level-up). One soft rose key-light pools where the spoken line sits
+     * (bottom-left), a top sheen catches the lip, the floor falls into shadow.
+     * The co-host's voice now reads as glowing up out of the obsidian. */
     background:
-      radial-gradient(76% 80% at 16% 100%, rgba(255, 165, 223, 0.055), transparent 58%),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 28%, rgba(0, 0, 0, 0.30)),
-      rgba(0, 0, 0, 0.23);
+      radial-gradient(88% 86% at 14% 102%, rgba(255, 165, 223, 0.10), transparent 56%),
+      radial-gradient(60% 50% at 92% 0%, rgba(255, 255, 255, 0.018), transparent 60%),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.022), transparent 26%, rgba(0, 0, 0, 0.34)),
+      rgba(0, 0, 0, 0.22);
     box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.034),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.72),
-      inset 0 0 42px rgba(0, 0, 0, 0.28),
-      0 1px 0 rgba(0, 0, 0, 0.70);
+      inset 0 1px 0 rgba(255, 210, 240, 0.07),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.74),
+      inset 0 0 60px rgba(0, 0, 0, 0.30),
+      0 2px 0 rgba(0, 0, 0, 0.6),
+      0 24px 64px -12px rgba(0, 0, 0, 0.55),
+      0 0 90px -36px rgba(255, 165, 223, 0.14);
     overflow: hidden;
   }
+  /* The engraved inner faceplate (2026-05-30 level-up): an inset machined frame
+   * + a milled vertical grid + a top sheen, lifted from near-invisible (0.010-
+   * 0.035 alpha) to read as a real precision deck face — so the slab's open area
+   * is hardware character, not dead empty box. The frame catches a 0.5px lip. */
   .vmx-voice::before {
     content: "";
     position: absolute;
-    inset: 10px;
-    border: 1px solid rgba(214, 207, 199, 0.035);
+    inset: 12px;
+    border: 1px solid var(--border-subtle);
     border-radius: var(--rad-sm);
     background:
-      repeating-linear-gradient(90deg, transparent 0 42px, rgba(214, 207, 199, 0.010) 42px 43px),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 20%);
+      repeating-linear-gradient(90deg, transparent 0 46px, rgba(255, 222, 242, 0.022) 46px 47px),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.018) 0%, transparent 16%, transparent 100%);
+    box-shadow: inset 0 0.5px 0 rgba(255, 210, 240, 0.05);
     pointer-events: none;
   }
+  /* The readout dot-matrix (a speaker-grille / VFD-grille detail) top-right —
+   * boosted + de-blued (the old rgba(72,152,255) was an off-palette v5 leftover;
+   * tozpembe is rose + gold only). Now a faint warm-white matrix catching the
+   * room's rose light, masked so it fades into the slab. */
   .vmx-voice::after {
     content: "";
     position: absolute;
-    top: 22px;
-    right: 24px;
-    bottom: 22px;
+    top: 26px;
+    right: 28px;
+    bottom: 26px;
     width: min(34%, 280px);
     background:
-      radial-gradient(circle, rgba(214, 207, 199, 0.070) 0 1px, transparent 1px 11px),
-      linear-gradient(90deg, transparent, rgba(72, 152, 255, 0.018));
-    opacity: 0.22;
-    -webkit-mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.88) 28%, rgba(0, 0, 0, 0.42));
-    mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.88) 28%, rgba(0, 0, 0, 0.42));
+      radial-gradient(circle, rgba(255, 222, 242, 0.10) 0 1px, transparent 1px 12px),
+      linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.020));
+    opacity: 0.32;
+    -webkit-mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.9) 30%, rgba(0, 0, 0, 0.4));
+    mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.9) 30%, rgba(0, 0, 0, 0.4));
     pointer-events: none;
   }
   .vmx-voice > * {
     position: relative;
     z-index: 1;
   }
+  /* The co-host's PRIOR lines, receding up the slab toward the void — a quiet
+   * receipt of what it just said, so the display reads as a living stream, not
+   * a single line floating in an empty box (2026-05-30 level-up). In the hero
+   * serif (the same voice) but small + dim, two graded steps back. */
   .vmx-ghost {
-    font-family: var(--type-body);
-    font-variation-settings: 'wdth' 100, 'wght' 400;
-    font-size: 16px; line-height: 1.4;
+    font-family: var(--type-serif);
+    font-weight: 400;
+    font-size: clamp(18px, 1.7vw, 22px); line-height: 1.32; letter-spacing: -0.008em;
     transition: color 700ms ease-out;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: min(58ch, 100%);
   }
-  .vmx-ghost--g2 { color: var(--silk-22); }
-  .vmx-ghost--g1 { color: var(--silk-40); }
+  .vmx-ghost--g2 { color: var(--text-disabled); opacity: 0.7; }
+  .vmx-ghost--g1 { color: var(--text-muted); }
   .vmx-claim { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); margin-top: var(--sp-2); }
+  /* The co-host SPEAKING — set in the one warm human face of the system
+   * (Instrument Serif, the documented hero voice per DESIGN.md §3). The impl
+   * had been rendering this in condensed Saira display, which read industrial /
+   * label-like and was the single biggest reason the hero felt cheap rather
+   * than like a friend talking (2026-05-30 level-up). Larger, with a real
+   * machined-edge text-shadow so the letters sit ON the lit slab. */
   .vmx-now {
-    font-family: var(--type-display);
-    font-variation-settings: 'wdth' 92, 'wght' 600;
-    font-size: clamp(38px, 4.8vw, 68px); line-height: 0.98; letter-spacing: 0.003em;
-    color: var(--silk); text-wrap: balance; max-width: 17ch;
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75);
+    font-family: var(--type-serif);
+    font-weight: 400;
+    font-size: clamp(44px, 5.6vw, 78px); line-height: 1.02; letter-spacing: -0.014em;
+    color: var(--text-primary); text-wrap: balance; max-width: 18ch;
+    text-shadow:
+      0 1px 0 rgba(176, 112, 160, 0.20),
+      0 2px 1px rgba(20, 16, 18, 0.5),
+      0 18px 46px rgba(0, 0, 0, 0.55);
     transition: color 700ms ease-out;
+  }
+  /* Emphasis ignites rose — the co-host leaning on the word that matters. The
+   * one charisma beat in the hero line (mirrors the mock's cohost-line em). */
+  .vmx-now em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--brand);
+    text-shadow:
+      0 1px 0 rgba(176, 112, 160, 0.35),
+      0 0 24px var(--brand-22),
+      0 0 48px var(--brand-12);
+  }
+  /* Inline numerics / timecodes in the spoken line read as a lit mono cite
+   * lifted off the prose, not prose themselves (the "02:14" beat in the mock). */
+  .vmx-now .num {
+    font-family: var(--type-mono);
+    font-weight: 600;
+    font-size: 0.58em;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+    vertical-align: 0.16em;
+    font-style: normal;
   }
   .vmx-now[data-arrived="true"] { animation: vmx-rise 400ms cubic-bezier(0.16, 1, 0.3, 1); }
   @keyframes vmx-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -568,6 +619,12 @@ const LAYOUT_CSS = `
   /* === SILENT + FAULT — the surface settles into listening / holds on a drop = */
   .vmx-session[data-mode="silent"] .vmx-now,
   .vmx-session[data-mode="fault"] .vmx-now { color: var(--silk-40); }
+  /* Idle/fault hold a single grounded line (no live receipt), so center it in
+   * the faceplate instead of pinning to the live receipt-floor — kills the vast
+   * empty box above one line at rest (2026-05-30 level-up). Live keeps flex-end
+   * so the receipt still prints up from the floor. */
+  .vmx-session[data-mode="silent"] .vmx-voice,
+  .vmx-session[data-mode="fault"] .vmx-voice { justify-content: center; }
   .vmx-session[data-mode="silent"] .vmx-now {
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75), 0 0 18px rgba(255, 251, 244, 0.035);
   }

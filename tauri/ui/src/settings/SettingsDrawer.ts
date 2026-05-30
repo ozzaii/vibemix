@@ -104,20 +104,29 @@ const CSS = `
     z-index: 50;
     transform: translateX(100%);
     font-family: var(--type-body);
+    /* Forged-Obsidian level-up (2026-05-30): a raised MACHINED slide-over, not
+     * a flat dark rectangle. A warm-rose top sheen + a left-edge brand wash over
+     * the warm void ladder, so the panel reads as milled obsidian catching the
+     * room's one rose key-light as it floats over the live stage. */
     background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.030), transparent 18%),
-      linear-gradient(90deg, rgba(255, 165, 223, 0.026), transparent 18%),
-      linear-gradient(180deg, rgba(12, 14, 22, 0.94), rgba(3, 4, 8, 0.97) 66%, rgba(1, 2, 5, 0.98)),
+      linear-gradient(180deg, rgba(255, 222, 242, 0.030), transparent 16%),
+      linear-gradient(90deg, var(--brand-05), transparent 20%),
+      linear-gradient(180deg, var(--void-12) 0%, var(--void-5) 62%, var(--void-0) 100%),
       var(--glass-1);
     backdrop-filter: var(--blur-glass);
     -webkit-backdrop-filter: var(--blur-glass);
-    border-left: 1px solid var(--glass-edge-up);
+    border-left: 1px solid var(--border-strong);
+    /* The full lit stack: a machined top lip (--glass-top) + a left-edge milled
+     * highlight, a faint rose inner-glow bleeding from the leading edge, a hard
+     * floor shadow, and a real ambient drop so it sits ABOVE the stage. */
     box-shadow:
-      inset 1px 0 0 rgba(255, 251, 244, 0.080),
-      inset 10px 0 22px rgba(255, 165, 223, 0.018),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.78),
-      -18px 0 54px rgba(0, 0, 0, 0.68),
-      -1px 0 0 rgba(255, 251, 244, 0.020);
+      inset 1px 0 0 var(--glass-top),
+      inset 0 1px 0 var(--glass-top),
+      inset 12px 0 28px var(--brand-04),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.80),
+      -2px 0 0 rgba(255, 222, 242, 0.020),
+      -24px 0 64px rgba(0, 0, 0, 0.62),
+      -8px 0 90px -30px var(--brand-10);
     transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
     display: flex;
     flex-direction: column;
@@ -139,12 +148,12 @@ const CSS = `
     mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 88%, transparent 100%);
   }
   .vmx-settings-drawer::after {
-    left: 1px;
+    left: 0;
     right: auto;
     width: 1px;
-    background: linear-gradient(180deg, transparent, rgba(255, 165, 223, 0.42) 44%, transparent);
-    box-shadow: 0 0 16px rgba(255, 165, 223, 0.18);
-    opacity: 0.58;
+    background: linear-gradient(180deg, transparent, var(--brand) 44%, var(--brand-40) 62%, transparent);
+    box-shadow: 0 0 18px var(--brand-22);
+    opacity: 0.7;
   }
   /* z-index discipline kept as a defensive baseline even after the
    * .border-anim removal (2026-05-19) so any future glass overlay in
@@ -165,14 +174,31 @@ const CSS = `
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--sp-5);
-    border-bottom: 1px solid var(--glass-edge);
+    border-bottom: 1px solid var(--border-default);
+    /* Lit header — a machined cap on the slide-over: a warm-rose top sheen over
+     * a darker base, a top lip catching light, a hard floor, and a real ambient
+     * drop so the header reads as a raised crown above the scrolling body. */
     background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.030), transparent),
-      rgba(0, 0, 0, 0.48);
+      linear-gradient(180deg, rgba(255, 222, 242, 0.040), transparent 52%),
+      linear-gradient(180deg, var(--void-12) 0%, var(--void-5) 100%),
+      rgba(0, 0, 0, 0.42);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.72),
-      0 10px 24px rgba(0, 0, 0, 0.22);
+      inset 0 1px 0 var(--glass-top),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.74),
+      0 12px 26px rgba(0, 0, 0, 0.30);
+  }
+  /* The lit under-rule — a rose ignition seam beneath the header, brightest at
+   * the leading edge, so the header crown reads as actively lit. */
+  .vmx-settings-drawer__header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, var(--brand-40) 0%, var(--brand-12) 14%, transparent 56%);
+    box-shadow: 0 0 12px var(--brand-08);
   }
   .vmx-settings-drawer__header::before {
     content: "";
@@ -195,17 +221,33 @@ const CSS = `
    * neighbors. The new size lands as a peer label, not as a
    * separately-styled "page title." */
   .vmx-settings-drawer__title {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 11px;
+    padding-left: 13px;
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 14px;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: var(--silk);
+    color: var(--text-primary);
     line-height: 1;
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    text-shadow: var(--text-emboss);
+  }
+  /* A lit brand tick anchoring the title — the panel's heartbeat, the single
+   * decisive sign-of-life on the header crown (mock §panel-title::before). */
+  .vmx-settings-drawer__title::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--brand);
+    box-shadow: 0 0 6px var(--brand-50);
   }
   /* 2026-05-19 /impeccable critique fix round 2: drawer title amber
    * dot dropped entirely. When the drawer is open the user already
@@ -218,11 +260,12 @@ const CSS = `
     width: 30px;
     height: 30px;
     border-radius: var(--rad-sm);
+    /* Tactile machined key — a milled cap with a top lip + recessed floor. */
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.08)),
-      rgba(0, 0, 0, 0.32);
-    border: 1px solid rgba(255, 255, 255, 0.055);
-    color: var(--silk-65);
+      linear-gradient(180deg, rgba(255, 222, 242, 0.05), transparent 50%),
+      linear-gradient(180deg, var(--void-15) 0%, var(--void-5) 100%);
+    border: 1px solid var(--border-default);
+    color: var(--text-tertiary);
     line-height: 1;
     cursor: pointer;
     display: inline-flex;
@@ -230,10 +273,19 @@ const CSS = `
     justify-content: center;
     transition: color var(--motion-snap) ease-out,
                 border-color var(--motion-snap) ease-out,
-                background var(--motion-snap) ease-out;
+                background var(--motion-snap) ease-out,
+                box-shadow var(--motion-snap) ease-out,
+                transform var(--motion-snap) ease-out;
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.64);
+      inset 0 1px 0 var(--glass-top),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+      0 2px 6px rgba(0, 0, 0, 0.30);
+  }
+  .vmx-settings-drawer__close:active {
+    transform: scale(0.94);
+    box-shadow:
+      inset 0 2px 5px rgba(0, 0, 0, 0.50),
+      inset 0 -1px 0 rgba(255, 222, 242, 0.04);
   }
   .vmx-settings-drawer__close svg {
     width: 14px;
@@ -257,13 +309,16 @@ const CSS = `
   .vmx-settings-drawer__body {
     flex: 1;
     overflow-y: auto;
-    padding: 28px var(--sp-5) 30px;
+    padding: 22px var(--sp-4) 32px;
     display: flex;
     flex-direction: column;
     gap: 0;
     position: relative;
+    /* The body floor sits in shadow under the lit header crown — a faint top
+     * recess so the scroll region reads as the recessed channel the lit
+     * recessed group modules seat into. */
     background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 16%);
+      linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, transparent 5%);
   }
   .vmx-settings-drawer__body::-webkit-scrollbar { width: 6px; }
   .vmx-settings-drawer__body::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
@@ -301,23 +356,46 @@ const CSS = `
     display: flex;
   }
   .vmx-settings-drawer__btn {
+    position: relative;
+    overflow: hidden;
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 10px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    padding: 10px var(--sp-4);
-    background: rgba(0, 0, 0, 0.35);
-    border: 1px solid var(--glass-edge);
-    color: var(--silk-65);
+    padding: 11px var(--sp-4);
+    /* Lit primary (the recipe's signature switch): a rose-washed fill, a brand
+     * edge, an inset top-highlight + rose bleed + soft drop, brand ink. The one
+     * lit affordance in the CALIBRATION group — the RE-RUN action. */
+    background: linear-gradient(180deg, var(--brand-16) 0%, var(--brand-04) 100%);
+    border: 1px solid var(--brand-40);
+    color: var(--brand);
     border-radius: var(--rad-sm);
     cursor: pointer;
     line-height: 1;
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    text-shadow: var(--text-emboss);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 222, 242, 0.10),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.40),
+      inset 0 0 16px var(--brand-06),
+      0 1px 0 rgba(255, 255, 255, 0.03),
+      0 6px 16px rgba(0, 0, 0, 0.30);
     transition: color var(--motion-snap) ease-out,
                 border-color var(--motion-snap) ease-out,
                 background var(--motion-snap) ease-out,
+                filter var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out;
+  }
+  /* Top specular line — light skating across the machined cap of the button. */
+  .vmx-settings-drawer__btn::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   }
   /* VIS-02 — Plan 43-03. --glow-faint appended comma-separated; preserves
    * the inset amber bleed (mock §02 .btn.on body) while applying the
@@ -325,12 +403,21 @@ const CSS = `
    * mascot-group buttons, library-panel actions, ear-test toggle host). */
   .vmx-settings-drawer__btn:hover,
   .vmx-settings-drawer__btn:focus-visible {
-    color: var(--amber);
-    border-color: var(--amber-40);
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.06) 0%, rgba(255, 165, 223, 0.02) 100%);
+    color: var(--brand-glow);
+    border-color: var(--brand);
+    background: linear-gradient(180deg, var(--brand-22) 0%, var(--brand-06) 100%);
+    filter: brightness(1.08);
     box-shadow:
-      inset 0 0 12px var(--amber-22),
-      var(--glow-faint);
+      inset 0 1px 0 rgba(255, 222, 242, 0.12),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.40),
+      inset 0 0 16px var(--brand-10),
+      var(--glow-soft);
+  }
+  .vmx-settings-drawer__btn:active {
+    filter: brightness(0.96);
+    box-shadow:
+      inset 0 2px 5px rgba(0, 0, 0, 0.50),
+      inset 0 -1px 0 rgba(255, 222, 242, 0.04);
   }
   /* Surface-wide VIS-02 contract — broad interactive union; comma-
    * separated --glow-faint so deeper child components that already
@@ -380,14 +467,26 @@ const CSS = `
     z-index: 60;
   }
   .vmx-settings-drawer__label {
-    font-family: var(--type-body);
-    font-variation-settings: "wdth" 85, "wght" 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 10px;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--silk-65);
+    color: var(--text-muted);
     line-height: 1;
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    text-shadow: var(--text-emboss);
+  }
+  /* Leading hairline tick — the sub-label's quiet rose anchor, one rung below
+   * the group header's solid dot (mock §panel-section-label::before). */
+  .vmx-settings-drawer__label::before {
+    content: "";
+    width: 10px;
+    height: 1px;
+    flex-shrink: 0;
+    background: var(--brand-22);
   }
 `;
 

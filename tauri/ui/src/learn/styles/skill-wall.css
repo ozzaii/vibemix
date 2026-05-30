@@ -10,41 +10,60 @@
 }
 
 .skill-wall {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
-  padding: var(--sp-4);
-  border: 1px solid var(--border-subtle);
+  padding: var(--sp-5);
+  border: 1px solid var(--border-default);
   border-radius: var(--rad-lg);
-  background: var(--surface-base);
+  /* The Earned Wall as a lit raised module — a top sheen over the warm-void
+   * base + a machined lip + an ambient drop, so the trophy case sits ABOVE the
+   * void as a real slab. This is the surface's hero, so it earns the lit float. */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0%, transparent 18%, transparent 100%),
+    var(--surface-base);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    var(--shadow-raised);
 }
 
 .skill-wall__head {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-3);
+  margin-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
+/* "Earned" — the headline. Real serif hero hierarchy on the lit void: warm ink,
+ * larger, with the brand-tinted 3D depth so it carries the trophy-case weight
+ * (mirrors the cohost-slab hero), not a small flat heading. */
 .skill-wall__title {
   margin: 0;
   font-family: var(--type-serif);
-  font-size: 1.5rem;
+  font-size: clamp(2rem, 3vw, 2.75rem);
   font-weight: 400;
-  letter-spacing: 0.01em;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
+  text-shadow: var(--text-3d);
 }
 
 .skill-wall__sub {
   margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.4;
-  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
 }
 
 .skill-wall__empty {
   margin: 0;
   padding: var(--sp-3) 0 var(--sp-1);
-  font-size: 0.84rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
   color: var(--text-tertiary);
 }
 
@@ -58,22 +77,33 @@
 }
 
 .skill-wall__row {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(8rem, 1fr) minmax(4rem, 8rem) auto;
   align-items: center;
   gap: var(--sp-3);
-  padding: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
   border: 1px solid var(--border-subtle);
-  border-left: 2px solid transparent;
   border-radius: var(--rad-md);
-  background: var(--surface-raised);
-  transition: border-color 120ms ease, background 120ms ease;
+  /* Each skill as a lit hardware tile — a top sheen + a machined lip + a quiet
+   * inset floor, so a row reads as a milled key, not a flat list item. Stage is
+   * expressed in material + brand presence below, never a fat side-stripe. */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0%, transparent 22%, transparent 100%),
+    var(--surface-raised);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 240, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
 }
 
 /* SURF-04 dual-cue: the stage SHAPE (not color). Muted by default; each stage
  * rule below recolors it, but the GLYPH itself already distinguishes the stage. */
 .skill-wall__glyph {
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   line-height: 1;
   color: var(--text-muted);
 }
@@ -82,11 +112,17 @@
 .skill-wall__row:focus-visible {
   outline: none;
   border-color: var(--border-strong);
-  box-shadow: 0 0 0 1px var(--border-strong) inset;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 240, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 0 0 1px var(--border-strong) inset;
 }
 
 .skill-wall__name {
-  font-size: 0.92rem;
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 92, "wght" 500;
+  font-size: 0.96rem;
+  letter-spacing: 0.005em;
   color: var(--text-secondary);
 }
 
@@ -94,7 +130,7 @@
   justify-self: end;
   font-family: var(--type-mono, monospace);
   font-size: 0.64rem;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -104,7 +140,12 @@
 .skill-wall__fill {
   height: 4px;
   border-radius: 999px;
+  /* A milled groove the fill sits in — a recessed inset so the lesson-ladder
+   * reads as a real channel, not a painted line. */
   background: var(--void-12);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
   overflow: hidden;
 }
 
@@ -131,15 +172,28 @@
   color: var(--text-muted);
 }
 
-/* --- Locked: muted, nothing earned yet --- */
+/* --- Locked: muted, nothing earned yet. A dead key — no sheen, recessed. --- */
 .skill-wall__row[data-stage="locked"] {
   opacity: 0.62;
+  background: var(--surface-base);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    inset 0 2px 5px rgba(0, 0, 0, 0.35);
 }
 
-/* --- Competent: lessons done, brand-pink lit --- */
+/* --- Competent: lessons done, brand-pink lit. The key powers on — a crisp 1px
+ * brand edge + a low-alpha rose wash + a faint inset rose underglow, so the row
+ * reads as ALIVE without a fat side-stripe (constraint: side-stripes ≤ 1px). --- */
 .skill-wall__row[data-stage="competent"] {
-  border-left-color: var(--brand-40);
-  background: var(--surface-raised);
+  border-color: var(--brand-30);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0%, transparent 22%, transparent 100%),
+    linear-gradient(180deg, var(--brand-05), transparent 60%),
+    var(--surface-raised);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 240, 0.07),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 16px var(--brand-04);
 }
 .skill-wall__row[data-stage="competent"] .skill-wall__name {
   color: var(--text-primary);
@@ -147,26 +201,38 @@
 .skill-wall__row[data-stage="competent"] .skill-wall__stage,
 .skill-wall__row[data-stage="competent"] .skill-wall__glyph {
   color: var(--brand);
+  text-shadow: var(--text-emboss);
 }
 .skill-wall__row[data-stage="competent"] .skill-wall__fill > i {
   background: var(--brand-50);
 }
 
-/* --- Mastered: the trophy. Gold edge + glow, earned only by a cited demo --- */
+/* --- Mastered: the trophy. The lit float — a crisp gold edge + a contained gold
+ * wash + a warm gold rim-glow, lifted ABOVE the wall as the earned piece. Gold
+ * stays quarantined to the trophy state (the only non-numeric gold the system
+ * allows, by design: this IS the earned-heat moment). --- */
 .skill-wall__row[data-stage="mastered"] {
-  border-left-color: var(--gold);
   border-color: var(--gold-soft);
   background:
-    linear-gradient(90deg, var(--gold-glow), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 20%, transparent 100%),
+    linear-gradient(180deg, var(--gold-glow), transparent 46%),
     var(--surface-float);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 200, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 18px var(--gold-glow),
+    0 6px 18px rgba(0, 0, 0, 0.3),
+    0 0 40px -16px var(--gold-glow);
   cursor: pointer;
 }
 .skill-wall__row[data-stage="mastered"] .skill-wall__name {
   color: var(--text-primary);
+  text-shadow: var(--text-emboss);
 }
 .skill-wall__row[data-stage="mastered"] .skill-wall__stage,
 .skill-wall__row[data-stage="mastered"] .skill-wall__glyph {
   color: var(--gold);
+  text-shadow: 0 0 6px var(--gold-glow);
 }
 .skill-wall__row[data-stage="mastered"] .skill-wall__fill > i {
   background: var(--gold);
@@ -175,6 +241,12 @@
 .skill-wall__row[data-stage="mastered"]:focus-visible {
   border-color: var(--gold);
   outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 200, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 22px var(--gold-glow),
+    0 6px 18px rgba(0, 0, 0, 0.32),
+    0 0 52px -14px var(--gold-glow);
 }
 .skill-wall__row[data-stage="mastered"][aria-expanded="false"] .skill-wall__proof {
   /* Compact line is always shown; expansion is reserved for the cited-demo
