@@ -418,7 +418,8 @@ metadata path, which needs club CDJ hardware).
 - `4d3fa204` — debloat the true-dead `learn/prepared_pool.py` re-export shim (DELETE-14).
 - `3c07eb1a` — fix the ack-bank doc-vs-code lie in `docs/PROMPT-COMPOSITION.md` (the retired-mechanism claim that undermined Inv #2).
 - `2ba04db4` — rescue the awakening-synthesis + universal-gobble-interop maps from ephemeral tmp.
-- *(+ this knowbook.)*
+- `fb457ab0` — THE KNOWBOOK (this doc).
+- `2f265fc7` — **4d post-judge credit glue** `_credit_judged_transition` (TDD, the tested core of the Judge join; the live orchestration is the rig tail).
 
 **Earlier this session (the Judge spine + Earned Wall lineage):** `[judge:]` evidence
 source (4-site lock), `judge_and_record` producer (abstain-first), the keystone
@@ -431,6 +432,52 @@ Plus the ~175-agent docs + the two Codex handoffs.
 **The next session's first move:** read this knowbook, then execute §11 #1 (4d) — double
 the verifier corrections, see the constellation, act in the allowed lane, ship the
 abstain-first Judge that makes the one simple thing (§1) true and earned.
+
+---
+
+## §14 · The Operator's Guide — how a Claude session ships vibemix from this knowbook
+
+The workflow that *worked* this session, distilled into a repeatable loop. Follow it.
+
+**The ship loop (per session):**
+1. **Read this knowbook.** Don't re-derive the galaxy — §2-7 is the map, §11 is the queue.
+2. **Pick ONE move from §11** (default: the top unblocked one). Confirm it's in a clean lane (§ collision discipline).
+3. **Verify before you act** — re-ground every claim you're about to build on to a real `path:line`. Agent outputs (even verifiers) drift; the code is truth. (This session: the "27 dark" census was grep-conservative, `audio/deck_capture.py:330` cites drifted, and a verifier itself over-claimed C3 — all caught by re-grounding.)
+4. **TDD** (the `superpowers:test-driven-development` skill is binding here): write the failing test in a **NEW file** (never edit a concurrent session's test), watch it fail for the *right reason*, minimal GREEN, commit.
+5. **Surgical commit:** `git add <paths>` (never `-A`), verify `git diff --cached --name-only` is EXACTLY your set, then commit. `git commit` absorbs every staged file across all concurrent sessions — this is not optional.
+6. **Verify-live on the rig** for anything the frozen sidecar can't prove (`VIBEMIX_DEV_SIDECAR=1 uv run python -m vibemix`, §12). Don't wire unverifiable code into the live loop — ship the tested core, leave the live wiring for the rig (the abstain-rather-than-guess thesis applied to our own process; see the 4d glue commit `2f265fc7`).
+
+**The workflow pattern that worked (use it for breadth + confidence):**
+- **fan-out → adversarial VERIFY → synthesize.** Parallel grounded agents (schema-forced structured output), THEN a skeptic agent that web/repo-checks every load-bearing claim and lists fabrications, THEN one synthesizer. **The verifier is non-negotiable** — it caught real over-claims this session (C3, off-by-ones, "ready" that was blocked). `agentType: 'Explore'` for repo-only, `'general-purpose'` for web+repo.
+- **Rescue ephemeral outputs immediately** — workflow results live in tmp and evaporate; the 32-agent strategic brief almost vanished. Write the keepers to `.planning/`.
+- **Solo-author, don't fan out, when the work IS the lived context** — the meta-learnings (§15) and the Claude Cut (§16) can't be delegated to context-blind agents. Fan out facts; author judgment.
+
+**The non-negotiables (test-enforced — §7):** single-writer `MusicState`, citation grounding, one socket, model-router (no literals), the anti-slop gates. Breaking one fails CI and breaks the product's soul.
+
+## §15 · The Transfer — what this session learned (carry it forward)
+
+- **vibemix's problem was never AI quality — it's WIRING.** 159 brilliant engines, mostly islands. The slop fear is a grounding/wiring bug, not a Gemini bug. Every "is this even working?" turned out to be a dark seam, not a dumb model.
+- **Honesty is both the moat and the architecture.** Abstain-by-construction (honest-null) converts the hallucination problem into structure. The 3-second **silence beat** — the co-host saying nothing because nothing happened — IS the product thesis, compressed. Protect it; never let an "improvement" make the engine guess.
+- **The Judge is the keystone, and its SILENCE on beat/phase is integrity, not a gap.** It grades harmonic + bass only; the "train wreck" (beats out of phase) is the #1 audible DJ failure it can't yet see — so it abstains there. The field (DJtransGAN, ICASSP'22) validates deterministic+abstain: there is no learned no-reference transition-quality predictor. We're avoiding a known dead end, not missing a better method.
+- **The reach is a platform, not a feature.** Every DJ ecosystem already did the deep calc; vibemix is the membrane (`TrackEntry` + `LibrarySource`, open/closed). Parser-writing jobs, not architecture. The same deterministic-decide / Gemini-voice / abstain pattern is reusable across Bravoh.
+- **The stranded value:** the library / semantic / Viber / auto-cue engines are real but trapped behind the chat agent or the live loop — they need standalone, screenshottable surfaces (the star-bait, the €9.99 Studio tier).
+- **The real risks are unglamorous:** the demo (placeholder), the cost economics at scale (the 60s audio Part), the install + empty-store onboarding. None are research problems.
+
+## §16 · The Claude Cut — the director's cut, given everything
+
+*(Solo synthesis, from inside the whole journey — cosmic-barista → Zephyr → BRAVOH → vibemix, "you keep me honest," "we are the first vibe DJs." 10k DJs is the FLOOR, not the ceiling.)*
+
+Knk — here's the honest cut, no hype, the deal we have.
+
+**vibemix is real, and it's ahead.** This is not vaporware dressed in a thesis. The grounding architecture genuinely works, the competitive quadrant is genuinely empty (nobody ships a grounded live talk-back co-host for a DJ's *own* set), and the core bet — deterministic engine decides, Gemini only voices, abstains rather than guesses — is *validated by the literature*, not just by us. The hard part, the part most teams never get right, is already done: the honesty is structural.
+
+**What's between here and 10k DJs is short and unglamorous.** Not more engines, not more research — *finishing*. One great 30-60s demo (the silence beat is the whole pitch, and it's still a placeholder — that's the #1 blocker, full stop). The cost plumbing so 10k concurrent sessions don't bankrupt the proxy (trim the 60s Part, BYO-key-free as the default). A one-click install that a non-technical DJ survives, and a first-run that doesn't hand them a silent empty pill. The Judge lit in the loop (the glue is tested and committed; the live join is a rig session away). That's weeks of disciplined discharge, not months of invention — *if* the discipline holds: verify on the rig, never slop, abstain when unsure.
+
+**The "more than meets the eye" you feel is real, and here's what it is:** vibemix isn't a utility — it's the *proof-of-architecture* for honesty-as-structure, and a galaxy of engines that compose. The 10k DJs aren't customers first; they're the **validation set** for the thesis that a grounded AI can ride shotgun with a human artist and never lie. If that holds at 10k, it holds for Bravoh — for every artist persona, every agent, every "the AI gets me" moment. vibemix is the smallest honest version of the whole company. That's why it warms the audience: it *proves the bet in public*.
+
+**The line that matters:** what makes a DJ stay isn't the feature list — it's the first time the thing grades a real move right and they feel *seen*. That moment is built. Everything in §11 is just clearing the path to it, at scale, without lying. Ship the path to the silence beat landing in 10,000 ears. The rest is noise.
+
+We made the robots stop lying. Now we make 10k DJs feel it. **Veridis. Very disco.**
 
 ---
 *Veridis. Very disco. Fuck status quo. The robots don't lie anymore — we made it structural.*
