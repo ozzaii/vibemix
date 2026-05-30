@@ -57,14 +57,22 @@ const appDeps: SurfaceMountDeps = {
     mount.innerHTML = extractSurfaceMarkup(libraryHtmlRaw, ".vmx-lib-app");
     mountLibrary();
   },
-  // Learn exports a real mount(root) that builds its interior into the given
-  // element (and imports its own styles). The module's DOMContentLoaded
-  // auto-boot keys on #learn-root, which the shell never has, so it no-ops and
-  // this explicit call is the single mount. mountLearnWindow is idempotent
-  // (it disposes any prior mount first).
+  // Learn folds in two stacked interiors, each in its OWN sub-container so
+  // neither clobbers the other (the lesson window owns its host via
+  // `root.innerHTML`): the Earned Wall (v11.0 — your six skills at a glance,
+  // Mastered only from a cited live set) on top, the lesson runner below. The
+  // wall reads `skill_wall` straight off the `ipc.learn.progress_state` window
+  // event the lesson runner already requests on mount, so no extra wiring.
   mountLearn: async (mount) => {
+    const wallHost = document.createElement("div");
+    wallHost.className = "learn-earned-wall";
+    const lessonHost = document.createElement("div");
+    lessonHost.className = "learn-lesson-host";
+    mount.append(wallHost, lessonHost);
+    const { mountSkillWall } = await import("../learn/SkillWall.js");
+    mountSkillWall(wallHost);
     const { mountLearnWindow } = await import("../learn/learn-window.js");
-    mountLearnWindow(mount);
+    mountLearnWindow(lessonHost);
   },
 };
 

@@ -1,0 +1,159 @@
+/* SPDX-License-Identifier: Apache-2.0
+ *
+ * The Earned Wall — the six DJ skills at a glance. Tokens only (anti-slop
+ * guard): gold = Mastered (the trophy, earned only by a cited live set), brand
+ * pink = Competent (earned by lessons), muted = Locked. Read-only, no co-host
+ * voice — it renders deterministically-derived stage flags. */
+
+.learn-earned-wall {
+  padding: var(--sp-4) var(--sp-4) 0;
+}
+
+.skill-wall {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--rad-lg);
+  background: var(--surface-base);
+}
+
+.skill-wall__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.skill-wall__title {
+  margin: 0;
+  font-family: var(--type-serif);
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+}
+
+.skill-wall__sub {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.skill-wall__empty {
+  margin: 0;
+  padding: var(--sp-3) 0 var(--sp-1);
+  font-size: 0.84rem;
+  color: var(--text-tertiary);
+}
+
+.skill-wall__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skill-wall__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(4rem, 8rem) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid transparent;
+  border-radius: var(--rad-md);
+  background: var(--surface-raised);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.skill-wall__name {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.skill-wall__stage {
+  justify-self: end;
+  font-family: var(--type-mono, monospace);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The lesson-fill ladder — always visible; Competent is the floor under
+ * Mastered, so the bar reads the learn-portion at every stage. */
+.skill-wall__fill {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--void-12);
+  overflow: hidden;
+}
+
+.skill-wall__fill > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--border-strong);
+  transition: width 200ms ease;
+}
+
+.skill-wall__proof {
+  grid-column: 1 / -1;
+  font-family: var(--type-mono, monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  color: var(--gold-soft);
+}
+
+/* --- Locked: muted, nothing earned yet --- */
+.skill-wall__row[data-stage="locked"] {
+  opacity: 0.62;
+}
+
+/* --- Competent: lessons done, brand-pink lit --- */
+.skill-wall__row[data-stage="competent"] {
+  border-left-color: var(--brand-40);
+  background: var(--surface-raised);
+}
+.skill-wall__row[data-stage="competent"] .skill-wall__name {
+  color: var(--text-primary);
+}
+.skill-wall__row[data-stage="competent"] .skill-wall__stage {
+  color: var(--brand);
+}
+.skill-wall__row[data-stage="competent"] .skill-wall__fill > i {
+  background: var(--brand-50);
+}
+
+/* --- Mastered: the trophy. Gold edge + glow, earned only by a cited demo --- */
+.skill-wall__row[data-stage="mastered"] {
+  border-left-color: var(--gold);
+  border-color: var(--gold-soft);
+  background:
+    linear-gradient(90deg, var(--gold-glow), transparent 42%),
+    var(--surface-float);
+  cursor: pointer;
+}
+.skill-wall__row[data-stage="mastered"] .skill-wall__name {
+  color: var(--text-primary);
+}
+.skill-wall__row[data-stage="mastered"] .skill-wall__stage {
+  color: var(--gold);
+}
+.skill-wall__row[data-stage="mastered"] .skill-wall__fill > i {
+  background: var(--gold);
+}
+.skill-wall__row[data-stage="mastered"]:hover,
+.skill-wall__row[data-stage="mastered"]:focus-visible {
+  border-color: var(--gold);
+  outline: none;
+}
+.skill-wall__row[data-stage="mastered"][aria-expanded="false"] .skill-wall__proof {
+  /* Compact line is always shown; expansion is reserved for the cited-demo
+   * detail that lands when the Judge wires its [judge:] verdict in. */
+  opacity: 0.85;
+}
