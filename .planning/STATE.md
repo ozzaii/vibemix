@@ -24,8 +24,8 @@ progress:
 
 Phase: 103 (Live Mastered Grounding) — COMPLETE
 Plan: 2 of 2 (103-01 + 103-02 SHIPPED)
-Status: Phase complete — ready for verification (`/gsd:verify-work`)
-Last activity: 2026-05-29
+Status: Phase complete — ready for verification (`/gsd:verify-work`). v11.0 mastery spine now LIVE-WIRED (skill_recognizer call-site; §EARNED-LIVE-MASTERED-VERIFY hardware ear-pass still KAAN-ACTION).
+Last activity: 2026-05-30 — quick task 260530-3lh: wired the orphaned skill_recognizer into the live event loop (backend)
 Progress: [██████████] 100%
 
 ## Milestone Reference
@@ -89,6 +89,7 @@ See: `.planning/REQUIREMENTS.md` (16 v11.0 REQ-IDs across SKILL / COMP / MAST / 
 |---|-------------|------|--------|-----------|
 | 260529-ifq | Onboarding skill-level wizard step (beginner/intermediate/pro) + config.json clobber fix | 2026-05-29 | f74635fd | [260529-ifq-onboarding-skill-level-wizard-step](./quick/260529-ifq-onboarding-skill-level-wizard-step/) |
 | 260529-m4m | Converge config.json store path (Rust→sidecar `vibemix/` dir) + reload-harden all 5 writers | 2026-05-29 | 7780322c | [260529-m4m-converge-config-store-path](./quick/260529-m4m-converge-config-store-path/) |
+| 260530-3lh | Wire the orphaned v11.0 skill_recognizer into the live event loop (§EARNED-LIVE-MASTERED-VERIFY backend call-site; TDD + 2-agent cross-verify) | 2026-05-30 | 6dc07ab3 | [260530-3lh-land-backend-live-tuning-brain](./quick/260530-3lh-land-backend-live-tuning-brain/) |
 
 ## Session Continuity
 
