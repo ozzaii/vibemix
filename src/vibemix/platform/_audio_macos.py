@@ -100,6 +100,43 @@ def assert_device_sample_rate(device_index: int, expected: int) -> None:
     )
 
 
+def _make_input_resampler(
+    callback: AudioCallback,
+    *,
+    device_sr: int,
+    target_sr: int,
+    channels: int,
+) -> AudioCallback:
+    """Wrap an input callback so device-native-rate capture buffers are resampled
+    to ``target_sr`` before the grounding callback sees them.
+
+    The inverse of ``open_passthrough_output``'s resample_wrapper: capture pulls
+    device-rate audio in and converts it to the analysis rate, so the grounding
+    engine always operates at the rate it expects regardless of the hardware
+    default. Holding grounding on the right rate is the anti-mis-ground guarantee.
+    """
+    import numpy as np
+
+    from vibemix.audio.resample import resample_audio
+
+    def resample_input_wrapper(indata, frames, time_info, status):
+        per_channel = [
+            resample_audio(
+                np.asarray(indata[:, ch], dtype=np.float32),
+                source_sr=device_sr,
+                target_sr=target_sr,
+            )
+            for ch in range(channels)
+        ]
+        out_frames = per_channel[0].shape[0] if per_channel else 0
+        converted = np.zeros((out_frames, channels), dtype=np.float32)
+        for ch in range(channels):
+            converted[:, ch] = per_channel[ch]
+        callback(converted, out_frames, time_info, status)
+
+    return resample_input_wrapper
+
+
 def set_device_nominal_sample_rate(device_name: str, rate: int) -> bool:
     """Set a CoreAudio device's nominal sample rate via the AudioToolbox API.
 
@@ -644,6 +681,38 @@ class AudioMacOS:
         drift on Multi-Output Devices). On either failure raises
         ``SampleRateMismatchError`` AND closes the stream to avoid leaks.
         """
+        info = sd.query_devices(device_index)
+        device_sr = int(info["default_samplerate"])
+        if device_sr != sample_rate:
+            # Master device runs at a non-analysis rate (e.g. a factory-default
+            # 44.1k BlackHole). Open at its native rate and resample to the
+            # analysis rate instead of forcing the OS rate — mirrors
+            # open_passthrough_output. Grounding still sees ``sample_rate`` audio,
+            # so a 44.1k rig no longer crashes main() at the first track.
+            open_block = max(1, round(block_size * (device_sr / sample_rate)))
+            wrapped = _make_input_resampler(
+                callback, device_sr=device_sr, target_sr=sample_rate, channels=channels
+            )
+            stream = sd.InputStream(
+                device=device_index,
+                samplerate=device_sr,
+                channels=channels,
+                dtype="float32",
+                blocksize=open_block,
+                latency="low",
+                callback=wrapped,
+            )
+            if int(stream.samplerate) != device_sr:
+                negotiated = int(stream.samplerate)
+                stream.close()
+                raise SampleRateMismatchError(
+                    f"PortAudio negotiated {negotiated}Hz vs requested {device_sr}Hz on "
+                    f"device {device_index!r}."
+                )
+            stream.start()
+            return _SoundDeviceStreamHandle(stream)
+
+        # Device already at the analysis rate — the proven 48k path, unchanged.
         assert_device_sample_rate(device_index, sample_rate)
         stream = sd.InputStream(
             device=device_index,

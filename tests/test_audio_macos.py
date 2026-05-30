@@ -88,25 +88,79 @@ def test_assert_device_sample_rate_passes_on_match(mocker: MockerFixture) -> Non
     assert result is None
 
 
-# ===== RATE-03: open_capture pre-open guard short-circuits =====
+# ===== RATE-03: open_capture opens at the device's NATIVE rate + resamples =====
 
 
-def test_open_capture_pre_open_guard_fires_before_stream_construction(
+def test_open_capture_native_rate_resamples_instead_of_raising(
     mocker: MockerFixture, make_backend
 ) -> None:
-    """Pre-open SampleRateMismatchError short-circuits BEFORE sd.InputStream is called."""
+    """A 44.1k master device no longer crashes: open_capture opens at the device's
+    native rate and resamples to the analysis rate, mirroring the proven
+    open_passthrough_output path. The raw callback is wrapped (not passed through)."""
     mocker.patch(
         "vibemix.platform._audio_macos.sd.query_devices",
         return_value={"default_samplerate": 44100.0, "name": "BlackHole 2ch"},
     )
-    input_stream_mock = mocker.patch("vibemix.platform._audio_macos.sd.InputStream")
+    fake_stream = MagicMock()
+    fake_stream.samplerate = 44100
+    input_stream_mock = mocker.patch(
+        "vibemix.platform._audio_macos.sd.InputStream", return_value=fake_stream
+    )
 
     backend = make_backend()
-    with pytest.raises(SampleRateMismatchError):
-        backend.open_capture(
-            0, sample_rate=48000, channels=2, block_size=480, callback=lambda *a: None
-        )
-    assert input_stream_mock.call_count == 0
+    real_cb = lambda *a: None  # noqa: E731
+    backend.open_capture(0, sample_rate=48000, channels=2, block_size=480, callback=real_cb)
+
+    ck = input_stream_mock.call_args.kwargs
+    assert ck["samplerate"] == 44100, "must open at the device's native rate, not force 48k"
+    assert ck["callback"] is not real_cb, "callback must be the resampling wrapper"
+    fake_stream.start.assert_called_once()
+
+
+def test_open_capture_48k_passes_raw_callback_unchanged(
+    mocker: MockerFixture, make_backend
+) -> None:
+    """device already at 48000 → byte-identical path: opened at 48000 with the raw
+    callback (no resample wrapper), so the working case is untouched."""
+    mocker.patch(
+        "vibemix.platform._audio_macos.sd.query_devices",
+        return_value={"default_samplerate": 48000.0, "name": "BlackHole 2ch"},
+    )
+    fake_stream = MagicMock()
+    fake_stream.samplerate = 48000
+    input_stream_mock = mocker.patch(
+        "vibemix.platform._audio_macos.sd.InputStream", return_value=fake_stream
+    )
+
+    backend = make_backend()
+    real_cb = lambda *a: None  # noqa: E731
+    backend.open_capture(0, sample_rate=48000, channels=2, block_size=480, callback=real_cb)
+
+    ck = input_stream_mock.call_args.kwargs
+    assert ck["samplerate"] == 48000
+    assert ck["callback"] is real_cb, "48k path must pass the raw callback unchanged"
+
+
+def test_input_resampler_converts_device_rate_to_analysis_rate() -> None:
+    """The capture wrapper resamples device-rate buffers to the analysis rate so the
+    grounding engine always sees target_sr audio — the anti-mis-ground guarantee."""
+    from vibemix.audio.resample import resample_audio
+    from vibemix.platform._audio_macos import _make_input_resampler
+
+    received: dict[str, object] = {}
+
+    def real_cb(buf, frames, time_info, status):
+        received["buf"] = buf
+        received["frames"] = frames
+
+    wrapped = _make_input_resampler(real_cb, device_sr=44100, target_sr=48000, channels=2)
+    indata = np.ones((441, 2), dtype=np.float32)
+    wrapped(indata, 441, None, None)
+
+    expected_len = len(resample_audio(indata[:, 0], source_sr=44100, target_sr=48000))
+    assert received["frames"] == expected_len
+    assert received["buf"].shape == (expected_len, 2)
+    assert received["buf"].dtype == np.float32
 
 
 # ===== RATE-04: open_capture post-open guard closes stream on negotiated drift =====
