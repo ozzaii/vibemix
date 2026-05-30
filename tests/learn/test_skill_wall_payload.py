@@ -35,6 +35,7 @@ def test_payload_is_json_serializable():
     assert set(back[0]) == {
         "skill_id", "stage", "learn_fill", "competent",
         "live_proof_count", "mastered", "first_mastered_at",
+        "what_remains",  # SURF-01 — the plain "what remains to advance" line
     }
 
 

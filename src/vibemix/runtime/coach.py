@@ -116,6 +116,7 @@ def _credit_live_skill_demo(
     *,
     evidence_registry: EvidenceRegistry | None,
     learn_progress: Any | None,
+    speak: Callable[[str], None] | None = None,
 ) -> list[str]:
     """Credit the v11.0 skill(s) a CITED live event demonstrates (the
     ``§EARNED-LIVE-MASTERED-VERIFY`` backend wiring — finally giving the
@@ -153,6 +154,16 @@ def _credit_live_skill_demo(
         set_start_at = float(getattr(state, "set_start_at", 0.0) or 0.0)
         t_session = max(0.0, time.time() - set_start_at)
         iso_now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        # SURF-03 — snapshot each skill's Mastered flag BEFORE crediting so we can
+        # detect the rare not-mastered→mastered FLIP afterward (recognize mutates
+        # learn_progress.skills in place). Scalar copies, not the aliased dicts.
+        before_mastered = {
+            sid: bool(blk.get("mastered", False))
+            for sid, blk in (getattr(learn_progress, "skills", {}) or {}).items()
+            if isinstance(blk, dict)
+        }
+
         credited = recognize(
             ev,
             citation_check=lambda s, k, t: evidence_registry.has(s, k, t, tol=1.0),
@@ -161,6 +172,30 @@ def _credit_live_skill_demo(
             event_t=t_session,
         )
         if credited:
+            # SURF-03 — the single, rare, earned "Mastered" unlock vocal. Fires
+            # ONLY on a skill that JUST flipped to Mastered this event (not on a
+            # normal demo, not again after the flip). Hand-authored fixture copy
+            # via the existing co-host ``speak`` path (no LLM, no new provider).
+            # Guarded never-raises: a vocal failure must never wedge the loop.
+            if speak is not None:
+                from vibemix.learn.mastered_vocal import mastered_unlock_line
+
+                for sid in credited:
+                    now_mastered = bool(
+                        (learn_progress.skills.get(sid) or {}).get("mastered", False)
+                    )
+                    if now_mastered and not before_mastered.get(sid, False):
+                        line = mastered_unlock_line(
+                            sid, was_mastered=False, now_mastered=True
+                        )
+                        if line:
+                            try:
+                                speak(line)
+                            except Exception as exc:  # vocal failure ≠ credit failure
+                                print(
+                                    f"\n[coach mastered-vocal err] {exc}",
+                                    file=sys.stderr,
+                                )
             # SAFETY: this LearnProgress is the SAME object the LessonRuntime
             # holds; both mutate-then-save it. That is clobber-free ONLY because
             # both run as coroutines on the one asyncio loop and each
@@ -172,6 +207,24 @@ def _credit_live_skill_demo(
     except Exception as exc:  # never wedge the reaction loop on a credit failure
         print(f"\n[coach skill-credit err] {exc}", file=sys.stderr)
         return []
+
+
+def _make_mastered_speak(session: Any) -> Callable[[str], None] | None:
+    """Build the SURF-03 ``speak`` hook from the live co-host session — the
+    FIXED-TEXT path (``session.say``), NOT ``generate_reply`` (no LLM, no slop, no
+    new provider). Returns ``None`` when the session can't speak fixed text; the
+    credit still lands, only the rare vocal is skipped. The actual TTS tone is the
+    parked ``§EARNED-MASTERED-VOCAL-EAR`` ear-pass."""
+    say = getattr(session, "say", None)
+    if not callable(say):
+        return None
+
+    def _speak(line: str) -> None:
+        # Fire-and-forget fixed text; the SpeechHandle is not awaited (the Mastered
+        # unlock is rare and one-shot, never competing with the reaction cadence).
+        say(line)
+
+    return _speak
 
 
 async def coach_loop(
@@ -213,6 +266,9 @@ async def coach_loop(
 
     wired = cancel_gate is not None and ttft_meter is not None and playback is not None
     citation_wired = ipc_bus is not None and citation_telemetry is not None
+    # SURF-03 — the rare grounded "Mastered" unlock vocal hook (fixed-text co-host
+    # path). Built once; None when the session can't speak (credit still lands).
+    mastered_speak = _make_mastered_speak(session)
 
     # SessionTracer hook — additive, side-effect-free, fully fail-soft. A None
     # tracer (or a tracer raising) must NEVER perturb the in_flight gate or the
@@ -394,6 +450,7 @@ async def coach_loop(
                 state,
                 evidence_registry=evidence_registry,
                 learn_progress=learn_progress,
+                speak=mastered_speak,
             )
             _tr(
                 "event",

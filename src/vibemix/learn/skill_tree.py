@@ -89,11 +89,19 @@ class SkillSpec:
             ``§EARNED-MASTERY-THRESHOLD-TUNE`` Kaan-action can tune any one skill
             without a code change; the 6 manifest entries stay valid unchanged
             because the default is supplied here.
+        live_creditable: Whether this skill has a live Mastered path in v11.0 —
+            i.e. some real event type credits it (see ``skill_recognizer``).
+            Defaults ``True``; ``beatmatching`` is the sole ``False`` (there is no
+            BEATMATCH/SYNC event to honestly demonstrate it — ``_HONEST_UNCREDITABLE_V11``).
+            Read by ``_what_remains`` (SURF-01) so the wall never promises a demo
+            path a skill does not have. The drift between this field and the
+            recognizer's uncreditable list is pinned by ``test_creditability_drift``.
     """
 
     lesson_ids: tuple[str, ...]
     gate: str
     mastered_threshold: int = 3
+    live_creditable: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +143,10 @@ SKILL_MANIFEST: dict[str, SkillSpec] = {
     "beatmatching": SkillSpec(
         lesson_ids=("L2.01", "L2.02"),
         gate="course_3_unlocked",
+        # The sole v11.0 honest-uncreditable skill: there is NO BEATMATCH/SYNC
+        # event to ground a live demo, so it caps at Competent (no proxy-slop).
+        # Mirrors skill_recognizer._HONEST_UNCREDITABLE_V11 (drift-pinned).
+        live_creditable=False,
     ),
     "eq_mixing": SkillSpec(
         lesson_ids=("L1.14", "L2.04", "L2.05"),
@@ -342,6 +354,35 @@ class SkillTree:
         return results
 
 
+def _what_remains(sp: SkillProgress, spec: SkillSpec) -> str:
+    """The plain "what remains to advance" line for one skill (SURF-01).
+
+    Deterministic, never-raises UI affordance copy — single-sourced in Python so
+    the frontend never re-derives the stage rule. Honest at every stage, and
+    honest about the one skill with no live Mastered path (``beatmatching``):
+
+      * ``mastered``  → ``""`` (the cited-proof line carries it; nothing remains).
+      * ``competent`` + creditable → ``"{N-count} more cited live demo(s) to Master"``.
+      * ``competent`` + uncreditable → states the limit, NO false "soon"/"coming".
+      * ``locked`` + lessons done (fill ≥ threshold) → the recital is the gate (COMP-02).
+      * ``locked`` + lessons unfinished → finish the lessons first.
+    """
+    if sp.stage == "mastered":
+        return ""
+    if sp.stage == "competent":
+        if not spec.live_creditable:
+            # beatmatching: no event grounds it, so it caps at Competent. State
+            # the fact without promising a path that does not exist (anti-slop).
+            return "Mastered isn't live-graded for this skill"
+        remaining = max(1, spec.mastered_threshold - sp.live_proof_count)
+        unit = "demo" if remaining == 1 else "demos"
+        return f"{remaining} more cited live {unit} to Master"
+    # locked: distinguish "needs the recital" (lessons done) from "needs lessons".
+    if sp.learn_fill >= COMPETENT_THRESHOLD:
+        return "Pass the recital to reach Competent"
+    return "Finish the lessons to reach Competent"
+
+
 def skill_wall_payload(
     progress: Any, manifest: dict[str, SkillSpec] | None = None
 ) -> list[dict[str, Any]]:
@@ -349,12 +390,19 @@ def skill_wall_payload(
 
     Folds :meth:`SkillTree.compute` into a JSON-safe, manifest-ordered list — the
     paint-ready block the webview renders as the Earned Wall. The Competent/
-    Mastered stage rule stays single-sourced HERE (Python), so the frontend never
-    re-derives ``COMPETENT_THRESHOLD``/weights (no manifest-drift risk). IPC-only:
-    this is NEVER persisted — it rides the snapshot envelope, never ``to_dict``.
+    Mastered stage rule AND the ``what_remains`` advance line stay single-sourced
+    HERE (Python), so the frontend never re-derives ``COMPETENT_THRESHOLD``/weights
+    (no manifest-drift risk). IPC-only: this is NEVER persisted — it rides the
+    snapshot envelope, never ``to_dict``.
     """
     tree = SkillTree(manifest) if manifest is not None else SkillTree()
-    return [sp.as_payload() for sp in tree.compute(progress).values()]
+    rows: list[dict[str, Any]] = []
+    for skill_id, sp in tree.compute(progress).items():
+        row = sp.as_payload()
+        spec = tree._manifest.get(skill_id)
+        row["what_remains"] = _what_remains(sp, spec) if spec is not None else ""
+        rows.append(row)
+    return rows
 
 
 # ---------------------------------------------------------------------------
