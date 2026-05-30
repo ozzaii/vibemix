@@ -153,3 +153,37 @@ def test_close_is_safe_to_call_twice(tmp_path: Path) -> None:
     rec = VoiceRecorder(root=tmp_path)
     rec.close()
     rec.close()  # must not raise
+
+
+# ===== REC-collision: two sessions in the same second get distinct dirs =====
+
+
+def test_two_recorders_in_same_second_get_distinct_dirs(tmp_path, monkeypatch):
+    """Two sessions starting in the same wall-clock second must NOT collide.
+
+    The session dir is a second-granularity timestamp. A manual restart,
+    double-launch, or crash-recovery relaunch within one second hit
+    ``session_dir.mkdir()`` (no exist_ok) and raised FileExistsError, aborting
+    boot (caught live 2026-05-30 on the frozen sidecar). Each session must keep
+    its OWN dir (exist_ok=True would let them clobber each other's recordings).
+    """
+    import vibemix.audio.recorder as rec_mod
+    from datetime import datetime as _dt
+
+    fixed = _dt(2026, 5, 30, 20, 24, 21)
+
+    class _FrozenDatetime(_dt):
+        @classmethod
+        def now(cls, *args, **kwargs):  # type: ignore[override]
+            return fixed
+
+    monkeypatch.setattr(rec_mod, "datetime", _FrozenDatetime)
+    r1 = rec_mod.VoiceRecorder(root=tmp_path)
+    r2 = rec_mod.VoiceRecorder(root=tmp_path)  # same second — must not raise
+    try:
+        assert r1.session_dir != r2.session_dir, "second session reused the first's dir"
+        assert r1.session_dir.exists()
+        assert r2.session_dir.exists()
+    finally:
+        r1.close()
+        r2.close()

@@ -215,9 +215,24 @@ class VoiceRecorder:
         with contextlib.suppress(OSError):
             os.chmod(rec_dir, 0o700)
 
+        # The session dir is a second-granularity timestamp. Two sessions can
+        # start within the same second (manual restart, double-launch, or a
+        # crash-recovery relaunch) — a bare ``mkdir`` then raises FileExistsError
+        # and aborts boot (caught live 2026-05-30 on the frozen sidecar). Retry
+        # with a numeric suffix so each session keeps its OWN dir; ``exist_ok=True``
+        # would instead make them clobber each other's recordings. The mkdir
+        # itself is the collision test (atomic — no TOCTOU window).
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.session_dir = rec_dir / ts
-        self.session_dir.mkdir(mode=0o700)
+        session_dir = rec_dir / ts
+        attempt = 1
+        while True:
+            try:
+                session_dir.mkdir(mode=0o700)
+                break
+            except FileExistsError:
+                attempt += 1
+                session_dir = rec_dir / f"{ts}-{attempt}"
+        self.session_dir = session_dir
         with contextlib.suppress(OSError):
             os.chmod(self.session_dir, 0o700)
 
