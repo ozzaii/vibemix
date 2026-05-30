@@ -14,20 +14,28 @@
 
 ## §1 · THE HEADLINE (honest)
 
-**The engine is ALIVE and the app BUILDS, SIGNS, and NOTARIZES — but the shipped
-bundle's sidecar can't boot yet.** Two distinct truths:
+> **UPDATE 2026-05-30 (later, boot-fix session): THE SIDECAR NOW BOOTS.** B1 is
+> FIXED. The frozen sidecar boots fully and cleanly — verified on both the raw
+> onedir AND the bundled `.app` sidecar: reaches `-> agent started.`, MIDI
+> DDJ-FLX4, 12 IPC types, `listening to BlackHole 16ch @ 48000Hz (4ch)`, and
+> `mascot bus on ws://127.0.0.1:8765`, with graceful SIGINT shutdown. B3 + B4
+> (sign pipeline) are also FIXED in-repo. The `.app` now bundles a WORKING engine.
+> Fixes: `0af90e90` (lazy-cli + cli-unexclude + B3/B4), `6d2dcebc` (Cartesia
+> http_session), `50d78a62` (recorder mkdir), `46e21ec6` (test-iso). See §4.
+> **Boot-test trick:** a clean boot block-buffers stdout — kill with **SIGINT**
+> (not SIGKILL) to flush it; only a crash or graceful exit shows the log.
 
-- ✅ **Signed + notarized + Gatekeeper-accepted dmg exists**: `dist/vibemix-0.0.1.dmg`
-  (119M). `spctl` = `accepted, source=Notarized Developer ID`; signed by
+**(Original headline, now partly superseded.)** The engine is ALIVE and the app
+BUILDS, SIGNS, and NOTARIZES:
+
+- ✅ **Signed + notarized + Gatekeeper-accepted dmg exists**: `dist/vibemix-0.0.1.dmg`.
+  `spctl` = `accepted, source=Notarized Developer ID`; signed by
   *Developer ID Application: Francesco Fasanella (UK7DYFK6F8)* → Apple Root; stapled.
-  This is a real, distributable-on-any-Mac container.
-- ❌ **Its Python sidecar crashes on launch** with a livekit circular `ImportError`
-  (see §4 B1). So the dmg *installs* and *opens* but the **co-host can't start from
-  the frozen bundle.** The live engine has only ever run via **dev-source**
-  (`uv run python -m vibemix`), where the import is patched and works.
+  (A fresh signed dmg with the BOOTING sidecar is being produced in the boot-fix session.)
+- ✅ **Its Python sidecar NOW boots** (was ❌ — the livekit circular ImportError, B1).
 
-**The product is ~70% to a working shipped build.** What's left is real, mostly
-bounded, and documented below.
+**The product is now well past the boot wall.** Remaining: B2 (key delivery,
+kaan/momo), B5 (Windows), B6 (ear-pass, kaan) — documented below.
 
 ---
 
@@ -102,8 +110,17 @@ plugin path; key valid), and the **full sign→notarize→staple pipeline** (bel
 
 ## §4 · OPEN BLOCKERS — with exact fix recipes
 
-### B1 — Frozen sidecar can't boot: livekit circular `ImportError` 🔴 THE wall to a working dmg
-**Symptom:** `dist/vibemix-0.0.1.dmg` opens but the co-host never starts. Running the
+### B1 — Frozen sidecar can't boot: livekit circular `ImportError` ✅ RESOLVED (`0af90e90`)
+> **FIXED.** The "split cli first" guess was wrong — loading cli *at all* is the trigger
+> (cli pulls voice/worker which re-enter the partial parent for cli). Real fix: cli is
+> never used by vibemix (only Agent/AgentSession/RealtimeModel), so make it **lazy** via
+> the module's PEP-562 `__getattr__` using `importlib.import_module` (NOT `from . import
+> cli`, which recurses through `__getattr__`→`hasattr`→infinite loop). PLUS cli had to be
+> *un-excluded* from `_ANALYSIS_EXCLUDES` in both specs — `start()` imports it
+> unconditionally, so it's a runtime dep, not a dev CLI. Verified: clean boot to `agent
+> started` + ws bus. The historical diagnosis below is kept for context.
+
+**Symptom (historical):** `dist/vibemix-0.0.1.dmg` opens but the co-host never starts. Running the
 frozen sidecar directly (`…/vibemix.app/Contents/Resources/binaries/vibemix-core-aarch64-apple-darwin/vibemix-core-aarch64-apple-darwin`)
 boots through env/genre/MIDI/persona, then crashes:
 ```
@@ -146,7 +163,11 @@ STOPPED`. **Decision (Kaan/Momo):** Bravoh proxy `/api/vibemix/v1/register` (was
 **or** a wizard BYO-key step. The wizard-step UI + keyring store is *claude-now* once
 the path is chosen. (Kaan ran the app live this session and hit exactly this wall.)
 
-### B3 — `entitlements.macos.plist` breaks codesign (AMFI) 🟡 claude-now, SAFE fix
+### B3 — `entitlements.macos.plist` breaks codesign (AMFI) ✅ RESOLVED (`0af90e90`)
+> **FIXED in-repo.** The `codesign --force --deep …` example inside the XML comment was
+> rephrased into prose (no literal `--`). `xmllint` + `plutil -lint` now clean, all 5
+> entitlements intact, codesign reads the repo file directly (no plutil workaround).
+
 The committed distribution entitlements file's XML *comment block* contains `--`
 sequences (`--force --deep`, box-drawing `────`). `--` is illegal inside XML comments;
 `plutil` tolerates it but **codesign's AMFI parser rejects it** (`AMFIUnserializeXML:
@@ -156,7 +177,11 @@ was always ungated). **Fix:** strip the comment block (or the `--`), keep the 5 
 `device.microphone`, `network.client`). Verify: `codesign … --entitlements <file> -s -
 /tmp/x` succeeds. (This session worked around it with a `plutil -convert`-stripped copy.)
 
-### B4 — `sign_macos.sh` Stage-2 leaves adhoc sigs → notarization rejects 🟡 claude-now
+### B4 — `sign_macos.sh` Stage-2 leaves adhoc sigs → notarization rejects ✅ RESOLVED (`0af90e90`)
+> **FIXED in-repo.** Stage 2 now force-signs EVERY nested Mach-O deepest-first (matches
+> `*.so`/`*.dylib` + `-perm +111`, `LC_ALL=C` depth sort, no idempotent-skip). The
+> `cargo tauri build` adhoc sigs are replaced with Developer ID + secure timestamp.
+
 Stage 2 signs `find -perm +111` and **skips already-signed files** (`codesign --verify
 --strict && continue`). But cargo's bundler **adhoc-signs** nested binaries, so the skip
 leaves adhoc sigs (notarization rejects: "not signed with a valid Developer ID"), and
