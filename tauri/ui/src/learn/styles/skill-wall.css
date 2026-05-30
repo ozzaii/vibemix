@@ -109,6 +109,13 @@
   color: var(--gold-soft);
 }
 
+/* SURF-01: the plain "what's left to advance" line (locked / competent rows). */
+.skill-wall__remains {
+  grid-column: 1 / -1;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
 /* --- Locked: muted, nothing earned yet --- */
 .skill-wall__row[data-stage="locked"] {
   opacity: 0.62;

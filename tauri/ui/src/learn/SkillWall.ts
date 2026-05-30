@@ -23,6 +23,9 @@ export interface SkillWallRow {
   live_proof_count: number;
   mastered: boolean;
   first_mastered_at: string | null;
+  /** SURF-01: the plain "what's left to advance" line, single-sourced in Python
+   *  (SkillTree). Empty string for Mastered (the proof line carries it). */
+  what_remains: string;
 }
 
 /** Display names for the six REQ-locked skills. An unknown id falls back to its
@@ -80,6 +83,15 @@ function renderRow(row: SkillWallRow): HTMLLIElement {
   fill.appendChild(bar);
 
   li.append(name, stage, fill);
+
+  // SURF-01: the honest "what's left" line (empty for Mastered — the proof
+  // line carries it there). Single-sourced in Python; we only paint it.
+  if (row.what_remains) {
+    const remains = document.createElement("span");
+    remains.className = "skill-wall__remains";
+    remains.textContent = row.what_remains;
+    li.appendChild(remains);
+  }
 
   if (row.mastered) {
     // The trophy: tappable to its cited demo. Only Mastered earns the affordance.

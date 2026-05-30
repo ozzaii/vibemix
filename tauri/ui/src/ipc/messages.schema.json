@@ -3470,12 +3470,12 @@
                   }
                 },
                 "skill_wall": {
-                  "$comment": "v11.0 Earned Wall. IPC-only derived block (SkillTree.compute), never persisted. Per-skill Competent/Mastered stage the webview renders. Phase 104.",
+                  "$comment": "v11.0 Earned Wall. IPC-only derived block (SkillTree.compute), never persisted. Per-skill Competent/Mastered stage + the SURF-01 what_remains advance line the webview renders. Phase 104.",
                   "type": "array",
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["skill_id", "stage", "learn_fill", "competent", "live_proof_count", "mastered", "first_mastered_at"],
+                    "required": ["skill_id", "stage", "learn_fill", "competent", "live_proof_count", "mastered", "first_mastered_at", "what_remains"],
                     "properties": {
                       "skill_id": {"type": "string"},
                       "stage": {"type": "string", "enum": ["locked", "competent", "mastered"]},
@@ -3483,7 +3483,8 @@
                       "competent": {"type": "boolean"},
                       "live_proof_count": {"type": "integer", "minimum": 0},
                       "mastered": {"type": "boolean"},
-                      "first_mastered_at": {"type": ["string", "null"]}
+                      "first_mastered_at": {"type": ["string", "null"]},
+                      "what_remains": {"type": "string"}
                     }
                   }
                 }

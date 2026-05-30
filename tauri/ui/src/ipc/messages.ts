@@ -1010,6 +1010,7 @@ export interface LearnProgressState {
         live_proof_count: number;
         mastered: boolean;
         first_mastered_at: string | null;
+        what_remains: string;
       }[];
     };
   };

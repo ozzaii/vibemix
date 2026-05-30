@@ -20,6 +20,7 @@ function row(over: Partial<SkillWallRow>): SkillWallRow {
     live_proof_count: 0,
     mastered: false,
     first_mastered_at: null,
+    what_remains: "Finish the lessons to reach Competent",
     ...over,
   };
 }
@@ -80,6 +81,18 @@ describe("renderSkillWall — the Earned Wall", () => {
     const el = renderSkillWall([]);
     expect(el.querySelectorAll(".skill-wall__row").length).toBe(0);
     expect(el.querySelector(".skill-wall__empty")).not.toBeNull();
+  });
+
+  it("paints the SURF-01 what_remains line on an unfinished skill, none on Mastered", () => {
+    const rows = renderSkillWall(SIX).querySelectorAll<HTMLElement>(".skill-wall__row");
+    expect(rows[1]!.querySelector(".skill-wall__remains")?.textContent).toBe(
+      "Finish the lessons to reach Competent",
+    );
+    // Mastered carries its proof line, not a "what remains" line (empty string).
+    const mastered = renderSkillWall([
+      row({ skill_id: "harmonic_mixing", stage: "mastered", mastered: true, what_remains: "" }),
+    ]).querySelector<HTMLElement>(".skill-wall__row");
+    expect(mastered?.querySelector(".skill-wall__remains")).toBeNull();
   });
 });
 
