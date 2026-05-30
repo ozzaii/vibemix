@@ -103,6 +103,11 @@ v0.1.0-rc1 ships signed + notarized for macOS Apple Silicon. The Windows build
 waits on SignPath OSS-program approval and ships with v0.1.0 stable.
 Auto-update is on by default for release builds; opt out in Settings.
 
+Windows binaries are code-signed by the [SignPath Foundation](https://signpath.org),
+which provides free code signing for open-source projects; macOS builds use Apple
+Developer ID + notarization. See the [Code Signing Policy](docs/code-signing-policy.md)
+and [Privacy Policy](PRIVACY.md).
+
 ---
 
 ## Feature matrix
