@@ -18,6 +18,7 @@ The v4 import order on lines 62-66 pins this invariant — do NOT reorder.
 
 from __future__ import annotations
 
+import asyncio
 import os
 from typing import Literal
 
@@ -47,6 +48,31 @@ _openai_tts_mod.AUDIO_STREAM_MODELS.add(OPENROUTER_TTS_MODEL)
 from vibemix.agent._livekit_google_slim import gemini_native_tts_class  # noqa: E402
 
 _TTS_INSTRUCTIONS = "Casual studio friend, brief, natural — no theatrics, no announcer voice."
+
+
+def _live_http_session():
+    """Return an aiohttp ClientSession bound to the running loop, else ``None``.
+
+    The livekit Cartesia plugin, given no ``http_session``, falls back to
+    ``utils.http_context.http_session()`` — which REQUIRES a livekit agent-worker
+    "job context". vibemix runs its OWN asyncio loop (not the worker api), so that
+    fallback raises ``RuntimeError: Attempted to use an http session outside of a
+    job context`` the moment the plugin's connection pool prewarms — and the
+    co-host goes mute (verified 2026-05-30 on the frozen sidecar: boot reached
+    ``-> agent started.`` but every Cartesia connect crashed). Passing our own
+    ClientSession makes the plugin self-sufficient.
+
+    Returns ``None`` when there is no running loop (unit tests / pure construction)
+    so plugin construction stays loop-free there; the live path always builds the
+    chain from inside ``async def main()`` so a session is created then.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return None
+    import aiohttp
+
+    return aiohttp.ClientSession()
 
 
 def _build_direct_chain(
@@ -87,6 +113,10 @@ def _build_direct_chain(
                 model=CARTESIA_TTS_MODEL,
                 voice=CARTESIA_VOICE,
                 api_key=cartesia_api_key,
+                # Self-supplied session — vibemix has no livekit job context to
+                # borrow one from (see _live_http_session). None when built
+                # loop-free (tests) keeps the plugin's lazy default.
+                http_session=_live_http_session(),
             )
         )
     gemini_tts = gemini_native_tts_class()

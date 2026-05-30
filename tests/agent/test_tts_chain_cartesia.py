@@ -9,8 +9,61 @@ No Cartesia key -> the chain is unchanged (Gemini primary).
 """
 from __future__ import annotations
 
+import asyncio
+
+import aiohttp
 from livekit.agents import tts as agents_tts
 from livekit.plugins import cartesia
+
+
+def test_live_http_session_is_none_without_running_loop():
+    # Construction-time / unit-test path: no running loop -> None, so plugin
+    # construction stays loop-free (and the existing Cartesia tests still pass).
+    from vibemix.agent.tts_chain import _live_http_session
+
+    assert _live_http_session() is None
+
+
+def test_live_http_session_returns_clientsession_inside_loop():
+    from vibemix.agent.tts_chain import _live_http_session
+
+    async def _run():
+        sess = _live_http_session()
+        assert isinstance(sess, aiohttp.ClientSession)
+        await sess.close()
+
+    asyncio.run(_run())
+
+
+def test_cartesia_gets_http_session_when_built_in_loop(mocker):
+    # The livekit Cartesia plugin falls back to utils.http_context.http_session()
+    # when given no session — that REQUIRES a livekit job context, which vibemix
+    # (own asyncio loop, not the agent-worker api) lacks, so the connection-pool
+    # prewarm raises "http session outside of a job context" and TTS goes MUTE.
+    # The fix: build_tts_chain must pass our own aiohttp.ClientSession.
+    captured: dict = {}
+
+    def _capture(*args, **kwargs):
+        captured.update(kwargs)
+        return mocker.MagicMock()
+
+    mocker.patch.object(cartesia, "TTS", side_effect=_capture)
+    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
+    from vibemix.agent.tts_chain import build_tts_chain
+
+    async def _run():
+        build_tts_chain(gemini_api_key="g", cartesia_api_key="c", mode="direct")
+        sess = captured.get("http_session")
+        if isinstance(sess, aiohttp.ClientSession):
+            await sess.close()
+
+    asyncio.run(_run())
+
+    assert "http_session" in captured, "cartesia.TTS built without an http_session kwarg"
+    assert isinstance(captured["http_session"], aiohttp.ClientSession), (
+        "cartesia.TTS must receive a real aiohttp.ClientSession when built in a "
+        "running loop, else the prewarm crashes outside the job context"
+    )
 
 
 def test_cartesia_is_primary_when_key_present(mocker):
