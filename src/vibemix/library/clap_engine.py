@@ -58,6 +58,7 @@ Select via the ``backend=`` arg or the ``VIBEMIX_CLAP_BACKEND`` env var
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -90,6 +91,9 @@ _VALID_BACKENDS = ("torch", "onnx")
 # Override the dir with VIBEMIX_CLAP_ONNX_DIR; default is the vibemix cache.
 _ENV_ONNX_DIR = CLAP_ONNX_ENV
 _DEFAULT_ONNX_DIR = DEFAULT_CLAP_ONNX_DIR
+# Auto-fetch the snapshot on first use (the zero-config default); opt out for
+# offline/air-gapped installs with VIBEMIX_CLAP_NO_AUTODOWNLOAD=1.
+_ENV_AUTODOWNLOAD_OFF = "VIBEMIX_CLAP_NO_AUTODOWNLOAD"
 _ONNX_AUDIO_REL = "onnx/audio_model.onnx"
 _ONNX_TEXT_REL = "onnx/text_model.onnx"
 _ONNX_REQUIRED_RELS = (
@@ -126,6 +130,83 @@ _MIME_TO_SUFFIX = {
     "audio/mpeg": ".mp3",
     "audio/mp3": ".mp3",
 }
+
+
+def _clap_autodownload_enabled() -> bool:
+    """Whether to auto-fetch the CLAP snapshot on first use (zero-config default).
+
+    Opt out for offline/air-gapped installs with ``VIBEMIX_CLAP_NO_AUTODOWNLOAD=1``;
+    then the model must be pre-placed or installed via the CLI.
+    """
+    return os.environ.get(_ENV_AUTODOWNLOAD_OFF, "").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _stderr_clap_progress(frame: dict[str, object]) -> None:
+    """Honest one-line stderr progress for the first-run model fetch, so the
+    multi-minute ~785 MB first-use download is never a silent hang."""
+    status = frame.get("status")
+    if status not in ("downloading", "downloaded", "verified"):
+        return
+    rel = frame.get("rel_path", "?")
+    n, total = frame.get("n", "?"), frame.get("total", "?")
+    if status == "downloading":
+        got = int(frame.get("downloaded", 0) or 0) >> 20
+        size = int(frame.get("size", 0) or 0) >> 20
+        print(
+            f"-> CLAP model: downloading {rel} ({n}/{total}) {got}/{size} MB",
+            file=sys.stderr,
+        )
+    else:
+        print(f"-> CLAP model: {status} {rel} ({n}/{total})", file=sys.stderr)
+
+
+def _ensure_onnx_assets(mdir: Path) -> None:
+    """Ensure the CLAP ONNX snapshot exists under ``mdir``, auto-downloading on
+    first use — the README's "one-time ~785 MB download on first Library open".
+
+    Reuses the shared ``model_assets.install_clap_model`` installer (the same one
+    behind ``vibemix library models --install clap``) so a GUI-only user never has
+    to open a terminal. Stays honest: raises an ACTIONABLE ``FileNotFoundError``
+    (never a silent mis-ground) when the model is absent and cannot be fetched —
+    because auto-download is opted out, or because the download did not complete.
+    """
+    audio_path = mdir / _ONNX_AUDIO_REL
+    text_path = mdir / _ONNX_TEXT_REL
+    if audio_path.exists() and text_path.exists():
+        return
+
+    install_hint = (
+        "Download Xenova/larger_clap_music_and_speech (run "
+        f"`vibemix library models --install clap`) or set {_ENV_ONNX_DIR}."
+    )
+    if not _clap_autodownload_enabled():
+        raise FileNotFoundError(
+            f"CLAP model not found under {mdir} and auto-download is disabled "
+            f"({_ENV_AUTODOWNLOAD_OFF}). {install_hint}"
+        )
+
+    # Zero-config first use: fetch the pinned snapshot via the shared installer.
+    # Lazy import keeps the module's no-heavy-deps-at-top contract and lets tests
+    # monkeypatch the installer.
+    import vibemix.library.model_assets as model_assets
+
+    print(
+        f"-> CLAP model not found under {mdir}; downloading once (~785 MB, one-time)…",
+        file=sys.stderr,
+    )
+    result = model_assets.install_clap_model(progress=_stderr_clap_progress)
+
+    if not (audio_path.exists() and text_path.exists()):
+        errors = "; ".join(str(e) for e in result.get("errors", [])) or "unknown error"
+        raise FileNotFoundError(
+            f"CLAP model download did not complete under {mdir}: {errors}. {install_hint}"
+        )
+    print("-> CLAP model ready.", file=sys.stderr)
 
 
 def onnx_model_status() -> dict[str, object]:
@@ -325,15 +406,11 @@ class ClapEngine:
             ) from e
 
         mdir = clap_onnx_dir()
+        # Zero-config: auto-download the snapshot on first use; raises an
+        # actionable error (never a wrong vector) if it is absent + unfetchable.
+        _ensure_onnx_assets(mdir)
         audio_path = mdir / _ONNX_AUDIO_REL
         text_path = mdir / _ONNX_TEXT_REL
-        if not audio_path.exists() or not text_path.exists():
-            raise FileNotFoundError(
-                f"ClapEngine onnx backend: model files not found under {mdir}. "
-                f"Expected {_ONNX_AUDIO_REL} + {_ONNX_TEXT_REL} (+ tokenizer "
-                f"config). Download Xenova/larger_clap_music_and_speech "
-                f"or set {_ENV_ONNX_DIR}."
-            )
 
         tok = Tokenizer.from_file(str(mdir / "tokenizer.json"))
         tok.enable_truncation(max_length=_ONNX_TEXT_MAXLEN)
