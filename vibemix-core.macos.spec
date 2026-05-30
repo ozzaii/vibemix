@@ -309,14 +309,14 @@ _ANALYSIS_EXCLUDES = [
     "vibemix.bench.matrix",
     "vibemix.bench.review",
     "vibemix.bench.run",
-    "livekit.agents.cli",
-    "livekit.agents.cli.cli",
-    "livekit.agents.cli.discover",
-    "livekit.agents.cli.log",
-    "livekit.agents.cli.proto",
-    "livekit.agents.cli.readchar",
-    "livekit.agents.cli.tcp_console",
-    "livekit.agents.cli.watcher",
+    # NOTE: livekit.agents.cli is NOT excluded — it is a RUNTIME dependency, not
+    # a dev CLI. ``livekit/agents/voice/agent_session.py::start()`` unconditionally
+    # does ``from .. import cli; AgentsConsole.get_instance()`` to read console-mode
+    # state on EVERY session start. Excluding it boot-crashed the frozen sidecar
+    # with ``ModuleNotFoundError: No module named 'livekit.agents.cli'`` at start()
+    # (verified 2026-05-30 on the real onedir bundle). The import-TIME circular
+    # ImportError is handled separately by the lazy-cli patch in
+    # scripts/dist/patch_livekit_agents_init.py. Do NOT re-exclude cli.
     "livekit.agents.jupyter",
     "livekit.plugins.google.realtime",
     "livekit.plugins.google.stt",

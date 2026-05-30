@@ -9,22 +9,26 @@ the parent process forwards env vars like CARGO_* / OUT_DIR):
 
     ImportError: cannot import name 'cli' from partially initialized module
     'livekit.agents'
-      File "livekit/agents/voice/agent_session.py", line 26, in <module>
+      File "livekit/agents/__init__.py", line 23, in <module>
 
-Root cause: ``livekit/agents/__init__.py:23`` does
+Root cause: ``livekit/agents/__init__.py`` eagerly does ``from . import cli``.
+Loading ``cli`` pulls in ``voice``/``worker`` (cli/cli.py:46-49), whose chain
+re-enters the parent package for ``cli`` while ``__init__`` is still parked on
+that eager line — so ``cli`` is mid-load (not yet bound on the parent) and the
+frozen importer raises the circular ImportError. (The earlier "split the line so
+cli is first" fix did NOT help: loading cli at all is the trigger, regardless of
+position. Verified 2026-05-30 on the real onedir sidecar.)
 
-    from . import cli, inference, ipc, llm, metrics, stt, tokenize, tts, utils, vad, voice
-
-PyInstaller's frozen importer does NOT bind submodules onto the parent package
-in the comma-list order the way CPython's normal importer does. When the
-chained load of ``voice`` (last in the list) reaches
-``voice/agent_session.py:26`` (``from .. import cli, inference, llm, ...``),
-``cli`` has been imported as a module but isn't bound on the parent package
-yet → circular.
-
-The fix: split the single ``from . import ...`` line into two statements with
-``cli`` first. Python evaluates each statement independently, so ``cli`` is
-fully bound on the parent before the rest of the chain runs.
+The fix: vibemix uses ``Agent``/``AgentSession``/``RealtimeModel`` only and never
+touches the worker ``cli`` — so stop importing it eagerly. Drop the eager
+``from . import cli`` and resolve cli lazily through the module's existing
+PEP-562 ``__getattr__``. By the time anything reads ``livekit.agents.cli`` the
+parent ``__init__`` has fully run, so cli's ``voice``/``worker`` chain finds them
+bound → no cycle. ``cli`` stays bundled (collected by the spec's
+``collect_submodules``; guarded by test_spec_blocklist_keeps_livekit_cli.py). The
+companion ``voice/agent_session.py`` patch (drop module-scope ``cli``, lazy-import
+it in the one function that needs it) stays load-bearing: that import fires during
+the eager ``voice`` load, before ``__init__`` completes.
 
 This script runs before ``pyinstaller`` inside ``scripts/build_sidecar.py``
 so the patch is always applied to the .venv before the bundle is frozen.
@@ -38,20 +42,97 @@ Regression-guarded by ``tests/dist/test_livekit_agents_init_patch.py``.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-_BUG_LINE = (
-    "from . import cli, inference, ipc, llm, metrics, stt, tokenize, tts, utils, vad, voice"
+# --- The __init__.py fix: make ``cli`` LAZY (not eager-first). ----------------
+#
+# History: the first fix split ``from . import cli, inference, ...`` into two
+# statements with ``cli`` first, on the theory that binding cli before the rest
+# would break the cycle. It does NOT — loading ``cli`` itself pulls in
+# ``voice``/``worker`` (cli/cli.py:46-49), whose chain re-enters the parent for
+# ``cli`` while ``__init__`` is still parked on the eager ``from . import cli``
+# line → ``ImportError: cannot import name 'cli' from partially initialized
+# module 'livekit.agents'`` in the frozen bundle (verified 2026-05-30 on the
+# real onedir sidecar). The "cli first" split fought the wrong layer.
+#
+# Root cause: vibemix uses ``Agent``/``AgentSession``/``RealtimeModel`` only — it
+# NEVER touches the worker ``cli``. So the real fix is to stop importing ``cli``
+# eagerly at all: drop the eager ``from . import cli`` and resolve it lazily via
+# the module's existing PEP-562 ``__getattr__`` (which already lazy-loads
+# ``mcp``). By the time anything accesses ``livekit.agents.cli``, the parent
+# ``__init__`` has fully executed, so cli's ``from ..voice import ...`` /
+# ``from ..worker import ...`` chain finds those submodules already bound — no
+# cycle. ``cli`` stays in the frozen bundle regardless (collected by the spec's
+# ``collect_submodules`` + guarded by tests/dist/test_spec_blocklist_keeps_livekit_cli.py).
+#
+# The companion ``voice/agent_session.py`` patch below is still load-bearing: its
+# module-scope ``from .. import cli`` (pristine upstream) would fire DURING the
+# eager ``voice`` load (still inside __init__), re-triggering the cycle before
+# __init__ completes — so cli is dropped there and lazy-imported in the one
+# function that needs it.
+
+# Match the eager ``from . import cli`` in either known shape, anchored at column
+# 0 (the injected lazy branch is indented, so these never re-match it).
+_EAGER_CLI_COMMA_RE = re.compile(r"^(from \. import )cli, ", re.MULTILINE)
+_EAGER_CLI_STANDALONE_RE = re.compile(
+    r"^from \. import cli[ \t]*(?:#[^\n]*)?\n", re.MULTILINE
+)
+_GETATTR_RAISE_RE = re.compile(
+    r'^([ \t]+)raise AttributeError\(f"module \{__name__!r\} has no attribute \{name!r\}"\)',
+    re.MULTILINE,
 )
 
-_FIX_LINES = (
-    "from . import cli  # explicit-first to fix the PyInstaller frozen-importer "
-    "circular ImportError — see scripts/dist/patch_livekit_agents_init.py\n"
-    "from . import inference, ipc, llm, metrics, stt, tokenize, tts, utils, vad, voice"
-)
+
+def _lazy_cli_branch(indent: str) -> str:
+    # Use ``importlib.import_module`` (NOT ``from . import cli``): a relative
+    # ``from . import cli`` INSIDE ``__getattr__('cli')`` re-enters via
+    # ``hasattr(parent, 'cli')`` → infinite ``__getattr__`` recursion. Importing
+    # the submodule by full name bypasses the parent's ``__getattr__`` entirely.
+    return (
+        f'{indent}if name == "cli":\n'
+        f"{indent}    import importlib  # lazy — breaks the PyInstaller "
+        "frozen-importer circular ImportError "
+        "(see scripts/dist/patch_livekit_agents_init.py)\n"
+        "\n"
+        f'{indent}    return importlib.import_module(__name__ + ".cli")\n'
+        "\n"
+    )
+
+
+def _append_getattr(text: str) -> str:
+    """Degenerate fallback: upstream shipped no ``__getattr__`` to extend."""
+    if not text.endswith("\n"):
+        text += "\n"
+    return text + (
+        "\n\ndef __getattr__(name):\n"
+        + _lazy_cli_branch("    ")
+        + '    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")\n'
+    )
+
+
+def transform_init_text(text: str) -> str:
+    """Convert ``livekit/agents/__init__.py`` text to the lazy-cli form.
+
+    Idempotent: re-applying produces no further change. Handles both the
+    pristine upstream comma-list and the older "cli first split" shape.
+    """
+    # 1) Drop the eager cli import (comma-list shape, then standalone-line shape).
+    text = _EAGER_CLI_COMMA_RE.sub(r"\1", text)
+    text = _EAGER_CLI_STANDALONE_RE.sub("", text)
+    # 2) Make cli lazily resolvable via __getattr__ (only once).
+    if 'if name == "cli":' not in text:
+        if "def __getattr__(" in text:
+            new_text, n = _GETATTR_RAISE_RE.subn(
+                lambda m: _lazy_cli_branch(m.group(1)) + m.group(0), text, count=1
+            )
+            text = new_text if n else _append_getattr(text)
+        else:
+            text = _append_getattr(text)
+    return text
 
 # Second-tier patch (added 2026-05-27 late session): voice/agent_session.py:26
 # does ``from .. import cli, inference, llm, stt, tts, utils, vad`` at module
@@ -135,7 +216,7 @@ def patch_agent_session(path: Path, *, dry_run: bool = False) -> bool:
 
 
 def patch_path(path: Path, *, dry_run: bool = False) -> bool:
-    """Apply the split-import patch to ``path``. Returns True if a change was written.
+    """Apply the lazy-cli patch to ``path``. Returns True if a change was written.
 
     Also clears the file's ``__pycache__/__init__.cpython-*.pyc`` so PyInstaller
     re-compiles fresh on its next freeze (without this, a stale bytecode cache
@@ -143,14 +224,14 @@ def patch_path(path: Path, *, dry_run: bool = False) -> bool:
     repro we hit on 2026-05-27).
     """
     text = path.read_text(encoding="utf-8")
-    if _BUG_LINE not in text:
+    new_text = transform_init_text(text)
+    if new_text == text:
         # Already patched (or upstream changed shape) — still clear the pyc
         # cache because we can't tell whether the cache was generated before
         # the patch landed.
         if not dry_run:
             _purge_pycache(path)
         return False
-    new_text = text.replace(_BUG_LINE, _FIX_LINES, 1)
     if dry_run:
         return True
     path.write_text(new_text, encoding="utf-8")

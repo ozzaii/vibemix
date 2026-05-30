@@ -20,10 +20,13 @@
 
   ────────────────────────────────────────────────────────────────────────
   This is the DISTRIBUTION-grade entitlements file. It is consumed by
-  ``scripts/dist/sign_macos.sh`` AFTER the bundle has been built, via:
-      codesign --force --deep --options runtime \
-               --entitlements tauri/src-tauri/entitlements.macos.plist \
-               --timestamp <app-bundle>
+  ``scripts/dist/sign_macos.sh`` AFTER the bundle has been built, via codesign
+  with the flags: force, deep, options=runtime, timestamp, and
+  entitlements=tauri/src-tauri/entitlements.macos.plist, against the app bundle.
+  (Flag syntax is spelled out in prose deliberately — a literal double-hyphen
+  inside an XML comment is illegal per the XML spec, and codesign's strict AMFI
+  plist parser REJECTS the whole file with "AMFIUnserializeXML: syntax error".
+  See scripts/dist/sign_macos.sh for the exact invocation.)
 
   The sibling ``tauri/src-tauri/entitlements.plist`` (Phase 11 W1) is the
   BUILD-time entitlements used by ``cargo tauri build`` for its own

@@ -11,9 +11,10 @@
 #     → spctl --assess --type execute (final gate)
 #     → verify_binary.py (cross-plan integration — AIza-scan release-blocker)
 #
-# The script is IDEMPOTENT: re-running on an already-signed + notarized +
-# stapled bundle is a no-op (Stage 2/3 detect existing signatures via
-# `codesign --verify`; Stage 6 detects existing stapler ticket).
+# The script is RE-RUNNABLE: Stage 2 always force-signs every nested Mach-O
+# with the Developer ID (re-signing an already-Developer-ID-signed binary is
+# harmless and replaces any adhoc signature `cargo tauri build` left behind);
+# Stage 6 detects an existing stapler ticket and skips re-stapling.
 #
 # Bundle ID: world.bravoh.vibemix (LOCKED — see Phase 11 W1 + entitlements
 # plist header; macOS TCC permissions are keyed to this).
@@ -317,26 +318,48 @@ python3 "$REPO_ROOT/scripts/dist/repair_macos_app_sidecar_symlinks.py" "$APP"
 # ---------------------------------------------------------------------------
 #
 # Per CONTEXT D-Area-2: `--deep` on `codesign` sometimes misses files inside
-# PyInstaller's `_internal/` tree. Pre-flight pass: find every regular file
-# with the executable bit, codesign each individually. Filter for idempotency
-# (skip files where `codesign --verify` already succeeds).
+# PyInstaller's `_internal/` tree. Pre-flight pass: FORCE-sign every nested
+# Mach-O binary, deepest-first (inside-out), with the Developer ID + Hardened
+# Runtime + secure timestamp.
+#
+# TWO bugs this stage previously had (both made notarization REJECT, fixed
+# 2026-05-30):
+#   (1) `find -perm +111` only catches files with the execute bit. PyInstaller
+#       ships hundreds of `_internal/**/*.so` / `*.dylib` WITHOUT +111 (they are
+#       dlopen'd, not exec'd). Those were never signed → notarization rejects an
+#       unsigned/adhoc Mach-O. Fix: also match `-name '*.so' -o -name '*.dylib'`.
+#   (2) `codesign --verify --strict` SUCCEEDS on the adhoc signatures that
+#       `cargo tauri build` stamps onto nested binaries — so the idempotent-skip
+#       left them adhoc-signed, and notarization rejects adhoc sigs. Fix: drop
+#       the skip and `--force` re-sign every Mach-O with the Developer ID.
+# Deepest-first ordering (sort by path-depth desc) guarantees a child is sealed
+# before its parent dir is signed — required for nested-code signature validity.
+# LC_ALL=C on awk/sort: this Mac is Turkish-locale; default collation/!numeric
+# parsing would corrupt the depth sort (see CLAUDE.md shell-numerics rule).
 
-stage 2 "pre-flight codesign nested binaries (BSD-find perm syntax)"
+stage 2 "force-sign every nested Mach-O deepest-first (incl. non-+111 .so/.dylib)"
 
+_nested_signed=0
 while IFS= read -r file; do
-    # Skip non-Mach-O / non-script entries; codesign tolerates them but they
-    # noise up the log.
-    if codesign --verify --strict "$file" >/dev/null 2>&1; then
-        continue  # already signed — idempotent skip
+    # Restrict to real Mach-O objects: .so/.dylib are always libs; for the rest
+    # (the +111 matches) confirm via `file` so scripts/data don't get signed.
+    case "$file" in
+        *.so|*.dylib) : ;;
+        *) file "$file" 2>/dev/null | grep -q "Mach-O" || continue ;;
+    esac
+    if ! codesign --sign "$APPLE_DEVELOPER_ID" \
+                  --force \
+                  --options runtime \
+                  --entitlements "$ENTITLEMENTS" \
+                  --timestamp \
+                  "$file"; then
+        log "FAIL: codesign nested ${file#"$APP"/}"
+        exit 1
     fi
-    log "  signing nested: ${file#"$APP"/}"
-    codesign --sign "$APPLE_DEVELOPER_ID" \
-             --force \
-             --options runtime \
-             --entitlements "$ENTITLEMENTS" \
-             --timestamp \
-             "$file"
-done < <(find "$APP" -type f -perm +111 2>/dev/null)
+    _nested_signed=$((_nested_signed + 1))
+done < <(find "$APP" -type f \( -name '*.so' -o -name '*.dylib' -o -perm +111 \) 2>/dev/null \
+         | LC_ALL=C awk -F/ '{print NF"\t"$0}' | LC_ALL=C sort -rn | cut -f2-)
+log "  force-signed $_nested_signed nested Mach-O binaries (deepest-first)"
 
 # ---------------------------------------------------------------------------
 # Stage 3 — Codesign the .app bundle (deep) + verify strict

@@ -483,10 +483,9 @@ def test_pyinstaller_specs_exclude_transformers(spec_name: str) -> None:
     ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
 )
 def test_pyinstaller_specs_exclude_dev_cli_and_otlp_grpc(spec_name: str) -> None:
-    """Frozen sidecars should not carry dev CLIs or unusable grpc exporters."""
+    """Frozen sidecars should not carry dev tools or unusable grpc exporters."""
     text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
     required = [
-        '"livekit.agents.cli"',
         '"livekit.agents.jupyter"',
         '"telegram"',
         '"telegram.ext"',
@@ -498,6 +497,20 @@ def test_pyinstaller_specs_exclude_dev_cli_and_otlp_grpc(spec_name: str) -> None
     ]
     for token in required:
         assert token in text, f"{spec_name} missing {token}"
+    # livekit.agents.cli is a RUNTIME dependency (agent_session.py::start() does
+    # ``from .. import cli; AgentsConsole.get_instance()`` on every session start).
+    # Excluding it boot-crashed the frozen sidecar with a ModuleNotFoundError at
+    # start() (2026-05-30). It must NOT be in the analysis exclude list — guard
+    # against a future size-sweep re-adding it.
+    excludes_body = re.search(
+        r"_ANALYSIS_EXCLUDES = \[(.*?)\n\]", text, re.DOTALL
+    )
+    assert excludes_body is not None, f"{spec_name}: cannot locate _ANALYSIS_EXCLUDES"
+    assert '"livekit.agents.cli"' not in excludes_body.group(1), (
+        f"{spec_name}: livekit.agents.cli is excluded from the frozen bundle, but "
+        "it is a runtime dependency of AgentSession.start(). Re-excluding it "
+        "reintroduces the ModuleNotFoundError boot crash."
+    )
 
 
 # ---------------------------------------------------------------------------
