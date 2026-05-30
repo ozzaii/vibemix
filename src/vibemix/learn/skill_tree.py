@@ -223,6 +223,22 @@ class SkillProgress:
     mastered: bool  # STORED (Phase 103; Plan 102 default False)
     first_mastered_at: str | None  # STORED (Phase 103; Plan 102 default None)
 
+    def as_payload(self) -> dict[str, Any]:
+        """JSON-safe dict for the ``ipc.learn.progress_state`` skill-wall block.
+
+        IPC-only — never persisted (the derived learn-portion is recomputed on
+        every load). ``learn_fill`` is rounded to keep the wire stable.
+        """
+        return {
+            "skill_id": self.skill_id,
+            "stage": self.stage,
+            "learn_fill": round(self.learn_fill, 4),
+            "competent": self.competent,
+            "live_proof_count": self.live_proof_count,
+            "mastered": self.mastered,
+            "first_mastered_at": self.first_mastered_at,
+        }
+
 
 def _weight_for(row: dict[str, Any] | None) -> float:
     """Quality weight of a single lesson row's contribution to fill.
@@ -324,6 +340,21 @@ class SkillTree:
                 first_mastered_at=first_mastered_at,
             )
         return results
+
+
+def skill_wall_payload(
+    progress: Any, manifest: dict[str, SkillSpec] | None = None
+) -> list[dict[str, Any]]:
+    """Derived Earned-Wall payload for the ``ipc.learn.progress_state`` envelope.
+
+    Folds :meth:`SkillTree.compute` into a JSON-safe, manifest-ordered list — the
+    paint-ready block the webview renders as the Earned Wall. The Competent/
+    Mastered stage rule stays single-sourced HERE (Python), so the frontend never
+    re-derives ``COMPETENT_THRESHOLD``/weights (no manifest-drift risk). IPC-only:
+    this is NEVER persisted — it rides the snapshot envelope, never ``to_dict``.
+    """
+    tree = SkillTree(manifest) if manifest is not None else SkillTree()
+    return [sp.as_payload() for sp in tree.compute(progress).values()]
 
 
 # ---------------------------------------------------------------------------

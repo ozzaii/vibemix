@@ -3468,6 +3468,24 @@
                       "first_mastered_at": {"type": ["string", "null"]}
                     }
                   }
+                },
+                "skill_wall": {
+                  "$comment": "v11.0 Earned Wall. IPC-only derived block (SkillTree.compute), never persisted. Per-skill Competent/Mastered stage the webview renders. Phase 104.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["skill_id", "stage", "learn_fill", "competent", "live_proof_count", "mastered", "first_mastered_at"],
+                    "properties": {
+                      "skill_id": {"type": "string"},
+                      "stage": {"type": "string", "enum": ["locked", "competent", "mastered"]},
+                      "learn_fill": {"type": "number", "minimum": 0, "maximum": 1},
+                      "competent": {"type": "boolean"},
+                      "live_proof_count": {"type": "integer", "minimum": 0},
+                      "mastered": {"type": "boolean"},
+                      "first_mastered_at": {"type": ["string", "null"]}
+                    }
+                  }
                 }
               }
             }

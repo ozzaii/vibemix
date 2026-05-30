@@ -1002,6 +1002,15 @@ export interface LearnProgressState {
           first_mastered_at: string | null;
         };
       };
+      skill_wall?: {
+        skill_id: string;
+        stage: "locked" | "competent" | "mastered";
+        learn_fill: number;
+        competent: boolean;
+        live_proof_count: number;
+        mastered: boolean;
+        first_mastered_at: string | null;
+      }[];
     };
   };
 }

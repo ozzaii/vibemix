@@ -322,10 +322,21 @@ class LearnProgress:
         row["strikes_used"] = max(0, min(3, int(strikes_used)))
 
     def snapshot(self) -> dict[str, Any]:
-        """Alias of :meth:`to_dict` — the name the runtime + envelope
-        emitters use when shipping the current state as a
-        ``LearnProgressState`` envelope payload."""
-        return self.to_dict()
+        """The ``LearnProgressState`` envelope payload — the file shape PLUS the
+        derived Earned-Wall block.
+
+        The runtime + envelope emitters ship this (not :meth:`to_dict`) over
+        ``ipc.learn.progress_state``. It is :meth:`to_dict` (the persisted
+        fields) with one ADDITIVE IPC-only key, ``skill_wall``: the per-skill
+        Competent/Mastered stage derived by ``SkillTree.compute`` so the webview
+        paints the wall without re-deriving the stage rule. ``skill_wall`` is
+        NEVER persisted — :meth:`to_dict` (the file + ``from_dict`` round-trip)
+        stays the pure stored shape. The import is local to keep the module
+        import graph one-way (``skill_tree`` reads ``progress`` structurally).
+        """
+        from vibemix.learn.skill_tree import skill_wall_payload
+
+        return {**self.to_dict(), "skill_wall": skill_wall_payload(self)}
 
     def dots_for_course(
         self,
