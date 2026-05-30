@@ -150,10 +150,7 @@ def test_deck_audio_routing_auto_reports_too_narrow_capture_device(
     assert "deck_outputs=A:0,1+B:2,3" in context["deck_audio_routing_hint"]
 
 
-def test_rekordbox_hint_is_context_only_without_auto_env(monkeypatch, tmp_path) -> None:
-    settings = tmp_path / "rekordbox3.settings"
-    settings.write_text(
-        """<?xml version="1.0" encoding="UTF-8"?>
+_EXTERNAL_AGGREGATE_SETTINGS = """<?xml version="1.0" encoding="UTF-8"?>
 <SETTINGS>
   <VALUE name="audioDeviceManager_PerformanceMode_aggregate">
     <DEVICESETUP audioOutputDeviceName="Aggregate Device" MixerMode_Is_Internal="0"
@@ -161,9 +158,16 @@ def test_rekordbox_hint_is_context_only_without_auto_env(monkeypatch, tmp_path) 
                  OutputChannel_Deck1_L="2" OutputChannel_Deck1_R="3"/>
   </VALUE>
 </SETTINGS>
-""",
-        encoding="utf-8",
-    )
+"""
+
+
+def test_rekordbox_external_mixer_auto_enables_per_deck_globally(monkeypatch, tmp_path) -> None:
+    # Kaan 2026-05-30: "it should be global — nobody will set this [env var]."
+    # A high-confidence rekordbox external-mixer config (both decks mapped, fits
+    # the capture device) auto-enables per-deck grounding with NO env var set.
+    # This REVERSES the prior opt-in-only contract by explicit owner decision.
+    settings = tmp_path / "rekordbox3.settings"
+    settings.write_text(_EXTERNAL_AGGREGATE_SETTINGS, encoding="utf-8")
     monkeypatch.delenv("VIBEMIX_DECK_AUDIO_CHANNELS", raising=False)
     monkeypatch.delenv("VIBEMIX_INPUT_CHANNELS", raising=False)
     monkeypatch.delenv("VIBEMIX_MASTER_AUDIO_CHANNELS", raising=False)
@@ -174,10 +178,47 @@ def test_rekordbox_hint_is_context_only_without_auto_env(monkeypatch, tmp_path) 
         rekordbox_settings_paths=(settings,),
     )
 
+    assert routing.enabled is True
+    assert routing.deck_channels == {"A": (0, 1), "B": (2, 3)}
+    assert routing.reason == "rekordbox_settings_auto"
+    assert routing.source == "rekordbox_settings"
+
+
+def test_explicit_off_overrides_global_per_deck_default(monkeypatch, tmp_path) -> None:
+    # The escape hatch: an explicit non-auto env value forces master-only even
+    # when rekordbox advertises an external-mixer hint (power-user opt-out).
+    settings = tmp_path / "rekordbox3.settings"
+    settings.write_text(_EXTERNAL_AGGREGATE_SETTINGS, encoding="utf-8")
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
+    monkeypatch.delenv("VIBEMIX_INPUT_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_MASTER_AUDIO_CHANNELS", raising=False)
+
+    routing = deck_audio_routing_from_env(
+        input_channels=16,
+        capture_device_name="BlackHole 16ch",
+        rekordbox_settings_paths=(settings,),
+    )
+
     assert routing.enabled is False
-    assert routing.reason == "disabled"
     assert routing.deck_channels == {}
-    assert "rekordbox_deck_routing_hint[" in routing.context()["deck_audio_routing_hint"]
+
+
+def test_global_per_deck_default_respects_capture_channel_fit(monkeypatch, tmp_path) -> None:
+    # Global default still never opens more channels than the device exposes:
+    # a 4-channel deck map on a 2-channel capture device stays master-only.
+    settings = tmp_path / "rekordbox3.settings"
+    settings.write_text(_EXTERNAL_AGGREGATE_SETTINGS, encoding="utf-8")
+    monkeypatch.delenv("VIBEMIX_DECK_AUDIO_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_INPUT_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_MASTER_AUDIO_CHANNELS", raising=False)
+
+    routing = deck_audio_routing_from_env(
+        input_channels=2,
+        capture_device_name="BlackHole 2ch",
+        rekordbox_settings_paths=(settings,),
+    )
+
+    assert routing.enabled is False
 
 
 def test_deck_audio_capture_downmixes_master_and_pushes_deck_rings(monkeypatch) -> None:

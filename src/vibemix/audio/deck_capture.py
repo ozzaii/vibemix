@@ -328,12 +328,29 @@ def deck_audio_routing_from_env(
     max_in = _bounded_channel_count(input_channels)
     requested_opened = _bounded_channel_count(os.environ.get("VIBEMIX_INPUT_CHANNELS"))
     raw_deck_channels = os.environ.get("VIBEMIX_DECK_AUDIO_CHANNELS")
-    auto_requested = str(raw_deck_channels or "").strip().lower() in {"auto", "rekordbox"}
+    _raw = str(raw_deck_channels or "").strip()
+    auto_requested_env = _raw.lower() in {"auto", "rekordbox"}
     hint = rekordbox_deck_output_routing_hint(
         settings_paths=rekordbox_settings_paths,
         capture_device_name=capture_device_name,
         input_channels=max_in,
     )
+    # Global default (Kaan 2026-05-30: "it should be global — nobody will set
+    # this [env var]"). With NO env override, a high-confidence rekordbox
+    # external-mixer hint — both decks mapped AND fitting the capture device —
+    # auto-enables per-deck grounding so the Judge + live grounding stack work
+    # out of the box instead of staying dark for every real user. Abstain-first
+    # downstream is the backstop if the routed audio isn't actually present. Any
+    # explicit value (a manual A=..;B=.. map, or "off"/"master") takes its own
+    # branch below and overrides this default.
+    _hint_high_confidence = bool(
+        hint
+        and hint.get("mixer_mode") == "external"
+        and hint.get("fits_input_channels") is True
+        and isinstance(hint.get("deck_channels"), dict)
+        and all(side in (hint.get("deck_channels") or {}) for side in _DECK_SIDES)
+    )
+    auto_requested = auto_requested_env or (_raw == "" and _hint_high_confidence)
     if auto_requested and hint:
         deck_channels = {
             side: tuple(channels)
