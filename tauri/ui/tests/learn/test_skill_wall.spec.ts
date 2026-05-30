@@ -64,11 +64,14 @@ describe("renderSkillWall — the Earned Wall", () => {
     expect(mastered.getAttribute("tabindex")).toBe("0");
   });
 
-  it("a non-Mastered skill shows NO proof and is not tappable (nothing given)", () => {
+  it("a non-Mastered skill shows NO proof and is not a button (nothing given)", () => {
     const locked = renderSkillWall(SIX).querySelectorAll<HTMLElement>(".skill-wall__row")[1]!;
     expect(locked.querySelector(".skill-wall__proof")).toBeNull();
+    // not an activatable button (only Mastered earns that)...
     expect(locked.getAttribute("role")).toBeNull();
-    expect(locked.getAttribute("tabindex")).toBeNull();
+    expect(locked.getAttribute("aria-expanded")).toBeNull();
+    // ...but SURF-04 makes it keyboard-browsable to read the skill.
+    expect(locked.getAttribute("tabindex")).toBe("0");
   });
 
   it("reflects learn_fill as a proportional bar width", () => {

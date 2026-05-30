@@ -45,6 +45,15 @@ const STAGE_LABELS: Record<SkillWallRow["stage"], string> = {
   mastered: "Mastered",
 };
 
+/** SURF-04 dual-channel cue: a distinct SHAPE per stage so the wall reads with
+ *  ZERO color perception (deuteranopia/protanopia/tritanopia). Decorative
+ *  (aria-hidden) — the `STAGE_LABELS` word is the screen-reader semantic. */
+const STAGE_GLYPHS: Record<SkillWallRow["stage"], string> = {
+  locked: "○", // hollow — nothing earned yet
+  competent: "◑", // half-lit — lessons done
+  mastered: "★", // the trophy — earned in a live set
+};
+
 function labelFor(skillId: string): string {
   return SKILL_WALL_LABELS[skillId] ?? skillId;
 }
@@ -65,6 +74,13 @@ function renderRow(row: SkillWallRow): HTMLLIElement {
   li.dataset.skill = row.skill_id;
   li.dataset.stage = row.stage;
 
+  // SURF-04 dual-cue: the shape glyph leads (decorative — the stage word is the
+  // semantic), so the row is distinguishable without any color perception.
+  const glyph = document.createElement("span");
+  glyph.className = "skill-wall__glyph";
+  glyph.setAttribute("aria-hidden", "true");
+  glyph.textContent = STAGE_GLYPHS[row.stage];
+
   const name = document.createElement("span");
   name.className = "skill-wall__name";
   name.textContent = labelFor(row.skill_id);
@@ -82,7 +98,7 @@ function renderRow(row: SkillWallRow): HTMLLIElement {
   bar.style.width = `${Math.round(pct * 100)}%`;
   fill.appendChild(bar);
 
-  li.append(name, stage, fill);
+  li.append(glyph, name, stage, fill);
 
   // SURF-01: the honest "what's left" line (empty for Mastered — the proof
   // line carries it there). Single-sourced in Python; we only paint it.
@@ -93,10 +109,20 @@ function renderRow(row: SkillWallRow): HTMLLIElement {
     li.appendChild(remains);
   }
 
+  // SURF-04 keyboard-nav: EVERY row is focusable so a keyboard-only user can
+  // browse the whole tree and read each skill; the aria-label folds the stage +
+  // the next-step (or the cited proof for Mastered) into one announced line.
+  const announce = row.mastered ? proofLine(row) : row.what_remains;
+  li.setAttribute("tabindex", "0");
+  li.setAttribute(
+    "aria-label",
+    `${labelFor(row.skill_id)}, ${STAGE_LABELS[row.stage]}${announce ? `. ${announce}` : ""}`,
+  );
+
   if (row.mastered) {
-    // The trophy: tappable to its cited demo. Only Mastered earns the affordance.
+    // The trophy: tappable to its cited demo. Only Mastered earns the BUTTON
+    // affordance (browsable ≠ activatable — the others are read-only).
     li.setAttribute("role", "button");
-    li.setAttribute("tabindex", "0");
     li.setAttribute("aria-expanded", "false");
     const proof = document.createElement("span");
     proof.className = "skill-wall__proof";

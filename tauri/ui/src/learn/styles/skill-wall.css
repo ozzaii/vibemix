@@ -59,7 +59,7 @@
 
 .skill-wall__row {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) minmax(4rem, 8rem) auto;
+  grid-template-columns: auto minmax(8rem, 1fr) minmax(4rem, 8rem) auto;
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3);
@@ -68,6 +68,21 @@
   border-radius: var(--rad-md);
   background: var(--surface-raised);
   transition: border-color 120ms ease, background 120ms ease;
+}
+
+/* SURF-04 dual-cue: the stage SHAPE (not color). Muted by default; each stage
+ * rule below recolors it, but the GLYPH itself already distinguishes the stage. */
+.skill-wall__glyph {
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+/* Every row is browsable by keyboard — a quiet focus ring, no loud outline. */
+.skill-wall__row:focus-visible {
+  outline: none;
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
 }
 
 .skill-wall__name {
@@ -129,7 +144,8 @@
 .skill-wall__row[data-stage="competent"] .skill-wall__name {
   color: var(--text-primary);
 }
-.skill-wall__row[data-stage="competent"] .skill-wall__stage {
+.skill-wall__row[data-stage="competent"] .skill-wall__stage,
+.skill-wall__row[data-stage="competent"] .skill-wall__glyph {
   color: var(--brand);
 }
 .skill-wall__row[data-stage="competent"] .skill-wall__fill > i {
@@ -148,7 +164,8 @@
 .skill-wall__row[data-stage="mastered"] .skill-wall__name {
   color: var(--text-primary);
 }
-.skill-wall__row[data-stage="mastered"] .skill-wall__stage {
+.skill-wall__row[data-stage="mastered"] .skill-wall__stage,
+.skill-wall__row[data-stage="mastered"] .skill-wall__glyph {
   color: var(--gold);
 }
 .skill-wall__row[data-stage="mastered"] .skill-wall__fill > i {
@@ -163,4 +180,16 @@
   /* Compact line is always shown; expansion is reserved for the cited-demo
    * detail that lands when the Judge wires its [judge:] verdict in. */
   opacity: 0.85;
+}
+
+/* SURF-02 / SURF-04 — motion-sensitive + no-time-pressure: the quiet fill cue is
+ * the ONLY motion on the wall; honor a reduced-motion preference by settling it
+ * instantly (the width still reflects the fill, just without the animation). */
+@media (prefers-reduced-motion: reduce) {
+  .skill-wall__fill > i {
+    transition: none;
+  }
+  .skill-wall__row {
+    transition: none;
+  }
 }
