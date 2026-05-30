@@ -14,6 +14,36 @@
 
 ---
 
+> ## ▲ 2026-05-30 LIVE-EXECUTION UPDATE — supersedes the §11 roadmap from #1
+>
+> A follow-on session ran the double→see→act→ship loop **ON KAAN'S REAL RIG** and shipped
+> past §11 #1. The §11 roadmap below is HISTORICAL from its first item; the **live ship plan
+> is now `.planning/2026-05-30-zero-config-ship-blockers.md`** + memory `project_live_verify_2026_05_30.md`.
+>
+> - **THE ENGINE WORKS LIVE.** Grounded reactions on a real rekordbox set off BlackHole-16ch
+>   per-deck audio: `[fast] Minimalist metallic resonance riding over that thin 136 kick
+>   [aud:bpm@6.0]`. The anti-slop co-host is **alive in the wild** — the honesty thesis holds.
+> - **SHIPPED (8 commits):** Judge 4d live join (`254cdcea` — fires in `coach_loop` on
+>   TRACK_CHANGE, abstain-first); per-deck grounding **GLOBAL DEFAULT** on rekordbox
+>   external-mixer detection (`e73911df`); **44.1k native-rate capture** — killed the 48k
+>   crash (`875b1e4e`); **Cartesia (Sonic) live primary voice** (`feat(tts)`); README +
+>   boot-log + the zero-config map doc.
+> - **THE REAL REFRAME (Kaan: "install → wizard → works — nobody sets env vars").** A 15-agent
+>   zero-config audit (44 findings) shows the app is several ship-blockers from that bar.
+>   **#1: the co-host never speaks on a fresh install — NO wizard/UI collects a key.** Kaan's
+>   fix = keyless proxy, BUT `POST api.altidus.world/api/vibemix/v1/register` is **404 (not
+>   deployed)** → BLOCKED on a Bravoh-backend deploy (Kaan/Momo). Other blockers: Windows
+>   WASAPI 48k crash; BlackHole install/validate never wired into the wizard STEP_ORDER.
+> - **LIVE-FOUND:** Gemini TTS is mute (`No audio content generated`) → Cartesia (done);
+>   deck **identity** doesn't resolve (`deck=none`) so the Judge **abstains honestly** until
+>   it does (the "Now Playing WebKit-owned" gap). Per-deck **audio** is proven flowing.
+> - **STILL OPEN (tasks):** finish the per-deck global-default **device upgrade** (the routing
+>   auto-enables but the 2ch→16ch device swap is still env-gated); Windows/mic 44.1k; the
+>   wizard install+key chain. Concurrent session owns `__main__.py`/`_router_config.py` (cost
+>   study) — commit surgically.
+
+---
+
 ## §0 · Preamble — what this is, and how to use it
 
 **vibemix** = a free, open-source, **local** AI DJ co-host for live sets (macOS +
