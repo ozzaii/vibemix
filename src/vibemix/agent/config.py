@@ -33,6 +33,11 @@ TTS_FALLBACK_MODEL: str = resolve_model("live_coach_tts_fallback")
 # outside ``llm/_router_config.py``.
 OPENROUTER_LLM_MODEL: str = resolve_model("live_coach_openrouter")
 OPENROUTER_TTS_MODEL: str = resolve_model("live_coach_tts_openrouter")
+# Cartesia (Sonic) — the non-Gemini live primary TTS model. Kept OUT of
+# model_router by the SAME convention as the Viber/DeepSeek brain: the router is
+# deliberately Gemini-only (test_no_non_gemini_models). A non-Gemini id is plain
+# config — the CI grep-gate only forbids GEMINI literals. Env-overridable.
+CARTESIA_TTS_MODEL: str = os.environ.get("VIBEMIX_CARTESIA_MODEL", "sonic-3")
 
 # ---- ServiceTier dispatch (Plan 41-01, LAT-07) ----
 # Exposed alongside LLM_MODEL so callers that need the tier (e.g. the
@@ -41,6 +46,13 @@ OPENROUTER_TTS_MODEL: str = resolve_model("live_coach_tts_openrouter")
 # want both values for a different path should import ``resolve`` directly.
 # ---- Voice id (v4:104) ----
 VOICE: str = "Achird"
+
+# Cartesia voice id for the Sonic primary. A voice UUID is not a Gemini model
+# literal, so it lives here (not the router). Overridable via env; defaults to
+# Cartesia's stock English voice (the plugin's own default).
+CARTESIA_VOICE: str = os.environ.get(
+    "VIBEMIX_CARTESIA_VOICE", "f786b574-daa5-4673-aa0c-cbe3e8534c02"
+)
 
 # ---- Device names (v4:101-103) ----
 # Factory defaults stay pinned for ordinary installs. The env overrides are

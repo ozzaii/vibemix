@@ -18,6 +18,7 @@ The v4 import order on lines 62-66 pins this invariant — do NOT reorder.
 
 from __future__ import annotations
 
+import os
 from typing import Literal
 
 from livekit.agents import tts as agents_tts
@@ -30,6 +31,8 @@ from livekit.plugins.openai import tts as _openai_tts_mod
 # preserved — `vibemix.agent.config` is import-safe and triggers no plugin
 # instantiation.
 from vibemix.agent.config import (
+    CARTESIA_TTS_MODEL,
+    CARTESIA_VOICE,
     OPENROUTER_TTS_MODEL,
     TTS_FALLBACK_MODEL,
     TTS_MODEL,
@@ -51,13 +54,19 @@ def _build_direct_chain(
     openrouter_api_key: str | None,
     *,
     openrouter_enabled: bool = False,
+    cartesia_api_key: str | None = None,
 ) -> agents_tts.FallbackAdapter:
     """Build the direct TTS chain.
 
     Returns a FallbackAdapter:
-        primary (Gemini native TTS_MODEL)
-          -> secondary (Gemini native TTS_FALLBACK_MODEL)
-          -> optional tertiary (OpenRouter standby).
+        optional primary (Cartesia Sonic, when ``cartesia_api_key`` is set)
+          -> secondary (Gemini native TTS_MODEL)
+          -> tertiary (Gemini native TTS_FALLBACK_MODEL)
+          -> optional quaternary (OpenRouter standby).
+
+    Cartesia leads when keyed (2026-05-30 — Gemini TTS returns 'No audio content
+    generated' live, muting the co-host); the Gemini natives stay as graceful
+    fallback so a Cartesia outage never silences the co-host.
 
     OpenRouter is no longer enabled just because ``OPENROUTER_API_KEY`` is
     present. A credit-exhausted OpenRouter account can otherwise block every
@@ -65,6 +74,21 @@ def _build_direct_chain(
     explicit standby via ``openrouter_enabled``.
     """
     chain: list = []
+    # Self-activate from the env when the caller didn't thread a key — dropping
+    # CARTESIA_API_KEY in .env is enough to switch the live voice to Cartesia.
+    cartesia_api_key = cartesia_api_key or os.environ.get("CARTESIA_API_KEY") or None
+    # Cartesia (Sonic) leads when a key is present — the fast, working primary
+    # voice. Lazy-import so the plugin is only required when actually used.
+    if cartesia_api_key:
+        from livekit.plugins import cartesia
+
+        chain.append(
+            cartesia.TTS(
+                model=CARTESIA_TTS_MODEL,
+                voice=CARTESIA_VOICE,
+                api_key=cartesia_api_key,
+            )
+        )
     gemini_tts = gemini_native_tts_class()
     chain.append(
         gemini_tts(
@@ -101,6 +125,7 @@ def build_tts_chain(
     gemini_api_key: str | None = None,
     openrouter_api_key: str | None = None,
     openrouter_enabled: bool = False,
+    cartesia_api_key: str | None = None,
     mode: Literal["direct", "proxy"] = "direct",
     proxy_base_url: str | None = None,
     jwt: str | None = None,
@@ -120,6 +145,7 @@ def build_tts_chain(
             gemini_api_key,
             openrouter_api_key,
             openrouter_enabled=openrouter_enabled,
+            cartesia_api_key=cartesia_api_key,
         )
     if mode == "proxy":
         missing: list[str] = []
