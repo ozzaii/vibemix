@@ -1158,13 +1158,20 @@ async def main() -> None:
             "yes",
             "on",
         )
+        _cartesia_key = os.environ.get("CARTESIA_API_KEY") or None
         tts_inst = build_tts_chain(
             gemini_api_key=api_key,
             openrouter_api_key=or_key or None,
             openrouter_enabled=openrouter_tts_enabled,
+            cartesia_api_key=_cartesia_key,
             mode="direct",
         )
-        if openrouter_tts_enabled and or_key:
+        if _cartesia_key:
+            print(
+                f"-> tts:   Cartesia Sonic (primary) → {TTS_MODEL} → "
+                f"{TTS_FALLBACK_MODEL} [Cartesia native voice; Gemini = fallback]"
+            )
+        elif openrouter_tts_enabled and or_key:
             print(
                 f"-> tts:   {TTS_MODEL} → {TTS_FALLBACK_MODEL} "
                 f"→ openrouter/{OPENROUTER_TTS_MODEL} (voice={VOICE}) [standby]"
@@ -1172,7 +1179,8 @@ async def main() -> None:
         else:
             print(
                 f"-> tts:   {TTS_MODEL} → {TTS_FALLBACK_MODEL} (voice={VOICE}) "
-                "[native primary; set VIBEMIX_TTS_OPENROUTER=1 for OpenRouter standby]"
+                "[native primary; set CARTESIA_API_KEY for the Cartesia primary "
+                "voice, or VIBEMIX_TTS_OPENROUTER=1 for OpenRouter standby]"
             )
     else:  # mode == "proxy"
         print(f"-> brain: {LLM_MODEL} via proxy at {proxy_base_url}")

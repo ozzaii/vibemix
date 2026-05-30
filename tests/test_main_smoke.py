@@ -487,6 +487,10 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
     monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
+    # Pin per-deck OFF so the device-upgrade path is deterministic regardless of
+    # the host's real rekordbox config — the zero-config global default reads
+    # ~/Library Pioneer settings, and this is a wiring smoke, not a per-deck test.
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
 
     audio_mocks = _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
@@ -532,6 +536,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
         gemini_api_key="dummy-key",
         openrouter_api_key="dummy-or",
         openrouter_enabled=False,
+        cartesia_api_key=None,
         mode="direct",
     )
 
@@ -584,6 +589,8 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    # Per-deck OFF — deterministic boot regardless of host rekordbox config.
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
 
     _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
@@ -611,6 +618,7 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
         gemini_api_key="dummy-key",
         openrouter_api_key=None,
         openrouter_enabled=False,
+        cartesia_api_key=None,
         mode="direct",
     )
 
