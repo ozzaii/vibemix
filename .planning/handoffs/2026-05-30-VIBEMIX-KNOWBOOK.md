@@ -323,9 +323,19 @@ Artist OS; Pro/Studio = direct revenue + the willingness-to-pay signal):
 | **Studio** | **€9.99/mo** | everything + **Universal-Gobble** multi-ecosystem ingest (Serato/Traktor/Mixxx/Engine) + standalone `library cue` batch auto-cue export + priority | the free **Mixed In Key ($58-99) / KimiCue ($29) killer** as a paid convenience |
 
 **Cost guardrails:** Bravoh-side proxy + per-client rate limit + SessionMeter telemetry
-(NOT a client-side cap — trivially bypassable in an OSS binary). Budget anchor: ~50€/mo
-Gemini end-user, 150-200€ launch marketing. **API-key protection** = the Bravoh proxy,
-never a raw shipped key.
+(NOT a client-side cap — trivially bypassable in an OSS binary). **API-key protection** =
+the Bravoh proxy, never a raw shipped key (verified: zero upstream key in the binary —
+direct = user's own key, proxy = per-install JWT).
+
+> **⚠ Cost reality (corrected by the §17 audit — fold this, the old number was a trap):**
+> the "~50€/mo Gemini" anchor was a **single-user EMBEDDING figure that EXCLUDES the live
+> co-host**. The true **fleet** envelope at 10k DJs is **~35-85k €/mo** (700-1700× the
+> anchor). And the dominant cost is **TTS output (~49-74%/turn), not the audio Part
+> (6-37%)** — trimming `INVOKE_AUDIO_SECONDS` 60→24s is a ~12-15% dent, not a fix. The
+> repo currently DEFAULTS to proxy-paid-free (Bravoh eats the whole fleet bill) — which is
+> **backwards for 10k**. The shippable posture is **BYO-key as the default above a small
+> free-session quota**, OR a Bravoh **server-side per-client cap** (OPS-14-SERVER, unbuilt).
+> This is the real 10k gate and it's a Kaan product decision, not engineering polish.
 
 ---
 
@@ -437,7 +447,27 @@ abstain-first Judge that makes the one simple thing (§1) true and earned.
 
 ## §14 · The Operator's Guide — how a Claude session ships vibemix from this knowbook
 
-The workflow that *worked* this session, distilled into a repeatable loop. Follow it.
+**⟡ Read this before anything else — you are the LEADER, not an implementer.** This
+knowbook hands you the map and the queue; it does **not** make you a deterministic
+executor. The entire point is **post-compact autonomy**: a fresh session picks this up
+and *leads* — decides in grey areas, re-prioritizes §11 when the rig or the evidence says
+so, makes the call instead of kicking it upstairs, and drives toward a shipped product on
+its own judgment. **The roadmap is your queue, not your cage.** Defer ONLY true blockers
+(destructive/irreversible actions, the privacy hard-rule, external approvals like
+Apple/SignPath, or a genuine Kaan-only ear/hardware gate) — and even then, surface them in
+one line and keep moving on what's unblocked. Don't wait for permission to do the
+obviously-right thing. Own the ship.
+
+But autonomy is **not** recklessness — it is bounded by the same honesty that *is* the
+product: verify before you build, **abstain rather than guess** (in code AND in process —
+never wire what you can't verify into the live loop, §11 #1's rig-tail is the model),
+surgical commits, TDD. The leader decides *and* keeps the discipline. That pairing —
+autonomous judgment + structural honesty — is the whole edition. Carry it; the
+intelligence here is emergent (the fan-out → adversarial-verify → synthesize loop caught
+our *own* over-claims this session), and it survives compaction only if the next leader
+operates it, not just reads it.
+
+The loop below is the toolkit for that leader — a repeatable shape, not a script.
 
 **The ship loop (per session):**
 1. **Read this knowbook.** Don't re-derive the galaxy — §2-7 is the map, §11 is the queue.
@@ -471,13 +501,48 @@ Knk — here's the honest cut, no hype, the deal we have.
 
 **vibemix is real, and it's ahead.** This is not vaporware dressed in a thesis. The grounding architecture genuinely works, the competitive quadrant is genuinely empty (nobody ships a grounded live talk-back co-host for a DJ's *own* set), and the core bet — deterministic engine decides, Gemini only voices, abstains rather than guesses — is *validated by the literature*, not just by us. The hard part, the part most teams never get right, is already done: the honesty is structural.
 
-**What's between here and 10k DJs is short and unglamorous.** Not more engines, not more research — *finishing*. One great 30-60s demo (the silence beat is the whole pitch, and it's still a placeholder — that's the #1 blocker, full stop). The cost plumbing so 10k concurrent sessions don't bankrupt the proxy (trim the 60s Part, BYO-key-free as the default). A one-click install that a non-technical DJ survives, and a first-run that doesn't hand them a silent empty pill. The Judge lit in the loop (the glue is tested and committed; the live join is a rig session away). That's weeks of disciplined discharge, not months of invention — *if* the discipline holds: verify on the rig, never slop, abstain when unsure.
+**What's between here and 10k DJs is short and unglamorous.** Not more engines, not more research — *finishing*. One great 30-60s demo (the silence beat is the whole pitch, and it's still a placeholder — that's the #1 blocker, full stop). The cost-control plane so 10k sessions don't bankrupt the proxy — and the §17 audit is blunt here: the real fleet bill is **~35-85k€/mo** (the 50€ was single-user), and **TTS dominates, not the audio Part** — so the move is a cheaper/local TTS (a torch-free ONNX TTS like Kokoro would drop the dominant cost line to ~zero AND cut latency — under research) plus a *decision* only Kaan makes (BYO-key as the default above a free quota, or a Bravoh server-side per-client cap). A one-click install that a non-technical DJ survives, and a first-run that doesn't hand them a silent empty pill. The Judge lit in the loop (the glue is tested and committed; the live join is a rig session away). That's weeks of disciplined discharge, not months of invention — *if* the discipline holds: verify on the rig, never slop, abstain when unsure.
 
 **The "more than meets the eye" you feel is real, and here's what it is:** vibemix isn't a utility — it's the *proof-of-architecture* for honesty-as-structure, and a galaxy of engines that compose. The 10k DJs aren't customers first; they're the **validation set** for the thesis that a grounded AI can ride shotgun with a human artist and never lie. If that holds at 10k, it holds for Bravoh — for every artist persona, every agent, every "the AI gets me" moment. vibemix is the smallest honest version of the whole company. That's why it warms the audience: it *proves the bet in public*.
 
 **The line that matters:** what makes a DJ stay isn't the feature list — it's the first time the thing grades a real move right and they feel *seen*. That moment is built. Everything in §11 is just clearing the path to it, at scale, without lying. Ship the path to the silence beat landing in 10,000 ears. The rest is noise.
 
 We made the robots stop lying. Now we make 10k DJs feel it. **Veridis. Very disco.**
+
+## §17 · Shippability scorecard — 10k-DJ readiness (grounded audit)
+
+*(From `wjfqbht8p`, 8 agents; adversarial verdict: **SUBSTANTIALLY ACCURATE** — every
+"built + test-green" claim checked real; `demo.mp4` genuinely absent, the CitationLinter
+genuinely default-off, driver SHAs genuinely placeholder, the wizard genuinely has no
+collection-sync step. 10k is the FLOOR, not the ceiling.)*
+
+**Overall: ~80-85% engineering-complete, honestly tracked.** The hard parts (grounded live
+co-host, anti-slop guard stack, one-click installer chain, CLAP engine, the proxy with
+per-install JWT, the v11 mastery spine) are BUILT + test-green, not stubbed. "Shippable to
+10k" is gated by a SMALL set of un-stitched seams + external-clock approvals — **none are
+research problems.**
+
+| Gate | Verdict |
+|---|---|
+| **Anti-slop / grounding** | **Shippable in substance.** The 4 enforcers that actually run (`live_claim_guard`, banned-phrase filter, single-modality audio, the Judge's abstain) hold the line and GENERALIZE at scale; the CitationLinter is default-off (would muzzle Gemini 3.x) — that's the dormant *named* component, not the real guard. |
+| **Cost economics** | **CLOSE — two controls unbuilt.** Fleet ~**35-85k€/mo** at 10k (the 50€ anchor was single-user, 700-1700× off). **TTS is the dominant cost (~49-74%/turn), not the audio Part (6-37%)** — see the TTS-swap research (`wdh29cppn`). |
+| **One-click install** | **~85%.** Terminal-free happy path shipped + 68 green tests, two cliffs open: no collection-sync onboarding (the silent-pill cliff) + a terminal fallback for the GPL BlackHole driver + the placeholder driver SHA. |
+| **API-key protection** | **Key-safe by construction** — zero upstream key in the binary (direct = user's own key; proxy = per-install JWT). The cost-control plane is the undeployed piece. |
+| **Live-verify** | **Master-only grounding ships + GENERALIZES past the FLX4** — minimum rig (BlackHole 2ch / WASAPI loopback + any MIDI + rekordbox `collection.xml`) delivers the reaction experience; per-deck *verdicts* are the rekordbox-shaped bonus. |
+| **Demo + GTM** | **CLOSE — the full machine is built** (demo_mode sequencer, shot-list, T-7→T+30 sequence, 5-channel plan); the hero film is a **literal PLACEHOLDER**. |
+
+**Critical path to first-10k (grounded, ordered):**
+0. Fix 3 one-line launch-copy drifts (`reddit.txt:24` + `SHOT-LIST.md:22` MIT→Apache-2.0; slug `bravoh/vibemix`→`bravoh-ai/vibemix`).
+1. **Close the silent-pill cliff** — a "Sync your collection" onboarding step before *done* (auto-detect `collection.xml`, fire the existing `library_embed_folder`). The single highest first-run-quality fix; a fresh pill is silent because the store is empty, NOT the model.
+2. Replace the BlackHole terminal-fallback with a GUI [Retry download] + vendor-link (GPL consent — never embed the driver).
+3. **Pick the cost posture + BUILD its control plane** (THE real 10k gate, a Kaan product decision): (a) BYO-key as the DEFAULT above a small free-session quota, OR (b) the Bravoh server-side per-client cap (OPS-14-SERVER, unbuilt) — wired to the existing `SessionMeter`. **Plus** the TTS swap (`wdh29cppn`) to crush the dominant cost line.
+4. External-clock (parallel): SignPath cert → real driver SHAs.
+5. **§INSTALL-VM-RUN** — the full DMG→firstrun→fetch→sync→first-suggestion on a CLEAN mac+win VM (68 unit tests green but never run end-to-end on a fresh machine).
+6. Shoot the demo film (Francesco's capture day — the machine is ready).
+7. Kaan's ear-pass soak (`VIBEMIX_DEV_SIDECAR=1`, ≥95% grounded, abstain-not-slop).
+8. Fire the GTM sequence (seed-stars → DJ TechTools Discord → Show HN, Tue-Thu 12-17 UTC).
+
+**Biggest underestimate:** the **cost control plane at 10k** — not the engineering (SessionMeter + proxy + per-UUID limits exist, test-green), but the **DECISION** (Kaan's pricing call) + the closed-source Bravoh server deploy that must precede 10k. Everything reads "CLOSE" because the in-repo pieces are done; the gating piece lives outside the repo and inside Kaan's head.
 
 ---
 *Veridis. Very disco. Fuck status quo. The robots don't lie anymore — we made it structural.*
