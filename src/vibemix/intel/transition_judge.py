@@ -28,6 +28,9 @@ _BASS_PRESENT_RATIO = 0.25
 
 VerdictState = Literal["judged", "abstained"]
 
+# events.jsonl event kind for a persisted Judge verdict (debrief/replay/calibration).
+TRANSITION_JUDGED_KIND = "transition_judged"
+
 
 @dataclass(frozen=True, slots=True)
 class TransitionVerdict:
@@ -86,6 +89,40 @@ def _abstain(reason: str) -> TransitionVerdict:
     return TransitionVerdict(
         verdict_state="abstained", score=None, confidence=0.0, abstain_reason=reason
     )
+
+
+def verdict_event_fields(
+    verdict: TransitionVerdict,
+    *,
+    track_a: str | None,
+    track_b: str | None,
+    citation_id: str | None = None,
+) -> dict[str, object]:
+    """Build the events.jsonl field payload for a Judge verdict.
+
+    The caller logs via ``recorder.log_event(TRANSITION_JUDGED_KIND, **fields)``.
+    BOTH judged and abstained verdicts produce a record — abstains are
+    load-bearing for calibration (they prove the Judge stays silent correctly,
+    and let debrief show "saw the blend, didn't grade it"). Honest-null: `score`
+    is None on abstain, never a fabricated number. The result is JSON-serializable
+    (events.jsonl is JSONL).
+    """
+    fields: dict[str, object] = {
+        "verdict_state": verdict.verdict_state,
+        "score": verdict.score,
+        "confidence": verdict.confidence,
+        "track_a": track_a,
+        "track_b": track_b,
+    }
+    if verdict.components:
+        fields["components"] = dict(verdict.components)
+    if verdict.risk_flags:
+        fields["risk_flags"] = list(verdict.risk_flags)
+    if verdict.abstain_reason is not None:
+        fields["abstain_reason"] = verdict.abstain_reason
+    if citation_id is not None:
+        fields["citation_id"] = citation_id
+    return fields
 
 
 def _harmonic_signal(a: LaneObservation, b: LaneObservation) -> float | None:
