@@ -227,6 +227,57 @@ def _make_mastered_speak(session: Any) -> Callable[[str], None] | None:
     return _speak
 
 
+def _credit_judged_transition(
+    verdict: Any,
+    state: MusicState,
+    *,
+    evidence_registry: EvidenceRegistry | None,
+    learn_progress: Any | None,
+    speak: Callable[[str], None] | None = None,
+) -> list[str]:
+    """4d — the live Judge join's post-judge credit glue.
+
+    ``judge_and_record`` writes the ``[judge:transition@t]`` voice-citation, but
+    ``skill_recognizer.recognize`` gates Mastered credit on an
+    ``[ev:transition_judged]`` citation (it hardcodes ``citation_check("ev",
+    ev_type, t)``). So on a JUDGED verdict we ALSO ground the ``ev`` atom — at the
+    same wall-clock ``t`` that ``_credit_live_skill_demo`` recomputes, so it
+    resolves under the ±1.0s ``has`` tolerance — then feed the existing
+    live-credit path: a COMPATIBLE harmonic component credits harmonic_mixing, a
+    clash credits nothing.
+
+    Abstain-first: an ``abstained`` verdict writes no citation and credits
+    nothing (honest-null — the abstain row was already logged by
+    ``judge_and_record``). NEVER raises — a producer hiccup must not wedge the
+    reaction loop. Returns the skill ids whose ``live_proof_count`` advanced.
+    """
+    if verdict is None or getattr(verdict, "verdict_state", None) != "judged":
+        return []
+    try:
+        from vibemix.intel.transition_judge import TRANSITION_JUDGED_KIND
+        from vibemix.state.event import Event
+
+        set_start_at = float(getattr(state, "set_start_at", 0.0) or 0.0)
+        t_session = max(0.0, time.time() - set_start_at)
+        if evidence_registry is not None:
+            evidence_registry.write("ev", TRANSITION_JUDGED_KIND, t_session)
+        judged_ev = Event(
+            type=TRANSITION_JUDGED_KIND,
+            state=state,
+            extra={"components": dict(getattr(verdict, "components", {}) or {})},
+        )
+        return _credit_live_skill_demo(
+            judged_ev,
+            state,
+            evidence_registry=evidence_registry,
+            learn_progress=learn_progress,
+            speak=speak,
+        )
+    except Exception as exc:  # never wedge the loop
+        print(f"[judge-credit err] {exc}", file=sys.stderr)
+        return []
+
+
 async def coach_loop(
     session: AgentSession,
     agent: DJCoHostAgent,
