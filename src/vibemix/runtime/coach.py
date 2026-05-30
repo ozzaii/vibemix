@@ -161,6 +161,12 @@ def _credit_live_skill_demo(
             event_t=t_session,
         )
         if credited:
+            # SAFETY: this LearnProgress is the SAME object the LessonRuntime
+            # holds; both mutate-then-save it. That is clobber-free ONLY because
+            # both run as coroutines on the one asyncio loop and each
+            # mutate→save_progress window has no intervening ``await`` (the save
+            # serializes the whole object, so skills + lessons coexist). A future
+            # off-loop driver of either side would reintroduce a real RMW race.
             save_progress(learn_progress)
         return credited
     except Exception as exc:  # never wedge the reaction loop on a credit failure

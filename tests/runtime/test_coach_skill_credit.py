@@ -160,6 +160,75 @@ def test_never_raises_on_broken_progress(_redirect_progress: Path) -> None:
     assert out == []
 
 
+def test_cited_mix_move_credits_both_eq_and_deck(_redirect_progress: Path) -> None:
+    """One cited MIX_MOVE carrying BOTH an EQ-band move and a play move credits
+    BOTH eq_mixing and deck_control from the single "ev"/"MIX_MOVE" citation —
+    proving the helper plumbs event.extra["moves"] through to the recognizer's
+    move-substring resolution end-to-end (one event, two distinct skills)."""
+    progress = LearnProgress()
+    _make_competent(progress, "eq_mixing")
+    _make_competent(progress, "deck_control")
+    reg = EvidenceRegistry()
+    reg.write("ev", "MIX_MOVE", 10.0)  # one citation, keyed on the event type
+    state = _state(10.0)
+
+    credited = _credit_live_skill_demo(
+        _event("MIX_MOVE", moves=["A_low: open→killed (big twist)", "A_play→cue"]),
+        state,
+        evidence_registry=reg,
+        learn_progress=progress,
+    )
+
+    assert set(credited) == {"eq_mixing", "deck_control"}
+    assert _count(progress, "eq_mixing") == 1
+    assert _count(progress, "deck_control") == 1
+
+
+def test_unset_set_start_at_self_cancels(_redirect_progress: Path) -> None:
+    """The realistic unset-clock edge: set_start_at == 0.0 makes the helper
+    compute t_session ≈ time.time() (a unix-sized value) — IDENTICAL to what the
+    EventDetector wrote with the same `now - 0.0`, so they still match within
+    ±1.0s and credit resolves (no silent denial from the unset default)."""
+    progress = LearnProgress()
+    _make_competent(progress, "transitions")
+    reg = EvidenceRegistry()
+    reg.write("ev", "LAYER_ARRIVAL", time.time())  # what _fire writes when set_start_at==0
+    state = SimpleNamespace(set_start_at=0.0)
+
+    credited = _credit_live_skill_demo(
+        _event("LAYER_ARRIVAL"),
+        state,
+        evidence_registry=reg,
+        learn_progress=progress,
+    )
+
+    assert credited == ["transitions"]
+    assert _count(progress, "transitions") == 1
+
+
+def test_never_raises_on_raising_registry(_redirect_progress: Path) -> None:
+    """The other half of the never-raises contract: a registry whose `has`
+    raises must degrade to [] (credit failure must never wedge the reaction
+    loop), not propagate out of the helper."""
+
+    class _BoomRegistry:
+        def has(self, *a: object, **k: object) -> bool:
+            raise RuntimeError("registry boom")
+
+    progress = LearnProgress()
+    _make_competent(progress, "transitions")
+
+    out = _credit_live_skill_demo(
+        _event("LAYER_ARRIVAL"),
+        _state(10.0),
+        evidence_registry=_BoomRegistry(),
+        learn_progress=progress,
+    )
+
+    assert out == []
+    assert _count(progress, "transitions") == 0
+
+
 def test_unmapped_event_credits_nothing(_redirect_progress: Path) -> None:
     """An event type with no EVENT_SKILL_MAP entry (e.g. HEARTBEAT) credits
     nothing even when cited — no proxy-credit, no new detector."""
