@@ -2286,7 +2286,7 @@ async def main() -> None:
         ),
     )
     print(
-        f"-> listening to {input_device_name} @ {INPUT_SR_NATIVE}Hz "
+        f"-> listening to {input_device_name} @ {capture_native_sr}Hz "
         f"({deck_audio_routing.opened_channels}ch) -> audio_buf + clean_audio_buf"
     )
 
