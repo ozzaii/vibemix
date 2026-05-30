@@ -452,6 +452,21 @@ def _run_debrief_sidecar(session_dir: str) -> None:
 # =============================================================================
 
 
+def _resolve_capture_native_sr(context: dict | None) -> int:
+    """The capture device's REAL nominal rate (44.1k / 48k / ...), used to open
+    the master stream at the device's native rate and resample to 16k internally
+    — instead of forcing 48k and crashing a fresh user whose BlackHole/loopback
+    is at 44.1kHz (the most common rate). ``describe_capture_input`` already
+    resolves the device ``default_samplerate`` into the capture context; this
+    reads it with a safe fallback for a missing/absurd value (common pro-audio
+    rates span 8k..192k)."""
+    try:
+        sr = int((context or {}).get("sample_rate") or 0)
+    except (TypeError, ValueError):
+        return INPUT_SR_NATIVE
+    return sr if 8000 <= sr <= 192000 else INPUT_SR_NATIVE
+
+
 def _input_callback_factory(
     levels: Levels,
     passthrough: PassthroughBuffer,
@@ -461,14 +476,18 @@ def _input_callback_factory(
     recorder: VoiceRecorder,
     deck_audio_capture: DeckAudioCapture | None = None,
     audio_capture_context: dict[str, object] | None = None,
+    source_sr: int = INPUT_SR_NATIVE,
 ):
-    """Verbatim port of cohost_v4.py:912-945 input stream callback."""
+    """Verbatim port of cohost_v4.py:912-945 input stream callback.
+
+    ``source_sr`` is the capture device's native rate (44.1k/48k/...) so the
+    resample to 16k stays correct regardless of the user's loopback rate."""
 
     def callback(indata, frames, time_info, status):
         if status:
             print(f"[input status] {status}", file=sys.stderr)
         if deck_audio_capture is not None:
-            captured = deck_audio_capture.process(indata, source_sr=INPUT_SR_NATIVE)
+            captured = deck_audio_capture.process(indata, source_sr=source_sr)
             passthrough_audio = captured.passthrough_stereo
             music48 = captured.master_mono
             if audio_capture_context is not None:
@@ -494,12 +513,12 @@ def _input_callback_factory(
         clean48 = music48
 
         try:
-            state16f = resample_audio(state48, source_sr=INPUT_SR_NATIVE, target_sr=INPUT_SR_TARGET)
+            state16f = resample_audio(state48, source_sr=source_sr, target_sr=INPUT_SR_TARGET)
             state_pcm_16k = np.clip(state16f * 32767.0, -32768, 32767).astype(np.int16)
             audio_buf.push(state_pcm_16k)
             recorder.push_input(state_pcm_16k.tobytes())
 
-            clean16f = resample_audio(clean48, source_sr=INPUT_SR_NATIVE, target_sr=INPUT_SR_TARGET)
+            clean16f = resample_audio(clean48, source_sr=source_sr, target_sr=INPUT_SR_TARGET)
             clean_pcm_16k = np.clip(clean16f * 32767.0, -32768, 32767).astype(np.int16)
             clean_audio_buf.push(clean_pcm_16k)
         except Exception as e:
@@ -2244,9 +2263,14 @@ async def main() -> None:
     parent_watch_task = asyncio.create_task(watch_parent(stop_event))
 
     # --- Input stream — last because state must be ready ---
+    # 44.1k-native capture — open the master stream at the device's REAL rate
+    # and resample to 16k internally, instead of forcing 48k (which crashed a
+    # fresh user whose BlackHole/loopback runs at 44.1kHz). A 48k device is
+    # unchanged: capture_native_sr == INPUT_SR_NATIVE -> byte-identical.
+    capture_native_sr = _resolve_capture_native_sr(audio_capture_context)
     input_stream = audio_backend.open_capture(
         input_idx,
-        sample_rate=INPUT_SR_NATIVE,
+        sample_rate=capture_native_sr,
         channels=deck_audio_routing.opened_channels,
         block_size=INPUT_CHUNK_FRAMES,
         callback=_input_callback_factory(
@@ -2258,6 +2282,7 @@ async def main() -> None:
             recorder,
             deck_audio_capture,
             audio_capture_context,
+            source_sr=capture_native_sr,
         ),
     )
     print(
