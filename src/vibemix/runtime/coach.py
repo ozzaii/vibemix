@@ -65,6 +65,8 @@ from typing import TYPE_CHECKING, Any
 from vibemix.audio import AI_TALK_THRESHOLD, MIC_TALK_THRESHOLD, Levels, VoiceRecorder
 from vibemix.state import EventDetector, MusicState
 from vibemix.state.deck_context import (
+    DECK_CONTEXT_TRUSTED_SOURCES,
+    live_claim_policy,
     render_audio_delta_items,
     render_audio_window_context,
     render_context_feed_contract,
@@ -278,6 +280,78 @@ def _credit_judged_transition(
         return []
 
 
+def _run_live_judge(
+    deck_audio_capture: Any,
+    state: MusicState,
+    *,
+    policy: str,
+    evidence_registry: EvidenceRegistry | None,
+    recorder: Any | None,
+    learn_progress: Any | None,
+    speak: Callable[[str], None] | None = None,
+) -> Any | None:
+    """4d — run the Vibe Judge on the live capture for a transition, abstain-first.
+
+    Resolves per-lane meta (camelot / source-trust / track-id) from the SAME
+    deck-state the prompt reads — READ-ONLY, single-writer respected — assembles
+    the typed ``LiveSignalFrame`` from the live rings, judges + persists the
+    verdict (``judge_and_record`` grounds ``[judge:transition@t]`` and writes the
+    ``transition_judged`` row), then credits any demonstrated v11 skill
+    (``_credit_judged_transition`` grounds the ``[ev:transition_judged]``
+    credit-gate atom the recognizer hardcodes).
+
+    Abstain-first by construction: ``None`` capture -> ``None``; Kaan's common
+    master-only rig (routing disabled, one stereo mix) or any policy short of
+    ``supported_verdict`` -> the Judge abstains (no citation, no score, no
+    credit — the honest-null default, not a bug). NEVER raises: a Judge hiccup
+    must not wedge the reaction loop. Returns the verdict, or ``None``.
+    """
+    if deck_audio_capture is None:
+        return None
+    try:
+        from vibemix.audio.deck_signal import signal_frame_from_capture
+        from vibemix.state.transition_judge_runtime import judge_and_record
+
+        decks = getattr(getattr(state, "deck_state", None), "decks", None) or {}
+        lane_meta: dict[str, dict[str, object]] = {}
+        for side in ("A", "B"):
+            deck = decks.get(side)
+            if deck is None:
+                continue
+            lane_meta[side] = {
+                "camelot": getattr(deck, "camelot", None),
+                "source_trusted": str(getattr(deck, "source", "") or "").strip().lower()
+                in DECK_CONTEXT_TRUSTED_SOURCES,
+                "track_id": getattr(deck, "track_id", None),
+            }
+        set_start_at = float(getattr(state, "set_start_at", 0.0) or 0.0)
+        t_session = max(0.0, time.time() - set_start_at)
+        frame = signal_frame_from_capture(
+            deck_audio_capture,
+            t_session=t_session,
+            policy=policy,
+            lane_meta=lane_meta,
+        )
+        verdict = judge_and_record(
+            frame,
+            registry=evidence_registry,
+            recorder=recorder,
+            track_a=lane_meta.get("A", {}).get("track_id"),  # type: ignore[arg-type]
+            track_b=lane_meta.get("B", {}).get("track_id"),  # type: ignore[arg-type]
+        )
+        _credit_judged_transition(
+            verdict,
+            state,
+            evidence_registry=evidence_registry,
+            learn_progress=learn_progress,
+            speak=speak,
+        )
+        return verdict
+    except Exception as exc:  # never wedge the loop
+        print(f"[judge-run err] {exc}", file=sys.stderr)
+        return None
+
+
 async def coach_loop(
     session: AgentSession,
     agent: DJCoHostAgent,
@@ -299,6 +373,7 @@ async def coach_loop(
     audio_capture_context: dict[str, object] | None = None,
     evidence_registry: EvidenceRegistry | None = None,
     learn_progress: Any | None = None,
+    deck_audio_capture: Any | None = None,
 ) -> None:
     """Polls MusicState for events at 10Hz. On event → prompt AI. Single
     in-flight generation at a time. Mic detection happens here against
@@ -647,6 +722,32 @@ async def coach_loop(
                 if move_effect_context:
                     event_payload["move_effect_context"] = move_effect_context
             recorder.log_event("event", **event_payload)
+
+            # 4d — the live Vibe Judge grades the blend the instant a track
+            # change lands, BEFORE the reaction fires, so the grounded
+            # [judge:transition@t] citation is already in the registry if the
+            # co-host voices the verdict. Abstain-first: on the master-only rig
+            # (routing off / one stereo mix) or any policy short of
+            # supported_verdict it records an honest-null row and credits
+            # nothing; only a grounded two-deck verdict advances a v11 skill.
+            # live_claim_policy mirrors dj_cohost.py's reaction-time resolution
+            # so the Judge sees the same evidence the prompt does.
+            if deck_audio_capture is not None and tag == "TRACK_CHANGE":
+                judge_policy, _judge_reason = live_claim_policy(
+                    state,
+                    moves,
+                    audio_capture_context=audio_capture_context,
+                    audio_delta_items=audio_delta_items,
+                )
+                _run_live_judge(
+                    deck_audio_capture,
+                    state,
+                    policy=judge_policy,
+                    evidence_registry=evidence_registry,
+                    recorder=recorder,
+                    learn_progress=learn_progress,
+                    speak=mastered_speak,
+                )
 
             if wired:
                 # ---- cancel-and-refire on stale in-flight ----

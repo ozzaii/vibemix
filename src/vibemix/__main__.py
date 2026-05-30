@@ -2227,6 +2227,10 @@ async def main() -> None:
             # the LearnProgress loaded at boot (also passed to the LessonRuntime).
             evidence_registry=evidence_registry,
             learn_progress=_learn_progress,
+            # 4d — the live Vibe Judge needs the per-deck rings to assemble its
+            # typed frame; None on a 2ch/master-only-incapable rig (the Judge
+            # then abstains by construction). Constructed at __main__:1056.
+            deck_audio_capture=deck_audio_capture,
         )
     )
 
