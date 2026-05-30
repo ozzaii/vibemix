@@ -93,18 +93,21 @@ _MIX_MOVE_DECK_SUBSTRINGS: tuple[str, ...] = ("_play→", "xfader")
 # HONEST-UNCREDITABLE in v11.0 (Finding #1, anti-slop):
 #   - beatmatching: there is NO BEATMATCH/SYNC_ENGAGED event; "{deck}_sync_hit"
 #     is a MIDI move BELOW the MIX_MOVE significance threshold, so no ``ev``
-#     ever fires for it. On-beat-blend is not a detected/citable event.
-#   - harmonic_mixing: the only harmonic events (KEY_CLASH /
-#     TRANSITION_OPPORTUNITY) are default-OFF (harmonic_clash_enabled=False,
-#     never flipped in production — gated behind the unshipped Plan 60-03
-#     Kaan-ear veto), so in a real session today they NEVER fire.
-# Both therefore have NO entry in EVENT_SKILL_MAP and NO MIX_MOVE move resolves
-# to them — NO proxy-credit, NO new detector. They are capped at Competent and
-# future-detector-gated (KAAN-ACTION §EARNED-MASTERY-THRESHOLD-TUNE). Silently
-# proxy-mapping them to a wrong signal is the exact false-expertise anti-slop
-# class this product guards — so we do not. Pinned by
+#     ever fires for it. On-beat-blend is not a detected/citable event. The Vibe
+#     Judge measures harmonic + bass-collision but NO tempo/phase signal yet, so
+#     it cannot honestly demonstrate beatmatching either — proxying it onto
+#     bass-collision is the exact false-expertise slop this guard exists for.
+#     Stays uncreditable until the deferred beatmatch_phase Judge signal ships.
+# RETIRED from this tuple (v11.0 the Vibe Judge):
+#   - harmonic_mixing: the Judge's ``transition_judged`` event is now the clean
+#     citable production event it lacked. A verdict with a COMPATIBLE harmonic
+#     component (the DJ blended two trusted in-key tracks) is resolved to
+#     harmonic_mixing in ``_candidate_skills`` and credited under the same
+#     MAST-03 citation gate (a clash / un-cited verdict credits nothing).
+# beatmatching has NO entry in EVENT_SKILL_MAP and NO MIX_MOVE / transition_judged
+# branch resolves to it — NO proxy-credit, NO new detector. Pinned by
 # ``test_unsignalled_skills_never_auto_master``.
-_HONEST_UNCREDITABLE_V11: tuple[str, ...] = ("beatmatching", "harmonic_mixing")
+_HONEST_UNCREDITABLE_V11: tuple[str, ...] = ("beatmatching",)
 
 
 def _candidate_skills(event: Any) -> list[str]:
@@ -134,6 +137,24 @@ def _candidate_skills(event: Any) -> list[str]:
         ):
             candidates.append("deck_control")
         return candidates
+
+    if ev_type == "transition_judged":
+        # v11.0 the Vibe Judge — the clean citable production event that retires
+        # harmonic_mixing from honest-uncreditable. The verdict's COMPATIBLE
+        # harmonic component (> 0 = the Camelot prior; a clash is 0.0) is a real
+        # harmonic-mixing demonstration: the DJ blended two trusted, in-key
+        # tracks. A clash / absent component credits NOTHING (it proves the
+        # opposite). beatmatching is deliberately NOT resolved here — the Judge
+        # measures no tempo/phase signal yet, and proxying it onto bass-collision
+        # is the exact false-expertise slop ``_HONEST_UNCREDITABLE_V11`` guards.
+        extra = getattr(event, "extra", None)
+        components = extra.get("components", {}) if isinstance(extra, dict) else {}
+        if not isinstance(components, dict):
+            return []
+        harmonic = components.get("harmonic")
+        if isinstance(harmonic, (int, float)) and not isinstance(harmonic, bool) and harmonic > 0.0:
+            return ["harmonic_mixing"]
+        return []
 
     return list(EVENT_SKILL_MAP.get(ev_type, ()))
 

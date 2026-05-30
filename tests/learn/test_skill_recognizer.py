@@ -207,12 +207,15 @@ def test_event_skill_map_credits_real_events() -> None:
 # MAST-02 HEADLINE (anti-slop): beatmatching/harmonic_mixing never auto-master
 # ---------------------------------------------------------------------------
 def test_unsignalled_skills_never_auto_master() -> None:
-    """Finding #1 — honest-uncreditable: beatmatching + harmonic_mixing have no
-    clean citable production event in v11.0, so NO event of ANY type (cited or
-    not) ever advances them. Both are made Competent first, so the ONLY thing
-    stopping Mastered is the ABSENCE of a creditable event (the honest decision),
-    not an accidental Competent gate. Feed a cited stream of EVERY mapped event
-    type and assert both stay live_proof_count=0 / mastered=False."""
+    """Finding #1 — no PROXY event auto-masters these skills. beatmatching has no
+    citable production event at all; harmonic_mixing now has ONE (the Vibe Judge's
+    ``transition_judged`` — see ``test_judge_credits_harmonic.py``), but NONE of
+    the ordinary event types (MIX_MOVE / LAYER_ARRIVAL / PHASE / PHRASE_BOUNDARY)
+    resolve to either. Both are made Competent first, so the ONLY thing stopping a
+    proxy-Mastered is the ABSENCE of a proxy mapping (the honest decision), not an
+    accidental Competent gate. Feed a cited stream of every mapped *ordinary*
+    event type (NOT transition_judged) and assert both stay
+    live_proof_count=0 / mastered=False."""
     # Make every skill Competent — including the two unsignalled ones.
     progress = _competent_progress(
         "eq_mixing",
