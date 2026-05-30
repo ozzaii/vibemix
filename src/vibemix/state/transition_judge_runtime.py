@@ -29,7 +29,7 @@ from vibemix.state.live_signal import LiveSignalFrame
 JUDGE_CITATION_SOURCE = "judge"
 
 
-def verdict_citation_key(t_session: float) -> str:
+def _verdict_citation_key(t_session: float) -> str:
     """The registry key (citation body) for a verdict at ``t_session``.
 
     Shape ``transition@<t>`` (1-decimal), matching the grammar's
@@ -59,7 +59,7 @@ def judge_and_record(
 
     citation_id: str | None = None
     if verdict.verdict_state == "judged":
-        key = verdict_citation_key(t)
+        key = _verdict_citation_key(t)
         if registry is not None:
             registry.write(JUDGE_CITATION_SOURCE, key, t)
         citation_id = f"{JUDGE_CITATION_SOURCE}:{key}"
