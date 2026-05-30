@@ -551,5 +551,68 @@ research problems.**
 
 **Biggest underestimate:** the **cost control plane at 10k** — not the engineering (SessionMeter + proxy + per-UUID limits exist, test-green), but the **DECISION** (Kaan's pricing call) + the closed-source Bravoh server deploy that must precede 10k. Everything reads "CLOSE" because the in-repo pieces are done; the gating piece lives outside the repo and inside Kaan's head.
 
+## §18 · The Clean-Ship Playbook (build → sign → notarize → user-test)
+
+*(From `waeeuiesh`, verdict VERIFIED against the repo. The whole chain is FULLY WIRED
+in code + CI; it's BLOCKED only on external trust anchors — Apple Dev ID + SignPath cert
++ the placeholder driver SHAs. None are engineering problems.)*
+
+**▶ The live-interaction fix (Kaan's "you can't play with the live thing") — small, and
+the backend is already wired.** The live webview is effectively READ-ONLY: the only control
+is cmd+m mute; the cohost panel (`tauri/ui/src/session/components/cohost.ts`) has zero
+interactive controls. But the ENTIRE manual-trigger path is wired end-to-end in the runtime:
+`ws_bus.py:804-807` receives `{"action":"trigger"}` → `manual_trigger.set()` → consumed by
+`coach_loop` (`coach.py:288/401-403`) — it's just unreachable from the UI. **FIX: add a
+"REACT NOW" button to `cohost.ts::renderCohostPanel()` that sends `{"action":"trigger"}`
+over the WebSocket (reuse the `sendMute` / `pill/ws-client.ts` pattern).** That alone makes
+the live session genuinely playable. *(Also deferred-but-wireable: voice / output_device /
+output_profile don't apply live — `settings.py:214-262` has no live cascade/restart hook in
+the LiveKit path; live-swap is a separate wiring job.)*
+
+**The macOS cut (the canonical chain):** PRECHECK (`xcode-select --install`, `brew install
+create-dmg`, `uv sync --frozen`; the committed `binaries/*` are `.placeholder`) → BUILD
+SIDECAR arm64 **and** x86_64 SEPARATELY (`scripts/build_sidecar.py --spec
+vibemix-core.macos.spec --target-arch …`; NEVER lipo-merge — PyInstaller embeds its PKG in
+the last slice → segfault; the AIza byte-scan gate runs here) → BUILD TAURI (`cargo tauri
+build --target aarch64-apple-darwin` → `…/bundle/macos/vibemix.app`) → REPAIR symlinks
+(`repair_macos_app_sidecar_symlinks.py`) → **SIGN+NOTARIZE+STAPLE+VERIFY in one command**
+(`scripts/dist/sign_macos.sh`: inside-out codesign every nested binary since `--deep` misses
+`_internal/` → create-dmg → `notarytool submit --wait` (3× backoff) → `stapler staple` →
+`spctl --assess` must print 'accepted' + 'Notarized Developer ID' → `verify_binary.py`
+key-leak scan, release-blocking). The real cut = tag `git push origin v0.1.0-rcN` →
+`release.yml` matrix; `pretag_check.sh` (8 gates) + `cut_release.sh` (prints, never runs, the
+`gh release create` — Kaan-action). **Windows:** `…windows.spec` → `cargo tauri build` →
+SignPath (`sign_windows.ps1`) → Inno Setup → verify.
+
+**Legacy cleanup (Kaan runs on the clean test machine — destructive, HIS action):**
+`lsof -i :8765` → `kill -9 <PID>` (reboot if still bound) → `pkill -f vibemix-core; pkill -f
+vibemix` → `rm -rf /Applications/vibemix.app` → clear `~/.cache/vibemix/*` + the app-support
+state. **PRESERVE the rekordbox library + Music.** (Never touches `~/hermes-rig|~/.hermes|~/.lmstudio` — privacy hard-rule.)
+
+**Logging — "log everything so future problems are easy to find":** rich but FRAGMENTED today
+(`trace.jsonl` SessionTracer 10 cats, `events.jsonl`, `ui.log` `[vmx:*]`, `sidecar.log`). The
+GAP: no unified per-session log a dev can `cat` to replay a turn. **Build `turnlog.jsonl`** —
+one correlated per-turn row {ts, t_rel, event_type, registry_snapshot, prompt_full,
+ai_latency, citation_decision, strip_reason, response_text, tts_latency, next_event}.
+Kaan-decision: full reaction text (perfect replay) vs truncated/hash (privacy). Ties into the
+observability milestone.
+
+**Kaan-action gates (external clock = the real critical path):** Apple Developer Program
+enrollment + Developer ID cert + ASC API key (8 secrets); SignPath OSS application (~1-week
+SLA); pin the BlackHole/VB-Cable driver SHAs after the cert; rotate the Tauri updater keypair
+to prod; run the legacy-delete + the first-run user-test on a clean machine. **Biggest risk:**
+the chain WARN-but-passes (not fail-closed) at 3 spots (placeholder SHAs, mock-signing) — a
+'clean build' can LOOK shippable yet not be trust-anchored. Fail closed before the real cut.
+
+**Related thread — context-richness + prompt-engineering uplift (Bravoh reference):** Kaan's
+"give the AI more history with good prompt engineering" — the gold reference is **Bravoh's
+main agentic prompt** (`/var/www/bravoh-backend/app/services/ai/agentic_prompts.py`:
+`ROUTING_PROMPT_TEMPLATE` / `SLIM_ROUTING_PROMPT_TEMPLATE`), which runs the SAME thesis as
+vibemix — *"BRAVOH's intelligence layer — the brain that decides what tools to fire so Gemini
+writes the response. You select tools, Gemini writes."* The uplift: feed the live co-host
+richer set-history via **cheap TEXT context** (recall / `context_compiler`), engineered in
+that routing-layer-decides / Gemini-voices style — NOT via the expensive audio window (which
+the §17 cost work trims).
+
 ---
 *Veridis. Very disco. Fuck status quo. The robots don't lie anymore — we made it structural.*
