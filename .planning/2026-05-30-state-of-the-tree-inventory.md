@@ -220,3 +220,20 @@ Full `uv run pytest -q` on the dirty tree: **14 failed, 6716 passed, 27 skipped,
 - **v0.1.0-rc1 ship work** — bundle/launchd fixes in flight; pretag at last check 5 pass / 1 fail (Phase-16 hallucination ear-pass) / 2 warn. Known rc1 bug: installed app squatting :8765 collides with `cargo tauri dev` (free :8765 first). Sidecar bundle is FROZEN — verify backend on current source or `VIBEMIX_DEV_SIDECAR=1`, not the bundled binary.
 - **LiveKit-upgrade** — `__main__.py:1353` `turn_handling` + livekit-agents 1.5.8→1.5.14; streaming speed-fix landed (chunk-by-chunk yield). Stale local sidecar on old livekit throws `cannot import name 'cli'` → use `VIBEMIX_DEV_SIDECAR=1`.
 - **Gear-aware "Tune"** — exploration/spec-prep only (research doc committed); no module. eqMac (Apache-2.0) + EqualizerAPO (hot-reload) identified as host targets, biquad to reimplement. Pending Kaan/Francesco section-7 decision.
+
+## 2026-05-30 Closeout — Backend Lane Shipped
+
+The dirty tree above is now packaged + wired + green. **Full suite: 6738 passed / 0 failed** (27 skipped, 1 xfail, 4 xpass) — up from the 14-failed baseline. Backend lane (Python / Rust / docs) is this session's; `tauri/ui/**` is the frontend session's and left untouched.
+
+**Committed this run (backend lane):**
+- `250db877` — this inventory doc.
+- `7347cff4` — deck-context / live-tuning brain (37 files; `deck_capture.py` bundled with its `__main__` importer → clean-checkout green) + 2 regression fixes (curator `MusicState` → function-local; byte-identity pin → `(audience perspective; global mix, not isolated deck stems)`).
+- `14431357` — Course-2 L2.11 library-grounded harmonic-pair lesson.
+- `1aaa09ad` — the 12 repo/build/meta ship-gates (capability snapshot `+learn`, orphan baseline refresh, README matrix + AUDIT.md regen, STATE phase-16 audit-trail restore, github-meta→`bravoh.ai`/`multimodal`, pyinstaller `cli` kept for livekit, phase20 v8.2-pin cleanup).
+- `da75b37c` — README anti-slop (`seamless`/`unlock` stripped at the ROADMAP source, re-synced).
+
+**Closed by the sibling session (verified, not duplicated):** `6dc07ab3` + `41ccd726` — the until-now-ORPHANED `learn/skill_recognizer.recognize()` got its live call site in `runtime/coach.py::_credit_live_skill_demo` (cited event → credit, un-cited → zero; Invariants #2/#3). The v11.0 mastery spine is LIVE-WIRED.
+
+**Cross-verified (5 adversarial agents):** all three feature wirings (deck-context brain, skill-recognizer, harmonic-pair) are reachable from `python -m vibemix` with their citation/two-deck invariants enforced in the live reaction path — not just unit-test-green.
+
+**Remaining = human-gated, NOT code blockers** (the `[kaan]` punch-list above stands): 🔴 `§EARNED-LIVE-MASTERED-VERIFY` real-FLX4 ear-pass, 🔴 `§EARNED-MASTERED-VOCAL-EAR`, 🔴 live deck-context DJ proof (Rekordbox→BlackHole), 🔴 Course-3 routed-audio; plus the frontend "sexification" + P104 skill-tree UI (other session) and the v4.0 Apple/SignPath external signing clock.
