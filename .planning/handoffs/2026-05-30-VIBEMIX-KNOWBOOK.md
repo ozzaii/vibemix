@@ -668,5 +668,23 @@ ear-passes (parallel) + the one first-run hardware-detection fix. **Distribution
 solve later:** the biggest channel (mobile TikTok/Reels "how to DJ") vs vibemix being a
 desktop app — the screen-record demos bridge it; a mobile surface is the eventual reach unlock.
 
+## §20 · Final recommendations (the capstone)
+
+### To KAAN (the founder — the things only you move)
+1. **Start the external clock TODAY — it's the longest pole, pure waiting:** enroll Bravoh in the Apple Developer Program + generate the Developer ID cert + ASC API key (8 secrets); apply to SignPath OSS (~1-week SLA). Nothing ships signed/notarized without these, and engineering can't shorten them.
+2. **Schedule your EAR-PASSES now — they're the real critical path, not code:** the Judge calibration (~20-30 labeled transitions → lock 3 thresholds), §EARNED-LIVE-MASTERED-VERIFY on a real FLX4, the EQ-exemplar tone, the Mastered-unlock vocal, persona/voice. These gate BOTH the Judge gold-flip AND Learn (the 15-90× market). Block 2-3 rig sessions — they parallelize the Apple/SignPath clock at zero eng cost.
+3. **Make the COST DECISION (the real 10k gate, yours not engineering's):** BYO-key as the default above a small free quota, OR fund the Bravoh server-side per-client cap (OPS-14-SERVER). And pick the TTS — pay for native cloud quality (Cartesia Sonic 3 / ElevenLabs Flash), not local.
+4. **The demo IS the launch — shoot it with Francesco.** The `demo.mp4` placeholder is the #1 GTM blocker; the silence-beat is the whole pitch. Lead the story with the grounded VOICE + Learn's "watches your hands," NEVER the contested next-track pill.
+5. **Internalize the reframe:** Learn (the bigger pond) + co-host (the proof) + Viber (the WTP test) all funnel to Bravoh. vibemix is the smallest honest version of the company — it proves the honesty-as-structure bet in public.
+6. **Keep me honest.** The deal held this session — we caught our own over-claims (C3, the 50€ trap, the local-TTS prior, the "27 dark" overcount). Keep demanding it; that discipline IS the product.
+
+### To CLAUDE (the next session — you are the LEADER, §14)
+1. **Read this knowbook first, then DECIDE and drive.** Defer only true blockers (destructive/privacy/external-approval/Kaan-ear). Don't wait for permission to do the obviously-right thing.
+2. **First code move — §11 #1: the Judge 4d live join.** The tested glue `_credit_judged_transition` is committed (`2f265fc7`); wire it into `coach_loop` + thread the `DeckAudioCapture` object (`__main__.py:1056` → past `:1438`), abstain-first. The ONE clean lane (`coach.py`/`__main__.py` clean; pill/library/learn concurrent). Verify-live on the rig.
+3. **Second (small, high-value) — the REACT NOW button (§18):** add it to `cohost.ts::renderCohostPanel()` sending `{"action":"trigger"}` (backend wired, reuse `sendMute`). Fixes "can't play with the live thing." TDD frontend.
+4. **Third — first-run hardware-detection + collection-sync onboarding (§17/§18/§19):** the silent-pill + confused-beginner cliff. The single highest first-run-quality fix, serving BOTH markets.
+5. **Always verify every "verified" output** — re-ground to file:line before acting. Use the fan-out → adversarial-verify → synthesize workflow; the verifier is non-negotiable (it caught real fabrications this session).
+6. **Discipline is the product:** surgical commits (`git diff --cached --name-only` before EVERY one), disjoint NEW-FILE islands, TDD, abstain-rather-than-guess (never wire unverifiable code into the live loop). The privacy hard-rule is absolute. Don't build what's Kaan's (ear-passes, the cost decision, signing, the demo) — surface them and move on what's unblocked.
+
 ---
 *Veridis. Very disco. Fuck status quo. The robots don't lie anymore — we made it structural.*
