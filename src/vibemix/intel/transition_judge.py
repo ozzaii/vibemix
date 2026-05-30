@@ -13,11 +13,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+from vibemix.state import harmonics
 from vibemix.state.live_signal import LaneObservation, LiveSignalFrame
 
 # At least this many independent non-null signals (incl. >=1 executed-mix signal)
 # are required to voice a verdict. Below it -> abstain.
 MIN_TRUSTWORTHY_SIGNALS = 2
+
+# Camelot adjacency is a PRIOR (smart pairing), not audible-quality ground truth.
+_HARMONIC_COMPATIBLE_PRIOR = 0.75
+
+# >=25% of a lane's energy in sub+low = "bass is up" on that lane.
+_BASS_PRESENT_RATIO = 0.25
 
 VerdictState = Literal["judged", "abstained"]
 
@@ -58,6 +65,12 @@ def judge_transition(frame: LiveSignalFrame) -> TransitionVerdict:
     if len(components) < MIN_TRUSTWORTHY_SIGNALS:
         return _abstain("insufficient_trustworthy_signals")
 
+    flags: list[str] = []
+    if components.get("harmonic") == 0.0:
+        flags.append("harmonic_clash")
+    if components.get("bass_collision") == 0.0:
+        flags.append("bass_collision")
+
     score = sum(components.values()) / len(components)
     confidence = len(components) / float(len(signals))
     return TransitionVerdict(
@@ -65,6 +78,7 @@ def judge_transition(frame: LiveSignalFrame) -> TransitionVerdict:
         score=round(score, 4),
         confidence=round(confidence, 4),
         components={k: round(v, 4) for k, v in components.items()},
+        risk_flags=tuple(flags),
     )
 
 
@@ -75,10 +89,43 @@ def _abstain(reason: str) -> TransitionVerdict:
 
 
 def _harmonic_signal(a: LaneObservation, b: LaneObservation) -> float | None:
-    """Stub — real logic in a later task."""
+    """Camelot compatibility. clash=0.0, compatible=capped prior, else abstain.
+
+    The one structurally-sound dimension: deterministic, metadata-grounded, works
+    on every rig. Abstains on untrusted provenance or unknown/cross-letter keys —
+    a guess there is exactly the slop we refuse.
+    """
+    if not (a.source_trusted and b.source_trusted):
+        return None
+    if a.camelot is None or b.camelot is None:
+        return None
+    if harmonics.is_clash(a.camelot, b.camelot):
+        return 0.0
+    if harmonics.compatible(a.camelot, b.camelot):
+        return _HARMONIC_COMPATIBLE_PRIOR
+    # Neither a proven clash nor a proven compatible (e.g. cross-letter) -> abstain.
     return None
+
+
+def _bass_energy(lane: LaneObservation) -> float | None:
+    if lane.bands is None:
+        return None
+    sub = lane.bands.get("sub")
+    low = lane.bands.get("low")
+    if sub is None or low is None:
+        return None
+    return float(sub) + float(low)
 
 
 def _bass_collision_signal(a: LaneObservation, b: LaneObservation) -> float | None:
-    """Stub — real logic in a later task."""
-    return None
+    """Coarse binary: both basslines up = masking mud = 0.0; one killed = clean = 1.0.
+
+    No fine dB/Hz claim — deck features carry no per-band phase. Abstains when
+    either lane lacks a per-lane spectrum (master-only / silent lane).
+    """
+    ba = _bass_energy(a)
+    bb = _bass_energy(b)
+    if ba is None or bb is None:
+        return None
+    both_present = ba >= _BASS_PRESENT_RATIO and bb >= _BASS_PRESENT_RATIO
+    return 0.0 if both_present else 1.0
