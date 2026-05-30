@@ -9,9 +9,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from livekit.agents import tts as agents_tts
 from livekit.plugins import openai as openai_plugin
 from livekit.plugins.google.beta import gemini_tts as gemini_native_tts
+
+
+@pytest.fixture(autouse=True)
+def _no_cartesia_env(monkeypatch):
+    """Pin the Gemini-primary chain shape regardless of a developer .env.
+
+    These tests predate the Cartesia env-fallback. When an earlier test imports
+    ``vibemix.__main__`` (which ``load_dotenv()``s), a developer .env leaks
+    ``CARTESIA_API_KEY`` into ``os.environ`` and ``_build_direct_chain`` silently
+    prepends a Cartesia entry → the entry-count assertions here fail in suite
+    order. Cartesia-primary behaviour is covered in test_tts_chain_cartesia.py.
+    """
+    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
 
 
 def test_tts_01_monkey_patch_active_at_module_load() -> None:
