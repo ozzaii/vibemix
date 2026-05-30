@@ -128,6 +128,7 @@ Forms (each is a single citation; the linter accepts any of these):
   [recall:<record_id>]  past-moment reference, e.g. [recall:20260520-2200:7]
   [exemplar:<track_id>]  band-exemplar track, e.g. [exemplar:library:Marlon Hoffstadt - Atlas]
   [cue:<anchor_id>]      cue/phrase anchor reference, e.g. [cue:phrase_boundary@45.2]
+  [judge:<verdict_id>]   move-quality verdict the Judge measured, e.g. [judge:transition@128.4]
 
 Multi-citation (comma-separated, no whitespace inside brackets):
   [ev:KICK_SWAP@45.2,aud:bpm@45.0]

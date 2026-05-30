@@ -755,7 +755,7 @@ def _build_citation_strip(
         # ``if not timestamps: continue`` guard with strip == [] (same
         # final state as the linter whole-turn strip — defense in depth
         # at two tiers).
-        if source not in ("ev", "mix", "midi", "key", "recall", "exemplar", "cue"):
+        if source not in ("ev", "mix", "midi", "key", "recall", "exemplar", "cue", "judge"):
             continue
         # Registry lookup uses the body verbatim (KEY@t form). Drop the
         # chip when the registry has no matching observation — closes
@@ -816,6 +816,17 @@ def _build_citation_strip(
             # word trivially matches the locked verb-format regex
             # ``^[a-z]+( [a-z]+){0,2}$``.
             verb = "cue"
+        elif source == "judge":
+            # v11.0 (the Vibe Judge) — mirrors the ``cue`` / ``exemplar`` /
+            # ``recall`` precedents above for opaque/structured bodies. The
+            # ``judge`` body shape is ``<verdict_id>`` (e.g.
+            # ``transition@128.4`` or ``8A>9A@128.4``). The full verdict_id
+            # rides in ``event_id`` for the click→debrief deep-link. The chip
+            # verb is a fixed letters-only ``"judge"`` label — deriving a verb
+            # from a verdict-id string would leak engine-internal values to the
+            # UI surface. A single lowercase word trivially matches the locked
+            # verb-format regex ``^[a-z]+( [a-z]+){0,2}$``.
+            verb = "judge"
         else:
             # Body shape is ``KEY@t`` for ev/aud/midi/mix; partition on "@"
             # so a missing "@" (defensive: future grammar drift) falls back

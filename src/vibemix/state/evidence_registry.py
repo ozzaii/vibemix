@@ -127,7 +127,7 @@ DEFAULT_MIN_REFRESH_INTERVAL_S: float = 30.0
 #: the EBNF docstring, ``prompts/matrix.py::CITATION_GRAMMAR_BLOCK`` and
 #: ``agent/dj_cohost.py::_build_citation_strip`` in lock-step.
 EVIDENCE_SOURCES: frozenset[str] = frozenset(
-    {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key", "recall", "exemplar", "cue"}
+    {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key", "recall", "exemplar", "cue", "judge"}
 )
 
 
@@ -166,12 +166,22 @@ EVIDENCE_SOURCES: frozenset[str] = frozenset(
 # inner colon(s) survive as the anchor_id body (same posture as
 # recall/key/exemplar).
 #
+# ``judge`` (v11.0 "Earned" / the Vibe Judge) is the same silent-poisoning-hole
+# pair as ``recall``/``exemplar``/``cue``: it MUST join this alternation in the
+# SAME commit it joins EVIDENCE_SOURCES — otherwise a co-host-voiced verdict atom
+# ``[judge:<verdict_id>]`` is never matched by parse_citations, never stripped,
+# and rides through un-validated. ``_INNER_ATOM`` stays UNCHANGED — a
+# ``judge:transition@128.4`` (or ``judge:8A>9A@128.4``) body has no
+# whitespace/comma/bracket and the inner colon(s) survive as the verdict_id body
+# (same posture as recall/key/exemplar/cue).
+#
 # ASYMMETRY (intentional, do NOT "fix"): ``memory/ingest.py``'s copy of this
-# alternation stays at 8 sources — ``recall``, ``exemplar``, AND ``cue`` are
-# RETRIEVAL-time, never ingest-time (a stored past reaction never cited
-# recall / exemplar / cue itself; cue is sampled from CueAnchor at narration
-# time), so the ingest-time extractor must not whitelist them.
-_SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend|key|recall|exemplar|cue"
+# alternation stays at 8 sources — ``recall``, ``exemplar``, ``cue``, AND
+# ``judge`` are RETRIEVAL/narration-time, never ingest-time (a stored past
+# reaction never cited recall / exemplar / cue / judge itself; the Judge writes
+# its evidence at narration time), so the ingest-time extractor must not
+# whitelist them.
+_SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend|key|recall|exemplar|cue|judge"
 _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 
 #: Compiled regex matching the LOCKED EBNF grammar:
@@ -179,7 +189,7 @@ _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 #:   citation := '[' atom ( ',' atom )* ']'
 #:   atom     := source ':' body
 #:   source   := 'ev' | 'aud' | 'midi' | 'track' | 'screen' | 'mix' | 'tend'
-#:             | 'key' | 'recall' | 'exemplar' | 'cue'
+#:             | 'key' | 'recall' | 'exemplar' | 'cue' | 'judge'
 #:   body     := one-or-more chars excluding whitespace, ']', ','
 #:   key-body := <deck> ':' <camelot>   # e.g. "A:8A" — deck ∈ {A,B,C,D},
 #:                                       # camelot ∈ 1A..12B (Phase 59 DECK-03)
@@ -192,8 +202,11 @@ _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 #:   cue-body := <anchor_id>             # e.g. "phrase_boundary@45.2" or
 #:                                        # "drop@180.0" — full body survives
 #:                                        # parse_citations (Phase 96 CURR-3.07)
+#:   judge-body := <verdict_id>          # e.g. "transition@128.4" or
+#:                                        # "8A>9A@128.4" — full body survives
+#:                                        # parse_citations (v11.0 the Vibe Judge)
 #:
-#: Matches the 11 single-citation forms + the comma-joined multi-citation
+#: Matches the 12 single-citation forms + the comma-joined multi-citation
 #: form in one pass. Empty ``[]`` is rejected (body requires at least one
 #: char). Whitespace inside brackets is rejected.
 EVIDENCE_CITATION_RE: re.Pattern[str] = re.compile(
