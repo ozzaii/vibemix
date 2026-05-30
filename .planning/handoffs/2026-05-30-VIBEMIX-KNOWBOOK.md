@@ -614,5 +614,59 @@ richer set-history via **cheap TEXT context** (recall / `context_compiler`), eng
 that routing-layer-decides / Gemini-voices style — NOT via the expensive audio window (which
 the §17 cost work trims).
 
+## §19 · The Learning Engine — the market-pool expander (the bigger pond)
+
+*(From `wbaudab6r`; verifier: the readiness claims are airtight, the market numbers are
+DIRECTIONAL — treat the multiplier as "an order of magnitude or more," not precise. Kaan
+flagged this as important "A LOT — it expands our market pool." It does.)*
+
+**The thesis (validated): two ponds, and Learn is the strategic prize.** The **co-host**
+serves people who can ALREADY DJ — the ~200k-working / ~3.2M-counted existing-DJ pool
+(niche, needs Francesco's DJ network to reach). **Learn turns vibemix from "a tool for DJs"
+into "the thing that MAKES you a DJ"** — the aspiring/bedroom pool: **>40% of DJ-gear buyers
+are first-time DJs, 58% self-teach on broken one-way YouTube, 90M+ mobile DJ-app downloads.**
+That pool is **~15-90× the gigging floor** (directional — an order of magnitude+), the
+fastest-growing segment (~8-12%/yr hobbyist), reachable through the channel vibemix is
+uniquely good at: a screen-record of the AI calling out *"your kick came in two bars early."*
+
+**The gap (sharp + uncontested):** the learn-to-DJ market splits into cheap one-way video
+($10-50/mo, never watches you — Digital DJ Tips, DJ Courses Online, Skillshare) and expensive
+human feedback ($60/hr lessons → £1,500-2,000 academies like Point Blank). **Nothing in
+between watches what you actually do.** Every "AI DJ" product (djay AI mixer, FLX10 auto-sync,
+PulseDJ) AUTOMATES the skill so the human never learns it. **vibemix is the ONLY one that
+TEACHES via grounded observation.** ROLI's AI Music Coach (Feb 2026, 27 hand-joints @ 90fps)
+proves the format works and the moment is now — but it's PIANO; the DJ lane is wide open.
+
+**The hook:** *"The AI DJ coach that watches your hands — and won't lie to you about how good
+you are."* Both halves are code-enforced, not slideware: it WATCHES (30Hz MIDI mirror
+`midi_mirror.py` grades your real hardware moves) and it's HONEST (Mastered locks behind a
+CITED live demo; beatmatching deliberately caps at Competent — `skill_tree.py:146`, the
+literal "no proxy-slop" comment — the structural opposite of 5-star-everything).
+
+**Readiness (verifier: airtight):** the ENGINE is SHIPPED + proven — v11.0 "Earned"
+engineering-complete (16/16 reqs, 739/740 tests, 36 lessons, `[screen:control]` citations,
+the citation-gated recognizer that abstains on un-cited events). As a standalone MARKET
+product: not yet — and the gap is **taste + external proof, NOT tech debt.** The ONE
+genuinely-missing CODE piece: a **first-run hardware-detection loop** (a no-hardware beginner
+lands in the booth and is confused — same family as the §18 onboarding cliff). Everything
+else is Kaan ear-passes (EQ exemplar tone, the rare Mastered-unlock vocal, Course-3
+routed-audio count-in).
+
+**Funnel + money (already wired in code):** free Learn (TikTok/Reels mega-magnet) → free
+co-host (the graduate flips coach→hype on the SAME grounding pipeline — a product-state
+change, not a re-acquisition) → €4.99/€9.99 Viber set-prep → Bravoh. `wizard.py` already
+self-segments Beginner/Intermediate/Pro. **Keep Learn 100% FREE** — incumbent courses are
+commoditized and cheap; Learn's strategic job is the top-of-funnel mega-magnet that warms an
+audience into Bravoh, not a price war.
+
+**Priority (decisive):** Learn is the single biggest strategic lever AND the closest-to-done
+— but it blocks on **Kaan's EAR, not engineering.** So it must NOT consume an engineering
+milestone; it **parallelizes against the Apple/SignPath external clock at near-zero eng cost**
+— schedule the ear-passes into Kaan's listening sessions NOW. Honest ordering: Bravoh main >
+the co-host/Judge anti-slop ship-gate (the foundation every funnel stage rides) > Learn's
+ear-passes (parallel) + the one first-run hardware-detection fix. **Distribution mismatch to
+solve later:** the biggest channel (mobile TikTok/Reels "how to DJ") vs vibemix being a
+desktop app — the screen-record demos bridge it; a mobile surface is the eventual reach unlock.
+
 ---
 *Veridis. Very disco. Fuck status quo. The robots don't lie anymore — we made it structural.*
