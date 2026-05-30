@@ -95,12 +95,37 @@ The pre-existing 14 suite failures are ship-gates/doc-drift, not ours.
     lesson runner in the Learn surface (`shell/app.ts` mountLearn). Locked/Competent/Mastered,
     gold trophy tappable to proof, honest-null empty state. 1420 vitest green.
 
-## Immediate next move — MOVE TWO: the Judge → coach-loop producer (abstaining-first)
+## ✅ MOVE TWO mostly SHIPPED — the Judge producer spine (4a–4c green)
 
-The Earned Wall renders whatever the recognizer credits. To make Kaan's plugged-in FLX4
-beatmatch/harmonic moves actually flip a skill to GOLD, wire the Judge into the coach loop
-(Step 4 of the Judge plan): emit `transition_judged` + register `[judge:]` → retires
-`skill_recognizer._HONEST_UNCREDITABLE_V11=('beatmatching','harmonic_mixing')` → those two
-become Mastered-creditable. MUST ship abstaining-first (scorer is a stub; a confidently-wrong
-grade is its own hallucination class). Pure backend (intel/state/runtime) — my lane.
-Plan: `docs/superpowers/plans/2026-05-30-the-vibe-judge.md` Step 4.
+- `30b74044` 4a — `[judge:]` evidence source (4-site grammar lock: EVIDENCE_SOURCES +
+  _SOURCE_ALT + EBNF + matrix.CITATION_GRAMMAR_BLOCK + dj_cohost strip; OUT of memory/ingest).
+- `46588d20` 4b — `state/transition_judge_runtime.py::judge_and_record` — runs the Judge on a
+  live frame, writes `[judge:transition@t]` evidence + a `transition_judged` row, abstain-first.
+- `cd645c73` 4c — KEYSTONE: `_candidate_skills` maps `transition_judged` → `harmonic_mixing`
+  when the verdict's harmonic component is COMPATIBLE (>0); retired harmonic_mixing from
+  `_HONEST_UNCREDITABLE_V11` (now just `("beatmatching",)` — no tempo/phase signal yet, so
+  crediting it would be proxy-slop). `19a5adbb` privatized `_verdict_citation_key` (orphan gate).
+- Full suite: **6795 passed** (the 1 fail was that orphan, now fixed).
+
+## ★ CONSTELLATION FOUND — Codex's proof-readiness gate IS the Judge's activation precondition
+
+Read all `.planning/handoffs/*` (Kaan's pointer). Codex (a prior session) already built, COMMITTED:
+- **Per-deck routing seam** `audio/deck_capture.py:330` — `VIBEMIX_DECK_AUDIO_CHANNELS=auto`
+  reads rekordbox `OutputChannel_Deck0_L` hints → populates `deck_channels` → `routing.enabled=True`;
+  explicit `A=0,1;B=2,3` form; auto-upgrades BlackHole 2ch→16ch. **Kaan's Mac probe found BlackHole
+  16ch + a rekordbox Aggregate Device** → gold-flip is CONFIG, not new gear.
+- **"Proof readiness" gate** (`__main__.py:3438`, `deck_context.py:887` 9-ref grounding) — decides
+  `supported_verdict` from {resolved deck rows + recent move + audible audio + per-deck deltas +
+  BOTH lanes active}. THIS IS EXACTLY the Judge's `frame.policy == "supported_verdict"` precondition.
+  Codex PRODUCES supported_verdict; the Judge GRADES it. Two engines, same boundary, two sides.
+
+## NEXT — 4d: the constellation join (the live call-site)
+
+In `coach_loop`: when `live_claim_policy(state, recent_moves)` == `supported_verdict`, assemble a
+`LiveSignalFrame` via `signal_frame_from_capture(deck_audio_capture, ...)` (capture object lives in
+`__main__` main(); pass it or a frame-provider closure into coach_loop), run `judge_and_record`,
+and on JUDGED write `ev:transition_judged@t` + feed a `transition_judged` event to
+`_credit_live_skill_demo` (coach.py:113) → credits harmonic_mixing. Abstain-first (master-only →
+silent). VERIFY-LIVE (frozen sidecar: `VIBEMIX_DEV_SIDECAR=1`), needs Kaan's per-deck rekordbox
+routing config to flip gold. lane_meta (camelot/source_trusted/track_id) comes from
+`state.deck_state.decks`. Plan: `docs/superpowers/plans/2026-05-30-the-vibe-judge.md` Step 4.
