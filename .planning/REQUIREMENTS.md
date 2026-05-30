@@ -31,10 +31,10 @@
 - [x] **DATA-03**: User can reset skill-tree progress (mirrors the existing lesson-progress reset path).
 
 ### SURF — Skill-tree surface & celebration *(exact surface resolved in the UI phase, per Kaan)*
-- [ ] **SURF-01**: User can view their skill tree from the Learn module — all ~6 skills, each bar's stage, current fill, and what remains to advance.
-- [ ] **SURF-02**: Competent-stage fills render with a quiet, satisfying progression cue — no slop, no spam, no constant celebration.
-- [ ] **SURF-03**: A live "Mastered" unlock triggers a single, rare, earned grounded co-host vocal acknowledgment, tone-gated against the anti-slop blocklist (final tone subject to KAAN-ACTION ear-pass).
-- [ ] **SURF-04**: The skill-tree surface honors v9.0 accessibility (dual color+shape cue, keyboard-nav, no time-pressure on advancement).
+- [x] **SURF-01**: User can view their skill tree from the Learn module — all ~6 skills, each bar's stage, current fill, and what remains to advance.
+- [x] **SURF-02**: Competent-stage fills render with a quiet, satisfying progression cue — no slop, no spam, no constant celebration.
+- [x] **SURF-03**: A live "Mastered" unlock triggers a single, rare, earned grounded co-host vocal acknowledgment, tone-gated against the anti-slop blocklist (final tone subject to KAAN-ACTION ear-pass).
+- [x] **SURF-04**: The skill-tree surface honors v9.0 accessibility (dual color+shape cue, keyboard-nav, no time-pressure on advancement).
 
 ---
 
@@ -76,9 +76,9 @@
 | MAST-02 | Phase 103 | Complete |
 | MAST-03 | Phase 103 | Complete |
 | MAST-04 | Phase 103 | Complete |
-| SURF-01 | Phase 104 | Pending |
-| SURF-02 | Phase 104 | Pending |
-| SURF-03 | Phase 104 | Pending |
-| SURF-04 | Phase 104 | Pending |
+| SURF-01 | Phase 104 | Complete |
+| SURF-02 | Phase 104 | Complete |
+| SURF-03 | Phase 104 | Complete |
+| SURF-04 | Phase 104 | Complete |
 
 **Coverage:** 16/16 v11.0 requirements mapped — no orphans, no duplicates.
