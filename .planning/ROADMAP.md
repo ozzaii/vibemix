@@ -61,9 +61,9 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
 
 ## Phases
 
-- [ ] **Phase 102: Skill-Tree Engine + Data Model + Competent Stage** — Pure-logic `skill_tree.py` (sole writer) + the ~6-skill→lesson manifest + quality-weighted Competent fill gated on the recital honest-score + a `skills` block on `learn-progress.json` with v1→v2 deterministic back-fill + corrupt-read recovery + reset. Standalone-verifiable WITHOUT any UI. Lands the Invariant #1 AST gate + Invariant #4 no-new-port gate.
-- [ ] **Phase 103: Live "Mastered" Grounding** — The Competent→Mastered segment: locked-until-Competent; a thin recognizer maps EXISTING `EvidenceRegistry` event types → skill credit, but ONLY when the event resolves a valid citation (Invariants #2/#3, test-pinned — fabricated/un-cited event grants zero credit); N grounded demos flip a skill to Mastered with persisted count + `first_mastered_at`. NO new detectors. Engine-level verifiable on synthetic cited/un-cited event streams.
-- [ ] **Phase 104: Skill-Tree Surface + Earned Celebration** — The Learn-module skill-tree panel (all ~6 skills · each stage · fill · what-remains) + a quiet Competent-fill cue + a single rare earned grounded co-host vocal on a live "Mastered" unlock (tone-gated against the anti-slop blocklist; final tone parks as KAAN-ACTION ear-pass) + v9.0 accessibility (dual color+shape, keyboard-nav, no time-pressure). The UI phase — exact surface + celebration treatment is an explicit Kaan decision-gate during the phase.
+- [x] **Phase 102: Skill-Tree Engine + Data Model + Competent Stage** — Pure-logic `skill_tree.py` (sole writer) + the ~6-skill→lesson manifest + quality-weighted Competent fill gated on the recital honest-score + a `skills` block on `learn-progress.json` with v1→v2 deterministic back-fill + corrupt-read recovery + reset. Standalone-verifiable WITHOUT any UI. Lands the Invariant #1 AST gate + Invariant #4 no-new-port gate.
+- [x] **Phase 103: Live "Mastered" Grounding** — The Competent→Mastered segment: locked-until-Competent; a thin recognizer maps EXISTING `EvidenceRegistry` event types → skill credit, but ONLY when the event resolves a valid citation (Invariants #2/#3, test-pinned — fabricated/un-cited event grants zero credit); N grounded demos flip a skill to Mastered with persisted count + `first_mastered_at`. NO new detectors. Engine-level verifiable on synthetic cited/un-cited event streams.
+- [x] **Phase 104: Skill-Tree Surface + Earned Celebration** — The Learn-module skill-tree panel (all ~6 skills · each stage · fill · what-remains) + a quiet Competent-fill cue + a single rare earned grounded co-host vocal on a live "Mastered" unlock (tone-gated against the anti-slop blocklist; final tone parks as KAAN-ACTION ear-pass) + v9.0 accessibility (dual color+shape, keyboard-nav, no time-pressure). The UI phase — exact surface + celebration treatment is an explicit Kaan decision-gate during the phase.
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
@@ -111,16 +111,19 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
   2. Competent-stage fills render with a **quiet, satisfying** progression cue — no slop, no spam, no constant celebration. The fill animates once on advance and settles; it does NOT fire a co-host vocal or a loud modal. Pinned at the frontend by `tauri/ui/tests/learn/skill-tree-quiet-fill.spec.ts` (Competent fill emits no `cohost-reaction` / no celebration modal). Frontend honors `frontend-enforcement` (CDJ-Whisper retro-futurist hardware aesthetic · 20/80 amber-on-charcoal · materially textured · no AI slop). **SURF-02.**
   3. A live "Mastered" unlock triggers a **single, rare, earned grounded co-host vocal acknowledgment** — one line, gated so it fires only on the Mastered flip (not on Competent, not on partial fill), routed through the existing co-host path (`model_router` — no new AI provider), and **tone-gated against the anti-slop blocklist** (`scripts/launch/check_no_ai_slop.py` + the v9.0 tutor-slop blocklist). The vocal copy is hand-authored / fixture-pinned (never free LLM generation that could slop). **Final tone is a KAAN-ACTION ear-pass** (`§EARNED-MASTERED-VOCAL-EAR`). Pinned by `tests/learn/test_mastered_vocal_fires_once.py` (fires exactly once per flip) + the slop-blocklist gate over the vocal copy. **SURF-03.**
   4. The skill-tree surface honors **v9.0 accessibility**: dual-channel cue (color + shape, not amber-only — deuteranopia/protanopia/tritanopia distinguishable), full keyboard-nav for browsing the tree without hardware, and **no time-pressure** on advancement (motor-impaired-safe). Pinned by `tauri/ui/tests/learn/skill-tree-a11y.spec.ts` (dual-cue + keyboard-nav + no timed gate). **SURF-04.**
-**Plans**: TBD
+**Plans**: 2 plans (2 waves)
+- [x] 104-01-PLAN.md — Backend: single-source-in-Python `what_remains` payload + `SkillSpec.live_creditable` manifest fact (drift-pinned) + `mastered_vocal.py` pure fire-once Mastered vocal (slop+dash-gated fixture) wired into the live credit site `speak` hook (SURF-01 payload, SURF-03)
+- [x] 104-02-PLAN.md — Frontend: quiet Competent-fill pin + `prefers-reduced-motion` + per-stage SHAPE glyph (dual color+shape cue) + full keyboard-nav (every row browsable, only Mastered activatable) + a11y pin (SURF-01 render, SURF-02, SURF-04)
 **UI hint**: yes
+**Status**: ✅ engineering-complete 2026-05-30 (`9242fc3d` backend · `2b53f79f` frontend; built atop the concurrent Earned Wall `aa04e8e8`/`6d87c632`/`e15e9c66`). 4/4 SURF REQs verified green. Public ship gated on `§EARNED-MASTERED-VOCAL-EAR` + `§EARNED-LIVE-MASTERED-VERIFY` (KAAN-ACTION).
 
 ## Progress Table
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 102. Skill-Tree Engine + Data Model + Competent Stage | 0/? | Not started | - |
-| 103. Live "Mastered" Grounding | 0/2 | Planned | - |
-| 104. Skill-Tree Surface + Earned Celebration | 0/? | Not started | - |
+| 102. Skill-Tree Engine + Data Model + Competent Stage | 2/2 | Complete | 2026-05-29 |
+| 103. Live "Mastered" Grounding | 2/2 | Complete | 2026-05-29 |
+| 104. Skill-Tree Surface + Earned Celebration | 2/2 | Complete | 2026-05-30 |
 
 ## KAAN-ACTION Queue (v11.0 — surfaced + parked, never faked)
 

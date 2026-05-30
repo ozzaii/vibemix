@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v11.0
 milestone_name: Earned
 status: verifying
-last_updated: "2026-05-28T23:36:52.491Z"
-last_activity: 2026-05-28
+last_updated: "2026-05-30T12:30:00.000Z"
+last_activity: 2026-05-30
 progress:
-  total_phases: 11
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
-  percent: 18
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 6
+  percent: 100
 ---
 
 # vibemix — State
@@ -22,11 +22,11 @@ progress:
 
 ## Current Position
 
-Phase: 103 (Live Mastered Grounding) — COMPLETE
-Plan: 2 of 2 (103-01 + 103-02 SHIPPED)
-Status: Phase complete — ready for verification (`/gsd:verify-work`). v11.0 mastery spine now LIVE-WIRED (skill_recognizer call-site; §EARNED-LIVE-MASTERED-VERIFY hardware ear-pass still KAAN-ACTION).
-Last activity: 2026-05-30 — quick task 260530-3lh: wired the orphaned skill_recognizer into the live event loop (backend)
-Progress: [██████████] 100%
+Phase: 104 (Skill-Tree Surface + Earned Celebration) — COMPLETE — **ALL 3 v11.0 PHASES DONE**
+Plan: 2 of 2 (104-01 backend `9242fc3d` + 104-02 frontend `2b53f79f` SHIPPED)
+Status: v11.0 "Earned" engineering-complete (102 + 103 + 104 all shipped). Ready for milestone lifecycle (audit → complete → cleanup). Public ship gated on the parked BLOCKING KAAN-ACTION ear-passes.
+Last activity: 2026-05-30 — Phase 104: completed the Earned Wall to SURF-01..04 (what_remains payload single-sourced in Python · fire-once tone-gated Mastered vocal wired to the live credit site · dual color+shape glyph + full keyboard-nav + quiet-fill/a11y pins). Built atop the concurrent Earned Wall (`aa04e8e8`/`6d87c632`/`e15e9c66`).
+Progress: [██████████] 100% (3/3 phases)
 
 ## Milestone Reference
 
@@ -104,5 +104,7 @@ See: `.planning/REQUIREMENTS.md` (16 v11.0 REQ-IDs across SKILL / COMP / MAST / 
 **103-02 SHIPPED (2026-05-29):** MAST-02, MAST-03. New pure-logic `learn/skill_recognizer.py` — the citation-gated reverse event→skill map (the anti-slop spine). `EVENT_SKILL_MAP` (single source) over REAL `state/event_detector.py` literals: `LAYER_ARRIVAL→transitions`, `PHASE`/`PHRASE_BOUNDARY→phrasing_performance`; `MIX_MOVE` resolves by move-substring (`_low:`/`_mid:`/`_hi:`/`killed`→`eq_mixing`, `_play→`/`xfader`→`deck_control`; one MIX_MOVE can credit BOTH — not a double-count). `recognize(event, *, citation_check, progress, now, _seen=None) -> list[str]`: MAST-03 spine — credit ONLY when the INJECTED `citation_check("ev", event.type, t)` predicate (live wraps `EvidenceRegistry.has`; tests inject True/False) resolves true; un-cited/fabricated → ZERO credit. Dedup by `(type, round(t,1))` transient batch set; credit delegated to `record_live_demo` (owns MAST-01 Competent gate + MAST-04 flip). **Finding #1 (anti-slop):** `beatmatching` + `harmonic_mixing` are HONEST-UNCREDITABLE in v11.0 — NO map entry / NO MIX_MOVE resolution, capped at Competent, NO proxy-slop (pinned by `test_unsignalled_skills_never_auto_master` with both made Competent first). TYPE_CHECKING-only `state/` imports — engine stays offline + island-clean. Headline `test_uncited_event_grants_zero_mastery_credit` (same event, cited=credits / uncited=zero — non-vacuous). New static gate `test_skill_recognizer_no_runtime_state_import` (TYPE_CHECKING-aware) + integration-flavored real-`EvidenceRegistry` seam test. Commits `3ad307ba` (test RED) → `5b6993e6` (feat GREEN) → `8deee4e9` (test invariant+seam). `tests/learn` 509 passed / 1 skipped. 2 NEW files + 1 additive test extension; surgical `--files`, learn-island only.
 
 **Phase 103 COMPLETE.** Both plans (103-01 record_live_demo writer, 103-02 skill_recognizer) shipped; 4/4 phase REQ-IDs (MAST-01/02/03/04) done. The live-firing call-site (`runtime/coach.py`/`__main__.py`) stays a deferred KAAN-ACTION (`§EARNED-LIVE-MASTERED-VERIFY`) — non-learn island, untouched.
+
+**Phase 104 COMPLETE (2026-05-30) — v11.0 ENGINEERING-COMPLETE.** SURF-01/02/03/04. The phase surface arrived ~70% pre-built as the "Earned Wall" (a concurrent constellation workstream: `aa04e8e8` frontend · `6d87c632` backend · `e15e9c66` what_remains render). This run closed the real gaps: **104-01 (`9242fc3d`)** — single-source-in-Python `what_remains` payload (the backend half the concurrent render needed; seam now whole + validator-verified) + `SkillSpec.live_creditable` manifest fact (beatmatching sole False, drift-pinned vs `_HONEST_UNCREDITABLE_V11`) + `learn/mastered_vocal.py` pure fire-once Mastered vocal (hand-authored slop+dash-gated `learn/vocals/mastered_vocals.json`) wired into the live `_credit_live_skill_demo` `speak` hook (fixed-text `session.say`, no LLM/provider, never wedges loop). **104-02 (`2b53f79f`)** — `skill-tree-quiet-fill.spec.ts` (SURF-02 read-only/no-vocal pin) + `prefers-reduced-motion` + per-stage SHAPE glyph (○ ◑ ★ dual color+shape cue) + every row keyboard-browsable (`tabindex`+`aria-label`, only Mastered activatable) + `skill-tree-a11y.spec.ts` (SURF-04). `tests/learn` 751 + `tests/runtime` 344 + vitest 1430 all green; ruff clean; codegen zero-diff. 4/4 SURF REQs verified. Parked: 🔴 `§EARNED-MASTERED-VOCAL-EAR` + 🔴 `§EARNED-LIVE-MASTERED-VERIFY` (BLOCKING ear-passes) · 🟡 `§EARNED-SURFACE-DESIGN-GATE` + 🟡 `§EARNED-MASTERY-THRESHOLD-TUNE`. **Next: v11.0 milestone lifecycle (audit → complete → cleanup).**
 
 Next step: `/gsd:verify-work` on Phase 103, then Phase 104 (Skill-Tree Surface + Earned Celebration — the UI phase, `tauri/ui` coordination). Read `.planning/ROADMAP.md` § Phase 104 + the locked constraints above.
