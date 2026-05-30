@@ -82,10 +82,25 @@ absorb every staged file). Build on disjoint NEW-FILE islands. Don't touch `deck
 (pre-existing XXE in its rekordbox parser — flagged to Kaan, his call, not a side-quest).
 The pre-existing 14 suite failures are ship-gates/doc-drift, not ours.
 
-## Immediate next move (post-compact)
+## ✅ DONE post-compact — the chart landed + Earned Wall SHIPPED
 
-1. Retrieve the constellation star-chart (running workflow above).
-2. Present DRAW_NOW constellations to Kaan; pick the first to draw.
-3. Likely candidates already known: the skill-tree keystone (Judge→recognizer→skill_tree→
-   progress_state.skills→Learn UI), the self-improvement replay-grader, the standalone
-   `library cue` tool. But let the verified chart decide — don't pre-commit.
+- Constellation chart retrieved + made durable: `.planning/2026-05-30-constellation-star-chart.md`
+  (commit `3465917c`). Verdict: **[84] Earned Wall = the only DRAW_NOW**; four workflows
+  converged on the v11 skill-tree live→UI seam.
+- **Earned Wall DRAWN (the first constellation):**
+  - Backend `6d87c632` — `skill_wall_payload()` (skill_tree.py) folds `SkillTree.compute`
+    into the `progress_state` envelope via `snapshot()` (NOT `to_dict` — derived, never
+    persisted); schema extended + codegen:ipc. 910 py green.
+  - Frontend `aa04e8e8` — `learn/SkillWall.ts` + `styles/skill-wall.css`, mounted above the
+    lesson runner in the Learn surface (`shell/app.ts` mountLearn). Locked/Competent/Mastered,
+    gold trophy tappable to proof, honest-null empty state. 1420 vitest green.
+
+## Immediate next move — MOVE TWO: the Judge → coach-loop producer (abstaining-first)
+
+The Earned Wall renders whatever the recognizer credits. To make Kaan's plugged-in FLX4
+beatmatch/harmonic moves actually flip a skill to GOLD, wire the Judge into the coach loop
+(Step 4 of the Judge plan): emit `transition_judged` + register `[judge:]` → retires
+`skill_recognizer._HONEST_UNCREDITABLE_V11=('beatmatching','harmonic_mixing')` → those two
+become Mastered-creditable. MUST ship abstaining-first (scorer is a stub; a confidently-wrong
+grade is its own hallucination class). Pure backend (intel/state/runtime) — my lane.
+Plan: `docs/superpowers/plans/2026-05-30-the-vibe-judge.md` Step 4.
