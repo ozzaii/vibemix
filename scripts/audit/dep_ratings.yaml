@@ -31,6 +31,9 @@ python:
   livekit-plugins-google:
     rating: green
     rationale: "LiveKit Gemini adapter — the seam through which all Gemini Live audio flows."
+  livekit-plugins-cartesia:
+    rating: green
+    rationale: "LiveKit Cartesia (Sonic) TTS adapter — the live co-host's primary voice (Gemini TTS returned no audio live, 2026-05-30). Pure-Python; Gemini natives stay as fallback."
   livekit-plugins-openai:
     rating: yellow
     rationale: "[CULL-BLOCKED] Used by src/vibemix/agent/tts_chain.py for the proxy TTS fallback chain. Cannot remove without rewiring the TTS chain — out of scope for Phase 46."

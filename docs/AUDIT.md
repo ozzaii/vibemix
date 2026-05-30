@@ -32,6 +32,7 @@
 | `keyring` | 25.7.0 | see uv.lock | Native macOS Keychain / Windows Credential Locker integration via pure-Python ctypes; no compile step. | 🟡 Yellow |  |
 | `livekit` | 1.1.8 | see uv.lock | WebRTC client; transitively pulls av + aiortc. Prebuilt wheels for Mac+Win64. | 🟡 Yellow |  |
 | `livekit-agents` | 1.5.14 | see uv.lock | Gemini Live API wrapper (cohost_v2/lk variants). Pure-Python. | 🟢 Green |  |
+| `livekit-plugins-cartesia` | 1.5.14 | see uv.lock | LiveKit Cartesia (Sonic) TTS adapter — the live co-host's primary voice (Gemini TTS returned no audio live, 2026-05-30). Pure-Python; Gemini natives stay as fallback. | 🟢 Green |  |
 | `livekit-plugins-google` | 1.5.14 | see uv.lock | LiveKit Gemini adapter — the seam through which all Gemini Live audio flows. | 🟢 Green |  |
 | `livekit-plugins-openai` | 1.5.14 | see uv.lock | [CULL-BLOCKED] Used by src/vibemix/agent/tts_chain.py for the proxy TTS fallback chain. Cannot remove without rewiring the TTS chain — out of scope for Phase 46. | 🟡 Yellow |  |
 | `mcp` | 1.27.1 | see uv.lock | Codex MCP bridge for the local Viber tool surface. Pure-Python; optional at runtime outside Codex-backed chat/curate/build-set. | 🟢 Green |  |
