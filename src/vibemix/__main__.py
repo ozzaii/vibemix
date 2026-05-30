@@ -529,13 +529,6 @@ def _input_callback_factory(
     return callback
 
 
-def _deck_audio_auto_requested() -> bool:
-    return str(os.environ.get("VIBEMIX_DECK_AUDIO_CHANNELS") or "").strip().lower() in {
-        "auto",
-        "rekordbox",
-    }
-
-
 def _input_device_env_is_explicit() -> bool:
     return bool(str(os.environ.get("VIBEMIX_INPUT_DEVICE") or "").strip())
 
@@ -548,9 +541,14 @@ def _maybe_upgrade_input_device_for_deck_audio(
     base_audio_capture_context: dict[str, object],
     deck_audio_routing: Any,
 ) -> tuple[int, str, dict[str, object], Any]:
-    """Prefer multichannel BlackHole when explicit deck-auto routing needs it."""
-    if not _deck_audio_auto_requested() or _input_device_env_is_explicit():
+    """Prefer multichannel BlackHole when deck routing needs more channels."""
+    if _input_device_env_is_explicit():
         return input_idx, input_device_name, base_audio_capture_context, deck_audio_routing
+    # Upgrade whenever the routing reports the external-mixer map needs more
+    # channels than the current device exposes (`capture_device_too_few_channels`).
+    # That single signal fires for BOTH the explicit env opt-in and the zero-config
+    # rekordbox-detected default — the live rig (2026-05-30) boots a 2ch BlackHole
+    # by default, which otherwise left per-deck grounding dark for every user.
     if getattr(deck_audio_routing, "reason", None) != "capture_device_too_few_channels":
         return input_idx, input_device_name, base_audio_capture_context, deck_audio_routing
     required = int(getattr(deck_audio_routing, "required_opened_channels", 0) or 0)

@@ -267,6 +267,84 @@ def test_deck_audio_auto_respects_explicit_input_device(monkeypatch):
     backend.find_device.assert_not_called()
 
 
+def test_deck_audio_global_default_upgrades_blackhole_without_env(monkeypatch, mocker):
+    # ZERO-CONFIG (Kaan 2026-05-30: "nobody will set this"): with NO env var, a
+    # rekordbox external-mixer config that needs more channels than the default
+    # 2ch BlackHole must STILL upgrade the input to BlackHole 16ch. The routing's
+    # `capture_device_too_few_channels` reason is the only signal we need — it no
+    # longer requires VIBEMIX_DECK_AUDIO_CHANNELS=auto to act.
+    import vibemix.__main__ as main_mod
+
+    monkeypatch.delenv("VIBEMIX_DECK_AUDIO_CHANNELS", raising=False)  # global default
+    monkeypatch.delenv("VIBEMIX_INPUT_DEVICE", raising=False)
+    backend = MagicMock()
+    backend.find_device.return_value = 16
+
+    def _describe(device_index, *, requested_device, opened_channels):
+        return {
+            "requested_device": requested_device,
+            "device_name": requested_device,
+            "input_channels": 16 if requested_device == "BlackHole 16ch" else 2,
+            "opened_channels": opened_channels,
+            "sample_rate": 48000,
+            "device_index": device_index,
+        }
+
+    backend.describe_capture_input.side_effect = _describe
+    original_routing = MagicMock(
+        reason="capture_device_too_few_channels",
+        required_opened_channels=4,
+        opened_channels=2,
+    )
+    upgraded_routing = MagicMock(enabled=True, opened_channels=4)
+    mocker.patch.object(main_mod, "deck_audio_routing_from_env", return_value=upgraded_routing)
+
+    idx, name, context, routing = main_mod._maybe_upgrade_input_device_for_deck_audio(
+        backend,
+        input_idx=0,
+        input_device_name="BlackHole 2ch",
+        base_audio_capture_context=_describe(
+            0,
+            requested_device="BlackHole 2ch",
+            opened_channels=2,
+        ),
+        deck_audio_routing=original_routing,
+    )
+
+    assert idx == 16
+    assert name == "BlackHole 16ch"
+    assert context["opened_channels"] == 4
+    assert routing is upgraded_routing
+    backend.find_device.assert_called_once_with("BlackHole 16ch", "input")
+
+
+def test_deck_audio_global_default_skips_upgrade_without_too_few_signal(monkeypatch):
+    # The relaxed gate must not over-trigger: with NO env var AND a routing reason
+    # that is not the device-too-narrow upgrade signal, leave the input untouched.
+    import vibemix.__main__ as main_mod
+
+    monkeypatch.delenv("VIBEMIX_DECK_AUDIO_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_INPUT_DEVICE", raising=False)
+    backend = MagicMock()
+    original_context = {"requested_device": "BlackHole 2ch"}
+    original_routing = MagicMock(
+        reason="disabled",
+        required_opened_channels=0,
+        opened_channels=2,
+    )
+
+    result = main_mod._maybe_upgrade_input_device_for_deck_audio(
+        backend,
+        input_idx=0,
+        input_device_name="BlackHole 2ch",
+        base_audio_capture_context=original_context,
+        deck_audio_routing=original_routing,
+    )
+
+    assert result == (0, "BlackHole 2ch", original_context, original_routing)
+    backend.find_device.assert_not_called()
+
+
 def _build_sensor_mocks(mocker):
     """Patch screen / midi / track backends to no-op."""
     import vibemix.__main__ as main_mod

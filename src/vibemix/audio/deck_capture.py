@@ -343,12 +343,22 @@ def deck_audio_routing_from_env(
     # downstream is the backstop if the routed audio isn't actually present. Any
     # explicit value (a manual A=..;B=.. map, or "off"/"master") takes its own
     # branch below and overrides this default.
-    _hint_high_confidence = bool(
+    _hint_external_both_decks = bool(
         hint
         and hint.get("mixer_mode") == "external"
-        and hint.get("fits_input_channels") is True
         and isinstance(hint.get("deck_channels"), dict)
         and all(side in (hint.get("deck_channels") or {}) for side in _DECK_SIDES)
+    )
+    # Fire the global default when the external-mixer map either fits the capture
+    # device NOW, or when a concrete capture device is named that __main__ can
+    # upgrade to a wider sibling (BlackHole 2ch -> 16ch). The live rig (2026-05-30)
+    # taught us the default device boots as 2ch: requiring fits_input_channels on
+    # THAT device left per-deck dark forever. With a named device but no fit, the
+    # routing falls through to `capture_device_too_few_channels` below — the swap
+    # signal __main__ keys on. capture_device_name=None (a plain stereo user, no
+    # rig) keeps the stereo master-only default untouched.
+    _hint_high_confidence = _hint_external_both_decks and (
+        hint.get("fits_input_channels") is True or bool(capture_device_name)
     )
     auto_requested = auto_requested_env or (_raw == "" and _hint_high_confidence)
     if auto_requested and hint:

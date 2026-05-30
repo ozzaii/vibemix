@@ -221,6 +221,32 @@ def test_global_per_deck_default_respects_capture_channel_fit(monkeypatch, tmp_p
     assert routing.enabled is False
 
 
+def test_global_per_deck_default_signals_device_upgrade_when_narrow(monkeypatch, tmp_path) -> None:
+    # The live-rig gap (2026-05-30): with NO env var, the selected capture device
+    # boots as BlackHole *2ch* — too narrow for the 4-channel external-mixer map.
+    # The global default must still report `capture_device_too_few_channels` (the
+    # signal __main__ keys on to swap 2ch -> 16ch) rather than going silently
+    # master-only "disabled" — otherwise per-deck grounding stays dark forever for
+    # every real rig with a default 2ch input. A concrete capture_device_name is
+    # what marks the device as upgradeable (None stays the plain-stereo default).
+    settings = tmp_path / "rekordbox3.settings"
+    settings.write_text(_EXTERNAL_AGGREGATE_SETTINGS, encoding="utf-8")
+    monkeypatch.delenv("VIBEMIX_DECK_AUDIO_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_INPUT_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_MASTER_AUDIO_CHANNELS", raising=False)
+
+    routing = deck_audio_routing_from_env(
+        input_channels=2,
+        capture_device_name="BlackHole 2ch",
+        rekordbox_settings_paths=(settings,),
+    )
+
+    assert routing.enabled is False
+    assert routing.reason == "capture_device_too_few_channels"
+    assert routing.required_opened_channels == 4
+    assert routing.source == "rekordbox_settings"
+
+
 def test_deck_audio_capture_downmixes_master_and_pushes_deck_rings(monkeypatch) -> None:
     monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "A=0,1;B=2,3")
     routing = deck_audio_routing_from_env(input_channels=4)
