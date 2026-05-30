@@ -936,6 +936,35 @@ class AudioMacOS:
         mic capture cross-platform, Phase 3 (or Phase 7 Windows port) should
         amend the Protocol via a separate commit.
         """
+        info = sd.query_devices(device_index)
+        device_sr = int(info["default_samplerate"])
+        if device_sr != sample_rate:
+            # 44.1k mic (common on USB/interface rigs) → open at native rate +
+            # resample to the analysis rate (mono) instead of dropping talk-back.
+            open_block = max(1, round(block_size * (device_sr / sample_rate)))
+            wrapped = _make_input_resampler(
+                callback, device_sr=device_sr, target_sr=sample_rate, channels=1
+            )
+            stream = sd.InputStream(
+                device=device_index,
+                samplerate=device_sr,
+                channels=1,
+                dtype="float32",
+                blocksize=open_block,
+                latency="low",
+                callback=wrapped,
+            )
+            if int(stream.samplerate) != device_sr:
+                negotiated = int(stream.samplerate)
+                stream.close()
+                raise SampleRateMismatchError(
+                    f"PortAudio negotiated {negotiated}Hz vs requested {device_sr}Hz on "
+                    f"mic device {device_index!r}."
+                )
+            stream.start()
+            return _SoundDeviceStreamHandle(stream)
+
+        # Mic already at the analysis rate — the proven path, unchanged.
         assert_device_sample_rate(device_index, sample_rate)
         stream = sd.InputStream(
             device=device_index,

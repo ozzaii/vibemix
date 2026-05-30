@@ -461,17 +461,52 @@ def test_open_voice_output_resamples_instead_of_raising(
     fake_stream.start.assert_called_once()
 
 
-def test_open_mic_capture_pre_open_guard(mocker: MockerFixture, make_backend) -> None:
-    """Mic capture (Plan 04 extension to AudioBackend) respects pre-open guard."""
+def test_open_mic_capture_native_rate_resamples_instead_of_raising(
+    mocker: MockerFixture, make_backend
+) -> None:
+    """A 44.1k mic (common on USB/interface rigs) no longer silently vanishes:
+    open_mic_capture opens at the mic's native rate and resamples to the analysis
+    rate (mono), so talk-back survives a rate mismatch instead of being dropped."""
     mocker.patch(
         "vibemix.platform._audio_macos.sd.query_devices",
         return_value={"default_samplerate": 44100.0, "name": "MacBook Mic"},
     )
-    in_mock = mocker.patch("vibemix.platform._audio_macos.sd.InputStream")
+    fake_stream = MagicMock()
+    fake_stream.samplerate = 44100
+    in_mock = mocker.patch(
+        "vibemix.platform._audio_macos.sd.InputStream", return_value=fake_stream
+    )
     backend = make_backend()
-    with pytest.raises(SampleRateMismatchError):
-        backend.open_mic_capture(0, sample_rate=48000, block_size=480, callback=lambda *a: None)
-    assert in_mock.call_count == 0
+    real_cb = lambda *a: None  # noqa: E731
+    backend.open_mic_capture(0, sample_rate=48000, block_size=480, callback=real_cb)
+
+    ck = in_mock.call_args.kwargs
+    assert ck["samplerate"] == 44100, "must open the mic at its native rate"
+    assert ck["channels"] == 1
+    assert ck["callback"] is not real_cb, "callback must be the resampling wrapper"
+    fake_stream.start.assert_called_once()
+
+
+def test_open_mic_capture_48k_passes_raw_callback_unchanged(
+    mocker: MockerFixture, make_backend
+) -> None:
+    """Mic already at the analysis rate → byte-identical path: raw callback, no wrapper."""
+    mocker.patch(
+        "vibemix.platform._audio_macos.sd.query_devices",
+        return_value={"default_samplerate": 48000.0, "name": "MacBook Mic"},
+    )
+    fake_stream = MagicMock()
+    fake_stream.samplerate = 48000
+    in_mock = mocker.patch(
+        "vibemix.platform._audio_macos.sd.InputStream", return_value=fake_stream
+    )
+    backend = make_backend()
+    real_cb = lambda *a: None  # noqa: E731
+    backend.open_mic_capture(0, sample_rate=48000, block_size=480, callback=real_cb)
+
+    ck = in_mock.call_args.kwargs
+    assert ck["samplerate"] == 48000
+    assert ck["callback"] is real_cb, "48k mic path must pass the raw callback unchanged"
 
 
 # ===== RATE-11: Phase 1 firewall still holds =====
