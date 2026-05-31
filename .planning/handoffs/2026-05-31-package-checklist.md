@@ -55,12 +55,14 @@ Proof already run:
   dirty path is assigned to a package or hold lane.
 - Current refresh, 2026-05-31:
   `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passes with 187 dirty paths exactly listed, 3 generated launch previews
-  ignored, and every dirty path assigned. The checker now reads staged
+  passes with 187 dirty paths exactly listed after Package 0 landed and the
+  cue-export research drift was classified, 3 generated launch previews ignored,
+  and every dirty path assigned. The checker now reads staged
   (`git diff --cached --name-only`), unstaged (`git diff --name-only`), and
   untracked paths so a half-staged tree cannot produce a false green. The live
   tree drifted with `.planning/singularity/2026-05-31/*.md` research/census
-  briefs and the real-CLAP fixture README; both are assigned to hold lanes.
+  briefs, nested cue-export research maps, and the real-CLAP fixture README;
+  those are assigned to hold lanes.
   Earlier in this same planning pass, the local MOSS TTS
   wrapper/runtime/test files are no longer dirty, `uv.lock` still carries the
   residual `sentencepiece` / `tts-local` lockfile diff, and the new
@@ -72,6 +74,9 @@ Proof already run:
   5 tests.
 - `uv run ruff check scripts/check_dirty_package_plan.py tests/scripts/test_check_dirty_package_plan.py`
   passed.
+- Package 0 commit landed as
+  `5fa5d4d8 docs(planning): document dirty tree shipping lanes`, with DCO
+  signoff.
 
 Remaining gate:
 
@@ -134,12 +139,11 @@ Current evidence bundle draft, 2026-05-31:
 
 ```text
 Package: Package 0 - Shipping Inventory Docs
-Commit: docs(planning): document dirty tree shipping lanes
+Commit: 5fa5d4d8 docs(planning): document dirty tree shipping lanes
 Scope: planning docs plus dirty-tree package checker only
-Staged files: none yet; stage the five Include paths above when sessions pause
-Shared-file hunks: none; all Package 0 paths are untracked standalone files
+Staged files: committed; no Package 0 paths remain untracked
+Shared-file hunks: none; all Package 0 paths were standalone planning/tooling files
 Checks:
-  git status --short shows the five Package 0 paths as untracked
   git diff --shortstat -> 96 files changed, 5117 insertions, 1756 deletions
   git ls-files --others --exclude-standard | wc -l -> 91
   uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary -> 187 dirty paths listed and assigned
@@ -714,6 +718,11 @@ Hold:
 - `.planning/singularity/2026-05-31/census-semantic-engine.md`
 - `.planning/singularity/2026-05-31/census-vibe-judge.md`
 - `.planning/singularity/2026-05-31/census-viber.md`
+- `.planning/singularity/2026-05-31/cue-export/map-cue-pipeline.md`
+- `.planning/singularity/2026-05-31/cue-export/map-export-pipeline.md`
+- `.planning/singularity/2026-05-31/cue-export/map-live-fusion.md`
+- `.planning/singularity/2026-05-31/cue-export/research-cue-boost.md`
+- `.planning/singularity/2026-05-31/cue-export/research-easy-export.md`
 - `.planning/singularity/2026-05-31/ROADMAP-SINGULARITY.md`
 - `.planning/singularity/2026-05-31/research-cue-boost.md`
 - `.planning/singularity/2026-05-31/research-data-flywheel.md`
@@ -723,9 +732,10 @@ Hold:
 Reason:
 
 - These are broad read-only research/census briefs that cross automix/TTS,
-  cue detection, Learn, Vibe Judge, Viber, semantic hot-cues, and data-flywheel
-  strategy. Keep them out of Package 0 so the first planning commit remains an
-  inventory/checker package rather than a claim-heavy research bundle.
+  cue detection/export, Learn, Vibe Judge, Viber, semantic hot-cues, and
+  data-flywheel strategy. Keep them out of Package 0 so the first planning
+  commit remains an inventory/checker package rather than a claim-heavy research
+  bundle.
 - Several briefs contain forward-looking status language and external references.
   Use them as discovery inputs, not as shipping proof, until each cited
   `path:line`, live-status claim, and product recommendation is reviewed in the
@@ -1568,13 +1578,13 @@ Latest package consolidation pass on 2026-05-31:
 - Current planning guardrails, 2026-05-31:
   `git diff --shortstat` reports 96 files changed, 5117 insertions, and 1756
   deletions; `git ls-files --others --exclude-standard | wc -l` reports 91.
-- Current package-checker refresh after Singularity research/census and CLAP
-  fixture drift:
+- Current package-checker refresh after Singularity research/census,
+  cue-export, and CLAP fixture drift:
   `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passes with 187 dirty paths assigned. This refresh keeps the checker honest
-  across staged, unstaged, and untracked paths; keeps the residual local-MOSS
-  `uv.lock` diff on hold; and assigns Singularity research plus the real-CLAP
-  eval fixture to hold lanes.
+  passes with 187 dirty paths assigned after Package 0 landed. This refresh
+  keeps the checker honest across staged, unstaged, and untracked paths; keeps
+  the residual local-MOSS `uv.lock` diff on hold; and assigns Singularity
+  research/cue-export plus the real-CLAP eval fixture to hold lanes.
 - `git diff --check -- .planning/handoffs/2026-05-31-maintainability-map.md .planning/handoffs/2026-05-31-package-checklist.md .planning/handoffs/2026-05-31-dirty-tree-shipping-inventory.md`
   passed.
 - `uv run pytest -q tests/scripts/test_check_dirty_package_plan.py`

@@ -12,9 +12,14 @@ Current refresh, 2026-05-31:
   insertions, and 1756 deletions; `git ls-files --others --exclude-standard |
   wc -l` reports 91 untracked paths.
 - Package coverage: `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passes with 187 dirty paths listed and assigned; 3 generated launch previews
-  are intentionally ignored. The checker now includes staged, unstaged, and
-  untracked paths so a partially staged tree cannot produce a false green.
+  passes with 187 dirty paths listed and assigned after Package 0 landed and
+  the cue-export research drift was classified; 3
+  generated launch previews are intentionally ignored. The checker now includes
+  staged, unstaged, and untracked paths so a partially staged tree cannot
+  produce a false green.
+- Package 0 landed as `5fa5d4d8 docs(planning): document dirty tree shipping lanes`
+  with DCO signoff. Its five paths are now tracked, so the package checker no
+  longer reports Package 0 as a dirty package.
 - Newest CLAP eval drift: the Real CLAP Retrieval Eval Gate is now 6 dirty paths,
   including README, manifest, vectors, evaluator, synthetic metric tests, and
   real-fixture regression test. `uv run pytest -q tests/library/test_clap_retrieval_eval.py tests/library/test_clap_real_retrieval.py`
@@ -34,9 +39,9 @@ Current refresh, 2026-05-31:
   / `tts-local` lockfile diff without a matching current `pyproject.toml` diff.
   Keep that lockfile hunk in the Local MOSS hold lane until its owner either
   restores the manifest/runtime slice or removes the residual lock change.
-- First staging action when sessions pause: Package 0 only. Do not stage product
-  source, dependency files, local MOSS TTS, IPC, launch collateral, or hold lanes
-  with the planning ledger.
+- First staging action is complete. Next commit must be selected from a package
+  card with hunk review; do not smuggle shared IPC/tooling hunks into a narrow
+  package.
 - Completion state: not complete. The codebase is mapped and package-covered,
   but not landed, refactored, dependency-modernized, or live-proof-complete.
 
@@ -52,8 +57,9 @@ truthful answer before doing anything else.
 Current lane: planning/evidence only; no product code edits while other sessions code.
 Live tree: 96 tracked files changed, 5117 insertions, 1756 deletions, 91 untracked.
 Package checker: green, 187 dirty paths assigned; staged/unstaged/untracked included; 3 generated launch previews ignored.
-First safe staging move: Package 0 only, when sessions pause.
-Do not stage: src/, tauri/, uv.lock, launch/design assets, local MOSS residual lockfile, or hold lanes with Package 0.
+Package 0 landed: 5fa5d4d8 docs(planning): document dirty tree shipping lanes.
+Next safe move: choose a package card and inspect shared hunks before staging; Package 1 is not whole-file safe because AGENTS.md also has IPC-count drift.
+Do not stage: unrelated src/, tauri/, uv.lock, launch/design assets, local MOSS residual lockfile, or hold lanes with the next package.
 Main active holds: Mix Timing Oracle has refresh.py Ruff red + no live/audio proof; CLAP eval is offline/no-ONNX; Local MOSS is residual uv.lock only; Deck Audio needs live controller/audio proof.
 ```
 
@@ -78,13 +84,14 @@ moving without pretending the tree is ready to stage.
 | Moment | Action | Evidence | Stop condition |
 |---|---|---|---|
 | While sessions are active | Keep this as planning/evidence work only; refresh and classify drift when the package checker goes red. | `git status --short`, shortstat, untracked count, package checker, and focused inspection of new paths. | A new path is unclassified, or a package owner needs product-code edits. |
-| First staging window | Stage Package 0 only: planning inventory, checklist, maintainability map, checker, and checker tests. | Package 0 Stage packet, checker tests, focused Ruff, cached diff check, and package checker before/after staging. | Any product source, dependency manifest, generated artifact, local MOSS TTS file, launch asset, or hold lane appears in the cached diff. |
-| After Package 0 lands | Refresh the package checklist and current index because all dirty counts will change. | Package checker summary, current shortstat/untracked count, and updated shared-path list. | A staged commit changed shared-file hunk ownership without updating the checklist. |
+| Package 0 landed | Keep it as the baseline commit: planning inventory, checklist, maintainability map, checker, and checker tests. | Commit `5fa5d4d8`, checker tests, focused Ruff, cached diff check, and post-commit package checker. | Any later rebaseline tries to pull product source, dependency manifests, generated artifacts, launch assets, or hold lanes back into Package 0. |
+| After Package 0 lands | Refresh the package checklist and current index because all dirty counts changed. | Package checker summary, current shortstat/untracked count, and updated shared-path list. | A staged commit changes shared-file hunk ownership without updating the checklist. |
 | Before product packages | Pick one staging card and prove that lane only. | Staging Cards section plus the package-specific evidence bundle. | Evidence for one lane is being used to claim another lane is ready. |
 | Before dependency/refactor work | Confirm all active feature packages are landed or explicitly deferred. | Dependency Modernization Rings and Structural Refactor DoD. | Dependency churn or structural movement appears in the same staged diff as feature work. |
 
-Immediate next safe action remains Package 0 when sessions pause. Everything
-else is queueing, not permission to stage.
+Immediate next safe action is shared-hunk review before the next package. Package
+1 touches `AGENTS.md`, which also carries IPC-count drift, so do not whole-file
+stage it unless intentionally combining packages.
 
 ## No-Drift Continuation Rule
 
@@ -106,8 +113,8 @@ must point to proof, a decision, and the next missing evidence.
 
 | Finding | Current evidence | Decision | Missing proof |
 |---|---|---|---|
-| The tree is messy but fully classified. | `git diff --shortstat` is 96 files / 5117 insertions / 1756 deletions, untracked count is 91, and strict package checker lists 187 dirty paths assigned; Singularity research and CLAP eval fixtures are classified as hold lanes. | Keep planning ledger as Package 0 and keep research/eval hold lanes out of first staging unless explicitly selected. | Re-run the same checks immediately before any staging window. |
-| Package 0 is the only first move that reduces confusion without touching product behavior. | Package 0 contains only three planning docs, the dirty-tree checker, and checker tests; checker tests and focused Ruff are green. | Stage Package 0 first when sessions pause. | Cached diff must contain exactly the five Package 0 acceptance-list paths. |
+| The tree is messy but fully classified. | `git diff --shortstat` is 96 files / 5117 insertions / 1756 deletions, untracked count is 91, and strict package checker lists 187 dirty paths assigned; Singularity research/cue-export and CLAP eval fixtures are classified as hold lanes. | Keep research/eval hold lanes out of active staging unless explicitly selected. | Re-run the same checks immediately before any staging window. |
+| Package 0 reduced confusion without touching product behavior. | Package 0 landed as `5fa5d4d8`; it contained only three planning docs, the dirty-tree checker, and checker tests; checker tests and focused Ruff are green. | Use it as the baseline; do not reopen it except for docs-only rebaseline notes. | Any rebaseline cached diff must contain only planning docs. |
 | Shared files are the main risk, not ordinary file count. | Checker reports shared assignments for `AGENTS.md`, `__main__.py`, `session_loop.py`, IPC schema/generated files, and IPC count/parity tests. | Stage shared paths by hunk or as an explicitly combined package. | `git diff --cached -- <path>` evidence for every shared path in a staged commit. |
 | IPC work should default to one contract review. | Packages 2 and 3 share schema, generated TS, generated validator, Python wrappers, Rust/UI consumers, and count/parity tests. | Combine Package 2 and Package 3 unless a deliberate split keeps full schema/codegen proof with each side. | Fresh `check_ipc_schema.py`, IPC wiring checker, UI `check:ipc`, focused tests, and build. |
 | Cue, pill, library live-read, and Viber changes are one product pipeline. | Packages 4, 5, and 6 preserve cue source, semantic hot-cue slot, compact pill detail, library context, and Viber/export behavior across layers. | Review/prove them end to end rather than as isolated rendering or ingest edits. | Live DDJ/Viber proof with source/slot/CARE evidence visible from ingest to export/live read. |
@@ -445,7 +452,7 @@ Audit refresh on 2026-05-31:
 | Requirement from objective | Current evidence | Completion proof still required |
 |---|---|---|
 | Do no product coding while other sessions are active | This map, checklist, inventory, package checker, and tests are planning/tooling surfaces; recent passes only changed planning docs. | Before any product edit, coding sessions must pause or the package lane must be explicitly opened by the user. |
-| Current work is organized into neat packages | Package checker is green with 187 dirty paths assigned; shared-path assignments are visible, and Singularity research / CLAP eval work are isolated as hold lanes. | Package 0 must stage first, then each Include/Hold lane must be refreshed after every staged commit. |
+| Current work is organized into neat packages | Package checker is green with 187 dirty paths assigned; shared-path assignments are visible, and Singularity research / cue-export / CLAP eval work are isolated as hold lanes. | Each Include/Hold lane must be refreshed after every staged commit; shared files need cached hunk review. |
 | Findings are always evidence-backed | Evidence snapshots include git status/shortstat, package checker, dependency checks, architecture density, subsystem boundaries, and orphan inventory. | Each future claim must name the command, file, runtime log, test, or live probe that proves it. |
 | Shared files cannot smuggle unrelated work | Shared-File Hunk Discipline names `AGENTS.md`, `__main__.py`, session loop, IPC schema/generated files, and IPC tests. | Every commit touching a shared path must inspect `git diff --cached -- <path>` and document intentional package combinations. |
 | Codebase becomes more maintainable | Cleanup sequence, subsystem boundary map, clean refactor candidate map, orphan triage, and extraction work orders now exist. | Structural refactors must wait until owning packages land, then pass entry/exit criteria and focused tests. |
@@ -467,7 +474,7 @@ needs current evidence before it can move to done.
 
 | Blocker | Evidence that it is still open | What closes it |
 |---|---|---|
-| Packages are mapped but not landed | Package checker is green with 187 assigned dirty paths, and the dirty tree still has 96 tracked files plus 91 untracked paths. | Stage and commit Package 0 first, then land or explicitly defer each Include/Hold lane with refreshed package-checker evidence. |
+| Packages are mapped but not landed | Package checker is green with 187 assigned dirty paths after Package 0 landed, and the dirty tree still has 96 tracked files plus 91 untracked paths. | Land or explicitly defer each remaining Include/Hold lane with refreshed package-checker evidence. |
 | Shared-file hunk risk remains | `__main__.py`, `session_loop.py`, IPC schema/codegen files, AGENTS/tooling files, and IPC tests are shared across packages. | Every commit touching those paths includes cached hunk review and intentional package-combination notes. |
 | Live proof is incomplete | Live proof queue still names Tauri IPC GUI, cue/pill/Viber DDJ proof, Earned Wall UI proof, memory readiness proof, audible auto-master proof, deck-audio controller proof, and a release-train long set. | Required UI log, websocket, session `events.jsonl`, hardware/audio, screenshot/recording, and cited co-host evidence are pasted into package notes. |
 | Local MOSS TTS is not shippable | The current dirty tree keeps only residual `uv.lock` changes for `sentencepiece` / `tts-local`; the previous wrapper/runtime/test slice is no longer dirty. | Either restore the full local-TTS package with tests, NOTICE/docs, install/model-cache, latency/bundle, and grounding proof, or remove/regenerate the residual lockfile diff. |
@@ -703,9 +710,9 @@ First refactor tickets to open after package lanes settle:
 1. Keep the package checker green after every live-tree movement.
    Evidence gate: `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`.
 
-2. Stage Package 0 first when coding sessions pause.
-   Include the inventory, checklist, checker, checker tests, and this map. This
-   makes later staging reviewable.
+2. Package 0 has landed.
+   Treat `5fa5d4d8` as the review ledger baseline. Rebaseline counts after it,
+   then select the next package with cached hunk review.
 
 3. Stage small isolated hold lanes before broad refactors.
    Good first candidates are Desktop Auto-Master 16ch Upgrade and Deck Audio
@@ -731,9 +738,9 @@ First refactor tickets to open after package lanes settle:
 
 ## Staging Dependency Graph
 
-Use this order when the active coding sessions pause:
+Use this order after the Package 0 baseline:
 
-1. Package 0 first: it gives the reviewer a trusted ledger and the package
+1. Package 0 is done: it gives the reviewer a trusted ledger and the package
    checker that keeps later commits honest.
 2. Packages 1, 13, and 15 can move early because they are tooling or narrow
    runtime boot/capture fixes, but each still needs its listed live/sidecar proof.
@@ -765,13 +772,14 @@ Wave 0 - refresh evidence:
 - If any new dirty path appears, stop and classify it in the package checklist
   before staging anything.
 
-Wave 1 - stage the ledger:
+Wave 1 - ledger baseline:
 
-- Stage Package 0 only: inventory, checklist, maintainability map, package
-  checker, and package-checker tests.
+- Package 0 is already committed as `5fa5d4d8`; do not restage it with product
+  files.
 - Re-run the package checker plus `uv run pytest -q tests/scripts/test_check_dirty_package_plan.py`
-  and `uv run ruff check scripts/check_dirty_package_plan.py tests/scripts/test_check_dirty_package_plan.py`.
-- After this wave lands, refresh the checklist because every later dirty-path
+  and `uv run ruff check scripts/check_dirty_package_plan.py tests/scripts/test_check_dirty_package_plan.py`
+  before using it to justify the next package.
+- After this wave, refresh the checklist because every later dirty-path
   count will change.
 
 Wave 2 - low-blast-radius tooling and runtime guards:
@@ -989,7 +997,7 @@ must be proved, and what makes the card stop.
 
 | Card | Stage shape | Evidence to refresh | Stop if |
 |---|---|---|---|
-| 0 - Ledger | Package 0 only: planning inventory, checklist, maintainability map, checker, checker tests. | `git status --short`, `git diff --shortstat`, untracked count, package checker, checker tests, focused Ruff, cached diff check. | Any product source, hold-lane file, dependency file, or generated artifact appears in the cached diff. |
+| 0 - Ledger | Done as `5fa5d4d8`; only rebaseline docs may touch it now. | `git status --short`, `git diff --shortstat`, untracked count, package checker, checker tests, focused Ruff, cached diff check. | A rebaseline tries to include product source, hold-lane files, dependency files, or generated artifacts. |
 | 1 - Tooling | Package 1 maintainer tooling only. | Tooling tests, IPC helper scan, UI log/session-event proof for live helper paths when available. | It starts describing customer-facing behavior or absorbs IPC count changes without Package 3. |
 | 2 - Narrow Runtime Guards | Packages 13, 14, and 15 only if fresh; stage `__main__.py` by hunk for Package 14. | Sidecar freshness checks, shutdown tests, macOS/audio route tests, source/Tauri route proof as listed in the checklist. | `__main__.py` carries budget or deck-audio hold hunks, or Package 15 claims musical grounding without audible/cited proof. |
 | 3 - IPC Bundle | Packages 2 and 3 together by default. | Schema count, IPC wiring checker, UI `check:ipc`, generated TS/validator review, IPC/UI-bus focused tests, UI build. | Schema, generated files, Python wrappers, tests, or Rust/TS consumers cannot move together. |
