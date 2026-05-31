@@ -354,6 +354,33 @@ Proof before staging:
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- .planning/handoffs/2026-05-31-ipc-staging-packet.md .planning/handoffs/2026-05-31-future-ai-routing.md .planning/handoffs/2026-05-31-package-checklist.md`
 
+## Package 0D - Dependency Modernization Packet
+
+Suggested commit: `docs(planning): add dependency modernization packet`
+
+Include:
+
+- `.planning/handoffs/2026-05-31-dependency-modernization-packet.md`
+- `.planning/handoffs/2026-05-31-future-ai-routing.md`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `pyproject.toml`, `uv.lock`, `tauri/ui/package.json`,
+  `tauri/ui/package-lock.json`, `tauri/src-tauri/Cargo.toml`, and `Cargo.lock`.
+- Any dependency bump, generated file, or product source edit.
+
+Reason:
+
+- This packet turns the "lighter, faster, latest libs, no conflicts" ask into
+  modernization rings with evidence and gates. It is planning-only and should
+  not be bundled with actual dependency changes.
+
+Proof before staging:
+
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- .planning/handoffs/2026-05-31-dependency-modernization-packet.md .planning/handoffs/2026-05-31-future-ai-routing.md .planning/handoffs/2026-05-31-package-checklist.md`
+
 ## Package 2 - Session IPC And Diagnostics Wiring
 
 Suggested commit: `fix(session-ipc): wire status recheck errors and citation telemetry`
@@ -1705,6 +1732,7 @@ Hold:
 - `src/vibemix/audio/voice_mix.py`
 - `src/vibemix/runtime/automix_demo.py`
 - `src/vibemix/runtime/drop_reaction.py`
+- `src/vibemix/state/event_detector.py`
 - `src/vibemix/state/refresh.py`
 - `scripts/automix_demo_smoke.py`
 - `tests/agent/test_line_voice.py`
@@ -1737,6 +1765,10 @@ Reason:
   by writing `state.predicted_drop_in_sec` from audible-deck sections with
   confidence/horizon guards. Keep both with this hold lane until lint,
   live/audio proof, and speech grounding are complete.
+- `event_detector.py` now has a dormant `VIBEMIX_DROP_CALL` gate that can emit a
+  `DROP` event from the predicted-drop crossing. Keep it with this hold lane; it
+  is no longer only offline/demo groundwork and needs the full live/audio/
+  grounding proof before promotion.
 
 Proof already run:
 

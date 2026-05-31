@@ -115,6 +115,9 @@ insertions or screenshot totals.
    their own checks exist.
 6. If the user wants polish/visual work next, promote Frontend Shell Settings
    Proof or the visual-proof hold lanes only with UI tests/build/screenshots.
+7. If the user wants lighter/faster/latest-library work, use
+   `.planning/handoffs/2026-05-31-dependency-modernization-packet.md` and keep
+   dependency rings separate from feature packages.
 
 Before any commit, verify the cached file list is exactly the chosen package.
 
