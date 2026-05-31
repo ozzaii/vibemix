@@ -35,10 +35,55 @@ from pathlib import Path
 
 from vibemix.audio.cues import track_cues_from_audio
 from vibemix.audio.miniplayer import MiniDeck
+from vibemix.audio.voice_mix import mix_voice_over
 from vibemix.runtime.automix_demo import build_automix_reel
+from vibemix.runtime.drop_reaction import narrate_reel
 from vibemix.state.transition_clock import TransitionMode, step_progress
 
 _MODES = {m.name.lower(): m for m in TransitionMode}
+
+
+def _prerender_voice(texts: list[str], *, target_sr: int) -> dict[str, np.ndarray]:
+    """Synthesize each unique reaction line in the LIVE co-host voice, once, up front.
+
+    Drives the EXACT live TTS chain (Cartesia Sonic → Gemini ``Achird`` → standby)
+    via ``agent.line_voice`` and resamples each line to the deck rate so the audio
+    callback can mix it sample-accurately. The reel is deterministic, so every line
+    is known before audio starts — no mid-playback network stall. Network failure /
+    missing key degrades to ``{}`` (print-only), never crashes the demo.
+    """
+    import asyncio
+
+    from vibemix.agent.line_voice import build_default_line_adapter, synthesize_line
+    from vibemix.audio.resample import resample_audio
+
+    async def _run() -> dict[str, np.ndarray]:
+        adapter = build_default_line_adapter()  # built inside the loop (Cartesia needs it)
+        out: dict[str, np.ndarray] = {}
+        try:
+            for text in texts:
+                pcm, sr = await synthesize_line(adapter, text)
+                if pcm.shape[0] == 0:
+                    continue
+                if sr != target_sr:
+                    left = resample_audio(pcm[:, 0], source_sr=sr, target_sr=target_sr)
+                    right = resample_audio(pcm[:, 1], source_sr=sr, target_sr=target_sr)
+                    pcm = np.stack([left, right], axis=1).astype(np.float32)
+                out[text] = pcm
+        finally:
+            aclose = getattr(adapter, "aclose", None)
+            if aclose is not None:
+                try:
+                    await aclose()  # close the Cartesia aiohttp session (no leak warning)
+                except Exception:  # pragma: no cover — best-effort cleanup
+                    pass
+        return out
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:  # no key / offline / plugin hiccup — print-only, never crash
+        print(f"   [voice synth unavailable: {exc}] — printing reactions only")
+        return {}
 
 
 def _auto_anchor(path: str, labels: tuple[str, ...]) -> tuple[float | None, str | None, float]:
@@ -110,8 +155,21 @@ def main() -> None:
     parser.add_argument("--device", default=None, help="output device name substring")
     parser.add_argument("--no-auto", action="store_true",
                         help="skip the structural cue detector (default: auto-find the drop)")
+    parser.add_argument("--no-voice", action="store_true",
+                        help="don't speak the reactions (print-only; default: AI calls the drop aloud)")
+    parser.add_argument("--duck", type=float, default=0.45,
+                        help="music gain while the co-host is talking (0..1, default 0.45)")
     parser.add_argument("--dry-run", action="store_true", help="print plan+reel, no audio")
     args = parser.parse_args()
+
+    # Load the repo-root .env so the live voice chain sees GEMINI_API_KEY /
+    # CARTESIA_API_KEY (the app does this in __main__; a standalone script must too).
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    except Exception:  # pragma: no cover — python-dotenv optional; voice degrades to print
+        pass
 
     sr = 44_100
     src_a, sr_a = _load(args.track_a, fallback_hz=220.0, sr=sr)
@@ -150,6 +208,9 @@ def main() -> None:
         transition_sec=args.transition, arm_lead_sec=args.arm_lead,
     )
     plan = reel.plan
+    # The persona turns each cue key into the line the co-host SPEAKS (compose-existing:
+    # one deterministic reel -> reaction keys -> slop-clean lines -> the live voice).
+    spoken = narrate_reel(reel)
     from_total = float(len(src_a))
     fade_begin_sec = plan.from_fade_begin * plan.from_duration_sec
     fade_end_sec = plan.from_fade_end * plan.from_duration_sec
@@ -159,13 +220,23 @@ def main() -> None:
     print(f"-> to  : {args.track_b or 'tone 330Hz'}  ({plan.to_duration_sec:.1f}s)")
     print(f"-> mode={mode.name.lower()} transition={args.transition}s  cut={plan.is_cut}")
     print(f"-> fade {fade_begin_sec:.1f}s .. {fade_end_sec:.1f}s  |  play window {start_sec:.1f}s .. {fade_end_sec + args.tail:.1f}s")
-    print("-> reel (reaction beats):")
-    for b in reel.beats:
-        print(f"     t={b.t_sec:7.2f}s  pos={b.from_playposition:.3f}  -> {b.cue}")
+    print("-> reel (the AI calls the drop):")
+    for b, sb in zip(reel.beats, spoken):
+        print(f"     t={b.t_sec:7.2f}s  pos={b.from_playposition:.3f}  [{b.cue}]  “{sb.text}”")
 
     if args.dry_run:
         print("-> dry-run: no audio opened.")
         return
+
+    # Pre-render every reaction line in the LIVE co-host voice BEFORE audio opens —
+    # the reel is deterministic, so no synth ever runs on the audio thread.
+    voice_pcm: dict[str, np.ndarray] = {}
+    if not args.no_voice:
+        unique_texts = list(dict.fromkeys(sb.text for sb in spoken))
+        print(f"-> 🔊 voicing {len(unique_texts)} line(s) in the live co-host voice (Achird)…")
+        voice_pcm = _prerender_voice(unique_texts, target_sr=sr)
+        print(f"-> voiced {len(voice_pcm)}/{len(unique_texts)} line(s)"
+              + ("" if voice_pcm else " — the AI will print, not speak"))
 
     import sounddevice as sd
 
@@ -178,10 +249,34 @@ def main() -> None:
     to_start_frame = plan.to_start * plan.to_duration_sec * sr
     state = {"fade_started": False, "prev_progress": 0.0, "fired": set()}
 
+    # Each beat's trigger sample on deck A + the finished voice buffer for its line
+    # (None when that line didn't synth — it still prints, just doesn't speak).
+    voice_plan = [
+        (b.from_playposition * from_total, i, sb.text, voice_pcm.get(sb.text))
+        for i, (b, sb) in enumerate(zip(reel.beats, spoken))
+    ]
+    duck = float(args.duck)
+    vstate: dict = {"active": None, "cursor": 0, "fired": set()}
+
     def _callback(outdata, frames, time_info, status):  # OS audio thread
         if status:
             print(f"   [stream status] {status}")
+        a_before = deck.state().a_frame
         mix = deck.render_block(frames)
+        # Latch a line the instant the deck reaches its beat; the voice ducks the mix
+        # under it for the length of the line, then the music comes back (mix_voice_over).
+        for trig, idx, _text, pcm in voice_plan:
+            if idx not in vstate["fired"] and a_before >= trig:
+                vstate["fired"].add(idx)
+                if pcm is not None and pcm.shape[0] > 0:
+                    vstate["active"] = pcm
+                    vstate["cursor"] = 0
+        active = vstate["active"]
+        if active is not None:
+            mix, cur = mix_voice_over(mix, active, vstate["cursor"], duck_gain=duck)
+            vstate["cursor"] = cur
+            if cur >= active.shape[0]:
+                vstate["active"] = None
         outdata.fill(0.0)
         nch = outdata.shape[1]
         for c in range(0, nch, 2):
@@ -204,9 +299,9 @@ def main() -> None:
             progress = step_progress(plan, frac, state["prev_progress"])
             state["prev_progress"] = progress
             deck.xfader = progress  # crossfade locked to the deck's real position
-            for b in reel.beats:
+            for b, sb in zip(reel.beats, spoken):
                 if b.cue not in state["fired"] and frac >= b.from_playposition:
-                    print(f"   >> {cur_sec:6.2f}s  [{b.cue}]")
+                    print(f"   >> {cur_sec:6.2f}s  [{b.cue}]  “{sb.text}”")
                     state["fired"].add(b.cue)
             if cur_sec >= end_sec or deck.state().a_frame >= from_total - 1:
                 break
