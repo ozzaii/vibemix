@@ -9,6 +9,10 @@ still dirty unless the user explicitly opens a dependency lane.
 
 Fresh audit commands from this checkout:
 
+- Refresh at 2026-05-31 14:11 +03 confirmed this evidence is still current.
+  The refresh did not intentionally update manifests or lockfiles; after the
+  Cargo dry-run, the only dependency-shaped dirty files were the already-assigned
+  `tauri/ui/package.json` and `uv.lock` hunks from other lanes.
 - `uv pip check`
   - 145 packages checked.
   - 1 incompatibility: `pyrekordbox` requires `sqlcipher3-wheels`, but it is not
@@ -23,6 +27,8 @@ Fresh audit commands from this checkout:
     `websockets`, `requests`, `ruff`, and `starlette`.
 - `npm --prefix tauri/ui audit --omit=dev --json`
   - production vulnerabilities: 0 total.
+  - Current install metadata reports 2 production packages and 510 total npm
+    packages.
 - `npm --prefix tauri/ui audit --json`
   - dev vulnerabilities: 6 total, 5 moderate and 1 high.
   - Main chain: `vitest` -> nested `vite` / `vite-node` / `@vitest/mocker` /
@@ -30,6 +36,11 @@ Fresh audit commands from this checkout:
   - High finding: `tmp <0.2.6`.
 - `npm --prefix tauri/ui explain tmp`
   - `tmp@0.2.5` comes from `@gltf-transform/cli@4.3.0`.
+- `npm --prefix tauri/ui ls --depth=0`
+  - exits cleanly for the top-level tree. Current notable resolved versions:
+    `@playwright/test` / `playwright` 1.60.0, Tauri JS API 2.11.0,
+    `@tauri-apps/plugin-shell` 2.3.5, `@tauri-apps/plugin-store` 2.4.3,
+    `vite` 6.4.2, `vitest` 2.1.9, and `typescript` 5.9.3.
 - `npm --prefix tauri/ui outdated --json`
   - `vitest` 2.1.9 -> 4.1.7
   - `vite` 6.4.2 -> 8.0.14
