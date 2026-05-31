@@ -409,6 +409,236 @@ Proof before staging:
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- .planning/handoffs/2026-05-31-refactor-wiring-session-handoff.md .planning/handoffs/2026-05-31-package-checklist.md`
 
+## Package 0F - Whole Rebuild Brief
+
+Suggested commit: `docs(planning): add whole rebuild brief`
+
+Include:
+
+- `.planning/handoffs/2026-05-31-rebuild-brief.md`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Product source changes.
+- Dependency manifests, generated files, launch/design assets, and release
+  packaging code.
+- Any attempt to rewrite old packages as the rebuild destination.
+
+Reason:
+
+- The user clarified that a whole rebuild is coming. This package changes the
+  planning posture: the package checklist and existing handoffs become
+  carry-forward evidence and migration-risk controls, not a mandate to polish
+  the old tree into its final shape.
+
+Proof before staging:
+
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- .planning/handoffs/2026-05-31-rebuild-brief.md .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Hold Lane - Demo Source-Run Ship Plan
+
+Suggested commit if/when selected: `docs(demo): capture source-run demo plan`
+
+Hold:
+
+- `.planning/handoffs/2026-05-31-DEMO-SHIP-PLAN.md`
+
+Reason:
+
+- This is a demo-night source-run plan that explicitly says to avoid the stale
+  packaged app and run current source with environment flags. It is useful
+  operational evidence, but it conflicts with the whole-rebuild posture if read
+  as architectural truth.
+- Keep it separate from the rebuild brief. Demo readiness and rebuild design are
+  different decisions.
+
+Remaining gate:
+
+- If promoted, verify its live-source claims against current source and runtime
+  logs. Do not treat the demo note as proof by itself.
+
+## Hold Lane - Rebuild Intake Digests
+
+Suggested commit if/when selected: `docs(rebuild): add intake digest pack`
+
+Hold:
+
+- `.planning/singularity/2026-05-31/whats-next/ingest-dirty-tree-inventory.md`
+- `.planning/singularity/2026-05-31/whats-next/ingest-future-ai-routing.md`
+- `.planning/singularity/2026-05-31/whats-next/ingest-maintainability-map.md`
+- `.planning/singularity/2026-05-31/whats-next/ingest-package-checklist.md`
+- `.planning/singularity/2026-05-31/whats-next/ingest-session-census.md`
+
+Reason:
+
+- These are Claude/team digest artifacts that summarize the existing planning
+  stack for what comes next. They are useful rebuild intake material, not source
+  code and not shippable proof.
+
+Remaining gate:
+
+- Review for claim drift against current files before using them as rebuild
+  requirements. If they conflict with the package checklist, prefer current
+  source plus the checklist.
+
+## Hold Lane - Rebuild Carry-Forward AI Observability
+
+Suggested commit if/when selected: `feat(observability): persist ai message evidence rows`
+
+Hold:
+
+- `src/vibemix/runtime/ai_observability.py`
+- `src/vibemix/agent/dj_cohost.py`
+- `src/vibemix/bench/run.py`
+- `src/vibemix/learn/runtime.py`
+- `tests/runtime/test_ai_observability.py`
+- `tests/agent/test_dj_cohost.py`
+- `tests/bench/test_run_fake.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+
+Reason:
+
+- This candidate adds a shared AI-message ledger and wires live co-host, bench
+  runs, and Learn tutor speech into it. It is a strong rebuild carry-forward idea
+  because it preserves evidence around what the AI said, which model/surface said
+  it, and which deck/move/lesson context was present.
+- It touches large live co-host, bench, and Learn runtime files, so keep it out
+  of IPC, cue, and demo packages until its own focused tests and grounding review
+  are accepted.
+
+Remaining gate:
+
+- Run focused observability, co-host, bench, and Learn evidence tests; then prove
+  the ledger is fail-soft in a source-mode live session. Grounding-review is
+  required because this changes the evidence surface around what the co-host or
+  tutor says.
+
+## Hold Lane - Rebuild Carry-Forward Debrief Summaries And Drills
+
+Suggested commit if/when selected: `feat(debrief): add compact summaries and drill hints`
+
+Hold:
+
+- `src/vibemix/debrief/drills.py`
+- `src/vibemix/debrief/tldr.py`
+- `tests/debrief/test_drill_citations_resolve.py`
+- `tests/debrief/test_tldr_length_60_to_90s.py`
+
+Reason:
+
+- These are candidate debrief primitives for the rebuild: compact session
+  summaries and drill hints. Keep them separate from live runtime and IPC work
+  until their consumers and proof gates are known.
+
+Remaining gate:
+
+- Add or identify focused tests and UI/API consumers before claiming this as a
+  product feature.
+
+## Hold Lane - Rebuild Carry-Forward Deck Vision
+
+Suggested commit if/when selected: `feat(state): infer deck vision signals`
+
+Hold:
+
+- `src/vibemix/state/deck_vision.py`
+- `tests/state/test_deck_vision.py`
+
+Reason:
+
+- This is a candidate rebuild slice for deck-aware state interpretation. It
+  belongs with the runtime/evidence spine, not with visual polish or demo docs.
+
+Remaining gate:
+
+- Prove how it combines with live audio/controller state and where uncertainty
+  is surfaced. Do not let screen/deck interpretation outrank live audio truth.
+
+## Hold Lane - Rebuild Carry-Forward Release Binary Verification
+
+Suggested commit if/when selected: `fix(dist): verify built binary freshness`
+
+Hold:
+
+- `scripts/dist/verify_binary.py`
+- `tests/dist/test_verify_binary.py`
+
+Reason:
+
+- This is release/rebuild packaging infrastructure. It is adjacent to sidecar
+  freshness and signing, but should stay separate until the rebuilt desktop
+  artifact path exists.
+
+Remaining gate:
+
+- Run focused dist tests and connect the verifier to the rebuild packaging
+  command path. Keep it out of runtime feature commits.
+
+## Hold Lane - Rebuild Carry-Forward Serato Cue Carrier
+
+Suggested commit if/when selected: `feat(library): export cues as serato markers`
+
+Hold:
+
+- `pyproject.toml`
+- `src/vibemix/library/export_serato.py`
+- `tests/library/test_export_serato.py`
+
+Reason:
+
+- This adds a Serato Markers2 cue carrier plus a `serato` optional dependency
+  for `mutagen`. It is a high-value rebuild candidate for universal cue export,
+  but it carries a GPL runtime dependency boundary and needs golden-vector /
+  real-app proof before broad claims.
+- `pyproject.toml` is now a shared path with the Local MOSS hold lane. Stage it
+  by hunk if either lane is promoted.
+
+Remaining gate:
+
+- Add real Serato/Mixxx/Rekordbox import proof or a golden Markers2 vector before
+  claiming app-level compatibility. Regenerate or validate the lockfile only in
+  the selected dependency/export lane.
+
+## Hold Lane - Rebuild Carry-Forward Codex Curate
+
+Suggested commit if/when selected: `feat(library): add codex curation workflow`
+
+Hold:
+
+- `src/vibemix/library/codex_curate.py`
+
+Reason:
+
+- This is a large library/Viber-adjacent curation workflow candidate. Keep it as
+  rebuild evidence until tool boundaries, grounded discovery requirements, and
+  export behavior are reviewed.
+
+Remaining gate:
+
+- Identify focused tests and the intended CLI/UI consumer. Preserve the grounded
+  tool spine before porting it into the rebuild.
+
+## Hold Lane - Rebuild Carry-Forward Judge Voice Evidence
+
+Suggested commit if/when selected: `feat(intel): voice transition judge evidence`
+
+Hold:
+
+- `tests/intel/test_judge_voice.py`
+
+Reason:
+
+- This test describes the engine half of voicing measured Vibe Judge verdicts
+  through a grounded citation atom. It is important rebuild evidence, but do not
+  claim runtime speech is fixed until the live coach actually consumes the line.
+
+Remaining gate:
+
+- Pair this with the implementation file and runtime coach integration, then
+  run grounding-review before shipping any new spoken judge line.
+
 ## Package 2 - Session IPC And Diagnostics Wiring
 
 Suggested commit: `fix(session-ipc): wire status recheck errors and citation telemetry`
