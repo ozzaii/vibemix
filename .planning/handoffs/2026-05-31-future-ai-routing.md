@@ -91,6 +91,32 @@ After those commits, the remaining dirty tree is mostly product packages and
 hold lanes. Do not re-open Package 0 or Package 1 except for a narrow docs
 rebaseline like this routing file.
 
+## Next Decision Ladder
+
+Use this when the checker is green and the user asks "what will we do with it?"
+Do not keep polishing count snapshots just because concurrent sessions changed
+insertions or screenshot totals.
+
+1. If the checker is red, classify missing paths first. This is the only
+   planning edit that should happen automatically while other sessions are still
+   coding.
+2. If the checker is green and no staging window is open, stop changing docs and
+   report the current package map. Count-only churn is not a product
+   improvement.
+3. If a staging window opens, choose one package card. The next strongest review
+   candidate is the combined Package 2 + Package 3 IPC contract package, because
+   the shared schema/codegen/count files already make a split risky.
+4. If the user wants product-facing musical value next, choose Packages 4-6 as
+   one cue/pill/Viber pipeline and require live DDJ/Viber evidence before any
+   "works in the app" claim.
+5. If the user wants low-risk technical cleanup next, choose one of Packages
+   12-15, but keep Rust sidecar-log and runtime diagnostic holds separate until
+   their own checks exist.
+6. If the user wants polish/visual work next, promote Frontend Shell Settings
+   Proof or the visual-proof hold lanes only with UI tests/build/screenshots.
+
+Before any commit, verify the cached file list is exactly the chosen package.
+
 ## File Groups And Meaning
 
 `AGENTS.md` and `CLAUDE.md`

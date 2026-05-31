@@ -1191,6 +1191,9 @@ Hold:
 - `docs/design/screenshots/2026-05-31-sexiest-live/01-sexified-deck.png`
 - `docs/design/screenshots/2026-05-31-sexiest-live/01-sexified-proof.json`
 - `docs/design/screenshots/2026-05-31-sexiest-live/01-sexified-settings.png`
+- `docs/design/screenshots/2026-05-31-sexiest-live/02-sexified-deck.png`
+- `docs/design/screenshots/2026-05-31-sexiest-live/02-sexified-proof.json`
+- `docs/design/screenshots/2026-05-31-sexiest-live/02-sexified-settings.png`
 
 Reason:
 
