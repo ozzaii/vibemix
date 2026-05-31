@@ -1744,6 +1744,7 @@ Hold:
 - `src/vibemix/state/transition_clock.py`
 - `tests/state/test_transition_clock.py`
 - `src/vibemix/state/drop_predict.py`
+- `tests/state/test_event_detector_drop.py`
 - `tests/state/test_drop_predict.py`
 
 Reason:
@@ -1769,6 +1770,9 @@ Reason:
   `DROP` event from the predicted-drop crossing. Keep it with this hold lane; it
   is no longer only offline/demo groundwork and needs the full live/audio/
   grounding proof before promotion.
+- `tests/state/test_event_detector_drop.py` is the matching unit proof for that
+  dormant gate: opt-in, no default firing, crossing behavior, and no repeated
+  firing while still inside the arm window.
 
 Proof already run:
 
