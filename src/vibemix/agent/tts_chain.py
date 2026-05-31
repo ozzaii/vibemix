@@ -85,14 +85,18 @@ def _build_direct_chain(
     """Build the direct TTS chain.
 
     Returns a FallbackAdapter:
-        optional primary (Cartesia Sonic, when ``cartesia_api_key`` is set)
+        optional primary (MOSS-TTS-Nano local, when ``VIBEMIX_LOCAL_TTS`` opted-in
+          + the model is cached)
+          -> optional (Cartesia Sonic, when ``cartesia_api_key`` is set)
           -> secondary (Gemini native TTS_MODEL)
           -> tertiary (Gemini native TTS_FALLBACK_MODEL)
           -> optional quaternary (OpenRouter standby).
 
-    Cartesia leads when keyed (2026-05-30 — Gemini TTS returns 'No audio content
-    generated' live, muting the co-host); the Gemini natives stay as graceful
-    fallback so a Cartesia outage never silences the co-host.
+    The local MOSS voice leads when enabled — free, key-free, never-mute (benched
+    71ms TTFT / 0.18 RTF on M4 Max CPU, torch-free ONNX). Cartesia leads otherwise
+    when keyed (2026-05-30 — Gemini TTS returns 'No audio content generated' live,
+    muting the co-host); the Gemini natives stay as graceful fallback so an outage
+    of the lead voice never silences the co-host.
 
     OpenRouter is no longer enabled just because ``OPENROUTER_API_KEY`` is
     present. A credit-exhausted OpenRouter account can otherwise block every
@@ -100,6 +104,19 @@ def _build_direct_chain(
     explicit standby via ``openrouter_enabled``.
     """
     chain: list = []
+    # Local MOSS-TTS-Nano leads when opted-in (VIBEMIX_LOCAL_TTS) + cached: the
+    # free, key-free, never-mute voice (benched 71ms TTFT / 0.18 RTF, M4 Max CPU,
+    # torch-free ONNX). Lazy-import so numpy/onnxruntime are pulled only when the
+    # local voice is actually used — keeps tts_chain import-light. Cartesia/Gemini
+    # remain graceful fallbacks behind it.
+    from vibemix.agent.local_tts import local_tts_enabled
+
+    if local_tts_enabled():
+        from vibemix.agent.local_tts import MossLocalTTS
+
+        _moss = MossLocalTTS()
+        _moss.prewarm()  # start the ~728MB load in the background so reaction #1 is warm
+        chain.append(_moss)
     # Self-activate from the env when the caller didn't thread a key — dropping
     # CARTESIA_API_KEY in .env is enough to switch the live voice to Cartesia.
     cartesia_api_key = cartesia_api_key or os.environ.get("CARTESIA_API_KEY") or None
