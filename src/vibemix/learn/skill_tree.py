@@ -91,10 +91,12 @@ class SkillSpec:
             because the default is supplied here.
         live_creditable: Whether this skill has a live Mastered path in v11.0 —
             i.e. some real event type credits it (see ``skill_recognizer``).
-            Defaults ``True``; ``beatmatching`` is the sole ``False`` (there is no
-            BEATMATCH/SYNC event to honestly demonstrate it — ``_HONEST_UNCREDITABLE_V11``).
+            Defaults ``True``; ALL six skills are now creditable (beatmatching was
+            the last ``False`` until the owned-deck Beatmatch Judge shipped its
+            ``BEATMATCH_GRADED`` signal — ``_HONEST_UNCREDITABLE_V11`` is now empty).
             Read by ``_what_remains`` (SURF-01) so the wall never promises a demo
-            path a skill does not have. The drift between this field and the
+            path a skill does not have (the branch survives for any future
+            re-uncreditable skill). The drift between this field and the
             recognizer's uncreditable list is pinned by ``test_creditability_drift``.
     """
 
@@ -143,10 +145,10 @@ SKILL_MANIFEST: dict[str, SkillSpec] = {
     "beatmatching": SkillSpec(
         lesson_ids=("L2.01", "L2.02"),
         gate="course_3_unlocked",
-        # The sole v11.0 honest-uncreditable skill: there is NO BEATMATCH/SYNC
-        # event to ground a live demo, so it caps at Competent (no proxy-slop).
-        # Mirrors skill_recognizer._HONEST_UNCREDITABLE_V11 (drift-pinned).
-        live_creditable=False,
+        # Creditable since the owned-deck Beatmatch Judge shipped: a cited LOCKED
+        # ``BEATMATCH_GRADED`` grade (tempo matched AND phase locked) is the honest
+        # live demonstration that was missing. Mirrors skill_recognizer (now no
+        # longer in ``_HONEST_UNCREDITABLE_V11``; drift-pinned). Default True.
     ),
     "eq_mixing": SkillSpec(
         lesson_ids=("L1.14", "L2.04", "L2.05"),
@@ -358,8 +360,9 @@ def _what_remains(sp: SkillProgress, spec: SkillSpec) -> str:
     """The plain "what remains to advance" line for one skill (SURF-01).
 
     Deterministic, never-raises UI affordance copy — single-sourced in Python so
-    the frontend never re-derives the stage rule. Honest at every stage, and
-    honest about the one skill with no live Mastered path (``beatmatching``):
+    the frontend never re-derives the stage rule. Honest at every stage; the
+    uncreditable branch survives for any future skill with no live path (in v11.0
+    all six are creditable since the Beatmatch Judge shipped):
 
       * ``mastered``  → ``""`` (the cited-proof line carries it; nothing remains).
       * ``competent`` + creditable → ``"{N-count} more cited live demo(s) to Master"``.
@@ -371,8 +374,9 @@ def _what_remains(sp: SkillProgress, spec: SkillSpec) -> str:
         return ""
     if sp.stage == "competent":
         if not spec.live_creditable:
-            # beatmatching: no event grounds it, so it caps at Competent. State
-            # the fact without promising a path that does not exist (anti-slop).
+            # No event grounds this skill, so it caps at Competent. State the fact
+            # without promising a path that does not exist (anti-slop). Currently
+            # unreached (every v11.0 skill is creditable); kept for future skills.
             return "Mastered isn't live-graded for this skill"
         remaining = max(1, spec.mastered_threshold - sp.live_proof_count)
         unit = "demo" if remaining == 1 else "demos"

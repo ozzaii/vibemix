@@ -75,17 +75,17 @@ def test_competent_creditable_singular_when_one_demo_left():
     assert row["what_remains"] == "1 more cited live demo to Master"
 
 
-def test_competent_uncreditable_beatmatching_is_honest_no_false_promise():
-    # beatmatching is the ONLY v11.0 honest-uncreditable skill — there is no live
-    # Mastered path. The line must NOT promise demos/"soon"/"coming" (anti-slop honesty).
+def test_competent_beatmatching_now_shows_live_demo_path():
+    # The owned-deck Beatmatch Judge shipped, so beatmatching is no longer the
+    # honest-uncreditable skill — it has a real live Mastered path (a cited locked
+    # BEATMATCH_GRADED). Its what_remains is now the ordinary creditable demo-count
+    # line, not the "no live path" cap. Freshly Competent (0 live proofs, default
+    # threshold 3) -> "3 more cited live demos to Master". This promise is now TRUE.
     progress = LearnProgress()
     _compete(progress, "beatmatching")
     row = _row(progress, "beatmatching")
     assert row["stage"] == "competent"
-    wr = row["what_remains"].lower()
-    assert "demo" not in wr
-    for promise in ("soon", "coming", "next update", "later", "yet"):
-        assert promise not in wr, f"beatmatching what_remains over-promises: {wr!r}"
+    assert row["what_remains"] == "3 more cited live demos to Master"
 
 
 def test_mastered_has_empty_what_remains():

@@ -90,24 +90,23 @@ EVENT_SKILL_MAP: dict[str, tuple[str, ...]] = {
 _MIX_MOVE_EQ_SUBSTRINGS: tuple[str, ...] = ("_low:", "_mid:", "_hi:", "_filter:", "killed")
 _MIX_MOVE_DECK_SUBSTRINGS: tuple[str, ...] = ("_play→", "xfader")
 
-# HONEST-UNCREDITABLE in v11.0 (Finding #1, anti-slop):
-#   - beatmatching: there is NO BEATMATCH/SYNC_ENGAGED event; "{deck}_sync_hit"
-#     is a MIDI move BELOW the MIX_MOVE significance threshold, so no ``ev``
-#     ever fires for it. On-beat-blend is not a detected/citable event. The Vibe
-#     Judge measures harmonic + bass-collision but NO tempo/phase signal yet, so
-#     it cannot honestly demonstrate beatmatching either — proxying it onto
-#     bass-collision is the exact false-expertise slop this guard exists for.
-#     Stays uncreditable until the deferred beatmatch_phase Judge signal ships.
-# RETIRED from this tuple (v11.0 the Vibe Judge):
-#   - harmonic_mixing: the Judge's ``transition_judged`` event is now the clean
-#     citable production event it lacked. A verdict with a COMPATIBLE harmonic
-#     component (the DJ blended two trusted in-key tracks) is resolved to
-#     harmonic_mixing in ``_candidate_skills`` and credited under the same
-#     MAST-03 citation gate (a clash / un-cited verdict credits nothing).
-# beatmatching has NO entry in EVENT_SKILL_MAP and NO MIX_MOVE / transition_judged
-# branch resolves to it — NO proxy-credit, NO new detector. Pinned by
-# ``test_unsignalled_skills_never_auto_master``.
-_HONEST_UNCREDITABLE_V11: tuple[str, ...] = ("beatmatching",)
+# HONEST-UNCREDITABLE in v11.0 (Finding #1, anti-slop) — now EMPTY.
+# RETIRED from this tuple as their citable production events shipped:
+#   - harmonic_mixing: the Judge's ``transition_judged`` event — a verdict with a
+#     COMPATIBLE harmonic component (the DJ blended two trusted in-key tracks) is
+#     resolved in ``_candidate_skills`` and credited under the MAST-03 gate.
+#   - beatmatching: the deferred beatmatch_phase Judge signal SHIPPED
+#     (``learn/beatmatch_judge.py`` — owned-deck exact tempo/phase grading). A
+#     ``BEATMATCH_GRADED`` event carrying a LOCKED grade (tempo matched AND phase
+#     locked, not abstaining) is the genuine demonstration that was missing; it is
+#     resolved in ``_candidate_skills`` and credited under the SAME MAST-03 gate
+#     (a trainwreck / drift / abstain / un-cited grade credits NOTHING — proxying
+#     beatmatching onto anything weaker is the exact false-expertise slop this
+#     guard existed for, and the LOCKED gate is what keeps it honest).
+# Every v11.0 skill now has an honest live-Mastered path. NO proxy-credit, NO new
+# detector. Drift-pinned to ``SkillSpec.live_creditable`` by
+# ``test_creditability_drift`` and exercised by ``test_judge_credits_beatmatch``.
+_HONEST_UNCREDITABLE_V11: tuple[str, ...] = ()
 
 
 def _candidate_skills(event: Any) -> list[str]:
@@ -154,6 +153,25 @@ def _candidate_skills(event: Any) -> list[str]:
         harmonic = components.get("harmonic")
         if isinstance(harmonic, (int, float)) and not isinstance(harmonic, bool) and harmonic > 0.0:
             return ["harmonic_mixing"]
+        return []
+
+    if ev_type == "BEATMATCH_GRADED":
+        # The owned-deck Beatmatch Judge — the tempo/phase signal v11.0 was
+        # waiting for (it retires beatmatching from honest-uncreditable). Because
+        # the learn module OWNS both decks, the grade is MEASURED, not inferred.
+        # A genuine demonstration is a LOCKED grade: tempo matched AND phase
+        # locked AND not abstaining (== verdict "locked"). A trainwreck / drift /
+        # tempo-off / abstain credits NOTHING — it proves the opposite, the exact
+        # proxy-slop ``_HONEST_UNCREDITABLE_V11`` once guarded. Read the
+        # load-bearing booleans (resilient to verdict-string drift); the payload
+        # is ``beatmatch_judge.grade_to_event_extra``.
+        extra = getattr(event, "extra", None)
+        if not isinstance(extra, dict):
+            return []
+        if extra.get("abstain"):
+            return []
+        if bool(extra.get("tempo_matched")) and bool(extra.get("phase_locked")):
+            return ["beatmatching"]
         return []
 
     return list(EVENT_SKILL_MAP.get(ev_type, ()))

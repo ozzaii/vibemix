@@ -140,3 +140,27 @@ def grade_beatmatch(grid_a: BeatGrid, grid_b: BeatGrid, state: DeckState) -> Bea
         verdict=verdict,
         score=score,
     )
+
+
+def grade_to_event_extra(grade: BeatmatchGrade) -> dict[str, object]:
+    """The canonical ``BEATMATCH_GRADED`` event ``extra`` payload for the recognizer.
+
+    The owned-deck Judge is the tempo/phase signal the v11.0 skill recognizer was
+    explicitly waiting for (``skill_recognizer._HONEST_UNCREDITABLE_V11`` —
+    *"Stays uncreditable until the deferred beatmatch_phase Judge signal ships."*).
+    The live practice loop fires a ``BEATMATCH_GRADED`` event carrying this payload
+    AND registers the matching ``("ev", "BEATMATCH_GRADED", t_session)`` citation;
+    ``skill_recognizer.recognize`` then credits beatmatching ONLY on a cited,
+    non-abstain, LOCKED grade (tempo matched AND phase locked) — a trainwreck /
+    drift / abstain credits nothing (it proves the opposite, anti-slop).
+
+    Only the load-bearing fields the recognizer reads ride the event; the full
+    grade (errors, score) is for the coach narration, not the credit gate.
+    """
+    return {
+        "abstain": grade.abstain,
+        "tempo_matched": grade.tempo_matched,
+        "phase_locked": grade.phase_locked,
+        "verdict": grade.verdict,
+        "score": grade.score,
+    }
