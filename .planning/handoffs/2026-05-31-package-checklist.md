@@ -437,6 +437,71 @@ Proof before staging:
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- .planning/handoffs/2026-05-31-rebuild-brief.md .planning/handoffs/2026-05-31-package-checklist.md`
 
+## Package 0G - Claude Workflow Fanout And Capability Ledger
+
+Suggested commit: `docs(planning): add claude workflow dispatch`
+
+Include:
+
+- `.planning/handoffs/2026-05-31-claude-workflow-dispatch.md`
+- `.planning/handoffs/2026-05-31-capability-integration-ledger.md`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Product source changes.
+- Dependency manifests, generated files, launch/design assets, and release
+  packaging code.
+- Any claim that a capability is complete without Codex verifier acceptance.
+
+Reason:
+
+- Claude Code can fan out many sub-agents. This planning packet turns that
+  breadth into a controlled rebuild workflow: read-only scouts first, one slice
+  per implementation team, capability ledger coverage, and a required Codex
+  verifier packet before any milestone is trusted.
+- It also makes Learn a first-class integration beneficiary. Learn must reuse
+  live evidence, cue/judge data, debrief drills, AI-message observability, and
+  IPC discipline; it must not remain a siloed curriculum surface.
+
+Proof before staging:
+
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- .planning/handoffs/2026-05-31-claude-workflow-dispatch.md .planning/handoffs/2026-05-31-capability-integration-ledger.md .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 0H - Final Acceptance Contract
+
+Suggested commit: `docs(planning): add final acceptance contract`
+
+Include:
+
+- `.planning/handoffs/2026-05-31-final-acceptance-contract.md`
+- `.planning/handoffs/2026-05-31-capability-integration-ledger.md`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Product source changes.
+- Dependency manifests, generated files, launch/design assets, and release
+  packaging code.
+- Any final-complete claim before Codex verifier acceptance.
+
+Reason:
+
+- This contract defines the true finish line for the rebuild: frontend,
+  runtime, Learn, judge voice, local TTS, packaging, one-click install,
+  monetized-product posture, docs, and old-hand-off sweep all integrated or
+  explicitly deferred. It also requires final accepted work to land on `main`
+  only after verification.
+- It updates the capability ledger so Claude's fanout and Codex verification
+  track commercial/product posture rather than preserving an outdated "fully
+  open-source" constraint.
+
+Proof before staging:
+
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- .planning/handoffs/2026-05-31-final-acceptance-contract.md .planning/handoffs/2026-05-31-capability-integration-ledger.md .planning/handoffs/2026-05-31-package-checklist.md`
+
 ## Hold Lane - Demo Source-Run Ship Plan
 
 Suggested commit if/when selected: `docs(demo): capture source-run demo plan`
@@ -492,10 +557,12 @@ Hold:
 - `src/vibemix/runtime/ai_observability.py`
 - `src/vibemix/agent/dj_cohost.py`
 - `src/vibemix/bench/run.py`
+- `src/vibemix/learn/observability.py`
 - `src/vibemix/learn/runtime.py`
 - `tests/runtime/test_ai_observability.py`
 - `tests/agent/test_dj_cohost.py`
 - `tests/bench/test_run_fake.py`
+- `tests/learn/test_observer_boot_wiring.py`
 - `tests/learn/test_runtime_evidence_grounding.py`
 
 Reason:
@@ -583,6 +650,7 @@ Suggested commit if/when selected: `feat(library): export cues as serato markers
 Hold:
 
 - `pyproject.toml`
+- `docs/mixxx.md`
 - `src/vibemix/library/export_serato.py`
 - `tests/library/test_export_serato.py`
 
@@ -620,12 +688,36 @@ Remaining gate:
 - Identify focused tests and the intended CLI/UI consumer. Preserve the grounded
   tool spine before porting it into the rebuild.
 
+## Hold Lane - Rebuild Carry-Forward Cue Agreement Flywheel
+
+Suggested commit if/when selected: `feat(library): record cue agreement weak labels`
+
+Hold:
+
+- `src/vibemix/library/cue_agreement.py`
+- `tests/library/test_cue_agreement.py`
+
+Reason:
+
+- This is a deterministic producer for auto-cue versus DJ-cue agreement, useful
+  for the rebuild's feedback/flywheel story. It is not a model and not yet an
+  ingest/runtime integration.
+- Keep it separate from cue export and smart-cue runtime work until the privacy,
+  storage, and ingest call-site decisions are accepted.
+
+Remaining gate:
+
+- Run focused cue-agreement tests, then decide where weak-label JSONL or
+  telemetry belongs. Do not claim a learning flywheel until an accepted producer
+  and consumer both exist.
+
 ## Hold Lane - Rebuild Carry-Forward Judge Voice Evidence
 
 Suggested commit if/when selected: `feat(intel): voice transition judge evidence`
 
 Hold:
 
+- `src/vibemix/intel/judge_voice.py`
 - `tests/intel/test_judge_voice.py`
 
 Reason:
@@ -638,6 +730,27 @@ Remaining gate:
 
 - Pair this with the implementation file and runtime coach integration, then
   run grounding-review before shipping any new spoken judge line.
+
+## Hold Lane - Rebuild Carry-Forward Live Reality Pins
+
+Suggested commit if/when selected: `test(repo): pin live reality gaps`
+
+Hold:
+
+- `tests/repo/test_live_reality_pins.py`
+
+Reason:
+
+- This is a reality pin that guards against false "Mastered" or live-capability
+  claims, especially around the Beatmatch Judge producer gap. It is valuable
+  during rebuild because it catches cases where the UI/consumer exists but the
+  production event producer is absent.
+
+Remaining gate:
+
+- Keep the pin only while it describes the current rebuilt reality. Once the
+  producer is wired and proven live, retire or rewrite the pin so it does not
+  freeze a fixed gap as permanent truth.
 
 ## Package 2 - Session IPC And Diagnostics Wiring
 
