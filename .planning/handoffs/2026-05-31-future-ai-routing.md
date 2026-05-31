@@ -105,7 +105,8 @@ insertions or screenshot totals.
    improvement.
 3. If a staging window opens, choose one package card. The next strongest review
    candidate is the combined Package 2 + Package 3 IPC contract package, because
-   the shared schema/codegen/count files already make a split risky.
+   the shared schema/codegen/count files already make a split risky. Use
+   `.planning/handoffs/2026-05-31-ipc-staging-packet.md` as the staging packet.
 4. If the user wants product-facing musical value next, choose Packages 4-6 as
    one cue/pill/Viber pipeline and require live DDJ/Viber evidence before any
    "works in the app" claim.

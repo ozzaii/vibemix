@@ -324,6 +324,36 @@ Remaining gate:
 - Stage by hunk only and keep the cached diff limited to the accepted runtime
   orientation notes.
 
+## Package 0C - IPC Staging Packet
+
+Suggested commit: `docs(planning): add ipc staging packet`
+
+Include:
+
+- `.planning/handoffs/2026-05-31-ipc-staging-packet.md`
+- `.planning/handoffs/2026-05-31-future-ai-routing.md`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Product source changes.
+- Generated IPC files, even if the packet discusses them.
+- Runtime diagnostic, sidecar-log, cue/pill/library-live-read, design, launch,
+  pricing, local TTS, and `__main__.py` hold lanes.
+
+Reason:
+
+- This is planning-only support for the next likely staging move: the combined
+  Package 2 + Package 3 IPC contract review. It records the current contract
+  evidence, stage list, keep-outs, verification commands, and split rules so a
+  future agent can stage deliberately instead of reconstructing the package from
+  the full checklist.
+
+Proof before staging:
+
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- .planning/handoffs/2026-05-31-ipc-staging-packet.md .planning/handoffs/2026-05-31-future-ai-routing.md .planning/handoffs/2026-05-31-package-checklist.md`
+
 ## Package 2 - Session IPC And Diagnostics Wiring
 
 Suggested commit: `fix(session-ipc): wire status recheck errors and citation telemetry`
@@ -1194,6 +1224,9 @@ Hold:
 - `docs/design/screenshots/2026-05-31-sexiest-live/02-sexified-deck.png`
 - `docs/design/screenshots/2026-05-31-sexiest-live/02-sexified-proof.json`
 - `docs/design/screenshots/2026-05-31-sexiest-live/02-sexified-settings.png`
+- `docs/design/screenshots/2026-05-31-sexiest-live/03-final-deck.png`
+- `docs/design/screenshots/2026-05-31-sexiest-live/03-final-proof.json`
+- `docs/design/screenshots/2026-05-31-sexiest-live/03-final-settings.png`
 
 Reason:
 
