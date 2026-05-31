@@ -9,11 +9,11 @@ refactor product code while concurrent feature lanes are still moving.
 Current refresh, 2026-05-31:
 
 - Dirty tree: after the future-AI routing refresh, `git diff --shortstat`
-  reports 102 tracked files changed, 5417 insertions, and 1853 deletions;
-  `git ls-files --others --exclude-standard | wc -l` reports 97 untracked
+  reports 102 tracked files changed, 5441 insertions, and 1872 deletions;
+  `git ls-files --others --exclude-standard | wc -l` reports 99 untracked
   paths.
 - Package coverage: `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passes with 199 dirty paths listed and assigned after the future-AI routing
+  passes with 201 dirty paths listed and assigned after the future-AI routing
   doc classified the new frontend proof, Mixxx research, cue-folder bridge,
   Local MOSS helper, and `CLAUDE.md` runtime-orientation drift; 3 generated
   launch previews are intentionally ignored. The checker now includes staged,
@@ -22,7 +22,8 @@ Current refresh, 2026-05-31:
 - Package 0 landed as `5fa5d4d8 docs(planning): document dirty tree shipping lanes`
   with DCO signoff. Later planning rebaselines can make its doc paths dirty
   again; keep those diffs docs-only.
-- Package 0B is the future-AI routing handoff:
+- Package 0B landed as `d433a42d docs(planning): add future ai routing handoff`
+  with DCO signoff. It is the future-AI routing handoff:
   `.planning/handoffs/2026-05-31-future-ai-routing.md`, paired with the package
   checklist hunk that classifies the latest drift.
 - Package 1 landed as `05ed0b91 chore(agent-tooling): add live verification helpers`
@@ -49,7 +50,8 @@ Current refresh, 2026-05-31:
   in the Local MOSS hold lane until its owner accepts or removes the slice.
 - New hold-lane classifications: frontend shell/settings proof, sexiest-live
   visual proof, cue export folder bridge, Mixxx research notes, and
-  `CLAUDE.md` runtime-orientation drift are assigned but not promoted.
+  `CLAUDE.md` runtime-orientation drift, plus Tauri sidecar log drain, are
+  and runtime diagnostic stdout resilience are assigned but not promoted.
 - First staging action is complete. Next commit must be selected from a package
   card with hunk review; do not smuggle shared IPC/tooling hunks into a narrow
   package.
@@ -66,14 +68,14 @@ truthful answer before doing anything else.
 
 ```text
 Current lane: planning/evidence only; no product code edits while other sessions code.
-Live tree: 102 tracked files changed, 5417 insertions, 1853 deletions, 97 untracked.
-Package checker: green, 199 dirty paths assigned; staged/unstaged/untracked included; 3 generated launch previews ignored.
+Live tree: 102 tracked files changed, 5441 insertions, 1872 deletions, 99 untracked.
+Package checker: green, 201 dirty paths assigned; staged/unstaged/untracked included; 3 generated launch previews ignored.
 Package 0 landed: 5fa5d4d8 docs(planning): document dirty tree shipping lanes.
-Package 0B drafted: future-AI routing handoff plus latest drift classifications.
+Package 0B landed: d433a42d docs(planning): add future ai routing handoff.
 Package 1 landed: 05ed0b91 chore(agent-tooling): add live verification helpers.
 Next safe move: choose a package card and inspect shared hunks before staging; remaining AGENTS.md belongs to Package 3 IPC guidance.
 Do not stage: unrelated src/, tauri/, uv.lock, launch/design assets, local MOSS residuals/helpers, CLAUDE.md, or hold lanes with the next package.
-Main active holds: Mix Timing Oracle has refresh.py Ruff red + no live/audio proof; CLAP eval is offline/no-ONNX; Local MOSS is residual uv.lock + local helper; Frontend Shell Settings Proof is UI code + screenshots; Deck Audio needs live controller/audio proof.
+Main active holds: Mix Timing Oracle has refresh.py Ruff red + no live/audio proof; CLAP eval is offline/no-ONNX; Local MOSS is residual uv.lock + local helper; Frontend Shell Settings Proof is UI code + screenshots; Tauri Sidecar Log Drain is Rust runtime code; Runtime Diagnostic Output Resilience is unproven; Deck Audio needs live controller/audio proof.
 ```
 
 Resume commands:
@@ -126,7 +128,7 @@ must point to proof, a decision, and the next missing evidence.
 
 | Finding | Current evidence | Decision | Missing proof |
 |---|---|---|---|
-| The tree is messy but fully classified. | `git diff --shortstat` is 102 files / 5417 insertions / 1853 deletions, untracked count is 97, and strict package checker lists 199 dirty paths assigned; Singularity/Mixxx research, cue-export, frontend proof, Local MOSS, and CLAP eval drift are classified as hold lanes. | Keep research/eval/frontend proof/local TTS hold lanes out of active staging unless explicitly selected. | Re-run the same checks immediately before any staging window. |
+| The tree is messy but fully classified. | `git diff --shortstat` is 102 files / 5441 insertions / 1872 deletions, untracked count is 99, and strict package checker lists 201 dirty paths assigned; Singularity/Mixxx research, cue-export, frontend proof, Local MOSS, sidecar-log, runtime diag, and CLAP eval drift are classified as hold lanes. | Keep research/eval/frontend proof/local TTS/sidecar-log/runtime-diag hold lanes out of active staging unless explicitly selected. | Re-run the same checks immediately before any staging window. |
 | Package 0 reduced confusion without touching product behavior. | Package 0 landed as `5fa5d4d8`; it contained only three planning docs, the dirty-tree checker, and checker tests; checker tests and focused Ruff are green. | Use it as the baseline; do not reopen it except for docs-only rebaseline notes. | Any rebaseline cached diff must contain only planning docs. |
 | Shared files are the main risk, not ordinary file count. | Checker reports shared assignments for `AGENTS.md`, `__main__.py`, `session_loop.py`, IPC schema/generated files, and IPC count/parity tests. | Stage shared paths by hunk or as an explicitly combined package. | `git diff --cached -- <path>` evidence for every shared path in a staged commit. |
 | IPC work should default to one contract review. | Packages 2 and 3 share schema, generated TS, generated validator, Python wrappers, Rust/UI consumers, and count/parity tests. | Combine Package 2 and Package 3 unless a deliberate split keeps full schema/codegen proof with each side. | Fresh `check_ipc_schema.py`, IPC wiring checker, UI `check:ipc`, focused tests, and build. |

@@ -33,11 +33,12 @@ not live truth.
 Latest routing refresh:
 
 - `git diff --shortstat` reported 102 tracked files changed, 5417 insertions,
-  and 1853 deletions.
-- `git ls-files --others --exclude-standard | wc -l` reported 97 untracked
-  paths.
+  and 1853 deletions before Package 0B landed. Post-commit,
+  `git diff --shortstat` reported 102 tracked files changed, 5441 insertions,
+  and 1872 deletions.
+- `git ls-files --others --exclude-standard | wc -l` reported 99 untracked paths.
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passed with 199 dirty paths listed and assigned; 3 generated launch previews
+  passed with 201 dirty paths listed and assigned; 3 generated launch previews
   are intentionally ignored.
 
 This handoff pairs with an update to
@@ -79,6 +80,12 @@ Package 1 has already landed:
 - `05ed0b91 chore(agent-tooling): add live verification helpers`
 - Scope: repo agent tooling, live websocket probe helpers, IPC wiring checker,
   grounding review skill, and runtime dev MCP helper tests.
+
+Package 0B has already landed:
+
+- `d433a42d docs(planning): add future ai routing handoff`
+- Scope: this routing handoff plus checklist/map rebaseline for the newest
+  drift classifications only.
 
 After those commits, the remaining dirty tree is mostly product packages and
 hold lanes. Do not re-open Package 0 or Package 1 except for a narrow docs

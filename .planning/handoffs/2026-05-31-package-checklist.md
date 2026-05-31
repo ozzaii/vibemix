@@ -55,7 +55,7 @@ Proof already run:
   dirty path is assigned to a package or hold lane.
 - Current refresh, 2026-05-31:
   `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passes with 199 dirty paths exactly listed after Packages 0 and 1 landed and
+  passes with 201 dirty paths exactly listed after Packages 0, 0B, and 1 landed and
   the future-AI routing refresh classified the latest frontend proof,
   sexiest-live screenshots, Mixxx research, cue-export bridge, Local MOSS helper,
   and `CLAUDE.md` runtime-orientation drift; 3 generated launch previews are
@@ -275,6 +275,8 @@ Remaining gate:
 
 Suggested commit: `docs(planning): add future ai routing handoff`
 
+Landed in `d433a42d`.
+
 Include:
 
 - `.planning/handoffs/2026-05-31-future-ai-routing.md`
@@ -420,6 +422,26 @@ Remaining gate:
   `ipc.profile.view`; closed boot/close should not spam profile requests.
 - Live Settings/Library pass in Tauri: boot/open/close should
   keep a single `ipc.library.staleness_nudge` subscription, not one per drawer refresh.
+
+## Hold Lane - Runtime Diagnostic Output Resilience
+
+Suggested commit if/when selected: `fix(runtime): ignore closed diagnostic stdout`
+
+Hold:
+
+- `src/vibemix/runtime/diag.py`
+
+Reason:
+
+- The current hunk catches `BrokenPipeError` / `OSError` while writing the live
+  diagnostic status line. That is runtime behavior, not IPC contract work, and
+  should not ride with Package 2 unless a focused diagnostic-output package is
+  intentionally selected.
+
+Remaining gate:
+
+- Run focused runtime diagnostics tests or add one before staging. Keep this out
+  of docs-only routing/rebaseline commits.
 
 ## Package 3 - IPC Contract Cleanup
 
@@ -1166,6 +1188,9 @@ Hold:
 - `docs/design/screenshots/2026-05-31-sexiest-live/00-current-deck.png`
 - `docs/design/screenshots/2026-05-31-sexiest-live/00-current-proof.json`
 - `docs/design/screenshots/2026-05-31-sexiest-live/00-current-settings.png`
+- `docs/design/screenshots/2026-05-31-sexiest-live/01-sexified-deck.png`
+- `docs/design/screenshots/2026-05-31-sexiest-live/01-sexified-proof.json`
+- `docs/design/screenshots/2026-05-31-sexiest-live/01-sexified-settings.png`
 
 Reason:
 
@@ -1308,6 +1333,29 @@ Remaining gate:
 - A full `cargo tauri build` / signed artifact pass still belongs to release
   packaging. This package prevents a stale sidecar schema from being silently
   accepted before that build.
+
+## Hold Lane - Tauri Sidecar Log Drain
+
+Suggested commit if/when selected: `fix(tauri): drain sidecar logs without line buffering`
+
+Hold:
+
+- `tauri/src-tauri/src/sidecar.rs`
+
+Reason:
+
+- This is production Tauri sidecar runtime code, not the Package 13 bundle
+  freshness guard. The current hunk changes stdout/stderr draining from
+  line-based reads to raw byte reads so partial sidecar output can reach the
+  rotating log.
+- Keep it separate until Rust formatting/checks and a focused sidecar-log proof
+  are run. Do not stage it with docs-only routing or Python sidecar-bundle
+  checks.
+
+Remaining gate:
+
+- Run `cargo fmt` / `cargo check --manifest-path tauri/src-tauri/Cargo.toml` and
+  any focused sidecar tests before promoting this lane.
 
 ## Package 14 - Live TTS Shutdown Hygiene
 
@@ -1727,12 +1775,12 @@ Ship path:
 Latest package consolidation pass on 2026-05-31:
 
 - Current planning guardrails, 2026-05-31:
-  `git diff --shortstat` reports 102 files changed, 5417 insertions, and 1853
-  deletions; `git ls-files --others --exclude-standard | wc -l` reports 97.
+  `git diff --shortstat` reports 102 files changed, 5441 insertions, and 1872
+  deletions; `git ls-files --others --exclude-standard | wc -l` reports 99.
 - Current package-checker refresh after Singularity research/census,
   cue-export, frontend proof, Mixxx research, and CLAP fixture drift:
   `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passes with 199 dirty paths assigned after Packages 0 and 1 landed. This
+  passes with 201 dirty paths assigned after Packages 0, 0B, and 1 landed. This
   refresh keeps the checker honest across staged, unstaged, and untracked paths;
   keeps the residual local-MOSS `uv.lock` diff plus local helper on hold; and
   assigns Singularity/Mixxx research, cue-export, frontend proof, sexiest-live
