@@ -33,6 +33,7 @@ NEVER exits on exception (verbatim v4 behavior).
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import sys
 import threading
@@ -62,6 +63,7 @@ from vibemix.audio.constants import (
     GENRE_CENTROID_HARD_TEK_MIN,
 )
 from vibemix.library.section_builder import next_section_after_position, sections_for_entry
+from vibemix.state.drop_predict import predict_drop_in_sec
 from vibemix.state.deck_context import (
     live_mix_evidence_keys,
     midi_evidence_key,
@@ -98,6 +100,12 @@ from vibemix.state.track_resolver import derive_audible_deck, derive_audible_tra
 # phase classification fall back to the no-hysteresis path → live phase flicker.
 _BPM_RING_MAXLEN = 5  # ~15 s at the 3 s estimate cadence
 _COURSE3_CUE_CONF_FLOOR = 0.7
+
+# Dormant drop-anticipation signal (SYSTEM-AUDIT C9). Only anticipate a drop the
+# detector is at least half-sure of, and never "call" one more than ~a phrase or two
+# out — a too-early or low-confidence prediction is worse than silence.
+_DROP_CUE_CONF_FLOOR = 0.5
+_DROP_HORIZON_S = 32.0
 _COURSE3_MIX_TITLE_MATCH_POSITION_CONF = 0.75
 _COURSE3_REVIEW_ONLY_LESSONS = frozenset({"L3.06"})
 
@@ -178,6 +186,28 @@ def _course3_session_lens_active(learn_state) -> bool:
     if lesson_id in _COURSE3_REVIEW_ONLY_LESSONS:
         return False
     return True
+
+
+def _log_drop_countdown(
+    new_drop: float | None,
+    prev_drop: float | None,
+    track_title: str | None,
+) -> None:
+    """Live-bench countdown for the dormant drop signal (DROP_DEBUG, opt-in).
+
+    Off unless ``VIBEMIX_DROP_DEBUG`` is set. Prints once per integer second as the
+    predicted drop approaches, plus a ``NOW`` marker when a small ETA resolves to
+    ``None`` (the drop section reached) — so a live tester can compare the
+    prediction against the music by ear. No reaction fires; this is observation only.
+    """
+    if not os.environ.get("VIBEMIX_DROP_DEBUG"):
+        return
+    title = (track_title or "?")[:32]
+    if new_drop is not None:
+        if prev_drop is None or int(new_drop) != int(prev_drop):
+            print(f"-> [drop] ~{new_drop:4.0f}s  {title}", flush=True)
+    elif prev_drop is not None and prev_drop <= 2.0:
+        print(f"-> [drop] >>> NOW <<<  {title}", flush=True)
 
 
 def _compute_buildup_score(curve: list, window_s: float, hop_s: float = 1.0) -> float:
@@ -916,6 +946,40 @@ def _tick_once(
                         pass
         else:
             deck_snap = None
+
+        # Dormant drop-anticipation signal (SYSTEM-AUDIT C9 dead-end). Populate the
+        # read-only predicted_drop_in_sec from the audible deck's OWN detected
+        # structure (cue_detect / DJ sections — never a hand-fed time, compose-
+        # existing). This closes the long-standing None and makes the signal
+        # AVAILABLE so its live accuracy can be measured — the prerequisite for the
+        # v2.1 telemetry-guarded flip. NO reaction fires on it: predictive drop
+        # FIRING stays gated (v2.0 CONTEXT D) until that accuracy is validated.
+        _prev_drop = state.predicted_drop_in_sec
+        state.predicted_drop_in_sec = None
+        if (
+            section_source is not None
+            and deck_snap is not None
+            and state.audible_deck in ("A", "B")
+            and state.audible_track_position_s is not None
+        ):
+            _drop_dt = deck_snap.get(state.audible_deck)
+            _drop_track_id = getattr(_drop_dt, "track_id", None) if _drop_dt is not None else None
+            if _drop_track_id:
+                _drop_entry = _lookup_section_entry(section_source, _drop_track_id)
+                if _drop_entry is not None:
+                    try:
+                        state.predicted_drop_in_sec = predict_drop_in_sec(
+                            sections_for_entry(_drop_entry),
+                            state.audible_track_position_s,
+                            min_confidence=_DROP_CUE_CONF_FLOOR,
+                            max_horizon_s=_DROP_HORIZON_S,
+                        )
+                    except Exception:
+                        pass  # detection hiccup → honest None, never wedge the tick
+        # Live-bench observability (DROP_DEBUG). The signal stays dormant (no reaction
+        # fires), but log the countdown on integer-second crossings + the arrival so we
+        # can eyeball predicted-vs-actual drop during a live set. Off unless VIBEMIX_DROP_DEBUG.
+        _log_drop_countdown(state.predicted_drop_in_sec, _prev_drop, state.audible_track)
 
         if state.session_active:
             course3_position_s = state.audible_track_position_s
