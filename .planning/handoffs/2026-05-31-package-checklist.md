@@ -381,6 +381,34 @@ Proof before staging:
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- .planning/handoffs/2026-05-31-dependency-modernization-packet.md .planning/handoffs/2026-05-31-future-ai-routing.md .planning/handoffs/2026-05-31-package-checklist.md`
 
+## Package 0E - Refactor/Wiring Session Handoff
+
+Suggested commit: `docs(planning): add refactor wiring handoff`
+
+Include:
+
+- `.planning/handoffs/2026-05-31-refactor-wiring-session-handoff.md`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Product source changes.
+- Generated IPC files, dependency manifests, and package-lock files.
+- Runtime diagnostic, Tauri sidecar-log, cue/pill/library-live-read, design,
+  launch, pricing, local TTS, signing/notarization, and `__main__.py` hold lanes.
+
+Reason:
+
+- This is planning-only support for handing a bounded refactor/wiring lane to
+  another session. It makes the recommended first move explicit: combined
+  Package 2 + Package 3 IPC contract review, not a broad refactor of every
+  floating dirty file.
+
+Proof before staging:
+
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- .planning/handoffs/2026-05-31-refactor-wiring-session-handoff.md .planning/handoffs/2026-05-31-package-checklist.md`
+
 ## Package 2 - Session IPC And Diagnostics Wiring
 
 Suggested commit: `fix(session-ipc): wire status recheck errors and citation telemetry`
@@ -1396,6 +1424,37 @@ Remaining gate:
 - A full `cargo tauri build` / signed artifact pass still belongs to release
   packaging. This package prevents a stale sidecar schema from being silently
   accepted before that build.
+
+## Hold Lane - macOS Signing And Notarization Flow
+
+Suggested commit if/when selected: `fix(packaging): support local notarization fallback`
+
+Hold:
+
+- `docs/signing-macos.md`
+- `scripts/dist/sign_macos.sh`
+- `tauri/src-tauri/tauri.conf.json5`
+
+Reason:
+
+- This is release packaging/signing behavior, not the Package 13 sidecar bundle
+  freshness guard and not the refactor/wiring lane. The current hunk adds a
+  local Apple-ID app-specific-password notarization fallback, an
+  `APPLE_SIGNING_IDENTITY` alias, and a Tauri build-command path correction.
+- Keep it separate until both dry-run and real signing/notarization evidence are
+  available. Code-signing changes should prove identity selection, secret
+  handling, notarization submission/log retrieval, staple verification, and the
+  Tauri build hook path.
+
+Remaining gate:
+
+- Run a dry-run against an existing `.app` bundle, for example
+  `bash scripts/dist/sign_macos.sh --dry-run <path-to-vibemix.app>`.
+- Run `cargo check --manifest-path tauri/src-tauri/Cargo.toml` if the Tauri
+  config hunk is staged.
+- Before shipping, perform a full sign/notarize/staple/verify pass with either
+  the ASC API-key path or the Apple-ID fallback, and confirm no secrets are
+  echoed or committed.
 
 ## Hold Lane - Tauri Sidecar Log Drain
 
