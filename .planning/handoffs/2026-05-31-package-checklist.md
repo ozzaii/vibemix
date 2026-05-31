@@ -55,14 +55,16 @@ Proof already run:
   dirty path is assigned to a package or hold lane.
 - Current refresh, 2026-05-31:
   `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passes with 174 dirty paths exactly listed after Packages 0 and 1 landed and
-  the cue-export plan drift was classified, 3 generated launch previews ignored,
-  and every dirty path assigned. The checker now reads staged
+  passes with 199 dirty paths exactly listed after Packages 0 and 1 landed and
+  the future-AI routing refresh classified the latest frontend proof,
+  sexiest-live screenshots, Mixxx research, cue-export bridge, Local MOSS helper,
+  and `CLAUDE.md` runtime-orientation drift; 3 generated launch previews are
+  ignored, and every dirty path is assigned. The checker now reads staged
   (`git diff --cached --name-only`), unstaged (`git diff --name-only`), and
   untracked paths so a half-staged tree cannot produce a false green. The live
-  tree drifted with `.planning/singularity/2026-05-31/*.md` research/census
-  briefs, nested cue-export research maps, and the real-CLAP fixture README;
-  those are assigned to hold lanes.
+  tree includes `.planning/singularity/2026-05-31/*.md` research/census briefs,
+  nested cue-export/Mixxx research maps, and the real-CLAP fixture README; those
+  are assigned to hold lanes.
   Earlier in this same planning pass, the local MOSS TTS
   wrapper/runtime/test files are no longer dirty, `uv.lock` still carries the
   residual `sentencepiece` / `tts-local` lockfile diff, and the new
@@ -268,6 +270,57 @@ Remaining gate:
   schema-rejecting on current source.
 - Prove the full source-mode helper path through UI log and session
   `events.jsonl` once the Tauri app runtime is available.
+
+## Package 0B - Future AI Routing Handoff
+
+Suggested commit: `docs(planning): add future ai routing handoff`
+
+Include:
+
+- `.planning/handoffs/2026-05-31-future-ai-routing.md`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Product source changes.
+- Research/census briefs that need separate citation review.
+- Any hold-lane file promoted only because it is mentioned in the routing doc.
+
+Reason:
+
+- This is a small planning-only router for future AI sessions. It gives one
+  clean doorway into the current dirty tree and explains how to use the
+  checklist, maintainability map, and handoffs without rediscovering the entire
+  `.planning/` directory.
+- The package-checklist hunk only classifies newly appeared dirty paths and
+  assigns this routing doc. It must not carry product behavior.
+
+Proof before staging:
+
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- .planning/handoffs/2026-05-31-future-ai-routing.md .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Hold Lane - Claude Runtime Orientation Drift
+
+Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
+
+Hold:
+
+- `CLAUDE.md`
+
+Reason:
+
+- The current hunk documents Local MOSS invocation, packaged-GUI environment
+  flag behavior, and deck passthrough/live audio caveats. It is useful
+  orientation, but it is a shared agent doc and should not be smuggled into the
+  future-AI routing package.
+- If staged later, review it with the Local MOSS TTS, live runtime, and deck
+  audio owners so the claims match the accepted package state.
+
+Remaining gate:
+
+- Stage by hunk only and keep the cached diff limited to the accepted runtime
+  orientation notes.
 
 ## Package 2 - Session IPC And Diagnostics Wiring
 
@@ -729,6 +782,10 @@ Hold:
 - `.planning/singularity/2026-05-31/cue-export/PLAN-CUE-EXPORT.md`
 - `.planning/singularity/2026-05-31/cue-export/research-cue-boost.md`
 - `.planning/singularity/2026-05-31/cue-export/research-easy-export.md`
+- `.planning/singularity/2026-05-31/mixxx/PLAN-MIXXX.md`
+- `.planning/singularity/2026-05-31/mixxx/research-fit-positioning.md`
+- `.planning/singularity/2026-05-31/mixxx/research-library-cues.md`
+- `.planning/singularity/2026-05-31/mixxx/research-live-control.md`
 - `.planning/singularity/2026-05-31/ROADMAP-SINGULARITY.md`
 - `.planning/singularity/2026-05-31/research-cue-boost.md`
 - `.planning/singularity/2026-05-31/research-data-flywheel.md`
@@ -739,9 +796,9 @@ Reason:
 
 - These are broad read-only research/census briefs that cross automix/TTS,
   cue detection/export, Learn, Vibe Judge, Viber, semantic hot-cues, and
-  data-flywheel strategy. Keep them out of Package 0 so the first planning
-  commit remains an inventory/checker package rather than a claim-heavy research
-  bundle.
+  data-flywheel strategy, plus new Mixxx positioning/library-cue/live-control
+  research. Keep them out of Package 0 so the first planning commit remains an
+  inventory/checker package rather than a claim-heavy research bundle.
 - Several briefs contain forward-looking status language and external references.
   Use them as discovery inputs, not as shipping proof, until each cited
   `path:line`, live-status claim, and product recommendation is reviewed in the
@@ -752,6 +809,30 @@ Remaining gate:
 - If selected as a docs-only research package, validate citations and stale line
   anchors. If selected as implementation input, split the relevant brief into the
   target package's evidence/acceptance criteria first.
+
+## Hold Lane - Cue Export Folder Bridge
+
+Suggested commit if/when selected: `feat(library): add folder cue export bridge`
+
+Hold:
+
+- `src/vibemix/library/cue_folder.py`
+- `tests/library/test_cue_folder.py`
+
+Reason:
+
+- These files appeared from the cue-export research lane as an implementation
+  slice, not as part of the already mapped auto-cue/pill/Viber package.
+- Keep this bridge separate from Package 4 until the CLI/export integration,
+  Rekordbox XML behavior, and staging boundary are reviewed together.
+- The nearby Singularity cue-export briefs can explain intent, but they are
+  research inputs. They do not make these runtime/library files shippable on
+  their own.
+
+Remaining gate:
+
+- Identify the intended CLI or Viber entry point, run the focused library tests,
+  and prove the output contract before promoting this from hold to a package.
 
 ## Hold Lane - Real CLAP Retrieval Eval Gate
 
@@ -1076,6 +1157,63 @@ Reason:
   production UI code. Keep them owned and reviewable, but do not mix them into
   runtime or launch-collateral commits unless the design direction is accepted.
 
+## Hold Lane - Sexiest Live Visual Proof
+
+Suggested commit if/when selected: `docs(design): capture sexiest live proof`
+
+Hold:
+
+- `docs/design/screenshots/2026-05-31-sexiest-live/00-current-deck.png`
+- `docs/design/screenshots/2026-05-31-sexiest-live/00-current-proof.json`
+- `docs/design/screenshots/2026-05-31-sexiest-live/00-current-settings.png`
+
+Reason:
+
+- These are visual proof artifacts from a later frontend/design pass. Keep them
+  separate from production UI code and from the selected launch collateral until
+  the design direction is accepted.
+
+Remaining gate:
+
+- If selected, pair the screenshots with the design note or production UI diff
+  they prove, then run the relevant UI build/test/screenshot proof before any
+  shipped visual claim.
+
+## Hold Lane - Frontend Shell Settings Proof
+
+Suggested commit if/when selected: `fix(ui-shell): keep settings drawer navigation stable`
+
+Hold:
+
+- `tauri/ui/src/settings/components/group.ts`
+- `tauri/ui/src/session/components/picker.ts`
+- `tauri/ui/src/session/components/rocker.ts`
+- `tauri/ui/src/shell/app.ts`
+- `tauri/ui/src/shell/shell.css`
+- `docs/design/screenshots/2026-05-31-frontend-proof/actionability-proof.json`
+- `docs/design/screenshots/2026-05-31-frontend-proof/after-fix-proof.json`
+- `docs/design/screenshots/2026-05-31-frontend-proof/after-fix-settings-open.png`
+- `docs/design/screenshots/2026-05-31-frontend-proof/shell-initial.png`
+- `docs/design/screenshots/2026-05-31-frontend-proof/shell-settings-open.png`
+- `docs/design/screenshots/2026-05-31-frontend-proof/shell-settings-proof.json`
+
+Reason:
+
+- This is production shell/settings behavior and shell visual polish plus proof
+  collateral. It should not be folded into the design-only Premium Enterprise
+  Visual Audit and should not ride with IPC/settings schema work unless the
+  package deliberately proves both layers.
+- The code diff keeps settings navigation synchronized with drawer open/close
+  state, stabilizes settings-group layout, changes session picker/rocker
+  styling, and changes shell chrome/sidebar CSS. That needs UI tests/build and a
+  screenshot proof before it is treated as shipped polish.
+
+Remaining gate:
+
+- Run the focused settings/shell UI tests, `npm --prefix tauri/ui run build`,
+  and keep the screenshot/JSON proof with the same package if this lane is
+  promoted.
+
 ## Package 12 - Runtime Memory CLAP Readiness
 
 Suggested commit: `fix(memory): reconcile stale sqlite-vec embedding dimensions`
@@ -1214,6 +1352,7 @@ Suggested commit if/when it ships: `feat(tts): add wrapped local moss onnx runti
 Hold:
 
 - `pyproject.toml`
+- `scripts/local_tts_speak.py`
 - `src/vibemix/agent/local_tts.py`
 - `src/vibemix/agent/moss_tts/__init__.py`
 - `src/vibemix/agent/moss_tts/ort_cpu_runtime.py`
@@ -1284,6 +1423,12 @@ Drift refresh, 2026-05-31 12:11 +03:
   the lockfile. Since the matching `pyproject.toml` manifest diff is not dirty,
   keep this as a residual hold-lane lockfile hunk. Do not stage it with Package
   14 shutdown hygiene, Package 10 pricing, or dependency modernization.
+
+Drift refresh, 2026-05-31 13:25 +03:
+
+- `scripts/local_tts_speak.py` appeared as a local proof/smoke helper for this
+  same on-device TTS lane. Keep it with the Local MOSS hold until the runtime,
+  dependency, model-source, and license story is accepted.
 
 Keep out:
 
@@ -1582,15 +1727,16 @@ Ship path:
 Latest package consolidation pass on 2026-05-31:
 
 - Current planning guardrails, 2026-05-31:
-  `git diff --shortstat` reports 94 files changed, 5085 insertions, and 1746
-  deletions; `git ls-files --others --exclude-standard | wc -l` reports 80.
+  `git diff --shortstat` reports 102 files changed, 5417 insertions, and 1853
+  deletions; `git ls-files --others --exclude-standard | wc -l` reports 97.
 - Current package-checker refresh after Singularity research/census,
-  cue-export, and CLAP fixture drift:
+  cue-export, frontend proof, Mixxx research, and CLAP fixture drift:
   `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passes with 174 dirty paths assigned after Packages 0 and 1 landed. This
+  passes with 199 dirty paths assigned after Packages 0 and 1 landed. This
   refresh keeps the checker honest across staged, unstaged, and untracked paths;
-  keeps the residual local-MOSS `uv.lock` diff on hold; and assigns Singularity
-  research/cue-export plus the real-CLAP eval fixture to hold lanes.
+  keeps the residual local-MOSS `uv.lock` diff plus local helper on hold; and
+  assigns Singularity/Mixxx research, cue-export, frontend proof, sexiest-live
+  screenshots, and the real-CLAP eval fixture to hold lanes.
 - `git diff --check -- .planning/handoffs/2026-05-31-maintainability-map.md .planning/handoffs/2026-05-31-package-checklist.md .planning/handoffs/2026-05-31-dirty-tree-shipping-inventory.md`
   passed.
 - `uv run pytest -q tests/scripts/test_check_dirty_package_plan.py`
