@@ -31,12 +31,37 @@ import time
 
 import numpy as np
 
+from pathlib import Path
+
 from vibemix.audio.cues import track_cues_from_audio
 from vibemix.audio.miniplayer import MiniDeck
 from vibemix.runtime.automix_demo import build_automix_reel
 from vibemix.state.transition_clock import TransitionMode, step_progress
 
 _MODES = {m.name.lower(): m for m in TransitionMode}
+
+
+def _auto_anchor(path: str, labels: tuple[str, ...]) -> tuple[float | None, str | None, float]:
+    """Auto-find a structural cue with vibemix's OWN detector (cue_detect.py).
+
+    Runs the intro/build/breakdown/drop/outro structural analysis and returns the
+    ``(start_s, label, confidence)`` of the best anchor matching ``labels`` (in
+    priority order, highest-confidence within a label). Returns ``(None, ...)`` when
+    the detector finds no structure — the honest, anti-hallucination empty case.
+    """
+    from vibemix.library.cue_detect import detect_cues
+
+    try:
+        anchors = detect_cues(Path(path))
+    except Exception as exc:  # decode/ffmpeg/model hiccup — degrade, never crash the demo
+        print(f"   [cue-detect skipped: {exc}]")
+        return None, None, 0.0
+    for want in labels:
+        matches = [a for a in anchors if getattr(a.label, "value", a.label) == want]
+        if matches:
+            best = max(matches, key=lambda a: a.confidence)
+            return best.start_s, want, best.confidence
+    return None, None, 0.0
 
 
 def _tone(freq_hz: float, *, seconds: float, sr: int, amplitude: float = 0.2) -> np.ndarray:
@@ -73,11 +98,18 @@ def main() -> None:
     parser.add_argument("track_a", nargs="?", default=None, help="fromDeck audio file")
     parser.add_argument("track_b", nargs="?", default=None, help="toDeck audio file")
     parser.add_argument("--mode", default="fixed_skip_silence", choices=sorted(_MODES))
+    parser.add_argument("--outro-start", type=float, default=None,
+                        help="seconds into track A where the DROP / mix-out is (forces "
+                             "fade_at_outro_start so the AI calls THAT, not the track end)")
+    parser.add_argument("--intro-start", type=float, default=None,
+                        help="seconds into track B to cue the incoming mix-in point")
     parser.add_argument("--transition", type=float, default=8.0, help="fade seconds")
     parser.add_argument("--lead", type=float, default=8.0, help="seconds of run-up before the drop")
     parser.add_argument("--tail", type=float, default=4.0, help="seconds to play after landing")
     parser.add_argument("--arm-lead", type=float, default=2.0, help="anticipation window (s)")
     parser.add_argument("--device", default=None, help="output device name substring")
+    parser.add_argument("--no-auto", action="store_true",
+                        help="skip the structural cue detector (default: auto-find the drop)")
     parser.add_argument("--dry-run", action="store_true", help="print plan+reel, no audio")
     args = parser.parse_args()
 
@@ -88,10 +120,33 @@ def main() -> None:
     if sr_b != sr_a:
         print(f"!! sample-rate mismatch (A={sr_a}, B={sr_b}); playing at A's rate — pitch of B will drift")
 
-    from_cues = track_cues_from_audio(src_a, sr)
-    to_cues = track_cues_from_audio(src_b, sr)
+    # Auto-find the REAL drop with vibemix's own structural detector (cue_detect),
+    # so the AI calls the banger drop, not the track end — and we actually benefit
+    # from the system's ability instead of hand-feeding a time. Manual --outro-start
+    # / --intro-start override; --no-auto disables. A/ mix-OUT prefers the drop (else
+    # outro); B/ mix-IN prefers the intro (else drop).
+    outro_start = args.outro_start
+    intro_start = args.intro_start
+    if not args.no_auto:
+        if args.track_a and outro_start is None:
+            outro_start, lbl, conf = _auto_anchor(args.track_a, ("drop", "outro"))
+            if outro_start is not None:
+                print(f"-> 🎯 A: detected {lbl} @ {outro_start:.1f}s (conf {conf:.2f}) — mix-out / drop point")
+        if args.track_b and intro_start is None:
+            intro_start, lbl, conf = _auto_anchor(args.track_b, ("intro", "drop"))
+            if intro_start is not None:
+                print(f"-> 🎯 B: detected {lbl} @ {intro_start:.1f}s (conf {conf:.2f}) — mix-in point")
+
+    from_cues = track_cues_from_audio(src_a, sr, outro_start_sec=outro_start)
+    to_cues = track_cues_from_audio(src_b, sr, intro_start_sec=intro_start)
+    # an outro_start (auto-detected or manual) forces the marker-respecting mode (else
+    # skip-silence only mixes the track END, calling the outro not the banger drop).
+    mode = (
+        TransitionMode.FADE_AT_OUTRO_START if outro_start is not None
+        else _MODES[args.mode]
+    )
     reel = build_automix_reel(
-        from_cues, to_cues, mode=_MODES[args.mode],
+        from_cues, to_cues, mode=mode,
         transition_sec=args.transition, arm_lead_sec=args.arm_lead,
     )
     plan = reel.plan
@@ -102,7 +157,7 @@ def main() -> None:
 
     print(f"-> from: {args.track_a or 'tone 220Hz'}  ({plan.from_duration_sec:.1f}s)")
     print(f"-> to  : {args.track_b or 'tone 330Hz'}  ({plan.to_duration_sec:.1f}s)")
-    print(f"-> mode={args.mode} transition={args.transition}s  cut={plan.is_cut}")
+    print(f"-> mode={mode.name.lower()} transition={args.transition}s  cut={plan.is_cut}")
     print(f"-> fade {fade_begin_sec:.1f}s .. {fade_end_sec:.1f}s  |  play window {start_sec:.1f}s .. {fade_end_sec + args.tail:.1f}s")
     print("-> reel (reaction beats):")
     for b in reel.beats:
