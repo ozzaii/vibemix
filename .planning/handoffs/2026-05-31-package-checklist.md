@@ -55,8 +55,8 @@ Proof already run:
   dirty path is assigned to a package or hold lane.
 - Current refresh, 2026-05-31:
   `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passes with 187 dirty paths exactly listed after Package 0 landed and the
-  cue-export research drift was classified, 3 generated launch previews ignored,
+  passes with 174 dirty paths exactly listed after Packages 0 and 1 landed and
+  the cue-export plan drift was classified, 3 generated launch previews ignored,
   and every dirty path assigned. The checker now reads staged
   (`git diff --cached --name-only`), unstaged (`git diff --name-only`), and
   untracked paths so a half-staged tree cannot produce a false green. The live
@@ -144,9 +144,9 @@ Scope: planning docs plus dirty-tree package checker only
 Staged files: committed; no Package 0 paths remain untracked
 Shared-file hunks: none; all Package 0 paths were standalone planning/tooling files
 Checks:
-  git diff --shortstat -> 96 files changed, 5117 insertions, 1756 deletions
-  git ls-files --others --exclude-standard | wc -l -> 91
-  uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary -> 187 dirty paths listed and assigned
+  git diff --shortstat -> 94 files changed, 5085 insertions, 1746 deletions
+  git ls-files --others --exclude-standard | wc -l -> 80
+  uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary -> 174 dirty paths listed and assigned
   uv run pytest -q tests/scripts/test_check_dirty_package_plan.py -> 5 passed
   uv run ruff check scripts/check_dirty_package_plan.py tests/scripts/test_check_dirty_package_plan.py -> clean
 Live proof: none required; this package is planning-only
@@ -191,7 +191,7 @@ Packaging decision: this is repo developer/operator tooling, not end-user produc
 runtime. It belongs in the source tree so agents and maintainers can prove live
 behavior, but it should not be described as a customer-facing release feature.
 
-Include:
+Landed in `05ed0b91`:
 
 - `AGENTS.md`
 - `CLAUDE.md`
@@ -208,6 +208,11 @@ Include:
 - `src/vibemix/runtime/dev_mcp_server.py`
 - `tests/runtime/test_dev_mcp_server.py`
 - `tests/runtime/test_drive_vibemix_ws_probe.py`
+
+Post-commit note:
+
+- The Package 1 `AGENTS.md` tooling hunk landed. The remaining dirty `AGENTS.md`
+  hunk is the IPC count guidance and belongs to Package 3.
 
 Keep out:
 
@@ -721,6 +726,7 @@ Hold:
 - `.planning/singularity/2026-05-31/cue-export/map-cue-pipeline.md`
 - `.planning/singularity/2026-05-31/cue-export/map-export-pipeline.md`
 - `.planning/singularity/2026-05-31/cue-export/map-live-fusion.md`
+- `.planning/singularity/2026-05-31/cue-export/PLAN-CUE-EXPORT.md`
 - `.planning/singularity/2026-05-31/cue-export/research-cue-boost.md`
 - `.planning/singularity/2026-05-31/cue-export/research-easy-export.md`
 - `.planning/singularity/2026-05-31/ROADMAP-SINGULARITY.md`
@@ -1576,14 +1582,14 @@ Ship path:
 Latest package consolidation pass on 2026-05-31:
 
 - Current planning guardrails, 2026-05-31:
-  `git diff --shortstat` reports 96 files changed, 5117 insertions, and 1756
-  deletions; `git ls-files --others --exclude-standard | wc -l` reports 91.
+  `git diff --shortstat` reports 94 files changed, 5085 insertions, and 1746
+  deletions; `git ls-files --others --exclude-standard | wc -l` reports 80.
 - Current package-checker refresh after Singularity research/census,
   cue-export, and CLAP fixture drift:
   `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-  passes with 187 dirty paths assigned after Package 0 landed. This refresh
-  keeps the checker honest across staged, unstaged, and untracked paths; keeps
-  the residual local-MOSS `uv.lock` diff on hold; and assigns Singularity
+  passes with 174 dirty paths assigned after Packages 0 and 1 landed. This
+  refresh keeps the checker honest across staged, unstaged, and untracked paths;
+  keeps the residual local-MOSS `uv.lock` diff on hold; and assigns Singularity
   research/cue-export plus the real-CLAP eval fixture to hold lanes.
 - `git diff --check -- .planning/handoffs/2026-05-31-maintainability-map.md .planning/handoffs/2026-05-31-package-checklist.md .planning/handoffs/2026-05-31-dirty-tree-shipping-inventory.md`
   passed.
