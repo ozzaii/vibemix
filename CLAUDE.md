@@ -110,16 +110,9 @@ sounddevice callbacks (OS audio thread) → lock-protected buffers → asyncio e
 <!-- GSD:skills-end -->
 
 <!-- GSD:workflow-start source:GSD defaults -->
-## GSD Workflow Enforcement
+## Workflow
 
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
-
-Use these entry points:
-- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd-debug` for investigation and bug fixing
-- `/gsd-execute-phase` for planned phase work
-
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+GSD is **not required** (Kaan retired the mandate 2026-05-30 — "over-complexity for nothing"). Make direct edits; orchestrate larger/parallel work with the **Workflow tool**. Keep the real discipline: TDD when building, atomic + surgically-staged commits. The `/gsd-*` commands and `.planning/` artifacts remain available (and as history) if ever explicitly asked for — but nothing forces you through GSD anymore.
 <!-- GSD:workflow-end -->
 
 

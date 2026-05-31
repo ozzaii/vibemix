@@ -45,6 +45,32 @@ only state refresh writes `MusicState`; AI reactions must resolve through
 `vibemix.llm.model_router` or the existing library agent backend seams. For broad
 agent work, read `CLAUDE.md` and the active `.planning/research/` sweep notes first.
 
+## Supercharge Tooling (shared by Claude Code + Codex)
+
+Three project skills live in `.claude/skills/`. Codex does not auto-load Claude
+skills, so use their bundled scripts and checklists directly:
+
+- **drive-vibemix** — prove a runtime change works LIVE; green tests do not (the
+  frozen sidecar + Tauri runtime hide real failures). Launch current source with
+  `VIBEMIX_DEV_SIDECAR=1 uv run python -m vibemix`, attach a ws client to
+  `127.0.0.1:8765` (client only — Invariant #4), drive a control or fire a reaction,
+  then read `~/Library/Application Support/world.bravoh.vibemix/vibemix/logs/ui.log`
+  and the session `events.jsonl`. Brain-mute signature = `citation_count:0` + empty
+  `transcript_delta` (cause: missing `GEMINI_API_KEY`, not a bug). Helper:
+  `.claude/skills/drive-vibemix/scripts/ws_probe.py`.
+- **ipc-wiring-checker** — before and after any `messages.schema.json` or handler
+  edit, run `uv run python .claude/skills/ipc-wiring-checker/scripts/check_ipc_wiring.py`;
+  it flags one-ended (dead) IPC types and stale `codegen:ipc`, exiting nonzero on a
+  dead type.
+- **vibemix-grounding-review** — before shipping any change to what the co-host SAYS
+  (`state/coach.py`, `agent/dj_cohost.py`, `prompts/*`, `state/event_detector.py`),
+  walk `.claude/skills/vibemix-grounding-review/references/invariant-checks.md`.
+
+Shared MCP servers in Codex `~/.codex/config.toml` `[mcp_servers.*]`: `vibemix_library`
+(existing) and `agentmemory` (persistent cross-session memory; LLM compression is off
+by default — do NOT set `AGENTMEMORY_ALLOW_AGENT_SDK`, it recurses inside agents). LSP
+(pyright + rust-analyzer + ts-language-server) gives both agents compiler-grade nav.
+
 ## Full-Surface Wiring Sweep Notes
 
 When continuing the May 2026 full-app wiring sweep, keep the user's boundary:

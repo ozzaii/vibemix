@@ -227,6 +227,8 @@ v5-*.png
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 .playwright-mcp/
+.codegraph/
+.serena/
 
 # Node modules at repo root (e.g. from running ``npx`` against the repo root).
 # Tauri-specific node_modules under ``tauri/ui/`` already ignored above.
@@ -266,6 +268,7 @@ assets/mascot/source/*.glb
 # Local UI debug screenshot artifact (not a committed fixture).
 /deck-after-delete-pass-silent.png
 
-# Generated partner-capabilities HTML previews — the .md files are the sources.
+# Generated launch HTML previews — committed Markdown/Python files are the sources.
 docs/launch/.partner-capabilities.html
 docs/launch/.partner-capabilities-short.html
+docs/launch/.vibemix-konusan.html
