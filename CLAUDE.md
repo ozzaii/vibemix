@@ -77,7 +77,7 @@ Single packaged app under `src/vibemix/`. Entry point: `python -m vibemix` → `
 - `audio/` — capture/playback ring buffers, `Levels` (EMA RMS), mic gating, ws constants (`WS_HOST`/`WS_PORT`).
 - `platform/` — per-OS audio/screen/MIDI/track backends (`_audio_macos.py`, Windows WASAPI, etc.). The firewall that keeps `__main__` OS-agnostic; selected at runtime.
 - `state/` — **the brain.** `music_state.py` (`MusicState`, single source of truth) written ONLY by `refresh.py`'s state-refresh loop; `event_detector.py` emits typed events with per-type cooldowns (`TRACK_CHANGE`, `PHASE`, `LAYER_ARRIVAL`, `MIX_MOVE`, `HEARTBEAT`, …); `coach.py` builds evidence-grounded prompts; `evidence_registry.py` backs citation grounding; `deck_*` (deck-aware state), `harmonics.py` (Camelot), plus `genre/` + `detectors/`.
-- `agent/` — LiveKit `RealtimeModel` session + the Gemini reaction path (`dj_cohost.py`).
+- `agent/` — LiveKit `RealtimeModel` session + the Gemini reaction path (`dj_cohost.py`). **TTS voices** = `livekit.agents.tts.TTS` plugins assembled into a `FallbackAdapter` cascade in `tts_chain.py::_build_direct_chain`; a new voice is a `tts.TTS` subclass appended there. The adapter requires uniform `num_channels` (mono) across entries, auto-resamples differing sample rates, and auto-wraps non-streaming providers in a StreamAdapter. The local on-device voice (`local_tts.py` — MOSS-TTS-Nano, torch-free ONNX) is opt-in via `VIBEMIX_LOCAL_TTS`.
 - `llm/` — `model_router.py` (config-driven model resolution, no hardcoded literals) + `thinking_gate.py`.
 - `coach/`, `prompts/`, `profile/` — persona/prompt templates per user level; long-term DJ profile.
 - `library/` — local CLAP ONNX 512-dim embeddings + sqlite-vec vibe search (macOS sqlite-vec / Windows numpy, bit-identical top-K parity); also home to `next_suggestion.py` (the pill's mean-centered "what's next" engine, grounded by Invariant #2) and the Viber curator core (`toolset.py`/`codex_curate.py`/`mcp_server.py`/`telegram_bridge.py`). **State on disk** under `~/.cache/vibemix/`: `library-clap.db` (sqlite-vec vectors), `embeddings.db` / CLAP-tagged cache rows, `library.pkl` (track-title cache), `library-clap_centroid.npy` (cached query centroid, auto-recomputed on store change). Historical Gemini `library.db` may exist; do not clobber it during CLAP re-embed. **Gotcha:** library/rekordbox tests MUST monkeypatch `RekordboxLibrary.CACHE_PATH` to a tmp dir, or they overwrite the real `library.pkl`.
@@ -140,6 +140,8 @@ The repo is a packaged project: `pyproject.toml` (hatchling) + `uv.lock` at root
 ```bash
 uv run python -m vibemix          # launches the real session loop (vibemix.__main__:main)
 ```
+
+> **Local AI features (CLAP / CUE / local-TTS) need their extras at run time:** `uv run --extra ai-local python -m vibemix`. Plain `uv run python -m vibemix` syncs to BASE deps and PRUNES `onnxruntime`/`sentencepiece`/`tokenizers` → those features silently fall back (no error). The uv venv has no `pip` — install with `uv pip install`.
 
 **Run the test suite** (the authoritative dev workflow, per CONTRIBUTING.md):
 
