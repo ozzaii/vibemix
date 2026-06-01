@@ -779,7 +779,8 @@ pub async fn library_chat(
 ///
 /// Returns `{ indexed:n, backend:"sqlite-vec"|"numpy", embedding_backend,
 /// embedding_dim, clap_model_installed, clap_model_path, agent_backend,
-/// agent_ready, agent_status, agent_hint, spent_eur:f, failed:n }`.
+/// agent_ready, agent_status, agent_hint, library freshness fields,
+/// spent_eur:f, failed:n }`.
 ///
 /// Two OFFLINE CLI calls (neither makes a Gemini/network call):
 ///   * `library stats --json`  → `{ indexed, backend, embedding_backend,
@@ -815,6 +816,11 @@ pub async fn library_stats(app: AppHandle) -> Result<Value, String> {
         agent_ready,
         agent_status,
         agent_hint,
+        library_freshness,
+        library_freshness_status,
+        library_stale,
+        library_staleness_reason,
+        library_age_days,
         failed,
     ) = match parse_cli_json(&s_out, &s_err, s_code) {
         Ok(v) => (
@@ -856,6 +862,23 @@ pub async fn library_stats(app: AppHandle) -> Result<Value, String> {
                 .and_then(|s| s.as_str())
                 .unwrap_or("")
                 .to_string(),
+            v.get("library_freshness")
+                .cloned()
+                .unwrap_or_else(|| json!({"status": "unknown"})),
+            v.get("library_freshness_status")
+                .and_then(|s| s.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
+            v.get("library_stale")
+                .and_then(|b| b.as_bool())
+                .unwrap_or(false),
+            v.get("library_staleness_reason")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            v.get("library_age_days")
+                .and_then(|n| n.as_u64())
+                .unwrap_or(0),
             v.get("failed").and_then(|n| n.as_u64()).unwrap_or(0),
         ),
         Err(_) => (
@@ -869,6 +892,11 @@ pub async fn library_stats(app: AppHandle) -> Result<Value, String> {
             false,
             "unknown".to_string(),
             "".to_string(),
+            json!({"status": "unknown", "stale": false, "reason": "stats_unavailable"}),
+            "unknown".to_string(),
+            false,
+            "stats_unavailable".to_string(),
+            0,
             0,
         ),
     };
@@ -897,6 +925,11 @@ pub async fn library_stats(app: AppHandle) -> Result<Value, String> {
         "agent_ready": agent_ready,
         "agent_status": agent_status,
         "agent_hint": agent_hint,
+        "library_freshness": library_freshness,
+        "library_freshness_status": library_freshness_status,
+        "library_stale": library_stale,
+        "library_staleness_reason": library_staleness_reason,
+        "library_age_days": library_age_days,
         "spent_eur": spent_eur,
         "failed": failed,
     }))

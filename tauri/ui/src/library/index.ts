@@ -586,10 +586,12 @@ function embeddingLabel(stats: LibraryStats): string {
         : "CLAP ready"
       : backend;
   const agent = (stats.agent_backend ?? "codex").toLowerCase();
-  const agentLabel = stats.agent_ready === false
-    ? `Viber ${agent} setup`
-    : `Viber ${agent}`;
-  return `${agentLabel} / ${model} / ${dim}d / ${stats.backend}`;
+  const agentLabel =
+    stats.agent_ready === false ? `Viber ${agent} setup` : `Viber ${agent}`;
+  const freshness = stats.library_freshness_status
+    ? `library ${stats.library_freshness_status.replace(/_/g, " ")}`
+    : "library unknown";
+  return `${agentLabel} / ${model} / ${dim}d / ${stats.backend} / ${freshness}`;
 }
 
 function renderStats(stats: LibraryStats): void {

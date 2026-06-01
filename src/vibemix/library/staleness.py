@@ -15,10 +15,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+import pickle
 import tempfile
 import time
 from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +35,29 @@ DEFAULT_LIBRARY_PKL = Path.home() / ".cache" / "vibemix" / "library.pkl"
 # Snooze state lives under the standard user config dir.
 DEFAULT_STATE_FILE_PATH = Path.home() / ".config" / "vibemix" / "state.json"
 STATE_KEY = "library_staleness_snoozed_until"
+FreshnessStatus = Literal["fresh", "stale", "not_indexed", "source_missing", "cache_unreadable"]
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryFreshness:
+    """Truthful freshness status for the cache Viber/set prep depends on."""
+
+    status: FreshnessStatus
+    stale: bool
+    reason: str
+    age_days: int
+    cache_path: str
+    source_path: str | None = None
+    source_age_days: int | None = None
+    cache_mtime: float | None = None
+    source_mtime: float | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+def _age_days_from_mtime(mtime: float, *, now: float) -> int:
+    return max(0, int((now - mtime) // 86400))
 
 
 def is_stale(library_pkl: Path | None = None) -> tuple[bool, int]:
@@ -45,6 +71,133 @@ def is_stale(library_pkl: Path | None = None) -> tuple[bool, int]:
         return False, 0
     age = time.time() - pkl.stat().st_mtime
     return age > STALE_AGE_SECONDS, int(age // 86400)
+
+
+def library_freshness_status(
+    library_pkl: Path | None = None,
+    *,
+    now: float | None = None,
+) -> LibraryFreshness:
+    """Return a source-aware freshness status for ``library.pkl``.
+
+    ``is_stale`` is the legacy 30-day nudge. This status is stricter for
+    product claims: if the source catalog/folder is newer than the cache, Viber
+    should treat the library as stale even when the cache is young.
+    """
+    if library_pkl is None:
+        from vibemix.library.rekordbox import RekordboxLibrary
+
+        pkl = RekordboxLibrary.CACHE_PATH
+    else:
+        pkl = Path(library_pkl)
+    now_ts = time.time() if now is None else now
+    cache_path = str(pkl)
+    if not pkl.exists():
+        return LibraryFreshness(
+            status="not_indexed",
+            stale=False,
+            reason="library_cache_missing",
+            age_days=0,
+            cache_path=cache_path,
+        )
+
+    try:
+        cache_stat = pkl.stat()
+    except OSError as e:
+        return LibraryFreshness(
+            status="cache_unreadable",
+            stale=True,
+            reason=f"cache_stat_failed:{type(e).__name__}",
+            age_days=0,
+            cache_path=cache_path,
+        )
+
+    cache_age_days = _age_days_from_mtime(cache_stat.st_mtime, now=now_ts)
+    try:
+        with pkl.open("rb") as fh:
+            blob = pickle.load(fh)
+    except Exception as e:  # cache is optional; stats must stay fail-soft
+        return LibraryFreshness(
+            status="cache_unreadable",
+            stale=True,
+            reason=f"cache_read_failed:{type(e).__name__}",
+            age_days=cache_age_days,
+            cache_path=cache_path,
+            cache_mtime=cache_stat.st_mtime,
+        )
+
+    source_path = getattr(blob, "xml_path", None)
+    recorded_source_mtime = getattr(blob, "xml_mtime", None)
+    if not isinstance(source_path, str) or not source_path:
+        return LibraryFreshness(
+            status="cache_unreadable",
+            stale=True,
+            reason="cache_missing_source_path",
+            age_days=cache_age_days,
+            cache_path=cache_path,
+            cache_mtime=cache_stat.st_mtime,
+        )
+    if not isinstance(recorded_source_mtime, (int, float)):
+        return LibraryFreshness(
+            status="cache_unreadable",
+            stale=True,
+            reason="cache_missing_source_mtime",
+            age_days=cache_age_days,
+            cache_path=cache_path,
+            source_path=source_path,
+            cache_mtime=cache_stat.st_mtime,
+        )
+
+    try:
+        current_source_mtime = os.path.getmtime(source_path)
+    except OSError:
+        return LibraryFreshness(
+            status="source_missing",
+            stale=True,
+            reason="source_path_missing",
+            age_days=cache_age_days,
+            cache_path=cache_path,
+            source_path=source_path,
+            cache_mtime=cache_stat.st_mtime,
+            source_mtime=float(recorded_source_mtime),
+        )
+
+    source_age_days = _age_days_from_mtime(current_source_mtime, now=now_ts)
+    if current_source_mtime > float(recorded_source_mtime) + 1.0:
+        return LibraryFreshness(
+            status="stale",
+            stale=True,
+            reason="source_newer_than_cache",
+            age_days=cache_age_days,
+            cache_path=cache_path,
+            source_path=source_path,
+            source_age_days=source_age_days,
+            cache_mtime=cache_stat.st_mtime,
+            source_mtime=current_source_mtime,
+        )
+    if now_ts - cache_stat.st_mtime > STALE_AGE_SECONDS:
+        return LibraryFreshness(
+            status="stale",
+            stale=True,
+            reason="cache_older_than_30d",
+            age_days=cache_age_days,
+            cache_path=cache_path,
+            source_path=source_path,
+            source_age_days=source_age_days,
+            cache_mtime=cache_stat.st_mtime,
+            source_mtime=current_source_mtime,
+        )
+    return LibraryFreshness(
+        status="fresh",
+        stale=False,
+        reason="cache_current",
+        age_days=cache_age_days,
+        cache_path=cache_path,
+        source_path=source_path,
+        source_age_days=source_age_days,
+        cache_mtime=cache_stat.st_mtime,
+        source_mtime=current_source_mtime,
+    )
 
 
 def load_snooze_state(state_path: Path | None = None) -> float | None:
@@ -174,10 +327,13 @@ __all__ = [
     "SNOOZE_DURATION_SECONDS",
     "STALE_AGE_SECONDS",
     "STATE_KEY",
+    "FreshnessStatus",
+    "LibraryFreshness",
     "apply_snooze_action",
     "emit_nudge_if_stale",
     "is_snoozed",
     "is_stale",
+    "library_freshness_status",
     "load_snooze_state",
     "save_snooze_state",
 ]

@@ -5726,8 +5726,10 @@ def _cmd_library_stats(args: argparse.Namespace) -> int:
 
     from vibemix.library._cosine import EMBED_BACKEND, EMBEDDING_DIM
     from vibemix.library.clap_engine import onnx_model_status
+    from vibemix.library.staleness import library_freshness_status
 
     model_status = onnx_model_status()
+    freshness = library_freshness_status().to_dict()
 
     payload = {
         "indexed": indexed,
@@ -5737,6 +5739,11 @@ def _cmd_library_stats(args: argparse.Namespace) -> int:
         "clap_model_installed": bool(model_status["installed"]),
         "clap_model_path": model_status["path"],
         "clap_model_missing": model_status["missing"],
+        "library_freshness": freshness,
+        "library_freshness_status": freshness["status"],
+        "library_stale": freshness["stale"],
+        "library_staleness_reason": freshness["reason"],
+        "library_age_days": freshness["age_days"],
         **_library_agent_setup_status(),
         "failed": 0,
     }
@@ -5751,6 +5758,11 @@ def _cmd_library_stats(args: argparse.Namespace) -> int:
     print(f"  backend:  {backend}")
     print(f"  embedder: {EMBED_BACKEND} ({EMBEDDING_DIM}d)")
     print(f"  agent:    {payload['agent_backend']} ({payload['agent_status']})")
+    print(
+        "  library:  "
+        f"{payload['library_freshness_status']} "
+        f"({payload['library_staleness_reason']})"
+    )
     print(
         "  model:    "
         + ("installed" if payload["clap_model_installed"] else "missing")

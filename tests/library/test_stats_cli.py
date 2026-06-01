@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -77,6 +78,17 @@ def _run_handler(monkeypatch: pytest.MonkeyPatch) -> dict:
 
 
 def _expected_payload(indexed: int, backend: str) -> dict:
+    freshness = {
+        "status": "not_indexed",
+        "stale": False,
+        "reason": "library_cache_missing",
+        "age_days": 0,
+        "cache_path": str(RekordboxLibrary.CACHE_PATH),
+        "source_path": None,
+        "source_age_days": None,
+        "cache_mtime": None,
+        "source_mtime": None,
+    }
     return {
         "indexed": indexed,
         "backend": backend,
@@ -85,6 +97,11 @@ def _expected_payload(indexed: int, backend: str) -> dict:
         "clap_model_installed": True,
         "clap_model_path": _TEST_CLAP_MODEL_PATH,
         "clap_model_missing": [],
+        "library_freshness": freshness,
+        "library_freshness_status": "not_indexed",
+        "library_stale": False,
+        "library_staleness_reason": "library_cache_missing",
+        "library_age_days": 0,
         "agent_backend": "codex",
         "agent_ready": True,
         "agent_status": "ready",
@@ -171,6 +188,11 @@ def test_json_shape_keys_exact(
         "clap_model_installed",
         "clap_model_path",
         "clap_model_missing",
+        "library_freshness",
+        "library_freshness_status",
+        "library_stale",
+        "library_staleness_reason",
+        "library_age_days",
         "agent_backend",
         "agent_ready",
         "agent_status",
@@ -183,6 +205,11 @@ def test_json_shape_keys_exact(
     assert isinstance(payload["clap_model_installed"], bool)
     assert isinstance(payload["clap_model_path"], str)
     assert isinstance(payload["clap_model_missing"], list)
+    assert isinstance(payload["library_freshness"], dict)
+    assert isinstance(payload["library_freshness_status"], str)
+    assert isinstance(payload["library_stale"], bool)
+    assert isinstance(payload["library_staleness_reason"], str)
+    assert isinstance(payload["library_age_days"], int)
     assert isinstance(payload["agent_backend"], str)
     assert isinstance(payload["agent_ready"], bool)
     assert isinstance(payload["agent_status"], str)
@@ -228,6 +255,33 @@ def test_agent_status_ignores_stale_gemini_backend_env(
     assert payload["agent_ready"] is True
     assert payload["agent_status"] == "ready"
     assert payload["agent_hint"] == ""
+
+
+def test_stats_reports_stale_when_source_newer_than_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vibemix.library.index_sqlite_vec import SqliteVecStore
+
+    db_path = tmp_path / "library.db"
+    source = tmp_path / "collection.xml"
+    source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    old_mtime = 1_700_000_000.0
+    new_mtime = old_mtime + 10.0
+    os.utime(source, (old_mtime, old_mtime))
+    lib = RekordboxLibrary()
+    lib._write_cache(str(source), old_mtime)
+    os.utime(source, (new_mtime, new_mtime))
+    monkeypatch.setattr(
+        "vibemix.library.store.open_store",
+        lambda *a, **k: LibraryStore(SqliteVecStore(db_path=db_path)),
+    )
+
+    payload = _run_handler(monkeypatch)
+
+    assert payload["library_freshness_status"] == "stale"
+    assert payload["library_stale"] is True
+    assert payload["library_staleness_reason"] == "source_newer_than_cache"
+    assert payload["library_freshness"]["source_path"] == str(source)
 
 
 def test_subcommand_routes_through_cli(

@@ -69,6 +69,21 @@ export interface LibraryStats {
   clap_model_installed?: boolean;
   clap_model_path?: string;
   clap_model_missing?: string[];
+  library_freshness?: {
+    status?: string;
+    stale?: boolean;
+    reason?: string;
+    age_days?: number;
+    cache_path?: string;
+    source_path?: string | null;
+    source_age_days?: number | null;
+    cache_mtime?: number | null;
+    source_mtime?: number | null;
+  };
+  library_freshness_status?: string;
+  library_stale?: boolean;
+  library_staleness_reason?: string;
+  library_age_days?: number;
   agent_backend?: "codex" | string;
   agent_ready?: boolean;
   agent_status?: string;
@@ -1531,6 +1546,10 @@ export function normalizeChatResult(value: unknown): LibraryChatResult {
 
 export function normalizeStats(value: unknown): LibraryStats {
   const root = asRecord(value, "library_stats");
+  const freshness =
+    root.library_freshness !== undefined && root.library_freshness !== null
+      ? asRecord(root.library_freshness, "library_stats.library_freshness")
+      : null;
   return {
     indexed: asFiniteNumber(root.indexed, "library_stats.indexed"),
     backend: asString(root.backend, "library_stats.backend"),
@@ -1539,6 +1558,35 @@ export function normalizeStats(value: unknown): LibraryStats {
     clap_model_installed: optionalBoolean(root, "clap_model_installed"),
     clap_model_path: optionalString(root, "clap_model_path"),
     clap_model_missing: optionalStringArray(root, "clap_model_missing"),
+    library_freshness: freshness
+      ? {
+          status: optionalString(freshness, "status"),
+          stale: optionalBoolean(freshness, "stale"),
+          reason: optionalString(freshness, "reason"),
+          age_days: optionalNumber(freshness, "age_days"),
+          cache_path: optionalString(freshness, "cache_path"),
+          source_path:
+            freshness.source_path === null
+              ? null
+              : optionalString(freshness, "source_path"),
+          source_age_days:
+            freshness.source_age_days === null
+              ? null
+              : optionalNumber(freshness, "source_age_days"),
+          cache_mtime:
+            freshness.cache_mtime === null
+              ? null
+              : optionalNumber(freshness, "cache_mtime"),
+          source_mtime:
+            freshness.source_mtime === null
+              ? null
+              : optionalNumber(freshness, "source_mtime"),
+        }
+      : undefined,
+    library_freshness_status: optionalString(root, "library_freshness_status"),
+    library_stale: optionalBoolean(root, "library_stale"),
+    library_staleness_reason: optionalString(root, "library_staleness_reason"),
+    library_age_days: optionalNumber(root, "library_age_days"),
     agent_backend: optionalString(root, "agent_backend"),
     agent_ready: optionalBoolean(root, "agent_ready"),
     agent_status: optionalString(root, "agent_status"),
@@ -1837,6 +1885,21 @@ const DEV_STATS: LibraryStats = {
   clap_model_installed: true,
   clap_model_path: "~/.cache/vibemix/clap-onnx",
   clap_model_missing: [],
+  library_freshness: {
+    status: "fresh",
+    stale: false,
+    reason: "dev_fixture",
+    age_days: 0,
+    cache_path: "~/.cache/vibemix/library.pkl",
+    source_path: "~/Music/rekordbox/collection.xml",
+    source_age_days: 0,
+    cache_mtime: null,
+    source_mtime: null,
+  },
+  library_freshness_status: "fresh",
+  library_stale: false,
+  library_staleness_reason: "dev_fixture",
+  library_age_days: 0,
   agent_backend: "codex",
   agent_ready: true,
   agent_status: "ready",

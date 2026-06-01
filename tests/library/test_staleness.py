@@ -18,6 +18,7 @@ from vibemix.library.staleness import (
     emit_nudge_if_stale,
     is_snoozed,
     is_stale,
+    library_freshness_status,
     load_snooze_state,
     save_snooze_state,
 )
@@ -59,6 +60,86 @@ def test_no_library_returns_false(tmp_path: Path) -> None:
     stale, age_days = is_stale(pkl)
     assert stale is False
     assert age_days == 0
+
+
+def test_freshness_status_not_indexed(tmp_path: Path) -> None:
+    status = library_freshness_status(tmp_path / "library.pkl")
+
+    assert status.status == "not_indexed"
+    assert status.stale is False
+    assert status.reason == "library_cache_missing"
+    assert status.age_days == 0
+    assert status.to_dict()["source_path"] is None
+
+
+def test_freshness_status_fresh_when_cache_matches_source(tmp_path: Path) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    source = tmp_path / "collection.xml"
+    source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    mtime = time.time()
+    os.utime(source, (mtime, mtime))
+    cache = tmp_path / "library.pkl"
+    old_cache = RekordboxLibrary.CACHE_PATH
+    RekordboxLibrary.CACHE_PATH = cache
+    try:
+        RekordboxLibrary()._write_cache(str(source), mtime)
+    finally:
+        RekordboxLibrary.CACHE_PATH = old_cache
+
+    status = library_freshness_status(cache, now=mtime + 10)
+
+    assert status.status == "fresh"
+    assert status.stale is False
+    assert status.reason == "cache_current"
+    assert status.source_path == str(source)
+
+
+def test_freshness_status_stale_when_source_newer(tmp_path: Path) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    source = tmp_path / "collection.xml"
+    source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    old_mtime = time.time() - 100
+    os.utime(source, (old_mtime, old_mtime))
+    cache = tmp_path / "library.pkl"
+    old_cache = RekordboxLibrary.CACHE_PATH
+    RekordboxLibrary.CACHE_PATH = cache
+    try:
+        RekordboxLibrary()._write_cache(str(source), old_mtime)
+    finally:
+        RekordboxLibrary.CACHE_PATH = old_cache
+    new_mtime = old_mtime + 10
+    os.utime(source, (new_mtime, new_mtime))
+
+    status = library_freshness_status(cache, now=new_mtime + 1)
+
+    assert status.status == "stale"
+    assert status.stale is True
+    assert status.reason == "source_newer_than_cache"
+    assert status.source_mtime == new_mtime
+
+
+def test_freshness_status_source_missing(tmp_path: Path) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    source = tmp_path / "collection.xml"
+    source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    mtime = time.time()
+    cache = tmp_path / "library.pkl"
+    old_cache = RekordboxLibrary.CACHE_PATH
+    RekordboxLibrary.CACHE_PATH = cache
+    try:
+        RekordboxLibrary()._write_cache(str(source), mtime)
+    finally:
+        RekordboxLibrary.CACHE_PATH = old_cache
+    source.unlink()
+
+    status = library_freshness_status(cache, now=mtime + 1)
+
+    assert status.status == "source_missing"
+    assert status.stale is True
+    assert status.reason == "source_path_missing"
 
 
 def test_snooze_persists(tmp_path: Path) -> None:
