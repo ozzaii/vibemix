@@ -23,7 +23,6 @@ from vibemix.debrief.drills import (
     generate_drills,
 )
 
-
 # ---------------------------------------------------------------------------
 # Unit — _citation_resolves
 # ---------------------------------------------------------------------------
@@ -113,7 +112,12 @@ def test_generate_drills_retries_on_unresolvable_citation():
     assert client.models.generate_content.call_count == 2
 
 
-def test_generate_drills_raises_after_retries_exhausted():
+def test_generate_drills_raises_after_retries_exhausted(monkeypatch):
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        "vibemix.debrief.drills.append_global_ai_message",
+        lambda **kwargs: calls.append(dict(kwargs)),
+    )
     bad_drill = _ok_drill(citation="[ev:NOPE@99:99]")
     client = MagicMock()
     client.models.generate_content.return_value = _drills_response(
@@ -124,3 +128,5 @@ def test_generate_drills_raises_after_retries_exhausted():
     assert ei.value.reason == "drills_generation_failed"
     # max_retries=2 → 1 initial + 2 retries = 3 total attempts.
     assert client.models.generate_content.call_count == 3
+    assert [call["stop_reason"] for call in calls] == ["invalid_citations"] * 3
+    assert calls[-1]["extra"]["invalid_indices"] == [0, 1, 2]

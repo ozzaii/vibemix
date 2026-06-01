@@ -54,6 +54,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from vibemix.runtime.ai_observability import append_global_ai_message
 from vibemix.state.deck_state import DeckTrack
 from vibemix.state.harmonics import to_camelot
 
@@ -200,12 +201,47 @@ class DeckVisionReader:
             _DECK_READ_PROMPT,
             types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg"),
         ]
-        response = self._client.models.generate_content(
+        try:
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=contents,
+                config=config,
+            )
+        except Exception as e:
+            err = repr(e)[:160]
+            append_global_ai_message(
+                engine="gemini",
+                surface="deck_vision",
+                direction="assistant",
+                text="",
+                event="deck_vision_read",
+                provider="gemini",
+                model=self._model,
+                stop_reason=err,
+                prompt_chars=len(_DECK_READ_PROMPT),
+                response_chars=0,
+                extra={"jpeg_bytes": len(jpeg_bytes), "error": err},
+                prompt=_DECK_READ_PROMPT,
+                response=f"<error {err}>",
+            )
+            raise
+        raw = _extract_text(response)
+        append_global_ai_message(
+            engine="gemini",
+            surface="deck_vision",
+            direction="assistant",
+            text=raw,
+            event="deck_vision_read",
+            provider="gemini",
             model=self._model,
-            contents=contents,
-            config=config,
+            stop_reason="model_done" if raw else "empty_output",
+            prompt_chars=len(_DECK_READ_PROMPT),
+            response_chars=len(raw),
+            extra={"jpeg_bytes": len(jpeg_bytes)},
+            prompt=_DECK_READ_PROMPT,
+            response=raw,
         )
-        return _extract_text(response)
+        return raw
 
     # ------------------------------------------------------------------ #
     # Null-defensive parse → DeckTrack map                                #

@@ -77,13 +77,22 @@ def test_generate_tldr_text_raises_on_empty_response():
         generate_tldr_text(client, ["c"], "cited")
 
 
-def test_generate_tldr_text_raises_on_gemini_exception():
+def test_generate_tldr_text_raises_on_gemini_exception(monkeypatch):
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        "vibemix.debrief.tldr.append_global_ai_message",
+        lambda **kwargs: calls.append(dict(kwargs)),
+    )
     client = MagicMock()
     client.models.generate_content.side_effect = RuntimeError("network down")
     with pytest.raises(DebriefGenerationError) as ei:
         generate_tldr_text(client, ["c"], "cited")
     assert ei.value.reason == "tldr_generation_failed"
     assert "network down" in ei.value.message
+    assert calls
+    assert calls[-1]["surface"] == "debrief_tldr"
+    assert calls[-1]["stop_reason"] == "error:RuntimeError"
+    assert "network down" in calls[-1]["response"]
 
 
 def test_generate_tldr_text_truncates_long_narration():

@@ -84,6 +84,23 @@ _MULTI_DECK_VERDICT_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_JUDGE_BLEND_SCORE_RE = re.compile(
+    r"\bblend score\s+([0-9]+(?:\.[0-9]+)?)/1\b",
+    re.IGNORECASE,
+)
+_JUDGE_STRONG_PRAISE_RE = re.compile(
+    r"\b("
+    r"bomb|lit|huge|massive|insane|perfect|flawless|killer|smashed|nailed|"
+    r"seamless|great|amazing|incredible|beautiful|gorgeous|big payoff|peak"
+    r")\b",
+    re.IGNORECASE,
+)
+_JUDGE_POSITIVE_PRAISE_RE = re.compile(
+    r"\b("
+    r"nice|good|clean|smooth|solid|successful|tight|worked|landed"
+    r")\b",
+    re.IGNORECASE,
+)
 _MOVE_EFFECT_CONTROL_RE = re.compile(
     r"\b("
     r"eq|low|mid|high|bass|sub|filter|fader|knob|kill(?:ed)?|cut|boost(?:ed)?|"
@@ -94,7 +111,8 @@ _MOVE_EFFECT_CONTROL_RE = re.compile(
 _MOVE_EFFECT_CAUSAL_VERDICT_RE = re.compile(
     r"\b("
     r"because|caused|made|fixed|cleaned|cleared|tightened|improved|saved|"
-    r"worked|landed|nailed|opened|resolved|sorted"
+    r"worked|landed|nailed|opened(?:\s+up)?|resolved|sorted|"
+    r"cleaner|tighter|muddy|muddier|brighter|darker|wider|widened"
     r")\b",
     re.IGNORECASE,
 )
@@ -107,6 +125,77 @@ _MOVE_EFFECT_DISCLAIMER_RE = re.compile(
     r"not causal proof|not proof|cannot say it caused|can't say it caused|"
     r"won't claim it caused|correlated|around the move|same window"
     r")\b",
+    re.IGNORECASE,
+)
+_LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE = re.compile(
+    r"\b("
+    r"vocal|vocals|voice|lyric|lyrics|kick|kickdrum|kick drum|snare|clap|"
+    r"hi[- ]?hat|hat|hats|drum|drums|bassline|lead|synth|pad|stem|stems|"
+    r"acapella|instrumental"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE = re.compile(
+    r"\b("
+    r"hear|heard|hearing|sounds?|feels?|opened(?:\s+up)?|opening|"
+    r"tight(?:ened|er|ening)?|clean(?:ed|er)?|clear(?:ed|er)?|brighter|"
+    r"darker|wider|punch(?:y|ier)|muddy|muddier|landed|came in|sits?|"
+    r"cut(?:s|ting)? through|present|up front"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE = re.compile(
+    r"\b("
+    r"can't tell|cannot tell|can't say|cannot say|not enough proof|not proof|"
+    r"don't have proof|do not have proof|won't claim|will not claim|"
+    r"not source[- ]level proof|not stem proof|not isolated"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIVE_AUDIO_KICK_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "KICK_SWAP",
+        "KICK_DENSITY_SHIFT",
+        "BREAKDOWN_KICK_KILL",
+        "REENTRY_KICK_LAND",
+    }
+)
+_LIVE_AUDIO_VOCAL_NOUNS: frozenset[str] = frozenset(
+    {"vocal", "vocals", "voice", "lyric", "lyrics", "acapella"}
+)
+_LIVE_AUDIO_KICK_NOUNS: frozenset[str] = frozenset({"kick", "kickdrum", "kick drum"})
+_NO_MOVE_CONTROL_ACTION_RE = re.compile(
+    r"\byou\b[^.?!]{0,32}\b("
+    r"brought|pulled|pushed|raised|dropped|cut|killed|boosted|opened|closed|swept"
+    r")\b[^.?!]{0,32}\b("
+    r"fader|faders|low|lows|mid|mids|high|highs|hi|bass|sub|eq|filter|"
+    r"high[- ]?pass|low[- ]?pass|gain|trim|volume|knob"
+    r")\b",
+    re.IGNORECASE,
+)
+_NO_MOVE_CONTROL_NOUN_RE = re.compile(
+    r"\bthat\b[^.?!]{0,24}\b("
+    r"eq|filter|low|high|fader|kill|cut|move|low cut|high cut"
+    r")\b[^.?!]{0,32}\b("
+    r"cleaned|cleared|fixed|tightened|improved|saved|caused|made|opened|sorted"
+    r")\b",
+    re.IGNORECASE,
+)
+_NO_MOVE_CONTROL_INSTRUCTION_RE = re.compile(
+    r"\b("
+    r"bring|pull|push|take|move|set"
+    r")\b[^.?!]{0,32}\b("
+    r"high[- ]?pass|low[- ]?pass|filter|fader|eq|low|high|mid|gain"
+    r")\b[^.?!]{0,32}\b(back|down|up|to)\b",
+    re.IGNORECASE,
+)
+_MIXER_LOW_KILL_CLAIM_RE = re.compile(
+    r"\b(?:eq|mixer|move|it|that|you)\b[^.?!]{0,80}\bkilled\s+(?:the\s+)?(?:low|lows|bass|sub)\b|"
+    r"\b(?:low|lows|bass|sub)\b[^.?!]{0,40}\b(?:was|were|got|is|are)?\s*killed\b",
+    re.IGNORECASE,
+)
+_MIXER_LOW_KILL_NEGATION_RE = re.compile(
+    r"\b(?:not|no|never|didn't|didnt|doesn't|doesnt|without)\b[^.?!]{0,32}\bkilled\b",
     re.IGNORECASE,
 )
 _EVIDENCE_TOKEN_RE = re.compile(r"[^A-Za-z0-9_.:+-]+")
@@ -187,6 +276,13 @@ _DECK_AUDIO_SEPARATION_CONTEXT_SHAPES: tuple[tuple[str, ...], ...] = (
         "per_deck_audio=captured_not_attached",
         "isolated_decks=runtime_capture_available",
     ),
+    (
+        "deckA_audio=captured_unverified",
+        "deckB_audio=captured_unverified",
+        "current_capture=P1_global_mix_plus_unverified_deck_pairs",
+        "per_deck_audio=unverified_not_attached",
+        "isolated_decks=false",
+    ),
 )
 _DECK_AUDIO_SEPARATION_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
     "deckA_audio=attached",
@@ -254,13 +350,19 @@ class LiveClaimGuardResult:
 
 
 LIVE_TRANSITION_HELD_REPLY = (
-    "I caught the live move. The useful note is the sound change right there."
+    "I can't call that a transition until I have clear two-deck proof."
 )
 LIVE_CANDIDATE_HELD_REPLY = (
-    "That reads like a transition setup. The useful note is the shape, not a quality score."
+    "That is only a transition candidate; I need clear two-deck proof before I grade it."
 )
 LIVE_MOVE_EFFECT_HELD_REPLY = (
-    "I caught the move and the sound change. The useful note is how the energy shifted right after it."
+    "I can't tell from this live proof whether the control caused that."
+)
+LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY = (
+    "I only have a broad listener read from the audio here, not source-level proof."
+)
+LIVE_JUDGE_OVERPRAISE_HELD_REPLY = (
+    "The measured Judge read was restrained there. The useful note is the evidence, not a hype grade."
 )
 
 
@@ -876,6 +978,9 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
     required_opened = _capture_int(capture.get("deck_audio_required_opened_channels"))
     capture_reason = _evidence_token(str(capture.get("deck_audio_capture_reason") or "unknown"))
     deck_channels = _capture_deck_channels(capture.get("deck_channels"))
+    deck_capture_configured = bool(capture.get("deck_audio_capture_configured")) and all(
+        side in deck_channels for side in ("A", "B")
+    )
     deck_capture_enabled = bool(capture.get("deck_audio_capture_enabled")) and all(
         side in deck_channels for side in ("A", "B")
     )
@@ -888,6 +993,8 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
     )
     if deck_capture_enabled:
         mode = "deck_pair_capture_configured"
+    elif deck_capture_configured and capture.get("deck_audio_capture_verified") is False:
+        mode = "deck_pair_capture_unverified"
     elif opened is not None and opened >= 4:
         mode = "multichannel_open_but_deck_pairs_not_attached"
     elif max_in is not None and max_in >= 4:
@@ -908,6 +1015,9 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
     master_channels = _capture_channel_map_token(capture.get("master_channels"))
     if master_channels:
         fields.append(f"master_channels={master_channels}")
+    master_source = _evidence_token(str(capture.get("deck_audio_master_source") or ""))
+    if master_source:
+        fields.append(f"master_source={master_source}")
     if required_opened and required_opened > 0:
         fields.append(f"required_opened_channels={required_opened}")
     if capture_reason and capture_reason != "unknown":
@@ -935,6 +1045,26 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
                 "upgrade_path=attach_deck_pair_audio_parts_when_needed",
             ]
         )
+        if activity:
+            fields.append(f"deck_audio_activity={activity}")
+    elif deck_capture_configured:
+        activity = _deck_audio_activity_token(capture.get("deck_audio_rms"))
+        active_seen = _evidence_token(str(capture.get("deck_audio_active_sides_seen") or "none"))
+        fields.extend(
+            [
+                "current_capture=P1_global_mix_plus_unverified_deck_pairs",
+                "gemini_audio=mono_downmix_of_master_capture",
+                "deckA_audio=captured_unverified",
+                "deckB_audio=captured_unverified",
+                "per_deck_audio=unverified_not_attached",
+                "isolated_decks=false",
+                "deck_pairs=" + _deck_pairs_token(deck_channels),
+                "verification=awaiting_live_audio_on_both_deck_pairs",
+                "upgrade_path=verify_rekordbox_deck_routing_or_use_manual_map",
+            ]
+        )
+        if active_seen:
+            fields.append(f"active_sides_seen={active_seen}")
         if activity:
             fields.append(f"deck_audio_activity={activity}")
     else:
@@ -2128,6 +2258,7 @@ def should_defer_live_claim_stream(
     audio_capture_context: dict[str, object] | None = None,
     audio_delta_items: list[str] | tuple[str, ...] | None = None,
     deck_audio_parts_attached: bool | None = None,
+    event_type: str | None = None,
 ) -> bool:
     """Return True when the response must be post-checked before TTS flush."""
     policy, _reason = live_claim_policy(
@@ -2142,6 +2273,12 @@ def should_defer_live_claim_stream(
         if isinstance(audio_capture_context, dict)
         else {}
     )
+    if str(event_type or "").upper() == "MANUAL" and not moves and not getattr(
+        state, "audible", False
+    ):
+        return True
+    if moves and getattr(state, "audible", False):
+        return True
     return policy in {"blocked", "watch_not_claim", "candidate_not_verdict"} or bool(
         moves and (audio_delta_items or render_audio_delta_items(state) or capture_deltas)
     )
@@ -2155,14 +2292,16 @@ def apply_live_claim_guard(
     audio_delta_items: list[str] | tuple[str, ...] | None = None,
     audio_capture_context: dict[str, object] | None = None,
     deck_audio_parts_attached: bool | None = None,
+    judge_evidence_line: str | None = None,
+    event_type: str | None = None,
 ) -> LiveClaimGuardResult:
     """Correct unsupported or debuggy live outcome text from live coach text.
 
     This is a result-boundary guard. The prompt teaches the rule, but this
     catches failures without depending on a specific phrase such as "great
     transition". Public copy should not expose the model's internal proof
-    struggle either: "I can't call that a transition" is true, but still reads
-    like debug self-correction in the DJ's ear.
+    struggle either: the held replies below use a short human-facing reason,
+    not raw claim-policy/debug labels.
     """
     policy, reason = live_claim_policy(
         state,
@@ -2174,6 +2313,26 @@ def apply_live_claim_guard(
     outcome_claim = has_multi_deck_outcome_claim(text)
     public_diagnostic = bool(_LIVE_PUBLIC_DIAGNOSTIC_RE.search(text))
     effect_deltas = [str(item) for item in (audio_delta_items or render_audio_delta_items(state))]
+    if _has_unsupported_mixer_low_kill_claim(text, state):
+        summary = _live_guard_summary(state, moves)
+        mixer_summary = _mixer_low_summary(state)
+        return LiveClaimGuardResult(
+            text=LIVE_MOVE_EFFECT_HELD_REPLY,
+            corrected=True,
+            policy="mixer_contradiction",
+            reason="low_kill_not_in_mixer_state",
+            summary=summary + (f"; mixer_lows={mixer_summary}" if mixer_summary else ""),
+        )
+    if not moves and _has_unsupported_no_move_control_claim(text):
+        summary = _live_guard_summary(state, moves)
+        stripped = _strip_unsupported_no_move_control_clause(text)
+        return LiveClaimGuardResult(
+            text=stripped or LIVE_MOVE_EFFECT_HELD_REPLY,
+            corrected=True,
+            policy="single_deck_control_not_grounded",
+            reason="control_causality_without_moves",
+            summary=summary,
+        )
     effect_claim = bool(
         moves
         and effect_deltas
@@ -2194,6 +2353,20 @@ def apply_live_claim_guard(
             policy="move_effect_not_verdict",
             reason="dsp_delta_not_causal_proof",
             summary=log_summary,
+        )
+    source_detail_reason = _unsupported_audio_source_detail_reason(
+        text,
+        state,
+        event_type=event_type,
+    )
+    if source_detail_reason is not None:
+        summary = _live_guard_summary(state, moves)
+        return LiveClaimGuardResult(
+            text=LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY,
+            corrected=True,
+            policy="audio_source_detail_not_proof",
+            reason=source_detail_reason,
+            summary=summary,
         )
     if public_diagnostic:
         summary = _live_guard_summary(state, moves)
@@ -2243,6 +2416,20 @@ def apply_live_claim_guard(
             summary=summary,
         )
 
+    if policy == "supported_verdict" and outcome_claim:
+        judge_score = _judge_score_from_evidence_line(judge_evidence_line)
+        judge_reason = _judge_overpraise_reason(text, judge_score)
+        if judge_reason is not None:
+            summary = _live_guard_summary(state, moves)
+            summary = f"{summary}; judge_score={judge_score:.2f}"
+            return LiveClaimGuardResult(
+                text=LIVE_JUDGE_OVERPRAISE_HELD_REPLY,
+                corrected=True,
+                policy="judge_verdict_not_hype_grade",
+                reason=judge_reason,
+                summary=summary,
+            )
+
     if policy not in {"blocked", "watch_not_claim"}:
         return LiveClaimGuardResult(text=text, policy=policy, reason=reason)
     if not text.strip() or not outcome_claim:
@@ -2256,6 +2443,150 @@ def apply_live_claim_guard(
         reason=reason,
         summary=summary,
     )
+
+
+def _judge_score_from_evidence_line(judge_evidence_line: str | None) -> float | None:
+    if not judge_evidence_line:
+        return None
+    match = _JUDGE_BLEND_SCORE_RE.search(judge_evidence_line)
+    if match is None:
+        return None
+    try:
+        score = float(match.group(1))
+    except ValueError:
+        return None
+    if score < 0.0:
+        return 0.0
+    if score > 1.0:
+        return 1.0
+    return score
+
+
+def _judge_overpraise_reason(text: str, judge_score: float | None) -> str | None:
+    if judge_score is None:
+        return None
+    if judge_score < 0.76 and _JUDGE_STRONG_PRAISE_RE.search(text):
+        return "judge_score_below_strong_praise"
+    if judge_score < 0.60 and _JUDGE_POSITIVE_PRAISE_RE.search(text):
+        return "judge_score_below_positive_praise"
+    return None
+
+
+def _unsupported_audio_source_detail_reason(
+    text: str,
+    state: MusicState,
+    *,
+    event_type: str | None = None,
+) -> str | None:
+    """Return a guard reason for hidden song-part claims audio did not prove."""
+    if not text.strip() or _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(text):
+        return None
+    if not (
+        _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.search(text)
+        and _LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE.search(text)
+    ):
+        return None
+
+    unsupported = [
+        _source_detail_noun_key(match.group(1))
+        for match in _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.finditer(text)
+        if not _source_detail_noun_supported(match.group(1), state, event_type=event_type)
+    ]
+    if not unsupported:
+        return None
+    return "source_detail_without_grounded_detector"
+
+
+def has_unsupported_audio_source_detail_claim(
+    text: str,
+    state: MusicState,
+    *,
+    event_type: str | None = None,
+) -> bool:
+    """Return True when broad live audio got promoted into hidden source detail."""
+    return _unsupported_audio_source_detail_reason(text, state, event_type=event_type) is not None
+
+
+def has_unsupported_audio_source_detail_mention(
+    text: str,
+    state: MusicState,
+    *,
+    event_type: str | None = None,
+) -> bool:
+    """Return True for an unsupported source noun before a full claim forms."""
+    raw = str(text or "")
+    if not raw.strip() or _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(raw):
+        return False
+    return any(
+        _source_detail_noun_key(match.group(1)) not in _LIVE_AUDIO_KICK_NOUNS
+        and not _source_detail_noun_supported(match.group(1), state, event_type=event_type)
+        for match in _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.finditer(raw)
+    )
+
+
+def _source_detail_noun_key(noun: str) -> str:
+    return " ".join(str(noun or "").lower().replace("-", " ").split())
+
+
+def _source_detail_noun_supported(
+    noun: str,
+    state: MusicState,
+    *,
+    event_type: str | None = None,
+) -> bool:
+    key = _source_detail_noun_key(noun)
+    if key in _LIVE_AUDIO_VOCAL_NOUNS:
+        return bool(getattr(state, "vocal_active", False))
+    if key in _LIVE_AUDIO_KICK_NOUNS:
+        return str(event_type or "").strip().upper() in _LIVE_AUDIO_KICK_EVENT_TYPES
+    return False
+
+
+def _has_unsupported_mixer_low_kill_claim(text: str, state: MusicState) -> bool:
+    if not getattr(state, "controller_connected", False):
+        return False
+    if not _MIXER_LOW_KILL_CLAIM_RE.search(text):
+        return False
+    if _MIXER_LOW_KILL_NEGATION_RE.search(text):
+        return False
+    tiers = []
+    for side in ("A", "B"):
+        raw = _deck_raw(state, side)
+        if raw:
+            tiers.append(_control_now_tier(raw, "low"))
+    return bool(tiers) and not any(tier in {"killed", "deep-cut"} for tier in tiers)
+
+
+def _mixer_low_summary(state: MusicState) -> str:
+    parts = []
+    for side in ("A", "B"):
+        raw = _deck_raw(state, side)
+        if raw:
+            parts.append(f"{side}:{_control_now_tier(raw, 'low')}")
+    return "+".join(parts)
+
+
+def _has_unsupported_no_move_control_claim(text: str) -> bool:
+    if _MOVE_EFFECT_DISCLAIMER_RE.search(text):
+        return False
+    return bool(
+        _NO_MOVE_CONTROL_ACTION_RE.search(text)
+        or _NO_MOVE_CONTROL_NOUN_RE.search(text)
+        or _NO_MOVE_CONTROL_INSTRUCTION_RE.search(text)
+    )
+
+
+def _strip_unsupported_no_move_control_clause(text: str) -> str:
+    """Keep a sound-only clause when the unsupported control clause is trailing."""
+    stripped = text.strip()
+    if not stripped:
+        return ""
+    match = re.search(r"\s+\bwhen\s+you\b", stripped, flags=re.IGNORECASE)
+    if match:
+        kept = stripped[: match.start()].strip(" ,;:")
+        if kept:
+            return kept if kept.endswith((".", "!", "?")) else f"{kept}."
+    return ""
 
 
 def _resolved_decks(decks: dict[str, DeckTrack]) -> dict[str, DeckTrack]:

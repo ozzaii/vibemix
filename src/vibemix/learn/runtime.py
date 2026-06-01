@@ -93,6 +93,7 @@ from vibemix.learn.harmonic_practice import (
     harmonic_practice_citations,
 )
 from vibemix.learn.lesson_flow import LessonFlow, LessonStep, build_lesson_flow
+from vibemix.learn.observability import learn_tutor_speak_observability_events
 from vibemix.learn.state import LearnState
 from vibemix.learn.teaching_loop import (
     TeachingTurn,
@@ -1280,19 +1281,26 @@ class LessonRuntime(StateMachine):
         return step.step_id if step is not None else None
 
     def _log_tutor_speak_event(self, speak: dict[str, Any]) -> None:
-        payload = speak.get("payload") if isinstance(speak, dict) else None
-        if not isinstance(payload, dict):
-            return
-        self._log_session_event(
-            "learn_tutor_speak",
-            lesson_id=self._learn.current_lesson_id or "",
-            course_id=self._learn.current_course_id or "",
-            step_id=self._current_step_id(),
-            text=payload.get("text", ""),
-            tts_marker=payload.get("tts_marker", ""),
-            citations=payload.get("citations", []),
-            data_state=payload.get("data_state", ""),
-        )
+        lesson_id = self._learn.current_lesson_id or ""
+        course_id = self._learn.current_course_id or ""
+        step_id = self._current_step_id()
+        try:
+            events = learn_tutor_speak_observability_events(
+                speak,
+                lesson_id=lesson_id,
+                course_id=course_id,
+                step_id=step_id,
+                source="learn_runtime",
+            )
+            for kind, fields in events:
+                self._log_session_event(kind, **fields)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] tutor ai_message log failed: {exc!r}",
+                file=sys.stderr,
+            )
 
     def _evidence_time(self) -> float:
         """Return session-relative time for lesson evidence writes."""

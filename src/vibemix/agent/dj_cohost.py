@@ -58,6 +58,7 @@ from vibemix.agent._streaming_pipe import (
 )
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL, OPENROUTER_LLM_MODEL
+from vibemix.agent.emote_parser import has_emote_tag, strip_emote_tags
 from vibemix.agent.proxy_client import (
     classify_proxy_error,
     probe_proxy_health,
@@ -76,6 +77,10 @@ from vibemix.coach import CitationLinter, StrippedRateTracker
 from vibemix.library.budget import get_session_meter
 from vibemix.llm.thinking_gate import validate_live_config
 from vibemix.prompts import build_parts_description, build_system_instruction, filter_for_slop
+from vibemix.runtime.ai_observability import (
+    record_session_ai_message,
+    snapshot_state_for_ai_message,
+)
 from vibemix.runtime.debug_flags import debug_log_enabled
 from vibemix.runtime.llm_to_tts_delta_meter import LLMToTTSDeltaMeter
 from vibemix.runtime.ttft import TTFTMeter
@@ -84,6 +89,8 @@ from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
 from vibemix.state.deck_context import (
     GEMINI_AUDIO_TOKENS_PER_SECOND,
     apply_live_claim_guard,
+    has_unsupported_audio_source_detail_claim,
+    has_unsupported_audio_source_detail_mention,
     live_claim_policy,
     render_audio_delta_items,
     render_audio_part_context,
@@ -278,7 +285,8 @@ def _deck_audio_rms_activity(audio_capture_context: dict[str, object] | None) ->
 
 def _deck_audio_rms_active(audio_capture_context: dict[str, object] | None) -> bool:
     return any(
-        activity == "active" for activity in _deck_audio_rms_activity(audio_capture_context).values()
+        activity == "active"
+        for activity in _deck_audio_rms_activity(audio_capture_context).values()
     )
 
 
@@ -288,6 +296,39 @@ def _deck_audio_pcm_activity(pcm: np.ndarray) -> str:
     pcm_f = pcm.astype(np.float32) / 32768.0
     rms = float(np.sqrt(np.mean(pcm_f * pcm_f)))
     return "active" if rms >= DECK_AUDIO_PART_MIN_RMS else "silent"
+
+
+def _state_audio_signal_active(state: MusicState) -> bool:
+    try:
+        rms = float(getattr(state, "rms", 0.0) or 0.0)
+    except (TypeError, ValueError, OverflowError):
+        rms = 0.0
+    return rms >= DECK_AUDIO_PART_MIN_RMS
+
+
+def _should_skip_manual_no_evidence_llm(
+    event_type: str,
+    state: MusicState,
+    moves: list[str] | tuple[str, ...] = (),
+    *,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
+    deck_part_activity: dict[str, str] | None = None,
+) -> bool:
+    """True when a manual trigger has no live evidence worth sending to Gemini."""
+    if str(event_type or "").upper() != "MANUAL":
+        return False
+    if any(str(move).strip() for move in moves):
+        return False
+    if bool(getattr(state, "audible", False)) or _state_audio_signal_active(state):
+        return False
+    if audio_delta_items:
+        return False
+    if _deck_audio_rms_active(audio_capture_context):
+        return False
+    if any(str(value).strip().lower() == "active" for value in (deck_part_activity or {}).values()):
+        return False
+    return True
 
 
 def _deck_audio_part_suffix(parts: list[dict[str, object]]) -> str:
@@ -2058,6 +2099,9 @@ class DJCoHostAgent(Agent):
             audio_seconds = DIET_AUDIO_SECONDS if diet else INVOKE_AUDIO_SECONDS
             skip_screen = ev_type_for_diet in SCREEN_SKIP_EVENTS
             ev_extra = ev.extra if ev is not None and isinstance(ev.extra, dict) else {}
+            judge_evidence_line = ev_extra.get("judge_evidence_line")
+            if not isinstance(judge_evidence_line, str):
+                judge_evidence_line = None
             ev_audio_capture_context = ev_extra.get("audio_capture_context")
             prompt_audio_capture_context = (
                 ev_audio_capture_context
@@ -2274,6 +2318,7 @@ class DJCoHostAgent(Agent):
             live_claim_state = ev.state if ev is not None else self._state
             live_claim_moves = _event_live_move_labels(ev, self._state)
             live_claim_audio_delta = render_audio_delta_items(live_claim_state)
+            observability_state = snapshot_state_for_ai_message(live_claim_state) or live_claim_state
             lookahead_part_label = (
                 "P3"
                 if lookahead_attached and mic_attached
@@ -2335,10 +2380,132 @@ class DJCoHostAgent(Agent):
                 contents.append(types.Part.from_bytes(data=screen_jpeg, mime_type="image/jpeg"))
 
             full_prompt = contents[0] if contents else text_prompt
+            prompt_path = invoke_dir / "prompt.txt"
             try:
-                (invoke_dir / "prompt.txt").write_text(full_prompt)
+                prompt_path.write_text(full_prompt)
             except Exception:
                 pass
+
+            ai_provider = "openrouter" if self._or_client is not None else "gemini"
+            ai_model = self._or_model if self._or_client is not None else LLM_MODEL
+            manual_no_evidence_skip = _should_skip_manual_no_evidence_llm(
+                ev_tag,
+                live_claim_state,
+                live_claim_moves,
+                audio_delta_items=live_claim_audio_delta,
+                audio_capture_context=prompt_audio_capture_context,
+                deck_part_activity=deck_part_activity,
+            )
+            if manual_no_evidence_skip:
+                response_id = f"{invoke_n:04d}_{invoke_ts}"
+                response_path = invoke_dir / "response.txt"
+                meta_path = invoke_dir / "meta.json"
+                meta_payload = {
+                    "event": ev_tag,
+                    "ts": invoke_ts,
+                    "invoke_n": invoke_n,
+                    "response_id": response_id,
+                    "provider": ai_provider,
+                    "model": ai_model,
+                    "audible": bool(getattr(observability_state, "audible", False)),
+                    "deck": getattr(observability_state, "audible_deck", "none"),
+                    "track": getattr(observability_state, "audible_track", None),
+                    "track_confidence": round(
+                        float(
+                            getattr(
+                                observability_state,
+                                "audible_track_confidence",
+                                0.0,
+                            )
+                            or 0.0
+                        ),
+                        2,
+                    ),
+                    "phase": getattr(observability_state, "phase", ""),
+                    "rms": round(float(getattr(observability_state, "rms", 0.0) or 0.0), 4),
+                    "bpm": round(float(getattr(observability_state, "bpm", 0.0) or 0.0), 1),
+                    "audio_bytes": len(audio_wav),
+                    "audio_seconds": audio_seconds,
+                    "diet": diet,
+                    "llm_latency_s": 0.0,
+                    "llm_error": None,
+                    "response_chars": 0,
+                    "suppression": "manual_no_evidence",
+                    "slop_matches": [],
+                    "citation_lint_valid": None,
+                    "citation_lint_reason": "manual_no_live_evidence",
+                    "citation_lint_missing": None,
+                    "citation_action": "skip",
+                    "head_yielded": False,
+                    "pre_llm_short_circuit": True,
+                    "avoided_audio_tokens_est": audio_tokens_est,
+                }
+                try:
+                    response_path.write_text("")
+                    meta_path.write_text(json.dumps(meta_payload, indent=2, ensure_ascii=False))
+                except Exception:
+                    pass
+                try:
+                    self._recorder.log_event(
+                        "manual_silence_short_circuit",
+                        event=ev_tag,
+                        reason="manual_no_live_evidence",
+                        audible=bool(getattr(observability_state, "audible", False)),
+                        deck=getattr(observability_state, "audible_deck", "none"),
+                        phase=getattr(observability_state, "phase", ""),
+                        rms=round(float(getattr(observability_state, "rms", 0.0) or 0.0), 4),
+                        audio_bytes=len(audio_wav),
+                        avoided_audio_tokens_est=audio_tokens_est,
+                        deck_audio_parts=len(deck_audio_parts),
+                        invoke_dir=str(invoke_dir),
+                    )
+                except Exception:
+                    pass
+                print("[ai_text] <manual silence: no live evidence>", flush=True)
+                record_session_ai_message(
+                    self._recorder,
+                    engine="live_coach",
+                    surface="session",
+                    direction="assistant",
+                    text="",
+                    response_id=response_id,
+                    event=ev_tag,
+                    provider=ai_provider,
+                    model=ai_model,
+                    stop_reason="manual_no_live_evidence",
+                    latency_s=0.0,
+                    prompt_chars=len(full_prompt),
+                    response_chars=0,
+                    prompt=full_prompt,
+                    response="",
+                    citation_count=0,
+                    citation_action="skip",
+                    citation_valid=None,
+                    citation_reason="manual_no_live_evidence",
+                    suppression="manual_no_evidence",
+                    state=observability_state,
+                    event_obj=ev,
+                    artifacts={
+                        "invoke_dir": str(invoke_dir),
+                        "prompt_path": str(prompt_path),
+                        "response_path": str(response_path),
+                        "meta_path": str(meta_path),
+                        "audio_path": str(invoke_dir / "audio.wav"),
+                    },
+                    extra={
+                        "head_yielded": False,
+                        "diet": diet,
+                        "cache_state": "skipped",
+                        "audio_tokens_est": 0,
+                        "avoided_audio_tokens_est": audio_tokens_est,
+                        "deck_audio_parts": len(deck_audio_parts),
+                        "live_claim_defer_stream": True,
+                        "pre_llm_short_circuit": True,
+                        "raw_response_chars": 0,
+                        "spoken_response_chars": 0,
+                    },
+                )
+                return
 
             # ---- Plan 19-03 — context-cache dispatch ----
             # Three branches:
@@ -2371,10 +2538,10 @@ class DJCoHostAgent(Agent):
             self._recorder.log_event(
                 "llm_invoke",
                 event=ev_tag,
-                audible=self._state.audible,
-                deck=self._state.audible_deck,
-                track=self._state.audible_track,
-                phase=self._state.phase,
+                audible=bool(getattr(observability_state, "audible", False)),
+                deck=getattr(observability_state, "audible_deck", "none"),
+                track=getattr(observability_state, "audible_track", None),
+                phase=getattr(observability_state, "phase", ""),
                 audio_bytes=len(audio_wav),
                 audio_tokens_est=audio_tokens_est,
                 deck_audio_parts=len(deck_audio_parts),
@@ -2382,6 +2549,8 @@ class DJCoHostAgent(Agent):
                 audio_seconds=int(audio_seconds),
                 diet=diet,
                 cache_state=cache_state,
+                provider=ai_provider,
+                model=ai_model,
                 prompt=text_prompt,
                 invoke_dir=str(invoke_dir),
             )
@@ -2402,6 +2571,7 @@ class DJCoHostAgent(Agent):
                 audio_capture_context=prompt_audio_capture_context,
                 audio_delta_items=live_claim_audio_delta,
                 deck_audio_parts_attached=deck_audio_parts_attached,
+                event_type=ev_tag,
             )
 
             # === Chunk-by-chunk streaming pipe-through ===
@@ -2533,6 +2703,18 @@ class DJCoHostAgent(Agent):
                     print(txt, end="", flush=True)
                     full_text += txt
                     buffered_chunks.append(txt)
+                    source_detail_risky = has_unsupported_audio_source_detail_claim(
+                        full_text, live_claim_state, event_type=ev_tag
+                    ) or (
+                        not head_yielded
+                        and has_unsupported_audio_source_detail_mention(
+                            full_text,
+                            live_claim_state,
+                            event_type=ev_tag,
+                        )
+                    )
+                    if source_detail_risky:
+                        live_claim_defer_stream = True
                     if live_claim_defer_stream:
                         continue
                     # Chunk-by-chunk yield with bracket-balance clipping.
@@ -2546,11 +2728,14 @@ class DJCoHostAgent(Agent):
                     if not head_yielded:
                         if can_yield_chunks(full_text):
                             safe_pos = last_balanced_position(full_text)
-                            if safe_pos > 0:
-                                head_yielded = True
-                                self._llm_to_tts_meter.record_first_sentence()
-                                yield full_text[:safe_pos]
+                            if safe_pos > yielded_pos:
+                                segment = full_text[yielded_pos:safe_pos]
+                                tts_segment, _ = strip_emote_tags(segment, normalize=False)
                                 yielded_pos = safe_pos
+                                if tts_segment:
+                                    head_yielded = True
+                                    self._llm_to_tts_meter.record_first_sentence()
+                                    yield tts_segment
                             # else: every char is inside an open bracket
                             # (e.g. the entire first chunk is the start
                             # of one big citation). Defer; the next
@@ -2565,8 +2750,11 @@ class DJCoHostAgent(Agent):
                         # ``safe_pos`` won't move and we just defer.
                         safe_pos = last_balanced_position(full_text)
                         if safe_pos > yielded_pos:
-                            yield full_text[yielded_pos:safe_pos]
+                            segment = full_text[yielded_pos:safe_pos]
+                            tts_segment, _ = strip_emote_tags(segment, normalize=False)
                             yielded_pos = safe_pos
+                            if tts_segment:
+                                yield tts_segment
             except Exception as e:
                 # ---- Plan 69-03 (OSS-02) — proxy unavailable classification ---
                 # Classify the exception against the 4 documented trigger classes
@@ -2725,6 +2913,7 @@ class DJCoHostAgent(Agent):
                     pass
 
             live_claim_guard = None
+            raw_live_claim_text: str | None = None
             if suppression is None:
                 try:
                     live_claim_guard = apply_live_claim_guard(
@@ -2734,6 +2923,8 @@ class DJCoHostAgent(Agent):
                         audio_delta_items=live_claim_audio_delta,
                         audio_capture_context=prompt_audio_capture_context,
                         deck_audio_parts_attached=deck_audio_parts_attached,
+                        judge_evidence_line=judge_evidence_line,
+                        event_type=ev_tag,
                     )
                 except Exception as _e:
                     live_claim_guard = None
@@ -2752,12 +2943,21 @@ class DJCoHostAgent(Agent):
                             summary=live_claim_guard.summary,
                             raw_text=raw_live_claim_text,
                             corrected_text=full_text,
+                            action="strip",
                             latency_s=round(elapsed, 2),
                         )
                     except Exception:
                         pass
                     if head_yielded:
                         _push_silence_pad_and_cancel("live_claim_guard")
+
+            spoken_text, emote_intents = strip_emote_tags(full_text)
+            spoken_stripped = spoken_text.strip()
+            if has_emote_tag(full_text):
+                # Post-stream re-yield paths consume buffered_chunks only when
+                # nothing has reached TTS yet. Collapse to the spoken response
+                # so bracketed [emote:*] control tags never leak to audio.
+                buffered_chunks = [spoken_text] if spoken_text else []
 
             if suppression == "silence":
                 self._recorder.log_event(
@@ -2781,19 +2981,25 @@ class DJCoHostAgent(Agent):
                 if head_yielded:
                     _push_silence_pad_and_cancel("slop")
             elif live_claim_guard is not None and live_claim_guard.corrected:
-                citation_action = "emit"
-                if not head_yielded:
-                    yield full_text
+                # A live-claim guard hit means the model tried to say something
+                # we cannot ground. Do not convert that failure into a spoken
+                # canned line; leave the correction in artifacts/repair queues
+                # and keep the user's audio path silent.
+                citation_action = "strip"
+                if head_yielded:
+                    _push_silence_pad_and_cancel("live_claim_guard")
                 if self._stripped_tracker is not None:
-                    self._stripped_tracker.record(False)
-                print(f"[ai_text] {stripped!r}", flush=True)
-                self._recorder.log_event(
-                    "ai_text",
-                    text=full_text,
-                    latency_s=round(elapsed, 2),
+                    self._stripped_tracker.record(
+                        True,
+                        unverified_text=raw_live_claim_text or full_text,
+                    )
+                print(
+                    f"[ai_text:live-claim-stripped] policy={live_claim_guard.policy}",
+                    flush=True,
                 )
-                self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
-                self._push_transcript(stripped[:140])
+                buffered_chunks = []
+                spoken_text = ""
+                spoken_stripped = ""
             else:
                 # Plan 20-01 — citation linter chokepoint runs HERE, after the
                 # silence/slop gate, before yielding chunks. The wired path
@@ -2828,17 +3034,19 @@ class DJCoHostAgent(Agent):
                                 yield txt
                         if self._stripped_tracker is not None:
                             self._stripped_tracker.record(False)
-                        if stripped:
-                            print(f"[ai_text] {stripped!r}", flush=True)
+                        if spoken_stripped:
+                            print(f"[ai_text] {spoken_stripped!r}", flush=True)
                             self._recorder.log_event(
                                 "ai_text",
-                                text=full_text,
+                                text=spoken_text,
                                 latency_s=round(elapsed, 2),
                             )
                             # WR-04 — stamp from event-fired set_seconds, not the
                             # post-stream/lint/bus set_seconds (multi-second drift).
-                            self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
-                            self._push_transcript(stripped[:140])
+                            self._record_said(
+                                spoken_stripped[:140], set_s_at_event=ev_set_seconds
+                            )
+                            self._push_transcript(spoken_stripped[:140])
                         else:
                             print("[ai_text] <empty> (skip TTS)", flush=True)
                     else:
@@ -2871,13 +3079,15 @@ class DJCoHostAgent(Agent):
                                 reason=lint_result.reason,
                                 latency_s=round(elapsed, 2),
                             )
-                            print(f"[ai_text:unverified] {stripped!r}", flush=True)
+                            print(f"[ai_text:unverified] {spoken_stripped!r}", flush=True)
                             # History appended on bypass — the user heard the
                             # text, so the no-repeat memory must reflect it.
-                            if stripped:
+                            if spoken_stripped:
                                 # WR-04 — stamp from event-fired set_seconds.
-                                self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
-                                self._push_transcript(stripped[:140])
+                                self._record_said(
+                                    spoken_stripped[:140], set_s_at_event=ev_set_seconds
+                                )
+                                self._push_transcript(spoken_stripped[:140])
                         else:
                             # Strip path — no chunks yielded. Pre-recorded
                             # ack substitution is retired (English placeholder
@@ -2921,14 +3131,14 @@ class DJCoHostAgent(Agent):
                     if not head_yielded:
                         for txt in buffered_chunks:
                             yield txt
-                    if stripped:
-                        print(f"[ai_text] {stripped!r}", flush=True)
+                    if spoken_stripped:
+                        print(f"[ai_text] {spoken_stripped!r}", flush=True)
                         self._recorder.log_event(
-                            "ai_text", text=full_text, latency_s=round(elapsed, 2)
+                            "ai_text", text=spoken_text, latency_s=round(elapsed, 2)
                         )
                         # WR-04 — stamp from event-fired set_seconds.
-                        self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
-                        self._push_transcript(stripped[:140])
+                        self._record_said(spoken_stripped[:140], set_s_at_event=ev_set_seconds)
+                        self._push_transcript(spoken_stripped[:140])
                     else:
                         print("[ai_text] <empty> (skip TTS)", flush=True)
                     # Legacy path = no linter wired; treat as if citation_action
@@ -2970,6 +3180,22 @@ class DJCoHostAgent(Agent):
                         citation_missing=citation_lint_missing_payload,
                         suppression=suppression,
                         latency_s=round(elapsed, 2),
+                    )
+                except Exception:
+                    pass
+
+            if citation_action in ("emit", "bypass") and emote_intents and spoken_stripped:
+                reaction_intent = emote_intents[-1]
+                try:
+                    self._state.last_reaction_intent = reaction_intent
+                    self._state.last_reaction_intent_seq = (
+                        int(getattr(self._state, "last_reaction_intent_seq", 0) or 0) + 1
+                    )
+                    self._recorder.log_event(
+                        "mascot_reaction_intent",
+                        intent=reaction_intent,
+                        seq=self._state.last_reaction_intent_seq,
+                        response_id=response_id,
                     )
                 except Exception:
                     pass
@@ -3020,14 +3246,14 @@ class DJCoHostAgent(Agent):
                 try:
                     strip = (
                         _build_citation_strip(
-                            reaction_text=full_text,
+                            reaction_text=spoken_text,
                             registry=self._registry,
                         )
                         if self._registry is not None
                         else []
                     )
                     reaction_msg = SessionCohostReaction.make(
-                        text=full_text,
+                        text=spoken_text,
                         event_id=ev_tag,
                         citation_strip=strip,
                     )
@@ -3091,7 +3317,7 @@ class DJCoHostAgent(Agent):
                 else:
                     try:
                         strip = _build_citation_strip(
-                            reaction_text=full_text,
+                            reaction_text=spoken_text,
                             registry=self._registry,
                         )
                         if any(chip.get("event_id", "").startswith("recall:") for chip in strip):
@@ -3100,46 +3326,92 @@ class DJCoHostAgent(Agent):
                         print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
 
             # ---- Per-invocation dump (always written, even on suppression) ----
+            response_path = invoke_dir / "response.txt"
+            meta_path = invoke_dir / "meta.json"
+            prompt_path = invoke_dir / "prompt.txt"
+            meta_payload = {
+                "event": ev_tag,
+                "ts": invoke_ts,
+                "invoke_n": invoke_n,
+                "response_id": response_id,
+                "provider": ai_provider,
+                "model": ai_model,
+                "audible": bool(getattr(observability_state, "audible", False)),
+                "deck": getattr(observability_state, "audible_deck", "none"),
+                "track": getattr(observability_state, "audible_track", None),
+                "track_confidence": round(
+                    float(getattr(observability_state, "audible_track_confidence", 0.0) or 0.0),
+                    2,
+                ),
+                "phase": getattr(observability_state, "phase", ""),
+                "rms": round(float(getattr(observability_state, "rms", 0.0) or 0.0), 4),
+                "bpm": round(float(getattr(observability_state, "bpm", 0.0) or 0.0), 1),
+                "audio_bytes": len(audio_wav),
+                "audio_seconds": audio_seconds,
+                "diet": diet,
+                "llm_latency_s": round(elapsed, 2),
+                "llm_error": llm_err,
+                "response_chars": len(full_text),
+                "suppression": suppression,
+                "slop_matches": slop_matches,
+                # Plan 20-01 — citation linter chokepoint outcome. When wired
+                # is False, all four are None (skip path).
+                "citation_lint_valid": citation_lint_valid,
+                "citation_lint_reason": citation_lint_reason,
+                "citation_lint_missing": citation_lint_missing_payload,
+                "citation_action": citation_action,
+                # Plan 41-04 — streaming-pipe outcome. True iff the
+                # speculative head was emitted before stream completion; False
+                # on suppression/short-response.
+                "head_yielded": head_yielded,
+            }
             try:
-                (invoke_dir / "response.txt").write_text(full_text)
-                (invoke_dir / "meta.json").write_text(
-                    json.dumps(
-                        {
-                            "event": ev_tag,
-                            "ts": invoke_ts,
-                            "invoke_n": invoke_n,
-                            "audible": self._state.audible,
-                            "deck": self._state.audible_deck,
-                            "track": self._state.audible_track,
-                            "track_confidence": round(self._state.audible_track_confidence, 2),
-                            "phase": self._state.phase,
-                            "rms": round(self._state.rms, 4),
-                            "bpm": round(self._state.bpm, 1),
-                            "audio_bytes": len(audio_wav),
-                            "audio_seconds": audio_seconds,
-                            "diet": diet,
-                            "llm_latency_s": round(elapsed, 2),
-                            "llm_error": llm_err,
-                            "response_chars": len(full_text),
-                            "suppression": suppression,
-                            "slop_matches": slop_matches,
-                            # Plan 20-01 — citation linter chokepoint outcome.
-                            # When wired==False, all four are None (skip path).
-                            "citation_lint_valid": citation_lint_valid,
-                            "citation_lint_reason": citation_lint_reason,
-                            "citation_lint_missing": citation_lint_missing_payload,
-                            "citation_action": citation_action,
-                            # Plan 41-04 — streaming-pipe outcome. True iff
-                            # the speculative head was emitted before stream
-                            # completion; False on suppression/short-response.
-                            "head_yielded": head_yielded,
-                        },
-                        indent=2,
-                        ensure_ascii=False,
-                    )
-                )
+                response_path.write_text(full_text)
+                meta_path.write_text(json.dumps(meta_payload, indent=2, ensure_ascii=False))
             except Exception:
                 pass
+
+            record_session_ai_message(
+                self._recorder,
+                engine="live_coach",
+                surface="session",
+                direction="assistant",
+                text=spoken_text,
+                response_id=response_id,
+                event=ev_tag,
+                provider=ai_provider,
+                model=ai_model,
+                stop_reason=llm_err or suppression or citation_action,
+                latency_s=round(elapsed, 2),
+                prompt_chars=len(full_prompt),
+                response_chars=len(full_text),
+                prompt=full_prompt,
+                response=full_text,
+                citation_count=citation_count,
+                citation_action=citation_action,
+                citation_valid=citation_lint_valid,
+                citation_reason=citation_lint_reason,
+                suppression=suppression,
+                state=observability_state,
+                event_obj=ev,
+                artifacts={
+                    "invoke_dir": str(invoke_dir),
+                    "prompt_path": str(prompt_path),
+                    "response_path": str(response_path),
+                    "meta_path": str(meta_path),
+                    "audio_path": str(invoke_dir / "audio.wav"),
+                },
+                extra={
+                    "head_yielded": head_yielded,
+                    "diet": diet,
+                    "cache_state": cache_state,
+                    "audio_tokens_est": audio_tokens_est,
+                    "deck_audio_parts": len(deck_audio_parts),
+                    "live_claim_defer_stream": live_claim_defer_stream,
+                    "raw_response_chars": len(full_text),
+                    "spoken_response_chars": len(spoken_text),
+                },
+            )
 
             # Plan 41-04 — emit llm_to_tts_delta_ms event (skip when no head
             # was yielded — keeps the per-turn metric stream tight).

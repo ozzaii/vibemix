@@ -30,6 +30,7 @@ from vibemix.library.codex_curate import (
     chat_with_codex,
     curate_with_codex,
     find_codex,
+    verify_live_reply_for_viber,
 )
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
 
@@ -763,6 +764,12 @@ def test_chat_prompt_marks_current_live_question_as_active_context():
 
     assert "LIVE CONTEXT USE: active_live_context" in p
     assert "asking about the current live deck/move/audio moment" in p
+    assert "LIVE AUDIO CONTRACT" in p
+    assert "listener/vibe evidence for texture, energy" in p
+    assert "not proof of track identity, deck identity, hidden sources" in p
+    assert "EQ/fader/filter/cue causality" in p
+    assert "the low end got hollow for a moment" in p
+    assert "never credit or blame the control from audio alone" in p
 
 
 def test_chat_prompt_preserves_last_known_deck_as_unverified_context_only():
@@ -1113,7 +1120,7 @@ def test_chat_with_codex_corrects_outcome_after_empty_live_deck_clear(library):
     )
 
     assert "Great transition" not in res.reply
-    assert "sound change right there" in res.reply
+    assert "clear two-deck proof" in res.reply
     assert "resolved decks=none" not in res.reply
     assert "won't call that a transition" not in res.reply
 
@@ -1614,7 +1621,7 @@ def test_chat_with_codex_corrects_unsupported_multi_deck_outcome_claim(library):
     )
 
     assert "Great transition" not in res.reply
-    assert "sound change right there" in res.reply
+    assert "clear two-deck proof" in res.reply
     assert "I need to correct that live read" not in res.reply
     assert "resolved decks=A" not in res.reply
     assert "deck lanes=A=known" not in res.reply
@@ -1748,7 +1755,7 @@ def test_chat_with_codex_uses_shared_guard_for_transition_synonyms(library):
 
     assert "Nice switch" not in res.reply
     assert "incoming track came in clean" not in res.reply
-    assert "sound change right there" in res.reply
+    assert "clear two-deck proof" in res.reply
     assert "recent control evidence: xfader->A-side" not in res.reply
 
 
@@ -1788,8 +1795,8 @@ def test_chat_with_codex_corrects_candidate_quality_verdict(library):
     )
 
     assert "great transition" not in res.reply.lower()
-    assert "transition setup" in res.reply
-    assert "shape, not a quality score" in res.reply
+    assert "transition candidate" in res.reply
+    assert "clear two-deck proof" in res.reply
 
 
 def test_chat_with_codex_live_evidence_block_overrides_candidate_correction(library):
@@ -1833,7 +1840,7 @@ def test_chat_with_codex_live_evidence_block_overrides_candidate_correction(libr
 
     assert "great transition" not in res.reply.lower()
     assert "transition or blend candidate" not in res.reply
-    assert "sound change right there" in res.reply
+    assert "clear two-deck proof" in res.reply
     assert "live evidence gate: transition_block=single_deck_move" not in res.reply
 
 
@@ -1877,8 +1884,8 @@ def test_chat_with_codex_live_evidence_candidate_blocks_quality_grade(library):
     )
 
     assert "Great transition" not in res.reply
-    assert "transition setup" in res.reply
-    assert "shape, not a quality score" in res.reply
+    assert "transition candidate" in res.reply
+    assert "clear two-deck proof" in res.reply
     assert "live evidence gate: transition_candidate=two_deck_move_audible_mix" not in res.reply
     assert res.move_grades == []
     assert res.track_ids == []
@@ -2050,7 +2057,7 @@ def test_chat_with_codex_requires_consistent_audio_parts_for_quality_grade(libra
     )
 
     assert "Great transition" not in res.reply
-    assert "transition setup" in res.reply
+    assert "transition candidate" in res.reply
     assert res.move_grades == []
     assert res.live_verification is not None
     assert res.live_verification["claim_policy"] == "candidate_not_verdict"
@@ -2130,7 +2137,7 @@ def test_chat_with_codex_requires_trusted_sources_for_quality_grade(library):
     )
 
     assert "Great transition" not in res.reply
-    assert "transition setup" in res.reply
+    assert "transition candidate" in res.reply
     assert res.move_grades == []
     assert res.live_verification is not None
     assert res.live_verification["claim_policy"] == "candidate_not_verdict"
@@ -2182,7 +2189,7 @@ def test_chat_with_codex_drops_move_grade_when_live_policy_blocks_current_claim(
     )
 
     assert "Great transition" not in res.reply
-    assert "sound change right there" in res.reply
+    assert "clear two-deck proof" in res.reply
     assert res.move_grades == []
     assert res.track_ids == []
 
@@ -2222,8 +2229,102 @@ def test_chat_with_codex_corrects_move_effect_causal_verdict(library):
     )
 
     assert "low cut cleaned" not in res.reply
-    assert "energy shifted right after it" in res.reply
+    assert "can't tell" in res.reply.lower()
+    assert "control caused that" in res.reply
     assert "sub energy fell 50% (strong)" not in res.reply
+
+
+def test_verify_live_reply_rejects_eq_audio_song_detail_verdict() -> None:
+    verdict = verify_live_reply_for_viber(
+        "That EQ move made the vocal open up and the kick got tighter.",
+        {
+            **_fresh_live_transport(),
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Left", "confidence": 0.9}},
+            "audio_delta": ["low energy fell 50% (strong)"],
+            "recent_moves": ["A_low: flat->killed"],
+        },
+    )
+
+    assert verdict["ok"] is False
+    assert "unsupported_audio_source_detail_claim" in verdict["violations"]
+    assert "vocal" not in str(verdict["corrected_reply"]).lower()
+    assert "kick" not in str(verdict["corrected_reply"]).lower()
+
+
+def test_verify_live_reply_rejects_audio_source_detail_without_control_claim() -> None:
+    verdict = verify_live_reply_for_viber(
+        "The vocal opened up and the kick got tighter.",
+        {
+            **_fresh_live_transport(),
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Left", "confidence": 0.9}},
+            "audio_delta": ["low energy fell 50% (strong)"],
+            "recent_moves": ["A_low: flat->killed"],
+        },
+    )
+
+    assert verdict["ok"] is False
+    assert "unsupported_audio_source_detail_claim" in verdict["violations"]
+    assert "vocal" not in str(verdict["corrected_reply"]).lower()
+    assert "kick" not in str(verdict["corrected_reply"]).lower()
+    assert "source-level proof" in str(verdict["corrected_reply"])
+
+
+def test_verify_live_reply_allows_broad_audio_listener_read() -> None:
+    verdict = verify_live_reply_for_viber(
+        "The low end got hollow for a moment.",
+        {
+            **_fresh_live_transport(),
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Left", "confidence": 0.9}},
+            "audio_delta": ["low energy fell 50% (strong)"],
+            "recent_moves": ["A_low: flat->killed"],
+        },
+    )
+
+    assert verdict["ok"] is True
+    assert verdict["violations"] == []
+    assert verdict["corrected"] is False
+    assert verdict["transport_status"] == "fresh_schema_v2"
+
+
+def test_chat_with_codex_blocks_audio_source_detail_without_control_claim(library):
+    runner = _runner_writing(
+        {
+            "reply": "The vocal opened up and the kick got tighter.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "did that low cut fix it?",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "audible": True,
+            "deck_state": {"A": {"title": "Left", "confidence": 0.9}},
+            "audio_delta": ["low energy fell 50% (strong)"],
+            "recent_moves": ["A_low: flat->killed"],
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "vocal" not in res.reply.lower()
+    assert "kick" not in res.reply.lower()
+    assert "source-level proof" in res.reply
+    assert res.live_verification["guard_applied"] is True
+    assert "unsupported_audio_source_detail_claim" in res.live_verification["guard_violations"]
 
 
 def test_chat_with_codex_normalizes_self_corrected_transition_disclaimer(library):
@@ -2253,8 +2354,7 @@ def test_chat_with_codex_normalizes_self_corrected_transition_disclaimer(library
     )
 
     assert "I saw a deck A low move" not in res.reply
-    assert "can't call it a transition" not in res.reply
-    assert "sound change right there" in res.reply
+    assert res.reply == "I can't call that a transition until I have clear two-deck proof."
 
 
 def test_chat_with_codex_normalizes_public_live_diagnostics_without_transition_claim(library):
@@ -2294,7 +2394,7 @@ def test_chat_with_codex_normalizes_public_live_diagnostics_without_transition_c
     assert "resolved decks" not in res.reply
     assert "live evidence gate" not in res.reply
     assert "claim_policy" not in res.reply
-    assert "sound change right there" in res.reply
+    assert "clear two-deck proof" in res.reply
     assert res.live_verification is not None
     assert res.live_verification["guard_applied"] is True
     assert "unsupported_live_outcome_claim" in res.live_verification["guard_violations"]
@@ -2334,8 +2434,8 @@ def test_chat_with_codex_normalizes_public_live_self_confession(library):
 
     assert "mistake" not in res.reply
     assert "not sure" not in res.reply
-    assert "live move" in res.reply
-    assert "sound change right there" in res.reply
+    assert "live move" not in res.reply
+    assert "clear two-deck proof" in res.reply
     assert res.live_verification is not None
     assert res.live_verification["ok"] is True
     assert res.live_verification["guard_applied"] is True
@@ -2390,8 +2490,8 @@ def test_chat_with_codex_normalizes_public_live_self_diagnosis_variants(library,
     assert "dumb" not in lower
     assert "stupid" not in lower
     assert "overclaimed" not in lower
-    assert "live move" in res.reply
-    assert "sound change right there" in res.reply
+    assert "live move" not in res.reply
+    assert "clear two-deck proof" in res.reply
     assert res.live_verification is not None
     assert res.live_verification["ok"] is True
     assert res.live_verification["guard_applied"] is True
@@ -2499,7 +2599,7 @@ def test_chat_with_codex_corrects_disclaimer_with_fresh_blend_claim(library):
     )
 
     assert "blend was clean" not in res.reply
-    assert "sound change right there" in res.reply
+    assert "clear two-deck proof" in res.reply
     assert "I need to correct that live read" not in res.reply
     assert "deck lanes=A=known" not in res.reply
     assert "won't call that a transition" not in res.reply

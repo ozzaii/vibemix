@@ -224,18 +224,15 @@ def test_live_claim_guard_corrects_single_deck_transition_claim(mocker, tmp_path
     agent.set_next_event(Event(type="HEARTBEAT", state=state, extra={}))
     chunks = _drive(agent)
 
-    assert len(chunks) == 1
-    assert "sound change right there" in chunks[0]
-    assert "deck lanes=A=known:dominant / B=unknown:muted" not in chunks[0]
-    assert "second_deck=independent_source_required" not in chunks[0]
-    assert "rule=unresolved_deck_is_not_transition_evidence" not in chunks[0]
-    assert "great transition" not in chunks[0]
+    assert chunks == []
     kinds = [k for k, _ in recorder.events]
     assert "live_claim_guard" in kinds
+    assert "ai_text" not in kinds
     guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "strip"
     assert "second_deck=independent_source_required" in guard_log["summary"]
     assert "citation_strip" not in kinds
-    assert tracker.rate() == 0.0
+    assert tracker.rate() == 1.0
     playback.push.assert_not_called()
 
 
@@ -259,10 +256,9 @@ def test_live_claim_guard_defers_watch_only_stream_before_correction(mocker, tmp
     agent.set_next_event(Event(type="MIX_MOVE", state=state, extra={"moves": ["xfader→A-side"]}))
     chunks = _drive(agent)
 
-    assert len(chunks) == 1
-    assert chunks[0].startswith("I caught the live move.")
-    assert all("Nice " not in chunk for chunk in chunks)
+    assert chunks == []
     guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "strip"
     assert guard_log["policy"] == "watch_not_claim"
     assert guard_log["reason"] == "two_deck_move_single_audible"
     assert "Nice handoff" in guard_log["raw_text"]
@@ -296,13 +292,111 @@ def test_live_claim_guard_corrects_move_effect_verdict(mocker, tmp_path) -> None
     )
     chunks = _drive(agent)
 
-    assert len(chunks) == 1
-    assert "energy shifted right after it" in chunks[0]
-    assert "low cut cleaned" not in chunks[0]
+    assert chunks == []
+    kinds = [kind for kind, _ in recorder.events]
+    assert "ai_text" not in kinds
     guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "strip"
     assert guard_log["policy"] == "move_effect_not_verdict"
     assert guard_log["reason"] == "dsp_delta_not_causal_proof"
     assert "Your low cut cleaned" in guard_log["raw_text"]
+    assert guard_log["corrected_text"] == (
+        "I can't tell from this live proof whether the control caused that."
+    )
+
+
+def test_live_claim_guard_strips_hidden_source_detail_before_tts(mocker, tmp_path) -> None:
+    """Audio can ground vibe; source-level song-part claims need a detector."""
+    registry = EvidenceRegistry()
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "A"
+    state.deck_state = DeckState(decks={"A": _deck("OutA", camelot="8A")})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["The vocal opened up and the kick got tighter."])
+    )
+
+    agent.set_next_event(
+        Event(type="MIX_MOVE", state=state, extra={"moves": ["A_low: flat→killed"]})
+    )
+    chunks = _drive(agent)
+
+    assert chunks == []
+    kinds = [kind for kind, _ in recorder.events]
+    assert "ai_text" not in kinds
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "strip"
+    assert guard_log["policy"] == "audio_source_detail_not_proof"
+    assert guard_log["reason"] == "source_detail_without_grounded_detector"
+    assert "vocal opened" in guard_log["raw_text"]
+    assert "source-level proof" in guard_log["corrected_text"]
+    assert tracker.rate() == 1.0
+    playback.push.assert_not_called()
+
+
+def test_live_claim_guard_allows_broad_audio_listener_read_before_tts(mocker, tmp_path) -> None:
+    """Broad listener texture is the allowed audio-vibe lane when cited."""
+    registry = EvidenceRegistry()
+    registry.write("ev", "BAND_SHIFT_LOW", 12.3)
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "A"
+    state.deck_state = DeckState(decks={"A": _deck("OutA", camelot="8A")})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["The low end got hollow for a moment [ev:BAND_SHIFT_LOW@12.3]"])
+    )
+
+    agent.set_next_event(
+        Event(
+            type="MIX_MOVE",
+            state=state,
+            extra={
+                "moves": ["A_low: flat→killed"],
+                "audio_delta_items": ["low energy fell 50% (strong)"],
+            },
+        )
+    )
+    chunks = _drive(agent)
+
+    assert chunks == ["The low end got hollow for a moment [ev:BAND_SHIFT_LOW@12.3]"]
+    kinds = [kind for kind, _ in recorder.events]
+    assert "ai_text" in kinds
+    assert "live_claim_guard" not in kinds
+    assert "citation_strip" not in kinds
+    assert tracker.rate() == 0.0
+    playback.push.assert_not_called()
+
+
+def test_live_claim_guard_defers_hidden_source_detail_without_move(mocker, tmp_path) -> None:
+    """Unsupported source detail should not leak as a speculative head."""
+    registry = EvidenceRegistry()
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["The vocal ", "opened up."])
+    )
+
+    agent.set_next_event(Event(type="HEARTBEAT", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert chunks == []
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["policy"] == "audio_source_detail_not_proof"
+    assert "The vocal opened up." in guard_log["raw_text"]
+    assert tracker.rate() == 1.0
+    playback.push.assert_not_called()
 
 
 # --------------------------------------------------------------------------
@@ -359,6 +453,71 @@ def test_invalid_response_strips_silently(mocker, tmp_path) -> None:
     assert tracker.rate() == 1.0
     # ai_text NOT logged on strip.
     assert "ai_text" not in kinds
+
+
+def test_manual_silent_trigger_skips_llm_before_tts(mocker, tmp_path) -> None:
+    """Manual trigger with no live evidence should become silence before Gemini."""
+    registry = EvidenceRegistry()
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = False
+    state.audible_deck = "none"
+    state.audible_track = None
+    state.phase = "silent"
+    state.rms = 0.0
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: none")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["I'm listening."])
+    )
+
+    agent.set_next_event(Event(type="MANUAL", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert chunks == []
+    kinds = [k for k, _ in recorder.events]
+    assert "manual_silence_short_circuit" in kinds
+    assert "llm_invoke" not in kinds
+    assert "citation_strip" not in kinds
+    assert "streaming_cancel" not in kinds
+    assert "ai_text" not in kinds
+    gen.aio.models.generate_content_stream.assert_not_called()
+    playback.push.assert_not_called()
+    assert tracker.rate() == 0.0
+    ai_message = next(fields for kind, fields in recorder.events if kind == "ai_message")
+    assert ai_message["stop_reason"] == "manual_no_live_evidence"
+    assert ai_message["citation"]["action"] == "skip"
+    assert ai_message["suppression"] == "manual_no_evidence"
+    assert ai_message["extra"]["head_yielded"] is False
+    assert ai_message["extra"]["audio_tokens_est"] == 0
+    assert ai_message["extra"]["avoided_audio_tokens_est"] > 0
+
+
+def test_manual_trigger_with_audio_signal_still_reaches_model(mocker, tmp_path) -> None:
+    """Broad audio can still be a listener-read signal; only true silence skips."""
+    registry = EvidenceRegistry()
+    agent, gen, recorder, state, _, _, _ = _build_agent_wired(mocker, tmp_path, registry)
+    state.audible = False
+    state.audible_deck = "none"
+    state.audible_track = None
+    state.phase = "unknown"
+    state.rms = 0.05
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: raw audio signal")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["<silence/>"])
+    )
+
+    agent.set_next_event(Event(type="MANUAL", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert chunks == []
+    kinds = [k for k, _ in recorder.events]
+    assert "manual_silence_short_circuit" not in kinds
+    assert "llm_invoke" in kinds
+    assert "silence_short_circuit" in kinds
+    gen.aio.models.generate_content_stream.assert_called_once()
 
 
 # --------------------------------------------------------------------------

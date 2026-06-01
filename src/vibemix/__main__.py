@@ -904,11 +904,13 @@ async def main() -> None:
         "lookahead_part_attached": ("AI_CALL", "lookahead_part_attached"),
         "lookahead_part_skipped": ("AI_CALL", "lookahead_part_skipped"),
         "ai_text": ("AI_RESP", "ai_text"),
+        "ai_message": ("AI_RESP", "ai_message"),
         "citation_count": ("AI_RESP", "citation_count"),
         "citation_bypass": ("AI_RESP", "citation_bypass"),
         "citation_strip": ("AI_RESP", "citation_strip"),
         "slop_suppressed": ("AI_RESP", "slop_suppressed"),
         "silence_short_circuit": ("AI_RESP", "silence_short_circuit"),
+        "manual_silence_short_circuit": ("AI_RESP", "manual_silence_short_circuit"),
         "streaming_cancel": ("AI_RESP", "streaming_cancel"),
         "reaction_evidence": ("AI_RESP", "reaction_evidence"),
         "proxy_unavailable": ("ERROR", "proxy_unavailable"),
@@ -2137,8 +2139,27 @@ async def main() -> None:
         except Exception:
             return None
 
+    from vibemix.learn.observability import (
+        learn_tutor_speak_observability_events as _learn_tutor_speak_observability_events,
+    )
+
     def _learn_observer_emit(msg: dict) -> None:
         _lesson_ipc_adapter.emit(msg)
+        if isinstance(msg, dict) and msg.get("type") == "ipc.learn.tutor_speak":
+            try:
+                for kind, fields in _learn_tutor_speak_observability_events(
+                    msg,
+                    lesson_id=_learn_state.current_lesson_id or "",
+                    course_id=_learn_state.current_course_id or "",
+                    step_id=lesson_runtime.current_step_id,
+                    source="learn_observer",
+                ):
+                    _learn_session_event(kind, fields)
+            except Exception as _learn_obs_exc:  # pragma: no cover - defensive
+                print(
+                    f"[learn boot] observer tutor observability failed: {_learn_obs_exc!r}",
+                    file=sys.stderr,
+                )
         if not isinstance(msg, dict) or msg.get("type") != "ipc.learn.complete_lesson":
             return
         payload = msg.get("payload", {})

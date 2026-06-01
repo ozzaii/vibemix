@@ -2016,7 +2016,29 @@ def test_cmd_library_verify_live_reply_rejects_unsupported_transition_claim(tmp_
     assert out["ok"] is False
     assert "unsupported_live_outcome_claim" in out["violations"]
     assert "Great transition" not in out["corrected_reply"]
-    assert "sound change right there" in out["corrected_reply"]
+    assert "clear two-deck proof" in out["corrected_reply"]
+
+
+def test_cmd_library_verify_live_reply_rejects_audio_source_detail_claim(tmp_path, capsys):
+    proof_path = tmp_path / "proof.json"
+    _write_ready_single_deck_proof(proof_path)
+
+    rc = main_mod._cmd_library_verify_live_reply(
+        argparse.Namespace(
+            live_context_file=str(proof_path),
+            chat_result_file=None,
+            reply="The vocal opened up and the kick got tighter.",
+            json=True,
+        )
+    )
+
+    assert rc == 1
+    out = json.loads(capsys.readouterr().out)
+    assert out["ok"] is False
+    assert "unsupported_audio_source_detail_claim" in out["violations"]
+    assert "vocal" not in out["corrected_reply"].lower()
+    assert "kick" not in out["corrected_reply"].lower()
+    assert "source-level proof" in out["corrected_reply"]
 
 
 def test_cmd_library_verify_live_reply_rejects_deck_audio_rich_single_deck_transition(
@@ -2059,7 +2081,7 @@ def test_cmd_library_verify_live_reply_rejects_deck_audio_rich_single_deck_trans
     assert "move_grades_without_live_proof" in out["violations"]
     assert "Great transition" not in out["corrected_reply"]
     assert "incoming deck landed clean" not in out["corrected_reply"]
-    assert "sound change right there" in out["corrected_reply"]
+    assert "clear two-deck proof" in out["corrected_reply"]
 
 
 def test_cmd_library_verify_live_reply_rejects_public_self_correction(tmp_path, capsys):
@@ -2080,8 +2102,9 @@ def test_cmd_library_verify_live_reply_rejects_public_self_correction(tmp_path, 
     assert out["ok"] is False
     assert "unsupported_live_outcome_claim" in out["violations"]
     assert out["proof_ready"] is True
-    assert "can't call it a transition" not in out["corrected_reply"]
-    assert "sound change right there" in out["corrected_reply"]
+    assert out["corrected_reply"] == (
+        "I can't call that a transition until I have clear two-deck proof."
+    )
 
 
 def test_cmd_library_verify_live_reply_rejects_public_debug_labels(tmp_path, capsys):
@@ -2108,7 +2131,7 @@ def test_cmd_library_verify_live_reply_rejects_public_debug_labels(tmp_path, cap
     assert "correct the live read" not in out["corrected_reply"]
     assert "resolved decks" not in out["corrected_reply"]
     assert "claim_policy" not in out["corrected_reply"]
-    assert "sound change right there" in out["corrected_reply"]
+    assert "clear two-deck proof" in out["corrected_reply"]
 
 
 def test_cmd_library_verify_live_reply_rejects_unready_proof_artifact(tmp_path, capsys):

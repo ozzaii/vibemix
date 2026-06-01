@@ -39,6 +39,7 @@ def test_ws_bus_emits_layer_3_fields_priority_stack_consumes() -> None:
     required_fields = [
         '"emotion"',  # priority-60 EmotionLayer
         '"reaction_intent"',  # priority-80 ReactionLayer
+        '"reaction_intent_seq"',  # one-shot dedup for 30Hz snapshot stream
         '"active_genre"',  # GenreRouter on frontend
         '"beat_phase"',  # priority-70 anticipation hip-bob
         '"bpm"',
@@ -95,6 +96,7 @@ def test_ws_bus_frame_is_json_serialisable() -> None:
         "active_genre": "techno",
         "emotion": "focused",
         "reaction_intent": None,
+        "reaction_intent_seq": 0,
     }
     encoded = json.dumps(frame)
     parsed = json.loads(encoded)
@@ -102,4 +104,5 @@ def test_ws_bus_frame_is_json_serialisable() -> None:
     # Required layer-3 fields present.
     assert "emotion" in parsed
     assert "reaction_intent" in parsed
+    assert "reaction_intent_seq" in parsed
     assert "active_genre" in parsed

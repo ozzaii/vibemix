@@ -27,6 +27,7 @@ from typing import Any, Protocol
 
 from vibemix.debrief.stripper import strip_uncited_sentences
 from vibemix.llm.model_router import resolve
+from vibemix.runtime.ai_observability import append_global_ai_message
 
 __all__ = [
     "ACHIRD_VOICE_NAME",
@@ -103,6 +104,36 @@ def _build_tldr_prompt(
     )
 
 
+def _record_tldr_ai_message(
+    *,
+    surface: str,
+    text: str,
+    model: str,
+    stop_reason: str,
+    prompt: str,
+    response: str,
+    extra: dict[str, Any] | None = None,
+    engine: str = "gemini",
+) -> None:
+    try:
+        append_global_ai_message(
+            engine=engine,
+            surface=surface,
+            direction="assistant",
+            text=text,
+            provider="gemini",
+            model=model,
+            stop_reason=stop_reason,
+            prompt_chars=len(prompt),
+            response_chars=len(response),
+            extra=extra,
+            prompt=prompt,
+            response=response,
+        )
+    except Exception:  # pragma: no cover - observability must not break debrief
+        pass
+
+
 def generate_tldr_text(
     client: GeminiClientProtocol,
     chapter_summaries: list[str],
@@ -121,6 +152,15 @@ def generate_tldr_text(
     try:
         response = client.models.generate_content(model=model, contents=prompt)
     except Exception as e:
+        _record_tldr_ai_message(
+            surface="debrief_tldr",
+            text="",
+            model=model,
+            stop_reason=f"error:{type(e).__name__}",
+            prompt=prompt,
+            response=f"<error {type(e).__name__}: {e}>",
+            extra={"error": f"{type(e).__name__}: {e}"},
+        )
         raise DebriefGenerationError(
             reason="tldr_generation_failed",
             message=f"Gemini call failed: {type(e).__name__}: {e}",
@@ -128,6 +168,14 @@ def generate_tldr_text(
 
     raw_text = _extract_text(response)
     if not raw_text:
+        _record_tldr_ai_message(
+            surface="debrief_tldr",
+            text="",
+            model=model,
+            stop_reason="empty_response",
+            prompt=prompt,
+            response="",
+        )
         raise DebriefGenerationError(
             reason="tldr_generation_failed",
             message="Empty response from Gemini",
@@ -135,6 +183,15 @@ def generate_tldr_text(
 
     narration, stripped = strip_uncited_sentences(raw_text)
     if not narration.strip():
+        _record_tldr_ai_message(
+            surface="debrief_tldr",
+            text="",
+            model=model,
+            stop_reason="all_stripped",
+            prompt=prompt,
+            response=raw_text,
+            extra={"stripped_sentences": stripped},
+        )
         raise DebriefGenerationError(
             reason="tldr_generation_failed",
             message=(
@@ -144,7 +201,17 @@ def generate_tldr_text(
         )
 
     # Truncate at sentence boundary if it overshoots 220 words.
-    return _truncate_to_word_budget(narration, MAX_TLDR_WORDS)
+    out = _truncate_to_word_budget(narration, MAX_TLDR_WORDS)
+    _record_tldr_ai_message(
+        surface="debrief_tldr",
+        text=out,
+        model=model,
+        stop_reason="stripped" if stripped else "model_done",
+        prompt=prompt,
+        response=raw_text,
+        extra={"stripped_sentences": stripped, "output_words": len(out.split())},
+    )
+    return out
 
 
 def synthesize_achird_mp3(
@@ -173,6 +240,16 @@ def synthesize_achird_mp3(
             },
         )
     except Exception as e:
+        _record_tldr_ai_message(
+            surface="debrief_tts",
+            text=text,
+            model=model,
+            stop_reason=f"error:{type(e).__name__}",
+            prompt=text,
+            response=f"<error {type(e).__name__}: {e}>",
+            extra={"voice_name": voice_name, "error": f"{type(e).__name__}: {e}"},
+            engine="gemini_tts",
+        )
         raise DebriefGenerationError(
             reason="tldr_generation_failed",
             message=f"TTS call failed: {type(e).__name__}: {e}",
@@ -180,10 +257,30 @@ def synthesize_achird_mp3(
 
     pcm = _extract_audio_pcm(response)
     if not pcm:
+        _record_tldr_ai_message(
+            surface="debrief_tts",
+            text=text,
+            model=model,
+            stop_reason="empty_audio",
+            prompt=text,
+            response="<pcm bytes=0>",
+            extra={"voice_name": voice_name, "pcm_bytes": 0},
+            engine="gemini_tts",
+        )
         raise DebriefGenerationError(
             reason="tldr_generation_failed",
             message="TTS returned empty PCM",
         )
+    _record_tldr_ai_message(
+        surface="debrief_tts",
+        text=text,
+        model=model,
+        stop_reason="model_done",
+        prompt=text,
+        response=f"<pcm bytes={len(pcm)}>",
+        extra={"voice_name": voice_name, "pcm_bytes": len(pcm)},
+        engine="gemini_tts",
+    )
     return _encode_pcm_to_mp3(pcm, sample_rate=24000)
 
 

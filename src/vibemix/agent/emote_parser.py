@@ -77,18 +77,27 @@ def parse_emote_tags(text: str) -> list[str]:
     return intents
 
 
-def strip_emote_tags(text: str) -> tuple[str, list[str]]:
+def has_emote_tag(text: str) -> bool:
+    """Return True when ``text`` contains any complete ``[emote:*]`` control tag."""
+    return _EMOTE_TAG_RE.search(text) is not None
+
+
+def strip_emote_tags(text: str, *, normalize: bool = True) -> tuple[str, list[str]]:
     """Strip ALL ``[emote:*]`` tags from ``text`` AND return whitelisted intents.
 
     Unknown tags are still stripped from the returned text (so the LLM
     can't smuggle them into TTS) but they DON'T appear in the intent
     list. Whitespace around removed tags is normalized — runs of spaces
     collapse to a single space, and leading/trailing whitespace trims.
+
+    Set ``normalize=False`` for streaming TTS chunks where preserving
+    boundary whitespace matters more than pretty transcript text.
     """
     intents = parse_emote_tags(text)
     cleaned = _EMOTE_TAG_RE.sub("", text)
-    # Collapse runs of whitespace and trim — without this, the stripped
-    # text reads "Loving that bassline  — keep it rolling " with a
-    # double-space gap where the tag used to be.
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if normalize:
+        # Collapse runs of whitespace and trim — without this, the stripped
+        # text reads "Loving that bassline  — keep it rolling " with a
+        # double-space gap where the tag used to be.
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned, intents

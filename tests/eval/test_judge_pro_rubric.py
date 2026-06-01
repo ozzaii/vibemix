@@ -10,14 +10,19 @@ critical Pitfall P42 evidence.
 
 from __future__ import annotations
 
+import asyncio
 import json
+from types import SimpleNamespace
 
 import pytest
-
 from scripts.eval.judge import (
+    FLASH_MODEL,
     FLASH_VERDICT_SCHEMA,
+    PRO_MODEL,
     PRO_VERDICT_SCHEMA,
     aggregate_session_f1,
+    call_flash_judge,
+    call_pro_judge,
     load_rubric,
 )
 
@@ -125,3 +130,86 @@ def test_pro_verdict_schema_is_json_serializable() -> None:
     serialized = json.dumps(PRO_VERDICT_SCHEMA)
     deserialized = json.loads(serialized)
     assert deserialized == PRO_VERDICT_SCHEMA
+
+
+class _FakeModels:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.calls: list[dict] = []
+
+    def generate_content(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(text=self.text)
+
+
+class _FakeClient:
+    def __init__(self, text: str) -> None:
+        self.models = _FakeModels(text)
+
+
+def test_pro_judge_records_ai_message_observability(monkeypatch) -> None:
+    records = []
+    monkeypatch.setattr(
+        "scripts.eval.judge.append_global_ai_message",
+        lambda **kwargs: records.append(kwargs) or {},
+    )
+    verdict_text = json.dumps(
+        {
+            "groundedness": 0.9,
+            "timing": 0.8,
+            "substance": 0.7,
+            "tone": 0.8,
+            "relevance": 0.9,
+            "brevity": 0.8,
+            "verdict": "pass",
+            "rationale": "Anchored to the move.",
+        }
+    )
+    evidence = {
+        "type": "MIX_MOVE",
+        "t_session": 4.0,
+        "session": "synthetic_session",
+        "payload": {"control": "filter_low", "deck": "B"},
+    }
+
+    verdict = asyncio.run(call_pro_judge("Nice filter move.", evidence, _FakeClient(verdict_text)))
+
+    assert verdict["verdict"] == "pass"
+    assert records
+    row = records[0]
+    assert row["engine"] == "eval_judge"
+    assert row["surface"] == "eval_judge_pro"
+    assert row["model"] == PRO_MODEL
+    assert row["stop_reason"] == "parsed"
+    assert row["prompt"].startswith("Spoken response:")
+    assert row["response"] == verdict_text
+    assert row["live_context"]["recent_moves"] == ["filter_low"]
+    assert row["live_context"]["deck"] == "B"
+    assert row["extra"]["judge"] == "pro"
+    assert row["extra"]["verdict"]["rationale"] == "Anchored to the move."
+
+
+def test_flash_judge_records_parse_error_observability(monkeypatch) -> None:
+    records = []
+    monkeypatch.setattr(
+        "scripts.eval.judge.append_global_ai_message",
+        lambda **kwargs: records.append(kwargs) or {},
+    )
+
+    with pytest.raises(ValueError, match="Flash judge returned non-JSON"):
+        asyncio.run(
+            call_flash_judge(
+                "Too vague.",
+                {"type": "TRACK_CHANGE", "session": "synthetic_session", "payload": {}},
+                _FakeClient("not-json"),
+            )
+        )
+
+    assert records
+    row = records[0]
+    assert row["engine"] == "eval_judge"
+    assert row["surface"] == "eval_judge_flash"
+    assert row["model"] == FLASH_MODEL
+    assert row["stop_reason"] == "parse_error"
+    assert row["response"] == "not-json"
+    assert "non-JSON" in row["extra"]["error"]

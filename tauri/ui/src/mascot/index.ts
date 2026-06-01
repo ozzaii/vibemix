@@ -38,6 +38,7 @@ import {
   getCurrentMood,
   setCurrentMood,
 } from "./mood.js";
+import { selectReactionIntent } from "./reaction-intent.js";
 import { MascotRenderer } from "./renderer.js";
 import {
   applyTransition,
@@ -179,6 +180,15 @@ async function boot(): Promise<void> {
   // `fireAt <= now`. Keeps the dispatcher pure AND lets the followup
   // honour priority + beat-lock just like any other transition.
   const followups: PendingFollowup[] = [];
+  let lastReactionIntentSeq = 0;
+
+  function settleStateAfterReaction(prior: MascotState): MascotState {
+    const priorClass = STATE_CLASS[prior];
+    if (priorClass === "idle" || priorClass === "dance") return prior;
+    return currentSnapshot.music >= 0.11
+      ? "idle_bop_to_beat_energetic"
+      : "idle_breathe";
+  }
 
   function handleMessage(message: unknown): void {
     const now = performance.now();
@@ -215,6 +225,24 @@ async function boot(): Promise<void> {
       currentSnapshot.mood = mood;
       currentSnapshot.music = music;
       currentSnapshot.voice = voice;
+      const reaction = selectReactionIntent(message, lastReactionIntentSeq);
+      if (reaction) {
+        lastReactionIntentSeq = reaction.seq;
+        const settleState = settleStateAfterReaction(machine.current);
+        const plan = {
+          action: "switch_now" as const,
+          target: reaction.state,
+          blendMs: 180,
+          reason: "reaction_intent",
+        };
+        machine = applyTransition(machine, plan, now);
+        renderer.crossFadeTo(reaction.state, plan.blendMs);
+        followups.push({
+          state: settleState,
+          fireAt: now + 800,
+          trigger: "manual_fire",
+        });
+      }
       return;
     }
 

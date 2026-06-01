@@ -1123,7 +1123,7 @@ def test_deck_audio_context_marks_two_deck_route_as_candidate_support() -> None:
     assert result.corrected is False
     assert result.policy == "candidate_not_verdict"
     assert verdict.corrected is True
-    assert "transition setup" in verdict.text
+    assert "transition candidate" in verdict.text
 
 
 def test_live_claim_guard_allows_verdict_with_citable_deck_pair_audio_delta() -> None:
@@ -1153,6 +1153,69 @@ def test_live_claim_guard_allows_verdict_with_citable_deck_pair_audio_delta() ->
     assert result.corrected is False
     assert result.policy == "supported_verdict"
     assert result.text == "That was a great transition."
+
+
+def test_live_claim_guard_strips_judge_overpraise_below_strong_score() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A"),
+            "B": _deck("InB", camelot="9A"),
+        }
+    )
+    capture = _deck_pair_audio_capture()
+    moves = ["xfader→center"]
+    judge_line = (
+        "[judge:transition@128.4] Judge graded the transition: compatible keys; "
+        "both basslines up, low-end mud (blend score 0.50/1)"
+    )
+
+    result = apply_live_claim_guard(
+        "That was a bomb transition.",
+        state,
+        moves,
+        audio_capture_context=capture,
+        judge_evidence_line=judge_line,
+    )
+
+    assert result.corrected is True
+    assert result.policy == "judge_verdict_not_hype_grade"
+    assert result.reason == "judge_score_below_strong_praise"
+    assert "restrained" in result.text
+    assert "bomb transition" not in result.text
+    assert "judge_score=0.50" in result.summary
+
+
+def test_live_claim_guard_allows_strong_judge_praise_when_score_supports_it() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A"),
+            "B": _deck("InB", camelot="9A"),
+        }
+    )
+    capture = _deck_pair_audio_capture()
+    moves = ["xfader→center"]
+    judge_line = (
+        "[judge:transition@128.4] Judge graded the transition: compatible keys; "
+        "clean low end, one bass ducked (blend score 0.88/1)"
+    )
+
+    result = apply_live_claim_guard(
+        "That was a bomb transition.",
+        state,
+        moves,
+        audio_capture_context=capture,
+        judge_evidence_line=judge_line,
+    )
+
+    assert result.corrected is False
+    assert result.policy == "supported_verdict"
+    assert result.text == "That was a bomb transition."
 
 
 def test_live_claim_guard_requires_attached_deck_audio_parts_when_requested() -> None:
@@ -1193,7 +1256,7 @@ def test_live_claim_guard_requires_attached_deck_audio_parts_when_requested() ->
     assert result.corrected is True
     assert result.policy == "candidate_not_verdict"
     assert result.reason == "deck_audio_parts_not_attached"
-    assert "transition setup" in result.text
+    assert "transition candidate" in result.text
 
 
 def test_live_claim_guard_keeps_candidate_when_deck_pair_audio_delta_missing() -> None:
@@ -1218,7 +1281,7 @@ def test_live_claim_guard_keeps_candidate_when_deck_pair_audio_delta_missing() -
 
     assert result.corrected is True
     assert result.policy == "candidate_not_verdict"
-    assert "transition setup" in result.text
+    assert "transition candidate" in result.text
 
 
 def test_live_claim_guard_keeps_candidate_when_deck_audio_window_missing() -> None:
@@ -1246,7 +1309,7 @@ def test_live_claim_guard_keeps_candidate_when_deck_audio_window_missing() -> No
     assert reason is None
     assert result.corrected is True
     assert result.policy == "candidate_not_verdict"
-    assert "transition setup" in result.text
+    assert "transition candidate" in result.text
 
 
 def test_live_claim_guard_requires_trusted_sources_for_supported_verdict() -> None:
@@ -1271,7 +1334,7 @@ def test_live_claim_guard_requires_trusted_sources_for_supported_verdict() -> No
 
     assert result.corrected is True
     assert result.policy == "candidate_not_verdict"
-    assert "transition setup" in result.text
+    assert "transition candidate" in result.text
 
 
 def test_deck_audio_separation_context_marks_stereo_capture_as_global_mix_only() -> None:
@@ -1362,6 +1425,7 @@ def test_deck_audio_separation_context_marks_configured_deck_pair_capture() -> N
             "opened_channels": 4,
             "sample_rate": 48000,
             "master_channels": "0,1,2,3",
+            "deck_audio_master_source": "controller_weighted_deck_pairs",
             "deck_channels": {"A": "0,1", "B": "2,3"},
             "deck_audio_capture_enabled": True,
             "deck_audio_rms": {"A": 0.02, "B": 0.0},
@@ -1370,11 +1434,43 @@ def test_deck_audio_separation_context_marks_configured_deck_pair_capture() -> N
 
     assert "mode=deck_pair_capture_configured" in out
     assert "current_capture=P1_global_mix_plus_deck_pairs" in out
+    assert "master_source=controller_weighted_deck_pairs" in out
     assert "deckA_audio=captured" in out
     assert "deckB_audio=captured" in out
     assert "per_deck_audio=captured_not_attached" in out
     assert "isolated_decks=runtime_capture_available" in out
     assert "deck_pairs=A:0,1+B:2,3" in out
+    assert "deck_audio_activity=A_active+B_silent" in out
+    assert normalize_deck_audio_separation_context_text(out) == out
+
+
+def test_deck_audio_separation_context_marks_unverified_auto_deck_pair_capture() -> None:
+    out = render_deck_audio_separation_context(
+        {
+            "requested_device": "BlackHole 16ch",
+            "device_name": "BlackHole 16ch",
+            "input_channels": 16,
+            "opened_channels": 4,
+            "sample_rate": 48000,
+            "master_channels": "0,1,2,3",
+            "deck_audio_master_source": "controller_weighted_deck_pairs",
+            "deck_channels": {"A": "0,1", "B": "2,3"},
+            "deck_audio_capture_configured": True,
+            "deck_audio_capture_enabled": False,
+            "deck_audio_capture_verified": False,
+            "deck_audio_active_sides_seen": "A",
+            "deck_audio_rms": {"A": 0.02, "B": 0.0},
+        }
+    )
+
+    assert "mode=deck_pair_capture_unverified" in out
+    assert "current_capture=P1_global_mix_plus_unverified_deck_pairs" in out
+    assert "deckA_audio=captured_unverified" in out
+    assert "deckB_audio=captured_unverified" in out
+    assert "per_deck_audio=unverified_not_attached" in out
+    assert "isolated_decks=false" in out
+    assert "verification=awaiting_live_audio_on_both_deck_pairs" in out
+    assert "active_sides_seen=A" in out
     assert "deck_audio_activity=A_active+B_silent" in out
     assert normalize_deck_audio_separation_context_text(out) == out
 
@@ -1881,7 +1977,8 @@ def test_live_claim_guard_corrects_move_effect_causal_verdict() -> None:
     assert result.corrected is True
     assert result.policy == "move_effect_not_verdict"
     assert result.reason == "dsp_delta_not_causal_proof"
-    assert "energy shifted right after it" in result.text
+    assert "can't tell" in result.text.lower()
+    assert "control caused that" in result.text
     assert "sub energy fell 50% (strong)" in result.summary
 
 
@@ -1896,7 +1993,27 @@ def test_live_claim_guard_corrects_bare_move_effect_quality_verdict() -> None:
     assert result.corrected is True
     assert result.policy == "move_effect_not_verdict"
     assert "That landed" not in result.text
-    assert "energy shifted right after it" in result.text
+    assert "can't tell" in result.text.lower()
+
+
+def test_live_claim_guard_suppresses_eq_audio_song_detail_verdict() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    state.deck_state = DeckState(decks={"A": _deck("Strobe")})
+    state.audio_delta = ["low energy fell 50% (strong)"]
+    moves = ["A_low: flat->killed"]
+
+    result = apply_live_claim_guard(
+        "That EQ move made the vocal open up and the kick got tighter.",
+        state,
+        moves,
+    )
+
+    assert result.corrected is True
+    assert result.policy == "move_effect_not_verdict"
+    assert result.reason == "dsp_delta_not_causal_proof"
+    assert "vocal" not in result.text.lower()
+    assert "kick" not in result.text.lower()
+    assert "tighter" not in result.text.lower()
 
 
 def test_live_claim_guard_preserves_move_effect_correlation_disclaimer() -> None:
@@ -1909,6 +2026,149 @@ def test_live_claim_guard_preserves_move_effect_correlation_disclaimer() -> None
 
     assert result.corrected is False
     assert result.text == reply
+
+
+def test_live_claim_guard_corrects_mixer_low_kill_contradiction() -> None:
+    state = MusicState(audible=True, audible_deck="mix", deck_confidence=0.5)
+    state.controller_connected = True
+    state.xfader = 17
+    state.deck_a = {"vol": 0, "eq_low": 81, "eq_mid": 73, "eq_hi": 73, "filter": 64}
+    state.deck_b = {"vol": 127, "eq_low": 78, "eq_mid": 83, "eq_hi": 89, "filter": 60}
+    reply = "EQ killed the lows too aggressively when you boosted deck B's mids and highs."
+
+    result = apply_live_claim_guard(reply, state)
+
+    assert result.corrected is True
+    assert result.policy == "mixer_contradiction"
+    assert result.reason == "low_kill_not_in_mixer_state"
+    assert "killed the lows" not in result.text.lower()
+    assert "mixer_lows=A:boost+B:boost" in result.summary
+
+
+def test_live_claim_guard_allows_low_kill_when_mixer_agrees() -> None:
+    state = MusicState(audible=True, audible_deck="A", deck_confidence=0.8)
+    state.controller_connected = True
+    state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    reply = "EQ killed the lows on deck A."
+
+    result = apply_live_claim_guard(reply, state)
+
+    assert result.corrected is False
+    assert result.text == reply
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "you brought the faders up",
+        "you killed the lows",
+        "you cut the lows",
+        "You killed the lows there.",
+        "that low cut cleaned the mix",
+        "that EQ move cleaned up the low end",
+        "Bring the high-pass filter back down to 12 o'clock",
+        "You pulled the faders up and it got muddy.",
+    ],
+)
+def test_live_claim_guard_corrects_no_move_control_causality(reply: str) -> None:
+    state = MusicState(controller_connected=True)
+
+    result = apply_live_claim_guard(reply, state, [])
+
+    assert result.corrected is True
+    assert result.policy == "single_deck_control_not_grounded"
+    assert result.reason == "control_causality_without_moves"
+    assert "faders" not in result.text.lower()
+    assert "high-pass" not in result.text.lower()
+
+
+def test_live_claim_guard_salvages_sound_clause_before_no_move_control_claim() -> None:
+    state = MusicState(controller_connected=True)
+
+    result = apply_live_claim_guard(
+        "That synth clashed with the pad when you brought the faders up.",
+        state,
+        [],
+    )
+
+    assert result.corrected is True
+    assert result.policy == "single_deck_control_not_grounded"
+    assert result.text == "That synth clashed with the pad."
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "The low end dropped out and the mid felt hollow.",
+        "The filter sweep in the track sounded hollow.",
+        "The bass got thinner for a moment.",
+    ],
+)
+def test_live_claim_guard_preserves_pure_audio_descriptions_without_moves(reply: str) -> None:
+    state = MusicState(controller_connected=True)
+
+    result = apply_live_claim_guard(reply, state, [])
+
+    assert result.corrected is False
+    assert result.text == reply
+
+
+def test_live_claim_guard_suppresses_hidden_source_detail_without_detector() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+
+    result = apply_live_claim_guard(
+        "The vocal opened up and the kick got tighter.",
+        state,
+        ["A_low: flat→killed"],
+    )
+
+    assert result.corrected is True
+    assert result.policy == "audio_source_detail_not_proof"
+    assert result.reason == "source_detail_without_grounded_detector"
+    assert "source-level proof" in result.text
+    assert "vocal opened" not in result.text.lower()
+    assert should_defer_live_claim_stream(state, ["A_low: flat→killed"]) is True
+
+
+def test_live_claim_guard_allows_vocal_detail_when_vocal_detector_active() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    state.vocal_active = True
+
+    result = apply_live_claim_guard("The vocal came in up front.", state)
+
+    assert result.corrected is False
+    assert result.text == "The vocal came in up front."
+
+
+def test_live_claim_guard_allows_kick_detail_on_grounded_kick_event() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+
+    result = apply_live_claim_guard(
+        "The kick came in clean.",
+        state,
+        event_type="REENTRY_KICK_LAND",
+    )
+
+    assert result.corrected is False
+    assert result.text == "The kick came in clean."
+
+
+def test_live_claim_guard_keeps_move_present_effect_policy() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    state.deck_state = DeckState(decks={"A": _deck("Strobe")})
+    moves = ["A_low: flat->killed"]
+
+    result = apply_live_claim_guard(
+        "that EQ move cleaned up the low end",
+        state,
+        moves,
+        audio_delta_items=["low energy fell 50% (strong)"],
+    )
+
+    assert result.corrected is True
+    assert result.policy == "move_effect_not_verdict"
+    assert result.reason == "dsp_delta_not_causal_proof"
 
 
 def test_single_deck_eq_move_blocks_transition_even_with_two_loaded_decks() -> None:
@@ -1973,7 +2233,7 @@ def test_live_claim_guard_corrects_multi_deck_outcome_category() -> None:
     assert result.corrected is True
     assert result.policy == "blocked"
     assert result.reason == "single_resolved_deck"
-    assert "sound change right there" in result.text
+    assert "clear two-deck proof" in result.text
     assert "resolved decks=A" in result.summary
     assert "second deck identity=unknown_or_suppressed" in result.summary
     assert "deck source=resolved=A unresolved=B" in result.summary
@@ -2009,6 +2269,13 @@ def test_live_claim_guard_generalizes_beyond_transition_word() -> None:
     assert all("recent control evidence: xfader→A-side" in result.summary for result in results)
 
 
+def test_manual_silent_trigger_defers_stream_until_linter() -> None:
+    state = MusicState(audible=False, audible_deck="none")
+    state.phase = "silent"
+
+    assert should_defer_live_claim_stream(state, [], event_type="MANUAL") is True
+
+
 def test_live_claim_guard_normalizes_public_self_correction() -> None:
     state = MusicState(audible_deck="A")
     state.deck_state = DeckState(decks={"A": _deck("Strobe")})
@@ -2017,8 +2284,7 @@ def test_live_claim_guard_normalizes_public_self_correction() -> None:
     result = apply_live_claim_guard(reply, state)
 
     assert result.corrected is True
-    assert "can't call that a transition" not in result.text
-    assert "sound change right there" in result.text
+    assert result.text == "I can't call that a transition until I have clear two-deck proof."
 
 
 @pytest.mark.parametrize(
@@ -2042,7 +2308,7 @@ def test_live_claim_guard_normalizes_public_diagnostic_without_outcome_claim(rep
     assert "stupid" not in lower
     assert "resolved decks" not in lower
     assert "live evidence gate" not in lower
-    assert "sound change right there" in result.text
+    assert "clear two-deck proof" in result.text
 
 
 def test_live_claim_guard_corrects_disclaimer_with_fresh_blend_claim() -> None:
@@ -2054,7 +2320,7 @@ def test_live_claim_guard_corrects_disclaimer_with_fresh_blend_claim() -> None:
 
     assert result.corrected is True
     assert "blend was clean" not in result.text
-    assert "sound change right there" in result.text
+    assert "clear two-deck proof" in result.text
 
 
 def test_live_claim_guard_defers_mix_candidate_for_verdict_check() -> None:

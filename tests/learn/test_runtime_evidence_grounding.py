@@ -170,7 +170,22 @@ def test_runtime_logs_learn_milestones_to_session_event_sink() -> None:
     kinds = [kind for kind, _fields in events]
     assert "learn_lesson_loaded" in kinds
     assert "learn_tutor_speak" in kinds
+    assert "ai_message" in kinds
     assert "learn_action_observed" in kinds
+
+    ai_message = next(fields for kind, fields in events if kind == "ai_message")
+    assert ai_message["engine"] == "learn_tutor"
+    assert ai_message["surface"] == "learn"
+    assert ai_message["direction"] == "assistant"
+    assert ai_message["event"] == "learn_tutor_speak"
+    assert ai_message["provider"] == "authored_fixture"
+    assert ai_message["stop_reason"] == "authored_fixture"
+    assert ai_message["message"]
+    assert ai_message["extra"]["lesson_id"] == "L1.03"
+    assert ai_message["extra"]["course_id"] == "course_1_anatomy"
+    assert ai_message["extra"]["step_id"] == "L1.03.practice"
+    assert ai_message["extra"]["tts_marker"]
+    assert ai_message["extra"]["source"] == "learn_runtime"
 
     action = next(fields for kind, fields in events if kind == "learn_action_observed")
     assert action["lesson_id"] == "L1.03"

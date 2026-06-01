@@ -51,6 +51,17 @@ def _async_iter_raise(exc):
     return gen()
 
 
+def _async_iter_after(callback, chunks):
+    """Build an async iterable that mutates state after prompt construction."""
+
+    async def gen():
+        callback()
+        for c in chunks:
+            yield type("Chunk", (), {"text": c})()
+
+    return gen()
+
+
 class _FakeRecorder:
     """Minimal recorder stub — no 0o700 dir creation, no real wav writers."""
 
@@ -246,6 +257,123 @@ def test_llm_node_02_fallback_to_manual_when_no_event(mocker, tmp_path) -> None:
     assert called_with.extra == {}
 
 
+def test_llm_node_logs_ai_message_observability_with_moves(mocker, tmp_path) -> None:
+    """A spoken live-coach response gets one durable ai_message row with moves."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    state.recent_moves = [(0.3, "A_low: flat->cut")]
+    state.deck_a = {"vol": 127, "eq_low": 20, "filter": 64, "play": True}
+    state.deck_b = {"vol": 0, "eq_low": 64, "filter": 64, "play": False}
+    state.xfader = 10
+    state.controller_connected = True
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["that low cut reads clearly"])
+    )
+
+    ev = Event(type="MIX_MOVE", state=state, extra={"moves": [(0.2, "A_low: flat->cut")]})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    rows = [fields for kind, fields in recorder.events if kind == "ai_message"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["engine"] == "live_coach"
+    assert row["event"] == "MIX_MOVE"
+    assert row["message"] == "that low cut reads clearly"
+    assert row["moves"]["recent_moves"] == [{"label": "A_low: flat->cut", "age_s": 0.3}]
+    assert row["moves"]["event_moves"] == [{"label": "A_low: flat->cut", "age_s": 0.2}]
+    assert row["moves"]["deck_mixer"]["A"]["eq_low"] == 20
+    prompt_text = Path(row["artifacts"]["session_prompt_path"]).read_text(encoding="utf-8")
+    assert prompt_text.startswith("EVIDENCE: x")
+    assert "AUDIO CONTEXT MAP FOR ATTACHED P1" in prompt_text
+    assert (
+        Path(row["artifacts"]["session_response_path"]).read_text(encoding="utf-8")
+        == "that low cut reads clearly"
+    )
+
+
+def test_llm_node_strips_emote_tags_and_sets_mascot_intent(mocker, tmp_path) -> None:
+    """Inline emote controls must drive the mascot, not leak into spoken text."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["Nice [emote:fist_pump]drop."])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    chunks = _drive_llm_node(agent)
+
+    assert "".join(chunks) == "Nice drop."
+    assert state.last_reaction_intent == "fist_pump"
+    assert state.last_reaction_intent_seq == 1
+    ai_texts = [fields["text"] for kind, fields in recorder.events if kind == "ai_text"]
+    assert ai_texts == ["Nice drop."]
+    intent_rows = [
+        fields for kind, fields in recorder.events if kind == "mascot_reaction_intent"
+    ]
+    assert len(intent_rows) == 1
+    assert intent_rows[0]["intent"] == "fist_pump"
+    assert intent_rows[0]["seq"] == 1
+    assert isinstance(intent_rows[0]["response_id"], str)
+
+
+def test_llm_node_strips_unknown_emote_tags_without_mascot_intent(mocker, tmp_path) -> None:
+    """Unknown emote controls are removed from speech but do not fire the mascot."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["Nice [emote:wink]drop."])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    chunks = _drive_llm_node(agent)
+
+    assert "".join(chunks) == "Nice drop."
+    assert state.last_reaction_intent is None
+    assert state.last_reaction_intent_seq == 0
+    ai_texts = [fields["text"] for kind, fields in recorder.events if kind == "ai_text"]
+    assert ai_texts == ["Nice drop."]
+    assert "mascot_reaction_intent" not in [kind for kind, _fields in recorder.events]
+
+
+def test_llm_node_ai_message_uses_prompt_time_mixer_snapshot(mocker, tmp_path) -> None:
+    """Model latency must not rewrite the saved mixer evidence for the turn."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    state.recent_moves = [(0.3, "A_low: flat->cut")]
+    state.deck_a = {"vol": 127, "eq_low": 20, "filter": 64, "play": True}
+    state.deck_b = {"vol": 0, "eq_low": 64, "filter": 64, "play": False}
+    state.xfader = 10
+    state.controller_connected = True
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    def mutate_live_state() -> None:
+        state.recent_moves = []
+        state.deck_a = {"vol": 0, "eq_low": 99, "filter": 64, "play": False}
+        state.xfader = 127
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter_after(mutate_live_state, ["still saw the original low cut"])
+    )
+
+    ev = Event(type="MIX_MOVE", state=state, extra={"moves": [(0.2, "A_low: flat->cut")]})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    rows = [fields for kind, fields in recorder.events if kind == "ai_message"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["moves"]["recent_moves"] == [{"label": "A_low: flat->cut", "age_s": 0.3}]
+    assert row["moves"]["deck_mixer"]["A"]["eq_low"] == 20
+    assert row["moves"]["deck_mixer"]["A"]["vol"] == 127
+    assert row["moves"]["deck_mixer"]["xfader"] == 10
+
+
 def test_llm_node_03_screen_jpeg_none_unconditional(mocker, tmp_path) -> None:
     """LLM-NODE-03: screen_jpeg=None unconditionally; v4:1502 comment present."""
     agent, gen_client, _, state = _build_agent(mocker, tmp_path)
@@ -393,8 +521,7 @@ def test_llm_node_audio_map_reflects_configured_deck_pair_capture(mocker, tmp_pa
     assert "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong" in prompt_text
     assert (
         "deck_audio_window=A_active_pre_0.020_current_0.040+"
-        "B_silent_pre_0.030_current_0.000"
-        in prompt_text
+        "B_silent_pre_0.030_current_0.000" in prompt_text
     )
     assert "claim_policy[policy=requires_more_evidence" in prompt_text
     assert "rule=multi_deck_outcome_requires_live_support" in prompt_text
@@ -404,9 +531,7 @@ def test_llm_node_audio_map_reflects_configured_deck_pair_capture(mocker, tmp_pa
     assert "global mix, not isolated deck stems" in prompt_text
 
 
-def test_llm_node_downgrades_verdict_when_deck_audio_parts_not_attached(
-    mocker, tmp_path
-) -> None:
+def test_llm_node_downgrades_verdict_when_deck_audio_parts_not_attached(mocker, tmp_path) -> None:
     audio_capture_context = {
         "requested_device": "BlackHole 16ch",
         "device_name": "BlackHole 16ch",
@@ -471,8 +596,9 @@ def test_llm_node_downgrades_verdict_when_deck_audio_parts_not_attached(
     assert "claim_policy[policy=supported_verdict" not in prompt_text
     assert "deck_audio_parts=not_attached" in prompt_text
     assert "Great transition" not in heard
-    assert "transition setup" in heard
+    assert heard == ""
     assert guard_events
+    assert guard_events[-1]["action"] == "strip"
     assert guard_events[-1]["reason"] == "deck_audio_parts_not_attached"
     assert "Great transition" in guard_events[-1]["raw_text"]
     assert "Great transition" not in guard_events[-1]["corrected_text"]
@@ -530,8 +656,9 @@ def test_llm_node_live_claim_guard_uses_event_audio_capture_context(mocker, tmp_
     assert AICoach.build_prompt.call_args.kwargs["audio_capture_context"] is audio_capture_context
     guard_events = [fields for kind, fields in recorder.events if kind == "live_claim_guard"]
     assert "Great transition" not in "".join(chunks)
-    assert "transition setup" in "".join(chunks)
+    assert "".join(chunks) == ""
     assert guard_events
+    assert guard_events[-1]["action"] == "strip"
     assert guard_events[-1]["reason"] == "deck_audio_parts_not_attached"
 
 
@@ -791,9 +918,10 @@ def test_llm_node_03b_places_deck_audio_map_next_to_audio_part(mocker, tmp_path)
 
     assert len(contents) == 2
     assert prompt_text.startswith("EVIDENCE: base")
-    assert AICoach.build_prompt.call_args.kwargs["audio_capture_context"] is ev.extra[
-        "audio_capture_context"
-    ]
+    assert (
+        AICoach.build_prompt.call_args.kwargs["audio_capture_context"]
+        is ev.extra["audio_capture_context"]
+    )
     assert audio_map_at < attached_at
     assert "context_feed_contract[" in prompt_text
     assert "surface=gemini_p1" in prompt_text

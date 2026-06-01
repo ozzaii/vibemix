@@ -60,6 +60,62 @@ def test_result_carries_usage_from_fake(fake_client) -> None:
     assert first.usage.get("total_token_count") == 1940
 
 
+def test_successful_cell_records_ai_message_observability(fake_client, monkeypatch) -> None:
+    """Every successful bench generation lands in the shared AI-message ledger."""
+    import vibemix.bench.run as run_mod
+    from vibemix.bench.matrix import STUDY_A
+
+    rows: list[dict] = []
+    monkeypatch.setattr(
+        run_mod,
+        "append_global_ai_message",
+        lambda **kwargs: rows.append(kwargs) or kwargs,
+    )
+
+    results = run_mod.run_study([STUDY_A[0]], client=fake_client)
+
+    assert len(results) == 1
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["engine"] == "gemini"
+    assert row["surface"] == "bench_run"
+    assert row["event"] == "bench_cell"
+    assert row["text"] == results[0].output
+    assert row["prompt"] == results[0].prompt
+    assert row["response"] == results[0].output
+    assert row["model"]
+    assert row["stop_reason"] == "model_done"
+    assert row["extra"]["cell"]["model_path"] == STUDY_A[0].model_path
+    assert row["extra"]["usage"]["prompt_token_count"] == 1900
+    assert row["extra"]["error"] is None
+
+
+def test_parked_cell_records_ai_message_observability(no_text_client, monkeypatch) -> None:
+    """Blocked/no-text bench calls are also visible as parked AI-message rows."""
+    import vibemix.bench.run as run_mod
+    from vibemix.bench.matrix import STUDY_A
+
+    rows: list[dict] = []
+    monkeypatch.setattr(
+        run_mod,
+        "append_global_ai_message",
+        lambda **kwargs: rows.append(kwargs) or kwargs,
+    )
+
+    results = run_mod.run_study([STUDY_A[0]], client=no_text_client)
+
+    assert len(results) == 1
+    assert len(rows) == 1
+    row = rows[0]
+    assert results[0].output == ""
+    assert results[0].error == "blocked: no text candidate"
+    assert row["text"] == ""
+    assert row["stop_reason"] == "blocked: no text candidate"
+    assert row["response"] == "<parked error=blocked: no text candidate>"
+    assert row["extra"]["error"] == "blocked: no text candidate"
+    assert row["extra"]["usage"]["prompt_token_count"] == 1900
+
+
 def test_study_a_records_nonzero_known_cost(fake_client) -> None:
     """WR-01: a STUDY_A cell (router alias ``library_auto_tag``, NOT a pricing
     key) must record a NON-ZERO KNOWN cost — the bench bills it against the

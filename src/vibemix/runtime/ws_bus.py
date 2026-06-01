@@ -907,10 +907,10 @@ async def ws_broadcast(
             # P47). `emotion` ("neutral"/"focused"/"hyped"/"concerned"/
             # None) drives the priority-60 EmotionLayer on the frontend.
             # `reaction_intent` (MascotReaction whitelist value / None)
-            # is set by the AICoach emote-tag parser and consumed by
-            # the priority-80 ReactionLayer. Both fields default None
-            # which the renderer interprets as "no-op" — backward
-            # compatible with v2.0 subscribers that don't read them.
+            # and `reaction_intent_seq` are set by the AICoach emote-tag
+            # parser and consumed by the mascot. The seq lets the 30Hz
+            # frontend subscriber fire each intent once while still allowing
+            # the same intent to re-fire on a later co-host turn.
             # Build the mascot frame as a dict FIRST so we can gate the send
             # at the emit boundary (BRINGUP-04). The key set / ordering / 30Hz
             # cadence are unchanged — the guard below only decides whether to
@@ -970,6 +970,7 @@ async def ws_broadcast(
                 "genre_confidence": state.genre_confidence,
                 "emotion": state.emotion,
                 "reaction_intent": state.last_reaction_intent,
+                "reaction_intent_seq": state.last_reaction_intent_seq,
                 # Phase 62 (PILL-03) — additive, read-only. The per-deck
                 # ``deck_state`` map ({side: {title, camelot, key, bpm,
                 # confidence}}) read from the Phase-59 ``MusicState.deck_state``

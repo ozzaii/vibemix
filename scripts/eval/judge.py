@@ -27,9 +27,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+from vibemix.runtime.ai_observability import append_global_ai_message
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _RUBRICS_DIR = _PROJECT_ROOT / "eval" / "rubrics"
@@ -106,6 +109,68 @@ def _assemble_judge_prompt(response: str, evidence: dict[str, Any]) -> str:
     )
 
 
+def _eval_live_context(evidence: dict[str, Any]) -> dict[str, Any]:
+    payload = evidence.get("payload")
+    payload = payload if isinstance(payload, dict) else {}
+    ctx: dict[str, Any] = {}
+    recent_moves = payload.get("recent_moves")
+    if isinstance(recent_moves, list):
+        ctx["recent_moves"] = recent_moves
+    elif evidence.get("type") == "MIX_MOVE":
+        control = payload.get("control") or payload.get("move") or payload.get("label")
+        if control:
+            ctx["recent_moves"] = [str(control)]
+    if isinstance(payload.get("deck_mixer"), dict):
+        ctx["deck_mixer"] = payload["deck_mixer"]
+    if isinstance(payload.get("audio_delta"), list):
+        ctx["audio_delta"] = payload["audio_delta"]
+    deck = payload.get("deck") or payload.get("side")
+    if deck:
+        ctx["deck"] = str(deck)
+    return ctx
+
+
+def _record_eval_judge_ai_message(
+    *,
+    judge: str,
+    model: str,
+    prompt: str,
+    response_text: str,
+    response_under_judgment: str,
+    evidence: dict[str, Any],
+    stop_reason: str,
+    latency_s: float,
+    verdict: dict[str, Any] | None = None,
+    error: Exception | None = None,
+) -> None:
+    try:
+        append_global_ai_message(
+            engine="eval_judge",
+            surface=f"eval_judge_{judge}",
+            direction="assistant",
+            text=response_text,
+            event="eval_judge",
+            provider="gemini",
+            model=model,
+            stop_reason=stop_reason,
+            latency_s=round(latency_s, 3),
+            prompt=prompt,
+            response=response_text,
+            live_context=_eval_live_context(evidence),
+            extra={
+                "judge": judge,
+                "evidence_type": evidence.get("type"),
+                "evidence_session": evidence.get("session"),
+                "evidence_t_session": evidence.get("t_session"),
+                "response_under_judgment_chars": len(response_under_judgment),
+                "verdict": verdict,
+                "error": str(error) if error else None,
+            },
+        )
+    except Exception:
+        pass
+
+
 async def call_pro_judge(
     response: str, evidence: dict[str, Any], client: Any
 ) -> dict[str, Any]:
@@ -119,19 +184,71 @@ async def call_pro_judge(
         response_schema=PRO_VERDICT_SCHEMA,
         temperature=0.1,
     )
-    api_response = client.models.generate_content(
-        model=PRO_MODEL,
-        contents=[_assemble_judge_prompt(response, evidence)],
-        config=cfg,
-    )
+    prompt = _assemble_judge_prompt(response, evidence)
+    start = time.perf_counter()
+    try:
+        api_response = client.models.generate_content(
+            model=PRO_MODEL,
+            contents=[prompt],
+            config=cfg,
+        )
+    except Exception as exc:
+        _record_eval_judge_ai_message(
+            judge="pro",
+            model=PRO_MODEL,
+            prompt=prompt,
+            response_text="",
+            response_under_judgment=response,
+            evidence=evidence,
+            stop_reason="api_error",
+            latency_s=time.perf_counter() - start,
+            error=exc,
+        )
+        raise
     text = api_response.text or ""
     try:
         verdict = json.loads(text)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Pro judge returned non-JSON: {text!r}") from e
+        err = ValueError(f"Pro judge returned non-JSON: {text!r}")
+        _record_eval_judge_ai_message(
+            judge="pro",
+            model=PRO_MODEL,
+            prompt=prompt,
+            response_text=text,
+            response_under_judgment=response,
+            evidence=evidence,
+            stop_reason="parse_error",
+            latency_s=time.perf_counter() - start,
+            error=err,
+        )
+        raise err from e
     missing = set(PRO_VERDICT_SCHEMA["required"]) - set(verdict.keys())
     if missing:
-        raise ValueError(f"Pro verdict missing keys {sorted(missing)}: {verdict}")
+        err = ValueError(f"Pro verdict missing keys {sorted(missing)}: {verdict}")
+        _record_eval_judge_ai_message(
+            judge="pro",
+            model=PRO_MODEL,
+            prompt=prompt,
+            response_text=text,
+            response_under_judgment=response,
+            evidence=evidence,
+            stop_reason="schema_error",
+            latency_s=time.perf_counter() - start,
+            verdict=verdict,
+            error=err,
+        )
+        raise err
+    _record_eval_judge_ai_message(
+        judge="pro",
+        model=PRO_MODEL,
+        prompt=prompt,
+        response_text=text,
+        response_under_judgment=response,
+        evidence=evidence,
+        stop_reason="parsed",
+        latency_s=time.perf_counter() - start,
+        verdict=verdict,
+    )
     return verdict
 
 
@@ -147,19 +264,71 @@ async def call_flash_judge(
         response_schema=FLASH_VERDICT_SCHEMA,
         temperature=0.1,
     )
-    api_response = client.models.generate_content(
-        model=FLASH_MODEL,
-        contents=[_assemble_judge_prompt(response, evidence)],
-        config=cfg,
-    )
+    prompt = _assemble_judge_prompt(response, evidence)
+    start = time.perf_counter()
+    try:
+        api_response = client.models.generate_content(
+            model=FLASH_MODEL,
+            contents=[prompt],
+            config=cfg,
+        )
+    except Exception as exc:
+        _record_eval_judge_ai_message(
+            judge="flash",
+            model=FLASH_MODEL,
+            prompt=prompt,
+            response_text="",
+            response_under_judgment=response,
+            evidence=evidence,
+            stop_reason="api_error",
+            latency_s=time.perf_counter() - start,
+            error=exc,
+        )
+        raise
     text = api_response.text or ""
     try:
         verdict = json.loads(text)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Flash judge returned non-JSON: {text!r}") from e
+        err = ValueError(f"Flash judge returned non-JSON: {text!r}")
+        _record_eval_judge_ai_message(
+            judge="flash",
+            model=FLASH_MODEL,
+            prompt=prompt,
+            response_text=text,
+            response_under_judgment=response,
+            evidence=evidence,
+            stop_reason="parse_error",
+            latency_s=time.perf_counter() - start,
+            error=err,
+        )
+        raise err from e
     missing = set(FLASH_VERDICT_SCHEMA["required"]) - set(verdict.keys())
     if missing:
-        raise ValueError(f"Flash verdict missing keys {sorted(missing)}: {verdict}")
+        err = ValueError(f"Flash verdict missing keys {sorted(missing)}: {verdict}")
+        _record_eval_judge_ai_message(
+            judge="flash",
+            model=FLASH_MODEL,
+            prompt=prompt,
+            response_text=text,
+            response_under_judgment=response,
+            evidence=evidence,
+            stop_reason="schema_error",
+            latency_s=time.perf_counter() - start,
+            verdict=verdict,
+            error=err,
+        )
+        raise err
+    _record_eval_judge_ai_message(
+        judge="flash",
+        model=FLASH_MODEL,
+        prompt=prompt,
+        response_text=text,
+        response_under_judgment=response,
+        evidence=evidence,
+        stop_reason="parsed",
+        latency_s=time.perf_counter() - start,
+        verdict=verdict,
+    )
     return verdict
 
 
@@ -212,7 +381,7 @@ async def call_judges(
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
     out: dict[str, Any] = {"pro": None, "flash": None, "judges_invoked": names}
-    for name, result in zip(names, results):
+    for name, result in zip(names, results, strict=True):
         if isinstance(result, Exception):
             out[name] = {"error": str(result), "_failed": True}
         else:
@@ -236,9 +405,9 @@ def _judge_f1(predictions: list[bool], ground_truth: list[bool]) -> float:
     """Binary F1 with explicit zero-division handling."""
     if not predictions or len(predictions) != len(ground_truth):
         return 0.0
-    tp = sum(1 for p, g in zip(predictions, ground_truth) if p and g)
-    fp = sum(1 for p, g in zip(predictions, ground_truth) if p and not g)
-    fn = sum(1 for p, g in zip(predictions, ground_truth) if not p and g)
+    tp = sum(1 for p, g in zip(predictions, ground_truth, strict=True) if p and g)
+    fp = sum(1 for p, g in zip(predictions, ground_truth, strict=True) if p and not g)
+    fn = sum(1 for p, g in zip(predictions, ground_truth, strict=True) if not p and g)
     precision = tp / (tp + fp) if (tp + fp) else 0.0
     recall = tp / (tp + fn) if (tp + fn) else 0.0
     if precision + recall == 0:

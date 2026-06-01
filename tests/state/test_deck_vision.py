@@ -107,6 +107,32 @@ def test_request_is_structured_output_not_free_text():
     )
 
 
+def test_vision_read_records_ai_message_observability(monkeypatch):
+    import vibemix.state.deck_vision as deck_vision
+
+    rows: list[dict] = []
+    monkeypatch.setattr(
+        deck_vision,
+        "append_global_ai_message",
+        lambda **kwargs: rows.append(kwargs) or kwargs,
+    )
+    payload = json.dumps({"decks": [{"side": "A", "title": "Strobe", "key": "8A", "bpm": 128}]})
+    reader = _reader(_FakeClient(text=payload))
+
+    reader.read(_JPEG)
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["engine"] == "gemini"
+    assert row["surface"] == "deck_vision"
+    assert row["event"] == "deck_vision_read"
+    assert row["text"] == payload
+    assert row["response"] == payload
+    assert row["model"] == "gemini-vision-test"
+    assert row["stop_reason"] == "model_done"
+    assert row["extra"]["jpeg_bytes"] == len(_JPEG)
+
+
 def test_screenshot_attached_as_image_jpeg_part():
     payload = json.dumps({"decks": []})
     client = _FakeClient(text=payload)
@@ -165,6 +191,28 @@ def test_raising_client_returns_graceful_unknown_no_raise():
     reader = _reader(_FakeClient(exc=RuntimeError("network down")))
     decks = reader.read(_JPEG)  # must NOT raise
     assert decks == {}
+
+
+def test_vision_error_records_parked_ai_message(monkeypatch):
+    import vibemix.state.deck_vision as deck_vision
+
+    rows: list[dict] = []
+    monkeypatch.setattr(
+        deck_vision,
+        "append_global_ai_message",
+        lambda **kwargs: rows.append(kwargs) or kwargs,
+    )
+    reader = _reader(_FakeClient(exc=RuntimeError("network down")))
+
+    decks = reader.read(_JPEG)
+
+    assert decks == {}
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["text"] == ""
+    assert "network down" in row["stop_reason"]
+    assert row["response"].startswith("<error ")
+    assert row["extra"]["error"] == row["stop_reason"]
 
 
 def test_malformed_json_returns_graceful_unknown():

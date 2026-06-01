@@ -28,6 +28,7 @@ from pathlib import Path
 from vibemix.bench.assemble import build_cell_prompt
 from vibemix.bench.cell import BenchCell, BenchResult
 from vibemix.library.budget import ROUTE_PRICING, get_session_meter
+from vibemix.runtime.ai_observability import append_global_ai_message
 
 __all__ = ["resolve_track_path", "results_to_json", "run_study"]
 
@@ -108,6 +109,74 @@ def _usage_dict(usage_metadata: object) -> dict:
     }
 
 
+def _cell_axes(cell: BenchCell) -> dict[str, object]:
+    return {
+        "model_path": cell.model_path,
+        "grounding": cell.grounding,
+        "prompting": cell.prompting,
+        "contexting": cell.contexting,
+        "lens": cell.lens,
+        "taste": cell.taste,
+        "skill": cell.skill,
+        "track": cell.track,
+        "uses_audio": cell.uses_audio,
+        "secondary_ear": cell.secondary_ear,
+        "structured": cell.structured,
+    }
+
+
+def _bench_response_id(cell: BenchCell, index: int) -> str:
+    axes = (
+        cell.model_path,
+        cell.grounding,
+        cell.prompting,
+        cell.contexting,
+        cell.lens,
+        cell.taste,
+    )
+    slug = "_".join(str(item).replace("/", "-").replace(" ", "_") for item in axes)
+    return f"bench_{index:03d}_{slug}"[:160]
+
+
+def _record_bench_ai_message(
+    *,
+    cell: BenchCell,
+    index: int,
+    model: str,
+    prompt: str,
+    output: str,
+    usage: dict,
+    error: str | None,
+    audio_attached: bool,
+) -> None:
+    """Persist one bench cell in the shared AI-message ledger."""
+    stop_reason = "model_done" if output and error is None else error or "empty_output"
+    try:
+        append_global_ai_message(
+            engine="gemini",
+            surface="bench_run",
+            direction="assistant",
+            text=output,
+            response_id=_bench_response_id(cell, index),
+            event="bench_cell",
+            provider="gemini",
+            model=model,
+            stop_reason=stop_reason,
+            prompt_chars=len(prompt),
+            response_chars=len(output),
+            extra={
+                "cell": _cell_axes(cell),
+                "usage": usage,
+                "error": error,
+                "audio_attached": audio_attached,
+            },
+            prompt=prompt,
+            response=output if output else f"<parked error={error or 'empty_output'}>",
+        )
+    except Exception:
+        pass
+
+
 def run_study(
     cells,
     *,
@@ -141,13 +210,14 @@ def run_study(
     results: list[BenchResult] = []
     meter = get_session_meter()
 
-    for cell in cells:
+    for index, cell in enumerate(cells):
         _system, contents, model, _tier = build_cell_prompt(
             cell, audio_seconds=audio_seconds
         )
         prompt_text = "".join(p for p in contents if isinstance(p, str))
 
         call_contents = list(contents)
+        audio_attached = False
         if cell.uses_audio and cell.track:
             track_path = resolve_track_path(cell.track, data_dir)
             if track_path is not None:
@@ -157,6 +227,7 @@ def run_study(
                 call_contents.append(
                     types.Part.from_bytes(data=audio_bytes, mime_type="audio/mp3")
                 )
+                audio_attached = True
 
         # --- THE 429 FAIL-SAFE — per-cell; never abort, never fabricate ---- #
         # WR-03: the call runs under a hard wall-clock timeout so a silent hang
@@ -182,6 +253,7 @@ def run_study(
             # success.
             text = resp.text or ""
             if not text:
+                error = "blocked: no text candidate"
                 results.append(
                     BenchResult(
                         cell=cell,
@@ -189,8 +261,18 @@ def run_study(
                         output="",  # parked — never fabricate output
                         dsp_snapshot=fixture_snapshot_for(cell),
                         usage=usage,
-                        error="blocked: no text candidate",
+                        error=error,
                     )
+                )
+                _record_bench_ai_message(
+                    cell=cell,
+                    index=index,
+                    model=model,
+                    prompt=prompt_text,
+                    output="",
+                    usage=usage,
+                    error=error,
+                    audio_attached=audio_attached,
                 )
                 continue
             results.append(
@@ -203,6 +285,16 @@ def run_study(
                     error=None,
                 )
             )
+            _record_bench_ai_message(
+                cell=cell,
+                index=index,
+                model=model,
+                prompt=prompt_text,
+                output=text,
+                usage=usage,
+                error=None,
+                audio_attached=audio_attached,
+            )
             # Cost bounding — feed the real usage to the session meter, billed
             # against the alias's pricing LANE (WR-01) so the cost summary
             # reports real spend instead of $0.00 for every reaction-model cell.
@@ -213,6 +305,7 @@ def run_study(
                 output=int(usage.get("candidates_token_count") or 0),
             )
         except Exception as e:
+            error = repr(e)[:160]
             results.append(
                 BenchResult(
                     cell=cell,
@@ -220,8 +313,18 @@ def run_study(
                     output="",  # NEVER fabricate output for a failed cell
                     dsp_snapshot=fixture_snapshot_for(cell),
                     usage={},
-                    error=repr(e)[:160],
+                    error=error,
                 )
+            )
+            _record_bench_ai_message(
+                cell=cell,
+                index=index,
+                model=model,
+                prompt=prompt_text,
+                output="",
+                usage={},
+                error=error,
+                audio_attached=audio_attached,
             )
 
     if results_path is not None:

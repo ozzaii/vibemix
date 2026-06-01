@@ -7,6 +7,7 @@ import pytest
 
 from vibemix.agent.emote_parser import (
     REACTION_WHITELIST,
+    has_emote_tag,
     parse_emote_tags,
     strip_emote_tags,
 )
@@ -47,6 +48,10 @@ class TestParseEmoteTags:
         # pins the exact lowercase form.
         assert parse_emote_tags("[Emote:Wave]") == []
 
+    def test_has_emote_tag_detects_unknown_complete_tags(self) -> None:
+        assert has_emote_tag("[emote:wink]")
+        assert not has_emote_tag("[emote:wave whoops")
+
     def test_all_whitelisted_tags_round_trip(self) -> None:
         text = " ".join(f"[emote:{name}]" for name in sorted(REACTION_WHITELIST))
         intents = parse_emote_tags(text)
@@ -80,6 +85,11 @@ class TestStripEmoteTags:
         clean, intents = strip_emote_tags("[emote:wave] [emote:nod]")
         assert clean == ""
         assert intents == ["wave", "nod"]
+
+    def test_strip_can_preserve_streaming_whitespace(self) -> None:
+        clean, intents = strip_emote_tags("Hello [emote:wave]  world", normalize=False)
+        assert clean == "Hello   world"
+        assert intents == ["wave"]
 
 
 class TestWhitelistContract:

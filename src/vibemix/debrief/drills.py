@@ -25,6 +25,7 @@ except ImportError:  # pragma: no cover — pydantic should be installed
 
 from vibemix.coach.constants import DEBRIEF_TOLERANCE_S
 from vibemix.llm.model_router import resolve
+from vibemix.runtime.ai_observability import append_global_ai_message
 from vibemix.state.evidence_registry import EVIDENCE_CITATION_RE
 
 __all__ = [
@@ -192,6 +193,35 @@ def _build_drills_prompt(
     )
 
 
+def _record_drills_ai_message(
+    *,
+    text: str,
+    model: str,
+    stop_reason: str,
+    prompt: str,
+    response: str,
+    attempt: int,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    try:
+        append_global_ai_message(
+            engine="gemini",
+            surface="debrief_drills",
+            direction="assistant",
+            text=text,
+            provider="gemini",
+            model=model,
+            stop_reason=stop_reason,
+            prompt_chars=len(prompt),
+            response_chars=len(response),
+            extra={"attempt": attempt, **(extra or {})},
+            prompt=prompt,
+            response=response,
+        )
+    except Exception:  # pragma: no cover - observability must not break debrief
+        pass
+
+
 def generate_drills(
     client: _GeminiClient,
     cited_critique: str,
@@ -224,6 +254,15 @@ def generate_drills(
             )
         except Exception as e:
             last_error = f"Gemini call failed: {type(e).__name__}: {e}"
+            _record_drills_ai_message(
+                text="",
+                model=model,
+                stop_reason=f"error:{type(e).__name__}",
+                prompt=prompt,
+                response=f"<error {last_error}>",
+                attempt=attempt + 1,
+                extra={"error": last_error},
+            )
             logger.warning(
                 "[debrief] drills attempt %d/%d: %s",
                 attempt + 1,
@@ -234,14 +273,24 @@ def generate_drills(
 
         # Parse — accept .parsed (newer SDK) or .text (fallback).
         parsed = getattr(response, "parsed", None)
+        response_text = getattr(response, "text", "")
         if isinstance(parsed, Drills):
             drills = parsed
+            response_text = response_text or drills.model_dump_json()
         else:
-            text = getattr(response, "text", "")
             try:
-                drills = Drills.model_validate_json(text)
+                drills = Drills.model_validate_json(response_text)
             except Exception as e:
                 last_error = f"Pydantic validate failed: {e}"
+                _record_drills_ai_message(
+                    text="",
+                    model=model,
+                    stop_reason="parse_failed",
+                    prompt=prompt,
+                    response=str(response_text or ""),
+                    attempt=attempt + 1,
+                    extra={"error": last_error},
+                )
                 logger.warning("[debrief] %s", last_error)
                 continue
 
@@ -259,11 +308,30 @@ def generate_drills(
                     invalid.append(i)
                     break
         if not invalid:
+            drills_json = drills.model_dump_json()
+            _record_drills_ai_message(
+                text=drills_json,
+                model=model,
+                stop_reason="model_done",
+                prompt=prompt,
+                response=drills_json,
+                attempt=attempt + 1,
+                extra={"drill_count": len(drills.drills)},
+            )
             return drills
 
         last_error = (
             f"{len(invalid)}/{len(drills.drills)} drills have unresolvable "
             f"citations (indices {invalid})"
+        )
+        _record_drills_ai_message(
+            text=drills.model_dump_json(),
+            model=model,
+            stop_reason="invalid_citations",
+            prompt=prompt,
+            response=response_text or drills.model_dump_json(),
+            attempt=attempt + 1,
+            extra={"invalid_indices": invalid, "error": last_error},
         )
         logger.info(
             "[debrief] drills retry %d: %s", attempt + 1, last_error

@@ -165,10 +165,12 @@ class MusicState:
     # tests stay byte-identical until the Phase 31 ws_bus extension fires
     # the first non-None payload. Single-writer rule still holds:
     # `emotion` is set inside state_refresh_loop._tick_once via
-    # emotion_router.derive_emotion(); `last_reaction_intent` is set by
-    # the AICoach reaction-tag parser path.
+    # emotion_router.derive_emotion(); `last_reaction_intent` and its
+    # monotonically increasing seq are set by the AICoach reaction-tag
+    # parser path.
     emotion: str | None = None  # "neutral" | "focused" | "hyped" | "concerned" | None
     last_reaction_intent: str | None = None  # MascotReaction whitelist value or None
+    last_reaction_intent_seq: int = 0
 
     # Phase 96 (Plan 96-01) — Course 3 proactive tutor lens scaffolding.
     # CONTRACT (CONTEXT.md §Decisions, ROADMAP §Phase 96 step 1):

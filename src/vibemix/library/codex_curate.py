@@ -42,12 +42,14 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from vibemix.library.rekordbox import RekordboxLibrary
+from vibemix.runtime.ai_observability import append_global_ai_message
 from vibemix.state.deck_context import (
     DECK_CONTEXT_TRUSTED_SOURCES as _SHARED_DECK_CONTEXT_TRUSTED_SOURCES,
 )
@@ -159,6 +161,9 @@ from vibemix.state.deck_context import (
 from vibemix.state.deck_state import DeckState, DeckTrack
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from vibemix.state import MusicState
 
 # Outer wall-clock guard. Codex bounds tool calls (tool_timeout_sec) and its
 # own loop; this is the belt-and-braces kill for a wedged process.
@@ -574,6 +579,73 @@ def _read_tool_event_trace(events_path: str) -> list[dict[str, Any]]:
     return rows
 
 
+def _record_codex_ai_message(
+    *,
+    surface: str,
+    request: str,
+    prompt: str | None,
+    result: object,
+    live_context: dict[str, Any] | None = None,
+) -> None:
+    """Persist a fail-soft observability row for a Codex-backed engine turn."""
+    try:
+        reply = str(getattr(result, "reply", "") or "").strip()
+        rationale = str(getattr(result, "rationale", "") or "").strip()
+        error = getattr(result, "error", None)
+        text = reply or rationale or (str(error) if error else "")
+        tools_used = getattr(result, "tools_used", None)
+        tool_trace = getattr(result, "tool_trace", None)
+        track_ids = getattr(result, "track_ids", None)
+        move_grades = getattr(result, "move_grades", None)
+        stop_reason = getattr(result, "stop_reason", None)
+        playlist = getattr(result, "playlist", None)
+        export_path = getattr(result, "export_path", None)
+        if playlist is None:
+            playlist_name = getattr(result, "playlist_name", None)
+            m3u_path = getattr(result, "m3u_path", None)
+            json_path = getattr(result, "json_path", None)
+            if playlist_name or m3u_path or json_path:
+                playlist = {
+                    "name": playlist_name,
+                    "m3u_path": m3u_path,
+                    "json_path": json_path,
+                }
+        stop_text = str(stop_reason or "model_done")
+        response_id = f"{time.strftime('%Y%m%d-%H%M%S')}_{surface}_{stop_text}"
+        append_global_ai_message(
+            engine="codex",
+            surface=surface,
+            direction="assistant",
+            text=text,
+            response_id=response_id,
+            event=surface,
+            provider="codex_cli",
+            model=None,
+            stop_reason=str(stop_reason or "model_done"),
+            prompt_chars=len(prompt) if prompt is not None else None,
+            response_chars=len(text),
+            live_context=live_context,
+            tools_used=[str(t) for t in tools_used] if isinstance(tools_used, list) else [],
+            tool_trace=tool_trace if isinstance(tool_trace, list) else [],
+            move_grades=move_grades if isinstance(move_grades, list) else [],
+            extra={
+                "request": request,
+                "track_ids": track_ids if isinstance(track_ids, list) else [],
+                "playlist": playlist,
+                "export_path": export_path,
+                "error": str(error) if error else None,
+                "question": getattr(result, "question", None),
+                "choices": getattr(result, "choices", None),
+                "live_verification": getattr(result, "live_verification", None),
+                "backend": "codex_exec",
+            },
+            prompt=prompt,
+            response=text,
+        )
+    except Exception:
+        pass
+
+
 def _start_tool_tape(events_path: str) -> Callable[[], None]:
     """Start a daemon tailer that streams the live tool tape to STDERR while the
     blocking Codex subprocess runs. Returns a ``stop()`` callable the caller MUST
@@ -623,6 +695,17 @@ def curate_with_codex(
     Codex installed. ``library`` is used only for the result-boundary
     grounding re-validation (read-only).
     """
+    prompt_text: str | None = None
+
+    def _finish(result: CodexCurateResult) -> CodexCurateResult:
+        _record_codex_ai_message(
+            surface="viber_curate",
+            request=theme,
+            prompt=prompt_text,
+            result=result,
+        )
+        return result
+
     if allow_shell is None:
         allow_shell = os.environ.get("VIBEMIX_CODEX_ALLOW_SHELL", "").strip() not in (
             "",
@@ -633,14 +716,16 @@ def curate_with_codex(
 
     codex = find_codex(codex_path)
     if codex is None:
-        return CodexCurateResult(
-            theme=theme,
-            stop_reason="codex_not_installed",
-            error=(
-                "Codex CLI not found. Install it (`npm i -g @openai/codex` or "
-                "`brew install codex`) and run `codex login` to enable AI "
-                "playlists."
-            ),
+        return _finish(
+            CodexCurateResult(
+                theme=theme,
+                stop_reason="codex_not_installed",
+                error=(
+                    "Codex CLI not found. Install it (`npm i -g @openai/codex` or "
+                    "`brew install codex`) and run `codex login` to enable AI "
+                    "playlists."
+                ),
+            )
         )
 
     # Upstream regression gate: without the bypass, codex exec auto-cancels
@@ -648,16 +733,18 @@ def curate_with_codex(
     # fail cryptically, surface the honest choice up-front. The user opts into
     # the bypass (which grants codex shell access) consciously.
     if not allow_shell:
-        return CodexCurateResult(
-            theme=theme,
-            stop_reason="codex_mcp_blocked",
-            error=(
-                "Codex's MCP tool calls are auto-cancelled in non-interactive "
-                "mode (upstream bug openai/codex#16685). Running them needs "
-                "`--dangerously-bypass-approvals-and-sandbox`, which also grants "
-                "codex shell access. Set VIBEMIX_CODEX_ALLOW_SHELL=1 for the "
-                "current local Codex path."
-            ),
+        return _finish(
+            CodexCurateResult(
+                theme=theme,
+                stop_reason="codex_mcp_blocked",
+                error=(
+                    "Codex's MCP tool calls are auto-cancelled in non-interactive "
+                    "mode (upstream bug openai/codex#16685). Running them needs "
+                    "`--dangerously-bypass-approvals-and-sandbox`, which also grants "
+                    "codex shell access. Set VIBEMIX_CODEX_ALLOW_SHELL=1 for the "
+                    "current local Codex path."
+                ),
+            )
         )
 
     # The MCP server is launched by Codex as a STDIO child: this interpreter
@@ -681,13 +768,14 @@ def curate_with_codex(
         tool_events_path = str(Path(td) / "tool_events.jsonl")
         Path(schema_path).write_text(json.dumps(_OUTPUT_SCHEMA), encoding="utf-8")
 
+        prompt_text = build_prompt(theme)
         argv = build_argv(
             codex,
             mcp_command=command,
             mcp_args=[*args, "--vibemix-tool-events", tool_events_path],
             schema_path=schema_path,
             out_path=out_path,
-            prompt=build_prompt(theme),
+            prompt=prompt_text,
             bypass_sandbox=allow_shell,
         )
 
@@ -722,16 +810,20 @@ def curate_with_codex(
             )
         except FileNotFoundError:
             # Race: binary vanished between which() and spawn.
-            return CodexCurateResult(
-                theme=theme,
-                stop_reason="codex_not_installed",
-                error="Codex CLI disappeared at spawn time.",
+            return _finish(
+                CodexCurateResult(
+                    theme=theme,
+                    stop_reason="codex_not_installed",
+                    error="Codex CLI disappeared at spawn time.",
+                )
             )
         except subprocess.TimeoutExpired:
-            return CodexCurateResult(
-                theme=theme,
-                stop_reason="timeout",
-                error=f"Codex did not finish within {timeout_s:.0f}s.",
+            return _finish(
+                CodexCurateResult(
+                    theme=theme,
+                    stop_reason="timeout",
+                    error=f"Codex did not finish within {timeout_s:.0f}s.",
+                )
             )
         finally:
             _tape_stop()
@@ -740,15 +832,19 @@ def curate_with_codex(
         if proc.returncode != 0:
             low = stderr.lower()
             if any(h in low for h in _AUTH_HINTS):
-                return CodexCurateResult(
-                    theme=theme,
-                    stop_reason="codex_auth_required",
-                    error="Codex is not logged in. Run `codex login`.",
+                return _finish(
+                    CodexCurateResult(
+                        theme=theme,
+                        stop_reason="codex_auth_required",
+                        error="Codex is not logged in. Run `codex login`.",
+                    )
                 )
-            return CodexCurateResult(
-                theme=theme,
-                stop_reason="error",
-                error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
+            return _finish(
+                CodexCurateResult(
+                    theme=theme,
+                    stop_reason="error",
+                    error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
+                )
             )
 
         # Plan 99-04: Channel A side-channel SHORT-CIRCUIT — runs BEFORE the
@@ -763,13 +859,15 @@ def curate_with_codex(
             try:
                 payload = json.loads(Path(stop_reason_path).read_text(encoding="utf-8"))
                 if isinstance(payload, dict) and payload.get("reason") == "tool_starvation":
-                    return CodexCurateResult(
-                        theme=theme,
-                        stop_reason="tool_starvation",
-                        error=str(
-                            payload.get("hint")
-                            or "no playlist — tool starvation, no hint available"
-                        ),
+                    return _finish(
+                        CodexCurateResult(
+                            theme=theme,
+                            stop_reason="tool_starvation",
+                            error=str(
+                                payload.get("hint")
+                                or "no playlist — tool starvation, no hint available"
+                            ),
+                        )
                     )
                 # Plan 100-03: sibling extension of the tool_starvation branch.
                 # Same side-channel file, same wrapper-side read, same short-
@@ -783,11 +881,13 @@ def curate_with_codex(
                 if isinstance(payload, dict) and payload.get("reason") == "clarification_needed":
                     q = payload.get("question")
                     cs = payload.get("choices")
-                    return CodexCurateResult(
-                        theme=theme,
-                        stop_reason="clarification_needed",
-                        question=str(q) if isinstance(q, str) else None,
-                        choices=([str(c) for c in cs] if isinstance(cs, list) else None),
+                    return _finish(
+                        CodexCurateResult(
+                            theme=theme,
+                            stop_reason="clarification_needed",
+                            question=str(q) if isinstance(q, str) else None,
+                            choices=([str(c) for c in cs] if isinstance(cs, list) else None),
+                        )
                     )
             except (OSError, json.JSONDecodeError):
                 pass  # fall through to existing parse logic
@@ -798,46 +898,56 @@ def curate_with_codex(
         except OSError:
             raw = ""
         if not raw:
-            return CodexCurateResult(
-                theme=theme,
-                stop_reason="empty_output",
-                error="Codex produced no output.",
+            return _finish(
+                CodexCurateResult(
+                    theme=theme,
+                    stop_reason="empty_output",
+                    error="Codex produced no output.",
+                )
             )
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError:
-            return CodexCurateResult(
-                theme=theme,
-                stop_reason="empty_output",
-                error="Codex output was not valid JSON.",
+            return _finish(
+                CodexCurateResult(
+                    theme=theme,
+                    stop_reason="empty_output",
+                    error="Codex output was not valid JSON.",
+                )
             )
         # --output-schema enforces an object, but never trust it on faith — a
         # bare array/scalar would AttributeError on .get() below (and that line
         # is outside the try, so it would escape "never raises").
         if not isinstance(payload, dict):
-            return CodexCurateResult(
-                theme=theme,
-                stop_reason="empty_output",
-                error="Codex output was not a JSON object.",
+            return _finish(
+                CodexCurateResult(
+                    theme=theme,
+                    stop_reason="empty_output",
+                    error="Codex output was not a JSON object.",
+                )
             )
 
     raw_ids = payload.get("track_ids")
     if not isinstance(raw_ids, list) or not raw_ids:
-        return CodexCurateResult(
-            theme=theme,
-            stop_reason="no_playlist",
-            rationale=str(payload.get("rationale", "")),
-            error="Codex returned no track_ids.",
+        return _finish(
+            CodexCurateResult(
+                theme=theme,
+                stop_reason="no_playlist",
+                rationale=str(payload.get("rationale", "")),
+                error="Codex returned no track_ids.",
+            )
         )
 
     # GROUNDING re-validation at the result boundary.
     validated = _validate_against_library(raw_ids, library)
     if not validated:
-        return CodexCurateResult(
-            theme=theme,
-            stop_reason="no_playlist",
-            rationale=str(payload.get("rationale", "")),
-            error="No returned track_id resolved in the library (grounding).",
+        return _finish(
+            CodexCurateResult(
+                theme=theme,
+                stop_reason="no_playlist",
+                rationale=str(payload.get("rationale", "")),
+                error="No returned track_id resolved in the library (grounding).",
+            )
         )
 
     # PERSIST — the wrapper is the single validated writer (codex SELECTS, we
@@ -857,14 +967,16 @@ def curate_with_codex(
     except Exception as e:
         logger.warning("[codex] persist failed: %s", e)
 
-    return CodexCurateResult(
-        theme=theme,
-        stop_reason="created",
-        playlist_name=playlist_name,
-        track_ids=validated,
-        m3u_path=m3u_path,
-        json_path=json_path,
-        rationale=str(payload.get("rationale", "")),
+    return _finish(
+        CodexCurateResult(
+            theme=theme,
+            stop_reason="created",
+            playlist_name=playlist_name,
+            track_ids=validated,
+            m3u_path=m3u_path,
+            json_path=json_path,
+            rationale=str(payload.get("rationale", "")),
+        )
     )
 
 
@@ -980,6 +1092,17 @@ def build_set_with_codex(
     itself grounded (seen-set + library re-validation), so the written XML never
     references an invented track.
     """
+    prompt_text: str | None = None
+
+    def _finish(result: CodexCurateResult) -> CodexCurateResult:
+        _record_codex_ai_message(
+            surface="viber_build_set",
+            request=brief,
+            prompt=prompt_text,
+            result=result,
+        )
+        return result
+
     if allow_shell is None:
         allow_shell = os.environ.get("VIBEMIX_CODEX_ALLOW_SHELL", "").strip() not in (
             "",
@@ -990,25 +1113,29 @@ def build_set_with_codex(
 
     codex = find_codex(codex_path)
     if codex is None:
-        return CodexCurateResult(
-            theme=brief,
-            stop_reason="codex_not_installed",
-            error=(
-                "Codex CLI not found. Install it (`npm i -g @openai/codex` or "
-                "`brew install codex`) and run `codex login` to enable AI sets."
-            ),
+        return _finish(
+            CodexCurateResult(
+                theme=brief,
+                stop_reason="codex_not_installed",
+                error=(
+                    "Codex CLI not found. Install it (`npm i -g @openai/codex` or "
+                    "`brew install codex`) and run `codex login` to enable AI sets."
+                ),
+            )
         )
 
     if not allow_shell:
-        return CodexCurateResult(
-            theme=brief,
-            stop_reason="codex_mcp_blocked",
-            error=(
-                "Codex's MCP tool calls are auto-cancelled in non-interactive "
-                "mode (upstream bug openai/codex#16685). Running them needs "
-                "`--dangerously-bypass-approvals-and-sandbox`. To use the Codex "
-                "backend, set VIBEMIX_CODEX_ALLOW_SHELL=1."
-            ),
+        return _finish(
+            CodexCurateResult(
+                theme=brief,
+                stop_reason="codex_mcp_blocked",
+                error=(
+                    "Codex's MCP tool calls are auto-cancelled in non-interactive "
+                    "mode (upstream bug openai/codex#16685). Running them needs "
+                    "`--dangerously-bypass-approvals-and-sandbox`. To use the Codex "
+                    "backend, set VIBEMIX_CODEX_ALLOW_SHELL=1."
+                ),
+            )
         )
 
     command = mcp_command or sys.executable
@@ -1027,19 +1154,20 @@ def build_set_with_codex(
         tool_events_path = str(Path(td) / "tool_events.jsonl")
         Path(schema_path).write_text(json.dumps(_BUILD_SET_SCHEMA), encoding="utf-8")
 
+        prompt_text = build_set_prompt(
+            brief,
+            curve=curve,
+            name=name,
+            n_slots=n_slots,
+            export=export,
+        )
         argv = build_argv(
             codex,
             mcp_command=command,
             mcp_args=[*args, "--vibemix-tool-events", tool_events_path],
             schema_path=schema_path,
             out_path=out_path,
-            prompt=build_set_prompt(
-                brief,
-                curve=curve,
-                name=name,
-                n_slots=n_slots,
-                export=export,
-            ),
+            prompt=prompt_text,
             bypass_sandbox=allow_shell,
         )
 
@@ -1067,16 +1195,20 @@ def build_set_with_codex(
                 stdin=subprocess.DEVNULL,
             )
         except FileNotFoundError:
-            return CodexCurateResult(
-                theme=brief,
-                stop_reason="codex_not_installed",
-                error="Codex CLI disappeared at spawn time.",
+            return _finish(
+                CodexCurateResult(
+                    theme=brief,
+                    stop_reason="codex_not_installed",
+                    error="Codex CLI disappeared at spawn time.",
+                )
             )
         except subprocess.TimeoutExpired:
-            return CodexCurateResult(
-                theme=brief,
-                stop_reason="timeout",
-                error=f"Codex did not finish within {timeout_s:.0f}s.",
+            return _finish(
+                CodexCurateResult(
+                    theme=brief,
+                    stop_reason="timeout",
+                    error=f"Codex did not finish within {timeout_s:.0f}s.",
+                )
             )
         finally:
             _tape_stop()
@@ -1085,15 +1217,19 @@ def build_set_with_codex(
         if proc.returncode != 0:
             low = stderr.lower()
             if any(h in low for h in _AUTH_HINTS):
-                return CodexCurateResult(
-                    theme=brief,
-                    stop_reason="codex_auth_required",
-                    error="Codex is not logged in. Run `codex login`.",
+                return _finish(
+                    CodexCurateResult(
+                        theme=brief,
+                        stop_reason="codex_auth_required",
+                        error="Codex is not logged in. Run `codex login`.",
+                    )
                 )
-            return CodexCurateResult(
-                theme=brief,
-                stop_reason="error",
-                error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
+            return _finish(
+                CodexCurateResult(
+                    theme=brief,
+                    stop_reason="error",
+                    error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
+                )
             )
 
         # Plan 99-04: Channel A side-channel SHORT-CIRCUIT (parallel of
@@ -1106,13 +1242,15 @@ def build_set_with_codex(
             try:
                 payload = json.loads(Path(stop_reason_path).read_text(encoding="utf-8"))
                 if isinstance(payload, dict) and payload.get("reason") == "tool_starvation":
-                    return CodexCurateResult(
-                        theme=brief,
-                        stop_reason="tool_starvation",
-                        error=str(
-                            payload.get("hint")
-                            or "no playlist — tool starvation, no hint available"
-                        ),
+                    return _finish(
+                        CodexCurateResult(
+                            theme=brief,
+                            stop_reason="tool_starvation",
+                            error=str(
+                                payload.get("hint")
+                                or "no playlist — tool starvation, no hint available"
+                            ),
+                        )
                     )
                 # Plan 100-03: parallel of the curate_with_codex sibling
                 # branch. Uniform propagation across both wrappers — the
@@ -1121,11 +1259,13 @@ def build_set_with_codex(
                 if isinstance(payload, dict) and payload.get("reason") == "clarification_needed":
                     q = payload.get("question")
                     cs = payload.get("choices")
-                    return CodexCurateResult(
-                        theme=brief,
-                        stop_reason="clarification_needed",
-                        question=str(q) if isinstance(q, str) else None,
-                        choices=([str(c) for c in cs] if isinstance(cs, list) else None),
+                    return _finish(
+                        CodexCurateResult(
+                            theme=brief,
+                            stop_reason="clarification_needed",
+                            question=str(q) if isinstance(q, str) else None,
+                            choices=([str(c) for c in cs] if isinstance(cs, list) else None),
+                        )
                     )
             except (OSError, json.JSONDecodeError):
                 pass  # fall through to existing parse logic
@@ -1135,40 +1275,50 @@ def build_set_with_codex(
         except OSError:
             raw = ""
         if not raw:
-            return CodexCurateResult(
-                theme=brief, stop_reason="empty_output", error="Codex produced no output."
+            return _finish(
+                CodexCurateResult(
+                    theme=brief, stop_reason="empty_output", error="Codex produced no output."
+                )
             )
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError:
-            return CodexCurateResult(
-                theme=brief,
-                stop_reason="empty_output",
-                error="Codex output was not valid JSON.",
+            return _finish(
+                CodexCurateResult(
+                    theme=brief,
+                    stop_reason="empty_output",
+                    error="Codex output was not valid JSON.",
+                )
             )
         if not isinstance(payload, dict):
-            return CodexCurateResult(
-                theme=brief,
-                stop_reason="empty_output",
-                error="Codex output was not a JSON object.",
+            return _finish(
+                CodexCurateResult(
+                    theme=brief,
+                    stop_reason="empty_output",
+                    error="Codex output was not a JSON object.",
+                )
             )
 
     raw_ids = payload.get("track_ids")
     if not isinstance(raw_ids, list) or not raw_ids:
-        return CodexCurateResult(
-            theme=brief,
-            stop_reason="no_playlist",
-            rationale=str(payload.get("rationale", "")),
-            error="Codex returned no track_ids.",
+        return _finish(
+            CodexCurateResult(
+                theme=brief,
+                stop_reason="no_playlist",
+                rationale=str(payload.get("rationale", "")),
+                error="Codex returned no track_ids.",
+            )
         )
 
     validated = _validate_against_library(raw_ids, library)
     if not validated:
-        return CodexCurateResult(
-            theme=brief,
-            stop_reason="no_playlist",
-            rationale=str(payload.get("rationale", "")),
-            error="No returned track_id resolved in the library (grounding).",
+        return _finish(
+            CodexCurateResult(
+                theme=brief,
+                stop_reason="no_playlist",
+                rationale=str(payload.get("rationale", "")),
+                error="No returned track_id resolved in the library (grounding).",
+            )
         )
 
     # export_path comes from the export_set tool (grounded writer). Trust only a
@@ -1191,15 +1341,17 @@ def build_set_with_codex(
     except Exception as e:
         logger.warning("[codex] set persist failed: %s", e)
 
-    return CodexCurateResult(
-        theme=brief,
-        stop_reason="exported" if export_path is not None else "created",
-        playlist_name=playlist_name,
-        track_ids=validated,
-        m3u_path=m3u_path,
-        json_path=json_path,
-        rationale=str(payload.get("rationale", "")),
-        export_path=export_path,
+    return _finish(
+        CodexCurateResult(
+            theme=brief,
+            stop_reason="exported" if export_path is not None else "created",
+            playlist_name=playlist_name,
+            track_ids=validated,
+            m3u_path=m3u_path,
+            json_path=json_path,
+            rationale=str(payload.get("rationale", "")),
+            export_path=export_path,
+        )
     )
 
 
@@ -1492,8 +1644,47 @@ _LIBRARY_REQUEST_LIVE_LEAK_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE = re.compile(
+    r"\b("
+    r"vocal|vocals|voice|lyric|lyrics|kick|kickdrum|kick drum|snare|clap|"
+    r"hi[- ]?hat|hat|hats|drum|drums|bassline|lead|synth|pad|stem|stems|"
+    r"acapella|instrumental"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE = re.compile(
+    r"\b("
+    r"hear|heard|sounds?|feels?|opened(?:\s+up)?|opening|tight(?:ened|er|ening)?|"
+    r"clean(?:ed|er)?|clear(?:ed|er)?|brighter|darker|wider|punch(?:y|ier)|"
+    r"muddy|muddier|landed|came in|sits?|cut(?:s|ting)? through|present|up front"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE = re.compile(
+    r"\b("
+    r"can't tell|cannot tell|can't say|cannot say|not enough proof|not proof|"
+    r"don't have proof|do not have proof|won't claim|will not claim|"
+    r"not source[- ]level proof|not stem proof|not isolated"
+    r")\b",
+    re.IGNORECASE,
+)
 _LIVE_GROUNDED_PUBLIC_REPLY = (
     "The live read is grounded now. I can score it from the locked deck context."
+)
+_LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY = (
+    "I only have a broad listener read from the audio here, not source-level proof."
+)
+_LIVE_AUDIO_VIBE_CONTRACT = (
+    "LIVE AUDIO CONTRACT: audio_delta, deck_audio_features_context, "
+    "deck_audio_delta_context, deck_audio_window_context, audio_part_context, "
+    "and audio_window_context are listener/vibe evidence for texture, energy, "
+    "motion, density, mood, and silence/music presence. They are not proof of "
+    "track identity, deck identity, hidden sources such as vocals/kicks/stems, "
+    "or EQ/fader/filter/cue causality. If the DJ asks whether a move fixed, "
+    "cleaned, opened, tightened, saved, or improved the sound, give a pure "
+    "listener read like 'the low end "
+    "got hollow for a moment' or stay at the evidence boundary; never credit or "
+    "blame the control from audio alone."
 )
 
 
@@ -1558,7 +1749,8 @@ def _live_context_use_instruction(
             "LIVE CONTEXT USE: active_live_context. The DJ is asking about the "
             "current live deck/move/audio moment, so apply CURRENT LIVE DECK "
             "CONTEXT, claim_policy, freshness, provenance, and evidence gates "
-            "directly before answering."
+            "directly before answering. "
+            + _LIVE_AUDIO_VIBE_CONTRACT
         )
         if _live_context_transport_is_stale(live_context):
             text += (
@@ -2267,7 +2459,7 @@ def normalize_live_context_for_viber(live_context: dict[str, Any] | None) -> dic
     return dict(normalized) if normalized else None
 
 
-def _music_state_from_live_context(context: dict[str, Any]) -> "MusicState":
+def _music_state_from_live_context(context: dict[str, Any]) -> MusicState:
     """Adapt Viber's raw live-context dict into the shared deck guard model."""
     # Import locally so the curator module never leaks MusicState as a top-level
     # attribute — the curate/Viber boundary stays decoupled from runtime state
@@ -2796,9 +2988,7 @@ def _render_live_claim_policy(
         "deck_pair_audio_observed" if policy == "supported_verdict" else "not_observed_by_viber"
     )
     outcome_rule = (
-        "grounded_by_live_deck_pair_audio"
-        if policy == "supported_verdict"
-        else "do_not_infer"
+        "grounded_by_live_deck_pair_audio" if policy == "supported_verdict" else "do_not_infer"
     )
     fields = [
         f"deck_reference=resolved_{resolved}",
@@ -3165,6 +3355,7 @@ def _apply_live_claim_guard(reply: str, live_context: dict[str, Any] | None) -> 
         return reply
     outcome_claim = _shared_has_multi_deck_outcome_claim(reply)
     public_diagnostic = bool(_LIVE_CONTEXT_PUBLIC_DIAGNOSTIC_REPLY_RE.search(reply))
+    audio_source_detail = _has_unsupported_audio_source_detail_claim(reply, context)
     stale_transport = _live_context_transport_is_stale(context)
     if stale_transport and (outcome_claim or public_diagnostic):
         return "Refresh the live session first, then I'll judge that transition."
@@ -3182,6 +3373,8 @@ def _apply_live_claim_guard(reply: str, live_context: dict[str, Any] | None) -> 
         if active_policy == "candidate_not_verdict":
             return _SHARED_LIVE_CANDIDATE_HELD_REPLY
         return _SHARED_LIVE_TRANSITION_HELD_REPLY
+    if audio_source_detail:
+        return _LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY
     has_disclaimer = bool(outcome_claim and _shared_has_multi_deck_outcome_disclaimer(reply))
     if has_disclaimer and not _shared_has_unsafe_multi_deck_disclaimer_claim(reply):
         if active_policy in {"blocked", "watch_not_claim", "requires_more_evidence"}:
@@ -3230,6 +3423,18 @@ def _apply_live_claim_guard(reply: str, live_context: dict[str, Any] | None) -> 
     if _shared_has_multi_deck_outcome_disclaimer(reply):
         return reply
     return _SHARED_LIVE_TRANSITION_HELD_REPLY
+
+
+def _has_unsupported_audio_source_detail_claim(reply: str, context: dict[str, Any] | None) -> bool:
+    if not context:
+        return False
+    text = str(reply or "")
+    if not text.strip() or _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(text):
+        return False
+    return bool(
+        _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.search(text)
+        and _LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE.search(text)
+    )
 
 
 def _live_context_claim_policy(context: dict[str, Any] | None) -> str:
@@ -3308,6 +3513,7 @@ def verify_live_reply_for_viber(
     """
     context = _normalize_live_context(live_context)
     text = " ".join(str(reply or "").split())
+    audio_source_detail = _has_unsupported_audio_source_detail_claim(text, context)
     corrected_reply = _apply_live_claim_guard(text, context) if text else text
     corrected = corrected_reply != text
     grades = move_grades if isinstance(move_grades, list) else []
@@ -3315,7 +3521,9 @@ def verify_live_reply_for_viber(
     violations: list[str] = []
     if not text:
         violations.append("empty_reply")
-    if corrected:
+    if audio_source_detail:
+        violations.append("unsupported_audio_source_detail_claim")
+    elif corrected:
         violations.append("unsupported_live_outcome_claim")
     if grades and not grades_allowed:
         violations.append("move_grades_without_live_proof")
@@ -3620,6 +3828,18 @@ def chat_with_codex(
     for re-validating any ``track_ids`` the reply referenced (Invariant #2 at the
     result boundary).
     """
+    prompt_text: str | None = None
+
+    def _finish(result: CodexChatResult) -> CodexChatResult:
+        _record_codex_ai_message(
+            surface="viber_chat",
+            request=message,
+            prompt=prompt_text,
+            result=result,
+            live_context=live_context,
+        )
+        return result
+
     if _live_context_use_mode(message) == "active_live_context" and not live_context:
         reply = _missing_live_context_reply()
         live_verification = {
@@ -3629,17 +3849,19 @@ def chat_with_codex(
             "guard_applied": False,
             "guard_violations": [],
         }
-        return CodexChatResult(
-            reply=reply,
-            tool_trace=[
-                {
-                    "name": "live_context_required",
-                    "arg": "waiting for live deck feed",
-                    "ok": False,
-                }
-            ],
-            live_verification=live_verification,
-            stop_reason="live_context_required",
+        return _finish(
+            CodexChatResult(
+                reply=reply,
+                tool_trace=[
+                    {
+                        "name": "live_context_required",
+                        "arg": "waiting for live deck feed",
+                        "ok": False,
+                    }
+                ],
+                live_verification=live_verification,
+                stop_reason="live_context_required",
+            )
         )
 
     if allow_shell is None:
@@ -3652,21 +3874,25 @@ def chat_with_codex(
 
     codex = find_codex(codex_path)
     if codex is None:
-        return CodexChatResult(
-            stop_reason="codex_not_installed",
-            error=(
-                "Codex CLI not found. Install it (`npm i -g @openai/codex` or "
-                "`brew install codex`) and run `codex login`."
-            ),
+        return _finish(
+            CodexChatResult(
+                stop_reason="codex_not_installed",
+                error=(
+                    "Codex CLI not found. Install it (`npm i -g @openai/codex` or "
+                    "`brew install codex`) and run `codex login`."
+                ),
+            )
         )
     if not allow_shell:
-        return CodexChatResult(
-            stop_reason="codex_mcp_blocked",
-            error=(
-                "Codex's MCP tool calls are auto-cancelled in non-interactive "
-                "mode (upstream bug openai/codex#16685). Set "
-                "VIBEMIX_CODEX_ALLOW_SHELL=1 to use the Codex backend."
-            ),
+        return _finish(
+            CodexChatResult(
+                stop_reason="codex_mcp_blocked",
+                error=(
+                    "Codex's MCP tool calls are auto-cancelled in non-interactive "
+                    "mode (upstream bug openai/codex#16685). Set "
+                    "VIBEMIX_CODEX_ALLOW_SHELL=1 to use the Codex backend."
+                ),
+            )
         )
 
     command = mcp_command or sys.executable
@@ -3683,13 +3909,14 @@ def chat_with_codex(
         tool_events_path = str(Path(td) / "tool_events.jsonl")
         Path(schema_path).write_text(json.dumps(_CHAT_SCHEMA), encoding="utf-8")
 
+        prompt_text = chat_prompt(message, history, live_context=live_context)
         argv = build_argv(
             codex,
             mcp_command=command,
             mcp_args=[*args, "--vibemix-tool-events", tool_events_path],
             schema_path=schema_path,
             out_path=out_path,
-            prompt=chat_prompt(message, history, live_context=live_context),
+            prompt=prompt_text,
             bypass_sandbox=allow_shell,
         )
 
@@ -3714,14 +3941,18 @@ def chat_with_codex(
                 stdin=subprocess.DEVNULL,
             )
         except FileNotFoundError:
-            return CodexChatResult(
-                stop_reason="codex_not_installed",
-                error="Codex CLI disappeared at spawn time.",
+            return _finish(
+                CodexChatResult(
+                    stop_reason="codex_not_installed",
+                    error="Codex CLI disappeared at spawn time.",
+                )
             )
         except subprocess.TimeoutExpired:
-            return CodexChatResult(
-                stop_reason="timeout",
-                error=f"Codex did not finish within {timeout_s:.0f}s.",
+            return _finish(
+                CodexChatResult(
+                    stop_reason="timeout",
+                    error=f"Codex did not finish within {timeout_s:.0f}s.",
+                )
             )
         finally:
             _tape_stop()
@@ -3730,13 +3961,17 @@ def chat_with_codex(
         if proc.returncode != 0:
             low = stderr.lower()
             if any(h in low for h in _AUTH_HINTS):
-                return CodexChatResult(
-                    stop_reason="codex_auth_required",
-                    error="Codex is not logged in. Run `codex login`.",
+                return _finish(
+                    CodexChatResult(
+                        stop_reason="codex_auth_required",
+                        error="Codex is not logged in. Run `codex login`.",
+                    )
                 )
-            return CodexChatResult(
-                stop_reason="error",
-                error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
+            return _finish(
+                CodexChatResult(
+                    stop_reason="error",
+                    error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
+                )
             )
 
         if Path(stop_reason_path).exists():
@@ -3746,12 +3981,14 @@ def chat_with_codex(
                     isinstance(stop_payload, dict)
                     and stop_payload.get("reason") == "tool_starvation"
                 ):
-                    return CodexChatResult(
-                        stop_reason="tool_starvation",
-                        error=str(
-                            stop_payload.get("hint")
-                            or "Viber stopped after repeated empty tool results."
-                        ),
+                    return _finish(
+                        CodexChatResult(
+                            stop_reason="tool_starvation",
+                            error=str(
+                                stop_payload.get("hint")
+                                or "Viber stopped after repeated empty tool results."
+                            ),
+                        )
                     )
                 if (
                     isinstance(stop_payload, dict)
@@ -3765,19 +4002,21 @@ def chat_with_codex(
                         if isinstance(raw_choices, list)
                         else None
                     )
-                    return CodexChatResult(
-                        reply=_chat_clarification_reply(question, choices),
-                        tools_used=["request_clarification"],
-                        tool_trace=[
-                            {
-                                "name": "request_clarification",
-                                "arg": question or "clarification",
-                                "ok": True,
-                            }
-                        ],
-                        stop_reason="clarification_needed",
-                        question=question,
-                        choices=choices,
+                    return _finish(
+                        CodexChatResult(
+                            reply=_chat_clarification_reply(question, choices),
+                            tools_used=["request_clarification"],
+                            tool_trace=[
+                                {
+                                    "name": "request_clarification",
+                                    "arg": question or "clarification",
+                                    "ok": True,
+                                }
+                            ],
+                            stop_reason="clarification_needed",
+                            question=question,
+                            choices=choices,
+                        )
                     )
             except (OSError, json.JSONDecodeError):
                 pass
@@ -3787,16 +4026,20 @@ def chat_with_codex(
         except OSError:
             raw = ""
         if not raw:
-            return CodexChatResult(stop_reason="empty_output", error="Codex produced no output.")
+            return _finish(
+                CodexChatResult(stop_reason="empty_output", error="Codex produced no output.")
+            )
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError:
-            return CodexChatResult(
-                stop_reason="empty_output", error="Codex output was not valid JSON."
+            return _finish(
+                CodexChatResult(
+                    stop_reason="empty_output", error="Codex output was not valid JSON."
+                )
             )
         if not isinstance(payload, dict):
-            return CodexChatResult(
-                stop_reason="empty_output", error="Codex output was not an object."
+            return _finish(
+                CodexChatResult(stop_reason="empty_output", error="Codex output was not an object.")
             )
         actual_tool_trace = _read_tool_event_trace(tool_events_path)
 
@@ -3834,7 +4077,13 @@ def chat_with_codex(
         or _looks_like_unprompted_live_correction(raw_reply)
         or guarded_reply != raw_reply
     ):
-        if playlist is not None or track_ids or tools_used or tool_trace or library_context_request:
+        if (
+            playlist is not None
+            or track_ids
+            or tools_used
+            or tool_trace
+            or library_context_request
+        ):
             reply = _library_request_fallback_reply(
                 playlist=playlist,
                 track_ids=track_ids,
@@ -3882,18 +4131,22 @@ def chat_with_codex(
             export_path = candidate
 
     if not reply and not tools_used:
-        return CodexChatResult(stop_reason="empty_output", error="Codex returned an empty reply.")
+        return _finish(
+            CodexChatResult(stop_reason="empty_output", error="Codex returned an empty reply.")
+        )
     stop_reason = "exported" if export_path else "created" if playlist else "model_done"
-    return CodexChatResult(
-        reply=reply,
-        tools_used=tools_used,
-        tool_trace=tool_trace,
-        track_ids=track_ids,
-        move_grades=move_grades,
-        live_verification=live_verification,
-        playlist=playlist,
-        export_path=export_path,
-        stop_reason=stop_reason,
+    return _finish(
+        CodexChatResult(
+            reply=reply,
+            tools_used=tools_used,
+            tool_trace=tool_trace,
+            track_ids=track_ids,
+            move_grades=move_grades,
+            live_verification=live_verification,
+            playlist=playlist,
+            export_path=export_path,
+            stop_reason=stop_reason,
+        )
     )
 
 

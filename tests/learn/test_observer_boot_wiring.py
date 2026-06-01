@@ -37,6 +37,15 @@ def test_observer_complete_envelopes_return_to_lesson_runtime() -> None:
     assert "completed=reason == \"completed\"" in src
 
 
+def test_observer_tutor_speak_is_logged_as_ai_message() -> None:
+    src = _main_source()
+
+    assert "learn_tutor_speak_observability_events" in src
+    assert 'msg.get("type") == "ipc.learn.tutor_speak"' in src
+    assert 'source="learn_observer"' in src
+    assert "_learn_session_event(kind, fields)" in src
+
+
 def test_exemplar_observer_has_safe_noop_player_fallback() -> None:
     src = _main_source()
 
