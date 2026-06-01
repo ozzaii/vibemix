@@ -25,6 +25,7 @@ Strategy:
 from __future__ import annotations
 
 import asyncio
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -1081,3 +1082,38 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
     assert "TTFTMeter()" in src, "TTFTMeter not instantiated"
     assert "AckBank(" not in src, "AckBank constructor leaked back into __main__.py"
     assert "CancelGate()" in src, "CancelGate not instantiated"
+
+
+# ---------------------------------------------------------------------------
+# Packaged defaults — the free on-device voice ships ON
+# ---------------------------------------------------------------------------
+
+
+def test_apply_packaged_defaults_opts_moss_in_when_absent(monkeypatch):
+    """With no operator override, the packaged app turns the free MOSS voice ON.
+
+    It does not turn the drop-call oracle on; spoken drop calls stay explicitly
+    opted in until the mix-timing lane has live grounding proof.
+    """
+    from vibemix.__main__ import _apply_packaged_defaults
+
+    monkeypatch.delenv("VIBEMIX_LOCAL_TTS", raising=False)
+    monkeypatch.delenv("VIBEMIX_DROP_CALL", raising=False)
+
+    _apply_packaged_defaults()
+
+    assert os.environ["VIBEMIX_LOCAL_TTS"] == "1"
+    assert "VIBEMIX_DROP_CALL" not in os.environ
+
+
+def test_apply_packaged_defaults_respects_explicit_off(monkeypatch):
+    """An explicit ``VIBEMIX_*=0`` is never clobbered — setdefault, not assign."""
+    from vibemix.__main__ import _apply_packaged_defaults
+
+    monkeypatch.setenv("VIBEMIX_LOCAL_TTS", "0")
+    monkeypatch.setenv("VIBEMIX_DROP_CALL", "0")
+
+    _apply_packaged_defaults()
+
+    assert os.environ["VIBEMIX_LOCAL_TTS"] == "0"
+    assert os.environ["VIBEMIX_DROP_CALL"] == "0"

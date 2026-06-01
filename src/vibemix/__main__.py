@@ -771,6 +771,19 @@ def _mic_callback_factory(mic: MicBuffer, mic_audio_buf: AudioBuffer | None = No
 # =============================================================================
 
 
+def _apply_packaged_defaults() -> None:
+    """Ship the free on-device voice ON by default.
+
+    ``setdefault`` (not assignment) so an explicit shell/.env override still wins,
+    AND so the default survives ``open -a`` / Dock / launchd launches that strip
+    ``VIBEMIX_*`` from the inherited env — the process opts ITSELF in rather than
+    trusting the launcher to pass the flag. ``VIBEMIX_LOCAL_TTS=0`` still turns
+    speech off. Drop-call speech remains opt-in until the mix-timing oracle has
+    live grounding proof.
+    """
+    os.environ.setdefault("VIBEMIX_LOCAL_TTS", "1")  # MOSS = the only voice (zero TTS cost, no key)
+
+
 async def main() -> None:
     """Verbatim port of cohost_v4.py:1925-2080 with package-aware imports.
 
@@ -779,6 +792,11 @@ async def main() -> None:
       VIBEMIX_PROXY_BASE_URL = 'https://api.altidus.world' (default)
       VIBEMIX_CLIENT_VERSION = vibemix.__version__ (default)
     """
+    # The packaged app ships with the free on-device voice ON unless the operator
+    # explicitly disables it. Set before agent construction so the TTS chain reads
+    # the opted-in env. Drop-call speech is intentionally not defaulted here.
+    _apply_packaged_defaults()
+
     # ----- Phase 34 / SEC-10 — auditable privacy banner -----
     # Emitted to stderr BEFORE any network activity so a user reading the
     # sidecar log sees the privacy posture before the proxy /register
