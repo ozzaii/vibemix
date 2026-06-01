@@ -189,6 +189,21 @@ _NO_MOVE_CONTROL_INSTRUCTION_RE = re.compile(
     r")\b[^.?!]{0,32}\b(back|down|up|to)\b",
     re.IGNORECASE,
 )
+_NO_MOVE_COACHING_ADVICE_RE = re.compile(
+    r"\b("
+    r"try\b[^.?!]{0,48}\b(?:next time|later|earlier|on the|at the|for the|"
+    r"cut|kill|ride|wait|hold|bring|release|tighten|cleaner|one|1|8 bars?)|"
+    r"next time|wait\s+\d+\s+bars?|"
+    r"tighten(?:\s+(?:it|that|the|your))?|"
+    r"ride(?:\s+(?:it|that|the|your|low|lows|bass|sub))?|"
+    r"bring\b[^.?!]{0,32}\bback|"
+    r"hold\b[^.?!]{0,32}\blonger|"
+    r"cut\b[^.?!]{0,32}\bcleaner|"
+    r"kill\b[^.?!]{0,32}\bnext time|"
+    r"release\b[^.?!]{0,32}\b(?:on|at)\s+(?:the\s+)?(?:1|one)"
+    r")\b",
+    re.IGNORECASE,
+)
 _MIXER_LOW_KILL_CLAIM_RE = re.compile(
     r"\b(?:eq|mixer|move|it|that|you)\b[^.?!]{0,80}\bkilled\s+(?:the\s+)?(?:low|lows|bass|sub)\b|"
     r"\b(?:low|lows|bass|sub)\b[^.?!]{0,40}\b(?:was|were|got|is|are)?\s*killed\b",
@@ -357,6 +372,9 @@ LIVE_CANDIDATE_HELD_REPLY = (
 )
 LIVE_MOVE_EFFECT_HELD_REPLY = (
     "I can't tell from this live proof whether the control caused that."
+)
+LIVE_COACHING_ADVICE_HELD_REPLY = (
+    "I can't give coaching advice from this live proof."
 )
 LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY = (
     "I only have a broad listener read from the audio here, not source-level proof."
@@ -2277,6 +2295,8 @@ def should_defer_live_claim_stream(
         state, "audible", False
     ):
         return True
+    if not moves and str(event_type or "").upper() == "PHASE":
+        return True
     if moves and getattr(state, "audible", False):
         return True
     return policy in {"blocked", "watch_not_claim", "candidate_not_verdict"} or bool(
@@ -2331,6 +2351,15 @@ def apply_live_claim_guard(
             corrected=True,
             policy="single_deck_control_not_grounded",
             reason="control_causality_without_moves",
+            summary=summary,
+        )
+    if not moves and _has_unsupported_no_move_coaching_advice(text):
+        summary = _live_guard_summary(state, moves)
+        return LiveClaimGuardResult(
+            text=LIVE_COACHING_ADVICE_HELD_REPLY,
+            corrected=True,
+            policy="coaching_advice_not_grounded",
+            reason="advice_without_recent_move_proof",
             summary=summary,
         )
     effect_claim = bool(
@@ -2524,6 +2553,11 @@ def has_unsupported_audio_source_detail_mention(
     )
 
 
+def has_unsupported_no_move_coaching_advice(text: str) -> bool:
+    """Return True when text prescribes a DJ fix without recent move proof."""
+    return _has_unsupported_no_move_coaching_advice(text)
+
+
 def _source_detail_noun_key(noun: str) -> str:
     return " ".join(str(noun or "").lower().replace("-", " ").split())
 
@@ -2574,6 +2608,16 @@ def _has_unsupported_no_move_control_claim(text: str) -> bool:
         or _NO_MOVE_CONTROL_NOUN_RE.search(text)
         or _NO_MOVE_CONTROL_INSTRUCTION_RE.search(text)
     )
+
+
+def _has_unsupported_no_move_coaching_advice(text: str) -> bool:
+    """Return True when no recent move proof exists for a coaching prescription."""
+    raw = str(text or "").strip()
+    if not raw:
+        return False
+    if _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(raw) or _MOVE_EFFECT_DISCLAIMER_RE.search(raw):
+        return False
+    return bool(_NO_MOVE_COACHING_ADVICE_RE.search(raw))
 
 
 def _strip_unsupported_no_move_control_clause(text: str) -> str:

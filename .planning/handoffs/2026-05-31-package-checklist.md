@@ -1400,6 +1400,7 @@ Suggested commit: `fix(prompts): keep audio vibe separate from control proof`
 Include:
 
 - `src/vibemix/prompts/matrix.py`
+- `tests/agent/test_coach_prompt_grounding.py`
 - `tests/prompts/test_matrix.py`
 
 Reason:
@@ -1412,6 +1413,10 @@ Reason:
   for texture, energy, motion, density, mood, and silence/music presence, while
   explicitly forbidding track identity, deck identity, hidden-source detail, or
   control causality unless structured live evidence supplied it.
+- The 2026-06-01 live FLX4 proof found a narrower prompt failure too: a valid
+  PHASE citation still let "try the 1 next time" advice through with no recent
+  move or resolved deck proof. This package now also covers the coach task tail
+  and its prompt-grounding pin.
 - Keep this separate from the runtime guard package when staging: Package 8D is
   the enforcement/silence backstop, Package 8E is prompt steering. Either can be
   reviewed without pretending the other proves a live model cannot regress.
@@ -1422,6 +1427,16 @@ Proof already run:
   passed: 20 tests, 76 deselected.
 - `uv run ruff check src/vibemix/prompts/matrix.py tests/prompts/test_matrix.py`
   passed.
+- 2026-06-01 follow-up: `uv run pytest -q tests/state/test_deck_context.py tests/agent/test_dj_cohost_linter.py tests/prompts/test_matrix.py tests/agent/test_coach_prompt_grounding.py tests/state/test_coach_anti_slop.py`
+  passed: 248 tests. `uv run ruff check src/vibemix/state/deck_context.py src/vibemix/agent/dj_cohost.py src/vibemix/prompts/matrix.py src/vibemix/state/coach.py tests/state/test_deck_context.py tests/agent/test_dj_cohost_linter.py tests/prompts/test_matrix.py tests/agent/test_coach_prompt_grounding.py`
+  passed.
+- 2026-06-01 live source smoke with DDJ-FLX4 + Rekordbox + `VIBEMIX_INPUT_DEVICE='BlackHole 16ch'`
+  produced session `20260601-144052`: app booted, MIDI status ok, live audio
+  observed (`music` RMS around 0.04-0.06), MOSS spoke English, and the PHASE
+  prompt carried the new no-advice rule. The PHASE response was sound-only
+  ("A metallic, resonant sweep filter...") with no "try next time" advice.
+  Honest caveat: `VIBEMIX_CITATION_LINT` was off in that source run, so this
+  proves live boot/audio/MOSS/prompt behavior, not the final citation-lint gate.
 - `.planning/packets/2026-06-01/CODEX_READY-audio-vibe-contract-prompt-guard.md`
   records the current proof.
 

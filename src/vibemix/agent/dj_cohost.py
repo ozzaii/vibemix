@@ -91,6 +91,7 @@ from vibemix.state.deck_context import (
     apply_live_claim_guard,
     has_unsupported_audio_source_detail_claim,
     has_unsupported_audio_source_detail_mention,
+    has_unsupported_no_move_coaching_advice,
     live_claim_policy,
     render_audio_delta_items,
     render_audio_part_context,
@@ -2713,7 +2714,10 @@ class DJCoHostAgent(Agent):
                             event_type=ev_tag,
                         )
                     )
-                    if source_detail_risky:
+                    advice_risky = not live_claim_moves and has_unsupported_no_move_coaching_advice(
+                        full_text
+                    )
+                    if source_detail_risky or advice_risky:
                         live_claim_defer_stream = True
                     if live_claim_defer_stream:
                         continue

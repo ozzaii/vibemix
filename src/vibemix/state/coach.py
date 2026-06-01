@@ -763,7 +763,9 @@ class AICoach:
             prev = ev_extra.get("prev_phase", "?")
             return (
                 f"Phase shifted: {prev}→{new}. React to what the new section "
-                "FEELS like, not the label."
+                "FEELS like, not the label. If recent_moves[8s] is NONE or "
+                "live_evidence blocks transition proof, do not give next-time "
+                "advice or timing prescriptions; sound-only read or silence."
             )
         if t == "LAYER_ARRIVAL":
             return (
@@ -823,6 +825,7 @@ class AICoach:
             return (
                 "Steady stretch. ONE sharp observation about the SOUND right "
                 "now — groove, texture, what the track is doing musically. "
+                "No coaching advice unless recent_moves[8s] names a real move. "
                 "Always reply with something fresh; don't go silent."
             )
         # Phase 60-04 (HARMONIC-01) — CITED, NARRATE-ONLY clash fragment. The

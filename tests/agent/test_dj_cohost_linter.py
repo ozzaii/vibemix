@@ -236,6 +236,50 @@ def test_live_claim_guard_corrects_single_deck_transition_claim(mocker, tmp_path
     playback.push.assert_not_called()
 
 
+def test_live_claim_guard_strips_cited_phase_advice_without_move_proof(mocker, tmp_path) -> None:
+    """A valid PHASE citation is not permission to coach without move/deck proof."""
+    registry = EvidenceRegistry()
+    registry.write("ev", "PHASE", 22.4)
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "none"
+    state.audible_track = None
+    state.audible_track_confidence = 0.0
+    state.recent_moves = []
+    state.deck_state = DeckState(decks={})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                "That low end was heavy ",
+                "but the build released on the 3 — try the 1 next time ",
+                "to let that vocal sample find its pocket [ev:PHASE@22.4].",
+            ]
+        )
+    )
+
+    agent.set_next_event(
+        Event(type="PHASE", state=state, extra={"prev_phase": "build", "new_phase": "drop"})
+    )
+    chunks = _drive(agent)
+
+    assert chunks == []
+    kinds = [kind for kind, _ in recorder.events]
+    assert "ai_text" not in kinds
+    assert "citation_strip" not in kinds
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "strip"
+    assert guard_log["policy"] == "coaching_advice_not_grounded"
+    assert guard_log["reason"] == "advice_without_recent_move_proof"
+    assert "try the 1 next time" in guard_log["raw_text"]
+    assert "try the 1" not in guard_log["corrected_text"].lower()
+    assert tracker.rate() == 1.0
+    playback.push.assert_not_called()
+
+
 def test_live_claim_guard_defers_watch_only_stream_before_correction(mocker, tmp_path) -> None:
     """Watch-only crossfader evidence should not leak the raw streamed head."""
     registry = EvidenceRegistry()

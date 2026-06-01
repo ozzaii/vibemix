@@ -118,7 +118,7 @@ def test_build_prompt_phase_grounded_with_corpus_footer():
     assert "event=PHASE" in prompt
     # The PHASE coach task tail (built from the event, not a template).
     assert "React to what the new section" in prompt
-    assert prompt.endswith("FEELS like, not the label.")
+    assert prompt.endswith("sound-only read or silence.")
     # Evidence-corpus footer present because the snapshot is non-empty
     # (2 ev obs + 1 mix obs).
     assert "evidence_corpus[ev=2,aud=0,mix=1]" in prompt

@@ -49,13 +49,13 @@ ANCHOR_PHRASES = {
     ("intermediate", "hype"): [
         # The intermediate-hype cell IS the v4 prompt. Its anchors are the
         # phrasings v4 already shipped — pulled from the v4 vocabulary
-        # (drum/kick character, vibe words, scene tags).
+        # (drum/kick character, vibe words, scene-reference rules).
         "STANDOUT ELEMENT",
         "raw tunnel",
         "303",
         "warehouse-4am",
-        "Hard Tek",
-        "Acidcore",
+        "scene references",
+        "Never assume a genre",
         "kicks stepped on each other",
         "that cut felt half-bar off",
     ],
@@ -88,11 +88,11 @@ ANCHOR_PHRASES = {
     ("intermediate", "coach"): [
         "kicks stepped on each other for a half-bar",
         "EQ killed the lows too aggressively",
-        "build released on the 3 — try the 1",
+        "build release missed the one",
         "phrase mismatch in the blend",
         "for a half-bar",
         "killed the lows",
-        "try the 1",
+        "missed the one",
         "phrase mismatch",
     ],
     ("pro", "coach"): [
@@ -237,6 +237,35 @@ def test_hype_prompt_keeps_latency_safe_variety_rule() -> None:
     assert "Don't make every reaction past-tense" not in out
     assert "present-tense claims" in out
     assert "past-tense or timeless fragments" in out
+
+
+def test_hype_prompt_blocks_no_move_coaching_advice() -> None:
+    """No-move live proof can still describe sound, but must not prescribe fixes."""
+    out = build_system_instruction(
+        "intermediate",
+        "hype",
+        include_citation_grammar=False,
+        include_listening_fallback=False,
+        include_tag_dsl=False,
+    )
+
+    assert "do not give \"try next time\" coaching advice" in out
+    assert "Sound-only listener read or silence" in out
+
+
+def test_hype_prompt_does_not_assume_kaans_genre() -> None:
+    """Sven can use detected genre, but the default prompt must not hard-code one."""
+    out = build_system_instruction(
+        "intermediate",
+        "hype",
+        include_citation_grammar=False,
+        include_listening_fallback=False,
+        include_tag_dsl=False,
+    )
+
+    assert "Kaan plays Hard Tek" not in out
+    assert "Kaan plays" not in out
+    assert "Never assume a genre" in out
 
 
 # ---------------------------------------------------------------------------
@@ -772,4 +801,6 @@ def test_prompt_63_psy_tripper_overlay_is_explicit_opt_in(
 ) -> None:
     monkeypatch.setenv("VIBEMIX_PROMPT_OVERLAY", "psy_tripper_tr")
     body = build_system_instruction("intermediate", "hype")
-    assert "SADECE TÜRKÇE KONUŞ" in body
+    assert "Speak only English." in body
+    assert "SADECE TÜRKÇE KONUŞ" not in body
+    assert "recent_moves[8s] is NONE" in body

@@ -2097,12 +2097,31 @@ def test_live_claim_guard_salvages_sound_clause_before_no_move_control_claim() -
     assert result.text == "That synth clashed with the pad."
 
 
+def test_live_claim_guard_strips_no_move_coaching_advice() -> None:
+    state = MusicState(audible=True, controller_connected=True, audible_deck="none")
+
+    result = apply_live_claim_guard(
+        "That low end was heavy but the build released on the 3 — try the 1 next time.",
+        state,
+        [],
+        event_type="PHASE",
+    )
+
+    assert should_defer_live_claim_stream(state, [], event_type="PHASE") is True
+    assert result.corrected is True
+    assert result.policy == "coaching_advice_not_grounded"
+    assert result.reason == "advice_without_recent_move_proof"
+    assert "try the 1" not in result.text.lower()
+    assert "next time" not in result.text.lower()
+
+
 @pytest.mark.parametrize(
     "reply",
     [
         "The low end dropped out and the mid felt hollow.",
         "The filter sweep in the track sounded hollow.",
         "The bass got thinner for a moment.",
+        "The bass kept trying to crawl under the pads.",
     ],
 )
 def test_live_claim_guard_preserves_pure_audio_descriptions_without_moves(reply: str) -> None:
