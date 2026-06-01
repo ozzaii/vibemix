@@ -2360,6 +2360,46 @@ Remaining gate:
   confirm the palette visually, but this package removes an explicitly fake
   shipped action and does not claim runtime live proof.
 
+## Package 5G.3 - Shell Status Footer Honest Live State
+
+Suggested commit: `fix(tauri-ui): make shell status read-only`
+
+Include:
+
+- `tauri/ui/src/shell/StatusFooter.ts`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/shell/shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime activation bridges, websocket/session state, and backend live-status
+  plumbing.
+- Any co-host speech, prompt, DROP-call, TTS, or deck-audio capture changes.
+
+Reason:
+
+- Package 5G.2 removed the fake command-palette live controls, but the footer
+  still carried the same demo-only state mutation through a click handler. A
+  user could click the quiet status readout and make the shell paint
+  listening/live plus connected without any runtime session, audio evidence, or
+  websocket state.
+- This package makes the footer a read-only status group. Activation remains
+  owned by the live activation bridge, not by UI simulation.
+
+Proof for this UI honesty slice:
+
+- `npm --prefix tauri/ui test -- tests/shell/shell.spec.ts tests/shell/command-palette.spec.ts tests/shell/activation-bridge.spec.ts tests/shell/library-freshness-badge.spec.ts`
+  passed: 25 tests.
+- `git diff --check -- tauri/ui/src/shell/StatusFooter.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+  passed.
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- None for source behavior. This removes a simulation control; it does not claim
+  a live-runtime activation proof.
+
 ## Package 5H - Viber Raw Cue Export Boundary
 
 Suggested commit: `fix(library): drop raw cue export from Viber tools`

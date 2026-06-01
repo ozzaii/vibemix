@@ -143,6 +143,16 @@ describe("DesktopShell", () => {
     expect(host.dataset.conn).toBe("connected");
   });
 
+  it("keeps the footer read-only so it cannot fake a live session", () => {
+    shell = mountDesktopShell(host);
+    const footer = host.querySelector<HTMLElement>(".shell-footer")!;
+    expect(footer.tagName).toBe("DIV");
+    expect(footer.getAttribute("role")).toBe("group");
+    footer.click();
+    expect(shell.store.getState().activation).toBe("idle");
+    expect(shell.store.getState().connection).toBe("disconnected");
+  });
+
   it("jumps surfaces with Cmd+digit accelerators (Settings is Cmd+5, not a bare comma)", () => {
     shell = mountDesktopShell(host);
     press("3", { meta: true });

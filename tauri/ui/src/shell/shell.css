@@ -705,7 +705,6 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
-  cursor: pointer;
 }
 .shell-footer .conn-dot {
   width: 7px;
