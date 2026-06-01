@@ -2532,6 +2532,44 @@ Remaining gate:
 - Boundary unchanged: this package keeps the product honest; it does not ship
   the owned-deck live producer.
 
+## Package 8A - Cue Placement Judge Primitive
+
+Suggested commit: `feat(learn): grade cue placement against beatgrid`
+
+Include:
+
+- `src/vibemix/learn/cue_placement_judge.py`
+- `tests/learn/test_cue_placement_judge.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Live cue detector changes.
+- Runtime coach or co-host speech changes.
+- Learn skill-credit producer wiring.
+
+Reason:
+
+- Claude's capability inventory marked `grade_cue_placement` / Cue-Drop Judge as
+  claimed-but-absent. The source already has the clean-room `BeatGrid` primitive;
+  this package adds the offline Learn judge half without claiming live proof.
+- The judge measures signed cue timing against the nearest beat and, when a drop
+  target frame is provided, requires the cue to be near that absolute target
+  rather than merely on some other beat.
+
+Proof for this source slice:
+
+- `uv run pytest -q tests/learn/test_cue_placement_judge.py tests/audio/test_grid.py`
+- `uv run ruff check src/vibemix/learn/cue_placement_judge.py tests/learn/test_cue_placement_judge.py`
+- `git diff --check -- src/vibemix/learn/cue_placement_judge.py tests/learn/test_cue_placement_judge.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- This is an offline primitive only. A future package must wire it into a real
+  Learn/practice flow with cited evidence before any user-visible Mastered,
+  cue-quality, or live-coach claim.
+
 ## Hold Lane - Learn Beatmatch Producer Moat Plan
 
 Suggested commit if/when selected: `docs(learn): plan beatmatch graded producer`
