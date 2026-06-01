@@ -1,0 +1,1077 @@
+{
+  "proof": {
+    "url": "http://127.0.0.1:1420/?dev=shell",
+    "shell": {
+      "activeSurface": "settings",
+      "rootData": {
+        "state": "idle",
+        "panel": "closed",
+        "collapsed": "false"
+      }
+    },
+    "overlays": {
+      "backdrop": {
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 900,
+          "cx": 720,
+          "cy": 450
+        },
+        "open": "true",
+        "z": "49",
+        "pe": "auto"
+      },
+      "drawer": {
+        "rect": {
+          "x": 994,
+          "y": 0,
+          "w": 446,
+          "h": 900,
+          "cx": 1217,
+          "cy": 450
+        },
+        "open": "true",
+        "z": "50",
+        "transform": "matrix(1, 0, 0, 1, 0, 0)"
+      },
+      "sidebar": {
+        "rect": {
+          "x": 0,
+          "y": 28,
+          "w": 260,
+          "h": 872,
+          "cx": 130,
+          "cy": 464
+        },
+        "z": "40"
+      },
+      "panel": {
+        "rect": {
+          "x": 1440,
+          "y": 28,
+          "w": 280,
+          "h": 872,
+          "cx": 1580,
+          "cy": 464
+        },
+        "z": "50",
+        "transform": "matrix(1, 0, 0, 1, 280, 0)"
+      },
+      "footer": {
+        "rect": {
+          "x": 1388,
+          "y": 868,
+          "w": 40,
+          "h": 24,
+          "cx": 1408,
+          "cy": 880
+        },
+        "z": "20"
+      }
+    },
+    "hitTests": {
+      "deckNav": {
+        "sel": ".sb-nav-item[data-surface=\"deck\"]",
+        "text": "Deck1",
+        "rect": {
+          "x": 8,
+          "y": 88,
+          "w": 243,
+          "h": 38,
+          "cx": 130,
+          "cy": 107
+        },
+        "targetPath": "button.sb-nav-item[data-surface=deck] < nav.sb-nav < div.shell-sidebar[data-wire=shell.sidebar] < div.shell-body < div#shell-root < body",
+        "hitPath": "div.vmx-settings-backdrop[data-wire=settings.backdrop] < body < html",
+        "hitInsideTarget": false,
+        "pointerEvents": "auto",
+        "zIndex": "auto",
+        "topPointerEvents": "auto",
+        "topZIndex": "49"
+      },
+      "crateNav": {
+        "sel": ".sb-nav-item[data-surface=\"crate\"]",
+        "text": "Crate2",
+        "rect": {
+          "x": 8,
+          "y": 128,
+          "w": 243,
+          "h": 38,
+          "cx": 130,
+          "cy": 147
+        },
+        "targetPath": "button.sb-nav-item[data-surface=crate] < nav.sb-nav < div.shell-sidebar[data-wire=shell.sidebar] < div.shell-body < div#shell-root < body",
+        "hitPath": "div.vmx-settings-backdrop[data-wire=settings.backdrop] < body < html",
+        "hitInsideTarget": false,
+        "pointerEvents": "auto",
+        "zIndex": "auto",
+        "topPointerEvents": "auto",
+        "topZIndex": "49"
+      },
+      "settingsNav": {
+        "sel": ".sb-nav-item[data-surface=\"settings\"]",
+        "text": "Settings5",
+        "rect": {
+          "x": 8,
+          "y": 248,
+          "w": 243,
+          "h": 38,
+          "cx": 130,
+          "cy": 267
+        },
+        "targetPath": "button.sb-nav-item[data-surface=settings] < nav.sb-nav < div.shell-sidebar[data-wire=shell.sidebar] < div.shell-body < div#shell-root < body",
+        "hitPath": "div.vmx-settings-backdrop[data-wire=settings.backdrop] < body < html",
+        "hitInsideTarget": false,
+        "pointerEvents": "auto",
+        "zIndex": "auto",
+        "topPointerEvents": "auto",
+        "topZIndex": "49"
+      },
+      "drawerClose": {
+        "sel": ".vmx-settings-drawer__close",
+        "text": "",
+        "rect": {
+          "x": 1386,
+          "y": 13,
+          "w": 30,
+          "h": 30,
+          "cx": 1401,
+          "cy": 28
+        },
+        "targetPath": "button.vmx-settings-drawer__close[data-wire=settings.close] < div.vmx-settings-drawer__header[data-wire=settings.header] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "hitPath": "path < svg < button.vmx-settings-drawer__close[data-wire=settings.close] < div.vmx-settings-drawer__header[data-wire=settings.header] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body",
+        "hitInsideTarget": true,
+        "pointerEvents": "auto",
+        "zIndex": "auto",
+        "topPointerEvents": "auto",
+        "topZIndex": "auto"
+      },
+      "drawerBody": {
+        "sel": ".vmx-settings-drawer__body",
+        "text": "PERSONACFGkore▾korepuckcharonfenriraoedeledaoruszephyrHYPECOACHLENSHYPECRITIQUET",
+        "rect": {
+          "x": 995,
+          "y": 56,
+          "w": 445,
+          "h": 844,
+          "cx": 1217,
+          "cy": 478
+        },
+        "targetPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "hitInsideTarget": true,
+        "pointerEvents": "auto",
+        "zIndex": "5",
+        "topPointerEvents": "auto",
+        "topZIndex": "5"
+      }
+    },
+    "groups": [
+      {
+        "header": "PERSONACFG",
+        "group": {
+          "x": 1011,
+          "y": 78,
+          "w": 413,
+          "h": 62,
+          "cx": 1217,
+          "cy": 109
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 79,
+          "w": 411,
+          "h": 46,
+          "cx": 1217,
+          "cy": 102
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 125,
+          "w": 411,
+          "h": 310,
+          "cx": 1217,
+          "cy": 280
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 310,
+        "bodyClientHeight": 310,
+        "display": "block",
+        "overflow": "hidden"
+      },
+      {
+        "header": "OUTPUT",
+        "group": {
+          "x": 1011,
+          "y": 168,
+          "w": 413,
+          "h": 31,
+          "cx": 1217,
+          "cy": 183
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 169,
+          "w": 411,
+          "h": 40,
+          "cx": 1217,
+          "cy": 189
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 209,
+          "w": 411,
+          "h": 134,
+          "cx": 1217,
+          "cy": 276
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 134,
+        "bodyClientHeight": 134,
+        "display": "block",
+        "overflow": "hidden"
+      },
+      {
+        "header": "HOTKEY",
+        "group": {
+          "x": 1011,
+          "y": 227,
+          "w": 413,
+          "h": 25,
+          "cx": 1217,
+          "cy": 239
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 228,
+          "w": 411,
+          "h": 40,
+          "cx": 1217,
+          "cy": 248
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 268,
+          "w": 411,
+          "h": 96,
+          "cx": 1217,
+          "cy": 316
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 96,
+        "bodyClientHeight": 96,
+        "display": "block",
+        "overflow": "hidden"
+      },
+      {
+        "header": "RECORDING",
+        "group": {
+          "x": 1011,
+          "y": 280,
+          "w": 413,
+          "h": 56,
+          "cx": 1217,
+          "cy": 308
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 281,
+          "w": 411,
+          "h": 40,
+          "cx": 1217,
+          "cy": 301
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 321,
+          "w": 411,
+          "h": 282,
+          "cx": 1217,
+          "cy": 461
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 282,
+        "bodyClientHeight": 282,
+        "display": "block",
+        "overflow": "hidden"
+      },
+      {
+        "header": "LIBRARY",
+        "group": {
+          "x": 1011,
+          "y": 363,
+          "w": 413,
+          "h": 34,
+          "cx": 1217,
+          "cy": 381
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 364,
+          "w": 411,
+          "h": 40,
+          "cx": 1217,
+          "cy": 384
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 404,
+          "w": 411,
+          "h": 154,
+          "cx": 1217,
+          "cy": 481
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 154,
+        "bodyClientHeight": 154,
+        "display": "block",
+        "overflow": "hidden"
+      },
+      {
+        "header": "PROFILE",
+        "group": {
+          "x": 1011,
+          "y": 426,
+          "w": 413,
+          "h": 47,
+          "cx": 1217,
+          "cy": 449
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 427,
+          "w": 411,
+          "h": 40,
+          "cx": 1217,
+          "cy": 447
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 467,
+          "w": 411,
+          "h": 228,
+          "cx": 1217,
+          "cy": 581
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 228,
+        "bodyClientHeight": 228,
+        "display": "block",
+        "overflow": "hidden"
+      },
+      {
+        "header": "DIAGNOSTICSLIVE",
+        "group": {
+          "x": 1011,
+          "y": 501,
+          "w": 413,
+          "h": 29,
+          "cx": 1217,
+          "cy": 515
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 502,
+          "w": 411,
+          "h": 46,
+          "cx": 1217,
+          "cy": 525
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 548,
+          "w": 411,
+          "h": 117,
+          "cx": 1217,
+          "cy": 606
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 117,
+        "bodyClientHeight": 117,
+        "display": "block",
+        "overflow": "hidden"
+      },
+      {
+        "header": "CALIBRATION",
+        "group": {
+          "x": 1011,
+          "y": 558,
+          "w": 413,
+          "h": 21,
+          "cx": 1217,
+          "cy": 569
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 559,
+          "w": 411,
+          "h": 40,
+          "cx": 1217,
+          "cy": 579
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 599,
+          "w": 411,
+          "h": 76,
+          "cx": 1217,
+          "cy": 637
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 76,
+        "bodyClientHeight": 76,
+        "display": "block",
+        "overflow": "hidden"
+      },
+      {
+        "header": "LEARN",
+        "group": {
+          "x": 1011,
+          "y": 607,
+          "w": 413,
+          "h": 26,
+          "cx": 1217,
+          "cy": 620
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 608,
+          "w": 411,
+          "h": 40,
+          "cx": 1217,
+          "cy": 628
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 656,
+          "w": 411,
+          "h": 95,
+          "cx": 1217,
+          "cy": 704
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 95,
+        "bodyClientHeight": 95,
+        "display": "flex",
+        "overflow": "hidden"
+      },
+      {
+        "header": "MASCOT",
+        "group": {
+          "x": 1011,
+          "y": 661,
+          "w": 413,
+          "h": 49,
+          "cx": 1217,
+          "cy": 686
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 662,
+          "w": 411,
+          "h": 40,
+          "cx": 1217,
+          "cy": 682
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 714,
+          "w": 411,
+          "h": 230,
+          "cx": 1217,
+          "cy": 829
+        },
+        "bodyChildren": 3,
+        "bodyScrollHeight": 230,
+        "bodyClientHeight": 230,
+        "display": "flex",
+        "overflow": "hidden"
+      },
+      {
+        "header": "PERFORMANCE",
+        "group": {
+          "x": 1011,
+          "y": 739,
+          "w": 413,
+          "h": 22,
+          "cx": 1217,
+          "cy": 750
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 740,
+          "w": 411,
+          "h": 40,
+          "cx": 1217,
+          "cy": 760
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 788,
+          "w": 411,
+          "h": 70,
+          "cx": 1217,
+          "cy": 823
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 70,
+        "bodyClientHeight": 70,
+        "display": "flex",
+        "overflow": "hidden"
+      },
+      {
+        "header": "HELP",
+        "group": {
+          "x": 1011,
+          "y": 788,
+          "w": 413,
+          "h": 66,
+          "cx": 1217,
+          "cy": 821
+        },
+        "headerRect": {
+          "x": 1012,
+          "y": 789,
+          "w": 411,
+          "h": 40,
+          "cx": 1217,
+          "cy": 809
+        },
+        "bodyRect": {
+          "x": 1012,
+          "y": 837,
+          "w": 411,
+          "h": 332,
+          "cx": 1217,
+          "cy": 1003
+        },
+        "bodyChildren": 1,
+        "bodyScrollHeight": 332,
+        "bodyClientHeight": 332,
+        "display": "flex",
+        "overflow": "hidden"
+      }
+    ],
+    "drawerInteractives": [
+      {
+        "i": 0,
+        "text": "close settings",
+        "classes": "vmx-settings-drawer__close",
+        "rect": {
+          "x": 1386,
+          "y": 13,
+          "w": 30,
+          "h": 30,
+          "cx": 1401,
+          "cy": 28
+        },
+        "hitInsideTarget": true,
+        "hitPath": "path < svg < button.vmx-settings-drawer__close[data-wire=settings.close] < div.vmx-settings-drawer__header[data-wire=settings.header] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body",
+        "targetPath": "button.vmx-settings-drawer__close[data-wire=settings.close] < div.vmx-settings-drawer__header[data-wire=settings.header] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html"
+      },
+      {
+        "i": 1,
+        "text": "kore▾",
+        "classes": "vmx-picker__row",
+        "rect": {
+          "x": 1036,
+          "y": 145,
+          "w": 98,
+          "h": 42,
+          "cx": 1085,
+          "cy": 166
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__row < div.vmx-picker[data-wire=settings.persona.voice] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona] < div.vmx-settings-drawer__body[data-wire=settings.body]"
+      },
+      {
+        "i": 2,
+        "text": "kore",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 189,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 203
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker[data-wire=settings.persona.voice] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 3,
+        "text": "puck",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 217,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 231
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.hotkey.header] < section.vmx-settings-group[data-wire=settings.group.hotkey] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker[data-wire=settings.persona.voice] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 4,
+        "text": "charon",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 245,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 259
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker[data-wire=settings.persona.voice] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 5,
+        "text": "fenrir",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 273,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 287
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.recording.header] < section.vmx-settings-group[data-wire=settings.group.recording] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker[data-wire=settings.persona.voice] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 6,
+        "text": "aoede",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 301,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 315
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.recording.header] < section.vmx-settings-group[data-wire=settings.group.recording] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker[data-wire=settings.persona.voice] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 7,
+        "text": "leda",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 329,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 343
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker[data-wire=settings.persona.voice] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 8,
+        "text": "orus",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 357,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 371
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.library.header] < section.vmx-settings-group[data-wire=settings.group.library] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker[data-wire=settings.persona.voice] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 9,
+        "text": "zephyr",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 385,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 399
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker[data-wire=settings.persona.voice] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 10,
+        "text": "HYPE",
+        "classes": "vmx-rocker__seg",
+        "rect": {
+          "x": 1040,
+          "y": 207,
+          "w": 178,
+          "h": 26,
+          "cx": 1128,
+          "cy": 220
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-rocker__seg < div.vmx-rocker[data-wire=settings.persona.mode] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona] < div.vmx-settings-drawer__body[data-wire=settings.body]"
+      },
+      {
+        "i": 11,
+        "text": "COACH",
+        "classes": "vmx-rocker__seg",
+        "rect": {
+          "x": 1217,
+          "y": 207,
+          "w": 178,
+          "h": 26,
+          "cx": 1306,
+          "cy": 220
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-rocker__seg < div.vmx-rocker[data-wire=settings.persona.mode] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona] < div.vmx-settings-drawer__body[data-wire=settings.body]"
+      },
+      {
+        "i": 12,
+        "text": "HYPE",
+        "classes": "vmx-rocker__seg",
+        "rect": {
+          "x": 1040,
+          "y": 275,
+          "w": 118,
+          "h": 26,
+          "cx": 1099,
+          "cy": 288
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.recording.header] < section.vmx-settings-group[data-wire=settings.group.recording] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-rocker__seg < div.vmx-rocker < div[data-wire=settings.persona.lens] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 13,
+        "text": "CRITIQUE",
+        "classes": "vmx-rocker__seg",
+        "rect": {
+          "x": 1158,
+          "y": 275,
+          "w": 118,
+          "h": 26,
+          "cx": 1217,
+          "cy": 288
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.recording.header] < section.vmx-settings-group[data-wire=settings.group.recording] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-rocker__seg < div.vmx-rocker < div[data-wire=settings.persona.lens] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 14,
+        "text": "TUTOR",
+        "classes": "vmx-rocker__seg",
+        "rect": {
+          "x": 1277,
+          "y": 275,
+          "w": 118,
+          "h": 26,
+          "cx": 1336,
+          "cy": 288
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.recording.header] < section.vmx-settings-group[data-wire=settings.group.recording] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-rocker__seg < div.vmx-rocker < div[data-wire=settings.persona.lens] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 15,
+        "text": "techno▾",
+        "classes": "vmx-picker__row",
+        "rect": {
+          "x": 1036,
+          "y": 321,
+          "w": 83,
+          "h": 42,
+          "cx": 1077,
+          "cy": 342
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__row < div.vmx-picker < div.vmx-settings-drawer__genre-wrap[data-wire=settings.persona.genre] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona]"
+      },
+      {
+        "i": 16,
+        "text": "house",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 365,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 379
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.library.header] < section.vmx-settings-group[data-wire=settings.group.library] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker < div.vmx-settings-drawer__genre-wrap[data-wire=settings.persona.genre] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body]"
+      },
+      {
+        "i": 17,
+        "text": "tech-house",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 393,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 407
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker < div.vmx-settings-drawer__genre-wrap[data-wire=settings.persona.genre] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body]"
+      },
+      {
+        "i": 18,
+        "text": "techno",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 421,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 435
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.profile.header] < section.vmx-settings-group[data-wire=settings.group.profile] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker < div.vmx-settings-drawer__genre-wrap[data-wire=settings.persona.genre] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body]"
+      },
+      {
+        "i": 19,
+        "text": "dnb",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 449,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 463
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.profile.header] < section.vmx-settings-group[data-wire=settings.group.profile] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker < div.vmx-settings-drawer__genre-wrap[data-wire=settings.persona.genre] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body]"
+      },
+      {
+        "i": 20,
+        "text": "trance",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 477,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 491
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker < div.vmx-settings-drawer__genre-wrap[data-wire=settings.persona.genre] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body]"
+      },
+      {
+        "i": 21,
+        "text": "psytrance",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 505,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 519
+        },
+        "hitInsideTarget": false,
+        "hitPath": "span < div.vmx-settings-group__header[data-wire=settings.group.diagnostics.header] < section.vmx-settings-group[data-wire=settings.group.diagnostics] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker < div.vmx-settings-drawer__genre-wrap[data-wire=settings.persona.genre] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body]"
+      },
+      {
+        "i": 22,
+        "text": "hip-hop",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 533,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 547
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker < div.vmx-settings-drawer__genre-wrap[data-wire=settings.persona.genre] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body]"
+      },
+      {
+        "i": 23,
+        "text": "edm-generic",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 561,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 575
+        },
+        "hitInsideTarget": false,
+        "hitPath": "span < div.vmx-settings-group__header[data-wire=settings.group.calibration.header] < section.vmx-settings-group[data-wire=settings.group.calibration] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker < div.vmx-settings-drawer__genre-wrap[data-wire=settings.persona.genre] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body]"
+      },
+      {
+        "i": 24,
+        "text": "BEG",
+        "classes": "vmx-rocker__seg",
+        "rect": {
+          "x": 1040,
+          "y": 383,
+          "w": 118,
+          "h": 26,
+          "cx": 1099,
+          "cy": 396
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.library.header] < section.vmx-settings-group[data-wire=settings.group.library] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-rocker__seg < div.vmx-rocker[data-wire=settings.persona.skill] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona] < div.vmx-settings-drawer__body[data-wire=settings.body]"
+      },
+      {
+        "i": 25,
+        "text": "INT",
+        "classes": "vmx-rocker__seg",
+        "rect": {
+          "x": 1158,
+          "y": 383,
+          "w": 118,
+          "h": 26,
+          "cx": 1217,
+          "cy": 396
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.library.header] < section.vmx-settings-group[data-wire=settings.group.library] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-rocker__seg < div.vmx-rocker[data-wire=settings.persona.skill] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona] < div.vmx-settings-drawer__body[data-wire=settings.body]"
+      },
+      {
+        "i": 26,
+        "text": "PRO",
+        "classes": "vmx-rocker__seg",
+        "rect": {
+          "x": 1277,
+          "y": 383,
+          "w": 118,
+          "h": 26,
+          "cx": 1336,
+          "cy": 396
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.library.header] < section.vmx-settings-group[data-wire=settings.group.library] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-rocker__seg < div.vmx-rocker[data-wire=settings.persona.skill] < div < div.vmx-settings-group__body[data-wire=settings.group.persona.body] < section.vmx-settings-group[data-wire=settings.group.persona] < div.vmx-settings-drawer__body[data-wire=settings.body]"
+      },
+      {
+        "i": 27,
+        "text": "defaultAUTO▾",
+        "classes": "vmx-picker__row",
+        "rect": {
+          "x": 1036,
+          "y": 229,
+          "w": 142,
+          "h": 42,
+          "cx": 1106,
+          "cy": 250
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.hotkey.header] < section.vmx-settings-group[data-wire=settings.group.hotkey] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__row < div.vmx-picker < div < div.vmx-settings-group__body[data-wire=settings.group.output.body] < section.vmx-settings-group[data-wire=settings.group.output] < div.vmx-settings-drawer__body[data-wire=settings.body]"
+      },
+      {
+        "i": 28,
+        "text": "default",
+        "classes": "vmx-picker__opt",
+        "rect": {
+          "x": 1041,
+          "y": 273,
+          "w": 190,
+          "h": 28,
+          "cx": 1136,
+          "cy": 287
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.recording.header] < section.vmx-settings-group[data-wire=settings.group.recording] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-picker__opt < div.vmx-picker__list < div.vmx-picker < div < div.vmx-settings-group__body[data-wire=settings.group.output.body] < section.vmx-settings-group[data-wire=settings.group.output]"
+      },
+      {
+        "i": 29,
+        "text": "HP",
+        "classes": "vmx-rocker__seg",
+        "rect": {
+          "x": 1040,
+          "y": 291,
+          "w": 178,
+          "h": 26,
+          "cx": 1128,
+          "cy": 304
+        },
+        "hitInsideTarget": false,
+        "hitPath": "div.vmx-settings-group__header[data-wire=settings.group.recording.header] < section.vmx-settings-group[data-wire=settings.group.recording] < div.vmx-settings-drawer__body[data-wire=settings.body] < aside.vmx-settings-drawer[data-wire=settings.drawer] < body < html",
+        "targetPath": "button.vmx-rocker__seg < div.vmx-rocker < div < div.vmx-settings-group__body[data-wire=settings.group.output.body] < section.vmx-settings-group[data-wire=settings.group.output] < div.vmx-settings-drawer__body[data-wire=settings.body]"
+      }
+    ],
+    "counts": {
+      "navButtons": 5,
+      "settingsGroups": 12,
+      "drawerInteractives": 30,
+      "visibleGroupBodies": 12
+    }
+  },
+  "logs": [
+    "[debug] [vite] connecting...",
+    "[debug] [vite] connected.",
+    "[log] [vmx:state] boot: start {\"readyState\":\"interactive\"}",
+    "[log] [vmx:state] boot → shell app (dev=shell)",
+    "[log] [vmx:state] shell-app → mount",
+    "[log] [vmx:state] session-router → routeSession (mount)",
+    "[log] [vmx:state] session-router → teardownSession",
+    "[log] [vmx:ipc<] subscribe ipc.library.staleness_nudge",
+    "[log] [vmx:ipc<] subscribe ipc.session.snapshot",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:540:7)\n    at mountSettingsDrawer (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:556:10)\n    at routeSession (http://127.0.0.1:1420/src/session/router.ts:26:3)\n    at async mountDeck (http://127.0.0.1:1420/src/shell/app.ts:15:5)\n    at async mountOne (http://127.0.0.1:1420/src/shell/surface-mounts.ts:28:5)",
+    "[log] [vmx:ipc<] subscribe ipc.status.tick",
+    "[log] [vmx:ipc<] subscribe ipc.settings.state",
+    "[log] [vmx:ipc<] subscribe ipc.error",
+    "[log] [vmx:ipc<] subscribe ipc.session.citation",
+    "[log] [vmx:ipc<] subscribe ipc.session.mute",
+    "[log] [vmx:ipc<] subscribe ipc.recordings.usage",
+    "[log] [vmx:ipc<] subscribe ipc.session.cohost-reaction",
+    "[log] [vmx:ipc>] emit ipc.settings.get (fire-and-forget) {\"payload\":{}}",
+    "[warning] [ws-bridge] ipc.settings.get failed: Error: Tauri runtime unavailable\n    at invokeTauri (http://127.0.0.1:1420/src/tauri-runtime.ts:5:27)\n    at emitIpc (http://127.0.0.1:1420/src/ipc/client.ts:89:9)\n    at initSessionBridge (http://127.0.0.1:1420/src/session/ws-bridge.ts:87:11)\n    at async routeSession (http://127.0.0.1:1420/src/session/router.ts:27:30)\n    at async mountDeck (http://127.0.0.1:1420/src/shell/app.ts:15:5)\n    at async mountOne (http://127.0.0.1:1420/src/shell/surface-mounts.ts:28:5)\n    at async mountSurfacesInto (http://127.0.0.1:1420/src/shell/surface-mounts.ts:34:3)\n    at async mountShellApp (http://127.0.0.1:1420/src/shell/app.ts:60:20)\n    at async boot (http://127.0.0.1:1420/src/main.ts:84:7)",
+    "[error] [shell] surface failed to mount: deck TypeError: Cannot read properties of undefined (reading 'transformCallback')\n    at transformCallback (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:22:37)\n    at listen (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-7FCLUC5I.js?v=6cfcaa63:39:14)\n    at installTrayQuitListener (http://127.0.0.1:1420/src/session/quit-guard.ts:45:26)\n    at routeSession (http://127.0.0.1:1420/src/session/router.ts:32:31)\n    at async mountDeck (http://127.0.0.1:1420/src/shell/app.ts:15:5)\n    at async mountOne (http://127.0.0.1:1420/src/shell/surface-mounts.ts:28:5)\n    at async mountSurfacesInto (http://127.0.0.1:1420/src/shell/surface-mounts.ts:34:3)\n    at async mountShellApp (http://127.0.0.1:1420/src/shell/app.ts:60:20)\n    at async boot (http://127.0.0.1:1420/src/main.ts:84:7)",
+    "[log] [vmx:ipc>] emit ipc.learn.progress_state (fire-and-forget) {\"payload\":{\"action\":\"snapshot\"}}",
+    "[log] [vmx:state] shell-app → mounted",
+    "[log] [vmx:click] settings drawer open",
+    "[log] [vmx:ipc>] request ipc.profile.view → expect ipc.profile.view_result {\"payload\":{}}",
+    "[log] [vmx:ipc>] request ipc.recordings.list → expect ipc.recordings.list_result {\"payload\":{}}",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at openSettingsState (http://127.0.0.1:1420/src/settings/state.ts:46:22)",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at setRecordingsSlice (http://127.0.0.1:1420/src/settings/state.ts:43:3)",
+    "[warning] [settings] ipc.recordings.list failed: Error: ipc invoke failed: Error: Tauri runtime unavailable\n    at http://127.0.0.1:1420/src/ipc/client.ts:47:16",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at setRecordingsSlice (http://127.0.0.1:1420/src/settings/state.ts:43:3)"
+  ]
+}

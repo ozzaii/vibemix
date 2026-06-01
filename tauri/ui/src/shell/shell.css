@@ -36,11 +36,16 @@
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  position: relative;
   /* The void is LIT (2026-05-30 level-up): one soft rose key-light top-left
    * (the co-host's presence), a faint gold counter-warmth, a top sheen, a
    * gentle floor vignette. Replaces the flat var(--void-0) fill that read as
    * unfinished dark-mode. The token carries the whole machined-obsidian scene. */
-  background: var(--scene-lit);
+  background:
+    linear-gradient(112deg, rgba(255, 165, 223, 0.055) 0%, transparent 28%),
+    radial-gradient(115% 82% at 74% 10%, rgba(255, 222, 242, 0.050) 0%, transparent 46%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0%, transparent 20%),
+    var(--scene-lit);
   background-attachment: fixed;
   color: var(--text-primary);
   font-family: var(--type-body);
@@ -51,14 +56,20 @@
 /* ── Top chrome — slim drag bar (28px). The brand mark lives in the sidebar;
  *    this is just the window grip + a mono clock. ─────────────────────────── */
 .shell-chrome {
+  position: relative;
+  z-index: var(--z-sidebar);
   flex: 0 0 var(--chrome-h);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--sp-3);
-  background: var(--scrim-chrome);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.010)),
+    var(--scrim-chrome);
   border-bottom: 1px solid var(--border-subtle);
-  box-shadow: var(--chrome-highlight);
+  box-shadow:
+    var(--chrome-highlight),
+    0 8px 26px rgba(0, 0, 0, 0.24);
   -webkit-app-region: drag;
   user-select: none;
 }
@@ -92,14 +103,16 @@
   display: flex;
   flex-direction: column;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0%, transparent 12%, transparent 100%),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.034) 0%, transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.026) 0%, transparent 14%, transparent 100%),
     var(--scrim-furniture);
   border-right: 1px solid var(--border-default);
   /* The sidebar is a raised furniture slab: a machined top lip + a real shadow
    * cast onto the recessed stage to its right (2026-05-30 level-up). */
   box-shadow:
     var(--chrome-highlight),
-    8px 0 28px rgba(0, 0, 0, 0.34);
+    inset -1px 0 0 rgba(255, 222, 242, 0.025),
+    14px 0 42px rgba(0, 0, 0, 0.42);
   transition: width 200ms var(--ease-brand);
   overflow: hidden;
   z-index: var(--z-sidebar);
@@ -124,9 +137,10 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  height: 52px;
+  height: 56px;
   padding: 0 var(--sp-4);
   flex: 0 0 auto;
+  border-bottom: 1px solid var(--border-subtle);
 }
 /* Both ears (brand mark + co-host foot pill) are lit rose dots; the box
  * styling is bare so it applies to either. */
@@ -158,8 +172,8 @@
    * the tiny negative tracking a tight modern wordmark wants. */
   font-family: var(--type-display);
   font-variation-settings: "wdth" 92, "wght" 700;
-  font-size: 19px;
-  letter-spacing: -0.01em;
+  font-size: 20px;
+  letter-spacing: 0;
   text-transform: none;
   color: var(--text-primary);
   white-space: nowrap;
@@ -186,7 +200,7 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 2px; /* deliberately tight (sub --sp-1): a dense nav stack, not airy rows */
+  gap: 4px; /* deliberately tight: a dense nav stack, not airy rows */
   padding: var(--sp-2);
   overflow: hidden;
 }
@@ -194,8 +208,9 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  height: 38px;
+  height: 40px;
   padding: 0 var(--sp-3);
+  border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--text-tertiary);
   font-size: 13px;
@@ -204,16 +219,30 @@
   /* Reset the <button> UA default (center) so the label reads left, flush with
    * its glyph as one unit — the glyph keeps its own centered box below. */
   text-align: left;
-  transition: background 150ms var(--ease-brand), color 150ms var(--ease-brand);
+  transition:
+    background 150ms var(--ease-brand),
+    border-color 150ms var(--ease-brand),
+    box-shadow 150ms var(--ease-brand),
+    color 150ms var(--ease-brand);
 }
 /* Hover warms the WHOLE row in lockstep — bg, label, and glyph together. Before,
  * the glyph stayed dead-muted while the row lit, so the icon read half-asleep. */
-.sb-nav-item:hover { background: var(--brand-04); color: var(--text-secondary); }
+.sb-nav-item:hover {
+  background: var(--brand-04);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+}
 .sb-nav-item:hover .sb-glyph { color: var(--text-secondary); }
 .sb-nav-item[aria-current="true"] {
   /* A touch more fill than hover (-10 vs -04) so "you are here" reads at a glance,
    * not just on the glyph. */
-  background: var(--brand-10);
+  background:
+    linear-gradient(180deg, var(--brand-12), var(--brand-04));
+  border-color: var(--brand-22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 222, 242, 0.075),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.38),
+    0 8px 20px rgba(0, 0, 0, 0.16);
   color: var(--text-primary);
 }
 .sb-nav-item .sb-glyph {
@@ -363,11 +392,11 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: 64px;
+  width: 96px;
   pointer-events: none;
   /* Deepened (2026-05-30): the recessed-stage edge needs a real falloff so the
    * sidebar slab reads as raised ABOVE the stage, not flush with it. */
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.10) 38%, transparent 100%);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.44) 0%, rgba(0, 0, 0, 0.16) 40%, transparent 100%);
   z-index: var(--z-recess);
 }
 

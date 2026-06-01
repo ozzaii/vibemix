@@ -51,14 +51,17 @@ const CSS = `
     gap: var(--sp-3);
     height: 42px;
     padding: 0 12px 0 10px;
-    background: var(--glass-2);
+    background:
+      linear-gradient(180deg, rgba(255, 222, 242, 0.020), transparent 58%),
+      var(--glass-2);
     backdrop-filter: var(--blur-glass-display);
     -webkit-backdrop-filter: var(--blur-glass-display);
-    border: 1px solid var(--glass-edge);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--rad-sm);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.035),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+      inset 0 -1px 0 rgba(0, 0, 0, 0.44),
+      0 1px 0 rgba(255, 255, 255, 0.018);
     cursor: pointer;
     color: var(--silk);
     transition: color var(--motion-snap) ease-out,
@@ -73,10 +76,11 @@ const CSS = `
   .vmx-picker__row:hover,
   .vmx-picker__row:focus-visible {
     color: var(--silk);
+    border-color: var(--brand-22);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-      0 0 10px var(--amber-22),
+      0 0 0 1px var(--brand-08),
       var(--glow-faint);
   }
   /* Picker row owns the outer halo above — kill the body-level
@@ -84,14 +88,14 @@ const CSS = `
   .vmx-picker__row:focus-visible { outline: none; }
   .vmx-picker[data-open="true"] .vmx-picker__row {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
-    border-color: rgba(255, 165, 223, 0.14);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.072) 0%, rgba(255, 165, 223, 0.022) 100%);
+    border-color: var(--brand-22);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 var(--amber-40),
-      inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 165, 223, 0.14);
-    text-shadow: 0 0 4px var(--amber-65);
+      inset 0 0 10px var(--amber-22),
+      0 0 0 1px var(--brand-08);
+    text-shadow: 0 0 3px var(--amber-40);
   }
   .vmx-picker__icon {
     display: inline-flex;

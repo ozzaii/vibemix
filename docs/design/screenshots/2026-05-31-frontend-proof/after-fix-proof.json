@@ -1,0 +1,421 @@
+{
+  "openSnap": {
+    "activeSurface": "settings",
+    "drawerOpen": "true",
+    "backdrop": {
+      "z": "39",
+      "pe": "auto",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900,
+        "cx": 720,
+        "cy": 450
+      }
+    },
+    "sidebar": {
+      "z": "40",
+      "hitDeck": {
+        "rect": {
+          "x": 8,
+          "y": 88,
+          "w": 243,
+          "h": 38,
+          "cx": 130,
+          "cy": 107
+        },
+        "hitInsideTarget": true,
+        "hitPath": "span.sb-label < button.sb-nav-item[data-surface=deck] < nav.sb-nav < div.shell-sidebar[data-wire=shell.sidebar] < div.shell-body",
+        "z": "auto"
+      }
+    },
+    "groups": [
+      {
+        "header": "PERSONACFG",
+        "groupH": 358,
+        "headerH": 46,
+        "bodyH": 310,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "OUTPUT",
+        "groupH": 176,
+        "headerH": 40,
+        "bodyH": 134,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "HOTKEY",
+        "groupH": 138,
+        "headerH": 40,
+        "bodyH": 96,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "RECORDING",
+        "groupH": 324,
+        "headerH": 40,
+        "bodyH": 282,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "LIBRARY",
+        "groupH": 196,
+        "headerH": 40,
+        "bodyH": 154,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "PROFILE",
+        "groupH": 270,
+        "headerH": 40,
+        "bodyH": 228,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "DIAGNOSTICSLIVE",
+        "groupH": 165,
+        "headerH": 46,
+        "bodyH": 117,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "CALIBRATION",
+        "groupH": 118,
+        "headerH": 40,
+        "bodyH": 76,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "LEARN",
+        "groupH": 145,
+        "headerH": 40,
+        "bodyH": 95,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "MASCOT",
+        "groupH": 284,
+        "headerH": 40,
+        "bodyH": 230,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "PERFORMANCE",
+        "groupH": 120,
+        "headerH": 40,
+        "bodyH": 70,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "HELP",
+        "groupH": 382,
+        "headerH": 40,
+        "bodyH": 332,
+        "clipped": false,
+        "flex": "0 0 auto"
+      }
+    ],
+    "collapsedCount": 0
+  },
+  "deckClick": {
+    "ok": true,
+    "error": null,
+    "after": {
+      "activeSurface": "deck",
+      "drawerOpen": "false",
+      "backdrop": {
+        "z": "39",
+        "pe": "none",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 900,
+          "cx": 720,
+          "cy": 450
+        }
+      },
+      "sidebar": {
+        "z": "40",
+        "hitDeck": {
+          "rect": {
+            "x": 8,
+            "y": 88,
+            "w": 243,
+            "h": 38,
+            "cx": 130,
+            "cy": 107
+          },
+          "hitInsideTarget": true,
+          "hitPath": "span.sb-label < button.sb-nav-item[data-surface=deck] < nav.sb-nav < div.shell-sidebar[data-wire=shell.sidebar] < div.shell-body",
+          "z": "auto"
+        }
+      },
+      "groups": [
+        {
+          "header": "PERSONACFG",
+          "groupH": 358,
+          "headerH": 46,
+          "bodyH": 310,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "OUTPUT",
+          "groupH": 176,
+          "headerH": 40,
+          "bodyH": 134,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "HOTKEY",
+          "groupH": 138,
+          "headerH": 40,
+          "bodyH": 96,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "RECORDING",
+          "groupH": 324,
+          "headerH": 40,
+          "bodyH": 282,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "LIBRARY",
+          "groupH": 196,
+          "headerH": 40,
+          "bodyH": 154,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "PROFILE",
+          "groupH": 237,
+          "headerH": 40,
+          "bodyH": 195,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "DIAGNOSTICSLIVE",
+          "groupH": 165,
+          "headerH": 46,
+          "bodyH": 117,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "CALIBRATION",
+          "groupH": 118,
+          "headerH": 40,
+          "bodyH": 76,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "LEARN",
+          "groupH": 145,
+          "headerH": 40,
+          "bodyH": 95,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "MASCOT",
+          "groupH": 284,
+          "headerH": 40,
+          "bodyH": 230,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "PERFORMANCE",
+          "groupH": 120,
+          "headerH": 40,
+          "bodyH": 70,
+          "clipped": false,
+          "flex": "0 0 auto"
+        },
+        {
+          "header": "HELP",
+          "groupH": 382,
+          "headerH": 40,
+          "bodyH": 332,
+          "clipped": false,
+          "flex": "0 0 auto"
+        }
+      ],
+      "collapsedCount": 0
+    }
+  },
+  "backdropDismiss": {
+    "activeSurface": "deck",
+    "drawerOpen": "false",
+    "backdrop": {
+      "z": "39",
+      "pe": "none",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900,
+        "cx": 720,
+        "cy": 450
+      }
+    },
+    "sidebar": {
+      "z": "40",
+      "hitDeck": {
+        "rect": {
+          "x": 8,
+          "y": 88,
+          "w": 243,
+          "h": 38,
+          "cx": 130,
+          "cy": 107
+        },
+        "hitInsideTarget": true,
+        "hitPath": "span.sb-label < button.sb-nav-item[data-surface=deck] < nav.sb-nav < div.shell-sidebar[data-wire=shell.sidebar] < div.shell-body",
+        "z": "auto"
+      }
+    },
+    "groups": [
+      {
+        "header": "PERSONACFG",
+        "groupH": 358,
+        "headerH": 46,
+        "bodyH": 310,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "OUTPUT",
+        "groupH": 176,
+        "headerH": 40,
+        "bodyH": 134,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "HOTKEY",
+        "groupH": 138,
+        "headerH": 40,
+        "bodyH": 96,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "RECORDING",
+        "groupH": 324,
+        "headerH": 40,
+        "bodyH": 282,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "LIBRARY",
+        "groupH": 196,
+        "headerH": 40,
+        "bodyH": 154,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "PROFILE",
+        "groupH": 237,
+        "headerH": 40,
+        "bodyH": 195,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "DIAGNOSTICSLIVE",
+        "groupH": 165,
+        "headerH": 46,
+        "bodyH": 117,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "CALIBRATION",
+        "groupH": 118,
+        "headerH": 40,
+        "bodyH": 76,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "LEARN",
+        "groupH": 145,
+        "headerH": 40,
+        "bodyH": 95,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "MASCOT",
+        "groupH": 284,
+        "headerH": 40,
+        "bodyH": 230,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "PERFORMANCE",
+        "groupH": 120,
+        "headerH": 40,
+        "bodyH": 70,
+        "clipped": false,
+        "flex": "0 0 auto"
+      },
+      {
+        "header": "HELP",
+        "groupH": 382,
+        "headerH": 40,
+        "bodyH": 332,
+        "clipped": false,
+        "flex": "0 0 auto"
+      }
+    ],
+    "collapsedCount": 0
+  },
+  "logsTail": [
+    "[log] [vmx:ipc>] emit ipc.learn.progress_state (fire-and-forget) {\"payload\":{\"action\":\"snapshot\"}}",
+    "[log] [vmx:state] shell-app → mounted",
+    "[log] [vmx:click] settings drawer open",
+    "[log] [vmx:ipc>] request ipc.profile.view → expect ipc.profile.view_result {\"payload\":{}}",
+    "[log] [vmx:ipc>] request ipc.recordings.list → expect ipc.recordings.list_result {\"payload\":{}}",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at openSettingsState (http://127.0.0.1:1420/src/settings/state.ts:46:22)",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at setRecordingsSlice (http://127.0.0.1:1420/src/settings/state.ts:43:3)",
+    "[warning] [settings] ipc.recordings.list failed: Error: ipc invoke failed: Error: Tauri runtime unavailable\n    at http://127.0.0.1:1420/src/ipc/client.ts:47:16",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at setRecordingsSlice (http://127.0.0.1:1420/src/settings/state.ts:43:3)",
+    "[log] [vmx:click] settings drawer close",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at closeSettingsState (http://127.0.0.1:1420/src/settings/state.ts:50:5)",
+    "[log] [vmx:click] settings drawer open",
+    "[log] [vmx:ipc>] request ipc.profile.view → expect ipc.profile.view_result {\"payload\":{}}",
+    "[log] [vmx:ipc>] request ipc.recordings.list → expect ipc.recordings.list_result {\"payload\":{}}",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at openSettingsState (http://127.0.0.1:1420/src/settings/state.ts:46:22)",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at setRecordingsSlice (http://127.0.0.1:1420/src/settings/state.ts:43:3)",
+    "[warning] [settings] ipc.recordings.list failed: Error: ipc invoke failed: Error: Tauri runtime unavailable\n    at http://127.0.0.1:1420/src/ipc/client.ts:47:16",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at setRecordingsSlice (http://127.0.0.1:1420/src/settings/state.ts:43:3)",
+    "[log] [vmx:click] settings drawer close",
+    "[warning] [mascot-group] read_mascot_window_state invoke failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=6cfcaa63:109:37)\n    at http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:116:27\n    at buildMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:132:5)\n    at renderMascotGroup (http://127.0.0.1:1420/src/settings/components/mascot-group.ts?t=1780223334670:89:18)\n    at renderDrawerBody (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:941:15)\n    at Object.refresh (http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:540:7)\n    at http://127.0.0.1:1420/src/settings/SettingsDrawer.ts?t=1780223340480:549:52\n    at notify (http://127.0.0.1:1420/src/settings/state.ts:23:7)\n    at setSettingsUIState (http://127.0.0.1:1420/src/settings/state.ts:34:3)\n    at closeSettingsState (http://127.0.0.1:1420/src/settings/state.ts:50:5)"
+  ]
+}

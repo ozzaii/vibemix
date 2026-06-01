@@ -3100,11 +3100,11 @@ Remaining gate:
   they prove, then run the relevant UI build/test/screenshot proof before any
   shipped visual claim.
 
-## Hold Lane - Frontend Shell Settings Proof
+## Package 16 - Frontend Shell Settings Proof
 
-Suggested commit if/when selected: `fix(ui-shell): keep settings drawer navigation stable`
+Suggested commit: `fix(ui-shell): keep settings drawer navigation stable`
 
-Hold:
+Include:
 
 - `tauri/ui/src/settings/components/group.ts`
 - `tauri/ui/src/session/components/picker.ts`
@@ -3118,7 +3118,7 @@ Hold:
 - `docs/design/screenshots/2026-05-31-frontend-proof/shell-settings-open.png`
 - `docs/design/screenshots/2026-05-31-frontend-proof/shell-settings-proof.json`
 
-Reason:
+Packaging decision:
 
 - This is production shell/settings behavior and shell visual polish plus proof
   collateral. It should not be folded into the design-only Premium Enterprise
@@ -3126,14 +3126,33 @@ Reason:
   package deliberately proves both layers.
 - The code diff keeps settings navigation synchronized with drawer open/close
   state, stabilizes settings-group layout, changes session picker/rocker
-  styling, and changes shell chrome/sidebar CSS. That needs UI tests/build and a
-  screenshot proof before it is treated as shipped polish.
+  styling, and changes shell chrome/sidebar CSS. It does not touch speech,
+  runtime audio, IPC schema, or backend settings persistence.
+
+Current evidence, 2026-06-01:
+
+- `npm --prefix tauri/ui test -- tests/settings/drawer.spec.ts tests/session/components.spec.ts tests/session/router-teardown.spec.ts`
+  passed: 73 tests.
+- `npm --prefix tauri/ui test -- tests/session/integration.spec.ts tests/session/render-loop-actions.spec.ts tests/settings/drawer.spec.ts tests/session/components.spec.ts`
+  passed: 88 tests.
+- `npm --prefix tauri/ui run build` passed: TypeScript check plus Vite build.
+- `git diff --check -- tauri/ui/src/settings/components/group.ts tauri/ui/src/session/components/picker.ts tauri/ui/src/session/components/rocker.ts tauri/ui/src/shell/app.ts tauri/ui/src/shell/shell.css docs/design/screenshots/2026-05-31-frontend-proof`
+  passed.
+- Clean detached replay at `/tmp/vibemix-ui-shell-clean.vJdvjF` passed the same
+  88-test UI gate, the 73-test drawer/router/component gate, `npm --prefix
+  tauri/ui run build`, `git diff --check`, and
+  `uv run python scripts/check_dirty_package_plan.py --strict-assignments
+  --summary`.
+- Visual proof artifacts are kept with the slice under
+  `docs/design/screenshots/2026-05-31-frontend-proof/`. The current after-fix
+  screenshot is nonblank at 1440x900, the proof JSON records zero clipped
+  settings groups, and the settings-close/deck-nav actionability check closes
+  the drawer instead of trapping the shell.
 
 Remaining gate:
 
-- Run the focused settings/shell UI tests, `npm --prefix tauri/ui run build`,
-  and keep the screenshot/JSON proof with the same package if this lane is
-  promoted.
+- Packaged-app visual proof is still separate release evidence. This package
+  proves source UI behavior/build plus captured screenshot artifacts.
 
 ## Package 12 - Runtime Memory CLAP Readiness
 

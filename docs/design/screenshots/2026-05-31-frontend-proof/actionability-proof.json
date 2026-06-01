@@ -1,0 +1,85 @@
+{
+  "attempts": [
+    {
+      "name": "real click deck nav while settings drawer/backdrop is open",
+      "ok": false,
+      "error": "TimeoutError: locator.click: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.sb-nav-item[data-surface=\"deck\"]')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Deck\" class=\"sb-nav-item\" data-surface=\"deck\" aria-current=\"false\" title=\"Deck: the live co-host\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m",
+      "after": {
+        "activeSurface": "settings",
+        "drawerOpen": "true",
+        "backdropOpen": "true",
+        "topAtDeck": {
+          "tag": "DIV",
+          "cls": "vmx-settings-backdrop",
+          "wire": "settings.backdrop",
+          "surface": null
+        },
+        "firstPickerHit": {
+          "tag": "DIV",
+          "cls": "vmx-settings-drawer__body",
+          "wire": "settings.body",
+          "text": "PERSONACFGkore▾korepuckcharonfenriraoedeledaoruszephyrHYPECOACHLENSHYPECRITIQUET"
+        }
+      }
+    },
+    {
+      "name": "real click first voice picker row inside collapsed group",
+      "ok": true,
+      "after": {
+        "activeSurface": "settings",
+        "drawerOpen": "true",
+        "backdropOpen": "true",
+        "topAtDeck": {
+          "tag": "DIV",
+          "cls": "vmx-settings-backdrop",
+          "wire": "settings.backdrop",
+          "surface": null
+        },
+        "firstPickerHit": {
+          "tag": "SPAN",
+          "cls": "vmx-picker__label",
+          "wire": null,
+          "text": "kore"
+        }
+      }
+    },
+    {
+      "name": "real click drawer close button",
+      "ok": true,
+      "after": {
+        "activeSurface": "settings",
+        "drawerOpen": "false",
+        "backdropOpen": "false",
+        "topAtDeck": {
+          "tag": "SPAN",
+          "cls": "sb-label",
+          "wire": null,
+          "surface": null
+        },
+        "firstPickerHit": {
+          "tag": "DIV",
+          "cls": "vmx-settings-drawer__body",
+          "wire": "settings.body",
+          "text": "PERSONACFGkore▾korepuckcharonfenriraoedeledaoruszephyrHYPECOACHLENSHYPECRITIQUET"
+        }
+      }
+    }
+  ],
+  "initial": {
+    "activeSurface": "settings",
+    "drawerOpen": "true",
+    "backdropOpen": "true",
+    "topAtDeck": {
+      "tag": "DIV",
+      "cls": "vmx-settings-backdrop",
+      "wire": "settings.backdrop",
+      "surface": null
+    },
+    "firstPickerHit": {
+      "tag": "DIV",
+      "cls": "vmx-settings-drawer__body",
+      "wire": "settings.body",
+      "text": "PERSONACFGkore▾korepuckcharonfenriraoedeledaoruszephyrHYPECOACHLENSHYPECRITIQUET"
+    }
+  }
+}

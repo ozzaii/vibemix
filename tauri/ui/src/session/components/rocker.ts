@@ -38,14 +38,17 @@ const CSS = `
     display: inline-flex;
     align-items: stretch;
     gap: 0;
-    background: var(--glass-3);
-    border: 1px solid var(--glass-edge);
+    background:
+      linear-gradient(180deg, rgba(255, 222, 242, 0.018), transparent 60%),
+      var(--glass-3);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--rad-sm);
     padding: 3px;
     box-shadow:
       inset 0 2px 5px rgba(0, 0, 0, 0.85),
       inset 0 0 0 1px rgba(0, 0, 0, 0.5),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.028);
+      inset 0 -1px 0 rgba(255, 255, 255, 0.028),
+      0 1px 0 rgba(255, 255, 255, 0.016);
     height: 34px;
     width: 100%;
   }
@@ -79,7 +82,9 @@ const CSS = `
   .vmx-rocker__seg:hover,
   .vmx-rocker__seg:focus-visible {
     color: var(--silk);
-    box-shadow: var(--glow-faint);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.040),
+      var(--glow-faint);
   }
   /* The body-level *:focus-visible already paints a 2px amber outline +
    * --glow-soft so we explicitly suppress the duplicate ring on the
@@ -88,24 +93,24 @@ const CSS = `
   /* --- rocker variant: pressed amber tile when active (used for BEG/INT/PRO etc.) --- */
   .vmx-rocker[data-variant="rocker"] .vmx-rocker__seg[data-active="true"] {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.095) 0%, rgba(255, 165, 223, 0.026) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.080) 0%, rgba(255, 165, 223, 0.024) 100%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 rgba(255, 165, 223, 0.30),
-      inset 0 0 9px var(--amber-22),
+      inset 0 0 8px var(--amber-22),
       0 0 0 1px rgba(255, 165, 223, 0.13);
-    text-shadow: 0 0 3px var(--amber-40);
+    text-shadow: 0 0 2px var(--amber-40);
   }
   /* --- interaction variant: same hardware state, not a second palette. --- */
   .vmx-rocker[data-variant="interaction"] .vmx-rocker__seg[data-active="true"] {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.085) 0%, rgba(255, 165, 223, 0.022) 100%);
+    background: linear-gradient(180deg, rgba(255, 165, 223, 0.074) 0%, rgba(255, 165, 223, 0.020) 100%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.055),
       inset 0 -1px 0 rgba(255, 165, 223, 0.28),
-      inset 0 0 8px var(--amber-22),
+      inset 0 0 7px var(--amber-22),
       0 0 0 1px rgba(255, 165, 223, 0.12);
-    text-shadow: 0 0 3px var(--amber-40);
+    text-shadow: 0 0 2px var(--amber-40);
   }
   /* Legacy LED prefix kept rendering for backward-compat with the
    * existing renderRocker(variant="interaction") signature, but visually

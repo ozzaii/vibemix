@@ -34,18 +34,19 @@ const CSS = `
    * body and footer — no monotone padding. Material reads via tokens only. */
   .vmx-settings-group {
     position: relative;
-    margin: 14px 0;
-    border-radius: var(--rad-md);
-    border: 1px solid var(--border-default);
+    flex: 0 0 auto;
+    margin: 10px 0;
+    border-radius: var(--rad-sm);
+    border: 1px solid var(--border-subtle);
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.022) 0%, transparent 14%, transparent 100%),
-      linear-gradient(180deg, var(--void-10) 0%, var(--void-5) 100%);
+      linear-gradient(180deg, rgba(255, 222, 242, 0.018) 0%, transparent 16%, transparent 100%),
+      linear-gradient(180deg, var(--void-8) 0%, var(--void-4) 100%);
     box-shadow:
       inset 0 1px 0 var(--glass-top),
       inset 0 0 0 1px rgba(255, 255, 255, 0.014),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.48),
       0 1px 0 rgba(255, 255, 255, 0.025),
-      0 8px 22px rgba(0, 0, 0, 0.34);
+      0 6px 18px rgba(0, 0, 0, 0.26);
     overflow: hidden;
   }
   /* The leading rose seam — a vertical brand light down the left edge, the same
@@ -66,13 +67,16 @@ const CSS = `
   .vmx-settings-group:first-child {
     margin-top: 0;
   }
+  .vmx-settings-group:last-child {
+    margin-bottom: 0;
+  }
   .vmx-settings-group__header {
     position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    padding: 16px var(--sp-4) 13px var(--sp-5);
+    padding: 13px var(--sp-4) 11px 18px;
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 11px;
@@ -82,9 +86,9 @@ const CSS = `
     line-height: 1;
     text-shadow: var(--text-emboss);
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.020) 0%, transparent 60%),
-      rgba(0, 0, 0, 0.18);
-    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.40);
+      linear-gradient(180deg, rgba(255, 222, 242, 0.016) 0%, transparent 62%),
+      rgba(0, 0, 0, 0.13);
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.34);
   }
   /* Brand tick before the label — the section's heartbeat dot, same vocabulary
    * as the grounding panel-section-label (mock §1084-1095). */
@@ -107,7 +111,7 @@ const CSS = `
   .vmx-settings-group__header::after {
     content: "";
     position: absolute;
-    left: var(--sp-5);
+    left: 18px;
     right: var(--sp-4);
     bottom: 0;
     height: 1px;
@@ -133,12 +137,12 @@ const CSS = `
   /* Milled inset floor — the controls sit DOWN inside the recessed module.
    * Taller top breathing room than the tight bottom seat = internal rhythm. */
   .vmx-settings-group__body {
-    padding: 20px var(--sp-5) 22px;
+    padding: 16px 18px 18px;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, transparent 30%);
-    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.28);
+    gap: 12px;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0%, transparent 32%);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.22);
   }
   /* Mono numerics inside any group read in warm ink, tabular — the hardware
    * readout vocabulary (gold stays quarantined to Camelot/heat/energy). */

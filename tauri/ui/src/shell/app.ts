@@ -29,6 +29,7 @@ import { extractSurfaceMarkup } from "./scaffolds.js";
 import { wireActivation } from "./activation-bridge.js";
 import { routeSession } from "../session/router.js";
 import { closeSettings, openSettings } from "../settings/SettingsDrawer.js";
+import { getSettingsUIState, subscribeSettingsUI } from "../settings/state.js";
 
 export interface MountedShellApp {
   readonly shell: MountedShell;
@@ -90,15 +91,35 @@ const appDeps: SurfaceMountDeps = {
  */
 function wireSettingsNav(shell: MountedShell): () => void {
   let prev = shell.store.getState().activeSurface;
-  return shell.store.subscribe((model) => {
+  let lastNonSettings = prev === "settings" ? "deck" : prev;
+
+  if (prev === "settings") {
+    openSettings();
+  }
+
+  const unstore = shell.store.subscribe((model) => {
+    if (model.activeSurface !== "settings") {
+      lastNonSettings = model.activeSurface;
+    }
     if (model.activeSurface === prev) return;
     if (model.activeSurface === "settings") {
       openSettings();
-    } else if (prev === "settings") {
+    } else if (prev === "settings" && getSettingsUIState().open) {
       closeSettings();
     }
     prev = model.activeSurface;
   });
+
+  const unsettings = subscribeSettingsUI((ui) => {
+    if (!ui.open && shell.store.getState().activeSurface === "settings") {
+      shell.store.setActiveSurface(lastNonSettings);
+    }
+  });
+
+  return () => {
+    unstore();
+    unsettings();
+  };
 }
 
 export async function mountShellApp(host: HTMLElement): Promise<MountedShellApp> {
