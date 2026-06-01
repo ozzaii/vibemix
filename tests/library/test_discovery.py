@@ -21,7 +21,6 @@ from vibemix.library.discovery import (
 )
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
 
-
 # --------------------------------------------------------------------------- #
 # Fixtures — mirror tests/library/test_next_suggestion.py's fake pattern.
 # --------------------------------------------------------------------------- #

@@ -969,6 +969,33 @@ Proof before staging:
 - `git diff --check -- tests/library/test_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AJ - Library Discovery Test Ruff Hygiene
+
+Suggested commit: `test(library): clean discovery test lint`
+
+Include:
+
+- `tests/library/test_discovery.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Discovery implementation, library stores, Viber/cohost paths, runtime files,
+  and generated files.
+
+Reason:
+
+- The discovery test import block had an extra separator blank before the local
+  section comment. Removing it keeps the focused ruff gate clean without
+  changing discovery assertions.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_discovery.py`
+- `uv run pytest -q tests/library/test_discovery.py`
+- `git diff --check -- tests/library/test_discovery.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Cohost Reaction Schema Drift
 
 Suggested commit if/when selected: `fix(ui-bus): reconcile cohost reaction schema`
