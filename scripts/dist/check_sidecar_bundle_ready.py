@@ -18,6 +18,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BINARIES_REL = Path("tauri/src-tauri/binaries")
+IPC_SCHEMA_REL = Path("tauri/ui/src/ipc/messages.schema.json")
 DEFAULT_MIN_BYTES = 4096
 
 
@@ -65,6 +66,14 @@ def expected_binary(root: Path, triple: str) -> Path:
         / f"vibemix-core-{triple}"
         / f"vibemix-core-{triple}{suffix}"
     )
+
+
+def _bundled_ipc_schema(bundle_dir: Path) -> Path:
+    return bundle_dir / "_internal" / IPC_SCHEMA_REL
+
+
+def _source_ipc_schema(root: Path) -> Path:
+    return root / IPC_SCHEMA_REL
 
 
 def check_sidecar_bundle_ready(
@@ -124,6 +133,22 @@ def check_sidecar_bundle_ready(
             f"PyInstaller _internal directory missing next to {binary}. Run `{build_cmd}`.",
             binary,
         )
+
+    source_schema = _source_ipc_schema(root)
+    if source_schema.is_file():
+        bundled_schema = _bundled_ipc_schema(bundle_dir)
+        if not bundled_schema.is_file():
+            return SidecarBundleStatus(
+                False,
+                f"bundled IPC schema missing: {bundled_schema}. Run `{build_cmd}`.",
+                binary,
+            )
+        if bundled_schema.read_bytes() != source_schema.read_bytes():
+            return SidecarBundleStatus(
+                False,
+                f"bundled IPC schema is stale: {bundled_schema}. Run `{build_cmd}`.",
+                binary,
+            )
 
     return SidecarBundleStatus(True, f"sidecar bundle ready: {binary}", binary)
 
