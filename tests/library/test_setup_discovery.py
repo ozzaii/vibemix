@@ -32,6 +32,21 @@ def test_setup_discovery_finds_standard_traktor_nml(tmp_path: Path) -> None:
     assert "library ingest --source traktor" in traktor[0].command
 
 
+def test_setup_discovery_finds_standard_virtualdj_database(tmp_path: Path) -> None:
+    database = tmp_path / "Documents" / "VirtualDJ" / "database.xml"
+    database.parent.mkdir(parents=True)
+    database.write_text("<VirtualDJ_Database />", encoding="utf-8")
+
+    candidates = discover_library_setup_candidates(home=tmp_path)
+
+    virtualdj = [
+        candidate for candidate in candidates if candidate.kind == "virtualdj_database"
+    ]
+    assert virtualdj
+    assert virtualdj[0].path == str(database)
+    assert "library ingest --source virtualdj" in virtualdj[0].command
+
+
 def test_setup_discovery_finds_bounded_music_folder_candidate(tmp_path: Path) -> None:
     crate = tmp_path / "Music" / "PSYMIND"
     crate.mkdir(parents=True)

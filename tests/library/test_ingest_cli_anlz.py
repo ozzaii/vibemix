@@ -39,10 +39,14 @@ class _FakeSource:
         self,
         xml_path: str | None = None,
         nml_path: str | None = None,
+        database_path: str | None = None,
     ) -> None:
         self.xml_path = xml_path
         self.nml_path = nml_path
-        self.resolved_path = Path(xml_path or nml_path or "/fixture/collection.xml")
+        self.database_path = database_path
+        self.resolved_path = Path(
+            xml_path or nml_path or database_path or "/fixture/collection.xml"
+        )
 
     def detect(self) -> bool:
         return True
@@ -56,6 +60,13 @@ class _FakeTraktorSource(_FakeSource):
 
     def default_paths(self) -> list[Path]:
         return [Path("/fixture/collection.nml")]
+
+
+class _FakeVirtualDJSource(_FakeSource):
+    name = "virtualdj"
+
+    def default_paths(self) -> list[Path]:
+        return [Path("/fixture/database.xml")]
 
 
 class _FakeStore:
@@ -75,10 +86,12 @@ def _patch_ingest_dependencies(monkeypatch, *, anlz_builder, captured):
     import vibemix.library.ingest as ingest_mod
     import vibemix.library.sources.rekordbox as source_mod
     import vibemix.library.sources.traktor as traktor_source_mod
+    import vibemix.library.sources.virtualdj as virtualdj_source_mod
     import vibemix.library.store as store_mod
 
     monkeypatch.setattr(source_mod, "RekordboxSource", _FakeSource)
     monkeypatch.setattr(traktor_source_mod, "TraktorSource", _FakeTraktorSource)
+    monkeypatch.setattr(virtualdj_source_mod, "VirtualDJSource", _FakeVirtualDJSource)
     monkeypatch.setattr(clap_mod, "ClapEngine", _FakeClapEngine)
     monkeypatch.setattr(store_mod, "open_store", lambda: _FakeStore())
     monkeypatch.setattr(anlz_mod, "build_anlz_index", anlz_builder)
@@ -188,3 +201,33 @@ def test_library_ingest_cli_can_select_traktor_source(monkeypatch, capsys) -> No
     assert json.loads(out.out)["embedded"] == 1
     assert "source=traktor" in out.err
     assert "ANLZ structure index skipped for source=traktor" in out.err
+
+
+def test_library_ingest_cli_can_select_virtualdj_source(monkeypatch, capsys) -> None:
+    import vibemix.__main__ as main_mod
+
+    captured = {}
+    _patch_ingest_dependencies(
+        monkeypatch,
+        anlz_builder=lambda: SimpleNamespace(by_basename={"should-not": (object(),)}),
+        captured=captured,
+    )
+
+    code = main_mod._cmd_library_ingest(
+        argparse.Namespace(
+            path="database.xml",
+            source="virtualdj",
+            json=True,
+            calibrate_cues=False,
+        )
+    )
+
+    assert code == 0
+    assert isinstance(captured["source"], _FakeVirtualDJSource)
+    assert captured["source"].database_path == "database.xml"
+    assert captured["kwargs"]["anlz_index"] is None
+
+    out = capsys.readouterr()
+    assert json.loads(out.out)["embedded"] == 1
+    assert "source=virtualdj" in out.err
+    assert "ANLZ structure index skipped for source=virtualdj" in out.err

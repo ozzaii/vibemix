@@ -2502,6 +2502,47 @@ Remaining gate:
 - CLI/setup discovery for VirtualDJ is a separate follow-up package. This
   package proves parser correctness and the shared LibrarySource contract only.
 
+## Package 5Q - VirtualDJ Ingest CLI and Setup Discovery
+
+Suggested commit: `feat(library): wire virtualdj ingest setup path`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `src/vibemix/library/setup_discovery.py`
+- `tests/library/test_setup_discovery.py`
+- `tests/library/test_ingest_cli_anlz.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Live co-host speech, prompts, EventDetector timing, or DROP-call paths.
+- Automatic ingest/re-embed from discovery candidates.
+- Settings UI redesign; the existing Library setup surfaces consume candidates.
+- Serato/Engine/Rekordbox `master.db` readers.
+
+Reason:
+
+- Package 5P made VirtualDJ `database.xml` parseable, but discovery must not
+  surface a fake command. This slice makes
+  `library ingest --source virtualdj <database.xml>` real, then lets Viber and
+  `library doctor` recommend that exact command when a standard VirtualDJ
+  database exists.
+- Rekordbox ANLZ enrichment remains Rekordbox-only and is skipped explicitly
+  for VirtualDJ so the command is honest about what metadata it can add.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_setup_discovery.py tests/library/test_ingest_cli_anlz.py tests/library/test_sources_virtualdj.py`
+- `uv run ruff check src/vibemix/__main__.py src/vibemix/library/setup_discovery.py tests/library/test_setup_discovery.py tests/library/test_ingest_cli_anlz.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/__main__.py src/vibemix/library/setup_discovery.py tests/library/test_setup_discovery.py tests/library/test_ingest_cli_anlz.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- GUI one-click source selection remains a follow-up. This package gives the
+  CLI and Viber setup candidate a truthful, runnable VirtualDJ import path.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`

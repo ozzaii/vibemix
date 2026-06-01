@@ -4,8 +4,8 @@
 Fresh installs often have no ``library.pkl`` yet, so Viber cannot ground deck
 identity or set-prep. This module provides a bounded, content-light discovery
 pass: standard Rekordbox XML export locations, standard Traktor NML locations,
-plus shallow music-folder candidates. It never reads Rekordbox's live database
-and never auto-ingests.
+standard VirtualDJ database locations, plus shallow music-folder candidates. It
+never reads Rekordbox's live database and never auto-ingests.
 """
 
 from __future__ import annotations
@@ -16,8 +16,9 @@ from typing import Literal
 
 from vibemix.library.sources.rekordbox import RekordboxSource
 from vibemix.library.sources.traktor import TraktorSource
+from vibemix.library.sources.virtualdj import VirtualDJSource
 
-CandidateKind = Literal["rekordbox_xml", "traktor_nml", "music_folder"]
+CandidateKind = Literal["rekordbox_xml", "traktor_nml", "virtualdj_database", "music_folder"]
 SUPPORTED_AUDIO_SUFFIXES = (".mp3", ".m4a", ".wav", ".flac", ".aac")
 
 
@@ -121,6 +122,22 @@ def discover_library_setup_candidates(
                         confidence="high",
                         reason="standard Traktor collection.nml path exists",
                         command=f"uv run python -m vibemix library ingest --source traktor {path}",
+                    )
+                )
+        except OSError:
+            continue
+
+    for database in VirtualDJSource().default_paths():
+        path = _path_at_home(database, base if home else None)
+        try:
+            if path.is_file():
+                candidates.append(
+                    LibrarySetupCandidate(
+                        kind="virtualdj_database",
+                        path=str(path),
+                        confidence="high",
+                        reason="standard VirtualDJ database.xml path exists",
+                        command=f"uv run python -m vibemix library ingest --source virtualdj {path}",
                     )
                 )
         except OSError:

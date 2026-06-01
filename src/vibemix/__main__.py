@@ -3379,12 +3379,12 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         "ingest",
         help="Auto-detect your DJ library and embed it on-device (CLAP)",
         description=(
-            "Detect a Rekordbox collection.xml or Traktor collection.nml at its "
-            "standard export location (or pass an explicit path), parse each "
-            "track, embed it ON-DEVICE via CLAP (512-dim, keyless — no Gemini, "
-            "no API cost, audio never leaves the machine), and store the "
-            "vectors so search/similar resolve your own crate. Resumable + "
-            "partial-failure-tolerant."
+            "Detect a Rekordbox collection.xml, Traktor collection.nml, or "
+            "VirtualDJ database.xml at its standard export location (or pass "
+            "an explicit path), parse each track, embed it ON-DEVICE via CLAP "
+            "(512-dim, keyless — no Gemini, no API cost, audio never leaves "
+            "the machine), and store the vectors so search/similar resolve "
+            "your own crate. Resumable + partial-failure-tolerant."
         ),
     )
     sp_ingest.add_argument(
@@ -3392,13 +3392,14 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         nargs="?",
         default=None,
         help=(
-            "explicit path to a Rekordbox collection.xml or Traktor collection.nml "
-            "(omit to auto-detect the selected source's standard export location)"
+            "explicit path to a Rekordbox collection.xml, Traktor collection.nml, "
+            "or VirtualDJ database.xml (omit to auto-detect the selected source's "
+            "standard export location)"
         ),
     )
     sp_ingest.add_argument(
         "--source",
-        choices=("rekordbox", "traktor"),
+        choices=("rekordbox", "traktor", "virtualdj"),
         default="rekordbox",
         help="DJ library source to parse (default: rekordbox)",
     )
@@ -7002,6 +7003,7 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
     from vibemix.library.rekordbox import RekordboxLibrary
     from vibemix.library.sources.rekordbox import RekordboxSource
     from vibemix.library.sources.traktor import TraktorSource
+    from vibemix.library.sources.virtualdj import VirtualDJSource
     from vibemix.library.store import open_store
 
     explicit = getattr(args, "path", None)
@@ -7013,6 +7015,14 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
             "one from Traktor, then re-run "
             "`vibemix library ingest --source traktor <path>` (or place it at "
             "a standard location)."
+        )
+    elif source_name == "virtualdj":
+        source = VirtualDJSource(database_path=explicit) if explicit else VirtualDJSource()
+        missing_msg = (
+            "[FATAL] library ingest: no VirtualDJ database.xml found. Point "
+            "vibemix at your VirtualDJ database.xml, then re-run "
+            "`vibemix library ingest --source virtualdj <path>` (or place it "
+            "at a standard location)."
         )
     else:
         source = RekordboxSource(xml_path=explicit) if explicit else RekordboxSource()
