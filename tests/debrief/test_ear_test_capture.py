@@ -14,14 +14,13 @@ from pathlib import Path
 import pytest
 
 from vibemix.debrief.ear_test_capture import (
-    EarTestPayload,
-    EarTestValidationError,
     SCHEMA_PATH,
     SLOP_FLAG_KEYS,
+    EarTestPayload,
+    EarTestValidationError,
     validate_payload,
     write_ear_test_log,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

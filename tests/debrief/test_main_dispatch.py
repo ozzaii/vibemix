@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 import wave
 from pathlib import Path
 from types import SimpleNamespace
@@ -103,9 +102,9 @@ def test_run_first_time_generation_calls_gemini(tmp_path: Path, monkeypatch):
             drills=[
                 Drill(
                     situation=f"S{i}",
-                    behavior=f"B [ev:MIX_MOVE@05:00]",
-                    impact=f"I [ev:TRACK_CHANGE@01:40]",
-                    action_recommended=f"A [ev:HEARTBEAT@10:00]",
+                    behavior="B [ev:MIX_MOVE@05:00]",
+                    impact="I [ev:TRACK_CHANGE@01:40]",
+                    action_recommended="A [ev:HEARTBEAT@10:00]",
                     citation="[ev:MIX_MOVE@05:00]",
                 )
                 for i in range(3)

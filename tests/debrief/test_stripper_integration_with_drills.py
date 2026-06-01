@@ -20,7 +20,6 @@ from vibemix.debrief.drills import (
     generate_drills,
 )
 
-
 SNAPSHOT = {
     "ev": {"MIX_MOVE": [83.0], "PHASE": [120.0]},
     "track": {"t1": [60.0]},

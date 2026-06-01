@@ -135,7 +135,6 @@ def test_e2e_with_zero_cited_events_raises_typed_error(tmp_path: Path):
     """When the evidence_registry is empty + Gemini returns all-uncited TLDR
     text, the orchestrator surfaces a typed error and does not write a
     partial debrief."""
-    from vibemix.debrief.tldr import DebriefGenerationError
 
     root = tmp_path / "recordings"
     root.mkdir()
