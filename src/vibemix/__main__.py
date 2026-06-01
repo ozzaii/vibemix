@@ -604,6 +604,7 @@ def _input_callback_factory(
     recorder: VoiceRecorder,
     deck_audio_capture: DeckAudioCapture | None = None,
     audio_capture_context: dict[str, object] | None = None,
+    controller_state: Any | None = None,
     source_sr: int = INPUT_SR_NATIVE,
 ):
     """Verbatim port of cohost_v4.py:912-945 input stream callback.
@@ -615,7 +616,25 @@ def _input_callback_factory(
         if status:
             print(f"[input status] {status}", file=sys.stderr)
         if deck_audio_capture is not None:
-            captured = deck_audio_capture.process(indata, source_sr=source_sr)
+            controller_snapshot = None
+            controller_touched = None
+            if controller_state is not None:
+                try:
+                    controller_snapshot = controller_state.deck_snapshot()
+                except Exception:
+                    controller_snapshot = None
+                try:
+                    touched_snapshot = getattr(controller_state, "control_touched_snapshot", None)
+                    if callable(touched_snapshot):
+                        controller_touched = touched_snapshot()
+                except Exception:
+                    controller_touched = None
+            captured = deck_audio_capture.process(
+                indata,
+                source_sr=source_sr,
+                controller_snapshot=controller_snapshot,
+                controller_touched=controller_touched,
+            )
             passthrough_audio = captured.passthrough_stereo
             music48 = captured.master_mono
             if audio_capture_context is not None:
@@ -2664,6 +2683,7 @@ async def main() -> None:
                     recorder,
                     deck_audio_capture,
                     audio_capture_context,
+                    midi_macos.controller_state,
                     source_sr=capture_native_sr,
                 ),
             )

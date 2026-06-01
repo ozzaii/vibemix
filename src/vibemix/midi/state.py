@@ -166,6 +166,8 @@ class ControllerState:
             for d in profile.decks
         }
         self.xfader = 64
+        self._touched_fields: dict[str, set[str]] = {d: set() for d in profile.decks}
+        self._touched_master_fields: set[str] = set()
         self._moves: list[tuple[float, str]] = []
         self._events: list[MidiEvent] = []
         self._next_event_id = 0
@@ -212,6 +214,9 @@ class ControllerState:
             self._connected = False
             self._moves.clear()
             self._events.clear()
+            for fields in self._touched_fields.values():
+                fields.clear()
+            self._touched_master_fields.clear()
 
     def is_connected(self) -> bool:
         with self._lock:
@@ -319,6 +324,7 @@ class ControllerState:
                     if field == "xfader":
                         prev = self.xfader
                         self.xfader = v
+                        self._touched_master_fields.add("xfader")
                         if _xfader_label(prev) != _xfader_label(v):
                             self._record_move(f"xfader→{_xfader_label(v)}", now)
                         mag = self._compute_magnitude(binding.axis, prev, v)
@@ -336,6 +342,7 @@ class ControllerState:
                             self.deck[deck][field] = 0
                         else:
                             self.deck[deck][field] = v
+                        self._touched_fields.setdefault(deck, set()).add(field)
                         abs_d = abs(v - prev)
                         mag_label = "small" if abs_d < 15 else ("medium" if abs_d < 40 else "big")
                         if field == "jog" and binding.axis == "relative" and v != 64:
@@ -424,6 +431,20 @@ class ControllerState:
             snap["xfader"] = self.xfader
             snap["connected"] = self._connected
             return snap
+
+    def control_touched_snapshot(self) -> dict[str, object]:
+        """Return which stable controller controls have emitted real MIDI this run.
+
+        Physical MIDI surfaces often do not publish absolute fader/knob positions
+        at launch. Consumers that need to apply mixer posture to audio can treat
+        untouched controls as unknown instead of trusting boot defaults.
+        """
+        with self._lock:
+            out: dict[str, object] = {
+                d: tuple(sorted(self._touched_fields.get(d, set()))) for d in self.deck
+            }
+            out["master"] = tuple(sorted(self._touched_master_fields))
+            return out
 
     def moves_since(self, t: float) -> list[tuple[float, str]]:
         """Returns ``[(seconds_ago_rounded_to_0.1, label), ...]`` — note the

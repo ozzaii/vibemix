@@ -102,6 +102,19 @@ def test_controller_state_decks_match_profile():
     assert set(snap4.keys()) == {"A", "B", "C", "D", "xfader", "connected"}
 
 
+def test_control_touched_snapshot_tracks_real_absolute_controls_only():
+    cs = ControllerState(profile=_flx4())
+    assert cs.control_touched_snapshot() == {"A": (), "B": (), "master": ()}
+
+    cs.handle_msg(_cc(0, 19, 127))  # A channel volume
+    cs.handle_msg(_cc(6, 31, 0))  # crossfader
+
+    touched = cs.control_touched_snapshot()
+    assert touched["A"] == ("vol",)
+    assert touched["B"] == ()
+    assert touched["master"] == ("xfader",)
+
+
 # ---------- Magnitude-aware MidiEvent emission ----------
 
 

@@ -34,6 +34,7 @@ def test_deck_audio_routing_enables_zero_based_deck_pairs(monkeypatch) -> None:
 
     assert routing.opened_channels == 4
     assert routing.master_channels == (0, 1, 2, 3)
+    assert routing.master_source == "controller_weighted_deck_pairs"
     assert routing.deck_channels == {"A": (0, 1), "B": (2, 3)}
     assert routing.enabled is True
     assert routing.reason == "configured"
@@ -491,6 +492,128 @@ def test_deck_audio_capture_downmixes_master_and_pushes_deck_rings(monkeypatch) 
     context = capture.context()
     assert context["deck_audio_deltas"]["A"][0] == "rms_rose_100pct_strong"
     assert context["deck_audio_deltas"]["B"][0] == "rms_fell_50pct_strong"
+
+
+def test_deck_audio_capture_weights_deck_pairs_from_controller_posture(monkeypatch) -> None:
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "A=0,1;B=2,3")
+    routing = deck_audio_routing_from_env(input_channels=4)
+    capture = DeckAudioCapture(routing, seconds=1.0)
+    indata = np.zeros((480, 4), dtype=np.float32)
+    indata[:, 0] = 0.2
+    indata[:, 1] = 0.2
+    indata[:, 2] = 0.6
+    indata[:, 3] = 0.6
+    deck_a = {"vol": 127, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    deck_b = {"vol": 127, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+
+    full_a = capture.process(
+        indata,
+        source_sr=48000,
+        controller_snapshot={"connected": True, "xfader": 0, "A": deck_a, "B": deck_b},
+    )
+    full_b = capture.process(
+        indata,
+        source_sr=48000,
+        controller_snapshot={"connected": True, "xfader": 127, "A": deck_a, "B": deck_b},
+    )
+    b_fader_down = capture.process(
+        indata,
+        source_sr=48000,
+        controller_snapshot={
+            "connected": True,
+            "xfader": 127,
+            "A": deck_a,
+            "B": {**deck_b, "vol": 0},
+        },
+    )
+
+    assert np.allclose(full_a.master_mono, 0.2)
+    assert np.allclose(full_b.master_mono, 0.6)
+    assert np.allclose(b_fader_down.master_mono, 0.0)
+
+
+def test_deck_audio_capture_ignores_unknown_boot_default_fader_positions(monkeypatch) -> None:
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "A=0,1;B=2,3")
+    routing = deck_audio_routing_from_env(input_channels=4)
+    capture = DeckAudioCapture(routing, seconds=1.0)
+    indata = np.zeros((480, 4), dtype=np.float32)
+    indata[:, 0] = 0.2
+    indata[:, 1] = 0.2
+    indata[:, 2] = 0.6
+    indata[:, 3] = 0.6
+    boot_default_deck = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+
+    untouched = capture.process(
+        indata,
+        source_sr=48000,
+        controller_snapshot={
+            "connected": True,
+            "xfader": 64,
+            "A": boot_default_deck,
+            "B": boot_default_deck,
+        },
+        controller_touched={"A": (), "B": (), "master": ()},
+    )
+    xfader_moved = capture.process(
+        indata,
+        source_sr=48000,
+        controller_snapshot={
+            "connected": True,
+            "xfader": 127,
+            "A": boot_default_deck,
+            "B": boot_default_deck,
+        },
+        controller_touched={"A": (), "B": (), "master": ("xfader",)},
+    )
+    b_fader_moved_down = capture.process(
+        indata,
+        source_sr=48000,
+        controller_snapshot={
+            "connected": True,
+            "xfader": 127,
+            "A": boot_default_deck,
+            "B": boot_default_deck,
+        },
+        controller_touched={"A": (), "B": ("vol",), "master": ("xfader",)},
+    )
+
+    assert np.allclose(untouched.master_mono, 0.4)
+    assert np.allclose(xfader_moved.master_mono, 0.6)
+    assert np.allclose(b_fader_moved_down.master_mono, 0.0)
+
+
+def test_deck_audio_capture_controller_filter_attenuates_synthesized_master(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "A=0,1;B=2,3")
+    routing = deck_audio_routing_from_env(input_channels=4)
+    capture = DeckAudioCapture(routing, seconds=1.0)
+    indata = np.full((480, 4), 0.5, dtype=np.float32)
+    flat_deck = {"vol": 127, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    closed_filter_deck = {**flat_deck, "filter": 0}
+
+    flat = capture.process(
+        indata,
+        source_sr=48000,
+        controller_snapshot={
+            "connected": True,
+            "xfader": 0,
+            "A": flat_deck,
+            "B": flat_deck,
+        },
+    )
+    filtered = capture.process(
+        indata,
+        source_sr=48000,
+        controller_snapshot={
+            "connected": True,
+            "xfader": 0,
+            "A": closed_filter_deck,
+            "B": flat_deck,
+        },
+    )
+
+    assert np.mean(np.abs(filtered.master_mono)) < np.mean(np.abs(flat.master_mono))
 
 
 def test_deck_audio_capture_context_includes_pre_current_windows(monkeypatch) -> None:

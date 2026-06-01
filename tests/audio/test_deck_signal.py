@@ -28,6 +28,7 @@ def _auto_routing():
         enabled=True,
         source="rekordbox_settings",
         reason="rekordbox_settings_auto",
+        master_source="controller_weighted_deck_pairs",
     )
 
 

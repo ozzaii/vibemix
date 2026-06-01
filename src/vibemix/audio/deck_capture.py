@@ -46,6 +46,7 @@ class DeckAudioRouting:
     reason: str = "disabled"
     source: str = "env"
     hint: dict[str, object] | None = None
+    master_source: str = "capture_channels"
 
     def context(self) -> dict[str, object]:
         context: dict[str, object] = {
@@ -59,6 +60,7 @@ class DeckAudioRouting:
             "deck_audio_capture_reason": self.reason,
             "deck_audio_required_opened_channels": self.required_opened_channels,
             "deck_audio_routing_source": self.source,
+            "deck_audio_master_source": self.master_source,
         }
         if self.hint:
             hint = _routing_hint_context(self.hint)
@@ -95,7 +97,14 @@ class DeckAudioCapture:
         self.last_features: dict[str, dict[str, object]] = {}
         self.last_deltas: dict[str, list[str]] = {}
 
-    def process(self, indata: np.ndarray, *, source_sr: int) -> DeckAudioFrame:
+    def process(
+        self,
+        indata: np.ndarray,
+        *,
+        source_sr: int,
+        controller_snapshot: dict[str, object] | None = None,
+        controller_touched: dict[str, object] | None = None,
+    ) -> DeckAudioFrame:
         """Return master/passthrough audio and update deck rings.
 
         ``indata`` is float32 ``(frames, channels)`` from PortAudio. The master
@@ -107,11 +116,20 @@ class DeckAudioCapture:
             empty = np.zeros(0, dtype=np.float32)
             return DeckAudioFrame(empty, np.zeros((0, 2), dtype=np.float32), {}, {}, {})
 
-        master_channels = _valid_channels(self.routing.master_channels, indata.shape[1])
-        if not master_channels:
-            master_channels = tuple(range(indata.shape[1]))
-        master_view = indata[:, master_channels]
-        master_mono = master_view.mean(axis=1).astype(np.float32)
+        master_mono = None
+        if self.routing.master_source == "controller_weighted_deck_pairs":
+            master_mono = _controller_weighted_master(
+                indata,
+                self.routing.deck_channels,
+                controller_snapshot,
+                controller_touched,
+            )
+        if master_mono is None:
+            master_channels = _valid_channels(self.routing.master_channels, indata.shape[1])
+            if not master_channels:
+                master_channels = tuple(range(indata.shape[1]))
+            master_view = indata[:, master_channels]
+            master_mono = master_view.mean(axis=1).astype(np.float32)
         passthrough = np.repeat(master_mono[:, None], 2, axis=1).astype(np.float32)
 
         deck_rms: dict[str, float] = {}
@@ -418,13 +436,16 @@ def deck_audio_routing_from_env(
     requested_opened = max(1, min(requested_opened, _MAX_CAPTURE_CHANNELS))
 
     master_channels = _parse_channel_list(os.environ.get("VIBEMIX_MASTER_AUDIO_CHANNELS"))
+    master_source = "env" if master_channels else "capture_channels"
     if not master_channels:
         if deck_channels:
             master_channels = tuple(
                 sorted({ch for channels in deck_channels.values() for ch in channels})
             )
+            master_source = "controller_weighted_deck_pairs"
         else:
             master_channels = tuple(range(min(2, requested_opened)))
+            master_source = "capture_channels"
 
     valid_decks = {
         side: channels
@@ -452,7 +473,131 @@ def deck_audio_routing_from_env(
         reason=reason,
         source=source,
         hint=hint,
+        master_source=master_source,
     )
+
+
+def _controller_weighted_master(
+    indata: np.ndarray,
+    deck_channels: dict[str, tuple[int, ...]],
+    controller_snapshot: dict[str, object] | None,
+    controller_touched: dict[str, object] | None,
+) -> np.ndarray | None:
+    if not isinstance(controller_snapshot, dict) or not bool(controller_snapshot.get("connected")):
+        return None
+    if not deck_channels:
+        return None
+    touched_known = isinstance(controller_touched, dict)
+    if touched_known and not _any_mixer_control_touched(controller_touched):
+        return None
+    xfader = (
+        _int_0_127(controller_snapshot.get("xfader"), 64)
+        if _field_touched(controller_touched, "master", "xfader")
+        else 64
+    )
+    out = np.zeros(indata.shape[0], dtype=np.float32)
+    wrote = False
+    for side in _DECK_SIDES:
+        raw_deck = controller_snapshot.get(side)
+        if not isinstance(raw_deck, dict):
+            continue
+        valid = _valid_channels(deck_channels.get(side, ()), indata.shape[1])
+        if not valid:
+            continue
+        deck_mono = indata[:, valid].mean(axis=1).astype(np.float32)
+        gain = _controller_deck_gain(
+            raw_deck,
+            side=side,
+            xfader=xfader,
+            touched=controller_touched.get(side) if touched_known else None,
+        )
+        out += deck_mono * gain
+        wrote = True
+    if not wrote:
+        return None
+    return np.clip(out, -1.0, 1.0).astype(np.float32)
+
+
+def _controller_deck_gain(
+    deck: dict[str, object],
+    *,
+    side: str,
+    xfader: int,
+    touched: object,
+) -> float:
+    vol_raw = deck.get("vol") if touched is None or _touched_contains(touched, "vol") else 127
+    vol = _int_0_127(vol_raw, 0) / 127.0
+    if vol <= 0.0:
+        return 0.0
+    eq_low = _control_value(deck, touched, "eq_low", 64)
+    eq_mid = _control_value(deck, touched, "eq_mid", 64)
+    eq_hi = _control_value(deck, touched, "eq_hi", 64)
+    eq_gain = (eq_low + eq_mid + eq_hi) / (64.0 * 3.0)
+    eq_gain = max(0.0, min(eq_gain, 1.5))
+    filter_value = _control_value(deck, touched, "filter", 64)
+    filter_offset = abs(filter_value - 64)
+    filter_gain = 1.0
+    if filter_offset > 6:
+        filter_gain = max(0.15, 1.0 - ((filter_offset - 6) / 57.0) * 0.85)
+    return vol * _xfader_gain(side, xfader) * eq_gain * filter_gain
+
+
+def _xfader_gain(side: str, xfader: int) -> float:
+    if side == "A":
+        if xfader >= 112:
+            return 0.0
+        if xfader >= 80:
+            return 0.3
+        if xfader >= 48:
+            return 0.7
+        return 1.0
+    if xfader < 16:
+        return 0.0
+    if xfader < 48:
+        return 0.3
+    if xfader <= 80:
+        return 0.7
+    return 1.0
+
+
+def _int_0_127(raw: object, default: int) -> int:
+    if raw is None or isinstance(raw, bool):
+        return default
+    try:
+        value = int(float(str(raw)))
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return max(0, min(127, value))
+
+
+def _control_value(deck: dict[str, object], touched: object, field: str, default: int) -> int:
+    if touched is not None and not _touched_contains(touched, field):
+        return default
+    return _int_0_127(deck.get(field), default)
+
+
+def _any_mixer_control_touched(controller_touched: dict[str, object]) -> bool:
+    if _field_touched(controller_touched, "master", "xfader"):
+        return True
+    for side in _DECK_SIDES:
+        touched = controller_touched.get(side)
+        if any(_touched_contains(touched, field) for field in ("vol", "eq_low", "eq_mid", "eq_hi", "filter")):
+            return True
+    return False
+
+
+def _field_touched(controller_touched: dict[str, object] | None, section: str, field: str) -> bool:
+    if not isinstance(controller_touched, dict):
+        return True
+    return _touched_contains(controller_touched.get(section), field)
+
+
+def _touched_contains(raw: object, field: str) -> bool:
+    if isinstance(raw, (list, tuple, set, frozenset)):
+        return field in raw
+    if isinstance(raw, str):
+        return raw == field
+    return False
 
 
 def _parse_deck_channels(raw: str | None) -> tuple[dict[str, tuple[int, ...]], str]:
