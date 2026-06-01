@@ -1786,6 +1786,7 @@ class LibraryStalenessNudge:
         age_days: int,
         snoozed_until_ts: float | None,
         source_path: str | None = None,
+        source_kind: str | None = None,
         reason: str | None = None,
     ) -> LibraryStalenessNudge:
         return cls(
@@ -1795,6 +1796,7 @@ class LibraryStalenessNudge:
                 age_days=age_days,
                 snoozed_until_ts=snoozed_until_ts,
                 source_path=source_path,
+                source_kind=source_kind,
                 reason=reason,
             ),
         )

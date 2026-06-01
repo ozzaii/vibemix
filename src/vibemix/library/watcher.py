@@ -16,6 +16,7 @@ from pathlib import Path
 from vibemix.library.staleness import (
     DEFAULT_LIBRARY_PKL,
     LibraryFreshness,
+    _refreshable_source_kind,
     _refreshable_source_path,
     _should_emit_nudge,
     is_snoozed,
@@ -158,6 +159,7 @@ async def watch_library_freshness(
                         "age_days": status.age_days,
                         "snoozed_until_ts": load_snooze_state(state_path),
                         "source_path": _refreshable_source_path(status),
+                        "source_kind": _refreshable_source_kind(status),
                         "reason": status.reason,
                         "schema_version": "1",
                     }

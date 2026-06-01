@@ -157,6 +157,20 @@ describe("library-panel — programmatic refresh", () => {
       payload: { path: "/path/to/collection.xml", schema_version: "1" },
     });
   });
+
+  it("beginFolderReindex emits the folder staleness action", async () => {
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    await handle.beginFolderReindex();
+    await _flush();
+
+    expect(emitted).toContainEqual({
+      type: "ipc.library.staleness_action",
+      payload: { action: "reindex_folder", schema_version: "1" },
+    });
+    expect(subscribers.get("ipc.library.import_progress")).toBeDefined();
+  });
 });
 
 describe("library-panel — cancel emits cancel message", () => {

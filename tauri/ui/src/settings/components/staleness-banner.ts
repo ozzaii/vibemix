@@ -6,8 +6,10 @@
  *
  * IPC contract (Plan 28-09):
  *   inbound:  ipc.library.staleness_nudge { age_days, snoozed_until_ts,
- *                                           source_path?, reason?, schema_version }
- *   outbound: ipc.library.staleness_action { action: "dismiss" | "snooze_7d", schema_version }
+ *                                           source_path?, source_kind?, reason?,
+ *                                           schema_version }
+ *   outbound: ipc.library.staleness_action { action: "dismiss" | "snooze_7d"
+ *                                            | "reindex_folder", schema_version }
  *   outbound: ipc.library.import { path, schema_version } when the stale source is refreshable
  *
  * Visual direction follows project_visual_direction_cdj_whisper:
@@ -25,7 +27,7 @@ export interface StalenessBannerHandle {
 }
 
 interface StalenessBannerOptions {
-  onRefresh?: (path: string) => void | Promise<void>;
+  onRefresh?: (path: string, sourceKind: "xml" | "folder") => void | Promise<void>;
 }
 
 /** Render the banner. Hidden until ipc.library.staleness_nudge arrives. */
@@ -62,6 +64,7 @@ export function renderStalenessBanner(
   let disposed = false;
   let unsub: (() => void) | null = null;
   let refreshPath: string | null = null;
+  let refreshKind: "xml" | "folder" | null = null;
 
   const hide = (): void => {
     root.classList.add("hidden");
@@ -69,19 +72,28 @@ export function renderStalenessBanner(
   const show = (
     ageDays: number,
     sourcePath: string | null,
+    sourceKind: string | null,
     reason: string | null,
   ): void => {
     refreshPath = sourcePath;
+    refreshKind = sourceKind === "folder" ? "folder" : sourcePath ? "xml" : null;
     const discoveredButNotIndexed = reason === "source_detected_not_indexed";
+    const folderRefresh = refreshKind === "folder";
     ageEl.textContent = discoveredButNotIndexed
       ? "source found"
       : `${ageDays} day${ageDays === 1 ? "" : "s"}`;
     copyEl.textContent = discoveredButNotIndexed
       ? "Import it so Viber can use your tracks."
-      : sourcePath
-        ? "Refresh to keep Viber grounded."
-        : "Drop the Rekordbox XML below.";
-    refreshBtn.textContent = discoveredButNotIndexed ? "Import library" : "Refresh library";
+      : folderRefresh
+        ? "Re-index this folder so Viber uses your latest tracks."
+        : sourcePath
+          ? "Refresh to keep Viber grounded."
+          : "Drop the Rekordbox XML or import a folder below.";
+    refreshBtn.textContent = discoveredButNotIndexed
+      ? "Import library"
+      : folderRefresh
+        ? "Re-index folder"
+        : "Refresh library";
     refreshBtn.classList.toggle("hidden", !sourcePath);
     refreshBtn.disabled = !sourcePath;
     root.classList.remove("hidden");
@@ -90,11 +102,17 @@ export function renderStalenessBanner(
   refreshBtn.addEventListener("click", () => {
     if (disposed || !refreshPath) return;
     const path = refreshPath;
+    const kind = refreshKind || "xml";
     refreshBtn.disabled = true;
     void (async () => {
       try {
         if (opts.onRefresh) {
-          await opts.onRefresh(path);
+          await opts.onRefresh(path, kind);
+        } else if (kind === "folder") {
+          await emitIpc("ipc.library.staleness_action", {
+            action: "reindex_folder",
+            schema_version: "1",
+          });
         } else {
           await emitIpc("ipc.library.import", { path, schema_version: "1" });
         }
@@ -129,6 +147,7 @@ export function renderStalenessBanner(
       show(
         msg.payload.age_days,
         msg.payload.source_path || null,
+        msg.payload.source_kind || null,
         msg.payload.reason || null,
       );
     },

@@ -1921,6 +1921,8 @@ async def main() -> None:
             from vibemix.library.importer import LibraryImporter
             from vibemix.library.staleness import (
                 apply_snooze_action,
+                library_freshness_status,
+                refreshable_source,
                 watch_library_freshness,
             )
             from vibemix.ui_bus.messages import (
@@ -1947,19 +1949,8 @@ async def main() -> None:
                     ).to_json()
                 )
 
-            async def _on_library_import(msg: dict) -> None:
+            def _ensure_library_runtime(label: str) -> bool:
                 nonlocal _library_embedder, _library_store
-                _task = _import_state.get("task")
-                if _task is not None and not _task.done():
-                    return  # an import is already running — drop the duplicate
-                payload = msg.get("payload") or {}
-                raw_path = str(payload.get("path", "")).strip()
-                if not raw_path:
-                    return
-                xml_path = Path(raw_path).expanduser()
-                # Lazily build embedder + store — import is the one path that
-                # must run cold (first-time user has no cache yet). build_embedder
-                # loads the local CLAP ONNX model.
                 try:
                     if _library_embedder is None or _library_store is None:
                         from vibemix.library import open_store as _open_store
@@ -1971,9 +1962,36 @@ async def main() -> None:
                         _library_store = _open_store()
                 except Exception as _e:
                     print(
-                        f"-> library import: embedder unavailable ({_e!r})",
+                        f"-> library {label}: embedder unavailable ({_e!r})",
                         file=sys.stderr,
                     )
+                    return False
+                return True
+
+            def _refresh_library_registry() -> None:
+                try:
+                    _lib = RekordboxLibrary()
+                    if _lib.try_load_cache():
+                        evidence_registry.register_library(_lib)
+                except Exception as _e:
+                    print(
+                        f"-> post-import registry refresh failed: {_e!r}",
+                        file=sys.stderr,
+                    )
+
+            async def _on_library_import(msg: dict) -> None:
+                _task = _import_state.get("task")
+                if _task is not None and not _task.done():
+                    return  # an import is already running — drop the duplicate
+                payload = msg.get("payload") or {}
+                raw_path = str(payload.get("path", "")).strip()
+                if not raw_path:
+                    return
+                xml_path = Path(raw_path).expanduser()
+                # Lazily build embedder + store — import is the one path that
+                # must run cold (first-time user has no cache yet). build_embedder
+                # loads the local CLAP ONNX model.
+                if not _ensure_library_runtime("import"):
                     return
 
                 loop = asyncio.get_running_loop()
@@ -1999,15 +2017,7 @@ async def main() -> None:
                             # Refresh the EvidenceRegistry so [track:<id>]
                             # citations resolve mid-session, no restart needed
                             # (mirrors import_library_async).
-                            try:
-                                _lib = RekordboxLibrary()
-                                if _lib.try_load_cache():
-                                    evidence_registry.register_library(_lib)
-                            except Exception as _e:
-                                print(
-                                    f"-> post-import registry refresh failed: {_e!r}",
-                                    file=sys.stderr,
-                                )
+                            _refresh_library_registry()
                         # Final frame doubles as the completion signal.
                         await _emit_library(
                             _progress_envelope(
@@ -2028,6 +2038,101 @@ async def main() -> None:
                 _background_tasks.add(_t)
                 _t.add_done_callback(_background_tasks.discard)
 
+            async def _start_folder_reindex() -> None:
+                _task = _import_state.get("task")
+                if _task is not None and not _task.done():
+                    return
+                status = library_freshness_status(library_cache)
+                source_path, source_kind = refreshable_source(status)
+                if source_kind != "folder" or not source_path:
+                    print(
+                        "-> staleness reindex rejected: recorded source is not a folder",
+                        file=sys.stderr,
+                    )
+                    return
+                folder = Path(source_path).expanduser()
+                if not folder.is_dir():
+                    print(
+                        "-> staleness reindex rejected: recorded folder is missing",
+                        file=sys.stderr,
+                    )
+                    return
+                if not _ensure_library_runtime("folder reindex"):
+                    return
+
+                _import_state["importer"] = None
+                loop = asyncio.get_running_loop()
+                try:
+                    from vibemix.library import scan_folder as _scan_folder
+
+                    folder_total = len(_scan_folder(folder))
+                except Exception:
+                    folder_total = 0
+                progress_done = 0
+
+                def _on_folder_progress(line: str) -> None:
+                    nonlocal progress_done
+                    progress_done += 1
+
+                    def _send() -> None:
+                        _pt = loop.create_task(
+                            _emit_library(
+                                _progress_envelope(
+                                    {
+                                        "total": folder_total,
+                                        "done": progress_done,
+                                        "current_track_name": line[:200],
+                                        "cache_hits": 0,
+                                        "cancelled": False,
+                                    }
+                                )
+                            )
+                        )
+                        _background_tasks.add(_pt)
+                        _pt.add_done_callback(_background_tasks.discard)
+
+                    loop.call_soon_threadsafe(_send)
+
+                async def _run_folder_reindex() -> None:
+                    try:
+                        from vibemix.library import ingest_folder
+
+                        def _sync_reindex():
+                            return ingest_folder(
+                                folder,
+                                _library_embedder,
+                                _library_store,
+                                persist_library=True,
+                                progress=_on_folder_progress,
+                                embed_strategy=getattr(
+                                    _library_embedder,
+                                    "_embed_strategy",
+                                    "mean_excerpt",
+                                ),
+                            )
+
+                        report = await loop.run_in_executor(None, _sync_reindex)
+                        _refresh_library_registry()
+                        await _emit_library(
+                            _progress_envelope(
+                                {
+                                    "total": report.total,
+                                    "done": report.total,
+                                    "current_track_name": "",
+                                    "cache_hits": report.skipped_cached,
+                                    "cancelled": False,
+                                }
+                            )
+                        )
+                        ipc_router.clear_retained("ipc.library.staleness_nudge")
+                    except Exception as _e:
+                        print(f"-> library folder reindex failed: {_e!r}", file=sys.stderr)
+
+                _t = loop.create_task(_run_folder_reindex())
+                _import_state["task"] = _t
+                _background_tasks.add(_t)
+                _t.add_done_callback(_background_tasks.discard)
+
             async def _on_library_import_cancel(msg: dict) -> None:
                 importer = _import_state.get("importer")
                 if importer is not None:
@@ -2037,6 +2142,9 @@ async def main() -> None:
                 payload = msg.get("payload") or {}
                 action = str(payload.get("action", "")).strip()
                 try:
+                    if action == "reindex_folder":
+                        await _start_folder_reindex()
+                        return
                     apply_snooze_action(action)
                     ipc_router.clear_retained("ipc.library.staleness_nudge")
                 except ValueError as _e:
@@ -2059,6 +2167,9 @@ async def main() -> None:
                             source_path=_p.get("source_path")
                             if isinstance(_p.get("source_path"), str)
                             else None,
+                            source_kind=_p.get("source_kind")
+                            if isinstance(_p.get("source_kind"), str)
+                            else None,
                             reason=_p.get("reason") if isinstance(_p.get("reason"), str) else None,
                         ).to_json()
                     )
@@ -2076,6 +2187,9 @@ async def main() -> None:
                                 snoozed_until_ts=payload.get("snoozed_until_ts"),
                                 source_path=payload.get("source_path")
                                 if isinstance(payload.get("source_path"), str)
+                                else None,
+                                source_kind=payload.get("source_kind")
+                                if isinstance(payload.get("source_kind"), str)
                                 else None,
                                 reason=payload.get("reason")
                                 if isinstance(payload.get("reason"), str)

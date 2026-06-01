@@ -38,6 +38,7 @@ DEFAULT_LIBRARY_PKL = Path.home() / ".cache" / "vibemix" / "library.pkl"
 DEFAULT_STATE_FILE_PATH = Path.home() / ".config" / "vibemix" / "state.json"
 STATE_KEY = "library_staleness_snoozed_until"
 FreshnessStatus = Literal["fresh", "stale", "not_indexed", "source_missing", "cache_unreadable"]
+RefreshableSourceKind = Literal["xml", "folder"]
 FreshnessChangeWaiter = Callable[[set[Path], asyncio.Event, float], Awaitable[None]]
 _AUDIO_SUFFIXES = {".mp3", ".m4a", ".wav", ".flac", ".aac"}
 
@@ -64,15 +65,32 @@ def _age_days_from_mtime(mtime: float, *, now: float) -> int:
     return max(0, int((now - mtime) // 86400))
 
 
-def _refreshable_source_path(status: LibraryFreshness) -> str | None:
-    """Return a source path the existing XML importer can refresh directly."""
+def _refreshable_source(status: LibraryFreshness) -> tuple[str | None, RefreshableSourceKind | None]:
+    """Return the source path + action kind the app can refresh directly."""
     source_path = status.source_path
     if not source_path:
-        return None
+        return None, None
     path = Path(source_path)
-    if path.suffix.lower() != ".xml" or not path.exists():
-        return None
-    return source_path
+    if path.suffix.lower() == ".xml" and path.exists():
+        return source_path, "xml"
+    if path.is_dir():
+        return source_path, "folder"
+    return None, None
+
+
+def refreshable_source(status: LibraryFreshness) -> tuple[str | None, RefreshableSourceKind | None]:
+    """Public wrapper for the recorded source the user may explicitly refresh."""
+    return _refreshable_source(status)
+
+
+def _refreshable_source_path(status: LibraryFreshness) -> str | None:
+    """Return a source path the UI/backend can refresh directly."""
+    return _refreshable_source(status)[0]
+
+
+def _refreshable_source_kind(status: LibraryFreshness) -> RefreshableSourceKind | None:
+    """Return whether the refresh path is an XML catalog or folder source."""
+    return _refreshable_source(status)[1]
 
 
 def _detect_library_source_path() -> str | None:
@@ -326,6 +344,7 @@ def freshness_nudge_payload(
         "age_days": status.age_days,
         "snoozed_until_ts": load_snooze_state(state_path),
         "source_path": _refreshable_source_path(status),
+        "source_kind": _refreshable_source_kind(status),
         "reason": status.reason,
         "schema_version": "1",
     }
@@ -484,6 +503,7 @@ __all__ = [
     "STATE_KEY",
     "FreshnessStatus",
     "LibraryFreshness",
+    "RefreshableSourceKind",
     "apply_snooze_action",
     "emit_nudge_if_stale",
     "freshness_nudge_payload",
@@ -491,6 +511,7 @@ __all__ = [
     "is_stale",
     "library_freshness_status",
     "load_snooze_state",
+    "refreshable_source",
     "save_snooze_state",
     "watch_library_freshness",
 ]

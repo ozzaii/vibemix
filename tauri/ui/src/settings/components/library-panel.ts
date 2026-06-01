@@ -20,6 +20,7 @@ import type { LibraryImportProgress } from "../../ipc/messages.js";
 export interface LibraryPanelHandle {
   element: HTMLElement;
   beginImport(path: string): Promise<void>;
+  beginFolderReindex(): Promise<void>;
   dispose(): void;
 }
 
@@ -98,19 +99,7 @@ export async function renderLibraryPanel(
     status.textContent = text;
   }
 
-  async function beginImport(path: string): Promise<void> {
-    if (disposed) return;
-    showProgress();
-    fill.style.width = "0%";
-    label.textContent = "Loading…";
-    try {
-      await emitIpc("ipc.library.import", { path, schema_version: "1" });
-    } catch (e) {
-      hideProgress();
-      setStatus(`Import failed: ${(e as Error).message ?? e}`);
-      return;
-    }
-
+  async function ensureProgressSubscription(): Promise<void> {
     if (!unsubProgress) {
       const unsub = await subscribeIpc<LibraryImportProgress>(
         "ipc.library.import_progress",
@@ -126,7 +115,7 @@ export async function renderLibraryPanel(
           if (p.cancelled) {
             hideProgress();
             setStatus(`Cancelled at ${p.done}/${p.total}`);
-          } else if (p.done >= p.total && p.total > 0) {
+          } else if (p.done >= p.total) {
             hideProgress();
             setStatus(
               `${p.total} tracks indexed (${p.cache_hits} from cache)`,
@@ -150,6 +139,41 @@ export async function renderLibraryPanel(
         unsubProgress = disposeProgress;
       }
     }
+  }
+
+  async function beginLibraryJob(
+    start: () => Promise<void>,
+    failureLabel: string,
+  ): Promise<void> {
+    if (disposed) return;
+    showProgress();
+    fill.style.width = "0%";
+    label.textContent = "Loading…";
+    await ensureProgressSubscription();
+    try {
+      await start();
+    } catch (e) {
+      hideProgress();
+      setStatus(`${failureLabel}: ${(e as Error).message ?? e}`);
+    }
+  }
+
+  async function beginImport(path: string): Promise<void> {
+    await beginLibraryJob(
+      () => emitIpc("ipc.library.import", { path, schema_version: "1" }),
+      "Import failed",
+    );
+  }
+
+  async function beginFolderReindex(): Promise<void> {
+    await beginLibraryJob(
+      () =>
+        emitIpc("ipc.library.staleness_action", {
+          action: "reindex_folder",
+          schema_version: "1",
+        }),
+      "Re-index failed",
+    );
   }
 
   cancelBtn.addEventListener("click", () => {
@@ -218,6 +242,7 @@ export async function renderLibraryPanel(
   return {
     element: root,
     beginImport,
+    beginFolderReindex,
     dispose(): void {
       disposed = true;
       try {

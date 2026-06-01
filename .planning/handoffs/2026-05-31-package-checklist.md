@@ -1255,6 +1255,58 @@ Remaining gate:
 - Trigger the refresh action from the stale banner, verify importer progress,
   and show Viber set-prep unblocks only after freshness returns current.
 
+## Package 5J - Folder Stale Re-index Action
+
+Suggested commit: `fix(settings): reindex stale folder libraries`
+
+Include:
+
+- `src/vibemix/library/staleness.py`
+- `src/vibemix/library/watcher.py`
+- `src/vibemix/ui_bus/schemas/library.py`
+- `src/vibemix/ui_bus/messages.py`
+- `src/vibemix/__main__.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/settings/components/staleness-banner.ts`
+- `tauri/ui/src/settings/components/library-panel.ts`
+- `tauri/ui/src/settings/SettingsDrawer.ts`
+- `tauri/ui/tests/settings/staleness-banner.spec.ts`
+- `tauri/ui/tests/settings/library-panel.spec.ts`
+- `tests/library/test_staleness.py`
+- `tests/ipc/test_library_schemas.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Reason:
+
+- Package 5F made stale Rekordbox XML sources refreshable, but folder-backed
+  libraries still showed the nudge without a working remediation. This closes
+  H8 from `CLAUDE_LAND_QUEUE.md`: when the recorded source is a folder, the
+  nudge carries `source_kind="folder"`, the Settings banner says "Re-index
+  folder", and the backend runs `ingest_folder` from the recorded freshness
+  source instead of trusting a renderer-supplied path.
+- The action reuses `ipc.library.staleness_action` with a new
+  `reindex_folder` action and reuses `ipc.library.import_progress` for visible
+  progress. XML refresh keeps the existing `ipc.library.import` path.
+- Consent stays intact: folders are not auto-detected on fresh install. A
+  folder re-index appears only for a folder source already stored in the
+  user's library cache.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_staleness.py tests/ipc/test_library_schemas.py tests/ui_bus/test_messages_schema.py tests/runtime/test_ws_bus.py::test_ws_broadcast_replays_staleness_nudge_to_late_client`
+- `npm --prefix tauri/ui test -- tests/settings/staleness-banner.spec.ts tests/settings/library-panel.spec.ts tests/settings/drawer.spec.ts`
+- `npm --prefix tauri/ui run check:ipc`
+- `uv run python scripts/check_ipc_schema.py`
+- `uv run ruff check src/vibemix/library/staleness.py src/vibemix/library/watcher.py src/vibemix/ui_bus/schemas/library.py src/vibemix/ui_bus/messages.py src/vibemix/__main__.py tests/library/test_staleness.py tests/ipc/test_library_schemas.py`
+- `uv run python .claude/skills/ipc-wiring-checker/scripts/check_ipc_wiring.py`
+
+Remaining gate:
+
+- Source-level only until a live Settings click proves a folder stale nudge
+  starts folder re-index progress in the Tauri app.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`

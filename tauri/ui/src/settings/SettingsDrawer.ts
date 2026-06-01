@@ -1209,7 +1209,18 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     "display:flex; flex-direction:column; gap: var(--sp-2);";
   if (!stalenessBannerHandle) {
     stalenessBannerHandle = renderStalenessBanner({
-      onRefresh: async (path) => {
+      onRefresh: async (path, sourceKind) => {
+        if (sourceKind === "folder") {
+          if (libraryPanelHandle) {
+            await libraryPanelHandle.beginFolderReindex();
+            return;
+          }
+          await emitIpc("ipc.library.staleness_action", {
+            action: "reindex_folder",
+            schema_version: "1",
+          });
+          return;
+        }
         if (libraryPanelHandle) {
           await libraryPanelHandle.beginImport(path);
           return;

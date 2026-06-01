@@ -99,7 +99,7 @@ describe("staleness-banner — dismiss hides + emits action", () => {
 
 describe("staleness-banner — refresh action", () => {
   it("shows Refresh library for a refreshable source and calls onRefresh", async () => {
-    const onRefresh = vi.fn(async (_path: string) => undefined);
+    const onRefresh = vi.fn(async (_path: string, _kind: string) => undefined);
     const handle = renderStalenessBanner({ onRefresh });
     document.body.append(handle.element);
     await _flushMicrotasks();
@@ -124,12 +124,12 @@ describe("staleness-banner — refresh action", () => {
     refreshBtn.click();
     await _flushMicrotasks();
 
-    expect(onRefresh).toHaveBeenCalledWith("/Music/collection.xml");
+    expect(onRefresh).toHaveBeenCalledWith("/Music/collection.xml", "xml");
     expect(handle.element.classList.contains("hidden")).toBe(true);
   });
 
   it("labels a detected-but-unindexed source as an import action", async () => {
-    const onRefresh = vi.fn(async (_path: string) => undefined);
+    const onRefresh = vi.fn(async (_path: string, _kind: string) => undefined);
     const handle = renderStalenessBanner({ onRefresh });
     document.body.append(handle.element);
     await _flushMicrotasks();
@@ -156,7 +156,71 @@ describe("staleness-banner — refresh action", () => {
     refreshBtn.click();
     await _flushMicrotasks();
 
-    expect(onRefresh).toHaveBeenCalledWith("/Music/rekordbox/collection.xml");
+    expect(onRefresh).toHaveBeenCalledWith("/Music/rekordbox/collection.xml", "xml");
+  });
+
+  it("routes folder sources to the re-index action", async () => {
+    const onRefresh = vi.fn(async (_path: string, _kind: string) => undefined);
+    const handle = renderStalenessBanner({ onRefresh });
+    document.body.append(handle.element);
+    await _flushMicrotasks();
+
+    const cb = subscribers.get("ipc.library.staleness_nudge")!;
+    cb({
+      type: "ipc.library.staleness_nudge",
+      ts: "2026-05-15T12:00:00Z",
+      payload: {
+        age_days: 2,
+        snoozed_until_ts: null,
+        source_path: "/Users/ka/Music",
+        source_kind: "folder",
+        reason: "source_newer_than_cache",
+        schema_version: "1",
+      },
+    });
+
+    const refreshBtn = handle.element.querySelector(
+      ".vmx-staleness-refresh",
+    ) as HTMLButtonElement;
+    expect(handle.element.textContent).toContain(
+      "Re-index this folder so Viber uses your latest tracks.",
+    );
+    expect(refreshBtn.textContent).toBe("Re-index folder");
+    refreshBtn.click();
+    await _flushMicrotasks();
+
+    expect(onRefresh).toHaveBeenCalledWith("/Users/ka/Music", "folder");
+  });
+
+  it("emits reindex_folder when no custom refresh handler is attached", async () => {
+    const handle = renderStalenessBanner();
+    document.body.append(handle.element);
+    await _flushMicrotasks();
+
+    const cb = subscribers.get("ipc.library.staleness_nudge")!;
+    cb({
+      type: "ipc.library.staleness_nudge",
+      ts: "2026-05-15T12:00:00Z",
+      payload: {
+        age_days: 2,
+        snoozed_until_ts: null,
+        source_path: "/Users/ka/Music",
+        source_kind: "folder",
+        reason: "source_newer_than_cache",
+        schema_version: "1",
+      },
+    });
+
+    const refreshBtn = handle.element.querySelector(
+      ".vmx-staleness-refresh",
+    ) as HTMLButtonElement;
+    refreshBtn.click();
+    await _flushMicrotasks();
+
+    expect(emitted).toContainEqual({
+      type: "ipc.library.staleness_action",
+      payload: { action: "reindex_folder", schema_version: "1" },
+    });
   });
 
   it("hides Refresh library when no source path is attached", async () => {
@@ -176,7 +240,9 @@ describe("staleness-banner — refresh action", () => {
     ) as HTMLButtonElement;
     expect(refreshBtn.classList.contains("hidden")).toBe(true);
     expect(refreshBtn.disabled).toBe(true);
-    expect(handle.element.textContent).toContain("Drop the Rekordbox XML below.");
+    expect(handle.element.textContent).toContain(
+      "Drop the Rekordbox XML or import a folder below.",
+    );
   });
 });
 

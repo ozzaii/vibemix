@@ -627,6 +627,7 @@ export interface LibraryStalenessNudge {
     age_days: number;
     snoozed_until_ts: number | null;
     source_path?: string | null;
+    source_kind?: "xml" | "folder" | null;
     reason?: string | null;
     schema_version: "1";
   };
@@ -635,7 +636,7 @@ export interface LibraryStalenessAction {
   type: "ipc.library.staleness_action";
   ts: string;
   payload: {
-    action: "dismiss" | "snooze_7d";
+    action: "dismiss" | "snooze_7d" | "reindex_folder";
     schema_version: "1";
   };
 }

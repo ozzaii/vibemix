@@ -287,8 +287,38 @@ def test_freshness_nudge_payload_source_newer_than_cache(tmp_path: Path) -> None
     assert payload is not None
     assert payload["age_days"] == 0
     assert payload["source_path"] == str(source)
+    assert payload["source_kind"] == "xml"
     assert payload["reason"] == "source_newer_than_cache"
     assert payload["schema_version"] == "1"
+
+
+def test_freshness_nudge_payload_refreshes_folder_source(tmp_path: Path) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    root = tmp_path / "Music"
+    nested = root / "crate"
+    nested.mkdir(parents=True)
+    track = nested / "track.mp3"
+    track.write_bytes(b"audio")
+    old_mtime = time.time() - 100
+    for path in (root, nested, track):
+        os.utime(path, (old_mtime, old_mtime))
+    cache = tmp_path / "library.pkl"
+    old_cache = RekordboxLibrary.CACHE_PATH
+    RekordboxLibrary.CACHE_PATH = cache
+    try:
+        RekordboxLibrary()._write_cache(str(root), old_mtime)
+    finally:
+        RekordboxLibrary.CACHE_PATH = old_cache
+    new_mtime = old_mtime + 10
+    os.utime(track, (new_mtime, new_mtime))
+
+    payload = freshness_nudge_payload(cache, tmp_path / "state.json", now=new_mtime + 1)
+
+    assert payload is not None
+    assert payload["source_path"] == str(root)
+    assert payload["source_kind"] == "folder"
+    assert payload["reason"] == "source_newer_than_cache"
 
 
 def test_freshness_nudge_payload_imports_detected_source(
@@ -306,6 +336,7 @@ def test_freshness_nudge_payload_imports_detected_source(
     assert payload is not None
     assert payload["age_days"] == 0
     assert payload["source_path"] == str(source)
+    assert payload["source_kind"] == "xml"
     assert payload["reason"] == "source_detected_not_indexed"
     assert payload["schema_version"] == "1"
 
@@ -370,6 +401,7 @@ def test_watch_library_freshness_emits_when_source_becomes_stale(tmp_path: Path)
                 "age_days": 0,
                 "snoozed_until_ts": None,
                 "source_path": None,
+                "source_kind": None,
                 "reason": "source_newer_than_cache",
                 "schema_version": "1",
             },
@@ -418,6 +450,7 @@ def test_watch_library_freshness_emits_detected_source_import(tmp_path: Path) ->
                 "age_days": 0,
                 "snoozed_until_ts": None,
                 "source_path": str(source),
+                "source_kind": "xml",
                 "reason": "source_detected_not_indexed",
                 "schema_version": "1",
             },

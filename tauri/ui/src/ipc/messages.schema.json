@@ -2516,6 +2516,17 @@
               ],
               "minLength": 1
             },
+            "source_kind": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "xml",
+                "folder",
+                null
+              ]
+            },
             "reason": {
               "type": [
                 "string",
@@ -2557,7 +2568,8 @@
             "action": {
               "enum": [
                 "dismiss",
-                "snooze_7d"
+                "snooze_7d",
+                "reindex_folder"
               ]
             },
             "schema_version": {

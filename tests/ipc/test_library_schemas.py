@@ -107,6 +107,11 @@ def test_schema_version_field() -> None:
         assert d["payload"]["schema_version"] == "1", name
 
 
+def test_library_staleness_action_accepts_folder_reindex() -> None:
+    d = json.loads(LibraryStalenessAction.make(action="reindex_folder").to_json())
+    _VALIDATOR.validate(d)
+
+
 def test_count_parity_python_vs_schema() -> None:
     """Python wrappers ↔ schema oneOf entries — 1:1 contract.
 

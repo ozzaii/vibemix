@@ -70,13 +70,15 @@ class LibraryStalenessNudgePayload:
         age_days: cache age in days since last import.
         snoozed_until_ts: epoch seconds when the snooze expires; ``None``
             when not snoozed.
-        source_path: refreshable Rekordbox XML path, when known.
+        source_path: refreshable source path, when known.
+        source_kind: ``"xml" | "folder"`` for the source_path, when known.
         reason: machine-readable freshness reason, when known.
     """
 
     age_days: int
     snoozed_until_ts: float | None
     source_path: str | None = None
+    source_kind: str | None = None
     reason: str | None = None
     schema_version: str = "1"
 
@@ -86,7 +88,7 @@ class LibraryStalenessActionPayload:
     """Plan 28-07 — renderer → sidecar. User dismissed or snoozed the nudge.
 
     Fields:
-        action: ``"dismiss" | "snooze_7d"``.
+        action: ``"dismiss" | "snooze_7d" | "reindex_folder"``.
     """
 
     action: str
