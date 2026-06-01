@@ -1381,6 +1381,37 @@ Remaining gate:
 - None for the agent-facing boundary. Any future single-track cue write tool
   must be proposal-id or track-id grounded before it is exposed to Viber/Codex.
 
+## Package 8J - Heartbeat Golden Test Refresh
+
+Suggested commit: `test(coach): refresh heartbeat grounding golden`
+
+Include:
+
+- `tests/state/test_coach.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/state/coach.py` and any cohost speech/prompt source changes.
+- `src/vibemix/runtime/coach.py`, DROP-call files, TTS, and live runtime files.
+
+Reason:
+
+- The HEARTBEAT task source was already hardened to forbid coaching advice
+  without recent move evidence and to require exact grounding refs for citations.
+  The test still asserted the older shorter golden string.
+- `tests/learn/test_progress_snapshot_skill_wall.py::test_mastered_demo_reaches_the_envelope_wall`
+  is already refreshed at current HEAD and passes, so this package only updates
+  the remaining stale S4 golden.
+
+Proof before staging:
+
+- `uv run pytest -q tests/state/test_coach.py::test_task_heartbeat_LOAD_BEARING_anti_silence_clause`
+- `uv run pytest -q tests/learn/test_progress_snapshot_skill_wall.py::test_mastered_demo_reaches_the_envelope_wall`
+- `uv run ruff check tests/state/test_coach.py`
+- `git diff --check -- tests/state/test_coach.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Package 5I - Folder Cache Source Docstring
 
 Suggested commit: `docs(library): clarify folder cache source path`
