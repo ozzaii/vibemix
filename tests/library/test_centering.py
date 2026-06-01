@@ -129,7 +129,7 @@ def test_search_centered_distinct_neighbours(tmp_path: Path) -> None:
             vectors_path=tmp_path / "v.npy", ids_path=tmp_path / "ids.json"
         )
     )
-    store.add_batch(list(zip(ids, corpus)))
+    store.add_batch(list(zip(ids, corpus, strict=True)))
 
     # Route centroid cache to tmp.
     import vibemix.library.centering as centering_mod

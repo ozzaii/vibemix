@@ -782,6 +782,32 @@ Proof before staging:
 - `git diff --check -- tests/intel/test_transition_judge.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AC - Library Centering Test Ruff Hygiene
+
+Suggested commit: `test(library): clean centering test lint`
+
+Include:
+
+- `tests/library/test_centering.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Library centering source, index implementations, runtime files, and generated files.
+
+Reason:
+
+- The centering test zips ids and vectors with equal expected lengths. Adding
+  `strict=True` keeps the focused library-test ruff gate clean while preserving
+  the test's batch input contract.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_centering.py`
+- `uv run pytest -q tests/library/test_centering.py`
+- `git diff --check -- tests/library/test_centering.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
