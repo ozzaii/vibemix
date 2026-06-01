@@ -1102,8 +1102,10 @@ def _repeated_physical_attempt_action() -> dict | None:
                 "source": "physical",
                 "detail": (
                     f"{proof_progress['summary']} Per-deck capture is configured, but it has not "
-                    "seen active audio on both deck lanes. Play or cue both decks until the proof "
-                    "shows deck_audio_capture=A_active+B_active."
+                    "seen active audio on both deck lanes. For a BlackHole 16ch/Rekordbox rig, "
+                    "route Deck 1 to BlackHole channels 1/2 and Deck 2 to channels 3/4, or update "
+                    "VIBEMIX_DECK_AUDIO_CHANNELS to the actual A/B channel map. Rerun until the "
+                    "proof shows deck_audio_capture=A_active+B_active."
                 ),
                 "diagnostic_commands": _deck_capture_probe_commands(),
                 "recommended_command": _physical_rehearsal_recommended_command(),

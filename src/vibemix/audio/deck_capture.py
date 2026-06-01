@@ -94,6 +94,7 @@ class DeckAudioCapture:
         self._clock_s: float = 0.0
         self._feature_history: list[tuple[float, dict[str, dict[str, object]]]] = []
         self.last_rms: dict[str, float] = {}
+        self.last_pair_rms: dict[str, float] = {}
         self.last_features: dict[str, dict[str, object]] = {}
         self.last_deltas: dict[str, list[str]] = {}
 
@@ -131,6 +132,7 @@ class DeckAudioCapture:
             master_view = indata[:, master_channels]
             master_mono = master_view.mean(axis=1).astype(np.float32)
         passthrough = np.repeat(master_mono[:, None], 2, axis=1).astype(np.float32)
+        pair_rms = _opened_stereo_pair_rms(indata)
 
         deck_rms: dict[str, float] = {}
         deck_features: dict[str, dict[str, object]] = {}
@@ -160,6 +162,7 @@ class DeckAudioCapture:
                     continue
         self._record_feature_history(deck_features, frames=indata.shape[0], source_sr=source_sr)
         self.last_rms = deck_rms
+        self.last_pair_rms = pair_rms
         self.last_features = deck_features
         self.last_deltas = deck_deltas
         return DeckAudioFrame(master_mono, passthrough, deck_rms, deck_features, deck_deltas)
@@ -196,6 +199,17 @@ class DeckAudioCapture:
         if self.last_rms:
             ctx["deck_audio_rms"] = {
                 side: round(value, 6) for side, value in sorted(self.last_rms.items())
+            }
+            diagnosis = _deck_route_diagnosis(
+                self.routing.deck_channels,
+                deck_rms=self.last_rms,
+                pair_rms=self.last_pair_rms,
+            )
+            if diagnosis:
+                ctx["deck_audio_route_diagnosis"] = diagnosis
+        if self.last_pair_rms:
+            ctx["deck_audio_opened_pair_rms"] = {
+                pair: round(value, 6) for pair, value in sorted(self.last_pair_rms.items())
             }
         if self.last_features:
             ctx["deck_audio_features"] = {
@@ -319,6 +333,62 @@ def _deck_frame_features(deck_mono: np.ndarray, rms: float) -> dict[str, object]
         "flux": round(min(max(flux, 0.0), 9.999), 6),
         "crest": round(min(max(crest, 0.0), 99.9), 2),
     }
+
+
+def _opened_stereo_pair_rms(indata: np.ndarray) -> dict[str, float]:
+    out: dict[str, float] = {}
+    if indata.ndim != 2 or indata.shape[1] < 2:
+        return out
+    for left in range(0, indata.shape[1] - 1, 2):
+        pair_mono = indata[:, (left, left + 1)].mean(axis=1).astype(np.float32)
+        out[f"{left},{left + 1}"] = float(np.sqrt(np.mean(pair_mono * pair_mono)))
+    return out
+
+
+def _deck_route_diagnosis(
+    deck_channels: dict[str, tuple[int, ...]],
+    *,
+    deck_rms: dict[str, float],
+    pair_rms: dict[str, float],
+) -> dict[str, object]:
+    """Summarize whether live audio supports the configured A/B channel map."""
+
+    if not deck_channels or not deck_rms:
+        return {}
+    inactive = [
+        side for side in _DECK_SIDES if float(deck_rms.get(side, 0.0)) < _DECK_ACTIVE_RMS
+    ]
+    if not inactive:
+        return {"status": "configured_deck_lanes_active", "rule": "live_audio_probe"}
+
+    configured_pairs = {
+        side: _channel_pair_key(channels)
+        for side, channels in sorted(deck_channels.items())
+        if _channel_pair_key(channels)
+    }
+    configured_pair_values = set(configured_pairs.values())
+    active_pairs = [
+        pair for pair, rms in sorted(pair_rms.items()) if float(rms) >= _DECK_ACTIVE_RMS
+    ]
+    unassigned_active = [pair for pair in active_pairs if pair not in configured_pair_values]
+    return {
+        "status": "configured_deck_lane_missing_audio",
+        "inactive_sides": ",".join(inactive),
+        "active_sides": ",".join(side for side in _DECK_SIDES if side not in inactive) or "none",
+        "configured_pairs": "+".join(
+            f"{side}:{pair}" for side, pair in sorted(configured_pairs.items())
+        )
+        or "none",
+        "opened_active_pairs": "+".join(active_pairs) or "none",
+        "active_unassigned_pairs": "+".join(unassigned_active) or "none",
+        "rule": "opened_channel_probe_not_rekordbox_control",
+    }
+
+
+def _channel_pair_key(channels: tuple[int, ...]) -> str:
+    if len(channels) < 2:
+        return ""
+    return ",".join(str(ch) for ch in channels[:2])
 
 
 def _feature_delta_tokens(

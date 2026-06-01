@@ -629,7 +629,12 @@ if (
     add_action(
         operator_actions,
         "feed_both_deck_lanes",
-        "Play or cue both deck lanes so deck_audio_capture shows active A and B lanes.",
+        (
+            "Deck-pair capture is configured, but live proof still has only one active deck lane. "
+            "For a BlackHole 16ch/Rekordbox rig, route Deck 1 to BlackHole channels 1/2 and "
+            "Deck 2 to channels 3/4, or update VIBEMIX_DECK_AUDIO_CHANNELS to the actual "
+            "A/B channel map; rerun until deck_audio_capture=A_active+B_active."
+        ),
     )
 if needs_operator_action and not operator_actions and blockers:
     add_action(operator_actions, "inspect_blockers", next_action)

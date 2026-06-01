@@ -288,8 +288,21 @@ def test_deck_audio_capture_auto_rekordbox_map_requires_both_pairs_live(
     assert context["deck_audio_active_sides_seen"] == "A"
     assert context["deck_audio_rms"]["A"] == pytest.approx(0.2)
     assert context["deck_audio_rms"]["B"] == pytest.approx(0.0)
+    assert context["deck_audio_opened_pair_rms"]["0,1"] == pytest.approx(0.2)
+    assert context["deck_audio_opened_pair_rms"]["2,3"] == pytest.approx(0.0)
+    assert context["deck_audio_route_diagnosis"] == {
+        "status": "configured_deck_lane_missing_audio",
+        "inactive_sides": "B",
+        "active_sides": "A",
+        "configured_pairs": "A:0,1+B:2,3",
+        "opened_active_pairs": "0,1",
+        "active_unassigned_pairs": "none",
+        "rule": "opened_channel_probe_not_rekordbox_control",
+    }
 
     deck_b_on_second_pair = np.zeros((480, 4), dtype=np.float32)
+    deck_b_on_second_pair[:, 0] = 0.2
+    deck_b_on_second_pair[:, 1] = 0.2
     deck_b_on_second_pair[:, 2] = 0.3
     deck_b_on_second_pair[:, 3] = 0.3
     capture.process(deck_b_on_second_pair, source_sr=48000)
@@ -298,6 +311,34 @@ def test_deck_audio_capture_auto_rekordbox_map_requires_both_pairs_live(
     assert context["deck_audio_capture_enabled"] is True
     assert context["deck_audio_capture_verified"] is True
     assert context["deck_audio_active_sides_seen"] == "A,B"
+    assert context["deck_audio_route_diagnosis"] == {
+        "status": "configured_deck_lanes_active",
+        "rule": "live_audio_probe",
+    }
+
+
+def test_deck_audio_capture_diagnoses_active_unassigned_pair(monkeypatch) -> None:
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "A=0,1;B=2,3")
+    routing = deck_audio_routing_from_env(input_channels=6)
+    capture = DeckAudioCapture(routing, seconds=1.0)
+    indata = np.zeros((480, 6), dtype=np.float32)
+    indata[:, 0] = 0.2
+    indata[:, 1] = 0.2
+    indata[:, 4] = 0.5
+    indata[:, 5] = 0.5
+
+    capture.process(indata, source_sr=48000)
+    context = capture.context()
+
+    assert context["deck_audio_route_diagnosis"] == {
+        "status": "configured_deck_lane_missing_audio",
+        "inactive_sides": "B",
+        "active_sides": "A",
+        "configured_pairs": "A:0,1+B:2,3",
+        "opened_active_pairs": "0,1+4,5",
+        "active_unassigned_pairs": "4,5",
+        "rule": "opened_channel_probe_not_rekordbox_control",
+    }
 
 
 def test_deck_audio_capture_manual_map_stays_operator_trusted(monkeypatch) -> None:

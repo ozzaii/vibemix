@@ -894,7 +894,9 @@ def _flx4_action(data: dict, flx4: dict) -> dict:
                 "source": "flx4",
                 "detail": (
                     "Per-deck capture is configured, but it has not seen active audio on both deck lanes. "
-                    "Play or cue both decks until the proof shows deck_audio_capture=A_active+B_active."
+                    "For a BlackHole 16ch/Rekordbox rig, route Deck 1 to BlackHole channels 1/2 "
+                    "and Deck 2 to channels 3/4, or update VIBEMIX_DECK_AUDIO_CHANNELS to the actual "
+                    "A/B channel map. Rerun until the proof shows deck_audio_capture=A_active+B_active."
                 ),
                 "diagnostic_commands": _deck_capture_probe_commands(),
                 "recommended_command": recommended_command,

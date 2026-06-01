@@ -578,7 +578,7 @@ def normalize_deck_audio_context_text(raw: object, *, max_len: int = 900) -> str
     )
 
 
-def normalize_deck_audio_separation_context_text(raw: object, *, max_len: int = 900) -> str | None:
+def normalize_deck_audio_separation_context_text(raw: object, *, max_len: int = 1200) -> str | None:
     """Return trusted ``deck_audio_separation_context[...]`` text, or ``None``."""
     text = _normalize_live_context_text(
         raw,
@@ -1069,6 +1069,9 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
     elif deck_capture_configured:
         activity = _deck_audio_activity_token(capture.get("deck_audio_rms"))
         active_seen = _evidence_token(str(capture.get("deck_audio_active_sides_seen") or "none"))
+        route_diagnosis = _deck_audio_route_diagnosis_token(
+            capture.get("deck_audio_route_diagnosis")
+        )
         fields.extend(
             [
                 "current_capture=P1_global_mix_plus_unverified_deck_pairs",
@@ -1086,6 +1089,8 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
             fields.append(f"active_sides_seen={active_seen}")
         if activity:
             fields.append(f"deck_audio_activity={activity}")
+        if route_diagnosis:
+            fields.append(f"route_diagnosis={route_diagnosis}")
     else:
         fields.extend(
             [
@@ -3035,6 +3040,27 @@ def _deck_audio_activity_token(raw: object) -> str | None:
         tier = "active" if value >= 0.003 else "silent"
         parts.append(f"{side}_{tier}")
     return "+".join(parts) if parts else None
+
+
+def _deck_audio_route_diagnosis_token(raw: object) -> str | None:
+    if not isinstance(raw, dict):
+        return None
+    status = _evidence_token(str(raw.get("status") or "unknown"))
+    if not status or status == "unknown":
+        return None
+    parts = [status]
+    for key in (
+        "inactive_sides",
+        "active_sides",
+        "configured_pairs",
+        "opened_active_pairs",
+        "active_unassigned_pairs",
+        "rule",
+    ):
+        token = _evidence_token(str(raw.get(key) or ""))
+        if token:
+            parts.append(f"{key}_{token}")
+    return "__".join(parts)[:420]
 
 
 def _deck_audio_capture_evidence_status(capture: dict[str, object] | None) -> str | None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 
@@ -15,6 +16,7 @@ from vibemix.library.codex_curate import (
     render_live_context_preview,
 )
 from vibemix.library.rekordbox import TrackEntry
+from vibemix.runtime.config_store import ConfigStore, load_config
 
 
 def _live_context_capabilities() -> list[str]:
@@ -169,6 +171,31 @@ def _deck_pair_audio_separation_context() -> str:
         "isolated_decks=runtime_capture_available deck_pairs=A:0,1+B:2,3 "
         "upgrade_path=attach_deck_pair_audio_parts_when_needed "
         "deck_audio_activity=A_active+B_silent "
+        "rule=separation_capability_not_outcome]"
+    )
+
+
+def _deck_pair_audio_separation_context_with_route_diagnosis(
+    *,
+    active_unassigned_pairs: str = "none",
+) -> str:
+    active_unassigned_token = active_unassigned_pairs.replace(",", "_")
+    return (
+        "deck_audio_separation_context[requested_device=BlackHole_16ch "
+        "capture_device=BlackHole_16ch input_channels=16 opened_channels=4 "
+        "sample_rate=48000 device_capacity=multichannel_available "
+        "mode=deck_pair_capture_unverified master_channels=0,1,2,3 "
+        "current_capture=P1_global_mix_plus_unverified_deck_pairs "
+        "gemini_audio=mono_downmix_of_master_capture deckA_audio=captured_unverified "
+        "deckB_audio=captured_unverified per_deck_audio=unverified_not_attached "
+        "isolated_decks=false deck_pairs=A:0,1+B:2,3 "
+        "verification=awaiting_live_audio_on_both_deck_pairs "
+        "upgrade_path=verify_rekordbox_deck_routing_or_use_manual_map "
+        "active_sides_seen=A deck_audio_activity=A_active+B_silent "
+        "route_diagnosis=configured_deck_lane_missing_audio__inactive_sides_B"
+        "__active_sides_A__configured_pairs_A:0_1+B:2_3__opened_active_pairs_0_1"
+        f"__active_unassigned_pairs_{active_unassigned_token}"
+        "__rule_opened_channel_probe_not_rekordbox_control "
         "rule=separation_capability_not_outcome]"
     )
 
@@ -1210,7 +1237,9 @@ def test_viber_live_context_readiness_requires_both_deck_audio_lanes_active():
             },
             "recent_moves": ["xfader: A->center"],
             "deck_source_status": _deck_source_status(),
-            "deck_audio_separation_context": _deck_pair_audio_separation_context(),
+            "deck_audio_separation_context": (
+                _deck_pair_audio_separation_context_with_route_diagnosis()
+            ),
             "deck_audio_features_context": _deck_audio_features_context(),
             "deck_audio_delta_context": _deck_audio_delta_context(),
             "deck_audio_window_context": _deck_audio_window_context(),
@@ -1254,6 +1283,8 @@ def test_viber_live_context_readiness_requires_both_deck_audio_lanes_active():
     assert readiness["ready"] is False
     assert readiness["checks"]["deck_audio_capture_active"] is True
     assert readiness["checks"]["deck_audio_capture_both_active"] is False
+    assert readiness["deck_audio_route_diagnosis"]["inactive_sides"] == "B"
+    assert readiness["deck_audio_route_diagnosis"]["active_unassigned_pairs"] == "none"
     assert "deck_audio_capture did not show active audio on both deck lanes" in readiness[
         "blockers"
     ]
@@ -1607,7 +1638,87 @@ def test_viber_live_context_operator_actions_name_connected_controller_gaps():
         "resolve_deck_identity",
         "feed_both_deck_lanes",
     ]
-    assert "both deck lanes" in actions[-1]["detail"]
+    assert "one active deck lane" in actions[-1]["detail"]
+    assert "BlackHole channels 1/2" in actions[-1]["detail"]
+    assert "Deck 2 to channels 3/4" in actions[-1]["detail"]
+    assert "deck_audio_capture=A_active+B_active" in actions[-1]["detail"]
+
+
+def test_viber_live_context_operator_actions_recommends_local_channel_map_override():
+    actions = main_mod._viber_live_context_operator_actions(
+        {
+            "ready": False,
+            "diagnosis": "missing_physical_proof",
+            "checks": {
+                "frames_seen": True,
+                "flat_deck_frame_seen": True,
+                "controller_connected": True,
+                "recent_moves_seen": True,
+                "audio_observed": True,
+                "deck_state_resolved": True,
+                "deck_state_pair_resolved": True,
+                "deck_pair_capture_configured": True,
+                "deck_audio_capture_both_active": False,
+            },
+            "blockers": [
+                "deck_audio_capture did not show active audio on both deck lanes",
+            ],
+            "deck_audio_separation_context": (
+                _deck_pair_audio_separation_context_with_route_diagnosis(
+                    active_unassigned_pairs="4,5"
+                )
+            ),
+        }
+    )
+
+    assert [action["code"] for action in actions] == ["feed_both_deck_lanes"]
+    assert actions[0]["route_diagnosis"]["inactive_sides"] == "B"
+    assert actions[0]["route_diagnosis"]["active_unassigned_pairs"] == "4,5"
+    assert actions[0]["recommended_env"] == {"VIBEMIX_DECK_AUDIO_CHANNELS": "A=0,1;B=4,5"}
+    assert "local channel-map override" in actions[0]["detail"]
+
+
+def test_apply_viber_operator_recommended_env_persists_deck_channel_map(tmp_path):
+    config_path = tmp_path / "config.json"
+    ConfigStore().save(config_path)
+    result = {
+        "operator_actions": [
+            {
+                "code": "feed_both_deck_lanes",
+                "recommended_env": {"VIBEMIX_DECK_AUDIO_CHANNELS": "A=0,1;B=4,5"},
+            }
+        ]
+    }
+
+    applied = main_mod._apply_viber_operator_recommended_env(
+        result,
+        config_path=config_path,
+    )
+
+    assert applied["applied"] is True
+    assert applied["restart_required"] is True
+    assert applied["env"] == {"VIBEMIX_DECK_AUDIO_CHANNELS": "A=0,1;B=4,5"}
+    assert load_config(config_path).extra["deck_audio.channels"] == "A=0,1;B=4,5"
+
+
+def test_apply_deck_audio_config_to_env_respects_explicit_env(monkeypatch):
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
+    config = ConfigStore(extra={"deck_audio.channels": "A=0,1;B=4,5"})
+
+    applied = main_mod._apply_deck_audio_config_to_env(config)
+
+    assert applied == {}
+    assert os.environ["VIBEMIX_DECK_AUDIO_CHANNELS"] == "off"
+
+
+def test_apply_deck_audio_config_to_env_seeds_persisted_viber_setup(monkeypatch):
+    monkeypatch.delenv("VIBEMIX_DECK_AUDIO_CHANNELS", raising=False)
+    config = ConfigStore(extra={"deck_audio.channels": "A=0,1;B=4,5"})
+
+    applied = main_mod._apply_deck_audio_config_to_env(config)
+
+    assert applied == {"VIBEMIX_DECK_AUDIO_CHANNELS": "A=0,1;B=4,5"}
+    assert os.environ["VIBEMIX_DECK_AUDIO_CHANNELS"] == "A=0,1;B=4,5"
 
 
 def test_viber_live_context_operator_actions_promote_setup_hint():

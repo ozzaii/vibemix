@@ -1460,6 +1460,15 @@ def test_deck_audio_separation_context_marks_unverified_auto_deck_pair_capture()
             "deck_audio_capture_verified": False,
             "deck_audio_active_sides_seen": "A",
             "deck_audio_rms": {"A": 0.02, "B": 0.0},
+            "deck_audio_route_diagnosis": {
+                "status": "configured_deck_lane_missing_audio",
+                "inactive_sides": "B",
+                "active_sides": "A",
+                "configured_pairs": "A:0,1+B:2,3",
+                "opened_active_pairs": "0,1",
+                "active_unassigned_pairs": "none",
+                "rule": "opened_channel_probe_not_rekordbox_control",
+            },
         }
     )
 
@@ -1472,6 +1481,10 @@ def test_deck_audio_separation_context_marks_unverified_auto_deck_pair_capture()
     assert "verification=awaiting_live_audio_on_both_deck_pairs" in out
     assert "active_sides_seen=A" in out
     assert "deck_audio_activity=A_active+B_silent" in out
+    assert "route_diagnosis=configured_deck_lane_missing_audio" in out
+    assert "inactive_sides_B" in out
+    assert "opened_active_pairs_0_1" in out
+    assert "active_unassigned_pairs_none" in out
     assert normalize_deck_audio_separation_context_text(out) == out
 
 

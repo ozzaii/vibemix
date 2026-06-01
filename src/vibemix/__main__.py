@@ -104,7 +104,7 @@ from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
 from vibemix.profile import load_consent, load_profile, render_profile_for_cache
 from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
 from vibemix.runtime.cancel import CancelGate
-from vibemix.runtime.config_store import app_data_dir, load_config
+from vibemix.runtime.config_store import app_data_dir, load_config, save_config
 from vibemix.runtime.recordings_index import run_retention_sweep
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import (
@@ -837,6 +837,36 @@ def _apply_packaged_defaults() -> None:
     os.environ.setdefault("VIBEMIX_LOCAL_TTS", "1")  # MOSS = the only voice (zero TTS cost, no key)
 
 
+_DECK_AUDIO_CHANNELS_CONFIG_KEY = "deck_audio.channels"
+
+
+def _valid_deck_audio_channels_config_value(raw: object) -> str | None:
+    text = str(raw or "").strip()
+    lowered = text.lower()
+    if lowered in {"auto", "off", "master"}:
+        return lowered
+    if re.fullmatch(r"A=\d+,\d+;B=\d+,\d+", text):
+        return text
+    return None
+
+
+def _apply_deck_audio_config_to_env(config: Any) -> dict[str, str]:
+    """Seed deck-audio routing env from persisted Viber setup when env is unset."""
+
+    if os.environ.get("VIBEMIX_DECK_AUDIO_CHANNELS") is not None:
+        return {}
+    extra = getattr(config, "extra", None)
+    if not isinstance(extra, dict):
+        return {}
+    value = _valid_deck_audio_channels_config_value(
+        extra.get(_DECK_AUDIO_CHANNELS_CONFIG_KEY)
+    )
+    if not value:
+        return {}
+    os.environ["VIBEMIX_DECK_AUDIO_CHANNELS"] = value
+    return {"VIBEMIX_DECK_AUDIO_CHANNELS": value}
+
+
 async def main() -> None:
     """Verbatim port of cohost_v4.py:1925-2080 with package-aware imports.
 
@@ -1176,10 +1206,16 @@ async def main() -> None:
 
     _boot_settings_config = load_config()
     _persona_seed = apply_persona_config_to_env(_boot_settings_config)
+    _deck_audio_env_seed = _apply_deck_audio_config_to_env(_boot_settings_config)
     if _persona_seed:
         print(
             "-> persona settings: "
             + ", ".join(f"{k}={v}" for k, v in sorted(_persona_seed.items()))
+        )
+    if _deck_audio_env_seed:
+        print(
+            "-> deck audio settings: "
+            + ", ".join(f"{k}={v}" for k, v in sorted(_deck_audio_env_seed.items()))
         )
     state = MusicState()
     # 2026-05-21 — seed mood from VIBEMIX_MOOD at boot. MusicState.mood defaults
@@ -3128,6 +3164,14 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         "--out",
         default=None,
         help="write the full bounded live-context proof packet to this JSON file",
+    )
+    sp_live_context.add_argument(
+        "--apply-recommended-env",
+        action="store_true",
+        help=(
+            "persist a safe recommended Viber operator env override, such as a "
+            "deck channel map; takes effect on the next live-session restart"
+        ),
     )
     sp_live_context.add_argument("--json", action="store_true")
     sp_live_context.set_defaults(func=_cmd_library_live_context)
@@ -5293,9 +5337,14 @@ def _viber_live_context_readiness(
     has_raw_audio_part_context = bool(
         normalize_audio_part_context_text(context.get("audio_part_context"))
     )
+    deck_audio_separation_context = normalize_deck_audio_separation_context_text(
+        context.get("deck_audio_separation_context")
+    )
     has_deck_audio_separation_context = bool(
-        normalize_deck_audio_separation_context_text(context.get("deck_audio_separation_context"))
-        or "deck_audio_separation_context[" in preview
+        deck_audio_separation_context or "deck_audio_separation_context[" in preview
+    )
+    deck_audio_route_diagnosis = _viber_route_diagnosis_from_text(
+        deck_audio_separation_context or preview
     )
     has_deck_audio_features_context = bool(
         normalize_deck_audio_features_context_text(context.get("deck_audio_features_context"))
@@ -5519,7 +5568,7 @@ def _viber_live_context_readiness(
         diagnosis = "ready"
         next_action = "Live Viber deck/audio context proof is ready."
 
-    return {
+    result = {
         "ready": not blockers,
         "diagnosis": diagnosis,
         "next_action": next_action,
@@ -5536,6 +5585,9 @@ def _viber_live_context_readiness(
         "deck_source_status": deck_source_status,
         "session_snapshot_seen": bool(session_snapshot_seen),
     }
+    if deck_audio_route_diagnosis:
+        result["deck_audio_route_diagnosis"] = deck_audio_route_diagnosis
+    return result
 
 
 def _viber_live_context_operator_actions(
@@ -5550,6 +5602,7 @@ def _viber_live_context_operator_actions(
     checks = readiness.get("checks") if isinstance(readiness.get("checks"), dict) else {}
     blockers = readiness.get("blockers") if isinstance(readiness.get("blockers"), list) else []
     diagnosis = str(readiness.get("diagnosis") or "")
+    route_diagnosis = _viber_live_context_route_diagnosis(readiness)
     physical_diagnosis = diagnosis not in {"live_socket_missing", "stale_live_runtime"}
 
     actions: list[dict[str, Any]] = []
@@ -5642,9 +5695,39 @@ def _viber_live_context_operator_actions(
         and checks.get("deck_pair_capture_configured")
         and not checks.get("deck_audio_capture_both_active")
     ):
+        detail = (
+            "Deck-pair capture is configured, but live proof still has only one active "
+            "deck lane. For a BlackHole 16ch/Rekordbox rig, route Deck 1 to "
+            "BlackHole channels 1/2 and Deck 2 to channels 3/4, or update "
+            "VIBEMIX_DECK_AUDIO_CHANNELS to the actual A/B channel map; rerun until "
+            "deck_audio_capture=A_active+B_active."
+        )
+        recommended_env: dict[str, str] | None = None
+        if route_diagnosis:
+            inactive = str(route_diagnosis.get("inactive_sides") or "")
+            active_unassigned = str(route_diagnosis.get("active_unassigned_pairs") or "")
+            if inactive and active_unassigned and active_unassigned != "none":
+                detail = (
+                    "Deck-pair capture is configured, but the configured lane "
+                    f"{inactive} is silent while unassigned input pair {active_unassigned} "
+                    "has live audio. Viber can retry with a local channel-map override; "
+                    "rerun until deck_audio_capture=A_active+B_active."
+                )
+                recommended = _viber_recommended_deck_channel_map(route_diagnosis)
+                if recommended:
+                    recommended_env = {"VIBEMIX_DECK_AUDIO_CHANNELS": recommended}
+            elif inactive:
+                detail = (
+                    "Deck-pair capture is configured, but the configured lane "
+                    f"{inactive} is silent and no other opened stereo pair has live audio. "
+                    "Viber can keep diagnosing the proof, but Rekordbox must send that "
+                    "deck into the BlackHole/Aggregate route before Vibemix can capture it."
+                )
         add(
             "feed_both_deck_lanes",
-            "The deck-pair route is configured, but proof does not show active audio on both deck lanes.",
+            detail,
+            **({"route_diagnosis": route_diagnosis} if route_diagnosis else {}),
+            **({"recommended_env": recommended_env} if recommended_env else {}),
         )
 
     if not actions and blockers:
@@ -5653,6 +5736,106 @@ def _viber_live_context_operator_actions(
             str(readiness.get("next_action") or "Inspect the live-context proof blockers."),
         )
     return actions
+
+
+def _viber_live_context_route_diagnosis(readiness: dict[str, Any]) -> dict[str, str] | None:
+    """Extract the bounded deck route diagnosis from normalized readiness context."""
+
+    if not isinstance(readiness, dict):
+        return None
+    structured = readiness.get("deck_audio_route_diagnosis")
+    if isinstance(structured, dict) and structured.get("status"):
+        return {str(key): str(value) for key, value in structured.items() if value}
+    text = " ".join(str(item) for item in readiness.get("blockers", []) if item)
+    source_status = readiness.get("deck_source_status")
+    if isinstance(source_status, dict):
+        text += " " + " ".join(str(value) for value in source_status.values())
+    raw = str(readiness.get("deck_audio_separation_context") or "")
+    if raw:
+        text += " " + raw
+    context = readiness.get("context")
+    if isinstance(context, dict):
+        text += " " + str(context.get("deck_audio_separation_context") or "")
+    return _viber_route_diagnosis_from_text(text)
+
+
+def _viber_route_diagnosis_from_text(text: str) -> dict[str, str] | None:
+    if not text:
+        return None
+    match = re.search(r"\broute_diagnosis=([^\]\s]+)", text)
+    if not match:
+        return None
+    token = match.group(1)
+    out: dict[str, str] = {"status": token.split("__", 1)[0]}
+    for key in (
+        "inactive_sides",
+        "active_sides",
+        "configured_pairs",
+        "opened_active_pairs",
+        "active_unassigned_pairs",
+        "rule",
+    ):
+        found = re.search(rf"(?:^|__){re.escape(key)}_([^_]+(?:_[^_]+)*?)(?=__|$)", token)
+        if found:
+            out[key] = found.group(1).replace("_", ",")
+    return out
+
+
+def _viber_recommended_deck_channel_map(route_diagnosis: dict[str, str]) -> str | None:
+    configured = str(route_diagnosis.get("configured_pairs") or "")
+    inactive = str(route_diagnosis.get("inactive_sides") or "")
+    active_unassigned = str(route_diagnosis.get("active_unassigned_pairs") or "")
+    if not configured or not inactive or not active_unassigned or active_unassigned == "none":
+        return None
+    pairs: dict[str, str] = {}
+    for chunk in configured.replace(" ", "").split("+"):
+        if ":" not in chunk:
+            continue
+        side, pair = chunk.split(":", 1)
+        if side in {"A", "B"} and re.fullmatch(r"\d+,\d+", pair):
+            pairs[side] = pair
+    candidate_pair = active_unassigned.split("+", 1)[0]
+    if inactive in {"A", "B"} and re.fullmatch(r"\d+,\d+", candidate_pair):
+        pairs[inactive] = candidate_pair
+    if set(pairs) >= {"A", "B"}:
+        return f"A={pairs['A']};B={pairs['B']}"
+    return None
+
+
+def _apply_viber_operator_recommended_env(
+    result: dict[str, Any],
+    *,
+    config_path: Path | None = None,
+) -> dict[str, Any]:
+    """Persist a safe Viber operator recommendation into ConfigStore.extra."""
+
+    actions = result.get("operator_actions") if isinstance(result, dict) else None
+    if not isinstance(actions, list):
+        return {"applied": False, "reason": "no_operator_actions"}
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        recommended_env = action.get("recommended_env")
+        if not isinstance(recommended_env, dict):
+            continue
+        value = _valid_deck_audio_channels_config_value(
+            recommended_env.get("VIBEMIX_DECK_AUDIO_CHANNELS")
+        )
+        if not value:
+            continue
+        config = load_config(config_path)
+        if not isinstance(config.extra, dict):
+            config.extra = {}
+        config.extra[_DECK_AUDIO_CHANNELS_CONFIG_KEY] = value
+        written = save_config(config, config_path)
+        return {
+            "applied": True,
+            "env": {"VIBEMIX_DECK_AUDIO_CHANNELS": value},
+            "config_key": _DECK_AUDIO_CHANNELS_CONFIG_KEY,
+            "config_path": str(written),
+            "restart_required": True,
+        }
+    return {"applied": False, "reason": "no_safe_recommended_env"}
 
 
 def _merge_viber_live_context_frame(
@@ -6011,6 +6194,11 @@ def _cmd_library_live_context(args: argparse.Namespace) -> int:
             interval_s=float(getattr(args, "interval", 1.0) or 1.0),
         )
     )
+    if getattr(args, "apply_recommended_env", False):
+        result = {
+            **result,
+            "applied_operator_env": _apply_viber_operator_recommended_env(result),
+        }
     out_path_raw = getattr(args, "out", None)
     if out_path_raw:
         out_path = Path(str(out_path_raw)).expanduser()
@@ -6045,6 +6233,14 @@ def _cmd_library_live_context(args: argparse.Namespace) -> int:
             )
             if next_action:
                 print(f"next action: {next_action}", file=sys.stderr)
+            applied = result.get("applied_operator_env")
+            if isinstance(applied, dict) and applied.get("applied"):
+                print(
+                    "applied operator env: "
+                    + ",".join(f"{k}={v}" for k, v in applied.get("env", {}).items())
+                    + " (restart live session)",
+                    file=sys.stderr,
+                )
             setup_hint = result.get("setup_hint")
             if isinstance(setup_hint, dict) and setup_hint.get("next_action"):
                 print(f"setup hint: {setup_hint['next_action']}", file=sys.stderr)
@@ -6068,6 +6264,14 @@ def _cmd_library_live_context(args: argparse.Namespace) -> int:
         setup_hint = result.get("setup_hint")
         if isinstance(setup_hint, dict) and setup_hint.get("next_action"):
             print(f"setup hint: {setup_hint['next_action']}", file=sys.stderr)
+        applied = result.get("applied_operator_env")
+        if isinstance(applied, dict) and applied.get("applied"):
+            print(
+                "applied operator env: "
+                + ",".join(f"{k}={v}" for k, v in applied.get("env", {}).items())
+                + " (restart live session)",
+                file=sys.stderr,
+            )
         operator_actions = (
             result.get("operator_actions")
             if isinstance(result.get("operator_actions"), list)
