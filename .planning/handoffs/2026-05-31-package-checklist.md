@@ -1381,6 +1381,37 @@ Remaining gate:
 - None for the agent-facing boundary. Any future single-track cue write tool
   must be proposal-id or track-id grounded before it is exposed to Viber/Codex.
 
+## Package 5I - Folder Cache Source Docstring
+
+Suggested commit: `docs(library): clarify folder cache source path`
+
+Include:
+
+- `src/vibemix/library/folder_ingest.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/library/rekordbox.py`, which is active in the fixture-reject
+  lane.
+- Folder re-index UI, IPC/schema, `__main__.py`, or freshness watcher behavior.
+
+Reason:
+
+- `folder_ingest._write_library_cache` writes a resolved folder path to
+  `_CacheBlob.xml_path`, not a `folder:<root>` marker. The marker belongs in
+  folder-backed `track_id` values.
+- Keeping the comment honest prevents a future "fix" from breaking
+  `try_load_cache` source-folder staleness detection, which depends on being
+  able to stat the folder path.
+
+Proof before staging:
+
+- `uv run pytest -q tests/library/test_folder_ingest.py`
+- `uv run ruff check src/vibemix/library/folder_ingest.py`
+- `git diff --check -- src/vibemix/library/folder_ingest.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Rebuild Carry-Forward Cue Agreement Flywheel
 
 Suggested commit if/when selected: `feat(library): record cue agreement weak labels`

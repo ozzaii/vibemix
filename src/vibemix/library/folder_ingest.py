@@ -285,16 +285,16 @@ def _write_library_cache(entries: dict[str, TrackEntry], root: Path) -> Path:
     """Write a ``RekordboxLibrary.try_load_cache``-compatible pickle.
 
     Mirrors ``RekordboxLibrary._write_cache`` shape: a ``_CacheBlob`` with
-    ``version=SCHEMA_VERSION``, ``xml_path`` = a ``folder:<root>`` marker,
-    ``xml_mtime`` = the folder's mtime (so try_load_cache's staleness check
-    passes — the cache is never "behind" its source folder), and the
-    track dict. Returns the cache path written.
+    ``version=SCHEMA_VERSION``, ``xml_path`` = the resolved folder path,
+    ``xml_mtime`` = the folder's mtime, and the track dict. Track IDs keep the
+    ``folder:<root>`` prefix; the cache source path stays stat-able so
+    ``try_load_cache`` can detect when the folder is newer than the cache.
+    Returns the cache path written.
     """
     cache_path = RekordboxLibrary.CACHE_PATH
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    # Use the folder marker as xml_path. try_load_cache stats this path's
-    # mtime and compares to xml_mtime; record the live folder mtime so the
-    # cache validates (folder exists → mtime stat succeeds → not stale).
+    # try_load_cache stats this path's mtime and compares to xml_mtime; record
+    # the live folder mtime so source-folder freshness remains observable.
     marker = str(Path(root).resolve())
     try:
         folder_mtime = os.path.getmtime(marker)
