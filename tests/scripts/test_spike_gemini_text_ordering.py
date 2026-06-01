@@ -33,7 +33,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 SPIKE_SCRIPT = REPO_ROOT / "scripts" / "spike_gemini_text_ordering.py"
 
