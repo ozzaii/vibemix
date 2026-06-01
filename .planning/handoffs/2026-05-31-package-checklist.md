@@ -356,6 +356,32 @@ Proof before staging:
 - `git diff --check -- tests/repo/test_model_literal_gate.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0M - Live Spike Scaffold Test Ruff Hygiene
+
+Suggested commit: `test(repo): clean live spike scaffold lint`
+
+Include:
+
+- `tests/repo/test_live_spike_scaffold.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Spike runtime scripts, model-router source, prompts, and live app runtime files.
+
+Reason:
+
+- The live-spike scaffold guard imported `re` and `pytest` without using either.
+  Removing the dead imports keeps the focused repo-test ruff gate clean without
+  changing the scaffold assertions or the spike entry point.
+
+Proof before staging:
+
+- `uv run ruff check tests/repo/test_live_spike_scaffold.py`
+- `uv run pytest -q tests/repo/test_live_spike_scaffold.py`
+- `git diff --check -- tests/repo/test_live_spike_scaffold.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
