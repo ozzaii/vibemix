@@ -27,6 +27,7 @@ first audio still streams out fast.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import threading
 from collections.abc import Callable
@@ -51,6 +52,8 @@ if TYPE_CHECKING:
 _DEFAULT_NATIVE_SR = 48000
 _DEFAULT_VOICE = os.environ.get("VIBEMIX_MOSS_TTS_VOICE", "Adam")  # clear EN male preset
 _DEFAULT_THREADS = int(os.environ.get("VIBEMIX_MOSS_TTS_THREADS", "4") or "4")
+MOSS_MODEL_DIR_ENV = "VIBEMIX_MOSS_TTS_DIR"
+_MOSS_MANIFEST = "browser_poc_manifest.json"
 
 
 def default_model_dir() -> Path:
@@ -59,17 +62,119 @@ def default_model_dir() -> Path:
     return Path(cache) / "moss-tts-onnx" / "MOSS-TTS-Nano-100M-ONNX"
 
 
+def candidate_model_dir() -> Path:
+    """Return the configured MOSS model dir, even when it is not installed."""
+    override = os.environ.get(MOSS_MODEL_DIR_ENV)
+    return Path(override).expanduser() if override else default_model_dir()
+
+
 def resolve_model_dir() -> Path | None:
     """Return the usable MOSS model dir, or ``None`` if not present/cached.
 
     ``VIBEMIX_MOSS_TTS_DIR`` overrides; it must point at the ``*-Nano-100M-ONNX``
     dir (the dir holding ``browser_poc_manifest.json``).
     """
-    override = os.environ.get("VIBEMIX_MOSS_TTS_DIR")
-    candidate = Path(override).expanduser() if override else default_model_dir()
-    if (candidate / "browser_poc_manifest.json").is_file():
+    candidate = candidate_model_dir()
+    if not model_status()["installed"]:
+        return None
+    if (candidate / _MOSS_MANIFEST).is_file():
         return candidate
     return None
+
+
+def _resolve_manifest_path(base: Path, rel_path: str) -> Path:
+    path = Path(rel_path)
+    return path if path.is_absolute() else (base / path).resolve(strict=False)
+
+
+def _display_model_path(path: Path, model_dir: Path) -> str:
+    for root in (model_dir, model_dir.parent):
+        try:
+            return str(path.relative_to(root))
+        except ValueError:
+            continue
+    return str(path)
+
+
+def _read_json_file(path: Path, mismatched: list[str], model_dir: Path) -> dict[str, object] | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        mismatched.append(_display_model_path(path, model_dir))
+        return None
+
+
+def _add_meta_files(
+    *,
+    meta_path: Path,
+    required: set[Path],
+    missing: list[str],
+    mismatched: list[str],
+    model_dir: Path,
+) -> None:
+    """Add ONNX/data files referenced by a MOSS meta file to ``required``."""
+    if not meta_path.is_file():
+        missing.append(_display_model_path(meta_path, model_dir))
+        return
+    meta = _read_json_file(meta_path, mismatched, model_dir)
+    if not meta:
+        return
+    base = meta_path.parent
+    files = meta.get("files")
+    if isinstance(files, dict):
+        for rel_path in files.values():
+            if isinstance(rel_path, str):
+                required.add(_resolve_manifest_path(base, rel_path))
+    external = meta.get("external_data_files")
+    if isinstance(external, dict):
+        for rel_paths in external.values():
+            if isinstance(rel_paths, list):
+                for rel_path in rel_paths:
+                    if isinstance(rel_path, str):
+                        required.add(_resolve_manifest_path(base, rel_path))
+
+
+def model_status() -> dict[str, object]:
+    """Return a cheap, no-ORT readiness check for the required MOSS model tree."""
+    model_dir = candidate_model_dir()
+    manifest_path = model_dir / _MOSS_MANIFEST
+    missing: list[str] = []
+    mismatched: list[str] = []
+    required: set[Path] = {manifest_path}
+
+    if not manifest_path.is_file():
+        missing.append(_MOSS_MANIFEST)
+    else:
+        manifest = _read_json_file(manifest_path, mismatched, model_dir)
+        if manifest:
+            model_files = manifest.get("model_files")
+            if isinstance(model_files, dict):
+                for key, rel_path in model_files.items():
+                    if not isinstance(rel_path, str):
+                        continue
+                    path = _resolve_manifest_path(model_dir, rel_path)
+                    required.add(path)
+                    if key in {"tts_meta", "codec_meta"}:
+                        _add_meta_files(
+                            meta_path=path,
+                            required=required,
+                            missing=missing,
+                            mismatched=mismatched,
+                            model_dir=model_dir,
+                        )
+
+    for path in sorted(required, key=lambda p: str(p)):
+        if not path.is_file():
+            display = _display_model_path(path, model_dir)
+            if display not in missing:
+                missing.append(display)
+
+    return {
+        "installed": not missing and not mismatched,
+        "path": str(model_dir),
+        "missing": missing,
+        "mismatched": mismatched,
+    }
 
 
 _DISABLE_FLAGS = {"0", "false", "no", "off", "disabled"}
@@ -101,15 +206,13 @@ def local_tts_unavailable_reason() -> str:
     return (
         "MOSS local TTS model not found; cache it under "
         "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX or set "
-        "VIBEMIX_MOSS_TTS_DIR"
+        f"{MOSS_MODEL_DIR_ENV}"
     )
 
 
 def _read_native_sample_rate(model_dir: Path) -> int:
     """Cheaply read the codec output sample rate from the model meta (no ORT load)."""
     try:
-        import json
-
         manifest = json.loads((model_dir / "browser_poc_manifest.json").read_text(encoding="utf-8"))
         codec_meta_rel = manifest["model_files"]["codec_meta"]
         codec_meta_path = (model_dir / codec_meta_rel).resolve()

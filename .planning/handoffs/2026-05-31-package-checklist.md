@@ -3955,6 +3955,48 @@ Remaining gate:
 - Add real model download or model-bundle UX before packaged release can claim a
   speaking MOSS co-host on a fresh machine.
 
+## Package 14E - MOSS Model Readiness and Installer Surface
+
+Suggested commit: `fix(tts): surface moss model readiness`
+
+Packaging decision: MOSS remains the only TTS source. This package makes the
+required voice model visible in the same setup surface as CLAP/CUE instead of
+letting a fresh install look "ready" while the co-host is muted. `library models`
+now reports `moss-tts` as a required local model, includes it in
+`--install required`, and supports a release/ops-hosted archive only when URL,
+SHA-256, and byte-size pins are supplied. Without those pins it fails honestly
+with manual setup guidance; it does not invent a cloud fallback or an unverified
+download.
+
+Include:
+
+- `src/vibemix/agent/local_tts.py`
+- `src/vibemix/library/model_assets.py`
+- `src/vibemix/__main__.py`
+- `tests/agent/test_local_tts.py`
+- `tests/library/test_models_cli.py`
+
+Keep out:
+
+- Bundling the 600MB+ MOSS ONNX tree into PyInstaller specs.
+- Any cloud/provider TTS fallback.
+- DROP-call speech/timing hunks and deck-audio capture hunks in
+  `src/vibemix/__main__.py`.
+
+Proof for this readiness slice:
+
+- `uv run pytest -q tests/library/test_models_cli.py tests/agent/test_local_tts.py`
+- `uv run ruff check src/vibemix/agent/local_tts.py src/vibemix/library/model_assets.py src/vibemix/__main__.py tests/library/test_models_cli.py tests/agent/test_local_tts.py`
+- `git diff --check -- src/vibemix/agent/local_tts.py src/vibemix/library/model_assets.py src/vibemix/__main__.py tests/library/test_models_cli.py tests/agent/test_local_tts.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- A packaged release still needs either a pinned hosted archive configured in
+  release/ops, a bundled model, or a first-run downloader UI that feeds this
+  installer surface. This package proves readiness and verified archive plumbing,
+  not that the public hosted artifact exists.
+
 ## Hold Lane - Local MOSS TTS ONNX Runtime Spike
 
 Suggested commit if/when it ships: `feat(tts): add wrapped local moss onnx runtime`

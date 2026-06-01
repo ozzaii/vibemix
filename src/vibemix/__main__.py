@@ -3102,24 +3102,26 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
 
     sp_models = sub.add_parser(
         "models",
-        help="Show local AI model cache status for CLAP and CUE-DETR",
+        help="Show local AI model cache status for CLAP, MOSS, and CUE-DETR",
         description=(
             "Offline model asset status for one-click setup. Reports where "
-            "the CLAP embedding snapshot and CUE-DETR cue model should live, "
-            "which files are missing, and which env var overrides the path."
+            "the CLAP embedding snapshot, required MOSS voice model, and "
+            "CUE-DETR cue model should live, which files are missing, and "
+            "which env var overrides the path."
         ),
     )
     sp_models.add_argument("--json", action="store_true")
     sp_models.add_argument(
         "--install",
-        choices=("required", "clap", "cue", "all"),
+        choices=("required", "clap", "moss", "cue", "all"),
         default=None,
         help=(
             "download/install supported local model assets. 'required' "
-            "installs the first-run required assets; 'clap' installs the "
-            "Hugging Face CLAP ONNX snapshot; 'cue' reports/verifies the "
-            "manual CUE-DETR ONNX target until hosting exists; 'all' requires "
-            "both local model targets to be ready."
+            "installs first-run required CLAP + MOSS assets; 'clap' installs "
+            "the Hugging Face CLAP ONNX snapshot; 'moss' reports/verifies the "
+            "required MOSS voice model unless a release archive is configured; "
+            "'cue' reports/verifies the manual CUE-DETR ONNX target until "
+            "hosting exists; 'all' requires every local model target to be ready."
         ),
     )
     sp_models.add_argument(
@@ -6776,11 +6778,14 @@ def _cmd_library_models(args: argparse.Namespace) -> int:
                 progress=progress,
             )
 
+    from vibemix.agent.local_tts import MOSS_MODEL_DIR_ENV
+    from vibemix.agent.local_tts import model_status as moss_model_status
     from vibemix.library.clap_engine import onnx_model_status
     from vibemix.library.cue_detr import model_status as cue_model_status
-    from vibemix.library.model_assets import cue_model_installable
+    from vibemix.library.model_assets import cue_model_installable, moss_model_installable
 
     clap = onnx_model_status()
+    moss = moss_model_status()
     cue = cue_model_status()
     models = [
         {
@@ -6794,6 +6799,18 @@ def _cmd_library_models(args: argparse.Namespace) -> int:
             "path": clap["path"],
             "missing": clap["missing"],
             "mismatched": clap.get("mismatched", []),
+        },
+        {
+            "id": "moss-tts",
+            "label": "MOSS TTS ONNX",
+            "role": "local co-host voice",
+            "required": True,
+            "env": MOSS_MODEL_DIR_ENV,
+            "installed": bool(moss["installed"]),
+            "installable": moss_model_installable(),
+            "path": moss["path"],
+            "missing": moss["missing"],
+            "mismatched": moss.get("mismatched", []),
         },
         {
             "id": "cue-detr",

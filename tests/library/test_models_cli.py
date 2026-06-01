@@ -8,6 +8,7 @@ import hashlib
 import io
 import json
 import tomllib
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -24,7 +25,8 @@ def test_local_ai_optional_extras_are_declared() -> None:
     }
     assert set(extras["clap"]) == expected | {"tokenizers>=0.22"}
     assert set(extras["cue"]) == expected
-    assert set(extras["ai-local"]) == expected | {"tokenizers>=0.22"}
+    assert set(extras["tts-local"]) == expected | {"sentencepiece>=0.2"}
+    assert set(extras["ai-local"]) == expected | {"tokenizers>=0.22", "sentencepiece>=0.2"}
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +34,7 @@ def _fake_model_status(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureR
     if request.node.get_closest_marker("real_model_status"):
         return
 
+    import vibemix.agent.local_tts as local_tts
     import vibemix.library.clap_engine as clap_engine
     import vibemix.library.cue_detr as cue_detr
 
@@ -42,6 +45,16 @@ def _fake_model_status(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureR
             "installed": True,
             "path": "/tmp/vibemix-test/clap-onnx",
             "missing": [],
+        },
+    )
+    monkeypatch.setattr(
+        local_tts,
+        "model_status",
+        lambda: {
+            "installed": True,
+            "path": "/tmp/vibemix-test/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+            "missing": [],
+            "mismatched": [],
         },
     )
     monkeypatch.setattr(
@@ -71,7 +84,7 @@ def test_models_json_reports_required_and_optional_status(
     assert payload["required_ready"] is True
     assert payload["all_ready"] is False
 
-    clap, cue = payload["models"]
+    clap, moss, cue = payload["models"]
     assert clap == {
         "id": "clap",
         "label": "CLAP ONNX",
@@ -81,6 +94,18 @@ def test_models_json_reports_required_and_optional_status(
         "installed": True,
         "installable": True,
         "path": "/tmp/vibemix-test/clap-onnx",
+        "missing": [],
+        "mismatched": [],
+    }
+    assert moss == {
+        "id": "moss-tts",
+        "label": "MOSS TTS ONNX",
+        "role": "local co-host voice",
+        "required": True,
+        "env": "VIBEMIX_MOSS_TTS_DIR",
+        "installed": True,
+        "installable": False,
+        "path": "/tmp/vibemix-test/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
         "missing": [],
         "mismatched": [],
     }
@@ -100,9 +125,44 @@ def test_models_json_marks_cue_installable_when_hosted_url_present(
 
     payload = _run_handler(monkeypatch)
 
-    cue = payload["models"][1]
+    cue = next(model for model in payload["models"] if model["id"] == "cue-detr")
     assert cue["id"] == "cue-detr"
     assert cue["installable"] is True
+
+
+def test_models_json_marks_moss_installable_when_archive_url_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_URL", "https://models.example/moss.zip")
+
+    payload = _run_handler(monkeypatch)
+
+    moss = next(model for model in payload["models"] if model["id"] == "moss-tts")
+    assert moss["installable"] is True
+
+
+def test_models_json_marks_missing_moss_as_required_not_ready(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import vibemix.agent.local_tts as local_tts
+
+    monkeypatch.setattr(
+        local_tts,
+        "model_status",
+        lambda: {
+            "installed": False,
+            "path": "/tmp/vibemix-test/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+            "missing": ["browser_poc_manifest.json"],
+            "mismatched": [],
+        },
+    )
+
+    payload = _run_handler(monkeypatch)
+
+    moss = next(model for model in payload["models"] if model["id"] == "moss-tts")
+    assert payload["required_ready"] is False
+    assert moss["required"] is True
+    assert moss["missing"] == ["browser_poc_manifest.json"]
 
 
 def test_models_subcommand_routes_through_cli(
@@ -111,7 +171,7 @@ def test_models_subcommand_routes_through_cli(
     rc = m._run_library_cli(["models", "--json"])
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
-    assert [model["id"] for model in payload["models"]] == ["clap", "cue-detr"]
+    assert [model["id"] for model in payload["models"]] == ["clap", "moss-tts", "cue-detr"]
 
 
 def test_models_install_payload_is_included(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -323,11 +383,117 @@ def test_models_install_required_does_not_require_optional_cue(
         raise AssertionError("required install must not touch optional CUE")
 
     monkeypatch.setattr(model_assets, "install_cue_model", _unexpected_cue)
+    monkeypatch.setattr(
+        model_assets,
+        "install_moss_model",
+        lambda force=False: {
+            "id": "moss-tts",
+            "installed": True,
+            "path": "/tmp/vibemix-test/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+            "files": [],
+            "errors": [],
+        },
+    )
 
     payload = model_assets.install_models("required")
     assert payload["target"] == "required"
     assert payload["ok"] is True
-    assert [result["id"] for result in payload["results"]] == ["clap"]
+    assert [result["id"] for result in payload["results"]] == ["clap", "moss-tts"]
+
+
+def test_models_install_moss_reports_manual_gap(monkeypatch: pytest.MonkeyPatch) -> None:
+    import vibemix.agent.local_tts as local_tts
+    import vibemix.library.model_assets as model_assets
+
+    monkeypatch.delenv("VIBEMIX_MOSS_TTS_ARCHIVE_URL", raising=False)
+    monkeypatch.setattr(
+        local_tts,
+        "model_status",
+        lambda: {
+            "installed": False,
+            "path": "/tmp/vibemix-test/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+            "missing": ["browser_poc_manifest.json"],
+            "mismatched": [],
+        },
+    )
+
+    payload = model_assets.install_models("moss")
+    assert payload["target"] == "moss"
+    assert payload["ok"] is False
+    assert payload["results"][0]["id"] == "moss-tts"
+    assert "VIBEMIX_MOSS_TTS_ARCHIVE_URL" in payload["results"][0]["errors"][0]
+
+
+@pytest.mark.real_model_status
+def test_install_moss_model_downloads_env_hosted_archive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import vibemix.library.model_assets as model_assets
+
+    archive_buf = io.BytesIO()
+    with zipfile.ZipFile(archive_buf, "w") as zf:
+        zf.writestr(
+            "MOSS-TTS-Nano-100M-ONNX/browser_poc_manifest.json",
+            json.dumps(
+                {
+                    "model_files": {
+                        "tts_meta": "tts_browser_onnx_meta.json",
+                        "codec_meta": "../MOSS-Audio-Tokenizer-Nano-ONNX/codec_browser_onnx_meta.json",
+                        "tokenizer_model": "tokenizer.model",
+                    }
+                }
+            ),
+        )
+        zf.writestr(
+            "MOSS-TTS-Nano-100M-ONNX/tts_browser_onnx_meta.json",
+            json.dumps(
+                {
+                    "files": {"prefill": "moss_tts_prefill.onnx"},
+                    "external_data_files": {
+                        "moss_tts_prefill.onnx": ["moss_tts_global_shared.data"]
+                    },
+                }
+            ),
+        )
+        zf.writestr(
+            "MOSS-Audio-Tokenizer-Nano-ONNX/codec_browser_onnx_meta.json",
+            json.dumps({"files": {"decode": "codec.onnx"}, "external_data_files": {}}),
+        )
+        zf.writestr("MOSS-TTS-Nano-100M-ONNX/tokenizer.model", b"tok")
+        zf.writestr("MOSS-TTS-Nano-100M-ONNX/moss_tts_prefill.onnx", b"onnx")
+        zf.writestr("MOSS-TTS-Nano-100M-ONNX/moss_tts_global_shared.data", b"data")
+        zf.writestr("MOSS-Audio-Tokenizer-Nano-ONNX/codec.onnx", b"codec")
+    archive = archive_buf.getvalue()
+    digest = hashlib.sha256(archive).hexdigest()
+    monkeypatch.setenv("VIBEMIX_CACHE_DIR", str(tmp_path))
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_URL", "https://models.example/moss.zip")
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_SHA256", digest)
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_SIZE", str(len(archive)))
+
+    def _fake_download(*, url, dest, expected_size, expected_sha256, rel_path, **_kwargs):
+        assert url == "https://models.example/moss.zip"
+        assert expected_size == len(archive)
+        assert expected_sha256 == digest
+        dest.write_bytes(archive)
+        return {
+            "rel_path": rel_path,
+            "path": str(dest),
+            "status": "downloaded",
+            "size": len(archive),
+            "sha256": digest,
+            "url": url,
+        }
+
+    monkeypatch.setattr(model_assets, "_download_url_to_file", _fake_download)
+
+    payload = model_assets.install_models("moss")
+
+    assert payload["ok"] is True
+    result = payload["results"][0]
+    assert result["id"] == "moss-tts"
+    assert result["installed"] is True
+    assert (tmp_path / "moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX/tokenizer.model").is_file()
 
 
 def test_install_cue_model_rejects_unverified_hosted_url(
@@ -413,8 +579,19 @@ def test_models_install_all_requires_cue_when_requested(
     )
     monkeypatch.setattr(
         model_assets,
-        "cue_model_install_status",
-        lambda: {
+        "install_moss_model",
+        lambda force=False: {
+            "id": "moss-tts",
+            "installed": True,
+            "path": "/tmp/vibemix-test/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+            "files": [],
+            "errors": [],
+        },
+    )
+    monkeypatch.setattr(
+        model_assets,
+        "install_cue_model",
+        lambda force=False: {
             "id": "cue-detr",
             "installed": False,
             "path": "/tmp/vibemix-test/cue-detr-onnx/cuedetr.fp32.onnx",
@@ -425,7 +602,7 @@ def test_models_install_all_requires_cue_when_requested(
 
     payload = model_assets.install_models("all")
     assert payload["ok"] is False
-    assert [result["id"] for result in payload["results"]] == ["clap", "cue-detr"]
+    assert [result["id"] for result in payload["results"]] == ["clap", "moss-tts", "cue-detr"]
 
 
 @pytest.mark.real_model_status
@@ -486,6 +663,17 @@ def test_install_models_progress_reports_target_and_verified_file(
     monkeypatch.setenv("VIBEMIX_CLAP_ONNX_DIR", str(tmp_path))
     (tmp_path / "tiny.bin").write_bytes(data)
     frames: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        model_assets,
+        "install_moss_model",
+        lambda force=False, progress=None: {
+            "id": "moss-tts",
+            "installed": True,
+            "path": "/tmp/vibemix-test/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+            "files": [],
+            "errors": [],
+        },
+    )
 
     payload = model_assets.install_models("required", progress=frames.append)
 

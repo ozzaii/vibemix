@@ -21,6 +21,7 @@ from vibemix.agent.local_tts import (
     _read_native_sample_rate,
     build_local_tts_adapter,
     local_tts_enabled,
+    model_status,
     pcm16_mono_le,
     resolve_model_dir,
 )
@@ -81,6 +82,79 @@ def test_enabled_with_flag_and_cached_model(monkeypatch, tmp_path):
     monkeypatch.setenv("VIBEMIX_MOSS_TTS_DIR", str(_fake_model_dir(tmp_path)))
     assert resolve_model_dir() == tmp_path
     assert local_tts_enabled() is True
+
+
+def test_model_status_reports_missing_manifest(monkeypatch, tmp_path):
+    missing = tmp_path / "missing-moss"
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_DIR", str(missing))
+
+    status = model_status()
+
+    assert status == {
+        "installed": False,
+        "path": str(missing),
+        "missing": ["browser_poc_manifest.json"],
+        "mismatched": [],
+    }
+
+
+def test_model_status_checks_manifest_referenced_files(monkeypatch, tmp_path):
+    model_dir = tmp_path / "MOSS-TTS-Nano-100M-ONNX"
+    codec_dir = tmp_path / "MOSS-Audio-Tokenizer-Nano-ONNX"
+    model_dir.mkdir()
+    codec_dir.mkdir()
+    (model_dir / "browser_poc_manifest.json").write_text(
+        json.dumps(
+            {
+                "model_files": {
+                    "tts_meta": "tts_browser_onnx_meta.json",
+                    "codec_meta": "../MOSS-Audio-Tokenizer-Nano-ONNX/codec_browser_onnx_meta.json",
+                    "tokenizer_model": "tokenizer.model",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (model_dir / "tts_browser_onnx_meta.json").write_text(
+        json.dumps(
+            {
+                "files": {"prefill": "moss_tts_prefill.onnx"},
+                "external_data_files": {"moss_tts_prefill.onnx": ["moss_tts_global_shared.data"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (codec_dir / "codec_browser_onnx_meta.json").write_text(
+        json.dumps(
+            {
+                "files": {"decode_step": "moss_audio_tokenizer_decode_step.onnx"},
+                "external_data_files": {
+                    "moss_audio_tokenizer_decode_step.onnx": [
+                        "moss_audio_tokenizer_decode_shared.data"
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    for path in (
+        model_dir / "tokenizer.model",
+        model_dir / "moss_tts_prefill.onnx",
+        model_dir / "moss_tts_global_shared.data",
+        codec_dir / "moss_audio_tokenizer_decode_step.onnx",
+        codec_dir / "moss_audio_tokenizer_decode_shared.data",
+    ):
+        path.write_bytes(b"x")
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_DIR", str(model_dir))
+
+    assert model_status()["installed"] is True
+
+    (codec_dir / "moss_audio_tokenizer_decode_shared.data").unlink()
+    status = model_status()
+    assert status["installed"] is False
+    assert status["missing"] == [
+        "MOSS-Audio-Tokenizer-Nano-ONNX/moss_audio_tokenizer_decode_shared.data"
+    ]
 
 
 def test_read_native_sample_rate(monkeypatch, tmp_path):
