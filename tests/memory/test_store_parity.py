@@ -18,10 +18,11 @@ pinned contract — it proves these tests target the unbuilt package, not a stub
 Synthetic 768-dim L2-normalized vectors are generated IN-TEST via
 ``np.random.default_rng(seed)`` (no new fixture file — keeps the repo lean).
 
-The chokepoint (``cosine_topk`` / ``l2_normalize`` / ``EMBEDDING_DIM``) is
-IMPORTED VERBATIM from ``vibemix.library._cosine`` — never forked. No test in
-this file defines a bespoke nearest-neighbour search or asserts a native
-distance-ordered query path; ranking is the shared chokepoint, end to end.
+The chokepoint (``cosine_topk`` inside ``MemoryStore``, plus the shared
+``l2_normalize`` / ``EMBEDDING_DIM`` imported here) lives in
+``vibemix.library._cosine`` — never forked. No test in this file defines a
+bespoke nearest-neighbour search or asserts a native distance-ordered query
+path; ranking is the shared chokepoint, end to end.
 """
 
 from __future__ import annotations
@@ -32,14 +33,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from vibemix.library._cosine import EMBEDDING_DIM, cosine_topk, l2_normalize
+from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
 from vibemix.library.index_numpy import NumpyStore  # noqa: F401 (parity ref)
 from vibemix.memory.store import MemoryStore
 
 
 def _sqlite_vec_available() -> bool:
     try:
-        import sqlite_vec  # noqa: F401
+        import sqlite_vec
 
         db = sqlite3.connect(":memory:")
         db.enable_load_extension(True)
@@ -51,6 +52,58 @@ def _sqlite_vec_available() -> bool:
 
 
 SQLITE_VEC_AVAILABLE = _sqlite_vec_available()
+
+
+def _stale_dim() -> int:
+    return 768 if EMBEDDING_DIM != 768 else 512
+
+
+def _create_stale_sqlite_vec_memory_db(
+    db_path: Path,
+    *,
+    with_vector: bool,
+    with_moment: bool,
+) -> int:
+    """Create a memory.db whose vec0 table is pinned to the previous dim."""
+    import sqlite_vec
+
+    stale_dim = _stale_dim()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    db = sqlite3.connect(str(db_path))
+    db.enable_load_extension(True)
+    sqlite_vec.load(db)
+    db.enable_load_extension(False)
+    db.execute(
+        f"CREATE VIRTUAL TABLE vec_memory USING vec0("
+        f"record_id TEXT PRIMARY KEY, "
+        f"embedding FLOAT[{stale_dim}] distance_metric=cosine"
+        f")"
+    )
+    db.execute(
+        "CREATE TABLE moments ("
+        "record_id  TEXT PRIMARY KEY, "
+        "session_id TEXT NOT NULL, "
+        "ts         REAL NOT NULL, "
+        "kind       TEXT NOT NULL, "
+        "signature  TEXT NOT NULL"
+        ")"
+    )
+    if with_vector:
+        old_vec = np.zeros(stale_dim, dtype=np.float32)
+        old_vec[0] = 1.0
+        db.execute(
+            "INSERT INTO vec_memory(record_id, embedding) VALUES (?, ?)",
+            ("old:0", old_vec.tobytes()),
+        )
+    if with_moment:
+        db.execute(
+            "INSERT INTO moments(record_id, session_id, ts, kind, signature) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("old:0", "old", 0.0, "moment", "old stale signature"),
+        )
+    db.commit()
+    db.close()
+    return stale_dim
 
 
 def _synthetic_records(seed: int, n: int = 100):
@@ -65,6 +118,55 @@ def _synthetic_records(seed: int, n: int = 100):
         vec = l2_normalize(rng.standard_normal(EMBEDDING_DIM).astype(np.float32))
         records.append((f"s1:{i}", "s1", float(i), "moment", f"sig {i}", vec))
     return records
+
+
+@pytest.mark.parity
+@pytest.mark.skipif(not SQLITE_VEC_AVAILABLE, reason="sqlite-vec extension unavailable")
+def test_memory_sqlite_vec_recreates_empty_stale_dim_table(tmp_path: Path) -> None:
+    """An empty 768-dim ``vec_memory`` table self-heals before first 512-d insert."""
+    db_path = tmp_path / "memory.db"
+    stale_dim = _create_stale_sqlite_vec_memory_db(
+        db_path, with_vector=False, with_moment=True
+    )
+    assert stale_dim != EMBEDDING_DIM
+
+    store = MemoryStore(db_path=db_path, prefer_sqlite_vec=True)
+    try:
+        assert store.backend_name == "SqliteVecMemoryStore"
+        assert store._backend.vector_dim() == EMBEDDING_DIM
+        assert (
+            store._moments.execute("SELECT COUNT(*) FROM moments").fetchone()[0]
+            == 0
+        )
+
+        vec = l2_normalize(np.ones(EMBEDDING_DIM, dtype=np.float32))
+        store.add_record("s1:0", "s1", 0.0, "moment", "fresh", vec)
+
+        assert store._backend.row_count() == 1
+        assert [r.record_id for r in store.query_topk(vec, k=1)] == ["s1:0"]
+    finally:
+        store.close()
+
+
+@pytest.mark.parity
+@pytest.mark.skipif(not SQLITE_VEC_AVAILABLE, reason="sqlite-vec extension unavailable")
+def test_memory_sqlite_vec_populated_stale_dim_falls_back(tmp_path: Path) -> None:
+    """A populated stale table is not wiped; the store falls back to fresh numpy."""
+    db_path = tmp_path / "memory.db"
+    stale_dim = _create_stale_sqlite_vec_memory_db(
+        db_path, with_vector=True, with_moment=True
+    )
+    assert stale_dim != EMBEDDING_DIM
+
+    store = MemoryStore(db_path=db_path, prefer_sqlite_vec=True)
+    try:
+        assert store.backend_name == "NumpyStore"
+        vec = l2_normalize(np.ones(EMBEDDING_DIM, dtype=np.float32))
+        store.add_record("fresh:0", "fresh", 0.0, "moment", "fresh", vec)
+
+        assert [r.record_id for r in store.query_topk(vec, k=5)] == ["fresh:0"]
+    finally:
+        store.close()
 
 
 @pytest.mark.parity

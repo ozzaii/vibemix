@@ -174,6 +174,7 @@ class SessionLoop:
         recordings_root: Path | None = None,
         active_recorder: object | None = None,
         evidence_registry: object | None = None,
+        memory_ingest_enabled: bool = True,
     ) -> None:
         self.bus = bus
         self.config_store = config_store or load_config()
@@ -188,6 +189,7 @@ class SessionLoop:
         self.controller_state = controller_state
         self.screen_available = screen_available
         self.recordings_root = recordings_root
+        self.memory_ingest_enabled = bool(memory_ingest_enabled)
         # Phase 15 Plan 02 — `active_recorder` is the live VoiceRecorder
         # instance whose events.jsonl receives the per-sweep
         # `retention_pruned` line when count > 0. None in --session
@@ -751,6 +753,9 @@ class SessionLoop:
         sweep must never block startup).
         """
         await self._fire_one_retention_sweep("boot")
+        if not self.memory_ingest_enabled:
+            log.info("memory ingest (boot) skipped: disabled for this session loop")
+            return
         # Fire-and-forget: the boot ingest must NOT block boot/IPC readiness.
         # Keep a ref so the task is not GC'd mid-flight.
         self._boot_ingest_task = asyncio.create_task(self._fire_ingest("boot"))
@@ -772,6 +777,9 @@ class SessionLoop:
         no-op). Best-effort — a failing ingest never blocks session close.
         """
         await self._fire_one_retention_sweep("close")
+        if not self.memory_ingest_enabled:
+            log.info("memory ingest (close) skipped: disabled for this session loop")
+            return
         session_dir = self._active_session_dir()
         await self._fire_ingest("close", session_dir=session_dir)
 
@@ -888,6 +896,9 @@ class SessionLoop:
         function-local (inside the worker) so the no-live-path dormancy gate
         (which scans the ``memory/*.py`` import graph) is unaffected.
         """
+        if not self.memory_ingest_enabled:
+            log.info("memory ingest (%s) skipped: disabled for this session loop", trigger)
+            return
         if self.recordings_root is None:
             return
 
@@ -1437,7 +1448,14 @@ async def run_session() -> int:
     from vibemix.runtime.config_store import app_data_dir
 
     recordings_root = app_data_dir() / "recordings"
-    loop = SessionLoop(bus, recordings_root=recordings_root)
+    loop = SessionLoop(
+        bus,
+        recordings_root=recordings_root,
+        # ``--session`` is a diagnostic bus probe: no live recorder, no co-host
+        # recall surface. Keep retention/recordings handlers live, but do not let
+        # a quick MCP health check launch CLAP memory indexing or block shutdown.
+        memory_ingest_enabled=False,
+    )
     print("-> session boot", file=sys.stderr)
     started = time.monotonic()
     try:

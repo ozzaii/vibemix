@@ -37,8 +37,9 @@ import pytest
 
 import vibemix.memory.ingest as ingest_mod
 import vibemix.memory.store as store_mod
+from vibemix.runtime import session_loop as session_loop_mod
+from vibemix.runtime.recordings_index import RetentionSweepResult
 from vibemix.runtime.session_loop import SessionLoop
-
 
 # ---------------------------------------------------------------------------
 # Minimal fakes
@@ -48,11 +49,14 @@ from vibemix.runtime.session_loop import SessionLoop
 class FakeBus:
     """In-memory stand-in for ``WizardBus`` — only what SessionLoop touches."""
 
-    def register_handler(self, message_type, handler) -> None:  # noqa: D401
+    def __init__(self) -> None:
+        self.emitted: list[dict] = []
+
+    def register_handler(self, message_type, handler) -> None:
         pass
 
     async def emit(self, msg: dict) -> None:
-        pass
+        self.emitted.append(msg)
 
 
 class FakeRecorder:
@@ -203,6 +207,47 @@ def test_none_recordings_root_skips_ingest(_stub_ingest: dict) -> None:
     assert _stub_ingest["close_tid"] is None
 
 
+def test_disabled_memory_ingest_skips_boot_and_close(
+    tmp_path: Path, _stub_ingest: dict
+) -> None:
+    """Diagnostic session loops can keep retention live without starting CLAP ingest."""
+    loop = SessionLoop(
+        FakeBus(),
+        recordings_root=tmp_path,
+        memory_ingest_enabled=False,
+    )
+
+    asyncio.run(loop._fire_ingest("boot"))
+    asyncio.run(loop._fire_ingest("close", session_dir=tmp_path / "20260531-000000"))
+
+    assert _stub_ingest["boot_tid"] is None
+    assert _stub_ingest["close_tid"] is None
+
+
+def test_disabled_memory_ingest_keeps_retention_sweep_live(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The diagnostic ``--session`` guard disables CLAP ingest, not retention."""
+    calls: list[tuple[Path, int]] = []
+
+    def fake_retention_sweep(root: Path, retention_days: int) -> RetentionSweepResult:
+        calls.append((root, retention_days))
+        return RetentionSweepResult(deleted_names=[], bytes_pruned=0)
+
+    monkeypatch.setattr(session_loop_mod, "run_retention_sweep", fake_retention_sweep)
+    bus = FakeBus()
+    loop = SessionLoop(
+        bus,
+        recordings_root=tmp_path,
+        memory_ingest_enabled=False,
+    )
+
+    asyncio.run(loop.run_boot_sweeps())
+
+    assert calls == [(tmp_path, loop.config_store.retention_days)]
+    assert any(msg.get("type") == "ipc.recordings.usage" for msg in bus.emitted)
+
+
 def test_ingest_failure_is_swallowed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -298,6 +343,15 @@ def test_main_ingest_is_gated_behind_recall_enabled() -> None:
     assert "recall_enabled" in window, (
         "_fire_ingest on the main() path must be gated behind recall_enabled"
     )
+
+
+def test_diagnostic_run_session_disables_memory_ingest() -> None:
+    """The sidecar-only ``--session`` probe must not launch CLAP memory indexing."""
+    src = _session_loop_source()
+    idx = src.find("async def run_session")
+    assert idx != -1, "run_session not found"
+    window = src[idx : idx + 1800]
+    assert "memory_ingest_enabled=False" in window
 
 
 def test_main_does_not_call_combined_retention_methods() -> None:

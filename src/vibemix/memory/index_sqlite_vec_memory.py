@@ -44,6 +44,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import re
 import sqlite3
 from pathlib import Path
 
@@ -51,6 +53,8 @@ import numpy as np
 import sqlite_vec
 
 from vibemix.library._cosine import EMBEDDING_DIM
+
+logger = logging.getLogger(__name__)
 
 
 class SqliteVecMemoryStore:
@@ -95,34 +99,65 @@ class SqliteVecMemoryStore:
             # caller (open_memory_store) catches → numpy fallback. Assumption A2.
             sqlite_vec.load(self.db)
             self.db.enable_load_extension(False)
-            self.db.execute(
-                f"CREATE VIRTUAL TABLE IF NOT EXISTS vec_memory USING vec0("
-                f"record_id TEXT PRIMARY KEY, "
-                f"embedding FLOAT[{EMBEDDING_DIM}] distance_metric=cosine"
-                f")"
-            )
+            self._create_vec_table(if_not_exists=True)
             # moments sibling table on the SAME connection so add_record commits
             # the vec0 vector and metadata row downstream. Plain sqlite — no
             # vec0 syntax.
-            self.db.execute(
-                "CREATE TABLE IF NOT EXISTS moments ("
-                "record_id  TEXT PRIMARY KEY, "
-                "session_id TEXT NOT NULL, "
-                "ts         REAL NOT NULL, "
-                "kind       TEXT NOT NULL, "
-                "signature  TEXT NOT NULL"
-                ")"
-            )
-            self.db.execute(
-                "CREATE INDEX IF NOT EXISTS idx_moments_session "
-                "ON moments(session_id)"
-            )
+            self._ensure_moments_schema()
+            self._reconcile_declared_dim()
             self.db.commit()
         except Exception:
             try:
                 self.db.close()
             finally:
                 raise
+
+    def _create_vec_table(self, *, if_not_exists: bool) -> None:
+        clause = "IF NOT EXISTS " if if_not_exists else ""
+        self.db.execute(
+            f"CREATE VIRTUAL TABLE {clause}vec_memory USING vec0("
+            f"record_id TEXT PRIMARY KEY, "
+            f"embedding FLOAT[{EMBEDDING_DIM}] distance_metric=cosine"
+            f")"
+        )
+
+    def _ensure_moments_schema(self) -> None:
+        self.db.execute(
+            "CREATE TABLE IF NOT EXISTS moments ("
+            "record_id  TEXT PRIMARY KEY, "
+            "session_id TEXT NOT NULL, "
+            "ts         REAL NOT NULL, "
+            "kind       TEXT NOT NULL, "
+            "signature  TEXT NOT NULL"
+            ")"
+        )
+        self.db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_moments_session "
+            "ON moments(session_id)"
+        )
+
+    def _reconcile_declared_dim(self) -> None:
+        declared = self.vector_dim()
+        if declared is None or declared == EMBEDDING_DIM:
+            return
+
+        count = self.row_count()
+        if count == 0:
+            logger.warning(
+                "memory vec table is empty but pinned at dim %s != EMBEDDING_DIM=%s "
+                "— recreating it and clearing unbacked moments rows.",
+                declared,
+                EMBEDDING_DIM,
+            )
+            self.recreate_table()
+            return
+
+        raise RuntimeError(
+            f"Memory store holds {count} vectors at dim {declared}, but current "
+            f"ingest produces dim {EMBEDDING_DIM}. Refusing to mix dimensions "
+            f"silently; migrate or wipe the stale memory.db before sqlite-vec "
+            f"memory ingest resumes."
+        )
 
     def add_batch(self, items: list[tuple[str, np.ndarray]]) -> None:
         if not items:
@@ -164,6 +199,28 @@ class SqliteVecMemoryStore:
             [np.frombuffer(r[1], dtype=np.float32) for r in rows]
         )
         return ids, vectors
+
+    def vector_dim(self) -> int | None:
+        """Return the declared ``FLOAT[N]`` dim of ``vec_memory``, or None."""
+        row = self.db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_memory'"
+        ).fetchone()
+        if not row or not row[0]:
+            return None
+        match = re.search(r"FLOAT\[(\d+)\]", row[0])
+        return int(match.group(1)) if match else None
+
+    def row_count(self) -> int:
+        """Number of stored memory vectors."""
+        return int(self.db.execute("SELECT COUNT(*) FROM vec_memory").fetchone()[0])
+
+    def recreate_table(self) -> None:
+        """Drop + recreate an empty stale vec table at the current EMBEDDING_DIM."""
+        self.db.execute("DROP TABLE IF EXISTS vec_memory")
+        self._create_vec_table(if_not_exists=False)
+        # A clean vec wipe leaves any moments rows unbacked and unretrievable.
+        self.db.execute("DELETE FROM moments")
+        self.db.commit()
 
     def delete(self, record_ids: list[str]) -> None:
         if not record_ids:
