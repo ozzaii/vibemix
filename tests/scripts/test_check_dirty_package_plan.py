@@ -88,6 +88,59 @@ Include:
     assert outside_assignment == []
 
 
+def test_paths_by_section_assigns_directory_tokens() -> None:
+    checker = _load_script_module()
+    checklist = """
+## Hold Lane - Eval Archives
+
+Hold:
+
+- `.planning/eval-runs/`
+"""
+
+    sections, shared, outside_assignment = checker._paths_by_section(
+        checklist,
+        {
+            ".planning/eval-runs/run-a/report.json",
+            ".planning/eval-runs/run-b/report.md",
+            "src/vibemix/runtime/coach.py",
+        },
+    )
+
+    assert sections == {
+        "Hold Lane - Eval Archives": [
+            ".planning/eval-runs/run-a/report.json",
+            ".planning/eval-runs/run-b/report.md",
+        ],
+    }
+    assert shared == {}
+    assert outside_assignment == []
+
+
+def test_directory_token_must_be_in_include_or_hold_to_assign() -> None:
+    checker = _load_script_module()
+    checklist = """
+## Hold Lane - Eval Archives
+
+Keep out:
+
+- `.planning/eval-runs/`
+"""
+
+    gaps = checker._strict_assignment_gaps(
+        checklist,
+        [
+            ".planning/eval-runs/run-a/report.json",
+            ".planning/eval-runs/run-b/report.md",
+        ],
+    )
+
+    assert gaps == [
+        ".planning/eval-runs/run-a/report.json",
+        ".planning/eval-runs/run-b/report.md",
+    ]
+
+
 def test_paths_by_section_reports_shared_dirty_paths() -> None:
     checker = _load_script_module()
     checklist = """
@@ -178,3 +231,15 @@ Hold:
     )
 
     assert gaps == ["tests/test_main_smoke.py"]
+
+
+def test_path_is_covered_by_exact_or_directory_token() -> None:
+    checker = _load_script_module()
+    tokens = {
+        ".planning/packets/2026-06-01/",
+        "src/vibemix/runtime/coach.py",
+    }
+
+    assert checker._path_is_covered(".planning/packets/2026-06-01/INDEX.md", tokens)
+    assert checker._path_is_covered("src/vibemix/runtime/coach.py", tokens)
+    assert not checker._path_is_covered(".planning/packets/2026-06-02/INDEX.md", tokens)

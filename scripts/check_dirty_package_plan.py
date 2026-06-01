@@ -65,6 +65,20 @@ def _checklist_tokens(text: str) -> set[str]:
     return {match.group(1) for match in BACKTICK_TOKEN_RE.finditer(text)}
 
 
+def _matches_token(token: str, dirty_paths: set[str]) -> list[str]:
+    if token in dirty_paths:
+        return [token]
+    if token.endswith("/"):
+        return sorted(path for path in dirty_paths if path.startswith(token))
+    return []
+
+
+def _path_is_covered(path: str, tokens: set[str]) -> bool:
+    if path in tokens:
+        return True
+    return any(token.endswith("/") and path.startswith(token) for token in tokens)
+
+
 def _paths_by_section(
     text: str,
     dirty_paths: set[str],
@@ -95,13 +109,15 @@ def _paths_by_section(
             continue
 
         for token in BACKTICK_TOKEN_RE.findall(line):
-            if token not in dirty_paths:
+            matched_paths = _matches_token(token, dirty_paths)
+            if not matched_paths:
                 continue
-            mentioned_paths.add(token)
-            if current_mode != "assign" or token in section_paths[current_section]:
-                continue
-            section_paths[current_section].append(token)
-            path_sections.setdefault(token, []).append(current_section)
+            for path in matched_paths:
+                mentioned_paths.add(path)
+                if current_mode != "assign" or path in section_paths[current_section]:
+                    continue
+                section_paths[current_section].append(path)
+                path_sections.setdefault(path, []).append(current_section)
 
     active_sections = {
         section: paths for section, paths in section_paths.items() if paths
@@ -152,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     checklist = CHECKLIST.read_text(encoding="utf-8")
     checklist_tokens = _checklist_tokens(checklist)
     dirty = _dirty_paths()
-    missing = [path for path in dirty if path not in checklist_tokens]
+    missing = [path for path in dirty if not _path_is_covered(path, checklist_tokens)]
     ignored_missing = _check_generated_ignores()
 
     if missing or ignored_missing:
@@ -174,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print(
-        f"OK: {len(dirty)} dirty paths exactly listed in "
+        f"OK: {len(dirty)} dirty paths covered by "
         f"{CHECKLIST.relative_to(ROOT)}; "
         f"{len(IGNORED_GENERATED)} generated launch previews ignored."
     )

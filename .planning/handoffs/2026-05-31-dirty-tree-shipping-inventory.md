@@ -859,8 +859,8 @@ learning-module owned-deck Judge can grade phase and tempo from known deck state
 | `tests/learn/test_judge_credits_beatmatch.py` | 80-113 | Trainwreck, drift, tempo-off, and abstain grades credit nothing. |
 | `tests/learn/test_judge_credits_beatmatch.py` | 116-134 | Uncited or not-yet-Competent locked grades credit nothing. |
 | `tests/learn/test_judge_credits_beatmatch.py` | 137-171 | Real `grade_beatmatch()` output round-trips through `grade_to_event_extra()` into recognizer credit or refusal. |
-| `tests/learn/test_creditability_drift.py` | 24-33 | Manifest `live_creditable` flags and recognizer uncreditable list both prove no uncreditable v11.0 skills remain. |
-| `tests/learn/test_skill_wall_what_remains.py` | 78-88 | Competent beatmatching now promises the real cited-live-demo path to Mastered. |
+| `tests/learn/test_creditability_drift.py` | 24-33 | Manifest `live_creditable` flags and recognizer uncreditable list both prove beatmatching remains the one honest-uncreditable v11.0 skill. |
+| `tests/learn/test_skill_wall_what_remains.py` | 78-88 | Competent beatmatching explicitly says Mastered is not live-graded yet, so the wall does not promise a missing live path. |
 
 ### Packaging Notes
 
