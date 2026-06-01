@@ -65,6 +65,26 @@ def _check_repaired_dylib_links(internal: Path, status: MacOSAppBundleStatus) ->
                 )
 
 
+def _is_test_fixture_path(path: Path) -> bool:
+    parts = path.parts
+    for index, part in enumerate(parts):
+        if part == "tests" and "fixtures" in parts[index + 1 :]:
+            return True
+    return False
+
+
+def _check_no_test_fixtures(app: Path, status: MacOSAppBundleStatus) -> None:
+    hits = [
+        path.relative_to(app)
+        for path in app.rglob("*")
+        if _is_test_fixture_path(path.relative_to(app))
+    ]
+    if hits:
+        preview = ", ".join(str(path) for path in sorted(hits)[:5])
+        extra = "" if len(hits) <= 5 else f" (+{len(hits) - 5} more)"
+        status.fail(f"test fixture payloads bundled: {preview}{extra}")
+
+
 def _run_smoke(binary: Path, smoke: str, timeout_s: float, status: MacOSAppBundleStatus) -> None:
     if smoke == "none":
         return
@@ -136,6 +156,7 @@ def check_macos_app_bundle_ready(
         status.fail(f"sidecar _internal directory missing: {internal}")
         return status
 
+    _check_no_test_fixtures(app, status)
     _check_repaired_dylib_links(internal, status)
     if status.ok:
         _run_smoke(sidecar, smoke, smoke_timeout_s, status)

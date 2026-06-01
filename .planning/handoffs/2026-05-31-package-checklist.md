@@ -4258,6 +4258,37 @@ Remaining gate:
   notarization, clean-install proof, and live DJ acceptance still belong to the
   release gate.
 
+## Package 13A2 - Packaged Test Fixture Exclusion Gate
+
+Suggested commit: `fix(packaging): reject bundled test fixtures`
+
+Include:
+
+- `scripts/dist/check_macos_app_bundle_ready.py`
+- `tests/install/test_macos_app_bundle_ready.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Signed/notarized artifacts, DMGs, PyInstaller output, and Tauri build output.
+- `src/vibemix/library/rekordbox.py`; fixture-cache quarantine is a separate
+  active library lane.
+
+Reason:
+
+- Fixture-cache rejection is only meaningful in packaged builds if repository
+  test fixtures do not ship inside the `.app`. The app-bundle readiness gate now
+  fails on any bundled `tests/.../fixtures/...` path before signing/upload.
+- `check_macos_dmg_artifact_ready.py` reuses this app-bundle checker on the
+  copied app from a DMG, so the same exclusion gate protects local DMG proof.
+
+Proof before staging:
+
+- `uv run pytest -q tests/install/test_macos_app_bundle_ready.py`
+- `uv run ruff check scripts/dist/check_macos_app_bundle_ready.py tests/install/test_macos_app_bundle_ready.py`
+- `git diff --check -- scripts/dist/check_macos_app_bundle_ready.py tests/install/test_macos_app_bundle_ready.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Package 13B - macOS Signing And Notarization Flow
 
 Suggested commit if/when selected: `fix(packaging): support local notarization fallback`

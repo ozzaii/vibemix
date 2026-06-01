@@ -101,6 +101,35 @@ def test_missing_sidecar_binary_fails(tmp_path: Path) -> None:
     assert "sidecar binary" in status.errors[0]
 
 
+def test_bundled_test_fixture_payloads_fail(tmp_path: Path) -> None:
+    app = _fake_app(tmp_path)
+    fixture = (
+        app
+        / "Contents"
+        / "Resources"
+        / "binaries"
+        / f"vibemix-core-{MAC_TRIPLE}"
+        / "_internal"
+        / "tests"
+        / "library"
+        / "fixtures"
+        / "synthetic_collection.xml"
+    )
+    fixture.parent.mkdir(parents=True)
+    fixture.write_text("<DJ_PLAYLISTS />\n", encoding="utf-8")
+
+    status = gate.check_macos_app_bundle_ready(
+        app,
+        triple=MAC_TRIPLE,
+        min_bytes=1,
+        smoke="none",
+    )
+
+    assert status.ok is False
+    assert any("test fixture payloads bundled" in error for error in status.errors)
+    assert any("synthetic_collection.xml" in error for error in status.errors)
+
+
 def test_main_returns_one_for_flattened_links(tmp_path: Path, capsys) -> None:
     app = _fake_app(tmp_path, repaired_links=False)
 
