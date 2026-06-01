@@ -942,6 +942,57 @@ Proof before staging:
 - `git diff --check -- tests/library/test_toolset_starvation_concurrency.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AI - Library Grounding Test Ruff Hygiene
+
+Suggested commit: `test(library): clean grounding test lint`
+
+Include:
+
+- `tests/library/test_grounding.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Grounding implementation, cohost speech paths, runtime files, audio capture,
+  and generated files.
+
+Reason:
+
+- The library grounding tests had an unused `SimpleNamespace` import and a
+  stale annotation `noqa` on a local race-test shim. Removing both keeps the
+  focused ruff gate clean without changing grounding decisions or assertions.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_grounding.py`
+- `uv run pytest -q tests/library/test_grounding.py`
+- `git diff --check -- tests/library/test_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Hold Lane - Cohost Reaction Schema Drift
+
+Suggested commit if/when selected: `fix(ui-bus): reconcile cohost reaction schema`
+
+Include:
+
+- `src/vibemix/ui_bus/schemas/cohost_reaction.py`
+
+Keep out:
+
+- Cohost speech/prompt logic, TTS provider code, runtime coach files, live audio
+  controller files, and generated files unless a schema package owns codegen.
+
+Reason:
+
+- Concurrent work left this cohost-adjacent schema dirty while this lane is
+  restricted to proof/test cleanup. Track it as a hold lane so the strict dirty
+  package guard remains useful without Codex C changing cohost behavior.
+
+Proof before staging:
+
+- Re-run the schema owner tests/codegen checks chosen by the package owner.
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

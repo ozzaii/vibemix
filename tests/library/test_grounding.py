@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -167,7 +166,7 @@ def test_clear_during_inflight_on_event_discards_stale_citation(
 
     original_search = fake_store.search
 
-    def racing_search(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202 — test shim
+    def racing_search(*args, **kwargs):
         result = original_search(*args, **kwargs)
         g.clear()  # bumps _inflight_gen between dispatch and write
         return result
