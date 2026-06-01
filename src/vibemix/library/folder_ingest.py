@@ -287,7 +287,7 @@ def _write_library_cache(entries: dict[str, TrackEntry], root: Path) -> Path:
     Mirrors ``RekordboxLibrary._write_cache`` shape: a ``_CacheBlob`` with
     ``version=SCHEMA_VERSION``, ``xml_path`` = the resolved folder path,
     ``xml_mtime`` = the folder's mtime, and the track dict. Track IDs keep the
-    ``folder:<root>`` prefix; the cache source path stays stat-able so
+    ``folder:<sha1[:16]>`` namespace; the cache source path stays stat-able so
     ``try_load_cache`` can detect when the folder is newer than the cache.
     Returns the cache path written.
     """
