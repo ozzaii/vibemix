@@ -32,8 +32,10 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from livekit.agents import NOT_GIVEN
 
 from vibemix import __version__
+from vibemix.agent.local_tts import LocalTTSUnavailable
 
 _REAL_SLEEP = asyncio.sleep
 
@@ -625,6 +627,55 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
         openrouter_api_key=None,
         mode="direct",
     )
+
+
+def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
+    monkeypatch,
+    mocker,
+    tmp_path,
+    capsys,
+):
+    """Missing MOSS must not crash boot or create a cloud-TTS fallback."""
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
+
+    _build_audio_mocks(mocker)
+    _build_sensor_mocks(mocker)
+    _build_state_refresh_noop(mocker)
+    livekit_mocks = _build_livekit_mocks(mocker)
+    livekit_mocks["build_tts_chain"].side_effect = LocalTTSUnavailable("MOSS model missing")
+    _patch_voice_recorder(mocker, tmp_path)
+
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen)
+
+    from vibemix.__main__ import main
+
+    async def driver():
+        main_task = asyncio.create_task(main())
+        await _REAL_SLEEP(0.05)
+        main_task.cancel()
+        try:
+            await asyncio.wait_for(main_task, timeout=3.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    asyncio.run(driver())
+
+    livekit_mocks["build_tts_chain"].assert_called_once_with(
+        gemini_api_key="dummy-key",
+        openrouter_api_key=None,
+        mode="direct",
+    )
+    assert livekit_mocks["AgentSession"].call_args.kwargs["tts"] is NOT_GIVEN
+    assert livekit_mocks["DJCoHostAgent"].call_args.kwargs["tts_inst"] is NOT_GIVEN
+    assert livekit_mocks["session"].start.await_count == 1
+    assert "voice muted, no cloud fallback" in capsys.readouterr().err
 
 
 # ---------------------------------------------------------------------------

@@ -203,6 +203,31 @@ def _ensure_live_session_deps() -> None:
         PlaybackQueueAudioOutput = _PlaybackQueueAudioOutput
 
 
+def _livekit_not_given() -> Any:
+    from livekit.agents import NOT_GIVEN
+
+    return NOT_GIVEN
+
+
+def _build_tts_chain_or_mute(**kwargs: Any) -> Any:
+    """Build MOSS-only TTS for app boot, or start muted without cloud fallback."""
+    try:
+        return build_tts_chain(**kwargs)
+    except Exception as exc:
+        from vibemix.agent.local_tts import LocalTTSUnavailable
+
+        if not isinstance(exc, LocalTTSUnavailable):
+            raise
+        reason = str(exc) or "local MOSS unavailable"
+        print(
+            "-> tts:   unavailable (MOSS local only; voice muted, no cloud fallback)",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(f"-> tts:   {reason}", file=sys.stderr, flush=True)
+        return _livekit_not_given()
+
+
 async def _close_tts_chain(tts_inst: Any) -> None:
     """Close the live TTS adapter and any nested providers that own sessions."""
     seen: set[int] = set()
@@ -1287,19 +1312,25 @@ async def main() -> None:
         print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
         genai_client = genai.Client(api_key=api_key)
         llm_inst = build_llm(api_key, mode="direct")
-        tts_inst = build_tts_chain(
+        tts_inst = _build_tts_chain_or_mute(
             gemini_api_key=api_key,
             openrouter_api_key=or_key or None,
             mode="direct",
         )
-        print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
+        if tts_inst is not _livekit_not_given():
+            print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
     else:  # mode == "proxy"
         print(f"-> brain: {LLM_MODEL} via proxy at {proxy_base_url}")
         _ensure_proxy_client_dep()
         genai_client = build_proxy_genai_client(jwt, proxy_base_url)
         llm_inst = build_llm(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
-        tts_inst = build_tts_chain(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
-        print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
+        tts_inst = _build_tts_chain_or_mute(
+            mode="proxy",
+            proxy_base_url=proxy_base_url,
+            jwt=jwt,
+        )
+        if tts_inst is not _livekit_not_given():
+            print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
 
     # ---- Phase 19 latency-stack wiring (ack_bank retired) ----
     # Pre-recorded ack/filler clips ("yeah/oh/nice") were removed —

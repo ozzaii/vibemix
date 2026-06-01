@@ -3787,6 +3787,42 @@ Current evidence, 2026-06-01:
 - `git diff --check -- vibemix-core.macos.spec vibemix-core.windows.spec tests/sidecar/test_build_sidecar_rename.py`
   passed.
 
+## Package 14D - MOSS-only Missing Model Boot Guard
+
+Suggested commit: `fix(tts): boot muted when moss model is unavailable`
+
+Packaging decision: MOSS remains the only live voice source. This package does
+not add cloud fallback and does not fake speech. It translates the known
+`LocalTTSUnavailable` boot case into a transparent muted LiveKit session
+(`NOT_GIVEN` TTS) so a clean machine missing the large model does not crash the
+sidecar before the UI can explain or repair it. Direct calls to
+`build_tts_chain()` still fail loudly; only app boot catches the product-known
+"model missing / local disabled" exception.
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `tests/test_main_smoke.py`
+
+Keep out:
+
+- Any cloud/provider TTS fallback.
+- MOSS model download/ship UX, vendored runtime movement, and
+  `scripts/local_tts_speak.py`.
+- DROP-call speech/timing hunks and deck-audio capture hunks in `__main__.py`.
+
+Proof for this boot-guard slice:
+
+- `uv run pytest -q tests/test_main_smoke.py::test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback tests/agent/test_tts_chain.py::test_tts_chain_missing_moss_model_fails_loud`
+- `uv run ruff check src/vibemix/__main__.py tests/test_main_smoke.py`
+- `git diff --check -- src/vibemix/__main__.py tests/test_main_smoke.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- Add real model download or model-bundle UX before packaged release can claim a
+  speaking MOSS co-host on a fresh machine.
+
 ## Hold Lane - Local MOSS TTS ONNX Runtime Spike
 
 Suggested commit if/when it ships: `feat(tts): add wrapped local moss onnx runtime`
