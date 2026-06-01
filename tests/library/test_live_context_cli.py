@@ -1578,6 +1578,70 @@ def test_viber_setup_hint_respects_explicit_input_device(monkeypatch):
     assert "VIBEMIX_INPUT_DEVICE='BlackHole 16ch'" in setup_hint["next_action"]
 
 
+def test_viber_live_context_operator_actions_name_connected_controller_gaps():
+    actions = main_mod._viber_live_context_operator_actions(
+        {
+            "ready": False,
+            "diagnosis": "missing_physical_proof",
+            "next_action": "Collect the missing live proof legs shown in blockers.",
+            "checks": {
+                "frames_seen": True,
+                "flat_deck_frame_seen": True,
+                "controller_connected": True,
+                "recent_moves_seen": False,
+                "audio_observed": True,
+                "deck_state_resolved": False,
+                "deck_state_pair_resolved": False,
+                "deck_pair_capture_configured": True,
+                "deck_audio_capture_both_active": False,
+            },
+            "blockers": [
+                "no recent controller moves were observed",
+                "deck_audio_capture did not show active audio on both deck lanes",
+            ],
+        }
+    )
+
+    assert [action["code"] for action in actions] == [
+        "move_controller",
+        "resolve_deck_identity",
+        "feed_both_deck_lanes",
+    ]
+    assert "both deck lanes" in actions[-1]["detail"]
+
+
+def test_viber_live_context_operator_actions_promote_setup_hint():
+    setup_hint = {
+        "next_action": "Start with VIBEMIX_DECK_AUDIO_CHANNELS=auto.",
+        "recommended_env": {"VIBEMIX_DECK_AUDIO_CHANNELS": "auto"},
+        "rule": "setup_hint_not_live_audio_proof",
+    }
+    actions = main_mod._viber_live_context_operator_actions(
+        {
+            "ready": False,
+            "diagnosis": "missing_physical_proof",
+            "checks": {
+                "frames_seen": True,
+                "flat_deck_frame_seen": True,
+                "controller_connected": True,
+                "recent_moves_seen": True,
+                "audio_observed": True,
+                "deck_state_resolved": True,
+                "deck_state_pair_resolved": True,
+                "deck_pair_capture_configured": False,
+                "deck_audio_capture_both_active": False,
+            },
+            "blockers": ["deck-pair audio capture was not configured in the live packet"],
+        },
+        setup_hint=setup_hint,
+    )
+
+    assert actions[0]["code"] == "apply_route_hint"
+    assert actions[0]["recommended_env"] == {"VIBEMIX_DECK_AUDIO_CHANNELS": "auto"}
+    assert actions[0]["setup_hint"]["rule"] == "setup_hint_not_live_audio_proof"
+    assert actions[1]["code"] == "configure_deck_pair_capture"
+
+
 def test_cmd_library_live_context_json_success(monkeypatch, capsys):
     async def fake_sample(timeout_s: float, max_frames: int, *, require_proof: bool):
         assert timeout_s == 0.2
@@ -1771,6 +1835,12 @@ def test_cmd_library_live_context_require_proof_fails_with_blockers(monkeypatch,
                 "blockers": ["controller mixer posture was not connected"],
                 "next_action": "Collect the missing live proof legs.",
             },
+            "operator_actions": [
+                {
+                    "code": "connect_controller",
+                    "detail": "Connect the DJ controller over USB.",
+                }
+            ],
             "error": None,
             "hint": None,
         }
@@ -1786,6 +1856,7 @@ def test_cmd_library_live_context_require_proof_fails_with_blockers(monkeypatch,
     assert "live_context[deck=A]" in out.out
     assert "controller mixer posture was not connected" in out.err
     assert "next action: Collect the missing live proof legs." in out.err
+    assert "operator action: connect_controller: Connect the DJ controller over USB." in out.err
 
 
 def test_viber_live_context_payload_extracts_nested_proof_artifact():

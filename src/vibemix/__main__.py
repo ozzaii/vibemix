@@ -5388,6 +5388,123 @@ def _viber_live_context_readiness(
     }
 
 
+def _viber_live_context_operator_actions(
+    readiness: dict[str, Any],
+    *,
+    setup_hint: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Translate proof blockers into a concise, machine-readable action queue."""
+
+    if readiness.get("ready"):
+        return []
+    checks = readiness.get("checks") if isinstance(readiness.get("checks"), dict) else {}
+    blockers = readiness.get("blockers") if isinstance(readiness.get("blockers"), list) else []
+    diagnosis = str(readiness.get("diagnosis") or "")
+    physical_diagnosis = diagnosis not in {"live_socket_missing", "stale_live_runtime"}
+
+    actions: list[dict[str, Any]] = []
+
+    def add(code: str, detail: str, **extra: Any) -> None:
+        if any(action.get("code") == code for action in actions):
+            return
+        action: dict[str, Any] = {"code": code, "detail": detail}
+        action.update(extra)
+        actions.append(action)
+
+    if diagnosis == "live_socket_missing":
+        add(
+            "start_live_session",
+            "Start the Vibemix live session and keep ws://127.0.0.1:8765 open.",
+        )
+        return actions
+
+    if diagnosis == "stale_live_runtime":
+        add(
+            "restart_live_session",
+            "Restart the Vibemix live session so it advertises the current live-context schema.",
+        )
+        return actions
+
+    if setup_hint and setup_hint.get("next_action"):
+        recommended_env = (
+            setup_hint.get("recommended_env") if isinstance(setup_hint, dict) else None
+        )
+        add(
+            "apply_route_hint",
+            str(setup_hint["next_action"]),
+            **({"recommended_env": recommended_env} if isinstance(recommended_env, dict) else {}),
+            setup_hint=setup_hint,
+        )
+
+    if physical_diagnosis and (
+        not checks.get("frames_seen") or not checks.get("flat_deck_frame_seen")
+    ):
+        add(
+            "start_live_session",
+            "Start the Vibemix live session and keep ws://127.0.0.1:8765 open.",
+        )
+
+    if physical_diagnosis and not checks.get("controller_connected"):
+        add(
+            "connect_controller",
+            "Connect the DJ controller over USB, then restart the live session if it was already running.",
+        )
+
+    if (
+        physical_diagnosis
+        and not actions
+        and not checks.get("recent_moves_seen")
+        and not checks.get("audio_observed")
+    ):
+        add(
+            "perform_physical_proof_window",
+            "During the proof window, play audible DJ app output and move a fader, EQ, filter, or transport control.",
+        )
+
+    if physical_diagnosis and not checks.get("recent_moves_seen"):
+        add(
+            "move_controller",
+            "Move a fader, EQ, filter, or transport control during the proof window.",
+        )
+
+    if physical_diagnosis and not checks.get("audio_observed"):
+        add(
+            "play_audible_audio",
+            "Play audible DJ app output into the configured capture route during the proof window.",
+        )
+
+    if physical_diagnosis and (
+        not checks.get("deck_state_resolved") or not checks.get("deck_state_pair_resolved")
+    ):
+        add(
+            "resolve_deck_identity",
+            "Load identifiable tracks on both decks so live context can cite deck A and deck B instead of guessing.",
+        )
+
+    if physical_diagnosis and not checks.get("deck_pair_capture_configured"):
+        add(
+            "configure_deck_pair_capture",
+            "Use a multichannel route such as BlackHole 16ch with VIBEMIX_DECK_AUDIO_CHANNELS=auto for per-deck proof.",
+        )
+
+    if (
+        physical_diagnosis
+        and checks.get("deck_pair_capture_configured")
+        and not checks.get("deck_audio_capture_both_active")
+    ):
+        add(
+            "feed_both_deck_lanes",
+            "The deck-pair route is configured, but proof does not show active audio on both deck lanes.",
+        )
+
+    if not actions and blockers:
+        add(
+            "inspect_blockers",
+            str(readiness.get("next_action") or "Inspect the live-context proof blockers."),
+        )
+    return actions
+
+
 def _merge_viber_live_context_frame(
     context: dict[str, Any], frame: dict[str, Any]
 ) -> dict[str, bool]:
@@ -5639,6 +5756,7 @@ async def _sample_viber_live_context(
             flat_deck_frame_seen=flat_seen,
             session_snapshot_seen=snapshot_seen,
         )
+        setup_hint = _viber_setup_hint_from_source_status(source_status, readiness)
         return {
             "ok": False,
             "source": uri,
@@ -5649,7 +5767,11 @@ async def _sample_viber_live_context(
             "preview": render_live_context_preview(normalized_context),
             "readiness": readiness,
             "source_status": source_status,
-            "setup_hint": _viber_setup_hint_from_source_status(source_status, readiness),
+            "setup_hint": setup_hint,
+            "operator_actions": _viber_live_context_operator_actions(
+                readiness,
+                setup_hint=setup_hint,
+            ),
             "error": error,
             "hint": _viber_live_context_hint(error, source_status),
         }
@@ -5663,6 +5785,7 @@ async def _sample_viber_live_context(
         session_snapshot_seen=snapshot_seen,
     )
     source_status = _viber_local_source_status()
+    setup_hint = _viber_setup_hint_from_source_status(source_status, readiness)
     return {
         "ok": bool(preview),
         "source": uri,
@@ -5673,7 +5796,11 @@ async def _sample_viber_live_context(
         "preview": preview,
         "readiness": readiness,
         "source_status": source_status,
-        "setup_hint": _viber_setup_hint_from_source_status(source_status, readiness),
+        "setup_hint": setup_hint,
+        "operator_actions": _viber_live_context_operator_actions(
+            readiness,
+            setup_hint=setup_hint,
+        ),
         "error": None if preview else "No deck/context frames were observed before timeout.",
         "hint": None
         if preview
@@ -5771,6 +5898,18 @@ def _cmd_library_live_context(args: argparse.Namespace) -> int:
             setup_hint = result.get("setup_hint")
             if isinstance(setup_hint, dict) and setup_hint.get("next_action"):
                 print(f"setup hint: {setup_hint['next_action']}", file=sys.stderr)
+            operator_actions = (
+                result.get("operator_actions")
+                if isinstance(result.get("operator_actions"), list)
+                else []
+            )
+            for action in operator_actions[:5]:
+                if not isinstance(action, dict):
+                    continue
+                code = str(action.get("code") or "operator_action")
+                detail = str(action.get("detail") or "").strip()
+                if detail:
+                    print(f"operator action: {code}: {detail}", file=sys.stderr)
     else:
         print(f"live-context unavailable: {result.get('error')}", file=sys.stderr)
         hint = result.get("hint")
@@ -5779,6 +5918,18 @@ def _cmd_library_live_context(args: argparse.Namespace) -> int:
         setup_hint = result.get("setup_hint")
         if isinstance(setup_hint, dict) and setup_hint.get("next_action"):
             print(f"setup hint: {setup_hint['next_action']}", file=sys.stderr)
+        operator_actions = (
+            result.get("operator_actions")
+            if isinstance(result.get("operator_actions"), list)
+            else []
+        )
+        for action in operator_actions[:5]:
+            if not isinstance(action, dict):
+                continue
+            code = str(action.get("code") or "operator_action")
+            detail = str(action.get("detail") or "").strip()
+            if detail:
+                print(f"operator action: {code}: {detail}", file=sys.stderr)
     if not result.get("ok"):
         return 1
     if require_proof:
