@@ -730,6 +730,32 @@ Proof before staging:
 - `git diff --check -- tests/scripts/test_cli_library_search.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AA - Replay Linter Test Ruff Hygiene
+
+Suggested commit: `test(scripts): clean replay linter test lint`
+
+Include:
+
+- `tests/scripts/test_replay_linter.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Replay linter source, replay fixtures, session artifacts, and app runtime files.
+
+Reason:
+
+- The replay-linter contract test had a stale extra blank line after `pytest`
+  and used a manual adjacent-pair `zip`. Using `itertools.pairwise` keeps the
+  focused scripts-test ruff gate clean without changing monotonicity coverage.
+
+Proof before staging:
+
+- `uv run ruff check tests/scripts/test_replay_linter.py`
+- `uv run pytest -q tests/scripts/test_replay_linter.py`
+- `git diff --check -- tests/scripts/test_replay_linter.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

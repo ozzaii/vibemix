@@ -31,10 +31,10 @@ import csv
 import shutil
 import subprocess
 import sys
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 SYNTHETIC_FIXTURE = REPO_ROOT / "tests/scripts/fixtures/synthetic_session"
@@ -188,7 +188,7 @@ def test_csv_t_session_increases_monotonically(replay_session_dir: Path) -> None
 
     rows = _read_csv_rows(replay_session_dir / "linter_report.csv")[1:]
     t_values = [float(row[1]) for row in rows]
-    for prev, cur in zip(t_values, t_values[1:]):
+    for prev, cur in pairwise(t_values):
         assert cur > prev, (
             f"t_session not monotonic: prev={prev} cur={cur} all={t_values}"
         )
