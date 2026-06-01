@@ -24,11 +24,13 @@ at customer time.
   same file; no other source module may read or write it. (Tests under
   `tests/` MAY reference it for assertions — the gate scopes to `src/`.)
 
-* **`test_stop_reason_writes_confined_to_toolset`** — pins the propagation
-  surface for the starvation `stop_reason` payload to a strict whitelist
-  of four files (see `STOP_REASON_WHITELIST` below). Any new source file
-  that imports / mentions `stop_reason` outside the whitelist fails the
-  gate with a precise path so the developer knows exactly where to look.
+* **`test_stop_reason_writes_confined_to_toolset`** — pins every
+  `stop_reason` source reference to an explicit whitelist. The original
+  Phase 99 Viber starvation propagation surface is still confined to the
+  four owner/dispatch files; the later AI-message observability spine is
+  authorized separately so live coach, bench, deck vision, Learn, debrief,
+  and eval rows can record why an assistant turn stopped without weakening
+  the Viber tool-starvation contract.
 
 ## `BASELINE_SEEN_ADD_COUNT` provenance
 
@@ -59,7 +61,7 @@ message for the recipe.
 
 Pre-Phase-99 baseline: zero hits anywhere.
 
-Phase 99 lands the four-file propagation surface:
+Phase 99 lands the four-file Viber tool-starvation propagation surface:
 
 | File | What it does with `stop_reason` | Plan |
 |---|---|---|
@@ -68,10 +70,28 @@ Phase 99 lands the four-file propagation surface:
 | `src/vibemix/__main__.py` | CLI DISPATCH — reads `result.stop_reason` at the `library curate` / `library build-set` CLI surfaces; routes to stderr hint + exit-code branching. Pre-existing reads (lines ~2525, 2545, 2554, 2591, 2600, 2842) cover the today-shipped stop reasons (`created`, `exported`, `codex_not_installed`, etc.); Plan 99-07 will add the exit-code-10 dispatch on `tool_starvation`. | 99-07 (extends pre-existing surface) |
 | `src/vibemix/library/telegram_bridge.py` | MOBILE FORMAT — Plan 99-06 will add a `tool_starvation` branch to `format_reply(norm)` that renders the hint via `strip_leaks`. No hits yet at Plan-99-05 execute time (Plan 99-06 has not landed); the whitelist PRE-AUTHORIZES the file so when 99-06 lands the gate does not fight it. | 99-06 (pre-authorized) |
 
+Package 1A later adds a cross-engine AI-message observability ledger. Those
+rows use the generic `stop_reason` field for live co-host, bench, deck vision,
+Learn, debrief, and eval/reporting surfaces. These are NOT Viber
+tool-starvation propagation reads; they are canonical event-row metadata. The
+authorized observability files are:
+
+| File | What it does with `stop_reason` | Plan |
+|---|---|---|
+| `src/vibemix/runtime/ai_observability.py` | Defines the shared AI-message row shape and serializes `stop_reason` into the ledger. | Package 1A |
+| `src/vibemix/agent/dj_cohost.py` | Emits live-coach assistant rows with the LLM/suppression/citation stop reason. | Package 1A |
+| `src/vibemix/bench/run.py` | Emits bench-cell AI-message rows. | Package 1A |
+| `src/vibemix/state/deck_vision.py` | Emits deck-vision success/error AI-message rows while the screen-reader source stays gated. | Package 1A |
+| `src/vibemix/learn/observability.py` | Emits authored Learn tutor speech rows. | Package 1A |
+| `src/vibemix/debrief/drills.py` | Emits debrief drill generation rows. | Package 1A |
+| `src/vibemix/debrief/tldr.py` | Emits debrief TLDR/TTS rows. | Package 1A |
+| `src/vibemix/eval/session_report.py` | Reads global AI-message rows, including Viber `tool_starvation`, to produce repair issues. | Package 1A |
+
 Any other source file that mentions `stop_reason` (in `src/vibemix/`,
-recursive) is an Invariant #1 single-writer-analog violation: the
-starvation state is bleeding out of the four files designated to own it.
-The gate's failure message names the offending path exactly.
+recursive) still fails the gate. If it is Viber starvation plumbing, route
+through the four-file Phase 99 surface. If it is a new observability producer
+or consumer, update this whitelist with a plan/package justification instead
+of silently spreading the field.
 
 ## Phase 100 carry-over
 
@@ -113,6 +133,7 @@ propagation seam without coupling to the starvation counter.
 
 Run with: `PYTHONPATH=src python3 -m pytest tests/repo/test_no_seen_relaxation.py -q`
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -131,15 +152,25 @@ TOOLSET = SRC_ROOT / "library" / "toolset.py"
 BASELINE_SEEN_ADD_COUNT = 2
 
 # Files allowed to mention `stop_reason` in `src/vibemix/`. See the
-# whitelist table in this module's docstring for the rationale per file.
+# whitelist tables in this module's docstring for the rationale per file.
 # Stored as relative POSIX paths from REPO_ROOT for stable cross-platform
 # comparison; the gate normalizes hits to the same form before set-checking.
-STOP_REASON_WHITELIST: frozenset[str] = frozenset({
-    "src/vibemix/library/toolset.py",
-    "src/vibemix/library/codex_curate.py",
-    "src/vibemix/__main__.py",
-    "src/vibemix/library/telegram_bridge.py",
-})
+STOP_REASON_WHITELIST: frozenset[str] = frozenset(
+    {
+        "src/vibemix/__main__.py",
+        "src/vibemix/agent/dj_cohost.py",
+        "src/vibemix/bench/run.py",
+        "src/vibemix/debrief/drills.py",
+        "src/vibemix/debrief/tldr.py",
+        "src/vibemix/eval/session_report.py",
+        "src/vibemix/learn/observability.py",
+        "src/vibemix/library/codex_curate.py",
+        "src/vibemix/library/telegram_bridge.py",
+        "src/vibemix/library/toolset.py",
+        "src/vibemix/runtime/ai_observability.py",
+        "src/vibemix/state/deck_vision.py",
+    }
+)
 
 
 def _toolset_exists() -> None:
@@ -301,9 +332,9 @@ def test_consecutive_empties_single_writer() -> None:
 
 
 def test_stop_reason_writes_confined_to_toolset() -> None:
-    """`stop_reason` may appear ONLY in the four whitelisted source files.
+    """`stop_reason` may appear ONLY in explicitly authorized source files.
 
-    Whitelist (per this module's docstring table):
+    Viber starvation whitelist (per this module's docstring table):
       * `src/vibemix/library/toolset.py` — owner
       * `src/vibemix/library/codex_curate.py` — wrapper + propagation seam
       * `src/vibemix/__main__.py` — CLI dispatch (pre-existing reads,
@@ -311,10 +342,22 @@ def test_stop_reason_writes_confined_to_toolset() -> None:
       * `src/vibemix/library/telegram_bridge.py` — mobile format
         (pre-authorized for plan 99-06)
 
+    Package 1A observability whitelist:
+      * `src/vibemix/runtime/ai_observability.py` — shared row shape
+      * `src/vibemix/agent/dj_cohost.py` — live-coach assistant rows
+      * `src/vibemix/bench/run.py` — bench-cell rows
+      * `src/vibemix/state/deck_vision.py` — deck-vision rows
+      * `src/vibemix/learn/observability.py` — Learn tutor rows
+      * `src/vibemix/debrief/drills.py` — debrief drill rows
+      * `src/vibemix/debrief/tldr.py` — debrief TLDR/TTS rows
+      * `src/vibemix/eval/session_report.py` — report consumer
+
     Why this gate exists: `stop_reason` is the Decision-4 propagation
-    surface for terminal run states. Spreading reads across `agent/`,
-    `intel/`, `runtime/`, etc. would mean those modules start carrying
-    starvation handling, breaking the four-file-only contract.
+    surface for Viber terminal run states AND a canonical AI-message
+    observability field. Spreading Viber starvation handling across
+    `agent/`, `intel/`, `runtime/`, etc. would still break the four-file
+    contract; emitting canonical observability rows is separately authorized
+    by Package 1A and must stay confined to the files named above.
 
     The gate uses a per-file existence check (NOT a count): it does not
     care HOW MANY times each whitelisted file mentions `stop_reason`,
@@ -324,22 +367,24 @@ def test_stop_reason_writes_confined_to_toolset() -> None:
 
     If this test fails on YOUR PR:
       - You added a `stop_reason` reference in a non-whitelisted source
-        file. That's Decision 4 violation.
-      - Either route through one of the whitelisted files, OR justify
-        the propagation expansion in your PR description and add the
-        new file to `STOP_REASON_WHITELIST` (with a docstring update
-        documenting WHICH plan authorized the change).
+        file.
+      - If this is Viber starvation handling, route through one of the
+        four Phase 99 files.
+      - If this is a new AI-message observability producer/consumer, justify
+        the expansion in your PR description and add the new file to
+        `STOP_REASON_WHITELIST` with a docstring update documenting WHICH
+        plan/package authorized the change.
     """
     hits = _find_src_files_with("stop_reason")
     offenders = hits - STOP_REASON_WHITELIST
     assert not offenders, (
-        f"`stop_reason` (Phase 99 Decision 4 — propagation surface for "
-        f"terminal run states) appeared in non-whitelisted source files. "
+        f"`stop_reason` appeared in non-whitelisted source files. "
         f"Whitelist: {sorted(STOP_REASON_WHITELIST)}. Found in: "
         f"{sorted(hits)}. Offending files: {sorted(offenders)}. Either "
-        f"route through a whitelisted file, or expand "
-        f"STOP_REASON_WHITELIST in this gate (with PR justification + "
-        f"docstring update naming the authorizing plan)."
+        f"route Viber starvation handling through the Phase 99 files, "
+        f"or expand STOP_REASON_WHITELIST in this gate for a justified "
+        f"observability producer/consumer (with a docstring update "
+        f"naming the authorizing plan/package)."
     )
 
 
@@ -354,10 +399,12 @@ def test_stop_reason_writes_confined_to_toolset() -> None:
 # `mcp_server.py`. Plan 100-01 shipped the toolset.py handler; Plan 100-02
 # shipped the mcp_server.py wrapper. Any THIRD definition is a duplication
 # bug — the dispatch table is the single point of routing.
-REQUEST_CLARIFICATION_DEF_ALLOWED: frozenset[str] = frozenset({
-    "src/vibemix/library/toolset.py",
-    "src/vibemix/library/mcp_server.py",
-})
+REQUEST_CLARIFICATION_DEF_ALLOWED: frozenset[str] = frozenset(
+    {
+        "src/vibemix/library/toolset.py",
+        "src/vibemix/library/mcp_server.py",
+    }
+)
 
 
 def test_request_clarification_handler_two_file_pattern() -> None:

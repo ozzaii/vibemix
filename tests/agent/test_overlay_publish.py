@@ -72,7 +72,7 @@ class _FakeIpcBus:
         self.emits.append(msg)
 
 
-def _overlay_only(bus: "_FakeIpcBus") -> list[dict]:
+def _overlay_only(bus: _FakeIpcBus) -> list[dict]:
     """Filter ``bus.emits`` to overlay-highlight envelopes only.
 
     Plan 44-03 added an ``ipc.session.cohost-reaction`` emit on the same
@@ -217,9 +217,7 @@ def test_wired_strip_does_not_publish_overlay(mocker, tmp_path) -> None:
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
-        return_value=_async_iter(
-            ["unverified [ev:GHOST@99.0] and [screen:waveform_a] reply"]
-        )
+        return_value=_async_iter(["unverified [ev:GHOST@99.0] and [screen:waveform_a] reply"])
     )
 
     ev = Event(type="HEARTBEAT", state=state, extra={})
@@ -264,8 +262,12 @@ def test_no_screen_citation_no_publish(mocker, tmp_path) -> None:
 
 
 def test_ipc_bus_none_is_silent(mocker, tmp_path) -> None:
-    """Default construction (no ipc_bus kwarg) — backward compatible silence."""
-    agent, gen, recorder, state = _build_agent(mocker, tmp_path)  # ipc_bus=None
+    """Default construction (no ipc_bus kwarg) — no emits or errors.
+
+    The stream returns the TTS-safe text: bracketed citation atoms are kept in
+    logs/overlay parsing surfaces, not spoken chunks.
+    """
+    agent, gen, _recorder, state = _build_agent(mocker, tmp_path)  # ipc_bus=None
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
@@ -276,7 +278,7 @@ def test_ipc_bus_none_is_silent(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     # Must complete without error — backward compat.
     chunks = _drive(agent)
-    assert chunks == ["nice [screen:waveform_a] reply"]
+    assert chunks == ["nice reply"]
 
 
 # --------------------------------------------------------------------------
@@ -296,9 +298,7 @@ def test_multi_atom_citation_publishes_each_screen(mocker, tmp_path) -> None:
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
-        return_value=_async_iter(
-            ["that [ev:KICK_SWAP@45.2,screen:waveform_a] drop was clean"]
-        )
+        return_value=_async_iter(["that [ev:KICK_SWAP@45.2,screen:waveform_a] drop was clean"])
     )
 
     ev = Event(type="HEARTBEAT", state=state, extra={})
@@ -374,4 +374,4 @@ def test_bus_emit_failure_is_swallowed(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     # The drive call must complete without raising despite the bus exception.
     chunks = _drive(agent)
-    assert chunks == ["that [screen:waveform_a] move"]
+    assert chunks == ["that move"]

@@ -670,6 +670,7 @@ Include:
 - `tests/eval/test_judge_pro_rubric.py`
 - `tests/learn/test_observer_boot_wiring.py`
 - `tests/learn/test_runtime_evidence_grounding.py`
+- `tests/repo/test_no_seen_relaxation.py`
 - `.planning/packets/2026-06-01/CODEX_READY-ai-message-observability-spine.md`
 
 Reason:
@@ -694,6 +695,11 @@ Reason:
 - Shared-file caution: `dj_cohost.py`, `__main__.py`, `codex_curate.py`, and
   `scripts/eval/judge.py` carry other package work too. If this package is split
   from those lanes, stage by hunk and keep only the observability hunks here.
+- Repo-gate follow-up: `tests/repo/test_no_seen_relaxation.py` still guards the
+  original four-file Viber tool-starvation propagation seam, but Package 1A
+  authorizes the generic AI-message `stop_reason` field in the named ledger
+  producers/consumers. New producers must still be added explicitly with a
+  package justification; the gate is not a free-form escape hatch.
 
 Proof already run:
 
@@ -718,6 +724,9 @@ Proof already run:
   passed: 111 tests.
 - `npm --prefix tauri/ui test -- src/debrief/__tests__/drills-panel-shape.spec.ts src/debrief/__tests__/tldr-player.spec.ts src/debrief/__tests__/error-banner.spec.ts src/debrief/__tests__/stripper-roundtrip.spec.ts src/debrief/__tests__/recording-row-debrief-button.spec.ts src/debrief/__tests__/recording-row-debrief-disabled.spec.ts`
   passed: 35 tests across 6 files.
+- 2026-06-01 repo-gate closure: `uv run pytest -q tests/repo/test_no_seen_relaxation.py::test_stop_reason_writes_confined_to_toolset`
+  passed: 1 test. The gate now matches Package 1A's cross-engine AI-message
+  row shape while still failing any unassigned `stop_reason` source file.
 
 Remaining gate:
 
@@ -1629,6 +1638,7 @@ Include:
 - `tests/agent/test_dj_cohost.py`
 - `tests/agent/test_dj_cohost_streaming_pipe.py`
 - `tests/agent/test_dj_cohost_linter.py`
+- `tests/agent/test_overlay_publish.py`
 - `.planning/packets/2026-06-01/CODEX_READY-cohost-tts-citation-sanitizer.md`
 
 Reason:
@@ -1651,6 +1661,11 @@ Proof to run:
 - `uv run pytest -q tests/agent/test_tts_sanitizer.py tests/agent/test_dj_cohost.py::test_llm_node_english_only_guard_preserves_grounded_english_response tests/agent/test_dj_cohost.py::test_AE_citation_count_event_written_per_turn tests/agent/test_dj_cohost.py::test_AJ_no_registry_path_writes_recorder_event_only tests/agent/test_dj_cohost_streaming_pipe.py`
 - `uv run pytest -q tests/agent/test_dj_cohost_linter.py tests/agent/test_citation_strip_emit.py tests/coach/test_citation_linter.py`
 - `uv run ruff check src/vibemix/agent/tts_sanitizer.py src/vibemix/agent/dj_cohost.py tests/agent/test_tts_sanitizer.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_streaming_pipe.py tests/agent/test_dj_cohost_linter.py`
+- 2026-06-01 drift-test closure:
+  `uv run pytest -q tests/agent/test_dj_cohost_linter.py::test_fabricated_recall_strips_turn tests/agent/test_overlay_publish.py::test_ipc_bus_none_is_silent tests/agent/test_overlay_publish.py::test_bus_emit_failure_is_swallowed`
+  passed: 3 tests. This keeps fabricated recall strip isolated from the
+  live-claim guard and updates overlay smoke expectations to the TTS-safe chunk
+  contract: citation atoms remain available to logs/overlay parsing, not MOSS.
 
 ## Hold Lane - Rebuild Carry-Forward Live Reality Pins
 

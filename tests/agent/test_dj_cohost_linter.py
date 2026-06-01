@@ -619,13 +619,12 @@ def test_fabricated_recall_strips_turn(mocker, tmp_path) -> None:
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     # A fabricated recall callback riding ALONGSIDE a genuinely valid ev cite.
+    # Keep the prose neutral so this isolates the citation linter instead of
+    # the live-claim guard for unsupported DJ-action praise.
     fabricated_id = "20260520-2200:999"
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
         return_value=_async_iter(
-            [
-                f"that [ev:KICK_SWAP@45.2] hit — remember when you "
-                f"[recall:{fabricated_id}] killed that same drop"
-            ]
+            [f"that [ev:KICK_SWAP@45.2] hit had this matching old note [recall:{fabricated_id}]"]
         )
     )
 
