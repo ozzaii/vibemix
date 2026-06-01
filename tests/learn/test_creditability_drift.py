@@ -21,13 +21,14 @@ def test_manifest_uncreditable_matches_recognizer():
     assert manifest_uncreditable == set(_HONEST_UNCREDITABLE_V11)
 
 
-def test_no_honest_uncreditable_skills_remain():
-    # v11.0 reality after the owned-deck Beatmatch Judge shipped: EVERY skill now
-    # has a live Mastered path. beatmatching was the last honest-uncreditable skill;
-    # the Judge's BEATMATCH_GRADED signal (test_judge_credits_beatmatch.py) is the
-    # tempo/phase event it was explicitly waiting for, so it is now creditable like
-    # the rest. A future RE-uncreditable skill would be a deliberate edit here.
-    assert set(_HONEST_UNCREDITABLE_V11) == set()
-    assert SKILL_MANIFEST["beatmatching"].live_creditable is True
+def test_beatmatching_is_the_only_honest_uncreditable_skill():
+    # The judge/consumer engine exists, but no production live loop emits
+    # BEATMATCH_GRADED yet. Keep the wall honest until that producer lands.
+    assert set(_HONEST_UNCREDITABLE_V11) == {"beatmatching"}
+    assert SKILL_MANIFEST["beatmatching"].live_creditable is False
     assert SKILL_MANIFEST["harmonic_mixing"].live_creditable is True
-    assert all(spec.live_creditable for spec in SKILL_MANIFEST.values())
+    assert all(
+        spec.live_creditable
+        for sid, spec in SKILL_MANIFEST.items()
+        if sid != "beatmatching"
+    )

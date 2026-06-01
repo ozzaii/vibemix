@@ -75,17 +75,32 @@ def test_competent_creditable_singular_when_one_demo_left():
     assert row["what_remains"] == "1 more cited live demo to Master"
 
 
-def test_competent_beatmatching_now_shows_live_demo_path():
-    # The owned-deck Beatmatch Judge shipped, so beatmatching is no longer the
-    # honest-uncreditable skill — it has a real live Mastered path (a cited locked
-    # BEATMATCH_GRADED). Its what_remains is now the ordinary creditable demo-count
-    # line, not the "no live path" cap. Freshly Competent (0 live proofs, default
-    # threshold 3) -> "3 more cited live demos to Master". This promise is now TRUE.
+def test_competent_beatmatching_states_no_live_grade_path_yet():
+    # The owned-deck Beatmatch Judge exists, but no production emitter can fire
+    # BEATMATCH_GRADED yet. The wall must cap at Competent instead of promising
+    # a Mastered path the app cannot observe.
     progress = LearnProgress()
     _compete(progress, "beatmatching")
     row = _row(progress, "beatmatching")
     assert row["stage"] == "competent"
-    assert row["what_remains"] == "3 more cited live demos to Master"
+    assert row["what_remains"] == "Mastered isn't live-graded for this skill"
+
+
+def test_uncreditable_stored_mastery_is_not_displayed_as_mastered():
+    # A prior/stale profile entry must not make the product claim a live Mastered
+    # beatmatch while the production emitter is still absent.
+    progress = LearnProgress()
+    _compete(progress, "beatmatching")
+    progress.skills["beatmatching"] = {
+        "live_proof_count": 3,
+        "mastered": True,
+        "first_mastered_at": "2026-05-30T11:00:00Z",
+    }
+    row = _row(progress, "beatmatching")
+    assert row["stage"] == "competent"
+    assert row["mastered"] is False
+    assert row["first_mastered_at"] is None
+    assert row["what_remains"] == "Mastered isn't live-graded for this skill"
 
 
 def test_mastered_has_empty_what_remains():

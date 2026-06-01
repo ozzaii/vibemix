@@ -89,14 +89,12 @@ class SkillSpec:
             ``§EARNED-MASTERY-THRESHOLD-TUNE`` Kaan-action can tune any one skill
             without a code change; the 6 manifest entries stay valid unchanged
             because the default is supplied here.
-        live_creditable: Whether this skill has a live Mastered path in v11.0 —
-            i.e. some real event type credits it (see ``skill_recognizer``).
-            Defaults ``True``; ALL six skills are now creditable (beatmatching was
-            the last ``False`` until the owned-deck Beatmatch Judge shipped its
-            ``BEATMATCH_GRADED`` signal — ``_HONEST_UNCREDITABLE_V11`` is now empty).
+        live_creditable: Whether this skill has a production live Mastered path
+            in v11.0, meaning the app can actually emit a cited live event for
+            it. Defaults ``True``; set ``False`` when only a future-ready grader
+            or recognizer branch exists but no production emitter can fire.
             Read by ``_what_remains`` (SURF-01) so the wall never promises a demo
-            path a skill does not have (the branch survives for any future
-            re-uncreditable skill). The drift between this field and the
+            path a skill does not have. The drift between this field and the
             recognizer's uncreditable list is pinned by ``test_creditability_drift``.
     """
 
@@ -145,10 +143,11 @@ SKILL_MANIFEST: dict[str, SkillSpec] = {
     "beatmatching": SkillSpec(
         lesson_ids=("L2.01", "L2.02"),
         gate="course_3_unlocked",
-        # Creditable since the owned-deck Beatmatch Judge shipped: a cited LOCKED
-        # ``BEATMATCH_GRADED`` grade (tempo matched AND phase locked) is the honest
-        # live demonstration that was missing. Mirrors skill_recognizer (now no
-        # longer in ``_HONEST_UNCREDITABLE_V11``; drift-pinned). Default True.
+        # The owned-deck Beatmatch Judge and recognizer branch exist, but no
+        # production live loop emits ``BEATMATCH_GRADED`` yet. Keep the Earned Wall
+        # honest: Competent can be earned from lessons/recital, Mastered is not a
+        # live-graded promise until that emitter ships.
+        live_creditable=False,
     ),
     "eq_mixing": SkillSpec(
         lesson_ids=("L1.14", "L2.04", "L2.05"),
@@ -306,8 +305,9 @@ class SkillTree:
              gate False can never be Competent).
           4. live-portion read from ``progress.skills.get(skill_id, {})`` with
              safe defaults (count 0, not mastered, ts None).
-          5. ``stage`` = ``"mastered"`` if the live-portion says so, else
-             ``"competent"`` if competent, else ``"locked"``.
+          5. ``stage`` = ``"mastered"`` if the live-portion says so and the skill
+             is production-live-creditable, else ``"competent"`` if competent,
+             else ``"locked"``.
         """
         results: dict[str, SkillProgress] = {}
         live_block = getattr(progress, "skills", {}) or {}
@@ -323,7 +323,7 @@ class SkillTree:
             live = live_block.get(skill_id, {})
             if not isinstance(live, dict):
                 live = {}
-            mastered = bool(live.get("mastered", False))
+            mastered = bool(live.get("mastered", False)) and spec.live_creditable
             # Mirror ``_weight_for``'s guard: ``from_dict`` only isinstance-checks
             # the top-level ``skills`` dict, never the inner value types, so a
             # parseable v2 JSON carrying a non-numeric ``live_proof_count``
@@ -335,7 +335,7 @@ class SkillTree:
                 live_proof_count = int(live.get("live_proof_count", 0) or 0)
             except (TypeError, ValueError):
                 live_proof_count = 0
-            first_mastered_at = live.get("first_mastered_at", None)
+            first_mastered_at = live.get("first_mastered_at", None) if mastered else None
 
             if mastered:
                 stage = "mastered"
@@ -361,8 +361,7 @@ def _what_remains(sp: SkillProgress, spec: SkillSpec) -> str:
 
     Deterministic, never-raises UI affordance copy — single-sourced in Python so
     the frontend never re-derives the stage rule. Honest at every stage; the
-    uncreditable branch survives for any future skill with no live path (in v11.0
-    all six are creditable since the Beatmatch Judge shipped):
+    uncreditable branch states the current limit without hinting at a hidden path:
 
       * ``mastered``  → ``""`` (the cited-proof line carries it; nothing remains).
       * ``competent`` + creditable → ``"{N-count} more cited live demo(s) to Master"``.
@@ -375,8 +374,7 @@ def _what_remains(sp: SkillProgress, spec: SkillSpec) -> str:
     if sp.stage == "competent":
         if not spec.live_creditable:
             # No event grounds this skill, so it caps at Competent. State the fact
-            # without promising a path that does not exist (anti-slop). Currently
-            # unreached (every v11.0 skill is creditable); kept for future skills.
+            # without promising a path that does not exist (anti-slop).
             return "Mastered isn't live-graded for this skill"
         remaining = max(1, spec.mastered_threshold - sp.live_proof_count)
         unit = "demo" if remaining == 1 else "demos"

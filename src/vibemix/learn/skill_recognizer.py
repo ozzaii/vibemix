@@ -13,12 +13,13 @@ math — the recognizer never re-implements either.
 WHY the citation check is INJECTED (a ``Callable``, not a real
 ``EvidenceRegistry``): it keeps the engine offline-unit-testable and island-clean
 (RESEARCH Pitfall 3). This module is owned by the learn island; the live
-``EvidenceRegistry`` / ``EventDetector`` are owned by concurrent sessions and
-must not be runtime-imported here. The live wiring (DEFERRED KAAN-ACTION
-``§EARNED-LIVE-MASTERED-VERIFY``) passes ``lambda s, k, t: registry.has(s, k, t,
-tol=1.0)``; tests pass ``lambda s, k, t: True`` / ``... : False``. Type hints for
-event/registry shapes are ``TYPE_CHECKING``-only (mirrors ``exemplar.py:40``) —
-NO runtime ``state/`` import.
+``EvidenceRegistry`` / ``EventDetector`` are owned by runtime code and must not be
+runtime-imported here. The live wiring now lives in
+``runtime/coach.py::_credit_live_skill_demo`` and passes
+``lambda s, k, t: registry.has(s, k, t, tol=1.0)``; tests pass
+``lambda s, k, t: True`` / ``... : False``. Type hints for event/registry shapes
+are ``TYPE_CHECKING``-only (mirrors ``exemplar.py:40``) — NO runtime ``state/``
+import.
 
 The credit pipeline per event:
 
@@ -34,8 +35,8 @@ The credit pipeline per event:
      ``t`` is NOT a field on the real ``Event`` (it carries only type/state/extra/
      priority); the EventDetector derives it as ``max(0.0, now -
      state.set_start_at)`` at fire time and writes it into the registry. The
-     deferred live caller (``§EARNED-LIVE-MASTERED-VERIFY``) MUST therefore pass
-     that same value explicitly via ``recognize(..., event_t=t_session)`` — the
+     live caller MUST therefore pass that same value explicitly via
+     ``recognize(..., event_t=t_session)`` — the
      ``_event_time`` attribute fallback exists ONLY for the synthetic test stubs.
   3. Dedup (MAST-04): by ``(event.type, round(t, 1))`` within the credit batch
      (a transient ``seen`` set, NOT persisted). The same fire handed twice
@@ -90,23 +91,18 @@ EVENT_SKILL_MAP: dict[str, tuple[str, ...]] = {
 _MIX_MOVE_EQ_SUBSTRINGS: tuple[str, ...] = ("_low:", "_mid:", "_hi:", "_filter:", "killed")
 _MIX_MOVE_DECK_SUBSTRINGS: tuple[str, ...] = ("_play→", "xfader")
 
-# HONEST-UNCREDITABLE in v11.0 (Finding #1, anti-slop) — now EMPTY.
+# HONEST-UNCREDITABLE in v11.0 (Finding #1, anti-slop).
 # RETIRED from this tuple as their citable production events shipped:
 #   - harmonic_mixing: the Judge's ``transition_judged`` event — a verdict with a
 #     COMPATIBLE harmonic component (the DJ blended two trusted in-key tracks) is
 #     resolved in ``_candidate_skills`` and credited under the MAST-03 gate.
-#   - beatmatching: the deferred beatmatch_phase Judge signal SHIPPED
-#     (``learn/beatmatch_judge.py`` — owned-deck exact tempo/phase grading). A
-#     ``BEATMATCH_GRADED`` event carrying a LOCKED grade (tempo matched AND phase
-#     locked, not abstaining) is the genuine demonstration that was missing; it is
-#     resolved in ``_candidate_skills`` and credited under the SAME MAST-03 gate
-#     (a trainwreck / drift / abstain / un-cited grade credits NOTHING — proxying
-#     beatmatching onto anything weaker is the exact false-expertise slop this
-#     guard existed for, and the LOCKED gate is what keeps it honest).
-# Every v11.0 skill now has an honest live-Mastered path. NO proxy-credit, NO new
-# detector. Drift-pinned to ``SkillSpec.live_creditable`` by
-# ``test_creditability_drift`` and exercised by ``test_judge_credits_beatmatch``.
-_HONEST_UNCREDITABLE_V11: tuple[str, ...] = ()
+# Still uncreditable:
+#   - beatmatching: the owned-deck Judge and BEATMATCH_GRADED consumer are
+#     future-ready, but no production loop calls the grader or emits the event.
+#     The wall must not promise "3 more live demos" until that producer exists.
+#     Synthetic BEATMATCH_GRADED tests can still exercise the branch; production
+#     creditability is this list plus ``SkillSpec.live_creditable``.
+_HONEST_UNCREDITABLE_V11: tuple[str, ...] = ("beatmatching",)
 
 
 def _candidate_skills(event: Any) -> list[str]:
@@ -156,9 +152,10 @@ def _candidate_skills(event: Any) -> list[str]:
         return []
 
     if ev_type == "BEATMATCH_GRADED":
-        # The owned-deck Beatmatch Judge — the tempo/phase signal v11.0 was
-        # waiting for (it retires beatmatching from honest-uncreditable). Because
-        # the learn module OWNS both decks, the grade is MEASURED, not inferred.
+        # The owned-deck Beatmatch Judge consumer branch. It is future-ready, but
+        # beatmatching stays honest-uncreditable until a production live loop can
+        # actually emit this cited event. Because the learn module OWNS both decks,
+        # the grade is MEASURED, not inferred.
         # A genuine demonstration is a LOCKED grade: tempo matched AND phase
         # locked AND not abstaining (== verdict "locked"). A trainwreck / drift /
         # tempo-off / abstain credits NOTHING — it proves the opposite, the exact
