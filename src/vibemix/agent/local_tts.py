@@ -13,9 +13,9 @@ LiveKit's ``AudioEmitter``. The model emits 48 kHz stereo; we downmix to mono an
 declare the native rate, letting the FallbackAdapter / playback sink resample to
 the 24 kHz output contract (``OUTPUT_SR``).
 
-Wiring: when ``VIBEMIX_LOCAL_TTS`` is enabled and the model is cached,
-``tts_chain._build_direct_chain`` uses this as the only voice. Off by default -
-flipping it to the default free-tier voice is a product decision, not a code one.
+Wiring: ``tts_chain`` and proxy mode both use this provider as the single source
+of TTS. If the model is missing, voice is unavailable; vibemix does not route to
+a paid/cloud voice as a fallback.
 
 The heavy ONNX runtime (~728 MB, 9 ORT sessions) loads once per instance, lazily,
 off the event loop. ``prewarm()`` kicks the load in the background so the first
@@ -72,17 +72,37 @@ def resolve_model_dir() -> Path | None:
     return None
 
 
-def local_tts_enabled() -> bool:
-    """True when the operator opted in AND the model is cached.
+_DISABLE_FLAGS = {"0", "false", "no", "off", "disabled"}
 
-    Opt-in is explicit (``VIBEMIX_LOCAL_TTS`` truthy) so existing Cartesia/Gemini
-    behavior is unchanged until a user chooses the local voice. Flipping this to a
-    default-on free-tier voice is a separate product decision.
+
+class LocalTTSUnavailable(RuntimeError):
+    """Raised when the only allowed TTS provider, local MOSS, cannot be built."""
+
+
+def _local_tts_disabled_by_env() -> bool:
+    return (os.environ.get("VIBEMIX_LOCAL_TTS") or "").strip().lower() in _DISABLE_FLAGS
+
+
+def local_tts_enabled() -> bool:
+    """True when local MOSS is allowed and the model is cached.
+
+    MOSS is the single TTS provider. ``VIBEMIX_LOCAL_TTS=0`` disables speech, but
+    it never enables a cloud fallback.
     """
-    flag = (os.environ.get("VIBEMIX_LOCAL_TTS") or "").strip().lower()
-    if flag not in {"1", "true", "yes", "on"}:
+    if _local_tts_disabled_by_env():
         return False
     return resolve_model_dir() is not None
+
+
+def local_tts_unavailable_reason() -> str:
+    """Human-actionable reason the MOSS provider cannot be built."""
+    if _local_tts_disabled_by_env():
+        return "MOSS local TTS is disabled by VIBEMIX_LOCAL_TTS=0"
+    return (
+        "MOSS local TTS model not found; cache it under "
+        "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX or set "
+        "VIBEMIX_MOSS_TTS_DIR"
+    )
 
 
 def _read_native_sample_rate(model_dir: Path) -> int:
@@ -272,8 +292,8 @@ class MossLocalTTS(agents_tts.TTS):
             try:
                 self._get_engine()
             except Exception:
-                # A failed prewarm must not crash boot; the synth path surfaces the
-                # error into the FallbackAdapter (Cartesia/Gemini take over).
+                # A failed prewarm must not crash boot; the synth path surfaces
+                # the error because there is no cloud TTS fallback.
                 pass
 
         threading.Thread(target=_bg, name="moss-tts-prewarm", daemon=True).start()
@@ -282,6 +302,15 @@ class MossLocalTTS(agents_tts.TTS):
         self, text: str, *, conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS
     ) -> agents_tts.ChunkedStream:
         return _MossChunkedStream(tts=self, input_text=text, conn_options=conn_options)
+
+
+def build_local_tts_adapter() -> agents_tts.FallbackAdapter:
+    """Build the single allowed live voice chain: one local MOSS provider."""
+    if not local_tts_enabled():
+        raise LocalTTSUnavailable(local_tts_unavailable_reason())
+    moss = MossLocalTTS()
+    moss.prewarm()
+    return agents_tts.FallbackAdapter(tts=[moss], max_retry_per_tts=1)
 
 
 class _MossChunkedStream(agents_tts.ChunkedStream):

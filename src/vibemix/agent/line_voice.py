@@ -1,23 +1,22 @@
 # SPDX-License-Identifier: Apache-2.0
-"""One-shot synth seam — drive the EXISTING live TTS chain for a single line.
+"""One-shot synth seam — drive the existing MOSS live TTS chain for one line.
 
-The live co-host voice is a LiveKit ``tts.FallbackAdapter`` (Cartesia Sonic →
-Gemini native ``Achird`` → OpenRouter standby) built in ``agent.tts_chain`` for a
-streaming room. The viral auto-mix demo has no room, but the reel is deterministic:
-every reaction line is known before audio starts. So instead of rebuilding a voice,
-this drives that exact adapter's ``.synthesize(text)`` once per line and assembles
-the int16 frames into a finished stereo float32 buffer the demo mixes over the deck.
+The live co-host voice is a LiveKit ``tts.FallbackAdapter`` with one provider:
+local ``MossLocalTTS``. The viral auto-mix demo has no room, but the reel is
+deterministic: every reaction line is known before audio starts. So instead of
+rebuilding a voice, this drives that exact adapter's ``.synthesize(text)`` once
+per line and assembles the int16 frames into a finished stereo float32 buffer the
+demo mixes over the deck.
 
 ``synthesize_line`` is the seam (tested with a fake adapter — no network, no key);
-``build_default_line_adapter`` is the live wiring (Cartesia needs a loop-bound HTTP
-session, so build it inside a running event loop). Same chain, same Achird voice.
+``build_default_line_adapter`` is the live wiring. Same chain, same MOSS voice.
 """
 from __future__ import annotations
 
 import numpy as np
 
-# Gemini native TTS and Cartesia Sonic both emit 24 kHz PCM; a non-zero default keeps
-# downstream resample/duration math safe even if a stream yields no frames.
+# A non-zero default keeps downstream resample/duration math safe even if a stream
+# yields no frames.
 _DEFAULT_SR: int = 24000
 
 
@@ -66,21 +65,8 @@ async def synthesize_line(adapter, text: str) -> tuple[np.ndarray, int]:
 
 
 def build_default_line_adapter():
-    """Build the live TTS FallbackAdapter from env (Cartesia → Gemini → OpenRouter).
-
-    Call this INSIDE a running asyncio loop — the Cartesia plugin binds an aiohttp
-    session to the loop (see ``tts_chain._live_http_session``). Raises if no Gemini
-    key is configured (the chain's required fallback).
-    """
-    import os
+    """Build the live MOSS-only TTS FallbackAdapter from local model state."""
 
     from vibemix.agent.tts_chain import build_tts_chain
 
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    if not gemini_key:
-        raise RuntimeError("GEMINI_API_KEY required to build the live voice chain")
-    return build_tts_chain(
-        gemini_api_key=gemini_key,
-        cartesia_api_key=os.environ.get("CARTESIA_API_KEY") or None,
-        mode="direct",
-    )
+    return build_tts_chain(mode="direct")

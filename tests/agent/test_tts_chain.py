@@ -1,301 +1,91 @@
 # SPDX-License-Identifier: Apache-2.0
-"""TTS chain — TTS-01..06 + PKG-02 + PYPROJECT-01.
-
-Pins the OpenRouter monkey-patch as a module-load invariant (TTS-01) and the
-factory's branching shape with native Gemini primary plus explicit OpenRouter
-standby opt-in (TTS-02..06)."""
+"""MOSS-only TTS chain contract."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
 from livekit.agents import tts as agents_tts
-from livekit.plugins import openai as openai_plugin
-from livekit.plugins.google.beta import gemini_tts as gemini_native_tts
 
 
-@pytest.fixture(autouse=True)
-def _no_cartesia_env(monkeypatch):
-    """Pin the Gemini-primary chain shape regardless of a developer .env.
-
-    These tests predate the Cartesia env-fallback. When an earlier test imports
-    ``vibemix.__main__`` (which ``load_dotenv()``s), a developer .env leaks
-    ``CARTESIA_API_KEY`` into ``os.environ`` and ``_build_direct_chain`` silently
-    prepends a Cartesia entry → the entry-count assertions here fail in suite
-    order. Cartesia-primary behaviour is covered in test_tts_chain_cartesia.py.
-    """
-    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
-
-
-def test_tts_01_monkey_patch_active_at_module_load() -> None:
-    """TTS-01: the patch happens at module-load time. We trigger import inside
-    the test body and immediately read AUDIO_STREAM_MODELS — no factory call."""
-    from livekit.plugins.openai import tts as t
-
-    import vibemix.agent.tts_chain  # noqa: F401 — import triggers the patch
-
-    assert "google/gemini-3.1-flash-tts-preview" in t.AUDIO_STREAM_MODELS
-
-
-def test_tts_02_with_openrouter_standby_has_3_entries(mocker) -> None:
-    """TTS-02: explicit OpenRouter standby → FallbackAdapter has 3 entries."""
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
-    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
+def _patch_moss_chain(mocker):
+    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
+    fake_moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
     mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
+    return fake_moss_cls
+
+
+def test_tts_chain_direct_is_moss_only(mocker) -> None:
+    fake_moss_cls = _patch_moss_chain(mocker)
 
     from vibemix.agent.tts_chain import build_tts_chain
 
     build_tts_chain(
-        gemini_api_key="g",
-        openrouter_api_key="or",
+        gemini_api_key="ignored",
+        openrouter_api_key="ignored",
         openrouter_enabled=True,
+        cartesia_api_key="ignored",
+        mode="direct",
     )
 
     kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    chain = kwargs["tts"]
-    assert len(chain) == 3
+    assert kwargs["tts"] == [fake_moss_cls.return_value]
     assert kwargs["max_retry_per_tts"] == 1
-    assert isinstance(chain[0], gemini_native_tts.TTS)
-    assert isinstance(chain[1], gemini_native_tts.TTS)
-    assert isinstance(chain[2], openai_plugin.TTS)
+    fake_moss_cls.return_value.prewarm.assert_called_once()
 
 
-def test_tts_02b_openrouter_key_alone_does_not_enter_chain(mocker) -> None:
-    """TTS-02b: OPENROUTER_API_KEY alone is not enough to opt into TTS."""
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
-    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
+def test_tts_chain_proxy_is_moss_only_without_proxy_args(mocker) -> None:
+    fake_moss_cls = _patch_moss_chain(mocker)
 
     from vibemix.agent.tts_chain import build_tts_chain
 
-    build_tts_chain(gemini_api_key="g", openrouter_api_key="or")
+    build_tts_chain(mode="proxy")
 
     kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    chain = kwargs["tts"]
-    assert len(chain) == 2
-    assert openai_plugin.TTS.__init__.call_count == 0
+    assert kwargs["tts"] == [fake_moss_cls.return_value]
+    assert kwargs["max_retry_per_tts"] == 1
 
 
-def test_tts_03_without_openrouter_key_none_chain_has_2_entries(mocker) -> None:
-    """TTS-03: openrouter_api_key=None → chain has 2 entries, no openai.TTS."""
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
-    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
-
+def test_tts_chain_missing_moss_model_fails_loud(mocker) -> None:
+    from vibemix.agent.local_tts import LocalTTSUnavailable
     from vibemix.agent.tts_chain import build_tts_chain
 
-    build_tts_chain(gemini_api_key="g", openrouter_api_key=None)
+    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=False)
+    mocker.patch(
+        "vibemix.agent.local_tts.local_tts_unavailable_reason",
+        return_value="MOSS model missing",
+    )
 
-    kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    chain = kwargs["tts"]
-    assert len(chain) == 2
-    # openai.TTS was never instantiated
-    assert openai_plugin.TTS.__init__.call_count == 0
-    assert isinstance(chain[0], gemini_native_tts.TTS)
-    assert isinstance(chain[1], gemini_native_tts.TTS)
+    try:
+        build_tts_chain()
+    except LocalTTSUnavailable as exc:
+        assert "MOSS model missing" in str(exc)
+    else:  # pragma: no cover - assertion clarity
+        raise AssertionError("build_tts_chain must fail when MOSS is unavailable")
 
 
-def test_tts_04_empty_string_openrouter_key_treated_as_none(mocker) -> None:
-    """TTS-04: openrouter_api_key="" → same as None, exactly 2 entries."""
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
-    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
-
+def test_tts_chain_unknown_mode_raises(mocker) -> None:
+    _patch_moss_chain(mocker)
     from vibemix.agent.tts_chain import build_tts_chain
 
-    build_tts_chain(gemini_api_key="g", openrouter_api_key="")
-
-    kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    chain = kwargs["tts"]
-    assert len(chain) == 2
-    assert openai_plugin.TTS.__init__.call_count == 0
-
-
-def test_tts_05_openrouter_kwargs_match_v4(mocker) -> None:
-    """TTS-05: openai_plugin.TTS kwargs match v4:1994-2001 verbatim."""
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
-    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
-
-    from vibemix.agent.tts_chain import build_tts_chain
-
-    build_tts_chain(
-        gemini_api_key="g",
-        openrouter_api_key="or",
-        openrouter_enabled=True,
-    )
-
-    kw = openai_plugin.TTS.__init__.call_args.kwargs
-    assert kw["model"] == "google/gemini-3.1-flash-tts-preview"
-    assert kw["voice"] == "Achird"
-    assert kw["api_key"] == "or"
-    assert kw["base_url"] == "https://openrouter.ai/api/v1"
-    assert kw["response_format"] == "pcm"
-    # em-dash here is v4 verbatim (U+2014)
-    assert (
-        kw["instructions"]
-        == "Casual studio friend, brief, natural — no theatrics, no announcer voice."
-    )
+    try:
+        build_tts_chain(mode="garbage")  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "unknown mode" in str(exc)
+    else:  # pragma: no cover - assertion clarity
+        raise AssertionError("unknown mode must raise")
 
 
-def test_tts_06_gemini_native_kwargs_match_v4(mocker) -> None:
-    """TTS-06: gemini_native_tts.TTS kwargs (both fallbacks) match v4:2003-2014."""
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
-    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
+def test_tts_chain_keeps_legacy_openrouter_audio_stream_patch() -> None:
+    from livekit.plugins.openai import tts as openai_tts_mod
 
-    from vibemix.agent.tts_chain import build_tts_chain
+    import vibemix.agent.tts_chain  # noqa: F401
+    from vibemix.agent.config import OPENROUTER_TTS_MODEL
 
-    build_tts_chain(
-        gemini_api_key="g",
-        openrouter_api_key="or",
-        openrouter_enabled=True,
-    )
-
-    # Two gemini_native_tts.TTS constructor calls — primary then fallback
-    calls = gemini_native_tts.TTS.__init__.call_args_list
-    assert len(calls) == 2
-
-    primary_kw = calls[0].kwargs
-    assert primary_kw["model"] == "gemini-3.1-flash-tts-preview"
-    assert primary_kw["voice_name"] == "Achird"
-    assert primary_kw["api_key"] == "g"
-    assert (
-        primary_kw["instructions"]
-        == "Casual studio friend, brief, natural — no theatrics, no announcer voice."
-    )
-
-    fallback_kw = calls[1].kwargs
-    assert fallback_kw["model"] == "gemini-2.5-flash-preview-tts"
-    assert fallback_kw["voice_name"] == "Achird"
-    assert fallback_kw["api_key"] == "g"
-    assert (
-        fallback_kw["instructions"]
-        == "Casual studio friend, brief, natural — no theatrics, no announcer voice."
-    )
+    assert OPENROUTER_TTS_MODEL in openai_tts_mod.AUDIO_STREAM_MODELS
 
 
 def test_pkg_02_build_tts_chain_exported() -> None:
-    """PKG-02: build_tts_chain resolves from vibemix.agent and is in __all__."""
     import vibemix.agent as vagent
     from vibemix.agent import build_tts_chain
 
     assert callable(build_tts_chain)
     assert "build_tts_chain" in vagent.__all__
-
-
-def test_pyproject_01_livekit_plugins_openai_explicit() -> None:
-    """PYPROJECT-01: pyproject.toml declares livekit-plugins-openai explicitly.
-
-    The monkey-patch makes this load-bearing — must not be transitive-only.
-    """
-    text = Path("pyproject.toml").read_text()
-    # tolerant — accept any version constraint
-    assert '"livekit-plugins-openai>=' in text or "'livekit-plugins-openai>=" in text, (
-        "livekit-plugins-openai must be an explicit dep in pyproject.toml"
-    )
-
-
-# ----------------------------------------------------------------------------
-# Phase 5 — TTS-MODE-01..03 + ERR-05 — mode dispatch
-# ----------------------------------------------------------------------------
-
-
-def test_tts_mode_01_direct_default_preserves_phase4(mocker) -> None:
-    """TTS-MODE-01: build_tts_chain(gemini_api_key='g') == Phase 4 (2 entries)."""
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
-    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
-
-    from vibemix.agent.tts_chain import build_tts_chain
-
-    build_tts_chain(gemini_api_key="g")  # no mode → default direct, no OR
-
-    kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    chain = kwargs["tts"]
-    assert len(chain) == 2
-    assert openai_plugin.TTS.__init__.call_count == 0
-
-
-def test_tts_mode_02_direct_with_openrouter_standby(mocker) -> None:
-    """TTS-MODE-02: direct mode with explicit OpenRouter standby gives 3 entries."""
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
-    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
-
-    from vibemix.agent.tts_chain import build_tts_chain
-
-    build_tts_chain(
-        gemini_api_key="g",
-        openrouter_api_key="or",
-        openrouter_enabled=True,
-        mode="direct",
-    )
-
-    kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    chain = kwargs["tts"]
-    assert len(chain) == 3
-
-
-def test_tts_mode_03_proxy_single_entry(mocker) -> None:
-    """TTS-MODE-03: proxy mode returns 1-entry chain pointed at proxy/v1."""
-    import pytest
-
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
-    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
-
-    from vibemix.agent.tts_chain import build_tts_chain
-
-    build_tts_chain(
-        mode="proxy",
-        proxy_base_url="https://api.altidus.world",
-        jwt="jwt-x",
-    )
-
-    kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    chain = kwargs["tts"]
-    assert len(chain) == 1
-    assert kwargs["max_retry_per_tts"] == 1
-
-    or_kw = openai_plugin.TTS.__init__.call_args.kwargs
-    assert or_kw["base_url"] == "https://api.altidus.world/v1"
-    assert or_kw["api_key"] == "jwt-x"
-    assert or_kw["model"] == "google/gemini-3.1-flash-tts-preview"
-    assert or_kw["response_format"] == "pcm"
-
-    # No gemini_native_tts entries in proxy mode
-    assert gemini_native_tts.TTS.__init__.call_count == 0
-
-    # Avoid the unused-pytest import warning
-    _ = pytest
-
-
-def test_err_05_direct_without_gemini_key_raises():
-    import pytest
-
-    from vibemix.agent.tts_chain import build_tts_chain
-
-    with pytest.raises(ValueError, match="direct mode requires gemini_api_key"):
-        build_tts_chain()
-
-
-def test_err_05_proxy_without_args_raises():
-    import pytest
-
-    from vibemix.agent.tts_chain import build_tts_chain
-
-    with pytest.raises(ValueError) as exc:
-        build_tts_chain(mode="proxy")
-    msg = str(exc.value)
-    assert "proxy_base_url" in msg and "jwt" in msg
-
-
-def test_err_05_unknown_mode_raises():
-    import pytest
-
-    from vibemix.agent.tts_chain import build_tts_chain
-
-    with pytest.raises(ValueError, match="unknown mode"):
-        build_tts_chain(mode="garbage")  # type: ignore[arg-type]

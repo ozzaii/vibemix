@@ -4,17 +4,18 @@
 I/O sample-rate / blocksize / gain constants live in ``vibemix.audio.constants``
 (already shipped by Phase 2). Phase 4's __main__ imports the audio-side
 constants from there; this module only holds the agent-layer string IDs
-(model names, voice, device names) that ride with the LiveKit/Gemini surface.
+(model names, legacy voice names, device names) that ride with the LiveKit/
+Gemini surface.
 
 Phase 11's calibration wizard will surface the device names as user-editable
 Settings; v4 hard-codes them so we port the v4 defaults verbatim.
 
-Plan 41-01 migration: the four LLM/TTS model strings are now resolved
+Plan 41-01 migration: the LLM and legacy TTS model strings are now resolved
 through :func:`vibemix.llm.model_router.resolve` so a future SKU bump is
-a one-file edit in ``vibemix/llm/_router_config.py``. The constant
-*names* are preserved (``LLM_MODEL``, ``TTS_MODEL``, …) for backward
-compatibility — every existing import (``__main__.py``, ``agent/cache.py``,
-``debrief/*``, multiple tests) keeps working unchanged.
+a one-file edit in ``vibemix/llm/_router_config.py``. The constant *names* are
+preserved (``LLM_MODEL``, ``TTS_MODEL``, …) for backward compatibility. Live
+co-host speech no longer uses those cloud TTS IDs; ``agent.tts_chain`` resolves
+to local MOSS only.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ import os
 
 from vibemix.llm.model_router import resolve, resolve_model
 
-# ---- LLM + TTS model identifiers (v4:97-99, router-derived per Plan 41-01) ----
+# ---- LLM + legacy TTS model identifiers (router-derived per Plan 41-01) ----
 LLM_MODEL: str = resolve_model("live_coach")
 TTS_MODEL: str = resolve_model("live_coach_tts")
 TTS_FALLBACK_MODEL: str = resolve_model("live_coach_tts_fallback")
@@ -33,10 +34,10 @@ TTS_FALLBACK_MODEL: str = resolve_model("live_coach_tts_fallback")
 # outside ``llm/_router_config.py``.
 OPENROUTER_LLM_MODEL: str = resolve_model("live_coach_openrouter")
 OPENROUTER_TTS_MODEL: str = resolve_model("live_coach_tts_openrouter")
-# Cartesia (Sonic) — the non-Gemini live primary TTS model. Kept OUT of
-# model_router by the SAME convention as the Viber/DeepSeek brain: the router is
-# deliberately Gemini-only (test_no_non_gemini_models). A non-Gemini id is plain
-# config — the CI grep-gate only forbids GEMINI literals. Env-overridable.
+# Cartesia (Sonic) legacy constant. It is not an active live-cohost voice
+# provider; MOSS is the single TTS source. Kept OUT of model_router by the SAME
+# convention as the Viber/DeepSeek brain: the router is deliberately Gemini-only
+# (test_no_non_gemini_models). Env-overridable for compatibility only.
 CARTESIA_TTS_MODEL: str = os.environ.get("VIBEMIX_CARTESIA_MODEL", "sonic-3")
 
 # ---- ServiceTier dispatch (Plan 41-01, LAT-07) ----
@@ -47,9 +48,8 @@ CARTESIA_TTS_MODEL: str = os.environ.get("VIBEMIX_CARTESIA_MODEL", "sonic-3")
 # ---- Voice id (v4:104) ----
 VOICE: str = "Achird"
 
-# Cartesia voice id for the Sonic primary. A voice UUID is not a Gemini model
-# literal, so it lives here (not the router). Overridable via env; defaults to
-# Cartesia's stock English voice (the plugin's own default).
+# Cartesia voice id retained for compatibility with old imports. A voice UUID is
+# not a Gemini model literal, so it lives here (not the router).
 CARTESIA_VOICE: str = os.environ.get(
     "VIBEMIX_CARTESIA_VOICE", "f786b574-daa5-4673-aa0c-cbe3e8534c02"
 )

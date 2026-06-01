@@ -3595,6 +3595,55 @@ Remaining gate:
   `git diff --cached -- src/vibemix/__main__.py` before committing so the
   unrelated budget and shutdown hunks do not travel together accidentally.
 
+## Package 14B - MOSS-only Voice Source
+
+Suggested commit: `fix(tts): make moss the only voice source`
+
+Packaging decision: this promotes the accepted local-MOSS voice policy into the
+live TTS factory. Direct mode and proxy mode both resolve to the same on-device
+MOSS adapter. Cloud TTS keys may still be accepted by compatibility call
+signatures, but they must not select Cartesia, Gemini-native TTS, OpenRouter TTS,
+or proxy speech. If MOSS is disabled or missing, speech fails loudly instead of
+falling back to a paid/cloud voice.
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `src/vibemix/agent/__init__.py`
+- `src/vibemix/agent/config.py`
+- `src/vibemix/agent/line_voice.py`
+- `src/vibemix/agent/local_tts.py`
+- `src/vibemix/agent/proxy_client.py`
+- `src/vibemix/agent/tts_chain.py`
+- `tests/agent/test_line_voice.py`
+- `tests/agent/test_livekit_google_slim.py`
+- `tests/agent/test_local_tts.py`
+- `tests/agent/test_proxy_client.py`
+- `tests/agent/test_tts_chain.py`
+- `tests/agent/test_tts_chain_cartesia.py`
+- `tests/test_main_smoke.py`
+- `tests/test_phase05_verification.py`
+
+Keep out:
+
+- `scripts/local_tts_speak.py`, vendored MOSS runtime movement, model download
+  UX, and dependency/lockfile churn unless selected as a separate model-shipping
+  package.
+- Package 14 shutdown cleanup hunks in `src/vibemix/__main__.py` and
+  `tests/test_main_smoke.py`.
+- Drop-call/default-on hunks in `src/vibemix/__main__.py` and
+  `tests/test_main_smoke.py`.
+
+Current evidence, 2026-06-01:
+
+- `uv run pytest -q tests/test_phase05_verification.py::test_g8_direct_mode_phase4_regression_safe tests/test_main_smoke.py::test_smoke_03_full_wiring tests/test_main_smoke.py::test_smoke_04_no_openrouter_key tests/agent/test_tts_chain.py tests/agent/test_tts_chain_cartesia.py tests/agent/test_proxy_client.py tests/agent/test_local_tts.py tests/agent/test_line_voice.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py -m 'not slow'`
+  passed: 44 tests, 1 deselected.
+- `uv run ruff check src/vibemix/agent/__init__.py src/vibemix/agent/config.py src/vibemix/agent/line_voice.py src/vibemix/agent/local_tts.py src/vibemix/agent/proxy_client.py src/vibemix/agent/tts_chain.py src/vibemix/__main__.py tests/agent/test_tts_chain.py tests/agent/test_tts_chain_cartesia.py tests/agent/test_proxy_client.py tests/agent/test_local_tts.py tests/agent/test_line_voice.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py tests/test_main_smoke.py tests/test_phase05_verification.py`
+  passed.
+- Run the package checker after staging, because this package intentionally
+  shares `src/vibemix/__main__.py` and `tests/test_main_smoke.py` with existing
+  hold/land lanes and must be staged by hunk.
+
 ## Hold Lane - Local MOSS TTS ONNX Runtime Spike
 
 Suggested commit if/when it ships: `feat(tts): add wrapped local moss onnx runtime`

@@ -195,14 +195,17 @@ def test_g7_install_uuid_persists(tmp_path, monkeypatch):
 # -------------------------------------------------------------------------
 
 
-def test_g8_direct_mode_phase4_regression_safe():
-    """G8: build_llm and build_tts_chain default to Phase 4 direct behavior;
-    proxy mode rejects missing args (no silent fallback)."""
-    from livekit.agents import tts as agents_tts  # noqa: F401
+def test_g8_direct_mode_phase4_regression_safe(mocker):
+    """G8: build_llm stays direct-compatible; TTS is MOSS-only in every mode."""
+    from livekit.agents import tts as agents_tts
     from livekit.plugins import google as google_plugin  # noqa: F401
     from livekit.plugins import openai as openai_plugin  # noqa: F401
 
     from vibemix.agent import build_llm, build_tts_chain
+
+    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
+    fake_moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
+    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
 
     # Direct mode requires only api_key (Phase 4 surface preserved)
     try:
@@ -210,14 +213,17 @@ def test_g8_direct_mode_phase4_regression_safe():
     except (ValueError, TypeError) as e:
         pytest.fail(f"build_llm('test-api-key') raised — direct mode regression: {e}")
 
-    # build_tts_chain with keyword gemini_api_key works
+    # build_tts_chain accepts legacy keyword args, but always resolves to MOSS.
     try:
         _ = build_tts_chain(gemini_api_key="test-g", openrouter_api_key=None)
     except (ValueError, TypeError) as e:
         pytest.fail(f"build_tts_chain regression: {e}")
+    assert agents_tts.FallbackAdapter.__init__.call_args.kwargs["tts"] == [
+        fake_moss_cls.return_value
+    ]
 
-    # Proxy mode rejects missing args (no silent fallback)
+    # Proxy LLM still rejects missing args. Proxy TTS no longer needs proxy args:
+    # voice never leaves the device.
     with pytest.raises(ValueError):
         build_llm(mode="proxy")
-    with pytest.raises(ValueError):
-        build_tts_chain(mode="proxy")
+    _ = build_tts_chain(mode="proxy")

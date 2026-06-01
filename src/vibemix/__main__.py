@@ -58,11 +58,7 @@ from vibemix.agent.config import (
     LLM_MODEL,
     MIC_DEVICE,
     OPENROUTER_LLM_MODEL,
-    OPENROUTER_TTS_MODEL,
     OUTPUT_DEVICE,
-    TTS_FALLBACK_MODEL,
-    TTS_MODEL,
-    VOICE,
 )
 from vibemix.agent.persona import SYSTEM_INSTRUCTION  # noqa: F401
 from vibemix.audio import (
@@ -1273,43 +1269,19 @@ async def main() -> None:
         print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
         genai_client = genai.Client(api_key=api_key)
         llm_inst = build_llm(api_key, mode="direct")
-        openrouter_tts_enabled = os.environ.get("VIBEMIX_TTS_OPENROUTER", "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-            "on",
-        )
-        _cartesia_key = os.environ.get("CARTESIA_API_KEY") or None
         tts_inst = build_tts_chain(
             gemini_api_key=api_key,
             openrouter_api_key=or_key or None,
-            openrouter_enabled=openrouter_tts_enabled,
-            cartesia_api_key=_cartesia_key,
             mode="direct",
         )
-        if _cartesia_key:
-            print(
-                f"-> tts:   Cartesia Sonic (primary) → {TTS_MODEL} → "
-                f"{TTS_FALLBACK_MODEL} [Cartesia native voice; Gemini = fallback]"
-            )
-        elif openrouter_tts_enabled and or_key:
-            print(
-                f"-> tts:   {TTS_MODEL} → {TTS_FALLBACK_MODEL} "
-                f"→ openrouter/{OPENROUTER_TTS_MODEL} (voice={VOICE}) [standby]"
-            )
-        else:
-            print(
-                f"-> tts:   {TTS_MODEL} → {TTS_FALLBACK_MODEL} (voice={VOICE}) "
-                "[native primary; set CARTESIA_API_KEY for the Cartesia primary "
-                "voice, or VIBEMIX_TTS_OPENROUTER=1 for OpenRouter standby]"
-            )
+        print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
     else:  # mode == "proxy"
         print(f"-> brain: {LLM_MODEL} via proxy at {proxy_base_url}")
         _ensure_proxy_client_dep()
         genai_client = build_proxy_genai_client(jwt, proxy_base_url)
         llm_inst = build_llm(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
         tts_inst = build_tts_chain(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
-        print(f"-> tts:   {OPENROUTER_TTS_MODEL} via proxy (voice={VOICE})")
+        print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
 
     # ---- Phase 19 latency-stack wiring (ack_bank retired) ----
     # Pre-recorded ack/filler clips ("yeah/oh/nice") were removed —

@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""One-shot synth seam — drive the EXISTING live TTS chain for a single line.
+"""One-shot synth seam — drive the existing live TTS chain for a single line.
 
-The live co-host voice is a LiveKit ``tts.FallbackAdapter`` (Cartesia Sonic →
-Gemini native ``Achird`` → OpenRouter standby) built for a streaming room. The
-viral auto-mix demo has no room: it knows every reaction line ahead of time and
-needs each one as a finished PCM buffer to mix over the deck. ``synthesize_line``
-drives that exact adapter's ``.synthesize(text)`` once and assembles the int16
-frames into stereo float32 — reusing the live voice, not rebuilding one.
+The live co-host voice is a LiveKit ``tts.FallbackAdapter`` backed by the single
+MOSS provider. The viral auto-mix demo has no room: it knows every reaction line
+ahead of time and needs each one as a finished PCM buffer to mix over the deck.
+``synthesize_line`` drives that exact adapter's ``.synthesize(text)`` once and
+assembles the int16 frames into stereo float32 — reusing the live voice, not
+rebuilding one.
 
 These tests use a fake adapter so the seam is verified with no network / no key.
 """

@@ -487,8 +487,8 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
     monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
-    # Cartesia (Sonic) is the live primary voice; clear the developer's real
-    # CARTESIA_API_KEY so the wiring assertion sees a controlled (absent) value.
+    # MOSS is the only voice; keep old cloud voice env from affecting the
+    # compatibility-call assertion.
     monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     # Pin per-deck OFF so the device-upgrade path is deterministic regardless of
     # the host's real rekordbox config — the zero-config global default reads
@@ -535,12 +535,10 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     # (c) build_llm called with the dummy key in direct mode (Phase 5 explicit mode kwarg)
     livekit_mocks["build_llm"].assert_called_once_with("dummy-key", mode="direct")
 
-    # (d) build_tts_chain called with both keys + mode=direct
+    # (d) build_tts_chain called in direct mode; TTS itself ignores cloud keys.
     livekit_mocks["build_tts_chain"].assert_called_once_with(
         gemini_api_key="dummy-key",
         openrouter_api_key="dummy-or",
-        openrouter_enabled=False,
-        cartesia_api_key=None,
         mode="direct",
     )
 
@@ -593,8 +591,8 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    # Clear the developer's real CARTESIA_API_KEY so the wiring assertion sees a
-    # controlled (absent) value rather than leaking the host env into the test.
+    # MOSS is the only voice; keep old cloud voice env from affecting the
+    # compatibility-call assertion.
     monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     # Per-deck OFF — deterministic boot regardless of host rekordbox config.
     monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
@@ -624,8 +622,6 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
     livekit_mocks["build_tts_chain"].assert_called_once_with(
         gemini_api_key="dummy-key",
         openrouter_api_key=None,
-        openrouter_enabled=False,
-        cartesia_api_key=None,
         mode="direct",
     )
 

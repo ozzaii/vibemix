@@ -15,9 +15,11 @@ import numpy as np
 import pytest
 
 from vibemix.agent.local_tts import (
+    LocalTTSUnavailable,
     MossEngine,
     MossLocalTTS,
     _read_native_sample_rate,
+    build_local_tts_adapter,
     local_tts_enabled,
     pcm16_mono_le,
     resolve_model_dir,
@@ -55,9 +57,15 @@ def _fake_model_dir(tmp_path, sample_rate=44100):
     return tmp_path
 
 
-def test_disabled_without_flag(monkeypatch, tmp_path):
+def test_enabled_without_flag_when_model_cached(monkeypatch, tmp_path):
     monkeypatch.setenv("VIBEMIX_MOSS_TTS_DIR", str(_fake_model_dir(tmp_path)))
     monkeypatch.delenv("VIBEMIX_LOCAL_TTS", raising=False)
+    assert local_tts_enabled() is True
+
+
+def test_disabled_by_explicit_off(monkeypatch, tmp_path):
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_DIR", str(_fake_model_dir(tmp_path)))
+    monkeypatch.setenv("VIBEMIX_LOCAL_TTS", "0")
     assert local_tts_enabled() is False
 
 
@@ -105,19 +113,15 @@ def test_moss_leads_chain_when_enabled(mocker, monkeypatch):
     assert len(chain) == 1  # MOSS is the only voice — zero paid fallback (cost + no key)
 
 
-def test_moss_absent_when_disabled(mocker, monkeypatch):
-    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
-    monkeypatch.delenv("VIBEMIX_LOCAL_TTS", raising=False)
-    from livekit.agents import tts as agents_tts
+def test_moss_absent_fails_loud(mocker):
+    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=False)
+    mocker.patch(
+        "vibemix.agent.local_tts.local_tts_unavailable_reason",
+        return_value="MOSS model missing",
+    )
 
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
-    from vibemix.agent.tts_chain import build_tts_chain
-
-    build_tts_chain(gemini_api_key="g", mode="direct")
-
-    chain = agents_tts.FallbackAdapter.__init__.call_args.kwargs["tts"]
-    # first entry is a Gemini native, not a MossLocalTTS
-    assert type(chain[0]).__name__ != "MossLocalTTS"
+    with pytest.raises(LocalTTSUnavailable, match="MOSS model missing"):
+        build_local_tts_adapter()
 
 
 # ---------------- ChunkedStream plumbing (fake engine, no model) ----------------

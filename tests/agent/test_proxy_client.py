@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from livekit.agents import tts as agents_tts
-from livekit.plugins import openai as openai_plugin
 
 from vibemix.agent.proxy_client import build_proxy_genai_client, build_proxy_tts_chain
 
@@ -24,31 +23,10 @@ def test_proxy_02_trailing_slash_stripped():
     assert ho.base_url == "https://api.altidus.world"
 
 
-def test_proxy_03_tts_chain_single_entry(mocker):
-    """PROXY-03: build_proxy_tts_chain returns 1-entry FallbackAdapter pointed at proxy/v1."""
-    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=False)
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
-
-    build_proxy_tts_chain(jwt="jwt-x", proxy_base_url="https://api.altidus.world")
-
-    fa_kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    chain = fa_kwargs["tts"]
-    assert len(chain) == 1
-    assert fa_kwargs["max_retry_per_tts"] == 1
-
-    tts_kw = openai_plugin.TTS.__init__.call_args.kwargs
-    assert tts_kw["model"] == "google/gemini-3.1-flash-tts-preview"
-    assert tts_kw["base_url"] == "https://api.altidus.world/v1"
-    assert tts_kw["api_key"] == "jwt-x"
-    assert tts_kw["response_format"] == "pcm"
-
-
-def test_proxy_03b_tts_chain_uses_local_moss_when_enabled(mocker):
-    """Proxy mode should not route voice to paid/proxy TTS when local MOSS is ready."""
+def test_proxy_03_tts_chain_is_moss_only(mocker):
+    """PROXY-03: proxy TTS is local MOSS, never proxy/OpenAI speech."""
     mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
     fake_moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
-    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
     mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
 
     build_proxy_tts_chain(jwt="jwt-x", proxy_base_url="https://api.altidus.world")
@@ -57,16 +35,26 @@ def test_proxy_03b_tts_chain_uses_local_moss_when_enabled(mocker):
     assert fa_kwargs["tts"] == [fake_moss_cls.return_value]
     assert fa_kwargs["max_retry_per_tts"] == 1
     fake_moss_cls.return_value.prewarm.assert_called_once()
-    openai_plugin.TTS.__init__.assert_not_called()
+
+
+def test_proxy_03b_tts_chain_uses_local_moss_when_enabled(mocker):
+    """Proxy mode should not route voice to paid/proxy TTS when local MOSS is ready."""
+    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
+    fake_moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
+    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
+
+    build_proxy_tts_chain(jwt="jwt-x", proxy_base_url="https://api.altidus.world")
+
+    fa_kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
+    assert fa_kwargs["tts"] == [fake_moss_cls.return_value]
+    assert fa_kwargs["max_retry_per_tts"] == 1
+    fake_moss_cls.return_value.prewarm.assert_called_once()
 
 
 def test_proxy_04_monkey_patch_active_after_proxy_client_import():
-    """PROXY-04: importing proxy_client triggers the OpenRouter monkey-patch
-    via the explicit `import vibemix.agent.tts_chain` at the top of
-    proxy_client.py — so AUDIO_STREAM_MODELS still contains the model after a
-    fresh import."""
+    """PROXY-04: the legacy OpenRouter audio patch remains available."""
     from livekit.plugins.openai import tts as t
 
-    import vibemix.agent.proxy_client  # noqa: F401
+    import vibemix.agent.tts_chain  # noqa: F401
 
     assert "google/gemini-3.1-flash-tts-preview" in t.AUDIO_STREAM_MODELS

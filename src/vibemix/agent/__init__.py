@@ -5,10 +5,7 @@ Phase 4 ships the DJCoHostAgent (multimodal llm_node override calling
 google.genai.aio.models.generate_content_stream with the last
 INVOKE_AUDIO_SECONDS of audio attached as a Part), the
 PlaybackQueueAudioOutput TTS sink, the SYSTEM_INSTRUCTION persona, the LLM
-factory, and the Gemini-native TTS chain with optional OpenRouter standby
-(with a load-bearing module-load monkey-patch that puts the OpenRouter model on
-LiveKit's
-AudioChunkedStream path).
+factory, and the MOSS-only local TTS chain.
 
 Phase 5 adds:
 - ``install_uuid.get_or_create_install_uuid()`` — OS keychain (with file
@@ -16,12 +13,12 @@ Phase 5 adds:
 - ``jwt_cache.get_or_refresh_jwt(install_uuid, proxy_base_url, client_version)``
   — keychain-cached JWT, refreshed via /api/vibemix/v1/register when within
   7 days of expiry.
-- ``proxy_client.build_proxy_genai_client(jwt, proxy_base_url)`` +
-  ``build_proxy_tts_chain(jwt, proxy_base_url)``.
+- ``proxy_client.build_proxy_genai_client(jwt, proxy_base_url)`` plus the
+  MOSS-only ``build_proxy_tts_chain(jwt, proxy_base_url)`` compatibility shim.
 - ``build_llm(api_key, *, mode, proxy_base_url, jwt)`` extended with mode
   dispatch (direct = Phase 4 verbatim; proxy = http_options-pointed at proxy).
-- ``build_tts_chain(*, gemini_api_key, openrouter_api_key, openrouter_enabled,
-  mode, ...)`` same.
+- ``build_tts_chain(*, mode, ...)`` accepts old direct/proxy arguments but
+  always resolves to the single MOSS provider.
 """
 
 from __future__ import annotations
