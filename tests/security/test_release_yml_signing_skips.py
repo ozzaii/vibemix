@@ -75,6 +75,23 @@ def test_release_yml_apple_sign_step_guarded_by_signing_available(workflow_yaml)
     assert sign_step["if"] == "env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'"
 
 
+def test_release_yml_macos_build_does_not_pre_sign_before_sidecar_codesign(workflow_yaml):
+    """Tauri must not notarize before sign_macos.sh signs PyInstaller sidecar contents."""
+    build_macos = workflow_yaml["jobs"]["build-macos"]
+    steps = build_macos["steps"]
+    build_step = next(
+        (s for s in steps if s.get("name") == "BUILD — Tauri app (cargo tauri build)"),
+        None,
+    )
+    assert build_step is not None, "macOS Tauri build step not found"
+    run = build_step["run"]
+    assert "cargo tauri build" in run
+    assert "--bundles app" in run
+    assert "--no-sign" in run
+    assert "--ci" in run
+    assert "--bundles dmg" not in run
+
+
 def test_release_yml_detects_complete_apple_secret_group(workflow_text: str):
     """Full-release mode must not start with a partial Apple signing setup."""
     for secret in (

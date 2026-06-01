@@ -340,7 +340,7 @@ jobs:
           npm ci
           npm run build
           cd src-tauri
-          cargo tauri build --target ${{ matrix.rust_target }}
+          cargo tauri build --target ${{ matrix.rust_target }} --bundles app --no-sign --ci
 
       - name: PACKAGE — Repair macOS app sidecar symlinks
         run: |

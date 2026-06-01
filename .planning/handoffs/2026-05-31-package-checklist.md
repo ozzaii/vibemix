@@ -3543,6 +3543,7 @@ Suggested commit if/when selected: `fix(packaging): support local notarization f
 Include:
 
 - `docs/signing-macos.md`
+- `.github/workflows/release.yml`
 - `scripts/dist/sign_macos.sh`
 - `tauri/src-tauri/tauri.conf.json5`
 - `tests/security/test_release_yml_signing_skips.py`
@@ -3555,6 +3556,9 @@ Reason:
   `APPLE_SIGNING_IDENTITY` alias, and a Tauri build-command path correction.
 - Code-signing changes prove identity selection, secret handling, notarization
   submission/log retrieval, staple verification, and the Tauri build hook path.
+- The release workflow must build the macOS `.app` with `--no-sign` so Tauri
+  does not notarize before `sign_macos.sh` force-signs the nested PyInstaller
+  sidecar Mach-O tree.
 
 Proof already run:
 
