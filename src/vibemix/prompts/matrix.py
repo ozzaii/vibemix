@@ -835,6 +835,8 @@ def build_system_instruction(
     include_citation_grammar: bool = True,
     include_listening_fallback: bool = True,
     include_tag_dsl: bool = True,
+    include_audio_vibe_contract: bool | None = None,
+    include_coach_closing: bool | None = None,
     taste_persona_tags: tuple[str, ...] | list[str] | None = None,
 ) -> str:
     """Return the prompt cell body for ``(skill, mode)`` rendered with ``mood``.
@@ -867,13 +869,21 @@ def build_system_instruction(
             identity invariant on ``SYSTEM_INSTRUCTION``.
         include_tag_dsl: Plan 41-04 LAT-05 — when True (default), the
             :data:`TTS_TAG_DSL_BLOCK` (Gemini 3.1 Flash TTS expressivity
-            tags) is appended after the fail-soft fragment. The live
-            agent uses the default so every coach turn knows the 6-tag
-            DSL. When False the block is suppressed — used by
+            tags) is appended after the fail-soft fragment. Legacy Gemini-TTS
+            and non-live callers can keep the default; live MOSS-only co-host
+            calls now suppress it. When False the block is suppressed — used by
             ``vibemix.agent.persona`` together with
             ``include_citation_grammar=False`` /
             ``include_listening_fallback=False`` to preserve the
             v4-byte-identity invariant on ``SYSTEM_INSTRUCTION``.
+        include_audio_vibe_contract: When ``None`` (default), mirrors
+            ``include_tag_dsl`` for backward compatibility with byte-identity
+            callers. Live MOSS-only co-host calls can pass ``True`` while
+            suppressing the obsolete Gemini-TTS delivery-tag DSL.
+        include_coach_closing: When ``None`` (default), mirrors
+            ``include_tag_dsl`` for backward compatibility. Live MOSS-only
+            coach calls can pass ``True`` so the professional-coach closing
+            survives even when delivery tags are disabled.
 
     Returns:
         The prompt string for the requested cell, with ``{mood_persona}``
@@ -893,6 +903,10 @@ def build_system_instruction(
         raise ValueError(f"unknown mode {mode!r} — must be one of {sorted(_VALID_MODES)}")
     if mood not in MOOD_PERSONAS:
         raise ValueError(f"unknown mood {mood!r} — must be one of {sorted(MOOD_PERSONAS.keys())}")
+    if include_audio_vibe_contract is None:
+        include_audio_vibe_contract = include_tag_dsl
+    if include_coach_closing is None:
+        include_coach_closing = include_tag_dsl
 
     body = _CELLS[(skill_norm, mode_norm)]
 
@@ -934,27 +948,28 @@ def build_system_instruction(
     # Plan 41-04 LAT-05 — append the TTS tag DSL block. The block starts
     # with its own ``\n\n`` separator (matches CITATION_GRAMMAR_BLOCK
     # pattern) so it lands after the fail-soft fragment with the same
-    # paragraph break. Default-on so every live coach turn sees the 6-
-    # tag DSL; persona overlays / v4-byte-identity callers opt out.
+    # paragraph break. Default-on for backward-compatible prompt builders;
+    # live MOSS-only co-host calls opt out and keep the audio-vibe contract.
     if include_tag_dsl:
         # Coach mode gets the calm-only tag set (no [excited]/[fast]) so the
         # delivery never reads as hype; hype mode keeps the full 6-tag DSL.
         body = body + (COACH_TAG_DSL_BLOCK if mode_norm == "coach" else TTS_TAG_DSL_BLOCK)
-        # 2026-05-21 (Kaan): the LAST thing a coach reads — strongest recency.
-        # Everything above is context to internalize, NOT a checklist to recite.
-        # Kaan: "eqları seslendirebilir ... tam bir professional coach olmalı, ne
-        # hakkında konuşacağına o karar verecek." Trust the model's judgment over
-        # the rules; let it name EQs/filters/moves when a real pro would. Gated
-        # with the tag DSL so byte-identity callers (persona.py, prompt-dispatch
-        # tests) that pass include_tag_dsl=False still get the bare cell.
-        if mode_norm == "coach":
-            body = body + COACH_CLOSING_BLOCK
 
-        # 2026-05-26 (Kaan, canlı tuning) — explicit demo overlay only.
-        # Never append it by default: otherwise it globally overrides mode,
-        # language, and genre instructions for every live session.
-        if _psy_tripper_overlay_enabled():
-            body = body + _PSY_TRIPPER_TR_OVERLAY
+    # 2026-05-21 (Kaan): the LAST thing a coach reads — strongest recency.
+    # Everything above is context to internalize, NOT a checklist to recite.
+    # Kaan: "eqları seslendirebilir ... tam bir professional coach olmalı, ne
+    # hakkında konuşacağına o karar verecek." Trust the model's judgment over
+    # the rules; let it name EQs/filters/moves when a real pro would. Defaults
+    # stay tied to include_tag_dsl for byte-identity callers; live MOSS-only
+    # calls can keep this closing while suppressing obsolete delivery tags.
+    if mode_norm == "coach" and include_coach_closing:
+        body = body + COACH_CLOSING_BLOCK
+
+    # 2026-05-26 (Kaan, canlı tuning) — explicit demo overlay only.
+    # Never append it by default: otherwise it globally overrides mode,
+    # language, and genre instructions for every live session.
+    if include_tag_dsl and _psy_tripper_overlay_enabled():
+        body = body + _PSY_TRIPPER_TR_OVERLAY
 
     # One Mind S2 — taste→persona overlay. Kwarg-gated: default None / empty
     # appends nothing, so the v4-byte-identity invariant + every existing matrix
@@ -967,7 +982,7 @@ def build_system_instruction(
     # signal. Append after persona/taste so the final rule does not let Gemini
     # promote audio into hidden facts, controller causality, or determined
     # correction TTS.
-    if include_tag_dsl:
+    if include_audio_vibe_contract:
         body = body + AUDIO_VIBE_CONTRACT_BLOCK
 
     return body

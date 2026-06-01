@@ -975,12 +975,28 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
 
         if lens in LENS_TO_MODE_MOOD:
             mode, lens_mood = LENS_TO_MODE_MOOD[lens]
-            return build_system_instruction(skill, mode, lens_mood, taste_persona_tags=taste_tags)
+            return build_system_instruction(
+                skill,
+                mode,
+                lens_mood,
+                include_tag_dsl=False,
+                include_audio_vibe_contract=True,
+                include_coach_closing=True,
+                taste_persona_tags=taste_tags,
+            )
 
     mode = os.environ.get(ENV_MODE, DEFAULT_MODE)
     if mood is None:
         mood = os.environ.get(ENV_MOOD, DEFAULT_MOOD)
-    return build_system_instruction(skill, mode, mood, taste_persona_tags=taste_tags)
+    return build_system_instruction(
+        skill,
+        mode,
+        mood,
+        include_tag_dsl=False,
+        include_audio_vibe_contract=True,
+        include_coach_closing=True,
+        taste_persona_tags=taste_tags,
+    )
 
 
 class DJCoHostAgent(Agent):

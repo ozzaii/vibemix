@@ -25,6 +25,7 @@ from vibemix.agent.dj_cohost import (
     _build_recall_query_context,
 )
 from vibemix.audio import INPUT_SR_TARGET, AudioBuffer
+from vibemix.prompts.matrix import AUDIO_VIBE_CONTRACT_BLOCK, TTS_TAGS
 from vibemix.state import AICoach, Event, MusicState
 from vibemix.state.deck_state import DeckState, DeckTrack
 
@@ -192,6 +193,9 @@ def test_agent_03_initial_state(mocker, tmp_path) -> None:
     # GenerateContentConfig is a pydantic model — direct field access works
     assert agent._gen_cfg.system_instruction.startswith(SYSTEM_INSTRUCTION)
     assert "[ev:" in agent._gen_cfg.system_instruction
+    assert AUDIO_VIBE_CONTRACT_BLOCK in agent._gen_cfg.system_instruction
+    for tag in TTS_TAGS:
+        assert tag not in agent._gen_cfg.system_instruction
     assert agent._gen_cfg.temperature == 1.0
     assert agent._gen_cfg.max_output_tokens == 1024
     level = agent._gen_cfg.thinking_config.thinking_level
@@ -2141,12 +2145,11 @@ def test_resolve_prompt_cell_uses_shared_lens(tmp_path, monkeypatch) -> None:
 
 
 def test_resolve_prompt_cell_cold_path_byte_identical(tmp_path, monkeypatch) -> None:
-    """With NO shared lens + default env, the cell is byte-identical to today.
+    """With NO shared lens + default env, the live cell stays deterministic.
 
     REAL-GREEN co-host cold-path guard: when extra['lens'] is unset and no env
-    overrides, _resolve_prompt_cell must equal build_system_instruction(
-    'intermediate','hype','hype-man') exactly — true today AND preserved through
-    Plan 03 (the cold path is left unchanged). This guard must never regress.
+    overrides, _resolve_prompt_cell must equal the MOSS-only live prompt shape:
+    default hype cell + grounding/audio contract, but no legacy Gemini-TTS tags.
     """
     import vibemix.runtime.config_store as cs_mod
 
@@ -2161,7 +2164,17 @@ def test_resolve_prompt_cell_cold_path_byte_identical(tmp_path, monkeypatch) -> 
     cs_mod.save_config(store)
 
     out = dj_mod._resolve_prompt_cell()
-    assert out == build_system_instruction("intermediate", "hype", "hype-man")
+    assert out == build_system_instruction(
+        "intermediate",
+        "hype",
+        "hype-man",
+        include_tag_dsl=False,
+        include_audio_vibe_contract=True,
+        include_coach_closing=True,
+    )
+    assert AUDIO_VIBE_CONTRACT_BLOCK in out
+    for tag in TTS_TAGS:
+        assert tag not in out
 
 
 def test_resolve_prompt_cell_lens_wins_over_live_mood(tmp_path, monkeypatch) -> None:
@@ -2191,7 +2204,16 @@ def test_resolve_prompt_cell_lens_wins_over_live_mood(tmp_path, monkeypatch) -> 
     # tutor → (coach, teacher): the teacher persona fragment is substituted in,
     # and it equals the canonical tutor cell — NOT the hype default.
     assert "framework-anchored" in out
-    assert out == build_system_instruction("intermediate", "coach", "teacher")
+    assert out == build_system_instruction(
+        "intermediate",
+        "coach",
+        "teacher",
+        include_tag_dsl=False,
+        include_audio_vibe_contract=True,
+        include_coach_closing=True,
+    )
+    for tag in TTS_TAGS:
+        assert tag not in out
 
 
 def test_resolve_prompt_cell_corrupt_lens_falls_back_no_crash(tmp_path, monkeypatch) -> None:
@@ -2218,4 +2240,13 @@ def test_resolve_prompt_cell_corrupt_lens_falls_back_no_crash(tmp_path, monkeypa
 
     # Must not raise; falls through to the cold path (default hype cell).
     out = dj_mod._resolve_prompt_cell(mood="hype-man")
-    assert out == build_system_instruction("intermediate", "hype", "hype-man")
+    assert out == build_system_instruction(
+        "intermediate",
+        "hype",
+        "hype-man",
+        include_tag_dsl=False,
+        include_audio_vibe_contract=True,
+        include_coach_closing=True,
+    )
+    for tag in TTS_TAGS:
+        assert tag not in out

@@ -1481,6 +1481,44 @@ Remaining gate:
   entirely for MOSS-only sessions. This package is the runtime backstop: even if
   the model emits a legacy tag, user-facing speech/log rows stay clean.
 
+## Package 8G - MOSS Live Prompt Delivery Tag Opt-Out
+
+Suggested commit: `fix(cohost): stop prompting moss voice tags`
+
+Include:
+
+- `src/vibemix/prompts/matrix.py`
+- `src/vibemix/agent/dj_cohost.py`
+- `tests/prompts/test_matrix.py`
+- `tests/agent/test_dj_cohost.py`
+
+Reason:
+
+- Package 8F strips leaked delivery tags after model output. This companion
+  package prevents the live co-host from inviting those tags in the first place:
+  `DJCoHostAgent` asks for the audio-vibe grounding contract, but opts out of
+  the legacy Gemini-TTS `[chill]` / `[excited]` DSL because MOSS is the only
+  voice source.
+- Backward-compatible prompt builders still keep the old `include_tag_dsl=True`
+  default for legacy DSL tests/tools. The live MOSS path uses the new explicit
+  combination: `include_tag_dsl=False`, `include_audio_vibe_contract=True`,
+  `include_coach_closing=True`.
+
+Proof already run:
+
+- `uv run pytest -q tests/prompts/test_matrix.py tests/agent/test_dj_cohost.py tests/agent/test_emote_parser.py tests/agent/test_dj_cohost_streaming_pipe.py`
+  passed: 195 tests.
+- `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_dj_cohost_linter.py tests/prompts/test_negative_dict.py`
+  passed: 52 tests.
+- `uv run ruff check src/vibemix/prompts/matrix.py src/vibemix/agent/dj_cohost.py src/vibemix/agent/emote_parser.py tests/prompts/test_matrix.py tests/agent/test_dj_cohost.py tests/agent/test_emote_parser.py tests/agent/test_dj_cohost_streaming_pipe.py`
+  passed.
+
+Remaining gate:
+
+- Final live source/packaged runs should confirm the prompt no longer causes
+  bracket delivery tags in `ai_text` under real model output. Package 8F remains
+  the hard backstop if a model still emits one.
+
 ## Hold Lane - Rebuild Carry-Forward Live Reality Pins
 
 Suggested commit if/when selected: `test(repo): pin live reality gaps`

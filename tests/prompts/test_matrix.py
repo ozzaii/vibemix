@@ -29,6 +29,7 @@ from vibemix.prompts.matrix import (
     HYPE_INTERMEDIATE,
     HYPE_PRO,
     MOOD_PERSONAS,
+    TTS_TAGS,
     build_system_instruction,
 )
 
@@ -671,6 +672,34 @@ def test_double_opt_out_byte_identical_to_cell() -> None:
     )
     assert out == HYPE_INTERMEDIATE
     assert AUDIO_VIBE_CONTRACT_BLOCK not in out
+
+
+def test_live_moss_prompt_can_keep_audio_contract_without_delivery_tags() -> None:
+    out = build_system_instruction(
+        "intermediate",
+        "hype",
+        include_tag_dsl=False,
+        include_audio_vibe_contract=True,
+    )
+
+    assert AUDIO_VIBE_CONTRACT_BLOCK in out
+    for tag in TTS_TAGS:
+        assert tag not in out
+
+
+def test_live_moss_coach_prompt_can_keep_closing_without_delivery_tags() -> None:
+    out = build_system_instruction(
+        "intermediate",
+        "coach",
+        include_tag_dsl=False,
+        include_audio_vibe_contract=True,
+        include_coach_closing=True,
+    )
+
+    assert AUDIO_VIBE_CONTRACT_BLOCK in out
+    assert "Don't run it as a checklist" in out
+    for tag in TTS_TAGS:
+        assert tag not in out
 
 
 def test_invalid_skill_still_raises() -> None:
