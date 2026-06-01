@@ -193,9 +193,12 @@ def test_valid_response_passes_through_when_wired(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     chunks = _drive(agent)
 
-    assert chunks == ["that drop [ev:KICK_SWAP@45.2] was clean"]
+    assert chunks == ["that drop was clean"]
     kinds = [k for k, _ in recorder.events]
     assert "ai_text" in kinds
+    assert next(f for k, f in recorder.events if k == "ai_text")["text"] == (
+        "that drop [ev:KICK_SWAP@45.2] was clean"
+    )
     assert "citation_strip" not in kinds
     assert "citation_bypass" not in kinds
     # Tracker was told the response was NOT stripped.
@@ -410,9 +413,12 @@ def test_live_claim_guard_allows_broad_audio_listener_read_before_tts(mocker, tm
     )
     chunks = _drive(agent)
 
-    assert chunks == ["The low end got hollow for a moment [ev:BAND_SHIFT_LOW@12.3]"]
+    assert chunks == ["The low end got hollow for a moment "]
     kinds = [kind for kind, _ in recorder.events]
     assert "ai_text" in kinds
+    assert next(f for kind, f in recorder.events if kind == "ai_text")["text"] == (
+        "The low end got hollow for a moment [ev:BAND_SHIFT_LOW@12.3]"
+    )
     assert "live_claim_guard" not in kinds
     assert "citation_strip" not in kinds
     assert tracker.rate() == 0.0
@@ -471,12 +477,13 @@ def test_invalid_response_strips_silently(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     chunks = _drive(agent)
 
-    # Chunks-by-chunks pipe yields the clean-prefix response immediately;
-    # the citation_failure cancel is what enforces the contract that the
-    # fabricated atom never reaches the user. In production the cancel
-    # beats TTS synthesis on fast-completion streams (single-chunk Gemini
-    # responses settle in ~10ms, TTS first-frame is ~100-200ms).
-    assert chunks == ["fake [ev:UNKNOWN@99.0] reply"]
+    # Chunks-by-chunks pipe yields the TTS-sanitized clean-prefix response
+    # immediately; the citation_failure cancel is what enforces the
+    # contract that the fabricated atom never reaches the user. In
+    # production the cancel beats TTS synthesis on fast-completion streams
+    # (single-chunk Gemini responses settle in ~10ms, TTS first-frame is
+    # ~100-200ms).
+    assert chunks == ["fake reply"]
     kinds = [k for k, _ in recorder.events]
     # Silence-pad cancel fires (head was speculatively in-flight).
     assert "streaming_cancel" in kinds
@@ -875,8 +882,9 @@ def test_bypass_emits_with_unverified_marker(mocker, tmp_path, capsys) -> None:
     agent.set_next_event(ev)
     chunks = _drive(agent)
 
-    # Chunks ARE yielded under bypass.
-    assert chunks == ["unverified [ev:NONEXISTENT@1.0] reply"]
+    # Chunks ARE yielded under bypass, but citation atoms are still TTS-only
+    # stripped so MOSS does not read bracket receipts aloud.
+    assert chunks == ["unverified reply"]
     kinds = [k for k, _ in recorder.events]
     assert "citation_bypass" in kinds
     bypass_log = next(f for k, f in recorder.events if k == "citation_bypass")
@@ -913,9 +921,9 @@ def test_strip_path_with_unknown_event_class(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     chunks = _drive(agent)
 
-    # Speed-pipe yields the chunk; silence-pad cancel kills further audio
-    # on the citation_failure path regardless of event class.
-    assert chunks == ["[ev:GHOST@1.0] junk"]
+    # Speed-pipe yields the TTS-clean chunk; silence-pad cancel kills further
+    # audio on the citation_failure path regardless of event class.
+    assert chunks == ["junk"]
     kinds = [k for k, _ in recorder.events]
     assert "streaming_cancel" in kinds
     playback.push.assert_called()
@@ -1091,8 +1099,11 @@ def test_cooldown_suppresses_back_to_back_recalls_COPILOT02(mocker, tmp_path) ->
     chunks_n = _drive(agent)
 
     assert chunks_n, "turn N must emit (chunks non-empty)"
-    assert f"[recall:{record_a.record_id}]" in chunks_n[0], (
-        "turn N must carry the recall callback so the cooldown arms"
+    assert f"[recall:{record_a.record_id}]" not in chunks_n[0], (
+        "TTS must not read recall callback atoms aloud"
+    )
+    assert agent._last_recall_callback_at == 100.0, (
+        "turn N must still arm recall cooldown from the grounded visible/logged callback"
     )
 
     # Advance the clock to t=180.0 (inside the 120s window).

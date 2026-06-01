@@ -175,9 +175,7 @@ def test_no_boundary_in_short_response_yields_after_stream(mocker, tmp_path) -> 
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     # 'Yeah.' = 5 chars, below MIN_HEAD_LEN — no head fires.
-    gen.aio.models.generate_content_stream = mocker.AsyncMock(
-        return_value=_async_iter(["Yeah."])
-    )
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(return_value=_async_iter(["Yeah."]))
     ev = Event(type="HEARTBEAT", state=state, extra={})
     agent.set_next_event(ev)
     chunks = _drive(agent)
@@ -232,9 +230,7 @@ def test_citation_failure_after_head_emits_cancel(mocker, tmp_path) -> None:
     linter → PlaybackQueue.push called with silence-pad PCM + a
     ``streaming_cancel`` event with reason ``citation_failure``."""
     registry = EvidenceRegistry()  # empty — every citation will miss
-    agent, gen, recorder, state, _, playback = _build_agent_wired(
-        mocker, tmp_path, registry
-    )
+    agent, gen, recorder, state, _, playback = _build_agent_wired(mocker, tmp_path, registry)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
@@ -274,9 +270,7 @@ def test_citation_failure_after_short_response_emits_cancel(mocker, tmp_path) ->
     is already in-flight to TTS.
     """
     registry = EvidenceRegistry()
-    agent, gen, recorder, state, _, playback = _build_agent_wired(
-        mocker, tmp_path, registry
-    )
+    agent, gen, recorder, state, _, playback = _build_agent_wired(mocker, tmp_path, registry)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
@@ -288,7 +282,7 @@ def test_citation_failure_after_short_response_emits_cancel(mocker, tmp_path) ->
     # Head WAS emitted speculatively — the chunk-by-chunk yield no
     # longer waits for a sentence boundary, so short responses also
     # stream.
-    assert chunks == ["wow [ev:MISS@0.1] yeah"]
+    assert chunks == ["wow yeah"]
     kinds = [k for k, _ in recorder.events]
     # Citation linter still fails on the missing registry entry.
     assert "citation_strip" in kinds
@@ -304,9 +298,7 @@ def test_citation_pass_no_head_yields_after_stream(mocker, tmp_path) -> None:
     stream completes via the legacy emit branch (head never fired)."""
     registry = EvidenceRegistry()
     registry.write("ev", "KICK_SWAP", 45.2)
-    agent, gen, recorder, state, _, _playback = _build_agent_wired(
-        mocker, tmp_path, registry
-    )
+    agent, gen, recorder, state, _, _playback = _build_agent_wired(mocker, tmp_path, registry)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     # No sentence boundary — single short chunk with citation.
@@ -316,9 +308,11 @@ def test_citation_pass_no_head_yields_after_stream(mocker, tmp_path) -> None:
     ev = Event(type="HEARTBEAT", state=state, extra={})
     agent.set_next_event(ev)
     chunks = _drive(agent)
-    assert "".join(chunks) == "nice [ev:KICK_SWAP@45.2] yeah"
+    assert "".join(chunks) == "nice yeah"
     kinds = [k for k, _ in recorder.events]
     assert "ai_text" in kinds
+    ai_text = recorder.events[kinds.index("ai_text")][1]["text"]
+    assert ai_text == "nice [ev:KICK_SWAP@45.2] yeah"
     assert "streaming_cancel" not in kinds
 
 
@@ -410,9 +404,9 @@ def test_partial_citation_clipped_at_bracket_open(mocker, tmp_path) -> None:
     chunks = _drive(agent)
     # First yield clipped before the open bracket.
     assert chunks[0] == "kick is pure brutal "
-    # Citation arrives intact in a later yield.
-    assert "[ev:kick@2.5]" in "".join(chunks[1:])
-    assert "".join(chunks) == "kick is pure brutal [ev:kick@2.5] and the bassline rolls."
+    # Citation remains clipped and never reaches TTS, even after it closes.
+    assert "[ev:kick@2.5]" not in "".join(chunks)
+    assert "".join(chunks) == "kick is pure brutal and the bassline rolls."
 
 
 def test_pitfall_1_citation_period_no_premature_yield(mocker, tmp_path) -> None:
@@ -438,7 +432,7 @@ def test_pitfall_1_citation_period_no_premature_yield(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     chunks = _drive(agent)
     full = "".join(chunks)
-    assert full == "Killer drop building up [ev:kick@2.5] hit hard. Next track up."
+    assert full == "Killer drop building up hit hard. Next track up."
     # Head yielded only when bracket closed + boundary period seen.
     # First chunk (with citation period) must NOT have been emitted alone.
     assert chunks[0] != "Killer drop building up [ev:kick@2.5"

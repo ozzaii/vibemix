@@ -1555,6 +1555,41 @@ Proof to run:
 - `uv run pytest -q tests/prompts/test_matrix.py tests/agent/test_dj_cohost_linter.py tests/state/test_coach_anti_slop.py`
 - `uv run ruff check src/vibemix/agent/language_guard.py src/vibemix/agent/dj_cohost.py tests/agent/test_language_guard.py tests/agent/test_dj_cohost.py`
 
+## Package 8I - TTS Citation Sanitizer
+
+Suggested commit: `fix(cohost): keep citation atoms out of tts`
+
+Include:
+
+- `src/vibemix/agent/tts_sanitizer.py`
+- `src/vibemix/agent/dj_cohost.py`
+- `tests/agent/test_tts_sanitizer.py`
+- `tests/agent/test_dj_cohost.py`
+- `tests/agent/test_dj_cohost_streaming_pipe.py`
+- `tests/agent/test_dj_cohost_linter.py`
+- `.planning/packets/2026-06-01/CODEX_READY-cohost-tts-citation-sanitizer.md`
+
+Reason:
+
+- Citation atoms are product receipts, not voice copy. They must stay in raw
+  artifacts, linter input, `ai_text`, and `ai_message.message`, but MOSS should
+  not vocalize bracket text such as `[aud:rms@12.0]`.
+- This package adds a TTS-only sanitizer under the same co-host chokepoint:
+  yielded chunks lose citation atoms, while visible/logged text keeps them.
+
+Keep out:
+
+- No citation-linter policy changes.
+- No prompt/persona rewrite.
+- No Viber/library changes.
+- No DROP-call speech/timing.
+
+Proof to run:
+
+- `uv run pytest -q tests/agent/test_tts_sanitizer.py tests/agent/test_dj_cohost.py::test_llm_node_english_only_guard_preserves_grounded_english_response tests/agent/test_dj_cohost.py::test_AE_citation_count_event_written_per_turn tests/agent/test_dj_cohost.py::test_AJ_no_registry_path_writes_recorder_event_only tests/agent/test_dj_cohost_streaming_pipe.py`
+- `uv run pytest -q tests/agent/test_dj_cohost_linter.py tests/agent/test_citation_strip_emit.py tests/coach/test_citation_linter.py`
+- `uv run ruff check src/vibemix/agent/tts_sanitizer.py src/vibemix/agent/dj_cohost.py tests/agent/test_tts_sanitizer.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_streaming_pipe.py tests/agent/test_dj_cohost_linter.py`
+
 ## Hold Lane - Rebuild Carry-Forward Live Reality Pins
 
 Suggested commit if/when selected: `test(repo): pin live reality gaps`

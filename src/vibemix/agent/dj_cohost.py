@@ -64,6 +64,7 @@ from vibemix.agent.proxy_client import (
     classify_proxy_error,
     probe_proxy_health,
 )
+from vibemix.agent.tts_sanitizer import model_text_for_tts
 from vibemix.audio import (
     INVOKE_AUDIO_SECONDS,
     MIC_AUDIO_PART_PRESENCE_RMS,
@@ -2629,6 +2630,19 @@ class DJCoHostAgent(Agent):
             head_yielded = False
             language_defer_stream = False
             language_matches: tuple[str, ...] = ()
+            tts_yielded_any = False
+            tts_yielded_ends_space = False
+
+            def _prepare_tts_segment(segment: str) -> str:
+                nonlocal tts_yielded_any, tts_yielded_ends_space
+                tts_segment = model_text_for_tts(segment, normalize=False)
+                if tts_yielded_ends_space or not tts_yielded_any:
+                    tts_segment = tts_segment.lstrip()
+                if tts_segment:
+                    tts_yielded_any = True
+                    tts_yielded_ends_space = tts_segment[-1].isspace()
+                return tts_segment
+
             # Tracks the highest position in ``full_text`` we have
             # already yielded. Combined with ``last_balanced_position``
             # this keeps mid-stream yields clipped at the last closed
@@ -2761,7 +2775,7 @@ class DJCoHostAgent(Agent):
                             safe_pos = last_balanced_position(full_text)
                             if safe_pos > yielded_pos:
                                 segment = full_text[yielded_pos:safe_pos]
-                                tts_segment, _ = strip_emote_tags(segment, normalize=False)
+                                tts_segment = _prepare_tts_segment(segment)
                                 yielded_pos = safe_pos
                                 if tts_segment:
                                     head_yielded = True
@@ -2782,7 +2796,7 @@ class DJCoHostAgent(Agent):
                         safe_pos = last_balanced_position(full_text)
                         if safe_pos > yielded_pos:
                             segment = full_text[yielded_pos:safe_pos]
-                            tts_segment, _ = strip_emote_tags(segment, normalize=False)
+                            tts_segment = _prepare_tts_segment(segment)
                             yielded_pos = safe_pos
                             if tts_segment:
                                 yield tts_segment
@@ -3085,7 +3099,9 @@ class DJCoHostAgent(Agent):
                         # would duplicate audio. Skip it.
                         if not head_yielded:
                             for txt in buffered_chunks:
-                                yield txt
+                                tts_txt = _prepare_tts_segment(txt)
+                                if tts_txt:
+                                    yield tts_txt
                         if self._stripped_tracker is not None:
                             self._stripped_tracker.record(False)
                         if spoken_stripped:
@@ -3115,7 +3131,9 @@ class DJCoHostAgent(Agent):
                             # re-yield from buffer.
                             if not head_yielded:
                                 for txt in buffered_chunks:
-                                    yield txt
+                                    tts_txt = _prepare_tts_segment(txt)
+                                    if tts_txt:
+                                        yield tts_txt
                             # Bypass means we did NOT strip — tracker records
                             # the actual outcome (False = "we let it through").
                             # Plan 55-03 — surface the raw reply as the
@@ -3182,7 +3200,9 @@ class DJCoHostAgent(Agent):
                     # buffer re-yield to avoid duplicate audio.
                     if not head_yielded:
                         for txt in buffered_chunks:
-                            yield txt
+                            tts_txt = _prepare_tts_segment(txt)
+                            if tts_txt:
+                                yield tts_txt
                     if spoken_stripped:
                         print(f"[ai_text] {spoken_stripped!r}", flush=True)
                         self._recorder.log_event(
