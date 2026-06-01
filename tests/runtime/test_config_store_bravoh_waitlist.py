@@ -25,7 +25,6 @@ from pathlib import Path
 
 from vibemix.runtime.config_store import ConfigStore, load_config, save_config
 
-
 # ---------------------------------------------------------------------------
 # (a) Default is OFF
 # ---------------------------------------------------------------------------
@@ -130,10 +129,10 @@ def test_bravoh_addition_preserves_unknown_top_level_keys(tmp_path: Path) -> Non
     assert "first_run_state" in loaded.extra
 
     # Mutate something unrelated and save — unknown keys + bravoh both survive.
-    loaded.voice = "puck"
+    loaded.voice = "Bella"
     save_config(loaded, target)
     on_disk = json.loads(target.read_text())
-    assert on_disk["voice"] == "puck"
+    assert on_disk["voice"] == "Bella"
     assert on_disk["bravoh_waitlist_opt_in"] is True
     assert on_disk["future_field_we_dont_own"] == {"nested": "value"}
     assert on_disk["first_run_state"] == {"first_run_completed": True}

@@ -1382,7 +1382,7 @@ export function defaultState(): SessionState {
       errors: {},
     },
     claimPolicy: null,
-    persona: { skill: "INT", interaction: "HYPE", mood: "HYPE", voice: "kore", genre: "techno" },
+    persona: { skill: "INT", interaction: "HYPE", mood: "HYPE", voice: "Adam", genre: "techno" },
     output: { device: "MacBook Pro Speakers", profile: "HP" },
     mode: "cohost",
   };

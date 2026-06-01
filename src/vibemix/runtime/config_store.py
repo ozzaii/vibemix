@@ -22,7 +22,7 @@ Phase 11 keys preserved verbatim on save:
   * ``first_run_state`` (tauri-plugin-store wrapper key — preserved as-is)
 
 Phase 12 fields added:
-  * ``voice`` (default ``"kore"``)
+  * ``voice`` (default ``"Adam"``)
   * ``mode`` (default ``"coach"``)
   * ``genre`` (default ``"tech-house"``)
   * ``output_profile`` (default ``"hp"``)
@@ -47,6 +47,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from vibemix.voice_presets import DEFAULT_MOSS_VOICE, normalize_stored_voice
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -166,7 +168,7 @@ class ConfigStore:
     """
 
     # Phase 12 fields
-    voice: str = "kore"
+    voice: str = DEFAULT_MOSS_VOICE
     mode: str = "coach"
     genre: str = "tech-house"
     output_device_id: str | None = None
@@ -235,6 +237,8 @@ class ConfigStore:
                 kwargs["retention_days"] = int(kwargs["retention_days"])
             except (TypeError, ValueError):
                 kwargs.pop("retention_days", None)
+        if "voice" in kwargs:
+            kwargs["voice"] = normalize_stored_voice(kwargs["voice"])
         # IN-02 in 14-REVIEW.md — coerce/drop non-bool lighter_blur from
         # disk. A corrupted config.json with `"lighter_blur": "yes"` or
         # `1` would otherwise populate the dataclass verbatim and break

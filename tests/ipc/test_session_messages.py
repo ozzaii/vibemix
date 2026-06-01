@@ -132,7 +132,7 @@ def test_session_set_mode_roundtrip() -> None:
 @pytest.mark.parametrize(
     "field,value",
     [
-        ("voice", "kore"),
+        ("voice", "Adam"),
         ("mode", "hype"),
         ("genre", "techno"),
         ("output_device_id", "dev-3"),
@@ -182,7 +182,7 @@ def test_settings_set_field_literal_matches_schema_enum() -> None:
 
 def test_settings_state_full_roundtrip() -> None:
     msg = SettingsState.make(
-        voice="puck",
+        voice="Bella",
         mode="hype",
         genre="dnb",
         output_device_id="dev-7",
@@ -227,7 +227,7 @@ def test_settings_state_rejects_invalid_mode() -> None:
         "type": "ipc.settings.state",
         "ts": "2026-05-12T00:00:00Z",
         "payload": {
-            "voice": "kore",
+            "voice": "Adam",
             "mode": "neutral",  # not in enum
             "genre": "techno",
             "output_device_id": None,

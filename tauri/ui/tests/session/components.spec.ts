@@ -603,10 +603,10 @@ describe("renderPicker", () => {
   it("opens dropdown on click", () => {
     const p = renderPicker({
       label: "VOICE",
-      value: "kore",
+      value: "Adam",
       options: [
-        { id: "kore", label: "kore" },
-        { id: "puck", label: "puck" },
+        { id: "Adam", label: "Adam" },
+        { id: "Bella", label: "Bella" },
       ],
     });
     host().append(p);

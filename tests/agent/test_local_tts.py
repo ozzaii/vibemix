@@ -25,6 +25,7 @@ from vibemix.agent.local_tts import (
     pcm16_mono_le,
     resolve_model_dir,
 )
+from vibemix.voice_presets import select_moss_voice_row
 
 # ---------------- pure helpers ----------------
 
@@ -165,6 +166,22 @@ def test_read_native_sample_rate(monkeypatch, tmp_path):
 def test_read_native_sample_rate_defaults_on_broken_meta(tmp_path):
     # no manifest at all -> safe default (the model genuinely emits 48k)
     assert _read_native_sample_rate(tmp_path) == 48000
+
+
+def test_select_moss_voice_row_uses_requested_voice():
+    voices = [{"voice": "Junhao"}, {"voice": "Adam"}, {"voice": "Bella"}]
+
+    row = select_moss_voice_row(voices, "Bella")
+
+    assert row["voice"] == "Bella"
+
+
+def test_select_moss_voice_row_falls_back_to_default_not_first_voice():
+    voices = [{"voice": "Junhao"}, {"voice": "Adam"}, {"voice": "Bella"}]
+
+    row = select_moss_voice_row(voices, "kore")
+
+    assert row["voice"] == "Adam"
 
 
 # ---------------- FallbackAdapter wiring ----------------

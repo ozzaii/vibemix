@@ -225,12 +225,12 @@ def _make_examples() -> list[tuple[str, object]]:
         ),
         ("SessionMute", SessionMute.make_toggle()),
         ("SessionSetMode", SessionSetMode.make(mode="build")),
-        ("SettingsSet", SettingsSet.make(field="voice", value="kore")),
+        ("SettingsSet", SettingsSet.make(field="voice", value="Adam")),
         ("SettingsGet", SettingsGet.make()),
         (
             "SettingsState",
             SettingsState.make(
-                voice="kore",
+                voice="Adam",
                 mode="coach",
                 genre="tech-house",
                 output_device_id=None,

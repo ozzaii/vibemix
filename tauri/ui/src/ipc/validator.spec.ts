@@ -231,7 +231,7 @@ describe("parseIpcMessage — ipc.session.mute", () => {
 describe("parseIpcMessage — ipc.settings.set", () => {
   it("accepts every documented field", () => {
     const fields: { field: string; value: unknown }[] = [
-      { field: "voice", value: "kore" },
+      { field: "voice", value: "Adam" },
       { field: "mode", value: "hype" },
       { field: "genre", value: "techno" },
       { field: "output_device_id", value: "dev-3" },
@@ -261,7 +261,7 @@ describe("parseIpcMessage — ipc.settings.state", () => {
     type: "ipc.settings.state",
     ts: TS,
     payload: {
-      voice: "kore",
+      voice: "Adam",
       mode: "coach",
       genre: "tech-house",
       output_device_id: null,

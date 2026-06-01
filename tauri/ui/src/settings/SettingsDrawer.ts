@@ -542,15 +542,17 @@ interface DrawerHandle {
 
 let mountedHandle: DrawerHandle | null = null;
 
+// Mirrored from src/vibemix/voice_presets.py. These are real MOSS-TTS-Nano
+// manifest voices; retired Gemini voice ids must not re-enter this picker.
 const VOICE_OPTIONS = [
-  "kore",
-  "puck",
-  "charon",
-  "fenrir",
-  "aoede",
-  "leda",
-  "orus",
-  "zephyr",
+  "Adam",
+  "Bella",
+  "Ava",
+  "Nathan",
+  "Soyo",
+  "Mei",
+  "Arisa",
+  "Xiaoyu",
 ] as const;
 
 const GENRE_OPTIONS = [

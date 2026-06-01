@@ -175,7 +175,7 @@ def test_boot_emits_ipc_boot_and_initial_settings_state(fake_bus: FakeBus) -> No
     settings = fake_bus.emitted_by_type("ipc.settings.state")
     assert len(settings) == 1
     payload = settings[0]["payload"]
-    assert payload["voice"] == "kore"
+    assert payload["voice"] == "Adam"
     assert payload["mode"] == "coach"
     assert payload["genre"] == "tech-house"
     assert payload["muted"] is False
@@ -268,7 +268,7 @@ def test_mute_clear_failure_does_not_crash(fake_bus: FakeBus) -> None:
 
 def test_settings_get_emits_current_state(fake_bus: FakeBus) -> None:
     cfg = ConfigStore(
-        voice="puck",
+        voice="Bella",
         mode="hype",
         extra={"lens": "critique", "learn.headphone_device_index": 3},
     )
@@ -283,7 +283,7 @@ def test_settings_get_emits_current_state(fake_bus: FakeBus) -> None:
         },
     )
     state = fake_bus.emitted_by_type("ipc.settings.state")[-1]["payload"]
-    assert state["voice"] == "puck"
+    assert state["voice"] == "Bella"
     assert state["mode"] == "hype"
     assert state["lens"] == "critique"
     assert state["learn.headphone_device_index"] == 3
@@ -337,12 +337,12 @@ def test_settings_set_success_emits_fresh_state(fake_bus: FakeBus) -> None:
         {
             "type": "ipc.settings.set",
             "ts": "2026-05-12T08:00:00+00:00",
-            "payload": {"field": "voice", "value": "puck"},
+            "payload": {"field": "voice", "value": "Bella"},
         },
     )
-    cascade.set_voice.assert_called_once_with("puck")
+    cascade.set_voice.assert_called_once_with("Bella")
     state = fake_bus.emitted_by_type("ipc.settings.state")[-1]["payload"]
-    assert state["voice"] == "puck"
+    assert state["voice"] == "Bella"
 
 
 def test_settings_set_failure_emits_ipc_error(fake_bus: FakeBus) -> None:
@@ -567,7 +567,7 @@ def test_invalid_inbound_emits_ipc_error_when_wrapped(fake_bus: FakeBus) -> None
     bad_msg = {
         "type": "ipc.settings.set",
         "ts": "2026-05-12T08:00:00+00:00",
-        "payload": {"value": "puck"},
+        "payload": {"value": "Bella"},
     }
     asyncio.run(fake_bus.handlers["ipc.settings.set"](bad_msg))
     errors = fake_bus.emitted_by_type("ipc.error")

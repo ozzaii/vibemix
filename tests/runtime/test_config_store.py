@@ -31,7 +31,6 @@ from vibemix.runtime.config_store import (
     save_config,
 )
 
-
 # ---------------------------------------------------------------------------
 # Defaults + dataclass shape
 # ---------------------------------------------------------------------------
@@ -40,7 +39,7 @@ from vibemix.runtime.config_store import (
 def test_defaults_phase12_fields() -> None:
     """A fresh ``ConfigStore`` carries the Phase 12 defaults verbatim."""
     cfg = ConfigStore()
-    assert cfg.voice == "kore"
+    assert cfg.voice == "Adam"
     assert cfg.mode == "coach"
     assert cfg.genre == "tech-house"
     assert cfg.output_device_id is None
@@ -67,7 +66,7 @@ def test_round_trip_phase12_fields(tmp_path: Path) -> None:
     """Writing then reading recovers every Phase 12 field."""
     target = tmp_path / "config.json"
     cfg = ConfigStore(
-        voice="puck",
+        voice="Bella",
         mode="hype",
         genre="dnb",
         output_device_id="dev-7",
@@ -78,7 +77,7 @@ def test_round_trip_phase12_fields(tmp_path: Path) -> None:
     save_config(cfg, target)
     assert target.exists()
     loaded = load_config(target)
-    assert loaded.voice == "puck"
+    assert loaded.voice == "Bella"
     assert loaded.mode == "hype"
     assert loaded.genre == "dnb"
     assert loaded.output_device_id == "dev-7"
@@ -127,13 +126,13 @@ def test_round_trip_preserves_unknown_keys(tmp_path: Path) -> None:
     # Unknown key landed in extra
     assert "first_run_state" in loaded.extra
     # Defaults filled in for everything else
-    assert loaded.voice == "kore"
+    assert loaded.voice == "Adam"
     # Now write and verify the unknown key survives
-    loaded.voice = "puck"
+    loaded.voice = "Bella"
     save_config(loaded, target)
     on_disk = json.loads(target.read_text())
     assert on_disk["first_run_state"]["first_run_completed"] is True
-    assert on_disk["voice"] == "puck"
+    assert on_disk["voice"] == "Bella"
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +145,7 @@ def test_atomic_write_uses_tmp_then_replace(
 ) -> None:
     """``save_config`` writes to a tmp file then ``os.replace`` swaps in."""
     target = tmp_path / "config.json"
-    cfg = ConfigStore(voice="puck")
+    cfg = ConfigStore(voice="Bella")
     saw_tmp: list[Path] = []
 
     real_replace = cs_mod.os.replace
@@ -166,7 +165,7 @@ def test_atomic_write_uses_tmp_then_replace(
 def test_atomic_write_creates_parent_dir(tmp_path: Path) -> None:
     """``save`` mkdir-p's the parent so a fresh install doesn't ENOENT."""
     target = tmp_path / "deep" / "nested" / "config.json"
-    cfg = ConfigStore(voice="puck")
+    cfg = ConfigStore(voice="Bella")
     save_config(cfg, target)
     assert target.exists()
 
@@ -180,7 +179,7 @@ def test_load_missing_file_returns_defaults(tmp_path: Path) -> None:
     """No file on disk → fresh defaults without raising."""
     target = tmp_path / "nope.json"
     cfg = load_config(target)
-    assert cfg.voice == "kore"
+    assert cfg.voice == "Adam"
     assert cfg.retention_days == 7
 
 
@@ -191,7 +190,7 @@ def test_load_corrupt_json_returns_defaults(
     target = tmp_path / "config.json"
     target.write_text("{not json")
     cfg = load_config(target)
-    assert cfg.voice == "kore"
+    assert cfg.voice == "Adam"
     captured = capsys.readouterr()
     assert "config_store" in captured.err
 
@@ -201,7 +200,17 @@ def test_load_non_dict_returns_defaults(tmp_path: Path) -> None:
     target = tmp_path / "config.json"
     target.write_text("[1, 2, 3]")
     cfg = load_config(target)
-    assert cfg.voice == "kore"
+    assert cfg.voice == "Adam"
+
+
+def test_load_legacy_cloud_voice_returns_moss_default(tmp_path: Path) -> None:
+    """Retired Gemini voice ids must not keep the MOSS picker in a no-op state."""
+    target = tmp_path / "config.json"
+    target.write_text(json.dumps({"voice": "kore"}))
+
+    cfg = load_config(target)
+
+    assert cfg.voice == "Adam"
 
 
 def test_load_coerces_retention_days(tmp_path: Path) -> None:

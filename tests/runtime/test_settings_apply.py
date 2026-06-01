@@ -43,7 +43,6 @@ from vibemix.runtime.settings import (
     resolve_genre_profile_name,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -125,10 +124,10 @@ def _apply(applier: SettingsApplier, field: str, value) -> tuple[bool, str | Non
 
 def test_voice_happy_path(store, cascade, _redirect_config_path):
     applier = SettingsApplier(config_store=store, cascade_agent=cascade)
-    success, error = _apply(applier, "voice", "puck")
+    success, error = _apply(applier, "voice", "Bella")
     assert (success, error) == (True, None)
-    cascade.set_voice.assert_called_once_with("puck")
-    assert store.voice == "puck"
+    cascade.set_voice.assert_called_once_with("Bella")
+    assert store.voice == "Bella"
     assert _redirect_config_path.exists()
 
 
@@ -137,10 +136,10 @@ def test_voice_missing_hook_persists_with_warning(store, caplog):
     like genre — the voice sticks for the next session, not a dead error."""
     applier = SettingsApplier(config_store=store)
     with caplog.at_level("WARNING"):
-        success, error = _apply(applier, "voice", "puck")
+        success, error = _apply(applier, "voice", "Bella")
     assert success is True
     assert error is None
-    assert store.voice == "puck"
+    assert store.voice == "Bella"
     assert any("cascade_agent not wired" in r.message for r in caplog.records)
 
 
@@ -188,7 +187,7 @@ def test_mode_missing_hook_persists_with_warning(store, caplog):
 
 def test_mode_invalid_value(store, event_detector):
     applier = SettingsApplier(config_store=store, event_detector=event_detector)
-    success, error = _apply(applier, "mode", "chill")
+    success, _error = _apply(applier, "mode", "chill")
     assert success is False
     event_detector.set_mode.assert_not_called()
 
@@ -263,7 +262,7 @@ def test_genre_missing_hook_persists_with_warning(store, caplog):
 
 def test_genre_invalid_value(store, genre_loader):
     applier = SettingsApplier(config_store=store, genre_loader=genre_loader)
-    success, error = _apply(applier, "genre", "")
+    success, _error = _apply(applier, "genre", "")
     assert success is False
     genre_loader.reload.assert_not_called()
 
@@ -349,7 +348,7 @@ def test_output_device_missing_hook_persists_with_warning(store, caplog):
 
 def test_output_device_invalid_type(store, audio_core):
     applier = SettingsApplier(config_store=store, audio_core=audio_core)
-    success, error = _apply(applier, "output_device_id", 42)
+    success, _error = _apply(applier, "output_device_id", 42)
     assert success is False
     audio_core.restart_output.assert_not_called()
 
@@ -369,7 +368,7 @@ def test_output_profile_happy_path(store, audio_core):
 
 def test_output_profile_invalid_value(store, audio_core):
     applier = SettingsApplier(config_store=store, audio_core=audio_core)
-    success, error = _apply(applier, "output_profile", "studio")
+    success, _error = _apply(applier, "output_profile", "studio")
     assert success is False
     audio_core.set_mic_gating_profile.assert_not_called()
 
@@ -407,14 +406,14 @@ def test_retention_days_coerces_string(store):
 
 def test_retention_days_negative_rejected(store):
     applier = SettingsApplier(config_store=store)
-    success, error = _apply(applier, "retention_days", -1)
+    success, _error = _apply(applier, "retention_days", -1)
     assert success is False
     assert store.retention_days == 7
 
 
 def test_retention_days_non_numeric_rejected(store):
     applier = SettingsApplier(config_store=store)
-    success, error = _apply(applier, "retention_days", "many")
+    success, _error = _apply(applier, "retention_days", "many")
     assert success is False
     assert store.retention_days == 7
 
@@ -434,7 +433,7 @@ def test_hotkey_happy_path(store):
 
 def test_hotkey_empty_rejected(store):
     applier = SettingsApplier(config_store=store)
-    success, error = _apply(applier, "push_to_mute_hotkey", "")
+    success, _error = _apply(applier, "push_to_mute_hotkey", "")
     assert success is False
 
 
@@ -471,7 +470,7 @@ def test_skill_invalid_value_rejected(store, monkeypatch):
 
 def test_skill_non_string_rejected(store):
     applier = SettingsApplier(config_store=store)
-    success, error = _apply(applier, "skill", 3)
+    success, _error = _apply(applier, "skill", 3)
     assert success is False
     assert "skill" not in store.extra
 
@@ -520,7 +519,7 @@ def test_apply_lens_non_string_rejected(store):
     REAL-GREEN guard: a non-string lens must never persist.
     """
     applier = SettingsApplier(config_store=store)
-    success, error = _apply(applier, "lens", 123)
+    success, _error = _apply(applier, "lens", 123)
     assert success is False
     assert "lens" not in store.extra
 
@@ -586,8 +585,8 @@ def test_lighter_blur_rejects_non_bool(store):
 
 def test_apply_persists_to_disk(store, cascade, _redirect_config_path):
     applier = SettingsApplier(config_store=store, cascade_agent=cascade)
-    _apply(applier, "voice", "puck")
+    _apply(applier, "voice", "Bella")
     import json
 
     on_disk = json.loads(_redirect_config_path.read_text())
-    assert on_disk["voice"] == "puck"
+    assert on_disk["voice"] == "Bella"

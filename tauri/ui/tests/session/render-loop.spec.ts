@@ -107,7 +107,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
           screen: "ok",
         },
         settings: {
-          voice: "kore",
+          voice: "Adam",
           mode: "hype",
           skill: "intermediate",
           lens: "hype",
@@ -158,7 +158,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
       track: null,
       status: { livekit: null, gemini: null, midi: null, screen: null },
       settings: {
-        voice: "kore",
+        voice: "Adam",
         mode: "hype",
         skill: "intermediate",
         lens: "hype",
@@ -206,7 +206,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
       track: null,
       status: { livekit: null, gemini: null, midi: null, screen: null },
       settings: {
-        voice: "kore",
+        voice: "Adam",
         mode: "hype",
         skill: "intermediate",
         lens: "hype",
@@ -298,7 +298,7 @@ describe("layout projection", () => {
         screen: "ok" as const,
       },
       settings: {
-        voice: "kore",
+        voice: "Adam",
         mode: "hype" as const,
         skill: "intermediate" as const,
         lens: "hype" as const,
@@ -344,7 +344,7 @@ describe("layout projection", () => {
       track: null,
       status: { livekit: null, gemini: null, midi: null, screen: null },
       settings: {
-        voice: "kore",
+        voice: "Adam",
         mode: "coach",
         skill: "intermediate",
         lens: "hype",

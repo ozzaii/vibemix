@@ -6221,6 +6221,70 @@ Remaining gate:
   package makes the absence impossible to miss during pretag; it does not
   create the hosted artifact.
 
+## Package 14J - MOSS Voice Picker Defaults
+
+Suggested commit: `fix(settings): align voice picker with moss voices`
+
+Packaging decision: MOSS is the only live co-host TTS source. The settings
+drawer and runtime config must therefore expose/persist real MOSS voice names,
+not retired Gemini/Cartesia voice ids such as `kore` or `puck`. This package
+keeps the source default on `Adam`, gives the UI a small real-MOSS voice set,
+and makes stale cloud-era config values fall back to `Adam` deterministically
+instead of selecting the first arbitrary voice in the MOSS manifest.
+
+Include:
+
+- `src/vibemix/voice_presets.py`
+- `src/vibemix/agent/local_tts.py`
+- `src/vibemix/runtime/config_store.py`
+- `tauri/ui/src/settings/SettingsDrawer.ts`
+- `tauri/ui/src/session/state.ts`
+- `tauri/ui/src/session/SessionLayout.ts`
+- `tests/agent/test_local_tts.py`
+- `tests/runtime/test_config_store.py`
+- `tests/runtime/test_config_store_bravoh_waitlist.py`
+- `tests/runtime/test_settings_apply.py`
+- `tests/runtime/test_session_loop.py`
+- `tests/ipc/test_session_messages.py`
+- `tests/ui_bus/test_messages_schema.py`
+- `tests/recording/test_session_metadata.py`
+- `tests/security/test_telemetry_consent.py`
+- `tauri/ui/src/ipc/validator.spec.ts`
+- `tauri/ui/tests/session/integration.spec.ts`
+- `tauri/ui/tests/session/render-loop.spec.ts`
+- `tauri/ui/tests/session/components.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Any cloud/provider TTS fallback.
+- MOSS model install/download/bundling behavior.
+- Live voice quality, ear-pass, or packaged-audio claims.
+- Any co-host prompt, claim guard, DROP-call, or deck-timing behavior.
+- IPC schema/codegen changes; the voice value remains a string payload.
+
+Reason:
+
+- `SettingsDrawer.ts` still listed old Gemini voice ids (`kore`, `puck`,
+  `charon`, `fenrir`, `aoede`, `leda`, `orus`, `zephyr`), while local MOSS
+  defaults to `Adam`.
+- Old persisted config values made the picker look alive but all landed on the
+  same manifest fallback voice. The runtime now resolves missing/legacy names
+  through the MOSS default first, not `voices[0]`.
+
+Proof for this source/UI slice:
+
+- `uv run pytest -q tests/agent/test_local_tts.py tests/runtime/test_config_store.py tests/runtime/test_config_store_bravoh_waitlist.py tests/runtime/test_settings_apply.py tests/runtime/test_session_loop.py tests/ipc/test_session_messages.py tests/ui_bus/test_messages_schema.py tests/recording/test_session_metadata.py tests/security/test_telemetry_consent.py`
+- `npm --prefix tauri/ui test -- tests/session/integration.spec.ts tests/session/render-loop.spec.ts tests/session/components.spec.ts src/ipc/validator.spec.ts`
+- `uv run ruff check src/vibemix/voice_presets.py src/vibemix/agent/local_tts.py src/vibemix/runtime/config_store.py tests/agent/test_local_tts.py tests/runtime/test_config_store.py tests/runtime/test_config_store_bravoh_waitlist.py tests/runtime/test_settings_apply.py tests/runtime/test_session_loop.py tests/ipc/test_session_messages.py tests/ui_bus/test_messages_schema.py tests/recording/test_session_metadata.py tests/security/test_telemetry_consent.py`
+- `git diff --check -- src/vibemix/voice_presets.py src/vibemix/agent/local_tts.py src/vibemix/runtime/config_store.py tauri/ui/src/settings/SettingsDrawer.ts tauri/ui/src/session/state.ts tauri/ui/src/session/SessionLayout.ts tests/agent/test_local_tts.py tests/runtime/test_config_store.py tests/runtime/test_config_store_bravoh_waitlist.py tests/runtime/test_settings_apply.py tests/runtime/test_session_loop.py tests/ipc/test_session_messages.py tests/ui_bus/test_messages_schema.py tests/recording/test_session_metadata.py tests/security/test_telemetry_consent.py tauri/ui/src/ipc/validator.spec.ts tauri/ui/tests/session/integration.spec.ts tauri/ui/tests/session/render-loop.spec.ts tauri/ui/tests/session/components.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- This only fixes the source settings and deterministic voice selection. It
+  does not prove audible quality or voice differences on a live/packaged build.
+
 ## Hold Lane - Local MOSS TTS ONNX Runtime Spike
 
 Suggested commit if/when it ships: `feat(tts): add wrapped local moss onnx runtime`

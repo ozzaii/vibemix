@@ -20,7 +20,6 @@ import pytest
 
 from vibemix.runtime.config_store import ConfigStore, load_config
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPONENT = REPO_ROOT / "tauri/ui/src/wizard/components/telemetry-consent.ts"
 STEP = REPO_ROOT / "tauri/ui/src/wizard/step-telemetry-consent.ts"
@@ -69,11 +68,11 @@ def test_telemetry_consent_int_value_falls_back_to_off(tmp_path: Path):
 
 
 def test_telemetry_consent_persists_alongside_phase12_fields(tmp_path: Path):
-    cs = ConfigStore(voice="leda", mode="hype", telemetry_consent=False)
+    cs = ConfigStore(voice="Bella", mode="hype", telemetry_consent=False)
     p = cs.save(tmp_path / "config.json")
     raw = json.loads(p.read_text(encoding="utf-8"))
     assert raw["telemetry_consent"] is False
-    assert raw["voice"] == "leda"
+    assert raw["voice"] == "Bella"
     assert raw["mode"] == "hype"
 
 

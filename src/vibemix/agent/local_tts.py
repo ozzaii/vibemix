@@ -39,6 +39,8 @@ from livekit.agents._exceptions import APIError
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 from livekit.agents.utils import shortuuid
 
+from vibemix.voice_presets import DEFAULT_MOSS_VOICE, select_moss_voice_row
+
 if TYPE_CHECKING:
     import numpy as np
 
@@ -46,7 +48,9 @@ if TYPE_CHECKING:
 # Native model output rate. The codec emits 48 kHz; we read the real value from
 # the model meta at construction and only fall back to this if that read fails.
 _DEFAULT_NATIVE_SR = 48000
-_DEFAULT_VOICE = os.environ.get("VIBEMIX_MOSS_TTS_VOICE", "Adam")  # clear EN male preset
+_DEFAULT_VOICE = os.environ.get(
+    "VIBEMIX_MOSS_TTS_VOICE", DEFAULT_MOSS_VOICE
+)  # clear EN male preset
 _DEFAULT_THREADS = int(os.environ.get("VIBEMIX_MOSS_TTS_THREADS", "4") or "4")
 MOSS_MODEL_DIR_ENV = "VIBEMIX_MOSS_TTS_DIR"
 _MOSS_MANIFEST = "browser_poc_manifest.json"
@@ -273,7 +277,7 @@ class _OrtCpuEngine(MossEngine):
         sp = spm.SentencePieceProcessor(model_file=str(tok_path))
         sample_rate = int(rt.codec_meta["codec_config"]["sample_rate"])
         voices = rt.list_builtin_voices()
-        row = next((v for v in voices if v.get("voice") == voice), voices[0])
+        row = select_moss_voice_row(voices, voice, fallback=_DEFAULT_VOICE)
         prompt_codes = list(row["prompt_audio_codes"])
         rt.warmup()  # build/JIT the ORT graphs so the first real synth is warm
         return cls(rt, sp, sample_rate, prompt_codes, row.get("voice", voice))

@@ -213,7 +213,7 @@ function makeDefault(): SessionState {
       screen: null,
     },
     settings: {
-      voice: "kore",
+      voice: "Adam",
       mode: "hype",
       skill: "intermediate",
       lens: "hype",
