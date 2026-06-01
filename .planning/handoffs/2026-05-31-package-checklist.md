@@ -810,6 +810,43 @@ Remaining gate:
 - Include this package with the final debrief/observability staging batch or as
   its own small test-hygiene commit; do not mix it into product runtime hunks.
 
+## Package 1B2 - Retire Python Ear-Test Writer
+
+Suggested commit: `refactor(debrief): remove duplicate python ear-test writer`
+
+Include:
+
+- `src/vibemix/debrief/ear_test_capture.py`
+- `tests/debrief/test_ear_test_capture.py`
+- `tauri/ui/src/debrief/components/ear-test-toggle.ts`
+- `tauri/ui/debrief.html`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `tauri/src-tauri/src/ear_test_cmds.rs`; the live Rust Tauri writer remains
+  unchanged and covered by its existing tests.
+- Generated `tauri/ui/dist/**` assets.
+- Debrief model, TLDR, drill, or websocket behavior.
+
+Reason:
+
+- The debrief UI's live sign-off path writes through the Rust
+  `write_ear_test_log` Tauri command. The Python `write_ear_test_log`
+  duplicate had no production caller and made proof readers chase the wrong
+  writer.
+- The Python module still pins payload/schema validation, while source comments
+  now point at the Rust command that actually persists logs.
+
+Proof before staging:
+
+- `uv run pytest -q tests/debrief/test_ear_test_capture.py`
+- `uv run ruff check src/vibemix/debrief/ear_test_capture.py tests/debrief/test_ear_test_capture.py`
+- `npm --prefix tauri/ui test -- src/debrief/__tests__/ear-test-toggle.spec.ts`
+- `cargo test --manifest-path tauri/src-tauri/Cargo.toml ear_test`
+- `git diff --check -- src/vibemix/debrief/ear_test_capture.py tests/debrief/test_ear_test_capture.py tauri/ui/src/debrief/components/ear-test-toggle.ts tauri/ui/debrief.html .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Deck Vision Live Source Gate
 
 Suggested commit if/when selected: `feat(state): enable evaluated deck vision source`

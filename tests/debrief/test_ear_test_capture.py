@@ -1,15 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Plan 42-03 Task 1 — ear-test capture writer contract.
+"""Plan 42-03 Task 1 — ear-test capture validator contract.
 
-Pins the schema-aligned validator + path-traversal rejection + atomic
-write-then-read roundtrip for ``vibemix.debrief.ear_test_capture``.
+Pins the schema-aligned validator + path-traversal rejection for
+``vibemix.debrief.ear_test_capture``. Live writes are owned by the Rust
+``write_ear_test_log`` Tauri command.
 """
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 import pytest
 
@@ -19,7 +18,6 @@ from vibemix.debrief.ear_test_capture import (
     EarTestPayload,
     EarTestValidationError,
     validate_payload,
-    write_ear_test_log,
 )
 
 # ---------------------------------------------------------------------------
@@ -138,91 +136,9 @@ def test_session_id_pattern_enforced():
         validate_payload(payload, schema_path=SCHEMA_PATH)
 
 
-# ---------------------------------------------------------------------------
-# Path-traversal + atomic-write tests (write_ear_test_log)
-# ---------------------------------------------------------------------------
-
-
-def test_path_traversal_rejected(tmp_path: Path):
-    """``session_id`` with ``..`` raises and writes nothing."""
-    bad = _happy_payload()
-    # Bypass dataclass frozen check by constructing a dict-shaped payload
-    # — but write_ear_test_log accepts EarTestPayload only. Use the
-    # explicit constructor with traversal char.
+@pytest.mark.parametrize("session_id", ["..escape", "evil/path", ".hidden"])
+def test_path_traversal_session_ids_reject(session_id: str):
+    """Traversal-shaped ``session_id`` values reject at schema level."""
+    payload = _happy_payload(session_id=session_id)
     with pytest.raises(EarTestValidationError):
-        # The schema regex rejects ``..`` first (pattern excludes dots).
-        # Both validators (jsonschema + fallback) reject before any disk
-        # write occurs.
-        write_ear_test_log(
-            EarTestPayload(
-                session_id="..escape",
-                started_at=bad.started_at,
-                duration_s=bad.duration_s,
-                genre=bad.genre,
-                slop_flags=bad.slop_flags,
-                free_form=bad.free_form,
-                signed_by=bad.signed_by,
-                signed_at=bad.signed_at,
-            ),
-            base_dir=tmp_path,
-            schema_path=SCHEMA_PATH,
-        )
-    # No file written.
-    assert list(tmp_path.iterdir()) == []
-
-
-def test_path_traversal_slash_rejected(tmp_path: Path):
-    """Forward-slash in session_id also rejects."""
-    bad = _happy_payload()
-    with pytest.raises(EarTestValidationError):
-        write_ear_test_log(
-            EarTestPayload(
-                session_id="evil/path",
-                started_at=bad.started_at,
-                duration_s=bad.duration_s,
-                genre=bad.genre,
-                slop_flags=bad.slop_flags,
-                free_form=bad.free_form,
-                signed_by=bad.signed_by,
-                signed_at=bad.signed_at,
-            ),
-            base_dir=tmp_path,
-            schema_path=SCHEMA_PATH,
-        )
-    assert list(tmp_path.iterdir()) == []
-
-
-def test_atomic_write_roundtrip(tmp_path: Path):
-    """write → read JSON → deep-equal to payload.to_dict()."""
-    payload = _happy_payload(
-        free_form="Transitions felt grounded; layer arrival "
-        "on track 3 was a touch dry but not slop."
-    )
-    out_path = write_ear_test_log(
-        payload, base_dir=tmp_path, schema_path=SCHEMA_PATH
-    )
-    assert out_path == tmp_path / f"{payload.session_id}.json"
-    assert out_path.is_file()
-    re_read = json.loads(out_path.read_text(encoding="utf-8"))
-    assert re_read == payload.to_dict()
-
-
-def test_write_creates_base_dir(tmp_path: Path):
-    """Writer creates the parent dir if absent (mirror persistence.py)."""
-    target = tmp_path / "nested" / "ear-test-logs"
-    assert not target.exists()
-    payload = _happy_payload()
-    write_ear_test_log(payload, base_dir=target, schema_path=SCHEMA_PATH)
-    assert (target / f"{payload.session_id}.json").is_file()
-
-
-def test_write_overwrites_existing(tmp_path: Path):
-    """Same session_id rewrites — last sign-off wins for that session."""
-    p1 = _happy_payload(free_form="first take")
-    p2 = _happy_payload(free_form="second take, same session")
-    write_ear_test_log(p1, base_dir=tmp_path, schema_path=SCHEMA_PATH)
-    write_ear_test_log(p2, base_dir=tmp_path, schema_path=SCHEMA_PATH)
-    re_read = json.loads(
-        (tmp_path / f"{p1.session_id}.json").read_text(encoding="utf-8")
-    )
-    assert re_read["free_form"] == "second take, same session"
+        validate_payload(payload, schema_path=SCHEMA_PATH)

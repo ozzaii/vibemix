@@ -4,9 +4,8 @@
 // Wired into the Phase 29 debrief window per D-GATE-07. Renders an
 // opt-in toggle: when ON, a form expands with the 4 slop-flag
 // checkboxes + free-form textarea + Sign off button. Submit posts the
-// structured payload to the Python writer
-// (`src/vibemix/debrief/ear_test_capture.py::write_ear_test_log`) via
-// Tauri IPC, with a DebriefWsClient fallback for dev mode.
+// structured payload to the Rust `write_ear_test_log` Tauri command, with a
+// DebriefWsClient fallback for dev mode.
 //
 // Copy is Turkish-mix per CLAUDE.md tone · single-DJ regime (signed_by
 // pinned to "kaan" in the schema).

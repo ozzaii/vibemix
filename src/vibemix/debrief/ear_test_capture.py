@@ -1,20 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Ear-test capture writer for the v3.0 hybrid hallucination gate.
+"""Ear-test payload validator for the v3.0 hybrid hallucination gate.
 
 Plan 42-03 (GATE-05 + GATE-07). When the Phase 29 debrief window's
 "Rate this session for release-gate" toggle is opted in, the form
-payload crosses the Tauri IPC (or, in dev mode, the debrief WS client
-on 127.0.0.1:8766) into this module. We:
+payload crosses the Tauri IPC into the Rust ``write_ear_test_log`` command
+(or, in dev mode, the debrief WS client on 127.0.0.1:8766). This module keeps
+the Python-side schema contract pinned. We:
 
 1. Validate the payload against ``eval/ear-test-logs/schema.json``
    (JSON Schema draft 2020-12).
 2. Reject path-traversal attempts in ``session_id`` (defense in depth
    on top of the schema's regex — same pattern as Phase 29
    ``test_session_dir_path_traversal_rejected.py``).
-3. Atomically write ``<base_dir>/<session_id>.json`` via temp file +
-   ``os.replace`` (mirrors ``vibemix.debrief.persistence``).
 
-The output is consumed by ``scripts/release/check_ear_test.sh`` (the
+The live Rust writer output is consumed by ``scripts/release/check_ear_test.sh`` (the
 14-day window math + ≥ 2 genres + zero-slop-flag gate).
 
 See ``eval/EAR-TEST-PROTOCOL.md`` for the protocol that produced this
@@ -24,28 +23,18 @@ shape.
 from __future__ import annotations
 
 import json
-import logging
-import os
 import re
-import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
 __all__ = [
-    "EAR_TEST_LOG_DIR",
     "GENRE_ENUM",
     "SCHEMA_PATH",
     "SLOP_FLAG_KEYS",
     "EarTestPayload",
     "validate_payload",
-    "write_ear_test_log",
 ]
-
-logger = logging.getLogger(__name__)
-
-# Default landing directory. Tests override via the ``base_dir`` argument.
-EAR_TEST_LOG_DIR = Path("eval/ear-test-logs")
 
 # Schema path is relative to repo root; tests resolve it explicitly to keep
 # the writer importable in CI environments that don't share cwd with repo.
@@ -255,77 +244,3 @@ def validate_payload(
 
     # Fallback path — keep contract identical.
     _validate_dict(payload_dict)
-
-
-def _reject_path_traversal(session_id: str) -> None:
-    """Defense in depth on top of the schema regex.
-
-    The regex already excludes ``/``, ``\\``, and ``.`` — this rejects
-    explicitly so the ValueError message surfaces the traversal intent
-    instead of a generic regex mismatch.
-    """
-
-    if (
-        ".." in session_id
-        or "/" in session_id
-        or "\\" in session_id
-        or session_id.startswith(".")
-    ):
-        raise EarTestValidationError(
-            f"session_id contains path-traversal characters: "
-            f"{session_id!r}"
-        )
-
-
-def _atomic_write_bytes(path: Path, data: bytes) -> None:
-    """Atomic file write — mirrors vibemix.debrief.persistence."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_fd, tmp_path = tempfile.mkstemp(
-        prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
-    )
-    try:
-        with os.fdopen(tmp_fd, "wb") as f:
-            f.write(data)
-        os.replace(tmp_path, path)
-    except Exception:
-        if os.path.exists(tmp_path):
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-        raise
-
-
-def write_ear_test_log(
-    payload: EarTestPayload,
-    base_dir: Path | str = EAR_TEST_LOG_DIR,
-    schema_path: Path | None = None,
-) -> Path:
-    """Validate + atomically persist an ear-test log JSON file.
-
-    Returns the path of the written file. Raises
-    :class:`EarTestValidationError` on schema or path-traversal failures
-    (no file is written in that case).
-    """
-
-    base_dir = Path(base_dir)
-
-    # Validate first — never touch disk on a malformed payload.
-    validate_payload(payload, schema_path=schema_path)
-
-    # Defense-in-depth: the schema regex already excludes traversal
-    # chars; this surfaces the failure with a clearer message.
-    _reject_path_traversal(payload.session_id)
-
-    out_path = base_dir / f"{payload.session_id}.json"
-
-    body = json.dumps(payload.to_dict(), ensure_ascii=False, indent=2)
-    _atomic_write_bytes(out_path, body.encode("utf-8"))
-
-    logger.info(
-        "[ear-test] wrote %s (genre=%s, duration_s=%d)",
-        out_path,
-        payload.genre,
-        payload.duration_s,
-    )
-    return out_path
