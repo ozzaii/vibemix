@@ -7325,3 +7325,45 @@ Proof before staging:
 - `uv run ruff check src/vibemix/agent/dj_cohost.py src/vibemix/agent/language_guard.py src/vibemix/coach/citation_linter.py src/vibemix/debrief/drills.py src/vibemix/debrief/tldr.py src/vibemix/memory/ingest.py src/vibemix/prompts/matrix.py src/vibemix/state/deck_context.py src/vibemix/state/evidence_registry.py src/vibemix/ui_bus/learn_messages.py tests/agent/test_dj_cohost.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py tests/debrief/test_no_uncited_critique_in_debrief.py tests/prompts/test_matrix.py tests/state/test_evidence_registry.py`
 - `git diff --check -- scripts/README.md src/vibemix/agent/dj_cohost.py src/vibemix/agent/language_guard.py src/vibemix/coach/citation_linter.py src/vibemix/debrief/drills.py src/vibemix/debrief/tldr.py src/vibemix/memory/ingest.py src/vibemix/prompts/matrix.py src/vibemix/state/deck_context.py src/vibemix/state/evidence_registry.py src/vibemix/ui_bus/learn_messages.py tauri/ui/src/debrief/__tests__/stripper-roundtrip.spec.ts tauri/ui/src/debrief/stripper-roundtrip.ts tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/validator.generated.mjs tests/agent/test_dj_cohost.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py tests/debrief/test_no_uncited_critique_in_debrief.py tests/prompts/test_matrix.py tests/scripts/fixtures/synthetic_session/events.jsonl tests/scripts/fixtures/synthetic_session/responses/0007_120130_MANUAL/response.txt tests/state/test_evidence_registry.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 21 - Grounded Spoken Next Suggestion Receipt
+
+Suggested commit: `feat(coach): surface grounded next suggestions`
+
+Include:
+
+- `src/vibemix/runtime/suggestion_voice.py`
+- `src/vibemix/runtime/coach.py`
+- `src/vibemix/state/coach.py`
+- `tests/runtime/test_suggestion_voice.py`
+- `tests/runtime/test_coach.py`
+- `tests/state/test_coach.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- DROP-call / Mix Timing Oracle hold-lane hunks in `src/vibemix/runtime/coach.py`,
+  `src/vibemix/state/drop_predict.py`, `src/vibemix/state/event_detector.py`, and
+  `tests/state/test_drop_predict.py`.
+- Any direct `session.say()` path for the suggestion. This package feeds Sven
+  grounded prompt context only; the existing LLM/linter/live-claim path decides
+  whether speech survives.
+- Viber UI/library-agent behavior. Viber remains the set-prep/library agent;
+  Sven is the live co-host voice.
+
+Reason:
+
+- The next-suggestion engine already powers pills/Viber, but the live co-host
+  had no citable receipt for the current candidate. This package writes
+  existence-only `[track:<id>]` and `[mix:next_suggestion=<id>]` citations before
+  the prompt, then appends an optional suggestion receipt to TRACK_CHANGE /
+  TRANSITION_OPPORTUNITY tasks. It explicitly says the candidate is not loaded,
+  playing, or a proven transition unless deck/live evidence supports that claim.
+
+Proof before staging:
+
+- `uv run pytest -q tests/runtime/test_suggestion_voice.py tests/runtime/test_coach.py::test_coach_hands_grounded_next_suggestion_to_agent tests/state/test_coach.py::test_task_track_change_includes_grounded_next_suggestion_receipt tests/state/test_coach.py::test_task_transition_opportunity_includes_grounded_next_suggestion_receipt tests/coach/test_citation_linter.py::test_track_atom_existence_only tests/coach/test_citation_linter.py::test_screen_mix_key_existence_only`
+- `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py`
+- `uv run ruff check src/vibemix/runtime/suggestion_voice.py src/vibemix/runtime/coach.py src/vibemix/state/coach.py tests/runtime/test_suggestion_voice.py tests/runtime/test_coach.py tests/state/test_coach.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check`

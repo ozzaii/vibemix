@@ -14,7 +14,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 from vibemix.runtime.coach import coach_loop
-from vibemix.state import Event
+from vibemix.state import Event, EvidenceRegistry
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -358,6 +358,64 @@ def test_coach_event_log_carries_deck_move_audio_context(
     assert "move_context[" in payload["move_context"]
     assert "deck_change_context[" in payload["deck_change_context"]
     assert "move_effect_context[" in payload["move_effect_context"]
+
+
+def test_coach_hands_grounded_next_suggestion_to_agent(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    class _SuggestionService:
+        def maybe_schedule_compute_from_state(self, state):
+            return False
+
+        def current_for_state(self, state):
+            return {
+                "track_id": "track-42",
+                "title": "Ananta Gathering",
+                "artist": "Crew",
+                "why": "similar vibe",
+                "transition": {"risk_flags": ["timing_low_confidence"]},
+            }
+
+    ev = Event(type="TRACK_CHANGE", state=music_state, extra={})
+    fake_event_detector.detect.return_value = ev
+    registry = EvidenceRegistry()
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            asyncio.Event(),
+            {"in_flight": False},
+            stop_event,
+            suggestion_service=_SuggestionService(),
+            evidence_registry=registry,
+        )
+    )
+
+    sent_ev = fake_agent.set_next_event.call_args.args[0]
+    line = sent_ev.extra["next_suggestion_voice_line"]
+    assert "Ananta Gathering by Crew" in line
+    assert "[track:track-42]" in line
+    assert "[mix:next_suggestion=track-42]" in line
+    assert "[mix:next_suggestion_risk=timing_low_confidence]" in line
+    snapshot = registry.snapshot()
+    assert "track-42" in snapshot["track"]
+    assert "next_suggestion=track-42" in snapshot["mix"]
 
 
 # ---------------------------------------------------------------------------

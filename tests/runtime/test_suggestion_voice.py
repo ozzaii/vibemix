@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: Apache-2.0
+
+from vibemix.coach.citation_linter import CitationLinter
+from vibemix.runtime.suggestion_voice import build_next_suggestion_voice_line
+from vibemix.state import EvidenceRegistry
+
+
+def test_next_suggestion_voice_line_registers_track_and_mix_citations() -> None:
+    registry = EvidenceRegistry()
+    suggestion = {
+        "track_id": "track-42",
+        "title": "Ananta [live] | cut",
+        "artist": "Crew",
+        "why": "similar vibe",
+        "transition": {"risk_flags": ["source_loop_recent"]},
+    }
+
+    line = build_next_suggestion_voice_line(
+        suggestion,
+        event_type="TRACK_CHANGE",
+        evidence_registry=registry,
+    )
+
+    assert line is not None
+    assert "Ananta (live) / cut by Crew" in line
+    assert "[track:track-42]" in line
+    assert "[mix:next_suggestion=track-42]" in line
+    assert "[mix:next_suggestion_risk=source_loop_recent]" in line
+    assert "not a proven transition" in line
+
+    result = CitationLinter().check(line, registry.snapshot(), mode="live")
+    assert result.valid is True
+    assert result.reason == "valid"
+
+
+def test_next_suggestion_voice_line_abstains_on_uncitable_track_id() -> None:
+    registry = EvidenceRegistry()
+
+    line = build_next_suggestion_voice_line(
+        {"track_id": "bad id with spaces", "title": "Bad"},
+        event_type="TRACK_CHANGE",
+        evidence_registry=registry,
+    )
+
+    assert line is None
+    assert registry.snapshot() == {}
+
+
+def test_next_suggestion_voice_line_only_runs_on_voice_events() -> None:
+    registry = EvidenceRegistry()
+
+    line = build_next_suggestion_voice_line(
+        {"track_id": "track-42", "title": "Ananta"},
+        event_type="HEARTBEAT",
+        evidence_registry=registry,
+    )
+
+    assert line is None
+    assert registry.snapshot() == {}

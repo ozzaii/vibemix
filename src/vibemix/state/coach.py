@@ -732,6 +732,16 @@ class AICoach:
     def task_for_event(ev: Event) -> str:
         t = ev.type
         ev_extra = ev.extra if isinstance(ev.extra, dict) else {}
+
+        def _with_next_suggestion(base: str) -> str:
+            line = ev_extra.get("next_suggestion_voice_line")
+            if not isinstance(line, str) or not line.strip():
+                return base
+            return (
+                f"{base} {line.strip()} This is suggestion context, not a command; "
+                "do not force it if the live sound is more important."
+            )
+
         if t == "KAAN_SPOKE":
             return (
                 "Kaan just SPOKE — answer him directly, friend tone. Short. Not a music reaction."
@@ -744,7 +754,7 @@ class AICoach:
         if t == "TRACK_CHANGE":
             judge_line = ev_extra.get("judge_evidence_line")
             if isinstance(judge_line, str) and judge_line.strip():
-                return (
+                return _with_next_suggestion(
                     f"{judge_line.strip()}. Use that measured Judge verdict as "
                     "the hard transition read. Keep the bracketed citation exactly, "
                     "translate the measured key/low-end result into one short DJ "
@@ -754,7 +764,7 @@ class AICoach:
                 )
             prev = ev_extra.get("prev_track")
             prev_clause = f" (was: {prev!r})" if prev else ""
-            return (
+            return _with_next_suggestion(
                 f"Track flipped{prev_clause}. React to the NEW track's vibe vs "
                 "the previous — heavier, weirder, darker, more euphoric?"
             )
@@ -881,7 +891,7 @@ class AICoach:
                 if clash
                 else "harmonically the keys sat fine together"
             )
-            return (
+            return _with_next_suggestion(
                 f"You just blended deck {a_side} ({a_cam}) into deck {b_side} "
                 f"({b_cam}) — {verdict}. Give Kaan the PAST-TENSE read on how that "
                 f"blend sat harmonically — nothing else, no present-tense advice, "

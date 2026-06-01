@@ -85,6 +85,8 @@ from vibemix.state.deck_context import (
 )
 from vibemix.ui_bus import SessionCitation
 
+from .suggestion_voice import build_next_suggestion_voice_line
+
 if TYPE_CHECKING:
     from livekit.agents import AgentSession
 
@@ -692,6 +694,26 @@ async def coach_loop(
 
         if ev is None:
             continue
+
+        if suggestion_service is not None and ev.type in (
+            "TRACK_CHANGE",
+            "TRANSITION_OPPORTUNITY",
+        ):
+            try:
+                current_suggestion = None
+                if hasattr(suggestion_service, "current_for_state"):
+                    current_suggestion = suggestion_service.current_for_state(state)
+                elif hasattr(suggestion_service, "current"):
+                    current_suggestion = suggestion_service.current()
+                voice_line = build_next_suggestion_voice_line(
+                    current_suggestion,
+                    event_type=ev.type,
+                    evidence_registry=evidence_registry,
+                )
+                if voice_line:
+                    ev.extra["next_suggestion_voice_line"] = voice_line
+            except Exception as e:
+                _safe_print(f"\n[coach suggestion voice] {e}", file=sys.stderr)
 
         try:
             trigger_state["in_flight"] = True

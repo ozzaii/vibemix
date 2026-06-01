@@ -919,6 +919,52 @@ def test_task_transition_opportunity_LOAD_BEARING_past_tense_cited_no_invent():
     assert "the keys sat fine together" in out
 
 
+def test_task_track_change_includes_grounded_next_suggestion_receipt():
+    out = AICoach.task_for_event(
+        _ev(
+            "TRACK_CHANGE",
+            {
+                "next_suggestion_voice_line": (
+                    "Next-suggestion receipt: the live suggestion engine selected Ananta. "
+                    "If you recommend it, copy these citations exactly: "
+                    "[track:track-42] [mix:next_suggestion=track-42]."
+                )
+            },
+        )
+    )
+
+    assert "Track flipped" in out
+    assert "Next-suggestion receipt" in out
+    assert "[track:track-42]" in out
+    assert "[mix:next_suggestion=track-42]" in out
+    assert "suggestion context, not a command" in out
+
+
+def test_task_transition_opportunity_includes_grounded_next_suggestion_receipt():
+    out = AICoach.task_for_event(
+        _ev(
+            "TRANSITION_OPPORTUNITY",
+            {
+                "a_side": "A",
+                "a_camelot": "8A",
+                "b_side": "B",
+                "b_camelot": "9A",
+                "clash": False,
+                "next_suggestion_voice_line": (
+                    "Next-suggestion receipt: the live suggestion engine selected Next One. "
+                    "If you recommend it, copy these citations exactly: "
+                    "[track:next-one] [mix:next_suggestion=next-one]."
+                ),
+            },
+        )
+    )
+
+    assert "Cite both keys: [key:A:8A] and [key:B:9A]" in out
+    assert "Next-suggestion receipt" in out
+    assert "[track:next-one]" in out
+    assert "[mix:next_suggestion=next-one]" in out
+
+
 # ---------- build_prompt: format wrapper ----------
 
 
