@@ -1213,6 +1213,46 @@ Remaining gate:
 
 - None. This is a test-fixture sync only and does not change product behavior.
 
+## Package 5G.2 - Shell Command Palette Honest Live State
+
+Suggested commit: `fix(tauri-ui): remove fake live palette actions`
+
+Include:
+
+- `tauri/ui/src/shell/DesktopShell.ts`
+- `tauri/ui/tests/shell/command-palette.spec.ts`
+
+Keep out:
+
+- Runtime activation bridges, websocket/session state, and backend live-status
+  plumbing.
+- Any co-host speech, prompt, DROP-call, TTS, or deck-audio capture changes.
+
+Reason:
+
+- The meta-audit found two shipped command-palette actions, `sim.live` and
+  `sim.idle`, that directly mutated shell activation and connection state. A
+  user could open Cmd+K, run "Go live", and make the shell paint live/connected
+  without a runtime session, audio evidence, or websocket state. That violates
+  the product honesty rule: visible live status must come from the runtime, not
+  a simulation control in the shipped palette.
+- The real shell activation path already exists outside the palette. This slice
+  removes only the fake controls and adds a regression test so simulation
+  actions do not return as product commands.
+
+Proof for this UI honesty slice:
+
+- `npm --prefix tauri/ui test -- tests/shell/command-palette.spec.ts tests/shell/shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/shell/DesktopShell.ts tauri/ui/tests/shell/command-palette.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- None for source behavior. A packaged screenshot/live shell pass can still
+  confirm the palette visually, but this package removes an explicitly fake
+  shipped action and does not claim runtime live proof.
+
 ## Package 5H - Viber Raw Cue Export Boundary
 
 Suggested commit: `fix(library): drop raw cue export from Viber tools`

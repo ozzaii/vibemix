@@ -92,24 +92,6 @@ function buildPaletteActions(store: ShellStore): PaletteAction[] {
   const commands: PaletteAction[] = [
     { id: "toggle.sidebar", label: "Toggle sidebar", accel: "Ctrl+\\", glyph: "‹", run: () => store.toggleCollapsed() },
     { id: "toggle.panel", label: "Toggle grounding panel", accel: "Ctrl+]", glyph: "▸", run: () => store.togglePanel() },
-    {
-      id: "sim.live",
-      label: "Go live",
-      glyph: "●",
-      run: () => {
-        store.setActivation("live");
-        store.setConnection("connected");
-      },
-    },
-    {
-      id: "sim.idle",
-      label: "Return to idle",
-      glyph: "○",
-      run: () => {
-        store.setActivation("idle");
-        store.setConnection("disconnected");
-      },
-    },
   ];
 
   return [...goTo, ...commands];

@@ -71,9 +71,16 @@ describe("command palette — accelerators teach the shortcuts", () => {
     const palette = openPalette();
     const toggle = rowFor(palette, "Toggle grounding panel");
     expect(toggle.querySelector(".pi-accel")?.textContent).toContain("]");
-    // A command with no shortcut (Go live) shows no accelerator chip rather than an empty one.
-    const live = rowFor(palette, "Go live");
-    expect(live.querySelector(".pi-accel")).toBeNull();
+  });
+
+  it("does not expose fake live-state simulation commands", () => {
+    shell = mountDesktopShell(host);
+    const palette = openPalette();
+    const labels = Array.from(palette.querySelectorAll(".pi-label")).map((e) =>
+      e.textContent?.trim(),
+    );
+    expect(labels).not.toContain("Go live");
+    expect(labels).not.toContain("Return to idle");
   });
 
   it("still filters by the description text, not just the label", () => {
