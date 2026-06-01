@@ -1077,6 +1077,33 @@ Proof before staging:
 - `git diff --check -- tests/library/test_embed.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AN - Folder Ingest Test Ruff Hygiene
+
+Suggested commit: `test(library): clean folder ingest test lint`
+
+Include:
+
+- `tests/library/test_folder_ingest.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Folder ingest implementation, stores/index backends, embedder behavior,
+  runtime files, and generated files.
+
+Reason:
+
+- The folder ingest tests had stale annotation `noqa`s, an extra import-block
+  separator blank, and one intentionally ignored loaded-vector value. Cleaning
+  those keeps the focused ruff gate green without changing ingest assertions.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_folder_ingest.py`
+- `uv run pytest -q tests/library/test_folder_ingest.py`
+- `git diff --check -- tests/library/test_folder_ingest.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Cohost Reaction Schema Drift
 
 Suggested commit if/when selected: `fix(ui-bus): reconcile cohost reaction schema`

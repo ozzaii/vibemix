@@ -36,7 +36,6 @@ from vibemix.library.index_numpy import NumpyStore
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.library.store import LibraryStore
 
-
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
 
@@ -68,10 +67,10 @@ class FakeEmbedder:
         # the strategy off the embedder for the report annotation.
         self._embed_strategy = embed_strategy
 
-    def has_cached_embedding(self, track) -> bool:  # noqa: ANN001
+    def has_cached_embedding(self, track) -> bool:
         return track.track_id in self.cached
 
-    def embed_track(self, track) -> np.ndarray:  # noqa: ANN001
+    def embed_track(self, track) -> np.ndarray:
         self.embed_calls.append(track.track_id)
         return self._vec.copy()
 
@@ -195,7 +194,7 @@ def test_partial_failure_continues_no_faked_embed(
     _touch(music / "c.mp3")
 
     class FlakyEmbedder(FakeEmbedder):
-        def embed_track(self, track):  # noqa: ANN001
+        def embed_track(self, track):
             if "bad" in track.title:
                 raise RuntimeError("simulated corrupt audio")
             return super().embed_track(track)
@@ -262,7 +261,7 @@ def test_dim_mismatch_store_fails_loud(tmp_path: Path) -> None:
     _touch(music / "x.mp3")
 
     class StaleStore:
-        def search(self, q, k=1):  # noqa: ANN001
+        def search(self, q, k=1):
             raise AssertionError("vectors must be shape (N, 1536), got (N, 768)")
 
         def add_batch(self, items):  # pragma: no cover
@@ -294,10 +293,10 @@ def test_empty_stale_dim_table_auto_recreates(
         def recreate_table(self):
             self.recreated = True
 
-        def search(self, q, k=1):  # noqa: ANN001
+        def search(self, q, k=1):
             return []
 
-        def add_batch(self, items):  # noqa: ANN001
+        def add_batch(self, items):
             self.added.extend(items)
 
     store = EmptyStaleStore()
@@ -325,7 +324,7 @@ def test_populated_stale_dim_table_never_wiped(tmp_path: Path) -> None:
         def recreate_table(self):  # pragma: no cover
             raise AssertionError("must never wipe a populated table")
 
-        def search(self, q, k=1):  # noqa: ANN001
+        def search(self, q, k=1):
             return []
 
         def add_batch(self, items):  # pragma: no cover
@@ -363,7 +362,7 @@ def test_ingest_reads_cue_anchored_strategy_off_embedder(
     report = ingest_folder(music, emb, numpy_store, probe=_const_probe())
     assert report.embed_strategy == "cue_anchored"
     assert report.embedded == 2  # loop behavior identical to default
-    ids, vecs = numpy_store._backend.load_all()
+    ids, _vecs = numpy_store._backend.load_all()
     assert len(ids) == 2
 
 
