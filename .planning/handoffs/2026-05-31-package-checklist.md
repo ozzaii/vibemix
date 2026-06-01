@@ -914,6 +914,34 @@ Proof before staging:
 - `git diff --check -- tests/library/test_pyrekordbox_install.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AH - Toolset Starvation Concurrency Test Ruff Hygiene
+
+Suggested commit: `test(library): clean starvation concurrency lint`
+
+Include:
+
+- `tests/library/test_toolset_starvation_concurrency.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Library toolset implementation, Viber/cohost speech paths, runtime files, and
+  generated files.
+
+Reason:
+
+- The concurrency acid test intentionally captures worker exceptions for later
+  assertion, but the `BLE001` suppression is stale because that rule is not
+  enabled here. Removing the obsolete directive keeps the focused ruff gate
+  clean without changing concurrency behavior.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_toolset_starvation_concurrency.py`
+- `uv run pytest -q tests/library/test_toolset_starvation_concurrency.py`
+- `git diff --check -- tests/library/test_toolset_starvation_concurrency.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

@@ -100,7 +100,7 @@ def test_monotonic_under_parallel_dispatch(
             out = toolset.dispatch("search_vibe", {"query": "x"})
             with results_lock:
                 results.append(out)
-        except BaseException as e:  # noqa: BLE001 — surface to assert below
+        except BaseException as e:
             errors.append(e)
 
     threads = [
