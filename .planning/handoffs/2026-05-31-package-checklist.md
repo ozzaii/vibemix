@@ -2788,6 +2788,40 @@ Remaining gate:
   expected to fail if physical motion, audible audio, deck identity, or canary
   proof is missing.
 
+## Package 1D2 - FLX4 B Jog Live Mapping
+
+Suggested commit: `fix(midi): accept live flx4 b-jog cc34`
+
+Include:
+
+- `src/vibemix/midi/profiles/pioneer_ddj_flx4.json`
+- `tests/midi/test_profile.py`
+- `tests/midi/test_profile_flx4_golden.py`
+- `tests/midi/test_flx4_synthetic_decode.py`
+
+Reason:
+
+- 2026-06-01 clean-HEAD source proof with DDJ-FLX4 connected captured real
+  hardware motion via `scripts/sniff_controller.py --port FLX4 --seconds 20
+  --mode poll`: 134 MIDI frames, unique CC `[34]`, unique note `[54]`.
+- The product profile already accepted live-discovered jog ticks on CC33, but
+  the captured B-deck jog stream emitted channel 1 / CC34 alongside the
+  jog-touch note. Without this additive binding, the direct hardware probe sees
+  the move while the app's live `midi_events` ribbon stays empty.
+- This package does not claim deck identity, audio routing, beat quality, or
+  move impact. It only maps the observed B-jog byte so future live proof windows
+  can surface the physical jog move honestly.
+
+Current proof:
+
+- `uv run python scripts/sniff_controller.py --port FLX4 --seconds 20 --mode
+  poll` in clean worktree `4bc30e66` wrote
+  `.planning/eval-runs/flx4-live-context-clean-head-4bc30e66/direct_midi_probe.jsonl`
+  with 134 frames, CC34, and note54.
+- Focused unit gates must pass before landing: `uv run pytest -q
+  tests/midi/test_profile.py tests/midi/test_profile_flx4_golden.py
+  tests/midi/test_flx4_synthetic_decode.py tests/midi/test_state.py`.
+
 ## Hold Lane - FLX4 Live Context Proof Artifacts
 
 Suggested commit: none by default; attach to verifier packet if needed.

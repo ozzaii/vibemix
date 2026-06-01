@@ -26,7 +26,6 @@ import pytest
 from vibemix.midi import load_profile
 from vibemix.midi.state import ControllerState, MidiEvent
 
-
 # ---------- mido-shaped message factories (match handle_msg's attr surface) ----------
 
 
@@ -141,6 +140,25 @@ def test_flx4_decode_deck_b_independent_from_deck_a():
     # Deck A untouched (defaults: vol=0, eq_hi=64).
     assert snap["A"]["vol"] == 0
     assert snap["A"]["eq_hi"] == 64
+
+
+def test_flx4_decode_live_discovered_b_jog_cc34_variant():
+    """The 2026-06-01 FLX4 proof emitted B jog ticks as ch1/CC34.
+
+    The older live-discovered map already keeps ch1/CC33 for B jog. Accepting
+    this additive variant keeps hardware jog movement visible to websocket
+    snapshots instead of surfacing only the jog-touch note with no move label.
+    """
+    cs = _flx4_state()
+
+    cs.handle_msg(_cc(1, 0x22, 65))
+
+    events = [e for e in cs.events_since(0.0) if e.field == "jog" and e.deck == "B"]
+    assert events
+    assert events[-1].kind == "cc"
+    assert events[-1].value_raw == 65
+    assert events[-1].magnitude == pytest.approx(1.0, abs=1e-3)
+    assert "B_jog nudge forward" in _labels(cs)
 
 
 def test_flx4_decode_unmapped_cc_is_noop():

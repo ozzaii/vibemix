@@ -44,6 +44,10 @@ _V4_CC_MAP = {
 _LIVE_JOG_CC_MAP = {
     (0, 0x21): ("A", "jog"),
     (1, 0x21): ("B", "jog"),
+    # Live FLX4 proof on 2026-06-01 emitted B-jog ticks on ch1/CC34
+    # alongside jog-touch note54. Keep the original CC33 and accept this
+    # additive hardware variant so product snapshots do not drop the move.
+    (1, 0x22): ("B", "jog"),
 }
 _V4_NOTE_MAP = {
     (0, 0x0B): ("A", "play"),

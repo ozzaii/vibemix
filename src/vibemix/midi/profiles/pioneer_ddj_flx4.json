@@ -16,6 +16,7 @@
     "tempo_b":   {"kind": "cc", "channel": 1, "cc": 0,  "axis": "bipolar",  "deck": "B", "field": "tempo"},
     "jog_move_a": {"kind": "cc", "channel": 0, "cc": 33, "axis": "relative", "deck": "A", "field": "jog"},
     "jog_move_b": {"kind": "cc", "channel": 1, "cc": 33, "axis": "relative", "deck": "B", "field": "jog"},
+    "jog_move_b_alt": {"kind": "cc", "channel": 1, "cc": 34, "axis": "relative", "deck": "B", "field": "jog"},
     "filter_a":  {"kind": "cc", "channel": 6, "cc": 23, "axis": "bipolar",  "deck": "A", "field": "filter"},
     "filter_b":  {"kind": "cc", "channel": 6, "cc": 24, "axis": "bipolar",  "deck": "B", "field": "filter"},
     "xfader":    {"kind": "cc", "channel": 6, "cc": 31, "axis": "bipolar",  "deck": null, "field": "xfader"}

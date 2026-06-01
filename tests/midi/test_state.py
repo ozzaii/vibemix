@@ -296,8 +296,8 @@ def test_moves_ring_drops_entries_older_than_12s(mocker):
 
 def test_controller_state_lookup_tables_built_from_profile():
     cs = ControllerState(profile=_flx4())
-    # 13 legacy CC entries + 2 live-discovered relative jog tick entries.
-    assert len(cs._cc_lookup) == 15
+    # 13 legacy CC entries + 3 live-discovered relative jog tick entries.
+    assert len(cs._cc_lookup) == 16
     # 12 note entries.
     assert len(cs._note_lookup) == 12
     # Validate one binding identity.
