@@ -187,7 +187,7 @@ def test_select_moss_voice_row_falls_back_to_default_not_first_voice():
 # ---------------- FallbackAdapter wiring ----------------
 
 def test_moss_leads_chain_when_enabled(mocker, monkeypatch):
-    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)  # keep Cartesia out of the chain
+    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     from livekit.agents import tts as agents_tts
 
     mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
@@ -196,7 +196,7 @@ def test_moss_leads_chain_when_enabled(mocker, monkeypatch):
 
     from vibemix.agent.tts_chain import build_tts_chain
 
-    build_tts_chain(gemini_api_key="g", mode="direct")
+    build_tts_chain(mode="direct")
 
     chain = agents_tts.FallbackAdapter.__init__.call_args.kwargs["tts"]
     assert chain[0] is fake_moss_cls.return_value  # MOSS leads

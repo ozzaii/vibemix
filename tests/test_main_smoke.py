@@ -509,8 +509,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
     monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
-    # MOSS is the only voice; keep old cloud voice env from affecting the
-    # compatibility-call assertion.
+    # MOSS is the only voice; legacy cloud voice env must not affect boot.
     monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     monkeypatch.delenv("VIBEMIX_DECK_VISION", raising=False)
     # Pin per-deck OFF so the device-upgrade path is deterministic regardless of
@@ -558,12 +557,8 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     # (c) build_llm called with the dummy key in direct mode (Phase 5 explicit mode kwarg)
     livekit_mocks["build_llm"].assert_called_once_with("dummy-key", mode="direct")
 
-    # (d) build_tts_chain called in direct mode; TTS itself ignores cloud keys.
-    livekit_mocks["build_tts_chain"].assert_called_once_with(
-        gemini_api_key="dummy-key",
-        openrouter_api_key="dummy-or",
-        mode="direct",
-    )
+    # (d) build_tts_chain called in direct mode; cloud keys stay out of voice.
+    livekit_mocks["build_tts_chain"].assert_called_once_with(mode="direct")
 
     # (e) DJCoHostAgent constructed with non-None kwargs
     agent_call = livekit_mocks["DJCoHostAgent"].call_args
@@ -647,15 +642,13 @@ def test_screen_vision_capture_opt_in_spawns_capture_task(monkeypatch, mocker, t
 
 
 def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
-    """SMOKE-04: with no OPENROUTER_API_KEY, build_tts_chain is called with
-    openrouter_api_key=None."""
+    """SMOKE-04: no OPENROUTER_API_KEY still boots MOSS-only voice."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    # MOSS is the only voice; keep old cloud voice env from affecting the
-    # compatibility-call assertion.
+    # MOSS is the only voice; legacy cloud voice env must not affect boot.
     monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     # Per-deck OFF — deterministic boot regardless of host rekordbox config.
     monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
@@ -682,11 +675,7 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
 
     asyncio.run(driver())
 
-    livekit_mocks["build_tts_chain"].assert_called_once_with(
-        gemini_api_key="dummy-key",
-        openrouter_api_key=None,
-        mode="direct",
-    )
+    livekit_mocks["build_tts_chain"].assert_called_once_with(mode="direct")
 
 
 def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
@@ -727,11 +716,7 @@ def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
 
     asyncio.run(driver())
 
-    livekit_mocks["build_tts_chain"].assert_called_once_with(
-        gemini_api_key="dummy-key",
-        openrouter_api_key=None,
-        mode="direct",
-    )
+    livekit_mocks["build_tts_chain"].assert_called_once_with(mode="direct")
     assert livekit_mocks["AgentSession"].call_args.kwargs["tts"] is NOT_GIVEN
     assert livekit_mocks["DJCoHostAgent"].call_args.kwargs["tts_inst"] is NOT_GIVEN
     livekit_mocks["session"].output.set_audio_enabled.assert_called_once_with(False)

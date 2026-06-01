@@ -1378,11 +1378,7 @@ async def main() -> None:
         print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
         genai_client = genai.Client(api_key=api_key)
         llm_inst = build_llm(api_key, mode="direct")
-        tts_inst = _build_tts_chain_or_mute(
-            gemini_api_key=api_key,
-            openrouter_api_key=or_key or None,
-            mode="direct",
-        )
+        tts_inst = _build_tts_chain_or_mute(mode="direct")
         if tts_inst is not _livekit_not_given():
             print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
     else:  # mode == "proxy"
@@ -1390,11 +1386,7 @@ async def main() -> None:
         _ensure_proxy_client_dep()
         genai_client = build_proxy_genai_client(jwt, proxy_base_url)
         llm_inst = build_llm(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
-        tts_inst = _build_tts_chain_or_mute(
-            mode="proxy",
-            proxy_base_url=proxy_base_url,
-            jwt=jwt,
-        )
+        tts_inst = _build_tts_chain_or_mute(mode="proxy")
         if tts_inst is not _livekit_not_given():
             print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
 

@@ -17,8 +17,8 @@ Phase 5 adds:
   MOSS-only ``build_proxy_tts_chain(jwt, proxy_base_url)`` compatibility shim.
 - ``build_llm(api_key, *, mode, proxy_base_url, jwt)`` extended with mode
   dispatch (direct = Phase 4 verbatim; proxy = http_options-pointed at proxy).
-- ``build_tts_chain(*, mode, ...)`` accepts old direct/proxy arguments but
-  always resolves to the single MOSS provider.
+- ``build_tts_chain(*, mode)`` always resolves to the single MOSS provider;
+  cloud/provider voice keys are intentionally outside the API.
 """
 
 from __future__ import annotations

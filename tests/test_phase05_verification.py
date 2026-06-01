@@ -213,9 +213,9 @@ def test_g8_direct_mode_phase4_regression_safe(mocker):
     except (ValueError, TypeError) as e:
         pytest.fail(f"build_llm('test-api-key') raised — direct mode regression: {e}")
 
-    # build_tts_chain accepts legacy keyword args, but always resolves to MOSS.
+    # build_tts_chain no longer accepts cloud/provider voice keys.
     try:
-        _ = build_tts_chain(gemini_api_key="test-g", openrouter_api_key=None)
+        _ = build_tts_chain()
     except (ValueError, TypeError) as e:
         pytest.fail(f"build_tts_chain regression: {e}")
     assert agents_tts.FallbackAdapter.__init__.call_args.kwargs["tts"] == [

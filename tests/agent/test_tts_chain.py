@@ -21,13 +21,7 @@ def test_tts_chain_direct_is_moss_only(mocker) -> None:
 
     from vibemix.agent.tts_chain import build_tts_chain
 
-    build_tts_chain(
-        gemini_api_key="ignored",
-        openrouter_api_key="ignored",
-        openrouter_enabled=True,
-        cartesia_api_key="ignored",
-        mode="direct",
-    )
+    build_tts_chain(mode="direct")
 
     kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
     assert kwargs["tts"] == [fake_moss_cls.return_value]

@@ -48,7 +48,7 @@ from vibemix.agent.tts_chain import build_tts_chain
 
 build_llm("dummy-key")
 try:
-    build_tts_chain(gemini_api_key="dummy-key")
+    build_tts_chain()
 except LocalTTSUnavailable:
     pass
 
