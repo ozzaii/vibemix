@@ -1668,6 +1668,19 @@ def test_viber_live_context_operator_actions_include_library_index_setup():
                 "loaded": False,
                 "track_count": 0,
             },
+            "library_setup_candidates": [
+                {
+                    "kind": "music_folder",
+                    "path": "/Users/ka/Music/PSYMIND",
+                    "confidence": "high",
+                    "reason": "bounded scan saw 42 supported audio files",
+                    "command": (
+                        "uv run python -m vibemix library embed-folder "
+                        "/Users/ka/Music/PSYMIND"
+                    ),
+                    "audio_files_seen": 42,
+                }
+            ],
             "rekordbox_app": {"exists": True},
             "rekordbox_master_db": {"exists": True},
         },
@@ -1680,6 +1693,8 @@ def test_viber_live_context_operator_actions_include_library_index_setup():
         "library.embed-folder",
     ]
     assert actions[0]["source_kind"] == "missing"
+    assert actions[0]["candidate_sources"][0]["path"] == "/Users/ka/Music/PSYMIND"
+    assert "music_folder:/Users/ka/Music/PSYMIND" in actions[0]["detail"]
     assert "Drop a Rekordbox collection.xml or a music folder" in actions[0]["detail"]
     assert "does not read the live SQLCipher master.db" in actions[0]["detail"]
     assert "resolve_deck_identity" in [action["code"] for action in actions]

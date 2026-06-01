@@ -2292,6 +2292,49 @@ Remaining gate:
   cache plus controller movement and, for per-deck claims, deck-pair audio
   capture configuration.
 
+## Package 5L - Viber Library Setup Discovery Candidates
+
+Suggested commit: `feat(viber): discover local library setup candidates`
+
+Include:
+
+- `src/vibemix/library/setup_discovery.py`
+- `src/vibemix/__main__.py`
+- `tests/library/test_setup_discovery.py`
+- `tests/library/test_live_context_cli.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Automatic ingest/re-embed.
+- Recursive whole-disk scanning or hidden-folder traversal.
+- Live Rekordbox `master.db` reads.
+- Any co-host speech or prompt changes.
+
+Reason:
+
+- Package 5K made missing library state machine-readable, but its guidance was
+  still generic. A fresh install needs Viber to help the DJ choose a concrete
+  setup source without guessing or mutating files.
+- This slice adds a bounded, content-light discovery pass: standard Rekordbox
+  `collection.xml` export locations plus shallow music-folder candidates under
+  common user-owned roots. The live-context proof includes these candidates in
+  the `index_library` operator action so Viber can guide setup while preserving
+  consent.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_setup_discovery.py tests/library/test_live_context_cli.py`
+- `uv run ruff check src/vibemix/library/setup_discovery.py src/vibemix/__main__.py tests/library/test_setup_discovery.py tests/library/test_live_context_cli.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/library/setup_discovery.py src/vibemix/__main__.py tests/library/test_setup_discovery.py tests/library/test_live_context_cli.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- Source/live-context proof only. A future product slice can add an explicit
+  one-click "Use this folder/XML" action, but this package only discovers and
+  reports candidates.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`

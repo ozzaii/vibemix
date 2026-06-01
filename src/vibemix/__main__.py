@@ -4830,13 +4830,23 @@ def _ws_port_listener_lsof_probe(host: str, port: int) -> dict[str, Any]:
 def _viber_local_source_status() -> dict[str, Any]:
     """Return a compact, content-free local source diagnostic for Viber proof."""
     home = Path.home()
+    try:
+        from vibemix.library.setup_discovery import discover_library_setup_candidate_dicts
+
+        setup_candidates = discover_library_setup_candidate_dicts(max_candidates=5)
+    except Exception as exc:
+        setup_candidates = []
+        setup_discovery_error = type(exc).__name__
+    else:
+        setup_discovery_error = None
     routing_hint = rekordbox_deck_output_routing_hint(
         capture_device_name=str(os.environ.get("VIBEMIX_INPUT_DEVICE") or INPUT_DEVICE),
         input_channels=None,
     )
-    return {
+    out = {
         "ws_port_listener": _ws_port_listener_probe(),
         "library_cache": _library_cache_probe(),
+        "library_setup_candidates": setup_candidates,
         "nowplaying": _nowplaying_probe(),
         "rekordbox_app": _file_probe(Path("/Applications/rekordbox 7/rekordbox.app")),
         "rekordbox_master_db": _file_probe(home / "Library/Pioneer/rekordbox/master.db"),
@@ -4854,6 +4864,9 @@ def _viber_local_source_status() -> dict[str, Any]:
             "reason": "SQLCipher live DB path stays disabled; deck context uses app state plus library cache.",
         },
     }
+    if setup_discovery_error:
+        out["library_setup_discovery_error"] = setup_discovery_error
+    return out
 
 
 def _viber_live_context_hint(error: str | None, source_status: dict[str, Any]) -> str:
@@ -5681,6 +5694,20 @@ def _viber_live_context_operator_actions(
         bool(library_cache.get("loaded")) and library_track_count <= 0
     )
     if physical_diagnosis and library_needs_index:
+        setup_candidates = (
+            source_status.get("library_setup_candidates")
+            if isinstance(source_status, dict)
+            and isinstance(source_status.get("library_setup_candidates"), list)
+            else []
+        )
+        candidate_preview: list[str] = []
+        for candidate in setup_candidates[:3]:
+            if not isinstance(candidate, dict):
+                continue
+            kind = str(candidate.get("kind") or "source")
+            path = str(candidate.get("path") or "")
+            if path:
+                candidate_preview.append(f"{kind}:{path}")
         rekordbox_xml_detected = False
         if isinstance(source_status, dict):
             for key in ("rekordbox_app", "rekordbox_master_db"):
@@ -5694,6 +5721,8 @@ def _viber_live_context_operator_actions(
             "`uv run python -m vibemix library ingest <collection.xml>` / "
             "`uv run python -m vibemix library embed-folder <music-folder>`."
         )
+        if candidate_preview:
+            detail += " Local candidates found: " + "; ".join(candidate_preview) + "."
         if rekordbox_xml_detected:
             detail += (
                 " Rekordbox is installed locally, but Vibemix does not read the live "
@@ -5705,6 +5734,7 @@ def _viber_live_context_operator_actions(
             recommended_surfaces=["settings.library.drop", "library.ingest", "library.embed-folder"],
             source_kind=library_source_type or "unknown",
             track_count=library_track_count,
+            candidate_sources=setup_candidates[:5],
         )
 
     if physical_diagnosis and (
@@ -6202,6 +6232,7 @@ async def _sample_viber_live_context(
         "operator_actions": _viber_live_context_operator_actions(
             readiness,
             setup_hint=setup_hint,
+            source_status=source_status,
         ),
         "error": None if preview else "No deck/context frames were observed before timeout.",
         "hint": None
