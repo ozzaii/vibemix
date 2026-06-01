@@ -69,6 +69,36 @@ logger = logging.getLogger("vibemix.library")
 _STALE_AGE_SECONDS: int = 30 * 86400
 
 
+def _is_user_library_cache_path(cache_path: Path) -> bool:
+    """Return true for the production user cache location.
+
+    Tests are allowed to cache fixture XML when they monkeypatch ``CACHE_PATH`` to
+    an isolated tmp file. The real user cache is different: if it ever points at
+    the repo fixture corpus, Viber/search will look "wired" while answering from
+    fake tracks. Keep this path-shape based so tests can simulate a user cache
+    without touching ``~/.cache``.
+    """
+    parts = cache_path.expanduser().parts
+    return len(parts) >= 3 and parts[-3:-1] == (".cache", "vibemix") and parts[-1] in {
+        "library.pkl",
+        "library.pkl.v1bak",
+    }
+
+
+def _is_repo_test_fixture_source_path(source_path: str) -> bool:
+    """Return true when a cache source points at this repo's test fixtures."""
+    source = Path(source_path).expanduser()
+    repo_root = Path(__file__).resolve().parents[3]
+    try:
+        relative = source.resolve(strict=False).relative_to(repo_root)
+    except ValueError:
+        if source.is_absolute():
+            return False
+        relative = source
+    parts = relative.parts
+    return "tests" in parts and "fixtures" in parts
+
+
 @dataclass(frozen=True, slots=True)
 class CuePoint:
     """A single Rekordbox cue / loop / fade / load marker.
@@ -273,6 +303,14 @@ class RekordboxLibrary:
         if not isinstance(blob, _CacheBlob):
             return None
         if blob.version not in (1, 2, self.SCHEMA_VERSION):
+            return None
+        if _is_user_library_cache_path(cache_path) and _is_repo_test_fixture_source_path(
+            blob.xml_path
+        ):
+            logger.warning(
+                "library: ignoring user cache because it points at a repo test fixture: %s",
+                blob.xml_path,
+            )
             return None
         # Mtime check: if the XML file on disk is NEWER than the cache,
         # the cache is stale — fall through.

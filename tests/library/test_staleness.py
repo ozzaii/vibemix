@@ -29,6 +29,8 @@ from vibemix.library.staleness import (
 )
 from vibemix.library.watcher import _freshness_watch_targets as _watcher_watch_targets
 
+FIXTURE = Path(__file__).parent / "fixtures" / "synthetic_collection.xml"
+
 
 def _touch_with_age(path: Path, age_seconds: float) -> None:
     """Create empty file at path with mtime = now - age_seconds."""
@@ -142,6 +144,73 @@ def test_freshness_status_stale_when_source_newer(tmp_path: Path) -> None:
     assert status.stale is True
     assert status.reason == "source_newer_than_cache"
     assert status.source_mtime == new_mtime
+
+
+def test_freshness_status_rejects_user_cache_pointing_at_test_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    user_cache = tmp_path / ".cache" / "vibemix" / "library.pkl"
+    detected_source = tmp_path / "collection.xml"
+    detected_source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", user_cache)
+    RekordboxLibrary()._write_cache(str(FIXTURE), FIXTURE.stat().st_mtime)
+    monkeypatch.setattr(
+        "vibemix.library.staleness._detect_library_source_path",
+        lambda: str(detected_source),
+    )
+
+    status = library_freshness_status(user_cache)
+
+    assert status.status == "cache_unreadable"
+    assert status.stale is True
+    assert status.reason == "cache_points_to_test_fixture"
+    assert status.source_path == str(detected_source)
+
+
+def test_freshness_status_uses_real_backup_when_primary_cache_is_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    user_cache = tmp_path / ".cache" / "vibemix" / "library.pkl"
+    backup_cache = user_cache.with_suffix(user_cache.suffix + ".v1bak")
+    source = tmp_path / "collection.xml"
+    source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    source_mtime = time.time()
+    os.utime(source, (source_mtime, source_mtime))
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", user_cache)
+    RekordboxLibrary()._write_cache(str(FIXTURE), FIXTURE.stat().st_mtime)
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", backup_cache)
+    RekordboxLibrary()._write_cache(str(source), source_mtime)
+
+    status = library_freshness_status(user_cache, now=source_mtime + 10)
+
+    assert status.status == "fresh"
+    assert status.reason == "cache_current"
+    assert status.cache_path == str(backup_cache)
+    assert status.source_path == str(source)
+
+
+def test_freshness_nudge_payload_never_refreshes_test_fixture_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    user_cache = tmp_path / ".cache" / "vibemix" / "library.pkl"
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", user_cache)
+    RekordboxLibrary()._write_cache(str(FIXTURE), FIXTURE.stat().st_mtime)
+    monkeypatch.setattr(
+        "vibemix.library.staleness._detect_library_source_path",
+        lambda: None,
+    )
+
+    payload = freshness_nudge_payload(user_cache, tmp_path / "state.json")
+
+    assert payload is not None
+    assert payload["reason"] == "cache_points_to_test_fixture"
+    assert payload["source_path"] is None
 
 
 def test_freshness_status_source_missing(tmp_path: Path) -> None:

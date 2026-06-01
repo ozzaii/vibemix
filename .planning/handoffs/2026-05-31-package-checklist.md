@@ -1041,8 +1041,10 @@ Include:
 
 - `src/vibemix/library/watcher.py`
 - `src/vibemix/library/staleness.py`
+- `src/vibemix/library/rekordbox.py`
 - `src/vibemix/__main__.py`
 - `src/vibemix/runtime/ws_bus.py`
+- `tests/library/test_rekordbox.py`
 - `tests/library/test_staleness.py`
 - `tests/runtime/test_ws_bus.py`
 - `.planning/packets/2026-06-01/CODEX_READY-library-freshness-watcher-pulse.md`
@@ -1092,6 +1094,14 @@ Proof already run:
   tests/library/test_setprep_tools.py tests/runtime/test_ws_bus.py` passed with
   76 tests, and `uv run ruff check src/vibemix/library/staleness.py
   src/vibemix/library/watcher.py tests/library/test_staleness.py` passed.
+- Codex user-file discovery follow-up, 2026-06-01: a live local probe found the
+  current user cache pointing at `tests/library/fixtures/synthetic_collection.xml`.
+  The follow-up rejects production-shaped `~/.cache/vibemix/library.pkl` caches
+  whose recorded source is a repo test fixture, while keeping pytest's isolated
+  fixture caches usable. Focused proof passed:
+  `uv run pytest -q tests/library/test_rekordbox.py tests/library/test_staleness.py
+  tests/library/test_stats_cli.py tests/library/test_setprep_tools.py
+  tests/runtime/test_ws_bus.py::test_ws_broadcast_replays_staleness_nudge_to_late_client`.
 
 Remaining gate:
 

@@ -126,6 +126,12 @@ def _current_source_mtime(source_path: str) -> float:
     return os.path.getmtime(path)
 
 
+def _legacy_cache_path(pkl: Path) -> Path | None:
+    if pkl.name.endswith(".v1bak"):
+        return None
+    return pkl.with_suffix(pkl.suffix + ".v1bak")
+
+
 def _should_emit_nudge(status: LibraryFreshness) -> bool:
     if status.status == "not_indexed":
         return _refreshable_source_path(status) is not None
@@ -165,6 +171,9 @@ def library_freshness_status(
     now_ts = time.time() if now is None else now
     cache_path = str(pkl)
     if not pkl.exists():
+        legacy_pkl = _legacy_cache_path(pkl)
+        if legacy_pkl is not None and legacy_pkl.exists():
+            return library_freshness_status(legacy_pkl, now=now_ts)
         detected_source = _detect_library_source_path()
         return LibraryFreshness(
             status="not_indexed",
@@ -224,6 +233,29 @@ def library_freshness_status(
             cache_path=cache_path,
             source_path=source_path,
             cache_mtime=cache_stat.st_mtime,
+        )
+
+    from vibemix.library.rekordbox import (
+        _is_repo_test_fixture_source_path,
+        _is_user_library_cache_path,
+    )
+
+    if _is_user_library_cache_path(pkl) and _is_repo_test_fixture_source_path(source_path):
+        legacy_pkl = _legacy_cache_path(pkl)
+        if legacy_pkl is not None and legacy_pkl.exists():
+            legacy_status = library_freshness_status(legacy_pkl, now=now_ts)
+            if legacy_status.reason != "cache_points_to_test_fixture":
+                return legacy_status
+        detected_source = _detect_library_source_path()
+        return LibraryFreshness(
+            status="cache_unreadable",
+            stale=True,
+            reason="cache_points_to_test_fixture",
+            age_days=cache_age_days,
+            cache_path=cache_path,
+            source_path=detected_source,
+            cache_mtime=cache_stat.st_mtime,
+            source_mtime=float(recorded_source_mtime),
         )
 
     try:

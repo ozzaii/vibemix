@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from vibemix.library.rekordbox import CuePoint, RekordboxLibrary, TrackEntry
+from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
 
 FIXTURE = Path(__file__).parent / "fixtures" / "synthetic_collection.xml"
 
@@ -176,6 +176,19 @@ def test_cache_warm_start_round_trip(isolated_cache):
     assert track1 is not None
     assert track1.title == "Test Track One"
     assert track1.bpm == 124.0
+
+
+def test_user_cache_ignores_repo_fixture_source(tmp_path, monkeypatch):
+    """The production cache must never make Viber answer from test-fixture tracks."""
+    user_cache = tmp_path / ".cache" / "vibemix" / "library.pkl"
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", user_cache)
+    lib1 = RekordboxLibrary()
+    lib1.load_xml(FIXTURE)
+    assert user_cache.exists()
+
+    lib2 = RekordboxLibrary()
+    assert lib2.try_load_cache() is False
+    assert len(lib2) == 0
 
 
 def test_cache_invalidated_when_xml_path_differs(
