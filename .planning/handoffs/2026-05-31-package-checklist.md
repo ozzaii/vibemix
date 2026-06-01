@@ -756,6 +756,32 @@ Proof before staging:
 - `git diff --check -- tests/scripts/test_replay_linter.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AB - Transition Judge Test Ruff Hygiene
+
+Suggested commit: `test(intel): clean transition judge test lint`
+
+Include:
+
+- `tests/intel/test_transition_judge.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Intel source, live signal source, cohost/runtime files, and generated files.
+
+Reason:
+
+- The transition-judge test import block drifted from Ruff ordering. Sorting
+  the imported names keeps the focused intel-test ruff gate clean without
+  changing judge assertions.
+
+Proof before staging:
+
+- `uv run ruff check tests/intel/test_transition_judge.py`
+- `uv run pytest -q tests/intel/test_transition_judge.py`
+- `git diff --check -- tests/intel/test_transition_judge.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

@@ -8,9 +8,8 @@ the law: the hakem shuts up rather than lie.
 """
 from __future__ import annotations
 
-from vibemix.intel.transition_judge import judge_transition, TransitionVerdict
-from vibemix.state.live_signal import LiveSignalFrame, LaneObservation
-
+from vibemix.intel.transition_judge import TransitionVerdict, judge_transition
+from vibemix.state.live_signal import LaneObservation, LiveSignalFrame
 
 # Sentinel so a test can pass an *explicit* bands=None (lane has no spectrum)
 # distinct from "not specified -> use the default heavy bands".
