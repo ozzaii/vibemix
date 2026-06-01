@@ -36,7 +36,6 @@ from vibemix.library.index_numpy import NumpyStore
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.library.store import LibraryStore
 
-
 # ─── Fixtures (mirror tests/library/test_folder_ingest.py shape) ─────────────
 
 
@@ -63,10 +62,10 @@ class FakeEmbedder:
         self._vec = l2_normalize(np.ones(EMBEDDING_DIM, dtype=np.float32))
         self._embed_strategy = "mean_excerpt"
 
-    def has_cached_embedding(self, track) -> bool:  # noqa: ANN001
+    def has_cached_embedding(self, track) -> bool:
         return False
 
-    def embed_track(self, track) -> np.ndarray:  # noqa: ANN001
+    def embed_track(self, track) -> np.ndarray:
         self.embed_calls.append(track.track_id)
         return self._vec.copy()
 
@@ -81,8 +80,8 @@ def _isolate_caches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     )
     # Point band_share_store.DB_PATH at a tmp sqlite file so the additive
     # write path (Plan 93-06) lands in tmp, not ~/.cache/vibemix/.
-    from vibemix.library import index_sqlite_vec
     from vibemix.learn import band_share_store
+    from vibemix.library import index_sqlite_vec
 
     bs_db = tmp_path / "library-clap.db"
     monkeypatch.setattr(index_sqlite_vec, "DB_PATH", bs_db)

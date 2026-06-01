@@ -1104,6 +1104,33 @@ Proof before staging:
 - `git diff --check -- tests/library/test_folder_ingest.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AO - Folder Ingest Band-Share Test Ruff Hygiene
+
+Suggested commit: `test(library): clean folder ingest band-share lint`
+
+Include:
+
+- `tests/library/test_folder_ingest_band_shares.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Folder ingest implementation, band-share/exemplar implementation, stores,
+  runtime files, and generated files.
+
+Reason:
+
+- The folder ingest band-share tests had stale annotation `noqa`s and import
+  order/spacing drift. Cleaning those keeps the focused ruff gate green without
+  changing side-car band-share assertions.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_folder_ingest_band_shares.py`
+- `uv run pytest -q tests/library/test_folder_ingest_band_shares.py`
+- `git diff --check -- tests/library/test_folder_ingest_band_shares.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Cohost Reaction Schema Drift
 
 Suggested commit if/when selected: `fix(ui-bus): reconcile cohost reaction schema`
