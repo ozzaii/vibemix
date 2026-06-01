@@ -66,6 +66,8 @@ import { invoke } from "@tauri-apps/api/core";
 
 const TAG = "[pill]";
 const PILL_ROOT_ARIA_LABEL = "vibemix cohost pill";
+const PILL_FEEDBACK_ECHO_MS = 1400;
+const PILL_REACTION_ECHO_MS = 1800;
 
 /**
  * Silent-baseline RMS the waveform settles to between phrases while speaking
@@ -1081,8 +1083,12 @@ export function syncPillRootActionability(root: HTMLElement, available: boolean)
   root.dataset.actionable = available ? "true" : "false";
   if (available) {
     root.setAttribute("aria-keyshortcuts", "Enter Space");
+    root.setAttribute("aria-controls", "pill-peek");
+    root.setAttribute("aria-expanded", "true");
   } else {
     root.removeAttribute("aria-keyshortcuts");
+    root.removeAttribute("aria-controls");
+    root.removeAttribute("aria-expanded");
   }
 }
 
@@ -1102,6 +1108,15 @@ export function pillShouldSuppressNextFocusPeek(
   active: Element | null,
 ): boolean {
   return active !== null && active !== root && root.contains(active);
+}
+
+export function pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(
+  active: Element | null,
+  root: HTMLElement,
+  mounts: HTMLElement[],
+): boolean {
+  if (active === null || active === root || !root.contains(active)) return false;
+  return mounts.some((mount) => mount.contains(active));
 }
 
 export function pillNextCompletionKey(
@@ -1377,7 +1392,10 @@ function render(view: PillView, state: PillState, baseLabel: string, now: number
   view.root.dataset.hasNext = hasNext ? "true" : "false";
   view.root.dataset.demoNext = demoNext ? "true" : "false";
   syncNextPulse(view, hasNext, nextKey);
-  const reactionEcho = activeReactionEcho(view, state.mode, now);
+  const storedReactionEcho = activeReactionEcho(view, state.mode, now);
+  const echoCanYieldToPeek =
+    state.peek && hasNext && COLLAPSED_PEEK_ENABLED && pillHoverCanOpen(state.mode);
+  const reactionEcho = echoCanYieldToPeek ? null : storedReactionEcho;
   const hoverActive =
     COLLAPSED_PEEK_ENABLED && state.peek && pillHoverCanOpen(state.mode) && !reactionEcho;
   const peekVisible = hoverActive && hasNext;
@@ -1901,7 +1919,7 @@ function syncReactionEcho(
     label,
     tone: parts.tone,
     key,
-    until: reactionRevision + 1200,
+    until: reactionRevision + PILL_REACTION_ECHO_MS,
   };
 }
 
@@ -2147,6 +2165,11 @@ function syncNextSuggestion(view: PillView): void {
   const key = nextSuggestionRenderKey(s);
   if (key === view.lastNextKey) return;
   view.lastNextKey = key;
+  const restoreRootFocus = pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(
+    document.activeElement,
+    view.root,
+    [mount],
+  );
   mount.replaceChildren();
   const card = renderNextSuggestion(s, {
     showAlternatives: true,
@@ -2159,6 +2182,7 @@ function syncNextSuggestion(view: PillView): void {
     card.setAttribute("data-no-drag", "");
     mount.append(card);
   }
+  if (restoreRootFocus) view.root.focus({ preventScroll: true });
 }
 
 /**
@@ -2179,6 +2203,11 @@ function syncPeekCard(view: PillView): void {
   const key = nextSuggestionRenderKey(s);
   if (key === view.lastPeekKey) return;
   view.lastPeekKey = key;
+  const restoreRootFocus = pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(
+    document.activeElement,
+    view.root,
+    [mount],
+  );
   mount.replaceChildren();
   mount.removeAttribute("aria-label");
   const card = renderNextSuggestion(s, {
@@ -2195,6 +2224,7 @@ function syncPeekCard(view: PillView): void {
     if (label) mount.setAttribute("aria-label", label);
     mount.append(card);
   }
+  if (restoreRootFocus) view.root.focus({ preventScroll: true });
 }
 
 function clearPeekCard(view: PillView): void {
@@ -2202,9 +2232,15 @@ function clearPeekCard(view: PillView): void {
     view.lastPeekKey = "";
     return;
   }
+  const restoreRootFocus = pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(
+    document.activeElement,
+    view.root,
+    [view.peekMount],
+  );
   view.peekMount.replaceChildren();
   view.peekMount.removeAttribute("aria-label");
   view.lastPeekKey = "";
+  if (restoreRootFocus) view.root.focus({ preventScroll: true });
 }
 
 const FOCUSABLE_DESCENDANT_SELECTOR = [
@@ -2351,18 +2387,24 @@ function sendNextSuggestionFeedback(
       grade,
       progress,
       care: label === "CARE",
-      until: now + 900,
+      until: now + PILL_FEEDBACK_ECHO_MS,
     };
     if (suggestionKey) view.handledNextRenderKey = suggestionKey;
     if (completionKey) {
       view.handledNextKey = completionKey;
     }
     if (completionKey || suggestionKey) {
+      const restoreRootFocus = pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(
+        document.activeElement,
+        view.root,
+        [view.nextMount, view.peekMount],
+      );
       view.nextMount.replaceChildren();
       view.peekMount.replaceChildren();
       view.peekMount.removeAttribute("aria-label");
       view.lastNextKey = "";
       view.lastPeekKey = "";
+      if (restoreRootFocus) view.root.focus({ preventScroll: true });
     }
   }
   const message = nextSuggestionFeedbackMessage(feedback);

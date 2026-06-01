@@ -626,6 +626,13 @@ export function nextDecisionText(
   return cleanDecisionText(d.spoken_text);
 }
 
+function nextFullActionText(
+  d: NextSuggestionDecisionWire | null | undefined,
+  t: NextSuggestionTransitionWire | null | undefined,
+): string {
+  return nextDecisionText(d, t) || nextTransitionText(t);
+}
+
 function nextPeekActionText(
   d: NextSuggestionDecisionWire | null | undefined,
   t: NextSuggestionTransitionWire | null | undefined,
@@ -665,6 +672,9 @@ export function nextSuggestionAriaLabel(
   const actionText = isPeek
     ? nextPeekActionText(s.decision, s.transition)
     : nextDecisionText(s.decision, s.transition) || nextTransitionText(s.transition);
+  const fullActionText = isPeek
+    ? nextFullActionText(s.decision, s.transition)
+    : "";
   const grade = nextMoveGrade(s);
   const gradeProgress = grade ? nextMoveGradeProgress(s, options.gradeProgress ?? null) : null;
   const parts = [`next: ${cleanDecisionText(s.title)}`];
@@ -673,6 +683,7 @@ export function nextSuggestionAriaLabel(
     if (meta) parts.push(meta);
   }
   if (actionText) parts.push(`action: ${actionText}`);
+  if (fullActionText && fullActionText !== actionText) parts.push(`detail: ${fullActionText}`);
   if (grade) {
     parts.push(
       grade.deserved
@@ -1073,6 +1084,7 @@ export function renderNextSuggestion(
     root.addEventListener("keydown", (ev) => {
       if (ev.key !== "Enter" && ev.key !== " ") return;
       ev.preventDefault();
+      ev.stopPropagation();
       options.onPrimaryAction?.();
     });
   } else if (isPeek) {
@@ -1134,7 +1146,8 @@ export function renderNextSuggestion(
   if (actionText) {
     const transition = document.createElement("div");
     transition.className = "vmx-next-card__transition";
-    transition.setAttribute("title", actionText);
+    const fullActionText = nextFullActionText(s.decision, s.transition);
+    transition.setAttribute("title", isPeek && fullActionText ? fullActionText : actionText);
     const bits = actionText.split(" · ").filter(Boolean);
     if (bits.length === 0) {
       transition.textContent = actionText;

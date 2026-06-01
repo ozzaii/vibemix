@@ -883,9 +883,29 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     );
 
     peek.click();
-    peek.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    peek.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    const wrapper = document.createElement("div");
+    wrapper.append(peek);
+    let bubbledKeys = 0;
+    wrapper.addEventListener("keydown", () => {
+      bubbledKeys += 1;
+    });
+
+    const enter = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    const space = new KeyboardEvent("keydown", {
+      key: " ",
+      bubbles: true,
+      cancelable: true,
+    });
+    peek.dispatchEvent(enter);
+    peek.dispatchEvent(space);
     expect(actions).toEqual(["keep", "keep", "keep"]);
+    expect(enter.defaultPrevented).toBe(true);
+    expect(space.defaultPrevented).toBe(true);
+    expect(bubbledKeys).toBe(0);
   });
 
   test("collapsed hover primary action names care when the move is risky", () => {
@@ -926,6 +946,40 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     expect(peek.querySelector(".vmx-next-card__peek-action")?.textContent).toBe("CARE");
     expect(peek.querySelector(".vmx-next-card__peek-action")?.getAttribute("data-care")).toBe(
       "true",
+    );
+  });
+
+  test("auto cue review grade makes the collapsed action care", () => {
+    const suggestion = _sugg({
+      transition: {
+        target_deck: "B",
+        cue_slot: "A",
+        start_in_bars: 4,
+        risk_flags: ["auto_cue_review"],
+        move_grade: {
+          slug: "mid",
+          label: "MID",
+          xp: 8,
+          reason: "auto cue needs review",
+          deserved: false,
+        },
+      },
+    });
+
+    const peek = renderNextSuggestion(suggestion, {
+      density: "peek",
+      showAlternatives: false,
+      showFeedback: false,
+      onPrimaryAction: () => undefined,
+    })!;
+
+    expect(nextSuggestionPrimaryActionText(nextMoveGrade(suggestion))).toBe("care");
+    expect(peek.querySelector(".vmx-next-card__peek-action")?.textContent).toBe("CARE");
+    expect(peek.querySelector(".vmx-next-card__peek-action")?.getAttribute("data-care")).toBe(
+      "true",
+    );
+    expect(peek.querySelector(".vmx-next-card__grade-reason")?.textContent).toBe(
+      "auto cue needs review",
     );
   });
 
@@ -976,8 +1030,14 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
       "load B · in 8 bars",
     );
     expect(card.querySelector(".vmx-next-card__transition")?.getAttribute("title")).toBe(
-      "load B · in 8 bars",
+      "load B · cue A · outro→intro · in 8 bars",
     );
+    expect(card.getAttribute("aria-label")).toBe([
+      "next: Strobe",
+      "action: load B · in 8 bars",
+      "detail: load B · cue A · outro→intro · in 8 bars",
+      "grade: BOMB, 72 xp, perfect phrase",
+    ].join(". "));
     expect(card.querySelector(".vmx-next-card__cue-rail")?.getAttribute("aria-hidden")).toBe(
       "true",
     );
@@ -1011,10 +1071,45 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     )!;
 
     const reason = card.querySelector(".vmx-next-card__grade-reason");
+    const transition = card.querySelector(".vmx-next-card__transition");
     expect(card.querySelector(".vmx-next-card__grade-label")?.textContent).toBe("NEG");
     expect(card.querySelector(".vmx-next-card__grade-xp")?.textContent).toBe("0xp");
     expect(card.querySelector(".vmx-next-card__grade")?.textContent).toBe("NEG0xpkey clash");
     expect(reason?.getAttribute("title")).toBe("key clash");
+    expect(transition?.textContent).toBe("load B · in 4 bars");
+    expect(transition?.getAttribute("title")).toBe("load B · in 4 bars");
+  });
+
+  test("peek preserves the full grounded transition as the compact line title", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          cue_slot: "A",
+          from_role: "outro",
+          to_role: "intro",
+          start_in_bars: 16,
+        },
+        decision: {
+          candidate_id: "tr_001",
+          timing_text: "in 16 bars",
+          spoken_text: "load B in 16 bars",
+        },
+      }),
+      { density: "peek", showAlternatives: false },
+    )!;
+
+    const transition = card.querySelector(".vmx-next-card__transition");
+    expect(transition?.textContent).toBe("load B · in 16 bars");
+    expect(transition?.getAttribute("title")).toBe(
+      "load B · cue A · outro→intro · in 16 bars",
+    );
+    expect(card.getAttribute("aria-label")).toBe([
+      "next: Strobe",
+      "action: load B · in 16 bars",
+      "detail: load B · cue A · outro→intro · in 16 bars",
+    ].join(". "));
   });
 
   test("backup alternative titles are text nodes, never injected markup", () => {

@@ -12,6 +12,7 @@
     "test": "vitest run --reporter=dot",
     "test:e2e:learn": "playwright test -c tests/learn/playwright.config.ts",
     "test:e2e:learn:tauri": "node ../../scripts/e2e/learn_launched_tauri_smoke.mjs",
+    "test:e2e:pill": "playwright test -c tests/pill/playwright.config.ts",
     "test:e2e:visual": "playwright test -c ../../tests/e2e/macbook/playwright.config.ts",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

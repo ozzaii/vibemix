@@ -66,6 +66,7 @@ import {
   pillShouldExposePeekFocus,
   pillShouldExposeNextChrome,
   pillShouldShowFaceWave,
+  pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval,
   pillShouldSuppressNextFocusPeek,
   pillRenderLabel,
   pillRootAriaLabel,
@@ -102,6 +103,53 @@ describe("pill.css — care affordance polish", () => {
       /\.pill__peek \.vmx-next-card\[data-interactive="true"\]\[data-grade-deserved="false"\]:hover/,
     );
     expect(pillCss).toMatch(/@keyframes pill-peek-care-arm/);
+  });
+
+  it("keeps the actionable face rail in the one-rose system", () => {
+    const rowRailRule = pillCss.match(/\.pill__row::after\s*\{[^}]*\}/s)?.[0];
+    expect(rowRailRule).toBeTruthy();
+    expect(rowRailRule).toContain("var(--brand-65)");
+    expect(rowRailRule).not.toMatch(/--gold/);
+  });
+
+  it("renders the DJ KNOWS peek action as a hardware capsule, not a tiny tag", () => {
+    const actionRule = pillCss.match(
+      /\.pill__peek \.vmx-next-card__peek-action\s*\{[^}]*\}/s,
+    )?.[0];
+    const careRule = pillCss.match(
+      /\.pill__peek \.vmx-next-card__peek-action\[data-care="true"\]\s*\{[^}]*\}/s,
+    )?.[0];
+    expect(actionRule).toBeTruthy();
+    expect(actionRule).toMatch(/min-width:\s*50px;/);
+    expect(actionRule).toMatch(/min-height:\s*17px;/);
+    expect(actionRule).toMatch(/border:\s*1px solid var\(--brand-40\);/);
+    expect(actionRule).toContain("var(--brand-16)");
+    expect(actionRule).not.toMatch(/--gold/);
+    expect(careRule).toBeTruthy();
+    expect(careRule).toContain("var(--led-warn)");
+    expect(careRule).not.toMatch(/--gold/);
+  });
+
+  it("makes risky DJ KNOWS reasons readable without adding more copy", () => {
+    const reasonRule = pillCss.match(
+      /\.pill__peek \.vmx-next-card\[data-grade-deserved="false"\] \.vmx-next-card__grade-reason\s*\{[^}]*\}/s,
+    )?.[0];
+    expect(reasonRule).toBeTruthy();
+    expect(reasonRule).toMatch(/font-size:\s*9px;/);
+    expect(reasonRule).toMatch(/min-height:\s*13px;/);
+    expect(reasonRule).toMatch(/letter-spacing:\s*0\.01em;/);
+    expect(pillCss).toMatch(
+      /\.pill__peek \.vmx-next-card__grade-reason\s*\{[^}]*text-transform:\s*none;/s,
+    );
+    expect(reasonRule).toContain("var(--led-warn)");
+    expect(reasonRule).not.toMatch(/--gold/);
+  });
+
+  it("keeps demo reaction controls from stealing pointer events from an open pill", () => {
+    expect(pillCss).toMatch(/\.pill-demo-controls\s*\{[^}]*z-index:\s*20;/);
+    expect(pillCss).toMatch(
+      /\.pill\[data-open="true"\] ~ \.pill-demo-controls\s*\{[^}]*z-index:\s*8;/,
+    );
   });
 });
 
@@ -1314,6 +1362,40 @@ describe("pillShouldExposePeekFocus — hidden drawer focus discipline", () => {
   });
 });
 
+describe("pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval — focus continuity", () => {
+  it("returns focus only when rebuild/removal drops the focused suggestion surface", () => {
+    const root = document.createElement("div");
+    const row = document.createElement("div");
+    const peek = document.createElement("div");
+    const card = document.createElement("button");
+    const next = document.createElement("div");
+    const nextButton = document.createElement("button");
+    const outside = document.createElement("button");
+    peek.append(card);
+    next.append(nextButton);
+    root.append(row, peek, next);
+
+    expect(
+      pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(card, root, [next, peek]),
+    ).toBe(true);
+    expect(
+      pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(nextButton, root, [next, peek]),
+    ).toBe(true);
+    expect(
+      pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(row, root, [next, peek]),
+    ).toBe(false);
+    expect(
+      pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(root, root, [next, peek]),
+    ).toBe(false);
+    expect(
+      pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(outside, root, [next, peek]),
+    ).toBe(false);
+    expect(
+      pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(null, root, [next, peek]),
+    ).toBe(false);
+  });
+});
+
 describe("pillRootPrimaryActionAvailable — root action affordance", () => {
   it("is available only for an open grounded peek without a feedback receipt", () => {
     expect(pillRootPrimaryActionAvailable(true, true, null)).toBe(true);
@@ -1337,10 +1419,14 @@ describe("syncPillRootActionability — aria shortcut affordance", () => {
     syncPillRootActionability(root, true);
     expect(root.dataset.actionable).toBe("true");
     expect(root.getAttribute("aria-keyshortcuts")).toBe("Enter Space");
+    expect(root.getAttribute("aria-controls")).toBe("pill-peek");
+    expect(root.getAttribute("aria-expanded")).toBe("true");
 
     syncPillRootActionability(root, false);
     expect(root.dataset.actionable).toBe("false");
     expect(root.hasAttribute("aria-keyshortcuts")).toBe(false);
+    expect(root.hasAttribute("aria-controls")).toBe(false);
+    expect(root.hasAttribute("aria-expanded")).toBe(false);
   });
 });
 
