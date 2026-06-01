@@ -1,0 +1,21 @@
+{
+  "date": "2026-06-01",
+  "session_id": "20260601-203332",
+  "session_path": "~/Library/Application Support/vibemix/recordings/20260601-203332/",
+  "runtime": {
+    "input_device": "BlackHole 16ch",
+    "input_channels": 4,
+    "deck_audio_channels": "A=0,1;B=2,3",
+    "opened": "BlackHole 16ch @ 48000Hz (4ch)",
+    "crashed": false,
+    "duration_s": 118.406
+  },
+  "trace_counts": {
+    "deck_audio_capture_A_active_B_silent": 240,
+    "deck_audio_capture_A_active_B_active": 0,
+    "B_active": 0,
+    "B_rms_nonzero": 0,
+    "deck_audio_support_no_deck_route": 240
+  },
+  "verdict": "Deck B is visible in Rekordbox but not present in captured BlackHole channels 2,3; keep no_deck_route and fix rig routing before claiming per-deck proof."
+}
