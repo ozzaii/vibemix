@@ -189,6 +189,8 @@ def test_user_cache_ignores_repo_fixture_source(tmp_path, monkeypatch):
     lib2 = RekordboxLibrary()
     assert lib2.try_load_cache() is False
     assert len(lib2) == 0
+    assert not user_cache.exists()
+    assert user_cache.with_name("library.pkl.fixturebak").exists()
 
 
 def test_cache_invalidated_when_xml_path_differs(

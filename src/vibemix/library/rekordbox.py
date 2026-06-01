@@ -99,6 +99,33 @@ def _is_repo_test_fixture_source_path(source_path: str) -> bool:
     return "tests" in parts and "fixtures" in parts
 
 
+def _quarantine_user_fixture_cache(cache_path: Path, source_path: str) -> Path | None:
+    """Move a production cache that points at repo fixtures out of the hot path."""
+    if not _is_user_library_cache_path(cache_path) or not _is_repo_test_fixture_source_path(
+        source_path
+    ):
+        return None
+    quarantine = cache_path.with_name(f"{cache_path.name}.fixturebak")
+    if quarantine.exists():
+        quarantine = cache_path.with_name(f"{cache_path.name}.fixturebak.{int(time.time())}")
+    try:
+        cache_path.replace(quarantine)
+    except OSError as e:
+        logger.warning(
+            "library: failed to quarantine user cache pointing at repo test fixture "
+            "%s: %s",
+            source_path,
+            e,
+        )
+        return None
+    logger.warning(
+        "library: quarantined user cache pointing at repo test fixture %s -> %s",
+        source_path,
+        quarantine,
+    )
+    return quarantine
+
+
 @dataclass(frozen=True, slots=True)
 class CuePoint:
     """A single Rekordbox cue / loop / fade / load marker.
@@ -307,10 +334,7 @@ class RekordboxLibrary:
         if _is_user_library_cache_path(cache_path) and _is_repo_test_fixture_source_path(
             blob.xml_path
         ):
-            logger.warning(
-                "library: ignoring user cache because it points at a repo test fixture: %s",
-                blob.xml_path,
-            )
+            _quarantine_user_fixture_cache(cache_path, blob.xml_path)
             return None
         # Mtime check: if the XML file on disk is NEWER than the cache,
         # the cache is stale — fall through.
