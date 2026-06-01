@@ -34,11 +34,14 @@ def test_to_dict_stays_pure_file_shape_without_skill_wall():
 
 def test_mastered_demo_reaches_the_envelope_wall():
     progress = LearnProgress()
-    progress.skills["beatmatching"] = {
+    skill_id = "harmonic_mixing"
+    spec = SKILL_MANIFEST[skill_id]
+    for lesson_id in spec.lesson_ids:
+        progress.lessons[lesson_id] = {"completed": True}
+    setattr(progress, spec.gate, True)
+    progress.skills[skill_id] = {
         "live_proof_count": 3, "mastered": True,
         "first_mastered_at": "2026-05-30T11:00:00Z",
     }
-    row = next(
-        r for r in progress.snapshot()["skill_wall"] if r["skill_id"] == "beatmatching"
-    )
+    row = next(r for r in progress.snapshot()["skill_wall"] if r["skill_id"] == skill_id)
     assert row["stage"] == "mastered"

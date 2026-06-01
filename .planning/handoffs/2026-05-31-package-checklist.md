@@ -2434,6 +2434,7 @@ Include:
 - `src/vibemix/learn/skill_tree.py`
 - `tests/learn/test_judge_credits_beatmatch.py`
 - `tests/learn/test_creditability_drift.py`
+- `tests/learn/test_progress_snapshot_skill_wall.py`
 - `tests/learn/test_skill_wall_what_remains.py`
 
 Review context, not staged by the current dirty tree:
