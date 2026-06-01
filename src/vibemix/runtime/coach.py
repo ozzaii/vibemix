@@ -195,9 +195,7 @@ def _credit_live_skill_demo(
                         (learn_progress.skills.get(sid) or {}).get("mastered", False)
                     )
                     if now_mastered and not before_mastered.get(sid, False):
-                        line = mastered_unlock_line(
-                            sid, was_mastered=False, now_mastered=True
-                        )
+                        line = mastered_unlock_line(sid, was_mastered=False, now_mastered=True)
                         if line:
                             try:
                                 speak(line)
@@ -224,7 +222,19 @@ async def _emit_earned_wall_refresh(
     learn_progress: Any | None,
     ipc_bus: IpcBus | None,
 ) -> None:
-    """Push refreshed Earned Wall progress after a live cited credit."""
+    """After ``_credit_live_skill_demo`` advances the Earned Wall on a live cited
+    demo, push the refreshed skill-wall to the shell so the trophy updates
+    WITHOUT a reload.
+
+    The credit path mutates + persists ``learn_progress`` but emits no IPC, and
+    the periodic ``ipc.session.snapshot`` does NOT carry learn progress — the
+    SkillWall only repaints on an ``ipc.learn.progress_state`` envelope. So a
+    live Mastered unlock stayed invisible until the next progress_state request
+    (effectively a reload). This closes that gap. Fail-soft: a refresh-emit
+    failure must NEVER perturb the reaction loop or the credit that already
+    landed. Imports are function-local to keep ``runtime/`` free of a top-level
+    ``learn/`` dependency (mirrors ``_credit_live_skill_demo``).
+    """
     if not credited or ipc_bus is None or learn_progress is None:
         return
     try:
@@ -618,7 +628,8 @@ async def coach_loop(
                 learn_progress=learn_progress,
                 speak=mastered_speak,
             )
-            # Push the refreshed Earned Wall so the SkillWall updates without reload.
+            # A live cited demo just advanced the Earned Wall — push the refresh
+            # to the shell so the SkillWall trophy updates without a reload.
             await _emit_earned_wall_refresh(credited, learn_progress, ipc_bus)
             _tr(
                 "event",
