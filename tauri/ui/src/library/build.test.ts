@@ -148,6 +148,17 @@ const MODELS_READY: LibraryModelsResult = {
       mismatched: [],
     },
     {
+      id: "moss-tts",
+      label: "MOSS TTS ONNX",
+      role: "local co-host voice",
+      required: true,
+      env: "VIBEMIX_MOSS_TTS_DIR",
+      installed: true,
+      path: "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+      missing: [],
+      mismatched: [],
+    },
+    {
       id: "cue-detr",
       label: "CUE-DETR ONNX",
       role: "cue-anchored ingest and structural cue detection",
@@ -187,6 +198,12 @@ const MODELS_FRESH_MISSING: LibraryModelsResult = {
           installed: false,
           missing: ["onnx/audio_model.onnx", "onnx/text_model.onnx"],
         }
+      : model.id === "moss-tts"
+        ? {
+            ...model,
+            installed: false,
+            missing: ["encoder_model.onnx"],
+          }
       : model,
   ),
   required_ready: false,
@@ -196,7 +213,7 @@ const MODELS_FRESH_MISSING: LibraryModelsResult = {
 const MODELS_REQUIRED_INSTALL_OK: LibraryModelsResult = {
   ...MODELS_FRESH_MISSING,
   models: MODELS_FRESH_MISSING.models.map((model) =>
-    model.id === "clap"
+    model.id === "clap" || model.id === "moss-tts"
       ? {
           ...model,
           installed: true,
@@ -229,6 +246,22 @@ const MODELS_REQUIRED_INSTALL_OK: LibraryModelsResult = {
             size: 501513769,
             sha256: "sha-text",
             url: "https://example.test/text_model.onnx",
+          },
+        ],
+        errors: [],
+      },
+      {
+        id: "moss-tts",
+        installed: true,
+        path: "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+        files: [
+          {
+            rel_path: "MOSS-TTS-Nano-100M-ONNX/encoder_model.onnx",
+            path: "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX/encoder_model.onnx",
+            status: "skipped",
+            size: 104857600,
+            sha256: "sha-moss",
+            url: "https://example.test/moss-tts.tar.gz",
           },
         ],
         errors: [],
@@ -634,7 +667,10 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
       "CLAP ready",
     );
     expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
-      "Required models ready: downloaded 1/2",
+      "MOSS ready",
+    );
+    expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
+      "Required models ready: downloaded 1/3",
     );
   });
 
@@ -654,6 +690,7 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
 
     const setupText = document.getElementById("vmx-lib-model-state")?.textContent ?? "";
     expect(setupText).toContain("CLAP ready");
+    expect(setupText).toContain("MOSS ready");
     expect(setupText).toContain("CUE ready");
     expect(setupText).not.toContain("codex login");
 

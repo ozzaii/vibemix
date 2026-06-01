@@ -720,6 +720,8 @@ function installStatusLine(models: LibraryModelsResult): string | null {
     const prefix =
       install.target === "cue"
         ? "Optional CUE setup unavailable"
+        : install.target === "moss"
+          ? "MOSS voice setup unavailable"
         : "Model setup failed";
     return errors[0] ? `${prefix}: ${errors[0]}` : prefix;
   }
@@ -735,6 +737,8 @@ function installStatusLine(models: LibraryModelsResult): string | null {
       ? "Required models ready"
       : install.target === "cue"
         ? "Optional CUE checked"
+        : install.target === "moss"
+          ? "MOSS voice ready"
         : install.target === "all"
           ? "Local models ready"
           : "CLAP ready";
@@ -751,7 +755,12 @@ function formatModelBytes(bytes: number): string {
 }
 
 export function modelProgressStateText(progress: LibraryModelProgress): string {
-  const model = progress.id === "cue-detr" ? "CUE" : "CLAP";
+  const model =
+    progress.id === "cue-detr"
+      ? "CUE"
+      : progress.id === "moss-tts"
+        ? "MOSS"
+        : "CLAP";
   const rel = progress.rel_path.split(/[\\/]/).pop() ?? progress.rel_path;
   const count = `${progress.n}/${progress.total}`;
   if (progress.status === "verified") {
@@ -781,6 +790,7 @@ export function modelInstallTargetFromDataset(
   return target === "cue" ||
     target === "all" ||
     target === "required" ||
+    target === "moss" ||
     target === "clap"
     ? target
     : "required";
@@ -790,9 +800,12 @@ export function deriveModelSetupView(
   models: LibraryModelsResult,
 ): ModelSetupView {
   const clap = models.models.find((m) => m.id === "clap");
+  const moss = models.models.find((m) => m.id === "moss-tts");
   const cue = models.models.find((m) => m.id === "cue-detr");
   const clapMismatched = (clap?.mismatched?.length ?? 0) > 0;
+  const mossMismatched = (moss?.mismatched?.length ?? 0) > 0;
   const cueMismatched = (cue?.mismatched?.length ?? 0) > 0;
+  const mossInstallable = moss?.installable === true;
   const cueInstallable = cue?.installable === true;
   const installErrors =
     models.install?.results.flatMap((result) => result.errors) ?? [];
@@ -803,6 +816,17 @@ export function deriveModelSetupView(
     : clapMismatched
       ? "CLAP repair"
       : "CLAP missing";
+  const mossLabel = moss
+    ? moss.installed
+      ? "MOSS ready"
+      : mossMismatched
+        ? mossInstallable
+          ? "MOSS repair"
+          : "MOSS manual repair"
+        : mossInstallable
+          ? "MOSS missing"
+          : "MOSS manual setup"
+    : null;
   const cueLabel = cue?.installed
     ? "CUE ready"
     : cueMismatched
@@ -810,13 +834,15 @@ export function deriveModelSetupView(
         ? "CUE repair"
         : "CUE manual repair"
       : "CUE optional";
-  const needsClap =
+  const needsRequired =
     clap?.installed === false ||
     clapMismatched ||
+    moss?.installed === false ||
+    mossMismatched ||
     models.required_ready === false;
   const needsCue =
     cueInstallable && (cue?.installed === false || cueMismatched);
-  const installTarget: LibraryModelInstallTarget | null = needsClap
+  const installTarget: LibraryModelInstallTarget | null = needsRequired
     ? "required"
     : needsCue
       ? "cue"
@@ -835,7 +861,7 @@ export function deriveModelSetupView(
         : "Install Required Models";
 
   return {
-    stateText: [clapLabel, cueLabel, installStatusLine(models)]
+    stateText: [clapLabel, mossLabel, cueLabel, installStatusLine(models)]
       .filter(Boolean)
       .join(" · "),
     installTarget,

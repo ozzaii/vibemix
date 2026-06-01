@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /* Vibe Engine — local model setup view spec.
  *
- * Pins the first-run setup contract: CLAP is required for embeddings/search,
- * CUE-DETR is optional unless the user explicitly checks/repairs it.
+ * Pins the first-run setup contract: CLAP + MOSS are required, and CUE-DETR
+ * is optional unless the user explicitly checks/repairs it.
  */
 
 import { describe, expect, it } from "vitest";
@@ -19,17 +19,40 @@ import {
 } from "./index.js";
 
 function model(
-  id: "clap" | "cue-detr",
+  id: "clap" | "moss-tts" | "cue-detr",
   overrides: Partial<LibraryModelAsset> = {},
 ): LibraryModelAsset {
+  const defaults = {
+    clap: {
+      label: "CLAP ONNX",
+      role: "library embeddings/search/similarity",
+      required: true,
+      env: "VIBEMIX_CLAP_ONNX_DIR",
+      installable: true,
+    },
+    "moss-tts": {
+      label: "MOSS TTS ONNX",
+      role: "local co-host voice",
+      required: true,
+      env: "VIBEMIX_MOSS_TTS_DIR",
+      installable: false,
+    },
+    "cue-detr": {
+      label: "CUE-DETR ONNX",
+      role: "cue anchors",
+      required: false,
+      env: "VIBEMIX_CUE_ONNX_PATH",
+      installable: false,
+    },
+  }[id];
   return {
     id,
-    label: id === "clap" ? "CLAP ONNX" : "CUE-DETR ONNX",
-    role: id === "clap" ? "library embeddings/search/similarity" : "cue anchors",
-    required: id === "clap",
-    env: id === "clap" ? "VIBEMIX_CLAP_ONNX_DIR" : "VIBEMIX_CUE_ONNX_PATH",
+    label: defaults.label,
+    role: defaults.role,
+    required: defaults.required,
+    env: defaults.env,
     installed: true,
-    installable: id === "clap",
+    installable: defaults.installable,
     path: `/tmp/vibemix-test/${id}`,
     missing: [],
     mismatched: [],
@@ -41,7 +64,7 @@ function payload(
   overrides: Partial<LibraryModelsResult> = {},
 ): LibraryModelsResult {
   return {
-    models: [model("clap"), model("cue-detr")],
+    models: [model("clap"), model("moss-tts"), model("cue-detr")],
     required_ready: true,
     all_ready: true,
     ...overrides,
@@ -49,10 +72,10 @@ function payload(
 }
 
 describe("deriveModelSetupView", () => {
-  it("hides the install button when CLAP and CUE are ready", () => {
+  it("hides the install button when CLAP, MOSS, and CUE are ready", () => {
     const view = deriveModelSetupView(payload());
 
-    expect(view.stateText).toBe("CLAP ready · CUE ready");
+    expect(view.stateText).toBe("CLAP ready · MOSS ready · CUE ready");
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });
@@ -62,6 +85,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap", { installed: false, missing: ["model.onnx"] }),
+          model("moss-tts"),
           model("cue-detr", { installed: false, missing: ["cuedetr.fp32.onnx"] }),
         ],
         required_ready: false,
@@ -69,10 +93,54 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP missing · CUE optional");
+    expect(view.stateText).toBe("CLAP missing · MOSS ready · CUE optional");
     expect(view.installTarget).toBe("required");
     expect(view.installButtonHidden).toBe(false);
     expect(view.installButtonText).toBe("Install Required Models");
+  });
+
+  it("routes missing MOSS through required setup without pretending it is CLAP", () => {
+    const view = deriveModelSetupView(
+      payload({
+        models: [
+          model("clap"),
+          model("moss-tts", {
+            installed: false,
+            installable: false,
+            missing: ["encoder_model.onnx"],
+          }),
+          model("cue-detr"),
+        ],
+        required_ready: false,
+        all_ready: false,
+      }),
+    );
+
+    expect(view.stateText).toBe("CLAP ready · MOSS manual setup · CUE ready");
+    expect(view.installTarget).toBe("required");
+    expect(view.installButtonHidden).toBe(false);
+    expect(view.installButtonText).toBe("Install Required Models");
+  });
+
+  it("labels an operator-hosted MOSS install as missing when pins are configured", () => {
+    const view = deriveModelSetupView(
+      payload({
+        models: [
+          model("clap"),
+          model("moss-tts", {
+            installed: false,
+            installable: true,
+            missing: ["encoder_model.onnx"],
+          }),
+          model("cue-detr"),
+        ],
+        required_ready: false,
+        all_ready: false,
+      }),
+    );
+
+    expect(view.stateText).toBe("CLAP ready · MOSS missing · CUE ready");
+    expect(view.installTarget).toBe("required");
   });
 
   it("does not show an optional CUE action when no hosted artifact is configured", () => {
@@ -80,13 +148,14 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap"),
+          model("moss-tts"),
           model("cue-detr", { installed: false, missing: ["cuedetr.fp32.onnx"] }),
         ],
         all_ready: false,
       }),
     );
 
-    expect(view.stateText).toBe("CLAP ready · CUE optional");
+    expect(view.stateText).toBe("CLAP ready · MOSS ready · CUE optional");
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });
@@ -96,6 +165,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap"),
+          model("moss-tts"),
           model("cue-detr", {
             installed: false,
             installable: true,
@@ -106,7 +176,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP ready · CUE optional");
+    expect(view.stateText).toBe("CLAP ready · MOSS ready · CUE optional");
     expect(view.installTarget).toBe("cue");
     expect(view.installButtonText).toBe("Check Optional CUE");
   });
@@ -116,6 +186,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap"),
+          model("moss-tts"),
           model("cue-detr", {
             installed: false,
             installable: true,
@@ -127,7 +198,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP ready · CUE repair");
+    expect(view.stateText).toBe("CLAP ready · MOSS ready · CUE repair");
     expect(view.installTarget).toBe("cue");
     expect(view.installButtonText).toBe("Repair CUE");
   });
@@ -137,6 +208,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap"),
+          model("moss-tts"),
           model("cue-detr", {
             installed: false,
             installable: false,
@@ -148,7 +220,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP ready · CUE manual repair");
+    expect(view.stateText).toBe("CLAP ready · MOSS ready · CUE manual repair");
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });
@@ -158,6 +230,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap", { installed: false, missing: ["model.onnx"] }),
+          model("moss-tts"),
           model("cue-detr"),
         ],
         required_ready: false,
@@ -188,6 +261,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap"),
+          model("moss-tts"),
           model("cue-detr", { installed: false, missing: ["cuedetr.fp32.onnx"] }),
         ],
         all_ready: false,
@@ -211,11 +285,51 @@ describe("deriveModelSetupView", () => {
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });
+
+  it("uses MOSS-specific install error copy for direct MOSS checks", () => {
+    const view = deriveModelSetupView(
+      payload({
+        models: [
+          model("clap"),
+          model("moss-tts", {
+            installed: false,
+            installable: true,
+            missing: ["encoder_model.onnx"],
+          }),
+          model("cue-detr"),
+        ],
+        required_ready: false,
+        all_ready: false,
+        install: {
+          target: "moss",
+          ok: false,
+          results: [
+            {
+              id: "moss-tts",
+              installed: false,
+              path: "/tmp/vibemix-test/moss-tts",
+              files: [],
+              errors: ["set VIBEMIX_MOSS_TTS_ARCHIVE_URL"],
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(view.stateText).toContain("MOSS voice setup unavailable");
+    expect(view.installTarget).toBe("required");
+  });
 });
 
 describe("modelInstallTargetFromDataset", () => {
   it("accepts every backend-supported install target", () => {
-    const targets: LibraryModelInstallTarget[] = ["required", "clap", "cue", "all"];
+    const targets: LibraryModelInstallTarget[] = [
+      "required",
+      "clap",
+      "moss",
+      "cue",
+      "all",
+    ];
 
     expect(targets.map((target) => modelInstallTargetFromDataset(target))).toEqual(
       targets,
@@ -257,6 +371,19 @@ describe("modelProgressStateText", () => {
         size: 281_749_092,
       }),
     ).toBe("CLAP verified 1/6 · audio_model.onnx");
+
+    expect(
+      modelProgressStateText({
+        target: "moss",
+        id: "moss-tts",
+        n: 1,
+        total: 3,
+        status: "downloading",
+        rel_path: "MOSS-TTS-Nano-100M-ONNX/encoder_model.onnx",
+        downloaded: 10_485_760,
+        size: 104_857_600,
+      }),
+    ).toBe("MOSS downloading 1/3 · encoder_model.onnx · 10 MB/100 MB");
 
     expect(
       modelProgressStateText({

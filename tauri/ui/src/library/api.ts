@@ -94,10 +94,15 @@ export interface LibraryStats {
   failed: number;
 }
 
-export type LibraryModelInstallTarget = "required" | "clap" | "cue" | "all";
+export type LibraryModelInstallTarget =
+  | "required"
+  | "clap"
+  | "moss"
+  | "cue"
+  | "all";
 
 export interface LibraryModelAsset {
-  id: "clap" | "cue-detr" | string;
+  id: "clap" | "moss-tts" | "cue-detr" | string;
   label: string;
   role: string;
   required: boolean;
@@ -135,7 +140,7 @@ export interface LibraryModelInstallSummary {
 
 export interface LibraryModelProgress {
   target: LibraryModelInstallTarget;
-  id: "clap" | "cue-detr" | string;
+  id: "clap" | "moss-tts" | "cue-detr" | string;
   n: number;
   total: number;
   status: "downloading" | "downloaded" | "verified" | "error" | string;
@@ -2031,6 +2036,7 @@ function normalizeInstallTarget(
   if (
     target === "required" ||
     target === "clap" ||
+    target === "moss" ||
     target === "cue" ||
     target === "all"
   ) {
@@ -2318,6 +2324,18 @@ const DEV_MODELS: LibraryModelsResult = {
       mismatched: [],
     },
     {
+      id: "moss-tts",
+      label: "MOSS TTS ONNX",
+      role: "local co-host voice",
+      required: true,
+      installable: false,
+      env: "VIBEMIX_MOSS_TTS_DIR",
+      installed: true,
+      path: "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+      missing: [],
+      mismatched: [],
+    },
+    {
       id: "cue-detr",
       label: "CUE-DETR ONNX",
       role: "cue-anchored ingest and structural cue detection",
@@ -2559,7 +2577,7 @@ export async function libraryStats(): Promise<LibraryStats> {
 }
 
 /** Local model asset status/install seam. With `install="required"` the backend
- *  downloads/verifies first-run required assets (currently CLAP);
+ *  downloads/verifies first-run required assets (CLAP + MOSS voice);
  *  `install="cue"` reports/verifies the manual CUE target until hosting exists.
  *  Real backend errors propagate. */
 export async function libraryModels(
@@ -2569,12 +2587,13 @@ export async function libraryModels(
   const invoke = await getInvoke();
   if (!invoke) {
     if (!install) return DEV_MODELS;
-    const installModels =
-      install === "cue"
-        ? DEV_MODELS.models.slice(1, 2)
-        : install === "all"
-          ? DEV_MODELS.models
-          : DEV_MODELS.models.slice(0, 1);
+    const installModels = DEV_MODELS.models.filter((model) => {
+      if (install === "all") return true;
+      if (install === "required") return model.required;
+      if (install === "clap") return model.id === "clap";
+      if (install === "moss") return model.id === "moss-tts";
+      return model.id === "cue-detr";
+    });
     return {
       ...DEV_MODELS,
       install: {

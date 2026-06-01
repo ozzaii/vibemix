@@ -3997,6 +3997,45 @@ Remaining gate:
   installer surface. This package proves readiness and verified archive plumbing,
   not that the public hosted artifact exists.
 
+## Package 14F - MOSS Model Setup UI Surface
+
+Suggested commit: `fix(library-ui): show moss model readiness`
+
+Packaging decision: Package 14E made the backend/CLI report `moss-tts` as a
+required voice model. This package carries that truth into the Tauri library
+window so the first-run setup line, install target routing, and progress tape no
+longer imply CLAP is the only required asset. CUE remains optional and separate.
+
+Include:
+
+- `tauri/ui/src/library/api.ts`
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/model-setup.test.ts`
+- `tauri/ui/src/library/api.test.ts`
+- `tauri/ui/src/library/build.test.ts`
+- `tauri/src-tauri/src/library_cmds.rs`
+
+Keep out:
+
+- Any Python model installer changes; Package 14E owns those.
+- Bundling the 600MB+ MOSS ONNX tree or changing PyInstaller specs.
+- Any cloud/provider TTS fallback.
+- Any co-host speech, DROP-call, live timing, or deck-audio capture changes.
+
+Proof for this UI/Rust surface:
+
+- `npm --prefix tauri/ui test -- src/library/model-setup.test.ts src/library/api.test.ts src/library/build.test.ts`
+- `cargo test --manifest-path tauri/src-tauri/Cargo.toml library_cmds`
+- `git diff --check -- tauri/ui/src/library/api.ts tauri/ui/src/library/index.ts tauri/ui/src/library/model-setup.test.ts tauri/ui/src/library/api.test.ts tauri/ui/src/library/build.test.ts tauri/src-tauri/src/library_cmds.rs .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- A packaged release still needs a real source of the MOSS model on fresh
+  machines: pinned hosted archive, bundled model, or first-run downloader UI.
+  This package makes the app honest about that readiness; it does not create the
+  public artifact.
+
 ## Hold Lane - Local MOSS TTS ONNX Runtime Spike
 
 Suggested commit if/when it ships: `feat(tts): add wrapped local moss onnx runtime`

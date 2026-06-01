@@ -240,9 +240,9 @@ fn normalize_model_install_target(raw: Option<String>) -> Result<Option<String>,
     let value = raw.trim().to_ascii_lowercase();
     match value.as_str() {
         "" => Ok(None),
-        "required" | "clap" | "cue" | "all" => Ok(Some(value)),
+        "required" | "clap" | "moss" | "cue" | "all" => Ok(Some(value)),
         _ => Err(format!(
-            "invalid model install target {value:?} (expected required | clap | cue | all)"
+            "invalid model install target {value:?} (expected required | clap | moss | cue | all)"
         )),
     }
 }
@@ -1060,7 +1060,7 @@ pub async fn library_stats(app: AppHandle) -> Result<Value, String> {
 /// `library_models` — local AI model status/install seam for setup UX.
 ///
 /// Status is offline (`library models --json`). Installing required assets may
-/// network via Hugging Face (`library models --install required --json`). CUE is
+/// network (`library models --install required --json`) for CLAP + MOSS. CUE is
 /// optional and installable only when an operator-hosted ONNX URL plus verified
 /// pins are configured. Returns the CLI's JSON payload even if the install
 /// failed, so the UI can show per-file errors instead of a generic invoke
@@ -1933,6 +1933,10 @@ mod tests {
             model_library_args(Some("cue"), true),
             vec!["library", "models", "--json", "--install", "cue", "--force"]
         );
+        assert_eq!(
+            model_library_args(Some("moss"), false),
+            vec!["library", "models", "--json", "--install", "moss"]
+        );
     }
 
     #[test]
@@ -2032,9 +2036,13 @@ mod tests {
             normalize_model_install_target(Some("cue".to_string())).unwrap(),
             Some("cue".to_string())
         );
+        assert_eq!(
+            normalize_model_install_target(Some("moss".to_string())).unwrap(),
+            Some("moss".to_string())
+        );
         let err = normalize_model_install_target(Some("gpt".to_string()))
             .expect_err("unknown target should fail");
-        assert!(err.contains("required | clap | cue | all"));
+        assert!(err.contains("required | clap | moss | cue | all"));
     }
 
     #[test]
