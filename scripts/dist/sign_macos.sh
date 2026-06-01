@@ -36,14 +36,19 @@
 #                              $APPLE_DEVELOPER_ID_P12_BASE64 +
 #                              $APPLE_DEVELOPER_ID_PASSWORD into a temp keychain.
 #   APPLE_TEAM_ID              10-char team identifier (TEAMID portion above).
-#   APPLE_API_KEY_PATH         Path to App Store Connect API .p8 key file.
-#                              CI mode (CI=true) base64-decodes $APPLE_API_KEY_P8
-#                              into a temp file.
-#   APPLE_API_KEY_ID           ASC API key ID (8-10 char alphanumeric).
-#   APPLE_API_KEY_ISSUER       ASC API key issuer UUID.
+#   One notarization credential set:
+#     Preferred/CI:
+#       APPLE_API_KEY_PATH     Path to App Store Connect API .p8 key file.
+#                              CI mode base64-decodes $APPLE_API_KEY_P8.
+#       APPLE_API_KEY_ID       ASC API key ID (8-10 char alphanumeric).
+#       APPLE_API_KEY_ISSUER   ASC API key issuer UUID.
+#     Local fallback:
+#       APPLE_ID               Developer Apple ID.
+#       APPLE_PASSWORD         App-specific password for that Apple ID.
 #
 # Optional env vars:
 #   CI                         "true" → CI mode (temp keychain + p8 decode).
+#   APPLE_SIGNING_IDENTITY     Back-compat alias for APPLE_DEVELOPER_ID.
 #   VIBEMIX_DMG_NAME           override DMG basename (default: vibemix-<ver>.dmg).
 #
 # Exit codes:
@@ -98,6 +103,7 @@ SKIP_DMG=0
 KEYCHAIN_PROFILE="vibemix-notarytool"
 OUTPUT_DIR="$REPO_ROOT/dist"
 APP=""
+APPLE_DEVELOPER_ID="${APPLE_DEVELOPER_ID:-${APPLE_SIGNING_IDENTITY:-}}"
 
 usage() {
     cat >&2 <<USAGE
@@ -190,6 +196,8 @@ if [[ "$SKIP_DMG" -eq 0 ]]; then
 fi
 
 MISSING=()
+NOTARY_AUTH_MODE=""
+NOTARY_AUTH_ARGS=()
 
 if [[ "${CI:-}" == "true" ]]; then
     for v in \
@@ -204,14 +212,35 @@ if [[ "${CI:-}" == "true" ]]; then
     done
 fi
 
-for v in APPLE_DEVELOPER_ID APPLE_TEAM_ID APPLE_API_KEY_ID APPLE_API_KEY_ISSUER; do
+for v in APPLE_DEVELOPER_ID APPLE_TEAM_ID; do
     if [[ -z "${!v:-}" ]]; then
         MISSING+=("$v")
     fi
 done
 
-if [[ "${CI:-}" != "true" && -z "${APPLE_API_KEY_PATH:-}" ]]; then
-    MISSING+=("APPLE_API_KEY_PATH")
+if [[ "${CI:-}" == "true" ]]; then
+    for v in APPLE_API_KEY_ID APPLE_API_KEY_ISSUER; do
+        if [[ -z "${!v:-}" ]]; then
+            MISSING+=("$v")
+        fi
+    done
+    NOTARY_AUTH_MODE="api-key"
+elif [[ -n "${APPLE_API_KEY_PATH:-}" || -n "${APPLE_API_KEY_ID:-}" || -n "${APPLE_API_KEY_ISSUER:-}" ]]; then
+    for v in APPLE_API_KEY_PATH APPLE_API_KEY_ID APPLE_API_KEY_ISSUER; do
+        if [[ -z "${!v:-}" ]]; then
+            MISSING+=("$v")
+        fi
+    done
+    NOTARY_AUTH_MODE="api-key"
+elif [[ -n "${APPLE_ID:-}" || -n "${APPLE_PASSWORD:-}" ]]; then
+    for v in APPLE_ID APPLE_PASSWORD; do
+        if [[ -z "${!v:-}" ]]; then
+            MISSING+=("$v")
+        fi
+    done
+    NOTARY_AUTH_MODE="apple-id"
+else
+    MISSING+=("APPLE_API_KEY_PATH/APPLE_API_KEY_ID/APPLE_API_KEY_ISSUER or APPLE_ID/APPLE_PASSWORD")
 fi
 
 if [[ ${#MISSING[@]} -gt 0 ]]; then
@@ -268,6 +297,33 @@ if [[ "${CI:-}" == "true" ]]; then
     log "CI signing material imported into temporary keychain"
 fi
 
+# Notary authentication. CI always uses the ASC API-key material decoded above.
+# Local runs prefer ASC API keys when any APPLE_API_KEY_* var is present, but can
+# fall back to notarytool's Apple-ID + app-specific-password path. Do not echo
+# secrets: only the auth mode is logged.
+case "$NOTARY_AUTH_MODE" in
+    api-key)
+        if [[ ! -f "$APPLE_API_KEY_PATH" ]]; then
+            fatal 2 "ASC API key not found: $APPLE_API_KEY_PATH (CI mode should have decoded \$APPLE_API_KEY_P8 first)"
+        fi
+        NOTARY_AUTH_ARGS=(
+            --key "$APPLE_API_KEY_PATH"
+            --key-id "$APPLE_API_KEY_ID"
+            --issuer "$APPLE_API_KEY_ISSUER"
+        )
+        ;;
+    apple-id)
+        NOTARY_AUTH_ARGS=(
+            --apple-id "$APPLE_ID"
+            --password "$APPLE_PASSWORD"
+            --team-id "$APPLE_TEAM_ID"
+        )
+        ;;
+    *)
+        fatal 2 "internal error: no notarization auth mode selected"
+        ;;
+esac
+
 # Paths.
 if [[ ! -d "$APP" ]]; then
     fatal 2 "app bundle not found: $APP (build via: uv run pyinstaller vibemix-core.macos.spec --clean --noconfirm)"
@@ -289,12 +345,7 @@ if [[ "${CI:-}" != "true" ]]; then
     fi
 fi
 
-# API key file.
-if [[ ! -f "$APPLE_API_KEY_PATH" ]]; then
-    fatal 2 "ASC API key not found: $APPLE_API_KEY_PATH (CI mode should have decoded \$APPLE_API_KEY_P8 first)"
-fi
-
-log "prerequisites OK: app=$APP entitlements=$ENTITLEMENTS"
+log "prerequisites OK: app=$APP entitlements=$ENTITLEMENTS notary_auth=$NOTARY_AUTH_MODE"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
     log "DRY-RUN: stopping after Stage 1; no codesign / notarytool / staple invoked"
@@ -438,9 +489,7 @@ else
     for attempt in 1 2 3; do
         log "  notarytool attempt $attempt of 3"
         if xcrun notarytool submit "$DMG_OUT" \
-                --key "$APPLE_API_KEY_PATH" \
-                --key-id "$APPLE_API_KEY_ID" \
-                --issuer "$APPLE_API_KEY_ISSUER" \
+                "${NOTARY_AUTH_ARGS[@]}" \
                 --wait \
                 --output-format json \
                 > "$SUBMISSION_LOG" 2>&1; then
@@ -468,9 +517,7 @@ else
     if [[ -n "$SUBMISSION_ID" ]]; then
         log "fetching notarization log for submission $SUBMISSION_ID"
         xcrun notarytool log "$SUBMISSION_ID" \
-            --key "$APPLE_API_KEY_PATH" \
-            --key-id "$APPLE_API_KEY_ID" \
-            --issuer "$APPLE_API_KEY_ISSUER" \
+            "${NOTARY_AUTH_ARGS[@]}" \
             "$OUTPUT_DIR/notarytool-detail.json" 2>&1 | head -20 >&2 || true
     fi
 

@@ -107,8 +107,10 @@ def test_sign_macos_materializes_ci_signing_secrets():
 def test_macos_signing_repairs_sidecar_symlinks_before_codesign():
     script = (REPO_ROOT / "scripts/dist/sign_macos.sh").read_text(encoding="utf-8")
     repair = "repair_macos_app_sidecar_symlinks.py"
+    stage2 = 'stage 2 "force-sign every nested Mach-O'
     assert repair in script
-    assert script.index(repair) < script.index('stage 2 "pre-flight codesign nested binaries')
+    assert stage2 in script
+    assert script.index(repair) < script.index(stage2)
 
 
 def test_release_yml_skip_on_empty_apple_secret(workflow_yaml):

@@ -15,6 +15,17 @@ export APPLE_API_KEY_ISSUER="YOUR_ISSUER_UUID"
 ./scripts/dist/sign_macos.sh dist/vibemix-core/vibemix-core.app
 ```
 
+Local fallback when you have an Apple-ID app-specific password instead of an ASC API key:
+
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Bravoh SAGL (TEAMID)"
+export APPLE_TEAM_ID="TEAMID"
+export APPLE_ID="you@example.com"
+export APPLE_PASSWORD="app-specific-password"
+
+./scripts/dist/sign_macos.sh tauri/src-tauri/target/release/bundle/macos/vibemix.app
+```
+
 Expected final line: `[sign_macos] DONE: vibemix-X.Y.Z.dmg notarized + stapled + verified`. The DMG path is also printed on stdout (alone, for piping).
 
 ## Prerequisites (one-time setup)
@@ -150,7 +161,8 @@ The lock is enforced at:
 
 In Local mode (your Mac):
 - The keychain identity is checked via `security find-identity -p codesigning -v` — fails fast if the cert is missing.
-- The `.p8` file is read from `$APPLE_API_KEY_PATH` directly; no decoding.
+- Preferred: the `.p8` file is read from `$APPLE_API_KEY_PATH` directly; no decoding.
+- Fallback: if no `APPLE_API_KEY_*` variables are set, `APPLE_ID` + `APPLE_PASSWORD` + `APPLE_TEAM_ID` are passed to `notarytool` as the app-specific-password auth path.
 
 The same script handles both via the `CI` env var gate. **Don't fork into two scripts** — that's the lesson from Phase 11 W1 (one PyInstaller pipeline, two specs).
 

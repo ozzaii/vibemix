@@ -21,9 +21,10 @@
     // and blocks the desktop dev loop before Rust even starts.
     "beforeDevCommand": "npm --prefix ui run dev",
     // Build the frontend and ensure the bundled PyInstaller sidecar is real
-    // before Tauri packages resources. Without this, a direct local
-    // `cargo tauri build` can silently ship the committed `.placeholder`
-    // sidecar directories.
+    // before Tauri packages resources. tauri-cli runs this command from the
+    // `tauri/` directory (same cwd as beforeDevCommand), so the repo-root
+    // script is one level up. Without this, a direct local `cargo tauri build`
+    // can silently ship the committed `.placeholder` sidecar directories.
     "beforeBuildCommand": "uv run python ../scripts/dist/prepare_tauri_build.py"
   },
   "app": {
