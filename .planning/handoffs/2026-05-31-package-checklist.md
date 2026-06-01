@@ -622,6 +622,33 @@ Proof before staging:
 - `git diff --check -- tests/scripts/test_demo_film_no_ai_vo.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0W - Kaan Action Rollup Test Ruff Hygiene
+
+Suggested commit: `test(scripts): clean kaan action rollup lint`
+
+Include:
+
+- `tests/scripts/test_kaan_action_rollup.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Integration audit source, Kaan action docs, signing/legal artifacts, and app
+  runtime files.
+
+Reason:
+
+- The Kaan-action rollup contract test had a dead `pytest` import, ambiguous
+  row variable names, and a single-item list slice. Cleaning those keeps the
+  focused scripts-test ruff gate clean without changing rollup semantics.
+
+Proof before staging:
+
+- `uv run ruff check tests/scripts/test_kaan_action_rollup.py`
+- `uv run pytest -q tests/scripts/test_kaan_action_rollup.py`
+- `git diff --check -- tests/scripts/test_kaan_action_rollup.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

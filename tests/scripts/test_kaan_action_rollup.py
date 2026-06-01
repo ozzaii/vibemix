@@ -7,8 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "integration_audit.py"
 
@@ -32,8 +30,8 @@ def test_rollup_finds_dist_09_and_dist_11_as_legal_capacity() -> None:
     assert "DIST-11" in body, "DIST-11 (SignPath OSS Foundation) missing"
     # Both must be classified as legal-capacity (NEVER autonomously discharged).
     lines = body.splitlines()
-    dist_09_rows = [l for l in lines if "DIST-09" in l]
-    dist_11_rows = [l for l in lines if "DIST-11" in l]
+    dist_09_rows = [row for row in lines if "DIST-09" in row]
+    dist_11_rows = [row for row in lines if "DIST-11" in row]
     assert any("legal-capacity" in r for r in dist_09_rows), (
         "DIST-09 must be classified as legal-capacity per P46"
     )
@@ -89,7 +87,7 @@ def test_rollup_classifies_proxy_entry_via_kaan_action_marker(tmp_path) -> None:
         sys.path.pop(0)
     actions = _parse_kaan_action_file(fake_path)
     assert len(actions) >= 1
-    dist_77 = [a for a in actions if a.id == "DIST-77"][0]
+    dist_77 = next(a for a in actions if a.id == "DIST-77")
     assert dist_77.type == "proxy"
 
 
