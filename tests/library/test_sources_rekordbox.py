@@ -128,6 +128,36 @@ def test_rekordbox_source_iter_tracks_yields_entries(isolated_cache):
     assert {e.track_id for e in entries} == {"1", "2", "3", "4", "5"}
 
 
+def test_rekordbox_source_iter_tracks_recovers_from_poisoned_user_cache(
+    tmp_path, monkeypatch
+):
+    """A fixture-poisoned user cache must not make source iteration go empty."""
+    from vibemix.library.sources.rekordbox import RekordboxSource
+
+    user_cache = tmp_path / ".cache" / "vibemix" / "library.pkl"
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", user_cache)
+
+    poison = RekordboxLibrary()
+    poison.load_xml(FIXTURE)
+    assert user_cache.exists()
+
+    real_xml = tmp_path / "collection.xml"
+    real_xml.write_bytes(FIXTURE.read_bytes())
+
+    src = RekordboxSource(xml_path=str(real_xml))
+    assert src.detect() is True
+    entries = list(src.iter_tracks())
+
+    assert len(entries) == 5
+    assert {entry.track_id for entry in entries} == {"1", "2", "3", "4", "5"}
+    assert user_cache.exists()
+    assert user_cache.with_name("library.pkl.fixturebak").exists()
+
+    warm = RekordboxLibrary()
+    assert warm.try_load_cache() is True
+    assert warm.xml_path == str(real_xml)
+
+
 def test_rekordbox_source_satisfies_protocol(isolated_cache):
     """RekordboxSource is a structural LibrarySource."""
     from vibemix.library.sources.rekordbox import RekordboxSource
