@@ -382,6 +382,32 @@ Proof before staging:
 - `git diff --check -- tests/repo/test_live_spike_scaffold.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0N - Tauri Activation Policy Test Ruff Hygiene
+
+Suggested commit: `test(repo): clean tauri activation policy lint`
+
+Include:
+
+- `tests/repo/test_tauri_activation_policy.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Tauri Rust source, generated UI files, release signing assets, and app runtime files.
+
+Reason:
+
+- The activation-policy guard had a stale extra blank line in its import block.
+  Removing it keeps the focused repo-test ruff gate clean without changing the
+  static assertions about foregroundable app behavior.
+
+Proof before staging:
+
+- `uv run ruff check tests/repo/test_tauri_activation_policy.py`
+- `uv run pytest -q tests/repo/test_tauri_activation_policy.py`
+- `git diff --check -- tests/repo/test_tauri_activation_policy.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
