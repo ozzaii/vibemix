@@ -408,6 +408,32 @@ Proof before staging:
 - `git diff --check -- tests/repo/test_tauri_activation_policy.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0O - Kaan Action V4 Surface Test Ruff Hygiene
+
+Suggested commit: `test(repo): clean kaan action v4 surface lint`
+
+Include:
+
+- `tests/repo/test_kaan_action_v4_surface.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Launch copy, release scripts, signing/notarization assets, and app runtime files.
+
+Reason:
+
+- The v4 surface guard loads the canonical launch slop checker dynamically, then
+  reads a constant with `getattr`. Direct attribute access satisfies Ruff's
+  constant-getattr rule while keeping the same drift-check behavior.
+
+Proof before staging:
+
+- `uv run ruff check tests/repo/test_kaan_action_v4_surface.py`
+- `uv run pytest -q tests/repo/test_kaan_action_v4_surface.py`
+- `git diff --check -- tests/repo/test_kaan_action_v4_surface.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

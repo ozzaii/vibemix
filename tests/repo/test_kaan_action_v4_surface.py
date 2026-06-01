@@ -54,7 +54,7 @@ def _load_blocklist() -> tuple[str, ...]:
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    blocklist = getattr(mod, "AI_SLOP_BLOCKLIST")
+    blocklist = mod.AI_SLOP_BLOCKLIST
     assert isinstance(blocklist, tuple) and blocklist
     return blocklist
 
