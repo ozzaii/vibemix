@@ -99,7 +99,7 @@ def test_gate_fails_on_synthetic_violation_in_src(tmp_path: Path) -> None:
         )
         violations = _python_gate_check(REPO_ROOT)
         assert len(violations) == 1
-        rel, lineno, line = violations[0]
+        rel, _lineno, line = violations[0]
         assert rel == Path("src/vibemix/agent/_canary_violation.py")
         assert "gemini-3-flash-preview" in line
     finally:

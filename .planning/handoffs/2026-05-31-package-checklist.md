@@ -330,6 +330,32 @@ Proof before staging:
 - `git diff --check -- scripts/integration_audit.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0L - Model Literal Gate Test Ruff Hygiene
+
+Suggested commit: `test(repo): clean model literal gate lint`
+
+Include:
+
+- `tests/repo/test_model_literal_gate.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Model-router source, LLM runtime code, prompts, and generated files.
+
+Reason:
+
+- The model-literal gate test intentionally unpacks a source line number but
+  only asserts the offending path and line text. Prefixing the unused binding
+  keeps the focused repo-test ruff gate clean without changing gate behavior.
+
+Proof before staging:
+
+- `uv run ruff check tests/repo/test_model_literal_gate.py`
+- `uv run pytest -q tests/repo/test_model_literal_gate.py`
+- `git diff --check -- tests/repo/test_model_literal_gate.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
