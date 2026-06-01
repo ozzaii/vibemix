@@ -834,6 +834,42 @@ Remaining gate:
   signed. This package hardens the gate; it does not by itself make a later
   artifact current.
 
+## Package 13D - Clean-Room Attribution Notice
+
+Suggested commit: `docs(legal): attribute clean-room mixxx references`
+
+Include:
+
+- `NOTICE`
+- `NOTICE.md`
+- `THIRD_PARTY_LICENSES.md`
+- `scripts/dist/gen_notice.py`
+- `src/vibemix/learn/beatmatch_judge.py`
+- `tests/learn/test_beatmatch_judge.py`
+- `tests/repo/test_third_party_attribution.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Reason:
+
+- This is the SAFE_NOW legal/proof slice from
+  `.planning/packets/2026-06-01/CLAUDE_META_AUDIT_NEXT_BOARD.md`: the product
+  had clean-room Mixxx references in source comments but no durable third-party
+  attribution map.
+- The package is documentation and static-proof only. It does not copy, bundle,
+  link, or redistribute Mixxx source, and it does not change runtime behavior.
+- The `beatmatch_judge.py` wording now says the behavior was reimplemented from
+  clean-room facts instead of "ported verbatim", matching the actual boundary
+  the attribution file records.
+
+Proof to run:
+
+- `uv run pytest -q tests/repo/test_third_party_attribution.py`
+- `uv run pytest -q tests/repo/test_oss_hygiene.py::test_notice_passes_gen_notice_check tests/repo/test_third_party_attribution.py`
+- `uv run ruff check tests/repo/test_third_party_attribution.py`
+- `python3 -m scripts.dist.gen_notice --check`
+- `git diff --check -- NOTICE NOTICE.md THIRD_PARTY_LICENSES.md scripts/dist/gen_notice.py src/vibemix/learn/beatmatch_judge.py tests/learn/test_beatmatch_judge.py tests/repo/test_third_party_attribution.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Rebuild Carry-Forward Serato Cue Carrier
 
 Suggested commit if/when selected: `feat(library): export cues as serato markers`

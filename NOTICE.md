@@ -5,6 +5,11 @@ runtime dependency attributions live in the sibling `NOTICE` file (the
 Apache-clean dep manifest); this file holds the bundled-asset attributions
 that require per-track licensing acknowledgements.
 
+Clean-room algorithm references that are not bundled assets live in
+`THIRD_PARTY_LICENSES.md`. In particular, that file records the source files
+whose comments cite Mixxx behavior while confirming that no Mixxx source is
+bundled, vendored, linked, or redistributed by vibemix.
+
 ## Packaged Learn Audio Assets
 
 The following audio exemplar files are bundled in

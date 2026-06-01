@@ -5,6 +5,11 @@ This product includes software developed by Bravoh (https://bravoh.com).
 
 Licensed under the Apache License, Version 2.0 — see LICENSE file.
 
+Some vibemix source files include clean-room implementations whose comments
+cite Mixxx behavior as a public reference. No Mixxx source files are bundled,
+vendored, linked, or redistributed by vibemix. See THIRD_PARTY_LICENSES.md for
+the source-file reference map.
+
 ----------------------------------------------------------------------
 
 This product bundles or depends on the following third-party software.
@@ -53,6 +58,31 @@ Rust dependencies (see tauri/src-tauri/Cargo.toml)
 - tauri-plugin-store          — Apache 2.0 / MIT  https://tauri.app/
 - tauri-plugin-fs             — Apache 2.0 / MIT  https://tauri.app/
 - serde, serde_json           — Apache 2.0 / MIT  https://serde.rs/
+
+----------------------------------------------------------------------
+Clean-room algorithm references (no Mixxx source or binaries bundled)
+----------------------------------------------------------------------
+
+vibemix includes Apache-2.0 clean-room implementations of DJ timing and
+mixing primitives whose behavior was checked against public Mixxx concepts and
+separate research notes. This notice is an attribution and review aid; vibemix
+does not bundle, link, or redistribute Mixxx source code or binaries.
+The detailed source-file reference map lives in `THIRD_PARTY_LICENSES.md`.
+
+- Mixxx — GPLv2 or later  https://github.com/mixxxdj/mixxx
+  Reference scope in vibemix:
+  - EngineXfader-style constant-power crossfader math:
+    src/vibemix/audio/xfade.py, src/vibemix/audio/miniplayer.py
+  - EngineBufferScaleLinear-style fractional cursor/miniplayer behavior:
+    src/vibemix/audio/miniplayer.py
+  - AnalyzerSilence-style -60 dB first/last audible bounds:
+    src/vibemix/audio/cues.py
+  - beats.cpp / BpmControl-style beatgrid distance and nearest-beat behavior:
+    src/vibemix/audio/grid.py
+  - sync / bpmcontrol-style beatmatch phase and tempo-fold grading:
+    src/vibemix/learn/beatmatch_judge.py
+  - AutoDJProcessor-style transition timing algebra:
+    src/vibemix/state/transition_clock.py
 
 ----------------------------------------------------------------------
 External tooling (not bundled; runtime dependencies on user's machine)

@@ -5,7 +5,7 @@ In the live co-host vibemix can only *observe* and infer; in the learning module
 it OWNS both decks, so it knows each deck's exact beat phase and can grade a
 beatmatch attempt against ground truth no observer-only competitor can match.
 
-The two primitives are ported verbatim from Mixxx sync (scar dossier 07):
+The two primitives are reimplemented from Mixxx sync behavior (scar dossier 07):
   * modular-1.0 beat-phase error  ``(target-cur+0.5) % 1 - 0.5``  (bpmcontrol.cpp:479, B1)
   * √2 octave-fold tempo multiplier  ``2 / 0.5 / 1``              (synccontrol.cpp:290, A1)
 """

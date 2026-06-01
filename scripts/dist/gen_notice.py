@@ -44,6 +44,13 @@ def main(argv: list[str] | None = None) -> int:
         "livekit-agents",
         "@tauri-apps/api",
         "tauri-plugin-updater",
+        "THIRD_PARTY_LICENSES.md",
+        "Clean-room algorithm references",
+        "Mixxx",
+        "EngineXfader",
+        "AutoDJProcessor",
+        "AnalyzerSilence",
+        "EngineBufferScaleLinear",
     ]
     missing = [m for m in required_markers if m not in content]
 

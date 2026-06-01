@@ -6,8 +6,8 @@ tracks and drives the playhead), it knows each deck's exact beat phase at every
 sample — so it can grade tempo-match and phase-alignment exactly, where a
 live-co-host observer could only infer.
 
-The math is ported verbatim from Mixxx sync (scar dossier 07), facts re-derived
-clean-room (C1 numpy-only, no GPL):
+The math is reimplemented from Mixxx sync behavior (scar dossier 07), with facts
+re-derived clean-room (C1 numpy-only, no GPL source copied):
   * modular-1.0 beat-phase error  ``(target-cur+0.5) % 1 - 0.5``  (bpmcontrol.cpp:479, B1)
   * √2 octave-fold tempo multiplier ``2 / 0.5 / 1``               (synccontrol.cpp:290, A1)
   * phase dead-band 0.01 beat / trainwreck 0.2 beat               (bpmcontrol.cpp:608, B2)
