@@ -29,11 +29,9 @@ LLM_MODEL: str = resolve_model("live_coach")
 TTS_MODEL: str = resolve_model("live_coach_tts")
 TTS_FALLBACK_MODEL: str = resolve_model("live_coach_tts_fallback")
 
-# OpenRouter-routed Gemini model ids. The TTS id was used inline at v4:1995;
-# both now ride the router so OpenRouter surfaces do not reintroduce literals
-# outside ``llm/_router_config.py``.
+# OpenRouter-routed Gemini brain model id. The retired OpenRouter TTS id is not
+# exported from the agent layer; live speech resolves through local MOSS only.
 OPENROUTER_LLM_MODEL: str = resolve_model("live_coach_openrouter")
-OPENROUTER_TTS_MODEL: str = resolve_model("live_coach_tts_openrouter")
 
 # ---- ServiceTier dispatch (Plan 41-01, LAT-07) ----
 # Exposed alongside LLM_MODEL so callers that need the tier (e.g. the

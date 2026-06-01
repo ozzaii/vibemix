@@ -9,7 +9,6 @@ from vibemix.agent.config import (
     LLM_MODEL,
     MIC_DEVICE,
     OPENROUTER_LLM_MODEL,
-    OPENROUTER_TTS_MODEL,
     OUTPUT_DEVICE,
     TTS_FALLBACK_MODEL,
     TTS_MODEL,
@@ -32,7 +31,6 @@ def test_config_01_constants_pinned() -> None:
     assert OPENROUTER_LLM_MODEL == "google/gemini-3.5-flash"
     assert TTS_MODEL == "gemini-3.1-flash-tts-preview"
     assert TTS_FALLBACK_MODEL == "gemini-2.5-flash-preview-tts"
-    assert OPENROUTER_TTS_MODEL == "google/gemini-3.1-flash-tts-preview"
     assert VOICE == "Achird"
     assert INPUT_DEVICE == "BlackHole 2ch"
     assert OUTPUT_DEVICE == "MacBook Pro Speakers"
@@ -50,9 +48,6 @@ def test_pkg_01_imports_from_package_root() -> None:
     )
     from vibemix.agent import (
         MIC_DEVICE as p_mic,
-    )
-    from vibemix.agent import (
-        OPENROUTER_TTS_MODEL as p_or,
     )
     from vibemix.agent import (
         OUTPUT_DEVICE as p_out,
@@ -76,7 +71,6 @@ def test_pkg_01_imports_from_package_root() -> None:
     assert p_llm == LLM_MODEL
     assert p_tts == TTS_MODEL
     assert p_tts_fb == TTS_FALLBACK_MODEL
-    assert p_or == OPENROUTER_TTS_MODEL
     assert p_voice == VOICE
     assert p_input == INPUT_DEVICE
     assert p_out == OUTPUT_DEVICE
@@ -93,13 +87,14 @@ def test_pkg_01_all_exports_includes_required_names() -> None:
         "LLM_MODEL",
         "TTS_MODEL",
         "TTS_FALLBACK_MODEL",
-        "OPENROUTER_TTS_MODEL",
         "VOICE",
         "INPUT_DEVICE",
         "OUTPUT_DEVICE",
         "MIC_DEVICE",
     }
     assert expected.issubset(set(vagent.__all__))
+    assert "OPENROUTER_TTS_MODEL" not in vagent.__all__
+    assert not hasattr(vagent, "OPENROUTER_TTS_MODEL")
 
 
 # ---------------------------------------------------------------------------
@@ -126,14 +121,6 @@ def test_41_01_tts_fallback_model_matches_router() -> None:
     from vibemix.llm.model_router import resolve
 
     assert TTS_FALLBACK_MODEL == resolve("live_coach_tts_fallback")[0]
-
-
-def test_41_01_openrouter_tts_model_matches_router() -> None:
-    """OPENROUTER_TTS_MODEL is router-derived for import compatibility only."""
-
-    from vibemix.llm.model_router import resolve
-
-    assert OPENROUTER_TTS_MODEL == resolve("live_coach_tts_openrouter")[0]
 
 
 def test_openrouter_llm_model_matches_router() -> None:

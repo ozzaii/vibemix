@@ -4598,6 +4598,7 @@ Include:
 - `src/vibemix/agent/tts_chain.py`
 - `src/vibemix/agent/_livekit_google_slim.py`
 - `src/vibemix/agent/config.py`
+- `src/vibemix/agent/__init__.py`
 - `tests/agent/test_tts_chain.py`
 - `tests/agent/test_proxy_client.py`
 - `tests/agent/test_livekit_google_slim.py`
@@ -4619,12 +4620,16 @@ Reason:
   not selected by `build_tts_chain()`.
 - The slice keeps legacy model constants only as import-compatibility strings;
   it removes the provider side effects and orphaned Cartesia voice config.
+- Codex follow-up, 2026-06-01: the remaining package-root
+  `OPENROUTER_TTS_MODEL` export was also import-only residue. `OPENROUTER_LLM_MODEL`
+  stays because it is brain transport; the retired OpenRouter TTS id is no
+  longer exported from `vibemix.agent` or `vibemix.agent.config`.
 
 Proof for this cleanup slice:
 
 - `uv run pytest -q tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py`
-- `uv run ruff check src/vibemix/agent/tts_chain.py src/vibemix/agent/_livekit_google_slim.py src/vibemix/agent/config.py tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py`
-- `git diff --check -- src/vibemix/agent/tts_chain.py src/vibemix/agent/_livekit_google_slim.py src/vibemix/agent/config.py tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run ruff check src/vibemix/agent/tts_chain.py src/vibemix/agent/_livekit_google_slim.py src/vibemix/agent/config.py src/vibemix/agent/__init__.py tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py`
+- `git diff --check -- src/vibemix/agent/tts_chain.py src/vibemix/agent/_livekit_google_slim.py src/vibemix/agent/config.py src/vibemix/agent/__init__.py tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
 Remaining gate:
