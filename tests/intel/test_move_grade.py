@@ -67,6 +67,33 @@ def test_mid_is_the_honest_fallback_when_it_works_but_does_not_click() -> None:
     assert grade["deserved"] is False
 
 
+def test_auto_cue_review_stays_care_even_with_strong_scores() -> None:
+    grade = grade_transition(
+        score=0.86,
+        confidence=0.82,
+        components=_scores(risk_penalty=0.04),
+        risk_flags=("auto_cue_review",),
+    ).to_dict()
+
+    assert grade["slug"] == "mid"
+    assert grade["reason"] == "auto cue needs review"
+    assert grade["deserved"] is False
+    assert grade["xp"] == 8
+
+
+def test_low_cue_confidence_uses_transition_scorer_flag_name() -> None:
+    grade = grade_transition(
+        score=0.76,
+        confidence=0.72,
+        components=_scores(cue_operability=0.63, risk_penalty=0.1),
+        risk_flags=("low_cue_confidence",),
+    ).to_dict()
+
+    assert grade["slug"] == "mid"
+    assert grade["reason"] == "cue confidence low"
+    assert grade["deserved"] is False
+
+
 def test_payload_grading_degrades_nonfinite_values() -> None:
     assert grade_transition_payload(None) is None
     grade = grade_transition_payload(

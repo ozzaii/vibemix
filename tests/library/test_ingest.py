@@ -562,12 +562,14 @@ def test_anlz_index_drives_windows_and_has_separate_cache(isolated_cache, tmp_pa
     cached_track = blob.tracks["50"]
     assert [cue.source for cue in cached_track.cues] == ["anlz", "anlz"]
     assert [cue.name for cue in cached_track.cues] == ["INTRO", "DROP"]
+    assert [cue.number for cue in cached_track.cues] == [0, 3]
     assert cached_track.cues[0].confidence == pytest.approx(0.84)
     sections = sections_for_entry(cached_track)
     assert sections[0].source == "anlz"
     assert sections[0].source_detail == "pssi"
     assert sections[0].cue_source == "anlz"
     assert sections[0].cue_confidence == pytest.approx(0.84)
+    assert [section.cue_slot for section in sections] == ["A", "D"]
     assert sections[0].role == "intro"
 
     resumed_embedder = FakeClapEmbedder()
@@ -582,6 +584,165 @@ def test_anlz_index_drives_windows_and_has_separate_cache(isolated_cache, tmp_pa
     assert resumed.embedded == 0
     assert resumed_embedder.calls == []
     assert resumed_embedder.byte_calls == []
+
+
+def test_auto_cues_materialize_to_cached_library_and_sections(
+    isolated_cache, tmp_path, monkeypatch
+):
+    """Auto cues must survive ingest so pill/Viber see grounded sections after restart."""
+    import vibemix.library.cue_engine as cue_engine
+    from vibemix.library import ingest as ingest_mod
+    from vibemix.library.cue_types import CueAnchor
+    from vibemix.library.ingest import (
+        INGEST_CUE_STRATEGY_VERSION,
+        _cue_strategy_tag_for_auto,
+        ingest_source,
+    )
+    from vibemix.library.section_builder import sections_for_entry
+
+    anchors = [
+        CueAnchor(label="intro", start_s=0.0, end_s=32.0, confidence=0.82, source="auto"),
+        CueAnchor(label="drop", start_s=96.0, end_s=156.0, confidence=0.74, source="auto"),
+    ]
+    monkeypatch.setattr(cue_engine, "detect_cues_auto", lambda *a, **k: anchors)
+
+    f = tmp_path / "auto.mp3"
+    f.write_bytes(b"AUTO-AUDIO" * 8)
+    track = _track_entry("55", str(f.resolve()), cues=(), duration_s=180.0)
+
+    sliced: list[tuple[float, float]] = []
+
+    def _fake_slicer(path, start_s, length_s):
+        sliced.append((start_s, length_s))
+        return f"AUTO-WIN-{start_s:.0f}-{length_s:.0f}".encode()
+
+    monkeypatch.setattr(ingest_mod, "_default_slicer", _fake_slicer)
+
+    embedder = FakeClapEmbedder()
+    report = ingest_source(
+        _SyntheticSource([track]),
+        embedder=embedder,
+        store=_DimAgnosticStore(),
+        cache=_open_cache(tmp_path),
+    )
+
+    assert report.embedded == 1
+    assert report.failed == 0
+    assert embedder.calls == []
+    assert len(embedder.byte_calls) == 4  # two track windows + two section windows
+    assert sliced[:2] == [(0.0, 32.0), (96.0, 60.0)]
+    with isolated_cache.open("rb") as fh:
+        blob = pickle.load(fh)
+    cached_track = blob.tracks["55"]
+    assert [cue.source for cue in cached_track.cues] == ["auto", "auto"]
+    assert [cue.name for cue in cached_track.cues] == ["INTRO", "DROP"]
+    assert [cue.number for cue in cached_track.cues] == [0, 3]
+    assert cached_track.cues[0].confidence == pytest.approx(0.82)
+
+    sections = sections_for_entry(cached_track)
+    assert sections[0].source == "auto"
+    assert sections[0].source_detail == "auto_cue"
+    assert sections[0].cue_source == "auto"
+    assert sections[0].cue_confidence == pytest.approx(0.82)
+    assert [section.cue_slot for section in sections] == ["A", "D"]
+    assert sections[0].role == "intro"
+    assert sections[1].role == "drop"
+
+    auto_tag = _cue_strategy_tag_for_auto(anchors)
+    assert auto_tag != INGEST_CUE_STRATEGY_VERSION
+    assert ":auto:" in auto_tag
+
+
+def test_cue_agreement_calibration_compares_dj_cues_without_replacing_them(
+    isolated_cache, tmp_path, monkeypatch
+):
+    """Calibration runs auto-cues against DJ cues, but keeps human cues authoritative."""
+    import vibemix.library.cue_engine as cue_engine
+    from vibemix.library.cue_types import CueAnchor
+    from vibemix.library.ingest import ingest_source
+
+    auto_anchors = [
+        CueAnchor(label="intro", start_s=0.4, end_s=32.0, confidence=0.8, source="auto"),
+        CueAnchor(label="drop", start_s=96.6, end_s=156.0, confidence=0.8, source="auto"),
+        CueAnchor(label="outro", start_s=210.0, end_s=250.0, confidence=0.7, source="auto"),
+    ]
+    monkeypatch.setattr(cue_engine, "detect_cues_auto", lambda *a, **k: list(auto_anchors))
+
+    f = tmp_path / "dj-cued.mp3"
+    f.write_bytes(b"DJ-CUED-AUDIO" * 8)
+    track = _track_entry(
+        "dj-cued",
+        str(f.resolve()),
+        cues=(_dj_cue(0.0, 0), _dj_cue(96.0, 3)),
+        duration_s=240.0,
+    )
+
+    report = ingest_source(
+        _SyntheticSource([track]),
+        embedder=FakeClapEmbedder(),
+        store=_DimAgnosticStore(),
+        cache=_open_cache(tmp_path),
+        cue_agreement_calibration=True,
+    )
+
+    assert report.embedded == 1
+    assert report.cue_agreement_tracks == 1
+    assert report.cue_agreement_scored == 1
+    assert report.cue_agreement_weak_labels == 1
+    assert report.as_dict()["cue_agreement"] == {
+        "tracks": 1,
+        "scored": 1,
+        "weak_labels": 1,
+        "mean_score": pytest.approx(2 / 3),
+        "mean_abs_offset_s": 0.5,
+    }
+    with isolated_cache.open("rb") as fh:
+        blob = pickle.load(fh)
+    cached_track = blob.tracks["dj-cued"]
+    assert [cue.source for cue in cached_track.cues] == ["dj", "dj"]
+
+
+def test_materialized_auto_cues_use_semantic_hot_cue_slots() -> None:
+    """Semantic cue labels should land on stable Rekordbox A-H slots."""
+    from vibemix.library.cue_types import CueAnchor
+    from vibemix.library.ingest import _materialize_anchor_cues
+
+    anchors = [
+        CueAnchor(label="intro", start_s=0.0, end_s=32.0, confidence=0.82, source="auto"),
+        CueAnchor(label="build", start_s=32.0, end_s=64.0, confidence=0.8, source="auto"),
+        CueAnchor(label="breakdown", start_s=64.0, end_s=96.0, confidence=0.79, source="auto"),
+        CueAnchor(label="drop", start_s=96.0, end_s=156.0, confidence=0.84, source="auto"),
+        CueAnchor(label="drop", start_s=180.0, end_s=220.0, confidence=0.76, source="auto"),
+        CueAnchor(label="outro", start_s=240.0, end_s=300.0, confidence=0.81, source="auto"),
+        CueAnchor(label="bridge", start_s=220.0, end_s=240.0, confidence=0.7, source="auto"),
+    ]
+
+    materialized, usable = _materialize_anchor_cues(
+        _track_entry("semantic", "/tmp/semantic.mp3", cues=()),
+        anchors,
+        "auto",
+    )
+
+    assert [cue.name for cue in materialized.cues] == [
+        "INTRO",
+        "BUILD",
+        "BREAKDOWN",
+        "DROP",
+        "DROP",
+        "BRIDGE",
+        "OUTRO",
+    ]
+    assert [cue.number for cue in materialized.cues] == [0, 1, 2, 3, 4, 6, 5]
+    assert {cue.source for cue in materialized.cues} == {"auto"}
+    assert [anchor.label for anchor in usable] == [
+        "intro",
+        "build",
+        "breakdown",
+        "drop",
+        "drop",
+        "bridge",
+        "outro",
+    ]
 
 
 def test_ingest_keeps_dj_cues_ahead_of_anlz(isolated_cache, tmp_path, monkeypatch):

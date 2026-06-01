@@ -194,6 +194,75 @@ def test_suggestion_includes_set_aware_transition_when_cues_exist(library):
     assert "enter cue A" not in s.why  # the dedicated transition line owns actions
 
 
+def test_suggestion_transition_preserves_auto_cue_provenance(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        key="9A",
+        cues=(
+            CuePoint(
+                name="INTRO",
+                type="cue",
+                start_s=0.0,
+                end_s=80.0,
+                number=0,
+                source="auto",
+                confidence=0.82,
+            ),
+        ),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
+
+    assert s is not None
+    assert s.transition is not None
+    assert s.transition["cue_slot"] == "A"
+    assert s.transition["cue_source"] == "auto"
+    assert s.transition["cue_confidence"] == pytest.approx(0.82)
+    assert "auto_cue_review" in s.transition["risk_flags"]
+    assert "auto-generated cue needs review before trusting it" in s.transition["reasons"]
+    assert s.transition["move_grade"]["slug"] == "mid"
+    assert s.transition["move_grade"]["reason"] == "auto cue needs review"
+    assert s.transition["move_grade"]["deserved"] is False
+    assert "cue intro @ 0:00" in s.why
+
+
+def test_suggestion_transition_uses_semantic_auto_drop_hot_cue_slot(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        key="9A",
+        cues=(
+            CuePoint(
+                name="DROP",
+                type="cue",
+                start_s=96.0,
+                end_s=176.0,
+                number=3,
+                source="auto",
+                confidence=0.84,
+            ),
+        ),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
+
+    assert s is not None
+    assert s.transition is not None
+    assert s.transition["to_role"] == "drop"
+    assert s.transition["cue_slot"] == "D"
+    assert s.transition["cue_source"] == "auto"
+    assert s.transition["cue_confidence"] == pytest.approx(0.84)
+
+
 def test_set_aware_transition_can_promote_lower_embedding_candidate(library):
     library.tracks["t0"] = _track(
         "t0",

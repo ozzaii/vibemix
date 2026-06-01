@@ -335,6 +335,56 @@ def test_get_track_sections_issues_cue_derived_sections(toolset):
     assert set(toolset.seen_sections) >= {"t000#s000", "t000#s001", "t000#s002"}
 
 
+def test_get_track_sections_preserves_materialized_auto_hot_cue_slots(toolset):
+    toolset.seen.add("t000")
+    toolset._library.tracks["t000"] = TrackEntry(
+        track_id="t000",
+        title="Auto Section Track",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="8A",
+        duration_s=300.0,
+        cues=(
+            CuePoint(
+                name="INTRO",
+                type="cue",
+                start_s=0.0,
+                end_s=64.0,
+                number=0,
+                source="auto",
+                confidence=0.88,
+            ),
+            CuePoint(
+                name="DROP",
+                type="cue",
+                start_s=96.0,
+                end_s=176.0,
+                number=3,
+                source="auto",
+                confidence=0.9,
+            ),
+            CuePoint(
+                name="OUTRO",
+                type="cue",
+                start_s=240.0,
+                end_s=300.0,
+                number=5,
+                source="auto",
+                confidence=0.86,
+            ),
+        ),
+        filepath="/tmp/t000.mp3",
+    )
+
+    out = toolset.get_track_sections({"track_id": "t000"})
+
+    assert [section["role"] for section in out["sections"]] == ["intro", "drop", "outro"]
+    assert [section["cue_slot"] for section in out["sections"]] == ["A", "D", "F"]
+    assert {section["cue_source"] for section in out["sections"]} == {"auto"}
+    assert {section["source_detail"] for section in out["sections"]} == {"auto_cue"}
+
+
 def test_transition_slate_issues_grounded_candidates(toolset):
     toolset.seen.update({"t000", "t001"})
     toolset._library.tracks["t000"] = TrackEntry(
@@ -480,6 +530,82 @@ def test_compile_musical_context_rejects_unknown_candidate(toolset):
 
     assert "error" in out
     assert "not issued" in out["error"]
+
+
+# --------------------------------------------------------------------------- #
+# smart_hot_cues / export_smart_cues — auto cue provenance through Viber
+# --------------------------------------------------------------------------- #
+
+
+def test_smart_hot_cues_exports_materialized_auto_cues(toolset, tmp_path):
+    toolset.seen.add("t001")
+    toolset._library.tracks["t001"] = TrackEntry(
+        track_id="t001",
+        title="Auto Cued",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="9A",
+        duration_s=300.0,
+        cues=(
+            CuePoint(
+                name="INTRO",
+                type="cue",
+                start_s=0.0,
+                end_s=64.0,
+                number=0,
+                source="auto",
+                confidence=0.88,
+            ),
+            CuePoint(
+                name="DROP",
+                type="cue",
+                start_s=96.0,
+                end_s=176.0,
+                number=3,
+                source="auto",
+                confidence=0.9,
+            ),
+            CuePoint(
+                name="OUTRO",
+                type="cue",
+                start_s=240.0,
+                end_s=300.0,
+                number=5,
+                source="auto",
+                confidence=0.86,
+            ),
+        ),
+        filepath="/tmp/t001.mp3",
+    )
+
+    issued = toolset.smart_hot_cues({"track_id": "t001"})
+
+    proposal = issued["proposals"][0]
+    assert proposal["proposal_id"] in toolset.issued_cue_proposals
+    by_slot = {cue["slot"]: cue for cue in proposal["cues"]}
+    assert by_slot["A"]["source"] == "auto"
+    assert tuple(by_slot["A"]["reason_codes"]) == ("high_confidence",)
+    assert by_slot["A"]["export_label"] == "VM A IN"
+
+    out_xml = tmp_path / "auto-cues.xml"
+    cue_id = by_slot["A"]["cue_id"]
+    exported = toolset.export_smart_cues(
+        {
+            "proposal_id": proposal["proposal_id"],
+            "selected_cue_ids": [cue_id],
+            "include_review": True,
+            "out_path": str(out_xml),
+        }
+    )
+
+    assert exported.get("exported") is True
+    assert exported["cue_count"] == 1
+    assert exported["cue_ids"] == [cue_id]
+    mark = ET.parse(out_xml).getroot().find(".//POSITION_MARK")
+    assert mark is not None
+    assert mark.attrib["Name"] == "VM A IN"
+    assert mark.attrib["Num"] == "0"
 
 
 # --------------------------------------------------------------------------- #

@@ -94,14 +94,39 @@ class IngestReport:
     # Which embed strategy this run used (Path 2). "mean_excerpt" (default) or
     # "cue_anchored". Surfaced so the CLI / caller can confirm the opt-in took.
     embed_strategy: str = "mean_excerpt"
+    cue_agreement_tracks: int = 0
+    cue_agreement_scored: int = 0
+    cue_agreement_weak_labels: int = 0
+    cue_agreement_score_sum: float = 0.0
+    cue_agreement_offset_sum_s: float = 0.0
+    cue_agreement_offset_count: int = 0
 
     def as_dict(self) -> dict:
+        mean_score = (
+            self.cue_agreement_score_sum / self.cue_agreement_scored
+            if self.cue_agreement_scored
+            else None
+        )
+        mean_offset_s = (
+            self.cue_agreement_offset_sum_s / self.cue_agreement_offset_count
+            if self.cue_agreement_offset_count
+            else None
+        )
         return {
             "total": self.total,
             "embedded": self.embedded,
             "skipped_cached": self.skipped_cached,
             "failed": self.failed,
             "embed_strategy": self.embed_strategy,
+            "cue_agreement": {
+                "tracks": self.cue_agreement_tracks,
+                "scored": self.cue_agreement_scored,
+                "weak_labels": self.cue_agreement_weak_labels,
+                "mean_score": round(mean_score, 6) if mean_score is not None else None,
+                "mean_abs_offset_s": (
+                    round(mean_offset_s, 6) if mean_offset_s is not None else None
+                ),
+            },
             "cost_estimate_eur": round(self.cost_estimate_eur, 6),
             "failures": [
                 {"filepath": fp, "error": err} for fp, err in self.failures
@@ -384,6 +409,8 @@ def ingest_folder(
                 from vibemix.learn import exemplar as _exemplar_mod
                 from vibemix.learn.band_share_store import (
                     open_default_db as _bs_open,
+                )
+                from vibemix.learn.band_share_store import (
                     upsert as _bs_upsert,
                 )
 

@@ -55,10 +55,14 @@ _SEVERE_RISKS = frozenset(
 
 _CARE_RISKS = frozenset(
     {
+        "auto_cue_review",
         "timing_low_confidence",
         "phrase_unknown",
         "phrase_short",
         "cue_low_confidence",
+        "low_cue_confidence",
+        "cue_needs_review",
+        "cue_confidence_unknown",
         "key_unknown",
         "bpm_unknown",
         "source_loop_recent",
@@ -73,10 +77,14 @@ _REASON_BY_RISK: tuple[tuple[str, str], ...] = (
     ("tempo_jump", "tempo jump"),
     ("cue_unusable", "cue not ready"),
     ("section_too_short", "section too short"),
+    ("auto_cue_review", "auto cue needs review"),
+    ("cue_needs_review", "cue needs review"),
+    ("low_cue_confidence", "cue confidence low"),
+    ("cue_low_confidence", "cue needs care"),
+    ("cue_confidence_unknown", "cue confidence unknown"),
     ("timing_low_confidence", "timing needs care"),
     ("phrase_unknown", "phrase needs care"),
     ("phrase_short", "short phrase"),
-    ("cue_low_confidence", "cue needs care"),
     ("key_unknown", "key unknown"),
     ("bpm_unknown", "bpm unknown"),
     ("blend_active", "blend already active"),
@@ -153,6 +161,7 @@ def grade_transition(
         component_scores["cue_operability"],
     )
     severe = any(flag in _SEVERE_RISKS for flag in risks)
+    care = any(flag in _CARE_RISKS for flag in risks)
     risk_penalty = component_scores["risk_penalty"]
 
     if severe and (clean_score < 0.72 or clean_confidence < 0.78 or risk_penalty >= 0.28):
@@ -172,6 +181,7 @@ def grade_transition(
         and clean_confidence >= 0.78
         and payoff_core >= 0.74
         and not severe
+        and not care
     ):
         return _grade("bomb", _positive_reason(component_scores, "big payoff"), clean_confidence)
     if (
@@ -179,6 +189,7 @@ def grade_transition(
         and clean_confidence >= 0.70
         and operability_core >= 0.66
         and not severe
+        and not care
     ):
         return _grade("sexy", _positive_reason(component_scores, "smooth blend"), clean_confidence)
     if (
@@ -186,6 +197,7 @@ def grade_transition(
         and clean_confidence >= 0.60
         and operability_core >= 0.70
         and not severe
+        and not care
     ):
         return _grade("clean", _positive_reason(component_scores, "clean fit"), clean_confidence)
 

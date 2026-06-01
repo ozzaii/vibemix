@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import sqlite3
 import subprocess
 import tempfile
@@ -51,7 +52,8 @@ from typing import Protocol
 import numpy as np
 
 from vibemix.library.cache_paths import CLAP_EMBED_CACHE_DB_PATH
-from vibemix.library.excerpt import anchors_for_track, cut_windows
+from vibemix.library.cue_types import CueAnchor
+from vibemix.library.excerpt import MAX_CUES_PER_TRACK, anchors_for_track, cut_windows
 from vibemix.library.folder_ingest import IngestReport, _write_library_cache
 from vibemix.library.rekordbox import CuePoint, TrackEntry
 from vibemix.library.section_builder import sections_for_entry
@@ -82,6 +84,23 @@ _FFMPEG_TIMEOUT_SECONDS = 60.0
 
 # Read the file in chunks so a multi-hundred-MB lossless file never loads whole.
 _HASH_CHUNK_BYTES = 64 * 1024
+
+# Rekordbox exposes hot cue slots A-H. Materialized offline structure should
+# stay inside that review/export vocabulary even when a producer emits more.
+_MAX_MATERIALIZED_CUES = 8
+
+_STRUCTURAL_CUE_TYPES = frozenset({"cue", "loop"})
+
+_SEMANTIC_HOT_CUE_SLOT_BY_LABEL = {
+    "intro": 0,  # A
+    "build": 1,  # B
+    "breakdown": 2,  # C
+    "drop": 3,  # D, then E for a second drop
+    "outro": 5,  # F
+}
+_SECONDARY_DROP_SLOT = 4  # E
+# Unknown labels should not steal B/C/E/F before later semantic cues appear.
+_MATERIALIZED_FALLBACK_SLOTS = (6, 7, 0, 1, 2, 3, 4, 5)
 
 
 class _Embedder(Protocol):  # pragma: no cover - structural typing only
@@ -235,6 +254,17 @@ def _cue_strategy_tag_for_anlz(meta: object | None) -> str:
     return f"{INGEST_CUE_STRATEGY_VERSION}:meta:{_anlz_meta_fingerprint(meta)}"
 
 
+def _cue_strategy_tag_for_auto(anchors: list[CueAnchor]) -> str:
+    usable = _usable_anchors_for_source(anchors, "auto")
+    if not usable:
+        return INGEST_CUE_STRATEGY_VERSION
+    return f"{INGEST_CUE_STRATEGY_VERSION}:auto:{_cue_anchor_fingerprint(usable)}"
+
+
+def _has_structural_cues(track: TrackEntry) -> bool:
+    return any(cue.type in _STRUCTURAL_CUE_TYPES for cue in track.cues or ())
+
+
 def _materialize_anlz_cues(track: TrackEntry, meta: object | None) -> TrackEntry:
     """Persist matched ANLZ phrases as provenance-tagged cue records.
 
@@ -245,7 +275,7 @@ def _materialize_anlz_cues(track: TrackEntry, meta: object | None) -> TrackEntry
     """
     if meta is None:
         return track
-    if any(cue.type in {"cue", "loop"} for cue in track.cues or ()):
+    if _has_structural_cues(track):
         return track
     try:
         from vibemix.library.anlz_ingest import anchors_from_anlz
@@ -258,24 +288,175 @@ def _materialize_anlz_cues(track: TrackEntry, meta: object | None) -> TrackEntry
             e,
         )
         return track
-    cues: list[CuePoint] = []
-    for index, anchor in enumerate(anchors[:8]):
-        if anchor.source != "anlz":
+    materialized, _usable = _materialize_anchor_cues(track, anchors, "anlz")
+    return materialized
+
+
+def _materialize_auto_cues(track: TrackEntry, local: Path) -> tuple[TrackEntry, list[CueAnchor]]:
+    """Persist auto-detected structure so live pill/Viber can use it later.
+
+    The embed path already knows how to call the auto-cue engine as a fallback,
+    but after a restart the cached library only contains ``TrackEntry.cues``.
+    Materializing here keeps auto-derived sections grounded for pill suggestions
+    and Viber smart-cue tools without running cue detection in realtime.
+    """
+    if _has_structural_cues(track):
+        return track, []
+    try:
+        from vibemix.library.cue_engine import detect_cues_auto
+
+        anchors = list(detect_cues_auto(local, max_cues=_MAX_MATERIALIZED_CUES))
+    except Exception as e:
+        logger.warning(
+            "[ingest] auto cue materialization failed for %s (%s); keeping track cues.",
+            track.track_id,
+            e,
+        )
+        return track, []
+    return _materialize_anchor_cues(track, anchors, "auto")
+
+
+def _record_cue_agreement_calibration(
+    report: IngestReport,
+    track: TrackEntry,
+    local: Path,
+) -> None:
+    """Opt-in DJ/ANLZ-vs-auto cue calibration telemetry for one track.
+
+    Normal ingest is DJ/ANLZ-first and only runs the auto-cue engine when no
+    human/offline structure exists. Calibration deliberately runs auto-cue
+    detection again for already-cued tracks, but only to count disagreements;
+    it never mutates the track, cache key, or exported cue data.
+    """
+    if not _has_structural_cues(track):
+        return
+    try:
+        from vibemix.library.cue_agreement import cue_agreement, weak_labels
+        from vibemix.library.cue_engine import detect_cues_auto
+        from vibemix.library.excerpt import anchors_for_track
+
+        reference = [
+            anchor
+            for anchor in anchors_for_track(track, max_cues=_MAX_MATERIALIZED_CUES)
+            if anchor.source in {"dj", "anlz"}
+        ]
+        if not reference:
+            return
+        auto = list(detect_cues_auto(local, max_cues=_MAX_MATERIALIZED_CUES))
+        result = cue_agreement(reference, auto)
+    except Exception as e:
+        logger.warning(
+            "[ingest] cue-agreement calibration failed for %s (%s); continuing.",
+            track.track_id,
+            e,
+        )
+        return
+
+    report.cue_agreement_tracks += 1
+    report.cue_agreement_weak_labels += len(weak_labels(result))
+    if result.agreement_score is not None:
+        report.cue_agreement_scored += 1
+        report.cue_agreement_score_sum += float(result.agreement_score)
+    if result.mean_abs_offset_s is not None:
+        report.cue_agreement_offset_count += 1
+        report.cue_agreement_offset_sum_s += float(result.mean_abs_offset_s)
+
+
+def _materialize_anchor_cues(
+    track: TrackEntry,
+    anchors: Iterable[CueAnchor],
+    source: str,
+) -> tuple[TrackEntry, list[CueAnchor]]:
+    usable = _usable_anchors_for_source(anchors, source)
+    if not usable:
+        return track, []
+    used_slots: set[int] = set()
+    cues = [
+        CuePoint(
+            name=str(anchor.label).upper(),
+            type="cue",
+            start_s=float(anchor.start_s),
+            end_s=float(anchor.end_s),
+            number=_materialized_cue_number(anchor, used_slots),
+            source=source,
+            confidence=float(anchor.confidence),
+        )
+        for anchor in usable
+    ]
+    return replace(track, cues=tuple(cues)), usable
+
+
+def _materialized_cue_number(anchor: CueAnchor, used_slots: set[int]) -> int:
+    label = str(anchor.label).strip().lower()
+    preferred = _SEMANTIC_HOT_CUE_SLOT_BY_LABEL.get(label)
+    if label == "drop" and preferred in used_slots and _SECONDARY_DROP_SLOT not in used_slots:
+        preferred = _SECONDARY_DROP_SLOT
+    if preferred is not None and preferred not in used_slots:
+        used_slots.add(preferred)
+        return preferred
+    for slot in _MATERIALIZED_FALLBACK_SLOTS:
+        if slot not in used_slots:
+            used_slots.add(slot)
+            return slot
+    return -1
+
+
+def _usable_anchors_for_source(anchors: Iterable[CueAnchor], source: str) -> list[CueAnchor]:
+    usable: list[CueAnchor] = []
+    sorted_anchors = sorted(
+        anchors,
+        key=lambda anchor: (
+            _finite_float(getattr(anchor, "start_s", None), default=float("inf")),
+            str(getattr(anchor, "label", "")),
+        ),
+    )
+    for anchor in sorted_anchors:
+        if getattr(anchor, "source", None) != source:
             continue
-        cues.append(
-            CuePoint(
-                name=str(anchor.label).upper(),
-                type="cue",
-                start_s=float(anchor.start_s),
-                end_s=float(anchor.end_s),
-                number=index,
-                source="anlz",
-                confidence=float(anchor.confidence),
+        start_s = _finite_float(anchor.start_s)
+        end_s = _finite_float(anchor.end_s)
+        confidence = _finite_float(anchor.confidence)
+        if start_s is None or end_s is None or confidence is None:
+            continue
+        start_s = max(0.0, start_s)
+        if end_s <= start_s:
+            continue
+        usable.append(
+            CueAnchor(
+                label=anchor.label,
+                start_s=start_s,
+                end_s=end_s,
+                confidence=max(0.0, min(1.0, confidence)),
+                source=anchor.source,
             )
         )
-    if not cues:
-        return track
-    return replace(track, cues=tuple(cues))
+        if len(usable) >= _MAX_MATERIALIZED_CUES:
+            break
+    return usable
+
+
+def _cue_anchor_fingerprint(anchors: Iterable[CueAnchor]) -> str:
+    """Hash cue geometry/provenance into a cache key without local paths."""
+    h = hashlib.sha256()
+    for anchor in anchors:
+        fields = (
+            anchor.source,
+            anchor.label,
+            f"{anchor.start_s:.3f}",
+            f"{anchor.end_s:.3f}",
+            f"{anchor.confidence:.3f}",
+        )
+        h.update("|".join(fields).encode("utf-8"))
+        h.update(b"\0")
+    return h.hexdigest()[:16]
+
+
+def _finite_float(value: object, *, default: float | None = None) -> float | None:
+    try:
+        parsed = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    return parsed if math.isfinite(parsed) else default
 
 
 def _anlz_meta_fingerprint(meta: object) -> str:
@@ -429,6 +610,7 @@ def _embed_track_cue_anchored(
     embedder: _Embedder,
     *,
     anlz_index: object | None = None,
+    precomputed_anchors: list[CueAnchor] | None = None,
     slicer: Callable[[str, float, float], bytes] | None = None,
 ) -> np.ndarray:
     """Embed a track over its cue-anchored ≤80s windows, mean-pooled.
@@ -453,19 +635,22 @@ def _embed_track_cue_anchored(
     if slicer is None:
         slicer = _default_slicer
 
-    # anchors_for_track may run detect_cues_auto (CUE-DETR ONNX if installed,
-    # heuristic fallback otherwise). A detection failure must degrade to whole-track
-    # embed, NOT abort the track (T-89-09: never anchor-less). Mirror embed.py's
-    # _embed_audio_cue_anchored fallback posture.
-    try:
-        anchors = anchors_for_track(track, anlz_index=anlz_index)
-    except Exception as e:
-        logger.warning(
-            "[ingest] cue anchoring failed for %s (%s); falling back to whole-track embed.",
-            local,
-            e,
-        )
-        anchors = []
+    if precomputed_anchors is None:
+        # anchors_for_track may run detect_cues_auto (CUE-DETR ONNX if installed,
+        # heuristic fallback otherwise). A detection failure must degrade to
+        # whole-track embed, NOT abort the track (T-89-09: never anchor-less).
+        # Mirror embed.py's _embed_audio_cue_anchored fallback posture.
+        try:
+            anchors = anchors_for_track(track, anlz_index=anlz_index)
+        except Exception as e:
+            logger.warning(
+                "[ingest] cue anchoring failed for %s (%s); falling back to whole-track embed.",
+                local,
+                e,
+            )
+            anchors = []
+    else:
+        anchors = list(precomputed_anchors[:MAX_CUES_PER_TRACK])
     windows = cut_windows(anchors, float(track.duration_s or 0.0))
 
     vecs: list[np.ndarray] = []
@@ -578,6 +763,7 @@ def ingest_source(
     cache: sqlite3.Connection | None = None,
     section_cache: sqlite3.Connection | None = None,
     anlz_index: object | None = None,
+    cue_agreement_calibration: bool = False,
 ) -> IngestReport:
     """Detect → iter → CLAP embed → store one source, resumably + honestly.
 
@@ -596,6 +782,9 @@ def ingest_source(
         anlz_index: optional caller-built ``AnlzIndex``. When supplied, ingest
             uses Rekordbox ANLZ phrases after DJ cues and before auto-cues, and
             matched ANLZ metadata is folded into the per-track cache key.
+        cue_agreement_calibration: when True, run the auto-cue engine against
+            DJ/ANLZ-cued tracks too and report agreement/weak-label counts.
+            This is telemetry only; it never changes cached cues or vectors.
 
     Returns:
         :class:`~vibemix.library.folder_ingest.IngestReport` (same shape).
@@ -639,6 +828,15 @@ def ingest_source(
             try:
                 anlz_meta = _match_anlz_for_cache(track, anlz_index)
                 strategy_tag = _cue_strategy_tag_for_anlz(anlz_meta)
+                working_track = _materialize_anlz_cues(track, anlz_meta)
+                if cue_agreement_calibration:
+                    _record_cue_agreement_calibration(report, working_track, local)
+                precomputed_anchors: list[CueAnchor] | None = None
+                if not _has_structural_cues(working_track):
+                    working_track, auto_anchors = _materialize_auto_cues(working_track, local)
+                    precomputed_anchors = auto_anchors
+                    if auto_anchors:
+                        strategy_tag = _cue_strategy_tag_for_auto(auto_anchors)
                 key = _content_hash_key(local, backend_tag, strategy_tag=strategy_tag)
             except OSError as e:
                 logger.error("[ingest err] %s: cannot read file (%s)", local, e)
@@ -646,7 +844,6 @@ def ingest_source(
                 report.failures.append((str(local), f"unreadable: {e}"))
                 _emit(progress, idx, "err", label)
                 continue
-            working_track = _materialize_anlz_cues(track, anlz_meta)
 
             cached = _cache_get(cache, key)
             if cached is not None:
@@ -676,6 +873,7 @@ def ingest_source(
                     local,
                     embedder,
                     anlz_index=anlz_index,
+                    precomputed_anchors=precomputed_anchors,
                 )
             except Exception as e:
                 logger.error("[ingest err] %s: %s", local, e)

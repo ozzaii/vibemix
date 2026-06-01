@@ -170,6 +170,8 @@ def propose_smart_cues(
         slot = _slot_from_num(cue.number)
         if slot is None or cue.type not in {"cue", "loop"}:
             continue
+        if not _is_human_authored_cue(cue):
+            continue
         smart = _smart_cue_from_dj_cue(track, cue, proposal_id, slot)
         cues[slot] = smart
         used_refs.add(smart.provenance_ref)
@@ -317,6 +319,21 @@ def _smart_cue_from_dj_cue(
         reason_codes=("preserve_human_hot_cue",),
         provenance_ref=f"dj:{track.track_id}:{slot}:{cue.start_s:.3f}",
     )
+
+
+def _is_human_authored_cue(cue: CuePoint) -> bool:
+    source = str(getattr(cue, "source", "") or "dj").strip().lower()
+    source = source.replace("-", "_").replace(" ", "_")
+    return source in {
+        "dj",
+        "rekordbox",
+        "rb",
+        "hotcue",
+        "hot_cue",
+        "memory",
+        "memory_cue",
+        "user",
+    }
 
 
 def _smart_cue_from_candidate(

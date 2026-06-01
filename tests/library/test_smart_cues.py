@@ -56,8 +56,23 @@ def _section(
     )
 
 
-def _cue(slot_num: int, start_s: float, *, name: str = "") -> CuePoint:
-    return CuePoint(name=name, type="cue", start_s=start_s, end_s=None, number=slot_num)
+def _cue(
+    slot_num: int,
+    start_s: float,
+    *,
+    name: str = "",
+    source: str = "dj",
+    confidence: float | None = None,
+) -> CuePoint:
+    return CuePoint(
+        name=name,
+        type="cue",
+        start_s=start_s,
+        end_s=None,
+        number=slot_num,
+        source=source,
+        confidence=confidence,
+    )
 
 
 def _by_slot(proposal):
@@ -97,6 +112,28 @@ def test_preserves_existing_human_hot_cue_slot_and_suppresses_shadow() -> None:
         item.slot == "B" and "human_slot_occupied" in item.reason_codes
         for item in proposal.suppressed_candidates
     )
+
+
+def test_materialized_auto_cues_are_proposals_not_preserved_human_slots() -> None:
+    proposal = propose_smart_cues(
+        _track(
+            cues=(
+                _cue(0, 0.0, name="INTRO", source="auto", confidence=0.88),
+                _cue(3, 64.0, name="DROP", source="auto", confidence=0.91),
+            )
+        ),
+        [
+            _section("trk_001#s000", "intro", 0.0, 32.0, source="auto", confidence=0.88),
+            _section("trk_001#s001", "drop", 64.0, 128.0, source="auto", confidence=0.91),
+        ],
+    )
+
+    cues = _by_slot(proposal)
+    assert cues["A"].source == "auto"
+    assert cues["D"].source == "auto"
+    assert cues["A"].export_label == "VM A IN"
+    assert cues["A"].reason_codes == ("high_confidence",)
+    assert cues["A"].review_status == "export_ready"
 
 
 def test_missing_required_slot_is_reported_not_fabricated() -> None:
