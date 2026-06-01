@@ -17,6 +17,7 @@ from vibemix.library.staleness import (
     DEFAULT_LIBRARY_PKL,
     LibraryFreshness,
     _refreshable_source_path,
+    _should_emit_nudge,
     is_snoozed,
     library_freshness_status,
     load_snooze_state,
@@ -25,6 +26,7 @@ from vibemix.library.staleness import (
 logger = logging.getLogger(__name__)
 
 FreshnessChangeWaiter = Callable[[set[Path], asyncio.Event, float], Awaitable[None]]
+_AUDIO_SUFFIXES = {".mp3", ".m4a", ".wav", ".flac", ".aac"}
 
 
 def _freshness_watch_targets(
@@ -57,6 +59,8 @@ async def _wait_for_watchfiles_or_timeout(
 
     if awatch is not None and targets:
         resolved_targets = {p.resolve(strict=False) for p in targets}
+        resolved_dirs = {p for p in resolved_targets if p.is_dir()}
+        resolved_files = resolved_targets - resolved_dirs
         roots = sorted(
             {
                 (p if p.is_dir() else p.parent).resolve(strict=False)
@@ -67,14 +71,22 @@ async def _wait_for_watchfiles_or_timeout(
         if roots:
 
             def _watch_filter(_change, path: str) -> bool:
-                return Path(path).resolve(strict=False) in resolved_targets
+                changed = Path(path).resolve(strict=False)
+                if changed in resolved_files or changed in resolved_dirs:
+                    return True
+                if changed.suffix and changed.suffix.lower() not in _AUDIO_SUFFIXES:
+                    return False
+                return any(
+                    changed == directory or changed.is_relative_to(directory)
+                    for directory in resolved_dirs
+                )
 
             async def _one_change() -> None:
                 async for changes in awatch(
                     *roots,
                     watch_filter=_watch_filter,
                     debounce=500,
-                    recursive=False,
+                    recursive=bool(resolved_dirs),
                 ):
                     if changes or stop_event.is_set():
                         return
@@ -140,7 +152,7 @@ async def watch_library_freshness(
                 status.source_mtime,
             )
             payload = None
-            if signature != last_signature and status.status != "not_indexed" and status.stale:
+            if signature != last_signature and _should_emit_nudge(status):
                 if not is_snoozed(state_path):
                     payload = {
                         "age_days": status.age_days,

@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 28 Plan 07 — 30-day library staleness nudge.
+"""Phase 28 Plan 07 — source-aware library freshness nudges.
 
 Closes v2.0 LIBRARY-06 deferred surface: detect when the user's library
-cache is older than 30 days and emit a single ``ipc.library.staleness_nudge``
-at sidecar boot so the renderer can show a "re-import to keep me grounded"
-banner. Snooze persists 7 days in ``~/.config/vibemix/state.json``.
+cache is older than 30 days, when a source catalog/folder has changed after the
+cache was written, or when a known Rekordbox ``collection.xml`` is present but
+the user has not indexed it yet. Snooze persists 7 days in
+``~/.config/vibemix/state.json``.
 
 Pure functions — no module-level state. Caller (``__main__.py``) decides
 when to call ``emit_nudge_if_stale`` (once per boot).
@@ -38,6 +39,7 @@ DEFAULT_STATE_FILE_PATH = Path.home() / ".config" / "vibemix" / "state.json"
 STATE_KEY = "library_staleness_snoozed_until"
 FreshnessStatus = Literal["fresh", "stale", "not_indexed", "source_missing", "cache_unreadable"]
 FreshnessChangeWaiter = Callable[[set[Path], asyncio.Event, float], Awaitable[None]]
+_AUDIO_SUFFIXES = {".mp3", ".m4a", ".wav", ".flac", ".aac"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +75,63 @@ def _refreshable_source_path(status: LibraryFreshness) -> str | None:
     return source_path
 
 
+def _detect_library_source_path() -> str | None:
+    """Return a local source catalog the app can import without user browsing.
+
+    This is intentionally narrow: today only a Rekordbox ``collection.xml`` at
+    the known export locations is auto-detected. Raw music folders still require
+    an explicit user action via ``embed-folder`` so we never recursively scan a
+    DJ's whole Music tree without consent.
+    """
+    try:
+        from vibemix.library.sources.rekordbox import RekordboxSource
+
+        source = RekordboxSource()
+        if source.detect():
+            return source.resolved_path
+    except Exception as e:
+        logger.debug("library source auto-detect failed: %s", e)
+    return None
+
+
+def _catalog_tree_mtime(root: Path) -> float:
+    """Latest mtime for a folder-backed library source.
+
+    ``folder_ingest`` stores the source as the folder root. A plain root mtime
+    misses changes in nested crate folders, so include directory mtimes plus
+    supported audio-file mtimes. This is still read-only and bounded to the
+    folder the DJ already imported.
+    """
+    latest = root.stat().st_mtime
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [name for name in dirnames if not name.startswith(".")]
+        try:
+            latest = max(latest, Path(dirpath).stat().st_mtime)
+        except OSError:
+            continue
+        for filename in filenames:
+            if filename.startswith(".") or Path(filename).suffix.lower() not in _AUDIO_SUFFIXES:
+                continue
+            try:
+                latest = max(latest, (Path(dirpath) / filename).stat().st_mtime)
+            except OSError:
+                continue
+    return latest
+
+
+def _current_source_mtime(source_path: str) -> float:
+    path = Path(source_path).expanduser()
+    if path.is_dir():
+        return _catalog_tree_mtime(path)
+    return os.path.getmtime(path)
+
+
+def _should_emit_nudge(status: LibraryFreshness) -> bool:
+    if status.status == "not_indexed":
+        return _refreshable_source_path(status) is not None
+    return status.stale
+
+
 def is_stale(library_pkl: Path | None = None) -> tuple[bool, int]:
     """Return ``(is_stale, age_in_days)`` for the library cache.
 
@@ -106,12 +165,18 @@ def library_freshness_status(
     now_ts = time.time() if now is None else now
     cache_path = str(pkl)
     if not pkl.exists():
+        detected_source = _detect_library_source_path()
         return LibraryFreshness(
             status="not_indexed",
             stale=False,
-            reason="library_cache_missing",
+            reason=(
+                "source_detected_not_indexed"
+                if detected_source
+                else "library_cache_missing"
+            ),
             age_days=0,
             cache_path=cache_path,
+            source_path=detected_source,
         )
 
     try:
@@ -162,7 +227,7 @@ def library_freshness_status(
         )
 
     try:
-        current_source_mtime = os.path.getmtime(source_path)
+        current_source_mtime = _current_source_mtime(source_path)
     except OSError:
         return LibraryFreshness(
             status="source_missing",
@@ -221,7 +286,7 @@ def freshness_nudge_payload(
 ) -> dict[str, object] | None:
     """Return an existing-schema nudge payload when freshness needs attention."""
     status = library_freshness_status(library_pkl, now=now)
-    if status.status == "not_indexed" or not status.stale:
+    if not _should_emit_nudge(status):
         return None
     if is_snoozed(state_path):
         return None
@@ -345,7 +410,7 @@ def emit_nudge_if_stale(
     library_pkl: Path | None = None,
     state_path: Path | None = None,
 ) -> bool:
-    """Boot-time check: emit nudge IFF library is stale AND not snoozed.
+    """Boot-time check: emit a freshness/import nudge when action is needed.
 
     Returns ``True`` if the nudge was emitted, ``False`` otherwise. Pure —
     caller must invoke once per boot.

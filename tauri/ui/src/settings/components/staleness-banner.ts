@@ -66,12 +66,22 @@ export function renderStalenessBanner(
   const hide = (): void => {
     root.classList.add("hidden");
   };
-  const show = (ageDays: number, sourcePath: string | null): void => {
+  const show = (
+    ageDays: number,
+    sourcePath: string | null,
+    reason: string | null,
+  ): void => {
     refreshPath = sourcePath;
-    ageEl.textContent = `${ageDays} day${ageDays === 1 ? "" : "s"}`;
-    copyEl.textContent = sourcePath
-      ? "Refresh to keep Viber grounded."
-      : "Drop the Rekordbox XML below.";
+    const discoveredButNotIndexed = reason === "source_detected_not_indexed";
+    ageEl.textContent = discoveredButNotIndexed
+      ? "source found"
+      : `${ageDays} day${ageDays === 1 ? "" : "s"}`;
+    copyEl.textContent = discoveredButNotIndexed
+      ? "Import it so Viber can use your tracks."
+      : sourcePath
+        ? "Refresh to keep Viber grounded."
+        : "Drop the Rekordbox XML below.";
+    refreshBtn.textContent = discoveredButNotIndexed ? "Import library" : "Refresh library";
     refreshBtn.classList.toggle("hidden", !sourcePath);
     refreshBtn.disabled = !sourcePath;
     root.classList.remove("hidden");
@@ -116,7 +126,11 @@ export function renderStalenessBanner(
     "ipc.library.staleness_nudge",
     (msg) => {
       if (disposed) return;
-      show(msg.payload.age_days, msg.payload.source_path || null);
+      show(
+        msg.payload.age_days,
+        msg.payload.source_path || null,
+        msg.payload.reason || null,
+      );
     },
   ).then((u) => {
     const disposeSubscription = u as unknown as () => void;

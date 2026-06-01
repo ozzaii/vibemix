@@ -78,6 +78,24 @@ def test_freshness_status_not_indexed(tmp_path: Path) -> None:
     assert status.to_dict()["source_path"] is None
 
 
+def test_freshness_status_not_indexed_attaches_detected_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "collection.xml"
+    source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    monkeypatch.setattr(
+        "vibemix.library.staleness._detect_library_source_path",
+        lambda: str(source),
+    )
+
+    status = library_freshness_status(tmp_path / "library.pkl")
+
+    assert status.status == "not_indexed"
+    assert status.stale is False
+    assert status.reason == "source_detected_not_indexed"
+    assert status.source_path == str(source)
+
+
 def test_freshness_status_fresh_when_cache_matches_source(tmp_path: Path) -> None:
     from vibemix.library.rekordbox import RekordboxLibrary
 
@@ -148,6 +166,36 @@ def test_freshness_status_source_missing(tmp_path: Path) -> None:
     assert status.reason == "source_path_missing"
 
 
+def test_freshness_status_stale_when_nested_folder_file_newer(tmp_path: Path) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    root = tmp_path / "Music"
+    nested = root / "crate"
+    nested.mkdir(parents=True)
+    track = nested / "track.mp3"
+    track.write_bytes(b"audio")
+    old_mtime = time.time() - 100
+    for path in (root, nested, track):
+        os.utime(path, (old_mtime, old_mtime))
+    cache = tmp_path / "library.pkl"
+    old_cache = RekordboxLibrary.CACHE_PATH
+    RekordboxLibrary.CACHE_PATH = cache
+    try:
+        RekordboxLibrary()._write_cache(str(root), old_mtime)
+    finally:
+        RekordboxLibrary.CACHE_PATH = old_cache
+    new_mtime = old_mtime + 10
+    os.utime(track, (new_mtime, new_mtime))
+
+    status = library_freshness_status(cache, now=new_mtime + 1)
+
+    assert status.status == "stale"
+    assert status.stale is True
+    assert status.reason == "source_newer_than_cache"
+    assert status.source_path == str(root)
+    assert status.source_mtime == new_mtime
+
+
 def test_freshness_nudge_payload_source_newer_than_cache(tmp_path: Path) -> None:
     from vibemix.library.rekordbox import RekordboxLibrary
 
@@ -171,6 +219,25 @@ def test_freshness_nudge_payload_source_newer_than_cache(tmp_path: Path) -> None
     assert payload["age_days"] == 0
     assert payload["source_path"] == str(source)
     assert payload["reason"] == "source_newer_than_cache"
+    assert payload["schema_version"] == "1"
+
+
+def test_freshness_nudge_payload_imports_detected_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "collection.xml"
+    source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    monkeypatch.setattr(
+        "vibemix.library.staleness._detect_library_source_path",
+        lambda: str(source),
+    )
+
+    payload = freshness_nudge_payload(tmp_path / "missing.pkl", tmp_path / "state.json")
+
+    assert payload is not None
+    assert payload["age_days"] == 0
+    assert payload["source_path"] == str(source)
+    assert payload["reason"] == "source_detected_not_indexed"
     assert payload["schema_version"] == "1"
 
 
@@ -235,6 +302,54 @@ def test_watch_library_freshness_emits_when_source_becomes_stale(tmp_path: Path)
                 "snoozed_until_ts": None,
                 "source_path": None,
                 "reason": "source_newer_than_cache",
+                "schema_version": "1",
+            },
+        )
+    ]
+
+
+def test_watch_library_freshness_emits_detected_source_import(tmp_path: Path) -> None:
+    source = tmp_path / "collection.xml"
+    source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    detected = LibraryFreshness(
+        status="not_indexed",
+        stale=False,
+        reason="source_detected_not_indexed",
+        age_days=0,
+        cache_path=str(tmp_path / "library.pkl"),
+        source_path=str(source),
+    )
+
+    async def _run() -> list[tuple[str, dict]]:
+        stop = asyncio.Event()
+        emitted: list[tuple[str, dict]] = []
+
+        def emit(msg_type: str, payload: dict) -> None:
+            emitted.append((msg_type, payload))
+            stop.set()
+
+        await asyncio.wait_for(
+            watch_library_freshness(
+                emit,
+                stop,
+                poll_seconds=0.01,
+                state_path=tmp_path / "state.json",
+                status_provider=lambda: detected,
+            ),
+            timeout=0.5,
+        )
+        return emitted
+
+    emitted = asyncio.run(_run())
+
+    assert emitted == [
+        (
+            "ipc.library.staleness_nudge",
+            {
+                "age_days": 0,
+                "snoozed_until_ts": None,
+                "source_path": str(source),
+                "reason": "source_detected_not_indexed",
                 "schema_version": "1",
             },
         )

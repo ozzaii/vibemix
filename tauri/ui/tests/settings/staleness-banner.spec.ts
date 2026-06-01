@@ -128,6 +128,37 @@ describe("staleness-banner — refresh action", () => {
     expect(handle.element.classList.contains("hidden")).toBe(true);
   });
 
+  it("labels a detected-but-unindexed source as an import action", async () => {
+    const onRefresh = vi.fn(async (_path: string) => undefined);
+    const handle = renderStalenessBanner({ onRefresh });
+    document.body.append(handle.element);
+    await _flushMicrotasks();
+
+    const cb = subscribers.get("ipc.library.staleness_nudge")!;
+    cb({
+      type: "ipc.library.staleness_nudge",
+      ts: "2026-05-15T12:00:00Z",
+      payload: {
+        age_days: 0,
+        snoozed_until_ts: null,
+        source_path: "/Music/rekordbox/collection.xml",
+        reason: "source_detected_not_indexed",
+        schema_version: "1",
+      },
+    });
+
+    const refreshBtn = handle.element.querySelector(
+      ".vmx-staleness-refresh",
+    ) as HTMLButtonElement;
+    expect(handle.element.textContent).toContain("source found");
+    expect(handle.element.textContent).toContain("Import it so Viber can use your tracks.");
+    expect(refreshBtn.textContent).toBe("Import library");
+    refreshBtn.click();
+    await _flushMicrotasks();
+
+    expect(onRefresh).toHaveBeenCalledWith("/Music/rekordbox/collection.xml");
+  });
+
   it("hides Refresh library when no source path is attached", async () => {
     const handle = renderStalenessBanner();
     document.body.append(handle.element);
