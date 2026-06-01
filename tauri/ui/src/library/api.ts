@@ -242,16 +242,23 @@ export interface LibraryAudioWindowAnchor {
   relation: string;
 }
 
+export type LibraryAudioWindowDeckAudio = "not_attached" | `P${number}`;
+
 export interface LibraryAudioWindowMap {
   p1: "master_global_mix";
   p1_heard: true;
   timeline: "past_action_future";
   together_audio: "P1_global_mix";
   decks_together: true;
-  deckA_audio: "not_attached";
-  deckB_audio: "not_attached";
-  per_deck_audio: "structured_text_only";
-  duplicate_audio: "same_master_not_deck_split";
+  deckA_audio: LibraryAudioWindowDeckAudio;
+  deckB_audio: LibraryAudioWindowDeckAudio;
+  per_deck_audio: "structured_text_only" | "deck_pair_parts";
+  duplicate_audio:
+    | "same_master_not_deck_split"
+    | "separate_deck_pair_parts";
+  deck_audio_separation?: "not_attached" | "deck_audio_separation_context";
+  deck_part_span_s?: [number, number];
+  deck_part_activity?: Partial<Record<"A" | "B", "active" | "silent">>;
   deck_separation: "deck_lanes_context";
   lane_aliases: "deck1:A,deck2:B";
   pre_s: [number, number];
@@ -278,6 +285,9 @@ export interface LibraryLiveContext {
   deck_source_context?: string;
   deck_audio_context?: string;
   deck_audio_separation_context?: string;
+  deck_audio_features_context?: string;
+  deck_audio_delta_context?: string;
+  deck_audio_window_context?: string;
   audio_part_context?: string;
   audio_window_context?: string;
   audio_window_map?: LibraryAudioWindowMap;
@@ -551,6 +561,8 @@ function normalizeLiveDeckMixer(value: unknown): LibraryLiveDeckMixer | null {
 }
 
 const LIVE_EVIDENCE_TOKEN_RE = /^[A-Za-z0-9_:.=@+-]{1,128}$/;
+const LIVE_EVIDENCE_CAP = 10;
+const LIVE_EVIDENCE_REFS_CAP = 14;
 
 function liveEvidencePriority(token: string): number {
   if (token.startsWith("midi:")) return 0;
@@ -564,12 +576,16 @@ function liveEvidencePriority(token: string): number {
     return 4;
   if (token.includes("transition_candidate=")) return 5;
   if (token.includes("second_deck_identity=")) return 6;
-  if (token.includes("move_scope=")) return 7;
+  if (token.includes("deck_audio_capture=")) return 7;
+  if (token.includes("deck_audio_features=")) return 8;
+  if (token.includes("deck_audio_delta=")) return 9;
+  if (token.includes("deck_audio_window=")) return 10;
+  if (token.includes("move_scope=")) return 11;
   if (token.includes("move_effect=") || token.includes("audio_delta="))
-    return 8;
-  if (token.includes("deck_audio_support=")) return 9;
-  if (token.includes("deck_route=")) return 10;
-  return 11;
+    return 12;
+  if (token.includes("deck_audio_support=")) return 13;
+  if (token.includes("deck_route=")) return 14;
+  return 15;
 }
 
 function boundedLiveEvidenceList(value: unknown, cap: number): string[] {
@@ -598,7 +614,7 @@ function normalizeLiveEvidence(value: unknown): LibraryLiveEvidence | null {
   const row = value as Record<string, unknown>;
   const evidence: LibraryLiveEvidence = {};
 
-  const mix = boundedLiveEvidenceList(row.mix, 8);
+  const mix = boundedLiveEvidenceList(row.mix, LIVE_EVIDENCE_CAP);
   if (mix.length > 0) evidence.mix = mix;
 
   const midi: LibraryLiveMidiEvidence[] = [];
@@ -621,7 +637,7 @@ function normalizeLiveEvidence(value: unknown): LibraryLiveEvidence | null {
       ...midi.map((item) => `midi:${item.key}@${item.t.toFixed(1)}`),
       ...mix.map((item) => `mix:${item}`),
     ],
-    9,
+    LIVE_EVIDENCE_REFS_CAP,
   );
   if (refs.length > 0) evidence.refs = refs;
 
@@ -714,7 +730,9 @@ function deckIdentityStatus(resolvedSides: string[]): string {
   return "second_deck_identity=observed";
 }
 
-function deriveLiveEvidence(context: LibraryLiveContext): LibraryLiveEvidence | null {
+function deriveLiveEvidence(
+  context: LibraryLiveContext,
+): LibraryLiveEvidence | null {
   const deckState = context.deck_state ?? {};
   const hasDeckStatePayload = context.deck_state !== undefined;
   const deckSides = ["A", "B", "C", "D"] as const;
@@ -755,7 +773,9 @@ function deriveLiveEvidence(context: LibraryLiveContext): LibraryLiveEvidence | 
         : deckState[side]
           ? "unresolved"
           : "unknown";
-      const route = scoreMap.has(side) ? routeTier(scoreMap.get(side) ?? 0) : "unknown";
+      const route = scoreMap.has(side)
+        ? routeTier(scoreMap.get(side) ?? 0)
+        : "unknown";
       return `${side}_${ident}_route_${route}`;
     });
     mix.push(`deck_lanes=${lanes.join("+")}`);
@@ -768,7 +788,9 @@ function deriveLiveEvidence(context: LibraryLiveContext): LibraryLiveEvidence | 
         : deckState[side]
           ? "unresolved"
           : "unknown";
-      const route = scoreMap.has(side) ? routeTier(scoreMap.get(side) ?? 0) : "unknown";
+      const route = scoreMap.has(side)
+        ? routeTier(scoreMap.get(side) ?? 0)
+        : "unknown";
       return `deck${index + 1}_${side}_${ident}_route_${route}`;
     });
     mix.push(`deck_reference=${references.join("+")}`);
@@ -795,13 +817,13 @@ function deriveLiveEvidence(context: LibraryLiveContext): LibraryLiveEvidence | 
         .join("+")}`,
     );
   }
-  const boundedMix = boundedLiveEvidenceList(mix, 8);
+  const boundedMix = boundedLiveEvidenceList(mix, LIVE_EVIDENCE_CAP);
   if (boundedMix.length === 0) return null;
   return {
     mix: boundedMix,
     refs: boundedLiveEvidenceList(
       boundedMix.map((item) => `mix:${item}`),
-      9,
+      LIVE_EVIDENCE_REFS_CAP,
     ),
   };
 }
@@ -812,7 +834,7 @@ function mergeLiveEvidencePayload(
 ): LibraryLiveEvidence | null {
   const mix = boundedLiveEvidenceList(
     [...(existing?.mix ?? []), ...(incoming?.mix ?? [])],
-    8,
+    LIVE_EVIDENCE_CAP,
   );
   const midi: LibraryLiveMidiEvidence[] = [];
   const seenMidi = new Set<string>();
@@ -830,7 +852,7 @@ function mergeLiveEvidencePayload(
       ...boundedMidi.map((item) => `midi:${item.key}@${item.t.toFixed(1)}`),
       ...mix.map((item) => `mix:${item}`),
     ],
-    9,
+    LIVE_EVIDENCE_REFS_CAP,
   );
   const out: LibraryLiveEvidence = {};
   if (mix.length > 0) out.mix = mix;
@@ -840,22 +862,32 @@ function mergeLiveEvidencePayload(
 }
 
 function normalizeAudioWindowContext(value: unknown): string | null {
-  const text = stringOrNull(value)?.slice(0, 420);
+  const text = stringOrNull(value)?.slice(0, 900);
   if (!text?.startsWith("audio_window_context[")) return null;
   const required = [
     "P1=master_global_mix",
     "P1_heard=true",
     "timeline=past_action_future",
-    "deckA_audio=not_attached",
-    "deckB_audio=not_attached",
-    "per_deck_audio=structured_text_only",
-    "duplicate_audio=same_master_not_deck_split",
     "deck_separation=deck_lanes_context",
     "lane_aliases=deck1:A,deck2:B",
     "action=-1.0..0.0",
     "rule=time_alignment_not_outcome_verdict",
   ];
   if (!required.every((atom) => text.includes(atom))) return null;
+  const globalOnly = [
+    "deckA_audio=not_attached",
+    "deckB_audio=not_attached",
+    "per_deck_audio=structured_text_only",
+    "duplicate_audio=same_master_not_deck_split",
+  ].every((atom) => text.includes(atom));
+  const deckPairParts =
+    text.includes("per_deck_audio=deck_pair_parts") &&
+    text.includes("duplicate_audio=separate_deck_pair_parts") &&
+    text.includes("deck_audio_separation=deck_audio_separation_context") &&
+    /\bdeckA_audio=P[2-9][0-9]?\b/.test(text) &&
+    /\bdeckB_audio=P[2-9][0-9]?\b/.test(text) &&
+    audioWindowDeckLabelsAreDistinct(text);
+  if (!globalOnly && !deckPairParts) return null;
   const forbidden = [
     "deckA_audio=attached",
     "deckB_audio=attached",
@@ -868,8 +900,49 @@ function normalizeAudioWindowContext(value: unknown): string | null {
   return text;
 }
 
+function audioWindowDeckLabelsAreDistinct(text: string): boolean {
+  const deckA = /\bdeckA_audio=(P[2-9][0-9]?)\b/.exec(text)?.[1] ?? null;
+  const deckB = /\bdeckB_audio=(P[2-9][0-9]?)\b/.exec(text)?.[1] ?? null;
+  return Boolean(deckA && deckB && deckA !== deckB);
+}
+
+type DeckAudioPartLabels = Readonly<{ A: string; B: string }>;
+
+function audioPartDeckLabelsForContext(
+  text: string | null,
+): DeckAudioPartLabels | null {
+  if (!text?.includes("per_deck_audio=deck_pair_parts")) return null;
+  const deckA = /\bdeckA_part=(P[2-9][0-9]?)\b/.exec(text)?.[1] ?? null;
+  const deckB = /\bdeckB_part=(P[2-9][0-9]?)\b/.exec(text)?.[1] ?? null;
+  if (!deckA || !deckB || deckA === deckB) return null;
+  return { A: deckA, B: deckB };
+}
+
+function audioWindowDeckLabelsForContext(
+  text: string | null,
+): DeckAudioPartLabels | null {
+  if (!text?.includes("per_deck_audio=deck_pair_parts")) return null;
+  const deckA = /\bdeckA_audio=(P[2-9][0-9]?)\b/.exec(text)?.[1] ?? null;
+  const deckB = /\bdeckB_audio=(P[2-9][0-9]?)\b/.exec(text)?.[1] ?? null;
+  if (!deckA || !deckB || deckA === deckB) return null;
+  return { A: deckA, B: deckB };
+}
+
+function audioWindowMatchesAudioPartLabels(
+  audioWindowContext: string | null,
+  partLabels: DeckAudioPartLabels | null,
+): boolean {
+  const windowLabels = audioWindowDeckLabelsForContext(audioWindowContext);
+  if (!partLabels) return windowLabels === null;
+  return (
+    windowLabels !== null &&
+    windowLabels.A === partLabels.A &&
+    windowLabels.B === partLabels.B
+  );
+}
+
 function normalizeAudioPartContext(value: unknown): string | null {
-  const text = stringOrNull(value)?.slice(0, 900);
+  const text = stringOrNull(value)?.slice(0, 1400);
   if (!text?.startsWith("audio_part_context[")) return null;
   const required = [
     "P1=live_global_mix",
@@ -879,24 +952,87 @@ function normalizeAudioPartContext(value: unknown): string | null {
     "deck1=A",
     "deck2=B",
     "together_audio=P1",
-    "per_deck_audio=not_attached",
-    "duplicate_audio=same_master_not_deck_split",
     "rule=part_labels_not_outcome_verdict",
   ];
   if (!required.every((atom) => text.includes(atom))) return null;
+  const globalOnly = [
+    "per_deck_audio=not_attached",
+    "duplicate_audio=same_master_not_deck_split",
+  ].every((atom) => text.includes(atom));
+  const deckPairParts = [
+    "per_deck_audio=deck_pair_parts",
+    "duplicate_audio=separate_deck_pair_parts",
+  ].every((atom) => text.includes(atom));
+  if (!globalOnly && !deckPairParts) return null;
+  if (globalOnly && /\bdeck[AB]_part=P[2-9][0-9]?\b/.test(text)) return null;
+  if (deckPairParts && !audioPartDeckPairMapIsValid(text)) return null;
   const forbidden = [
     "deckA_audio=attached",
     "deckB_audio=attached",
     "deckA_audio=stem",
     "deckB_audio=stem",
-    "per_deck_audio=attached",
     "isolated_decks=true",
     "P1_deck_audio=stems",
-    "P2_deck_audio=stems",
-    "P3_deck_audio=stems",
+    "deck_audio=stems",
   ];
   if (forbidden.some((atom) => text.includes(atom))) return null;
   return text;
+}
+
+function audioPartDeckPairMapIsValid(text: string): boolean {
+  const deckA = /\bdeckA_part=(P[2-9][0-9]?)\b/.exec(text)?.[1] ?? null;
+  const deckB = /\bdeckB_part=(P[2-9][0-9]?)\b/.exec(text)?.[1] ?? null;
+  if (!deckA || !deckB || deckA === deckB) return false;
+
+  const orderMatch = /\bpart_order=(P1(?:,P[2-9][0-9]?)*)\b/.exec(text);
+  if (!orderMatch) return false;
+  const orderText = orderMatch[1];
+  if (!orderText) return false;
+  const partOrder = orderText.split(",");
+  const ordered = [...partOrder].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  if (
+    partOrder[0] !== "P1" ||
+    new Set(partOrder).size !== partOrder.length ||
+    partOrder.join(",") !== ordered.join(",") ||
+    !partOrder.includes(deckA) ||
+    !partOrder.includes(deckB)
+  ) {
+    return false;
+  }
+
+  return (
+    audioPartDeckLabelIsValid(text, "A", deckA) &&
+    audioPartDeckLabelIsValid(text, "B", deckB)
+  );
+}
+
+function audioPartDeckLabelIsValid(
+  text: string,
+  side: "A" | "B",
+  label: string,
+): boolean {
+  const expectedRole = `deck${side}_configured_capture`;
+  const atoms = [
+    `deck${side}_part=${label}`,
+    `${label}=${expectedRole}`,
+    `${label}_model_heard=true`,
+    `${label}_audience_heard=false`,
+    `${label}_deck_audio=${expectedRole}`,
+    `${label}_rule=deck_pair_capture_reference_not_quality_verdict`,
+  ];
+  if (!atoms.every((atom) => audioPartHasAtom(text, atom))) return false;
+  const roles = new Set(
+    [...text.matchAll(new RegExp(`\\b${label}=([A-Za-z0-9_]+)\\b`, "g"))]
+      .map((match) => match[1])
+      .filter((role): role is string => typeof role === "string"),
+  );
+  return roles.size === 1 && roles.has(expectedRole);
+}
+
+function audioPartHasAtom(text: string, atom: string): boolean {
+  return ` ${text.replaceAll("[", " ").replaceAll("]", " ")} `.includes(
+    ` ${atom} `,
+  );
 }
 
 function normalizeSpanPair(value: unknown): [number, number] | null {
@@ -905,6 +1041,29 @@ function normalizeSpanPair(value: unknown): [number, number] | null {
   const b = finiteOrNull(value[1]);
   if (a === null || b === null) return null;
   return [Math.round(a * 10) / 10, Math.round(b * 10) / 10];
+}
+
+function normalizeAudioPartLabel(
+  value: unknown,
+): LibraryAudioWindowDeckAudio | null {
+  const label = stringOrNull(value)?.toUpperCase();
+  if (!label) return null;
+  if (!/^P[2-9][0-9]?$/.test(label)) return null;
+  return label as LibraryAudioWindowDeckAudio;
+}
+
+function normalizeAudioWindowActivity(
+  value: unknown,
+): Partial<Record<"A" | "B", "active" | "silent">> | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value))
+    return null;
+  const row = value as Record<string, unknown>;
+  const out: Partial<Record<"A" | "B", "active" | "silent">> = {};
+  for (const side of ["A", "B"] as const) {
+    const activity = stringOrNull(row[side])?.toLowerCase();
+    if (activity === "active" || activity === "silent") out[side] = activity;
+  }
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 function normalizeAudioWindowMap(value: unknown): LibraryAudioWindowMap | null {
@@ -917,15 +1076,60 @@ function normalizeAudioWindowMap(value: unknown): LibraryAudioWindowMap | null {
     row.timeline !== "past_action_future" ||
     row.together_audio !== "P1_global_mix" ||
     row.decks_together !== true ||
-    row.deckA_audio !== "not_attached" ||
-    row.deckB_audio !== "not_attached" ||
-    row.per_deck_audio !== "structured_text_only" ||
-    row.duplicate_audio !== "same_master_not_deck_split" ||
     row.deck_separation !== "deck_lanes_context" ||
     row.lane_aliases !== "deck1:A,deck2:B" ||
     row.rule !== "time_alignment_not_outcome_verdict"
   ) {
     return null;
+  }
+  let deckAAudio: LibraryAudioWindowDeckAudio;
+  let deckBAudio: LibraryAudioWindowDeckAudio;
+  let perDeckAudio: "structured_text_only" | "deck_pair_parts";
+  let duplicateAudio:
+    | "same_master_not_deck_split"
+    | "separate_deck_pair_parts";
+  let deckAudioSeparation:
+    | "not_attached"
+    | "deck_audio_separation_context"
+    | undefined;
+  let deckPartSpan = normalizeSpanPair(row.deck_part_span_s);
+  let deckPartActivity = normalizeAudioWindowActivity(
+    row.deck_part_activity,
+  );
+  if (
+    row.deckA_audio === "not_attached" &&
+    row.deckB_audio === "not_attached" &&
+    row.per_deck_audio === "structured_text_only" &&
+    row.duplicate_audio === "same_master_not_deck_split" &&
+    (row.deck_audio_separation === undefined ||
+      row.deck_audio_separation === "not_attached")
+  ) {
+    deckAAudio = "not_attached";
+    deckBAudio = "not_attached";
+    perDeckAudio = "structured_text_only";
+    duplicateAudio = "same_master_not_deck_split";
+    deckAudioSeparation =
+      row.deck_audio_separation === "not_attached" ? "not_attached" : undefined;
+    deckPartSpan = null;
+    deckPartActivity = null;
+  } else {
+    const deckALabel = normalizeAudioPartLabel(row.deckA_audio);
+    const deckBLabel = normalizeAudioPartLabel(row.deckB_audio);
+    if (
+      !deckALabel ||
+      !deckBLabel ||
+      deckALabel === deckBLabel ||
+      row.per_deck_audio !== "deck_pair_parts" ||
+      row.duplicate_audio !== "separate_deck_pair_parts" ||
+      row.deck_audio_separation !== "deck_audio_separation_context"
+    ) {
+      return null;
+    }
+    deckAAudio = deckALabel;
+    deckBAudio = deckBLabel;
+    perDeckAudio = "deck_pair_parts";
+    duplicateAudio = "separate_deck_pair_parts";
+    deckAudioSeparation = "deck_audio_separation_context";
   }
   const pre = normalizeSpanPair(row.pre_s);
   const current = normalizeSpanPair(row.current_s);
@@ -951,7 +1155,9 @@ function normalizeAudioWindowMap(value: unknown): LibraryAudioWindowMap | null {
     }
   }
   const future =
-    row.future != null && typeof row.future === "object" && !Array.isArray(row.future)
+    row.future != null &&
+    typeof row.future === "object" &&
+    !Array.isArray(row.future)
       ? (row.future as Record<string, unknown>)
       : {};
   if (future.heard !== false) return null;
@@ -960,16 +1166,16 @@ function normalizeAudioWindowMap(value: unknown): LibraryAudioWindowMap | null {
     if (future[key] !== undefined) futureOut[key] = future[key];
   }
 
-  return {
+  const out: LibraryAudioWindowMap = {
     p1: "master_global_mix",
     p1_heard: true,
     timeline: "past_action_future",
     together_audio: "P1_global_mix",
     decks_together: true,
-    deckA_audio: "not_attached",
-    deckB_audio: "not_attached",
-    per_deck_audio: "structured_text_only",
-    duplicate_audio: "same_master_not_deck_split",
+    deckA_audio: deckAAudio,
+    deckB_audio: deckBAudio,
+    per_deck_audio: perDeckAudio,
+    duplicate_audio: duplicateAudio,
     deck_separation: "deck_lanes_context",
     lane_aliases: "deck1:A,deck2:B",
     pre_s: pre,
@@ -979,6 +1185,42 @@ function normalizeAudioWindowMap(value: unknown): LibraryAudioWindowMap | null {
     future: futureOut,
     rule: "time_alignment_not_outcome_verdict",
   };
+  if (deckAudioSeparation) out.deck_audio_separation = deckAudioSeparation;
+  if (deckPartSpan) out.deck_part_span_s = deckPartSpan;
+  if (deckPartActivity) out.deck_part_activity = deckPartActivity;
+  return out;
+}
+
+function audioWindowMapDeckLabels(
+  audioWindowMap: LibraryAudioWindowMap | null,
+): DeckAudioPartLabels | null {
+  if (!audioWindowMap || audioWindowMap.per_deck_audio !== "deck_pair_parts")
+    return null;
+  const deckA =
+    typeof audioWindowMap.deckA_audio === "string" &&
+    /^P[2-9][0-9]?$/.test(audioWindowMap.deckA_audio)
+      ? audioWindowMap.deckA_audio
+      : null;
+  const deckB =
+    typeof audioWindowMap.deckB_audio === "string" &&
+    /^P[2-9][0-9]?$/.test(audioWindowMap.deckB_audio)
+      ? audioWindowMap.deckB_audio
+      : null;
+  if (!deckA || !deckB || deckA === deckB) return null;
+  return { A: deckA, B: deckB };
+}
+
+function audioWindowMapMatchesAudioPartLabels(
+  audioWindowMap: LibraryAudioWindowMap | null,
+  partLabels: DeckAudioPartLabels | null,
+): boolean {
+  const mapLabels = audioWindowMapDeckLabels(audioWindowMap);
+  if (!partLabels) return mapLabels === null;
+  return (
+    mapLabels !== null &&
+    mapLabels.A === partLabels.A &&
+    mapLabels.B === partLabels.B
+  );
 }
 
 function normalizeLiveContextString(
@@ -1070,16 +1312,10 @@ function normalizeDeckAudioContext(value: unknown): string | null {
 }
 
 function normalizeDeckAudioSeparationContext(value: unknown): string | null {
-  return normalizeLiveContextString(
+  const text = normalizeLiveContextString(
     value,
     "deck_audio_separation_context",
-    [
-      "deckA_audio=not_captured",
-      "deckB_audio=not_captured",
-      "current_capture=P1_global_mix",
-      "per_deck_audio=not_attached",
-      "rule=separation_capability_not_outcome",
-    ],
+    ["rule=separation_capability_not_outcome"],
     [
       "isolated_decks=true",
       "per_deck_audio=attached",
@@ -1089,16 +1325,105 @@ function normalizeDeckAudioSeparationContext(value: unknown): string | null {
       "deckB_audio=stem",
     ],
   );
+  if (!text) return null;
+  const globalOnly = [
+    "deckA_audio=not_captured",
+    "deckB_audio=not_captured",
+    "current_capture=P1_global_mix",
+    "per_deck_audio=not_attached",
+    "isolated_decks=false",
+  ].every((atom) => text.includes(atom));
+  const deckPairs = [
+    "deckA_audio=captured",
+    "deckB_audio=captured",
+    "current_capture=P1_global_mix_plus_deck_pairs",
+    "per_deck_audio=captured_not_attached",
+    "isolated_decks=runtime_capture_available",
+  ].every((atom) => text.includes(atom));
+  return globalOnly || deckPairs ? text : null;
+}
+
+function normalizeDeckAudioFeaturesContext(value: unknown): string | null {
+  const text = normalizeLiveContextString(
+    value,
+    "deck_audio_features_context",
+    [
+      "source=deck_pair_capture",
+      "per_deck_audio=captured_features",
+      "rule=deck_audio_features_not_outcome_verdict",
+    ],
+    [
+      "transition_verdict=",
+      "quality_verdict=",
+      "great_transition",
+      "clean_transition",
+    ],
+  );
+  if (!text) return null;
+  return /[AB]_activity=/.test(text) && /[AB]_rms=/.test(text) ? text : null;
+}
+
+function normalizeDeckAudioDeltaContext(value: unknown): string | null {
+  const text = normalizeLiveContextString(
+    value,
+    "deck_audio_delta_context",
+    [
+      "source=deck_pair_capture",
+      "per_deck_delta=captured_feature_delta",
+      "rule=deck_audio_delta_not_causal_proof",
+    ],
+    [
+      "transition_verdict=",
+      "quality_verdict=",
+      "caused_by_move=true",
+      "great_transition",
+      "clean_transition",
+    ],
+  );
+  if (!text) return null;
+  return /[AB]_delta=/.test(text) ? text : null;
+}
+
+function normalizeDeckAudioWindowContext(value: unknown): string | null {
+  const text = normalizeLiveContextString(
+    value,
+    "deck_audio_window_context",
+    [
+      "source=deck_pair_capture",
+      "timeline=pre_action_current",
+      "per_deck_audio=captured_window_features",
+      "rule=deck_audio_window_not_causal_or_quality_verdict",
+    ],
+    [
+      "transition_verdict=",
+      "quality_verdict=",
+      "caused_by_move=true",
+      "great_transition",
+      "clean_transition",
+    ],
+    1100,
+  );
+  if (!text) return null;
+  return /[AB]_current=/.test(text) ? text : null;
 }
 
 const LIVE_SOURCE_STATUS_KEYS = [
   "controller",
+  "controller_connection",
+  "library",
+  "library_tracks",
+  "library_source",
+  "library_match",
   "nowplaying",
   "nowplaying_owner",
   "nowplaying_title",
   "audible_deck",
   "resolution",
   "resolved_side",
+  "second_deck_source",
+  "screen_vision",
+  "last_known_sides",
+  "last_known_rule",
 ] as const;
 
 function normalizeLiveContextCapabilities(value: unknown): string[] {
@@ -1107,8 +1432,7 @@ function normalizeLiveContextCapabilities(value: unknown): string[] {
   const seen = new Set<string>();
   for (const item of value) {
     const token = stringOrNull(item)?.slice(0, 48).trim();
-    if (!token || !/^[A-Za-z0-9_]+$/.test(token) || seen.has(token))
-      continue;
+    if (!token || !/^[A-Za-z0-9_]+$/.test(token) || seen.has(token)) continue;
     seen.add(token);
     out.push(token);
     if (out.length >= 16) break;
@@ -1218,15 +1542,44 @@ export function normalizeLiveContextPayload(
   if (deckAudioSeparationContext)
     context.deck_audio_separation_context = deckAudioSeparationContext;
 
+  const deckAudioFeaturesContext = normalizeDeckAudioFeaturesContext(
+    row.deck_audio_features_context,
+  );
+  if (deckAudioFeaturesContext)
+    context.deck_audio_features_context = deckAudioFeaturesContext;
+
+  const deckAudioDeltaContext = normalizeDeckAudioDeltaContext(
+    row.deck_audio_delta_context,
+  );
+  if (deckAudioDeltaContext)
+    context.deck_audio_delta_context = deckAudioDeltaContext;
+
+  const deckAudioWindowContext = normalizeDeckAudioWindowContext(
+    row.deck_audio_window_context,
+  );
+  if (deckAudioWindowContext)
+    context.deck_audio_window_context = deckAudioWindowContext;
+
   const audioPartContext = normalizeAudioPartContext(row.audio_part_context);
   if (audioPartContext) context.audio_part_context = audioPartContext;
+  const audioPartDeckLabels = audioPartDeckLabelsForContext(audioPartContext);
 
-  const audioWindowContext = normalizeAudioWindowContext(row.audio_window_context);
-  if (audioWindowContext) {
+  const audioWindowContext = normalizeAudioWindowContext(
+    row.audio_window_context,
+  );
+  if (
+    audioWindowContext &&
+    audioWindowMatchesAudioPartLabels(audioWindowContext, audioPartDeckLabels)
+  ) {
     context.audio_window_context = audioWindowContext;
   }
   const audioWindowMap = normalizeAudioWindowMap(row.audio_window_map);
-  if (audioWindowMap) context.audio_window_map = audioWindowMap;
+  if (
+    audioWindowMap &&
+    audioWindowMapMatchesAudioPartLabels(audioWindowMap, audioPartDeckLabels)
+  ) {
+    context.audio_window_map = audioWindowMap;
+  }
 
   const audioDelta = normalizeRecentMoves(row.audio_delta).slice(-4);
   if (audioDelta.length > 0) context.audio_delta = audioDelta;
@@ -1255,6 +1608,9 @@ export function normalizeLiveContextPayload(
     context.deck_source_context ||
     context.deck_audio_context ||
     context.deck_audio_separation_context ||
+    context.deck_audio_features_context ||
+    context.deck_audio_delta_context ||
+    context.deck_audio_window_context ||
     context.audio_part_context ||
     context.music !== undefined ||
     context.audio_window_context ||

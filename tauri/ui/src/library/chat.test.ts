@@ -39,8 +39,28 @@ const DECK_SOURCE_CONTEXT =
   "deck_source_context[identity_state=MusicState.deck_state primary=nowplaying_controller_attribution_to_library_cache resolved=A unresolved=B sources=rekordbox_xml live_db=not_read event_xml=diagnostic_only second_deck=independent_source_required rule=unresolved_deck_is_not_transition_evidence]";
 const DECK_AUDIO_CONTEXT =
   "deck_audio_context[audio=audible source=global_mix isolated_decks=false routing=A_dominant B_muted support=single_deck_A rule=audio_heard_must_be_mapped_through_deck_context]";
+const DECK_PAIR_LANES_CONTEXT =
+  "deck_lanes_context[deck1=A identity=known route=dominant | deck2=B identity=known route=present lane_aliases=deck1:A,deck2:B rule=per_lane_identity_route_control_not_outcome]";
+const DECK_PAIR_REFERENCE_CONTEXT =
+  "deck_reference_context[deck1=A identity=known route=dominant deck2=B identity=known route=present audio=P1_global_mix per_deck_audio=not_attached isolated_decks=false rule=deck1_deck2_reference_not_outcome]";
+const DECK_PAIR_SOURCE_CONTEXT =
+  "deck_source_context[identity_state=MusicState.deck_state primary=rekordbox_xml resolved=A+B unresolved=none sources=deck1:rekordbox_xml+deck2:rekordbox_xml live_db=not_read event_xml=diagnostic_only second_deck=independent_source_required rule=unresolved_deck_is_not_transition_evidence]";
+const DECK_PAIR_AUDIO_CONTEXT =
+  "deck_audio_context[audio=audible source=global_mix isolated_decks=false routing=A_dominant B_present support=two_deck_context_no_outcome rule=audio_heard_must_be_mapped_through_deck_context]";
 const DECK_AUDIO_SEPARATION_CONTEXT =
   "deck_audio_separation_context[requested_device=BlackHole_2ch capture_device=BlackHole_2ch input_channels=2 opened_channels=2 sample_rate=48000 device_capacity=stereo_or_less mode=global_mix_only current_capture=P1_global_mix gemini_audio=mono_downmix_of_capture deckA_audio=not_captured deckB_audio=not_captured per_deck_audio=not_attached isolated_decks=false upgrade_path=multi_channel_deck_pair_capture rule=separation_capability_not_outcome]";
+const DECK_PAIR_AUDIO_SEPARATION_CONTEXT =
+  "deck_audio_separation_context[requested_device=BlackHole_16ch capture_device=BlackHole_16ch input_channels=16 opened_channels=4 sample_rate=48000 device_capacity=multichannel_available mode=deck_pair_capture_configured master_channels=0,1,2,3 current_capture=P1_global_mix_plus_deck_pairs gemini_audio=mono_downmix_of_master_capture deckA_audio=captured deckB_audio=captured per_deck_audio=captured_not_attached isolated_decks=runtime_capture_available deck_pairs=A:0,1+B:2,3 upgrade_path=attach_deck_pair_audio_parts_when_needed deck_audio_activity=A_active+B_active rule=separation_capability_not_outcome]";
+const DECK_AUDIO_FEATURES_CONTEXT =
+  "deck_audio_features_context[source=deck_pair_capture window=latest_callback per_deck_audio=captured_features A_activity=active A_rms=0.020 A_peak=0.100 A_zcr=0.030 B_activity=active B_rms=0.030 B_peak=0.110 B_zcr=0.035 rule=deck_audio_features_not_outcome_verdict]";
+const DECK_AUDIO_DELTA_CONTEXT =
+  "deck_audio_delta_context[source=deck_pair_capture window=latest_callback per_deck_delta=captured_feature_delta A_delta=rms_rose_100pct_strong B_delta=rms_fell_50pct_strong rule=deck_audio_delta_not_causal_proof]";
+const DECK_AUDIO_WINDOW_CONTEXT =
+  "deck_audio_window_context[source=deck_pair_capture timeline=pre_action_current pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 per_deck_audio=captured_window_features A_pre=active_rms_0.020_peak_0.100_flux_0.004 A_current=active_rms_0.040_peak_0.120_flux_0.009 A_delta=rms_rose_100pct_strong B_pre=active_rms_0.030_peak_0.110_flux_0.006 B_current=active_rms_0.020_peak_0.090_flux_0.004 B_delta=rms_fell_33pct_clear rule=deck_audio_window_not_causal_or_quality_verdict]";
+const DECK_PAIR_AUDIO_PART_CONTEXT =
+  "audio_part_context[surface=gemini_parts P1=live_global_mix P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true P1_span=-6.0..0.0 P1_deck_audio=global_mix_not_stems deck1=A deck2=B together_audio=P1 part_order=P1,P2,P3 per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts deckA_part=P2 P2=deckA_configured_capture P2_model_heard=true P2_audience_heard=false P2_span=-3.0..0.0 P2_deck_audio=deckA_configured_capture P2_rule=deck_pair_capture_reference_not_quality_verdict deckB_part=P3 P3=deckB_configured_capture P3_model_heard=true P3_audience_heard=false P3_span=-3.0..0.0 P3_deck_audio=deckB_configured_capture P3_rule=deck_pair_capture_reference_not_quality_verdict rule=part_labels_not_outcome_verdict]";
+const DECK_PAIR_AUDIO_WINDOW_CONTEXT =
+  "audio_window_context[P1=master_global_mix P1_heard=true timeline=past_action_future together_audio=P1_global_mix decks_together=true deckA_audio=P2 deckB_audio=P3 per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts deck_separation=deck_lanes_context deck_audio_separation=deck_audio_separation_context deck_part_span=-3.0..0.0 deckA_activity=active deckB_activity=active lane_aliases=deck1:A,deck2:B pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 rule=time_alignment_not_outcome_verdict move_anchor=none future_heard=false future=not_attached]";
 const searchMock = vi.fn(async (_query: string) => ({
   results: [],
   centered: true,
@@ -124,6 +144,9 @@ function readyLiveContext(): LibraryLiveContext {
       "deck_source_status",
       "audio_part_context",
       "deck_audio_separation_context",
+      "deck_audio_features_context",
+      "deck_audio_delta_context",
+      "deck_audio_window_context",
       "audio_window_map",
       "audio_delta",
       "live_evidence",
@@ -207,6 +230,95 @@ function readyLiveContext(): LibraryLiveContext {
   };
 }
 
+function readyDeckPairLiveContext(): LibraryLiveContext {
+  const context = readyIdentifiedDeckPairLiveContext();
+  return {
+    ...context,
+    deck_audio_separation_context: DECK_PAIR_AUDIO_SEPARATION_CONTEXT,
+    deck_audio_features_context: DECK_AUDIO_FEATURES_CONTEXT,
+    deck_audio_delta_context: DECK_AUDIO_DELTA_CONTEXT,
+    deck_audio_window_context: DECK_AUDIO_WINDOW_CONTEXT,
+    audio_part_context: DECK_PAIR_AUDIO_PART_CONTEXT,
+    audio_window_context: DECK_PAIR_AUDIO_WINDOW_CONTEXT,
+    audio_window_map: {
+      ...(context.audio_window_map ?? {
+        p1: "master_global_mix",
+        p1_heard: true,
+        timeline: "past_action_future",
+        together_audio: "P1_global_mix",
+        decks_together: true,
+        deck_separation: "deck_lanes_context",
+        lane_aliases: "deck1:A,deck2:B",
+        pre_s: [-6, -1],
+        current_s: [-1, 0],
+        action_s: [-1, 0],
+        move_anchors: [],
+        future: { heard: false, span: "not_attached" },
+        rule: "time_alignment_not_outcome_verdict",
+      }),
+      deckA_audio: "P2",
+      deckB_audio: "P3",
+      per_deck_audio: "deck_pair_parts",
+      duplicate_audio: "separate_deck_pair_parts",
+      deck_audio_separation: "deck_audio_separation_context",
+      deck_part_span_s: [-3, 0],
+      deck_part_activity: { A: "active", B: "active" },
+    },
+    live_evidence: {
+      mix: [
+        ...(context.live_evidence?.mix ?? []),
+        "deck_audio_capture=A_active+B_active",
+        "deck_audio_features=A_active_rms_0.020+B_active_rms_0.030",
+        "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+        "deck_audio_window=A_active_pre_0.020_current_0.040+B_active_pre_0.030_current_0.020",
+      ],
+      refs: [
+        ...(context.live_evidence?.refs ?? []),
+        "mix:deck_audio_capture=A_active+B_active",
+        "mix:deck_audio_features=A_active_rms_0.020+B_active_rms_0.030",
+        "mix:deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_50pct_strong",
+        "mix:deck_audio_window=A_active_pre_0.020_current_0.040+B_active_pre_0.030_current_0.020",
+      ],
+    },
+  };
+}
+
+function readyIdentifiedDeckPairLiveContext(): LibraryLiveContext {
+  const context = readyLiveContext();
+  return {
+    ...context,
+    deck_state: {
+      ...(context.deck_state ?? {}),
+      B: {
+        title: "Transit",
+        track_id: "t001",
+        camelot: "9A",
+        bpm: 128,
+        confidence: 0.78,
+        source: "rekordbox_xml",
+      },
+    },
+    deck_lanes_context: DECK_PAIR_LANES_CONTEXT,
+    deck_reference_context: DECK_PAIR_REFERENCE_CONTEXT,
+    deck_source_context: DECK_PAIR_SOURCE_CONTEXT,
+    deck_audio_context: DECK_PAIR_AUDIO_CONTEXT,
+    live_evidence: {
+      mix: [
+        "transition_watch=two_resolved_decks",
+        "deck_lanes=A_known_route_dominant+B_known_route_present",
+        "deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+        "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_known_src_rekordbox_xml",
+      ],
+      refs: [
+        "mix:transition_watch=two_resolved_decks",
+        "mix:deck_lanes=A_known_route_dominant+B_known_route_present",
+        "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_known_route_present",
+        "mix:deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_known_src_rekordbox_xml",
+      ],
+    },
+  };
+}
+
 function doMockApi(): void {
   liveContextCallback = null;
   liveMoveCallback = null;
@@ -215,58 +327,61 @@ function doMockApi(): void {
     const actual = await importOriginal<typeof import("./api.js")>();
     return {
       ...actual,
-    libraryChat: (
-      message: string,
-      history: unknown[],
-      liveContext?: LibraryLiveContext | null,
-    ) =>
-      liveContext === undefined
-        ? chatMock(message, history)
-        : chatMock(message, history, liveContext),
-    libraryBuildSet: vi.fn(async () => ({
-      name: "x",
-      rationale: "",
-      stop_reason: "exported",
-      tracks: [],
-      count: 0,
-      export_path: null,
-    })),
-    libraryCurate: vi.fn(async () => ({
-      name: "x",
-      rationale: "",
-      stop_reason: "created",
-      tracks: [],
-      count: 0,
-    })),
-    librarySearch: (query: string) => searchMock(query),
-    librarySimilar: vi.fn(async () => ({
-      results: [],
-      centered: true,
-      corpus_size: 0,
-    })),
-    libraryStats: () => statsMock(),
-    libraryModels: (install?: LibraryModelInstallTarget) => modelsMock(install),
-    libraryEmbedFolder: vi.fn(async () => false),
-    onEmbedProgress: vi.fn(async () => () => {}),
-    onEmbedDone: vi.fn(async () => () => {}),
-    onModelProgress: vi.fn(async () => () => {}),
-    onLiveDeckContext: vi.fn(
-      async (cb: (context: LibraryLiveContext) => void) => {
-        liveContextCallback = cb;
+      libraryChat: (
+        message: string,
+        history: unknown[],
+        liveContext?: LibraryLiveContext | null,
+      ) =>
+        liveContext === undefined
+          ? chatMock(message, history)
+          : chatMock(message, history, liveContext),
+      libraryBuildSet: vi.fn(async () => ({
+        name: "x",
+        rationale: "",
+        stop_reason: "exported",
+        tracks: [],
+        count: 0,
+        export_path: null,
+      })),
+      libraryCurate: vi.fn(async () => ({
+        name: "x",
+        rationale: "",
+        stop_reason: "created",
+        tracks: [],
+        count: 0,
+      })),
+      librarySearch: (query: string) => searchMock(query),
+      librarySimilar: vi.fn(async () => ({
+        results: [],
+        centered: true,
+        corpus_size: 0,
+      })),
+      libraryStats: () => statsMock(),
+      libraryModels: (install?: LibraryModelInstallTarget) =>
+        modelsMock(install),
+      libraryEmbedFolder: vi.fn(async () => false),
+      onEmbedProgress: vi.fn(async () => () => {}),
+      onEmbedDone: vi.fn(async () => () => {}),
+      onModelProgress: vi.fn(async () => () => {}),
+      onLiveDeckContext: vi.fn(
+        async (cb: (context: LibraryLiveContext) => void) => {
+          liveContextCallback = cb;
+          return () => {};
+        },
+      ),
+      onLiveMoveContext: vi.fn(async (cb: (moves: string[]) => void) => {
+        liveMoveCallback = cb;
         return () => {};
-      },
-    ),
-    onLiveMoveContext: vi.fn(async (cb: (moves: string[]) => void) => {
-      liveMoveCallback = cb;
-      return () => {};
-    }),
-    onViberTool: vi.fn(
-      async (cb: (event: { tool: string; ok: boolean; summary: string }) => void) => {
-        viberToolCallback = cb;
-        return () => {};
-      },
-    ),
-    DEV_FALLBACK: { embedLog: [] },
+      }),
+      onViberTool: vi.fn(
+        async (
+          cb: (event: { tool: string; ok: boolean; summary: string }) => void,
+        ) => {
+          viberToolCallback = cb;
+          return () => {};
+        },
+      ),
+      DEV_FALLBACK: { embedLog: [] },
     };
   });
 }
@@ -357,32 +472,196 @@ describe("chat - real runChat path", () => {
     document.body.innerHTML = "";
   });
 
-  it("shows live proof status before the user asks Viber", async () => {
+  it("shows live read status before the user asks Viber", async () => {
     await mountChat();
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live proof");
-    expect(toolText).toContain("not armed");
+    expect(toolText).toContain("live read");
+    expect(toolText).toContain("waiting");
 
     const proofRow = document.querySelector<HTMLElement>(
       '.vmx-lib-chat-tool[data-proof="true"]',
     );
-    expect(proofRow?.dataset.proofState).toBe("not_armed");
+    expect(proofRow?.dataset.proofState).toBe("waiting");
   });
 
-  it("updates the live proof row when deck context arrives", async () => {
+  it("keeps the live read partial until deck-pair audio is active", async () => {
     await mountChat();
 
-    liveContextCallback?.(readyLiveContext());
+    liveContextCallback?.(readyIdentifiedDeckPairLiveContext());
     for (let i = 0; i < 4; i++) await Promise.resolve();
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live proof");
+    expect(toolText).toContain("live read");
+    expect(toolText).toContain("partial");
+    expect(toolText).toContain("deck audio");
+    expect(toolText).not.toContain("armed");
+  });
+
+  it("arms the live read only after deck-pair audio activity arrives", async () => {
+    await mountChat();
+
+    liveContextCallback?.(readyDeckPairLiveContext());
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    const toolText =
+      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
+    expect(toolText).toContain("live read");
     expect(toolText).toContain("armed");
     expect(toolText).toContain("deck1 A=known:dominant");
-    expect(toolText).toContain("deck2 B=unknown:present");
+    expect(toolText).toContain("deck2 B=known:present");
+  });
+
+  it("keeps the live read partial when deck audio is active but Deck B is unresolved", async () => {
+    await mountChat();
+
+    const context = readyDeckPairLiveContext();
+    liveContextCallback?.({
+      ...context,
+      deck_state: context.deck_state?.A ? { A: context.deck_state.A } : {},
+    });
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    const toolText =
+      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
+    expect(toolText).toContain("live read");
+    expect(toolText).toContain("partial");
+    expect(toolText).toContain("deck identities");
+    expect(toolText).not.toContain("armed");
+  });
+
+  it("keeps the live read partial when only one captured deck lane is active", async () => {
+    await mountChat();
+
+    const oneLane = readyDeckPairLiveContext();
+    liveContextCallback?.({
+      ...oneLane,
+      live_evidence: {
+        mix: (oneLane.live_evidence?.mix ?? []).map((token) =>
+          token
+            .replace(
+              "deck_audio_capture=A_active+B_active",
+              "deck_audio_capture=A_active+B_silent",
+            )
+            .replace(
+              "deck_audio_features=A_active_rms_0.020+B_active_rms_0.030",
+              "deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000",
+            )
+            .replace(
+              "deck_audio_window=A_active_pre_0.020_current_0.040+B_active_pre_0.030_current_0.020",
+              "deck_audio_window=A_active_pre_0.020_current_0.040+B_silent_pre_0.030_current_0.000",
+            ),
+        ),
+        refs: (oneLane.live_evidence?.refs ?? []).map((token) =>
+          token
+            .replace(
+              "mix:deck_audio_capture=A_active+B_active",
+              "mix:deck_audio_capture=A_active+B_silent",
+            )
+            .replace(
+              "mix:deck_audio_features=A_active_rms_0.020+B_active_rms_0.030",
+              "mix:deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000",
+            )
+            .replace(
+              "mix:deck_audio_window=A_active_pre_0.020_current_0.040+B_active_pre_0.030_current_0.020",
+              "mix:deck_audio_window=A_active_pre_0.020_current_0.040+B_silent_pre_0.030_current_0.000",
+            ),
+        ),
+      },
+    });
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    const toolText =
+      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
+    expect(toolText).toContain("live read");
+    expect(toolText).toContain("partial");
+    expect(toolText).toContain("both decks active");
+    expect(toolText).not.toContain("armed");
+  });
+
+  it("passes Deck A/B audio-window part labels into Viber chat", async () => {
+    await mountChat();
+
+    liveContextCallback?.(readyDeckPairLiveContext());
+    await sendChat("what changed by deck?");
+
+    expect(chatMock).toHaveBeenLastCalledWith(
+      "what changed by deck?",
+      [],
+      expect.objectContaining({
+        audio_part_context: expect.stringContaining(
+          "per_deck_audio=deck_pair_parts",
+        ),
+        audio_window_context: expect.stringContaining("deckA_audio=P2"),
+        deck_audio_window_context: expect.stringContaining(
+          "timeline=pre_action_current",
+        ),
+        audio_window_map: expect.objectContaining({
+          deckA_audio: "P2",
+          deckB_audio: "P3",
+          per_deck_audio: "deck_pair_parts",
+          duplicate_audio: "separate_deck_pair_parts",
+          deck_audio_separation: "deck_audio_separation_context",
+          deck_part_span_s: [-3, 0],
+          deck_part_activity: { A: "active", B: "active" },
+        }),
+      }),
+    );
+  });
+
+  it("clears stale Deck A/B audio part context when a later frame omits it", async () => {
+    await mountChat();
+
+    liveContextCallback?.(readyDeckPairLiveContext());
+    liveContextCallback?.({ deck: "A", audible: true });
+    await sendChat("is the deck split still attached?");
+
+    expect(chatMock).toHaveBeenLastCalledWith(
+      "is the deck split still attached?",
+      [],
+      expect.not.objectContaining({
+        audio_part_context: expect.any(String),
+        audio_window_context: expect.any(String),
+        audio_window_map: expect.any(Object),
+        deck_audio_separation_context: expect.any(String),
+        deck_audio_features_context: expect.any(String),
+        deck_audio_delta_context: expect.any(String),
+        deck_audio_window_context: expect.any(String),
+      }),
+    );
+  });
+
+  it("keeps live read partial when deck-pair receipts are missing", async () => {
+    await mountChat();
+
+    const context = readyDeckPairLiveContext();
+    liveContextCallback?.({
+      ...context,
+      live_evidence: {
+        mix: (context.live_evidence?.mix ?? []).filter(
+          (token) =>
+            !token.includes("deck_audio_features=") &&
+            !token.includes("deck_audio_delta=") &&
+            !token.includes("deck_audio_window="),
+        ),
+        refs: (context.live_evidence?.refs ?? []).filter(
+          (token) =>
+            !token.includes("deck_audio_features=") &&
+            !token.includes("deck_audio_delta=") &&
+            !token.includes("deck_audio_window="),
+        ),
+      },
+    });
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    const toolText =
+      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
+    expect(toolText).toContain("live read");
+    expect(toolText).toContain("partial");
+    expect(toolText).toContain("feature receipt");
+    expect(toolText).not.toContain("armed");
   });
 
   it("renders a grounded tool trace and playlist artifact from one Viber turn", async () => {
@@ -419,10 +698,11 @@ describe("chat - real runChat path", () => {
     );
   });
 
-  it("renders the live proof verifier beside a Viber chat reply", async () => {
+  it("renders the live read verifier beside a Viber chat reply", async () => {
     chatMock.mockResolvedValueOnce({
       ...CHAT_WITH_PLAYLIST,
-      reply: "I'll hold the transition verdict until live deck proof is stronger.",
+      reply:
+        "I caught the live move. The useful note is the sound change right there.",
       tool_trace: [],
       playlist: null,
       seen_track_ids: [],
@@ -431,7 +711,8 @@ describe("chat - real runChat path", () => {
       live_verification: {
         ok: true,
         violations: [],
-        reply: "I'll hold the transition verdict until live deck proof is stronger.",
+        reply:
+          "I caught the live move. The useful note is the sound change right there.",
         corrected: false,
         corrected_reply: null,
         claim_policy: "blocked",
@@ -448,10 +729,10 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live proof");
+    expect(toolText).toContain("live read");
     expect(toolText).toContain("fresh");
-    expect(toolText).toContain("verdict held");
-    expect(toolText).toContain("claim held");
+    expect(toolText).toContain("live move checked");
+    expect(toolText).toContain("grounded");
     expect(toolText).not.toContain("live_reply_verify");
     expect(toolText).not.toContain("guard");
     expect(toolText).not.toContain("unsupported_live_outcome_claim");
@@ -463,18 +744,78 @@ describe("chat - real runChat path", () => {
 
     const artifactText =
       document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
-    expect(artifactText).toContain("live proof");
-    expect(artifactText).toContain("verdict held");
+    expect(artifactText).toContain("live read");
+    expect(artifactText).toContain("live move checked");
     expect(artifactText).not.toContain("guard");
     expect(artifactText).not.toContain("unsupported_live_outcome_claim");
   });
 
-  it("hides internal live proof failure labels from the chat chrome", async () => {
+  it("renders supported live verdicts as grounded scoring", async () => {
     chatMock.mockResolvedValueOnce({
       ...CHAT_WITH_PLAYLIST,
-      reply: "Live proof is not armed, so I won't judge that transition or deck move yet.",
+      reply: "Great transition, clean handoff.",
+      tool_trace: [],
+      playlist: null,
+      seen_track_ids: [],
+      move_grades: [
+        {
+          candidate_id: "tr_001",
+          track_id: "t000",
+          title: "Tt000",
+          slug: "lit_aff",
+          label: "LIT AFF",
+          xp: 100,
+          reason: "both decks are locked",
+          overdrive: true,
+        },
+      ],
+      iterations: 1,
+      stop_reason: "model_done",
+      live_verification: {
+        ok: true,
+        violations: [],
+        reply: "Great transition, clean handoff.",
+        corrected: false,
+        corrected_reply: null,
+        claim_policy: "supported_verdict",
+        transport_status: "fresh_schema_v2",
+        move_grades_allowed: true,
+        move_grades_seen: 1,
+        guard_applied: false,
+        guard_violations: [],
+      },
+    } satisfies LibraryChatResult);
+
+    await mountChat();
+    await sendChat("was that transition good?");
+
+    const toolText =
+      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
+    expect(toolText).toContain("live read");
+    expect(toolText).toContain("fresh");
+    expect(toolText).toContain("scoring grounded");
+    expect(toolText).not.toContain("supported_verdict");
+
+    const artifactText =
+      document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
+    expect(artifactText).toContain("live read");
+    expect(artifactText).toContain("scoring grounded");
+    expect(artifactText).toContain("move scoring grounded by live read");
+    expect(artifactText).not.toContain("claim_policy");
+    expect(artifactText).not.toContain("supported_verdict");
+  });
+
+  it("hides internal live read failure labels from the chat chrome", async () => {
+    chatMock.mockResolvedValueOnce({
+      ...CHAT_WITH_PLAYLIST,
+      reply:
+        "Start live monitoring first, then I'll read the live move from the decks.",
       tool_trace: [
-        { name: "live_context_required", arg: "live proof not armed", ok: false },
+        {
+          name: "live_context_required",
+          arg: "waiting for live deck feed",
+          ok: false,
+        },
       ],
       playlist: null,
       seen_track_ids: [],
@@ -484,7 +825,7 @@ describe("chat - real runChat path", () => {
         ok: false,
         violations: ["missing_live_context"],
         reply:
-          "Live proof is not armed, so I won't judge that transition or deck move yet.",
+          "Start live monitoring first, then I'll read the live move from the decks.",
         corrected: false,
         corrected_reply: null,
         claim_policy: "requires_more_evidence",
@@ -501,22 +842,22 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live proof");
-    expect(toolText).toContain("not armed");
-    expect(toolText).toContain("needs proof");
+    expect(toolText).toContain("live read");
+    expect(toolText).toContain("waiting");
+    expect(toolText).toContain("listening");
     expect(toolText).not.toContain("live_context_required");
     expect(toolText).not.toContain("live proof not armed");
     expect(toolText).not.toContain("requires_more_evidence");
 
     expect(document.querySelectorAll(".vmx-lib-chat-tool")).toHaveLength(1);
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
-      "live proof needed",
+      "live read waiting",
     );
 
     const artifactText =
       document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
-    expect(artifactText).toContain("live proof");
-    expect(artifactText).toContain("needs proof");
+    expect(artifactText).toContain("live read");
+    expect(artifactText).toContain("listening");
     expect(artifactText).not.toContain("live_context_required");
     expect(artifactText).not.toContain("requires_more_evidence");
   });
@@ -622,6 +963,9 @@ describe("chat - real runChat path", () => {
         "deck_source_status",
         "audio_part_context",
         "deck_audio_separation_context",
+        "deck_audio_features_context",
+        "deck_audio_delta_context",
+        "deck_audio_window_context",
         "audio_window_map",
         "audio_delta",
         "live_evidence",
@@ -782,6 +1126,7 @@ describe("chat - real runChat path", () => {
           "deck_reference=deck1_A_known_route_unknown+deck2_B_unknown_route_unknown",
           "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none",
           "deck_audio_support=single_deck_A",
+          "deck_route=A_dominant+B_muted",
         ],
         refs: [
           "mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted",
@@ -793,6 +1138,7 @@ describe("chat - real runChat path", () => {
           "mix:deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none",
           "midi:A_low_cut_to_killed@42.0",
           "mix:deck_audio_support=single_deck_A",
+          "mix:deck_route=A_dominant+B_muted",
         ],
         midi: [{ key: "A_low_cut_to_killed", t: 42 }],
       },
@@ -830,6 +1176,18 @@ describe("chat - real runChat path", () => {
       audible: true,
       recent_moves: ["A_low: cut->killed"],
     });
+  });
+
+  it("drops raw live deck context that the normalizer rejects", async () => {
+    await mountChat();
+    liveContextCallback?.({
+      audio_window_context:
+        "audio_window_context[P1=master_global_mix P1_heard=true timeline=past_action_future deckA_audio=P2 deckB_audio=P3 per_deck_audio=attached duplicate_audio=separate_deck_pair_parts rule=time_alignment_not_outcome_verdict]",
+    } as unknown as LibraryLiveContext);
+
+    await sendChat("should Viber trust this?");
+
+    expect(chatMock.mock.calls.at(-1)).toEqual(["should Viber trust this?", []]);
   });
 
   it("clears stale deck identity when an explicit empty deck frame arrives", async () => {

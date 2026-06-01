@@ -240,7 +240,8 @@ describe("runtime response normalizers", () => {
 
   it("keeps Viber live reply verification receipts before UI render", () => {
     const chat = normalizeChatResult({
-      reply: "I'll hold the transition verdict until live deck proof is stronger.",
+      reply:
+        "I caught the live move. The useful note is the sound change right there.",
       tool_trace: [],
       playlist: null,
       export_path: null,
@@ -251,7 +252,8 @@ describe("runtime response normalizers", () => {
       live_verification: {
         ok: true,
         violations: [],
-        reply: "I'll hold the transition verdict until live deck proof is stronger.",
+        reply:
+          "I caught the live move. The useful note is the sound change right there.",
         corrected: false,
         corrected_reply: null,
         claim_policy: "blocked",
@@ -271,6 +273,36 @@ describe("runtime response normalizers", () => {
     ]);
   });
 
+  it("keeps supported live verdict verification receipts before UI render", () => {
+    const chat = normalizeChatResult({
+      reply: "Great transition, clean handoff.",
+      tool_trace: [],
+      playlist: null,
+      export_path: null,
+      seen_track_ids: [],
+      move_grades: [],
+      iterations: 1,
+      stop_reason: "model_done",
+      live_verification: {
+        ok: true,
+        violations: [],
+        reply: "Great transition, clean handoff.",
+        corrected: false,
+        corrected_reply: null,
+        claim_policy: "supported_verdict",
+        transport_status: "fresh_schema_v2",
+        move_grades_allowed: true,
+        move_grades_seen: 1,
+        guard_applied: false,
+        guard_violations: [],
+      },
+    });
+
+    expect(chat.live_verification?.claim_policy).toBe("supported_verdict");
+    expect(chat.live_verification?.move_grades_allowed).toBe(true);
+    expect(chat.live_verification?.move_grades_seen).toBe(1);
+  });
+
   it("normalizes live deck context and drops non-deck frame noise", () => {
     const context = normalizeLiveContextPayload({
       live_context_schema_version: 2,
@@ -279,6 +311,9 @@ describe("runtime response normalizers", () => {
         "deck_source_status",
         "audio_part_context",
         "deck_audio_separation_context",
+        "deck_audio_features_context",
+        "deck_audio_delta_context",
+        "deck_audio_window_context",
         "audio_window_map",
         "audio_delta",
         "live_evidence",
@@ -328,9 +363,18 @@ describe("runtime response normalizers", () => {
       },
       deck_source_status: {
         controller: "present",
+        controller_connection: "connected",
+        library: "present",
+        library_tracks: "24",
+        library_source: "rekordbox_xml",
+        library_match: "ambiguous label",
         nowplaying: "blocked_non_deck_owner",
         nowplaying_owner: "com.apple.WebKit.GPU",
+        nowplaying_title: "seen",
+        audible_deck: "A",
         resolution: "blocked non deck nowplaying",
+        second_deck_source: "suppressed requires independent source",
+        screen_vision: "disabled",
         leak: "/Users/ozai/private",
       },
       deck_lanes_context:
@@ -343,6 +387,10 @@ describe("runtime response normalizers", () => {
         "deck_audio_context[audio=audible source=global_mix isolated_decks=false routing=A_dominant B_muted support=single_deck_A rule=audio_heard_must_be_mapped_through_deck_context]",
       deck_audio_separation_context:
         "deck_audio_separation_context[requested_device=BlackHole_2ch capture_device=BlackHole_2ch input_channels=2 opened_channels=2 sample_rate=48000 device_capacity=stereo_or_less mode=global_mix_only current_capture=P1_global_mix gemini_audio=mono_downmix_of_capture deckA_audio=not_captured deckB_audio=not_captured per_deck_audio=not_attached isolated_decks=false upgrade_path=multi_channel_deck_pair_capture rule=separation_capability_not_outcome]",
+      deck_audio_delta_context:
+        "deck_audio_delta_context[source=deck_pair_capture window=latest_callback per_deck_delta=captured_feature_delta A_delta=rms_rose_100pct_strong B_delta=rms_fell_50pct_strong rule=deck_audio_delta_not_causal_proof]",
+      deck_audio_window_context:
+        "deck_audio_window_context[source=deck_pair_capture timeline=pre_action_current pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 per_deck_audio=captured_window_features A_pre=active_rms_0.020_peak_0.100_flux_0.004 A_current=active_rms_0.040_peak_0.120_flux_0.009 A_delta=rms_rose_100pct_strong B_pre=active_rms_0.030_peak_0.110_flux_0.006 B_current=active_rms_0.020_peak_0.090_flux_0.004 B_delta=rms_fell_33pct_clear rule=deck_audio_window_not_causal_or_quality_verdict]",
       audio_part_context:
         "audio_part_context[surface=live_context P1=live_global_mix P1_model_heard=false P1_runtime_observed=true P1_audience_heard=true P1_span=-6.0..0.0 P1_deck_audio=global_mix_not_stems deck1=A deck2=B together_audio=P1 per_deck_audio=not_attached duplicate_audio=same_master_not_deck_split rule=part_labels_not_outcome_verdict]",
       audio_delta: [
@@ -407,6 +455,9 @@ describe("runtime response normalizers", () => {
         "deck_source_status",
         "audio_part_context",
         "deck_audio_separation_context",
+        "deck_audio_features_context",
+        "deck_audio_delta_context",
+        "deck_audio_window_context",
         "audio_window_map",
         "audio_delta",
         "live_evidence",
@@ -449,9 +500,18 @@ describe("runtime response normalizers", () => {
       },
       deck_source_status: {
         controller: "present",
+        controller_connection: "connected",
+        library: "present",
+        library_tracks: "24",
+        library_source: "rekordbox_xml",
+        library_match: "ambiguous_label",
         nowplaying: "blocked_non_deck_owner",
         nowplaying_owner: "com.apple.webkit.gpu",
+        nowplaying_title: "seen",
+        audible_deck: "a",
         resolution: "blocked_non_deck_nowplaying",
+        second_deck_source: "suppressed_requires_independent_source",
+        screen_vision: "disabled",
       },
       deck_lanes_context:
         "deck_lanes_context[deck1=A identity=known route=dominant | deck2=B identity=unresolved route=muted lane_aliases=deck1:A,deck2:B rule=per_lane_identity_route_control_not_outcome]",
@@ -463,6 +523,10 @@ describe("runtime response normalizers", () => {
         "deck_audio_context[audio=audible source=global_mix isolated_decks=false routing=A_dominant B_muted support=single_deck_A rule=audio_heard_must_be_mapped_through_deck_context]",
       deck_audio_separation_context:
         "deck_audio_separation_context[requested_device=BlackHole_2ch capture_device=BlackHole_2ch input_channels=2 opened_channels=2 sample_rate=48000 device_capacity=stereo_or_less mode=global_mix_only current_capture=P1_global_mix gemini_audio=mono_downmix_of_capture deckA_audio=not_captured deckB_audio=not_captured per_deck_audio=not_attached isolated_decks=false upgrade_path=multi_channel_deck_pair_capture rule=separation_capability_not_outcome]",
+      deck_audio_delta_context:
+        "deck_audio_delta_context[source=deck_pair_capture window=latest_callback per_deck_delta=captured_feature_delta A_delta=rms_rose_100pct_strong B_delta=rms_fell_50pct_strong rule=deck_audio_delta_not_causal_proof]",
+      deck_audio_window_context:
+        "deck_audio_window_context[source=deck_pair_capture timeline=pre_action_current pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 per_deck_audio=captured_window_features A_pre=active_rms_0.020_peak_0.100_flux_0.004 A_current=active_rms_0.040_peak_0.120_flux_0.009 A_delta=rms_rose_100pct_strong B_pre=active_rms_0.030_peak_0.110_flux_0.006 B_current=active_rms_0.020_peak_0.090_flux_0.004 B_delta=rms_fell_33pct_clear rule=deck_audio_window_not_causal_or_quality_verdict]",
       audio_part_context:
         "audio_part_context[surface=live_context P1=live_global_mix P1_model_heard=false P1_runtime_observed=true P1_audience_heard=true P1_span=-6.0..0.0 P1_deck_audio=global_mix_not_stems deck1=A deck2=B together_audio=P1 per_deck_audio=not_attached duplicate_audio=same_master_not_deck_split rule=part_labels_not_outcome_verdict]",
       audio_delta: [
@@ -503,10 +567,12 @@ describe("runtime response normalizers", () => {
           "transition_block=single_resolved_deck",
           "deck_lanes=A_known_route_dominant+B_unknown_route_muted",
           "deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
+          "deck_audio_support=two_deck_route",
           "second_deck_identity=unknown_or_suppressed",
           "deck_lanes=A_known_route_dominant+B_unknown_route_present",
           "deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_present",
           "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none",
+          "deck_route=A_dominant+B_present",
         ],
         midi: [{ key: "A_low_cut_to_killed", t: 42 }],
         refs: [
@@ -515,10 +581,12 @@ describe("runtime response normalizers", () => {
           "mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted",
           "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted",
           "mix:deck_audio_support=single_deck_A",
+          "mix:deck_audio_support=two_deck_route",
           "mix:second_deck_identity=unknown_or_suppressed",
           "mix:deck_lanes=A_known_route_dominant+B_unknown_route_present",
           "mix:deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_present",
           "mix:deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none",
+          "mix:deck_route=A_dominant+B_present",
         ],
       },
       recent_moves: ["A_low: cut->killed", "B_play->ON"],
@@ -526,7 +594,9 @@ describe("runtime response normalizers", () => {
   });
 
   it("preserves explicit empty live deck payloads so stale identities can clear", () => {
-    expect(normalizeLiveContextPayload({ deck: "none", deck_state: {} })).toEqual({
+    expect(
+      normalizeLiveContextPayload({ deck: "none", deck_state: {} }),
+    ).toEqual({
       deck: "none",
       deck_state: {},
     });
@@ -588,6 +658,365 @@ describe("runtime response normalizers", () => {
     ).toBeNull();
   });
 
+  it("accepts configured deck-pair capture separation context", () => {
+    const context = normalizeLiveContextPayload({
+      deck_audio_separation_context:
+        "deck_audio_separation_context[requested_device=BlackHole_16ch capture_device=BlackHole_16ch input_channels=16 opened_channels=4 sample_rate=48000 device_capacity=multichannel_available mode=deck_pair_capture_configured master_channels=0,1,2,3 current_capture=P1_global_mix_plus_deck_pairs gemini_audio=mono_downmix_of_master_capture deckA_audio=captured deckB_audio=captured per_deck_audio=captured_not_attached isolated_decks=runtime_capture_available deck_pairs=A:0,1+B:2,3 upgrade_path=attach_deck_pair_audio_parts_when_needed rule=separation_capability_not_outcome]",
+    });
+
+    expect(context?.deck_audio_separation_context).toContain(
+      "mode=deck_pair_capture_configured",
+    );
+    expect(context?.deck_audio_separation_context).toContain(
+      "deckA_audio=captured",
+    );
+  });
+
+  it("accepts deck-pair audio feature descriptors", () => {
+    const context = normalizeLiveContextPayload({
+      deck_audio_features_context:
+        "deck_audio_features_context[source=deck_pair_capture window=latest_callback per_deck_audio=captured_features A_activity=active A_rms=0.020 A_peak=0.100 A_zcr=0.030 B_activity=silent B_rms=0.000 B_peak=0.000 B_zcr=0.000 rule=deck_audio_features_not_outcome_verdict]",
+    });
+
+    expect(context?.deck_audio_features_context).toContain(
+      "A_activity=active",
+    );
+    expect(context?.deck_audio_features_context).toContain("B_rms=0.000");
+  });
+
+  it("accepts deck-pair audio delta descriptors", () => {
+    const context = normalizeLiveContextPayload({
+      deck_audio_delta_context:
+        "deck_audio_delta_context[source=deck_pair_capture window=latest_callback per_deck_delta=captured_feature_delta A_delta=rms_rose_100pct_strong B_delta=rms_fell_50pct_strong rule=deck_audio_delta_not_causal_proof]",
+    });
+
+    expect(context?.deck_audio_delta_context).toContain(
+      "A_delta=rms_rose_100pct_strong",
+    );
+    expect(context?.deck_audio_delta_context).toContain(
+      "rule=deck_audio_delta_not_causal_proof",
+    );
+  });
+
+  it("accepts deck-pair pre/current audio window descriptors", () => {
+    const context = normalizeLiveContextPayload({
+      deck_audio_window_context:
+        "deck_audio_window_context[source=deck_pair_capture timeline=pre_action_current pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 per_deck_audio=captured_window_features A_pre=active_rms_0.020_peak_0.100_flux_0.004 A_current=active_rms_0.040_peak_0.120_flux_0.009 A_delta=rms_rose_100pct_strong B_pre=active_rms_0.030_peak_0.110_flux_0.006 B_current=active_rms_0.020_peak_0.090_flux_0.004 B_delta=rms_fell_33pct_clear rule=deck_audio_window_not_causal_or_quality_verdict]",
+    });
+
+    expect(context?.deck_audio_window_context).toContain(
+      "timeline=pre_action_current",
+    );
+    expect(context?.deck_audio_window_context).toContain(
+      "A_current=active_rms_0.040",
+    );
+    expect(context?.deck_audio_window_context).toContain(
+      "rule=deck_audio_window_not_causal_or_quality_verdict",
+    );
+  });
+
+  it("accepts Gemini deck-pair audio part labels", () => {
+    const context = normalizeLiveContextPayload({
+      audio_part_context:
+        "audio_part_context[surface=gemini_parts P1=live_global_mix P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true P1_span=-6.0..0.0 P1_deck_audio=global_mix_not_stems deck1=A deck2=B together_audio=P1 part_order=P1,P2,P3 per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts deckA_part=P2 P2=deckA_configured_capture P2_model_heard=true P2_audience_heard=false P2_span=-3.0..0.0 P2_deck_audio=deckA_configured_capture P2_rule=deck_pair_capture_reference_not_quality_verdict deckB_part=P3 P3=deckB_configured_capture P3_model_heard=true P3_audience_heard=false P3_span=-3.0..0.0 P3_deck_audio=deckB_configured_capture P3_rule=deck_pair_capture_reference_not_quality_verdict rule=part_labels_not_outcome_verdict]",
+    });
+
+    expect(context?.audio_part_context).toContain(
+      "per_deck_audio=deck_pair_parts",
+    );
+    expect(context?.audio_part_context).toContain("deckA_part=P2");
+    expect(context?.audio_part_context).toContain("part_order=P1,P2,P3");
+    expect(context?.audio_part_context).toContain(
+      "P3_rule=deck_pair_capture_reference_not_quality_verdict",
+    );
+  });
+
+  it("keeps full audio part order when mic and lookahead shift deck parts", () => {
+    const fullPartContext = [
+      "audio_part_context[surface=gemini_parts",
+      "audio_token_rate=32_per_second",
+      "P1=live_global_mix",
+      "P1_model_heard=true",
+      "P1_runtime_observed=true",
+      "P1_audience_heard=true",
+      "P1_span=-6.0..0.0",
+      "P1_tokens_est=192",
+      "P1_deck_audio=global_mix_not_stems",
+      "deck1=A",
+      "deck2=B",
+      "together_audio=P1",
+      "part_order=P1,P2,P3,P4,P5",
+      "per_deck_audio=deck_pair_parts",
+      "duplicate_audio=separate_deck_pair_parts",
+      "deckA_part=P4",
+      "P4=deckA_configured_capture",
+      "P4_model_heard=true",
+      "P4_audience_heard=false",
+      "P4_span=-3.0..0.0",
+      "P4_tokens_est=96",
+      "P4_deck_audio=deckA_configured_capture",
+      "P4_rule=deck_pair_capture_reference_not_quality_verdict",
+      "deckB_part=P5",
+      "P5=deckB_configured_capture",
+      "P5_model_heard=true",
+      "P5_audience_heard=false",
+      "P5_span=-3.0..0.0",
+      "P5_tokens_est=96",
+      "P5_deck_audio=deckB_configured_capture",
+      "P5_rule=deck_pair_capture_reference_not_quality_verdict",
+      "P2=user_mic",
+      "P2_model_heard=true",
+      "P2_role=user_speech",
+      "P2_deck_audio=none",
+      "P2_rule=not_deck_audio",
+      "P3=source_file_lookahead",
+      "P3_model_heard=true",
+      "P3_audience_heard=false",
+      "P3_span=0.0..+3.0",
+      "P3_tokens_est=96",
+      "P3_deck_audio=none",
+      "P3_rule=forecast_only_not_current_live_evidence",
+      "rule=part_labels_not_outcome_verdict]",
+    ].join(" ");
+
+    expect(fullPartContext.length).toBeGreaterThan(900);
+
+    const context = normalizeLiveContextPayload({
+      audio_part_context: fullPartContext,
+    });
+
+    expect(context?.audio_part_context).toContain("part_order=P1,P2,P3,P4,P5");
+    expect(context?.audio_part_context).toContain("deckA_part=P4");
+    expect(context?.audio_part_context).toContain("deckB_part=P5");
+    expect(context?.audio_part_context).toContain("P3=source_file_lookahead");
+    expect(context?.audio_part_context).toContain(
+      "rule=part_labels_not_outcome_verdict",
+    );
+  });
+
+  it("rejects incomplete or conflicting deck-pair audio part labels", () => {
+    const base = [
+      "audio_part_context[surface=gemini_parts",
+      "P1=live_global_mix",
+      "P1_model_heard=true",
+      "P1_runtime_observed=true",
+      "P1_audience_heard=true",
+      "P1_deck_audio=global_mix_not_stems",
+      "deck1=A",
+      "deck2=B",
+      "together_audio=P1",
+      "per_deck_audio=deck_pair_parts",
+      "duplicate_audio=separate_deck_pair_parts",
+      "rule=part_labels_not_outcome_verdict]",
+    ];
+    const tail = base[base.length - 1];
+    const missingDeckB = [
+      ...base.slice(0, -1),
+      "part_order=P1,P2",
+      "deckA_part=P2",
+      "P2=deckA_configured_capture",
+      "P2_model_heard=true",
+      "P2_audience_heard=false",
+      "P2_deck_audio=deckA_configured_capture",
+      "P2_rule=deck_pair_capture_reference_not_quality_verdict",
+      tail,
+    ].join(" ");
+    const conflictingDeckLabel = [
+      ...base.slice(0, -1),
+      "part_order=P1,P2",
+      "deckA_part=P2",
+      "deckB_part=P2",
+      "P2=deckA_configured_capture",
+      "P2=deckB_configured_capture",
+      "P2_model_heard=true",
+      "P2_audience_heard=false",
+      "P2_deck_audio=deckA_configured_capture",
+      "P2_rule=deck_pair_capture_reference_not_quality_verdict",
+      tail,
+    ].join(" ");
+    const roleConflict = [
+      ...base.slice(0, -1),
+      "part_order=P1,P2,P3",
+      "deckA_part=P2",
+      "P2=deckA_configured_capture",
+      "P2_model_heard=true",
+      "P2_audience_heard=false",
+      "P2_deck_audio=deckA_configured_capture",
+      "P2_rule=deck_pair_capture_reference_not_quality_verdict",
+      "deckB_part=P3",
+      "P3=deckB_configured_capture",
+      "P3_model_heard=true",
+      "P3_audience_heard=false",
+      "P3_deck_audio=deckB_configured_capture",
+      "P3_rule=deck_pair_capture_reference_not_quality_verdict",
+      "P2=user_mic",
+      "P2_deck_audio=none",
+      "P2_rule=not_deck_audio",
+      tail,
+    ].join(" ");
+
+    expect(
+      normalizeLiveContextPayload({ audio_part_context: missingDeckB })
+        ?.audio_part_context,
+    ).toBeUndefined();
+    expect(
+      normalizeLiveContextPayload({ audio_part_context: conflictingDeckLabel })
+        ?.audio_part_context,
+    ).toBeUndefined();
+    expect(
+      normalizeLiveContextPayload({ audio_part_context: roleConflict })
+        ?.audio_part_context,
+    ).toBeUndefined();
+  });
+
+  it("accepts Deck A/B audio-window part labels", () => {
+    const context = normalizeLiveContextPayload({
+      audio_part_context:
+        "audio_part_context[surface=gemini_parts P1=live_global_mix P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true P1_deck_audio=global_mix_not_stems deck1=A deck2=B together_audio=P1 part_order=P1,P2,P3 per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts deckA_part=P2 P2=deckA_configured_capture P2_model_heard=true P2_audience_heard=false P2_deck_audio=deckA_configured_capture P2_rule=deck_pair_capture_reference_not_quality_verdict deckB_part=P3 P3=deckB_configured_capture P3_model_heard=true P3_audience_heard=false P3_deck_audio=deckB_configured_capture P3_rule=deck_pair_capture_reference_not_quality_verdict rule=part_labels_not_outcome_verdict]",
+      audio_window_context:
+        "audio_window_context[P1=master_global_mix P1_heard=true timeline=past_action_future together_audio=P1_global_mix decks_together=true deckA_audio=P2 deckB_audio=P3 per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts deck_separation=deck_lanes_context deck_audio_separation=deck_audio_separation_context deck_part_span=-3.0..0.0 deckA_activity=active deckB_activity=silent lane_aliases=deck1:A,deck2:B pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 rule=time_alignment_not_outcome_verdict move_anchor=none future_heard=false future=not_attached]",
+      audio_window_map: {
+        p1: "master_global_mix",
+        p1_heard: true,
+        timeline: "past_action_future",
+        together_audio: "P1_global_mix",
+        decks_together: true,
+        deckA_audio: "P2",
+        deckB_audio: "P3",
+        per_deck_audio: "deck_pair_parts",
+        duplicate_audio: "separate_deck_pair_parts",
+        deck_separation: "deck_lanes_context",
+        deck_audio_separation: "deck_audio_separation_context",
+        deck_part_span_s: [-3, 0],
+        deck_part_activity: { A: "active", B: "silent", C: "ignored" },
+        lane_aliases: "deck1:A,deck2:B",
+        pre_s: [-6, -1],
+        current_s: [-1, 0],
+        action_s: [-1, 0],
+        move_anchors: [],
+        future: { heard: false, span: "not_attached" },
+        rule: "time_alignment_not_outcome_verdict",
+      },
+    });
+
+    expect(context?.audio_part_context).toContain("deckA_part=P2");
+    expect(context?.audio_window_context).toContain("deckA_audio=P2");
+    expect(context?.audio_window_context).toContain(
+      "per_deck_audio=deck_pair_parts",
+    );
+    expect(context?.audio_window_map?.deckA_audio).toBe("P2");
+    expect(context?.audio_window_map?.deckB_audio).toBe("P3");
+    expect(context?.audio_window_map?.per_deck_audio).toBe("deck_pair_parts");
+    expect(context?.audio_window_map?.duplicate_audio).toBe(
+      "separate_deck_pair_parts",
+    );
+    expect(context?.audio_window_map?.deck_audio_separation).toBe(
+      "deck_audio_separation_context",
+    );
+    expect(context?.audio_window_map?.deck_part_span_s).toEqual([-3, 0]);
+    expect(context?.audio_window_map?.deck_part_activity).toEqual({
+      A: "active",
+      B: "silent",
+    });
+  });
+
+  it("rejects deck-pair audio windows without matching audio part labels", () => {
+    const mismatchedWindow =
+      "audio_window_context[P1=master_global_mix P1_heard=true timeline=past_action_future together_audio=P1_global_mix decks_together=true deckA_audio=P2 deckB_audio=P3 per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts deck_separation=deck_lanes_context deck_audio_separation=deck_audio_separation_context lane_aliases=deck1:A,deck2:B pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 rule=time_alignment_not_outcome_verdict move_anchor=none future_heard=false future=not_attached]";
+    const context = normalizeLiveContextPayload({
+      audio_window_context: mismatchedWindow,
+      audio_window_map: {
+        p1: "master_global_mix",
+        p1_heard: true,
+        timeline: "past_action_future",
+        together_audio: "P1_global_mix",
+        decks_together: true,
+        deckA_audio: "P2",
+        deckB_audio: "P3",
+        per_deck_audio: "deck_pair_parts",
+        duplicate_audio: "separate_deck_pair_parts",
+        deck_separation: "deck_lanes_context",
+        deck_audio_separation: "deck_audio_separation_context",
+        lane_aliases: "deck1:A,deck2:B",
+        pre_s: [-6, -1],
+        current_s: [-1, 0],
+        action_s: [-1, 0],
+        move_anchors: [],
+        future: { heard: false, span: "not_attached" },
+        rule: "time_alignment_not_outcome_verdict",
+      },
+    });
+
+    expect(context?.audio_window_context).toBeUndefined();
+    expect(context?.audio_window_map).toBeUndefined();
+  });
+
+  it("rejects audio windows that disagree with audio part labels", () => {
+    const context = normalizeLiveContextPayload({
+      audio_part_context:
+        "audio_part_context[surface=gemini_parts P1=live_global_mix P1_model_heard=true P1_runtime_observed=true P1_audience_heard=true P1_deck_audio=global_mix_not_stems deck1=A deck2=B together_audio=P1 part_order=P1,P2,P3,P4,P5 per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts deckA_part=P4 P4=deckA_configured_capture P4_model_heard=true P4_audience_heard=false P4_deck_audio=deckA_configured_capture P4_rule=deck_pair_capture_reference_not_quality_verdict deckB_part=P5 P5=deckB_configured_capture P5_model_heard=true P5_audience_heard=false P5_deck_audio=deckB_configured_capture P5_rule=deck_pair_capture_reference_not_quality_verdict rule=part_labels_not_outcome_verdict]",
+      audio_window_context:
+        "audio_window_context[P1=master_global_mix P1_heard=true timeline=past_action_future together_audio=P1_global_mix decks_together=true deckA_audio=P2 deckB_audio=P3 per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts deck_separation=deck_lanes_context deck_audio_separation=deck_audio_separation_context lane_aliases=deck1:A,deck2:B pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 rule=time_alignment_not_outcome_verdict move_anchor=none future_heard=false future=not_attached]",
+      audio_window_map: {
+        p1: "master_global_mix",
+        p1_heard: true,
+        timeline: "past_action_future",
+        together_audio: "P1_global_mix",
+        decks_together: true,
+        deckA_audio: "P2",
+        deckB_audio: "P3",
+        per_deck_audio: "deck_pair_parts",
+        duplicate_audio: "separate_deck_pair_parts",
+        deck_separation: "deck_lanes_context",
+        deck_audio_separation: "deck_audio_separation_context",
+        lane_aliases: "deck1:A,deck2:B",
+        pre_s: [-6, -1],
+        current_s: [-1, 0],
+        action_s: [-1, 0],
+        move_anchors: [],
+        future: { heard: false, span: "not_attached" },
+        rule: "time_alignment_not_outcome_verdict",
+      },
+    });
+
+    expect(context?.audio_part_context).toContain("deckA_part=P4");
+    expect(context?.audio_window_context).toBeUndefined();
+    expect(context?.audio_window_map).toBeUndefined();
+  });
+
+  it("rejects colliding Deck A/B audio-window part labels", () => {
+    const collidingWindow =
+      "audio_window_context[P1=master_global_mix P1_heard=true timeline=past_action_future together_audio=P1_global_mix decks_together=true deckA_audio=P2 deckB_audio=P2 per_deck_audio=deck_pair_parts duplicate_audio=separate_deck_pair_parts deck_separation=deck_lanes_context deck_audio_separation=deck_audio_separation_context lane_aliases=deck1:A,deck2:B pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 rule=time_alignment_not_outcome_verdict move_anchor=none future_heard=false future=not_attached]";
+    const baseMap = {
+      p1: "master_global_mix",
+      p1_heard: true,
+      timeline: "past_action_future",
+      together_audio: "P1_global_mix",
+      decks_together: true,
+      deckA_audio: "P2",
+      deckB_audio: "P2",
+      per_deck_audio: "deck_pair_parts",
+      duplicate_audio: "separate_deck_pair_parts",
+      deck_separation: "deck_lanes_context",
+      deck_audio_separation: "deck_audio_separation_context",
+      lane_aliases: "deck1:A,deck2:B",
+      pre_s: [-6, -1],
+      current_s: [-1, 0],
+      action_s: [-1, 0],
+      move_anchors: [],
+      future: { heard: false, span: "not_attached" },
+      rule: "time_alignment_not_outcome_verdict",
+    };
+
+    const context = normalizeLiveContextPayload({
+      audio_window_context: collidingWindow,
+      audio_window_map: baseMap,
+    });
+
+    expect(context?.audio_window_context).toBeUndefined();
+    expect(context?.audio_window_map).toBeUndefined();
+  });
+
   it("normalizes recent move labels from session snapshots", () => {
     const moves = normalizeLiveMovePayload({
       type: "ipc.session.snapshot",
@@ -634,7 +1063,7 @@ describe("runtime response normalizers", () => {
       },
     });
 
-    expect(context?.live_evidence?.mix).toHaveLength(8);
+    expect(context?.live_evidence?.mix).toHaveLength(10);
     expect(context?.live_evidence?.mix).toContain(
       "deck_lanes=A_known_route_dominant+B_unknown_route_muted",
     );

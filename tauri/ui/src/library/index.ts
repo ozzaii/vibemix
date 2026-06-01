@@ -144,14 +144,19 @@ let latestLiveContext: LibraryLiveContext | null = null;
 let latestRecentMoves: string[] = [];
 let latestMoveWindow: Array<{ label: string; seenAtMs: number }> = [];
 const LIVE_MOVE_CONTEXT_TTL_MS = 8_000;
-const LIVE_EVIDENCE_CAP = 8;
-const LIVE_EVIDENCE_REFS_CAP = 9;
+const LIVE_EVIDENCE_CAP = 10;
+const LIVE_EVIDENCE_REFS_CAP = 14;
 const LIVE_MIDI_EVIDENCE_CAP = 4;
 const LIVE_CONTEXT_TEXT_KEYS = [
   "deck_lanes_context",
   "deck_reference_context",
   "deck_source_context",
   "deck_audio_context",
+  "deck_audio_separation_context",
+  "deck_audio_features_context",
+  "deck_audio_delta_context",
+  "deck_audio_window_context",
+  "audio_part_context",
 ] as const;
 
 function baseLiveContext(
@@ -190,12 +195,16 @@ function liveEvidencePriority(token: string): number {
     return 4;
   if (token.includes("transition_candidate=")) return 5;
   if (token.includes("second_deck_identity=")) return 6;
-  if (token.includes("move_scope=")) return 7;
+  if (token.includes("deck_audio_capture=")) return 7;
+  if (token.includes("deck_audio_features=")) return 8;
+  if (token.includes("deck_audio_delta=")) return 9;
+  if (token.includes("deck_audio_window=")) return 10;
+  if (token.includes("move_scope=")) return 11;
   if (token.includes("move_effect=") || token.includes("audio_delta="))
-    return 8;
-  if (token.includes("deck_audio_support=")) return 9;
-  if (token.includes("deck_route=")) return 10;
-  return 11;
+    return 12;
+  if (token.includes("deck_audio_support=")) return 13;
+  if (token.includes("deck_route=")) return 14;
+  return 15;
 }
 
 function mergeLiveEvidenceTokens(
@@ -259,7 +268,10 @@ function mergeLiveEvidence(
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
-function mergeAudioDelta(existing?: string[], incoming?: string[]): string[] | undefined {
+function mergeAudioDelta(
+  existing?: string[],
+  incoming?: string[],
+): string[] | undefined {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const list of [existing, incoming]) {
@@ -276,9 +288,13 @@ function mergeAudioDelta(existing?: string[], incoming?: string[]): string[] | u
 function mergeLiveContext(
   existing: LibraryLiveContext | null,
   incoming: LibraryLiveContext,
-): LibraryLiveContext {
-  const normalizedIncoming = normalizeLiveContextPayload(incoming) ?? incoming;
-  if (normalizedIncoming.recent_moves && normalizedIncoming.recent_moves.length > 0) {
+): LibraryLiveContext | null {
+  const normalizedIncoming = normalizeLiveContextPayload(incoming);
+  if (!normalizedIncoming) return liveContextForChat(existing);
+  if (
+    normalizedIncoming.recent_moves &&
+    normalizedIncoming.recent_moves.length > 0
+  ) {
     rememberLiveMoves(normalizedIncoming.recent_moves);
   }
   const oldBase = baseLiveContext(existing) ?? {};
@@ -307,8 +323,10 @@ function mergeLiveContext(
     merged.deck_mixer = oldBase.deck_mixer;
   }
   if (merged.deck_mixer !== undefined) {
-    if (Object.keys(merged.deck_mixer.A ?? {}).length === 0) delete merged.deck_mixer.A;
-    if (Object.keys(merged.deck_mixer.B ?? {}).length === 0) delete merged.deck_mixer.B;
+    if (Object.keys(merged.deck_mixer.A ?? {}).length === 0)
+      delete merged.deck_mixer.A;
+    if (Object.keys(merged.deck_mixer.B ?? {}).length === 0)
+      delete merged.deck_mixer.B;
     if (Object.keys(merged.deck_mixer).length === 0) delete merged.deck_mixer;
   }
   if (newBase.deck_source_status !== undefined) {
@@ -387,7 +405,8 @@ function renderResults(result: SearchResult, mode: LibraryMode): void {
     });
   }
 
-  $("vmx-lib-rcount").textContent = `${result.results.length} of ${result.corpus_size}`;
+  $("vmx-lib-rcount").textContent =
+    `${result.results.length} of ${result.corpus_size}`;
   $("vmx-lib-scope-state").textContent = result.centered ? "centered" : "raw";
   $("vmx-lib-scope").innerHTML = renderScope(result, mode);
 }
@@ -633,7 +652,9 @@ function installStatusLine(models: LibraryModelsResult): string | null {
   }
 
   const files = install.results.flatMap((result) => result.files);
-  const downloaded = files.filter((file) => file.status === "downloaded").length;
+  const downloaded = files.filter(
+    (file) => file.status === "downloaded",
+  ).length;
   const skipped = files.filter((file) => file.status === "skipped").length;
   const verified = downloaded + skipped;
   const prefix =
@@ -644,7 +665,8 @@ function installStatusLine(models: LibraryModelsResult): string | null {
         : install.target === "all"
           ? "Local models ready"
           : "CLAP ready";
-  if (downloaded > 0) return `${prefix}: downloaded ${downloaded}/${files.length}`;
+  if (downloaded > 0)
+    return `${prefix}: downloaded ${downloaded}/${files.length}`;
   if (verified > 0) return `${prefix}: verified ${verified} files`;
   return prefix;
 }
@@ -716,10 +738,16 @@ export function deriveModelSetupView(
         : "CUE manual repair"
       : "CUE optional";
   const needsClap =
-    clap?.installed === false || clapMismatched || models.required_ready === false;
-  const needsCue = cueInstallable && (cue?.installed === false || cueMismatched);
-  const installTarget: LibraryModelInstallTarget | null =
-    needsClap ? "required" : needsCue ? "cue" : null;
+    clap?.installed === false ||
+    clapMismatched ||
+    models.required_ready === false;
+  const needsCue =
+    cueInstallable && (cue?.installed === false || cueMismatched);
+  const installTarget: LibraryModelInstallTarget | null = needsClap
+    ? "required"
+    : needsCue
+      ? "cue"
+      : null;
   const installButtonText =
     installTarget === "required"
       ? hasInstallError
@@ -788,15 +816,25 @@ function renderAgentSetup(stats: LibraryStats | null): void {
   stateEl.textContent = hint ?? "";
 }
 
-function setProgress(n: number, total: number, costEur: number, note: string): void {
+function setProgress(
+  n: number,
+  total: number,
+  costEur: number,
+  note: string,
+): void {
   const pct = total > 0 ? (n / total) * 100 : 0;
   ($("vmx-lib-progress-fill") as HTMLElement).style.transform =
     `scaleX(${Math.max(0, Math.min(1, pct / 100)).toFixed(3)})`;
-  $("vmx-lib-prog-n").innerHTML = `${n}<small> / ${total}${note ? ` · ${esc(note)}` : ""}</small>`;
+  $("vmx-lib-prog-n").innerHTML =
+    `${n}<small> / ${total}${note ? ` · ${esc(note)}` : ""}</small>`;
   $("vmx-lib-prog-cost").textContent = `~€${costEur.toFixed(2)}`;
 }
 
-function appendLog(status: EmbedProgress["status"], filename: string, costEur: number): void {
+function appendLog(
+  status: EmbedProgress["status"],
+  filename: string,
+  costEur: number,
+): void {
   const el = $("vmx-lib-loglist");
   el.insertAdjacentHTML(
     "afterbegin",
@@ -829,7 +867,11 @@ function appendChatTurn(
   return turn;
 }
 
-function setChatTurnText(turn: HTMLElement, text: string, pending = false): void {
+function setChatTurnText(
+  turn: HTMLElement,
+  text: string,
+  pending = false,
+): void {
   const body = turn.querySelector<HTMLElement>(".body");
   if (body) body.textContent = text;
   if (pending) turn.dataset.pending = "true";
@@ -872,6 +914,38 @@ function proofDeckResolved(deck?: LibraryLiveDeck): boolean {
   );
 }
 
+const LIVE_TRUSTED_DECK_SOURCES = new Set([
+  "rekordbox_xml",
+  "folder_cache",
+  "screen_vision",
+  "numpy_key",
+  "nowplaying",
+]);
+
+function proofDeckCitable(deck?: LibraryLiveDeck): boolean {
+  return (deck?.confidence ?? 0) >= 0.3 && Boolean(deck?.track_id);
+}
+
+function proofDeckSourced(deck?: LibraryLiveDeck): boolean {
+  const source = deck?.source ?? "";
+  return proofDeckCitable(deck) && LIVE_TRUSTED_DECK_SOURCES.has(source);
+}
+
+function liveDeckPairResolved(context: LibraryLiveContext): boolean {
+  const deckState = context.deck_state ?? {};
+  return proofDeckResolved(deckState.A) && proofDeckResolved(deckState.B);
+}
+
+function liveDeckPairCitable(context: LibraryLiveContext): boolean {
+  const deckState = context.deck_state ?? {};
+  return proofDeckCitable(deckState.A) && proofDeckCitable(deckState.B);
+}
+
+function liveDeckPairSourced(context: LibraryLiveContext): boolean {
+  const deckState = context.deck_state ?? {};
+  return proofDeckSourced(deckState.A) && proofDeckSourced(deckState.B);
+}
+
 function proofRouteTier(score: number): string {
   if (score <= 0.04) return "muted";
   if (score < 0.2) return "low";
@@ -892,7 +966,9 @@ function proofXfaderFactor(side: "A" | "B", xfader: number): number {
   return 1;
 }
 
-function proofRouteScores(context: LibraryLiveContext): Array<[string, number]> {
+function proofRouteScores(
+  context: LibraryLiveContext,
+): Array<[string, number]> {
   const mixer = context.deck_mixer;
   if (!mixer?.connected) return [];
   const xfader = Math.max(0, Math.min(127, Math.round(mixer.xfader ?? 64)));
@@ -915,8 +991,12 @@ function deckLaneSummary(context: LibraryLiveContext | null): string | null {
   if (!context) return null;
   const deckState = context.deck_state ?? {};
   const scoreMap = new Map(proofRouteScores(context));
-  const aRoute = scoreMap.has("A") ? proofRouteTier(scoreMap.get("A") ?? 0) : "unknown";
-  const bRoute = scoreMap.has("B") ? proofRouteTier(scoreMap.get("B") ?? 0) : "unknown";
+  const aRoute = scoreMap.has("A")
+    ? proofRouteTier(scoreMap.get("A") ?? 0)
+    : "unknown";
+  const bRoute = scoreMap.has("B")
+    ? proofRouteTier(scoreMap.get("B") ?? 0)
+    : "unknown";
   return `deck1 A=${liveDeckIdentity(deckState.A)}:${aRoute} / deck2 B=${liveDeckIdentity(deckState.B)}:${bRoute}`;
 }
 
@@ -929,11 +1009,49 @@ function hasLiveProofTransitionGate(context: LibraryLiveContext): boolean {
   );
 }
 
-function liveProofStatus(
-  context: LibraryLiveContext | null,
-): { ok: boolean; state: string; detail: string } {
+function liveDeckPairCaptureConfigured(context: LibraryLiveContext): boolean {
+  const text = context.deck_audio_separation_context ?? "";
+  return (
+    text.includes("mode=deck_pair_capture_configured") &&
+    text.includes("deckA_audio=captured") &&
+    text.includes("deckB_audio=captured") &&
+    text.includes("per_deck_audio=captured_not_attached")
+  );
+}
+
+function liveEvidenceTokens(
+  context: LibraryLiveContext,
+  needle: string,
+): string[] {
+  return [
+    ...(context.live_evidence?.mix ?? []),
+    ...(context.live_evidence?.refs ?? []),
+  ].filter((token) => token.includes(needle));
+}
+
+function liveDeckAudioCaptureTokens(context: LibraryLiveContext): string[] {
+  return liveEvidenceTokens(context, "deck_audio_capture=");
+}
+
+function liveDeckAudioCaptureActive(context: LibraryLiveContext): boolean {
+  return liveDeckAudioCaptureTokens(context).some(
+    (token) => token.includes("A_active") || token.includes("B_active"),
+  );
+}
+
+function liveDeckAudioCaptureBothActive(context: LibraryLiveContext): boolean {
+  return liveDeckAudioCaptureTokens(context).some(
+    (token) => token.includes("A_active") && token.includes("B_active"),
+  );
+}
+
+function liveProofStatus(context: LibraryLiveContext | null): {
+  ok: boolean;
+  state: string;
+  detail: string;
+} {
   if (!context) {
-    return { ok: false, state: "not armed", detail: "waiting for live deck feed" };
+    return { ok: false, state: "waiting", detail: "live deck feed" };
   }
   const capabilities = new Set(context.live_context_capabilities ?? []);
   const transportOk =
@@ -942,6 +1060,9 @@ function liveProofStatus(
       "deck_source_status",
       "audio_part_context",
       "deck_audio_separation_context",
+      "deck_audio_features_context",
+      "deck_audio_delta_context",
+      "deck_audio_window_context",
       "audio_window_map",
       "audio_delta",
       "live_evidence",
@@ -956,6 +1077,14 @@ function liveProofStatus(
   if (!context.deck_source_context || !context.deck_source_status) {
     missing.push("source");
   }
+  if (!liveDeckPairResolved(context)) {
+    missing.push("deck identities");
+  }
+  if (!liveDeckPairCitable(context)) {
+    missing.push("deck track IDs");
+  } else if (!liveDeckPairSourced(context)) {
+    missing.push("deck sources");
+  }
   if (
     !context.deck_audio_context ||
     !context.deck_audio_separation_context ||
@@ -967,10 +1096,39 @@ function liveProofStatus(
   if (!hasLiveProofTransitionGate(context)) {
     missing.push("gate");
   }
-  if (missing.length > 0) {
-    return { ok: false, state: "partial", detail: missing.slice(0, 2).join(" + ") };
+  if (!liveDeckPairCaptureConfigured(context)) {
+    missing.push("deck audio");
+  } else if (!context.deck_audio_features_context) {
+    missing.push("deck audio features");
+  } else if (!context.deck_audio_delta_context) {
+    missing.push("deck audio delta");
+  } else if (!context.deck_audio_window_context) {
+    missing.push("deck audio window");
+  } else if (liveDeckAudioCaptureTokens(context).length === 0) {
+    missing.push("deck audio receipt");
+  } else if (!liveDeckAudioCaptureActive(context)) {
+    missing.push("deck audio idle");
+  } else if (!liveDeckAudioCaptureBothActive(context)) {
+    missing.push("both decks active");
+  } else if (liveEvidenceTokens(context, "deck_audio_features=").length === 0) {
+    missing.push("deck audio feature receipt");
+  } else if (liveEvidenceTokens(context, "deck_audio_delta=").length === 0) {
+    missing.push("deck audio delta receipt");
+  } else if (liveEvidenceTokens(context, "deck_audio_window=").length === 0) {
+    missing.push("deck audio window receipt");
   }
-  return { ok: true, state: "armed", detail: deckLaneSummary(context) ?? "deck lanes armed" };
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      state: "partial",
+      detail: missing.slice(0, 2).join(" + "),
+    };
+  }
+  return {
+    ok: true,
+    state: "armed",
+    detail: deckLaneSummary(context) ?? "deck lanes armed",
+  };
 }
 
 function appendLiveProofStatusToolRow(
@@ -988,7 +1146,7 @@ function appendLiveProofStatusToolRow(
   const text = document.createElement("div");
   const name = document.createElement("div");
   name.className = "name";
-  name.textContent = "live proof";
+  name.textContent = "live read";
   const arg = document.createElement("div");
   arg.className = "arg";
   arg.textContent = `${status.state} · ${status.detail}`;
@@ -1003,8 +1161,9 @@ function renderChatIdleSide(): void {
   tools.replaceChildren();
   appendLiveProofStatusToolRow(tools, latestLiveContext);
   $("vmx-lib-chat-artifact").replaceChildren();
-  $("vmx-lib-scope-state").textContent =
-    liveProofStatus(latestLiveContext).ok ? "live proof armed" : "ready";
+  $("vmx-lib-scope-state").textContent = liveProofStatus(latestLiveContext).ok
+    ? "live read armed"
+    : "ready";
 }
 
 /** Append one live tool-tape row as Viber fires it (the agentic work made
@@ -1039,23 +1198,21 @@ function liveVerificationStateText(v: LibraryLiveVerification): string {
     v.transport_status === "fresh_schema_v2"
       ? "fresh"
       : v.transport_status === "missing_live_context"
-        ? "not armed"
+        ? "waiting"
         : v.transport_status === "stale_or_pre_schema_v2"
           ? "partial"
           : "checked";
   const policy =
     v.claim_policy === "requires_more_evidence"
-      ? "needs proof"
+      ? "listening"
       : v.claim_policy === "blocked" || v.claim_policy === "watch_not_claim"
-        ? "verdict held"
+        ? "live move checked"
         : v.claim_policy === "candidate_not_verdict"
-          ? "candidate only"
+          ? "setup noted"
+          : v.claim_policy === "supported_verdict"
+            ? "scoring grounded"
           : "ready";
-  const result = v.ok
-    ? v.guard_applied
-      ? "claim held"
-      : "checked"
-    : "needs proof";
+  const result = v.ok ? (v.guard_applied ? "grounded" : "checked") : "waiting";
   return `${transport} · ${policy} · ${result}`;
 }
 
@@ -1072,7 +1229,7 @@ function appendLiveVerificationToolRow(
   const text = document.createElement("div");
   const name = document.createElement("div");
   name.className = "name";
-  name.textContent = "live proof";
+  name.textContent = "live read";
   const arg = document.createElement("div");
   arg.className = "arg";
   arg.textContent = liveVerificationStateText(verification);
@@ -1086,21 +1243,19 @@ function isInternalLiveProofTool(tool: LibraryChatToolTrace): boolean {
 }
 
 function chatToolDisplayName(name: string): string {
-  return name === "live_context_required" ? "live proof" : name;
+  return name === "live_context_required" ? "live read" : name;
 }
 
-function chatToolDisplayArg(
-  name: string,
-  arg: string,
-  ok: boolean,
-): string {
-  if (name === "live_context_required") return "not armed";
+function chatToolDisplayArg(name: string, arg: string, ok: boolean): string {
+  if (name === "live_context_required") return "waiting";
   return arg || (ok ? "ok" : "failed");
 }
 
 function chatScopeStateText(result: LibraryChatResult): string {
-  if (isChatSetupStop(result.stop_reason)) return `setup · ${result.stop_reason}`;
-  if (result.stop_reason === "live_context_required") return "live proof needed";
+  if (isChatSetupStop(result.stop_reason))
+    return `setup · ${result.stop_reason}`;
+  if (result.stop_reason === "live_context_required")
+    return "live read waiting";
   return `${result.iterations} iter · ${result.stop_reason}`;
 }
 
@@ -1186,13 +1341,13 @@ function chatArtifactCard(result: LibraryChatResult): HTMLElement | null {
   label.textContent = result.playlist
     ? "playlist"
     : result.export_path
-        ? "export"
-        : clarification
-          ? "clarify"
-          : setupStop
-            ? "setup"
-            : result.live_verification
-              ? "live proof"
+      ? "export"
+      : clarification
+        ? "clarify"
+        : setupStop
+          ? "setup"
+          : result.live_verification
+            ? "live read"
             : result.move_grades.length > 0
               ? "moves"
               : "receipts";
@@ -1219,11 +1374,14 @@ function chatArtifactCard(result: LibraryChatResult): HTMLElement | null {
   if (result.playlist) {
     appendChatCardLine(card, result.playlist.name);
     appendChatCardLine(card, `${result.playlist.track_ids.length} tracks`);
-    if (result.playlist.m3u_path) appendChatCardLine(card, result.playlist.m3u_path);
+    if (result.playlist.m3u_path)
+      appendChatCardLine(card, result.playlist.m3u_path);
     appendChatSetBreakdown(card, result.playlist, result.move_grades);
   }
   if (result.export_path) appendChatCardLine(card, result.export_path);
-  result.move_grades.slice(0, 4).forEach((grade) => appendChatMoveGradeLine(card, grade));
+  result.move_grades
+    .slice(0, 4)
+    .forEach((grade) => appendChatMoveGradeLine(card, grade));
   if (!result.playlist && result.seen_track_ids.length > 0) {
     appendChatCardLine(card, result.seen_track_ids.slice(0, 6).join(" · "));
   }
@@ -1234,9 +1392,15 @@ function appendChatLiveVerificationLines(
   card: HTMLElement,
   verification: LibraryLiveVerification,
 ): void {
-  appendChatCardLine(card, `live proof: ${liveVerificationStateText(verification)}`);
+  appendChatCardLine(
+    card,
+    `live read: ${liveVerificationStateText(verification)}`,
+  );
   if (verification.move_grades_seen > 0 && !verification.move_grades_allowed) {
-    appendChatCardLine(card, "move grades held until live proof supports them");
+    appendChatCardLine(card, "move scoring waits for a stronger live read");
+  }
+  if (verification.move_grades_seen > 0 && verification.move_grades_allowed) {
+    appendChatCardLine(card, "move scoring grounded by live read");
   }
 }
 
@@ -1326,7 +1490,9 @@ function chatMoveGradeProgressText(grade: LibraryChatMoveGrade): string {
   return parts.join(" / ");
 }
 
-function chatMoveGradeIntelState(grade: LibraryChatMoveGrade): "care" | "earned" | "overdrive" {
+function chatMoveGradeIntelState(
+  grade: LibraryChatMoveGrade,
+): "care" | "earned" | "overdrive" {
   if (grade.level_up === true || grade.overdrive) return "overdrive";
   if (grade.slug === "negative" || grade.slug === "mid") return "care";
   return "earned";
@@ -1337,7 +1503,10 @@ function chatMoveGradeTitle(grade: LibraryChatMoveGrade): string {
   return grade.reason ? `DJ KNOWS · ${grade.reason}` : "DJ KNOWS";
 }
 
-function appendChatMoveGradeLine(card: HTMLElement, grade: LibraryChatMoveGrade): void {
+function appendChatMoveGradeLine(
+  card: HTMLElement,
+  grade: LibraryChatMoveGrade,
+): void {
   const row = document.createElement("div");
   row.className = "vmx-lib-chat-grade";
   row.dataset.wire = "library.chat-move-grade";
@@ -1439,9 +1608,11 @@ export function mountLibrary(): void {
 
   function applyModeVisibility(): void {
     document.body.dataset.mode = state.mode;
-    document.querySelectorAll<HTMLElement>(".vmx-lib-modeswitch button").forEach((b) => {
-      b.setAttribute("aria-selected", String(b.dataset.mode === state.mode));
-    });
+    document
+      .querySelectorAll<HTMLElement>(".vmx-lib-modeswitch button")
+      .forEach((b) => {
+        b.setAttribute("aria-selected", String(b.dataset.mode === state.mode));
+      });
     document.querySelectorAll<HTMLElement>("[data-for]").forEach((el) => {
       const modes = (el.dataset.for ?? "").split(" ");
       el.style.display = modes.includes(state.mode) ? "" : "none";
@@ -1484,7 +1655,9 @@ export function mountLibrary(): void {
   }
 
   function currentInstallTarget(): LibraryModelInstallTarget {
-    return modelInstallTargetFromDataset(installModelsBtn.dataset.installTarget);
+    return modelInstallTargetFromDataset(
+      installModelsBtn.dataset.installTarget,
+    );
   }
 
   function isCurrentRun(runId: number, mode: LibraryMode): boolean {
@@ -1670,7 +1843,11 @@ export function mountLibrary(): void {
     cancelActiveRun = null;
     // Reset the live tool tape for the Viber/Codex modes that stream tool calls,
     // so each run's tape starts clean (the listener repopulates it live).
-    if (modeAtStart === "chat" || modeAtStart === "curate" || modeAtStart === "build") {
+    if (
+      modeAtStart === "chat" ||
+      modeAtStart === "curate" ||
+      modeAtStart === "build"
+    ) {
       const liveTools = $("vmx-lib-chat-tools");
       liveTools.replaceChildren();
       delete liveTools.dataset.live;
@@ -1737,31 +1914,33 @@ export function mountLibrary(): void {
     }
   });
 
-  document.querySelectorAll<HTMLElement>(".vmx-lib-modeswitch button").forEach((b) => {
-    b.addEventListener("click", () => {
-      const previousMode = state.mode;
-      const mode = (b.dataset.mode ?? "search") as LibraryMode;
-      if (mode !== previousMode) cancelRun();
-      state = setMode(state, mode);
-      applyModeVisibility();
-      // The set-notes block is shared by curate + build; only clear it when
-      // leaving BOTH so a fresh build/curate keeps its own working state.
-      if (mode !== "curate" && mode !== "build") clearRationale();
-      if ((mode === "curate" || mode === "build") && previousMode !== mode) {
-        renderAgentIdle(mode);
-      }
-      if (mode === "build") syncCurvePicker();
-      if (mode === "ingest") {
-        // show last-known progress shape, don't auto-run
-        $("vmx-lib-loglist").innerHTML = "";
-        setProgress(0, DEV_FALLBACK.embedLog.length, 0, "");
-      } else if (mode === "chat") {
-        ensureChatIntro(chatThread);
-      } else if (mode === "search" || mode === "similar") {
-        void run();
-      }
+  document
+    .querySelectorAll<HTMLElement>(".vmx-lib-modeswitch button")
+    .forEach((b) => {
+      b.addEventListener("click", () => {
+        const previousMode = state.mode;
+        const mode = (b.dataset.mode ?? "search") as LibraryMode;
+        if (mode !== previousMode) cancelRun();
+        state = setMode(state, mode);
+        applyModeVisibility();
+        // The set-notes block is shared by curate + build; only clear it when
+        // leaving BOTH so a fresh build/curate keeps its own working state.
+        if (mode !== "curate" && mode !== "build") clearRationale();
+        if ((mode === "curate" || mode === "build") && previousMode !== mode) {
+          renderAgentIdle(mode);
+        }
+        if (mode === "build") syncCurvePicker();
+        if (mode === "ingest") {
+          // show last-known progress shape, don't auto-run
+          $("vmx-lib-loglist").innerHTML = "";
+          setProgress(0, DEV_FALLBACK.embedLog.length, 0, "");
+        } else if (mode === "chat") {
+          ensureChatIntro(chatThread);
+        } else if (mode === "search" || mode === "similar") {
+          void run();
+        }
+      });
     });
-  });
 
   // vibe-query suggestion chips (search mode)
   document.querySelectorAll<HTMLElement>("[data-chip]").forEach((chip) => {
@@ -1795,7 +1974,8 @@ export function mountLibrary(): void {
         chip.dataset.strategy === "mean" ? "mean_excerpt" : "cue_anchored";
       state = setStrategy(state, strat);
       document.querySelectorAll<HTMLElement>("[data-strategy]").forEach((c) => {
-        const wire = c.dataset.strategy === "mean" ? "mean_excerpt" : "cue_anchored";
+        const wire =
+          c.dataset.strategy === "mean" ? "mean_excerpt" : "cue_anchored";
         c.setAttribute("aria-pressed", String(wire === strat));
       });
     });
@@ -1859,7 +2039,12 @@ export function mountLibrary(): void {
   void onEmbedProgress((p: EmbedProgress) => {
     if (!busy || state.mode !== "ingest") return;
     appendLog(p.status, p.filename, p.cost_eur);
-    setProgress(p.n, p.total, p.cost_eur, p.filename.replace(/\.[a-z0-9]+$/i, ""));
+    setProgress(
+      p.n,
+      p.total,
+      p.cost_eur,
+      p.filename.replace(/\.[a-z0-9]+$/i, ""),
+    );
   });
   void onEmbedDone((d: EmbedDone) => {
     if (!busy || state.mode !== "ingest") return;
@@ -1882,7 +2067,11 @@ export function mountLibrary(): void {
   // not an opaque wait. No-op listener outside Tauri (dev/jsdom).
   void onViberTool((e: LibraryViberToolEvent) => {
     if (!busy) return;
-    if (state.mode !== "chat" && state.mode !== "curate" && state.mode !== "build") {
+    if (
+      state.mode !== "chat" &&
+      state.mode !== "curate" &&
+      state.mode !== "build"
+    ) {
       return;
     }
     appendLiveToolRow(e);
@@ -1925,7 +2114,9 @@ async function wireDropZone(onFile: (path: string) => void): Promise<void> {
           if (seen.has(id)) return;
           seen.add(id);
         }
-        const audio = payload.paths.find((p) => /\.(wav|mp3|m4a|flac)$/i.test(p));
+        const audio = payload.paths.find((p) =>
+          /\.(wav|mp3|m4a|flac)$/i.test(p),
+        );
         if (audio) onFile(audio);
       }
     });
@@ -1936,6 +2127,9 @@ async function wireDropZone(onFile: (path: string) => void): Promise<void> {
 
 // Auto-mount when loaded as the library.html entry (skipped under vitest,
 // which imports the pure modules directly).
-if (typeof document !== "undefined" && document.getElementById("vmx-lib-runbtn")) {
+if (
+  typeof document !== "undefined" &&
+  document.getElementById("vmx-lib-runbtn")
+) {
   mountLibrary();
 }
