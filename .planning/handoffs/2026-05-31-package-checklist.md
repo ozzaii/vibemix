@@ -834,6 +834,33 @@ Proof before staging:
 - `git diff --check -- tests/library/test_cue_export.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AE - Library CLI Exit Codes Test Ruff Hygiene
+
+Suggested commit: `test(library): clean cli exit codes test lint`
+
+Include:
+
+- `tests/library/test_cli_exit_codes.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- CLI implementation, `src/vibemix/__main__.py`, library curate source, runtime
+  files, and generated files.
+
+Reason:
+
+- The CLI exit-code tests imported `io` and `sys` without using them and had a
+  stale extra blank line in the import block. Removing the dead imports keeps
+  the focused library-test ruff gate clean without changing exit-code coverage.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_cli_exit_codes.py`
+- `uv run pytest -q tests/library/test_cli_exit_codes.py`
+- `git diff --check -- tests/library/test_cli_exit_codes.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

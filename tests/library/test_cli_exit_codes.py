@@ -40,15 +40,12 @@ posture unit-level without invoking the real Telegram bridge.
 from __future__ import annotations
 
 import argparse
-import io
-import sys
 from unittest.mock import patch
 
 import pytest
 
 import vibemix.__main__ as m
 from vibemix.library.codex_curate import CodexCurateResult
-
 
 # ──────────────────────────────────────────────────────────────────────
 # Fixtures
