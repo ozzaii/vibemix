@@ -38,14 +38,11 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import pytest
 from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
 from vibemix.coach import CitationLinter, StrippedRateTracker
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState
-
 
 # ---------- helpers ----------
 
@@ -307,7 +304,7 @@ def test_citation_pass_no_head_yields_after_stream(mocker, tmp_path) -> None:
     stream completes via the legacy emit branch (head never fired)."""
     registry = EvidenceRegistry()
     registry.write("ev", "KICK_SWAP", 45.2)
-    agent, gen, recorder, state, _, playback = _build_agent_wired(
+    agent, gen, recorder, state, _, _playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -372,8 +369,9 @@ def test_single_sentence_single_chunk_streams_immediately(mocker, tmp_path) -> N
     streaming feel).
 
     Chunk-by-chunk yield: the clean ``"[excited]"`` opener clears the
-    speed-gate AND brackets close before the terminal ``.``, so the
-    whole chunk yields immediately as ``chunks[0]``."""
+    speed-gate, gets stripped as an internal voice tag, and brackets close
+    before the terminal ``.``, so the spoken chunk still yields immediately
+    as ``chunks[0]``."""
     agent, gen, recorder, state = _build_agent_legacy(mocker, tmp_path)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
@@ -385,9 +383,7 @@ def test_single_sentence_single_chunk_streams_immediately(mocker, tmp_path) -> N
     ev = Event(type="HEARTBEAT", state=state, extra={})
     agent.set_next_event(ev)
     chunks = _drive(agent)
-    assert chunks == [
-        "[excited] That kick is absolutely brutal — pure warehouse pressure."
-    ]
+    assert chunks == ["That kick is absolutely brutal — pure warehouse pressure."]
     kinds = [k for k, _ in recorder.events]
     # llm_to_tts meter records the first-yield delta (head_yielded=True path).
     assert "llm_to_tts_delta_ms" in kinds

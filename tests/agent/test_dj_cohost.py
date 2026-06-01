@@ -341,6 +341,35 @@ def test_llm_node_strips_unknown_emote_tags_without_mascot_intent(mocker, tmp_pa
     assert "mascot_reaction_intent" not in [kind for kind, _fields in recorder.events]
 
 
+def test_llm_node_strips_legacy_voice_tags_from_speech_and_ai_message(
+    mocker, tmp_path
+) -> None:
+    """Legacy Gemini-TTS tags are internal controls, not user-visible speech."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["[chill] A fast kick sat over the low end."])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    chunks = _drive_llm_node(agent)
+
+    assert "".join(chunks) == "A fast kick sat over the low end."
+    assert state.last_reaction_intent is None
+    ai_texts = [fields["text"] for kind, fields in recorder.events if kind == "ai_text"]
+    assert ai_texts == ["A fast kick sat over the low end."]
+    rows = [fields for kind, fields in recorder.events if kind == "ai_message"]
+    assert len(rows) == 1
+    assert rows[0]["message"] == "A fast kick sat over the low end."
+    assert rows[0]["extra"]["spoken_response_chars"] == len(
+        "A fast kick sat over the low end."
+    )
+    assert "[chill]" not in rows[0]["message"]
+    assert "mascot_reaction_intent" not in [kind for kind, _fields in recorder.events]
+
+
 def test_llm_node_ai_message_uses_prompt_time_mixer_snapshot(mocker, tmp_path) -> None:
     """Model latency must not rewrite the saved mixer evidence for the turn."""
     agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)

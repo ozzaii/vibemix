@@ -52,6 +52,10 @@ class TestParseEmoteTags:
         assert has_emote_tag("[emote:wink]")
         assert not has_emote_tag("[emote:wave whoops")
 
+    def test_has_emote_tag_detects_legacy_voice_tags(self) -> None:
+        assert has_emote_tag("[chill] easy now")
+        assert has_emote_tag("[excited] drop")
+
     def test_all_whitelisted_tags_round_trip(self) -> None:
         text = " ".join(f"[emote:{name}]" for name in sorted(REACTION_WHITELIST))
         intents = parse_emote_tags(text)
@@ -76,6 +80,16 @@ class TestStripEmoteTags:
         # …but absent from intent list.
         assert intents == []
 
+    def test_strip_legacy_voice_tag_removes_from_text_but_not_intents(self) -> None:
+        clean, intents = strip_emote_tags("[chill] A fast kick sat over the low end.")
+        assert clean == "A fast kick sat over the low end."
+        assert intents == []
+
+    def test_strip_voice_tag_preserves_citations_for_linter(self) -> None:
+        clean, intents = strip_emote_tags("[excited] hit there [aud:rms@12.0]")
+        assert clean == "hit there [aud:rms@12.0]"
+        assert intents == []
+
     def test_strip_no_tags_returns_text_unchanged_after_trim(self) -> None:
         clean, intents = strip_emote_tags("  just words  ")
         assert clean == "just words"
@@ -90,6 +104,11 @@ class TestStripEmoteTags:
         clean, intents = strip_emote_tags("Hello [emote:wave]  world", normalize=False)
         assert clean == "Hello   world"
         assert intents == ["wave"]
+
+    def test_strip_voice_tags_can_preserve_streaming_whitespace(self) -> None:
+        clean, intents = strip_emote_tags("[excited]  Drop.", normalize=False)
+        assert clean == "Drop."
+        assert intents == []
 
 
 class TestWhitelistContract:

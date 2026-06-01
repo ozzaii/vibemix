@@ -1446,6 +1446,41 @@ Remaining gate:
   canaries against a fresh source session and confirm no EQ/control causality
   claim is spoken without structured move evidence.
 
+## Package 8F - Internal Voice Tag Sanitizer
+
+Suggested commit: `fix(cohost): strip internal voice tags from speech`
+
+Include:
+
+- `src/vibemix/agent/emote_parser.py`
+- `tests/agent/test_emote_parser.py`
+- `tests/agent/test_dj_cohost.py`
+- `tests/agent/test_dj_cohost_streaming_pipe.py`
+
+Reason:
+
+- MOSS is now the single TTS source, but the live prompt can still make the
+  model emit legacy Gemini-TTS delivery tags such as `[chill]` and `[excited]`.
+  The 2026-06-01 FLX4 source smoke observed `[chill]` leaking into `ai_text` /
+  `ai_message.message`. Those tags are internal control residue; they must not
+  be spoken, shown in transcript, or counted as spoken response characters.
+- Keep citation brackets intact for the grounding linter. This package strips
+  only known delivery tags plus `[emote:*]`, preserving `[aud:...]` /
+  `[ev:...]` citations for the existing validation path.
+
+Proof already run:
+
+- `uv run pytest -q tests/agent/test_emote_parser.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_streaming_pipe.py`
+  passed: 95 tests.
+- `uv run ruff check src/vibemix/agent/emote_parser.py tests/agent/test_emote_parser.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_streaming_pipe.py`
+  passed.
+
+Remaining gate:
+
+- A future prompt-shaping package should remove obsolete delivery-tag prompting
+  entirely for MOSS-only sessions. This package is the runtime backstop: even if
+  the model emits a legacy tag, user-facing speech/log rows stay clean.
+
 ## Hold Lane - Rebuild Carry-Forward Live Reality Pins
 
 Suggested commit if/when selected: `test(repo): pin live reality gaps`

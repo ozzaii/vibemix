@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 31 Plan 04 — Emote-tag parser.
+"""Phase 31 Plan 04 — Emote and voice-tag parser.
 
 Gemini response text may contain inline ``[emote:NAME]`` markers that
 fire the priority-80 mascot reaction layer. Example:
@@ -8,6 +8,11 @@ fire the priority-80 mascot reaction layer. Example:
 
 We extract the whitelisted intents and strip the tags from the
 playback text so they never get sent to TTS.
+
+Legacy Gemini-TTS voice tags such as ``[chill]`` and ``[excited]`` are
+also stripped from playback text. MOSS is the only TTS source now, so
+these tags are internal control residue, not text the DJ should hear or
+see in the transcript.
 
 Whitelist (load-bearing — Pitfall P47 anti-slop; matches
 ``MASCOT_REACTIONS`` in ``tauri/ui/src/mascot/types.ts``):
@@ -61,6 +66,22 @@ _EMOTE_TAG_RE: Final[re.Pattern[str]] = re.compile(
     r"\[emote:([a-z_]+)\]"
 )
 
+# Legacy Gemini 3.1 TTS delivery tags. Keep this set deliberately narrow:
+# citation brackets like ``[aud:rms@12.0]`` must remain visible to the linter.
+VOICE_TAGS: Final[frozenset[str]] = frozenset(
+    {
+        "whisper",
+        "laugh",
+        "fast",
+        "slow",
+        "excited",
+        "chill",
+    }
+)
+_VOICE_TAG_RE: Final[re.Pattern[str]] = re.compile(
+    r"\[(whisper|laugh|fast|slow|excited|chill)\]"
+)
+
 
 def parse_emote_tags(text: str) -> list[str]:
     """Return the ordered list of WHITELISTED emote intents in ``text``.
@@ -78,26 +99,32 @@ def parse_emote_tags(text: str) -> list[str]:
 
 
 def has_emote_tag(text: str) -> bool:
-    """Return True when ``text`` contains any complete ``[emote:*]`` control tag."""
-    return _EMOTE_TAG_RE.search(text) is not None
+    """Return True when ``text`` contains any complete internal control tag."""
+    return _EMOTE_TAG_RE.search(text) is not None or _VOICE_TAG_RE.search(text) is not None
 
 
 def strip_emote_tags(text: str, *, normalize: bool = True) -> tuple[str, list[str]]:
-    """Strip ALL ``[emote:*]`` tags from ``text`` AND return whitelisted intents.
+    """Strip internal control tags from ``text`` AND return whitelisted intents.
 
-    Unknown tags are still stripped from the returned text (so the LLM
-    can't smuggle them into TTS) but they DON'T appear in the intent
-    list. Whitespace around removed tags is normalized — runs of spaces
-    collapse to a single space, and leading/trailing whitespace trims.
+    Unknown ``[emote:*]`` tags and known legacy voice tags are stripped
+    from the returned text (so the LLM can't smuggle them into TTS) but
+    only whitelisted mascot tags appear in the intent list. Whitespace
+    around removed tags is normalized — runs of spaces collapse to a
+    single space, and leading/trailing whitespace trims.
 
     Set ``normalize=False`` for streaming TTS chunks where preserving
     boundary whitespace matters more than pretty transcript text.
     """
     intents = parse_emote_tags(text)
-    cleaned = _EMOTE_TAG_RE.sub("", text)
+    cleaned = _VOICE_TAG_RE.sub("", _EMOTE_TAG_RE.sub("", text))
     if normalize:
         # Collapse runs of whitespace and trim — without this, the stripped
         # text reads "Loving that bassline  — keep it rolling " with a
         # double-space gap where the tag used to be.
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    elif _EMOTE_TAG_RE.match(text.lstrip()) or _VOICE_TAG_RE.match(text.lstrip()):
+        # Streaming chunks should preserve boundary whitespace in the middle of
+        # a sentence, but a leading control tag must not leave a leading pause
+        # in the first spoken chunk.
+        cleaned = cleaned.lstrip()
     return cleaned, intents
