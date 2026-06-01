@@ -434,6 +434,36 @@ Proof before staging:
 - `git diff --check -- tests/repo/test_kaan_action_v4_surface.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0P - Cut Release Guard Test Ruff Hygiene
+
+Suggested commit: `test(repo): clean cut release guard lint`
+
+Include:
+
+- `tests/repo/test_cut_release_invokes_bravoh_server.py`
+- `tests/repo/test_cut_release_invokes_check_gate.py`
+- `tests/repo/test_cut_release_no_autonomous_publish.py`
+- `tests/repo/test_cut_release_tag_regex.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Cut-release scripts, signing/notarization assets, packaged artifacts, and app
+  runtime files.
+
+Reason:
+
+- The cut-release guard tests had stale extra blank lines after their import
+  blocks. Removing them keeps the focused repo-test ruff gate clean without
+  changing any release-proof assertions.
+
+Proof before staging:
+
+- `uv run ruff check tests/repo/test_cut_release_invokes_bravoh_server.py tests/repo/test_cut_release_invokes_check_gate.py tests/repo/test_cut_release_no_autonomous_publish.py tests/repo/test_cut_release_tag_regex.py`
+- `uv run pytest -q tests/repo/test_cut_release_invokes_bravoh_server.py tests/repo/test_cut_release_invokes_check_gate.py tests/repo/test_cut_release_no_autonomous_publish.py tests/repo/test_cut_release_tag_regex.py`
+- `git diff --check -- tests/repo/test_cut_release_invokes_bravoh_server.py tests/repo/test_cut_release_invokes_check_gate.py tests/repo/test_cut_release_no_autonomous_publish.py tests/repo/test_cut_release_tag_regex.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
