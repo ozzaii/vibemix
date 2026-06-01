@@ -35,11 +35,14 @@ async def diag_loop(
         snap = levels.snapshot()
         m_bar = "#" * int(min(snap["music"] * 50, 30))
         v_bar = "#" * int(min(snap["voice"] * 50, 30))
-        sys.stdout.write(
-            f"\r[live] music={snap['music']:.3f} {m_bar:<30} | voice={snap['voice']:.3f} {v_bar:<10} | "
-            f"audible={int(state.audible)} deck={state.audible_deck} phase={state.phase[:8]:<8}"
-        )
-        sys.stdout.flush()
+        try:
+            sys.stdout.write(
+                f"\r[live] music={snap['music']:.3f} {m_bar:<30} | voice={snap['voice']:.3f} {v_bar:<10} | "
+                f"audible={int(state.audible)} deck={state.audible_deck} phase={state.phase[:8]:<8}"
+            )
+            sys.stdout.flush()
+        except (BrokenPipeError, OSError):
+            pass
         if tracer is not None:
             try:
                 # Debounced: note_change only writes a line on an audible flip.

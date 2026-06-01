@@ -77,3 +77,39 @@ def test_diag_03_sleep_cadence_is_1s(mocker):
     asyncio.run(diag_loop(fake_levels, state, stop))
 
     assert all(s == 1.0 for s in calls), f"expected all sleeps to be 1.0, got {calls}"
+
+
+def test_diag_04_broken_stdout_does_not_stop_tracing(mocker):
+    """DIAG-04: packaged/managed stdout can disappear; tracing still runs."""
+    state = MusicState()
+    state.audible = True
+    state.audible_deck = "A"
+    state.phase = "peak"
+
+    fake_levels = mocker.MagicMock()
+    fake_levels.snapshot = mocker.MagicMock(
+        return_value={"music": 0.150, "voice": 0.025, "mic": 0.0}
+    )
+
+    class BrokenStdout:
+        def write(self, _text):
+            raise BrokenPipeError("stdout closed")
+
+        def flush(self):
+            raise AssertionError("flush should not run after write fails")
+
+    tracer = mocker.MagicMock()
+    stop = asyncio.Event()
+    calls = []
+
+    async def fake_sleep(delay):
+        calls.append(delay)
+        stop.set()
+        await _REAL_SLEEP(0)
+
+    mocker.patch("vibemix.runtime.diag.asyncio.sleep", side_effect=fake_sleep)
+    mocker.patch("vibemix.runtime.diag.sys.stdout", BrokenStdout())
+
+    asyncio.run(diag_loop(fake_levels, state, stop, tracer=tracer))
+
+    tracer.note_change.assert_called_once()
