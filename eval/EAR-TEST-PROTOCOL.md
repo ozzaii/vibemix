@@ -108,11 +108,11 @@ new modal. Flow:
      default (= no slop detected).
    - Free-form textarea, max 4000 chars: "what worked, what didn't".
    - Submit button: "Sign off".
-5. On submit, the UI sends the structured payload to the Python writer
-   (`src/vibemix/debrief/ear_test_capture.py::write_ear_test_log`) via
+5. On submit, the UI sends the structured payload to the Rust Tauri command
+   (`tauri/src-tauri/src/ear_test_cmds.rs::write_ear_test_log`) via
    the existing Tauri IPC channel (or, in dev mode, via the debrief WS
    client on 127.0.0.1:8766).
-6. The writer atomically persists `eval/ear-test-logs/<session-id>.json`.
+6. The Rust writer atomically persists `eval/ear-test-logs/<session-id>.json`.
 
 The toggle is opt-in: every regular session save proceeds without
 prompting for ear-test sign-off. The signal is captured **only when

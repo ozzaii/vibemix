@@ -1753,6 +1753,8 @@ Include:
 
 - `src/vibemix/debrief/ear_test_capture.py`
 - `tests/debrief/test_ear_test_capture.py`
+- `eval/EAR-TEST-PROTOCOL.md`
+- `KAAN-ACTION-LEGAL.md`
 - `tauri/ui/src/debrief/components/ear-test-toggle.ts`
 - `tauri/ui/debrief.html`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
@@ -1772,6 +1774,9 @@ Reason:
   writer.
 - The Python module still pins payload/schema validation, while source comments
   now point at the Rust command that actually persists logs.
+- Follow-up cleanup updates the remaining protocol/legal docs that still named
+  the deleted Python writer; the authoritative live writer is the Rust Tauri
+  command.
 
 Proof before staging:
 
@@ -1787,6 +1792,11 @@ Proof before staging:
   passed.
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
   passed.
+- Follow-up proof for the stale-anchor cleanup:
+  - `rg -n "src/vibemix/debrief/ear_test_capture.py::write_ear_test_log|vibemix.debrief.ear_test_capture|debrief/ln\\.py" eval KAAN-ACTION-LEGAL.md docs README.md src tests tauri/ui --glob '!tauri/ui/node_modules/**'`
+    returns no live/protocol anchors.
+  - `git diff --check -- eval/EAR-TEST-PROTOCOL.md KAAN-ACTION-LEGAL.md .planning/handoffs/2026-05-31-package-checklist.md`
+    passed.
 
 ## Hold Lane - Deck Vision Live Source Gate
 

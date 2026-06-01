@@ -1155,7 +1155,7 @@ qualitative gate that the autonomous 2-judge proxy cannot.
 
 - **Protocol document:** `eval/EAR-TEST-PROTOCOL.md` (Plan 42-03 Task 1).
 - **JSON Schema:** `eval/ear-test-logs/schema.json`.
-- **Capture writer:** `src/vibemix/debrief/ear_test_capture.py::write_ear_test_log`.
+- **Capture writer:** `tauri/src-tauri/src/ear_test_cmds.rs::write_ear_test_log`.
 - **Debrief UI toggle:** `tauri/ui/src/debrief/components/ear-test-toggle.ts` —
   mounts inside the existing Phase 29 debrief window on `session-loaded`.
 - **Gate script:** `scripts/release/check_ear_test.sh` (Plan 42-03 Task 3).
@@ -4786,4 +4786,3 @@ film rides this clock and does NOT block the v7.0 milestone close.
 Sign-off by (Francesco):                                 _________
 Sign-off by (Kaan):                                      _________
 ```
-
