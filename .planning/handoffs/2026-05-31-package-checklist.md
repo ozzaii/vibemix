@@ -491,6 +491,32 @@ Proof before staging:
 - `git diff --check -- tests/scripts/test_cut_release_preflight.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0R - Grey Area Log Test Ruff Hygiene
+
+Suggested commit: `test(scripts): clean grey area log lint`
+
+Include:
+
+- `tests/scripts/test_grey_area_log.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Integration audit source, planning phase archives, and app runtime files.
+
+Reason:
+
+- The grey-area log contract test imported `pytest` without using it. Removing
+  the dead import keeps the focused scripts-test ruff gate clean without
+  changing the integration-audit assertions.
+
+Proof before staging:
+
+- `uv run ruff check tests/scripts/test_grey_area_log.py`
+- `uv run pytest -q tests/scripts/test_grey_area_log.py`
+- `git diff --check -- tests/scripts/test_grey_area_log.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
