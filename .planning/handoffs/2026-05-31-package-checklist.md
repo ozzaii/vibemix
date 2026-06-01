@@ -593,6 +593,43 @@ Remaining gate:
 - Run `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
   and `git diff --check` across the docs posture slice before staging.
 
+## Package 0J - Retired Scripted Demo Mode
+
+Suggested commit: `fix(demo): retire scripted launch sequencer`
+
+Include:
+
+- `src/vibemix/runtime/demo_mode.py`
+- `tests/runtime/test_demo_mode_sequence.py`
+- `docs/launch-prep/DEMO-MODE-CONFIG.md`
+- `docs/launch-prep/README.md`
+- `docs/launch-prep/AUDIO-CAPTURE.md`
+- `docs/launch-prep/SHOT-LIST.md`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Live app driving, controller/audio runtime files, cohost speech, prompts,
+  DROP-call wiring, and TTS providers.
+- Launch screenshots or broader launch collateral.
+
+Reason:
+
+- The queue marks the deterministic demo sequencer as SAFE_NOW because it has no
+  runtime importers and conflicts with the live-audio-is-authoritative
+  invariant. Removing the module and its pins prevents scripted playback from
+  being mistaken for launch proof.
+- The launch-prep docs now require each capture take to name the source SHA or
+  packaged artifact plus recorded session evidence, rather than citing a retired
+  `--demo-mode` flow.
+
+Proof before staging:
+
+- `rg -n "demo_mode|DEMO_SEQUENCE|DEMO-MODE-CONFIG|--demo-mode" src tests docs/launch-prep`
+- `uv run pytest -q tests/launch/test_launch_docs.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/runtime/demo_mode.py tests/runtime/test_demo_mode_sequence.py docs/launch-prep/DEMO-MODE-CONFIG.md docs/launch-prep/README.md docs/launch-prep/AUDIO-CAPTURE.md docs/launch-prep/SHOT-LIST.md .planning/handoffs/2026-05-31-package-checklist.md`
+
 ## Hold Lane - Demo Source-Run Ship Plan
 
 Suggested commit if/when selected: `docs(demo): capture source-run demo plan`

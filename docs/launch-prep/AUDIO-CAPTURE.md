@@ -5,11 +5,14 @@ Phase 43 / VIS-09 — Audio capture plan for Francesco's hero-demo shoot day.
 
 # vibemix hero demo — Audio capture plan
 
-**Phase 43 / VIS-09.** 3 separate tracks recorded simultaneously, synced via clapboard, alongside vibemix's own `session.wav` as the canonical reference mix.
+**Phase 43 / VIS-09.** 3 separate tracks recorded simultaneously, synced via
+clapboard, alongside vibemix's own `session.wav` as the canonical reference mix.
+The retired deterministic demo-mode path is no longer a launch-proof source;
+every take should name the source SHA or packaged artifact it is proving.
 
 ## The 3 capture tracks
 
-### Track 1 — Gemini voice
+### Track 1 — AI voice
 
 - **Source:** vibemix's `playback_queue` → speaker bus.
 - **Capture:** line-out from the headphone amp, OR USB recording from vibemix audio output. Avoid re-recording with a mic in the room (introduces room tone and double-mics the audio).
@@ -63,14 +66,15 @@ Format: 48kHz 24-bit (matches the 3 capture tracks → bit-identical alignment a
 
 ## Take workflow
 
-1. **Reset vibemix demo-mode:** `vibemix --demo-mode reset` (resets the 30-event deterministic sequence to step 0 — every take starts from the same musical position).
-2. **Slate the take** (clapboard, visible and audible on all 3 audio tracks + all cameras).
-3. **Roll all recorders:** 3 audio tracks + cameras + vibemix's own `session.wav` capture (auto-starts when demo-mode starts).
-4. **Trigger demo-mode start in vibemix:** `vibemix --demo-mode start` — the deterministic 30-event sequence plays out across 6:00. See [`DEMO-MODE-CONFIG.md`](./DEMO-MODE-CONFIG.md).
-5. **Capture cuts 1, 4, 7 (real-world)** during the 6-minute demo-mode playback. Mascot cuts (4 and 7) are screen capture; cut 1 (DJ hands on FLX4) is a separate camera setup but rolls in parallel.
+1. **Pin the proof target:** record the git SHA or packaged artifact path, plus the exact launch command, in the take folder.
+2. **Start vibemix with the current source or artifact under proof.** Do not use a retired scripted demo flag; the take must be backed by live session evidence.
+3. **Slate the take** (clapboard, visible and audible on all 3 audio tracks + all cameras).
+4. **Roll all recorders:** 3 audio tracks + cameras + vibemix's own `session.wav` capture.
+5. **Capture cuts 1, 4, 7 (real-world)** during the live session pass. Mascot cuts (4 and 7) are screen capture; cut 1 (DJ hands on FLX4) is a separate camera setup but rolls in parallel.
 6. **End take.** Stop all recorders. Verify the clapboard transient is present at the head of all 4 audio sources.
 7. **Copy `session.wav`** from the vibemix recordings dir into the take folder before the next take.
-8. **Repeat per planned take count.** Reset between takes (step 1).
+8. **Attach proof artifacts** for the take: session `events.jsonl`, `ui.log` excerpt, source SHA or artifact checksum, and the live action window used.
+9. **Repeat per planned take count.** Re-pin the proof target if the source or artifact changes.
 
 ## Post — alignment recipe
 
@@ -85,6 +89,4 @@ In Resolve / Premiere / Logic:
 ## Cross-references
 
 - Shot list (8 cuts + per-cut timing): [`SHOT-LIST.md`](./SHOT-LIST.md)
-- Demo-mode deterministic sequence + reset CLI: [`DEMO-MODE-CONFIG.md`](./DEMO-MODE-CONFIG.md)
-- Demo-mode sequencer source (the 30 events): `src/vibemix/runtime/demo_mode.py`
 - Francesco discharge runbook: [`KAAN-ACTION-LEGAL.md §VIS-09`](../../KAAN-ACTION-LEGAL.md)

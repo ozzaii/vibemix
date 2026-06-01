@@ -26,24 +26,21 @@ Sourced 1-to-1 from `mocks/vibemix-cinematic-storyboard.html` (8 `<section data-
 - **Cuts 1 + 7 are real-world capture** (DJ hands + booth). Cuts 2-6, 8 are screen capture composited or hybrid.
 - **Cut 7 aesthetic gate (Pioneer-CDJ headbob, NOT VTuber dance):** if the take feels "slop" — jazz hands, body twirl, hip pop, exaggerated weight-shift, full-arm dance — re-take with a more reserved Mixamo source clip. Mascot celebrate must read like a CDJ pro at the booth, not a vtuber stream.
 - **Cut 4 mascot overlay** should be SUBTLE — micro-motion only, not a celebrate. Save the energy for cut 7.
-- **Cut 5 caption** is the literal demo-mode kick_swap anchor (153.0s in `DEMO_SEQUENCE`). Time the caption pop to land synced with the audio cue.
+- **Cut 5 caption** must come from the real EvidenceRegistry render captured in
+  the take. Time the caption pop to the recorded audio cue; do not recreate it
+  from a scripted sequence.
 - **Cut 6 chip strip** comes from the real EvidenceRegistry render — use the in-app screen capture, not a mocked overlay.
 
 ## Audio cues to time against
 
-The demo-mode deterministic sequence (see `DEMO-MODE-CONFIG.md`) fires at:
-
-- **0:00** track_start (Track A) — covers cuts 1–4
-- **2:33** kick_swap → mascot celebrate trigger → cut 5 caption + cut 7 animation are anchored here
-- **4:50** layer_drop → mascot teacher line — happens during cut 7 mid-track moment
-- **6:00** track_end — natural fade-out into cut 8
-
-Note: the 6-minute demo runs in vibemix; the final demo film is the 30-second cut down. Francesco picks the visual highlights from the full 6-minute pass.
+Use the live session evidence attached to the take folder. The cut edit can still
+target a 30-second final film, but captions, chip timing, and mascot reactions
+must line up with recorded `session.wav` audio plus the matching session
+`events.jsonl`, not a deterministic demo track.
 
 ## Cross-references
 
 - Storyboard mock (8 `<section data-cut>` frames): `mocks/vibemix-cinematic-storyboard.html`
 - Visual baseline (CDJ Whisper locked): `mocks/vibemix-direction-final.html`
 - Audio capture plan (3-track separation + clapboard sync): [`AUDIO-CAPTURE.md`](./AUDIO-CAPTURE.md)
-- Demo-mode config (deterministic playback for repeatable takes): [`DEMO-MODE-CONFIG.md`](./DEMO-MODE-CONFIG.md)
 - Francesco discharge runbook: [`KAAN-ACTION-LEGAL.md §VIS-09`](../../KAAN-ACTION-LEGAL.md)
