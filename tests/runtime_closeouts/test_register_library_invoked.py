@@ -145,6 +145,35 @@ def test_library_import_routes_directories_to_folder_ingest_before_xml_import() 
     assert branch_idx < folder_idx < return_idx < xml_idx < importer_idx
 
 
+def test_library_import_routes_traktor_and_virtualdj_catalogs_before_xml_import() -> None:
+    """Discovered non-Rekordbox catalogs must not be parsed as Rekordbox XML."""
+    source = (PROJECT_ROOT / "src/vibemix/__main__.py").read_text()
+
+    helper_idx = source.index("def _catalog_source_for_import_path(source_path: Path)")
+    assert "TraktorSource(nml_path=str(source_path))" in source[helper_idx:]
+    assert "VirtualDJSource(database_path=str(source_path))" in source[helper_idx:]
+
+    branch_idx = source.index("catalog_source = _catalog_source_for_import_path(source_path)")
+    catalog_import_idx = source.index("await _start_catalog_source_import(", branch_idx)
+    return_idx = source.index("return", catalog_import_idx)
+    xml_idx = source.index("xml_path = source_path", return_idx)
+    importer_idx = source.index("importer = LibraryImporter", xml_idx)
+
+    assert branch_idx < catalog_import_idx < return_idx < xml_idx < importer_idx
+
+
+def test_library_import_generic_catalog_path_uses_ingest_source() -> None:
+    """The non-Rekordbox path must use the source-ingest orchestrator."""
+    source = (PROJECT_ROOT / "src/vibemix/__main__.py").read_text()
+    helper_idx = source.index("async def _start_catalog_source_import(")
+    helper = source[helper_idx : source.index("async def _on_library_import", helper_idx)]
+
+    assert "from vibemix.library.ingest import ingest_source" in helper
+    assert "return ingest_source(" in helper
+    assert "persist_library=True" in helper
+    assert "progress=_on_source_progress" in helper
+
+
 def test_stale_folder_reindex_uses_recorded_source_not_renderer_path() -> None:
     """Folder re-index keeps the Package 5J consent boundary."""
     source = (PROJECT_ROOT / "src/vibemix/__main__.py").read_text()

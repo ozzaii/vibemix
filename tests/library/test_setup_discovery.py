@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 
 from vibemix.library.setup_discovery import discover_library_setup_candidates
@@ -17,6 +18,10 @@ def test_setup_discovery_finds_standard_rekordbox_xml(tmp_path: Path) -> None:
     assert candidates[0].kind == "rekordbox_xml"
     assert candidates[0].path == str(xml)
     assert "library ingest" in candidates[0].command
+    assert candidates[0].import_action == {
+        "type": "ipc.library.import",
+        "payload": {"path": str(xml), "schema_version": "1"},
+    }
 
 
 def test_setup_discovery_finds_standard_traktor_nml(tmp_path: Path) -> None:
@@ -30,6 +35,10 @@ def test_setup_discovery_finds_standard_traktor_nml(tmp_path: Path) -> None:
     assert traktor
     assert traktor[0].path == str(nml)
     assert "library ingest --source traktor" in traktor[0].command
+    assert traktor[0].import_action == {
+        "type": "ipc.library.import",
+        "payload": {"path": str(nml), "schema_version": "1"},
+    }
 
 
 def test_setup_discovery_finds_standard_virtualdj_database(tmp_path: Path) -> None:
@@ -45,6 +54,10 @@ def test_setup_discovery_finds_standard_virtualdj_database(tmp_path: Path) -> No
     assert virtualdj
     assert virtualdj[0].path == str(database)
     assert "library ingest --source virtualdj" in virtualdj[0].command
+    assert virtualdj[0].import_action == {
+        "type": "ipc.library.import",
+        "payload": {"path": str(database), "schema_version": "1"},
+    }
 
 
 def test_setup_discovery_finds_bounded_music_folder_candidate(tmp_path: Path) -> None:
@@ -61,6 +74,27 @@ def test_setup_discovery_finds_bounded_music_folder_candidate(tmp_path: Path) ->
     assert folders[0].path == str(crate)
     assert folders[0].audio_files_seen == 3
     assert "library embed-folder" in folders[0].command
+    assert folders[0].import_action == {
+        "type": "ipc.library.import",
+        "payload": {"path": str(crate), "schema_version": "1"},
+    }
+
+
+def test_setup_discovery_quotes_shell_commands_but_keeps_ipc_path_raw(tmp_path: Path) -> None:
+    crate = tmp_path / "Music" / "two words"
+    crate.mkdir(parents=True)
+    (crate / "track.mp3").write_bytes(b"audio")
+
+    candidates = discover_library_setup_candidates(home=tmp_path)
+
+    folders = [candidate for candidate in candidates if candidate.kind == "music_folder"]
+    assert folders
+    assert shlex.quote(str(crate)) in folders[0].command
+    assert folders[0].import_action is not None
+    assert folders[0].import_action["payload"] == {
+        "path": str(crate),
+        "schema_version": "1",
+    }
 
 
 def test_setup_discovery_does_not_descend_hidden_folders(tmp_path: Path) -> None:

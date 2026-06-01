@@ -2138,6 +2138,101 @@ async def main() -> None:
                 _background_tasks.add(_t)
                 _t.add_done_callback(_background_tasks.discard)
 
+            def _catalog_source_for_import_path(source_path: Path) -> object | None:
+                """Return a non-Rekordbox source for explicit catalog imports.
+
+                Rekordbox XML keeps using ``LibraryImporter`` below because it
+                supports cooperative cancel. Traktor/VirtualDJ candidates come
+                from setup discovery too; without this branch the visible
+                Library panel would send them to the XML importer and fail.
+                """
+                name = source_path.name.lower()
+                text = str(source_path).lower()
+                if source_path.suffix.lower() == ".nml":
+                    from vibemix.library.sources.traktor import TraktorSource
+
+                    return TraktorSource(nml_path=str(source_path))
+                if name == "database.xml" and "virtualdj" in text:
+                    from vibemix.library.sources.virtualdj import VirtualDJSource
+
+                    return VirtualDJSource(database_path=str(source_path))
+                return None
+
+            async def _start_catalog_source_import(source: object, *, label: str) -> None:
+                _task = _import_state.get("task")
+                if _task is not None and not _task.done():
+                    return
+                if not _ensure_library_runtime(label):
+                    return
+                detect = getattr(source, "detect", None)
+                if not callable(detect) or not bool(detect()):
+                    print(
+                        f"-> library {label} rejected: source is missing",
+                        file=sys.stderr,
+                    )
+                    return
+
+                _import_state["importer"] = None
+                loop = asyncio.get_running_loop()
+                progress_done = 0
+
+                def _on_source_progress(line: str) -> None:
+                    nonlocal progress_done
+                    progress_done += 1
+
+                    def _send() -> None:
+                        _pt = loop.create_task(
+                            _emit_library(
+                                _progress_envelope(
+                                    {
+                                        "total": 0,
+                                        "done": progress_done,
+                                        "current_track_name": line[:200],
+                                        "cache_hits": 0,
+                                        "cancelled": False,
+                                    }
+                                )
+                            )
+                        )
+                        _background_tasks.add(_pt)
+                        _pt.add_done_callback(_background_tasks.discard)
+
+                    loop.call_soon_threadsafe(_send)
+
+                async def _run_source_import() -> None:
+                    try:
+                        from vibemix.library.ingest import ingest_source
+
+                        def _sync_import():
+                            return ingest_source(
+                                source,  # type: ignore[arg-type]
+                                _library_embedder,
+                                _library_store,
+                                persist_library=True,
+                                progress=_on_source_progress,
+                            )
+
+                        report = await loop.run_in_executor(None, _sync_import)
+                        _refresh_library_registry()
+                        await _emit_library(
+                            _progress_envelope(
+                                {
+                                    "total": report.total,
+                                    "done": report.total,
+                                    "current_track_name": "",
+                                    "cache_hits": report.skipped_cached,
+                                    "cancelled": False,
+                                }
+                            )
+                        )
+                    except Exception as _e:
+                        print(f"-> library {label} failed: {_e!r}", file=sys.stderr)
+
+                _t = loop.create_task(_run_source_import())
+                _import_state["task"] = _t
+                _background_tasks.add(_t)
+                _t.add_done_callback(_background_tasks.discard)
+
             async def _on_library_import(msg: dict) -> None:
                 _task = _import_state.get("task")
                 if _task is not None and not _task.done():
@@ -2149,6 +2244,13 @@ async def main() -> None:
                 source_path = Path(raw_path).expanduser()
                 if source_path.is_dir():
                     await _start_folder_import(source_path, label="folder import")
+                    return
+                catalog_source = _catalog_source_for_import_path(source_path)
+                if catalog_source is not None:
+                    await _start_catalog_source_import(
+                        catalog_source,
+                        label=f"{getattr(catalog_source, 'name', 'catalog')} import",
+                    )
                     return
                 xml_path = source_path
                 # Lazily build embedder + store — import is the one path that
@@ -5710,6 +5812,7 @@ def _viber_live_context_operator_actions(
             else []
         )
         candidate_preview: list[str] = []
+        recommended_import_action: dict[str, Any] | None = None
         for candidate in setup_candidates[:3]:
             if not isinstance(candidate, dict):
                 continue
@@ -5717,6 +5820,9 @@ def _viber_live_context_operator_actions(
             path = str(candidate.get("path") or "")
             if path:
                 candidate_preview.append(f"{kind}:{path}")
+            import_action = candidate.get("import_action")
+            if recommended_import_action is None and isinstance(import_action, dict):
+                recommended_import_action = import_action
         rekordbox_xml_detected = False
         if isinstance(source_status, dict):
             for key in ("rekordbox_app", "rekordbox_master_db"):
@@ -5744,6 +5850,11 @@ def _viber_live_context_operator_actions(
             source_kind=library_source_type or "unknown",
             track_count=library_track_count,
             candidate_sources=setup_candidates[:5],
+            **(
+                {"recommended_import_action": recommended_import_action}
+                if recommended_import_action is not None
+                else {}
+            ),
         )
 
     if physical_diagnosis and (

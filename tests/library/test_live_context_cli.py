@@ -1677,6 +1677,13 @@ def test_viber_live_context_operator_actions_include_library_index_setup():
                         "/Users/ka/Music/PSYMIND"
                     ),
                     "audio_files_seen": 42,
+                    "import_action": {
+                        "type": "ipc.library.import",
+                        "payload": {
+                            "path": "/Users/ka/Music/PSYMIND",
+                            "schema_version": "1",
+                        },
+                    },
                 }
             ],
             "rekordbox_app": {"exists": True},
@@ -1692,6 +1699,13 @@ def test_viber_live_context_operator_actions_include_library_index_setup():
     ]
     assert actions[0]["source_kind"] == "missing"
     assert actions[0]["candidate_sources"][0]["path"] == "/Users/ka/Music/PSYMIND"
+    assert actions[0]["recommended_import_action"] == {
+        "type": "ipc.library.import",
+        "payload": {
+            "path": "/Users/ka/Music/PSYMIND",
+            "schema_version": "1",
+        },
+    }
     assert "music_folder:/Users/ka/Music/PSYMIND" in actions[0]["detail"]
     assert "Drop a Rekordbox collection.xml or a music folder" in actions[0]["detail"]
     assert "does not read the live SQLCipher master.db" in actions[0]["detail"]

@@ -10,6 +10,7 @@ never reads Rekordbox's live database and never auto-ingests.
 
 from __future__ import annotations
 
+import shlex
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
@@ -32,9 +33,25 @@ class LibrarySetupCandidate:
     reason: str
     command: str
     audio_files_seen: int = 0
+    import_action: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
-        return asdict(self)
+        data = asdict(self)
+        if self.import_action is None:
+            data.pop("import_action", None)
+        return data
+
+
+def _ipc_import_action(path: Path) -> dict[str, object]:
+    """Structured one-click app action for a user-approved library import."""
+    return {
+        "type": "ipc.library.import",
+        "payload": {"path": str(path), "schema_version": "1"},
+    }
+
+
+def _quote_path(path: Path) -> str:
+    return shlex.quote(str(path))
 
 
 def _audio_count_bounded(root: Path, *, max_depth: int = 2, max_entries: int = 1200) -> int:
@@ -105,7 +122,8 @@ def discover_library_setup_candidates(
                         path=str(path),
                         confidence="high",
                         reason="standard Rekordbox collection.xml export path exists",
-                        command=f"uv run python -m vibemix library ingest {path}",
+                        command=f"uv run python -m vibemix library ingest {_quote_path(path)}",
+                        import_action=_ipc_import_action(path),
                     )
                 )
         except OSError:
@@ -121,7 +139,11 @@ def discover_library_setup_candidates(
                         path=str(path),
                         confidence="high",
                         reason="standard Traktor collection.nml path exists",
-                        command=f"uv run python -m vibemix library ingest --source traktor {path}",
+                        command=(
+                            "uv run python -m vibemix library ingest --source traktor "
+                            f"{_quote_path(path)}"
+                        ),
+                        import_action=_ipc_import_action(path),
                     )
                 )
         except OSError:
@@ -137,7 +159,11 @@ def discover_library_setup_candidates(
                         path=str(path),
                         confidence="high",
                         reason="standard VirtualDJ database.xml path exists",
-                        command=f"uv run python -m vibemix library ingest --source virtualdj {path}",
+                        command=(
+                            "uv run python -m vibemix library ingest --source virtualdj "
+                            f"{_quote_path(path)}"
+                        ),
+                        import_action=_ipc_import_action(path),
                     )
                 )
         except OSError:
@@ -168,8 +194,9 @@ def discover_library_setup_candidates(
                     path=str(path),
                     confidence=confidence,
                     reason=f"bounded scan saw {audio_count} supported audio files",
-                    command=f"uv run python -m vibemix library embed-folder {path}",
+                    command=f"uv run python -m vibemix library embed-folder {_quote_path(path)}",
                     audio_files_seen=audio_count,
+                    import_action=_ipc_import_action(path),
                 )
             )
 
