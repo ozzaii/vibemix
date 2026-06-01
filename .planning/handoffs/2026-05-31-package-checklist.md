@@ -2462,6 +2462,46 @@ Remaining gate:
 - GUI one-click source selection remains a follow-up. This package gives the
   CLI and Viber setup candidate a truthful, runnable Traktor import path.
 
+## Package 5P - VirtualDJ Database XML Library Source
+
+Suggested commit: `feat(library): add virtualdj database source`
+
+Include:
+
+- `src/vibemix/library/sources/virtualdj.py`
+- `src/vibemix/library/sources/__init__.py`
+- `src/vibemix/library/sources/base.py`
+- `tests/library/test_sources_virtualdj.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/__main__.py` CLI/source-selection hooks.
+- Live co-host speech, prompts, event timing, or deck-identity changes.
+- VirtualDJ write-back or direct modification of the user's `database.xml`.
+
+Reason:
+
+- Universal Library Ingest should not stop at Rekordbox and Traktor. VirtualDJ
+  uses a read-only XML `database.xml`, so this source is another clean
+  stdlib-only parser island that feeds existing `TrackEntry`, cue, and beatgrid
+  rows without touching audio/model/runtime code.
+- VirtualDJ's scanned BPM value is seconds per beat, not displayed BPM. This
+  package pins that conversion in tests so future parsers do not silently
+  corrupt tempo-dependent search, suggestions, or Earned signals.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_sources_virtualdj.py tests/library/test_sources_traktor.py tests/library/test_sources_rekordbox.py`
+- `uv run ruff check src/vibemix/library/sources/virtualdj.py src/vibemix/library/sources/__init__.py src/vibemix/library/sources/base.py tests/library/test_sources_virtualdj.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/library/sources/virtualdj.py src/vibemix/library/sources/__init__.py src/vibemix/library/sources/base.py tests/library/test_sources_virtualdj.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- CLI/setup discovery for VirtualDJ is a separate follow-up package. This
+  package proves parser correctness and the shared LibrarySource contract only.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`

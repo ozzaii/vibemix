@@ -2,8 +2,9 @@
 """LibrarySource — the structural contract every DJ-library source implements.
 
 Phase 89 (DJ-Library Ingest). A ``LibrarySource`` is the firewall between a
-DJ-software-specific catalog (Rekordbox ``collection.xml`` today; Serato /
-Traktor / Engine later) and the OS-agnostic ingest orchestrator
+DJ-software-specific catalog (Rekordbox ``collection.xml``, Traktor
+``collection.nml``, VirtualDJ ``database.xml`` today; Serato / Engine later)
+and the OS-agnostic ingest orchestrator
 (``vibemix.library.ingest.ingest_source``). Each source knows three things:
 
     * ``detect()``         — is this source present on THIS machine?
