@@ -12,6 +12,7 @@ prove the bridge dict actually produces POSITION_MARK pads.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -234,3 +235,40 @@ def test_export_cued_folder_rejects_unknown_export_format(tmp_path: Path) -> Non
     (tmp_path / "t.mp3").write_bytes(b"x")
     with pytest.raises(ValueError, match="export"):
         export_cued_folder(tmp_path, tmp_path / "o.xml", export="serato", detect=lambda p, *, max_cues=8: [])
+
+
+@pytest.mark.skipif(not _REAL_MP3.exists(), reason="needs the in-repo test mp3")
+def test_tag_folder_serato_writes_cues_into_each_file(tmp_path: Path) -> None:
+    """The file-tag sink: walk -> cue -> write Serato Markers2 tags."""
+    pytest.importorskip("mutagen")
+    from vibemix.library.cue_folder import tag_folder_serato
+    from vibemix.library.export_serato import read_serato_cues
+
+    for name in ("a.mp3", "b.mp3"):
+        shutil.copy(_REAL_MP3, tmp_path / name)
+
+    def fake_detect(path: str, *, max_cues: int = 8) -> list[CueAnchor]:
+        return [_anchor("intro", 5.0), _anchor("drop", 64.0)]
+
+    report = tag_folder_serato(tmp_path, allow_write=True, detect=fake_detect)
+
+    assert report["tagged"] == 2
+    assert report["cues_total"] == 4
+    assert report["skipped"] == 0
+    for name in ("a.mp3", "b.mp3"):
+        back = read_serato_cues(tmp_path / name)
+        assert [c.name for c in back] == ["INTRO", "DROP"]
+
+
+def test_tag_folder_serato_requires_opt_in(tmp_path: Path) -> None:
+    """Without allow_write nothing is tagged (the files are never mutated)."""
+    from vibemix.library.cue_folder import tag_folder_serato
+
+    (tmp_path / "a.mp3").write_bytes(b"x")
+
+    def fake_detect(path: str, *, max_cues: int = 8) -> list[CueAnchor]:
+        return [_anchor("intro", 5.0)]
+
+    report = tag_folder_serato(tmp_path, allow_write=False, detect=fake_detect)
+    assert report["tagged"] == 0
+    assert report["skipped"] >= 1

@@ -2738,31 +2738,44 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_embed_folder.set_defaults(func=_cmd_library_embed_folder)
 
-    # Cue/export bridge: point at a folder and get structural hot cues without
-    # mutating the user's audio files.
+    # Cue/export bridge: point at a folder, get structural hot cues.
     sp_cue = sub.add_parser(
         "cue",
-        help="Auto-cue a folder and export Rekordbox/M3U8 handoffs",
+        help="Auto-cue a folder and export Rekordbox/M3U8 or Serato file tags",
         description=(
             "Walk a raw audio folder, run the local auto-cue engine per track, "
             "and emit a portable cue handoff. Default writes an additive "
-            "Rekordbox XML; --export m3u8 writes an order-only crate."
+            "Rekordbox XML; --export m3u8 writes an order-only crate; "
+            "--write-tags opt-in writes Serato Markers2 tags into the files."
         ),
     )
     sp_cue.add_argument("path", help="folder to cue (recursive)")
     sp_cue.add_argument(
         "--out",
         default="vibemix-cues.xml",
-        help="output path for XML/M3U8 export",
+        help="output path for XML/M3U8 export (ignored with --write-tags)",
     )
     sp_cue.add_argument(
         "--export",
         choices=("rekordbox", "m3u8", "both"),
         default="rekordbox",
-        help="export format (default: rekordbox)",
+        help="export format when not using --write-tags (default: rekordbox)",
     )
     sp_cue.add_argument("--name", default="vibemix cues", help="playlist name")
     sp_cue.add_argument("--max-cues", type=int, default=8, help="max cues per track")
+    sp_cue.add_argument(
+        "--write-tags",
+        action="store_true",
+        help=(
+            "write Serato Markers2 cue tags into the audio files. Mutates files; "
+            "merge-on by default so existing foreign cue pads are preserved."
+        ),
+    )
+    sp_cue.add_argument(
+        "--no-merge",
+        action="store_true",
+        help="with --write-tags, replace instead of merging existing Serato cues",
+    )
     sp_cue.add_argument("--json", action="store_true")
     sp_cue.set_defaults(func=_cmd_library_cue)
 
@@ -6088,24 +6101,40 @@ def _cmd_library_cue(args: argparse.Namespace) -> int:
             print(f"-> cue [{idx}/{total}] {name}", file=sys.stderr, flush=True)
 
     try:
-        from vibemix.library.cue_folder import export_cued_folder
+        if bool(getattr(args, "write_tags", False)):
+            from vibemix.library.cue_folder import tag_folder_serato
 
-        report = export_cued_folder(
-            folder,
-            getattr(args, "out", "vibemix-cues.xml"),
-            export=str(getattr(args, "export", "rekordbox")),
-            name=str(getattr(args, "name", "vibemix cues")),
-            max_cues=int(getattr(args, "max_cues", 8)),
-            on_progress=_progress,
-        )
-        payload = {
-            "ok": report.tracks_cued > 0,
-            "mode": "export",
-            "tracks_cued": report.tracks_cued,
-            "cues_total": report.cues_total,
-            "skipped": report.skipped,
-            "outputs": dict(report.outputs),
-        }
+            report = tag_folder_serato(
+                folder,
+                allow_write=True,
+                merge=not bool(getattr(args, "no_merge", False)),
+                max_cues=int(getattr(args, "max_cues", 8)),
+                on_progress=_progress,
+            )
+            payload = {
+                "ok": int(report.get("tagged", 0)) > 0,
+                "mode": "serato-tags",
+                **report,
+            }
+        else:
+            from vibemix.library.cue_folder import export_cued_folder
+
+            report = export_cued_folder(
+                folder,
+                getattr(args, "out", "vibemix-cues.xml"),
+                export=str(getattr(args, "export", "rekordbox")),
+                name=str(getattr(args, "name", "vibemix cues")),
+                max_cues=int(getattr(args, "max_cues", 8)),
+                on_progress=_progress,
+            )
+            payload = {
+                "ok": report.tracks_cued > 0,
+                "mode": "export",
+                "tracks_cued": report.tracks_cued,
+                "cues_total": report.cues_total,
+                "skipped": report.skipped,
+                "outputs": dict(report.outputs),
+            }
     except Exception as exc:
         payload = {"ok": False, "error": f"cue failed: {type(exc).__name__}: {exc}"}
         print(_json.dumps(payload), file=sys.stderr)
@@ -6115,12 +6144,19 @@ def _cmd_library_cue(args: argparse.Namespace) -> int:
         _json.dump(payload, sys.stdout, indent=2)
         sys.stdout.write("\n")
     else:
-        outputs = ", ".join(f"{k}={v}" for k, v in payload["outputs"].items())
-        print(
-            "cue done: "
-            f"tracks={payload['tracks_cued']} cues={payload['cues_total']} "
-            f"skipped={payload['skipped']} outputs={outputs}"
-        )
+        if payload["mode"] == "serato-tags":
+            print(
+                "cue done: "
+                f"tagged={payload['tagged']} cues={payload['cues_total']} "
+                f"skipped={payload['skipped']} scanned={payload['scanned']}"
+            )
+        else:
+            outputs = ", ".join(f"{k}={v}" for k, v in payload["outputs"].items())
+            print(
+                "cue done: "
+                f"tracks={payload['tracks_cued']} cues={payload['cues_total']} "
+                f"skipped={payload['skipped']} outputs={outputs}"
+            )
     return 0 if payload.get("ok") else 1
 
 

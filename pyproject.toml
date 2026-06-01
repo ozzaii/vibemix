@@ -171,6 +171,14 @@ ai-local = [
 telegram = [
     "python-telegram-bot>=21",
 ]
+# Serato file-tag cue export. mutagen writes the ID3 container in this first
+# slice; FLAC/MP4 carriers remain follow-ups. The Markers2 binary payload is
+# reimplemented from the documented format (vibemix/library/export_serato.py).
+# NOTE: mutagen is GPL-2.0-or-later - a runtime dep, lazy-imported and never
+# vendored.
+serato = [
+    "mutagen>=1.47",
+]
 
 [project.urls]
 Homepage = "https://github.com/ozzaii/vibemix"

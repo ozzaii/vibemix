@@ -24,6 +24,8 @@ def _args(tmp_path: Path, **overrides: object) -> argparse.Namespace:
         "export": "m3u8",
         "name": "vibemix cues",
         "max_cues": 4,
+        "write_tags": False,
+        "no_merge": False,
         "json": True,
     }
     data.update(overrides)
@@ -62,6 +64,34 @@ def test_cmd_library_cue_exports_folder_json(
     assert captured.err == ""
 
 
+def test_cmd_library_cue_write_tags_is_explicit_and_merges_by_default(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    def fake_tag(folder, *, allow_write, merge, max_cues, on_progress):
+        assert Path(folder) == tmp_path
+        assert allow_write is True
+        assert merge is True
+        assert max_cues == 8
+        on_progress(1, 2, "a.mp3")
+        return {"tagged": 2, "cues_total": 4, "skipped": 0, "scanned": 2}
+
+    monkeypatch.setattr(cue_folder_mod, "tag_folder_serato", fake_tag)
+
+    rc = main_mod._cmd_library_cue(
+        _args(tmp_path, write_tags=True, max_cues=8, json=True)
+    )
+
+    assert rc == 0
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["ok"] is True
+    assert payload["mode"] == "serato-tags"
+    assert payload["tagged"] == 2
+    assert captured.err == ""
+
+
 def test_cmd_library_cue_rejects_missing_folder(capsys) -> None:
     rc = main_mod._cmd_library_cue(
         argparse.Namespace(
@@ -70,6 +100,8 @@ def test_cmd_library_cue_rejects_missing_folder(capsys) -> None:
             export="rekordbox",
             name="vibemix cues",
             max_cues=8,
+            write_tags=False,
+            no_merge=False,
             json=True,
         )
     )

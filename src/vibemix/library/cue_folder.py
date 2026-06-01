@@ -150,7 +150,7 @@ def write_m3u8(tracks: Sequence[Mapping[str, Any]], out_path: Path | str) -> Pat
 
     Mixxx / Serato / most players import an ``.m3u8`` as an ADDITIVE playlist
     (Mixxx makes it a new crate) - order only; the cues ride in the Rekordbox
-    XML, never here. Duration is unknown from the cue
+    XML or the Serato file tags, never here. Duration is unknown from the cue
     path, so every entry is ``#EXTINF:-1``.
     """
     out = Path(out_path)
@@ -166,7 +166,8 @@ def write_m3u8(tracks: Sequence[Mapping[str, Any]], out_path: Path | str) -> Pat
 
 # Cue carriers per --export choice. Rekordbox XML reaches Rekordbox (and, via a
 # USB export, Pioneer hardware); M3U8 is the neutral order-only bridge every
-# player (incl. Mixxx/Serato) imports additively.
+# player (incl. Mixxx/Serato) imports additively. Serato file-tags are the
+# opt-in direct file carrier for engines that import Markers2 cues.
 _EXPORT_FORMATS: dict[str, tuple[str, ...]] = {
     "rekordbox": ("rekordbox",),
     "m3u8": ("m3u8",),
@@ -234,6 +235,54 @@ def export_cued_folder(
     )
 
 
+def tag_folder_serato(
+    folder: Path | str,
+    *,
+    allow_write: bool = False,
+    merge: bool = True,
+    max_cues: int = DEFAULT_MAX_CUES,
+    detect: DetectFn | None = None,
+    on_progress: Callable[[int, int, str], None] | None = None,
+) -> dict[str, int]:
+    """Auto-cue ``folder`` and write Serato Markers2 cue tags INTO each file.
+
+    This is the direct file carrier: cues are written into the audio file's
+    Serato Markers2 tag for software that imports those cues, with no DB write.
+    Because it mutates the user's files it is opt-in (``allow_write`` <- the CLI
+    ``--write-tags``) and ``merge``-by-default (never clobbers a hand-set cue).
+    Returns counts: ``{tagged, cues_total, skipped, scanned}``.
+    """
+    from vibemix.library.export_serato import (
+        marks_to_serato_cues,
+        write_serato_cues,
+    )
+
+    result = cue_folder(
+        folder, max_cues=max_cues, detect=detect, on_progress=on_progress
+    )
+    tagged = 0
+    cues_total = 0
+    skipped = list(result.skipped)
+    for track in result.tracks:
+        cues = marks_to_serato_cues(track["cues"])
+        res = write_serato_cues(
+            track["filepath"], cues, merge=merge, allow_write=allow_write
+        )
+        if res.get("written"):
+            tagged += 1
+            cues_total += int(res.get("cue_count", 0))
+        else:
+            skipped.append(
+                {"filepath": track["filepath"], "reason": res.get("reason", "not written")}
+            )
+    return {
+        "tagged": tagged,
+        "cues_total": cues_total,
+        "skipped": len(skipped),
+        "scanned": result.scanned,
+    }
+
+
 __all__ = [
     "HOT_CUE_SLOTS",
     "CueExportReport",
@@ -241,5 +290,6 @@ __all__ = [
     "anchors_to_marks",
     "cue_folder",
     "export_cued_folder",
+    "tag_folder_serato",
     "write_m3u8",
 ]
