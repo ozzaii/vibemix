@@ -2382,6 +2382,46 @@ Remaining gate:
 - Source-level setup visibility only. A future explicit action may start an
   ingest/re-embed run, but this package remains read-only.
 
+## Package 5N - Traktor NML Library Source
+
+Suggested commit: `feat(library): add traktor nml source`
+
+Include:
+
+- `src/vibemix/library/sources/traktor.py`
+- `src/vibemix/library/sources/__init__.py`
+- `tests/library/test_sources_traktor.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/__main__.py` CLI/source-selection hooks.
+- Live co-host speech, prompts, event timing, or deck-identity changes.
+- Native Traktor runtime/database dependencies; this slice is exported
+  `collection.nml` XML only.
+
+Reason:
+
+- Universal Library Ingest needs more than Rekordbox so Viber can help DJs
+  whose crates live elsewhere. A Traktor `.nml` reader is a clean source-island
+  proof: stdlib XML in, existing `TrackEntry` rows out, no audio/model/runtime
+  side effects.
+- The first slice intentionally proves the source seam before touching the
+  shared `__main__.py` orchestration file, which is active in other lanes.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_sources_traktor.py tests/library/test_sources_rekordbox.py`
+- `uv run ruff check src/vibemix/library/sources/traktor.py src/vibemix/library/sources/__init__.py tests/library/test_sources_traktor.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/library/sources/traktor.py src/vibemix/library/sources/__init__.py tests/library/test_sources_traktor.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- CLI/UI selection and automatic setup discovery for Traktor are separate
+  follow-up packages. This package proves parser correctness and the shared
+  LibrarySource contract only.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`
