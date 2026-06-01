@@ -169,12 +169,12 @@ def project_monthly_cost(
 # ROUTE_PRICING — USD per 1M tokens, May 2026 (see PLAN <pricing_facts>):
 #   - cache-eligible paths carry a "cached_input" rate (90% discount on
 #     live_coach: 0.15 vs 1.50);
-#   - tts / embedding paths have no cache → cached_input == input (the split
-#     degenerates to "all fresh", savings 0).
+#   - embedding paths have no cache → cached_input == input (the split
+#     degenerates to "all fresh", savings 0). Production TTS is local MOSS and
+#     no longer records a paid router path here.
 ROUTE_PRICING: dict[str, dict[str, float]] = {
     # path:            input,  output, cached_input  (USD per 1M tokens)
     "live_coach":     {"input": 1.50, "output": 9.00, "cached_input": 0.15},
-    "live_coach_tts": {"input": 1.00, "output": 20.00, "cached_input": 1.00},
     "debrief":        {"input": 2.00, "output": 12.00, "cached_input": 0.20},
     "embedding":      {"input": 0.20, "output": 0.00, "cached_input": 0.20},
 }

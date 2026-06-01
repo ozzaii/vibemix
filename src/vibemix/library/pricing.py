@@ -20,6 +20,7 @@ The EUR conversion + the per-turn/per-session/fleet cost model live in
 Sources (rechecked 2026-05-31):
 - Gemini:   https://ai.google.dev/gemini-api/docs/pricing
 - DeepSeek: https://api-docs.deepseek.com/quick_start/pricing
+- MOSS:     local on-device TTS; no per-call provider bill
 - ElevenLabs: https://elevenlabs.io/pricing/api
 - Hume:     https://www.hume.ai/pricing
 - Cartesia: https://www.cartesia.ai/pricing   (UNVERIFIED — credits/minutes only)
@@ -106,16 +107,29 @@ MODEL_PRICING: dict[str, PriceRow] = dict(
             cached_input_per_mtok_usd=0.05, audio_input_per_mtok_usd=1.00,
             notes="Current-gen standard Flash (cascade); $1.00/1M audio in.",
         ),
-        # ─── TTS (Gemini, audio-token billed) ─────────────────────────────────
+        # ─── TTS (production local MOSS + paid what-if vendors) ───────────────
+        (
+            "moss-local",
+            PriceRow(
+                model_id="moss-local", kind="tts", verified=True,
+                source_url="local:vibemix.agent.local_tts", source_date="2026-06-01",
+                tts_per_1m_char_usd=0.0,
+                notes="Production voice path: on-device MOSS-TTS-Nano. No per-call "
+                "provider bill; packaging/model distribution is tracked separately.",
+            ),
+        ),
+        # Historical Gemini TTS rows remain as explicit what-if comparison rows.
         _gemini_row(
             "live_coach_tts", kind="tts", verified=True,
             input_per_mtok_usd=1.00, tts_audio_out_per_mtok_usd=20.00,
-            notes="Current Gemini Flash TTS; per 1M tokens (audio=25 tok/sec).",
+            notes="Historical paid Gemini Flash TTS comparison row; production "
+            "speech is local MOSS.",
         ),
         _gemini_row(
             "live_coach_tts_fallback", kind="tts", verified=True,
             input_per_mtok_usd=0.50, tts_audio_out_per_mtok_usd=10.00,
-            notes="Prior-gen Gemini Flash TTS — HALF the audio-out cost; the value pick.",
+            notes="Historical paid Gemini Flash TTS comparison row; production "
+            "speech is local MOSS.",
         ),
         # ─── VIBER / set-prep brain (DeepSeek, LLM — not grep-gated) ───────────
         (

@@ -3868,6 +3868,7 @@ Include:
 - `src/vibemix/llm/_router_config.py`
 - `tests/library/test_cost.py`
 - `tests/library/test_pricing.py`
+- `tests/library/test_session_meter.py`
 - `tests/e2e/test_phase_41_latency_stack_integration.py`
 - `tests/llm/test_model_router.py`
 - `docs/pricing/live-stack-economics.en.md`
@@ -3948,6 +3949,29 @@ Codex refresh, 2026-06-01:
   `uv run python -m json.tool`, and preserved `verified: false` for Cartesia
   Sonic.
 - `git diff --check` over the Package 10 file set passed with no output.
+
+Codex refresh, 2026-06-01 MOSS cost rebaseline:
+
+- Classification remains LAND as an internal reproducible cost model. This
+  refresh aligns the default live stack with the accepted MOSS-only voice
+  policy: production TTS is now `moss-local` with an explicit zero provider
+  bill; Gemini/Eleven/Hume/Cartesia/OpenAI TTS rows remain only as sensitivity
+  what-ifs.
+- `uv run pytest -q tests/library/test_cost.py tests/library/test_pricing.py tests/library/test_session_meter.py tests/llm/test_model_router.py tests/e2e/test_phase_41_latency_stack_integration.py`
+  passed: 68 tests.
+- `uv run ruff check src/vibemix/library/cost.py src/vibemix/library/pricing.py src/vibemix/library/budget.py tests/library/test_cost.py tests/library/test_pricing.py tests/library/test_session_meter.py`
+  passed.
+- `bash scripts/release/check_no_hardcoded_model.sh`
+  passed.
+- `uv run python -m vibemix library budget --stack live --dau 10000 --brain live_coach_cand_25flash --tts moss-local`
+  exited 0 and printed `TOTAL 0.0485 EUR/session, 0.99 EUR/DJ-month,
+  9,917 fleet EUR/mo`, dominant leg `LISTEN`, with the `tts` leg at `0`.
+- The JSON form parsed successfully and preserved the sensitivity spread:
+  `Local MOSS (production)` at 9,917 fleet EUR/mo, `Gemini value TTS` at
+  54,371, `Gemini premium TTS` at 98,825, and `Cartesia Sonic` still marked
+  `verified: false`.
+- `git diff --check -- src/vibemix/library/cost.py src/vibemix/library/pricing.py src/vibemix/library/budget.py tests/library/test_cost.py tests/library/test_pricing.py tests/library/test_session_meter.py`
+  passed with no output.
 
 ## Package 11 - Launch Collateral
 

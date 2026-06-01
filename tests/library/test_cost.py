@@ -2,8 +2,9 @@
 """Live-stack cost model — per-turn → per-session → per-DJ-month → fleet.
 
 The cache-blend is the load-bearing insight (Kaan, 2026-05-30): with ~90%
-implicit cache hits across a continuous set, the input leg collapses ~5-9x, but
-output + TTS-audio never cache — so TTS dominates the per-turn bill even harder.
+implicit cache hits across a continuous set, the input leg collapses ~5-9x. The
+production voice is now local MOSS, so paid TTS appears only as an explicit
+what-if sensitivity row.
 """
 
 from __future__ import annotations
@@ -39,7 +40,7 @@ def test_brain_cost_falls_with_a_higher_cache_hit_rate() -> None:
 
 
 def test_tts_reaction_cost_gemini_is_audio_token_billed() -> None:
-    """Gemini TTS bills the spoken audio per token (25 tok/sec) plus the small
+    """Paid Gemini TTS what-if bills the spoken audio per token plus the small
     text-input charge for the words it speaks."""
     from vibemix.library.cost import tts_reaction_usd
 
@@ -48,6 +49,15 @@ def test_tts_reaction_cost_gemini_is_audio_token_billed() -> None:
     # audio = 12 * 25 = 300 tok * 10.00 / 1e6 = 0.003
     # text  = 40 * 0.50 / 1e6 = 0.00002
     assert usd == pytest.approx(0.00302, rel=1e-9)
+
+
+def test_tts_reaction_cost_moss_local_is_zero_provider_bill() -> None:
+    """MOSS is local/on-device, so provider TTS cost is explicitly zero."""
+    from vibemix.library.cost import tts_reaction_usd
+    from vibemix.library.pricing import price_for_model
+
+    row = price_for_model("moss-local")
+    assert tts_reaction_usd(row, speech_seconds=12.0, text_tokens=40) == 0.0
 
 
 def test_tts_reaction_cost_vendor_is_per_character() -> None:
@@ -100,13 +110,13 @@ def test_listen_cost_falls_back_to_input_rate_when_no_separate_audio_rate() -> N
 
 
 def _default_inputs():
-    """The cost-sane default live stack: cheap Gemini brain + value Gemini TTS +
+    """The cost-sane default live stack: cheap Gemini brain + local MOSS voice +
     mic→Gemini Part STT + DeepSeek Viber, at the bench-measured turn profile."""
     from vibemix.library.cost import LiveStackSpec, TurnProfile, UsageProfile
 
     spec = LiveStackSpec(
         live_brain_path="live_coach_cand_25flash",
-        tts_path="live_coach_tts_fallback",
+        tts_path="moss-local",
         stt="gemini_part",
         viber_model="deepseek-v4-pro",
     )
@@ -160,14 +170,13 @@ def test_livekit_cloud_rate_adds_a_real_leg_scaling_with_set_minutes() -> None:
     assert lk.per_session_eur > 0
 
 
-def test_tts_is_the_dominant_leg_for_the_default_stack() -> None:
-    """The thesis in one assertion: with caching applied, TTS — not the brain —
-    is where the money goes."""
+def test_listen_is_the_dominant_leg_for_the_default_moss_stack() -> None:
+    """With MOSS local, listening/audio-in becomes the dominant paid leg."""
     from vibemix.library.cost import compute_live_cost
 
     spec, turn, usage = _default_inputs()
     bd = compute_live_cost(spec, turn, usage, dau=10_000)
-    assert bd.dominant_leg == "tts"
+    assert bd.dominant_leg == "listen"
 
 
 def test_fleet_scales_linearly_with_dau() -> None:
@@ -181,20 +190,18 @@ def test_fleet_scales_linearly_with_dau() -> None:
     )
 
 
-def test_fleet_at_10k_reconciles_the_knowbook_anchor() -> None:
-    """§16 anchor: ~35-85k EUR/mo at 10k DAU with Gemini value TTS. The model
-    must land in that band, never re-import the old single-user €50/mo figure."""
+def test_fleet_at_10k_reflects_moss_removing_paid_tts() -> None:
+    """The MOSS default should be far below the old paid-Gemini-TTS anchor."""
     from vibemix.library.cost import compute_live_cost
 
     spec, turn, usage = _default_inputs()
     bd = compute_live_cost(spec, turn, usage, dau=10_000)
-    assert 30_000 <= bd.fleet_month_eur <= 90_000
+    assert 5_000 <= bd.fleet_month_eur <= 20_000
 
 
 def test_premium_tts_swap_moves_the_fleet_more_than_a_premium_brain_swap() -> None:
-    """Decision-grade: switching TTS vendor changes the fleet bill far more than
-    switching the brain tier — because TTS dominates and the brain is ~free
-    under caching."""
+    """Decision-grade: adding paid TTS changes the fleet bill far more than
+    switching the brain tier — because MOSS removes the default voice bill."""
     from dataclasses import replace
 
     from vibemix.library.cost import compute_live_cost
