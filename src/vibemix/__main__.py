@@ -7466,6 +7466,22 @@ def _cmd_library_stats(args: argparse.Namespace) -> int:
 
     model_status = onnx_model_status()
     freshness = library_freshness_status().to_dict()
+    setup_candidates: list[dict[str, object]] = []
+    needs_setup_candidate = (
+        indexed <= 0
+        or bool(freshness.get("stale"))
+        or freshness.get("status")
+        in {"not_indexed", "source_missing", "cache_unreadable", "stale"}
+    )
+    if needs_setup_candidate:
+        try:
+            from vibemix.library.setup_discovery import (
+                discover_library_setup_candidate_dicts,
+            )
+
+            setup_candidates = discover_library_setup_candidate_dicts(max_candidates=5)
+        except Exception as e:
+            print(f"[library stats] setup discovery unavailable: {e}", file=sys.stderr)
 
     payload = {
         "indexed": indexed,
@@ -7480,6 +7496,7 @@ def _cmd_library_stats(args: argparse.Namespace) -> int:
         "library_stale": freshness["stale"],
         "library_staleness_reason": freshness["reason"],
         "library_age_days": freshness["age_days"],
+        "library_setup_candidates": setup_candidates,
         **_library_agent_setup_status(),
         "failed": 0,
     }

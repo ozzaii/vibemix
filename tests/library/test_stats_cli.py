@@ -45,6 +45,7 @@ def _isolate_caches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         },
     )
     import vibemix.library.codex_curate as codex_curate
+    import vibemix.library.setup_discovery as setup_discovery
 
     codex_home = tmp_path / "codex"
     codex_home.mkdir()
@@ -54,6 +55,11 @@ def _isolate_caches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("VIBEMIX_PROXY_JWT", raising=False)
     monkeypatch.setattr(codex_curate, "find_codex", lambda codex_path=None: "/usr/bin/codex")
+    monkeypatch.setattr(
+        setup_discovery,
+        "discover_library_setup_candidate_dicts",
+        lambda *, max_candidates=5: [],
+    )
 
 
 def _seed_sqlite_store(db_path: Path, n: int) -> None:
@@ -102,6 +108,7 @@ def _expected_payload(indexed: int, backend: str) -> dict:
         "library_stale": False,
         "library_staleness_reason": "library_cache_missing",
         "library_age_days": 0,
+        "library_setup_candidates": [],
         "agent_backend": "codex",
         "agent_ready": True,
         "agent_status": "ready",
@@ -193,6 +200,7 @@ def test_json_shape_keys_exact(
         "library_stale",
         "library_staleness_reason",
         "library_age_days",
+        "library_setup_candidates",
         "agent_backend",
         "agent_ready",
         "agent_status",
@@ -210,6 +218,7 @@ def test_json_shape_keys_exact(
     assert isinstance(payload["library_stale"], bool)
     assert isinstance(payload["library_staleness_reason"], str)
     assert isinstance(payload["library_age_days"], int)
+    assert isinstance(payload["library_setup_candidates"], list)
     assert isinstance(payload["agent_backend"], str)
     assert isinstance(payload["agent_ready"], bool)
     assert isinstance(payload["agent_status"], str)
@@ -255,6 +264,42 @@ def test_agent_status_ignores_stale_gemini_backend_env(
     assert payload["agent_ready"] is True
     assert payload["agent_status"] == "ready"
     assert payload["agent_hint"] == ""
+
+
+def test_stats_surfaces_user_approved_library_setup_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import vibemix.library.setup_discovery as setup_discovery
+    from vibemix.library.index_sqlite_vec import SqliteVecStore
+
+    db_path = tmp_path / "library.db"
+    candidate = {
+        "kind": "music_folder",
+        "path": str(tmp_path / "PSYMIND"),
+        "confidence": "high",
+        "reason": "bounded scan saw 42 supported audio files",
+        "command": "uv run python -m vibemix library embed-folder PSYMIND",
+        "audio_files_seen": 42,
+        "import_action": {
+            "type": "ipc.library.import",
+            "payload": {"path": str(tmp_path / "PSYMIND"), "schema_version": "1"},
+        },
+    }
+    monkeypatch.setattr(
+        setup_discovery,
+        "discover_library_setup_candidate_dicts",
+        lambda *, max_candidates=5: [candidate],
+    )
+    monkeypatch.setattr(
+        "vibemix.library.store.open_store",
+        lambda *a, **k: LibraryStore(SqliteVecStore(db_path=db_path)),
+    )
+
+    payload = _run_handler(monkeypatch)
+
+    assert payload["indexed"] == 0
+    assert payload["library_freshness_status"] == "not_indexed"
+    assert payload["library_setup_candidates"] == [candidate]
 
 
 def test_stats_reports_stale_when_source_newer_than_cache(

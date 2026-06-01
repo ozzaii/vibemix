@@ -53,6 +53,7 @@ import {
   type LibraryChatToolTrace,
   type LibraryChatTurn,
   type LibraryCueResult,
+  type LibraryImportAction,
   type LibraryLiveDeck,
   type LibraryLiveContext,
   type LibraryLiveEvidence,
@@ -62,9 +63,11 @@ import {
   type LibraryModelProgress,
   type LibraryViberToolEvent,
   type LibraryModelsResult,
+  type LibrarySetupCandidate,
   type LibraryStats,
   type SearchResult,
 } from "./api.js";
+import { emitIpc } from "../ipc/client.js";
 import { renderScope } from "./scope.js";
 import {
   echoText,
@@ -1259,7 +1262,10 @@ function renderChatIdleSide(): void {
   if (tools.dataset.live === "true") return;
   tools.replaceChildren();
   appendLiveProofStatusToolRow(tools, latestLiveContext);
-  $("vmx-lib-chat-artifact").replaceChildren();
+  const artifact = $("vmx-lib-chat-artifact");
+  artifact.replaceChildren();
+  const setupCard = chatLibrarySetupCard(latestStats);
+  if (setupCard) artifact.append(setupCard);
   $("vmx-lib-scope-state").textContent = liveProofStatus(latestLiveContext).ok
     ? "live read armed"
     : "ready";
@@ -1400,6 +1406,10 @@ function renderChatSide(result: LibraryChatResult): void {
   artifact.replaceChildren();
   const card = chatArtifactCard(result);
   if (card) artifact.append(card);
+  else {
+    const setupCard = chatLibrarySetupCard(latestStats);
+    if (setupCard) artifact.append(setupCard);
+  }
   $("vmx-lib-scope-state").textContent = chatScopeStateText(result);
 }
 
@@ -1515,6 +1525,88 @@ function appendChatCardLine(card: HTMLElement, text: string): void {
   line.className = "line";
   line.textContent = text;
   card.append(line);
+}
+
+function librarySetupCandidateLabel(kind: string): string {
+  if (kind === "rekordbox_xml") return "Rekordbox XML";
+  if (kind === "traktor_nml") return "Traktor NML";
+  if (kind === "virtualdj_database") return "VirtualDJ database";
+  if (kind === "music_folder") return "music folder";
+  return kind.replace(/_/g, " ");
+}
+
+function bestLibrarySetupCandidate(
+  stats: LibraryStats | null,
+): LibrarySetupCandidate | null {
+  return (
+    stats?.library_setup_candidates?.find(
+      (candidate) => candidate.import_action?.type === "ipc.library.import",
+    ) ?? null
+  );
+}
+
+function chatLibrarySetupCard(stats: LibraryStats | null): HTMLElement | null {
+  const candidate = bestLibrarySetupCandidate(stats);
+  if (!candidate?.import_action) return null;
+
+  const card = document.createElement("div");
+  card.className = "vmx-lib-chat-card vmx-lib-chat-card--setup";
+  card.dataset.wire = "library.setup-candidate";
+
+  const cap = document.createElement("div");
+  cap.className = "cap";
+  const led = document.createElement("span");
+  led.className = "led";
+  const label = document.createElement("span");
+  label.textContent = "library setup";
+  cap.append(led, label);
+  card.append(cap);
+
+  appendChatCardLine(
+    card,
+    `Viber found a likely ${librarySetupCandidateLabel(candidate.kind)}.`,
+  );
+  appendChatCardLine(card, candidate.path);
+  if (candidate.reason) appendChatCardLine(card, candidate.reason);
+
+  const row = document.createElement("div");
+  row.className = "vmx-lib-chat-actionrow";
+  const status = document.createElement("span");
+  status.className = "vmx-lib-chat-actionstate";
+  status.textContent = "waiting for approval";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "vmx-lib-chat-action";
+  button.textContent =
+    candidate.kind === "music_folder" ? "Index folder" : "Import source";
+  button.addEventListener("click", () => {
+    void runLibrarySetupImport(candidate.import_action as LibraryImportAction, {
+      button,
+      status,
+    });
+  });
+  row.append(status, button);
+  card.append(row);
+  return card;
+}
+
+async function runLibrarySetupImport(
+  action: LibraryImportAction,
+  els: { button: HTMLButtonElement; status: HTMLElement },
+): Promise<void> {
+  els.button.disabled = true;
+  els.status.textContent = "indexing queued";
+  $("vmx-lib-scope-state").textContent = "indexing library";
+  try {
+    await emitIpc(action.type, { ...action.payload });
+    els.status.textContent = "indexing started";
+  } catch (err) {
+    els.button.disabled = false;
+    els.status.textContent = "setup action unavailable";
+    $("vmx-lib-scope-state").textContent = "setup unavailable";
+    // eslint-disable-next-line no-console
+    console.warn("[library] setup import emit failed", err);
+  }
 }
 
 /** The ordered "01. track" set view a built/curated playlist deserves — the
@@ -1744,6 +1836,7 @@ export function mountLibrary(): void {
   async function refreshStats(): Promise<void> {
     try {
       renderStats(await libraryStats());
+      if (state.mode === "chat" && !busy) renderChatIdleSide();
     } catch (err) {
       renderStatsError(err);
     }
@@ -1996,6 +2089,9 @@ export function mountLibrary(): void {
         busy = false;
         runBtn.disabled = false;
         cancelActiveRun = null;
+        if (modeAtStart === "chat" && chatHistory.length === 0) {
+          renderChatIdleSide();
+        }
       }
     }
   }

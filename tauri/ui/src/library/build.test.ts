@@ -130,6 +130,7 @@ const STATS_READY: LibraryStats = {
   agent_ready: true,
   agent_status: "ready",
   agent_hint: "",
+  library_setup_candidates: [],
   spent_eur: 0,
   failed: 0,
 };

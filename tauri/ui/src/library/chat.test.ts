@@ -70,6 +70,8 @@ const statsMock = vi.fn(async () => STATS_READY);
 const modelsMock = vi.fn(
   async (_install?: LibraryModelInstallTarget) => MODELS_READY,
 );
+const emitIpcMock =
+  vi.fn<(type: string, payload: Record<string, unknown>) => Promise<void>>();
 
 const STATS_READY: LibraryStats = {
   indexed: 12,
@@ -83,6 +85,7 @@ const STATS_READY: LibraryStats = {
   agent_ready: true,
   agent_status: "ready",
   agent_hint: "",
+  library_setup_candidates: [],
   spent_eur: 0,
   failed: 0,
 };
@@ -115,6 +118,33 @@ const MODELS_READY: LibraryModelsResult = {
   required_ready: true,
   all_ready: true,
 };
+
+function statsWithSetupCandidate(): LibraryStats {
+  return {
+    ...STATS_READY,
+    indexed: 0,
+    library_freshness_status: "not_indexed",
+    library_stale: false,
+    library_staleness_reason: "library_cache_missing",
+    library_age_days: 0,
+    library_setup_candidates: [
+      {
+        kind: "music_folder",
+        path: "/Users/ozai/Music/PSYMIND",
+        confidence: "high",
+        reason: "bounded scan saw 42 supported audio files",
+        audio_files_seen: 42,
+        import_action: {
+          type: "ipc.library.import",
+          payload: {
+            path: "/Users/ozai/Music/PSYMIND",
+            schema_version: "1",
+          },
+        },
+      },
+    ],
+  };
+}
 
 const CHAT_WITH_PLAYLIST: LibraryChatResult = {
   reply: "Pull SMOKED OUT after the current track and keep the low end clean.",
@@ -323,6 +353,9 @@ function doMockApi(): void {
   liveContextCallback = null;
   liveMoveCallback = null;
   viberToolCallback = null;
+  vi.doMock("../ipc/client.js", () => ({
+    emitIpc: emitIpcMock,
+  }));
   vi.doMock("./api.js", async (importOriginal) => {
     const actual = await importOriginal<typeof import("./api.js")>();
     return {
@@ -467,6 +500,8 @@ describe("chat - real runChat path", () => {
     statsMock.mockResolvedValue(STATS_READY);
     modelsMock.mockReset();
     modelsMock.mockResolvedValue(MODELS_READY);
+    emitIpcMock.mockReset();
+    emitIpcMock.mockResolvedValue(undefined);
     vi.resetModules();
     document.body.innerHTML = "";
   });
@@ -489,6 +524,50 @@ describe("chat - real runChat path", () => {
       '.vmx-lib-chat-tool[data-proof="true"]',
     );
     expect(proofRow?.dataset.proofState).toBe("waiting");
+  });
+
+  it("surfaces a user-approved library setup action when Viber finds a source", async () => {
+    statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
+
+    await mountChat();
+
+    const artifact = document.getElementById("vmx-lib-chat-artifact");
+    const setupCard = artifact?.querySelector<HTMLElement>(
+      '[data-wire="library.setup-candidate"]',
+    );
+    expect(setupCard).not.toBeNull();
+    expect(setupCard?.textContent).toContain("library setup");
+    expect(setupCard?.textContent).toContain("Viber found a likely music folder.");
+    expect(setupCard?.textContent).toContain("/Users/ozai/Music/PSYMIND");
+    expect(setupCard?.textContent).toContain("waiting for approval");
+    expect(setupCard?.textContent).toContain("Index folder");
+    expect(emitIpcMock).not.toHaveBeenCalled();
+  });
+
+  it("sends the safe library import action only after the user clicks it", async () => {
+    statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
+
+    await mountChat();
+
+    const button = document.querySelector<HTMLButtonElement>(
+      '[data-wire="library.setup-candidate"] .vmx-lib-chat-action',
+    );
+    expect(button).not.toBeNull();
+    button?.click();
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    expect(emitIpcMock).toHaveBeenCalledTimes(1);
+    expect(emitIpcMock).toHaveBeenCalledWith("ipc.library.import", {
+      path: "/Users/ozai/Music/PSYMIND",
+      schema_version: "1",
+    });
+    expect(button?.disabled).toBe(true);
+    expect(
+      document.getElementById("vmx-lib-chat-artifact")?.textContent,
+    ).toContain("indexing started");
+    expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
+      "indexing library",
+    );
   });
 
   it("keeps the live read partial until deck-pair audio is active", async () => {

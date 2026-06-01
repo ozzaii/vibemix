@@ -86,6 +86,7 @@ describe("dev fallback (no Tauri bridge)", () => {
       agent_ready: true,
       agent_status: "ready",
       agent_hint: "",
+      library_setup_candidates: [],
       spent_eur: 0.19,
       failed: 0,
     });
@@ -1323,6 +1324,27 @@ describe("runtime response normalizers", () => {
         library_stale: true,
         library_staleness_reason: "source_newer_than_cache",
         library_age_days: 2,
+        library_setup_candidates: [
+          {
+            kind: "music_folder",
+            path: "/Music/PSYMIND",
+            confidence: "high",
+            reason: "bounded scan saw 42 supported audio files",
+            audio_files_seen: 42,
+            import_action: {
+              type: "ipc.library.import",
+              payload: { path: "/Music/PSYMIND", schema_version: "1" },
+            },
+          },
+          {
+            kind: "music_folder",
+            path: "/Music/unsafe",
+            import_action: {
+              type: "ipc.settings.set",
+              payload: { path: "/Music/unsafe", schema_version: "1" },
+            },
+          },
+        ],
         spent_eur: 0.25,
         failed: 0,
         clap_model_missing: [],
@@ -1333,6 +1355,23 @@ describe("runtime response normalizers", () => {
       library_stale: true,
       library_staleness_reason: "source_newer_than_cache",
       library_age_days: 2,
+      library_setup_candidates: [
+        {
+          kind: "music_folder",
+          path: "/Music/PSYMIND",
+          confidence: "high",
+          reason: "bounded scan saw 42 supported audio files",
+          audio_files_seen: 42,
+          import_action: {
+            type: "ipc.library.import",
+            payload: { path: "/Music/PSYMIND", schema_version: "1" },
+          },
+        },
+        {
+          kind: "music_folder",
+          path: "/Music/unsafe",
+        },
+      ],
       library_freshness: {
         status: "stale",
         stale: true,
