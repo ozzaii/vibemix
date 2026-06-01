@@ -4752,6 +4752,7 @@ Hold:
 - `src/vibemix/audio/voice_mix.py`
 - `src/vibemix/runtime/automix_demo.py`
 - `src/vibemix/runtime/drop_reaction.py`
+- `src/vibemix/runtime/coach.py`
 - `src/vibemix/state/event_detector.py`
 - `src/vibemix/state/refresh.py`
 - `scripts/automix_demo_smoke.py`
@@ -4790,6 +4791,10 @@ Reason:
   `DROP` event from the predicted-drop crossing. Keep it with this hold lane; it
   is no longer only offline/demo groundwork and needs the full live/audio/
   grounding proof before promotion.
+- `runtime/coach.py` belongs here for the matching DROP-event fixed-text
+  `session.say()` hunk. It must not be staged with Judge Voice or Earned Wall
+  coach work unless this hold lane's grounding-review and on-beat live proof
+  are present.
 - `tests/state/test_event_detector_drop.py` is the matching unit proof for that
   dormant gate: opt-in, no default firing, crossing behavior, and no repeated
   firing while still inside the arm window.
