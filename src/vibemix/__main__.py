@@ -1718,8 +1718,12 @@ async def main() -> None:
             },
         },
     )
-    session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
-    print(f"-> AgentSession headless (no Room); audio out → PlaybackQueue @ {OUTPUT_SR}Hz")
+    if tts_inst is _livekit_not_given():
+        session.output.set_audio_enabled(False)
+        print("-> AgentSession headless (no Room); audio out muted (no local TTS)")
+    else:
+        session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
+        print(f"-> AgentSession headless (no Room); audio out → PlaybackQueue @ {OUTPUT_SR}Hz")
 
     await session.start(agent)
     print("-> agent started.")

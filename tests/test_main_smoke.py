@@ -674,6 +674,9 @@ def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
     )
     assert livekit_mocks["AgentSession"].call_args.kwargs["tts"] is NOT_GIVEN
     assert livekit_mocks["DJCoHostAgent"].call_args.kwargs["tts_inst"] is NOT_GIVEN
+    livekit_mocks["session"].output.set_audio_enabled.assert_called_once_with(False)
+    assert livekit_mocks["PlaybackQueueAudioOutput"].call_count == 0
+    assert livekit_mocks["session"].output.audio is None
     assert livekit_mocks["session"].start.await_count == 1
     assert "voice muted, no cloud fallback" in capsys.readouterr().err
 

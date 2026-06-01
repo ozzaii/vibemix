@@ -4112,6 +4112,11 @@ Proof for this boot-guard slice:
 - `uv run ruff check src/vibemix/__main__.py tests/test_main_smoke.py`
 - `git diff --check -- src/vibemix/__main__.py tests/test_main_smoke.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- Live source probe, 2026-06-01: `VIBEMIX_LOCAL_TTS=0` correctly selected
+  `NOT_GIVEN` TTS but LiveKit still attempted `tts_node` because audio output
+  stayed enabled. This package now disables session audio output when app boot
+  is muted, so muted mode stays quiet without cloud fallback and without a
+  background LiveKit error.
 
 Remaining gate:
 
