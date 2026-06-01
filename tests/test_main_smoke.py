@@ -494,6 +494,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     # the host's real rekordbox config — the zero-config global default reads
     # ~/Library Pioneer settings, and this is a wiring smoke, not a per-deck test.
     monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
+    monkeypatch.setenv("VIBEMIX_ENABLE_MIC", "1")
 
     audio_mocks = _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
@@ -639,6 +640,7 @@ def test_smoke_05_cleanup_closes_all_streams(monkeypatch, mocker, tmp_path):
     AND close() called."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setenv("VIBEMIX_ENABLE_MIC", "1")
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
 
     audio_mocks = _build_audio_mocks(mocker)

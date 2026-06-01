@@ -1169,18 +1169,30 @@ async def main() -> None:
     )
     print(f"-> djay passthrough -> {OUTPUT_DEVICE} @ {INPUT_SR_NATIVE}Hz")
 
-    # Mic stream is optional — gracefully degrade if not found (v4:1962-1979)
-    try:
-        mic_idx = audio_backend.find_device(MIC_DEVICE, "input")
-        mic_stream = audio_backend.open_mic_capture(
-            mic_idx,
-            sample_rate=INPUT_SR_NATIVE,
-            block_size=INPUT_CHUNK_FRAMES,
-            callback=_mic_callback_factory(mic, mic_audio_buf),
-        )
-        print(f"-> mic on {MIC_DEVICE} @ {INPUT_SR_NATIVE}Hz")
-    except Exception as e:
-        print(f"-> mic disabled: {e}")
+    # Mic stream is optional. Keep it opt-in at boot: CoreAudio can hang inside
+    # PortAudio when opening a mic device, and that previously blocked the
+    # websocket before the UI could explain anything.
+    mic_enabled = os.environ.get("VIBEMIX_ENABLE_MIC", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ) or bool(str(os.environ.get("VIBEMIX_MIC_DEVICE") or "").strip())
+    if mic_enabled:
+        try:
+            mic_idx = audio_backend.find_device(MIC_DEVICE, "input")
+            mic_stream = audio_backend.open_mic_capture(
+                mic_idx,
+                sample_rate=INPUT_SR_NATIVE,
+                block_size=INPUT_CHUNK_FRAMES,
+                callback=_mic_callback_factory(mic, mic_audio_buf),
+            )
+            print(f"-> mic on {MIC_DEVICE} @ {INPUT_SR_NATIVE}Hz")
+        except Exception as e:
+            print(f"-> mic disabled: {e}")
+            mic_stream = None
+    else:
+        print("-> mic disabled: set VIBEMIX_ENABLE_MIC=1 to enable mic capture")
         mic_stream = None
 
     # --- LLM + TTS chain ---
