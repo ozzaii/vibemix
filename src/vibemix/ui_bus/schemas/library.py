@@ -116,10 +116,14 @@ class LibraryStalenessNudgePayload:
         age_days: cache age in days since last import.
         snoozed_until_ts: epoch seconds when the snooze expires; ``None``
             when not snoozed.
+        source_path: refreshable Rekordbox XML path, when known.
+        reason: machine-readable freshness reason, when known.
     """
 
     age_days: int
     snoozed_until_ts: float | None
+    source_path: str | None = None
+    reason: str | None = None
     schema_version: str = "1"
 
 

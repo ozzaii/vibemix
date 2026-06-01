@@ -687,6 +687,8 @@ export interface LibraryStalenessNudge {
   payload: {
     age_days: number;
     snoozed_until_ts: number | null;
+    source_path?: string | null;
+    reason?: string | null;
     schema_version: "1";
   };
 }

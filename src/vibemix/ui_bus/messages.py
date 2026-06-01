@@ -1908,12 +1908,22 @@ class LibraryStalenessNudge:
     payload: LibraryStalenessNudgePayload
 
     @classmethod
-    def make(cls, *, age_days: int, snoozed_until_ts: float | None) -> LibraryStalenessNudge:
+    def make(
+        cls,
+        *,
+        age_days: int,
+        snoozed_until_ts: float | None,
+        source_path: str | None = None,
+        reason: str | None = None,
+    ) -> LibraryStalenessNudge:
         return cls(
             type="ipc.library.staleness_nudge",
             ts=_now_iso(),
             payload=LibraryStalenessNudgePayload(
-                age_days=age_days, snoozed_until_ts=snoozed_until_ts
+                age_days=age_days,
+                snoozed_until_ts=snoozed_until_ts,
+                source_path=source_path,
+                reason=reason,
             ),
         )
 

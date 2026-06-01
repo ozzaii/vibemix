@@ -144,6 +144,21 @@ describe("library-panel — progress updates fill width", () => {
   });
 });
 
+describe("library-panel — programmatic refresh", () => {
+  it("beginImport emits ipc.library.import for stale-source refreshes", async () => {
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    await handle.beginImport("/path/to/collection.xml");
+    await _flush();
+
+    expect(emitted).toContainEqual({
+      type: "ipc.library.import",
+      payload: { path: "/path/to/collection.xml", schema_version: "1" },
+    });
+  });
+});
+
 describe("library-panel — cancel emits cancel message", () => {
   it("clicking Cancel emits ipc.library.import_cancel", async () => {
     const handle = await renderLibraryPanel();

@@ -1945,6 +1945,10 @@ async def main() -> None:
                         LibraryStalenessNudge.make(
                             age_days=int(_p.get("age_days", 0)),
                             snoozed_until_ts=_p.get("snoozed_until_ts"),
+                            source_path=_p.get("source_path")
+                            if isinstance(_p.get("source_path"), str)
+                            else None,
+                            reason=_p.get("reason") if isinstance(_p.get("reason"), str) else None,
                         ).to_json()
                     )
                 )
@@ -1959,6 +1963,12 @@ async def main() -> None:
                             LibraryStalenessNudge.make(
                                 age_days=int(payload.get("age_days", 0)),
                                 snoozed_until_ts=payload.get("snoozed_until_ts"),
+                                source_path=payload.get("source_path")
+                                if isinstance(payload.get("source_path"), str)
+                                else None,
+                                reason=payload.get("reason")
+                                if isinstance(payload.get("reason"), str)
+                                else None,
                             ).to_json()
                         )
                     )

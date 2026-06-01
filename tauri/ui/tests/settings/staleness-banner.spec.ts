@@ -97,6 +97,58 @@ describe("staleness-banner — dismiss hides + emits action", () => {
   });
 });
 
+describe("staleness-banner — refresh action", () => {
+  it("shows Refresh library for a refreshable source and calls onRefresh", async () => {
+    const onRefresh = vi.fn(async (_path: string) => undefined);
+    const handle = renderStalenessBanner({ onRefresh });
+    document.body.append(handle.element);
+    await _flushMicrotasks();
+
+    const cb = subscribers.get("ipc.library.staleness_nudge")!;
+    cb({
+      type: "ipc.library.staleness_nudge",
+      ts: "2026-05-15T12:00:00Z",
+      payload: {
+        age_days: 2,
+        snoozed_until_ts: null,
+        source_path: "/Music/collection.xml",
+        reason: "source_newer_than_cache",
+        schema_version: "1",
+      },
+    });
+
+    const refreshBtn = handle.element.querySelector(
+      ".vmx-staleness-refresh",
+    ) as HTMLButtonElement;
+    expect(refreshBtn.classList.contains("hidden")).toBe(false);
+    refreshBtn.click();
+    await _flushMicrotasks();
+
+    expect(onRefresh).toHaveBeenCalledWith("/Music/collection.xml");
+    expect(handle.element.classList.contains("hidden")).toBe(true);
+  });
+
+  it("hides Refresh library when no source path is attached", async () => {
+    const handle = renderStalenessBanner();
+    document.body.append(handle.element);
+    await _flushMicrotasks();
+
+    const cb = subscribers.get("ipc.library.staleness_nudge")!;
+    cb({
+      type: "ipc.library.staleness_nudge",
+      ts: "2026-05-15T12:00:00Z",
+      payload: { age_days: 7, snoozed_until_ts: null, schema_version: "1" },
+    });
+
+    const refreshBtn = handle.element.querySelector(
+      ".vmx-staleness-refresh",
+    ) as HTMLButtonElement;
+    expect(refreshBtn.classList.contains("hidden")).toBe(true);
+    expect(refreshBtn.disabled).toBe(true);
+    expect(handle.element.textContent).toContain("Drop the Rekordbox XML below.");
+  });
+});
+
 describe("staleness-banner — snooze emits 7d action + hides", () => {
   it("emits ipc.library.staleness_action snooze_7d on snooze click", async () => {
     const handle = renderStalenessBanner();

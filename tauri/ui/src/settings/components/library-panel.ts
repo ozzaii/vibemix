@@ -19,6 +19,7 @@ import type { LibraryImportProgress } from "../../ipc/messages.js";
 
 export interface LibraryPanelHandle {
   element: HTMLElement;
+  beginImport(path: string): Promise<void>;
   dispose(): void;
 }
 
@@ -216,6 +217,7 @@ export async function renderLibraryPanel(
 
   return {
     element: root,
+    beginImport,
     dispose(): void {
       disposed = true;
       try {

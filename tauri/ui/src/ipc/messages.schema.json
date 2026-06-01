@@ -2766,6 +2766,19 @@
                 "null"
               ]
             },
+            "source_path": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "schema_version": {
               "const": "1"
             }

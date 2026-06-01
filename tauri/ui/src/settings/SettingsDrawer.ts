@@ -51,7 +51,10 @@ import {
   renderHotkeyCapture,
   type HotkeyCaptureHandle,
 } from "./components/hotkey-capture.js";
-import { renderLibraryPanel } from "./components/library-panel.js";
+import {
+  renderLibraryPanel,
+  type LibraryPanelHandle,
+} from "./components/library-panel.js";
 import { renderProfilePanel } from "./components/profile-panel.js";
 import { renderStalenessBanner } from "./components/staleness-banner.js";
 import {
@@ -750,6 +753,7 @@ export function _resetDrawerForTests(): void {
 
 let hotkeyHandle: HotkeyCaptureHandle | null = null;
 let retentionHandle: RetentionSliderHandle | null = null;
+let libraryPanelHandle: LibraryPanelHandle | null = null;
 // Phase 15 Plan 05 — Recording browser handle persists across refreshes
 // so the loadRecordings() async resolver can push results into the live
 // component without rebuilding it on every refresh tick.
@@ -783,6 +787,7 @@ function disposeDrawerBodyResources(): void {
   hotkeyHandle = null;
   retentionHandle = null;
   recordingBrowserHandle = null;
+  libraryPanelHandle = null;
 }
 
 function beginDrawerBodyRender(): number {
@@ -1047,7 +1052,15 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   const libraryBody = document.createElement("div");
   libraryBody.style.cssText =
     "display:flex; flex-direction:column; gap: var(--sp-2);";
-  const stalenessHandle = renderStalenessBanner();
+  const stalenessHandle = renderStalenessBanner({
+    onRefresh: async (path) => {
+      if (libraryPanelHandle) {
+        await libraryPanelHandle.beginImport(path);
+        return;
+      }
+      await emitIpc("ipc.library.import", { path, schema_version: "1" });
+    },
+  });
   bodyDisposers.push(() => stalenessHandle.dispose());
   libraryBody.append(stalenessHandle.element);
   // Library panel is async; mount a placeholder + swap when ready.
@@ -1058,7 +1071,11 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
       handle.dispose();
       return;
     }
-    bodyDisposers.push(() => handle.dispose());
+    libraryPanelHandle = handle;
+    bodyDisposers.push(() => {
+      if (libraryPanelHandle === handle) libraryPanelHandle = null;
+      handle.dispose();
+    });
     libraryPanelSlot.replaceWith(handle.element);
   }).catch((err: unknown) => {
     if (renderId !== bodyRenderId || !libraryPanelSlot.isConnected) return;

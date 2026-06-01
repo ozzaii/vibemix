@@ -5,8 +5,10 @@
  * Library section of the Settings drawer (Plan 28-06).
  *
  * IPC contract (Plan 28-09):
- *   inbound:  ipc.library.staleness_nudge { age_days, snoozed_until_ts, schema_version }
+ *   inbound:  ipc.library.staleness_nudge { age_days, snoozed_until_ts,
+ *                                           source_path?, reason?, schema_version }
  *   outbound: ipc.library.staleness_action { action: "dismiss" | "snooze_7d", schema_version }
+ *   outbound: ipc.library.import { path, schema_version } when the stale source is refreshable
  *
  * Visual direction follows project_visual_direction_cdj_whisper:
  *   - amber-2 background tint, amber-3 1px border-bottom
@@ -22,23 +24,34 @@ export interface StalenessBannerHandle {
   dispose(): void;
 }
 
+interface StalenessBannerOptions {
+  onRefresh?: (path: string) => void | Promise<void>;
+}
+
 /** Render the banner. Hidden until ipc.library.staleness_nudge arrives. */
-export function renderStalenessBanner(): StalenessBannerHandle {
+export function renderStalenessBanner(
+  opts: StalenessBannerOptions = {},
+): StalenessBannerHandle {
   const root = document.createElement("div");
   root.className = "vmx-staleness-banner hidden";
   root.setAttribute("role", "status");
   root.innerHTML = `
     <span class="vmx-staleness-text">
       Library is <em class="vmx-staleness-age">…</em> old.
-      Re-import to keep me grounded.
+      <span class="vmx-staleness-copy">Re-import to keep me grounded.</span>
     </span>
     <div class="vmx-staleness-actions">
+      <button type="button" class="vmx-staleness-refresh hidden">Refresh library</button>
       <button type="button" class="vmx-staleness-dismiss">Dismiss</button>
       <button type="button" class="vmx-staleness-snooze">Snooze 7 days</button>
     </div>
   `;
 
   const ageEl = root.querySelector(".vmx-staleness-age") as HTMLElement;
+  const copyEl = root.querySelector(".vmx-staleness-copy") as HTMLElement;
+  const refreshBtn = root.querySelector(
+    ".vmx-staleness-refresh",
+  ) as HTMLButtonElement;
   const dismissBtn = root.querySelector(
     ".vmx-staleness-dismiss",
   ) as HTMLButtonElement;
@@ -48,14 +61,39 @@ export function renderStalenessBanner(): StalenessBannerHandle {
 
   let disposed = false;
   let unsub: (() => void) | null = null;
+  let refreshPath: string | null = null;
 
   const hide = (): void => {
     root.classList.add("hidden");
   };
-  const show = (ageDays: number): void => {
+  const show = (ageDays: number, sourcePath: string | null): void => {
+    refreshPath = sourcePath;
     ageEl.textContent = `${ageDays} day${ageDays === 1 ? "" : "s"}`;
+    copyEl.textContent = sourcePath
+      ? "Refresh to keep Viber grounded."
+      : "Drop the Rekordbox XML below.";
+    refreshBtn.classList.toggle("hidden", !sourcePath);
+    refreshBtn.disabled = !sourcePath;
     root.classList.remove("hidden");
   };
+
+  refreshBtn.addEventListener("click", () => {
+    if (disposed || !refreshPath) return;
+    const path = refreshPath;
+    refreshBtn.disabled = true;
+    void (async () => {
+      try {
+        if (opts.onRefresh) {
+          await opts.onRefresh(path);
+        } else {
+          await emitIpc("ipc.library.import", { path, schema_version: "1" });
+        }
+        if (!disposed) hide();
+      } catch {
+        if (!disposed) refreshBtn.disabled = false;
+      }
+    })();
+  });
 
   dismissBtn.addEventListener("click", () => {
     if (disposed) return;
@@ -78,7 +116,7 @@ export function renderStalenessBanner(): StalenessBannerHandle {
     "ipc.library.staleness_nudge",
     (msg) => {
       if (disposed) return;
-      show(msg.payload.age_days);
+      show(msg.payload.age_days, msg.payload.source_path || null);
     },
   ).then((u) => {
     const disposeSubscription = u as unknown as () => void;
