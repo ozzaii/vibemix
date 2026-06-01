@@ -356,6 +356,16 @@ def test_prompt_01_each_cell_has_eight_anchor_phrases(skill: str, mode: str) -> 
     assert not missing, f"({skill},{mode}) missing anchors: {missing}"
 
 
+def test_hype_pro_control_praise_requires_live_move_proof() -> None:
+    """Pro hype can keep terse DJ phrases, but control praise needs proof."""
+    body = build_system_instruction("pro", "hype")
+
+    assert "CONTROL PRAISE NEEDS PROOF" in body
+    assert "recent_moves names the move" in body
+    assert "recent_moves NONE" in body
+    assert "filter sweep paid off" in body
+
+
 # ---------------------------------------------------------------------------
 # Shared anti-slop substrate every cell carries
 # ---------------------------------------------------------------------------

@@ -169,7 +169,7 @@ _NO_MOVE_CONTROL_ACTION_RE = re.compile(
     r"brought|pulled|pushed|raised|dropped|cut|killed|boosted|opened|closed|swept"
     r")\b[^.?!]{0,32}\b("
     r"fader|faders|low|lows|mid|mids|high|highs|hi|bass|sub|eq|filter|"
-    r"high[- ]?pass|low[- ]?pass|gain|trim|volume|knob"
+    r"high[- ]?pass|low[- ]?pass|gain|trim|volume|knob|it|that|them"
     r")\b",
     re.IGNORECASE,
 )
@@ -177,7 +177,8 @@ _NO_MOVE_CONTROL_NOUN_RE = re.compile(
     r"\bthat\b[^.?!]{0,24}\b("
     r"eq|filter|low|high|fader|kill|cut|move|low cut|high cut"
     r")\b[^.?!]{0,32}\b("
-    r"cleaned|cleared|fixed|tightened|improved|saved|caused|made|opened|sorted"
+    r"cleaned|cleared|fixed|tightened|improved|saved|caused|made|opened|sorted|"
+    r"landed|worked|paid\s+off"
     r")\b",
     re.IGNORECASE,
 )

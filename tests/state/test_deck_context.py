@@ -2067,8 +2067,10 @@ def test_live_claim_guard_allows_low_kill_when_mixer_agrees() -> None:
         "You killed the lows there.",
         "that low cut cleaned the mix",
         "that EQ move cleaned up the low end",
+        "that filter sweep paid off",
         "Bring the high-pass filter back down to 12 o'clock",
         "You pulled the faders up and it got muddy.",
+        "That high-frequency rise on Deck A got a bit too piercing before you pulled it back.",
     ],
 )
 def test_live_claim_guard_corrects_no_move_control_causality(reply: str) -> None:

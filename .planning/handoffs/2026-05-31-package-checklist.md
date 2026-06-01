@@ -1455,6 +1455,50 @@ Remaining gate:
   canaries against a fresh source session and confirm no EQ/control causality
   claim is spoken without structured move evidence.
 
+## Package 8E2 - No-Move Control Praise Guard
+
+Suggested commit: `fix(cohost): require proof for control-praise phrases`
+
+Include:
+
+- `src/vibemix/state/deck_context.py`
+- `tests/state/test_deck_context.py`
+- `src/vibemix/prompts/matrix.py`
+- `tests/prompts/test_matrix.py`
+
+Reason:
+
+- Clean FLX4/Rekordbox source proof at session `20260601-161123` showed the
+  guard still allowed no-move/no-citation control praise such as "filter sweep
+  paid off" and "Deck A got piercing before you pulled it back". That is not a
+  pure audio description; it credits an operator/control result without recent
+  move proof.
+- The runtime guard now treats terse control-praise phrases ("that filter sweep
+  paid off", "you pulled it back") as unsupported no-move control causality.
+  Pure audio texture remains allowed, for example "The filter sweep in the track
+  sounded hollow."
+- The prompt keeps pro-DJ anchor phrases, but explicitly says EQ/fader/filter/
+  transition praise requires `recent_moves` or `live_evidence`/`grounding_refs`.
+
+Proof already run:
+
+- `uv run pytest -q tests/state/test_deck_context.py -k 'live_claim_guard or live_claim_policy'`
+  passed: 41 tests, 69 deselected.
+- `uv run pytest -q tests/prompts/test_matrix.py -k 'control_praise or anchor or audio_vibe or grammar'`
+  passed: 26 tests, 75 deselected.
+- `uv run pytest -q tests/state/test_deck_context.py tests/prompts/test_matrix.py`
+  passed: 211 tests.
+- `uv run ruff check src/vibemix/state/deck_context.py src/vibemix/prompts/matrix.py tests/state/test_deck_context.py tests/prompts/test_matrix.py`
+  passed.
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+  passed with every dirty path assigned.
+
+Remaining gate:
+
+- Re-run a fresh cohost source session when convenient and confirm PHASE/MANUAL
+  no-move turns do not speak control praise. This package is still useful
+  without hardware because the failure is result-boundary deterministic.
+
 ## Package 8F - Internal Voice Tag Sanitizer
 
 Suggested commit: `fix(cohost): strip internal voice tags from speech`
