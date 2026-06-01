@@ -153,6 +153,9 @@ rust:
   tauri-plugin-fs:
     rating: green
     rationale: "Tauri FS access plugin. Build-time + native bindings; installer-invisible."
+  tauri-plugin-dialog:
+    rating: green
+    rationale: "Native open-file/open-folder picker plugin. Build-time + native bindings inside the Tauri shell; no separate user install."
   tauri-plugin-shell:
     rating: green
     rationale: "Tauri shell-out plugin (open-link). Build-time + native bindings."
@@ -179,6 +182,9 @@ js:
   '@tauri-apps/api':
     rating: green
     rationale: "Tauri JS bridge — pure-TS bindings to Rust IPC."
+  '@tauri-apps/plugin-dialog':
+    rating: green
+    rationale: "Tauri dialog JS bridge for the native library picker. Pure-TS bindings; native side is carried by the Rust plugin."
   '@tauri-apps/plugin-shell':
     rating: green
     rationale: "Shell-out plugin (open-link). Pure-TS bindings."

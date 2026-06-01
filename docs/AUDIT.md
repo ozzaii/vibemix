@@ -73,6 +73,7 @@
 | `serde_json` | see Cargo.lock | see Cargo.toml | JSON path for IPC payloads. Compile-time codegen. | 🟢 Green |  |
 | `tauri` | see Cargo.lock | see Cargo.toml | Desktop shell framework. Mac/Win supported with native toolchains; build chain is installer-invisible. | 🟡 Yellow |  |
 | `tauri-build` | see Cargo.lock | see Cargo.toml | Tauri's build-script crate. Build-time only — does not ship in the binary. | 🟡 Yellow |  |
+| `tauri-plugin-dialog` | see Cargo.lock | see Cargo.toml | Native open-file/open-folder picker plugin. Build-time + native bindings inside the Tauri shell; no separate user install. | 🟢 Green |  |
 | `tauri-plugin-fs` | see Cargo.lock | see Cargo.toml | Tauri FS access plugin. Build-time + native bindings; installer-invisible. | 🟢 Green |  |
 | `tauri-plugin-global-shortcut` | see Cargo.lock | see Cargo.toml | Tauri global hotkey plugin (Cmd+; mascot toggle). Native OS hotkey APIs; prebuilt. | 🟡 Yellow |  |
 | `tauri-plugin-positioner` | see Cargo.lock | see Cargo.toml | Tauri window-positioning helper. Pure-Rust. | 🟢 Green |  |
@@ -93,6 +94,7 @@
 | `@gltf-transform/core` | see package-lock.json | see package-lock.json | GLB transform library. | 🟢 Green |  |
 | `@playwright/test` | see package-lock.json | see package-lock.json | Playwright test-runner wrapper. Dev/test only; not shipped with the desktop app. | 🟢 Green |  |
 | `@tauri-apps/api` | see package-lock.json | see package-lock.json | Tauri JS bridge — pure-TS bindings to Rust IPC. | 🟢 Green |  |
+| `@tauri-apps/plugin-dialog` | see package-lock.json | see package-lock.json | Tauri dialog JS bridge for the native library picker. Pure-TS bindings; native side is carried by the Rust plugin. | 🟢 Green |  |
 | `@tauri-apps/plugin-shell` | see package-lock.json | see package-lock.json | Shell-out plugin (open-link). Pure-TS bindings. | 🟢 Green |  |
 | `@tauri-apps/plugin-store` | see package-lock.json | see package-lock.json | Tauri persistent KV store. Pure-TS bindings. | 🟢 Green |  |
 | `@types/three` | see package-lock.json | see package-lock.json | TS type declarations for three. Dev only. | 🟢 Green |  |

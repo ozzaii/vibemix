@@ -2276,6 +2276,7 @@ Include:
 - `tauri/src-tauri/Cargo.toml`
 - `tauri/src-tauri/Cargo.lock`
 - `tauri/src-tauri/capabilities/default.json`
+- `tauri/src-tauri/capabilities-snapshot/SNAPSHOT.json`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
 
 Keep out:
@@ -2304,8 +2305,9 @@ Proof to run:
 - `npm --prefix tauri/ui run build`
 - `cargo fmt --manifest-path tauri/src-tauri/Cargo.toml --check`
 - `cargo check --manifest-path tauri/src-tauri/Cargo.toml`
+- `uv run pytest -q tests/security/test_capability_snapshot.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-- `git diff --check -- tauri/ui/src/settings/components/library-panel.ts tauri/ui/tests/settings/library-panel.spec.ts tauri/ui/package.json tauri/ui/package-lock.json tauri/src-tauri/src/main.rs tauri/src-tauri/Cargo.toml tauri/src-tauri/Cargo.lock tauri/src-tauri/capabilities/default.json .planning/handoffs/2026-05-31-package-checklist.md`
+- `git diff --check -- tauri/ui/src/settings/components/library-panel.ts tauri/ui/tests/settings/library-panel.spec.ts tauri/ui/package.json tauri/ui/package-lock.json tauri/src-tauri/src/main.rs tauri/src-tauri/Cargo.toml tauri/src-tauri/Cargo.lock tauri/src-tauri/capabilities/default.json tauri/src-tauri/capabilities-snapshot/SNAPSHOT.json .planning/handoffs/2026-05-31-package-checklist.md`
 
 Remaining gate:
 
