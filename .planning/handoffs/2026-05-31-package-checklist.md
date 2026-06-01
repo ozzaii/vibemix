@@ -7269,3 +7269,59 @@ Proof before staging:
 - `uv run ruff check src/vibemix/__main__.py src/vibemix/library/codex_curate.py tests/repo/test_phase20_docs.py`
 - `git diff --check -- README.md AGENTS.md CLAUDE.md src/vibemix/__main__.py src/vibemix/library/codex_curate.py tauri/ui/library.html tauri/ui/src/library/api.ts tauri/ui/src/library/library.css tests/repo/test_phase20_docs.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 20 - Retire Dead Tend Citation Source
+
+Suggested commit: `fix(grounding): remove dead tend citation source`
+
+Include:
+
+- `scripts/README.md`
+- `src/vibemix/agent/dj_cohost.py`
+- `src/vibemix/agent/language_guard.py`
+- `src/vibemix/coach/citation_linter.py`
+- `src/vibemix/debrief/drills.py`
+- `src/vibemix/debrief/tldr.py`
+- `src/vibemix/memory/ingest.py`
+- `src/vibemix/prompts/matrix.py`
+- `src/vibemix/state/deck_context.py`
+- `src/vibemix/state/evidence_registry.py`
+- `src/vibemix/ui_bus/learn_messages.py`
+- `tauri/ui/src/debrief/__tests__/stripper-roundtrip.spec.ts`
+- `tauri/ui/src/debrief/stripper-roundtrip.ts`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tests/agent/test_dj_cohost.py`
+- `tests/coach/test_citation_linter.py`
+- `tests/coach/test_citation_zero_orphan_replay.py`
+- `tests/debrief/test_no_uncited_critique_in_debrief.py`
+- `tests/prompts/test_matrix.py`
+- `tests/scripts/fixtures/synthetic_session/events.jsonl`
+- `tests/scripts/fixtures/synthetic_session/responses/0007_120130_MANUAL/response.txt`
+- `tests/state/test_evidence_registry.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime co-host speech behavior beyond removing the unsupported citation source.
+- DROP-call / Mix Timing Oracle hold-lane files.
+- New profile-memory or preference-learning producers. This package chooses to cut
+  the unproduced `[tend:]` grammar source, not build it.
+
+Reason:
+
+- `[tend:<fact>]` was still advertised and accepted by the citation grammar even
+  though no runtime producer writes `registry.write("tend", ...)`. Keeping it made
+  prompt/schema/test surfaces promise user-profile facts that the app cannot ground.
+  The honest path is to remove the source until a real profile-fact producer exists.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui run codegen:ipc`
+- `uv run pytest -q tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py tests/debrief/test_no_uncited_critique_in_debrief.py tests/prompts/test_matrix.py tests/scripts/test_replay_linter.py tests/agent/test_dj_cohost.py::test_AE_citation_count_event_written_per_turn tests/agent/test_dj_cohost.py::test_AH_registry_record_citation_count_called_per_turn`
+- `npm --prefix tauri/ui test -- src/debrief/__tests__/stripper-roundtrip.spec.ts`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run check:ipc`
+- `uv run ruff check src/vibemix/agent/dj_cohost.py src/vibemix/agent/language_guard.py src/vibemix/coach/citation_linter.py src/vibemix/debrief/drills.py src/vibemix/debrief/tldr.py src/vibemix/memory/ingest.py src/vibemix/prompts/matrix.py src/vibemix/state/deck_context.py src/vibemix/state/evidence_registry.py src/vibemix/ui_bus/learn_messages.py tests/agent/test_dj_cohost.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py tests/debrief/test_no_uncited_critique_in_debrief.py tests/prompts/test_matrix.py tests/state/test_evidence_registry.py`
+- `git diff --check -- scripts/README.md src/vibemix/agent/dj_cohost.py src/vibemix/agent/language_guard.py src/vibemix/coach/citation_linter.py src/vibemix/debrief/drills.py src/vibemix/debrief/tldr.py src/vibemix/memory/ingest.py src/vibemix/prompts/matrix.py src/vibemix/state/deck_context.py src/vibemix/state/evidence_registry.py src/vibemix/ui_bus/learn_messages.py tauri/ui/src/debrief/__tests__/stripper-roundtrip.spec.ts tauri/ui/src/debrief/stripper-roundtrip.ts tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/validator.generated.mjs tests/agent/test_dj_cohost.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py tests/debrief/test_no_uncited_critique_in_debrief.py tests/prompts/test_matrix.py tests/scripts/fixtures/synthetic_session/events.jsonl tests/scripts/fixtures/synthetic_session/responses/0007_120130_MANUAL/response.txt tests/state/test_evidence_registry.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

@@ -19,8 +19,8 @@ describe('stripUncitedSentences', () => {
     expect(stripUncitedSentences('')).toEqual({ text: '', strippedCount: 0 });
   });
 
-  it('matches all 7 EBNF sources', () => {
-    for (const src of ['ev', 'aud', 'midi', 'track', 'screen', 'mix', 'tend']) {
+  it('matches all 7 debrief EBNF sources', () => {
+    for (const src of ['ev', 'aud', 'midi', 'track', 'screen', 'mix', 'key']) {
       const out = stripUncitedSentences(`Test [${src}:body@01:00].`);
       expect(out.strippedCount).toBe(0);
       expect(out.text).toBeTruthy();

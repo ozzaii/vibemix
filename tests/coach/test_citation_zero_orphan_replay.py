@@ -97,8 +97,7 @@ def _atom_resolves(
 
     Time-keyed sources (ev/aud/midi) decompose the body into ``key`` + float
     ``t`` and call ``reg.has(source, key, t, tol)``. Existence-only sources
-    (track/screen/mix/tend) just check key presence in the snapshot — mirrors
-    the linter's own dispatch.
+    just check key presence in the snapshot — mirrors the linter's own dispatch.
     """
     if source in ("ev", "aud", "midi"):
         if "@" not in body:

@@ -10,11 +10,11 @@
  * Locked Phase 18 grammar (port of Python ``EVIDENCE_CITATION_RE``):
  *   citation := '[' atom ( ',' atom )* ']'
  *   atom     := source ':' body
- *   source   := 'ev' | 'aud' | 'midi' | 'track' | 'screen' | 'mix' | 'tend'
+ *   source   := 'ev' | 'aud' | 'midi' | 'track' | 'screen' | 'mix' | 'key'
  *   body     := one-or-more chars excluding whitespace, ']', ','
  */
 export const EVIDENCE_CITATION_RE =
-  /\[(?:ev|aud|midi|track|screen|mix|tend):[^\s,\]]+(?:,(?:ev|aud|midi|track|screen|mix|tend):[^\s,\]]+)*\]/;
+  /\[(?:ev|aud|midi|track|screen|mix|key):[^\s,\]]+(?:,(?:ev|aud|midi|track|screen|mix|key):[^\s,\]]+)*\]/;
 
 const SENTENCE_BOUNDARY = /(?<=[.!?])\s+/;
 

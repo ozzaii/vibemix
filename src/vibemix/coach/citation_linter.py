@@ -10,17 +10,16 @@ telemetry, but the runtime decision in ``DJCoHostAgent.llm_node`` is binary.
 This is NEVER per-atom partial-strip and NEVER token-level partial-strip
 — v2.x territory only (CONTEXT Deferred Ideas).
 
-The seven EBNF atom shapes (``ev`` / ``aud`` / ``midi`` / ``track`` /
-``screen`` / ``mix`` / ``tend``) dispatch through ``_validate_atom``:
+The EBNF atom shapes dispatch through ``_validate_atom``:
 
 - ``ev`` / ``aud`` / ``midi`` — body MUST contain ``@``; split once and
   parse the trailing float as ``t``. Look up
   ``has(source, key, t, tol=LIVE_TOLERANCE_S)`` against the snapshot.
   Missing ``@`` or non-numeric ``t`` → MALFORMED.
-- ``track`` / ``screen`` / ``mix`` / ``tend`` — body has no ``@t``;
+- ``track`` / ``screen`` / ``mix`` — body has no ``@t``;
   presence check on ``snapshot[source][body]`` only.
 - Unknown source — already filtered out by the EBNF regex in
-  ``parse_citations`` (the regex whitelists the 7 sources). The linter
+  ``parse_citations`` (the regex whitelists the supported sources). The linter
   never sees them; the case is pinned by
   ``test_unknown_source_treated_as_no_citations``.
 
@@ -41,7 +40,7 @@ from vibemix.state.evidence_registry import EVIDENCE_SOURCES, parse_citations
 
 # Sources where the body shape is ``key@t`` (time-keyed lookup with
 # tolerance). The complement of this set inside EVIDENCE_SOURCES is the
-# existence-only set (track / screen / mix / tend / key).
+# existence-only set (track / screen / mix / key).
 #
 # Phase 59 (DECK-03): ``key`` (deck harmonic, body ``<deck>:<camelot>``)
 # joins the EXISTENCE-ONLY set purely by being in EVIDENCE_SOURCES and
@@ -183,7 +182,7 @@ class CitationLinter:
 
         ``malformed`` only surfaces for time-keyed atoms (ev/aud/midi)
         whose body is missing ``@`` or whose post-``@`` substring is not
-        a float. Existence-only atoms (track/screen/mix/tend/key) cannot be
+        a float. Existence-only atoms (track/screen/mix/key) cannot be
         malformed in v2.0 — their body shape is free-form. ``key`` (Phase 59,
         body ``<deck>:<camelot>``) flows through the existence-only branch.
 
@@ -208,6 +207,7 @@ class CitationLinter:
             valid = any(abs(t_obs - t_target) <= tol for t_obs in times)
             return (valid, False)
 
-        # Existence-only sources — track / screen / mix / tend.
+        # Existence-only sources — track / screen / mix / key / recall /
+        # exemplar / cue / judge.
         valid = body in snapshot.get(source, {})
         return (valid, False)

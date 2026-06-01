@@ -735,8 +735,8 @@ def _build_citation_strip(
     None) so the WS payload type stays stable across reactions.
 
     Sources currently supported for chip derivation: ``ev``, ``mix``,
-    ``midi``, ``key``. Other sources (``aud``, ``track``, ``screen``,
-    ``tend``) parse correctly but do not yield chips — they're either too
+    ``midi``, ``key``. Other sources (``aud``, ``track``, ``screen``)
+    parse correctly but do not yield chips — they're either too
     noisy (``aud``) or carry no obvious DJ-action verb (``track``). v2.x
     may widen this set; v1 stays narrow per the "no scope creep" rule.
 
@@ -766,7 +766,7 @@ def _build_citation_strip(
         if len(chips) >= CITATION_STRIP_MAX_CHIPS:
             break  # cap reached — drop the rest silently
         # Source allow-list — only sources with a clear "DJ action" verb
-        # yield UI chips. Quiet sources (aud/screen/tend) parse but do
+        # yield UI chips. Quiet sources (aud/screen) parse but do
         # not surface as user-visible evidence tags.
         #
         # Phase 66 (COPILOT-01) — ``recall`` added as the fifth allow-list

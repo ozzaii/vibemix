@@ -183,7 +183,7 @@ def _build_drills_prompt(
         "HARD RULE: every behavior, impact, and action_recommended field "
         "MUST contain at least one citation in the form "
         "[ev:<id>@<t>] / [track:<id>] / [mix:<id>] / [aud:<id>] / "
-        "[midi:<id>] / [screen:<id>] / [tend:<id>]. Citations MUST be "
+        "[midi:<id>] / [screen:<id>] / [key:<id>]. Citations MUST be "
         "from the allowlist below — citations referencing events that "
         "are not in the allowlist will be rejected.\n\n"
         f"Chapter summaries:\n{chapters_block}\n\n"

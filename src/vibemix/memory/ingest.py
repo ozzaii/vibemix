@@ -77,7 +77,7 @@ SIG_TEMPLATE_VERSION = "v9-coach_line-deck-audio-context"
 # grammar. lock-step source-of-truth: state/evidence_registry.py:133 (keep in
 # sync; copied rather than imported to keep ingest.py's import surface minimal
 # and unambiguously gate-clean — RESEARCH A5).
-_SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend|key"
+_SOURCE_ALT = "ev|aud|midi|track|screen|mix|key"
 _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 EVIDENCE_CITATION_RE: re.Pattern[str] = re.compile(rf"\[{_INNER_ATOM}(?:,{_INNER_ATOM})*\]")
 

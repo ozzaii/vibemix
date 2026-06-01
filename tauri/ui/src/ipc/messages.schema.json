@@ -2941,7 +2941,7 @@
             "tts_marker": {"type": "string", "minLength": 1, "maxLength": 64},
             "citations": {
               "type": "array",
-              "items": {"type": "string", "pattern": "^\\[(track|exemplar|cue|ev|aud|midi|screen|mix|tend|key|recall):.+\\]$"},
+              "items": {"type": "string", "pattern": "^\\[(track|exemplar|cue|ev|aud|midi|screen|mix|key|recall):.+\\]$"},
               "maxItems": 4
             },
             "data_state": {"type": "string", "enum": ["active", "hint"]},

@@ -157,15 +157,14 @@ def test_evidence_06_has_missing_returns_false_GROUND01() -> None:
         "[track:abc-123]",
         "[screen:waveform_deck_a]",
         "[mix:audible_deck=A]",
-        "[tend:user_likes_acid]",
         # Phase 59 (DECK-03) — the dedicated `key:` harmonic source.
         # body `A:8A` carries an inner colon; the atom regex still matches
         # because the body charset excludes only whitespace/comma/bracket.
         "[key:A:8A]",
     ],
 )
-def test_evidence_07_regex_matches_all_eight_forms_GROUND02(citation: str) -> None:
-    """EVIDENCE_CITATION_RE matches each of the 8 EBNF source forms."""
+def test_evidence_07_regex_matches_core_forms_GROUND02(citation: str) -> None:
+    """EVIDENCE_CITATION_RE matches each core EBNF source form."""
     assert EVIDENCE_CITATION_RE.fullmatch(citation) is not None, (
         f"expected EVIDENCE_CITATION_RE to match {citation!r}"
     )
@@ -181,7 +180,7 @@ def test_evidence_08_regex_multi_citation_GROUND02() -> None:
     assert m is not None, f"expected fullmatch on multi-citation {text!r}"
 
     # Inner-form sub-match: walk the source-tagged segments.
-    inner_re = re.compile(r"(ev|aud|midi|track|screen|mix|tend|key):[^\s,\]]+")
+    inner_re = re.compile(r"(ev|aud|midi|track|screen|mix|key):[^\s,\]]+")
     parts = inner_re.findall(text)
     assert len(parts) == 2
     assert parts == ["ev", "aud"]
@@ -208,7 +207,7 @@ def test_evidence_10_regex_rejects_empty_GROUND02_DLOCKED() -> None:
 # Test 11 — EVIDENCE_SOURCES constant — GROUND-02
 # --------------------------------------------------------------------------- #
 def test_evidence_11_sources_constant_locked_GROUND02() -> None:
-    """EVIDENCE_SOURCES is a frozenset of exactly the 12 source identifiers.
+    """EVIDENCE_SOURCES is a frozenset of exactly the 11 source identifiers.
 
     Phase 59 (DECK-03) added the dedicated ``key`` harmonic source to the
     original 7 CONTEXT.md sources. Phase 65 (RECALL-01) added ``recall`` —
@@ -227,7 +226,7 @@ def test_evidence_11_sources_constant_locked_GROUND02() -> None:
     """
     assert isinstance(EVIDENCE_SOURCES, frozenset)
     assert EVIDENCE_SOURCES == frozenset(
-        {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key", "recall", "exemplar", "cue", "judge"}
+        {"ev", "aud", "midi", "track", "screen", "mix", "key", "recall", "exemplar", "cue", "judge"}
     )
 
 

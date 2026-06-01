@@ -481,7 +481,7 @@ def test_o_citation_grammar_block_contains_eight_source_forms_and_multi_cite() -
     from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
 
     # 11 single-citation forms (GROUND-02 lock + DECK-03 `key` + RECALL-01
-    # `recall` + EXEMPLAR-05 `exemplar` + CURR-3.07 `cue`)
+    # `recall` + EXEMPLAR-05 `exemplar` + CURR-3.07 `cue` + Vibe Judge)
     for prefix in (
         "[ev:",
         "[aud:",
@@ -489,11 +489,11 @@ def test_o_citation_grammar_block_contains_eight_source_forms_and_multi_cite() -
         "[track:",
         "[screen:",
         "[mix:",
-        "[tend:",
         "[key:",
         "[recall:",
         "[exemplar:",
         "[cue:",
+        "[judge:",
     ):
         assert prefix in CITATION_GRAMMAR_BLOCK, f"missing source form {prefix!r}"
 

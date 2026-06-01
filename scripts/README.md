@@ -135,8 +135,8 @@ ear-test uses to ratify a session for release.
 ### Synthetic fixture
 
 `tests/scripts/fixtures/synthetic_session/` ships a self-contained 7-
-response fixture spanning all 7 EBNF atom shapes (`ev` / `aud` / `midi` /
-`track` / `screen` / `mix` / `tend`) plus one deliberately invalid `I'm
+response fixture spanning all replay-time EBNF atom shapes (`ev` / `aud` /
+`midi` / `track` / `screen` / `mix` / `key`) plus one deliberately invalid `I'm
 listening` fail-soft response. The fixture's `stripped_rate` lands at
 `1/7 ≈ 0.143 < 0.15` — pinning the threshold gate in CI before Phase 16
 swaps in real recorded sessions.

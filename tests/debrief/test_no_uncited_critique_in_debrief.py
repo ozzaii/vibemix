@@ -37,9 +37,9 @@ def test_strip_empty_input():
 
 @pytest.mark.parametrize(
     "source",
-    ["ev", "track", "mix", "aud", "midi", "screen", "tend"],
+    ["ev", "track", "mix", "aud", "midi", "screen", "key"],
 )
-def test_strip_accepts_all_7_ebnf_sources(source: str):
+def test_strip_accepts_all_debrief_ebnf_sources(source: str):
     text = f"This works [{source}:something@1.0]."
     out, dropped = strip_uncited_sentences(text)
     assert out == text  # sentence preserved

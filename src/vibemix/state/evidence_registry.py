@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """EvidenceRegistry — runtime anchor of cohost_v4's "trust the audio" rule.
 
-The registry records every citable observation the AI may reference
-(``ev`` event fires, ``aud`` audio features, ``midi`` controller moves,
-``track`` IDs, ``screen`` captures, ``mix`` derived deck state,
-``tend`` Kaan-profile facts) keyed by source + key, storing the
-``t_session`` timestamp at append-only insertion.
+The registry records every citable observation the AI may reference:
+``ev`` event fires, ``aud`` audio features, ``midi`` controller moves,
+``track`` IDs, ``screen`` captures, and ``mix`` derived deck state. Each
+observation is keyed by source + key, storing the ``t_session`` timestamp at
+append-only insertion.
 
 EvidenceRegistry is the runtime anchor of cohost_v4's "trust the audio"
 rule — the linter in Phase 20 reads it to verify every Gemini citation
@@ -93,7 +93,7 @@ DEFAULT_MIN_REFRESH_INTERVAL_S: float = 30.0
 #: ``ev`` = event-detector fire; ``aud`` = audio feature (RMS/BPM/bands);
 #: ``midi`` = controller move; ``track`` = nowplaying-cli track id;
 #: ``screen`` = djay screen-capture region; ``mix`` = derived mix state
-#: (``audible_deck`` etc.); ``tend`` = Kaan-profile fact (Phase 26 hook);
+#: (``audible_deck`` etc.);
 #: ``key`` = deck harmonic key, body ``<deck>:<camelot>`` (e.g. ``A:8A``) —
 #: the dedicated source that makes a fabricated clash uncitable-by-construction
 #: (Phase 60 narrates clashes the code already confirmed; existence-only,
@@ -127,7 +127,19 @@ DEFAULT_MIN_REFRESH_INTERVAL_S: float = 30.0
 #: the EBNF docstring, ``prompts/matrix.py::CITATION_GRAMMAR_BLOCK`` and
 #: ``agent/dj_cohost.py::_build_citation_strip`` in lock-step.
 EVIDENCE_SOURCES: frozenset[str] = frozenset(
-    {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key", "recall", "exemplar", "cue", "judge"}
+    {
+        "ev",
+        "aud",
+        "midi",
+        "track",
+        "screen",
+        "mix",
+        "key",
+        "recall",
+        "exemplar",
+        "cue",
+        "judge",
+    }
 )
 
 
@@ -176,20 +188,20 @@ EVIDENCE_SOURCES: frozenset[str] = frozenset(
 # (same posture as recall/key/exemplar/cue).
 #
 # ASYMMETRY (intentional, do NOT "fix"): ``memory/ingest.py``'s copy of this
-# alternation stays at 8 sources — ``recall``, ``exemplar``, ``cue``, AND
+# alternation stays at 7 sources — ``recall``, ``exemplar``, ``cue``, AND
 # ``judge`` are RETRIEVAL/narration-time, never ingest-time (a stored past
 # reaction never cited recall / exemplar / cue / judge itself; the Judge writes
 # its evidence at narration time), so the ingest-time extractor must not
 # whitelist them.
-_SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend|key|recall|exemplar|cue|judge"
+_SOURCE_ALT = "ev|aud|midi|track|screen|mix|key|recall|exemplar|cue|judge"
 _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 
 #: Compiled regex matching the LOCKED EBNF grammar:
 #:
 #:   citation := '[' atom ( ',' atom )* ']'
 #:   atom     := source ':' body
-#:   source   := 'ev' | 'aud' | 'midi' | 'track' | 'screen' | 'mix' | 'tend'
-#:             | 'key' | 'recall' | 'exemplar' | 'cue' | 'judge'
+#:   source   := 'ev' | 'aud' | 'midi' | 'track' | 'screen' | 'mix' | 'key'
+#:             | 'recall' | 'exemplar' | 'cue' | 'judge'
 #:   body     := one-or-more chars excluding whitespace, ']', ','
 #:   key-body := <deck> ':' <camelot>   # e.g. "A:8A" — deck ∈ {A,B,C,D},
 #:                                       # camelot ∈ 1A..12B (Phase 59 DECK-03)
@@ -206,7 +218,7 @@ _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 #:                                        # "8A>9A@128.4" — full body survives
 #:                                        # parse_citations (v11.0 the Vibe Judge)
 #:
-#: Matches the 12 single-citation forms + the comma-joined multi-citation
+#: Matches the 11 single-citation forms + the comma-joined multi-citation
 #: form in one pass. Empty ``[]`` is rejected (body requires at least one
 #: char). Whitespace inside brackets is rejected.
 EVIDENCE_CITATION_RE: re.Pattern[str] = re.compile(
@@ -556,7 +568,7 @@ def parse_citations(text: str) -> list[tuple[str, str]]:
 
     Each atom is split on the FIRST ``:`` so the body retains any inner
     structure (the ``key@t`` shape for ``ev`` / ``aud`` / ``midi`` or the
-    free-form key for ``track`` / ``screen`` / ``mix`` / ``tend``).
+    free-form key for ``track`` / ``screen`` / ``mix``).
 
     v1.0 callers MUST NOT rely on the inner-body shape being parsed
     further (e.g., splitting key from ``@t``) — that's Phase 20 territory

@@ -2,13 +2,15 @@
 """CitationLinter — Plan 20-01 Task 1.
 
 Pins the response-level (whole-utterance, binary) citation grounding contract
-against the EvidenceRegistry snapshot. The 7 EBNF atom shapes
-(ev / aud / midi / track / screen / mix / tend) each get their own case;
+against the EvidenceRegistry snapshot. Time-keyed and existence-only atoms
+each get their own case;
 boundary tolerance + malformed atom + multi-citation + mode dispatch +
 unknown-source + None-snapshot are all pinned here.
 """
 
 from __future__ import annotations
+
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -19,7 +21,6 @@ from vibemix.coach import (
     LintResult,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -28,7 +29,7 @@ from vibemix.coach import (
 def _registry(*entries: tuple[str, str, tuple[float, ...] | None]) -> dict:
     """Build a frozen registry snapshot from (source, key, times) triples.
 
-    For non-time-keyed atoms (track/screen/mix/tend) pass times=None — the
+    For non-time-keyed atoms (track/screen/mix/key) pass times=None — the
     snapshot stores an empty tuple as an "existence-only" marker (the linter
     only checks key presence for those atoms).
     """
@@ -256,23 +257,23 @@ def test_recall_existence_only_valid() -> None:
 
 
 # ---------------------------------------------------------------------------
-# (h) test_screen_mix_tend_existence_only
+# (h) test_screen_mix_key_existence_only
 # ---------------------------------------------------------------------------
 
 
-def test_screen_mix_tend_existence_only() -> None:
-    """screen / mix / tend atoms are existence-only (no @t)."""
+def test_screen_mix_key_existence_only() -> None:
+    """screen / mix / key atoms are existence-only (no @t)."""
     snap = _registry(
         ("screen", "waveform_deck_a", None),
         ("mix", "audible_deck=A", None),
-        ("tend", "user_likes_acid", None),
+        ("key", "A:8A", None),
     )
     linter = CitationLinter()
 
     for source, key in (
         ("screen", "waveform_deck_a"),
         ("mix", "audible_deck=A"),
-        ("tend", "user_likes_acid"),
+        ("key", "A:8A"),
     ):
         result = linter.check(f"[{source}:{key}]", snap, mode="live")
         assert result.valid is True, f"{source}:{key} should be valid"
@@ -387,5 +388,5 @@ def test_registry_snapshot_none() -> None:
 def test_lint_result_is_frozen_dataclass() -> None:
     """LintResult must be frozen (dataclass(frozen=True)) for safe sharing."""
     result = LintResult(valid=True, citations_found=1, missing=(), reason="valid")
-    with pytest.raises(Exception):  # FrozenInstanceError or AttributeError
+    with pytest.raises(FrozenInstanceError):
         result.valid = False  # type: ignore[misc]

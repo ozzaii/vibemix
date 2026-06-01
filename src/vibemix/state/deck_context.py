@@ -351,7 +351,7 @@ _DECK_AUDIO_WINDOW_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
     "clean_transition",
 )
 _HISTORICAL_CITATION_RE = re.compile(
-    r"\[(?:ev|aud|midi|track|screen|mix|tend|key|recall|exemplar|cue):[^\]]+\]"
+    r"\[(?:ev|aud|midi|track|screen|mix|key|recall|exemplar|cue):[^\]]+\]"
 )
 _HISTORICAL_AUDIO_WINDOW_RE = re.compile(r"audio_window=(audio_window_context\[[^\]]*\])")
 _HISTORICAL_SAID_FIELD_RE = re.compile(

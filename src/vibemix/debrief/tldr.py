@@ -95,7 +95,7 @@ def _build_tldr_prompt(
         "DJ's set.\n\n"
         "HARD RULE: every sentence MUST contain at least one citation in "
         "the form `[ev:<id>@<t>]`, `[track:<id>]`, `[mix:<id>]`, "
-        "`[aud:<id>]`, `[midi:<id>]`, `[screen:<id>]`, or `[tend:<id>]`. "
+        "`[aud:<id>]`, `[midi:<id>]`, `[screen:<id>]`, or `[key:<id>]`. "
         "Sentences without a citation will be stripped before the user "
         "hears them — wasted tokens.\n\n"
         "Voice: warm, grounded, no hype, no AI slop. Talk like a friend "

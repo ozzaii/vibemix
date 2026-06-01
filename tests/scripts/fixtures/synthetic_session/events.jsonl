@@ -7,6 +7,6 @@
 {"t": 1.6, "kind": "evidence_observation", "source": "track", "key": "marlon_hoffstadt-atlas", "t_session": 60.0}
 {"t": 1.7, "kind": "evidence_observation", "source": "screen", "key": "waveform_deck_a", "t_session": 60.0}
 {"t": 1.8, "kind": "evidence_observation", "source": "mix", "key": "audible_deck=A", "t_session": 60.0}
-{"t": 1.9, "kind": "evidence_observation", "source": "tend", "key": "user_likes_acid", "t_session": 0.0}
+{"t": 1.9, "kind": "evidence_observation", "source": "key", "key": "A:8A", "t_session": 0.0}
 {"t": 2.1, "kind": "evidence_observation", "source": "ev", "key": "PHRASE_BOUNDARY", "t_session": 90.0}
 {"t": 2.2, "kind": "evidence_observation", "source": "ev", "key": "LAYER_ARRIVAL", "t_session": 75.0}

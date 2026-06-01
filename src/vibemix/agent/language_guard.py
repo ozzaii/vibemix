@@ -13,7 +13,7 @@ import re
 from typing import Final
 
 _CITATION_RE: Final[re.Pattern[str]] = re.compile(
-    r"\[(?:aud|ev|midi|track|screen|mix|tend|key|recall|exemplar|cue|judge):[^\]]+\]"
+    r"\[(?:aud|ev|midi|track|screen|mix|key|recall|exemplar|cue|judge):[^\]]+\]"
 )
 _WORD_RE: Final[re.Pattern[str]] = re.compile(r"[A-Za-zÇĞİÖŞÜçğıöşü]+(?:'[A-Za-zÇĞİÖŞÜçğıöşü]+)?")
 _TURKISH_CHARS: Final[frozenset[str]] = frozenset("çğıöşüÇĞİÖŞÜ")

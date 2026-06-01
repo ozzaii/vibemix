@@ -590,7 +590,7 @@ class LearnTutorSpeakPayload:
     text: str  # 1..280 chars
     tts_marker: str  # 1..64 chars
     # tuple of citation tokens, each matching ^\[(track|exemplar|cue|ev|
-    # aud|midi|screen|mix|tend|key|recall):.+\]$ — maxItems 4 schema-side.
+    # aud|midi|screen|mix|key|recall):.+\]$ — maxItems 4 schema-side.
     citations: tuple[str, ...]
     data_state: Literal["active", "hint"]
     teaching_loop: LearnTeachingLoopPayload | None = None

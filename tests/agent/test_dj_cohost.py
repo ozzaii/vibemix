@@ -1944,7 +1944,7 @@ def test_AK_phase16_readiness_signal_end_to_end(mocker, tmp_path) -> None:
         "[ev:A@1] [aud:bpm@2]",  # 2
         "[ev:A@1] [aud:bpm@2] [midi:cue_a@3] [track:xyz-1] [screen:wave_a]",  # 5
         "[mix:audible_deck=A]",  # 1
-        "[tend:user_likes_acid] [ev:A@1] [aud:bpm@2]",  # 3
+        "[mix:audible_deck=A] [ev:A@1] [aud:bpm@2]",  # 3
     ]
     expected_counts = [3, 0, 2, 1, 4, 0, 2, 5, 1, 3]
 
