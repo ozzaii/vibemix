@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 from scripts.launch.check_no_tutor_slop import TUTOR_SLOP_BLOCKLIST
+
 from vibemix.learn.mastered_vocal import (
     MASTERED_VOCALS,
     mastered_unlock_line,

@@ -27,7 +27,7 @@ import pytest
 
 from vibemix.learn.progress import LearnProgress, load_progress
 from vibemix.learn.skill_tree import SKILL_MANIFEST, SkillTree
-from vibemix.runtime.coach import _credit_live_skill_demo
+from vibemix.runtime.coach import _credit_live_skill_demo, _make_mastered_speak
 from vibemix.state.evidence_registry import EvidenceRegistry
 
 
@@ -246,3 +246,130 @@ def test_unmapped_event_credits_nothing(_redirect_progress: Path) -> None:
 
     assert credited == []
     assert _count(progress, "transitions") == 0
+
+
+# ---------------------------------------------------------------------------
+# SURF-03 — the rare grounded "Mastered" unlock vocal, routed through the
+# injected co-host ``speak`` hook. Fires EXACTLY ONCE per not-mastered→mastered
+# flip; silent on a non-flip credit and on every later (already-mastered) demo.
+# ---------------------------------------------------------------------------
+
+
+def _one_below_mastered(progress: LearnProgress, skill_id: str) -> None:
+    """Competent + ``threshold - 1`` cited demos already banked → the NEXT cited
+    demo is the flip."""
+    _make_competent(progress, skill_id)
+    n = SKILL_MANIFEST[skill_id].mastered_threshold
+    progress.skills[skill_id] = {
+        "live_proof_count": n - 1, "mastered": False, "first_mastered_at": None,
+    }
+
+
+def test_mastered_speak_uses_fixed_text_outside_chat_context() -> None:
+    calls: list[dict[str, object]] = []
+
+    class _Session:
+        def say(self, line: str, **kw: object) -> object:
+            calls.append({"line": line, **kw})
+            return object()
+
+    speak = _make_mastered_speak(_Session())
+    assert speak is not None
+
+    speak("That one was real.")
+
+    assert calls == [{"line": "That one was real.", "add_to_chat_ctx": False}]
+
+
+def test_mastered_flip_speaks_the_vocal_exactly_once(_redirect_progress: Path) -> None:
+    from vibemix.learn.mastered_vocal import mastered_unlock_line
+
+    progress = LearnProgress()
+    _one_below_mastered(progress, "eq_mixing")
+    reg = EvidenceRegistry()
+    reg.write("ev", "MIX_MOVE", 10.0)
+    spoken: list[str] = []
+
+    # the flip demo — count crosses threshold this call → vocal fires once
+    credited = _credit_live_skill_demo(
+        _event("MIX_MOVE", moves=["A_low: open→killed (big twist)"]),
+        _state(10.0),
+        evidence_registry=reg,
+        learn_progress=progress,
+        speak=spoken.append,
+    )
+    assert credited == ["eq_mixing"]
+    assert progress.skills["eq_mixing"]["mastered"] is True
+    expected = mastered_unlock_line("eq_mixing", was_mastered=False, now_mastered=True)
+    assert spoken == [expected]
+
+    # a SECOND cited demo — already mastered → NO second vocal (rare, earned, once)
+    reg.write("ev", "MIX_MOVE", 11.0)
+    _credit_live_skill_demo(
+        _event("MIX_MOVE", moves=["A_low: open→killed"]),
+        _state(11.0),
+        evidence_registry=reg,
+        learn_progress=progress,
+        speak=spoken.append,
+    )
+    assert spoken == [expected]  # still exactly one
+
+
+def test_non_flip_credit_is_silent(_redirect_progress: Path) -> None:
+    # A cited demo that does NOT cross the threshold credits the bar but says nothing.
+    progress = LearnProgress()
+    _make_competent(progress, "eq_mixing")  # 0 demos banked → far below threshold
+    reg = EvidenceRegistry()
+    reg.write("ev", "MIX_MOVE", 10.0)
+    spoken: list[str] = []
+
+    credited = _credit_live_skill_demo(
+        _event("MIX_MOVE", moves=["A_low: open→killed"]),
+        _state(10.0),
+        evidence_registry=reg,
+        learn_progress=progress,
+        speak=spoken.append,
+    )
+    assert credited == ["eq_mixing"]
+    assert progress.skills["eq_mixing"]["mastered"] is False
+    assert spoken == []
+
+
+def test_uncited_event_never_speaks(_redirect_progress: Path) -> None:
+    # MAST-03 anti-slop: no citation → no credit → no vocal, even one-below-mastered.
+    progress = LearnProgress()
+    _one_below_mastered(progress, "eq_mixing")
+    reg = EvidenceRegistry()  # empty — no citation
+    spoken: list[str] = []
+
+    credited = _credit_live_skill_demo(
+        _event("MIX_MOVE", moves=["A_low: open→killed"]),
+        _state(10.0),
+        evidence_registry=reg,
+        learn_progress=progress,
+        speak=spoken.append,
+    )
+    assert credited == []
+    assert spoken == []
+
+
+def test_speak_failure_never_wedges_the_loop(_redirect_progress: Path) -> None:
+    # A raising speak hook must degrade silently — a vocal failure cannot break credit.
+    progress = LearnProgress()
+    _one_below_mastered(progress, "eq_mixing")
+    reg = EvidenceRegistry()
+    reg.write("ev", "MIX_MOVE", 10.0)
+
+    def _boom(_line: str) -> None:
+        raise RuntimeError("tts boom")
+
+    credited = _credit_live_skill_demo(
+        _event("MIX_MOVE", moves=["A_low: open→killed"]),
+        _state(10.0),
+        evidence_registry=reg,
+        learn_progress=progress,
+        speak=_boom,
+    )
+    # credit still lands + persists despite the vocal blowing up
+    assert credited == ["eq_mixing"]
+    assert progress.skills["eq_mixing"]["mastered"] is True

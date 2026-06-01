@@ -211,12 +211,38 @@ def _credit_live_skill_demo(
         return []
 
 
+async def _emit_earned_wall_refresh(
+    credited: list[str],
+    learn_progress: Any | None,
+    ipc_bus: IpcBus | None,
+) -> None:
+    """Push refreshed Earned Wall progress after a live cited credit."""
+    if not credited or ipc_bus is None or learn_progress is None:
+        return
+    try:
+        from vibemix.ui_bus.learn_messages import LearnProgressState
+
+        snapshot = learn_progress.snapshot()
+        if not isinstance(snapshot, dict):
+            snapshot = None
+        env = LearnProgressState.make(
+            action="snapshot",
+            was_recovered=False,
+            progress=snapshot,
+        ).to_dict()
+        await ipc_bus.emit(env)
+    except Exception as exc:  # refresh failure ≠ credit failure
+        print(f"\n[coach earned-wall refresh err] {exc}", file=sys.stderr)
+
+
 def _make_mastered_speak(session: Any) -> Callable[[str], None] | None:
     """Build the SURF-03 ``speak`` hook from the live co-host session — the
     FIXED-TEXT path (``session.say``), NOT ``generate_reply`` (no LLM, no slop, no
     new provider). Returns ``None`` when the session can't speak fixed text; the
-    credit still lands, only the rare vocal is skipped. The actual TTS tone is the
-    parked ``§EARNED-MASTERED-VOCAL-EAR`` ear-pass."""
+    credit still lands, only the rare vocal is skipped. The fixed line is not
+    appended to chat context; it should be heard once, not fed back into later
+    LLM turns. The actual TTS tone is the parked
+    ``§EARNED-MASTERED-VOCAL-EAR`` ear-pass."""
     say = getattr(session, "say", None)
     if not callable(say):
         return None
@@ -224,7 +250,7 @@ def _make_mastered_speak(session: Any) -> Callable[[str], None] | None:
     def _speak(line: str) -> None:
         # Fire-and-forget fixed text; the SpeechHandle is not awaited (the Mastered
         # unlock is rare and one-shot, never competing with the reaction cadence).
-        say(line)
+        say(line, add_to_chat_ctx=False)
 
     return _speak
 
@@ -577,13 +603,15 @@ async def coach_loop(
             # live event demonstrates (no-op when Learn handles are absent, the
             # event maps to no skill, or its citation does not resolve). Fires
             # independent of whether this event also triggers an AI reaction.
-            _credit_live_skill_demo(
+            credited = _credit_live_skill_demo(
                 ev,
                 state,
                 evidence_registry=evidence_registry,
                 learn_progress=learn_progress,
                 speak=mastered_speak,
             )
+            # Push the refreshed Earned Wall so the SkillWall updates without reload.
+            await _emit_earned_wall_refresh(credited, learn_progress, ipc_bus)
             _tr(
                 "event",
                 "emit",
