@@ -10,10 +10,10 @@ patterns:
 - Google AI Studio / Gemini: ``AIza[A-Za-z0-9_-]{35}``
 - AWS access key:           ``AKIA[A-Z0-9]{16}``
 - Google OAuth bearer:      ``ya29.[A-Za-z0-9_-]{20,}``
-- OpenAI:                   ``sk-[A-Za-z0-9_-]{20,}``
-- Generic 39-char shape:    ``\\b[A-Za-z0-9_-]{39}\\b`` (Google API key
-  silhouette, useful when a key was rotated through a less-greppable
-  format)
+- OpenAI:                   delimited ``sk-[A-Za-z0-9_-]{20,512}``
+- Generic 39-char shape:    ``\\b[A-Za-z0-9_-]{39}\\b`` on source/config-like
+  files only (Google API key silhouette, useful when a key was rotated through
+  a less-greppable format)
 
 Exit codes:
 - 0 — bundle clean
@@ -67,7 +67,15 @@ AKIA_PATTERN: re.Pattern[bytes] = re.compile(rb"AKIA[A-Z0-9]{16}")
 YA29_PATTERN: re.Pattern[bytes] = re.compile(rb"ya29\.[A-Za-z0-9_\-]{20,}")
 
 # OpenAI sk-* keys (legacy + project-scoped both start ``sk-``).
-SK_PATTERN: re.Pattern[bytes] = re.compile(rb"sk-[A-Za-z0-9_\-]{20,}")
+#
+# The token must be delimited. Native binaries can contain long
+# identifier-looking runs such as ``...task-...`` where the inner ``sk-``
+# would otherwise greedily match hundreds of bytes. The upper bound keeps
+# that failure mode from turning compiled code into false leaks while
+# remaining above known OpenAI key shapes.
+SK_PATTERN: re.Pattern[bytes] = re.compile(
+    rb"(?<![A-Za-z0-9_\-])sk-[A-Za-z0-9_\-]{20,512}(?![A-Za-z0-9_\-])"
+)
 
 # Generic Google-API-key shape: 39 base64url-ish chars between word
 # boundaries. This is the high-noise heuristic — fonts (.woff2 has long
@@ -119,6 +127,29 @@ _HIGH_FALSE_POSITIVE_SUFFIXES: tuple[str, ...] = (
     ".ogg",
 )
 
+# The generic 39-char heuristic is deliberately narrower than the
+# strict branded patterns. It catches obvious source/config accidents
+# but does not scan generated signatures, package hash manifests, or
+# native blobs where random bytes and checksums are shaped exactly like
+# the heuristic.
+_GENERIC39_SUFFIXES: frozenset[str] = frozenset(
+    (
+        ".py",
+        ".pyc",
+        ".json",
+        ".txt",
+        ".cfg",
+        ".ini",
+        ".plist",
+        ".env",
+        ".yaml",
+        ".yml",
+        ".toml",
+    )
+)
+_GENERATED_SIGNATURE_DIRS: frozenset[str] = frozenset(("_CodeSignature",))
+_GENERATED_HASH_MANIFESTS: frozenset[str] = frozenset(("RECORD", "RECORD.jws"))
+
 # Chunked-read size — 4 MiB matches build_sidecar.py for parity.
 _CHUNK: int = 4 * 1024 * 1024
 
@@ -135,10 +166,20 @@ _SCAN_SUFFIXES_STRICT: frozenset[str] = frozenset(
         ".pyd",
         ".bin",
         ".json",
+        ".js",
+        ".mjs",
+        ".cjs",
+        ".css",
+        ".html",
+        ".map",
         ".txt",
         ".cfg",
         ".ini",
         ".plist",
+        ".env",
+        ".yaml",
+        ".yml",
+        ".toml",
         ".exe",
         ".node",
         "",
@@ -235,11 +276,10 @@ def _scan_file(
     allowlist_suffixes: frozenset[str],
 ) -> Iterator[Hit]:
     """Scan a single file. Yields a Hit per match. Always runs the
-    strict patterns; runs generic39 only when the suffix is not in
-    ``allowlist_suffixes``.
+    strict patterns; runs generic39 only on source/config-like files
+    where that high-noise heuristic has useful signal.
     """
-    suffix = path.suffix.lower()
-    include_generic39 = suffix not in allowlist_suffixes
+    include_generic39 = _include_generic39(path, allowlist_suffixes)
     rel = _safe_relative(path, relative_to)
     base_offset = 0
     for chunk in _read_chunks(path):
@@ -258,6 +298,28 @@ def _safe_relative(path: Path, root: Path) -> str:
         return path.relative_to(root).as_posix()
     except ValueError:
         return path.as_posix()
+
+
+def _is_generated_signature_file(path: Path) -> bool:
+    """Generated code-signature resources are hash manifests, not app
+    payload. Scanning them creates false positives after notarization
+    without finding a leaked source secret.
+    """
+    return any(part in _GENERATED_SIGNATURE_DIRS for part in path.parts)
+
+
+def _include_generic39(path: Path, allowlist_suffixes: frozenset[str]) -> bool:
+    """Return whether the noisy generic-39 heuristic should run for
+    ``path``. Strict patterns are intentionally independent of this.
+    """
+    suffix = path.suffix.lower()
+    if suffix in allowlist_suffixes:
+        return False
+    if _is_generated_signature_file(path):
+        return False
+    if path.name in _GENERATED_HASH_MANIFESTS:
+        return False
+    return suffix in _GENERIC39_SUFFIXES
 
 
 # ---------------------------------------------------------------------------
@@ -437,6 +499,8 @@ def _scan_tree(
         files = _iter_files(root)
 
     for path in files:
+        if _is_generated_signature_file(path):
+            continue
         suffix = path.suffix.lower()
         # We always scan files with no suffix (main binary) and any
         # suffix in the strict set OR the allowlisted-binary set

@@ -12,12 +12,10 @@ import logging
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import pytest
-
-from scripts.dist import verify_binary
 from scripts.dist.verify_binary import (
     AIZA_PATTERN,
     GENERIC_KEY_PATTERN,
@@ -144,6 +142,50 @@ def test_generic_39_char_pattern_skipped_for_allowlisted_suffixes(
         f"generic39 should be suppressed on .woff2, got: {generic_hits!r}"
     )
     assert result.ok is True
+
+
+def test_generic_39_char_pattern_skipped_for_generated_signatures(
+    make_fake_app: Callable[..., Path],
+) -> None:
+    app = make_fake_app(
+        extra_files=(("Contents/_CodeSignature/CodeResources", _SENTINEL_GENERIC39),),
+    )
+    result = scan_bundle(app)
+    assert result.ok is True
+    assert result.hits == ()
+
+
+def test_generic_39_char_pattern_skipped_for_native_blobs(
+    make_fake_app: Callable[..., Path],
+) -> None:
+    app = make_fake_app(
+        extra_files=(("Contents/Resources/_internal/native.dylib", _SENTINEL_GENERIC39),),
+    )
+    result = scan_bundle(app)
+    assert result.ok is True
+    assert not [h for h in result.hits if h.pattern == Pattern.GENERIC39.value]
+
+
+def test_strict_patterns_still_scan_native_blobs(
+    make_fake_app: Callable[..., Path],
+) -> None:
+    app = make_fake_app(
+        extra_files=(("Contents/Resources/_internal/native.dylib", _SENTINEL_AIZA),),
+    )
+    result = scan_bundle(app)
+    assert result.ok is False
+    assert any(h.pattern == Pattern.AIZA.value for h in result.hits)
+
+
+def test_sk_pattern_requires_standalone_token_boundary(
+    make_fake_app: Callable[..., Path],
+) -> None:
+    # Native binaries can contain identifier-like text where "sk-" appears
+    # inside a longer symbol. That must not be treated as an OpenAI token.
+    app = make_fake_app(planted_bytes=b"task-" + b"a" * 80)
+    result = scan_bundle(app)
+    assert result.ok is True
+    assert not [h for h in result.hits if h.pattern == Pattern.SK.value]
 
 
 # ---------------------------------------------------------------------------
