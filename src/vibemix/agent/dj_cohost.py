@@ -59,6 +59,7 @@ from vibemix.agent._streaming_pipe import (
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL, OPENROUTER_LLM_MODEL
 from vibemix.agent.emote_parser import has_emote_tag, strip_emote_tags
+from vibemix.agent.language_guard import english_only_violation_matches
 from vibemix.agent.proxy_client import (
     classify_proxy_error,
     probe_proxy_health,
@@ -2335,7 +2336,9 @@ class DJCoHostAgent(Agent):
             live_claim_state = ev.state if ev is not None else self._state
             live_claim_moves = _event_live_move_labels(ev, self._state)
             live_claim_audio_delta = render_audio_delta_items(live_claim_state)
-            observability_state = snapshot_state_for_ai_message(live_claim_state) or live_claim_state
+            observability_state = (
+                snapshot_state_for_ai_message(live_claim_state) or live_claim_state
+            )
             lookahead_part_label = (
                 "P3"
                 if lookahead_attached and mic_attached
@@ -2624,6 +2627,8 @@ class DJCoHostAgent(Agent):
             full_text = ""
             buffered_chunks: list[str] = []
             head_yielded = False
+            language_defer_stream = False
+            language_matches: tuple[str, ...] = ()
             # Tracks the highest position in ``full_text`` we have
             # already yielded. Combined with ``last_balanced_position``
             # this keeps mid-stream yields clipped at the last closed
@@ -2735,7 +2740,13 @@ class DJCoHostAgent(Agent):
                     )
                     if source_detail_risky or advice_risky:
                         live_claim_defer_stream = True
+                    spoken_so_far, _ = strip_emote_tags(full_text, normalize=False)
+                    language_matches = english_only_violation_matches(spoken_so_far)
+                    if language_matches:
+                        language_defer_stream = True
                     if live_claim_defer_stream:
+                        continue
+                    if language_defer_stream:
                         continue
                     # Chunk-by-chunk yield with bracket-balance clipping.
                     # Before the speed-gate clears we hold every chunk
@@ -2978,6 +2989,12 @@ class DJCoHostAgent(Agent):
                 # nothing has reached TTS yet. Collapse to the spoken response
                 # so bracketed [emote:*] control tags never leak to audio.
                 buffered_chunks = [spoken_text] if spoken_text else []
+            if suppression is None and not (
+                live_claim_guard is not None and live_claim_guard.corrected
+            ):
+                language_matches = english_only_violation_matches(spoken_text)
+                if language_matches:
+                    suppression = "non_english"
 
             if suppression == "silence":
                 self._recorder.log_event(
@@ -3000,6 +3017,23 @@ class DJCoHostAgent(Agent):
                 print(f"[ai_text] <slop suppressed: {slop_matches}>", flush=True)
                 if head_yielded:
                     _push_silence_pad_and_cancel("slop")
+            elif suppression == "non_english":
+                self._recorder.log_event(
+                    "non_english_suppressed",
+                    event=ev_tag,
+                    matches=list(language_matches),
+                    response_chars=len(full_text),
+                    latency_s=round(elapsed, 2),
+                )
+                print(
+                    f"[ai_text] <non-English suppressed: {list(language_matches)}>",
+                    flush=True,
+                )
+                if head_yielded:
+                    _push_silence_pad_and_cancel("non_english")
+                buffered_chunks = []
+                spoken_text = ""
+                spoken_stripped = ""
             elif live_claim_guard is not None and live_claim_guard.corrected:
                 # A live-claim guard hit means the model tried to say something
                 # we cannot ground. Do not convert that failure into a spoken
@@ -3063,9 +3097,7 @@ class DJCoHostAgent(Agent):
                             )
                             # WR-04 — stamp from event-fired set_seconds, not the
                             # post-stream/lint/bus set_seconds (multi-second drift).
-                            self._record_said(
-                                spoken_stripped[:140], set_s_at_event=ev_set_seconds
-                            )
+                            self._record_said(spoken_stripped[:140], set_s_at_event=ev_set_seconds)
                             self._push_transcript(spoken_stripped[:140])
                         else:
                             print("[ai_text] <empty> (skip TTS)", flush=True)
@@ -3374,6 +3406,7 @@ class DJCoHostAgent(Agent):
                 "response_chars": len(full_text),
                 "suppression": suppression,
                 "slop_matches": slop_matches,
+                "language_matches": list(language_matches),
                 # Plan 20-01 — citation linter chokepoint outcome. When wired
                 # is False, all four are None (skip path).
                 "citation_lint_valid": citation_lint_valid,
@@ -3428,6 +3461,8 @@ class DJCoHostAgent(Agent):
                     "audio_tokens_est": audio_tokens_est,
                     "deck_audio_parts": len(deck_audio_parts),
                     "live_claim_defer_stream": live_claim_defer_stream,
+                    "language_defer_stream": language_defer_stream,
+                    "language_matches": list(language_matches),
                     "raw_response_chars": len(full_text),
                     "spoken_response_chars": len(spoken_text),
                 },

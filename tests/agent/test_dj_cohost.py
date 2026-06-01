@@ -315,9 +315,7 @@ def test_llm_node_strips_emote_tags_and_sets_mascot_intent(mocker, tmp_path) -> 
     assert state.last_reaction_intent_seq == 1
     ai_texts = [fields["text"] for kind, fields in recorder.events if kind == "ai_text"]
     assert ai_texts == ["Nice drop."]
-    intent_rows = [
-        fields for kind, fields in recorder.events if kind == "mascot_reaction_intent"
-    ]
+    intent_rows = [fields for kind, fields in recorder.events if kind == "mascot_reaction_intent"]
     assert len(intent_rows) == 1
     assert intent_rows[0]["intent"] == "fist_pump"
     assert intent_rows[0]["seq"] == 1
@@ -345,9 +343,7 @@ def test_llm_node_strips_unknown_emote_tags_without_mascot_intent(mocker, tmp_pa
     assert "mascot_reaction_intent" not in [kind for kind, _fields in recorder.events]
 
 
-def test_llm_node_strips_legacy_voice_tags_from_speech_and_ai_message(
-    mocker, tmp_path
-) -> None:
+def test_llm_node_strips_legacy_voice_tags_from_speech_and_ai_message(mocker, tmp_path) -> None:
     """Legacy Gemini-TTS tags are internal controls, not user-visible speech."""
     agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -367,11 +363,70 @@ def test_llm_node_strips_legacy_voice_tags_from_speech_and_ai_message(
     rows = [fields for kind, fields in recorder.events if kind == "ai_message"]
     assert len(rows) == 1
     assert rows[0]["message"] == "A fast kick sat over the low end."
-    assert rows[0]["extra"]["spoken_response_chars"] == len(
-        "A fast kick sat over the low end."
-    )
+    assert rows[0]["extra"]["spoken_response_chars"] == len("A fast kick sat over the low end.")
     assert "[chill]" not in rows[0]["message"]
     assert "mascot_reaction_intent" not in [kind for kind, _fields in recorder.events]
+
+
+def test_llm_node_suppresses_non_english_spoken_text_but_keeps_raw_artifact(
+    mocker, tmp_path
+) -> None:
+    """Prompt-only English is not enough: runtime blocks non-English speech."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    raw_response = "Süper drop abi, çok iyi."
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter([raw_response])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    chunks = _drive_llm_node(agent)
+
+    assert chunks == []
+    assert "ai_text" not in [kind for kind, _fields in recorder.events]
+    suppression_rows = [
+        fields for kind, fields in recorder.events if kind == "non_english_suppressed"
+    ]
+    assert len(suppression_rows) == 1
+    assert "phrase:çok iyi" in suppression_rows[0]["matches"]
+    rows = [fields for kind, fields in recorder.events if kind == "ai_message"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["message"] == ""
+    assert row["message_chars"] == 0
+    assert row["suppression"] == "non_english"
+    assert row["stop_reason"] == "non_english"
+    assert "phrase:çok iyi" in row["extra"]["language_matches"]
+    assert row["extra"]["spoken_response_chars"] == 0
+    assert (
+        Path(row["artifacts"]["session_response_path"]).read_text(encoding="utf-8") == raw_response
+    )
+
+
+def test_llm_node_english_only_guard_preserves_grounded_english_response(mocker, tmp_path) -> None:
+    """English speech with citations still reaches TTS and observability."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    response = "That low end is moving [aud:rms@12.0]."
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter([response])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    chunks = _drive_llm_node(agent)
+
+    assert "".join(chunks) == response
+    ai_texts = [fields["text"] for kind, fields in recorder.events if kind == "ai_text"]
+    assert ai_texts == [response]
+    rows = [fields for kind, fields in recorder.events if kind == "ai_message"]
+    assert len(rows) == 1
+    assert rows[0]["message"] == response
+    assert rows[0]["suppression"] is None
+    assert rows[0]["extra"]["language_matches"] == []
 
 
 def test_llm_node_ai_message_uses_prompt_time_mixer_snapshot(mocker, tmp_path) -> None:

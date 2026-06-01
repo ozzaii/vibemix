@@ -1519,6 +1519,42 @@ Remaining gate:
   bracket delivery tags in `ai_text` under real model output. Package 8F remains
   the hard backstop if a model still emits one.
 
+## Package 8H - English-Only Runtime Speech Guard
+
+Suggested commit: `fix(cohost): enforce english-only spoken output`
+
+Include:
+
+- `src/vibemix/agent/language_guard.py`
+- `src/vibemix/agent/dj_cohost.py`
+- `tests/agent/test_language_guard.py`
+- `tests/agent/test_dj_cohost.py`
+- `.planning/packets/2026-06-01/CODEX_READY-cohost-english-only-runtime-guard.md`
+
+Reason:
+
+- The live prompt asks the model to stay in English, but prompt text is not a
+  product boundary. Claude's co-host verifier accepted the MOSS tag cleanup and
+  still found the real remaining hole: a non-English model response could pass
+  through `strip_emote_tags`, reach MOSS, and be logged as spoken `ai_text`.
+- This package adds a narrow runtime backstop at the co-host emission chokepoint:
+  obvious Turkish DJ-chat is suppressed before speech/transcript/UI emission,
+  while raw response artifacts remain saved for observability. English responses
+  with grounding citations and Turkish-character artist names remain allowed.
+
+Keep out:
+
+- No prompt/persona rewrite beyond the already-landed MOSS tag opt-out.
+- No DROP-call speech.
+- No deck/controller inference changes.
+- No new language-detection dependency.
+
+Proof to run:
+
+- `uv run pytest -q tests/agent/test_language_guard.py tests/agent/test_dj_cohost.py::test_llm_node_suppresses_non_english_spoken_text_but_keeps_raw_artifact tests/agent/test_dj_cohost.py::test_llm_node_english_only_guard_preserves_grounded_english_response tests/agent/test_dj_cohost.py::test_llm_node_strips_legacy_voice_tags_from_speech_and_ai_message tests/agent/test_dj_cohost.py::test_llm_node_strips_emote_tags_and_sets_mascot_intent tests/agent/test_dj_cohost_streaming_pipe.py`
+- `uv run pytest -q tests/prompts/test_matrix.py tests/agent/test_dj_cohost_linter.py tests/state/test_coach_anti_slop.py`
+- `uv run ruff check src/vibemix/agent/language_guard.py src/vibemix/agent/dj_cohost.py tests/agent/test_language_guard.py tests/agent/test_dj_cohost.py`
+
 ## Hold Lane - Rebuild Carry-Forward Live Reality Pins
 
 Suggested commit if/when selected: `test(repo): pin live reality gaps`
