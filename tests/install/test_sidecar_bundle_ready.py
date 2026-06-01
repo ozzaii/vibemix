@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import stat
 from pathlib import Path
@@ -47,6 +48,57 @@ def _write_source_schema(root: Path, body: str = '{"oneOf": []}\n') -> None:
     schema = root / gate.IPC_SCHEMA_REL
     schema.parent.mkdir(parents=True, exist_ok=True)
     schema.write_text(body, encoding="utf-8")
+
+
+def _write_bundled_moss_model(root: Path, triple: str) -> Path:
+    base = _bundle_dir(root, triple) / "_internal" / "models" / "moss-tts-onnx"
+    model_dir = base / gate.MOSS_MODEL_DIRNAME
+    codec_dir = base / "MOSS-Audio-Tokenizer-Nano-ONNX"
+    model_dir.mkdir(parents=True)
+    codec_dir.mkdir(parents=True)
+    (model_dir / gate.MOSS_MANIFEST).write_text(
+        json.dumps(
+            {
+                "model_files": {
+                    "tts_meta": "tts_browser_onnx_meta.json",
+                    "codec_meta": "../MOSS-Audio-Tokenizer-Nano-ONNX/codec_browser_onnx_meta.json",
+                    "tokenizer_model": "tokenizer.model",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (model_dir / "tts_browser_onnx_meta.json").write_text(
+        json.dumps(
+            {
+                "files": {"prefill": "moss_tts_prefill.onnx"},
+                "external_data_files": {"moss_tts_prefill.onnx": ["moss_tts_global_shared.data"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (codec_dir / "codec_browser_onnx_meta.json").write_text(
+        json.dumps(
+            {
+                "files": {"decode": "moss_audio_tokenizer_decode_step.onnx"},
+                "external_data_files": {
+                    "moss_audio_tokenizer_decode_step.onnx": [
+                        "moss_audio_tokenizer_decode_shared.data"
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    for path in (
+        model_dir / "tokenizer.model",
+        model_dir / "moss_tts_prefill.onnx",
+        model_dir / "moss_tts_global_shared.data",
+        codec_dir / "moss_audio_tokenizer_decode_step.onnx",
+        codec_dir / "moss_audio_tokenizer_decode_shared.data",
+    ):
+        path.write_bytes(b"x")
+    return model_dir
 
 
 def test_ready_macos_bundle_passes(tmp_path: Path) -> None:
@@ -149,6 +201,85 @@ def test_missing_pyinstaller_internal_dir_fails(tmp_path: Path) -> None:
 
     assert status.ok is False
     assert "_internal" in status.message
+
+
+def test_require_moss_source_fails_without_bundle_or_archive(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_bundle(tmp_path, MAC_TRIPLE)
+    monkeypatch.delenv(gate.MOSS_ARCHIVE_URL_ENV, raising=False)
+    monkeypatch.delenv(gate.MOSS_ARCHIVE_SHA_ENV, raising=False)
+    monkeypatch.delenv(gate.MOSS_ARCHIVE_SIZE_ENV, raising=False)
+
+    status = gate.check_sidecar_bundle_ready(
+        root=tmp_path,
+        triple=MAC_TRIPLE,
+        require_moss_source=True,
+    )
+
+    assert status.ok is False
+    assert "MOSS-only release has no model source" in status.message
+    assert gate.MOSS_ARCHIVE_URL_ENV in status.message
+
+
+def test_require_moss_source_accepts_release_archive_pins(
+    tmp_path: Path, monkeypatch
+) -> None:
+    binary = _write_bundle(tmp_path, MAC_TRIPLE)
+    monkeypatch.setenv(gate.MOSS_ARCHIVE_URL_ENV, "https://models.example/moss.zip")
+    monkeypatch.setenv(gate.MOSS_ARCHIVE_SHA_ENV, "a" * 64)
+    monkeypatch.setenv(gate.MOSS_ARCHIVE_SIZE_ENV, "123")
+
+    status = gate.check_sidecar_bundle_ready(
+        root=tmp_path,
+        triple=MAC_TRIPLE,
+        require_moss_source=True,
+    )
+
+    assert status.ok is True
+    assert status.binary == binary
+
+
+def test_require_moss_source_rejects_unverified_archive_pins(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_bundle(tmp_path, MAC_TRIPLE)
+    monkeypatch.setenv(gate.MOSS_ARCHIVE_URL_ENV, "http://models.example/moss.zip")
+    monkeypatch.setenv(gate.MOSS_ARCHIVE_SHA_ENV, "not-a-sha")
+    monkeypatch.setenv(gate.MOSS_ARCHIVE_SIZE_ENV, "0")
+
+    status = gate.check_sidecar_bundle_ready(
+        root=tmp_path,
+        triple=MAC_TRIPLE,
+        require_moss_source=True,
+    )
+
+    assert status.ok is False
+    assert "https:// URL" in status.message
+    assert "64-character lowercase SHA-256" in status.message
+    assert "positive byte count" in status.message
+
+
+def test_require_moss_source_accepts_complete_bundled_model(
+    tmp_path: Path, monkeypatch
+) -> None:
+    binary = _write_bundle(tmp_path, MAC_TRIPLE)
+    model_dir = _write_bundled_moss_model(tmp_path, MAC_TRIPLE)
+    monkeypatch.delenv("VIBEMIX_MOSS_TTS_DIR", raising=False)
+    monkeypatch.delenv(gate.MOSS_ARCHIVE_URL_ENV, raising=False)
+    monkeypatch.delenv(gate.MOSS_ARCHIVE_SHA_ENV, raising=False)
+    monkeypatch.delenv(gate.MOSS_ARCHIVE_SIZE_ENV, raising=False)
+
+    status = gate.check_sidecar_bundle_ready(
+        root=tmp_path,
+        triple=MAC_TRIPLE,
+        require_moss_source=True,
+    )
+
+    assert status.ok is True
+    assert status.binary == binary
+    assert os.environ.get("VIBEMIX_MOSS_TTS_DIR") is None
+    assert str(model_dir) in gate._bundled_moss_model_status(binary.parent)[1]
 
 
 def test_main_returns_zero_for_ready_explicit_triple(tmp_path: Path, capsys) -> None:

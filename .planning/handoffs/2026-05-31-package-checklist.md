@@ -4902,6 +4902,58 @@ Remaining gate:
 - This only removes dead cloud-TTS residue. It does not solve fresh-machine MOSS
   model availability, packaged audio proof, or ear-pass quality.
 
+## Package 14H - MOSS Model Source Release Gate
+
+Suggested commit: `fix(packaging): require moss model source for release`
+
+Packaging decision: MOSS is the only live co-host voice. Development builds may
+start muted when the model is absent, but a release pretag must not cut a
+MOSS-only artifact unless the sidecar bundle either contains a complete
+`MOSS-TTS-Nano-100M-ONNX` tree or the release environment provides pinned HTTPS
+archive metadata (`VIBEMIX_MOSS_TTS_ARCHIVE_URL`,
+`VIBEMIX_MOSS_TTS_ARCHIVE_SHA256`, `VIBEMIX_MOSS_TTS_ARCHIVE_SIZE`). This is a
+release blocker, not a cloud fallback.
+
+Include:
+
+- `scripts/dist/check_sidecar_bundle_ready.py`
+- `scripts/dist/pretag_check.sh`
+- `tests/install/test_sidecar_bundle_ready.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Bundling the 600MB+ MOSS ONNX tree into PyInstaller specs.
+- Adding any cloud/provider TTS fallback.
+- Live voice quality/ear-pass claims.
+- Tauri library setup UI changes; Package 14F owns that surface.
+
+Reason:
+
+- Packages 14B-14F made MOSS the single TTS source, boot-safe when missing, and
+  visible in setup. The remaining release risk is process-level: a signed DMG
+  could still be cut with no MOSS model source, producing a product whose
+  co-host is muted on a fresh machine.
+- `check_sidecar_bundle_ready.py --require-moss-source` now validates either a
+  complete bundled model tree using the same manifest checker the runtime uses,
+  or a verified archive pin triple. `pretag_check.sh` opts into that stricter
+  release gate.
+
+Proof for this release-gate slice:
+
+- `uv run pytest -q tests/install/test_sidecar_bundle_ready.py`
+- `uv run ruff check scripts/dist/check_sidecar_bundle_ready.py tests/install/test_sidecar_bundle_ready.py`
+- `uv run python -m scripts.dist.check_sidecar_bundle_ready --help`
+- `git diff --check -- scripts/dist/check_sidecar_bundle_ready.py scripts/dist/pretag_check.sh tests/install/test_sidecar_bundle_ready.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- A real release still needs Kaan/release-ops to either host the MOSS archive
+  and export the three pins, or intentionally bundle the full model tree. This
+  package makes the absence impossible to miss during pretag; it does not
+  create the hosted artifact.
+
 ## Hold Lane - Local MOSS TTS ONNX Runtime Spike
 
 Suggested commit if/when it ships: `feat(tts): add wrapped local moss onnx runtime`

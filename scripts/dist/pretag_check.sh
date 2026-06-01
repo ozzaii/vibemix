@@ -106,11 +106,11 @@ echo
 # --- 5. Bundled sidecar resource tree ready -------------------------------
 echo "[5/8] Bundled sidecar resource tree ready"
 if command -v uv >/dev/null 2>&1; then
-  SIDECAR_CHECK=(uv run python scripts/dist/check_sidecar_bundle_ready.py --quiet)
+  SIDECAR_CHECK=(uv run python scripts/dist/check_sidecar_bundle_ready.py --quiet --require-moss-source)
 elif command -v python3 >/dev/null 2>&1; then
-  SIDECAR_CHECK=(python3 scripts/dist/check_sidecar_bundle_ready.py --quiet)
+  SIDECAR_CHECK=(python3 scripts/dist/check_sidecar_bundle_ready.py --quiet --require-moss-source)
 elif command -v python >/dev/null 2>&1; then
-  SIDECAR_CHECK=(python scripts/dist/check_sidecar_bundle_ready.py --quiet)
+  SIDECAR_CHECK=(python scripts/dist/check_sidecar_bundle_ready.py --quiet --require-moss-source)
 else
   SIDECAR_CHECK=()
 fi
