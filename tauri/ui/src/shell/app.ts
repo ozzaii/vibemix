@@ -90,7 +90,7 @@ const appDeps: SurfaceMountDeps = {
  * settings slides the drawer in, navigating away slides it out. Returns an
  * unsubscribe.
  */
-function wireSettingsNav(shell: MountedShell): () => void {
+export function wireSettingsNav(shell: MountedShell): () => void {
   let prev = shell.store.getState().activeSurface;
   let lastNonSettings = prev === "settings" ? "deck" : prev;
 
