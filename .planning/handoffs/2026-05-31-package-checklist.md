@@ -2679,6 +2679,39 @@ Proof:
 - `uv run ruff check src/vibemix/library/toolset.py src/vibemix/library/mcp_server.py src/vibemix/library/codex_curate.py tests/library/test_setprep_tools.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 18 - ANLZ BeatGrid Metadata Bridge
+
+Suggested commit: `feat(audio): build beatgrid from rekordbox anlz metadata`
+
+Include:
+
+- `src/vibemix/audio/grid.py`
+- `tests/audio/test_grid.py`
+
+Keep out:
+
+- Live beatmatch producer work (`BEATMATCH_GRADED`) and any change that flips
+  beatmatching back to live-creditable.
+- Dirty deck-audio/controller-weighted capture files under the deck context
+  hold lane.
+- DROP-call speech/timing files and runtime co-host speech surfaces.
+
+Reason:
+
+- The recovered Mixxx/goldmine research flagged `BeatGrid.from_anlz()` as a
+  small but absent metadata shortcut. Rekordbox ANLZ already carries beat
+  marker times and beat-in-bar labels; this bridge lets the existing constant
+  `BeatGrid` phase oracle anchor to the first known downbeat instead of forcing
+  future beatmatch/cue-placement work to rediscover timing from audio.
+- This is a pure deterministic audio helper. It creates no live producer, emits
+  no event, changes no spoken output, and makes no runtime/controller claim.
+
+Proof:
+
+- `uv run pytest -q tests/audio/test_grid.py tests/library/test_anlz_ingest.py tests/learn/test_beatmatch_judge.py tests/learn/test_judge_credits_beatmatch.py`
+- `uv run ruff check src/vibemix/audio/grid.py tests/audio/test_grid.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Cue Export Folder Bridge
 
 Suggested commit if/when selected: `feat(library): add folder cue export bridge`

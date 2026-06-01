@@ -19,6 +19,8 @@ owned-deck Judge only needs constant tempo.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
+from typing import Any
 
 
 class BeatGrid:
@@ -32,6 +34,48 @@ class BeatGrid:
         self.bpm = float(bpm)
         self.sample_rate = int(sample_rate)
         self.beat_len_frames = 60.0 * self.sample_rate / self.bpm
+
+    @classmethod
+    def from_anlz(
+        cls,
+        beatgrid: Any,
+        *,
+        sample_rate: int,
+        prefer_downbeat: bool = True,
+    ) -> BeatGrid:
+        """Build a constant grid from Rekordbox ANLZ beat-marker metadata.
+
+        ANLZ stores marker times for beats plus beat-in-bar labels. This helper
+        gives the owned-deck judge a clean shortcut from that metadata to the
+        constant-tempo phase oracle it already understands. When a downbeat is
+        present, beat index 0 anchors to the first bar ``1``; otherwise the first
+        marker is used. Variable-tempo ANLZ is intentionally reduced to the
+        local BPM at the anchor because :class:`BeatGrid` is constant-tempo.
+        """
+        times_s = _finite_floats(getattr(beatgrid, "times_s", ()))
+        if not times_s:
+            raise ValueError("ANLZ beatgrid has no finite beat times")
+
+        beat_in_bar = _ints(getattr(beatgrid, "beat_in_bar", ()))
+        anchor_idx = 0
+        if prefer_downbeat:
+            for idx, beat in enumerate(beat_in_bar[: len(times_s)]):
+                if beat == 1:
+                    anchor_idx = idx
+                    break
+
+        bpms = _finite_floats(getattr(beatgrid, "bpms", ()))
+        bpm = _nearest_positive_bpm(bpms, anchor_idx)
+        if bpm is None:
+            bpm = _infer_bpm_from_times(times_s, anchor_idx)
+        if bpm is None:
+            raise ValueError("ANLZ beatgrid has no usable BPM")
+
+        return cls(
+            anchor_frame=times_s[anchor_idx] * int(sample_rate),
+            bpm=bpm,
+            sample_rate=sample_rate,
+        )
 
     def beat_at(self, k: int) -> float:
         """Frame position of beat index ``k`` (negative extrapolates before the anchor)."""
@@ -61,3 +105,47 @@ class BeatGrid:
         prev_beat = self.beat_at(prev_k)
         next_beat = self.beat_at(prev_k + 1)
         return prev_beat if (next_beat - frame) > (frame - prev_beat) else next_beat
+
+
+def _finite_floats(values: Sequence[Any]) -> tuple[float, ...]:
+    out: list[float] = []
+    for value in values:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(number):
+            out.append(number)
+    return tuple(out)
+
+
+def _ints(values: Sequence[Any]) -> tuple[int, ...]:
+    out: list[int] = []
+    for value in values:
+        try:
+            out.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return tuple(out)
+
+
+def _nearest_positive_bpm(bpms: Sequence[float], anchor_idx: int) -> float | None:
+    candidates = [
+        (abs(idx - anchor_idx), idx, bpm)
+        for idx, bpm in enumerate(bpms)
+        if math.isfinite(bpm) and bpm > 0.0
+    ]
+    if not candidates:
+        return None
+    _distance, _idx, bpm = min(candidates)
+    return float(bpm)
+
+
+def _infer_bpm_from_times(times_s: Sequence[float], anchor_idx: int) -> float | None:
+    for left, right in ((anchor_idx, anchor_idx + 1), (anchor_idx - 1, anchor_idx)):
+        if left < 0 or right >= len(times_s):
+            continue
+        delta = float(times_s[right]) - float(times_s[left])
+        if math.isfinite(delta) and delta > 0.0:
+            return 60.0 / delta
+    return None

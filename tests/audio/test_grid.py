@@ -13,6 +13,7 @@ from __future__ import annotations
 import pytest
 
 from vibemix.audio.grid import BeatGrid
+from vibemix.library.anlz_ingest import AnlzBeatGrid
 
 
 def test_const_grid_beat_positions_and_indices() -> None:
@@ -54,3 +55,46 @@ def test_anchor_floored_to_whole_frame_and_bpm_validated() -> None:
     for bad_bpm in (0.0, -5.0, float("inf"), float("nan")):
         with pytest.raises(ValueError):
             BeatGrid(anchor_frame=0.0, bpm=bad_bpm, sample_rate=44100)
+
+
+def test_from_anlz_anchors_to_first_downbeat() -> None:
+    anlz = AnlzBeatGrid(
+        times_s=(0.0, 0.5, 1.0, 1.5),
+        bpms=(120.0, 120.0, 120.0, 120.0),
+        beat_in_bar=(3, 4, 1, 2),
+    )
+
+    grid = BeatGrid.from_anlz(anlz, sample_rate=48000)
+
+    assert grid.anchor_frame == pytest.approx(48000.0)
+    assert grid.bpm == pytest.approx(120.0)
+    assert grid.beat_at(-2) == pytest.approx(0.0)
+    assert grid.beat_at(4) == pytest.approx(144000.0)
+
+
+def test_from_anlz_falls_back_to_first_marker_and_infers_bpm() -> None:
+    anlz = AnlzBeatGrid(
+        times_s=(0.25, 0.75, 1.25),
+        bpms=(),
+        beat_in_bar=(2, 3, 4),
+    )
+
+    grid = BeatGrid.from_anlz(anlz, sample_rate=44100)
+
+    assert grid.anchor_frame == pytest.approx(11025.0)
+    assert grid.bpm == pytest.approx(120.0)
+    assert grid.beat_at(1) == pytest.approx(33075.0)
+
+
+def test_from_anlz_rejects_unusable_metadata() -> None:
+    with pytest.raises(ValueError, match="no finite beat times"):
+        BeatGrid.from_anlz(
+            AnlzBeatGrid(times_s=(), bpms=(120.0,), beat_in_bar=()),
+            sample_rate=44100,
+        )
+
+    with pytest.raises(ValueError, match="no usable BPM"):
+        BeatGrid.from_anlz(
+            AnlzBeatGrid(times_s=(0.0,), bpms=(0.0, float("nan")), beat_in_bar=(1,)),
+            sample_rate=44100,
+        )
