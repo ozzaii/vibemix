@@ -14,7 +14,12 @@ packets are gone as raw text but their **conclusions survive** in `.planning/han
 
 | Doc | What | Status |
 |---|---|---|
-| [`viber-capability-CORRECTION.md`](viber-capability-CORRECTION.md) | Source-verified correction to the Viber packet's #1 P0 | **READ THIS over the recovered Viber packet.** "Crate entirely unplugged" was FALSE — it's wired via Tauri `invoke()` (main.rs:105-113 / api.ts:2354-2476 / index.ts renderers). Real gaps: watcher, cue-GUI, freshness badge. The `ipc.library.*` ws path is dead vestigial → DELETE, don't resurrect. |
+| [`DRIFT-current-head.md`](DRIFT-current-head.md) | Drift-aware landing-readiness sweep at HEAD `dc4702eb` (6 commits since `e5c0e34e`; utility `wf_1f8b30d4-c6e`) | **FRESHEST current-HEAD truth — read first.** Tree SAFE (HOLD-bleed CLEAN; DROP speech still dirty-only + default now OFF). **1 CRITICAL ship-blocker:** MOSS model not bundled + no downloader + unwrapped call site (`__main__.py:1311`) → fresh-machine boot crash (MOSS is now the only voice). **+ package checker RED** (4 unassigned library-freshness paths). Codex consumed the board: settings-nav/freshness-badge/sentencepiece/drop-default-OFF all landed. Raw: `_drift-raw-wf_1f8b30d4.json`. |
+| [`CODEX_VERIFICATION-current-head.md`](CODEX_VERIFICATION-current-head.md) | Read-only verification of the 5 LAND commits since `2bd44cc5` at HEAD `e5c0e34e` (22-agent adversarial workflow `wf_c96f6f8d-aa8`) | **Current-HEAD truth. Start here for landing.** All 5 commits ACCEPTED (302d747d/3892f4bd/6254c923/8105b04f/e5c0e34e). 8105b04f Serato writer: opt-in/double-gated/merge-preserved/byte-conformant — only real-Serato render eye-check remains. Includes the dirty-tree hunk-staging map + 5 ground-state corrections. |
+| [`NEXT-LAND-BOARD-current-head.md`](NEXT-LAND-BOARD-current-head.md) | Ranked top-8 next slices (analysis) | **The routing map.** 4 SAFE_NOW (settings-nav fix, cue-export GUI, freshness badge, real-audio cue eval) + 1 source-safe watcher (P0 freshness) + 3 HOLD (MOSS-only TTS = ear-pass, DROP-call = grounding-review+on-by-default, Beatmatch producer = live proof). Full per-slice fields + lane summaries + HOLD gate register. |
+| [`CODEX_READY-next-land-board.md`](CODEX_READY-next-land-board.md) | Codex-facing actionable packet | **Pick up here to land.** L1-L5 land queue with exact include/keep-out + proof + the shared-file hunk-staging recipe; H1-H3 hold queue with each gate. |
+| `_verification-raw-wf_c96f6f8d.json` | Raw 11-item evidence (findings + adversarial verdicts) | Durable raw backing for the 3 docs above (persisted from `/private/tmp` immediately — the wipe can't touch it). |
+| [`viber-capability-CORRECTION.md`](viber-capability-CORRECTION.md) | Source-verified correction to the Viber packet's #1 P0 | **READ THIS over the recovered Viber packet.** "Crate entirely unplugged" was FALSE — it's wired via Tauri `invoke()` (main.rs:105-113 / api.ts:2354-2476 / index.ts renderers). Real gaps: watcher, cue-GUI, freshness badge. NOTE (2026-06-01 verification): `ipc.library.*` is **conditionally** both-ended (gated on `if ipc_router is not None`), not pure-dead — reconcile before deleting. |
 | [`CODEX_PACKAGE_SWEEP_STATUS.md`](CODEX_PACKAGE_SWEEP_STATUS.md) | Codex sweep status after package verification | **Start here for the landing phase.** Strict package assignment is green, 32 READY + 3 HOLD packet docs are durable, the Apple Silicon sidecar freshness blocker has been cleared, latest-code signed package boot/Quit is proven from a copied DMG app, and remaining release blockers are launch-collateral hold plus final live/release acceptance. |
 | [`CODEX_GOLD_STRUCTURE.md`](CODEX_GOLD_STRUCTURE.md) | Grouped product-stream map over the verified packet archive | **Use this for batching.** It turns the packet pile into Gold 0-7 streams (control plane, observability/eval, IPC/transport, library/Viber/cues, Learn/Earned, speech/Judge/mascot, runtime/package/signing, economics/launch) while preserving LAND/HOLD boundaries. |
 | [`CODEX_READY-planning-control-plane.md`](CODEX_READY-planning-control-plane.md) | Package 0/0B-0H proof packet for planning/control-plane docs and package governance | **LAND packet, planning control slice.** Dirty-tree package checker, future-AI routing, IPC/dependency/refactor/rebuild handoffs, Claude fanout archive, capability ledger, and final acceptance contract are classified as LAND docs with current checker/test/diff evidence. |
@@ -111,3 +116,25 @@ carry its files/acceptance) or have Codex re-emit it **into this dir**, not `/tm
 1. Packets → `.planning/packets/<date>/`, **in the repo**, never `/tmp`.
 2. Maintain this `INDEX.md` as packets land.
 3. Track (or commit) a packet before relying on it. `/tmp` is scratch, not an archive.
+
+## 7. Workflow outputs — where everything lives (Codex: read this)
+
+Workflow output exists in **three layers**. Codex should rely on layer A only.
+
+**A. DURABLE — in the repo, Codex-readable (the ONLY source of truth):** `.planning/packets/2026-06-01/`
+- Verification (run `wf_c96f6f8d-aa8`): `CODEX_VERIFICATION-current-head.md`, `NEXT-LAND-BOARD-current-head.md`, `CODEX_READY-next-land-board.md`, raw `_verification-raw-wf_c96f6f8d.json`.
+- Drift sweeps (utility below): `DRIFT-<head>.md` + raw `_drift-raw-<runid>.json`, written here each run. **Codex's pick-up point after every drift run.**
+- Reusable utility script: `_drift_verify.workflow.js`.
+
+**B. RAW / EPHEMERAL — do NOT rely on (this is the `/tmp` trap that already bit us once):**
+- Live task output: `/private/tmp/claude-501/.../tasks/<task-id>.output` — **wiped on reboot/cleanup.**
+- Agent transcripts: `~/.claude/projects/-Users-…/subagents/workflows/wf_*/` — session-scoped raw agent logs; recoverable via `_recover_all.py` but not a handoff surface.
+
+**Rule:** the orchestrator (Claude) extracts every workflow's result and persists the human-facing doc + raw JSON into layer A **immediately** on completion. Codex never reads `/tmp` or transcripts — it reads layer A. If a doc Codex needs is missing from layer A, it was not persisted yet → ask, don't hunt `/tmp`.
+
+**Re-runnable drift utility (Codex or Claude):**
+```
+Workflow({ scriptPath: ".planning/packets/2026-06-01/_drift_verify.workflow.js",
+           args: { since: "<last-verified-HEAD-sha>" } })
+```
+It verifies what landed since `since`, runs the **HOLD-bleed sentinel** (did a gated item — DROP-call speech, MOSS-only-without-sentencepiece, etc. — land/stage without its gate?), scans current ship-blockers, re-checks the HOLD gates, and refreshes the next-slice board. Output → `DRIFT-<head>.md` in this dir. Set `since` to the HEAD recorded in the most recent `DRIFT-*`/`CODEX_VERIFICATION-*` doc so each run covers only the new delta.

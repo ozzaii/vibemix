@@ -1,0 +1,1034 @@
+{
+  "summary": "Read-only verification of Codex LAND commits since 2bd44cc5 + 6 special-attention lanes at HEAD e5c0e34e. No product code edits, no staging, no commits. Produces evidence for the NEXT LAND BOARD.",
+  "agentCount": 22,
+  "logs": [
+    "evidence+verify complete: 11/11 items (commits + lanes)"
+  ],
+  "result": {
+    "head": "e5c0e34e774f3e9c4f3978ed04a0b9c7b761a19a",
+    "item_count": 11,
+    "results": [
+      {
+        "key": "302d747d",
+        "kind": "commit",
+        "title": "feat(library): export auto-cued folders",
+        "finding": {
+          "commit": "302d747d",
+          "title": "feat(library): export auto-cued folders — Cue Export Folder Bridge",
+          "classification": "ACCEPTED",
+          "files_changed": [
+            "src/vibemix/__main__.py (+82: 'library cue' subcommand sp_cue + _cmd_library_cue handler)",
+            "src/vibemix/library/cue_folder.py (new, 245L at commit; 295L at HEAD after 8105b04f added tag_folder_serato)",
+            "tests/library/test_cue_folder.py (new, 236L at commit; 275L at HEAD)",
+            "tests/library/test_cue_folder_cli.py (new, 95L at commit; 127L at HEAD)"
+          ],
+          "tests": [
+            {
+              "cmd": "uv run pytest -q tests/library/test_cue_folder.py tests/library/test_cue_folder_cli.py",
+              "passed": true,
+              "summary": "18 passed in 0.54s. Covers anchors_to_marks ascending-num/label-name + 8-pad cap, cue_folder walk/skip-non-fatal/anchorless-skip, export_set round-trip (pyrekordbox importorskip), m3u8 writer, both-format, unknown-format ValueError, and CLI subparser wiring (cue -> _cmd_library_cue)."
+            },
+            {
+              "cmd": "uv run python -c '... _build_library_subparsers(p); p.parse_args([cue,/tmp/music,--export,both,--out,x.xml,--json])'",
+              "passed": true,
+              "summary": "Live argparse resolves func=_cmd_library_cue, path/export/out parsed correctly; confirms the subcommand is registered and reachable through the real parser builder."
+            }
+          ],
+          "evidence": [
+            "src/vibemix/library/cue_folder.py:35-37 — imports _LABEL_TO_MARK_NAME (cue_export.py:61, verified present), CueAnchor (cue_types.py:42), SUPPORTED_SUFFIXES (folder_ingest.py:59) — all resolve at HEAD",
+            "src/vibemix/library/cue_folder.py:81 — anchors_to_marks: ordered = sorted(anchors, key=lambda a: a.start_s)[:max_marks] → deterministic ascending Num assignment",
+            "src/vibemix/library/cue_folder.py:117 — cue_folder: files = sorted(rglob filtered by SUPPORTED_SUFFIXES) → deterministic walk order; per-file try/except records skips, never fatal (Invariant #3: anchorless file produces NO track, line 137-141)",
+            "src/vibemix/library/cue_folder.py:112,213 — heavy imports are LAZY: detect_cues_auto (onnxruntime/CUE-DETR) imported inside cue_folder(); export_set imported inside export_cued_folder() → module import surface stays light",
+            "src/vibemix/library/cue_folder.py:144-156 — write_m3u8 emits fixed '#EXTM3U' + '#EXTINF:-1,<title>' + filepath lines → byte-deterministic playlist",
+            "grep cue_folder.py: NOT-FOUND for genai/GEMINI/google/api_key → fully offline/local, no Gemini key required",
+            "src/vibemix/__main__.py:2742-2780 (HEAD) — sp_cue subparser with path/--out/--export(rekordbox|m3u8|both)/--name/--max-cues/--json, set_defaults(func=_cmd_library_cue)",
+            "src/vibemix/__main__.py:3201 — _build_library_subparsers(parser) wired into top-level parser; :6871 — argv[0]=='library' dispatch path → CLI is reachable end-to-end",
+            "_cmd_library_cue (commit diff) — rejects non-dir with rc=1 JSON error; routes export_cued_folder; ok = tracks_cued>0; honest counts payload (tracks_cued/cues_total/skipped/outputs)"
+          ],
+          "proves": "The 'library cue' CLI path is REAL and REACHABLE (live argparse resolves func=_cmd_library_cue via _build_library_subparsers + library-argv dispatch). cue_folder.py deterministically walks a folder (sorted rglob), auto-cues each track via an injectable detect fn (defaulting to lazy detect_cues_auto so import stays onnxruntime-free), maps CueAnchors to ascending-numbered hot-cue dicts (sorted by start_s, capped at 8 pads), and writes Rekordbox collection.xml and/or order-only M3U8 deterministically. It is fully offline/local — zero Gemini/genai/google references, no API key. Per-file errors and anchorless files are non-fatally skipped (Invariant #3: never fabricates a placeholder cue). All 18 named tests pass; the real export_set round-trip test (pyrekordbox-gated) proves the bridge dict shape is consumable. The 3 non-shared feature files are clean vs HEAD.\">The 'library cue' CLI path is REAL and REACHABLE, deterministic, and offline; 18 tests pass.",
+          "does_not_prove": "Does NOT prove the REAL auto-cue engine (detect_cues_auto / CUE-DETR ONNX) produces musically-correct anchors on actual audio — every cue_folder test injects a fake detect; the real-audio path runs only under the pyrekordbox/mutagen-gated round-trip test and is not exercised by these unit tests. Does NOT prove the produced collection.xml actually imports into a real Rekordbox install or that Pioneer hardware reads the pads (no live import proof). Does NOT prove packaged-binary behavior (verified on current source via uv run, not the frozen sidecar). The task description's command name 'export-cued-folder' is INACCURATE — the actual subcommand is 'library cue <folder>' (no 'export-cued-folder' parser exists; grep NOT-FOUND).",
+          "dirty_remnants": "The 3 non-shared feature files (cue_folder.py, test_cue_folder.py, test_cue_folder_cli.py) are CLEAN vs HEAD (0 dirty-diff-lines each) — note their HEAD content already includes additions from the later commit 8105b04f (cue_folder.py 245L->295L tag_folder_serato; CLI test 95L->127L write_tags/serato-tags). The SHARED src/vibemix/__main__.py carries 203 dirty-diff-lines across 13 hunks vs HEAD. Of these, ONLY the hunk at lines 153-157 is cue-lane-adjacent (comment colon->em-dash + help text now reads 'Rekordbox/M3U8 or Serato file tags') — that is the 8105b04f Serato follow-on touching the same sp_cue block, NOT new work for 302d747d's feature. The remaining 12 hunks belong to OTHER lanes: agent config import reshuffle (~L58), input/mic callback factories (~L583-790), main() audio wiring incl. midi_macos.controller_state passthrough (~L1164-2510, deck-audio/MIDI lane), and Viber readiness reformatting (~L4670-5159). This shared file MUST be hunk-staged per the collision warning. The cue feature itself committed cleanly.",
+          "remaining_before_product_claim": "Before claiming the cue-export feature works end-to-end for a real user: (1) prove detect_cues_auto produces sane structural anchors on real tracks (real-audio eval, not fakes); (2) verify the emitted collection.xml imports additively into a real Rekordbox build and the hot-cue pads appear on hardware/software; (3) verify packaged-binary reachability (the onnxruntime extra must be present at runtime — plain 'uv run python -m vibemix' prunes it and detect_cues_auto would fail; the CLI must surface this actionably); (4) the cue-lane dirty hunk in __main__.py (the Serato help-text/comment touch) belongs to 8105b04f and must be hunk-staged with that package, never whole-file. No grounding-review gate needed — this is an offline library/CLI path; it does NOT touch what the co-host says or when it speaks."
+        },
+        "verdict": {
+          "target": "302d747d feat(library): export auto-cued folders",
+          "overclaims": [],
+          "live_or_packaged_claims_without_proof": [],
+          "corrected_classification": "unchanged",
+          "confidence": "high",
+          "notes": "I attempted to refute this ACCEPTED finding and could not. Every load-bearing claim verified independently against HEAD and the immutable commit:\n\nVERIFIED CLAIMS:\n- Commit 302d747d adds exactly 4 files, +658 lines (git show --stat): __main__.py +82, cue_folder.py 245L, test_cue_folder.py 236L, test_cue_folder_cli.py 95L. Matches finding.\n- 18 tests PASS: I re-ran `uv run pytest -q tests/library/test_cue_folder.py tests/library/test_cue_folder_cli.py` → 18 passed in 0.49s.\n- Determinism: cue_folder.py:117-120 sorted(rglob filtered by SUPPORTED_SUFFIXES); anchors_to_marks:81 sorted(key=start_s)[:max_marks]; write_m3u8:158-163 fixed #EXTM3U/#EXTINF:-1. All confirmed by Read.\n- Laziness: detect_cues_auto imported inside cue_folder (L111-114), export_set inside export_cued_folder (L213). Confirmed.\n- Invariant #3 (no fabricated cue): L133-137 anchorless file → skipped, no track. Confirmed.\n- Offline/no-Gemini: grep for genai/GEMINI/google/api_key/API_KEY in cue_folder.py → EXIT=1 (NOT-FOUND). Confirmed.\n- Imports resolve at HEAD: _LABEL_TO_MARK_NAME (cue_export.py:61), CueAnchor (cue_types.py:42), SUPPORTED_SUFFIXES (folder_ingest.py:59). All confirmed.\n- CLI wiring: subparser at __main__.py:2754-2792 (sp_cue, set_defaults(func=_cmd_library_cue)); _build_library_subparsers called at :3213; library argv dispatch at :6881. Reachable end-to-end.\n- Dirty tree: feature files 0 dirty-diff-lines vs HEAD; __main__.py 203 dirty lines across 13 hunks. Only the hunk at @@ -2738/+2750 (sp_cue help text → 'Rekordbox/M3U8 or Serato file tags') is cue-adjacent and is the 8105b04f Serato follow-on, NOT 302d747d. The other 12 hunks are unrelated lanes (agent config L58, input/mic callbacks L583-790, main audio wiring L1164-2510, Viber readiness L4670-5159). Matches finding exactly.\n\nThe finding's does_not_prove section is honest and accurate: (a) every cue test injects a fake detect (lines 69/92/107/123/145/167/206/221/250/269 use fake_detect/lambda) — the real CUE-DETR engine is NOT exercised; (b) no live Rekordbox-import/hardware proof; (c) no packaged-binary proof (verified on source via uv run); (d) the 'export-cued-folder' command name in the task description is INACCURATE — actual subcommand is `library cue <folder>`, grep NOT-FOUND for export-cued-folder.\n\nMINOR LINE-NUMBER DRIFT (not over-claims, tree is moving): finding cited subparser at __main__.py:2742-2780 / dispatch wiring at :3201 and :6871; HEAD shows 2754-2792 / 3213 / 6881. The wiring is real and unchanged in substance — drift is from concurrent edits above these blocks.\n\nGROUNDING-REVIEW GATE: Not required. git show 302d747d --stat touches NO speech/timing files (no coach.py, dj_cohost.py, prompts/, event_detector, drop_predict, refresh.py) → EXIT=1. This is a purely offline library/CLI path; it does not change what the co-host says or when it speaks. Finding's conclusion is correct.\n\nNo over-claims, no unproven LIVE/PACKAGED claims, no unflagged speech/timing changes. ACCEPTED stands."
+        }
+      },
+      {
+        "key": "3892f4bd",
+        "kind": "commit",
+        "title": "fix(runtime): supervise live bus task failures",
+        "finding": {
+          "commit": "3892f4bd",
+          "title": "fix(runtime): supervise live bus task failures",
+          "classification": "ACCEPTED",
+          "files_changed": [
+            "src/vibemix/__main__.py (+91)",
+            "tests/runtime/test_main_supervision.py (new, 117L)"
+          ],
+          "tests": [
+            {
+              "cmd": "uv run / .venv pytest -q tests/runtime/test_main_supervision.py (PYTHONPATH=src)",
+              "passed": true,
+              "summary": "4 passed in 0.30s — restart-after-crash, CancelledError propagation, named-task crash logging, cancelled/successful tasks ignored"
+            }
+          ],
+          "evidence": [
+            "git show 3892f4bd:src/vibemix/__main__.py:284-313 — _run_ws_broadcast_supervised loops `while not stop_event.is_set()`, awaits broadcast_once(), re-raises asyncio.CancelledError, catches Exception → logs + sleeps retry_delay only `if not stop_event.is_set()`. Correct supervisor restart semantics for the UI bus.",
+            "__main__.py:240-250 — _best_effort_error wraps tracer.error() in try/except (observability cannot become the crash) AND prints stderr line guarded against BrokenPipeError/OSError. Dual sink: structured trace + stderr.",
+            "__main__.py:252-268 — _record_task_exit reads task.exception(); returns early on asyncio.CancelledError (no shutdown-cancel noise) and on exc is None (clean exit). Only real crashes log event 'task_crashed' with task=name + err=repr.",
+            "__main__.py:271-278 — _attach_task_crash_observers binds name=task_name as a default arg in the lambda (avoids the classic late-binding-to-last-name bug; pinned by test_task_crash_observer_records_original_task_name).",
+            "__main__.py:2364-2381 — ws_broadcast(...) call moved verbatim into _ws_broadcast_once() (identical args: levels,state,manual_trigger,stop_event,transcript_buf,controller_state,suggestion_holder,tracer,ipc_router,screen_available,midi_mirror,audio_capture_context) then run under the supervisor. No argument change.",
+            "__main__.py:2466-2477 — crash observers attached to 7 existing tasks (ws_broadcast,coach_loop,state_refresh,diag_loop,track_poll,deck_poll,lesson_tick) — observe/log only; only ws_task additionally gets restart-supervision.",
+            "src/vibemix/runtime/tracer.py:266-267 + 209-234 — tracer.error(event,**detail) routes through trace() which writes to trace.jsonl (the SessionTracer spine that sits NEXT TO events.jsonl per module docstring), flushed under the recorder lock, fail-soft. NOTE: structured sink is trace.jsonl, not events.jsonl as the brief loosely states.",
+            "src/vibemix/runtime/coach.py:884-887 — coach_loop already has its own per-iteration try/except that resets trigger_state['in_flight']=False and continues; the new coach_task observer is belt-and-suspenders (logs an escaped outer exception that pre-commit died silently).",
+            "Bash grep __main__.py:240-310 — supervisor code path has ZERO references to in_flight/trigger_state. The gate is untouched.",
+            "__main__.py:2541-2570 — shutdown finally cancels all tasks then `await t`; supervisor re-raise of CancelledError (line 298) lets ws_task terminate, and _record_task_exit early-returns on CancelledError so shutdown produces no false 'task_crashed' lines.",
+            "git diff HEAD src/vibemix/__main__.py — NO-SUPERVISOR-HUNKS-IN-DIRTY-DIFF: all dirty hunks are in unrelated areas (TTS-chain rewrite, _apply_packaged_defaults, controller_state plumbing, formatting). Committed supervisor lines are byte-stable in the working tree (grep confirms _best_effort_error@240, _record_task_exit@252, _attach_task_crash_observers@271, _run_ws_broadcast_supervised@281, call-site@2364/2381/2466)."
+          ],
+          "proves": "A failing ws_broadcast loop is now caught, logged to both stderr and the structured trace sink, and restarted (with a stop_event-gated retry delay) instead of permanently darkening the UI. The other 6 long-running *_loop tasks get a crash observer that logs the failure once with the correct task name instead of dying silently. Cooperative shutdown is respected: CancelledError propagates through the supervisor and cancelled tasks are not mislogged as crashes. The in_flight gate is never touched by any supervisor code. 4/4 new tests pass. The committed hunk is clean and byte-stable against the heavily-dirty working tree (no collision with the ~10 other lanes editing __main__.py).",
+          "does_not_prove": "NOT a HOLD-sensitivity change: the commit adds nothing the co-host SAYS and changes nothing about WHEN it speaks — coach_loop/dj_cohost/prompts/event_detector/drop_predict/heartbeat are untouched; coach_task is only observed (log-only), and only the UI websocket bus (ws_broadcast) gets restart-supervision, which controls UI frame cadence not TTS/reaction timing. Limitations to note: (a) the restart-supervision is applied ONLY to ws_broadcast; the other 6 tasks (incl. coach_loop) are observe-only — if coach_loop's outer coroutine ever fully died it would be logged but NOT restarted, so the co-host would stay silent for the session (no regression vs pre-commit silent death, but not self-healing). (b) The structured sink is trace.jsonl, not events.jsonl as the brief phrases it. (c) Tests are unit-level on the helpers in isolation; no live-runtime proof that a real ws_broadcast crash actually recovers in the packaged app.",
+          "dirty_remnants": "__main__.py has large uncommitted hunks at HEAD but NONE overlap the committed supervisor region — verified via `git diff HEAD` (NO-SUPERVISOR-HUNKS-IN-DIRTY-DIFF) and a grep confirming the 5 supervisor symbols are byte-stable in the working tree. Dirty hunks are in other lanes: config import trim + TTS-chain rewrite (lines ~58, ~1308-1355), _apply_packaged_defaults (VIBEMIX_LOCAL_TTS/DROP_CALL setdefault, ~793), controller_state plumbing into _input_callback_factory (~579-615, ~2521), and cosmetic reflow. These belong to packages 14/16/deck-audio etc. and are out of scope for this commit.",
+          "remaining_before_product_claim": "Live-runtime proof (drive-vibemix) that an actual ws_broadcast exception in the packaged app recovers the UI within retry_delay and emits the task_crashed/ws_broadcast_crashed line — unit tests prove the helper logic but not the wired sidecar. Optionally: decide whether coach_loop (the speech producer) warrants the same restart-supervision rather than observe-only, since a dead coach_task = a silent co-host for the session."
+        },
+        "verdict": {
+          "target": "commit 3892f4bd — fix(runtime): supervise live bus task failures",
+          "overclaims": [],
+          "live_or_packaged_claims_without_proof": [
+            "The finding does NOT itself claim live/packaged behavior — it correctly lists 'Live-runtime proof (drive-vibemix) that an actual ws_broadcast exception in the packaged app recovers the UI' as REMAINING before a product claim, and 'remaining_before_product_claim' flags the absence of wired-sidecar proof. This is honest scoping, not an overclaim. No live recovery / no packaged-app recovery is asserted as proven anywhere in the finding, and I confirmed only unit-level tests exist (tests/runtime/test_main_supervision.py, 4 passed in 0.30s)."
+          ],
+          "corrected_classification": "unchanged (ACCEPTED)",
+          "confidence": "high",
+          "notes": "Attempted to refute; could not. Every load-bearing claim verified against the immutable commit blob and current tree:\n\n1. Supervisor semantics (git show 3892f4bd:__main__.py:240-313): _best_effort_error wraps tracer.error in try/except + guards stderr against BrokenPipeError/OSError (240-249); _record_task_exit early-returns on CancelledError and exc-None, logs 'task_crashed' only on real exceptions (252-268); _attach_task_crash_observers uses name=task_name default-arg to defeat late-binding (271-278); _run_ws_broadcast_supervised loops while not stop_event.is_set(), re-raises CancelledError, catches Exception -> logs 'ws_broadcast_crashed' + stop_event-gated retry sleep (281-313). All as described.\n\n2. Call-site (committed blob 2353-2370 / working tree 2364-2381): ws_broadcast(...) moved verbatim into _ws_broadcast_once with the exact 13-arg list the finding lists; run under _run_ws_broadcast_supervised. coach_loop and 5 other tasks get observe-only crash callbacks (2455-2466). Only ws_task is supervised/restarted — confirmed.\n\n3. HOLD-sensitivity exemption JUSTIFIED: diff of added lines (grep) shows ZERO references to speak/say/react/HEARTBEAT/cooldown/in_flight/generate/prompt/tts/voice. The only speech-producer touch (coach_loop) is an observe-only done_callback. Nothing changes what the co-host says or when. No grounding-review gate needed for this commit. The finding's own does_not_prove section correctly raises the residual: coach_loop is observe-only, so a fully-dead coach_task would be logged-not-restarted (silent co-host) — but that is no regression vs the pre-commit silent death, and the finding states this plainly. Correct.\n\n4. Clean-commit / dirty-tree claim CONFIRMED: git diff HEAD -- src/vibemix/__main__.py touches NONE of the 5 supervisor symbols (grep returned empty), and all 5 are present byte-stable in the working tree at the cited lines (240/252/271/281/2364/2381). No collision with the concurrent lanes editing __main__.py.\n\n5. Tracer sink correction CONFIRMED: tracer.py:11-17,157 — opens 'trace.jsonl' next to 'events.jsonl'. The finding's correction (structured sink = trace.jsonl, not events.jsonl) is accurate.\n\n6. Tests RE-RUN by me: PYTHONPATH=src .venv/bin/python -m pytest -q tests/runtime/test_main_supervision.py -> 4 passed in 0.30s. The 4 test names match the finding's summary (restart-after-crash, CancelledError propagation, original-task-name logging, ignore cancelled/successful).\n\n7. Shutdown handling (committed blob 2553-2557): finally block cancels each task then awaits, swallowing CancelledError+Exception; combined with supervisor re-raise (298) and _record_task_exit CancelledError early-return, shutdown emits no false task_crashed lines. Confirmed.\n\nThe finding is conservative and well-scoped: it does not claim LIVE or PACKAGED recovery, explicitly defers that to drive-vibemix, and correctly flags the observe-only coach_loop limitation. ACCEPTED stands."
+        }
+      },
+      {
+        "key": "6254c923",
+        "kind": "commit",
+        "title": "fix(deps): sync optional local tts lock",
+        "finding": {
+          "title": "fix(deps): sync optional local tts lock — sentencepiece added strictly extra-gated; base path unaffected",
+          "commit": "6254c923429642ab32beb0385234153e2dbf718c",
+          "classification": "ACCEPTED",
+          "files_changed": [
+            "uv.lock"
+          ],
+          "tests": [
+            {
+              "cmd": "uv lock --check",
+              "passed": true,
+              "summary": "Exit 0, 'Resolved 158 packages' — lockfile is consistent with the current working-tree pyproject.toml (which still contains tts-local + sentencepiece)."
+            },
+            {
+              "cmd": "uv sync --no-extra ai-local --no-extra tts-local --no-extra clap --no-extra cue --no-extra telegram --dry-run",
+              "passed": true,
+              "summary": "Base resolution (all extras off): header 'Would uninstall 9 packages' lists sentencepiece==0.2.1 and onnxruntime==1.26.0 among them — proves they are NOT in the base set and base `python -m vibemix` does not pull them."
+            }
+          ],
+          "evidence": [
+            "git show 6254c923 (uv.lock +25/-1): adds [[package]] sentencepiece 0.2.1 with cp312 macOS/win/linux wheels + sdist; adds it to ai-local and new tts-local optional-deps; adds two requires-dist entries both marker-gated.",
+            "uv.lock:1868-1881 — sentencepiece 0.2.1 package definition (leaf: no [package] dependencies block; not a transitive of anything).",
+            "uv.lock:2170-2172 — ai-local optional-dependencies now { onnxruntime, sentencepiece, tokenizers }.",
+            "uv.lock:2185-2188 — NEW tts-local optional-dependencies { onnxruntime, sentencepiece }.",
+            "uv.lock:2241-2242 — requires-dist: sentencepiece marker=\"extra == 'ai-local'\" >=0.2 AND marker=\"extra == 'tts-local'\" >=0.2. NO markerless sentencepiece requires-dist entry exists (grep of all 4 refs: 1868 def, 2172/2187 extras, 2241/2242 requires-dist — every one extra-gated).",
+            "uv.lock:2248 — provides-extras list now includes 'tts-local'.",
+            "pyproject.toml:162-165 (at 6254c923) — tts-local = [onnxruntime>=1.20, sentencepiece>=0.2].",
+            "pyproject.toml:166-170 (at 6254c923) — ai-local = [onnxruntime>=1.20, tokenizers>=0.22, sentencepiece>=0.2].",
+            "pyproject.toml:28-135 base dependencies block — explicit NOT-FOUND for sentencepiece/onnxruntime/tokenizers (grep returned none).",
+            "git diff --stat HEAD -- uv.lock + git status --porcelain uv.lock → both empty: uv.lock is CLEAN in the moving working tree."
+          ],
+          "proves": "The commit correctly syncs uv.lock to a pyproject change that introduces a new tts-local optional extra and adds sentencepiece to ai-local, for the opt-in local MOSS-TTS voice. sentencepiece is strictly extra-gated: it is not in the base dependencies block, has no markerless requires-dist entry, and is not a transitive dep of any locked package. The lockfile resolves consistently (uv lock --check exit 0) and the base install path explicitly excludes it (base dry-run would UNINSTALL sentencepiece+onnxruntime). uv.lock has no further uncommitted modification in the working tree.",
+          "does_not_prove": "Does not prove the local MOSS-TTS voice actually works end-to-end — this commit only makes its tokenizer installable via an extra; the runtime wiring (agent/local_tts.py, tts_chain.py chain[0] prepend) is uncommitted/separate and out of scope. Does not prove the PyInstaller spec bundles sentencepiece for the packaged build (third-party deps need explicit spec entries per CLAUDE.md; not checked here). Does not exercise import or inference of sentencepiece. The current dev venv DOES have sentencepiece/onnxruntime/tokenizers installed (uv pip list), but that reflects prior --extra ai-local dev syncs, not base behavior — the dry-run is the authoritative base-path evidence.",
+          "dirty_remnants": "None for uv.lock: git diff HEAD -- uv.lock is empty and git status --porcelain uv.lock is empty, so the lockfile is committed-clean in the working tree. The working-tree pyproject.toml still carries tts-local + sentencepiece (consistent with this commit; uv lock --check passes against it). Unrelated dirty product files (agent/local_tts.py, tts_chain.py, __main__.py etc.) exist per orchestrator ground state but are not part of this commit's surface.",
+          "remaining_before_product_claim": "Before claiming the free on-device voice ships: (1) verify agent/local_tts.py + tts_chain.py MOSS wiring is committed (currently dirty/separate), (2) confirm the PyInstaller specs (vibemix-core.{macos,windows}.spec) bundle sentencepiece + onnxruntime as third-party deps (collect_submodules covers vibemix.* only, not third-party), (3) live ear-pass that the MOSS voice actually speaks. This commit alone only unblocks installability of the tokenizer via the tts-local/ai-local extras — no runtime behavior change to what the co-host says or when."
+        },
+        "verdict": {
+          "target": "fix(deps): sync optional local tts lock — commit 6254c923429642ab32beb0385234153e2dbf718c",
+          "overclaims": [],
+          "live_or_packaged_claims_without_proof": [],
+          "corrected_classification": "unchanged (ACCEPTED)",
+          "confidence": "high",
+          "notes": "Attempted to refute; could not. Every load-bearing claim independently confirmed against current source/tests. (1) Commit surface: `git show 6254c923 --stat` = 1 file changed, uv.lock only, +25/-1 — matches finding exactly; no coach.py/dj_cohost/prompts/event_detector/drop_predict touch, so NO speech-or-timing change exists and no HOLD/grounding gate is required. (2) Re-ran `uv lock --check` → exit 0, 'Resolved 158 packages' (confirmed consistent with current working-tree pyproject.toml which still carries tts-local + sentencepiece). (3) Re-ran the base dry-run (`uv sync` with all 5 extras off) → 'Would uninstall 9 packages' listing sentencepiece==0.2.1, onnxruntime==1.26.0, tokenizers==0.22.2 — proves these are NOT in the base set and are present in the venv only from prior --extra syncs; base `python -m vibemix` does not pull them. (4) sentencepiece is a true leaf: uv.lock:1876-1890 `[[package]]` block has NO dependencies section (not a transitive of anything). (5) Both requires-dist entries are marker-gated (uv.lock:2254 extra=='ai-local', :2255 extra=='tts-local'); grep for a markerless `name = \\\"sentencepiece\\\", specifier` returned NONE. (6) Base `dependencies` block (pyproject.toml:28-134) read in full — zero sentencepiece/onnxruntime/tokenizers; all three live only under [project.optional-dependencies] (pyproject.toml:150-169). (7) uv.lock is committed-clean: `git diff HEAD -- uv.lock` and `git status --porcelain uv.lock` both empty in the moving tree.\n\nThe finding makes NO live or packaged behavior claims — it explicitly carves out MOSS runtime wiring (agent/local_tts.py, tts_chain.py — dirty/separate) and PyInstaller bundling as out-of-scope and lists them under remaining work. I independently confirmed both specs (vibemix-core.macos.spec / vibemix-core.windows.spec) contain ZERO sentencepiece/moss references, which validates the finding's conservatism: the packaged build does NOT yet bundle sentencepiece, and the finding did not claim it does. The does_not_prove and remaining_before_product_claim sections are accurate and appropriately scoped.\n\nOnly nit (not an overclaim): the finding's cited uv.lock line numbers drifted in the moving tree (cited 1868-1881/2170-2172/2185-2188/2241-2242/2248; actual now 1876-1890/2181/2199/2254-2255/2271-equivalent provides-extras). Every cited reference still resolves to the correct content — substance intact, anchors stale by a few lines. Does not change the classification."
+        }
+      },
+      {
+        "key": "8105b04f",
+        "kind": "commit",
+        "title": "feat(library): write opt-in Serato cue tags",
+        "finding": {
+          "commit": "8105b04f",
+          "title": "feat(library): write opt-in Serato cue tags — CLI + byte-conformant Markers2 writer, real-mp3 round-trip green",
+          "classification": "ACCEPTED",
+          "files_changed": [
+            "pyproject.toml (+8: serato extra, mutagen>=1.47)",
+            "src/vibemix/__main__.py (+96/-33: --write-tags/--no-merge CLI flags + serato-tags branch in _cmd_library_cue)",
+            "src/vibemix/library/cue_folder.py (+54: tag_folder_serato)",
+            "src/vibemix/library/export_serato.py (NEW 271L: Markers2 encode/decode/merge/read/write)",
+            "tests/library/test_cue_folder.py (+38)",
+            "tests/library/test_cue_folder_cli.py (+32, NEW CLI tests)",
+            "tests/library/test_export_serato.py (NEW 180L)",
+            "uv.lock (+15: mutagen 1.47.0 under serato extra)"
+          ],
+          "tests": [
+            {
+              "cmd": "uv run pytest -q tests/library/test_export_serato.py tests/library/test_cue_folder.py tests/library/test_cue_folder_cli.py (via source .venv/bin/activate && PYTHONPATH=src python3 -m pytest)",
+              "passed": true,
+              "summary": "30 passed in 0.56s. The two @skipif real-mp3 tests RAN (not skipped) because mutagen 1.47.0 is in the venv and the fixture tests/bench/data/t1_pyrez_darkside.mp3 (394k) exists — so write->read-back byte round-trip on a real ID3/mp3 container AND merge-preserve are actually exercised, not just the pure-Python path."
+            },
+            {
+              "cmd": "python3 -c '... _build_library_subparsers ...' (live argparse probe)",
+              "passed": true,
+              "summary": "cue subparser dispatches to _cmd_library_cue; --write-tags default=False (opt-in OFF), --no-merge default=False (merge ON). Confirms the two flags parse with the documented defaults."
+            },
+            {
+              "cmd": "pytest -v on test_export_serato.py",
+              "passed": true,
+              "summary": "12/12 incl. test_write_and_read_serato_cues_round_trip_real_mp3 PASSED and test_write_serato_cues_merge_preserves_hand_set_cue PASSED (NOT skipped)."
+            }
+          ],
+          "evidence": [
+            "export_serato.py:90-148 — encode_markers2/decode_markers2/_cue_entry/_parse_cue: pure spec-byte Markers2 codec, GEOB desc 'Serato Markers2', uint32 BE position, base64 wrap w/ LF every 72, 470-byte min pad. Reimplemented from documented format (docstring:14-26), copies no GPL source.",
+            "export_serato.py:189-214 — _merge_cues: union by pad index, vibemix cues win their pads, every OTHER pad preserved; _write_geob keeps non-Serato GEOB frames intact (keep=[f for f in getall('GEOB') if desc!=_GEOB_DESC]). Merge read-modify-write proven by test_write_serato_cues_merge_preserves_hand_set_cue (real mp3).",
+            "export_serato.py:230-271 — write_serato_cues(allow_write=False default) returns {written:False, reason:'opt-in required...'} and NEVER touches disk (test asserts file not created). suffix gate to .mp3/.aif/.aiff; ModuleNotFoundError('mutagen') -> actionable {written:False, reason:'needs serato extra: uv sync --extra serato'}, never raises on the gate.",
+            "export_serato.py:222-227,237 — mutagen imported LAZILY inside _read_geob/_write_geob (function-local 'from mutagen.id3 import ...'), never at module top. Module import works with no mutagen.",
+            "__main__.py:2767-2778 — --write-tags (action=store_true, default False) + --no-merge flags on the cue subparser; help text 'Mutates files; merge-on by default'.",
+            "__main__.py:6104-6118 — _cmd_library_cue: if write_tags -> tag_folder_serato(allow_write=True, merge=not no_merge); else export_cued_folder. Reachable handler, dispatches via set_defaults(func=_cmd_library_cue).",
+            "cue_folder.py:238-285 — tag_folder_serato lazy-imports export_serato, runs cue_folder, maps marks_to_serato_cues, calls write_serato_cues per track, returns {tagged,cues_total,skipped,scanned}. Result shape matches CueFolderResult (cue_folder.py:54-61: tracks/skipped/scanned; each track {filepath,title,cues}).",
+            "export_serato.py:25-26 + test_export_serato.py:6-12 — explicit disclaimer: green tests prove FORMAT/byte conformance, NOT that any Mixxx/Serato/Rekordbox build renders the pad; that is a separate one-time human eye-check (no-slop gate).",
+            "uv.lock:1045 (mutagen 1.47.0 pkg def), :2191-2193 ({name='mutagen'} INSIDE the serato=[...] optional-dependencies group — the implied-marker extra member, NOT a base leak), :2232 ({name='mutagen', marker=\"extra=='serato'\", >=1.47} in requires-dist), :2264 provides-extras includes 'serato'. mutagen resolves ONLY under the serato extra.",
+            "pyproject.toml:179-181 — serato=['mutagen>=1.47'] optional extra, comment flags mutagen GPL-2.0-or-later runtime dep, lazy-imported, never vendored.",
+            "NOT-FOUND: no Tauri/GUI surface for serato cue tags — rg of tauri/ for tag_folder_serato/write_serato_cues/export_serato/write-tags returns no real match (only a spurious broad-alternation hit in validator.generated.mjs, confirmed empty on re-grep). CLI-only feature."
+          ],
+          "proves": "The Serato Markers2 cue-tag writer is a real, reachable, byte-conformant CLI feature. (1) CLI is real: `vibemix library cue --write-tags [--no-merge]` parses to _cmd_library_cue and routes to tag_folder_serato (live argparse probe + __main__.py:2767-2778, 6104-6118). (2) Tag-writing is OPT-IN, double-gated: CLI --write-tags default False AND write_serato_cues(allow_write=False) refuses + never touches disk. (3) Pre-existing/hand-set cues are MERGE-preserved (union-by-pad-index + keep-foreign-GEOB), proven on a real mp3. (4) The Markers2 codec is byte-asserted against a golden oracle and round-trips through a real mutagen-written ID3/mp3 container (write->read-back->assert index/ms/name). (5) mutagen is optional (serato extra only), lazy-imported with an actionable missing-dep message, and the lockfile is synced with no base-dep leak. (6) Code+tests explicitly claim only byte/format conformance, NOT Serato-app visual rendering.",
+          "does_not_prove": "Does NOT prove cues actually RENDER as hot-cue pads inside a real Serato/Mixxx/Rekordbox build — that is an explicit deferred human eye-check (export_serato.py:25-26). Does NOT prove round-trip against a file written BY real Serato (the merge/round-trip fixtures are vibemix-written, not a captured Serato-authored Markers2 payload — the decoder's tolerance of foreign COLOR/BPMLOCK entries is unit-synthetic at test_export_serato.py:122-138, not from a real Serato file). Does NOT cover FLAC/MP4 carriers (suffix gate limits v1 to .mp3/.aif/.aiff, explicitly a follow-up). Does NOT prove any packaged-binary behavior (no fresh PyInstaller bundle check; serato extra must be installed for tag-write to function). No GUI surface exists, so nothing is claimed at the app/UI level.",
+          "dirty_remnants": "export_serato.py and cue_folder.py are CLEAN at HEAD e5c0e34e (git diff HEAD empty for both). __main__.py is dirty (+53/-43 vs HEAD) from ~10 unrelated lanes, but the ONLY serato-area dirt is one cosmetic comment edit at the cue subparser (line 153->154: ':' -> em-dash in '# Cue/export bridge ...'); the --write-tags/--no-merge flags and serato-tags handler branch are unchanged by the moving tree. uv.lock and pyproject.toml serato hunks committed cleanly. The moving __main__.py is the only collision risk for landing — the serato hunks must stay hunk-isolated from the other lanes' edits.",
+          "remaining_before_product_claim": "Before ANY app/product claim: (1) human eye-check that cues actually appear as pads in a real Serato (and ideally Mixxx/Rekordbox) build — the explicit no-slop gate; (2) a round-trip test against a real Serato-AUTHORED Markers2 payload fixture (current foreign-entry test is synthetic) to prove decode tolerance against actual vendor bytes; (3) if a GUI surface is ever desired, build it (none exists today — CLI-only); (4) FLAC/MP4 carrier support (v1 is ID3 mp3/aif/aiff only); (5) ensure the optional 'serato' extra is installed in the shipped/packaged path or the feature silently returns 'needs serato extra'. None of these block accepting the CLI/byte-conformance work as committed.",
+          "serato_answers": {
+            "cli_real": "REAL & reachable. __main__.py:2767-2778 defines --write-tags (store_true) + --no-merge on the 'cue' subparser; __main__.py:6104-6118 _cmd_library_cue branches to tag_folder_serato(allow_write=True, merge=not no_merge). Live argparse probe: `cue /tmp/music --write-tags --no-merge` -> func=_cmd_library_cue. CLI-only (no GUI).",
+            "tag_writing_opt_in": "OPT-IN, default OFF, double-gated. (1) CLI --write-tags action='store_true' -> default False (live probe: default write_tags=False). (2) write_serato_cues(allow_write=False default) at export_serato.py:230-241 returns {written:False, reason:'opt-in required: pass allow_write=True'} and the file is never created (test_write_serato_cues_requires_opt_in asserts not exists). The CLI only passes allow_write=True when --write-tags is given (__main__.py:6107-6109).",
+            "avoids_app_visual_claim": "YES. export_serato.py:25-26 docstring: 'Whether a specific Mixxx/Serato/Rekordbox build renders the pad is a human eye-check - green tests prove format conformance, not that product conclusion.' test_export_serato.py:6-12 repeats this. Code claims byte/format conformance only, never 'cues show up in Serato'.",
+            "existing_cues_merge_preserved": "YES, preserved. _merge_cues (export_serato.py:189-196) unions by pad index — vibemix cues win their own pads, every OTHER pad kept. _write_geob (export_serato.py:222-237) keeps non-Serato GEOB frames intact (keep=[f for ... desc!=_GEOB_DESC]). merge=True is the default at both write_serato_cues and tag_folder_serato. Proven on a real mp3: test_write_serato_cues_merge_preserves_hand_set_cue (pad-5 hand-set cue 'MINE' survives a vibemix write at pads 0/1) PASSED (not skipped).",
+            "mutagen_optional_and_lock_synced": "YES. pyproject.toml:179-181 serato=['mutagen>=1.47'] optional extra (comment flags GPL-2.0+ runtime dep, lazy, never vendored). Import is lazy/function-local inside _read_geob/_write_geob (export_serato.py:222,237) — module imports with no mutagen; missing-dep yields actionable {written:False, reason:'needs serato extra: uv sync --extra serato'} (export_serato.py:262-267), never raises. Lockfile synced: uv.lock:2232 requires-dist mutagen with marker extra=='serato'; the line-2192 markerless ref is INSIDE the serato=[...] optional-dependencies group (implied-marker extra member, NOT a base-dep leak); :2264 provides-extras lists 'serato'. RESOLVED: no base leak.",
+            "tests_sufficient_for_byte_roundtrip": "COVERED: golden-oracle exact-spec bytes (test_cue_entry_matches_exact_spec_bytes), inner-blob header+terminator, outer GEOB container header, unpadded-base64 decode, encode->decode field round-trip incl. ms position, decode-ignores-non-CUE (COLOR/BPMLOCK), marks->SeratoCue index/ms/name/color, merge-preserve unit, opt-in gate (no disk touch), AND on real mp3 via mutagen: write->read-back markers round-trip + merge-preserve (both RAN, mutagen present). CLI: opt-in flag, merge default, missing-folder, subparser-exists. NOT COVERED: decode against a real SERATO-authored payload (foreign-entry test is synthetic); FLAC/MP4 carriers; in-Serato pad rendering. 30/30 passed.",
+            "remains_before_app_claim": "(1) Human eye-check in a real Serato/Mixxx/Rekordbox build that cues render as pads (explicit no-slop gate). (2) Round-trip test vs a real Serato-written Markers2 fixture (current foreign-entry decode is synthetic). (3) No GUI surface exists — would need building for any UI claim. (4) FLAC/MP4 carriers (v1 ID3-only). (5) serato extra must be installed in the packaged path. None block the CLI/byte-conformance acceptance."
+          }
+        },
+        "verdict": {
+          "target": "8105b04f — feat(library): write opt-in Serato cue tags",
+          "overclaims": [],
+          "live_or_packaged_claims_without_proof": [
+            "NONE in the finding's affirmative claims. The finding explicitly does NOT claim packaged/DMG behavior, LIVE co-host behavior, or in-Serato-app rendering. It correctly parks all of those in does_not_prove / remaining_before_product_claim. I confirmed there is no PyInstaller/bundle proof here, but the finding never asserts one — so there is nothing to refute. The single 'runtime' claim it makes (CLI dispatch + opt-in defaults) IS backed by a live argparse probe I re-ran: cue->_cmd_library_cue, write_tags default False, no_merge default False."
+          ],
+          "corrected_classification": "unchanged (ACCEPTED)",
+          "confidence": "high",
+          "notes": "I tried to refute this finding and could not break any load-bearing claim. Independently verified at the IMMUTABLE commit (git show 8105b04f) and re-ran tests on the moving tree:\n\nCONFIRMED (file:line + test):\n1. Opt-in double-gate — export_serato.py write_serato_cues(allow_write=False default) returns {written:False, reason:'opt-in required...'} BEFORE touching disk; suffix gate to .mp3/.aif/.aiff; ModuleNotFoundError('mutagen') -> actionable msg, never raises. Verbatim at 8105b04f. test_write_serato_cues_requires_opt_in asserts the file is never created — PASSED.\n2. Lazy import — `from mutagen.id3 import ...` is function-local inside _read_geob (line 182) and _write_geob (line 195); no module-top mutagen import (only base64/logging/dataclass/Path at lines 31-34). Confirmed.\n3. Foreign-GEOB + foreign-pad preserve — _write_geob keep=[f for ... desc!=_GEOB_DESC] (line 202); _merge_cues unions by pad index, vibemix wins its pads (lines 166-175). Confirmed verbatim.\n4. CLI real & opt-in — __main__.py committed: --write-tags store_true (default False), --no-merge store_true (default False), set_defaults(func=_cmd_library_cue); handler routes allow_write=True ONLY when --write-tags, merge=not no_merge. LIVE argparse probe re-run on current tree: func is _cmd_library_cue=True, write_tags=True/no_merge=True when flagged, both False by default. Confirmed.\n5. Tests — re-ran the 3 named files: 30 passed in 0.52s. The two real-mp3 @skipif tests RAN (skipif guards only fixture existence; tests/bench/data/t1_pyrez_darkside.mp3 = 394k exists, mutagen 1.47.0 in venv): test_write_and_read_serato_cues_round_trip_real_mp3 PASSED, test_write_serato_cues_merge_preserves_hand_set_cue PASSED. Confirmed via -v output (no SKIPPED lines).\n6. uv.lock / pyproject — mutagen 1.47.0 at uv.lock:1045; under serato=[] optional group at :2191-2192; requires-dist marker extra=='serato' >=1.47 at :2232; provides-extras includes 'serato' at :2264. pyproject.toml serato extra at :179-181 with GPL-2.0+ comment. No base-dep leak. Confirmed.\n7. No HOLD trigger — commit touches NO co-host speech/timing files (grep for coach/dj_cohost/prompts/event_detector/drop_predict/refresh/evidence_registry in the commit = empty). Pure offline library/CLI feature; the grounding-review gate does not apply. No speech/timing change to flag.\n8. CLI-only / no GUI — rg of tauri/ for tag_folder_serato/write_serato_cues/export_serato = empty (validator.generated.mjs hit correctly excluded). Confirmed.\n\nDIRTY-REMNANT (verified against the moving tree): export_serato.py and cue_folder.py are CLEAN at HEAD e5c0e34e (git diff HEAD empty). __main__.py is dirty (+53/-43 from unrelated lanes) BUT the serato region is untouched by the working-tree diff (grep of `git diff HEAD -- __main__.py` for write-tags/no-merge/tag_folder_serato/serato = empty), and the current working-tree __main__.py still carries the flags+handler intact (lines 2779/2787/6114-6115). The finding's collision-risk caveat is accurate.\n\nThe finding's does_not_prove / remaining_before_product_claim sections are honest and complete: it correctly disclaims in-Serato pad rendering (export_serato.py:25-26 human eye-check), the synthetic foreign-entry decode test (test_decode_ignores_non_cue_entries builds COLOR/BPMLOCK by hand — I read it, confirmed synthetic, NOT a captured Serato payload), the self-written 'hand-set' merge fixture (the pad-5 'MINE' cue is written by vibemix's own writer first, not a real Serato file), no FLAC/MP4, and no packaged-path proof. No over-claims found. The ACCEPTED classification is warranted for CLI/byte-conformance scope as the finding scopes it."
+        }
+      },
+      {
+        "key": "e5c0e34e",
+        "kind": "commit",
+        "title": "fix(tts): keep explicit local voice on device",
+        "finding": {
+          "commit": "e5c0e34e774f3e9c4f3978ed04a0b9c7b761a19a",
+          "title": "fix(tts): keep explicit local voice on device",
+          "classification": "ACCEPTED",
+          "files_changed": [
+            "src/vibemix/agent/local_tts.py",
+            "src/vibemix/agent/proxy_client.py",
+            "src/vibemix/agent/tts_chain.py",
+            "tests/agent/test_local_tts.py",
+            "tests/agent/test_proxy_client.py"
+          ],
+          "tests": [
+            {
+              "cmd": "uv run pytest -q tests/agent/test_local_tts.py tests/agent/test_proxy_client.py (run via source .venv/bin/activate && PYTHONPATH=src python3 -m pytest -q)",
+              "passed": true,
+              "summary": "18 passed in 4.17s. Note: run against the WORKING TREE, which carries further uncommitted edits beyond e5c0e34e. Committed test assertions (e.g. test_moss_leads_chain_when_enabled asserts len(chain)==1; test_proxy_03b asserts proxy returns MOSS-only) are logically consistent with the committed source (early-return MOSS adapter in both builders)."
+            }
+          ],
+          "evidence": [
+            "git show e5c0e34e --name-only: touches EXACTLY 5 files (local_tts.py, proxy_client.py, tts_chain.py, test_local_tts.py, test_proxy_client.py); line_voice.py is NOT in the commit (only dirty uncommitted).",
+            "tts_chain.py:118-123 (committed @e5c0e34e): inside `if local_tts_enabled():` the diff changes `chain.append(_moss)` to `return agents_tts.FallbackAdapter(tts=[_moss], max_retry_per_tts=1)` — local voice now short-circuits and ships NO paid Cartesia/Gemini/OpenRouter fallback behind it.",
+            "proxy_client.py:64-78 (committed @e5c0e34e): build_proxy_tts_chain now does `from vibemix.agent.local_tts import local_tts_enabled; if local_tts_enabled(): ... return FallbackAdapter(tts=[moss], max_retry_per_tts=1)` BEFORE the openai_plugin.TTS proxy entry — local voice wired into the proxy builder too (BOTH builders confirmed).",
+            "tts_chain.py:84-104 (committed @e5c0e34e): docstring/comments rewritten to state MOSS-only-when-enabled, paid chain builds only when VIBEMIX_LOCAL_TTS=0/uncached — proves the no-paid-fallback is GATED on explicit opt-in, not unconditional.",
+            "tests/agent/test_local_tts.py:117 (committed): `assert len(chain) == 1  # MOSS is the only voice — zero paid fallback` (was `>= 2`).",
+            "tests/agent/test_proxy_client.py:47-62 (committed): new test_proxy_03b_tts_chain_uses_local_moss_when_enabled asserts fa_kwargs['tts'] == [fake_moss_cls.return_value] and openai_plugin.TTS.__init__.assert_not_called() — proves proxy mode keeps voice on-device when MOSS enabled.",
+            "local_tts.py:27 `from __future__ import annotations` present, so the committed annotation refactor (`\"np.ndarray\"`->`np.ndarray` at line 102; `\"_OrtCpuEngine\"`->`_OrtCpuEngine` at 141; numpy imported only under TYPE_CHECKING at line 45-46) is a safe no-op — annotations are lazy strings, runtime body re-imports numpy locally (line 109). No NameError risk.",
+            "No new model-name literals introduced; proxy still uses config.OPENROUTER_TTS_MODEL (router-derived) — no grep-gate violation."
+          ],
+          "proves": "At SOURCE level: when VIBEMIX_LOCAL_TTS is truthy AND the MOSS model is cached (local_tts_enabled() True), BOTH the direct chain (_build_direct_chain) and the proxy chain (build_proxy_tts_chain) now return a MOSS-only FallbackAdapter and do NOT silently fall through to a paid/cloud provider (Cartesia/Gemini/OpenRouter). The local voice is correctly wired into BOTH builders. The 5-file commit is internally consistent and its named tests pass (18 passed on the tree). This is a clean, scoped chain-wiring fix.",
+          "does_not_prove": "Does NOT prove packaged/live MOSS readiness — no fresh PyInstaller build, no live `python -m vibemix` run, no proof the 728MB ONNX model is actually cached or that synthesis produces audio on a real rig (that would be NEEDS_LIVE_PROOF; this is source-level only). Does NOT establish full 'no-paid-fallback' product intent: in THIS COMMIT the paid Cartesia/Gemini/OpenRouter chain still builds whenever VIBEMIX_LOCAL_TTS is OFF or the model is uncached (default-off posture). Does NOT change what the co-host SAYS or WHEN it speaks — no edits to coach.py/dj_cohost/prompts/event_detector/drop_predict — so the grounding-review speech HOLD gate is not triggered.",
+          "dirty_remnants": "SUBSTANTIAL — the working tree (git diff HEAD) carries concurrent uncommitted edits that go FAR beyond e5c0e34e and change the design: (1) tts_chain.py is rewritten to MOSS-ONLY-in-ALL-MODES — Cartesia/Gemini/OpenRouter providers, _live_http_session, gemini_native_tts_class entirely deleted; _build_direct_chain/build_tts_chain become compatibility wrappers that ignore mode and always call _build_moss_chain. (2) local_tts.py adds LocalTTSUnavailable + build_local_tts_adapter() + local_tts_unavailable_reason() + _local_tts_disabled_by_env(); local_tts_enabled() now defaults ON when model cached (VIBEMIX_LOCAL_TTS=0 only DISABLES, never enables cloud). (3) proxy_client.py strips the OpenRouter monkey-patch import, openai_plugin, _TTS_INSTRUCTIONS; build_proxy_tts_chain becomes `return build_local_tts_adapter()`. (4) line_voice.py rewritten MOSS-only (NOT in the commit at all). (5) test_local_tts.py/test_proxy_client.py rewritten (test_moss_absent_fails_loud expects LocalTTSUnavailable; test_disabled_without_flag -> test_enabled_without_flag_when_model_cached). test_tts_chain.py also dirty. These are a SEPARATE in-progress change (full cloud-removal) — verify them as their own unit; do NOT conflate with the conservative committed e5c0e34e hunk. These files must be hunk-staged given the shared-tree collision risk.",
+          "remaining_before_product_claim": "Before claiming 'co-host keeps the local voice on device, never falls to a paid provider' as a LIVE/PACKAGED product behavior: (1) live-drive proof — run `VIBEMIX_LOCAL_TTS=1 uv run --extra ai-local python -m vibemix` with the 728MB MOSS model cached and confirm the co-host actually speaks via MOSS (drive-vibemix). (2) fresh packaged-build proof that the sidecar ships onnxruntime/sentencepiece/tokenizers and the MOSS path works in the frozen bundle (plain base deps PRUNE these). (3) Decide+land the larger uncommitted cloud-removal change as its own reviewed commit if the intent is truly 'MOSS is the ONLY voice in every mode' — the COMMITTED e5c0e34e still keeps the paid chain alive when local TTS is off. (4) If MOSS becomes default-on or the sole voice, that is a product decision (per the code's own comment 'flipping it to the default free-tier voice is a product decision') and needs Kaan sign-off, not just code."
+        },
+        "verdict": {
+          "target": "e5c0e34e774f3e9c4f3978ed04a0b9c7b761a19a — fix(tts): keep explicit local voice on device",
+          "overclaims": [
+            "MINOR test-count nuance (already self-disclosed, not a real overclaim): the finding reports '18 passed in 4.17s' but that run is against the WORKING TREE, which carries an extra test function (test_local_tts.py has 13 test fns in the tree vs 12 in the commit). I re-ran the COMMITTED tree in isolation (git archive e5c0e34e -> /tmp/e5c0_verify, PYTHONPATH=src pytest tests/agent/test_local_tts.py tests/agent/test_proxy_client.py) and got 17 passed, not 18. The finding flagged the working-tree caveat explicitly, so the ACCEPTED classification is not over-claimed — but a reader should note the commit itself self-validates at 17/17, and the 18th passing test belongs to uncommitted work."
+          ],
+          "live_or_packaged_claims_without_proof": [
+            "The finding does NOT assert any LIVE or PACKAGED behavior in its 'proves' section — it explicitly scopes to SOURCE level and its 'does_not_prove' field correctly refuses to claim packaged/live MOSS readiness (no PyInstaller build, no `python -m vibemix` run, no proof the 728MB ONNX model is cached or that synthesis produces audio). I confirm there is NO unproven live/packaged claim to refute. If anyone later upgrades this to 'co-host keeps the local voice on device live' as a product statement, that REQUIRES: (1) drive-vibemix run with VIBEMIX_LOCAL_TTS=1 --extra ai-local and the model cached, confirming audible MOSS speech; (2) fresh frozen-bundle proof the sidecar ships onnxruntime/sentencepiece/tokenizers (base deps prune them). Default these to refuted until that proof exists."
+          ],
+          "corrected_classification": "unchanged (ACCEPTED — source-level, correctly scoped)",
+          "confidence": "high",
+          "notes": "I independently confirmed every load-bearing claim against the immutable commit (HEAD == e5c0e34e). VERIFIED: (1) git show touches EXACTLY 5 files (local_tts.py, proxy_client.py, tts_chain.py, + 2 tests); line_voice.py is NOT in the commit. (2) tts_chain.py committed diff: inside `if local_tts_enabled():` the change is `chain.append(_moss)` -> `return agents_tts.FallbackAdapter(tts=[_moss], max_retry_per_tts=1)` — local voice short-circuits, no paid fallback behind it. (3) proxy_client.py committed diff: build_proxy_tts_chain adds `from vibemix.agent.local_tts import local_tts_enabled; if local_tts_enabled(): ... return FallbackAdapter(tts=[moss], max_retry_per_tts=1)` BEFORE the openai_plugin.TTS entry — both builders confirmed. (4) Committed test assertions confirmed verbatim: test_local_tts.py:105 `assert len(chain) == 1` (was `>= 2`); test_proxy_client.py adds test_proxy_03b asserting fa_kwargs['tts'] == [fake_moss_cls.return_value] + openai_plugin.TTS.__init__.assert_not_called(). (5) future-annotations no-op safety confirmed: local_tts.py:27 has `from __future__ import annotations`, numpy under TYPE_CHECKING at 45-46, AND a runtime-local `import numpy as np` at line 109 before use at 111/113 — no NameError risk. (6) No inline model literals in any of the 3 files (grep empty after excluding router-derived config.* constants) — grep-gate holds. SCOPE/HOLD GATE: commit touches NONE of coach.py/dj_cohost.py/prompts/event_detector/drop_predict — this is voice-DELIVERY cascade wiring, not reaction text or timing. The speech-HOLD grounding gate is correctly NOT triggered. DIRTY REMNANTS — I CONFIRM the skeptic-finding's 'SUBSTANTIAL' assessment: git diff HEAD shows -290/+119 across 6 files; tts_chain.py uncommitted diff rewrites the module docstring to 'MOSS-only TTS factory' and deletes Cartesia/Gemini/openai_plugin instantiation, local_tts.py +51, proxy_client.py collapses to a local-only build, and line_voice.py (NOT in the commit) is also dirty. This is a SEPARATE in-progress full-cloud-removal change on the moving tree — it must NOT be conflated with the conservative committed hunk, and given the shared-tree collision risk it needs hunk-level staging before any future commit. BOTTOM LINE: the finding is honest and conservative — it accurately scopes to source-level, correctly refuses live/packaged claims, and correctly does not trigger the speech HOLD. ACCEPTED stands. The only nit is the 17-vs-18 committed-vs-tree test count, which the finding already disclosed."
+        }
+      },
+      {
+        "key": "moss-tts",
+        "kind": "lane",
+        "title": "Local MOSS / no-paid-fallback TTS",
+        "finding": {
+          "lane": "Local MOSS TTS & no-paid-fallback",
+          "summary": "The dirty working tree converts MOSS from an opt-in voice (HEAD: cloud Cartesia/Gemini primary, MOSS only when VIBEMIX_LOCAL_TTS truthy + cached) into the SINGLE TTS provider in every mode, removing all cloud TTS instantiation. (a) MOSS is wired into BOTH chains via one shared builder `build_local_tts_adapter()` (local_tts.py:307): tts_chain `_build_moss_chain`->`_build_direct_chain`/`build_tts_chain` (tts_chain.py:26-72) and proxy `build_proxy_tts_chain` (proxy_client.py:49-56) both call it. (b) The no-paid-fallback guard is real and hard: `build_local_tts_adapter` returns FallbackAdapter(tts=[moss], max_retry_per_tts=1) — one provider, no cloud entry; if local is unavailable it raises `LocalTTSUnavailable` (local_tts.py:309-310) instead of cascading. Default is now MOSS-on (enabled unless VIBEMIX_LOCAL_TTS in {0,false,no,off,disabled}), inverting the prior opt-in. (c) A NARROW SOURCE-ONLY slice (the 5 agent .py + 5 test files) is internally consistent and the 31 named tests pass — but it is NOT SAFE_NOW: it changes what voice the co-host uses live AND its no-speech failure mode (raise vs cloud fallback), so it needs the grounding-review gate + a live ear-pass; and `__main__.py` print lines are entangled in a multi-lane shared-collision file. (d) HOLD anything claiming packaged MOSS works: `sentencepiece` (lazy-imported at local_tts.py:162, required by `_OrtCpuEngine.load`) is NOT in either PyInstaller spec — a frozen build would ImportError on engine load. No fresh build proof, no live ear-pass.",
+          "already_landed": [
+            "At HEAD, MOSS provider class + engine seam already exist and are tracked: src/vibemix/agent/local_tts.py (MossLocalTTS, _OrtCpuEngine, _MossChunkedStream) and src/vibemix/agent/moss_tts/{__init__.py,ort_cpu_runtime.py} are committed and clean (git ls-files shows tracked; git status shows moss_tts/ not dirty)",
+            "At HEAD, MOSS was the OPT-IN voice: local_tts_enabled() required VIBEMIX_LOCAL_TTS truthy (git diff HEAD local_tts.py shows the removed `if flag not in {'1','true','yes','on'}` guard); the cloud chain (Cartesia->Gemini->OpenRouter) was the default — that is the COMMITTED behavior",
+            "pyproject.toml (clean at HEAD) already declares the deps: `tts-local`/`ai-local` extras carry onnxruntime>=1.20 + sentencepiece>=0.2 (pyproject.toml:158-170)",
+            "PyInstaller specs (clean at HEAD) already bundle onnxruntime (dylibs via collect_dynamic_libs, vibemix-core.macos.spec:168) + tokenizers + onnxruntime submodules (_LOCAL_AI_SUBMODULES, spec:144-149) and vibemix.agent submodules (spec:217) — so local_tts.py + moss_tts/ ship as Python modules",
+            "Proxy fallback contract (ProxyUnavailable / classify_proxy_error / probe_proxy_health) is committed and UNCHANGED by this lane (proxy_client.py:65-179 identical region; diff only touches the TTS builder + docstring/imports)"
+          ],
+          "missing": [
+            "sentencepiece is NOT in either PyInstaller spec (rg 'sentencepiece' vibemix-core.macos.spec / .windows.spec = NOT-FOUND). It is lazy-imported at local_tts.py:162 (`import sentencepiece as spm`) inside `_OrtCpuEngine.load` (called from `_get_engine` local_tts.py:283). A frozen build would fail at engine load even though the wheel-extra declares it — packaged MOSS is UNPROVEN",
+            "No fresh PyInstaller build proof that the dirty MOSS-only chain bundles + boots (no build/*.toc evidence gathered; spec is unchanged so even a rebuild would miss sentencepiece)",
+            "No live ear-pass proof for the dirty default-on MOSS-only path; memory note project_local_tts_moss_nano_benched lists Kaan ear-verdict + Windows path as open gates",
+            "No Windows packaging proof: windows spec also lacks sentencepiece; MOSS-only on Windows is unverified",
+            "The __main__.py print-line edits (lines 1316/1323 'MOSS-TTS-Nano local only') live in a multi-lane shared-collision file (orchestrator flagged ~10 lanes) — they cannot land with this slice without hunk-staging and are not part of a clean isolated source island"
+          ],
+          "candidate_slices": [
+            {
+              "name": "MOSS-only TTS chain (source + tests)",
+              "status": "NEEDS_LIVE_PROOF_FIRST",
+              "value": "Makes local on-device MOSS the single TTS provider in both direct (BYO-key) and proxy (keyless) modes with a hard no-paid-fallback guard; removes the cloud TTS cost + embedded-key surface. Internally consistent, 31 named tests green.",
+              "risk": "high",
+              "files_in": [
+                "src/vibemix/agent/local_tts.py",
+                "src/vibemix/agent/tts_chain.py",
+                "src/vibemix/agent/proxy_client.py",
+                "src/vibemix/agent/__init__.py",
+                "src/vibemix/agent/line_voice.py",
+                "tests/agent/test_local_tts.py",
+                "tests/agent/test_tts_chain.py",
+                "tests/agent/test_tts_chain_cartesia.py",
+                "tests/agent/test_proxy_client.py",
+                "tests/agent/test_line_voice.py"
+              ],
+              "files_out": [
+                "src/vibemix/__main__.py (shared multi-lane collision file; the two '-> tts: MOSS-TTS-Nano local only' print hunks at 1316/1323 must NOT ride this slice — hunk-stage separately or drop)",
+                "vibemix-core.macos.spec / vibemix-core.windows.spec (clean at HEAD; do NOT touch without adding sentencepiece + a rebuild — out of a source-only slice)",
+                "src/vibemix/agent/moss_tts/* (already committed at HEAD; nothing to land)",
+                "pyproject.toml (clean at HEAD; extras already present)"
+              ],
+              "evidence": [
+                "build_local_tts_adapter() single source: local_tts.py:307-313 (FallbackAdapter(tts=[moss], max_retry_per_tts=1))",
+                "direct chain -> MOSS: tts_chain.py:26-30 (_build_moss_chain) called by _build_direct_chain (33-42) and build_tts_chain (45-72)",
+                "proxy chain -> MOSS: proxy_client.py:49-56 (build_proxy_tts_chain delegates to build_local_tts_adapter)",
+                "no-fallback raise: local_tts.py:309-310 raises LocalTTSUnavailable when not enabled",
+                "default inverted to on: local_tts.py:82-94 (_local_tts_disabled_by_env / local_tts_enabled), diff HEAD removed the truthy opt-in guard",
+                "test result: `pytest -q tests/agent/test_local_tts.py test_tts_chain.py test_tts_chain_cartesia.py test_proxy_client.py test_line_voice.py` => 31 passed in 3.31s",
+                "all three importers tracked (git ls-files local_tts.py/tts_chain.py/proxy_client.py) — no clean-checkout gate break"
+              ],
+              "tests": [
+                "tests/agent/test_local_tts.py::test_enabled_without_flag_when_model_cached",
+                "tests/agent/test_local_tts.py::test_disabled_by_explicit_off",
+                "tests/agent/test_local_tts.py::test_moss_absent_fails_loud",
+                "tests/agent/test_tts_chain.py::test_tts_chain_direct_is_moss_only",
+                "tests/agent/test_tts_chain.py::test_tts_chain_proxy_is_moss_only_without_proxy_args",
+                "tests/agent/test_proxy_client.py::test_proxy_03_tts_chain_is_moss_only",
+                "tests/agent/test_proxy_client.py::test_proxy_04_monkey_patch_active_after_proxy_client_import"
+              ]
+            },
+            {
+              "name": "Packaged MOSS readiness (spec + build proof)",
+              "status": "HOLD",
+              "value": "Would let the .dmg/installer actually speak with the local voice end-to-end.",
+              "risk": "high",
+              "files_in": [
+                "vibemix-core.macos.spec",
+                "vibemix-core.windows.spec"
+              ],
+              "files_out": [],
+              "evidence": [
+                "sentencepiece NOT-FOUND in either spec (rg) — frozen engine load (_OrtCpuEngine.load, local_tts.py:162) would ImportError",
+                "no fresh build TOC proof gathered; spec unchanged at HEAD"
+              ],
+              "tests": []
+            },
+            {
+              "name": "local_tts_speak.py manual ear-proof script",
+              "status": "HOLD",
+              "value": "Dry standalone proof the on-device voice plays on real speakers (TTFT/RTF print + sd.play).",
+              "risk": "low",
+              "files_in": [
+                "scripts/local_tts_speak.py"
+              ],
+              "files_out": [],
+              "evidence": [
+                "scripts/local_tts_speak.py untracked (git status ??); reuses MossLocalTTS + _get_engine; needs the cached model + ai-local extra + a Mac speaker — this is the spike/ear-pass artifact the package plan holds, not a runtime feature"
+              ],
+              "tests": []
+            }
+          ],
+          "hold_required": true,
+          "hold_reason": "This lane changes WHAT voice the co-host uses live (cloud Cartesia/Gemini -> on-device MOSS) and its no-speech failure mode (raise LocalTTSUnavailable instead of cloud fallback), and flips the default from opt-in to on. Per the read-only verifier rule, anything altering what the co-host SAYS / WHEN it speaks must be flagged HOLD until the vibemix-grounding-review gate is satisfied; additionally packaged readiness is unproven (sentencepiece missing from both PyInstaller specs => frozen engine-load ImportError) and there is no live ear-pass. The source+tests slice is internally consistent and green (31 passed) but classified NEEDS_LIVE_PROOF_FIRST, not SAFE_NOW.",
+          "evidence": [
+            "local_tts.py:307-313 build_local_tts_adapter = single source, FallbackAdapter(tts=[moss], max_retry_per_tts=1), raises LocalTTSUnavailable at 309-310",
+            "tts_chain.py:26-72 both _build_direct_chain and build_tts_chain resolve to _build_moss_chain -> build_local_tts_adapter; cartesia_api_key/gemini_api_key accepted then discarded (`_ = (...)` at 41,62)",
+            "proxy_client.py:49-56 build_proxy_tts_chain delegates to build_local_tts_adapter; removed openai_plugin.TTS proxy/v1 path (git diff HEAD)",
+            "local_tts.py:82-94 default-on logic (disabled only on VIBEMIX_LOCAL_TTS in {0,false,no,off,disabled}); git diff HEAD removed the prior truthy opt-in guard",
+            "local_tts.py:162 `import sentencepiece as spm` inside _OrtCpuEngine.load (required for engine); rg sentencepiece in vibemix-core.macos.spec AND vibemix-core.windows.spec => NOT-FOUND",
+            "vibemix-core.macos.spec:144-149 _LOCAL_AI_SUBMODULES = (av, onnxruntime, onnxruntime.capi, tokenizers) — no sentencepiece; spec:168 collect_dynamic_libs for av+onnxruntime only",
+            "pyproject.toml:158-170 tts-local + ai-local extras declare onnxruntime>=1.20 + sentencepiece>=0.2 (wheel-extra correct, but spec bundling is the gap)",
+            "__main__.py:1316,1323 '-> tts: MOSS-TTS-Nano local only (provider=moss-local)' are dirty hunks in the shared multi-lane collision file (git diff HEAD __main__.py shows removed Cartesia/Gemini/OpenRouter print branches)",
+            "test run: pytest -q tests/agent/test_local_tts.py test_tts_chain.py test_tts_chain_cartesia.py test_proxy_client.py test_line_voice.py => 31 passed in 3.31s",
+            "line_voice.py:65-72 build_default_line_adapter now builds MOSS-only via build_tts_chain(mode='direct'); dropped the GEMINI_API_KEY requirement (git diff HEAD)",
+            "agent/__init__.py lazy-export map keeps build_proxy_tts_chain/build_tts_chain names (lines 53-68) — public API surface unchanged, only provider semantics changed",
+            "scripts/local_tts_speak.py untracked (git status ??), reuses MossLocalTTS._get_engine — the spike/ear-proof artifact, correctly HOLD per package plan"
+          ],
+          "ui_or_live_not_proven": [
+            "Live ear-pass that the MOSS voice actually speaks grounded reactions in a running session (no drive-vibemix / ws-bus proof gathered; read-only role)",
+            "Frozen .dmg/installer boots and speaks via MOSS — blocked by missing sentencepiece in both specs; no build TOC proof",
+            "Windows MOSS-only path (windows spec also missing sentencepiece; never run on a Windows box per memory)",
+            "scripts/local_tts_speak.py end-to-end audible run (needs cached model + ai-local extra + speaker)"
+          ]
+        },
+        "verdict": {
+          "target": "Local MOSS TTS & no-paid-fallback",
+          "overclaims": [],
+          "live_or_packaged_claims_without_proof": [],
+          "corrected_classification": "unchanged",
+          "confidence": "high",
+          "notes": "Adversarial review found NOTHING to refute — the finding is conservative and every load-bearing claim is anchored and confirmed against current source/tests. I independently verified the 5 most load-bearing claims:\n\n(1) DEFAULT INVERSION + NO-FALLBACK GUARD CONFIRMED. `git diff HEAD src/vibemix/agent/local_tts.py` shows the prior opt-in guard `if flag not in {\"1\",\"true\",\"yes\",\"on\"}` was REMOVED and replaced by `_local_tts_disabled_by_env()` (disabled only on {0,false,no,off,disabled}) — default flips opt-in→on. `build_local_tts_adapter()` (local_tts.py:307-313) returns `FallbackAdapter(tts=[moss], max_retry_per_tts=1)` and raises `LocalTTSUnavailable` (309-310) when not enabled — single provider, zero cloud entry. Verbatim match to the finding.\n\n(2) BOTH CHAINS RESOLVE TO MOSS CONFIRMED. tts_chain.py: `_build_direct_chain` and `build_tts_chain` both delegate to `_build_moss_chain()`→`build_local_tts_adapter()`; cloud keys accepted then discarded via `_ = (...)`. proxy_client.py: `build_proxy_tts_chain` now a shim that `return build_local_tts_adapter()`; the old `openai_plugin.TTS` proxy `/v1/audio/speech` path is fully removed (diff confirms). line_voice.py `build_default_line_adapter()` now `return build_tts_chain(mode=\"direct\")` with the GEMINI_API_KEY raise removed (verified at line_voice.py:67-72).\n\n(3) SENTENCEPIECE PACKAGING GAP CONFIRMED (the central HOLD basis). `rg sentencepiece vibemix-core.macos.spec vibemix-core.windows.spec` → NOT-FOUND (exit 1, no output). It IS lazy-imported at local_tts.py:162 (`import sentencepiece as spm`) inside `_OrtCpuEngine.load`. pyproject.toml:162-169 declares it in tts-local/ai-local extras (`sentencepiece>=0.2`) but the spec `_LOCAL_AI_SUBMODULES` (macos.spec:144-148) bundles only av/onnxruntime/onnxruntime.capi/tokenizers. So a frozen build would ImportError on engine load — packaged MOSS is genuinely UNPROVEN. pyproject + both specs are CLEAN at HEAD (empty git status), matching the finding's files_out discipline.\n\n(4) TESTS RE-RUN GREEN. `uv run pytest -q tests/agent/{test_local_tts,test_tts_chain,test_tts_chain_cartesia,test_proxy_client,test_line_voice}.py` => 31 passed in 3.20s — matches the claimed 31.\n\n(5) SHARED-COLLISION FILE CONFIRMED. `__main__.py` is dirty with 53+/43- churn; the two `-> tts: MOSS-TTS-Nano local only (provider=moss-local)` print lines replace the old Cartesia/Gemini/OpenRouter branches (diff hunks confirmed). Correctly flagged as a multi-lane collision file that must NOT ride this source-only slice.\n\nADDITIONALLY VERIFIED the finding does NOT over-claim: it explicitly marks the source+tests slice NEEDS_LIVE_PROOF_FIRST (not SAFE_NOW), packaged MOSS HOLD, and live ear-pass HOLD — no live/packaged capability is asserted without proof. moss_tts/ + local_tts.py are confirmed tracked (git ls-files) and moss_tts/ clean (no clean-checkout gate break). Proxy fallback contract symbols (ProxyUnavailable/classify_proxy_error/probe_proxy_health) confirmed untouched by the diff (0 removed lines referencing them).\n\nHOLD IS CORRECT AND BINDING: this lane changes WHAT voice the co-host uses live (cloud→on-device MOSS) and its no-speech failure mode (raise vs cloud fallback) and flips the default — squarely in vibemix-grounding-review gate territory. The finding's hold_required=true is right. No correction needed. Files (absolute): /Users/ozai/projects/dj-set-ai/src/vibemix/agent/local_tts.py, /tts_chain.py, /proxy_client.py, /line_voice.py, /__main__.py; /Users/ozai/projects/dj-set-ai/pyproject.toml; /Users/ozai/projects/dj-set-ai/vibemix-core.{macos,windows}.spec."
+        }
+      },
+      {
+        "key": "viber-freshness",
+        "kind": "lane",
+        "title": "Viber / library freshness / watch / action",
+        "finding": {
+          "lane": "Viber & library freshness/staleness/refresh (Packages 5C, 5D, 5E, 5F, replay-on-connect)",
+          "summary": "All four freshness packages (5C stats --json, 5D fail-closed set-prep guard, 5E poll-based staleness watcher/nudge, 5F stale-refresh UI action) plus the 5E/5F replay-on-connect path are ALREADY COMMITTED AT HEAD and CLEAN (not in the dirty diff). End-to-end wiring is proven: Python producer (staleness.py, committed clean) -> __main__.py boot+watcher wiring (committed; the dirty __main__.py hunks are for OTHER lanes and do NOT touch any staleness dependency) -> ws_bus emit+retain+replay_to (committed) -> IPC schema+precompiled validator (in sync, clean) -> settings banner (committed clean) with Dismiss/Snooze/Refresh buttons. The staleness watcher is confirmed POLL-based (poll_seconds=10.0, asyncio.wait_for(stop_event.wait())); the ONLY 'watchdog' refs in src/vibemix are parent_watchdog (orphan-poll), NOT a filesystem event watcher. 5F 'Refresh library' is wired end-to-end (button -> emitIpc ipc.library.import -> _on_library_import handler -> LibraryImporter.import_library). source_path is delivered (producer _refreshable_source_path returns it only for an existing .xml source) and replayed to late ws clients. Targeted tests all GREEN: 45 (staleness/stats/ws_bus) + 47 (setprep/toolset) Python + 9 frontend banner. Gap: live Tauri packaged repaint of the banner is NOT proven (unit-tested only). No reaction/coach/prompt code in this lane -> no grounding HOLD required for these packages.",
+          "already_landed": [
+            "5C stats --json freshness: src/vibemix/__main__.py:6694-6711 (HEAD) builds library_freshness/library_freshness_status/library_stale/library_staleness_reason/library_age_days into the --json payload via library_freshness_status().to_dict(); proven by tests/library/test_stats_cli.py (part of 45 passed)",
+            "5C source: src/vibemix/library/staleness.py:88-212 library_freshness_status() — source-aware (XML mtime vs cached xml_mtime) freshness with status fresh/stale/not_indexed/source_missing/cache_unreadable; committed clean (git status --porcelain empty), last commit b09a70a2/1d1568eb",
+            "5D fail-closed set-prep guard: src/vibemix/library/toolset.py:200-219 _freshness_guard_for_tool blocks the 14 FRESHNESS_GUARDED_TOOLS (toolset.py:77-93: search_vibe/get_track_features/sequence_set/export_set/etc) unless status=='fresh' and stale is False; dispatch path toolset.py:1557-1560. Committed clean, commit 782a84b7",
+            "5D MCP direct-call path (the real Codex path): mcp_server.py:132-135 _ToolTapProxy.__getattr__ runs guard(name) before the handler since FastMCP bypasses dispatch(); freshness_provider injected at mcp_server.py:108. Proven by tests/library/test_setprep_tools.py:209/225/239 (dispatch-blocks, dispatch-allows, mcp-proxy-blocks) — part of 47 passed",
+            "5D fail-soft: toolset.py:166-198 _freshness_payload treats provider exception / bad payload as stale (cache_unreadable) — fails CLOSED",
+            "5E poll-based watcher: src/vibemix/library/staleness.py:236-284 watch_library_freshness polls every poll_seconds (default 10.0) via asyncio.wait_for(stop_event.wait(), timeout=poll); de-dupes via (status,reason,cache_mtime,source_mtime) signature; emits ipc.library.staleness_nudge only on stale transition + not snoozed. Confirmed NOT fs-event-driven",
+            "5E watcher armed live: __main__.py:2077-2087 (HEAD) asyncio.create_task(watch_library_freshness(_watcher_staleness_emit, stop_event, poll_seconds=10.0, library_pkl=library_cache)) + added to _background_tasks; prints '-> library freshness watcher armed'",
+            "5E boot nudge: __main__.py:1606-1620 (HEAD) emit_nudge_if_stale captured into _pending_staleness_nudges; flushed onto live bus at __main__.py:2027-2043; emit_nudge_if_stale tested in tests/library/test_staleness.py (45 passed)",
+            "5F stale-refresh UI: tauri/ui/src/settings/components/staleness-banner.ts (committed clean, commit c30fff50) — Refresh button click (line 80-96) -> emitIpc('ipc.library.import',{path}) ; Dismiss/Snooze -> emitIpc('ipc.library.staleness_action'); subscribes ipc.library.staleness_nudge (line 115-119)",
+            "5F backend handler: __main__.py:2011-2018 (HEAD) _on_library_staleness_action -> apply_snooze_action + clear_retained; ipc.library.import handler __main__.py:~1908-2009 builds LibraryImporter and runs import_library. Banner mounted in drawer: SettingsDrawer.ts:1205-1221 (HEAD) renderStalenessBanner + libraryBody.append",
+            "5F frontend proven: tauri/ui/tests/settings/staleness-banner.spec.ts 9 tests PASS (vitest run)",
+            "Replay-on-connect (5E/5F late client): ws_bus.py:749-754 emit() retains ipc.library.staleness_nudge in _latest_replayable; ws_bus.py:759-767 replay_to(ws) re-sends on new connection; called from handler at ws_bus.py:860; clear_retained at ws_bus.py:756-757 fired by snooze/dismiss action. Proven by tests/runtime/test_ws_bus.py (part of 45 passed)",
+            "IPC schema + validator in sync & clean: messages.schema.json:2487/2543 (HEAD) has ipc.library.staleness_nudge + staleness_action; precompiled validator.generated.mjs contains them (rg -c = 1); both git-clean",
+            "Freshness text surface in library panel: tauri/ui/src/library/index.ts:610-613 embeddingLabel() appends 'library <status>'; library/api.ts:72-83/1906-1942 parses library_freshness from stats. Committed clean (NOT the banner; a passive engine-line label)",
+            "Dirty __main__.py is SAFE for this lane: git diff hunks are at lines 58/583/775/1164/1273/2510/2738/4670/5008/5108/5147 — none overlap the staleness blocks (~1606-2087, ~6694); dirty diff touches NO ipc_router/_background_tasks/bind_emit/stop_event/library_cache; dirty tree parses (ast.parse OK); library_cache still defined at __main__.py:1599"
+          ],
+          "missing": [
+            "No true filesystem event watcher exists anywhere in src/vibemix (confirmed: only parent_watchdog orphan-poll). Library freshness is POLL-based on a 10s cadence — a brand-new track added to disk is not noticed until the next 10s poll AND only matters via source XML mtime, not per-file FS events. This is by design, not a defect, but it is the obvious next slice if event-driven freshness is wanted.",
+            "No cue-export GUI/IPC surface: cue export (cue_folder.export_cued_folder / tag_folder_serato) is CLI-only via __main__.py:6115-6132; rg of tauri/ui/src for cue_export/cued_folder/export_smart_cues returns nothing. The auto-cue moat has no desktop button.",
+            "No prominent freshness BADGE/pill on the live deck or session surface — freshness only appears as (a) the Settings drawer amber banner when stale, and (b) a passive text fragment in the library-panel engine label (index.ts:610). No always-visible freshness indicator outside the Settings library section."
+          ],
+          "candidate_slices": [
+            {
+              "name": "Live-prove the staleness banner repaint (verification, not new code)",
+              "status": "SAFE_NOW",
+              "value": "Closes the only open gap in 5F: the banner + Refresh button are unit-tested (9 vitest) but the packaged/dev Tauri repaint round-trip (nudge frame -> amber banner shows -> Refresh -> ipc.library.import lands -> banner hides) is not proven live. Use drive-vibemix: set library.pkl mtime stale, boot dev sidecar, watch ws :8765 for ipc.library.staleness_nudge, confirm banner + click.",
+              "risk": "low",
+              "files_in": [
+                "src/vibemix/library/staleness.py",
+                "tauri/ui/src/settings/components/staleness-banner.ts"
+              ],
+              "files_out": [
+                "src/vibemix/__main__.py (do NOT stage — shared dirty file)",
+                "src/vibemix/runtime/coach.py (out of lane)"
+              ],
+              "tests": [
+                "tests/library/test_staleness.py",
+                "tauri/ui/tests/settings/staleness-banner.spec.ts"
+              ],
+              "evidence": [
+                "banner unit-tested but live repaint UI-NOT-PROVEN"
+              ]
+            },
+            {
+              "name": "Cue-export GUI surface (the auto-cue moat button)",
+              "status": "SAFE_NOW",
+              "value": "The auto-cue engine (the documented product moat) is CLI-only — export_cued_folder / tag_folder_serato have zero desktop surface. A 'Export auto-cues' action in the library panel (new ipc.library.cue_export type, both schema ends, validator codegen, button -> emitIpc -> register_handler -> cue_folder) makes the moat usable without the terminal. Pure-additive new IPC type; no reaction-loop code.",
+              "risk": "med",
+              "files_in": [
+                "tauri/ui/src/ipc/messages.schema.json",
+                "tauri/ui/src/library/index.ts",
+                "src/vibemix/__main__.py",
+                "src/vibemix/library/cue_folder.py"
+              ],
+              "files_out": [
+                "src/vibemix/runtime/coach.py",
+                "src/vibemix/agent/dj_cohost.py"
+              ],
+              "tests": [
+                "tests/ui_bus/test_messages_schema.py",
+                "tauri/ui new cue-export spec"
+              ],
+              "evidence": [
+                "cue export CLI-only: __main__.py:6115-6132; no tauri/ui hit for cue_export"
+              ]
+            },
+            {
+              "name": "Event-driven library freshness (true fs-watcher) to replace the 10s poll",
+              "status": "HOLD",
+              "value": "Replace/augment the 10s poll with a real FS watcher (watchfiles/watchdog) on the Rekordbox XML + watched folders so freshness flips instantly. Higher value only if the poll cadence is proven insufficient in practice; adds a new third-party dep (must be added to PyInstaller specs) and a new always-on thread/loop. HOLD until the poll is demonstrably a real UX miss — current poll-based path is shipping-correct.",
+              "risk": "med",
+              "files_in": [
+                "src/vibemix/library/staleness.py",
+                "src/vibemix/__main__.py",
+                "pyproject.toml"
+              ],
+              "files_out": [
+                "src/vibemix/runtime/coach.py",
+                "src/vibemix/state/event_detector.py"
+              ],
+              "tests": [
+                "tests/library/test_staleness.py"
+              ],
+              "evidence": [
+                "watcher confirmed poll-based staleness.py:236-284; no fs-event lib in src/vibemix except parent_watchdog orphan-poll"
+              ]
+            }
+          ],
+          "hold_required": false,
+          "hold_reason": "This lane touches library freshness/IPC/UI only — NOT coach.py speech, dj_cohost, prompts/, event_detector drop/heartbeat timing, or drop_predict. None of the 5C/5D/5E/5F packages change what the co-host says or when it speaks, so the grounding-review HOLD gate does not apply. (Note: the broader dirty __main__.py / coach.py collisions carry other lanes' speech-affecting hunks — those are out of THIS lane's scope and must be hunk-staged by their owners.)",
+          "evidence": [
+            "git status --porcelain on staleness.py, toolset.py, mcp_server.py, staleness-banner.ts, SettingsDrawer.ts, messages.schema.json, validator.generated.mjs, library/index.ts, library/api.ts = ALL CLEAN (committed)",
+            "git diff src/vibemix/__main__.py hunk headers: @@ at lines 58,583,594,775,783,1164,1273,2510,2738,4670,5008,5108,5147 — NONE overlap staleness blocks ~1606-2087 / ~6694; rg of dirty diff for staleness|freshness|ipc_router|_background_tasks|bind_emit = empty",
+            "git show HEAD:src/vibemix/__main__.py confirms full staleness wiring present at HEAD (boot capture 1606-1620, handlers+flush+watcher 1883-2078, stats CLI 6684-6718)",
+            "pytest GREEN: tests/library/test_staleness.py + test_stats_cli.py + tests/runtime/test_ws_bus.py = 45 passed; tests/library/test_setprep_tools.py + test_toolset.py = 47 passed",
+            "vitest GREEN: tauri/ui/tests/settings/staleness-banner.spec.ts = 9 passed",
+            "ast.parse(src/vibemix/__main__.py) on dirty tree = PARSE OK; library_cache defined at __main__.py:1599",
+            "fs-watcher search: rg watchdog/watchfiles/FSEvents/inotify in src/vibemix = only parent_watchdog imports (runtime/__init__.py:21, session_loop.py:59, wizard.py:54) + plain-English 'watchdog' comments — NO filesystem event library",
+            "watch_library_freshness poll confirmed: staleness.py:240 poll_seconds default 10.0, staleness.py:282 await asyncio.wait_for(stop_event.wait(), timeout=poll)",
+            "ws_bus.py:749-767 emit retains ipc.library.staleness_nudge + replay_to re-sends to new clients; called at ws_bus.py:860 in connection handler",
+            "validator.generated.mjs contains staleness_nudge/staleness_action (rg -c = 1) — precompiled validator in sync with schema, both clean"
+          ],
+          "ui_or_live_not_proven": [
+            "5F staleness banner LIVE Tauri repaint not proven — only vitest-unit-proven (9 tests). The packaged nudge-frame -> amber-banner-shows -> Refresh-click -> import-runs -> banner-hides round-trip was not driven on the real ws bus this session.",
+            "5E watcher live emission on a real stale library.pkl not observed this session (logic + unit tests only; no live ws :8765 capture of an ipc.library.staleness_nudge frame)"
+          ]
+        },
+        "verdict": {
+          "target": "Viber & library freshness/staleness/refresh (Packages 5C, 5D, 5E, 5F, replay-on-connect)",
+          "overclaims": [
+            "Summary prose says '_freshness_guard_for_tool blocks the 14 FRESHNESS_GUARDED_TOOLS' — the frozenset at toolset.py:77-93 (HEAD) has exactly 13 entries (grep -c '\".*\"' = 13). Minor miscount; does not affect the verdict. (The already_landed entry itself lists '...etc' without a count, so only the summary prose is wrong.)",
+            "Line-number drift: finding cites staleness blocks at '~1606-2087' and '~6694' and 'library_cache at 1599'. In the CURRENT dirty tree the actual lines are 1622-2089 (boot capture/handler/flush/watcher) and 6697 (stats CLI); library_cache IS at 1599 (matches). The ~10-line drift is because the dirty hunk @@ -1273,43 +1308,19 @@ shrinks that region. Conclusion (dirty hunks do not overlap staleness wiring) still holds — grep of the dirty diff for staleness|freshness|watch_library|_background_tasks|ipc_router|bind_emit|library_cache|_pending_staleness|_on_library = EMPTY."
+          ],
+          "live_or_packaged_claims_without_proof": [
+            "5F staleness banner LIVE Tauri repaint round-trip (nudge frame -> amber banner -> Refresh click -> import runs -> banner hides) is NOT proven — unit-tested only (9 vitest pass). The finding ALREADY self-flags this in ui_or_live_not_proven, so it is not an over-claim; I confirm it remains unproven this session (no live ws :8765 capture).",
+            "5E watcher live emission on a real stale library.pkl is NOT observed this session — logic + unit tests only (45 passed). The finding ALREADY self-flags this. Confirmed still unproven; no PACKAGED/DMG behavior was claimed for this lane so nothing to refute there."
+          ],
+          "corrected_classification": "unchanged (with one correction: 13 guarded tools, not 14)",
+          "confidence": "high",
+          "notes": "Adversarially spot-checked the load-bearing claims with fresh evidence; the finding holds up. CONFIRMED: (1) all lane files clean/committed — git status --porcelain empty for staleness.py/toolset.py/mcp_server.py/staleness-banner.ts/messages.schema.json/validator.generated.mjs; (2) HEAD = e5c0e34e; (3) watch_library_freshness is POLL-based at HEAD (poll_seconds=10.0, asyncio.wait_for(stop_event.wait()), staleness.py:236-284) — NOT fs-event driven; (4) only 'watchdog' refs in src are parent_watchdog orphan-poll + plain-English comments (rg confirmed, no watchfiles/FSEvents/inotify); (5) 5D guard + MCP _ToolTapProxy guard-before-handler + fail-CLOSED _freshness_payload (exception->stale=True/cache_unreadable) all present at HEAD; (6) IPC schema lines 2487/2543 + precompiled validator both contain staleness_nudge AND staleness_action (4 occurrences each — verified, not just rg -c=1); (7) banner buttons wired (Refresh->ipc.library.import via opts.onRefresh-or-emitIpc, Dismiss/Snooze->ipc.library.staleness_action, subscribes staleness_nudge); (8) ws_bus retain(751)/replay_to(759)/clear_retained(756); (9) boot-nudge capture(1622)+flush(2039)+action handler(2022)+watcher armed(2077). TESTS RE-RUN GREEN BY ME: tests/library/test_staleness.py+test_stats_cli.py+tests/runtime/test_ws_bus.py = 45 passed; tests/library/test_setprep_tools.py+test_toolset.py = 47 passed; tauri/ui staleness-banner.spec.ts = 9 passed. Dirty __main__.py AST-parses OK. The 'missing' claims (no fs-watcher; cue-export CLI-only at __main__.py:6115-6132 with zero tauri/ui hits) verified accurate. ADVERSARIAL NUANCE I SURFACED: the dirty __main__.py DOES carry voice/speech hunks (forces VIBEMIX_LOCAL_TTS=1 'MOSS = the only voice', rewires build_tts_chain — this is HEAD commit e5c0e34e's TTS lane) — a 'what the co-host SAYS' change. BUT it is correctly OUT of THIS staleness lane (grep of dirty diff for staleness deps = empty; finding explicitly scopes it out), so hold_required:false is CORRECT for the freshness lane. That TTS voice-provider change is a separate lane that should get its own grounding/HOLD review — not this one's responsibility. Net: finding is accurate; only correction is 13 (not 14) guarded tools."
+        }
+      },
+      {
+        "key": "coach-speech-drop",
+        "kind": "lane",
+        "title": "Runtime coach speech / slop / drop (HOLD analysis)",
+        "finding": {
+          "lane": "Runtime coach speech / slop / drop — HOLD gate analysis",
+          "summary": "The three dirty files form ONE coherent feature: the \"live drop call\" — a deterministic, fixed-text hype line the co-host SPEAKS the instant the predicted-drop countdown crosses into a 2s arm window. drop_predict.py(+34) adds the arm/cue pure functions; event_detector.py(+38) fires a new DROP event (priority 10, ties MANUAL at the speech-bus ceiling); coach.py(+45) speaks the canned bank line via the fixed-text session.say path (no LLM). This changes BOTH what the co-host says (new spoken surface) AND when it speaks (new highest-priority event, new 2s timing window) -> HARD HOLD pending vibemix-grounding-review. CRITICAL CONTRADICTION: the code comments repeatedly claim the call is 'DORMANT unless VIBEMIX_DROP_CALL is opted in (the v2.0 firing gate stays closed)', but the dirty __main__.py hunk _apply_packaged_defaults() runs os.environ.setdefault('VIBEMIX_DROP_CALL','1') before EventDetector construction (__main__.py:803, called ~:815) — so in the PACKAGED/live app the drop call is ARMED ON BY DEFAULT. The grounding gate (Invariant #3 'trust the audio': a PREDICTED drop that doesn't materialize = co-host says 'here it comes' over nothing = slop) is unresolved AND the firing gate is already open by default. Note: orchestrator GROUND-STATE attributes coach.py to 'Package 8B (Judge voice) + Package 9 (Earned Wall)' — Judge voice is NOT in the dirty diff (already committed at HEAD); the dirty coach.py is Package 9 docstrings + a NEW drop-call speech block (drop-call lane), not 8B.",
+          "already_landed": [
+            "predicted_drop_in_sec is a committed-at-HEAD field written ONLY by the refresh loop (refresh.py:971 `state.predicted_drop_in_sec = predict_drop_in_sec(...)`), confidence-gated (min_confidence=_DROP_CUE_CONF_FLOOR) and horizon-bounded (max_horizon_s=_DROP_HORIZON_S, refresh.py:974-975) — Invariant #1 single-writer respected; `git show HEAD:src/vibemix/state/refresh.py` shows identical lines so the prediction source is NOT part of this dirty lane",
+            "DROP event slot pre-wired at HEAD: EVENT_PRIORITY['DROP']=10 ties MANUAL at the ceiling (state/event.py:34, docstring lines 17-18,28-29 'pre-wired per CONTEXT D-04 ahead of Phase 17')",
+            "runtime/drop_reaction.py is committed at HEAD (git show HEAD:...drop_reaction.py succeeds); REACTION_LINES['drop_incoming']=('here it comes','ok, watch this','build's peaking, hold up','wait for it') (drop_reaction.py:26-31)",
+            "Judge voice (Package 8B): _credit_judged_transition + judge_and_record are committed at HEAD (coach.py:276,359,381) and ABSENT from the dirty diff — `git diff coach.py | rg judge` returns empty",
+            "Anti-slop validation of the canned lines is enforced as a TEST gate: tests/runtime/test_drop_reaction.py:63-70 test_every_line_survives_the_slop_filter asserts filter_for_slop(line)==[] for every bank line — so the closed bank is statically proven slop-free (runtime re-filter unnecessary). 30/30 targeted tests pass",
+            "_make_mastered_speak is the FIXED-TEXT session.say path, NOT generate_reply/LLM (coach.py:256-273, say(line, add_to_chat_ctx=False)) — no LLM turn, no new provider, line not fed back into chat context"
+          ],
+          "missing": [
+            "vibemix-grounding-review (5 cardinal invariants) has NOT been run on this drop-call feature — REQUIRED before it can land per the speech/timing HOLD rule",
+            "No live-rig proof that the 2s arm window (DROP_ARM_WINDOW_S=2.0, drop_predict.py) actually lands the spoken line ON the drop and not after — comment at drop_predict.py:51-53 claims it's 'sized so the spoken line + TTS latency lands the punchline ON the drop' but TTS latency is unverified",
+            "No live proof that predicted_drop_in_sec is reliable enough on real sets that 'here it comes' never fires when no drop materializes (Invariant #3 trust-the-audio risk) — predict_drop_in_sec is honest-by-construction (returns None on unknown/low-conf) but real-set false-positive rate is unmeasured",
+            "The 'dormant by default' design intent in the code comments is CONTRADICTED by __main__.py:803 setdefault('VIBEMIX_DROP_CALL','1') — this on-by-default decision needs Kaan sign-off because it means the FIRST live/packaged run speaks drop calls without an operator validating the countdown against a real drop, which the comments themselves say is a prerequisite"
+          ],
+          "candidate_slices": [
+            {
+              "name": "drop_predict.py pure arm/cue functions (should_arm_drop_call, drop_call_cue, DROP_ARM_WINDOW_S)",
+              "status": "HOLD",
+              "value": "Edge-trigger + cue-key helpers; the foundation of the drop call. Pure, deterministic, well-tested. Defines WHEN the call fires (the 2s window) -> timing-affecting.",
+              "risk": "med",
+              "files_in": [
+                "src/vibemix/state/drop_predict.py"
+              ],
+              "files_out": [],
+              "tests": [
+                "tests/state/test_drop_predict.py"
+              ],
+              "evidence": [
+                "drop_predict.py:62-83 should_arm_drop_call edge-triggers once per approach; :86-90 drop_call_cue returns 'drop_incoming'",
+                "30/30 pass incl tests/state/test_drop_predict.py"
+              ]
+            },
+            {
+              "name": "event_detector.py DROP firing path + _drop_call_enabled gate",
+              "status": "HOLD",
+              "value": "Fires the new highest-priority DROP event into the speech bus on the arm-window crossing. This IS the WHEN-it-speaks change.",
+              "risk": "high",
+              "files_in": [
+                "src/vibemix/state/event_detector.py"
+              ],
+              "files_out": [],
+              "tests": [
+                "tests/state/test_event_detector_drop.py",
+                "tests/state/test_event_priority.py"
+              ],
+              "evidence": [
+                "event_detector.py:278-291 fires DROP at priority-ceiling on arm+_cooldown_ok('DROP'); :164-174 _drop_call_enabled defaults to env read",
+                "MINOR LINT: _drop_call_enabled_from_env def (lines 65-69) is interleaved BETWEEN import statements (genre_router import above, harmonics import at line 70 below) — E402-style ordering smell, non-functional",
+                "33/33 pass (priority + diet)"
+              ]
+            },
+            {
+              "name": "coach.py DROP-call speech block (lines 696-718)",
+              "status": "HOLD",
+              "value": "The actual spoken surface — mastered_speak(reaction_line(drop_cue)) on ev.type=='DROP', then `continue` (skips the LLM turn). This IS the WHAT-it-says change.",
+              "risk": "high",
+              "files_in": [
+                "src/vibemix/runtime/coach.py"
+              ],
+              "files_out": [
+                "coach.py docstring-only hunk at lines 222-241 (Package 9 Earned Wall) and comment-only hunks at 195/628 — those are pure prose, separable as SAFE_NOW but belong to the Package 9 lane, not this drop lane"
+              ],
+              "tests": [
+                "tests/runtime/test_drop_reaction.py"
+              ],
+              "evidence": [
+                "coach.py:704-718 the new DROP speech block; :714 mastered_speak(reaction_line(drop_cue)); slop NOT re-filtered at call site (validated by test gate instead)"
+              ]
+            },
+            {
+              "name": "coach.py docstring/comment-only hunks (line 195 reformat, 222-241 _emit_earned_wall_refresh docstring, 628 comment)",
+              "status": "SAFE_NOW",
+              "value": "Pure prose: a black-style reformat (195), a docstring expansion explaining the Earned Wall refresh gap (Package 9), and a comment rewrite (628). Zero behavior change, never reaches speech.",
+              "risk": "low",
+              "files_in": [],
+              "files_out": [],
+              "tests": [],
+              "evidence": [
+                "git diff coach.py @@ -195 is whitespace-only (mastered_unlock_line call collapsed to one line); @@ -224 is docstring-only on _emit_earned_wall_refresh; @@ -618/628 is a 2-line comment rewrite — none touch the DROP block"
+              ]
+            }
+          ],
+          "hold_required": true,
+          "hold_reason": "EVERY functional hunk in this lane changes what the co-host SAYS or WHEN it speaks: drop_predict.py defines the 2s firing window (WHEN), event_detector.py fires a new ceiling-priority DROP event into the speech bus (WHEN), coach.py speaks a canned line and skips the LLM turn (WHAT). This is exactly the speech/timing/drop class the lane rules flag HOLD unless vibemix-grounding-review (5 cardinal invariants) is satisfied — and it has NOT been run. Aggravating: the feature is NOT dormant despite its comments — __main__.py:803 _apply_packaged_defaults() setdefault('VIBEMIX_DROP_CALL','1') arms it ON by default in the packaged app, before any operator has validated the countdown against a real drop (which the code comments themselves name as the prerequisite). The trust-the-audio risk (a predicted drop that doesn't materialize -> co-host says 'here it comes' over nothing) is real and unmeasured on live hardware. HOLD all three product files until grounding-review passes AND Kaan signs off on the on-by-default decision. Only the coach.py prose/docstring hunks (195/222-241/628) are pure-prose SAFE_NOW, and those belong to the Package 9 Earned Wall lane, not this drop lane.",
+          "evidence": [
+            "src/vibemix/__main__.py:803 (dirty hunk) `os.environ.setdefault('VIBEMIX_DROP_CALL', '1')  # call the drop live by default` inside _apply_packaged_defaults(), called before EventDetector construction (event_detector instantiated __main__.py:1167) — DIRECTLY contradicts event_detector.py:60-63 / :167-174 / coach.py:698 comments that say the call is DORMANT/opt-in by default",
+            "src/vibemix/state/event_detector.py:278-291 — new DROP firing block: `if self._drop_call_enabled: ... arm = should_arm_drop_call(predicted_drop, self._last_predicted_drop); ... if arm and self._cooldown_ok('DROP', now): self._fire('DROP', now, state); return Event('DROP', state, extra={'cue': drop_call_cue(...), 'eta': predicted_drop})`",
+            "src/vibemix/state/event_detector.py:170-174 — `self._drop_call_enabled = _drop_call_enabled_from_env() if drop_call_enabled is None else bool(drop_call_enabled)` (env-driven, no __main__ wiring needed)",
+            "src/vibemix/state/drop_predict.py:60-83 should_arm_drop_call edge-trigger (fires the single tick the countdown crosses DOWN into arm_window); :66 DROP_ARM_WINDOW_S=2.0; :86-90 drop_call_cue -> 'drop_incoming'",
+            "src/vibemix/runtime/coach.py:704-718 — new `if ev.type == 'DROP':` block: `mastered_speak(reaction_line(drop_cue))` + `_tr('event','drop_call',...)` then `continue` (skips the LLM reaction turn so the call lands on-beat)",
+            "src/vibemix/state/event.py:34 `'DROP': 10` — ties MANUAL at the speech-bus priority ceiling (lines 28-29 confirm 'MANUAL and DROP tie at the ceiling')",
+            "TEST: 30/30 pass for tests/state/test_drop_predict.py + tests/runtime/test_drop_reaction.py + tests/state/test_event_detector_drop.py; 33/33 pass for tests/state/test_event_priority.py + tests/state/test_coach_prompt_diet.py",
+            "tests/runtime/test_drop_reaction.py:63-70 test_every_line_survives_the_slop_filter — proves the canned bank is statically slop-free (anti-slop enforced as a test gate, not runtime re-filter)",
+            "src/vibemix/state/refresh.py:971-975 (committed at HEAD per git show) writes predicted_drop_in_sec with min_confidence + max_horizon gating — single-writer (Invariant #1) and trust-the-audio data source are sound; the HOLD is about the SPOKEN OUTPUT timing/grounding, not the prediction field",
+            "NOT-FOUND: no `judge`/`_credit_judged`/`transition_judge` strings in `git diff coach.py` — orchestrator's 'Package 8B Judge voice' attribution for the dirty coach.py is incorrect; Judge voice is committed at HEAD (coach.py:276,359,381)",
+            "MINOR: src/vibemix/state/event_detector.py:65-69 _drop_call_enabled_from_env() def is interleaved between import statements (E402-style ordering smell), non-functional"
+          ],
+          "ui_or_live_not_proven": [
+            "The on-beat timing claim (2s arm window + TTS latency = line lands ON the drop) is UNPROVEN live — no drive-vibemix / real-rig observation in evidence",
+            "False-positive rate of predicted_drop_in_sec on real sets (predicted drop that never materializes -> ungrounded 'here it comes') is UNMEASURED — the trust-the-audio risk that the HOLD turns on",
+            "The on-by-default packaging decision (__main__.py:803) means the first packaged/live run speaks drop calls with no prior operator validation — needs Kaan sign-off, not yet given"
+          ]
+        },
+        "verdict": {
+          "target": "Runtime coach speech / slop / drop — HOLD gate analysis",
+          "overclaims": [
+            "TEST COUNT IMPRECISION (minor, not a substance overclaim): the finding's headline says '30/30 pass for tests/state/test_drop_predict.py + tests/runtime/test_drop_reaction.py + tests/state/test_event_detector_drop.py' — I confirmed drop_predict+drop_reaction=26 and event_detector_drop=4, summing to exactly 30, so the bundle total is CORRECT; '33/33' = event_priority(14)+coach_prompt_diet(19)=33 also CORRECT. No overcount. Listing here only for transparency that I reconciled the per-file split.",
+            "SLOP-FILTER GATE WORDING (minor): the finding states test_drop_reaction.py:63-70 asserts 'filter_for_slop(line)==[]'. The actual test (verified at tests/runtime/test_drop_reaction.py:63-70) unpacks `clean, matched = filter_for_slop(line)` and asserts `matched == []` AND `clean == line`. filter_for_slop returns a (clean_text, matched) tuple, not a list — so the literal '==[]' is imprecise, but the substantive claim (every closed-bank line is statically slop-free) is fully correct.",
+            "SAFE_NOW separability is conceptual only (the finding already concedes this): the coach.py prose hunks (195/222-241/628) are genuinely pure-prose/whitespace (verified: 195 = black one-line collapse of identical mastered_unlock_line args; 222 = docstring expansion; 628 = 2-line comment rewrite) — but they live INTERLEAVED in the same dirty coach.py that carries the DROP speech block at :704-718, so they are NOT shippable as an independent unit. The finding correctly lands on HOLD-all-three-files; the SAFE_NOW tag is only a content classification, not a green-light to split-commit."
+          ],
+          "live_or_packaged_claims_without_proof": [
+            "ON-BEAT TIMING (correctly flagged unproven by the finding): the claim that DROP_ARM_WINDOW_S=2.0 + TTS latency lands the spoken line ON the drop is COMMENT-ASSERTED only (drop_predict.py:60-62 dirty diff) with zero live-rig / drive-vibemix observation. Confirmed unproven — the finding does NOT overclaim it, it lists it under ui_or_live_not_proven. Refuted as a live claim, which matches the finding's own posture.",
+            "FALSE-POSITIVE RATE of predicted_drop_in_sec on real sets (predicted drop that never materializes -> ungrounded 'here it comes') is UNMEASURED on hardware. predict_drop_in_sec is honest-by-construction (returns None on low-conf/unknown; verified drop_predict.py:55-58 returns None past horizon, should_arm returns False on None) and gated at refresh.py:974-975 (min_confidence=0.5, max_horizon=32.0s), but the real-world false-positive rate is unmeasured. The finding correctly classifies this as the live trust-the-audio risk the HOLD turns on — no overclaim.",
+            "PACKAGED on-by-default behavior: I confirmed __main__.py:803 setdefault('VIBEMIX_DROP_CALL','1') runs inside _apply_packaged_defaults() at :817, BEFORE EventDetector construction at :1167 (with an in-source comment stating exactly that ordering intent). So the SOURCE arms the call by default. The finding does NOT claim a fresh DMG/app was built and observed speaking — it claims the source path arms it, which is proven by file:line. No build-proof overclaim; the finding stays at the source level appropriately."
+          ],
+          "corrected_classification": "unchanged — HOLD (HARD) is correct for all three product files (drop_predict.py, event_detector.py, coach.py). vibemix-grounding-review has NOT been run and every functional hunk changes WHAT the co-host says (canned drop line via fixed-text session.say, coach.py:704-718) or WHEN it speaks (new ceiling-priority DROP event + 2s arm window). The aggravating on-by-default contradiction (__main__.py:803 setdefault armed before EventDetector at :1167) is fully confirmed and is a legitimate Kaan sign-off gate.",
+          "confidence": "high",
+          "notes": "I independently verified the load-bearing claims against the moving working tree (git diff vs HEAD, current source line numbers, git show HEAD for committed-at-HEAD claims, and 5 targeted test runs). RESULTS: (1) CRITICAL CONTRADICTION CONFIRMED — __main__.py:803 `os.environ.setdefault('VIBEMIX_DROP_CALL','1')` is in the dirty diff inside _apply_packaged_defaults(), called at :817 with an explicit comment 'Set before any state/agent construction so EventDetector ... read the opted-in env', and EventDetector is constructed at :1167 — so the packaged/live app arms the drop call ON by default, directly contradicting the event_detector.py:65-69 / coach.py comments that say 'DORMANT unless VIBEMIX_DROP_CALL is opted in'. The finding's central aggravating claim is solid. (2) FIRING PATH CONFIRMED — event_detector.py:283-288 fires DROP on should_arm_drop_call+_cooldown_ok; gate at :172-173; _drop_call_enabled_from_env at :65. DROP priority=10 ties MANUAL at event.py:33-34. (3) SPEECH BLOCK CONFIRMED — coach.py:704-718 `if ev.type=='DROP': mastered_speak(reaction_line(drop_cue))` then `continue` (skips LLM); _make_mastered_speak:256-273 uses say(line, add_to_chat_ctx=False) = fixed-text, no LLM. (4) NOT-FOUND CONFIRMED — `git diff coach.py` has zero judge/_credit_judged/transition_judge matches (exit 1); judge methods (_credit_judged_transition:276, judge_and_record:359/381) are committed at HEAD and absent from the dirty diff — so the orchestrator's 'Package 8B Judge voice' attribution for dirty coach.py IS incorrect, as the finding states. (5) ALREADY-LANDED CONFIRMED — refresh.py:971-975 (git show HEAD) writes predicted_drop_in_sec with min_confidence/max_horizon (single-writer Invariant #1 intact); drop_reaction.py committed at HEAD with REACTION_LINES['drop_incoming'] and NOT in the dirty diff (exit 1). (6) LINT CONFIRMED — _drop_call_enabled_from_env (event_detector.py:65-69) sits between genre_router import (:62) and harmonics import (:70) = E402 ordering smell, non-functional. (7) TESTS — all green: drop_predict+drop_reaction=26, event_detector_drop=4 (bundle=30, matches), event_priority=14, coach_prompt_diet=19 (bundle=33, matches). (8) DIFF STAT — coach.py +45, drop_predict.py +34, event_detector.py +38 exactly as claimed. The finding is well-evidenced and CORRECTLY HOLDs the speech/timing change; my adversarial pass found only minor wording imprecisions (filter_for_slop returns a tuple not a list; SAFE_NOW prose is conceptually-only separable since it shares the dirty file with the DROP block). No substantive over-claim. The finding does not assert any unproven LIVE/PACKAGED capability — it correctly parks on-beat timing and false-positive rate under ui_or_live_not_proven and grounds the on-by-default claim at file:line rather than claiming a built DMG was observed. HOLD stands."
+        }
+      },
+      {
+        "key": "learn-earned",
+        "kind": "lane",
+        "title": "Learn / Earned Wall (backend vs UI/live)",
+        "finding": {
+          "lane": "Learn module & Earned Wall (Packages 7 operator-action bridge / 8 Beatmatch Mastered honesty / 9 Earned Wall live refresh) — backend-functional vs UI/live-proof-missing",
+          "summary": "The Learn live-credit spine is ALREADY LANDED and clean in HEAD: cited coach events credit/persist Learn progress, emit ipc.learn.progress_state, fire the Mastered vocal once, and the DesktopShell SkillWall subscribes+repaints from that snapshot. 50 named-lane tests pass (26 backend + 24 recognizer/pins + 8 frontend SkillWall, all green). Beatmatch is INTENTIONALLY uncreditable — no production BEATMATCH_GRADED emitter or beatmatch_judge importer exists (grep + AST-pin test confirm). What is NOT proven: a real desktop Earned-Wall repaint from a live cited controller/audio event on hardware (only unit/spec-level proof). CRITICAL HOLD: src/vibemix/runtime/coach.py carries an UNCOMMITTED net-new speech behavior — a DROP-call branch (ev.type=='DROP' → mastered_speak(reaction_line(drop_cue))) backed by dirty state/event_detector.py + state/drop_predict.py hunks (VIBEMIX_DROP_CALL gate, default off). That changes WHAT/WHEN the co-host speaks and must go through vibemix-grounding-review before landing; it is NOT part of the Learn lane and must be hunk-excluded from any Learn slice. The dirty coach.py skill-credit hunk itself is logic-identical (whitespace reformat + docstring), not a behavior change.",
+          "already_landed": [
+            "Skill-credit spine LIVE-WIRED in HEAD: coach_loop calls _credit_live_skill_demo(ev, state, evidence_registry=, learn_progress=, speak=mastered_speak) at src/vibemix/runtime/coach.py:624 (committed; git show HEAD:.../coach.py shows it at line 614). Fires independent of whether the event also triggers an AI reaction.",
+            "Citation-gated credit: _credit_live_skill_demo (coach.py:123-217) recomputes t_session = max(0.0, time.time()-set_start_at), passes recognize(..., citation_check=lambda s,k,t: evidence_registry.has(s,k,t,tol=1.0), event_t=t_session) and persists via save_progress only on a real credit (coach.py:177-213). recognize() is the MAST-02/03 gate in src/vibemix/learn/skill_recognizer.py:200-289 — un-cited event → []; record_live_demo enforces MAST-01 Competent floor.",
+            "Progress-emit (Package 9) LANDED in HEAD: _emit_earned_wall_refresh (coach.py:220-253) builds LearnProgressState.make(action='snapshot', progress=learn_progress.snapshot()).to_dict() and awaits ipc_bus.emit(env); called at coach.py:633. snapshot() includes the additive 'skill_wall' key (src/vibemix/learn/progress.py:339 → skill_tree.skill_wall_payload).",
+            "Mastered vocal fires ONCE: coach.py:184-206 snapshots before_mastered, then for each credited sid checks now_mastered and not before → mastered_unlock_line(sid, was_mastered=False, now_mastered=True) via _make_mastered_speak (session.say fixed-text, add_to_chat_ctx=False, no LLM) coach.py:256-273. mastered_vocal.py is committed in HEAD.",
+            "Tests GREEN: tests/runtime/test_coach_skill_credit.py + test_coach_progress_emit.py + tests/learn/test_mastered_vocal_fires_once.py = 26 passed in 0.25s.",
+            "Beatmatch INTENTIONALLY uncreditable: grep 'grade_beatmatch'/'grade_to_event_extra' appears ONLY as definitions in src/vibemix/learn/beatmatch_judge.py:83,145 (no production caller); NO production module imports beatmatch_judge. _HONEST_UNCREDITABLE_V11=('beatmatching',) at skill_recognizer.py:105; the BEATMATCH_GRADED consumer branch exists (skill_recognizer.py:154-172) but is starved.",
+            "Reality pins GREEN: tests/repo/test_live_reality_pins.py asserts test_beatmatch_judge_has_no_production_emitter (call_sites==[]) + test_beatmatch_judge_is_import_orphaned_in_production (importers==[]) + consumer-present-but-starved. Plus tests/learn/test_skill_recognizer.py + test_creditability_drift.py + test_skill_wall_what_remains.py = 24 passed total.",
+            "Frontend SkillWall consumer wired+committed: tauri/ui/src/learn/SkillWall.ts:188-198 defaultSubscribe listens on window 'ipc.learn.progress_state' and reads detail.progress.skill_wall; mountSkillWall (SkillWall.ts:213-243) repaints on each push. Mounted into DesktopShell at tauri/ui/src/shell/app.ts:74 (mountLearn). SkillWall.ts is clean (not in git status).",
+            "Frontend live-repaint spec GREEN: tauri/ui/tests/learn/test_skill_wall.spec.ts 'mountSkillWall — live progress_state subscription' (lines 102-116) pushes a snapshot flipping beatmatching→mastered and asserts repaint = 8 passed.",
+            "Schema present: ipc.learn.progress_state const at tauri/ui/src/ipc/messages.schema.json:3049; envelope LearnProgressState at src/vibemix/ui_bus/learn_messages.py:800-816.",
+            "Judge join credits harmonic_mixing (retired from honest-uncreditable): skill_recognizer.py:136-152 (transition_judged → harmonic>0 → harmonic_mixing); coach.py:276-324 _credit_judged_transition grounds the ev citation. tests/learn/test_judge_credits_harmonic.py + test_judge_credits_beatmatch.py + tests/runtime/test_coach_judge_join.py + test_skill_tree_invariants.py = 21 passed."
+          ],
+          "missing": [
+            "NO live desktop proof: no test or runtime trace shows a REAL cited controller/audio event (live EvidenceRegistry write) propagating through coach_loop → _emit_earned_wall_refresh → ws → the DesktopShell SkillWall repainting on hardware. All proof is unit/spec-level (synthetic recognize stubs + JSDOM dispatchEvent). The end-to-end live perception loop is UNVERIFIED this session (read-only verifier; did not drive the app).",
+            "NO live proof of the Mastered vocal actually being heard once on a real session.say path (the §EARNED-MASTERED-VOCAL-EAR ear-pass is parked per code comment coach.py:262-263).",
+            "Beatmatch Mastered is correctly UNREACHABLE live — by design, not a gap to fix without a real BEATMATCH_GRADED producer (which itself is a speech/credit behavior requiring grounding-review + live proof)."
+          ],
+          "candidate_slices": [
+            {
+              "name": "Learn/Earned-Wall live-credit spine (Packages 7/8/9) — already-landed, NO new slice needed",
+              "status": "SAFE_NOW",
+              "value": "Cited live events advance+persist Learn progress, emit ipc.learn.progress_state, fire Mastered-vocal-once, and the SkillWall repaints — all committed in HEAD with 50 green tests. Nothing to land; this lane is functionally complete at the backend+UI-component level.",
+              "risk": "low",
+              "files_in": [],
+              "files_out": [
+                "src/vibemix/runtime/coach.py (the dirty DROP-call hunk + docstring reformat must NOT be staged as part of this lane)"
+              ],
+              "tests": [
+                "tests/runtime/test_coach_skill_credit.py",
+                "tests/runtime/test_coach_progress_emit.py",
+                "tests/learn/test_mastered_vocal_fires_once.py",
+                "tests/repo/test_live_reality_pins.py",
+                "tauri/ui/tests/learn/test_skill_wall.spec.ts"
+              ],
+              "evidence": [
+                "coach.py:614/624 call site committed (git show HEAD)",
+                "26+24 backend tests + 8 frontend tests all green",
+                "SkillWall.ts:188-243 + app.ts:74 committed and clean"
+              ]
+            },
+            {
+              "name": "BEATMATCH_GRADED production producer (owned-deck beatmatch practice loop)",
+              "status": "NEEDS_LIVE_PROOF_FIRST",
+              "value": "Would let beatmatching reach Mastered. Engine (beatmatch_judge.grade_beatmatch/grade_to_event_extra) + recognizer consumer branch already exist; only a real producer call-site + emitted BEATMATCH_GRADED event are missing. This is intentionally deferred until a live owned-deck loop can MEASURE tempo+phase — proxying it is the exact false-expertise slop the pins guard.",
+              "risk": "high",
+              "files_in": [
+                "src/vibemix/learn/beatmatch_judge.py (engine present, needs a caller)",
+                "a future owned-deck practice loop module (does not exist yet)"
+              ],
+              "files_out": [
+                "src/vibemix/learn/skill_recognizer.py:105 (do NOT remove 'beatmatching' from _HONEST_UNCREDITABLE_V11 without the real producer + live ear-proof)",
+                "tests/repo/test_live_reality_pins.py (the absence-pin; deleting it is the deliberate retirement signal, not an incidental edit)"
+              ],
+              "tests": [
+                "tests/repo/test_live_reality_pins.py",
+                "tests/learn/test_judge_credits_beatmatch.py",
+                "tests/learn/test_creditability_drift.py"
+              ],
+              "evidence": [
+                "grep: no production caller of grade_beatmatch/grade_to_event_extra (defs only at beatmatch_judge.py:83,145)",
+                "test_beatmatch_judge_has_no_production_emitter + test_beatmatch_judge_is_import_orphaned_in_production both pass = no emitter, no importer"
+              ]
+            },
+            {
+              "name": "DROP-call live hype line (dirty coach.py + event_detector.py + drop_predict.py) — NOT a Learn-lane unit",
+              "status": "HOLD",
+              "value": "Deterministic on-beat hype line at the predicted-drop moment (VIBEMIX_DROP_CALL gate, default off). Changes WHAT the co-host says and WHEN it speaks — a reaction-loop behavior change. Belongs to its own grounding-reviewed slice, must be hunk-excluded from any Learn slice that touches coach.py/event_detector.py.",
+              "risk": "high",
+              "files_in": [
+                "src/vibemix/runtime/coach.py (the ev.type=='DROP' branch, dirty hunk ~line 693-718)",
+                "src/vibemix/state/event_detector.py (+38 dirty: _drop_call_enabled_from_env, DROP fire branch)",
+                "src/vibemix/state/drop_predict.py (+34 dirty: should_arm_drop_call, drop_call_cue)",
+                "src/vibemix/runtime/drop_reaction.py (untracked helper, reaction_line)"
+              ],
+              "files_out": [],
+              "tests": [
+                "(grounding-review gate required before any test/landing — speech timing change)"
+              ],
+              "evidence": [
+                "git diff HEAD coach.py shows net-new mastered_speak(reaction_line(drop_cue)) DROP branch; git show HEAD coach.py has NO DROP/drop_reaction",
+                "git show HEAD event_detector.py: DROP/VIBEMIX_DROP_CALL NOT-FOUND (purely dirty)",
+                "drop_predict.py +34 / event_detector.py +38 uncommitted"
+              ]
+            }
+          ],
+          "hold_required": true,
+          "hold_reason": "The shared collision file src/vibemix/runtime/coach.py carries an uncommitted net-new speech behavior — the ev.type=='DROP' branch that calls mastered_speak(reaction_line(drop_cue)) — backed by dirty state/event_detector.py (+38, DROP fire branch, VIBEMIX_DROP_CALL gate) and state/drop_predict.py (+34). This changes WHAT the co-host says and WHEN it speaks and MUST pass vibemix-grounding-review (Invariants #2/#3) before landing. It is NOT part of the Learn/Earned Wall lane. Any Learn-lane commit touching coach.py or event_detector.py must hunk-stage and EXCLUDE these DROP hunks. The Learn live-credit spine itself needs no hold (already landed clean in HEAD); only the live desktop end-to-end Earned-Wall repaint and the Mastered-vocal-heard remain unproven (live-proof gaps, not blockers to the already-landed code).",
+          "evidence": [
+            "git rev-parse HEAD = e5c0e34e774f3e9c4f3978ed04a0b9c7b761a19a",
+            "src/vibemix/runtime/coach.py:614/624 (HEAD/working) — _credit_live_skill_demo live call site in coach_loop, committed",
+            "src/vibemix/runtime/coach.py:220-253 _emit_earned_wall_refresh (committed; dirty diff = docstring-only expansion)",
+            "src/vibemix/runtime/coach.py:184-206 Mastered-once vocal (before_mastered snapshot + flip detect); dirty diff = whitespace reformat of mastered_unlock_line call only (logic identical)",
+            "src/vibemix/learn/skill_recognizer.py:105 _HONEST_UNCREDITABLE_V11=('beatmatching',); :154-172 BEATMATCH_GRADED consumer branch; :200-289 recognize() MAST-03 citation gate",
+            "src/vibemix/learn/progress.py:339 snapshot() includes additive 'skill_wall' key",
+            "src/vibemix/learn/beatmatch_judge.py:83,145 grade_beatmatch/grade_to_event_extra (definitions only — grep found NO production caller, NO production importer)",
+            "tauri/ui/src/learn/SkillWall.ts:188-243 defaultSubscribe('ipc.learn.progress_state')+mountSkillWall repaint; tauri/ui/src/shell/app.ts:74 mountSkillWall(wallHost) (committed, clean)",
+            "tauri/ui/src/ipc/messages.schema.json:3049 ipc.learn.progress_state const",
+            "TEST: tests/runtime/test_coach_skill_credit.py + test_coach_progress_emit.py + tests/learn/test_mastered_vocal_fires_once.py = 26 passed in 0.25s",
+            "TEST: tests/repo/test_live_reality_pins.py + tests/learn/test_skill_recognizer.py + test_creditability_drift.py + test_skill_wall_what_remains.py = 24 passed in 1.03s",
+            "TEST: tests/learn/test_skill_tree_invariants.py + test_judge_credits_harmonic.py + test_judge_credits_beatmatch.py + tests/runtime/test_coach_judge_join.py = 21 passed in 0.25s",
+            "TEST: tauri/ui/tests/learn/test_skill_wall.spec.ts = 8 passed (incl. live progress_state subscription repaint, lines 102-116)",
+            "DIRTY-DROP: git show HEAD:coach.py — 'DROP'/'drop_reaction'/'drop_call' NOT-FOUND; git show HEAD:event_detector.py — 'DROP'/'VIBEMIX_DROP_CALL' NOT-FOUND (both purely uncommitted)",
+            "git diff HEAD --stat: state/event_detector.py +38, state/drop_predict.py +34 (uncommitted)",
+            "git status: src/vibemix/learn/ and src/vibemix/coach/ have NO dirty entries (clean); only runtime/coach.py is dirty in this lane's collision set"
+          ],
+          "ui_or_live_not_proven": [
+            "Live desktop Earned-Wall repaint from a REAL cited controller/audio event (live EvidenceRegistry write → coach_loop → _emit_earned_wall_refresh → ws → DesktopShell SkillWall) — only unit/JSDOM-spec proof exists; no hardware/live perception-loop run this session.",
+            "Mastered-vocal heard exactly once on a real session.say path (parked §EARNED-MASTERED-VOCAL-EAR ear-pass, coach.py:262-263).",
+            "Frozen sidecar caveat: green tests + committed wiring do not prove the packaged/live app repaints; a drive-vibemix live run would be needed to close the live-proof gap."
+          ]
+        },
+        "verdict": {
+          "target": "Learn module & Earned Wall (Packages 7/8/9) — backend-functional vs UI/live-proof-missing; plus the HOLD on the dirty DROP-call speech behavior",
+          "overclaims": [
+            "candidate_slice 'DROP-call live hype line' lists 'src/vibemix/runtime/drop_reaction.py (untracked helper, reaction_line)' as files_in — REFUTED: drop_reaction.py is NOT untracked. It is COMMITTED in HEAD (git cat-file -e HEAD:src/vibemix/runtime/drop_reaction.py = EXISTS; added by commit cee53119 'make the AI SPEAK the drop'). git status shows it clean. Only the COACH.PY branch that calls reaction_line(), plus event_detector.py / drop_predict.py hunks, are dirty. This is a factual error in the finding's file classification but does NOT change the HOLD — the speech-trigger wiring (coach.py DROP branch + event_detector DROP fire) is still purely dirty/uncommitted.",
+            "Claim that SkillWall mount is at 'tauri/ui/src/shell/app.ts:74 ... (committed, clean)' — IMPRECISE: app.ts IS dirty in the working tree (git status: ' M tauri/ui/src/shell/app.ts'; dirty hunks at lines 29 and 90-91). The mountSkillWall call itself is committed in HEAD (HEAD app.ts line 73, not 74 — line shifted by a dirty hunk above) and the dirty hunks do NOT touch the mount lines, so the wiring conclusion holds, but 'clean' is wrong for the file.",
+            "Line-number drift from the moving tree: finding cites coach.py:624 for the credit call site and :74 for the mount; current HEAD shows credit call at :614 (finding's own evidence array correctly notes :614 for HEAD) and mount at app.ts:73. Minor, self-acknowledged, non-load-bearing."
+          ],
+          "live_or_packaged_claims_without_proof": [
+            "'a real desktop Earned-Wall repaint from a live cited controller/audio event on hardware' — the finding ITSELF correctly lists this as UNPROVEN (missing[] + ui_or_live_not_proven[]). I confirm: no runtime/hardware trace exists; all proof is unit + JSDOM-spec. Conservative classification upheld — NOT live-proven.",
+            "'Mastered vocal actually being heard once on a real session.say path' — finding correctly parks this as an ear-pass (coach.py:262-263 comment). Confirmed unproven this session; no audible/live evidence. NOT live-proven.",
+            "Frozen-sidecar / packaged-app repaint — finding correctly notes green tests + committed wiring do NOT prove the packaged app repaints. No fresh build or drive-vibemix run was performed. Any PACKAGED behavior remains unproven."
+          ],
+          "corrected_classification": "unchanged — finding's core verdict stands: Learn/Earned-Wall spine (Packages 7/8/9) is backend+UI-component functional and committed-clean in HEAD (SAFE_NOW, no new slice); the DROP-call speech behavior is correctly HOLD pending vibemix-grounding-review. Two factual corrections required: (1) drop_reaction.py is COMMITTED in HEAD, not untracked; (2) app.ts is dirty (mount call itself committed/unaffected). Neither correction weakens the HOLD or the SAFE_NOW classification.",
+          "confidence": "high",
+          "notes": "Independently verified at HEAD=e5c0e34e774f3e9c4f3978ed04a0b9c7b761a19a. CONFIRMED claims: (a) Learn credit-spine committed in HEAD — _credit_live_skill_demo at coach.py:123, called at coach.py:614; _emit_earned_wall_refresh at coach.py:222, called at coach.py:622 (git show HEAD). (b) Dirty coach.py diff is exactly as described: net-new `if ev.type == 'DROP': ... mastered_speak(reaction_line(drop_cue)); continue` branch (skips the LLM turn — a genuine WHAT/WHEN-it-speaks change); the credit-spine hunk is whitespace+docstring only, logic-identical. (c) HEAD event_detector.py emits NO DROP event at all (grep '\\\"DROP\\\"'/predicted_drop = NOT-FOUND); the +38 dirty hunk adds _drop_call_enabled_from_env + VIBEMIX_DROP_CALL gate + DROP fire branch. (d) HEAD drop_predict.py lacks should_arm_drop_call/drop_call_cue (the +34 dirty hunk adds them). So the DROP-call speech feature is entirely uncommitted — HOLD is CORRECT and well-justified. (e) Beatmatch orphan CONFIRMED: rg shows grade_beatmatch/grade_to_event_extra are defs-only (beatmatch_judge.py:83,145) with the sole non-test reference being a comment at skill_recognizer.py:164 — no production import/call; _HONEST_UNCREDITABLE_V11=('beatmatching',) at skill_recognizer.py:105. TESTS RE-RUN GREEN: test_coach_skill_credit + test_coach_progress_emit + test_mastered_vocal_fires_once = 26 passed; test_live_reality_pins = 4 passed; tauri test_skill_wall.spec.ts = 8 passed. NOT mentioned by finding: an untracked test tests/state/test_event_detector_drop.py exists (the DROP-feature's own test, part of the held lane). The working tree is MOVING (concurrent session) — drop_reaction.py was committed since the finding was written, explaining the untracked-vs-committed discrepancy. Bottom line: HOLD is sound and the DROP-call speech/timing change is properly gated to grounding-review; the SAFE_NOW Learn lane is real and green; correct the two file-state errors."
+        }
+      },
+      {
+        "key": "frontend-surface",
+        "kind": "lane",
+        "title": "Frontend dead buttons / Viber surface / cue-export app surface",
+        "finding": {
+          "lane": "Frontend dead buttons / Viber-Crate surface / cue-export app surface — next APP-VISIBLE slice (propose-only, read-only verify)",
+          "summary": "Investigated the three sub-areas. (a) Viber/Crate is NOT unplugged: 9 library_* Tauri commands are both-end wired (main.rs:104-113 invoke_handler <-> tauri/ui/src/library/api.ts invoke calls). I also CORRECT the orchestrator ground-state claim that the ipc.library.* websocket path is \"dead vestigial\" — it is LIVE for the import + staleness flow: ipc.library.import/import_cancel/staleness_action are emitted from library-panel.ts/staleness-banner.ts/SettingsDrawer.ts and handled in Python (__main__.py:2031/2032/2034); ipc.library.import_progress + staleness_nudge are emitted Python-side (importer.py / staleness.py:278,372) and subscribed in the UI. Both ends present. (b) cue-export (export_serato / cue_folder) is CLI-ONLY — NO Tauri command, NO GUI surface, NO ipc.* type. The only 'export' in the GUI is build-set's Rekordbox export_path; 'cue_anchored' is just an embed strategy, not cue-export. (c) The dirty frontend hunks are a coherent slice: 4 of 5 files (picker/rocker/group/shell.css) are pure CSS visual polish (no behavior, no IPC, no false claim); shell/app.ts is a REAL dead/stuck-control fix in wireSettingsNav — closing the settings drawer via its own UI no longer leaves shell.activeSurface stuck on 'settings'. All targeted vitest specs pass (84 + 18 = 102 tests).",
+          "already_landed": [
+            "9 library_* commands both-end wired (Viber/Crate NOT unplugged): main.rs:104-113 registers library_search/similar/curate/build_set/chat/stats/models/embed_folder + open_library_window; matching invoke() calls in tauri/ui/src/library/api.ts:2417(search),2431(similar),2442(curate),2459(build_set),2474(chat),2483(stats),2519(models),2539(embed_folder) + render-loop.ts:80,88(open_library_window)",
+            "ipc.library.* websocket path is LIVE both-ended (corrects ground-state 'dead vestigial' claim): senders emitIpc 'ipc.library.import' at library-panel.ts:107, staleness-banner.ts:89, SettingsDrawer.ts:1217; 'ipc.library.import_cancel' library-panel.ts:157; 'ipc.library.staleness_action' staleness-banner.ts:100,108. Python handlers register_handler at __main__.py:2031(import),2032(import_cancel),2034(staleness_action). Inbound Python->UI: import_progress emitted importer.py, staleness_nudge emitted staleness.py:278,372 (ui_bus/messages.py:1743,1792) and subscribed library-panel.ts:116 / staleness-banner.ts:116",
+            "Library freshness IS surfaced (text, not a badge): stats.library_freshness_status -> library/index.ts:610-613 renders 'library {fresh|stale}' in the library-window footer line; full 30-day staleness banner mounts in SettingsDrawer (staleness-banner.ts). api.ts:72 maps library_freshness object",
+            "shell/app.ts wireSettingsNav fix is type-safe + coherent: uses subscribeSettingsUI (settings/state.ts:101, Listener=(s:Readonly<SettingsUIState>)=>void) + getSettingsUIState (state.ts:89) + shell-store setActiveSurface (shell-store.ts:120) + openSettings/closeSettings (SettingsDrawer.ts:680/728) — all exist",
+            "picker.ts/rocker.ts/group.ts/shell.css dirty hunks = pure CSS (glass gradients, --glass-edge->--border-subtle/--brand-22 token swaps, shadow/glow/padding tuning, sidebar nav border+active-fill) — git diff HEAD shows zero behavioral/IPC/text change",
+            "Targeted vitest GREEN on current dirty tree: drawer.spec.ts + session/components.spec.ts (picker/rocker) + shell/shell.spec.ts = 84 passed; staleness-banner.spec.ts + library-panel.spec.ts = 18 passed (npx vitest run, 2026-06-01)"
+          ],
+          "missing": [
+            "NO cue-export GUI surface anywhere: rg serato|cue-export|export-cued|cue_folder|exportSerato in tauri/ui/src returns only learn-controller hot-cue-pad SVGs (pioneer_ddj_1000.svg.ts etc.), the wizard DJ-app hint table (router.ts:762, window-picker.ts:320 'serato' as an app name), and the highlight cue_color/cue_shape a11y schema (messages.schema.json:2855). The CLI library export-set / cue_folder.py / export_serato.py (the 'moat') have ZERO desktop entry point",
+            "NO prominent freshness BADGE on the main shell/sidebar — freshness is only footer text in the library window + a settings-drawer banner. A glanceable badge on the Crate/Library nav item does not exist (rg freshness|stale in shell/ + sidebar = none)",
+            "NO direct unit test for app.ts::wireSettingsNav — no tauri/ui/tests file references wireSettingsNav; the drawer<->shell-surface round-trip (close drawer -> activeSurface restores) is uncovered. shell.spec.ts exercises mountShellApp but not this specific listener",
+            "NOT-FOUND: any export_serato / cue_folder / export_cued #[tauri::command] in library_cmds.rs (only library_search/similar/curate/build_set/chat/stats/models/embed_folder + open_library_window). No Rust bridge for the cue moat"
+          ],
+          "candidate_slices": [
+            {
+              "name": "Cue-export GUI button (surface the CLI-only 'moat' in the app)",
+              "status": "SAFE_NOW",
+              "value": "The auto-cue + Serato/Rekordbox/M3U8 cue-export engine (cue_folder.py / export_serato.py, the documented MOAT) is CLI-only with zero desktop reach. A 'Export cues to Rekordbox/Serato' button in the library window converts the highest-leverage backend asset into a user-visible feature. Highest product value of the three.",
+              "risk": "med",
+              "files_in": [
+                "tauri/src-tauri/src/library_cmds.rs (NEW #[tauri::command] export_cued spawning `vibemix library export-cued`/cue_folder path)",
+                "tauri/src-tauri/src/main.rs (register the new command in invoke_handler, list ~line 113)",
+                "tauri/ui/src/library/api.ts (add invoke('export_cued', {...}) wrapper mirroring library_embed_folder at api.ts:2539)",
+                "tauri/ui/src/library/index.ts (render the button + result toast)",
+                "tauri/ui/src/library/library.css"
+              ],
+              "files_out": [
+                "src/vibemix/runtime/coach.py",
+                "src/vibemix/agent/dj_cohost.py",
+                "src/vibemix/prompts/*",
+                "src/vibemix/state/event_detector.py",
+                "src/vibemix/state/drop_predict.py",
+                "src/vibemix/__main__.py (shared-collision file — do NOT touch in this slice)"
+              ],
+              "tests": [
+                "tauri/ui/src/library/api.test.ts (extend — new invoke wrapper + normalize, mirrors existing library_* mapping tests)",
+                "tauri/ui/tests/ (new index render spec for the button)",
+                "cargo test -p vibemix (library_cmds.rs arg-builder unit test, mirror model_library_args / parse_embed_progress_line patterns at library_cmds.rs:1811/1247)"
+              ],
+              "evidence": [
+                "CLI exists: CLAUDE.md library export-set + memory project_auto_cue_engine / cue_folder.py / export_serato.py",
+                "No GUI: rg serato|cue-export|export-cued|cue_folder in tauri/ui/src = only learn SVGs + wizard hint table (NOT-FOUND any export surface)",
+                "No Rust cmd: rg in library_cmds.rs = no export_serato/cue_folder command",
+                "Pattern to mirror: library_embed_folder (library_cmds.rs:1126, api.ts:2539) is the exact spawn+invoke template"
+              ]
+            },
+            {
+              "name": "Settings-nav dead-control fix lock-in (add a regression test for app.ts::wireSettingsNav)",
+              "status": "SAFE_NOW",
+              "value": "The dirty shell/app.ts already FIXES a real stuck-control bug: closing the settings drawer via its ✕ only flipped SettingsUIState.open, leaving shell.activeSurface pinned to 'settings' so the prior surface never restored (and deep-linking to activeSurface==='settings' on mount never opened the drawer). The fix is sound + type-safe + green, but has NO direct test. Add one to lock it (TEST ONLY — does not edit product source).",
+              "risk": "low",
+              "files_in": [
+                "tauri/ui/tests/shell/ (NEW app-settings-nav.spec.ts — mount, open settings, closeSettings(), assert store.getState().activeSurface restored to lastNonSettings)"
+              ],
+              "files_out": [
+                "tauri/ui/src/shell/app.ts (already-fixed product source — verifier does not edit; a separate impl session owns it)"
+              ],
+              "tests": [
+                "tauri/ui/tests/shell/app-settings-nav.spec.ts (new)"
+              ],
+              "evidence": [
+                "app.ts diff HEAD: wireSettingsNav now subscribeSettingsUI(ui => if(!ui.open && activeSurface==='settings') store.setActiveSurface(lastNonSettings)) + initial-mount openSettings()",
+                "API verified present: settings/state.ts:101 subscribeSettingsUI, :89 getSettingsUIState, shell-store.ts:120 setActiveSurface",
+                "No coverage: zero tauri/ui/tests files reference wireSettingsNav",
+                "Adjacent green: drawer.spec.ts + shell.spec.ts = 84 tests pass on current tree"
+              ]
+            },
+            {
+              "name": "Glanceable library-freshness badge on the Crate/Library nav (poll-based)",
+              "status": "SAFE_NOW",
+              "value": "Freshness exists as data (stats.library_freshness_status) but is buried as footer text + a settings banner. A small amber dot/badge on the sidebar Crate item makes 'your library is stale, re-embed' glanceable. Lower value than cue-export; pure read of existing wired state (no new IPC).",
+              "risk": "low",
+              "files_in": [
+                "tauri/ui/src/shell/Sidebar.ts (badge on the library/crate nav item)",
+                "tauri/ui/src/shell/shell.css (badge style — the dirty shell.css already in this slice touches .sb-nav-item)",
+                "tauri/ui/src/library/api.ts (reuse normalizeStats library_freshness_status — already mapped at api.ts:72 / index.ts:610)"
+              ],
+              "files_out": [
+                "src/vibemix/* (no backend change — freshness signal already emitted via staleness.py + library_stats)",
+                "src/vibemix/__main__.py"
+              ],
+              "tests": [
+                "tauri/ui/tests/shell/ (sidebar badge spec)",
+                "tauri/ui/src/library/api.test.ts (already covers library_freshness_status fresh/stale at api.test.ts:79,1268,1278)"
+              ],
+              "evidence": [
+                "Signal wired: library/index.ts:610-613 renders freshness text; staleness_nudge emitted staleness.py:278,372; subscribed UI-side",
+                "Gap: rg freshness|stale in shell/+sidebar = no badge (NOT-FOUND)",
+                "No new IPC needed — poll-based per ground state (Package 5E pulse, no true watcher)"
+              ]
+            }
+          ],
+          "hold_required": false,
+          "hold_reason": "None of the proposed slices or the dirty frontend hunks change what the co-host SAYS or WHEN it speaks. The dirty files are CSS visual polish (picker/rocker/group/shell.css) + a shell-nav surface-routing fix (app.ts) — no coach.py, dj_cohost, prompts/, event_detector, or drop_predict involvement. No false visual claim ships: the app.ts change makes a stuck control correctly responsive (truthful), and the CSS hunks are cosmetic. Therefore SAFE_NOW for source + vitest. (The src/vibemix coach.py / __main__.py / event_detector / drop_predict dirty hunks DO fall under the speech HOLD gate, but they are OUT of this frontend lane and assigned to other lanes per ground state.)",
+          "evidence": [
+            "HEAD = e5c0e34e774f3e9c4f3978ed04a0b9c7b761a19a (git rev-parse)",
+            "main.rs:78-116 invoke_handler registers exactly 9 library_* + open_library_window commands",
+            "tauri/ui/src/library/api.ts invoke() calls: 2417 search, 2431 similar, 2442 curate, 2459 build_set, 2474 chat, 2483 stats, 2519 models, 2539 embed_folder; render-loop.ts:80,88 open_library_window",
+            "ipc.library.import handler register __main__.py:2031; import_cancel :2032; staleness_action :2034",
+            "staleness_nudge emit staleness.py:278,372; import_progress emit per importer.py:12; ui_bus/messages.py:1743,1792 builders",
+            "UI senders: library-panel.ts:107(import),157(import_cancel); staleness-banner.ts:89(import),100,108(staleness_action); SettingsDrawer.ts:1217(import). Subscribers: library-panel.ts:116(import_progress), staleness-banner.ts:116(staleness_nudge)",
+            "NO cue-export GUI: rg serato|cue-export|export-cued|cue_folder|exportSerato tauri/ui/src -> learn SVGs (pioneer_ddj_1000.svg.ts hotcue pads), wizard/router.ts:762, window-picker.ts:320, messages.schema.json:2855 (cue_color/cue_shape a11y) only",
+            "NO export Rust cmd: rg in library_cmds.rs -> only the 9 library_* commands; build-set export_path (Rekordbox XML) at :640,659,727 is the only 'export'",
+            "app.ts diff HEAD: wireSettingsNav adds subscribeSettingsUI listener (restores activeSurface to lastNonSettings on drawer close) + initial openSettings() on mount + combined teardown",
+            "picker.ts/rocker.ts/group.ts/shell.css diff HEAD = CSS-only (gradients, token swaps --glass-edge->--border-subtle/--brand-22, shadow/padding/glow tuning)",
+            "vitest GREEN (2026-06-01): drawer.spec.ts + session/components.spec.ts + shell/shell.spec.ts = 84 passed; staleness-banner.spec.ts + library-panel.spec.ts = 18 passed",
+            "app.ts API exists: settings/state.ts:101 subscribeSettingsUI, :89 getSettingsUIState, :96 setSettingsUIState; shell-store.ts:120 setActiveSurface; SettingsDrawer.ts:680 openSettings, :728 closeSettings"
+          ],
+          "ui_or_live_not_proven": [
+            "app.ts wireSettingsNav fix verified by SOURCE READ + adjacent green specs only — NOT proven in the running Tauri app (no live drive; frozen-sidecar caveat per CLAUDE.md). The close-drawer->surface-restore round-trip has no direct vitest.",
+            "CSS visual changes (picker/rocker/group/shell.css) verified as non-breaking via tests + diff read; the actual rendered look is NOT pixel-verified (read-only role, no screenshot).",
+            "Cue-export + freshness-badge slices are PROPOSALS — not implemented, not run."
+          ]
+        },
+        "verdict": {
+          "target": "Frontend dead buttons / Viber-Crate surface / cue-export app surface (finding by primary verifier)",
+          "overclaims": [
+            "MINOR / not a true overclaim: the finding's per-line invoke anchors (api.ts:2417 search, 2431 similar, 2442 curate, 2459 build_set, 2474 chat, 2483 stats, 2519 models) were verified ACCURATE on read of api.ts 2400-2545 — each invoke<unknown>(\"library_*\", ...) sits inside its named exported async fn. The only literal invoke(\"library_...\") in the file is embed_folder at 2539; the rest use generic-typed invoke<unknown>(...), which a naive grep misses. Claim stands once you read the bodies.",
+            "MINOR scope nuance on the 'ipc.library.* LIVE both-ended' correction: registration is conditional on `if ipc_router is not None` (__main__.py:1890/2031) — it is live when an IPC bus is bound (the normal Tauri-sidecar path), not unconditionally. __main__.py:1896 carries a historical comment that these 'were built + unit-tested but never registered on the live router' — that describes the PRE-fix gap that the very next lines (2031-2034) remediate, NOT a current gap. The finding's 'LIVE' claim is correct for the bus-bound path; it slightly understates the `ipc_router is not None` guard."
+          ],
+          "live_or_packaged_claims_without_proof": [
+            "The finding makes NO live-app or packaged/DMG behavior claim. It explicitly and correctly self-flags (ui_or_live_not_proven) that: app.ts::wireSettingsNav is verified by SOURCE READ + adjacent green specs only, NOT proven in the running Tauri app (no live drive; frozen-sidecar caveat); CSS visual changes are non-breaking per tests+diff but NOT pixel-verified; the cue-export + freshness-badge slices are PROPOSALS, not run. No refutation needed — the finding already defaults these to unproven, matching the conservative bar."
+          ],
+          "corrected_classification": "unchanged",
+          "confidence": "high",
+          "notes": "Adversarial spot-checks all CONFIRM the finding on current HEAD e5c0e34e774f3e9c4f3978ed04a0b9c7b761a19a. Verified myself: (1) 9 library_* commands registered main.rs:105-113 AND matching invoke() bodies read at api.ts:2417/2431/2442/2459/2474/2483/2519/2539 + doc-header lines 8-13 — Viber/Crate is NOT unplugged, claim holds. (2) ipc.library.* both-ended: UI senders (SettingsDrawer.ts:1217, messages.ts:597/617/635 typed) + Python handlers register_handler __main__.py:2031/2032/2034 inside the ipc_router-bound block — the ground-state 'dead vestigial' correction is justified. (3) cue-export NOT-FOUND verified: zero serato/cue_folder/export_cued/export_serato #[tauri::command] in tauri/src-tauri/src (rg empty); frontend matches are only learn-controller SVGs + wizard hint table — the 'CLI-only moat, no GUI' claim holds. (4) app.ts diff read in full: wireSettingsNav adds subscribeSettingsUI restore-to-lastNonSettings on drawer close + initial openSettings() + combined teardown — a shell-nav routing fix, no speech path. (5) picker.ts diff read: pure CSS inside a const CSS template (gradient/token/shadow tuning, --glass-edge->--border-subtle/--brand-22); group/rocker/shell.css carry zero emitIpc/invoke/handler changes (only data-active CSS selectors). (6) Re-ran vitest components.spec.ts = 47 passed on the moving tree. HOLD GATE correctly applied: coach.py (+45/-5), event_detector.py (+38), drop_predict.py (+34) ARE dirty and DO change co-host speech/timing — but the finding explicitly scopes them OUT of this frontend lane and assigns them to the speech-HOLD lanes; the finding's own slices and dirty frontend hunks touch nothing under coach/dj_cohost/prompts/event_detector/drop_predict, so hold_required:false is correct FOR THIS LANE. The finding is conservative and honestly self-caveats every unproven (live/pixel/proposal) item. No over-claim to refute; only two minor accuracy nuances noted above. Classification stands."
+        }
+      },
+      {
+        "key": "file-watcher",
+        "kind": "lane",
+        "title": "File watcher for Viber/set-generation freshness",
+        "finding": {
+          "lane": "True file watcher for library/Viber/set-generation freshness",
+          "summary": "CONFIRMED: no event-driven fs-watcher exists for the Rekordbox XML or library dir. Freshness today is entirely POLL/STAT-based, via THREE committed mechanisms (boot nudge + 10s background poll + on-demand tool-call guard), all of which stat library.pkl mtime and compare it against the source XML mtime recorded inside the pickle (library.staleness.library_freshness_status). This is a genuinely missing capability (P0 freshness). A true watcher is a clean ADDITIVE source slice: watchfiles 1.1.1 (Rust, MIT) is ALREADY a transitive dependency via livekit-agents and installed in the venv, so a best-effort, off-loop watcher that degrades to the existing poll can be lazy-imported with ZERO new direct dependency. The source slice is SAFE_NOW (it does not touch what the co-host says/when it speaks); the packaged path is NEEDS_LIVE_PROOF (PyInstaller spec does not name watchfiles, and FSEvents/Rust-binary survival under freeze is unproven).",
+          "already_landed": [
+            "POLL-based live freshness watcher (NOT event-driven): src/vibemix/library/staleness.py:236 async def watch_library_freshness — polls library_freshness_status every poll_seconds and emits ipc.library.staleness_nudge on stale-edge; wired live in __main__.py:2077-2087 with poll_seconds=10.0. Committed at HEAD (git show HEAD:src/vibemix/library/staleness.py:236 + HEAD __main__.py:2067/2070). staleness.py working tree is CLEAN (git status --porcelain empty).",
+            "Freshness signature compare is STAT-only: staleness.py:84 (is_stale uses pkl.stat().st_mtime) and staleness.py:164/178 (library_freshness_status compares os.path.getmtime(source_path) to the pickle's recorded xml_mtime; current_source_mtime > recorded + 1.0 => status='stale', reason='source_newer_than_cache'). No FSEvents/inotify/kqueue anywhere.",
+            "Boot-time nudge (once per boot): __main__.py:1629 _emit_staleness(...) = library.emit_nudge_if_stale (staleness.py:359), captured into _pending_staleness_nudges (__main__.py:1622) and flushed onto the live router at __main__.py:2039-2054.",
+            "On-demand tool-call freshness guard for the Viber product path: mcp_server.py:108 build_toolset() passes freshness_provider=library_freshness_status into LibraryToolset; toolset.py:200 _freshness_guard_for_tool blocks the 13 FRESHNESS_GUARDED_TOOLS (toolset.py:77-93: search_vibe, discover_pool, sequence_set, export_set, create_playlist, ...) when stale. This is a stat-at-call-time poll, not a watcher.",
+            "MIDI hot-plug watcher is poll-based (precedent for how a fs-watcher should NOT be confused with event-driven): midi/watcher.py:41 port_watcher_task polls mido.get_input_names() every poll_seconds=2.0 (midi/watcher.py:46).",
+            "21/21 staleness unit tests pass: tests/library/test_staleness.py (uv run pytest -> 21 passed in 0.08s)."
+          ],
+          "missing": [
+            "TRUE event-driven fs-watcher for the Rekordbox collection.xml / library directory: NOT-FOUND. rg -i 'watchdog|watchfiles|fsevents|inotify|kqueue' src/vibemix/ returns ZERO library-watcher hits — only PlaybackQueue substring matches, the parent_watchdog.py orphan-poll, and the midi port poll-watcher. No code subscribes to OS filesystem events.",
+            "Live wiring of freshness_provider on the live co-host's in-process toolset: __main__.py does NOT pass freshness_provider when it constructs Viber toolsets in-process; only mcp_server.py:108 (the codex-exec MCP subprocess path, which IS the documented product path per CLAUDE.md) wires it. rg 'freshness_provider=' src/vibemix => single hit mcp_server.py:108.",
+            "watchfiles is NOT a DIRECT vibemix dependency: rg 'watchfiles|watchdog' pyproject.toml => NOT-FOUND. It is present ONLY transitively (uv.lock:813 under livekit-agents 1.5.14 deps; package def uv.lock:2280, v1.1.1) and installed in the venv (.venv/.../watchfiles + watchfiles-1.1.1.dist-info present).",
+            "PyInstaller frozen-bundle proof for watchfiles: vibemix-core.{macos,windows}.spec do NOT name watchfiles (rg => NOT-explicitly-in-spec). The Rust native binary + FSEvents backend surviving collect_dynamic_libs/collect_submodules under freeze is UNPROVEN — needs a fresh build TOC grep."
+          ],
+          "candidate_slices": [
+            {
+              "name": "True event-driven library fs-watcher (source slice)",
+              "status": "SAFE_NOW",
+              "value": "Closes the P0 freshness gap: today a DJ who re-exports their Rekordbox XML or drops new tracks mid-session waits up to 10s (live poll) or until next tool-call (guard) for staleness to register; an event-driven watcher fires within ~1s and lets Viber/set-gen refuse-or-refresh on real change instead of a coarse stat poll. Does NOT change what the co-host says or when it speaks (library/Viber path only, separate from coach.py/dj_cohost/event_detector) — outside the grounding-review gate.",
+              "risk": "low",
+              "files_in": [
+                "NEW src/vibemix/library/watcher.py — async watch_library_dir(emit, stop_event, *, paths, debounce_s, fallback=watch_library_freshness): lazy `import watchfiles` inside try/except (it is already installed via livekit-agents, uv.lock:813); on ImportError OR any watch error, degrade to the existing poll watcher. Best-effort, off-loop, must NEVER wedge the runtime (mirror staleness.py:279 broad-except + logger.warning).",
+                "src/vibemix/__main__.py:2077-2087 (HUNK-LEVEL ONLY — this file carries ~10 other uncommitted lanes per ground-state; stage only the freshness hunk) — swap the create_task(watch_library_freshness(...)) for the new watcher, keeping watch_library_freshness as the documented fallback.",
+                "pyproject.toml — promote watchfiles to a DIRECT dep in a lightweight extra (e.g. [project.optional-dependencies].watch = [\"watchfiles>=1.1\"]) for honesty/pinning, since relying on a transitive livekit pin is fragile. No new license burden: watchfiles is MIT."
+              ],
+              "files_out": [
+                "src/vibemix/runtime/coach.py",
+                "src/vibemix/agent/dj_cohost.py",
+                "src/vibemix/prompts/*",
+                "src/vibemix/state/event_detector.py",
+                "src/vibemix/state/drop_predict.py",
+                "any reaction/speech-timing code — the watcher must touch ONLY library freshness signalling"
+              ],
+              "tests": [
+                "tests/library/test_watcher.py (NEW): (1) watchfiles-present path emits ipc.library.staleness_nudge on a simulated file-change event using a fake/mock watchfiles.awatch; (2) ImportError fallback path delegates to watch_library_freshness and still emits on poll; (3) exception inside watch never raises out (mirrors test_staleness.py watcher-resilience cases); (4) stop_event cleanly exits.",
+                "tests/library/test_staleness.py (existing, must stay green — 21/21 baseline confirmed)"
+              ]
+            },
+            {
+              "name": "Packaged (frozen .dmg) watcher proof",
+              "status": "NEEDS_LIVE_PROOF_FIRST",
+              "value": "The watcher only matters end-user-side if it survives PyInstaller freeze. watchfiles ships a Rust native extension + an FSEvents backend on macOS; the spec does not name it, so packaged behavior cannot be claimed without a fresh build TOC grep + frozen-sidecar boot proof.",
+              "risk": "med",
+              "files_in": [
+                "vibemix-core.macos.spec / vibemix-core.windows.spec — likely add `watchfiles` (and its native _rust_notify binary) to hiddenimports + collect_dynamic_libs, ONLY after a build TOC grep proves the auto-collection misses it."
+              ],
+              "files_out": [
+                "do not edit the spec speculatively — gate on build/vibemix-core.macos/*.toc grep for watchfiles + a fresh sidecar boot that exercises the watch path"
+              ],
+              "tests": [
+                "fresh PyInstaller build + grep build/vibemix-core.macos/*.toc for watchfiles",
+                "boot the frozen sidecar, touch the source XML, confirm ipc.library.staleness_nudge fires (drive-vibemix / ws_observe on 127.0.0.1:8765)"
+              ]
+            }
+          ],
+          "hold_required": false,
+          "hold_reason": "The watcher lane touches ONLY library/Viber freshness signalling (staleness.py / a new library/watcher.py / library extra), which is disjoint from what the co-host SAYS or WHEN it speaks. coach.py, dj_cohost, prompts/, event_detector drop/heartbeat timing, and drop_predict are explicitly OUT of this slice (files_out). So the speech-grounding HOLD gate does not apply to the SOURCE slice. The packaged slice is independently held as NEEDS_LIVE_PROOF_FIRST for freeze survival, not for speech reasons. Note: __main__.py is a shared collision file (~10 lanes) — the single freshness hunk MUST be hunk-staged, never whole-file.",
+          "evidence": [
+            "grep NOT-FOUND: rg -i 'watchdog|watchfiles|fsevents|inotify|kqueue' src/vibemix/ => only PlaybackQueue substrings + parent_watchdog.py (orphan os.getppid poll, parent_watchdog.py:12) + midi/watcher.py (poll). No fs-event subscriber in product source.",
+            "src/vibemix/library/staleness.py:236-284 watch_library_freshness = poll loop (asyncio.wait_for(stop_event.wait(), timeout=poll); poll default 10.0); signature = (status, reason, cache_mtime, source_mtime) re-evaluated each tick from library_freshness_status.",
+            "src/vibemix/library/staleness.py:88-212 library_freshness_status stats pkl + compares os.path.getmtime(source_path) (line 164) to pickle-recorded xml_mtime (line 142); source_newer_than_cache => stale (line 178-189).",
+            "src/vibemix/__main__.py:2077-2087 live wiring poll_seconds=10.0, library_pkl=library_cache, prints '-> library freshness watcher armed'. Committed at HEAD (git show HEAD __main__.py:2067/2070/2076).",
+            "src/vibemix/__main__.py:1622-1631 boot nudge via library.emit_nudge_if_stale (staleness.py:359), captured + flushed at 2039-2054.",
+            "src/vibemix/library/mcp_server.py:104-109 build_toolset passes freshness_provider=library_freshness_status; toolset.py:200-217 _freshness_guard_for_tool blocks FRESHNESS_GUARDED_TOOLS (toolset.py:77-93) at tool-call time = on-demand stat, not a watcher.",
+            "uv.lock:813 watchfiles is a dependency of livekit-agents (1.5.14); uv.lock:2280-2286 watchfiles==1.1.1 (deps: anyio). pyproject.toml has NO direct watchfiles/watchdog (rg NOT-FOUND) => transitive only.",
+            ".venv/lib/python3.12/site-packages/ contains 'watchfiles' + 'watchfiles-1.1.1.dist-info' => installed and importable now.",
+            "vibemix-core.{macos,windows}.spec do NOT name watchfiles (rg NOT-explicitly-in-spec) => frozen-bundle survival unproven.",
+            "tests/library/test_staleness.py => 21 passed in 0.08s (uv run pytest, current source).",
+            "License: watchfiles = MIT (Rust); watchdog = Apache-2.0 — both safe; watchfiles is the lighter choice AND already vendored transitively, so it is the strict preference."
+          ],
+          "ui_or_live_not_proven": [
+            "End-user (frozen .dmg) watcher behavior — NOT proven; PyInstaller spec does not name watchfiles and the Rust/FSEvents backend's freeze survival is untested.",
+            "Whether a true watcher actually fires sub-second on a real Rekordbox re-export on Kaan's rig — NOT proven (no live drive run done here; read-only verifier).",
+            "No GUI freshness badge surface exists for the watcher's nudge beyond the existing ipc.library.staleness_nudge banner (orchestrator notes the freshness badge is a separate real gap) — UI surfacing of an event-driven update NOT proven."
+          ]
+        },
+        "verdict": {
+          "target": "True file watcher for library/Viber/set-generation freshness",
+          "overclaims": [],
+          "live_or_packaged_claims_without_proof": [
+            "The finding makes NO unproven LIVE/PACKAGED assertion — it explicitly self-flags all of them. For completeness, the items it correctly marks as NOT proven (and which remain so — I did no live drive / build): (1) End-user frozen-.dmg watcher behavior; (2) sub-second firing on a real Rekordbox re-export on Kaan's rig; (3) any GUI freshness-badge surface for an event-driven update. These are honestly placed under NEEDS_LIVE_PROOF_FIRST / ui_or_live_not_proven, NOT claimed as done."
+          ],
+          "corrected_classification": "unchanged",
+          "confidence": "high",
+          "notes": "Adversarial verification FAILED TO REFUTE — every load-bearing claim holds against immutable git/current source or a re-run test. Spot-checks I personally confirmed: (1) NO event-driven fs-watcher: rg -i 'watchdog|watchfiles|fsevents|inotify|kqueue' src/vibemix/ returns ONLY PlaybackQueue substrings + parent_watchdog.py (os.getppid poll) + midi poll — zero fs-event subscriber. (2) watch_library_freshness is poll-only: git show HEAD:src/vibemix/library/staleness.py:236-284 = while-loop on asyncio.wait_for(stop_event.wait(), timeout=poll), default poll_seconds=10.0, re-evaluates library_freshness_status each tick; broad-except logger.warning 'must never kill live runtime'. (3) Live wiring CONFIRMED at HEAD: git show HEAD:src/vibemix/__main__.py:2066-2076 create_task(watch_library_freshness(..., poll_seconds=10.0, library_pkl=library_cache)) + '-> library freshness watcher armed'. (4) Boot nudge: __main__.py:1624/1629 _emit_staleness via library.emit_nudge_if_stale (staleness.py:359 def exists). (5) freshness_provider wired ONLY at mcp_server.py:108 (single rg hit); build_toolset() called only at mcp_server.py:459 — so the in-process toolset does NOT wire it (matches the 'missing' claim); FRESHNESS_GUARDED_TOOLS + _freshness_guard_for_tool live at toolset.py:77/200/1557 = stat-at-call-time, not a watcher. (6) watchfiles is TRANSITIVE-ONLY: rg pyproject.toml NOT-FOUND; uv.lock:813 lists watchfiles under livekit-agents 1.5.14 (sdist on the next line), package def uv.lock:2280 v1.1.1 with cp312 macOS/win wheels. (7) Spec NOT-FOUND: rg -i watchfiles vibemix-core.{macos,windows}.spec returns empty → frozen survival genuinely unproven. (8) venv: watchfiles + watchfiles-1.1.1.dist-info present. (9) test_staleness.py = 21 passed in 0.08s EXACTLY as claimed. (10) staleness.py working tree CLEAN; __main__.py dirty (53 ins/43 del) → the hunk-level-staging warning is justified. (11) Proposed NEW files src/vibemix/library/watcher.py and tests/library/test_watcher.py correctly do NOT exist (not over-claimed as landed). CLASSIFICATION: source slice SAFE_NOW is correct — files_out correctly excludes coach.py/dj_cohost/prompts/event_detector/drop_predict; the lane touches only library freshness signalling, so the speech-grounding HOLD gate does NOT apply to the source slice. Packaged slice correctly held NEEDS_LIVE_PROOF_FIRST. No speech/timing/drop change is concealed in this lane → hold_required:false is correct. This is a conservative, evidence-disciplined finding; nothing to downgrade."
+        }
+      }
+    ]
+  }
+}

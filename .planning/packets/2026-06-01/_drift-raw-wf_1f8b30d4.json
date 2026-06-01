@@ -1,0 +1,433 @@
+{
+ "head": "dc4702ebddd789be46a9b7750d699f0285ae56df",
+ "since": "e5c0e34e",
+ "new_commit_count": 6,
+ "package_checker_green": true,
+ "bleed_clean": true,
+ "critical_blockers": [
+  "MOSS model not bundled and no auto-download — frozen build crashes at boot on any machine without the ~670MB cache (MOSS is now the ONLY voice)"
+ ],
+ "report_md": "# DRIFT REPORT — HEAD `dc4702eb` (since `e5c0e34e`) · 2026-06-01\n\n**VERDICT: Tree is SAFE to keep landing — zero HOLD-bleed in the 6 new commits; all are frontend/packaging/runtime-default fixes that do not ship net-new ungated speech.** One CRITICAL ship-blocker stands between HEAD and a shippable build (MOSS-model-absent boot crash), plus a now-RED dirty-package checker (a lane-assignment drift the concurrent session introduced — gate regression, not a bleed). Nothing live/packaged is proven; treat all DMG/voice claims as UNPROVEN.\n\n## 1. What landed since `e5c0e34e` (newest-first)\n| Commit | Class | speech/timing | hold_bleed |\n|---|---|---|---|\n| `dc4702eb` feat(tauri-ui): library freshness badge | ACCEPTED | no | no |\n| `baeac434` fix(runtime): default packaged voice w/o drop speech | ACCEPTED | no | no |\n| `07bf2f34` fix(packaging): bundle sentencepiece for moss | ACCEPTED | no | no |\n| `dd71213d` fix(learn-runtime): refresh earned wall (doc/whitespace only) | ACCEPTED | no | no |\n| `b16a9bf2` fix(ui-shell): keep settings drawer nav stable | ACCEPTED | no | no |\n| `440fcd56` fix(tts): make moss the only voice source | NEEDS_LIVE_PROOF | no | **flagged** |\n\nAll 6 carry a DCO `Signed-off-by: Kaan Özkan` trailer; NONE is GPG-signed (`%GS` empty) — \"signed\" = sign-off, not crypto.\n`440fcd56` is code-correct (70 targeted tests pass) but flagged `hold_bleed=true` only because, cut in isolation, it removes all cloud fallback BEFORE `07bf2f34` bundled sentencepiece — moot at HEAD since both landed.\n\n## 2. HOLD-BLEED verdict — **CLEAN** (skeptic UPHELD, high confidence)\n- **H-DROP HELD**: spoken DROP block is DIRTY-ONLY, absent from committed HEAD. `git show HEAD:src/vibemix/runtime/coach.py` has no `ev.type==\"DROP\"` block; `event_detector.py`/`drop_predict.py` DROP hunks are `+` in working tree only. Default OFF confirmed: `__main__.py:784` setdefaults ONLY `VIBEMIX_LOCAL_TTS`; no `VIBEMIX_DROP_CALL` anywhere (committed or dirty). The voiced path (`drop_reaction.py::reaction_line`) is additionally **orphaned/unimported** — doubly safe.\n- Dirty audio/midi product files (`deck_capture.py`, `deck_signal.py`, `midi/state.py`) carry zero say/speak/reaction_line in added lines — perception-only.\n- **WATCH-ITEM (carried)**: the entire DROP speech path is dirty in shared files (`coach.py`, `event_detector.py`, `drop_predict.py`, `__main__.py`). A whole-file `git add` of any of these would sweep ungated DROP speech in = CRITICAL bleed. **Future commits MUST hunk-stage.**\n\n## 3. Ship-blockers RIGHT NOW\n1. **CRITICAL — MOSS model not bundled / no auto-download → fresh-machine boot crash.** MOSS is now the ONLY voice (`tts_chain.py` `_build_moss_chain`); `build_local_tts_adapter()` raises `LocalTTSUnavailable` when model absent (`local_tts.py:307-310`), and `__main__.py:1290` (direct) / `:1301` (proxy) call it with NO surrounding try/except → uncaught raise crashes the sidecar at startup. Specs bundle `sentencepiece` but NOT the ~670MB ONNX model (no `datas` entry); no MOSS downloader exists in `src/vibemix/`. Kaan's dev cache masks it locally. **Fix:** wrap both call sites in `try/except LocalTTSUnavailable` → boot muted + clear banner (never crash); and/or add a MOSS auto-download mirroring `model_assets.install_clap_model`; and/or bundle the model in both specs.\n2. **HIGH — stale signed DMG.** Newest `dist/fresh-20260601-latest/vibemix-0.0.1.dmg` mtime **08:32**; ALL TTS-defining commits land 12:33–12:59. No DMG after 12:00 exists (verified). Every packaged/signed/boots-clean claim = UNPROVEN. **Fix:** rebuild+re-sign+notarize+staple from HEAD — but only AFTER blocker #1, or the rebuild crashes on a clean machine.\n3. **MED — dirty-package checker is RED (regression, not bleed).** `check_dirty_package_plan.py --strict-assignments` **exits 1** (re-confirmed this turn): `tauri/ui/library.html`, `src/library/library.css`, `state-machine.ts`, `state-machine.test.ts` are unassigned to any lane (concurrent session's library-freshness lane). The skeptic's correction stands — the GREEN reading in the delta/blocker scans is stale. **Fix:** assign those 4 paths to an Include/Hold lane before any commit.\n\n## 4. HOLD-gate status\n- **H-MOSS — PARTIAL (moved).** Movable source gate CLEARED: `sentencepiece` in both specs (`macos:148,169` / `windows:159,180`, committed `07bf2f34`) + declared dep. Runtime/packaged + Kaan ear-pass + Windows path + model-degrade UNPROVEN.\n- **H-DROP — PARTIAL (moved).** \"flip default OFF\" sub-gate now SATISFIED (`baeac434`). HARD hold STANDS: grounding-review not run, no live on-beat proof, FP-rate unmeasured, speech still uncommitted.\n- **H-WATCH — NO (moot).** No watcher code exists; `watchfiles` only transitive (`uv.lock:2280`).\n- **H-BEAT — NO.** Consumer only (`skill_recognizer.py:154`); no production `BEATMATCH_GRADED` emitter; pinned by `tests/repo/test_live_reality_pins.py`.\n- **H-CUE — NO.** `export_serato.py:25-26` refusal intact; no in-app render eye-check.\n- **H-PKG — NO.** Stale DMG (see blocker #2).\n- Stale-evidence correction: `.planning/packets/2026-06-01/_verification-raw-wf_c96f6f8d.json` (12:32) calls drop \"armed ON by default via `__main__.py:803`\" — STALE, predates `baeac434`. Default is OFF at HEAD.\n\n## 5. Next-slice board\n**landed_since `e5c0e34e`:** settings-nav fix (`b16a9bf2`) · freshness badge GUI (`dc4702eb`, 3 specs pass) · H-DROP default-OFF (`baeac434`) · sentencepiece-in-specs (`07bf2f34`) · moss-only voice (`440fcd56`) · earned-wall refresh (`dd71213d`).\n\n**SAFE_NOW (ranked):**\n1. **Fix the MOSS boot-crash** (blocker #1) — highest-leverage; unblocks H-PKG/H-MOSS frozen proof. `__main__.py:1290/1301` try/except + optional downloader. *Note: `__main__.py` is a dirty shared file — hunk-stage only.*\n2. **Cue-export GUI** — surface the moat (CLI-only today; no `ipc.library.cue` type, no cue panel). `library_cmds.rs` + new shell panel + schema; run `codegen:ipc` + ipc-wiring-checker. Avoid editing dirty `__main__.py`/`coach.py`; reuse the existing `library cue` CLI. risk: med.\n3. **Real-audio cue-detection eval gate** — automated correctness gate for the cue engine; mirror the CLAP-corpus fixture pattern. risk: low.\n\n## 6. Codex, do this next\nWrap `build_tts_chain()` at `__main__.py:1290` and `:1301` in `try/except LocalTTSUnavailable` (boot muted + stderr banner, never crash) and assign the 4 unassigned library-freshness paths to a package lane to turn the dirty checker green — hunk-stage only.",
+ "raw": {
+  "delta": {
+   "head": "dc4702ebddd789be46a9b7750d699f0285ae56df",
+   "since": "e5c0e34e",
+   "new_commits": [
+    {
+     "hash": "dc4702ebddd789be46a9b7750d699f0285ae56df",
+     "title": "feat(tauri-ui): show library freshness in shell",
+     "files": [
+      ".planning/handoffs/2026-05-31-package-checklist.md",
+      ".planning/packets/2026-06-01/CODEX_READY-library-freshness-badge.md",
+      ".planning/packets/2026-06-01/INDEX.md",
+      "tauri/ui/src/shell/LibraryFreshnessBadge.ts",
+      "tauri/ui/src/shell/app.ts",
+      "tauri/ui/src/shell/shell.css",
+      "tauri/ui/tests/shell/library-freshness-badge.spec.ts"
+     ],
+     "signed_off": true
+    },
+    {
+     "hash": "baeac434f28042e72228aa23767a831a02178f15",
+     "title": "fix(runtime): default packaged voice without drop speech",
+     "files": [
+      "src/vibemix/__main__.py",
+      "tests/test_main_smoke.py"
+     ],
+     "signed_off": true
+    },
+    {
+     "hash": "07bf2f34d38e0ff3759924a0f7c26f82a3e42174",
+     "title": "fix(packaging): bundle sentencepiece for moss tts",
+     "files": [
+      ".planning/handoffs/2026-05-31-package-checklist.md",
+      "tests/sidecar/test_build_sidecar_rename.py",
+      "vibemix-core.macos.spec",
+      "vibemix-core.windows.spec"
+     ],
+     "signed_off": true
+    },
+    {
+     "hash": "dd71213d77b11faa43662dd9c0aabfb2e9dfd520",
+     "title": "fix(learn-runtime): refresh earned wall after live cited credits",
+     "files": [
+      "src/vibemix/runtime/coach.py"
+     ],
+     "signed_off": true
+    },
+    {
+     "hash": "b16a9bf2e353b84fadb665762112d94c68fac629",
+     "title": "fix(ui-shell): keep settings drawer navigation stable",
+     "files": [
+      ".planning/handoffs/2026-05-31-package-checklist.md",
+      "docs/design/screenshots/2026-05-31-frontend-proof/actionability-proof.json",
+      "docs/design/screenshots/2026-05-31-frontend-proof/after-fix-proof.json",
+      "docs/design/screenshots/2026-05-31-frontend-proof/after-fix-settings-open.png",
+      "docs/design/screenshots/2026-05-31-frontend-proof/shell-initial.png",
+      "docs/design/screenshots/2026-05-31-frontend-proof/shell-settings-open.png",
+      "docs/design/screenshots/2026-05-31-frontend-proof/shell-settings-proof.json",
+      "tauri/ui/src/session/components/picker.ts",
+      "tauri/ui/src/session/components/rocker.ts",
+      "tauri/ui/src/settings/components/group.ts",
+      "tauri/ui/src/shell/app.ts",
+      "tauri/ui/src/shell/shell.css"
+     ],
+     "signed_off": true
+    },
+    {
+     "hash": "440fcd56ccc97b758da22448ae36060dcee1c951",
+     "title": "fix(tts): make moss the only voice source",
+     "files": [
+      ".planning/handoffs/2026-05-31-package-checklist.md",
+      "src/vibemix/__main__.py",
+      "src/vibemix/agent/__init__.py",
+      "src/vibemix/agent/config.py",
+      "src/vibemix/agent/line_voice.py",
+      "src/vibemix/agent/local_tts.py",
+      "src/vibemix/agent/proxy_client.py",
+      "src/vibemix/agent/tts_chain.py",
+      "tests/agent/test_line_voice.py",
+      "tests/agent/test_livekit_google_slim.py",
+      "tests/agent/test_local_tts.py",
+      "tests/agent/test_proxy_client.py",
+      "tests/agent/test_tts_chain.py",
+      "tests/agent/test_tts_chain_cartesia.py",
+      "tests/test_main_smoke.py",
+      "tests/test_phase05_verification.py"
+     ],
+     "signed_off": true
+    }
+   ],
+   "staged": [],
+   "dirty_product": [
+    "src/vibemix/__main__.py",
+    "src/vibemix/audio/deck_capture.py",
+    "src/vibemix/audio/deck_signal.py",
+    "src/vibemix/midi/state.py",
+    "src/vibemix/runtime/coach.py",
+    "src/vibemix/state/drop_predict.py",
+    "src/vibemix/state/event_detector.py"
+   ],
+   "package_checker_green": true,
+   "notes": "HEAD=dc4702eb; 6 new commits since e5c0e34e (newest-first), all carry Signed-off-by: Kaan Özkan <rahipdotaci@gmail.com> (DCO sign-off). NOTE: no GPG signature on any commit — `git show --format=%GS` returns empty; \"signed\" here means DCO Signed-off-by trailer, not a verified GPG signature. signed_off=true reflects the Signed-off-by trailer.\n\nNothing is staged (git diff --cached empty). 7 dirty PRODUCT files remain (all src/vibemix/*, no tauri/* dirty). Package checker is GREEN: `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary` exits 0 with \"OK: 5270 dirty paths covered ...; 3 generated launch previews ignored.\" and \"OK: every dirty path is assigned to an Include/Hold lane.\"\n\nTREE MOVED DURING READ (concurrent Codex session active): the initial git-status snapshot in my prompt listed many more dirty src/* and tauri/* files (e.g. tauri/ui/src/shell/app.ts, shell.css, session/components/picker.ts, rocker.ts, settings/components/group.ts, agent/local_tts.py, agent/proxy_client.py, agent/tts_chain.py, tests/* ) — those have SINCE been committed into b16a9bf2 / 440fcd56 / dc4702eb. So the remaining 7-file dirty set is smaller than the snapshot suggested; it is internally consistent at my pinned HEAD. Re-verify HEAD before acting since commits are still landing.\n\nTwo product files are dirty AND also touched by recent commits, indicating in-progress further edits on top of committed work: src/vibemix/__main__.py (committed in baeac434 + 440fcd56, still dirty) and src/vibemix/runtime/coach.py (committed in dd71213d, still dirty). Per the package checklist's shared-assignment table both are multi-package shared files (__main__.py spans Packages 1A/5C/5E/5F/1C/10/14/14B/15 + holds; coach.py spans Package 8B + 9) — expect surgical hunk-level staging there.\n\nCould NOT verify runtime/packaged behavior (read-only verifier, no build/launch run): the TTS \"make moss the only voice source\" (440fcd56) and \"bundle sentencepiece\" packaging (07bf2f34) commits claim voice/packaging effects that are UNPROVEN here — no DMG/app boot or live co-host proof was run. Package checker GREEN only proves dirty-path lane assignment, not that tests pass or the app works."
+  },
+  "commitVerdicts": [
+   {
+    "commit": "dc4702ebddd789be46a9b7750d699f0285ae56df",
+    "title": "feat(tauri-ui): show library freshness in shell",
+    "classification": "ACCEPTED",
+    "touches_speech_or_timing": false,
+    "hold_bleed": false,
+    "evidence": [
+     "git show dc4702eb --stat: touches only tauri/ui/src/shell/{LibraryFreshnessBadge.ts(new),app.ts,shell.css}, a new spec, and 3 .planning docs. Zero files under src/vibemix/, zero backend changes.",
+     "tauri/ui/src/library/api.ts:64-87 (HEAD) defines LibraryStats with exactly library_freshness.{status,stale,reason,age_days,cache_path,...}, library_freshness_status, library_stale, library_staleness_reason, library_age_days — every field the badge reads already exists in the contract.",
+     "src/vibemix/library/staleness.py:39 FreshnessStatus = Literal['fresh','stale','not_indexed','source_missing','cache_unreadable'] — the five statuses LibraryFreshnessBadge.ts maps are exactly the backend's emitted set; unrecognized/error -> 'unknown'.",
+     "LibraryFreshnessBadge.ts:39-46 stateForFreshness returns 'unknown' when stats null or status unknown, and the error branch (libraryFreshnessBadgeModel error arg) returns state 'unknown' label 'library unknown' — never fabricates an 'ok' state on read failure (anti-slop honest).",
+     "app.ts:131-134 queries '.shell-footer' (mounted by StatusFooter.ts:32), mounts badge with null-guard, and app.ts:143 registers freshnessBadge?.teardown() in teardown; poll timer cleared via clearInterval on teardown (LibraryFreshnessBadge.ts:120-129).",
+     "shell.css CSS vars --led-ok/--led-warn/--led-fault confirmed present at shell.css:745/749/752 (HEAD).",
+     "npx vitest run tests/shell/library-freshness-badge.spec.ts -> 3 passed (3). Covers fresh->ok, stale->warn, not_indexed->empty, and stats-error->unknown.",
+     "npx tsc --noEmit (full UI project) exit 0 — the build gate's typecheck leg is clean with the new import and file.",
+     ".planning/packets/2026-06-01/INDEX.md diff adds one row stating the badge 'consumes libraryStats() ... without adding backend behavior'; the speech-related INDEX rows in the diff context are pre-existing descriptions of OTHER packets, not changes by this commit."
+    ],
+    "proves": "A glanceable, read-only library-freshness badge is correctly wired into the shell footer: it consumes the pre-existing LibraryStats/libraryStats() contract, maps the real backend FreshnessStatus literals to terse footer states, falls back to 'unknown' on unrecognized status or stats-read failure (never inventing a healthy state), mounts/teardowns cleanly in app.ts, and is covered by 3 passing unit tests with a clean tsc --noEmit. Pure frontend display; no backend behavior added.",
+    "does_not_prove": "Does not prove the badge's visual/packaged appearance — no live Tauri-app run or built/signed-artifact screenshot was performed (the packet itself defers visual/package proof). This is cosmetic and not a HOLD gate. Does not exercise the real Tauri invoke('library_stats') path end-to-end (tests use injected getStats); the underlying IPC contract was confirmed to exist but not driven live in this verification.",
+    "remaining": "Optional later: visual confirmation of the badge in a real built shell (cosmetic, no HOLD). Nothing blocking — no speech/timing surface and no HOLD-register item touched.",
+    "tests": [
+     "tauri/ui/tests/shell/library-freshness-badge.spec.ts (npx vitest run) -> 3 passed",
+     "npx tsc --noEmit (tauri/ui) -> exit 0"
+    ]
+   },
+   {
+    "commit": "baeac434f28042e72228aa23767a831a02178f15",
+    "title": "fix(runtime): default packaged voice without drop speech",
+    "classification": "ACCEPTED",
+    "touches_speech_or_timing": false,
+    "hold_bleed": false,
+    "evidence": [
+     "src/vibemix/__main__.py:793-803 — new `_apply_packaged_defaults()` does ONLY `os.environ.setdefault(\"VIBEMIX_LOCAL_TTS\", \"1\")`; wired once at main() line 817; `os` imported at line 35.",
+     "git history: `VIBEMIX_DROP_CALL` has NEVER appeared in src/vibemix/__main__.py on any branch (`git log --all -S` empty); `_apply_packaged_defaults` first introduced by THIS commit. The HOLD-register note about a `setdefault('VIBEMIX_DROP_CALL','1')` at ~:803 was a prior dirty-tree intent the parent commit did not contain — this commit is the fix that ships the voice default WITHOUT a drop-call default.",
+     "grep across src/ for `setdefault(... VIBEMIX_DROP_CALL ...)` → NONE. Drop-call gate state/event_detector.py:69 still reads `VIBEMIX_DROP_CALL` from env (truthy-only) and is dormant by default → H-DROP speech stays OFF.",
+     "Tests PASS: `tests/test_main_smoke.py::test_apply_packaged_defaults_opts_moss_in_when_absent` and `::test_apply_packaged_defaults_respects_explicit_off` (2 passed in 0.32s). Full tests/test_main_smoke.py → 30 passed in 2.28s.",
+     "setdefault semantics verified: explicit `VIBEMIX_LOCAL_TTS=0` is not clobbered (respects_explicit_off test asserts env stays '0'); DROP_CALL absence asserted in opts_moss_in test.",
+     "H-MOSS sentencepiece-in-both-specs gate satisfied at HEAD: vibemix-core.macos.spec:148 + windows.spec:159 both list 'sentencepiece' (landed in prior commit 07bf2f34, NOT this one).",
+     "MOSS degrades gracefully when model absent: local_tts.py:86-94 `local_tts_enabled()` returns False unless `resolve_model_dir() is not None`, so default-on never crashes a model-less install — it falls back to disabled.",
+     "Dirty-package checker GREEN: `scripts/check_dirty_package_plan.py --strict-assignments --summary` EXIT=0; __main__.py assigned to 'Package 14B - MOSS-only Voice Source' Include lane.",
+     "Commit touches only the 2 declared files (`--name-only` confirms src/vibemix/__main__.py + tests/test_main_smoke.py); no cross-session staging bleed."
+    ],
+    "proves": "The commit makes the free on-device MOSS voice ON by default for packaged launches via `os.environ.setdefault(\\\"VIBEMIX_LOCAL_TTS\\\", \\\"1\\\")`, using setdefault so an explicit `VIBEMIX_LOCAL_TTS=0` still disables speech, and so the default survives `open -a`/launchd env-stripping. It explicitly does NOT default the drop-call oracle (`VIBEMIX_DROP_CALL`), keeping H-DROP net-new speech opt-in. The change is source+test only, well-covered by two new unit tests, leaves the reaction-text/timing/coach/event_detector/drop_predict modules untouched, keeps the dirty-package checker green, and degrades to disabled when the MOSS model is absent.",
+    "does_not_prove": "Does NOT prove the co-host audibly speaks with MOSS in a live or packaged run — that requires Kaan's live ear-pass (H-MOSS) and a frozen-bundle test that sentencepiece + the MOSS model load (H-PKG/H-MOSS), neither attempted here. Does NOT prove the Windows MOSS path. The default-on flag only activates MOSS if the model is cached at runtime; whether a shipped DMG bundles/finds the model is unverified (UNPROVEN, no build run). The latest signed artifact predates this state (H-PKG note), so no packaged claim is supported.",
+    "remaining": "SHIP-gate (not commit-gate) items still open under H-MOSS/H-PKG: Kaan live ear-pass of the default-on MOSS voice on real hardware; Windows MOSS path validation; a fresh re-signed build proving sentencepiece + MOSS model load in the frozen bundle (current dist artifact is stale). H-DROP remains correctly held (drop-call speech still opt-in, not touched by this commit).",
+    "tests": [
+     "tests/test_main_smoke.py::test_apply_packaged_defaults_opts_moss_in_when_absent (PASS)",
+     "tests/test_main_smoke.py::test_apply_packaged_defaults_respects_explicit_off (PASS)",
+     "tests/test_main_smoke.py full file (30 passed in 2.28s)",
+     "scripts/check_dirty_package_plan.py --strict-assignments (EXIT=0, green)"
+    ]
+   },
+   {
+    "commit": "07bf2f34d38e0ff3759924a0f7c26f82a3e42174",
+    "title": "fix(packaging): bundle sentencepiece for moss tts",
+    "classification": "ACCEPTED",
+    "touches_speech_or_timing": false,
+    "hold_bleed": false,
+    "evidence": [
+     "git show 07bf2f34: only 4 files touched — vibemix-core.macos.spec, vibemix-core.windows.spec, tests/sidecar/test_build_sidecar_rename.py, .planning/handoffs/2026-05-31-package-checklist.md. No source under src/vibemix/ touched (no coach/dj_cohost/prompts/event_detector/drop_predict/heartbeat).",
+     "HEAD (dc4702eb) vibemix-core.macos.spec lines ~143-169: 'sentencepiece' added to _LOCAL_AI_SUBMODULES tuple AND to the collect_dynamic_libs loop `for _pkg in (\"av\", \"onnxruntime\", \"sentencepiece\")`; windows spec lines ~145-178 identical structure (macos/windows parity confirmed).",
+     "Premise verified: src/vibemix/agent/local_tts.py:162 `import sentencepiece as spm` inside the real MOSS engine (_RealEngine), used at line 174 `spm.SentencePieceProcessor(model_file=str(tok_path))`. pyproject.toml:164/169 declares sentencepiece>=0.2 in tts-local + ai-local extras.",
+     "MOSS-only state confirmed at HEAD: src/vibemix/agent/tts_chain.py:2-72 — _build_direct_chain and build_proxy_tts_chain both resolve to _build_moss_chain(); docstring 'MOSS is the single source of TTS in every mode. If the local model is unavailable, build_local_tts_adapter raises a clear LocalTTSUnavailable instead of routing speech to a cloud fallback.'",
+     "Targeted test PASS: `uv run pytest tests/sidecar/test_build_sidecar_rename.py::test_pyinstaller_specs_collect_local_ai_runtime` -> 2 passed (macos + windows parametrize).",
+     "Full touched test file PASS: `uv run pytest tests/sidecar/test_build_sidecar_rename.py` -> 33 passed in 0.35s (new tokens did not break sibling assertions).",
+     "Ground-state checker GREEN: `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary` exit=0.",
+     "sentencepiece 0.2.1 importable in the uv base venv (so build-time collect_submodules/collect_dynamic_libs would resolve it).",
+     "Working tree clean for all 4 touched files (git status --short = no output) — no uncommitted drift on the specs."
+    ],
+    "proves": "The PyInstaller spec TEXT for both macOS and Windows now explicitly bundles sentencepiece (as a hiddenimports submodule collection AND as a native-lib collect_dynamic_libs target), which is the exact dependency the real MOSS engine imports at synthesis time (local_tts.py:162). This satisfies the H-MOSS gate requirement 'sentencepiece must be in BOTH specs' — it is the gate-filling fix, not a gate-bleeding new feature. The change is build-config + a text-assertion test + a doc; it does not alter what the co-host says or when. Targeted + full-file tests pass and the dirty-package checker stays green.",
+    "does_not_prove": "It does NOT prove a frozen build actually bundles the sentencepiece native library — the test only asserts the spec source contains the right tokens; PyInstaller is never run here (H-PKG: needs rebuild/re-sign; the latest signed artifact predates this state). It does NOT prove MOSS synthesizes audible speech in a packaged sidecar, nor Kaan's ear-pass, nor the Windows packaged path executes, nor that the MOSS model is present-or-degrades-gracefully — all H-MOSS/H-PKG live/runtime gates remain open. No live co-host or DMG/app behavior was exercised.",
+    "remaining": "H-PKG/H-MOSS runtime gates still open: (1) rebuild + re-sign the sidecar/DMG and verify sentencepiece native lib + onnxruntime land in the frozen TOC; (2) packaged MOSS synthesis proof (sidecar boots and actually produces audio, not LocalTTSUnavailable); (3) Kaan live ear-pass on the MOSS voice; (4) Windows packaged path verification; (5) MOSS model present-or-degrade-gracefully check. These are inherited from H-MOSS/H-PKG and are not in scope of this build-config commit.",
+    "tests": [
+     "uv run pytest tests/sidecar/test_build_sidecar_rename.py::test_pyinstaller_specs_collect_local_ai_runtime -> 2 passed",
+     "uv run pytest tests/sidecar/test_build_sidecar_rename.py -> 33 passed in 0.35s",
+     "uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary -> exit=0 (green)"
+    ]
+   },
+   {
+    "commit": "dd71213d77b11faa43662dd9c0aabfb2e9dfd520",
+    "title": "fix(learn-runtime): refresh earned wall after live cited credits",
+    "classification": "ACCEPTED",
+    "touches_speech_or_timing": false,
+    "hold_bleed": false,
+    "evidence": [
+     "git show dd71213d77b11faa43662dd9c0aabfb2e9dfd520 --stat: single file src/vibemix/runtime/coach.py, +16/-5; --name-only confirms ONLY coach.py touched.",
+     "Diff is 3 hunks: (1) coach.py:198 pure-whitespace collapse of mastered_unlock_line(sid, was_mastered=False, now_mastered=True) from 3 lines to 1 — identical call+args; (2) coach.py:225-236 docstring expansion of _emit_earned_wall_refresh (comment only); (3) coach.py:631-632 call-site comment expansion (comment only).",
+     "git show b16a9bf2:src/vibemix/runtime/coach.py grep -> function _emit_earned_wall_refresh (line 222), LearnProgressState import (231), LearnProgressState.make (236), await ipc_bus.emit(env) (241), and the call site (622) ALL already exist in the PARENT commit. The functional wiring is pre-existing; this commit documents it.",
+     "coach.py:240-251 (HEAD): _emit_earned_wall_refresh body builds LearnProgressState.make(action='snapshot', was_recovered=False, progress=snapshot).to_dict() and awaits ipc_bus.emit(env); guarded never-raises (coach.py:252-253). Both-ended: ipc.learn.progress_state present in tauri/ui/src/ipc/messages.schema.json:3049 + messages.ts:888.",
+     "Docstring behavioral claim verified accurate: rg for learn/progress in the session-snapshot path returned only the docstring line itself — ipc.session.snapshot does NOT carry learn progress; LearnProgressState/ipc.learn.progress_state is the SkillWall repaint envelope.",
+     "Targeted test: uv .venv + PYTHONPATH=src pytest tests/runtime/test_coach_progress_emit.py -q -> 4 passed in 0.09s (test_emits_progress_state_on_credit, test_no_emit_when_nothing_credited, test_no_emit_and_no_crash_without_bus, test_fail_soft_on_snapshot_error).",
+     "ast.parse(coach.py) at HEAD -> parses OK.",
+     "Word-level + added-line grep for drop|speak|say|reaction_line|mastered_speak|heartbeat|cooldown|predicted_drop|generate_reply across the diff -> NO matches added/changed. No speech-producing or timing line is touched."
+    ],
+    "proves": "The emitted envelope from _emit_earned_wall_refresh is a LearnProgressState (ipc.learn.progress_state) — a SkillWall trophy/UI repaint, visual not voiced — and the wiring (function body + coach_loop call) already existed verbatim in parent b16a9bf2. This commit is comment/docstring-only plus a no-op whitespace reformat: it documents why the existing refresh exists (snapshot carries no learn progress; SkillWall only repaints on progress_state) and the docstring's claims check out against the code/schema. The 4 dedicated unit tests pass at HEAD and coach.py parses. No behavior changed.",
+    "does_not_prove": "Does NOT prove the LIVE end-to-end behavior — that on Kaan's real rig a cited live demo flips a skill to Mastered and the shell's SkillWall trophy actually repaints WITHOUT a reload (requires running app + IPC bus + frontend; UNPROVEN here, and unchanged by this commit anyway). Does not prove the underlying credit/recognize path beyond what the parent already shipped. No packaged/signed claim is implicated.",
+    "remaining": "Live proof of the SkillWall repaint-on-credit loop in the running app (drive-vibemix / real-rig ear-and-eye pass) — but that is verification of the PARENT's wiring, not of this doc-only commit. Nothing in this commit needs further gating."
+   },
+   {
+    "commit": "b16a9bf2e353b84fadb665762112d94c68fac629",
+    "title": "fix(ui-shell): keep settings drawer navigation stable",
+    "classification": "ACCEPTED",
+    "touches_speech_or_timing": false,
+    "hold_bleed": false,
+    "evidence": [
+     "git show b16a9bf2: changes are 4 TS files (picker.ts/rocker.ts/group.ts/app.ts), shell.css, 1 planning doc, and 3 PNG + 3 JSON proof artifacts. No Python, no prompts/, no IPC schema, no audio.",
+     "Behavioral change is isolated to wireSettingsNav() in tauri/ui/src/shell/app.ts:92-122: adds lastNonSettings tracking + a subscribeSettingsUI listener (app.ts:114-117) that calls shell.store.setActiveSurface(lastNonSettings) when the drawer self-closes while surface==='settings', and adds the `&& getSettingsUIState().open` guard at app.ts:108 to the store->closeSettings path.",
+     "Loop-safety traced: drawer self-close -> closeSettingsState notify -> unsettings listener sets surface to deck -> unstore listener fires but `prev==='settings' && getSettingsUIState().open` is now false (open already cleared) so closeSettings is NOT re-invoked; the `if (model.activeSurface === prev) return;` early-return is a second guard. No re-entrant/infinite loop.",
+     "Dependencies verified present at the commit: settings/state.ts exports getSettingsUIState (line 89) and subscribeSettingsUI (line 101); SettingsDrawer.ts exports openSettings (680) and closeSettings (728); shell-store.ts defines setActiveSurface (line 120).",
+     "npx tsc --noEmit on tauri/ui PASSED clean (no type errors) at HEAD.",
+     "Ran tests/settings/drawer.spec.ts + tests/shell/shell.spec.ts + tests/shell/surface-mounts.spec.ts: 43 passed. Ran tests/session/components.spec.ts + tests/session/router-teardown.spec.ts: 48 passed. (The single stderr line in drawer.spec is an intentional ipc-timeout-path assertion, test still passes.)",
+     "Touched source files are NOT in the dirty working set; only delta HEAD-vs-commit is the next commit dc4702eb adding a LibraryFreshnessBadge import to app.ts. The wireSettingsNav fix (lastNonSettings/subscribeSettingsUI/`&& getSettingsUIState().open` guard) survives intact at HEAD (git show HEAD:app.ts lines 95/103/108/114/116).",
+     "Planning doc package-checklist.md correctly states the slice 'does not touch speech, runtime audio, IPC schema, or backend settings persistence' and keeps packaged-app visual proof as a SEPARATE release gate (no H-PKG claim made)."
+    ],
+    "proves": "A frontend-only shell/settings change: closing the settings drawer (via the X button, Esc, or backdrop) now syncs the shell's activeSurface back to the last real surface instead of leaving it stranded on 'settings', and the store->close path is guarded against a re-entrant close loop. The CSS edits are material/visual polish (gradients, borders, shadows, spacing) on picker/rocker/settings-group/shell chrome+sidebar. tsc is clean and the closely-related drawer/shell/session test files (91 tests across 5 files) pass at HEAD. No co-host speech, timing, prompt, event-detector, drop-predict, IPC-schema, or audio code is touched.",
+    "does_not_prove": "No automated regression test exists for wireSettingsNav itself — no test file imports shell/app.ts or exercises the new lastNonSettings/subscribeSettingsUI navigation logic. The navigation-stability behavior is documented only by a captured browser-state snapshot (docs/design/screenshots/2026-05-31-frontend-proof/shell-settings-proof.json) plus PNGs, which are manual/Playwright-style proof artifacts, not part of the vitest suite. The committed screenshots are unverified for visual correctness here (I read the JSON state, not the rendered pixels). The commit makes no packaged/signed claim, so H-PKG is untouched. I did not run the full UI suite (~886 tests) or a vite build — only tsc --noEmit plus 5 targeted spec files.",
+    "remaining": "Add an automated test for wireSettingsNav (drawer self-close -> activeSurface returns to last non-settings; no re-entrant close) so this fix is regression-locked rather than relying on a one-time screenshot JSON. Packaged-app visual proof of the shell/settings polish remains separate release evidence (correctly deferred by the checklist).",
+    "tests": [
+     "tauri/ui tests/settings/drawer.spec.ts + tests/shell/shell.spec.ts + tests/shell/surface-mounts.spec.ts: 43 passed",
+     "tauri/ui tests/session/components.spec.ts + tests/session/router-teardown.spec.ts: 48 passed",
+     "npx tsc --noEmit (tauri/ui): clean, no errors"
+    ]
+   },
+   {
+    "commit": "440fcd56ccc97b758da22448ae36060dcee1c951",
+    "title": "fix(tts): make moss the only voice source",
+    "classification": "NEEDS_LIVE_PROOF",
+    "touches_speech_or_timing": false,
+    "hold_bleed": true,
+    "evidence": [
+     "git show 440fcd56 -- src/vibemix/agent/tts_chain.py: collapses _build_direct_chain + build_tts_chain to a single `_build_moss_chain()` that lazy-imports `build_local_tts_adapter`; all Cartesia/Gemini-native/OpenRouter/openai_plugin.TTS instantiation deleted. mode arg kept but no longer selects a provider; missing/old args silently accepted (`_ = (...)`).",
+     "src/vibemix/agent/local_tts.py:78 new `class LocalTTSUnavailable(RuntimeError)`; :307 new `build_local_tts_adapter()` raises LocalTTSUnavailable when `local_tts_enabled()` is False (model missing or VIBEMIX_LOCAL_TTS=0) — never returns a cloud adapter. local_tts_enabled()/local_tts_unavailable_reason() rewritten so VIBEMIX_LOCAL_TTS=0 disables speech but never enables fallback.",
+     "src/vibemix/agent/proxy_client.py: removed `import vibemix.agent.tts_chain` side-effect import, openai_plugin import, and the proxy/v1 openai_plugin.TTS path; build_proxy_tts_chain is now a shim returning build_local_tts_adapter(). git grep at HEAD: NOT-FOUND for openai_plugin.TTS/cartesia.TTS/gemini_native_tts in tts_chain.py, proxy_client.py, line_voice.py.",
+     "src/vibemix/__main__.py hunk: only swaps the build_tts_chain call args (drops openrouter_enabled/cartesia_api_key) + replaces the dynamic `-> tts:` banner with static `-> tts:   MOSS-TTS-Nano local only (provider=moss-local)` for BOTH direct and proxy. No coach/prompt/event/drop/dj_cohost hunk in this commit (file list confirms).",
+     "TARGETED TESTS PASS: `pytest tests/agent/test_tts_chain.py test_tts_chain_cartesia.py test_proxy_client.py test_local_tts.py test_line_voice.py test_livekit_google_slim.py` -> 33 passed; `pytest tests/test_main_smoke.py tests/test_phase05_verification.py` -> 37 passed, 1 skipped. New test_tts_chain.py::test_tts_chain_missing_moss_model_fails_loud asserts LocalTTSUnavailable + no FallbackAdapter built.",
+     "H-MOSS GATE CHECK: `git grep sentencepiece 440fcd56 -- vibemix-core.{macos,windows}.spec` => NOT-FOUND. Specs were NOT touched by this commit (git show --stat has no .spec). sentencepiece was added by a SEPARATE follow-up commit 07bf2f34 (`fix(packaging): bundle sentencepiece for moss tts`) 14 min later; present at HEAD (macos.spec:148, windows.spec:159).",
+     "Import-light invariant intact: `python -c import vibemix.agent.tts_chain` -> onnxruntime NOT eagerly loaded (build_local_tts_adapter is lazy-imported inside _build_moss_chain). unknown mode still raises ValueError.",
+     "Removed guards: old tests test_err_05_direct_without_gemini_key_raises / test_err_05_proxy_without_args_raises DELETED; __main__.py:1311/1322 call build_tts_chain with no try/except — missing MOSS model now propagates LocalTTSUnavailable and crashes main() boot (not test-covered; smoke tests mock build_tts_chain)."
+    ],
+    "proves": "The diff + 70 passing targeted tests prove the CODE contract: TTS in both direct and proxy mode resolves to a single local MOSS provider; all cloud TTS providers (Cartesia, Gemini-native, OpenRouter, proxy /v1 openai) are removed from the touched files; and a missing/disabled MOSS model raises LocalTTSUnavailable rather than silently falling back to a paid/cloud voice (test_tts_chain_missing_moss_model_fails_loud). The change is purely voice-engine/provider, not speech content or timing (no coach.py, prompts/, event_detector, drop_predict, dj_cohost touched), so it does not alter WHAT the co-host says or WHEN. Import-light invariant holds (onnxruntime not eager).",
+    "does_not_prove": "Does NOT prove the H-MOSS ship gate is satisfied WITHIN this commit: 440fcd56 makes MOSS the only voice but did NOT add sentencepiece to either PyInstaller spec — that landed only in the separate follow-up 07bf2f34, so a frozen build cut at exactly 440fcd56 would be silent. Does NOT prove the remaining H-MOSS gate items: no fresh frozen-build proof that sentencepiece/onnxruntime/MOSS model load in the packaged sidecar (H-PKG: latest signed artifact predates this state), no Kaan live ear-pass on the MOSS voice, no Windows-path proof, and no model-present-or-degrade-gracefully proof (when the MOSS model is uncached, build_tts_chain now raises LocalTTSUnavailable with no try/except at the __main__ call site -> boot crash; not test-covered). Does NOT prove any LIVE co-host audio (default `unit` env mocks build_tts_chain).",
+    "remaining": "1) Confirm the H-MOSS packaging gate is fully closed at HEAD: sentencepiece present in both specs (verified via 07bf2f34) AND a fresh frozen-build proof that the MOSS ONNX path loads in the sidecar (H-PKG: needs rebuild/re-sign). 2) Decide whether missing-MOSS should degrade gracefully vs crash boot — currently __main__.py:1311/1322 has no guard around build_tts_chain, so an uncached model takes the whole session down (mute is acceptable per anti-slop, a boot crash may not be). 3) Kaan live ear-pass on the MOSS voice + Windows model-cache path. None of these are code-defects in this commit; they are the open H-MOSS/H-PKG gate items."
+   }
+  ],
+  "bleed": {
+   "clean": true,
+   "violations": [],
+   "notes": "HOLD-BLEED SENTINEL: CLEAN. Verified at HEAD dc4702eb (6 new commits dc4702eb, baeac434, 07bf2f34, dd71213d, b16a9bf2, 440fcd56; staged set = NONE per `git diff --cached --name-only`).\n\nH-DROP — HELD (no bleed). The net-new spoken DROP call is DIRTY-ONLY (uncommitted + unstaged), parked correctly in \"Hold Lane - Mix Timing Oracle\":\n  - DROP speech block at src/vibemix/runtime/coach.py:696-718 (`if ev.type == \"DROP\": mastered_speak(reaction_line(drop_cue))`) — confirmed ABSENT from committed HEAD (`git show HEAD:src/vibemix/runtime/coach.py` has no DROP block); present only in `git diff` working tree.\n  - DROP event at src/vibemix/state/event_detector.py (+38, ceiling-priority `_fire(\"DROP\")` gated by `_drop_call_enabled_from_env()`) — dirty only, not in any new commit.\n  - Arm window at src/vibemix/state/drop_predict.py (+34, `DROP_ARM_WINDOW_S=2.0` / `should_arm_drop_call` / `drop_call_cue`) — dirty only.\n  - DEFAULT IS OFF (the prior `setdefault('VIBEMIX_DROP_CALL','1')` concern is RESOLVED). Committed baeac434 `__main__.py:_apply_packaged_defaults()` sets ONLY `VIBEMIX_LOCAL_TTS=1`; commit subject is literally \"default packaged voice without drop speech\" and tests/test_main_smoke.py (committed) assert `\"VIBEMIX_DROP_CALL\" not in os.environ` after defaults applied. grep of __main__.py (HEAD + dirty) shows no VIBEMIX_DROP_CALL setdefault. dd71213d's runtime/coach.py change is the Earned Wall refresh (`_emit_earned_wall_refresh`, Package 9), NOT a DROP call.\n  - vibemix-grounding-review: NO fresh run evidence found for the dirty DROP speech — but since the speech is neither committed nor staged, the gate is not yet due. It MUST run (and default stay off / Kaan sign-off + live on-beat proof) before this work may land.\n\nH-MOSS — hard ship-blocker (sentencepiece in specs) RESOLVED at source: committed 07bf2f34 adds \"sentencepiece\" to _LOCAL_AI_SUBMODULES hiddenimports AND collect_dynamic_libs in BOTH vibemix-core.macos.spec (lines 148, 169) and vibemix-core.windows.spec (lines 159, 180). MOSS-only (440fcd56) removes all cloud/spoken fallbacks and raises LocalTTSUnavailable on model-unavailable (tts_chain.py) — no spoken-slop fallback ships. Residual gates (Kaan live ear-pass, Windows path, MOSS-model-present-or-degrade) are KAAN/live, UNPROVEN here by design.\n\nH-CUE / H-WATCH / H-BEAT / H-PKG — no bleed: no commit or doc claims the gated behavior as done. export_serato.py:25-26 refusal line intact (\"green tests prove format conformance, not that product conclusion\"). package-checklist (committed) frames distribution as gated on a fresh signed/notarized DMG and lists remaining gates; no false \"shipped/signed/notarized DONE\" claim. watchfiles native-ext load is unproven (correctly, doc says verify before packaged claim).\n\nGround-state checks: dirty-package checker GREEN — `uv run python scripts/check_dirty_package_plan.py --strict-assignments` exit 0; DROP files map to \"Hold Lane - Mix Timing Oracle\" (4 dirty paths). Targeted tests GREEN: tests/test_main_smoke.py::test_apply_packaged_defaults_opts_moss_in_when_absent + ::respects_explicit_off + tests/state/test_drop_predict.py = 19 passed. Dirty audio/midi product files (deck_capture.py +226, deck_signal.py, midi/state.py) carry no say/speak/reaction_line — perception-only, in the Controller-Weighted Master Context hold lane.\n\nWATCH-ITEM (not a violation): the entire H-DROP speech path sits in the dirty tree. Because `git commit` absorbs all staged files across concurrent sessions, any future commit on this tree must HUNK-stage to avoid sweeping the DROP speech / event / arm hunks of runtime/coach.py + event_detector.py + drop_predict.py + __main__.py in without their grounding-review + default-off gate. A whole-file `git add` of those four would be a CRITICAL HOLD bleed."
+  },
+  "shipblocker": {
+   "blockers": [
+    {
+     "name": "MOSS model not bundled and no auto-download — frozen build crashes at boot on any machine without the ~670MB cache (MOSS is now the ONLY voice)",
+     "severity": "CRITICAL",
+     "why": "Commit 440fcd56 made MOSS the single voice source with no cloud fallback (tts_chain.py:26-30 _build_moss_chain -> build_local_tts_adapter). build_local_tts_adapter() raises LocalTTSUnavailable when the model is absent (local_tts.py:309-310). __main__.py constructs the chain at line 1311 (direct) and 1322 (proxy) with NO surrounding try/except — the raise propagates uncaught and crashes the sidecar at startup. The model is NOT in either PyInstaller spec (rg moss/datas/add_data in vibemix-core.macos.spec finds only the comment at line 139, no model data entry) and there is NO MOSS download path anywhere in src/vibemix/ (CLAP has model_assets.install_clap_model + clap_engine.py:172-202 autodownload; MOSS has no equivalent — rg moss --ignore-case | rg install/download/snapshot/hf_hub returns nothing). On Kaan's dev rig the model IS present (~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX/, 441M+230M data files, dated 31 May), which masks the failure locally. A fresh install = no model = hard boot crash, not even a silent co-host. This is the H-MOSS 'MOSS model present-or-degrade-gracefully' gate, currently FAILING.",
+     "evidence": "src/vibemix/agent/tts_chain.py:26-30,72 (MOSS-only, no fallback); src/vibemix/agent/local_tts.py:307-311 (raise LocalTTSUnavailable if not local_tts_enabled); src/vibemix/agent/local_tts.py:86-94 (local_tts_enabled = flag AND resolve_model_dir() is not None); src/vibemix/__main__.py:1311 and :1322 (build_tts_chain called with no try/except); rg 'moss|datas|add_data' vibemix-core.macos.spec -> only line 139 comment, no model bundling; rg moss across src/vibemix/ for install/download -> NOT-FOUND (no MOSS downloader); git show 440fcd56 (MOSS-only landed). Dev cache present: ~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX/ exists, masking the gap.",
+     "fix": "Either (a) wrap build_tts_chain() at __main__.py:1311/1322 in try/except LocalTTSUnavailable that degrades gracefully (boot with co-host muted + a clear stderr banner, never crash); AND/OR (b) add a MOSS auto-download path mirroring model_assets.install_clap_model (gated like _clap_autodownload_enabled); AND/OR (c) bundle the MOSS model in both PyInstaller specs via datas. At minimum the boot must not crash when the model is absent. Then rebuild+re-sign (see staleness blocker)."
+    },
+    {
+     "name": "Latest signed DMG is stale — predates MOSS-only, sentencepiece bundling, and the default-voice-ON commits; any packaged/signed claim is invalid",
+     "severity": "HIGH",
+     "why": "The newest signed artifact dist/fresh-20260601-latest/vibemix-0.0.1.dmg was built at 08:32 (stat mtime Jun 1 08:32:00 2026). The load-bearing TTS commits all land AFTER that: 440fcd56 MOSS-only (12:33), 07bf2f34 bundle sentencepiece incl collect_dynamic_libs (12:47), baeac434 default packaged voice ON without drop speech (12:53), e5c0e34e keep explicit local voice (12:18), plus dc4702eb (12:59). The build TOC build/vibemix-core.macos/Analysis-00.toc is even older (08:15) and was produced from a spec WITHOUT the explicit collect_dynamic_libs('sentencepiece') line (that line was added at 12:47). So the signed DMG neither reflects MOSS-only behavior nor the hardened sentencepiece native-lib collection. This is exactly the H-PKG hold: 'latest signed artifact dist/fresh-20260601-latest predates the staleness-replay fix and the MOSS-only/sentencepiece state.' Any 'packaged/signed/boots-clean' claim is UNPROVEN against current HEAD.",
+     "evidence": "stat dist/fresh-20260601-latest/vibemix-0.0.1.dmg = Jun 1 08:32:00 2026; git log times: 440fcd56=12:33, 07bf2f34=12:47, baeac434=12:53, dc4702eb=12:59 (all AFTER 08:32); build/vibemix-core.macos/Analysis-00.toc mtime = Jun 1 08:15:45 (predates the 12:47 spec fix); git show 07bf2f34 -- vibemix-core.macos.spec adds collect_dynamic_libs('sentencepiece') not present at build time.",
+     "fix": "Rebuild the sidecar from current HEAD with --extra ai-local, re-run the PyInstaller spec, re-sign + re-notarize + staple, and re-verify the DMG sidecar boots clean — only after the MOSS-model-absence boot crash is fixed (otherwise the rebuild will crash on a fresh machine). Treat all prior packaged claims as void until then."
+    },
+    {
+     "name": "MOSS model presence is unverifiable in the frozen bundle even with sentencepiece bundled — the runtime native dep is correct, but the MODEL gate is the silent/crash point",
+     "severity": "MED",
+     "why": "Good news first: both specs DO carry sentencepiece. vibemix-core.macos.spec lists 'sentencepiece' in _LOCAL_AI_SUBMODULES (line 148) and in the collect_dynamic_libs loop (line 169), and the prior build TOC already resolved the native lib (build/vibemix-core.macos/COLLECT-00.toc contains sentencepiece/_sentencepiece.cpython-312-darwin.so). Windows spec mirrors this (lines 159, 180). So the sentencepiece-missing-silent risk flagged in the scan is NOT present at current HEAD. HOWEVER, sentencepiece being bundled does not help if the MOSS ONNX MODEL is absent (the CRITICAL above) — the tokenizer dep loading correctly just gets you to the model-load step which then fails. Flagging MED so this is not mis-read as 'TTS fully shippable': the dep wiring is done, the model-provisioning gate is not.",
+     "evidence": "vibemix-core.macos.spec:148 (sentencepiece in _LOCAL_AI_SUBMODULES), :169 (collect_dynamic_libs loop includes sentencepiece); vibemix-core.windows.spec:159,180 (same); build/vibemix-core.macos/COLLECT-00.toc contains sentencepiece/_sentencepiece.cpython-312-darwin.so; git show 07bf2f34 confirms the spec additions. local_tts.py:281-283 raises APIError('MOSS local TTS model not found') even past dep load if model_dir is None.",
+     "fix": "Resolve via the CRITICAL fix (bundle the model or add download + graceful degrade). Then verify in the FROZEN bundle (not dev): launch the signed sidecar on a machine with the model present AND with it absent, confirm clean boot + audible voice in the first case and graceful mute (no crash) in the second. This is the H-MOSS frozen-path eye-check."
+    }
+   ],
+   "notes": "HEAD pinned at dc4702eb (2026-06-01 12:59). Tree is moving (untracked eval-run dirs churning) but no collision with my reads.\n\nGOOD NEWS / cleared concerns:\n1. DROP-call default is now OFF, not ON. The known-hold register's claim that __main__.py:803 setdefault('VIBEMIX_DROP_CALL','1') makes it ON-by-default is STALE — commit baeac434 changed line 803 to setdefault('VIBEMIX_LOCAL_TTS','1') only (git show baeac434). event_detector.py:65-69 _drop_call_enabled_from_env() is dormant by default (no DROP event emitted), and coach.py:704-718 only speaks on a DROP event. The new smoke tests assert VIBEMIX_DROP_CALL stays unset (tests/test_main_smoke.py, 3 passed). H-DROP 'flip default OFF' gate is now SATISFIED at source level. The net-new DROP speech does NOT ship in the default config.\n\n2. sentencepiece IS in BOTH PyInstaller specs (macos:148,169 / windows:159,180) including collect_dynamic_libs for the native lib — the scan's #1 'silent co-host' fear is NOT present. The remaining MOSS risk is the MODEL, not the tokenizer dep.\n\n3. dirty-package checker is GREEN: `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary` -> 'OK: 5270 dirty paths covered ... OK: every dirty path is assigned to an Include/Hold lane.' (exit 0). MOSS-only Voice Source is Package 14B; coach DROP speech is held in the Mix Timing Oracle hold lane.\n\n4. Speech-content commits since 09:00 reviewed for slop: 2376eed1 (fix(prompts): bound live audio vibe claims, matrix.py) is an anti-slop TIGHTENING — it bounds audio->cause/identity claims (AUDIO_VIBE_CONTRACT_BLOCK), aligned with Invariant #2/#3, not net-new speech. b3828752 (feat(observability): ground spoken ai turns) ADDS silence guards (_push_silence_pad_and_cancel('live_claim_guard'), manual_silence_short_circuit in dj_cohost.py) — anti-slop hardening, no new voiced fallback. Neither is a slop regression.\n\nLive-brain note (source-level only, NOT over-claimed): default mode is 'direct' (__main__.py:848) requiring GEMINI_API_KEY (line 861); absent key prints [FATAL] and the co-host cannot speak (line 869). Proxy mode (api.altidus.world) is gated on a JWT register. Whether a real key/proxy is provisioned is a Kaan-action, not verifiable here.\n\nDid NOT run the full suite (per read-only rules). Ran only: packaged-defaults + smoke_08 tests (3 passed), and the dirty-package checker (green). No live runtime/build proof attempted — all packaged/LIVE behavior left UNPROVEN per discipline.\n\nThe single thing standing between current HEAD and a shippable build: the MOSS-model-absence boot crash (CRITICAL) + a fresh rebuild/re-sign from HEAD (the existing DMG is stale by ~4.5h and predates every TTS-defining commit)."
+  },
+  "holdgate": {
+   "items": [
+    {
+     "hold_item": "H-MOSS",
+     "gate": "sentencepiece in BOTH PyInstaller specs (the main movable gate) + Kaan live ear-pass + Windows path + MOSS model present-or-degrade-gracefully",
+     "satisfied": "PARTIAL",
+     "evidence": "MOVABLE GATE CLEARED: sentencepiece is now in BOTH specs — vibemix-core.macos.spec:148 ('sentencepiece') and :169 (collect_dynamic_libs loop over 'av','onnxruntime','sentencepiece'); vibemix-core.windows.spec:159 and :180 — committed in 07bf2f34 (2026-06-01 12:47). It is a resolvable dep so the hidden-import binds: pyproject.toml:164 and :169 declare 'sentencepiece>=0.2'; uv.lock:1877-1884 pins sentencepiece 0.2.1 (incl cp312 macos wheels). local_tts.py:162 `import sentencepiece as spm` / :174 SentencePieceProcessor confirms the runtime need. MOSS-only landed at 440fcd56. REMAINING (runtime, UNPROVEN by me, read-only): no fresh PyInstaller build proves the bundled spec actually ships spm (see H-PKG — latest dmg predates this commit), no Kaan ear-pass, no Windows-path proof, no frozen-build proof the 728MB ONNX model loads. Source-level gate satisfied; live/packaged gate NOT."
+    },
+    {
+     "hold_item": "H-DROP",
+     "gate": "vibemix-grounding-review PASS + default flipped OFF (or Kaan sign-off) + live on-beat proof + predicted_drop_in_sec false-positive rate. NET-NEW SPEECH -> HARD hold.",
+     "satisfied": "PARTIAL",
+     "evidence": "ONE sub-gate cleared, three open. DEFAULT FLIPPED OFF: the old `__main__.py setdefault('VIBEMIX_DROP_CALL','1')` aggravator is GONE at HEAD — baeac434 (2026-06-01 12:53) added `_apply_packaged_defaults()` (__main__.py:774-788) which ONLY sets `os.environ.setdefault('VIBEMIX_LOCAL_TTS','1')` and the docstring states 'Drop-call speech remains opt-in'; `git diff HEAD -- __main__.py` shows NO drop-relevant working-tree change. The gate now lives solely in event_detector.py:65-69 `_drop_call_enabled_from_env()` = dormant unless VIBEMIX_DROP_CALL in {1,true,yes,on}, default OFF. (NOTE: the prior _verification-raw-wf_c96f6f8d.json calling it 'armed ON by default' is STALE — predates baeac434.) NOT CLEARED: (1) grounding-review NOT run — .planning/packets/2026-06-01/_verification-raw-wf_c96f6f8d.json: 'vibemix-grounding-review ... has NOT been run on this drop-call feature'; (2) NO live on-beat proof (UNPROVEN, no fresh runtime run); (3) predicted_drop_in_sec false-positive rate on real sets is UNMEASURED (per same packet). Also the DROP speech block is still UNCOMMITTED/dirty: coach.py:704-718 (`mastered_speak(reaction_line(drop_cue))`), event_detector.py +38 hunk, drop_predict.py +34 — all show in `git diff HEAD`. HARD hold stands."
+    },
+    {
+     "hold_item": "H-WATCH",
+     "gate": "Frozen-bundle proof the watchfiles native ext loads (packaged fs-watcher behavior).",
+     "satisfied": "NO",
+     "evidence": "Gate is effectively moot AND unsatisfied. NO watcher code exists: `rg 'watchfiles|awatch|Watcher|fs_watch' src/vibemix/` returns nothing — no fs-watcher to bundle or prove. watchfiles is NOT a declared pyproject dep (`rg 'watch' pyproject.toml` = only the project description line); it appears ONLY transitively in uv.lock:2280 (and as a sub-dep at :813). No frozen-bundle proof of the native ext loading exists (UNPROVEN — read-only, no build). So both the missing-feature and the missing-proof sides keep this NO."
+    },
+    {
+     "hold_item": "H-BEAT",
+     "gate": "A real BEATMATCH_GRADED producer + live owned-deck proof (currently intentionally uncreditable).",
+     "satisfied": "NO",
+     "evidence": "No production emitter. skill_recognizer.py:154 has the CONSUMER branch `if ev_type == 'BEATMATCH_GRADED':` and beatmatch_judge.py:146-153 defines the event-extra payload, but there is NO production call-site that fires a BEATMATCH_GRADED event. This is actively pinned by tests/repo/test_live_reality_pins.py (:27 'with no production emitter, a BEATMATCH_GRADED event can never...', :129 'THE load-bearing pin'). skill_tree.py:147 and tests/learn/test_creditability_drift.py:26 / test_skill_wall_what_remains.py:80 all confirm the Earned Wall caps beatmatch at 'Competent' until the producer lands. Only synthetic SimpleNamespace(type='BEATMATCH_GRADED') tests exercise the branch (test_judge_credits_beatmatch.py:58). No live owned-deck proof (UNPROVEN). Gate NOT satisfied."
+    },
+    {
+     "hold_item": "H-CUE",
+     "gate": "Cue-export 'renders in Serato/Mixxx/Rekordbox' — human eye-check in a real build.",
+     "satisfied": "NO",
+     "evidence": "The code still refuses to claim render, and no eye-check evidence exists. export_serato.py (HEAD) docstring: 'Whether a specific Mixxx/Serato/Rekordbox build renders the pad is a human eye-check — green tests prove format conformance, not that product conclusion.' Prior verification (_verification-raw-wf_c96f6f8d.json) confirms byte-conformance + round-trip tests pass (30 passed) but explicitly disclaims in-app pad rendering and notes the merge fixture/foreign-entry decode are synthetic, not captured real Serato payloads. No human eye-check in a real build is recorded (UNPROVEN, read-only). Gate NOT satisfied."
+    },
+    {
+     "hold_item": "H-PKG",
+     "gate": "ANY packaged/signed claim needs a rebuild/re-sign newer than the MOSS-only commit (latest signed artifact predates the staleness-replay fix + MOSS-only/sentencepiece state).",
+     "satisfied": "NO",
+     "evidence": "Latest signed artifact PREDATES the MOSS-only/sentencepiece state. dist/fresh-20260601-latest/vibemix-0.0.1.dmg is mtimed 2026-06-01 08:32 (and dist/vibemix-0.0.1.dmg = 2026-05-31 19:02; dist/vibemix-core = 08:15). But MOSS-only commit 440fcd56 = 2026-06-01 12:33, sentencepiece-bundle 07bf2f34 = 12:47, drop-default baeac434 = 12:53, HEAD dc4702eb = 12:59 — ALL ~4h AFTER the newest dmg. `find dist -name '*.dmg'` finds only the three pre-12:00 artifacts; none newer. Therefore no rebuild/re-sign contains the MOSS-only voice path or the bundled sentencepiece. Any packaged/signed claim = UNPROVEN; gate NOT satisfied until a fresh rebuild+re-sign post-440fcd56."
+    }
+   ],
+   "notes": "Read-only verification at HEAD dc4702eb (tree moving; working dir dirty with the uncommitted DROP-call lane + unrelated lanes). Summary of which holds are clearing:\n\nCLEARING: H-MOSS (movable source gate DONE — sentencepiece in both specs + declared dep) and H-DROP (the on-by-default aggravator is now resolved — baeac434 removed the __main__ setdefault and only defaults VIBEMIX_LOCAL_TTS=1; drop is dormant via event_detector.py:65-69).\n\nNOT CLEARING: H-WATCH (no watcher exists; watchfiles undeclared, only transitive uv.lock:2280), H-BEAT (no production BEATMATCH_GRADED emitter; pinned by test_live_reality_pins.py), H-CUE (code still refuses the render claim; no eye-check), H-PKG (latest signed dmg 08:32 predates MOSS-only 12:33 + sentencepiece 12:47 by ~4h — the artifact cannot contain the changes it must ship).\n\nSTALE-EVIDENCE CORRECTION: .planning/packets/2026-06-01/_verification-raw-wf_c96f6f8d.json repeatedly calls the drop-call 'armed ON by default' via __main__.py:803 setdefault('VIBEMIX_DROP_CALL','1'). That is STALE — it predates commit baeac434. At current HEAD there is NO such setdefault; the DROP default is OFF. The remaining H-DROP gate is purely the runtime/review items (grounding-review run, live on-beat proof, false-positive rate), not the default flag.\n\nUNPROVEN-BY-CONSTRUCTION (read-only, no live/build allowed): all LIVE behavior (co-host speaks, MOSS audio on real rig, drop lands on-beat) and all PACKAGED behavior (frozen bundle loads sentencepiece/MOSS model/watchfiles ext, in-app cue render) default to UNPROVEN. The single most actionable next step that would clear multiple holds at once: a fresh PyInstaller rebuild + re-sign at/after HEAD (clears the source side of H-PKG and lets H-MOSS/H-CUE/H-WATCH get their frozen-bundle proofs).\n\nTree-stability note: working tree carries the uncommitted DROP-call speech block (coach.py:704-718, event_detector.py, drop_predict.py) plus ~unrelated lanes in __main__.py — none of which is committed at HEAD, consistent with the HARD hold on H-DROP."
+  },
+  "board": {
+   "landed_since": [
+    "settings-nav fix (b16a9bf2 'fix(ui-shell): keep settings drawer navigation stable') — picker.ts/rocker.ts/group.ts/app.ts/shell.css; prior board's predicted SAFE_NOW item, now committed",
+    "freshness badge GUI (dc4702eb 'feat(tauri-ui): show library freshness in shell') — new tauri/ui/src/shell/LibraryFreshnessBadge.ts wired into app.ts, consumes stats.library_freshness; 3 vitest specs PASS",
+    "H-DROP 'default flipped OFF' gate (baeac434 'fix(runtime): default packaged voice without drop speech') — __main__.py no longer setdefaults VIBEMIX_DROP_CALL=1; _apply_packaged_defaults() opts in only MOSS voice, leaves drop-call dormant; tests assert VIBEMIX_DROP_CALL stays unset. NOTE: only the OFF-by-default gate is satisfied; the spoken DROP line itself remains HELD (grounding-review + live on-beat proof still owed)",
+    "H-MOSS sentencepiece-in-both-specs gate (07bf2f34 'fix(packaging): bundle sentencepiece for moss tts') — sentencepiece now in vibemix-core.macos.spec:148 + windows.spec:159 and both binary-collect loops. Source gate satisfied; frozen-build + Kaan ear-pass still owed (H-PKG)",
+    "moss-only voice source (440fcd56) + earned-wall refresh after live cited credits (dd71213d) also landed since baseline e5c0e34e"
+   ],
+   "next_safe_now": [
+    {
+     "name": "Cue-export GUI (surface the moat)",
+     "value": "Surfaces the documented moat (auto-cue export) to users for the first time — currently CLI-only and invisible in the app.",
+     "files_in": [
+      "tauri/src-tauri/src/library_cmds.rs",
+      "tauri/ui/src/ipc/messages.schema.json",
+      "tauri/ui/src/shell/ (new cue-export panel + app.ts wiring)",
+      "tauri/ui/src/shell/shell.css"
+     ],
+     "files_out": [
+      "src/vibemix/__main__.py (CLI already exposes `library cue` — reuse, do not edit; shared file is dirty/held by concurrent session)",
+      "src/vibemix/library/cue_folder.py (engine done)",
+      "src/vibemix/library/export_serato.py (H-CUE: code refuses to claim 'renders in Serato/Mixxx/Rekordbox' — keep that honesty; GUI must not over-promise)"
+     ],
+     "risk": "med",
+     "tests": [
+      "npm --prefix tauri/ui test -- tests/shell/<new-cue-panel>.spec.ts",
+      "npm --prefix tauri/ui run build (tsc --noEmit + vite)",
+      "npm --prefix tauri/ui run codegen:ipc (REQUIRED after schema edit — validator.generated.mjs is precompiled)",
+      "cargo test --manifest-path tauri/src-tauri/Cargo.toml library_cmds",
+      "ipc-wiring-checker skill on the new ipc.library.cue type"
+     ]
+    },
+    {
+     "name": "Real-audio cue-detection eval gate",
+     "value": "Automated correctness gate for the cue engine (the moat) — catches a cue-placement regression before a user imports a wrong-cue crate.",
+     "files_in": [
+      "tests/library/ (new real-audio cue eval, mirror the 51e414a1 fixture pattern: tests/library/fixtures/clap_real_corpus/)",
+      "scripts/eval/ (new cue_placement eval analogous to clap_retrieval.py)"
+     ],
+     "files_out": [
+      "src/vibemix/library/cue_detr.py",
+      "src/vibemix/library/cue_engine.py",
+      "src/vibemix/library/cue_folder.py"
+     ],
+     "risk": "low",
+     "tests": [
+      "uv run pytest tests/library/<new_real_cue_eval>.py -q"
+     ]
+    },
+    {
+     "name": "Source-safe live library watcher (P0 freshness, watcher half)",
+     "value": "Makes the freshness badge live (updates on source change) instead of boot-only, without depending on a restart.",
+     "files_in": [
+      "src/vibemix/library/staleness.py (add a watch loop fn beside emit_nudge_if_stale)",
+      "tests/library/test_staleness*.py (or new test_library_watcher.py)"
+     ],
+     "files_out": [
+      "pyproject.toml (do NOT declare watchfiles speculatively without packaging proof — H-WATCH)",
+      "src/vibemix/__main__.py (call-site wiring is dirty/held — defer until concurrent session lands)"
+     ],
+     "risk": "med",
+     "tests": [
+      "uv run pytest tests/library/test_library_watcher.py -q"
+     ]
+    }
+   ],
+   "notes": "HEAD = dc4702eb (verified). Baseline e5c0e34e still in linear history; 6 commits landed since (440fcd56, b16a9bf2, dd71213d, 07bf2f34, baeac434, dc4702eb). Tree is MOVING: working-tree has uncommitted M edits on shared files the concurrent Codex session owns — __main__.py, coach.py, event_detector.py, drop_predict.py, plus deck_capture/deck_signal/midi.state (the H-DROP/drop-call + deck-signal lanes are dirty-HELD). Do NOT stage those for the slices above; cue-export GUI and the watcher must avoid editing __main__.py/coach.py (use the existing `library cue` CLI as-is). CUE-EXPORT GUI STILL MISSING — re-confirmed by current grep: no cue command in library_cmds.rs (only the 11 listed), no cue-export view in tauri/ui/src, no ipc.library.cue schema type (schema has only import/import_progress/import_cancel/staleness_nudge/staleness_action). Backend proven green (18 cue-folder tests PASS). This remains the single highest-value clean slice. UNPROVEN per rules (no fresh runtime/build evidence this turn): any live co-host speech, audible-deck behavior, MOSS voice actually sounding in a frozen build, and any DMG/packaged claim — H-PKG note stands (latest signed artifact predates the MOSS-only + staleness-replay state, so a re-sign is owed before any packaged claim). H-DROP correction: the prior board/hold note said __main__.py setdefaults VIBEMIX_DROP_CALL=1 'ON by default' — that is now FALSE at HEAD; baeac434 removed it and added tests asserting it stays unset (event_detector.py:69 _drop_call_enabled_from_env reads VIBEMIX_DROP_CALL, dormant default). The spoken DROP line is still HELD for grounding-review + live on-beat proof, but the 'flip default OFF' sub-gate is satisfied. Dirty-package checker (scripts/check_dirty_package_plan.py --strict-assignments) not re-run this turn (read-only, no edits made) — flagged for the implementer before committing into the dirty shared files."
+  },
+  "verdicts": [
+   {
+    "target": "Hold-bleed sentinel scanner output (clean:true) verified at HEAD dc4702eb",
+    "overclaims": [],
+    "missed": [],
+    "corrected": "VERDICT UPHELD: CLEAN, no hold-bleed. Independently confirmed every load-bearing claim at HEAD dc4702eb (staged set = NONE, `git diff --cached --name-only` empty).\n\nH-DROP — HELD, no bleed (confirmed 3 ways):\n  1. Committed coach.py has NO DROP speech: `git show HEAD:src/vibemix/runtime/coach.py` mastered_speak call sites are :629 `_credit_live_skill_demo` (Earned Wall) and :803 `_run_live_judge` (Judge voice) — NOT DROP. No `ev.type == \"DROP\"` block in committed file.\n  2. DROP speech is DIRTY-ONLY: `git diff src/vibemix/runtime/coach.py` shows the entire `if ev.type == \"DROP\": mastered_speak(reaction_line(drop_cue))` block as `+` added lines (working tree :704-715). event_detector.py DROP (`_drop_call_enabled_from_env`, gated `_fire(\"DROP\")` at dirty diff line 73) and drop_predict.py (`DROP_ARM_WINDOW_S=2.0`, `should_arm_drop_call`, `drop_call_cue`) are absent from HEAD (`git show HEAD:... | grep -c` = 0 for both) — all `+` in diff.\n  3. DEFAULT IS OFF (prior `setdefault('VIBEMIX_DROP_CALL','1')` concern RESOLVED): committed `__main__.py:_apply_packaged_defaults()` line 784 sets ONLY `VIBEMIX_LOCAL_TTS`; grep of working-tree `__main__.py` for `VIBEMIX_DROP_CALL` is EMPTY (no setdefault even in dirty tree). Committed tests/test_main_smoke.py:1106 asserts `\"VIBEMIX_DROP_CALL\" not in os.environ` after defaults. The DROP `_fire` is gated `if self._drop_call_enabled:` which reads env (off by default). Grounding-review gate is NOT yet due (speech not committed/staged) — must run before this work lands.\n\nH-MOSS — RESOLVED at source, no bleed: committed `git show HEAD:vibemix-core.macos.spec` has `sentencepiece` at lines 148 + 169 (collect_dynamic_libs loop); windows.spec at 159 + 180. Committed tts_chain.py (440fcd56) docstring confirms \"voice has exactly one source: MossLocalTTS; cloud TTS keys are intentionally [unused]\" and raises `LocalTTSUnavailable` instead of cloud fallback (line ~60). No spoken-slop fallback ships. Residual gates (Kaan ear-pass, Windows path, MOSS-model-degrade) are KAAN/live — UNPROVEN here by design, correctly not claimed.\n\nH-CUE — no bleed: `export_serato.py` refusal line intact (\"green tests prove format conformance, not that product conclusion\"). No false \"renders in Serato/Mixxx/Rekordbox\" claim.\n\nH-WATCH / H-BEAT / H-PKG — no bleed: no commit/doc claims the gated behavior done; watchfiles native-ext load unproven (correct).\n\nGround-state checks GREEN: `scripts/check_dirty_package_plan.py --strict-assignments` exit 0 (DROP files → \"Hold Lane - Mix Timing Oracle\", 4 dirty paths). Targeted tests: tests/test_main_smoke.py (2 packaged-defaults tests) + tests/state/test_drop_predict.py = 19 passed. Dirty audio/midi product files (deck_capture.py, deck_signal.py, midi/state.py) carry zero say/speak/reaction_line/transcript_delta in added lines — perception-only confirmed.\n\nWATCH-ITEM (carried, not a violation): the H-DROP speech path is entirely dirty and `runtime/coach.py` is a SHARED file the dirty-package checker maps to committed lanes \"Package 8B / Package 9\". A whole-file `git add` of coach.py + event_detector.py + drop_predict.py + __main__.py would sweep the ungated DROP speech/event/arm hunks into a commit without their grounding-review + default-off + live on-beat gate = CRITICAL bleed. Any future commit on this tree MUST hunk-stage.",
+    "confidence": "high",
+    "notes": "Spot-checked the 2 most load-bearing items (H-DROP speech gate, H-MOSS spec gate) plus H-CUE and audio/midi perception-only via git show/diff, grep, Read, and targeted test runs. The scanner's verdict is accurate and its evidence anchors match what I independently observed. No overclaims, no missed violations. The scanner correctly identified the only real risk as a FUTURE hunk-staging hazard (not a current bleed). Tree is moving (concurrent Codex session) but HEAD was stable across all my reads (dc4702eb throughout); pinned to immutable git show for committed state."
+   },
+   {
+    "target": "Scanner output: ship-blocker scan (HEAD dc4702eb, 2026-06-01)",
+    "overclaims": [
+     "Scanner's note #3 claims the dirty-package checker is GREEN ('OK: 5270 dirty paths covered ... exit 0'). At current working tree it is RED: `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary` exits 1 with 'Dirty paths not assigned to an Include/Hold lane: tauri/ui/src/library/state-machine.ts'. The tree moved after the scan (a concurrent session left tauri/ui/src/library/state-machine.ts modified, +33 lines, unassigned to any lane). The scanner's snapshot was true at scan-time but is now stale — this violates the GROUND-STATE NOTE that the checker 'must stay GREEN'. NOT a speech/packaging gate, but a real planning-lane regression to flag.",
+     "Minor: CRITICAL blocker cites build_tts_chain call sites at __main__.py:1311 and :1322. Actual line numbers at HEAD dc4702eb are 1290 (direct) and 1301 (proxy). The substance (no surrounding try/except, raise propagates uncaught) is fully correct — only the line anchors drifted.",
+     "Scanner's cleared-concern #1 reasoning leans on the known-hold register's code shape (coach.py:704-718 mastered_speak(reaction_line(drop_cue)) + event_detector emitting a ceiling-priority DROP event). At HEAD that shape no longer exists: event_detector.py has NO DROP-event emission and NO VIBEMIX_DROP_CALL gating; coach.py's mastered_speak feeds the v11.0 Earned-Wall skill credit + live Judge, not a drop hype line. The drop voiced path (reaction_line) lives in runtime/drop_reaction.py which is imported by NOTHING in src/vibemix/ (git grep for its import returns empty = orphaned/unwired). The scanner's CONCLUSION (net-new DROP speech does not ship by default) is correct and even stronger than stated, but it credited the wrong evidence."
+    ],
+    "missed": [
+     "The drop-call voiced path (runtime/drop_reaction.py::reaction_line) is currently ORPHANED — no module under src/vibemix/ imports drop_reaction (git grep -ln for the import returns empty at HEAD). The scanner did not surface this; it matters because it means H-DROP is doubly safe (default OFF AND the speech function is unwired), but also flags that any future re-wiring of drop speech must re-trigger the full H-DROP gate (grounding-review + live on-beat proof).",
+     "The dirty-package checker turning RED on tauri/ui/src/library/state-machine.ts (see overclaims) is a missed ground-state regression — the scanner reported it green and did not catch the moving-tree drift."
+    ],
+    "corrected": "VERDICT: NOT SHIPPABLE at HEAD dc4702eb. The scanner's verdict is essentially CORRECT and its two real ship-blockers are independently confirmed.\n\nCONFIRMED BLOCKERS (holds NOT satisfied):\n1. CRITICAL / H-MOSS — MOSS-model-absent boot crash. VERIFIED: tts_chain.py:_build_moss_chain -> local_tts.py:build_local_tts_adapter() raises LocalTTSUnavailable when local_tts_enabled() is False (= model dir not cached, local_tts.py:88-94,307-310); the deeper MossLocalTTS._get_engine raises APIError('MOSS local TTS model not found') at local_tts.py:281-283. Both build_tts_chain call sites (__main__.py:1290 direct, :1301 proxy — NOT 1311/1322) have NO try/except; the enclosing try blocks (1157/1213/1219) all close before the call. No MOSS auto-download exists in src/vibemix/ (no snapshot/hf_hub/download in local_tts.py). Specs bundle sentencepiece but NOT the model (no datas entry for browser_poc_manifest.json / ONNX files in either spec). Since VIBEMIX_LOCAL_TTS defaults ON (__main__.py:784) and MOSS is the ONLY voice with no cloud fallback (440fcd56), a fresh machine = uncaught raise = sidecar crash at startup. H-MOSS 'present-or-degrade-gracefully' gate FAILING.\n2. HIGH / H-PKG — stale signed DMG. VERIFIED: dist/fresh-20260601-latest/vibemix-0.0.1.dmg mtime 2026-06-01 08:32:00 predates every TTS-defining commit (440fcd56 12:33, 07bf2f34 12:47, baeac434 12:53, dc4702eb 12:59). All packaged/signed/boots-clean claims are UNPROVEN against HEAD. H-PKG gate FAILING.\n3. MED — sentencepiece dep IS bundled (macos spec:148,169 collect_dynamic_libs; windows:159,180), so the tokenizer-missing risk is NOT present; the model-provisioning gate (= blocker 1) is the actual silent/crash point. Correct.\n\nCONFIRMED CLEARED (gate satisfied at source level):\n- H-DROP — DROP-call default is OFF. VERIFIED: _apply_packaged_defaults() setdefaults only VIBEMIX_LOCAL_TTS, not VIBEMIX_DROP_CALL (__main__.py:784); test-guarded (test_main_smoke.py:1106 asserts VIBEMIX_DROP_CALL not in os.environ; 30/30 smoke pass). The voiced drop path is additionally unwired/orphaned. Net-new DROP speech does NOT ship in default config.\n- No spoken-slop regression in speech commits since 09:00 (scanner's assessment of 2376eed1 / b3828752 as anti-slop tightening is plausible; not independently deep-audited here).\n\nONE OVERCLAIM (non-blocking but flag): dirty-package checker is now RED (exit 1, tauri/ui/src/library/state-machine.ts unassigned), not GREEN as the scanner reported — the tree moved under the scan. Per the GROUND-STATE NOTE it must stay green before landing; a lane assignment is needed.\n\nBottom line: the single thing between HEAD and a shippable build remains the MOSS-model-absence boot crash + a fresh rebuild/re-sign — exactly as the scanner concluded. No speech/packaging hold has bled through ungated.",
+    "confidence": "high",
+    "notes": "Read-only verification only; no edits/staging. Independently confirmed via git show/grep + Read: 440fcd56 (MOSS-only), local_tts.py raise paths, __main__.py call sites (1290/1301) with no try/except, absence of MOSS downloader, spec contents (sentencepiece yes / model no), DMG mtime 08:32 vs commit times, _apply_packaged_defaults at HEAD, smoke test guard (30 passed). Ran ONLY: tests/test_main_smoke.py (30 passed) + the dirty-package checker (exit 1). Did NOT attempt any live runtime or frozen-build proof — all LIVE/PACKAGED behavior left UNPROVEN per discipline; the boot-crash blocker is established by static call-path analysis (uncaught raise on absent model), not by running the sidecar. Tree is MOVING (concurrent session modified tauri/ui/src/library/state-machine.ts during my reads), which flipped the dirty-package checker red after the scan — noted as instability. HEAD pinned dc4702eb throughout."
+   },
+   {
+    "target": "hold-gate-recheck (scanner output for H-MOSS/H-DROP/H-WATCH/H-BEAT/H-CUE/H-PKG at HEAD dc4702eb)",
+    "overclaims": [],
+    "missed": [],
+    "corrected": "VERDICT: Scanner output is ACCURATE on all six holds and on its load-bearing stale-evidence correction. I independently spot-checked the 4 most load-bearing items and found nothing to refute.\n\nH-DROP (the scanner's headline correction) — CONFIRMED CORRECT. At HEAD dc4702eb the `setdefault('VIBEMIX_DROP_CALL','1')` aggravator is GONE: `git show HEAD:src/vibemix/__main__.py | grep DROP_CALL` = no match (exit 1), AND the working tree has NO DROP_CALL reference either (grep exit 1), AND `git diff HEAD -- __main__.py` shows zero DROP_CALL hunks (exit 1). Commit baeac434 (2026-06-01 12:53) replaced it with `_apply_packaged_defaults()` (__main__.py:793, called at :817) which sets ONLY `os.environ.setdefault('VIBEMIX_LOCAL_TTS','1')` (line 803); the docstring at :800-801 explicitly states \"Drop-call speech remains opt-in until the mix-timing oracle has live grounding proof.\" The drop default now lives solely in event_detector.py:65-69 `_drop_call_enabled_from_env()` = OFF unless VIBEMIX_DROP_CALL in {1,true,yes,on}. The prior verification packet `_verification-raw-wf_c96f6f8d.json` (mtimed 12:32, ~21min BEFORE baeac434) repeatedly calls drop \"ARMED ON BY DEFAULT via __main__.py:803\" — that IS stale, exactly as the scanner states. H-DROP HARD hold still stands: the DROP speech block (coach.py +24 hunk at ~:696-718, drop_predict.py +34, event_detector.py +38) is UNCOMMITTED and UNSTAGED (confirmed absent from `git diff --cached`, present in `git diff`); grounding-review NOT run; no live on-beat proof; false-positive rate unmeasured.\n\nH-MOSS — CONFIRMED PARTIAL. Movable source gate cleared: sentencepiece in BOTH specs (macos.spec:148 + :169, windows.spec:159 + :180; committed 07bf2f34 @12:47); declared dep pyproject.toml:164/:169. Runtime/packaged gate UNPROVEN (read-only, no fresh build) — correct.\n\nH-PKG — CONFIRMED NO. Newest dmg = dist/fresh-20260601-latest/vibemix-0.0.1.dmg @ 1 June 08:32; sidecar @08:15. ALL post-MOSS commits (440fcd56 @12:33, 07bf2f34 @12:47, baeac434 @12:53, HEAD @12:59) postdate the artifact by ~4h. No dmg newer than 12:00 exists. Gate correctly NOT satisfied.\n\nH-BEAT — CONFIRMED NO. Only consumer (skill_recognizer.py:154 `if ev_type == \"BEATMATCH_GRADED\"`) + payload helper (beatmatch_judge.py:146) + synthetic tests; NO production emitter; pinned by tests/repo/test_live_reality_pins.py. (Trivial drift: test docstring cites skill_recognizer.py:158, actual code is :154 — non-substantive.)\n\nH-CUE — CONFIRMED NO. export_serato.py:25-26 still disclaims in-app render (\"human eye-check... format conformance, not that product conclusion\"). No eye-check evidence.\n\nH-WATCH — CONFIRMED NO/moot. `rg watchfiles|awatch|Watcher|fs_watch src/vibemix/` = no match; not in pyproject.toml; only transitive in uv.lock:813/:2280-2294. No watcher feature exists and no frozen-bundle proof.",
+    "confidence": "high",
+    "notes": "Read-only verification at HEAD dc4702eb. Independently spot-checked the 4 most load-bearing items via git show/diff (immutable blob + working tree), rg, Read, and dist artifact mtimes — no live/build runs (per rules; all LIVE/PACKAGED behavior correctly defaults to UNPROVEN). No overclaims and no missed violations found in the scanner output.\n\nThe scanner's most important contribution is correct and well-evidenced: it caught that the earlier verification packet (_verification-raw-wf_c96f6f8d.json) is STALE on H-DROP. That packet's central \"on-by-default contradiction\" finding (__main__.py:803 setdefault DROP_CALL=1) was true at 12:32 but was resolved by commit baeac434 at 12:53. A scanner that blindly trusted the packet would have falsely reported H-DROP as carrying an on-by-default speech violation. The scanner correctly demoted that to \"default flipped OFF\" while keeping the HARD hold for the still-open runtime gates (grounding-review, live on-beat proof, FP rate) and the still-uncommitted speech block.\n\nTree-stability note: working tree dirty with the uncommitted DROP-call lane (coach.py/drop_predict.py/event_detector.py + test) plus unrelated lanes (deck_capture/deck_signal/midi/state, tauri library-freshness). None of the DROP speech files are committed or staged at HEAD — consistent with H-DROP remaining a HARD hold. The single highest-leverage next action (clears the source side of H-PKG and unlocks frozen-bundle proofs for H-MOSS/H-CUE/H-WATCH) is a fresh PyInstaller rebuild + re-sign at/after HEAD dc4702eb.\n\nMinor non-substantive nit (NOT an overclaim): the scanner cites the H-BEAT consumer at skill_recognizer.py:158 in one place — that is the line the TEST docstring references; the actual code branch is at :154. Does not change the verdict (no production emitter either way)."
+   }
+  ]
+ }
+}
