@@ -1020,7 +1020,7 @@ def build_curator_instruction(lens: str = "tutor") -> str:
       * :data:`CITATION_GRAMMAR_BLOCK` (live-event ``[citation]`` grammar),
       * :data:`IM_LISTENING_FRAGMENT` (the audio fail-soft rule),
       * :data:`TTS_TAG_DSL_BLOCK` / :data:`COACH_TAG_DSL_BLOCK` /
-        :data:`COACH_CLOSING_BLOCK` (Gemini TTS expressivity tags).
+        :data:`COACH_CLOSING_BLOCK` (legacy voice-expression tag guidance).
 
     A curator emits a text M3U/JSON playlist — it has no voice delivery and no
     live-event stream, so those blocks would be noise (or worse, misleading

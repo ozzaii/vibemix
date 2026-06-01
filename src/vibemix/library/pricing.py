@@ -186,7 +186,8 @@ MODEL_PRICING: dict[str, PriceRow] = dict(
                 "quoted per-character SKU. Current public page lists Sonic-3.5 minutes "
                 "and plan prices but no exact per-character conversion; keep this row "
                 "unverified until account billing confirms the current effective rate. "
-                "Live primary voice (Gemini TTS is mute live); router id sonic-3.",
+                "Historical paid-voice sensitivity row only; production speech is local "
+                "MOSS. Router id sonic-3.",
             ),
         ),
         (

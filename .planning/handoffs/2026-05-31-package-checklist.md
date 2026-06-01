@@ -6471,6 +6471,44 @@ Remaining gate:
 - This is a docs/contract cleanup only. It does not prove packaged MOSS voice,
   release artifact readiness, or live FLX4 audio behavior.
 
+## Package 14L - MOSS-only Source Notes Contract
+
+Suggested commit: `docs(tts): remove stale cloud voice source notes`
+
+Packaging decision: MOSS-only needs to be true in source-facing comments and
+source data too, not only in docs. This package removes stale comments/pricing
+notes that still describe Cartesia/Gemini as the live voice or fallback chain,
+while leaving runtime provider behavior untouched.
+
+Include:
+
+- `src/vibemix/library/pricing.py`
+- `tests/library/test_pricing.py`
+- `scripts/automix_demo_smoke.py`
+- `src/vibemix/prompts/matrix.py`
+- `src/vibemix/platform/_audio_windows.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime TTS provider selection or model download/bundle behavior.
+- Product pricing math; only wording and the guard assertion change.
+- Co-host prompt semantics beyond stale comment wording.
+- Live/packaged voice claims.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_pricing.py tests/library/test_cost.py tests/scripts/test_demo_film_no_ai_vo.py tests/test_audio_macos.py`
+- `uv run ruff check src/vibemix/library/pricing.py tests/library/test_pricing.py scripts/automix_demo_smoke.py src/vibemix/prompts/matrix.py src/vibemix/platform/_audio_windows.py`
+- `rg -n "Live primary voice|Cartesia Sonic .*Gemini|Cartesia.*fallback|Gemini TTS expressivity|Gemini TTS streams produce|Cartesia needs it" src scripts tests docs --glob '!docs/launch/**' --glob '!scripts/local_tts_speak.py' --glob '!tests/library/test_pricing.py'`
+- `git diff --check -- src/vibemix/library/pricing.py tests/library/test_pricing.py scripts/automix_demo_smoke.py src/vibemix/prompts/matrix.py src/vibemix/platform/_audio_windows.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- This is source-data/comment cleanup only. It does not prove packaged MOSS
+  model availability, live voice quality, or real FLX4 audio behavior.
+
 Reason:
 
 - `SettingsDrawer.ts` still listed old Gemini voice ids (`kore`, `puck`,

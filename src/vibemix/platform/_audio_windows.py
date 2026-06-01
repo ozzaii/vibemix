@@ -291,7 +291,7 @@ class AudioWindows:
         """Open AI voice output (paInt16 mono — to user-selected device).
 
         24kHz int16 mono — same params as the macOS ``RawOutputStream``-equivalent,
-        same shape Gemini TTS streams produce.
+        same shape the local TTS path produces.
         """
         import pyaudiowpatch as pa
 

@@ -72,6 +72,8 @@ def test_cartesia_sonic_price_is_derived_not_an_official_sku() -> None:
     assert "LEGACY_DERIVED" in row.notes
     assert "unverified" in row.notes.lower()
     assert row.tts_per_1m_char_usd == 29.9
+    assert "production speech is local MOSS" in row.notes
+    assert "Live primary voice" not in row.notes
 
 
 def test_moss_local_tts_is_the_verified_zero_cost_voice_row() -> None:

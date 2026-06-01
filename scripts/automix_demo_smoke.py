@@ -28,10 +28,9 @@ from __future__ import annotations
 
 import argparse
 import time
+from pathlib import Path
 
 import numpy as np
-
-from pathlib import Path
 
 from vibemix.audio.cues import track_cues_from_audio
 from vibemix.audio.miniplayer import MiniDeck
@@ -46,11 +45,11 @@ _MODES = {m.name.lower(): m for m in TransitionMode}
 def _prerender_voice(texts: list[str], *, target_sr: int) -> dict[str, np.ndarray]:
     """Synthesize each unique reaction line in the LIVE co-host voice, once, up front.
 
-    Drives the EXACT live TTS chain (Cartesia Sonic → Gemini ``Achird`` → standby)
-    via ``agent.line_voice`` and resamples each line to the deck rate so the audio
+    Drives the exact local MOSS-only line voice via ``agent.line_voice`` and
+    resamples each line to the deck rate so the audio
     callback can mix it sample-accurately. The reel is deterministic, so every line
-    is known before audio starts — no mid-playback network stall. Network failure /
-    missing key degrades to ``{}`` (print-only), never crashes the demo.
+    is known before audio starts — no mid-playback provider stall. Missing local
+    model/runtime support degrades to ``{}`` (print-only), never crashes the demo.
     """
     import asyncio
 
@@ -58,7 +57,7 @@ def _prerender_voice(texts: list[str], *, target_sr: int) -> dict[str, np.ndarra
     from vibemix.audio.resample import resample_audio
 
     async def _run() -> dict[str, np.ndarray]:
-        adapter = build_default_line_adapter()  # built inside the loop (Cartesia needs it)
+        adapter = build_default_line_adapter()
         out: dict[str, np.ndarray] = {}
         try:
             for text in texts:
@@ -74,7 +73,7 @@ def _prerender_voice(texts: list[str], *, target_sr: int) -> dict[str, np.ndarra
             aclose = getattr(adapter, "aclose", None)
             if aclose is not None:
                 try:
-                    await aclose()  # close the Cartesia aiohttp session (no leak warning)
+                    await aclose()
                 except Exception:  # pragma: no cover — best-effort cleanup
                     pass
         return out
@@ -221,7 +220,7 @@ def main() -> None:
     print(f"-> mode={mode.name.lower()} transition={args.transition}s  cut={plan.is_cut}")
     print(f"-> fade {fade_begin_sec:.1f}s .. {fade_end_sec:.1f}s  |  play window {start_sec:.1f}s .. {fade_end_sec + args.tail:.1f}s")
     print("-> reel (the AI calls the drop):")
-    for b, sb in zip(reel.beats, spoken):
+    for b, sb in zip(reel.beats, spoken, strict=True):
         print(f"     t={b.t_sec:7.2f}s  pos={b.from_playposition:.3f}  [{b.cue}]  “{sb.text}”")
 
     if args.dry_run:
@@ -253,7 +252,7 @@ def main() -> None:
     # (None when that line didn't synth — it still prints, just doesn't speak).
     voice_plan = [
         (b.from_playposition * from_total, i, sb.text, voice_pcm.get(sb.text))
-        for i, (b, sb) in enumerate(zip(reel.beats, spoken))
+        for i, (b, sb) in enumerate(zip(reel.beats, spoken, strict=True))
     ]
     duck = float(args.duck)
     vstate: dict = {"active": None, "cursor": 0, "fired": set()}
@@ -299,7 +298,7 @@ def main() -> None:
             progress = step_progress(plan, frac, state["prev_progress"])
             state["prev_progress"] = progress
             deck.xfader = progress  # crossfade locked to the deck's real position
-            for b, sb in zip(reel.beats, spoken):
+            for b, sb in zip(reel.beats, spoken, strict=True):
                 if b.cue not in state["fired"] and frac >= b.from_playposition:
                     print(f"   >> {cur_sec:6.2f}s  [{b.cue}]  “{sb.text}”")
                     state["fired"].add(b.cue)
