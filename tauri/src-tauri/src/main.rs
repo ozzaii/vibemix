@@ -37,8 +37,6 @@ mod updater;
 mod wizard_cmds;
 mod ws_client;
 
-use std::fs;
-
 use tauri::{Listener, Manager};
 
 use crate::debrief_window::DebriefSidecarHandle;
@@ -132,14 +130,7 @@ fn main() {
 
             // Resolve rotating-log path. Falls back to a temp path if app-local
             // dir resolution fails (should be impossible on macOS/Windows).
-            let log_path = match app.path().app_local_data_dir() {
-                Ok(dir) => {
-                    let logs_dir = dir.join("vibemix").join("logs");
-                    let _ = fs::create_dir_all(&logs_dir);
-                    logs_dir.join("sidecar.log")
-                }
-                Err(_) => std::env::temp_dir().join("vibemix-sidecar.log"),
-            };
+            let log_path = sidecar::sidecar_log_path(&app_handle);
 
             let wizard_mode = config::is_first_run(&app_handle);
             let primary_surface = config::load_primary_surface(&app_handle).unwrap_or_default();
@@ -157,11 +148,11 @@ fn main() {
             } else {
                 let sidecar_app = app_handle.clone();
                 let sidecar_log = log_path.clone();
-                tauri::async_runtime::spawn(async move {
-                    let _ =
-                        sidecar::spawn_sidecar_with_watchdog(sidecar_app, wizard_mode, sidecar_log)
-                            .await;
-                });
+                if let Err(e) =
+                    sidecar::spawn_sidecar_supervisor(sidecar_app, wizard_mode, sidecar_log)
+                {
+                    tracing::error!("sidecar supervisor launch failed: {e}");
+                }
             }
 
             // WS bus client.
@@ -280,6 +271,12 @@ fn main() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                sidecar::request_sidecar_shutdown(app_handle);
+            }
+            _ => {}
+        });
 }

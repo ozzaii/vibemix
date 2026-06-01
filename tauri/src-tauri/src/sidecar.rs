@@ -10,15 +10,15 @@
 //! (10 MB × 5 files per CONTEXT decision D-Area-1.4).
 //!
 //! The `restart_sidecar` `#[tauri::command]` is wired to the crash banner's
-//! Restart button — Wave 2 publishes it as a stub command that emits a
-//! state event but does not actually re-invoke `spawn_sidecar_with_watchdog`
-//! (the watchdog loop has already exited at that point; respawning requires
-//! a separate task channel that Wave 4 will add). The capability allowlist
-//! locks at Wave 2 so we never surface "not allowed by ACL" later.
+//! Restart button. If the watchdog is still active, the command terminates
+//! the current child and lets the watchdog restart it. If the watchdog has
+//! already exited, it starts a fresh supervisor task.
 
-use std::io::{BufRead, BufReader, Write};
+use std::fs;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{Command as StdCommand, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -30,6 +30,7 @@ use tauri_plugin_shell::ShellExt;
 use crate::config;
 
 const MAX_RESTARTS: u32 = 3;
+const SIDECAR_TERM_GRACE_MS: u64 = 1500;
 
 /// Environment keys the watchdog relays from the Tauri parent process to the
 /// spawned sidecar, IF present and non-empty (RELEASE-AUTH). SECURITY: this is
@@ -63,6 +64,62 @@ where
 {
     let _ = env;
     Vec::new()
+}
+
+type SharedSidecarLog = Arc<Mutex<FileRotate<AppendCount>>>;
+
+fn terminate_std_pid(pid: u32) {
+    #[cfg(unix)]
+    {
+        let pid = pid as libc::pid_t;
+        // Ask the Python sidecar to shut down first so its signal handlers and
+        // atexit cleanup can run. The packaged proof on 2026-06-01 showed this
+        // can hang, so release the port with SIGKILL after a short grace.
+        unsafe {
+            libc::kill(pid, libc::SIGTERM);
+        }
+        let attempts = SIDECAR_TERM_GRACE_MS / 100;
+        for _ in 0..attempts {
+            let alive = unsafe { libc::kill(pid, 0) == 0 };
+            if !alive {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        unsafe {
+            libc::kill(pid, libc::SIGKILL);
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = pid;
+    }
+}
+
+fn drain_sidecar_stream_to_log<R>(mut stream: R, log: SharedSidecarLog)
+where
+    R: Read + Send + 'static,
+{
+    std::thread::spawn(move || {
+        let mut buf = [0_u8; 8192];
+        loop {
+            match stream.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    let text = String::from_utf8_lossy(&buf[..n]);
+                    if let Ok(mut g) = log.lock() {
+                        let _ = write!(g, "{text}");
+                    }
+                }
+                Err(e) => {
+                    if let Ok(mut g) = log.lock() {
+                        let _ = writeln!(g, "[sidecar log drain err] {e}");
+                    }
+                    break;
+                }
+            }
+        }
+    });
 }
 
 /// Target triple of the bundled sidecar. Matches the per-triple directory
@@ -123,13 +180,7 @@ impl SidecarChild {
                 .kill()
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
             SidecarChild::Std { pid } => {
-                // SAFETY: libc::kill is the POSIX kill syscall; SIGTERM (15)
-                // requests graceful exit (Python's signal handlers run).
-                // Returns -1 + errno on failure; we ignore (already-dead is
-                // not an error in our supervision flow).
-                unsafe {
-                    libc::kill(pid as libc::pid_t, libc::SIGTERM);
-                }
+                terminate_std_pid(pid);
                 Ok(())
             }
         }
@@ -138,24 +189,121 @@ impl SidecarChild {
 
 /// Shared handle to the most-recently-spawned sidecar child. `restart_sidecar`
 /// reads this to kill the current process; the watchdog loop refreshes it on
-/// every spawn. Wave 4 may extend this struct with a wake-up channel.
+/// every spawn. `supervisor_active` prevents duplicate watchdog tasks when the
+/// crash banner is clicked repeatedly or while the existing watchdog is still
+/// handling a child restart.
 pub struct SidecarHandle {
     pub child: Arc<Mutex<Option<SidecarChild>>>,
+    supervisor_active: Arc<Mutex<bool>>,
+    shutdown_requested: Arc<AtomicBool>,
 }
 
 impl Default for SidecarHandle {
     fn default() -> Self {
         SidecarHandle {
             child: Arc::new(Mutex::new(None)),
+            supervisor_active: Arc::new(Mutex::new(false)),
+            shutdown_requested: Arc::new(AtomicBool::new(false)),
         }
     }
+}
+
+struct SupervisorRunGuard {
+    active: Arc<Mutex<bool>>,
+}
+
+impl Drop for SupervisorRunGuard {
+    fn drop(&mut self) {
+        if let Ok(mut active) = self.active.lock() {
+            *active = false;
+        }
+    }
+}
+
+fn acquire_supervisor_run(app: &AppHandle) -> Result<SupervisorRunGuard, String> {
+    let state = app
+        .try_state::<SidecarHandle>()
+        .ok_or_else(|| "sidecar handle not initialised".to_string())?;
+    let active = state.supervisor_active.clone();
+    let mut guard = active
+        .lock()
+        .map_err(|_| "sidecar supervisor state lock poisoned".to_string())?;
+    if *guard {
+        return Err("sidecar supervisor is already running".to_string());
+    }
+    *guard = true;
+    drop(guard);
+    Ok(SupervisorRunGuard { active })
+}
+
+fn supervisor_is_active(app: &AppHandle) -> bool {
+    app.try_state::<SidecarHandle>()
+        .and_then(|state| state.supervisor_active.lock().ok().map(|active| *active))
+        .unwrap_or(false)
+}
+
+fn sidecar_shutdown_requested(app: &AppHandle) -> bool {
+    app.try_state::<SidecarHandle>()
+        .map(|state| state.shutdown_requested.load(Ordering::SeqCst))
+        .unwrap_or(false)
+}
+
+fn clear_sidecar_shutdown_requested(app: &AppHandle) {
+    if let Some(state) = app.try_state::<SidecarHandle>() {
+        state.shutdown_requested.store(false, Ordering::SeqCst);
+    }
+}
+
+pub(crate) fn request_sidecar_shutdown(app: &AppHandle) {
+    if let Some(state) = app.try_state::<SidecarHandle>() {
+        state.shutdown_requested.store(true, Ordering::SeqCst);
+        if let Ok(mut guard) = state.child.lock() {
+            if let Some(child) = guard.take() {
+                let _ = child.kill();
+            }
+        }
+    }
+    app.emit("sidecar-state", serde_json::json!({ "state": "stopped" }))
+        .ok();
+}
+
+pub(crate) fn sidecar_log_path(app: &AppHandle) -> PathBuf {
+    match app.path().app_local_data_dir() {
+        Ok(dir) => {
+            let logs_dir = dir.join("vibemix").join("logs");
+            let _ = fs::create_dir_all(&logs_dir);
+            logs_dir.join("sidecar.log")
+        }
+        Err(_) => std::env::temp_dir().join("vibemix-sidecar.log"),
+    }
+}
+
+/// Start the sidecar watchdog as a background task.
+///
+/// Returns an error if another supervisor task is already active; otherwise
+/// the task owns the active guard until the watchdog exits.
+pub fn spawn_sidecar_supervisor(
+    app: AppHandle,
+    wizard_mode: bool,
+    log_path: PathBuf,
+) -> Result<(), String> {
+    clear_sidecar_shutdown_requested(&app);
+    let run_guard = acquire_supervisor_run(&app)?;
+    tauri::async_runtime::spawn(async move {
+        let _run_guard = run_guard;
+        let app_for_error = app.clone();
+        if let Err(e) = run_sidecar_with_watchdog(app, wizard_mode, log_path).await {
+            app_for_error.emit("sidecar-error", e).ok();
+        }
+    });
+    Ok(())
 }
 
 /// Spawn the PyInstaller-built `vibemix-core` binary and supervise it.
 ///
 /// Up to MAX_RESTARTS restarts. On clean exit (code 0) returns `Ok(())`.
 /// On exhaustion emits `sidecar-crashed` and returns `Err(...)`.
-pub async fn spawn_sidecar_with_watchdog(
+async fn run_sidecar_with_watchdog(
     app: AppHandle,
     wizard_mode: bool,
     log_path: PathBuf,
@@ -173,6 +321,11 @@ pub async fn spawn_sidecar_with_watchdog(
     let mut wizard_mode = wizard_mode;
     let mut restart_count: u32 = 0;
     loop {
+        if sidecar_shutdown_requested(&app) {
+            app.emit("sidecar-state", serde_json::json!({ "state": "stopped" }))
+                .ok();
+            return Ok(());
+        }
         // First attempt fires immediately; retries sleep so the OS releases
         // 127.0.0.1:8765 cleanly before the next spawn.
         if restart_count > 0 {
@@ -298,24 +451,8 @@ pub async fn spawn_sidecar_with_watchdog(
                 // handle, so the stdio takes happen BEFORE the wait future.
                 let stdout = child.stdout.take().expect("Stdio::piped configured above");
                 let stderr = child.stderr.take().expect("Stdio::piped configured above");
-                let log_stdout = log.clone();
-                std::thread::spawn(move || {
-                    let reader = BufReader::new(stdout);
-                    for line in reader.lines().map_while(Result::ok) {
-                        if let Ok(mut g) = log_stdout.lock() {
-                            let _ = writeln!(g, "{line}");
-                        }
-                    }
-                });
-                let log_stderr = log.clone();
-                std::thread::spawn(move || {
-                    let reader = BufReader::new(stderr);
-                    for line in reader.lines().map_while(Result::ok) {
-                        if let Ok(mut g) = log_stderr.lock() {
-                            let _ = writeln!(g, "{line}");
-                        }
-                    }
-                });
+                drain_sidecar_stream_to_log(stdout, log.clone());
+                drain_sidecar_stream_to_log(stderr, log.clone());
 
                 // Move the blocking wait off the tokio worker via
                 // spawn_blocking so other async tasks keep ticking.
@@ -399,6 +536,12 @@ pub async fn spawn_sidecar_with_watchdog(
             if let Ok(mut guard) = state.child.lock() {
                 *guard = None;
             }
+        }
+
+        if sidecar_shutdown_requested(&app) {
+            app.emit("sidecar-state", serde_json::json!({ "state": "stopped" }))
+                .ok();
+            return Ok(());
         }
 
         if exit_code == 0 {
@@ -686,6 +829,21 @@ mod tests {
         assert_eq!(MAX_RESTARTS, 3);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn terminate_std_pid_escalates_when_term_is_ignored() {
+        let mut child = StdCommand::new("/bin/sh")
+            .arg("-c")
+            .arg("trap '' TERM; exec sleep 30")
+            .spawn()
+            .expect("spawn term-ignoring child");
+
+        terminate_std_pid(child.id());
+
+        let status = child.wait().expect("reap child");
+        assert!(!status.success(), "SIGKILL fallback should stop the child");
+    }
+
     #[test]
     fn read_last_log_line_returns_non_empty_tail() {
         let mut f = NamedTempFile::new().unwrap();
@@ -938,12 +1096,14 @@ mod tests {
 
 /// Webview-callable restart trigger — wired to the crash banner button.
 ///
-/// Wave 2 stub: kills the current child if present and emits a state event.
-/// Wave 4 wires the actual respawn — the watchdog has already exited by the
-/// time the user sees the banner, so we need a separate channel to restart
-/// the supervisor.
+/// If the supervisor is still active, killing the current child is enough:
+/// the watchdog sees the non-zero termination and respawns it. If the
+/// supervisor has already exited, this starts a new supervisor task so the
+/// button is a real recovery action instead of a cosmetic state event.
 #[tauri::command]
 pub async fn restart_sidecar(app: AppHandle) -> Result<(), String> {
+    clear_sidecar_shutdown_requested(&app);
+    let active_before_kill = supervisor_is_active(&app);
     if let Some(state) = app.try_state::<SidecarHandle>() {
         if let Ok(mut guard) = state.child.lock() {
             if let Some(child) = guard.take() {
@@ -956,7 +1116,10 @@ pub async fn restart_sidecar(app: AppHandle) -> Result<(), String> {
         serde_json::json!({ "state": "restarting", "attempt": 0 }),
     )
     .ok();
-    // Wave 4 wires the actual respawn path; Wave 2 just makes the capability
-    // and webview-side wiring reachable end-to-end.
-    Ok(())
+    if active_before_kill {
+        return Ok(());
+    }
+    let wizard_mode = config::is_first_run(&app);
+    let log_path = sidecar_log_path(&app);
+    spawn_sidecar_supervisor(app, wizard_mode, log_path)
 }
