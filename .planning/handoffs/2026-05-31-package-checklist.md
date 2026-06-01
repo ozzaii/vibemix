@@ -649,6 +649,32 @@ Proof before staging:
 - `git diff --check -- tests/scripts/test_kaan_action_rollup.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0X - CLI Library Similar Test Ruff Hygiene
+
+Suggested commit: `test(scripts): clean library similar cli lint`
+
+Include:
+
+- `tests/scripts/test_cli_library_similar.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- CLI implementation, library cache code, app runtime files, and generated files.
+
+Reason:
+
+- The library-similar CLI test had a stale extra blank line between its marker
+  import and module-level `pytestmark`. Removing it keeps the focused
+  scripts-test ruff gate clean without changing CLI coverage.
+
+Proof before staging:
+
+- `uv run ruff check tests/scripts/test_cli_library_similar.py`
+- `uv run pytest -q tests/scripts/test_cli_library_similar.py`
+- `git diff --check -- tests/scripts/test_cli_library_similar.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
