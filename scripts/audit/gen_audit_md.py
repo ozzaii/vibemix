@@ -239,8 +239,8 @@ def render_decisions(decisions: list[dict]) -> str:
     out = [DECISIONS_HEADER]
     for d in decisions:
         out.append(f"\n### {d['id']}\n")
-        out.append(f"**Date:** {d['date']}  ")
-        out.append(f"**Target:** `{d['target']}`  ")
+        out.append(f"**Date:** {d['date']}\n")
+        out.append(f"**Target:** `{d['target']}`\n")
         out.append(f"**Action:** {d['action']}\n")
         out.append(d["rationale"].rstrip() + "\n")
     return "\n".join(out)

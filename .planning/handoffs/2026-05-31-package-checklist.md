@@ -6424,6 +6424,53 @@ Keep out:
 - Any co-host prompt, claim guard, DROP-call, or deck-timing behavior.
 - IPC schema/codegen changes; the voice value remains a string payload.
 
+## Package 14K - MOSS-only Documentation Contract
+
+Suggested commit: `docs(tts): align docs with moss-only voice`
+
+Packaging decision: MOSS is the only product TTS source. Several generated or
+human-authored docs still described Cartesia/Gemini/OpenAI as the live voice or
+fallback path after the runtime policy changed. This package makes the docs and
+diagram say the same thing as the source: Gemini remains the brain/listening
+client, while speech is local MOSS-only. Paid cloud voices stay only as cost
+what-if rows.
+
+Include:
+
+- `scripts/audit/dep_ratings.yaml`
+- `scripts/audit/gen_audit_md.py`
+- `docs/AUDIT.md`
+- `docs/pricing/live-stack-economics.en.md`
+- `docs/pricing/live-stack-economics.it.md`
+- `scripts/dist/render_architecture.py`
+- `docs/assets/architecture.svg`
+- `tests/repo/test_docs_assets.py`
+- `tests/audit/test_dep_cull_complete.py`
+- `src/vibemix/agent/playback_sink.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime TTS provider selection; MOSS-only behavior is already structural.
+- Dependency removal from `pyproject.toml` or `uv.lock`.
+- MOSS model bundle/download/release gates.
+- Co-host speech, prompt, grounding, DROP-call, or deck-timing behavior.
+
+Proof to run:
+
+- `uv run python scripts/audit/gen_audit_md.py`
+- `uv run python scripts/dist/render_architecture.py`
+- `uv run python scripts/audit/gen_audit_md.py --check`
+- `uv run python scripts/dist/render_architecture.py --check`
+- `uv run pytest -q tests/audit/test_audit_md_generator.py tests/audit/test_dep_cull_complete.py tests/audit/test_opportunity_evaluations_schema.py tests/repo/test_docs_assets.py tests/library/test_cost.py tests/library/test_pricing.py`
+- `uv run ruff check src/vibemix/agent/playback_sink.py tests/audit/test_dep_cull_complete.py tests/repo/test_docs_assets.py scripts/audit/gen_audit_md.py scripts/dist/render_architecture.py`
+- `git diff --check -- scripts/audit/dep_ratings.yaml docs/AUDIT.md docs/pricing/live-stack-economics.en.md docs/pricing/live-stack-economics.it.md scripts/dist/render_architecture.py docs/assets/architecture.svg tests/repo/test_docs_assets.py tests/audit/test_dep_cull_complete.py src/vibemix/agent/playback_sink.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- This is a docs/contract cleanup only. It does not prove packaged MOSS voice,
+  release artifact readiness, or live FLX4 audio behavior.
+
 Reason:
 
 - `SettingsDrawer.ts` still listed old Gemini voice ids (`kore`, `puck`,

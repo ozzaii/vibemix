@@ -88,7 +88,7 @@ def test_arch_svg_parses_as_xml() -> None:
 def test_arch_svg_has_four_swim_lane_labels() -> None:
     """Task 1 / Test 4 — all four swim-lane labels are rendered."""
     text = ARCH_SVG.read_text(encoding="utf-8")
-    for label in ("User Hardware", "vibemix Client", "Network", "Gemini"):
+    for label in ("User Hardware", "vibemix Client", "Network", "AI + Voice"):
         assert label in text, f"missing swim-lane label '{label}' in architecture.svg"
 
 
@@ -126,7 +126,7 @@ def test_arch_svg_has_named_boxes() -> None:
         "Local recording",
         "Bravoh proxy",
         "Gemini 3 Flash",
-        "Gemini TTS",
+        "Local MOSS TTS",
     ]
     missing = [r for r in required if r not in text]
     assert not missing, f"SVG missing required box labels: {missing}"

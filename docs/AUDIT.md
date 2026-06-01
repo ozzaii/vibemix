@@ -26,15 +26,14 @@
 | `av` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `bidict` | 0.23.1 | see uv.lock | pyrekordbox transitive (declared explicitly per --no-deps recipe). Pure-Python. | 🟢 Green |  |
 | `construct` | 2.10.70 | see uv.lock | pyrekordbox transitive — ANLZ binary parser. Pure-Python. | 🟢 Green |  |
-| `google-genai` | 2.0.1 | see uv.lock | Gemini Live co-host and Gemini TTS. Library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build. | 🟢 Green |  |
+| `google-genai` | 2.0.1 | see uv.lock | Gemini Live co-host brain/listening client. Product speech is local MOSS-only; library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build. | 🟢 Green |  |
 | `httpx` | 0.28.1 | see uv.lock | HTTP client used by google-genai + livekit-agents transitives. | 🟢 Green |  |
 | `jsonschema` | 4.26.0 | see uv.lock | JSON-schema validation (IPC schema gate, dep_ratings_schema). Pure-Python. | 🟢 Green |  |
 | `keyring` | 25.7.0 | see uv.lock | Native macOS Keychain / Windows Credential Locker integration via pure-Python ctypes; no compile step. | 🟡 Yellow |  |
 | `livekit` | 1.1.8 | see uv.lock | WebRTC client; transitively pulls av + aiortc. Prebuilt wheels for Mac+Win64. | 🟡 Yellow |  |
 | `livekit-agents` | 1.5.14 | see uv.lock | Gemini Live API wrapper (cohost_v2/lk variants). Pure-Python. | 🟢 Green |  |
-| `livekit-plugins-cartesia` | 1.5.14 | see uv.lock | LiveKit Cartesia (Sonic) TTS adapter — the live co-host's primary voice (Gemini TTS returned no audio live, 2026-05-30). Pure-Python; Gemini natives stay as fallback. | 🟢 Green |  |
 | `livekit-plugins-google` | 1.5.14 | see uv.lock | LiveKit Gemini adapter — the seam through which all Gemini Live audio flows. | 🟢 Green |  |
-| `livekit-plugins-openai` | 1.5.14 | see uv.lock | [CULL-BLOCKED] Used by src/vibemix/agent/tts_chain.py for the proxy TTS fallback chain. Cannot remove without rewiring the TTS chain — out of scope for Phase 46. | 🟡 Yellow |  |
+| `livekit-plugins-openai` | 1.5.14 | see uv.lock | [CULL-BLOCKED] Legacy direct dependency retained only until the dependency-cull lane removes the pyproject/lock residue and legacy import test. MOSS-only TTS does not import or instantiate the OpenAI LiveKit voice plugin. | 🟡 Yellow |  |
 | `mcp` | 1.27.1 | see uv.lock | Codex MCP bridge for the local Viber tool surface. Pure-Python; optional at runtime outside Codex-backed chat/curate/build-set. | 🟢 Green |  |
 | `mido` | 1.3.3 | see uv.lock | MIDI message parsing (DDJ-FLX4 controller decode). Pure-Python. | 🟢 Green |  |
 | `mss` | 10.2.0 | see uv.lock | Win32 screen capture (CoreGraphics on Mac uses ScreenCaptureKit). Pure-Python. | 🟢 Green |  |
@@ -120,22 +119,28 @@ populates the dep-cull entries; future re-justifications append.
 
 ### cull-blocked-livekit-plugins-openai
 
-**Date:** 2026-05-18  
-**Target:** `livekit-plugins-openai`  
+**Date:** 2026-06-01
+
+**Target:** `livekit-plugins-openai`
+
 **Action:** cull-blocked
 
-Cull blocked: src/vibemix/agent/tts_chain.py:25 imports
-`from livekit.plugins.openai import tts as _openai_tts_mod` for the
-proxy TTS fallback chain. Test files (tests/agent/test_proxy_client.py,
-tests/agent/test_config.py, tests/agent/test_tts_chain.py) also reference
-the same surface. Removal requires rewiring the TTS chain — out of scope
-for Phase 46. Tracked as Kaan-action surface item.
+Cull still blocked only because `livekit-plugins-openai` remains declared
+in pyproject.toml and legacy phase-05 verification imports the provider
+package. The old runtime blocker is gone: src/vibemix/agent/tts_chain.py
+is MOSS-only and tests/agent/test_proxy_client.py plus
+tests/agent/test_tts_chain.py assert it does not patch, import, or
+instantiate the OpenAI LiveKit TTS plugin. Removal now belongs to a
+dependency-cull package that updates pyproject.toml, uv.lock, and the
+legacy verification test together.
 
 
 ### defer-google-cloud-speech
 
-**Date:** 2026-05-18  
-**Target:** `google-cloud-speech`  
+**Date:** 2026-05-18
+
+**Target:** `google-cloud-speech`
+
 **Action:** retained-as-transitive
 
 Retained as transitive of livekit-plugins-google. Zero direct imports
@@ -146,8 +151,10 @@ Tracked for follow-up when upstream drops the dep.
 
 ### defer-google-cloud-texttospeech
 
-**Date:** 2026-05-18  
-**Target:** `google-cloud-texttospeech`  
+**Date:** 2026-05-18
+
+**Target:** `google-cloud-texttospeech`
+
 **Action:** retained-as-transitive
 
 Same as google-cloud-speech — transitive of livekit-plugins-google,

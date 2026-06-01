@@ -1,9 +1,9 @@
 """DEPS-08 — assert the dep-cull pass surface is documented:
   - For deps with zero direct imports under src/vibemix/, dep is removed from
     pyproject.toml OR documented as retained-as-transitive in AUDIT.md § Decisions
-  - For deps with direct imports (e.g., livekit-plugins-openai used by
-    src/vibemix/agent/tts_chain.py), the cull is BLOCKED and documented as
-    such in AUDIT.md § Decisions
+  - For deps still declared in pyproject.toml after their runtime use has been
+    removed (e.g., livekit-plugins-openai), the cull is BLOCKED and documented
+    as such in AUDIT.md § Decisions
   - docs/AUDIT.md § Decisions documents each cull decision
 """
 

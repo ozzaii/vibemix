@@ -18,7 +18,7 @@
 python:
   google-genai:
     rating: green
-    rationale: "Gemini Live co-host and Gemini TTS. Library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build."
+    rationale: "Gemini Live co-host brain/listening client. Product speech is local MOSS-only; library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build."
   httpx:
     rating: green
     rationale: "HTTP client used by google-genai + livekit-agents transitives."
@@ -31,12 +31,9 @@ python:
   livekit-plugins-google:
     rating: green
     rationale: "LiveKit Gemini adapter — the seam through which all Gemini Live audio flows."
-  livekit-plugins-cartesia:
-    rating: green
-    rationale: "LiveKit Cartesia (Sonic) TTS adapter — the live co-host's primary voice (Gemini TTS returned no audio live, 2026-05-30). Pure-Python; Gemini natives stay as fallback."
   livekit-plugins-openai:
     rating: yellow
-    rationale: "[CULL-BLOCKED] Used by src/vibemix/agent/tts_chain.py for the proxy TTS fallback chain. Cannot remove without rewiring the TTS chain — out of scope for Phase 46."
+    rationale: "[CULL-BLOCKED] Legacy direct dependency retained only until the dependency-cull lane removes the pyproject/lock residue and legacy import test. MOSS-only TTS does not import or instantiate the OpenAI LiveKit voice plugin."
   livekit:
     rating: yellow
     rationale: "WebRTC client; transitively pulls av + aiortc. Prebuilt wheels for Mac+Win64."
@@ -236,16 +233,18 @@ js:
 
 decisions:
   - id: cull-blocked-livekit-plugins-openai
-    date: "2026-05-18"
+    date: "2026-06-01"
     target: livekit-plugins-openai
     action: cull-blocked
     rationale: |
-      Cull blocked: src/vibemix/agent/tts_chain.py:25 imports
-      `from livekit.plugins.openai import tts as _openai_tts_mod` for the
-      proxy TTS fallback chain. Test files (tests/agent/test_proxy_client.py,
-      tests/agent/test_config.py, tests/agent/test_tts_chain.py) also reference
-      the same surface. Removal requires rewiring the TTS chain — out of scope
-      for Phase 46. Tracked as Kaan-action surface item.
+      Cull still blocked only because `livekit-plugins-openai` remains declared
+      in pyproject.toml and legacy phase-05 verification imports the provider
+      package. The old runtime blocker is gone: src/vibemix/agent/tts_chain.py
+      is MOSS-only and tests/agent/test_proxy_client.py plus
+      tests/agent/test_tts_chain.py assert it does not patch, import, or
+      instantiate the OpenAI LiveKit TTS plugin. Removal now belongs to a
+      dependency-cull package that updates pyproject.toml, uv.lock, and the
+      legacy verification test together.
   - id: defer-google-cloud-speech
     date: "2026-05-18"
     target: google-cloud-speech
@@ -322,7 +321,7 @@ opportunity_evaluations:
     category: "python-dep"
     rating: "red-constraint"
     install_impact: "n/a"
-    rationale: "Multi-provider AI is explicitly out. livekit-plugins-openai in the lockfile is a TRANSITIVE TTS-proxy fallback per Phase 46 cull-blocked entry, not direct OpenAI adoption."
+    rationale: "Multi-provider AI is explicitly out. The remaining livekit-plugins-openai entry is legacy voice dependency residue documented by the Phase 46 cull-blocked marker, not direct OpenAI adoption and not a runtime TTS provider."
     integration_surface: "none"
     rejected_constraints:
       - memory: "feedback_no_scope_creep_clean_utility"
