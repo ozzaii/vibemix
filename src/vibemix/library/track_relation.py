@@ -45,6 +45,7 @@ from dataclasses import dataclass
 # math, already unit-tested in tests/intel/test_transition_scorer.py). Reusing
 # them here — rather than reimplementing — is the whole point of S6: one place
 # decides how a key pair or a tempo pair grades.
+from vibemix.intel.transition_scorer import bpm_folded_delta_pct as _bpm_folded_delta_pct
 from vibemix.intel.transition_scorer import bpm_score as _bpm_score
 from vibemix.intel.transition_scorer import harmonic_score as _harmonic_score
 
@@ -75,7 +76,7 @@ class TrackRelation:
 
     bpm_src: float | None
     bpm_dst: float | None
-    bpm_delta_pct: float | None  # abs(dst-src)/src; None when either bpm unknown
+    bpm_delta_pct: float | None  # nearest 0.5x/1x/2x BPM delta; None when unknown
     tempo: float
     tempo_flags: tuple[str, ...]
 
@@ -115,8 +116,23 @@ class TrackRelation:
         delta = self.bpm_delta_signed
         if delta is not None:
             rounded = round(delta)
+            ratio = (
+                self.bpm_dst / self.bpm_src
+                if self.bpm_src is not None
+                and self.bpm_dst is not None
+                and self.bpm_src > 0
+                and self.bpm_dst > 0
+                else None
+            )
             if rounded == 0:
                 parts.append("same BPM")
+            elif (
+                self.bpm_delta_pct is not None
+                and self.bpm_delta_pct <= 0.015
+                and ratio is not None
+                and (ratio >= 1.5 or ratio <= 0.75)
+            ):
+                parts.append("double-time BPM" if delta > 0 else "half-time BPM")
             else:
                 parts.append(f"{rounded:+d} BPM")
         return ", ".join(parts)
@@ -141,14 +157,7 @@ def compute_relation(
     harmonic, harmonic_flags = _harmonic_score(src_camelot, dst_camelot)
     tempo, tempo_flags = _bpm_score(src_bpm, dst_bpm)
 
-    delta_pct: float | None = None
-    if (
-        src_bpm is not None
-        and dst_bpm is not None
-        and src_bpm > 0
-        and dst_bpm > 0
-    ):
-        delta_pct = abs(dst_bpm - src_bpm) / src_bpm
+    delta_pct = _bpm_folded_delta_pct(src_bpm, dst_bpm)
 
     return TrackRelation(
         src_track_id=src_track_id,

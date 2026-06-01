@@ -51,6 +51,7 @@ from typing import Any
 
 import numpy as np
 
+from vibemix.intel.transition_scorer import bpm_folded_delta_pct
 from vibemix.library._cosine import l2_normalize
 from vibemix.state import harmonics
 
@@ -184,7 +185,8 @@ def _transition_valid(
     ``harmonics.compatible`` (``compatible`` returns False on unknown, so a
     missing key MUST pass or the graph collapses — exactly the degrade
     ``next_suggestion`` uses). BPM: reject only when BOTH are known and
-    ``|b.bpm - a.bpm| > bpm_tol * a.bpm``. Missing metadata => PASS.
+    the nearest 0.5x/1x/2x BPM fold is outside ``bpm_tol``. Missing metadata
+    => PASS.
 
     Structural mixability is handled by ``_structural_relax_reason`` in the
     beam edge-admission path: cue metadata never hard-rejects a track, but weak
@@ -210,7 +212,7 @@ def _transition_valid(
         a.bpm is not None
         and b.bpm is not None
         and a.bpm > 0
-        and abs(b.bpm - a.bpm) > bpm_tol * a.bpm
+        and (bpm_folded_delta_pct(a.bpm, b.bpm) or 0.0) > bpm_tol
     ):
         return False, False
 

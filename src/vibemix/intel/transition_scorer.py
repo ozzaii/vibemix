@@ -208,13 +208,28 @@ def harmonic_score(src: str | None, dst: str | None) -> tuple[float, tuple[str, 
     return 0.42, ("harmonic_drift",)
 
 
-def bpm_score(src: float | None, dst: float | None) -> tuple[float, tuple[str, ...]]:
-    """Grade tempo compatibility from deterministic BPM metadata."""
+_BPM_OCTAVE_FOLDS: tuple[float, ...] = (0.5, 1.0, 2.0)
+
+
+def bpm_folded_delta_pct(src: float | None, dst: float | None) -> float | None:
+    """Return the nearest one-octave tempo distance, or ``None`` for unknowns.
+
+    DJ metadata often lands at half/double time (87 vs 174 BPM). For transition
+    compatibility those are the same pulse family, so compare the destination
+    BPM against the source at 0.5x/1x/2x and keep the smallest percentage delta.
+    """
     src_bpm = _finite_positive_or_none(src)
     dst_bpm = _finite_positive_or_none(dst)
     if src_bpm is None or dst_bpm is None:
+        return None
+    return min(abs((dst_bpm * fold) - src_bpm) / src_bpm for fold in _BPM_OCTAVE_FOLDS)
+
+
+def bpm_score(src: float | None, dst: float | None) -> tuple[float, tuple[str, ...]]:
+    """Grade tempo compatibility from deterministic BPM metadata."""
+    delta = bpm_folded_delta_pct(src, dst)
+    if delta is None:
         return 0.55, ("bpm_unknown",)
-    delta = abs(dst_bpm - src_bpm) / src_bpm
     if delta <= 0.015:
         return 1.0, ()
     if delta <= 0.03:
@@ -817,6 +832,7 @@ __all__ = [
     "TransitionCandidate",
     "TransitionScoreComponents",
     "TransitionScoringInput",
+    "bpm_folded_delta_pct",
     "bpm_score",
     "cue_operability_score",
     "harmonic_score",

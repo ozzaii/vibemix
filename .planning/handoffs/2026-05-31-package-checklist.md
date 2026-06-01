@@ -2535,6 +2535,47 @@ Remaining gate:
   cited research note or implementation spec first, then delete or ignore the
   scratch tree separately.
 
+## Package 16 - Octave-Aware BPM Compatibility
+
+Suggested commit: `fix(library): accept half-time bpm matches`
+
+Include:
+
+- `src/vibemix/intel/transition_scorer.py`
+- `src/vibemix/library/next_suggestion.py`
+- `src/vibemix/library/sequencer.py`
+- `src/vibemix/library/track_relation.py`
+- `tests/intel/test_transition_scorer.py`
+- `tests/library/test_next_suggestion.py`
+- `tests/library/test_sequencer.py`
+- `tests/library/test_track_relation.py`
+
+Keep out:
+
+- All DROP-call speech/timing hunks in `src/vibemix/runtime/coach.py`,
+  `src/vibemix/state/drop_predict.py`, and `src/vibemix/state/event_detector.py`.
+- The controller-weighted deck-audio HOLD lane in `src/vibemix/__main__.py`,
+  `src/vibemix/audio/*`, `src/vibemix/midi/*`, and their tests.
+- Mixxx scratch files under `.mixxx-tmp-loop/`; this package consumes the
+  distilled BPM-folding finding only.
+
+Reason:
+
+- The recovered Mixxx/goldmine research called out a concrete DJ-logic bug:
+  half/double-time BPM pairs such as 87↔174 or 80↔160 were treated as large
+  tempo jumps. That makes psytrance/hi-tempo libraries look less mixable than a
+  working DJ would hear them.
+- This is a pure deterministic library/intel slice. It changes tempo
+  compatibility math for track relations, transition scoring, Viber/set
+  sequencing, and next-suggestion filtering; it does not change live speech,
+  event timing, controller capture, or packaging.
+
+Proof:
+
+- `uv run pytest -q tests/intel/test_transition_scorer.py tests/library/test_track_relation.py tests/library/test_sequencer.py tests/library/test_next_suggestion.py`
+- `uv run ruff check src/vibemix/intel/transition_scorer.py src/vibemix/library/track_relation.py src/vibemix/library/sequencer.py src/vibemix/library/next_suggestion.py tests/intel/test_transition_scorer.py tests/library/test_track_relation.py tests/library/test_sequencer.py tests/library/test_next_suggestion.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Cue Export Folder Bridge
 
 Suggested commit if/when selected: `feat(library): add folder cue export bridge`

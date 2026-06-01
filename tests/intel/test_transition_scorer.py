@@ -88,6 +88,14 @@ def test_bpm_score_within_three_percent_high() -> None:
     assert flags == ()
 
 
+def test_bpm_score_treats_half_double_time_as_compatible() -> None:
+    for src, dst in [(87.0, 174.0), (174.0, 87.0), (80.0, 160.0), (160.0, 80.0)]:
+        score, flags = bpm_score(src, dst)
+
+        assert score == pytest.approx(1.0)
+        assert flags == ()
+
+
 def test_bpm_score_tempo_jump_low_and_flagged() -> None:
     score, flags = bpm_score(128.0, 145.0)
 

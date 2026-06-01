@@ -11,6 +11,8 @@ Pins the three properties that make ``TrackRelation`` safe to share:
 
 from __future__ import annotations
 
+import pytest
+
 from vibemix.intel.transition_scorer import bpm_score, harmonic_score
 from vibemix.library.track_relation import (
     HARMONIC_COMPATIBLE_FLOOR,
@@ -43,7 +45,13 @@ def test_s6_harmonic_matches_transition_scorer() -> None:
 
 
 def test_s6_tempo_matches_transition_scorer() -> None:
-    for src, dst in [(128.0, 128.0), (128.0, 130.0), (128.0, 133.0), (128.0, 145.0)]:
+    for src, dst in [
+        (128.0, 128.0),
+        (128.0, 130.0),
+        (128.0, 133.0),
+        (128.0, 145.0),
+        (87.0, 174.0),
+    ]:
         rel = _rel(src_bpm=src, dst_bpm=dst)
         assert (rel.tempo, rel.tempo_flags) == bpm_score(src, dst)
 
@@ -99,11 +107,19 @@ def test_s6_bpm_delta_signed() -> None:
     assert _rel(src_bpm=133.0, dst_bpm=128.0).bpm_delta_signed == -5.0
 
 
+def test_s6_bpm_delta_pct_uses_nearest_octave_fold() -> None:
+    assert _rel(src_bpm=87.0, dst_bpm=174.0).bpm_delta_pct == pytest.approx(0.0)
+    assert _rel(src_bpm=174.0, dst_bpm=87.0).bpm_delta_pct == pytest.approx(0.0)
+
+
 # --- 4. why() — the live-voicing substrate ---------------------------------
 
 
 def test_s6_why_full_phrase() -> None:
-    assert _rel(src_camelot="8A", dst_camelot="9A", src_bpm=128.0, dst_bpm=133.0).why() == "8A→9A, +5 BPM"
+    assert (
+        _rel(src_camelot="8A", dst_camelot="9A", src_bpm=128.0, dst_bpm=133.0).why()
+        == "8A→9A, +5 BPM"
+    )
 
 
 def test_s6_why_same_key_no_arrow() -> None:
@@ -113,6 +129,17 @@ def test_s6_why_same_key_no_arrow() -> None:
 
 def test_s6_why_negative_bpm() -> None:
     assert _rel(src_bpm=133.0, dst_bpm=128.0).why().endswith("-5 BPM")
+
+
+def test_s6_why_names_half_double_time() -> None:
+    assert (
+        _rel(src_camelot=None, dst_camelot=None, src_bpm=87.0, dst_bpm=174.0).why()
+        == "double-time BPM"
+    )
+    assert (
+        _rel(src_camelot=None, dst_camelot=None, src_bpm=174.0, dst_bpm=87.0).why()
+        == "half-time BPM"
+    )
 
 
 def test_s6_why_empty_when_all_unknown() -> None:

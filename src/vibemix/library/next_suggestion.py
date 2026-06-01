@@ -40,6 +40,7 @@ from dataclasses import asdict, dataclass
 import numpy as np
 
 from vibemix.intel.move_grade import grade_transition_payload
+from vibemix.intel.transition_scorer import bpm_folded_delta_pct
 from vibemix.library._cosine import l2_normalize
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
 from vibemix.library.section_vectors import resolve_section_vector
@@ -162,7 +163,7 @@ def next_suggestion(
             if (
                 seed_bpm is not None
                 and cand_bpm is not None
-                and abs(cand_bpm - seed_bpm) > bpm_window
+                and _bpm_window_delta(seed_bpm, cand_bpm) > bpm_window
             ):
                 continue
 
@@ -345,6 +346,11 @@ def prepared_target_candidate_payload(
         },
         vector,
     )
+
+
+def _bpm_window_delta(seed_bpm: float, cand_bpm: float) -> float:
+    folded_delta = bpm_folded_delta_pct(seed_bpm, cand_bpm)
+    return float("inf") if folded_delta is None else folded_delta * seed_bpm
 
 
 def _prepared_target_option(

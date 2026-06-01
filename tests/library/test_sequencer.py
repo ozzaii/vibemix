@@ -143,6 +143,17 @@ def test_transition_bpm_within_tol_accepted():
     assert valid is True
 
 
+def test_transition_bpm_half_double_time_accepted():
+    a = _pt("a", camelot="8A", bpm=87.0)
+    b = _pt("b", camelot="8A", bpm=174.0)
+    _, valid = seq._transition_valid(a, b, bpm_tol=0.06)
+    assert valid is True
+
+    reverse_relaxed, reverse_valid = seq._transition_valid(b, a, bpm_tol=0.06)
+    assert reverse_valid is True
+    assert reverse_relaxed is False
+
+
 def test_transition_bpm_over_tol_rejected():
     a = _pt("a", camelot="8A", bpm=124.0)
     b = _pt("b", camelot="8A", bpm=124.0 * 1.07)  # +7% > 6%

@@ -785,6 +785,24 @@ def test_phase2_harmonic_filter_drops_incompatible(library):
     assert s.camelot == "8A" and s.bpm == 126.0
 
 
+def test_phase2_bpm_filter_keeps_half_double_time_match(library):
+    library.tracks["t1"] = _track("t1", bpm=174.0, key="8A")
+    store = _FakeStore([("t0", 0.99), ("t1", 0.92)])
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        seed_camelot="8A",
+        seed_bpm=87.0,
+        bpm_window=6.0,
+    )
+
+    assert s is not None and s.track_id == "t1"
+    assert s.camelot == "8A" and s.bpm == 174.0
+
+
 def test_phase2_keeps_candidate_missing_metadata(library):
     # A candidate with no key/bpm must NOT be dropped by the refine filter.
     library.tracks["t1"] = TrackEntry(
