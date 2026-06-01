@@ -1775,12 +1775,18 @@ Reason:
 
 Proof before staging:
 
-- `uv run pytest -q tests/debrief/test_ear_test_capture.py`
-- `uv run ruff check src/vibemix/debrief/ear_test_capture.py tests/debrief/test_ear_test_capture.py`
+- `rg -n "vibemix.debrief.ear_test_capture|from vibemix.debrief.ear_test_capture" src tests`
+  returned no production/test importers.
 - `npm --prefix tauri/ui test -- src/debrief/__tests__/ear-test-toggle.spec.ts`
+  passed: 2 tests.
 - `cargo test --manifest-path tauri/src-tauri/Cargo.toml ear_test`
-- `git diff --check -- src/vibemix/debrief/ear_test_capture.py tests/debrief/test_ear_test_capture.py tauri/ui/src/debrief/components/ear-test-toggle.ts tauri/ui/debrief.html .planning/handoffs/2026-05-31-package-checklist.md`
+  passed: 3 tests.
+- `uv run pytest -q tests/debrief/test_main_dispatch.py tests/debrief/test_no_uncited_critique_in_debrief_e2e.py`
+  passed: 7 tests.
+- `git diff --check -- src/vibemix/debrief/ear_test_capture.py tests/debrief/test_ear_test_capture.py .planning/handoffs/2026-05-31-package-checklist.md`
+  passed.
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+  passed.
 
 ## Hold Lane - Deck Vision Live Source Gate
 
