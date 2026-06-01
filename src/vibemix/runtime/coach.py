@@ -101,6 +101,14 @@ if TYPE_CHECKING:
 CITATION_PUBLISH_INTERVAL_S = 2.0
 
 
+def _safe_print(*args: object, **kwargs: object) -> None:
+    """Best-effort runtime logging; a broken parent pipe must not kill coaching."""
+    try:
+        print(*args, **kwargs)
+    except (BrokenPipeError, OSError):
+        pass
+
+
 def _log_suggestion_error(fut: Any) -> None:
     """Done-callback for the off-loop suggestion compute — surface its error to
     stderr without ever propagating into the reaction loop."""
@@ -109,7 +117,7 @@ def _log_suggestion_error(fut: Any) -> None:
     except Exception:
         return
     if exc is not None:
-        print(f"\n[coach suggestion err] {exc}", file=sys.stderr)
+        _safe_print(f"\n[coach suggestion err] {exc}", file=sys.stderr)
 
 
 def _credit_live_skill_demo(
@@ -194,7 +202,7 @@ def _credit_live_skill_demo(
                             try:
                                 speak(line)
                             except Exception as exc:  # vocal failure ≠ credit failure
-                                print(
+                                _safe_print(
                                     f"\n[coach mastered-vocal err] {exc}",
                                     file=sys.stderr,
                                 )
@@ -207,7 +215,7 @@ def _credit_live_skill_demo(
             save_progress(learn_progress)
         return credited
     except Exception as exc:  # never wedge the reaction loop on a credit failure
-        print(f"\n[coach skill-credit err] {exc}", file=sys.stderr)
+        _safe_print(f"\n[coach skill-credit err] {exc}", file=sys.stderr)
         return []
 
 
@@ -232,7 +240,7 @@ async def _emit_earned_wall_refresh(
         ).to_dict()
         await ipc_bus.emit(env)
     except Exception as exc:  # refresh failure ≠ credit failure
-        print(f"\n[coach earned-wall refresh err] {exc}", file=sys.stderr)
+        _safe_print(f"\n[coach earned-wall refresh err] {exc}", file=sys.stderr)
 
 
 def _make_mastered_speak(session: Any) -> Callable[[str], None] | None:
@@ -302,7 +310,7 @@ def _credit_judged_transition(
             speak=speak,
         )
     except Exception as exc:  # never wedge the loop
-        print(f"[judge-credit err] {exc}", file=sys.stderr)
+        _safe_print(f"[judge-credit err] {exc}", file=sys.stderr)
         return []
 
 
@@ -380,7 +388,7 @@ def _run_live_judge(
         )
         return verdict
     except Exception as exc:  # never wedge the loop
-        print(f"[judge-run err] {exc}", file=sys.stderr)
+        _safe_print(f"[judge-run err] {exc}", file=sys.stderr)
         return None
 
 
@@ -459,7 +467,7 @@ async def coach_loop(
                 )
                 await ipc_bus.emit(json.loads(msg.to_json()))  # type: ignore[union-attr]
             except Exception as e:
-                print(f"\n[coach citation publish err] {e}", file=sys.stderr)
+                _safe_print(f"\n[coach citation publish err] {e}", file=sys.stderr)
             finally:
                 last_citation_publish_at = now
 
@@ -467,7 +475,7 @@ async def coach_loop(
         if trigger_state.get("in_flight"):
             age = now - trigger_state.get("in_flight_at", 0)
             if age > 12.0:
-                print(f"\n[coach] in_flight stale {age:.1f}s — clearing", file=sys.stderr)
+                _safe_print(f"\n[coach] in_flight stale {age:.1f}s — clearing", file=sys.stderr)
                 trigger_state["in_flight"] = False
                 _tr("ai_call", "in_flight_stale_clear", age_s=round(age, 2))
             else:
@@ -669,7 +677,7 @@ async def coach_loop(
 
                     fut.add_done_callback(_trace_suggestion_done)
             except Exception as e:
-                print(f"\n[coach suggestion] {e}", file=sys.stderr)
+                _safe_print(f"\n[coach suggestion] {e}", file=sys.stderr)
 
         if ev is None:
             continue
@@ -678,7 +686,7 @@ async def coach_loop(
             trigger_state["in_flight"] = True
             trigger_state["in_flight_at"] = now
             tag = ev.type
-            print(
+            _safe_print(
                 f"\n[event {tag}] audible={state.audible} deck={state.audible_deck} "
                 f"track={state.audible_track!r}({state.audible_track_confidence:.1f}) "
                 f"phase={state.phase}"
@@ -830,7 +838,7 @@ async def coach_loop(
                     type=tag,
                     latency_ms=round((time.time() - _call_started) * 1000, 1),
                 )
-                print("[coach] generate_reply timed out", file=sys.stderr)
+                _safe_print("[coach] generate_reply timed out", file=sys.stderr)
             finally:
                 trigger_state["in_flight"] = False
                 if wired:
@@ -841,4 +849,4 @@ async def coach_loop(
         except Exception as e:
             trigger_state["in_flight"] = False
             _tr("error", "coach_loop", err=str(e))
-            print(f"\n[coach err] {e}", file=sys.stderr)
+            _safe_print(f"\n[coach err] {e}", file=sys.stderr)
