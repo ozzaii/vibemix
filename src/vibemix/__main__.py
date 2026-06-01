@@ -5621,6 +5621,7 @@ def _viber_live_context_operator_actions(
     readiness: dict[str, Any],
     *,
     setup_hint: dict[str, Any] | None = None,
+    source_status: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Translate proof blockers into a concise, machine-readable action queue."""
 
@@ -5664,6 +5665,46 @@ def _viber_live_context_operator_actions(
             str(setup_hint["next_action"]),
             **({"recommended_env": recommended_env} if isinstance(recommended_env, dict) else {}),
             setup_hint=setup_hint,
+        )
+
+    library_cache = (
+        source_status.get("library_cache")
+        if isinstance(source_status, dict) and isinstance(source_status.get("library_cache"), dict)
+        else {}
+    )
+    library_source_type = str(library_cache.get("source_type") or "")
+    try:
+        library_track_count = int(library_cache.get("track_count") or 0)
+    except (TypeError, ValueError):
+        library_track_count = 0
+    library_needs_index = library_source_type in {"missing", "unreadable"} or (
+        bool(library_cache.get("loaded")) and library_track_count <= 0
+    )
+    if physical_diagnosis and library_needs_index:
+        rekordbox_xml_detected = False
+        if isinstance(source_status, dict):
+            for key in ("rekordbox_app", "rekordbox_master_db"):
+                probe = source_status.get(key)
+                if isinstance(probe, dict) and probe.get("exists"):
+                    rekordbox_xml_detected = True
+                    break
+        detail = (
+            "Index the music library before deck identity can be trusted. Drop a "
+            "Rekordbox collection.xml or a music folder in Settings -> Library, or run "
+            "`uv run python -m vibemix library ingest <collection.xml>` / "
+            "`uv run python -m vibemix library embed-folder <music-folder>`."
+        )
+        if rekordbox_xml_detected:
+            detail += (
+                " Rekordbox is installed locally, but Vibemix does not read the live "
+                "SQLCipher master.db; export collection.xml or choose a folder."
+            )
+        add(
+            "index_library",
+            detail,
+            recommended_surfaces=["settings.library.drop", "library.ingest", "library.embed-folder"],
+            source_kind=library_source_type or "unknown",
+            track_count=library_track_count,
         )
 
     if physical_diagnosis and (
@@ -6131,6 +6172,7 @@ async def _sample_viber_live_context(
             "operator_actions": _viber_live_context_operator_actions(
                 readiness,
                 setup_hint=setup_hint,
+                source_status=source_status,
             ),
             "error": error,
             "hint": _viber_live_context_hint(error, source_status),

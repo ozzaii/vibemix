@@ -2252,6 +2252,46 @@ Remaining gate:
 - Source-level only until a live Settings click proves a folder stale nudge
   starts folder re-index progress in the Tauri app.
 
+## Package 5K - Viber Library Setup Operator Action
+
+Suggested commit: `fix(viber): surface missing library setup action`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `tests/library/test_live_context_cli.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Automatic recursive user-folder scanning.
+- Live Rekordbox `master.db` reads; SQLCipher stays diagnostic-only/off.
+- Settings UI redesign; the existing Settings drop target is reused.
+
+Reason:
+
+- A current FLX4/Rekordbox source proof heard live music and saw the controller,
+  but `library_cache` was missing, so Viber/Sven could not resolve deck identity.
+  The existing operator action list named deck identity generically but did not
+  tell the user how to fix the missing library substrate.
+- The new `index_library` action is content-light and consent-preserving: it
+  names the already-supported setup surfaces (Settings drop target,
+  `library ingest`, and `library embed-folder`) and explicitly says that
+  Vibemix does not read the live SQLCipher `master.db`.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_live_context_cli.py`
+- `uv run ruff check src/vibemix/__main__.py tests/library/test_live_context_cli.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/__main__.py tests/library/test_live_context_cli.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- Source-level action only. A live proof still needs a real indexed user library
+  cache plus controller movement and, for per-deck claims, deck-pair audio
+  capture configuration.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`

@@ -405,7 +405,7 @@ def test_merge_viber_live_context_frame_combines_deck_and_recent_moves():
     assert "A_low(now=killed route=dominant)" in preview
     assert "move_effect_context[" in preview
     assert "sub energy fell 50% (strong)" in preview
-    assert "rule=dsp_delta_not_causal_proof" in preview
+    assert "rule=move_effect_prediction_and_measurement_agree" in preview
     assert "live_evidence[" in preview
     assert "mix:transition_block=single_resolved_deck" in preview
     assert "mix:deck_lanes=A_known_route_dominant+B_unknown_route_dominant" in preview
@@ -1642,6 +1642,47 @@ def test_viber_live_context_operator_actions_name_connected_controller_gaps():
     assert "BlackHole channels 1/2" in actions[-1]["detail"]
     assert "Deck 2 to channels 3/4" in actions[-1]["detail"]
     assert "deck_audio_capture=A_active+B_active" in actions[-1]["detail"]
+
+
+def test_viber_live_context_operator_actions_include_library_index_setup():
+    actions = main_mod._viber_live_context_operator_actions(
+        {
+            "ready": False,
+            "diagnosis": "missing_physical_proof",
+            "checks": {
+                "frames_seen": True,
+                "flat_deck_frame_seen": True,
+                "controller_connected": True,
+                "recent_moves_seen": False,
+                "audio_observed": True,
+                "deck_state_resolved": False,
+                "deck_state_pair_resolved": False,
+                "deck_pair_capture_configured": True,
+                "deck_audio_capture_both_active": False,
+            },
+            "blockers": ["deck identity source: library cache is missing"],
+        },
+        source_status={
+            "library_cache": {
+                "source_type": "missing",
+                "loaded": False,
+                "track_count": 0,
+            },
+            "rekordbox_app": {"exists": True},
+            "rekordbox_master_db": {"exists": True},
+        },
+    )
+
+    assert actions[0]["code"] == "index_library"
+    assert actions[0]["recommended_surfaces"] == [
+        "settings.library.drop",
+        "library.ingest",
+        "library.embed-folder",
+    ]
+    assert actions[0]["source_kind"] == "missing"
+    assert "Drop a Rekordbox collection.xml or a music folder" in actions[0]["detail"]
+    assert "does not read the live SQLCipher master.db" in actions[0]["detail"]
+    assert "resolve_deck_identity" in [action["code"] for action in actions]
 
 
 def test_viber_live_context_operator_actions_recommends_local_channel_map_override():
