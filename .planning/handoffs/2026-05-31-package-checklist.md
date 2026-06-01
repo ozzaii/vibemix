@@ -887,6 +887,33 @@ Proof before staging:
 - `git diff --check -- tests/library/test_store_parity.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AG - Pyrekordbox Install Test Ruff Hygiene
+
+Suggested commit: `test(library): clean pyrekordbox smoke lint`
+
+Include:
+
+- `tests/library/test_pyrekordbox_install.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Pyrekordbox dependency declarations, installer/release files, runtime export code,
+  and generated files.
+
+Reason:
+
+- The pyrekordbox install smoke test now reads `pyrekordbox.__version__`, so its
+  import-only `noqa` is stale. Removing the directive keeps the focused
+  library-test ruff gate clean without changing the smoke assertions.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_pyrekordbox_install.py`
+- `uv run pytest -q tests/library/test_pyrekordbox_install.py`
+- `git diff --check -- tests/library/test_pyrekordbox_install.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

@@ -27,7 +27,7 @@ import sys
 
 def test_pyrekordbox_imports_clean() -> None:
     """``import pyrekordbox`` succeeds without raising."""
-    import pyrekordbox  # noqa: F401 — import-only smoke
+    import pyrekordbox
 
     # Spike-locked version: 0.4.4 (WAVE-0-DEPS-SPIKE.md).
     assert pyrekordbox.__version__ == "0.4.4", (
