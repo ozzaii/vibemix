@@ -17,6 +17,7 @@ pin the four properties that keep it safe:
 from __future__ import annotations
 
 from vibemix.prompts.matrix import (
+    AUDIO_VIBE_CONTRACT_BLOCK,
     TASTE_PERSONA_TAG_PHRASES,
     build_system_instruction,
 )
@@ -41,13 +42,16 @@ def test_s2_empty_tuple_is_byte_identical() -> None:
 
 def test_s2_byte_identity_callers_unaffected() -> None:
     """The triple-opt-out byte-identity caller stays byte-identical even if a
-    tag were passed — but the production path never does. Here we assert the
-    overlay only ADDS its block as a strict suffix, leaving the prefix intact."""
+    tag were passed — but the production path never does. The taste overlay now
+    lands before the final audio-vibe contract, so the base cell + safety tail
+    remains intact and the contract stays last."""
     base = build_system_instruction("intermediate", "coach", "coach")
     with_tag = build_system_instruction(
         "intermediate", "coach", "coach", taste_persona_tags=("vocal_avoidant",)
     )
-    assert with_tag.startswith(base), "overlay must be a strict suffix"
+    base_without_contract = base.removesuffix(AUDIO_VIBE_CONTRACT_BLOCK)
+    assert with_tag.startswith(base_without_contract)
+    assert with_tag.endswith(AUDIO_VIBE_CONTRACT_BLOCK)
     assert len(with_tag) > len(base)
 
 

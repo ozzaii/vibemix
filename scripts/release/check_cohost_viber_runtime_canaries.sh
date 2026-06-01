@@ -54,7 +54,7 @@ MANIFEST="${OUT_DIR}/runtime_canaries_manifest.json"
 CANARY_SPECS=(
   "manual_no_evidence_skips_llm|tests/agent/test_dj_cohost_linter.py::test_manual_silent_trigger_skips_llm_before_tts"
   "manual_audio_signal_reaches_model|tests/agent/test_dj_cohost_linter.py::test_manual_trigger_with_audio_signal_still_reaches_model"
-  "audio_causal_guard_strips_before_tts|tests/agent/test_dj_cohost_linter.py::test_live_claim_guard_corrects_move_effect_verdict"
+  "audio_causal_guard_strips_before_tts|tests/agent/test_dj_cohost_linter.py::test_licensed_move_effect_still_requires_citation"
   "audio_source_detail_guard_strips_before_tts|tests/agent/test_dj_cohost_linter.py::test_live_claim_guard_strips_hidden_source_detail_before_tts"
   "audio_listener_read_survives_before_tts|tests/agent/test_dj_cohost_linter.py::test_live_claim_guard_allows_broad_audio_listener_read_before_tts"
   "guard_fallback_stays_silent|tests/eval/test_cohost_viber_session_report.py::test_report_blocks_spoken_live_claim_guard_fallback"

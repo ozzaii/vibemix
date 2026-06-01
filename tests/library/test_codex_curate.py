@@ -954,7 +954,7 @@ def test_chat_prompt_includes_recent_move_context_guard():
     assert "A_low(now=killed route=dominant)" in p
     assert "move_effect_context[" in p
     assert "sub energy fell 50% (strong)" in p
-    assert "rule=dsp_delta_not_causal_proof" in p
+    assert "rule=move_effect_prediction_and_measurement_agree" in p
     assert "live_evidence[" in p
     assert "refs=midi:A_low_cut_to_killed@42.0,mix:transition_block=single_deck_move" in p
     assert "mix:move_scope=single_deck_move_A" in p
@@ -2194,7 +2194,7 @@ def test_chat_with_codex_drops_move_grade_when_live_policy_blocks_current_claim(
     assert res.track_ids == []
 
 
-def test_chat_with_codex_corrects_move_effect_causal_verdict(library):
+def test_chat_with_codex_licenses_grounded_move_effect_causal_verdict(library):
     runner = _runner_writing(
         {
             "reply": "Your low cut cleaned the mix.",
@@ -2228,9 +2228,9 @@ def test_chat_with_codex_corrects_move_effect_causal_verdict(library):
         _runner=runner,
     )
 
-    assert "low cut cleaned" not in res.reply
-    assert "can't tell" in res.reply.lower()
-    assert "control caused that" in res.reply
+    assert res.reply == "Your low cut cleaned the mix."
+    assert res.live_verification["ok"] is True
+    assert res.live_verification["guard_violations"] == []
     assert "sub energy fell 50% (strong)" not in res.reply
 
 

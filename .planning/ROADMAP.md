@@ -63,13 +63,13 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
 
 - [x] **Phase 102: Skill-Tree Engine + Data Model + Competent Stage** — Pure-logic `skill_tree.py` (sole writer) + the ~6-skill→lesson manifest + quality-weighted Competent fill gated on the recital honest-score + a `skills` block on `learn-progress.json` with v1→v2 deterministic back-fill + corrupt-read recovery + reset. Standalone-verifiable WITHOUT any UI. Lands the Invariant #1 AST gate + Invariant #4 no-new-port gate.
 - [x] **Phase 103: Live "Mastered" Grounding** — The Competent→Mastered segment: locked-until-Competent; a thin recognizer maps EXISTING `EvidenceRegistry` event types → skill credit, but ONLY when the event resolves a valid citation (Invariants #2/#3, test-pinned — fabricated/un-cited event grants zero credit); N grounded demos flip a skill to Mastered with persisted count + `first_mastered_at`. NO new detectors. Engine-level verifiable on synthetic cited/un-cited event streams.
-- [x] **Phase 104: Skill-Tree Surface + Earned Celebration** — The Learn-module skill-tree panel (all ~6 skills · each stage · fill · what-remains) + a quiet Competent-fill cue + a single rare earned grounded co-host vocal on a live "Mastered" unlock (tone-gated against the anti-slop blocklist; final tone parks as KAAN-ACTION ear-pass) + v9.0 accessibility (dual color+shape, keyboard-nav, no time-pressure). The UI phase — exact surface + celebration treatment is an explicit Kaan decision-gate during the phase.
+- [x] **Phase 104: Skill-Tree Surface + Earned Celebration** — The Learn-module skill-tree panel (all ~6 skills · each stage · fill · what-remains) + a quiet Competent-fill cue + a single rare earned grounded co-host vocal on a live "Mastered" milestone (tone-gated against the anti-slop blocklist; final tone parks as KAAN-ACTION ear-pass) + v9.0 accessibility (dual color+shape, keyboard-nav, no time-pressure). The UI phase — exact surface + celebration treatment is an explicit Kaan decision-gate during the phase.
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
 | 102 | Skill-Tree Engine + Data Model + Competent Stage | 2/2 | Complete   | 2026-05-28 |
 | 103 | Live "Mastered" Grounding | 2/2 | Complete   | 2026-05-28 |
-| 104 | Skill-Tree Surface + Earned Celebration | User views their full skill tree from the Learn module; Competent fills render a quiet progression cue; a live "Mastered" unlock triggers a single rare grounded co-host vocal; the surface honors v9.0 accessibility | SURF-01, SURF-02, SURF-03, SURF-04 (4) | 4 |
+| 104 | Skill-Tree Surface + Earned Celebration | User views their full skill tree from the Learn module; Competent fills render a quiet progression cue; a live "Mastered" milestone triggers a single rare grounded co-host vocal; the surface honors v9.0 accessibility | SURF-01, SURF-02, SURF-03, SURF-04 (4) | 4 |
 
 **Dependency spine:** `P102 → P103 → P104` (linear). P102 is the engine + Competent stage; P103 layers the live Mastered grounding on top of the Competent gate; P104 consumes **both** prior stages for display + celebration.
 
@@ -103,13 +103,13 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
 - [x] 103-02-PLAN.md — `skill_recognizer.py` (new): reverse event→skill map over REAL event-type literals + the citation-gate spine (un-cited/fabricated → zero credit) + dedup + honest-uncreditable beatmatching/harmonic_mixing + no-runtime-state-import gate (MAST-02, MAST-03); live-firing call-site deferred to `§EARNED-LIVE-MASTERED-VERIFY`
 
 ### Phase 104: Skill-Tree Surface + Earned Celebration
-**Goal:** The Learn-module **skill-tree panel** — the user views all ~6 skills, each bar's stage, current fill, and what remains to advance. Competent-stage fills render with a **quiet, satisfying** progression cue (no slop, no spam, no constant celebration). A live "Mastered" unlock triggers a **single, rare, earned grounded co-host vocal acknowledgment**, tone-gated against the anti-slop blocklist (final tone subject to a KAAN-ACTION ear-pass). The surface honors v9.0 accessibility (dual color+shape cue, keyboard-nav, no time-pressure). **This is the UI phase** — the exact surface layout + celebration treatment is an explicit **Kaan decision-gate** brought during the phase (he deferred it: "later on when design is done, within this gsd it will be done"). Rides existing `learn.*` envelopes on `:8765`; any `messages.schema.json` edit requires `cd tauri/ui && npm run codegen:ipc`.
+**Goal:** The Learn-module **skill-tree panel** — the user views all ~6 skills, each bar's stage, current fill, and what remains to advance. Competent-stage fills render with a **quiet, satisfying** progression cue (no slop, no spam, no constant celebration). A live "Mastered" milestone triggers a **single, rare, earned grounded co-host vocal acknowledgment**, tone-gated against the anti-slop blocklist (final tone subject to a KAAN-ACTION ear-pass). The surface honors v9.0 accessibility (dual color+shape cue, keyboard-nav, no time-pressure). **This is the UI phase** — the exact surface layout + celebration treatment is an explicit **Kaan decision-gate** brought during the phase (he deferred it: "later on when design is done, within this gsd it will be done"). Rides existing `learn.*` envelopes on `:8765`; any `messages.schema.json` edit requires `cd tauri/ui && npm run codegen:ipc`.
 **Depends on:** Phase 102 (Competent stage + `SkillProgress` state to display) + Phase 103 (Mastered grounding to celebrate). Consumes BOTH prior stages for display.
 **Requirements:** SURF-01, SURF-02, SURF-03, SURF-04
 **Success Criteria** (what must be TRUE):
   1. The user can open a **skill-tree panel from the Learn module** and see all ~6 skills, each with its stage (Locked / Competent / Mastered), current fill, and a plain "what remains to advance" line (e.g. "pass the EQ recital" / "2 more cited EQ swaps in a live set"). State arrives over an existing `learn.*` envelope on `127.0.0.1:8765` through `IpcRouterBus` (Invariant #4 — no new port, no new envelope family); any `messages.schema.json` edit regenerates the ajv validator via `cd tauri/ui && npm run codegen:ipc`. Verified live per `feedback_verify_live_app_not_just_tests` (`cargo tauri dev` + `ui.log` `[vmx:ipc>]/[vmx:ipc<]` round-trip). **SURF-01.**
   2. Competent-stage fills render with a **quiet, satisfying** progression cue — no slop, no spam, no constant celebration. The fill animates once on advance and settles; it does NOT fire a co-host vocal or a loud modal. Pinned at the frontend by `tauri/ui/tests/learn/skill-tree-quiet-fill.spec.ts` (Competent fill emits no `cohost-reaction` / no celebration modal). Frontend honors `frontend-enforcement` (CDJ-Whisper retro-futurist hardware aesthetic · 20/80 amber-on-charcoal · materially textured · no AI slop). **SURF-02.**
-  3. A live "Mastered" unlock triggers a **single, rare, earned grounded co-host vocal acknowledgment** — one line, gated so it fires only on the Mastered flip (not on Competent, not on partial fill), routed through the existing co-host path (`model_router` — no new AI provider), and **tone-gated against the anti-slop blocklist** (`scripts/launch/check_no_ai_slop.py` + the v9.0 tutor-slop blocklist). The vocal copy is hand-authored / fixture-pinned (never free LLM generation that could slop). **Final tone is a KAAN-ACTION ear-pass** (`§EARNED-MASTERED-VOCAL-EAR`). Pinned by `tests/learn/test_mastered_vocal_fires_once.py` (fires exactly once per flip) + the slop-blocklist gate over the vocal copy. **SURF-03.**
+  3. A live "Mastered" milestone triggers a **single, rare, earned grounded co-host vocal acknowledgment** — one line, gated so it fires only on the Mastered flip (not on Competent, not on partial fill), routed through the existing co-host path (`model_router` — no new AI provider), and **tone-gated against the anti-slop blocklist** (`scripts/launch/check_no_ai_slop.py` + the v9.0 tutor-slop blocklist). The vocal copy is hand-authored / fixture-pinned (never free LLM generation that could slop). **Final tone is a KAAN-ACTION ear-pass** (`§EARNED-MASTERED-VOCAL-EAR`). Pinned by `tests/learn/test_mastered_vocal_fires_once.py` (fires exactly once per flip) + the slop-blocklist gate over the vocal copy. **SURF-03.**
   4. The skill-tree surface honors **v9.0 accessibility**: dual-channel cue (color + shape, not amber-only — deuteranopia/protanopia/tritanopia distinguishable), full keyboard-nav for browsing the tree without hardware, and **no time-pressure** on advancement (motor-impaired-safe). Pinned by `tauri/ui/tests/learn/skill-tree-a11y.spec.ts` (dual-cue + keyboard-nav + no timed gate). **SURF-04.**
 **Plans**: 2 plans (2 waves)
 - [x] 104-01-PLAN.md — Backend: single-source-in-Python `what_remains` payload + `SkillSpec.live_creditable` manifest fact (drift-pinned) + `mastered_vocal.py` pure fire-once Mastered vocal (slop+dash-gated fixture) wired into the live credit site `speak` hook (SURF-01 payload, SURF-03)
@@ -128,7 +128,7 @@ Locked ──[lessons + recital honest-score gate]──▶ Competent ──[N g
 ## KAAN-ACTION Queue (v11.0 — surfaced + parked, never faked)
 
 **BLOCKING (must resolve before v11.0 public ship):**
-- 🔴 `§EARNED-MASTERED-VOCAL-EAR` (P104) — Kaan ear-pass on the single rare grounded "Mastered" unlock vocal. Does it land as a real friend earning a moment with you, or as scripted gamification slop? Final tone is Kaan's gate. Anti-slop release gate.
+- 🔴 `§EARNED-MASTERED-VOCAL-EAR` (P104) — Kaan ear-pass on the single rare grounded "Mastered" milestone vocal. Does it land as a real friend earning a moment with you, or as scripted gamification slop? Final tone is Kaan's gate. Anti-slop release gate.
 - 🔴 `§EARNED-LIVE-MASTERED-VERIFY` (P103) — real-hardware live-"Mastered" verify on Kaan's FLX4: play a set, perform a skill, confirm a grounded + cited event actually advances the Mastered bar (and an un-cited moment does NOT). Engine is synthetic-verified; the live round-trip is Kaan's hardware gate.
 
 **NON-BLOCKING (ride forward to KAAN-ACTION queue):**
@@ -392,7 +392,7 @@ has shipped the engine, agent, CLI, and GUI path; use
 - [x] **Phase 84: DISCOVER — Pool Building (library-local)** — `library/discovery.py` (intent centroid + hard filters + MMR) + `discover_pool` tool.
 - [x] **Phase 85: SEQUENCE — Energy-Curved, Harmonically-Valid Ordering** — `library/sequencer.py` (curve presets + transition graph + beam search → 3-5 diverse paths, honest fit labels) + `sequence_set` tool.
 - [x] **Phase 86: EXPORT — One-Click to Rekordbox** — `harmonics.to_classical` + `library/export_rekordbox.py` (RekordboxXml write path: order + key/BPM/genre + memory & hot cues + beatgrid) + `export_set` tool + `library export-set` CLI.
-- [x] **Phase 87: AGENT — The Set-Prep Co-Host Flow** — Viber build-set backend (discover→sequence→explain each transition, mentor not black-box, grounded) + `library build-set` CLI, on the existing no-hang harness + shared persona/lens.
+- [x] **Phase 87: AGENT — The Viber Set-Prep Agent Flow** — Viber build-set backend (discover→sequence→explain each transition, mentor not black-box, grounded) + `library build-set` CLI, on the existing no-hang harness + shared persona/lens.
 - [x] **Phase 88: UI — "Build a Set" Path** — Tauri "Build a Set" path (brief + curve picker → sequenced result + per-transition why + Export) in CDJ-Whisper aesthetic. UI-02 funded-key ear-pass remains KAAN-ACTION, not an engineering gap.
 
 | # | Phase | Goal | REQ-IDs | SC count |
@@ -401,7 +401,7 @@ has shipped the engine, agent, CLI, and GUI path; use
 | 84 | DISCOVER — Pool Building | An intent-centroid + filtered + MMR-diversified candidate pool from the DJ's own crate + grounded tool | DISCOVER-01, DISCOVER-02, DISCOVER-03 | 4 |
 | 85 | SEQUENCE — Energy-Curved Ordering | 3-5 diverse, energy-curved, harmonically-valid ordered sets with honest labels + tool | SEQUENCE-01, SEQUENCE-02, SEQUENCE-03 | 4 |
 | 86 | EXPORT — One-Click to Rekordbox | A Rekordbox-importable XML (order + cues + beatgrid) + tool + CLI | EXPORT-01, EXPORT-02 | 4 |
-| 87 | AGENT — Set-Prep Co-Host Flow | A NL-brief build-set flow that discovers→sequences→explains, grounded, no-hang | AGENT-01, AGENT-02 | 4 |
+| 87 | AGENT — Viber Set-Prep Agent Flow | A NL-brief build-set flow that discovers→sequences→explains, grounded, no-hang | AGENT-01, AGENT-02 | 4 |
 | 88 | UI — "Build a Set" Path | A live, no-dead-button "Build a Set" UI ending in a downloaded Rekordbox file | UI-01, UI-02 | 4 |
 
 ## Phase Details
@@ -450,7 +450,7 @@ has shipped the engine, agent, CLI, and GUI path; use
   4. The writer is offline-unit-testable (build XML → parse back → assert order + Tonality + cues), adds ZERO new dep (pyrekordbox already pinned `--no-deps`), and does NOT mutate any existing Rekordbox database (file write only).
 **Plans**: TBD
 
-### Phase 87: AGENT — The Set-Prep Co-Host Flow
+### Phase 87: AGENT — The Viber Set-Prep Agent Flow
 **Goal:** Wire the three engines behind one natural-language conversation — the DJ asks the co-host to build a set from a brief, and the agent discovers → sequences → and explains *why* each critical transition works, acting as a mentor rather than a black box. This is where the tools become a co-host, on the existing bounded no-hang harness so it can never wedge and its voice matches the live co-host's.
 **Depends on:** Phase 84 (`discover_pool`), Phase 85 (`sequence_set`), Phase 86 (`export_set`) — the tools it orchestrates. Consumed by Phase 88 (the UI spawns this CLI surface as a subprocess).
 **Requirements:** AGENT-01, AGENT-02
@@ -486,7 +486,7 @@ has shipped the engine, agent, CLI, and GUI path; use
 | 84. DISCOVER — Pool Building | shipped | Complete | 2026-05-26 |
 | 85. SEQUENCE — Energy-Curved Ordering | shipped | Complete | 2026-05-26 |
 | 86. EXPORT — One-Click to Rekordbox | shipped | Complete | 2026-05-26 |
-| 87. AGENT — Set-Prep Co-Host Flow | shipped | Complete | 2026-05-26 |
+| 87. AGENT — Viber Set-Prep Agent Flow | shipped | Complete | 2026-05-26 |
 | 88. UI — "Build a Set" Path | shipped | Complete; UI-02 KAAN-ACTION ear-pass remains | 2026-05-26 |
 
 ---

@@ -312,7 +312,8 @@ def test_citation_pass_no_head_yields_after_stream(mocker, tmp_path) -> None:
     kinds = [k for k, _ in recorder.events]
     assert "ai_text" in kinds
     ai_text = recorder.events[kinds.index("ai_text")][1]["text"]
-    assert ai_text == "nice [ev:KICK_SWAP@45.2] yeah"
+    assert ai_text == "nice yeah"
+    assert "[ev:" not in ai_text
     assert "streaming_cancel" not in kinds
 
 

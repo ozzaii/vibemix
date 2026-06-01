@@ -401,8 +401,8 @@ def _load_env_robust() -> None:
         try:
             if cand.is_file():
                 load_dotenv(dotenv_path=str(cand), override=True)
-                if loaded_from is None:
-                    loaded_from = str(cand)
+                loaded_from = str(cand)
+                break
         except Exception:
             continue
 

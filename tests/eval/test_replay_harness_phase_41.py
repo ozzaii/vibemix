@@ -20,7 +20,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from scripts.eval.replay_harness import (
     _emit_cache_hit_rate_report,
     _emit_llm_to_tts_delta_report,
@@ -157,13 +156,14 @@ def test_print_cache_hit_rate_event_fired_counts_as_invoke(capsys) -> None:
 
 
 def test_scan_router_resolves_finds_real_call_sites_in_src_vibemix() -> None:
-    """Plan 41-01 migration guarantees ≥9 resolve() call sites under
+    """Plan 41-01 migration guarantees ≥8 resolve() call sites under
     src/vibemix/ (one per migrated SDK invocation site)."""
     counts = _scan_router_resolves(SRC_VIBEMIX)
     total = sum(counts.values())
-    # Plan 41-01 lock — at least 9 sites across the 8 router paths.
-    assert total >= 9, (
-        f"expected ≥9 resolve() call sites under src/vibemix/, "
+    # Cloud TTS removal retired one migrated route; the remaining model calls
+    # still must go through the router.
+    assert total >= 8, (
+        f"expected ≥8 resolve() call sites under src/vibemix/, "
         f"got {total}: {counts!r}"
     )
 
@@ -315,15 +315,15 @@ def test_cli_print_router_resolves_against_real_src_tree(tmp_path, capsys) -> No
     assert rc == 0
     out = capsys.readouterr().out
     assert "[router-resolves]" in out
-    # Real src/vibemix/ — must have ≥9 call sites (Plan 41-01 migration).
+    # Real src/vibemix/ — must have ≥8 call sites after cloud TTS removal.
     # Extract the count from the header for a precise assertion.
     import re
 
     m = re.search(r"(\d+) call sites", out)
     assert m is not None, f"could not parse call-site count from: {out!r}"
     count = int(m.group(1))
-    assert count >= 9, (
-        f"expected ≥9 resolve() call sites in src/vibemix/, got {count}"
+    assert count >= 8, (
+        f"expected ≥8 resolve() call sites in src/vibemix/, got {count}"
     )
 
 

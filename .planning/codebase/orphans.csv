@@ -44,6 +44,7 @@ LegCost,src/vibemix/library/cost.py,class
 LiveCostBreakdown,src/vibemix/library/cost.py,class
 SensitivityRow,src/vibemix/library/cost.py,class
 LibraryEmbedderLike,src/vibemix/library/embed_types.py,class
+LibrarySetupCandidate,src/vibemix/library/setup_discovery.py,class
 check_clap_runtime,src/vibemix/library/doctor.py,function
 check_clap_model,src/vibemix/library/doctor.py,function
 check_library_cache,src/vibemix/library/doctor.py,function
@@ -62,6 +63,7 @@ compact_recall_context_for_event,src/vibemix/state/coach.py,function
 DeckSlot,src/vibemix/state/deck_vision.py,class
 DeckRead,src/vibemix/state/deck_vision.py,class
 LiveClaimGuardResult,src/vibemix/state/deck_context.py,class
+MoveEffectLicense,src/vibemix/state/deck_context.py,class
 DeckAudioFrame,src/vibemix/audio/deck_capture.py,class
 is_unstable_output_device,src/vibemix/audio/device_select.py,function
 ReportIssue,src/vibemix/eval/session_report.py,class

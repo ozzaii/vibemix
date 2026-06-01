@@ -3411,6 +3411,8 @@ def _apply_live_claim_guard(reply: str, live_context: dict[str, Any] | None) -> 
         recent_moves,
         audio_delta_items=_live_context_audio_delta(context),
     )
+    if result.policy == "move_effect_supported":
+        return reply
     if result.corrected:
         return result.text
 

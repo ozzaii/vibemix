@@ -57,6 +57,7 @@
 | `sounddevice` | 0.5.5 | see uv.lock | CoreAudio (Mac) + WASAPI (Win) bridge. Pure-Python over CFFI; system PortAudio resolved by the installer. | 🟡 Yellow |  |
 | `SQLAlchemy` | 2.0.49 | see uv.lock | pyrekordbox transitive — required for db6 import chain even when SQLCipher dormant. Prebuilt wheels all platforms. | 🟡 Yellow |  |
 | `sqlite-vec` | 0.1.9 | see uv.lock | Vector ANN extension for sqlite — Phase 28 library intelligence. Prebuilt loadable extension. | 🟡 Yellow |  |
+| `watchfiles` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `websockets` | 15.0.1 | see uv.lock | Mascot bus WebSocket server + LiveKit internals dep. Pure-Python. | 🟢 Green |  |
 | `winsdk` | 1.0.0b10 | see uv.lock | Windows SDK Python projections — MediaRemote MMC equivalent on Win (Win-only). | 🟡 Yellow |  |
 

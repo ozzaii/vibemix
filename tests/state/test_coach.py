@@ -713,7 +713,7 @@ def test_task_mix_move_includes_move_effect_context_when_dsp_delta_is_grounded()
 
     assert "move_effect_context[" in out
     assert "sub energy fell 50% (strong)" in out
-    assert "rule=dsp_delta_not_causal_proof" in out
+    assert "rule=move_effect_prediction_and_measurement_agree" in out
 
 
 def test_task_heartbeat_LOAD_BEARING_anti_silence_clause():

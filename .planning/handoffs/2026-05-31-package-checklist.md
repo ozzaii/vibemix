@@ -3125,6 +3125,54 @@ Proof to run:
   live-claim guard and updates overlay smoke expectations to the TTS-safe chunk
   contract: citation atoms remain available to logs/overlay parsing, not MOSS.
 
+## Package 8K - EQ Move Physics Full-Suite Cleanup
+
+Suggested commit: `fix(cohost): keep eq move license full-suite clean`
+
+Include:
+
+- `src/vibemix/library/codex_curate.py`
+- `src/vibemix/__main__.py` (only the `_load_env_robust` first-existing `.env`
+  hunk; do not stage unrelated formatting/Viber setup hunks)
+- `tests/agent/test_dj_cohost_streaming_pipe.py`
+- `tests/library/test_codex_curate.py`
+- `tests/state/test_coach.py`
+- `tests/prompts/test_taste_persona_overlay.py`
+- `tests/eval/test_replay_harness_phase_41.py`
+- `scripts/release/check_cohost_viber_runtime_canaries.sh`
+- `.planning/ROADMAP.md`
+- `README.md`
+- `docs/AUDIT.md`
+- `.planning/codebase/orphans.csv`
+- `.planning/eval-runs/flx4-live-context-current-codex-move-proof/session_trace_digest.jsonl`
+
+Reason:
+
+- Package `970e165b feat(intel): license grounded eq move effects` built the
+  EQ move-effect producer and double gate. The full source suite then exposed
+  stale expectations and one Viber guard edge: a licensed
+  `move_effect_supported` verdict must be allowed to keep the grounded causal
+  line instead of being flattened into the old generic refusal.
+- The cleanup keeps the default abstain/refuse posture intact, updates canaries
+  and generated docs to the new guard behavior, and removes an oversized tracked
+  live trace artifact while preserving the smaller proof summary files.
+
+Proof to run:
+
+- `uv run pytest -q tests/intel/test_eq_move_model.py tests/state/test_deck_context.py tests/agent/test_dj_cohost_linter.py tests/library/test_codex_curate.py::test_chat_with_codex_licenses_grounded_move_effect_causal_verdict tests/library/test_codex_curate.py::test_chat_prompt_includes_recent_move_context_guard tests/state/test_coach.py::test_task_mix_move_includes_move_effect_context_when_dsp_delta_is_grounded`
+- `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py`
+- `uv run pytest -q tests/learn/test_no_speculative_phrase.py tests/prompts/test_negative_dict.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py tests/state/test_event_detector.py`
+- `uv run pytest -q` before commit if the tree is otherwise settled enough.
+- `uv run ruff check src/vibemix/intel/eq_move_model.py src/vibemix/state/deck_context.py src/vibemix/library/codex_curate.py src/vibemix/__main__.py tests/intel/test_eq_move_model.py tests/state/test_deck_context.py tests/agent/test_dj_cohost_linter.py tests/agent/test_dj_cohost_streaming_pipe.py tests/library/test_codex_curate.py tests/state/test_coach.py tests/prompts/test_taste_persona_overlay.py tests/eval/test_replay_harness_phase_41.py`
+- `git diff --check` across the Package 8K file set.
+
+Remaining gate:
+
+- LIVE proof remains separate from SRC: on the master-only FLX4/Rekordbox rig,
+  confirm a real EQ move with bass licenses a grounded causal line, while the
+  same move during a bassless breakdown stays silent/held. Do not claim this
+  commit proves LIVE or PKG behavior.
+
 ## Hold Lane - Rebuild Carry-Forward Live Reality Pins
 
 Suggested commit if/when selected: `test(repo): pin live reality gaps`
