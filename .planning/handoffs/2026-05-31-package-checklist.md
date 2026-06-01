@@ -3663,6 +3663,40 @@ Current evidence, 2026-06-01:
   shares `src/vibemix/__main__.py` and `tests/test_main_smoke.py` with existing
   hold/land lanes and must be staged by hunk.
 
+## Package 14C - MOSS-only Frozen Runtime Dependencies
+
+Suggested commit: `fix(packaging): bundle sentencepiece for moss tts`
+
+Packaging decision: Package 14B made MOSS the single source of TTS in every
+runtime mode. That means a frozen sidecar missing MOSS runtime dependencies now
+fails loudly with `LocalTTSUnavailable` instead of falling back to cloud speech.
+The PyInstaller specs already collect `onnxruntime` and `tokenizers`, but the
+MOSS engine imports `sentencepiece` at synthesis time. Bundle `sentencepiece`
+explicitly on both macOS and Windows before any packaged/signed build claims a
+working MOSS-only co-host.
+
+Include:
+
+- `vibemix-core.macos.spec`
+- `vibemix-core.windows.spec`
+- `tests/sidecar/test_build_sidecar_rename.py`
+
+Keep out:
+
+- MOSS model download/ship UX, vendored runtime movement, and
+  `scripts/local_tts_speak.py`.
+- Any live voice-quality claim. This package proves the frozen sidecar includes
+  the Python/native dependency needed to import MOSS; Kaan ear-pass and packaged
+  synthesis proof remain release gates.
+
+Current evidence, 2026-06-01:
+
+- `uv run pytest -q tests/sidecar/test_build_sidecar_rename.py::test_pyinstaller_specs_collect_local_ai_runtime`
+  passed: 2 tests.
+- `uv run ruff check tests/sidecar/test_build_sidecar_rename.py` passed.
+- `git diff --check -- vibemix-core.macos.spec vibemix-core.windows.spec tests/sidecar/test_build_sidecar_rename.py`
+  passed.
+
 ## Hold Lane - Local MOSS TTS ONNX Runtime Spike
 
 Suggested commit if/when it ships: `feat(tts): add wrapped local moss onnx runtime`

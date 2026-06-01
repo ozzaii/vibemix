@@ -338,8 +338,10 @@ def test_pyinstaller_specs_collect_local_ai_runtime(spec_name: str) -> None:
         "av",
         "onnxruntime",
         "onnxruntime.capi",
+        "sentencepiece",
         "tokenizers",
         "collect_dynamic_libs",
+        'for _pkg in ("av", "onnxruntime", "sentencepiece")',
         '"transformers"',
     ]
     for token in required:

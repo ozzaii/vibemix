@@ -136,7 +136,7 @@ hiddenimports.extend(
     ]
 )
 
-# Local AI runtime deps. These are lazy-imported by the CLAP/CUE paths, so the
+# Local AI runtime deps. These are lazy-imported by the CLAP/CUE/MOSS paths, so the
 # PyInstaller bytecode scan can miss native libraries or dynamic submodules.
 # The build script runs `uv run --extra ai-local ...`; this block makes sure the
 # installed runtime actually lands in the frozen sidecar without bundling
@@ -145,6 +145,7 @@ _LOCAL_AI_SUBMODULES = (
     "av",
     "onnxruntime",
     "onnxruntime.capi",
+    "sentencepiece",
     "tokenizers",
 )
 
@@ -165,7 +166,7 @@ for _pkg in _LOCAL_AI_SUBMODULES:
         hiddenimports.extend(_collect_runtime_submodules(_pkg))
     except Exception as exc:  # pragma: no cover — optional local-AI dep drift
         print(f"[spec] collect_submodules({_pkg!r}) skipped: {exc}", file=sys.stderr)
-for _pkg in ("av", "onnxruntime"):
+for _pkg in ("av", "onnxruntime", "sentencepiece"):
     try:
         binaries.extend(collect_dynamic_libs(_pkg))
     except Exception as exc:  # pragma: no cover — native-lib packaging drift
