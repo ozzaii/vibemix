@@ -670,6 +670,40 @@ def test_smoke_05_cleanup_closes_all_streams(monkeypatch, mocker, tmp_path):
         assert stream_mock.close.call_count >= 1, f"{key}: close not called"
 
 
+def test_close_tts_chain_closes_nested_providers_once() -> None:
+    """The live TTS adapter owns nested provider sessions that need closing."""
+    from vibemix.__main__ import _close_tts_chain
+
+    class OwnedSession:
+        def __init__(self) -> None:
+            self.closed = False
+            self.close_count = 0
+
+        async def close(self) -> None:
+            self.close_count += 1
+            self.closed = True
+
+    class Provider:
+        def __init__(self) -> None:
+            self.closed = 0
+
+        async def aclose(self) -> None:
+            self.closed += 1
+
+    session = OwnedSession()
+    child = Provider()
+    child._session = session
+    parent = Provider()
+    parent._tts_instances = [child, child]
+    parent._session = session
+
+    asyncio.run(_close_tts_chain(parent))
+
+    assert parent.closed == 1
+    assert child.closed == 1
+    assert session.close_count == 1
+
+
 # ---------------------------------------------------------------------------
 # Phase 5 — MAIN-03..07: proxy mode dispatch + failure paths
 # ---------------------------------------------------------------------------

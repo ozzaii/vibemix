@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import inspect
 import os
 import re
 import signal
@@ -204,6 +205,40 @@ def _ensure_live_session_deps() -> None:
         )
 
         PlaybackQueueAudioOutput = _PlaybackQueueAudioOutput
+
+
+async def _close_tts_chain(tts_inst: Any) -> None:
+    """Close the live TTS adapter and any nested providers that own sessions."""
+    seen: set[int] = set()
+    seen_closeables: set[int] = set()
+
+    async def _maybe_close(obj: Any) -> None:
+        if obj is None or id(obj) in seen_closeables:
+            return
+        seen_closeables.add(id(obj))
+        if getattr(obj, "closed", False):
+            return
+        closer = getattr(obj, "close", None)
+        if callable(closer):
+            result = closer()
+            if inspect.isawaitable(result):
+                await result
+
+    async def _close_one(obj: Any) -> None:
+        if obj is None or id(obj) in seen:
+            return
+        seen.add(id(obj))
+        closer = getattr(obj, "aclose", None)
+        if callable(closer):
+            result = closer()
+            if inspect.isawaitable(result):
+                await result
+        for child in getattr(obj, "_tts_instances", ()) or ():
+            await _close_one(child)
+        for attr in ("_session", "_http_session", "_client_session"):
+            await _maybe_close(getattr(obj, attr, None))
+
+    await _close_one(tts_inst)
 
 
 def _load_env_robust() -> None:
@@ -2332,6 +2367,10 @@ async def main() -> None:
             await session.aclose()
         except Exception as e:
             print(f"[close session err] {e}", file=sys.stderr)
+        try:
+            await _close_tts_chain(tts_inst)
+        except Exception as e:
+            print(f"[close tts err] {e}", file=sys.stderr)
         # Phase 77 review WR-01 — cancel the agent's off-loop pre-dispatch
         # tasks (grounding + recall) so an event firing just before SIGINT
         # doesn't leak an orphaned executor embed / a "Task was destroyed but
