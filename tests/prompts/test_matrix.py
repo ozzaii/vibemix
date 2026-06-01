@@ -21,6 +21,7 @@ import re
 import pytest
 
 from vibemix.prompts.matrix import (
+    AUDIO_VIBE_CONTRACT_BLOCK,
     COACH_BEGINNER,
     COACH_INTERMEDIATE,
     COACH_PRO,
@@ -582,6 +583,17 @@ def test_default_path_includes_grammar_block_too() -> None:
     assert IM_LISTENING_FRAGMENT in out
 
 
+def test_default_path_includes_audio_vibe_not_proof_contract() -> None:
+    out = build_system_instruction()
+
+    assert AUDIO_VIBE_CONTRACT_BLOCK in out
+    assert "Use it fully for texture" in out
+    assert "not proof of track identity" in out
+    assert "Stay macro by default" in out
+    assert "Only name source-level parts" in out
+    assert "Do not speak a deterministic correction line" in out
+
+
 def test_grammar_after_cell_body_then_fragment() -> None:
     """Append order is: cell_body → CITATION_GRAMMAR_BLOCK → IM_LISTENING_FRAGMENT.
 
@@ -629,6 +641,7 @@ def test_double_opt_out_byte_identical_to_cell() -> None:
         include_tag_dsl=False,
     )
     assert out == HYPE_INTERMEDIATE
+    assert AUDIO_VIBE_CONTRACT_BLOCK not in out
 
 
 def test_invalid_skill_still_raises() -> None:
