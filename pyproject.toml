@@ -96,6 +96,9 @@ dependencies = [
     # Validation-only — no model gen (Phase 6 convention bans pydantic).
     "jsonschema>=4.23,<5",
     "websockets>=13.0",
+    # Event-driven library/catalog freshness pulse; staleness.py degrades to
+    # bounded polling if the native watcher is unavailable in a frozen build.
+    "watchfiles>=1.1.1",
     "python-dotenv>=1.2.2",
     "pyobjc-core>=12.1 ; sys_platform == 'darwin'",
     "pyobjc-framework-Cocoa>=12.1 ; sys_platform == 'darwin'",

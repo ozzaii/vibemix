@@ -147,8 +147,8 @@ hiddenimports.extend(
     ]
 )
 
-# Local AI runtime deps. These are lazy-imported by the CLAP/CUE/MOSS paths, so the
-# PyInstaller bytecode scan can miss native libraries or dynamic submodules.
+# Local AI + watcher runtime deps. These are lazy-imported by CLAP/CUE/MOSS and
+# freshness-watcher paths, so PyInstaller can miss native libs/submodules.
 # The build script runs `uv run --extra ai-local ...`; this block makes sure the
 # installed runtime actually lands in the frozen sidecar without bundling
 # Transformers.
@@ -158,6 +158,7 @@ _LOCAL_AI_SUBMODULES = (
     "onnxruntime.capi",
     "sentencepiece",
     "tokenizers",
+    "watchfiles",
 )
 
 # Pillow is needed for screen JPEG capture and the DETR image preprocessor, but
@@ -177,7 +178,7 @@ for _pkg in _LOCAL_AI_SUBMODULES:
         hiddenimports.extend(_collect_runtime_submodules(_pkg))
     except Exception as exc:  # pragma: no cover — optional local-AI dep drift
         print(f"[spec] collect_submodules({_pkg!r}) skipped: {exc}", file=sys.stderr)
-for _pkg in ("av", "onnxruntime", "sentencepiece"):
+for _pkg in ("av", "onnxruntime", "sentencepiece", "watchfiles"):
     try:
         binaries.extend(collect_dynamic_libs(_pkg))
     except Exception as exc:  # pragma: no cover — native-lib packaging drift

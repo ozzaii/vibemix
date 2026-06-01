@@ -16,6 +16,7 @@ from vibemix.library.staleness import (
     SNOOZE_DURATION_SECONDS,
     STALE_AGE_SECONDS,
     LibraryFreshness,
+    _freshness_watch_targets,
     apply_snooze_action,
     emit_nudge_if_stale,
     freshness_nudge_payload,
@@ -237,6 +238,90 @@ def test_watch_library_freshness_emits_when_source_becomes_stale(tmp_path: Path)
             },
         )
     ]
+
+
+def test_freshness_watch_targets_include_cache_and_source(tmp_path: Path) -> None:
+    cache = tmp_path / "library.pkl"
+    source = tmp_path / "collection.xml"
+    status = LibraryFreshness(
+        status="fresh",
+        stale=False,
+        reason="cache_current",
+        age_days=0,
+        cache_path=str(cache),
+        source_path=str(source),
+        cache_mtime=1.0,
+        source_mtime=1.0,
+    )
+
+    assert _freshness_watch_targets(status) == {cache, source}
+
+
+def test_watch_library_freshness_rechecks_on_file_change(tmp_path: Path) -> None:
+    cache = tmp_path / "library.pkl"
+    source = tmp_path / "collection.xml"
+    fresh = LibraryFreshness(
+        status="fresh",
+        stale=False,
+        reason="cache_current",
+        age_days=0,
+        cache_path=str(cache),
+        source_path=str(source),
+        cache_mtime=1.0,
+        source_mtime=1.0,
+    )
+    stale = LibraryFreshness(
+        status="stale",
+        stale=True,
+        reason="source_newer_than_cache",
+        age_days=0,
+        cache_path=str(cache),
+        source_path=str(source),
+        cache_mtime=1.0,
+        source_mtime=2.0,
+    )
+    calls = {"n": 0}
+    waiter_targets: list[set[Path]] = []
+
+    def provider() -> LibraryFreshness:
+        calls["n"] += 1
+        return fresh if calls["n"] == 1 else stale
+
+    async def change_waiter(
+        targets: set[Path],
+        stop: asyncio.Event,
+        poll_seconds: float,
+    ) -> None:
+        waiter_targets.append(targets)
+        assert poll_seconds == 30.0
+        await asyncio.sleep(0)
+
+    async def _run() -> list[tuple[str, dict]]:
+        stop = asyncio.Event()
+        emitted: list[tuple[str, dict]] = []
+
+        def emit(msg_type: str, payload: dict) -> None:
+            emitted.append((msg_type, payload))
+            stop.set()
+
+        await asyncio.wait_for(
+            watch_library_freshness(
+                emit,
+                stop,
+                poll_seconds=30.0,
+                state_path=tmp_path / "state.json",
+                status_provider=provider,
+                change_waiter=change_waiter,
+            ),
+            timeout=0.5,
+        )
+        return emitted
+
+    emitted = asyncio.run(_run())
+
+    assert waiter_targets[0] == {cache, source}
+    assert emitted[0][0] == "ipc.library.staleness_nudge"
+    assert emitted[0][1]["reason"] == "source_newer_than_cache"
 
 
 def test_snooze_persists(tmp_path: Path) -> None:

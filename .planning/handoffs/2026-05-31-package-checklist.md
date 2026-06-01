@@ -2701,6 +2701,51 @@ Remaining gate:
 
 Status: REQUIRED PRODUCT CAPABILITY / NO DIRTY CODE PATH YET
 
+### Event-driven source slice - selected 2026-06-01
+
+Suggested commit: `fix(library): accelerate freshness watcher with file events`
+
+Include:
+
+- `src/vibemix/library/staleness.py`
+- `tests/library/test_staleness.py`
+- `pyproject.toml`
+- `uv.lock`
+- `vibemix-core.macos.spec`
+- `vibemix-core.windows.spec`
+- `tests/sidecar/test_build_sidecar_rename.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Any automatic re-ingest/re-embed daemon. This slice marks/announces staleness
+  fast; it does not mutate the library index without the user's refresh action.
+- Viber answer-copy changes or spoken co-host changes.
+- Packaged-runtime claim until a frozen sidecar smoke proves the native watcher
+  extension loads from the built bundle.
+
+Reason:
+
+- Package 5E already added a source-aware live freshness pulse, but it waits for
+  the bounded poll interval. This slice keeps that poll fallback and adds a
+  first-class `watchfiles` path so changes to `library.pkl` or the source
+  Rekordbox XML trigger an immediate re-check.
+- `watchfiles` was already present transitively through LiveKit; this slice
+  declares it directly because `staleness.py` now imports it, and makes the
+  PyInstaller specs collect the native watcher package explicitly.
+
+Proof for this source slice:
+
+- `uv run pytest -q tests/library/test_staleness.py tests/sidecar/test_build_sidecar_rename.py::test_pyinstaller_specs_collect_local_ai_runtime`
+- `uv run ruff check src/vibemix/library/staleness.py tests/library/test_staleness.py tests/sidecar/test_build_sidecar_rename.py`
+- `git diff --check -- src/vibemix/library/staleness.py tests/library/test_staleness.py pyproject.toml uv.lock vibemix-core.macos.spec vibemix-core.windows.spec tests/sidecar/test_build_sidecar_rename.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- Frozen sidecar smoke that the `watchfiles` native extension loads in the
+  packaged app. Source tests prove fallback/event behavior, not packaged loading.
+
 Requirement:
 
 - Viber/set generation must have a first-class library freshness watcher. It

@@ -2171,6 +2171,7 @@ dependencies = [
     { name = "sounddevice" },
     { name = "sqlalchemy" },
     { name = "sqlite-vec" },
+    { name = "watchfiles" },
     { name = "websockets" },
     { name = "winsdk", marker = "sys_platform == 'win32'" },
 ]
@@ -2258,6 +2259,7 @@ requires-dist = [
     { name = "sqlite-vec", specifier = ">=0.1.9" },
     { name = "tokenizers", marker = "extra == 'ai-local'", specifier = ">=0.22" },
     { name = "tokenizers", marker = "extra == 'clap'", specifier = ">=0.22" },
+    { name = "watchfiles", specifier = ">=1.1.1" },
     { name = "websockets", specifier = ">=13.0" },
     { name = "winsdk", marker = "sys_platform == 'win32'", specifier = ">=1.0.0b10" },
 ]
