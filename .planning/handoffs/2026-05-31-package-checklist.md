@@ -1157,6 +1157,51 @@ Remaining gate:
   release copy claims. This package proves the UI contract and build, not final
   visual acceptance on the signed artifact.
 
+## Package 5H - Viber Raw Cue Export Boundary
+
+Suggested commit: `fix(library): drop raw cue export from Viber tools`
+
+Include:
+
+- `src/vibemix/library/toolset.py`
+- `src/vibemix/library/mcp_server.py`
+- `tests/library/test_toolset.py`
+- `tests/library/test_mcp_server_clarification.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/library/cue_export.py` and the cue-folder/GUI exporters. The
+  pure cue exporter remains available to trusted CLI/Rust/GUI code.
+- Any new cue-writing UX claim. This slice only removes an unsafe agent-facing
+  tool surface.
+
+Reason:
+
+- The recovered Viber capability packet and `viber-capability-CORRECTION.md`
+  both kept one live grounding hole: the MCP/toolset `export_cues` wrapper
+  accepted raw cue payloads plus arbitrary `track_path` and did not prove the
+  track or cues came from this run's grounded seen/proposal set.
+- `export_smart_cues` already provides the safe cue-write path: the proposal
+  must have been issued by `smart_hot_cues` in the same run, the track is
+  revalidated against the live library and seen set, and selected cue ids must
+  be part of that proposal.
+- Removing the raw agent tool is more honest than trying to infer grounding
+  from a filesystem path. It makes Viber/Codex cue writes proposal-id based
+  only.
+
+Proof for this source slice:
+
+- `uv run pytest -q tests/library/test_toolset.py tests/library/test_mcp_server_clarification.py`
+- `uv run ruff check src/vibemix/library/toolset.py src/vibemix/library/mcp_server.py tests/library/test_toolset.py tests/library/test_mcp_server_clarification.py`
+- `git diff --check -- src/vibemix/library/toolset.py src/vibemix/library/mcp_server.py tests/library/test_toolset.py tests/library/test_mcp_server_clarification.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- None for the agent-facing boundary. Any future single-track cue write tool
+  must be proposal-id or track-id grounded before it is exposed to Viber/Codex.
+
 ## Hold Lane - Rebuild Carry-Forward Cue Agreement Flywheel
 
 Suggested commit if/when selected: `feat(library): record cue agreement weak labels`

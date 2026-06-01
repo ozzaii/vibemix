@@ -84,6 +84,7 @@ def test_mcp_product_surface_does_not_expose_gemini_youtube_tool(monkeypatch) ->
     assert "smart_hot_cues" in registered
     assert "export_smart_cues" in registered
     assert "ingest_youtube" not in registered
+    assert "export_cues" not in registered
 
 
 def test_shared_toolset_does_not_dispatch_gemini_youtube_tool(toolset) -> None:
@@ -93,6 +94,18 @@ def test_shared_toolset_does_not_dispatch_gemini_youtube_tool(toolset) -> None:
     )
 
     assert out == {"error": "unknown tool 'ingest_youtube'"}
+
+
+def test_shared_toolset_does_not_dispatch_raw_cue_export_tool(toolset) -> None:
+    out = toolset.dispatch(
+        "export_cues",
+        {
+            "track_path": "/tmp/smuggled.wav",
+            "cues": [{"label": "drop", "start_s": 64.0}],
+        },
+    )
+
+    assert out == {"error": "unknown tool 'export_cues'"}
 
 
 def _make_track(

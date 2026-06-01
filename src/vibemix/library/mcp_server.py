@@ -407,30 +407,6 @@ def build_server(toolset: Any) -> Any:
             {"query": query, "topic": topic, "skill_level": skill_level, "k": k}
         )
 
-    @mcp.tool()
-    def export_cues(
-        track_path: str,
-        cues: list[dict[str, Any]],
-        out_path: str | None = None,
-        title: str | None = None,
-        artist: str | None = None,
-        bpm: float | None = None,
-    ) -> dict[str, Any]:
-        """Write AI-placed structural hot cues (from the auto-cue engine) back
-        to a Rekordbox-importable XML (non-destructive — the DJ imports it).
-        ``cues`` is a serialized CueAnchor list: dicts with
-        label/start_s/end_s/confidence/source."""
-        return toolset.export_cues(
-            {
-                "track_path": track_path,
-                "cues": cues,
-                "out_path": out_path,
-                "title": title,
-                "artist": artist,
-                "bpm": bpm,
-            }
-        )
-
     return mcp
 
 

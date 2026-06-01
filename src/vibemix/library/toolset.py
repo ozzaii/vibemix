@@ -1053,53 +1053,6 @@ class LibraryToolset:
             k=k if isinstance(k, int) else 4,
         )
 
-    def export_cues(self, args: dict[str, Any]) -> dict[str, Any]:
-        """Write AI-placed structural cues (from the auto-cue engine) to a
-        Rekordbox-importable XML. ``cues`` is a serialized CueAnchor list
-        (dicts: label/start_s/end_s/confidence/source); we rebuild CueAnchors
-        and hand them to cue_export (non-destructive round-trip)."""
-        track_path = args.get("track_path")
-        if not (isinstance(track_path, str) and track_path.strip()):
-            return {"error": "export_cues: 'track_path' must be a non-empty string"}
-        raw = args.get("cues")
-        if not isinstance(raw, list) or not raw:
-            return {"error": "export_cues: 'cues' must be a non-empty list"}
-        try:
-            from vibemix.library import cue_export
-            from vibemix.library.cue_types import CueAnchor
-
-            cues = [
-                CueAnchor(
-                    label=c["label"],
-                    start_s=float(c["start_s"]),
-                    end_s=float(c.get("end_s") or 0.0),
-                    confidence=float(c.get("confidence") or 0.0),
-                    source=c.get("source") or "auto",
-                )
-                for c in raw
-                if isinstance(c, dict) and c.get("label")
-            ]
-            if not cues:
-                return {"error": "export_cues: no valid cues after parse"}
-            out_path = args.get("out_path")
-            if not (isinstance(out_path, str) and out_path.strip()):
-                from pathlib import Path as _Path
-
-                out_path = str(
-                    _Path.home() / ".cache" / "vibemix" / "cues" / (_Path(track_path).stem + ".xml")
-                )
-            return cue_export.export_cues(
-                track_path,
-                cues,
-                out_path,
-                title=args.get("title"),
-                artist=args.get("artist"),
-                bpm=args.get("bpm"),
-            )
-        except Exception as e:
-            logger.warning("[viber] export_cues failed: %s", e)
-            return {"error": f"export_cues failed: {type(e).__name__}: {e}"}
-
     # -- dispatch (hard per-tool timeout; never raises) --------------------- #
 
     def _build_starvation_payload(
@@ -1423,10 +1376,6 @@ class LibraryToolset:
             return "; ".join(p for p in parts if p)[:160]
         if name == "export_smart_cues":
             return text("proposal_id", limit=120)
-        if name == "export_cues":
-            title = text("title", limit=80)
-            artist = text("artist", limit=60)
-            return " - ".join(p for p in (artist, title) if p)[:160]
 
         for key in ("query", "name", "track_id", "proposal_id", "mode"):
             value = text(key)
@@ -1549,7 +1498,6 @@ class LibraryToolset:
             "quote_moment": self.quote_moment,
             "request_clarification": self.request_clarification,
             "retrieve_dj_knowledge": self.retrieve_dj_knowledge,
-            "export_cues": self.export_cues,
         }
         handler = handlers.get(name)
         if handler is None:

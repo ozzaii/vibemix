@@ -11,9 +11,9 @@ thin FastMCP wrapper. These tests pin five behaviors:
 1.  **Build smoke** — ``build_server(fake_toolset)`` returns a FastMCP-like
     object (has a ``run`` method) without raising. No Codex spawn, no STDIO
     transport — purely a ``build_server()`` unit check.
-2.  **Tool count regression-pin** — the registered tool count is the
-    pre-100-02 baseline (17) + 1 = **18**. If a future refactor accidentally
-    drops a tool, this count flips and the regression is caught.
+2.  **Tool count regression-pin** — the registered tool count is the grounded
+    base surface (16) + 1 = **17**. If a future refactor accidentally drops a
+    tool, this count flips and the regression is caught.
 3.  **Tool delegation correctness** — invoking the registered
     ``request_clarification`` function delegates to
     ``fake_toolset.request_clarification`` with the exact args dict
@@ -33,7 +33,7 @@ thin FastMCP wrapper. These tests pin five behaviors:
     substring contract is the runtime gate.
 
 Plus an existing-exposures byte-equivalence check (no accidental drop of the
-17 base tools).
+16 grounded base tools).
 
 No Codex spawn. No STDIO transport. The fake toolset is a plain class with
 stub methods returning ``{}`` for each registered tool — enough for FastMCP's
@@ -50,7 +50,6 @@ from typing import Any
 import pytest
 
 from vibemix.library.mcp_server import build_server
-
 
 # --------------------------------------------------------------------------- #
 # FakeToolset — stub object with one method per registered tool.
@@ -119,9 +118,6 @@ class _FakeToolset:
     def retrieve_dj_knowledge(self, args: dict[str, Any]) -> dict[str, Any]:
         return {}
 
-    def export_cues(self, args: dict[str, Any]) -> dict[str, Any]:
-        return {}
-
     # -- Plan 100-02's new surface ---------------------------------------- #
     def request_clarification(self, args: dict[str, Any]) -> dict[str, Any]:
         # Record the args the MCP wrapper hands us — the delegation test
@@ -163,14 +159,14 @@ def test_build_server_smoke(server: Any) -> None:
     assert hasattr(server, "run"), "FastMCP server must expose a run() method"
 
 
-def test_registered_tool_count_is_eighteen(server: Any) -> None:
-    """Pre-100-02 baseline was 17; after 100-02 the count is 18 exactly.
+def test_registered_tool_count_is_seventeen(server: Any) -> None:
+    """The grounded base surface is 16; request_clarification brings it to 17.
 
     Regression-pin: if a future refactor drops a tool, this flips.
     """
     tools = server._tool_manager.list_tools()
-    assert len(tools) == 18, (
-        f"Expected 18 registered tools (17 base + 1 request_clarification), "
+    assert len(tools) == 17, (
+        f"Expected 17 registered tools (16 base + 1 request_clarification), "
         f"got {len(tools)}: {[t.name for t in tools]}"
     )
 
@@ -183,10 +179,12 @@ def test_request_clarification_is_registered(server: Any) -> None:
     )
 
 
-def test_existing_seventeen_tools_still_registered(server: Any) -> None:
-    """The 17 base tools are byte-equivalently registered (no accidental drop).
+def test_existing_sixteen_grounded_tools_still_registered(server: Any) -> None:
+    """The 16 grounded base tools are registered; raw cue export stays absent.
 
-    Mirrors the existing exposure surface — pre-Plan-100-02 manifest.
+    Raw ``export_cues`` accepted arbitrary track paths/cue payloads and is no
+    longer part of the agent-facing MCP surface; ``export_smart_cues`` is the
+    grounded cue-write path.
     """
     expected_base = {
         "search_vibe",
@@ -205,11 +203,11 @@ def test_existing_seventeen_tools_still_registered(server: Any) -> None:
         "fetch_url",
         "quote_moment",
         "retrieve_dj_knowledge",
-        "export_cues",
     }
     names = {t.name for t in server._tool_manager.list_tools()}
     missing = expected_base - names
     assert not missing, f"Plan 100-02 accidentally dropped: {sorted(missing)}"
+    assert "export_cues" not in names
 
 
 def test_request_clarification_delegates_with_dict_packed_args(
@@ -306,9 +304,9 @@ def test_request_clarification_docstring_teaches_codex(server: Any) -> None:
     )
 
 
-def test_grep_gate_eighteen_mcp_tool_decorators() -> None:
+def test_grep_gate_seventeen_mcp_tool_decorators() -> None:
     """Subprocess grep gate — independent confirmation that the source file
-    has exactly 18 ``@mcp.tool()`` decorators.
+    has exactly 17 ``@mcp.tool()`` decorators.
 
     Belt-and-braces for the registered-tool-count check; this also catches
     "tool was added but build_server didn't re-bind it" drift since the
@@ -323,10 +321,10 @@ def test_grep_gate_eighteen_mcp_tool_decorators() -> None:
         check=False,
     )
     count = int(out.stdout.strip())
-    assert count == 18, (
-        f"Expected exactly 18 @mcp.tool() decorators in mcp_server.py, "
-        f"got {count}. Either Plan 100-02 didn't add the request_clarification "
-        f"decorator, or a sibling tool was accidentally dropped."
+    assert count == 17, (
+        f"Expected exactly 17 @mcp.tool() decorators in mcp_server.py, "
+        f"got {count}. Either request_clarification is missing, the raw "
+        f"export_cues tool came back, or a sibling grounded tool was dropped."
     )
 
 
