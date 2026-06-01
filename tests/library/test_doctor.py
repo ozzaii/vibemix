@@ -10,6 +10,8 @@ environment inspections exercised against whatever env the test runs in.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from vibemix.library import doctor
 
 
@@ -48,6 +50,58 @@ def test_clap_runtime_and_dj_knowledge_probes_are_present() -> None:
     names = {fn().get("name") for fn in doctor.CHECKS}
     assert "clap_runtime" in names
     assert "dj_knowledge" in names
+    assert "library_setup" in names
+
+
+def test_library_setup_candidates_surface_first_run_sources(monkeypatch) -> None:
+    class FakeLibrary:
+        tracks: ClassVar[dict[str, object]] = {}
+
+        @staticmethod
+        def try_load_cache() -> bool:
+            return False
+
+    monkeypatch.setattr("vibemix.library.rekordbox.RekordboxLibrary", FakeLibrary)
+    monkeypatch.setattr(
+        "vibemix.library.setup_discovery.discover_library_setup_candidate_dicts",
+        lambda max_candidates=3: [
+            {
+                "kind": "music_folder",
+                "path": "/Users/ka/Music/PSYMIND",
+                "confidence": "high",
+                "reason": "bounded scan saw 42 supported audio files",
+                "command": "uv run python -m vibemix library embed-folder /Users/ka/Music/PSYMIND",
+                "audio_files_seen": 42,
+            }
+        ],
+    )
+
+    result = doctor.check_library_setup_candidates()
+
+    assert result["name"] == "library_setup"
+    assert result["ok"] is True
+    assert result["candidates"][0]["path"] == "/Users/ka/Music/PSYMIND"
+    assert "music_folder:/Users/ka/Music/PSYMIND" in result["detail"]
+
+
+def test_library_setup_candidates_do_not_mask_loaded_cache(monkeypatch) -> None:
+    class FakeLibrary:
+        tracks: ClassVar[dict[str, object]] = {"t1": object(), "t2": object()}
+
+        @staticmethod
+        def try_load_cache() -> bool:
+            return True
+
+    monkeypatch.setattr("vibemix.library.rekordbox.RekordboxLibrary", FakeLibrary)
+
+    result = doctor.check_library_setup_candidates()
+
+    assert result == {
+        "name": "library_setup",
+        "ok": True,
+        "detail": "library already indexed (2 tracks)",
+        "fix": "",
+    }
 
 
 def test_deep_mode_adds_functional_probes_on_top_of_presence_checks() -> None:

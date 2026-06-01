@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import os
 import shutil
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 def _check(name: str, ok: bool, detail: str, fix: str = "") -> dict[str, Any]:
@@ -35,7 +36,7 @@ def check_clap_runtime() -> dict[str, Any]:
     for mod in ("onnxruntime", "tokenizers"):
         try:
             __import__(mod)
-        except Exception:  # noqa: BLE001 — any import failure counts as missing
+        except Exception:
             missing.append(mod)
     if missing:
         return _check(
@@ -82,8 +83,46 @@ def check_library_cache() -> dict[str, Any]:
             "no library cache",
             "uv run python -m vibemix library ingest   (or embed-folder)",
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return _check("library_cache", False, f"{type(e).__name__}: {e}")
+
+
+def check_library_setup_candidates() -> dict[str, Any]:
+    """Concrete sources a first-run DJ can explicitly index.
+
+    This is not a replacement for ``library_cache``: Viber still cannot search
+    until the user imports something. It turns "no cache" into an actionable
+    setup board with local, bounded candidates.
+    """
+    try:
+        from vibemix.library.rekordbox import RekordboxLibrary
+        from vibemix.library.setup_discovery import discover_library_setup_candidate_dicts
+
+        lib = RekordboxLibrary()
+        if lib.try_load_cache():
+            return _check(
+                "library_setup",
+                True,
+                f"library already indexed ({len(lib.tracks)} tracks)",
+            )
+        candidates = discover_library_setup_candidate_dicts(max_candidates=3)
+        if candidates:
+            summary = "; ".join(
+                f"{c.get('kind')}:{c.get('path')} ({c.get('audio_files_seen', 0)} files)"
+                for c in candidates
+            )
+            return {
+                **_check("library_setup", True, f"setup candidates: {summary}"),
+                "candidates": candidates,
+            }
+        return _check(
+            "library_setup",
+            False,
+            "no Rekordbox XML or music-folder candidates found",
+            "Drop a Rekordbox collection.xml or music folder in Settings -> Library.",
+        )
+    except Exception as e:
+        return _check("library_setup", False, f"{type(e).__name__}: {e}")
 
 
 def check_embeddings_store() -> dict[str, Any]:
@@ -103,7 +142,7 @@ def check_embeddings_store() -> dict[str, Any]:
             f"0 vectors ({backend})",
             "embed tracks: library ingest / embed-folder",
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return _check("embeddings_store", False, f"{type(e).__name__}: {e}")
 
 
@@ -130,7 +169,7 @@ def check_dj_knowledge() -> dict[str, Any]:
                 "rebuild the KB with a text embedder matching the query dim",
             )
         return _check("dj_knowledge", True, f"{len(store)} chunks, dim {store_dim}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return _check("dj_knowledge", False, f"{type(e).__name__}: {e}")
 
 
@@ -152,7 +191,7 @@ def check_cue_export() -> dict[str, Any]:
         import pyrekordbox  # noqa: F401
 
         return _check("cue_export", True, "pyrekordbox importable")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return _check(
             "cue_export",
             False,
@@ -206,7 +245,7 @@ def check_search_live() -> dict[str, Any]:
             "search_vibe ran but returned 0 results",
             "embed tracks: library ingest / embed-folder",
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return _check("search_live", False, f"{type(e).__name__}: {e}")
 
 
@@ -216,6 +255,7 @@ CHECKS: tuple[Callable[[], dict[str, Any]], ...] = (
     check_clap_runtime,
     check_clap_model,
     check_library_cache,
+    check_library_setup_candidates,
     check_embeddings_store,
     check_dj_knowledge,
     check_web_search,
@@ -238,7 +278,7 @@ def run_doctor(*, deep: bool = False) -> dict[str, Any]:
     for fn in checks:
         try:
             results.append(fn())
-        except Exception as e:  # noqa: BLE001 — a crashing probe is itself a finding
+        except Exception as e:
             results.append(
                 _check(fn.__name__, False, f"probe crashed: {type(e).__name__}: {e}")
             )

@@ -2335,6 +2335,43 @@ Remaining gate:
   one-click "Use this folder/XML" action, but this package only discovers and
   reports candidates.
 
+## Package 5M - Library Doctor Setup Candidates
+
+Suggested commit: `feat(library): show setup candidates in doctor`
+
+Include:
+
+- `src/vibemix/library/doctor.py`
+- `tests/library/test_doctor.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- CLI ingest execution.
+- Settings UI changes.
+- Viber/cohost speech or live-context claim changes.
+
+Reason:
+
+- Package 5L exposes setup candidates in live-context JSON, but users and app
+  preflight surfaces still need a stable cheap command that says what to import
+  before Viber can search/set-prep.
+- `library doctor` now includes a `library_setup` check. It reports "already
+  indexed" when the cache loads, otherwise it surfaces bounded local candidates
+  from `setup_discovery` without indexing them.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_doctor.py tests/library/test_setup_discovery.py`
+- `uv run ruff check src/vibemix/library/doctor.py tests/library/test_doctor.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/library/doctor.py tests/library/test_doctor.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- Source-level setup visibility only. A future explicit action may start an
+  ingest/re-embed run, but this package remains read-only.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`
