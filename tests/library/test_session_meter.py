@@ -27,7 +27,7 @@ def _eur(usd: float) -> float:
 
 def test_route_pricing_keyed_by_router_path() -> None:
     """Pricing is keyed by router-PATH strings, never raw Gemini model names."""
-    for path in ("live_coach", "live_coach_tts", "debrief", "debrief_tts", "embedding"):
+    for path in ("live_coach", "live_coach_tts", "debrief", "embedding"):
         assert path in ROUTE_PRICING, f"missing pricing for path {path!r}"
         rate = ROUTE_PRICING[path]
         assert "input" in rate and "output" in rate

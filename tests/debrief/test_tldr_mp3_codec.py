@@ -1,24 +1,24 @@
 # SPDX-License-Identifier: Apache-2.0
-"""DEBRIEF-04: synthesized TLDR audio is MP3 (libmp3lame via PyAV).
+"""DEBRIEF-04: synthesized MOSS TLDR audio is MP3 (libmp3lame via PyAV).
 
-Real Gemini TTS calls are out of scope for offline tests — we verify
-the PyAV encode pipeline produces valid MP3 magic bytes when fed a
-synthetic PCM buffer.
+Real MOSS model calls are out of scope for offline tests — we verify the PyAV
+encode pipeline produces valid MP3 magic bytes when fed synthetic line audio.
 
 PyAV libmp3lame availability was verified at Plan 29-00 Wave 0 (A3).
 """
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
+from vibemix.agent.local_tts import LocalTTSUnavailable
 from vibemix.debrief.tldr import (
     DebriefGenerationError,
     _encode_pcm_to_mp3,
-    synthesize_achird_mp3,
+    synthesize_moss_mp3,
 )
 
 
@@ -41,56 +41,61 @@ def test_pcm_to_mp3_produces_mp3_magic_bytes():
     assert mp3.startswith(b"ID3") or (mp3[0] == 0xFF and (mp3[1] & 0xE0) == 0xE0)
 
 
-def test_synthesize_achird_mp3_happy_path():
-    """End-to-end: mocked TTS response → PCM → MP3 bytes."""
-    pcm = _make_silent_pcm(seconds=1.0)
-    inline_part = SimpleNamespace(
-        inline_data=SimpleNamespace(data=pcm),
-    )
-    candidate = SimpleNamespace(
-        content=SimpleNamespace(parts=[inline_part])
-    )
-    response = SimpleNamespace(candidates=[candidate])
+def test_synthesize_moss_mp3_happy_path():
+    """End-to-end: mocked MOSS line audio → PCM → MP3 bytes."""
+    adapter = object()
+    adapter_factory = MagicMock(return_value=adapter)
+    seen: list[str] = []
 
-    client = MagicMock()
-    client.models.generate_content.return_value = response
-    mp3 = synthesize_achird_mp3(client, "Hello world")
+    async def fake_line_synthesizer(adapter_arg, text):
+        assert adapter_arg is adapter
+        seen.append(text)
+        return np.zeros((24000, 2), dtype=np.float32), 24000
+
+    mp3 = synthesize_moss_mp3(
+        "Hello world",
+        adapter_factory=adapter_factory,
+        line_synthesizer=fake_line_synthesizer,
+    )
     assert isinstance(mp3, bytes)
     assert len(mp3) > 0
+    assert seen == ["Hello world"]
+    adapter_factory.assert_called_once_with()
 
 
-def test_synthesize_achird_mp3_raises_on_empty_pcm():
-    """TTS returns no audio → typed error."""
-    inline_part = SimpleNamespace(inline_data=SimpleNamespace(data=b""))
-    candidate = SimpleNamespace(content=SimpleNamespace(parts=[inline_part]))
-    response = SimpleNamespace(candidates=[candidate])
-    client = MagicMock()
-    client.models.generate_content.return_value = response
+def test_synthesize_moss_mp3_raises_on_empty_audio():
+    """MOSS returns no audio → typed error."""
+    async def empty_line_synthesizer(_adapter, _text):
+        return np.zeros((0, 2), dtype=np.float32), 24000
+
     with pytest.raises(DebriefGenerationError) as ei:
-        synthesize_achird_mp3(client, "x")
+        synthesize_moss_mp3(
+            "x",
+            adapter_factory=lambda: object(),
+            line_synthesizer=empty_line_synthesizer,
+        )
     assert ei.value.reason == "tldr_generation_failed"
 
 
-def test_synthesize_achird_mp3_raises_on_gemini_exception():
-    client = MagicMock()
-    client.models.generate_content.side_effect = RuntimeError("rate limited")
+def test_synthesize_moss_mp3_raises_on_line_synth_exception():
+    async def failing_line_synthesizer(_adapter, _text):
+        raise RuntimeError("model crashed")
+
     with pytest.raises(DebriefGenerationError) as ei:
-        synthesize_achird_mp3(client, "x")
+        synthesize_moss_mp3(
+            "x",
+            adapter_factory=lambda: object(),
+            line_synthesizer=failing_line_synthesizer,
+        )
     assert ei.value.reason == "tldr_generation_failed"
+    assert "model crashed" in ei.value.message
 
 
-def test_uses_achird_voice_in_tts_call():
-    """The voice name is passed in speech_config."""
-    pcm = _make_silent_pcm(seconds=0.5)
-    inline_part = SimpleNamespace(inline_data=SimpleNamespace(data=pcm))
-    candidate = SimpleNamespace(content=SimpleNamespace(parts=[inline_part]))
-    response = SimpleNamespace(candidates=[candidate])
-    client = MagicMock()
-    client.models.generate_content.return_value = response
-    synthesize_achird_mp3(client, "x")
-    call_kwargs = client.models.generate_content.call_args.kwargs
-    voice_cfg = (
-        call_kwargs["config"]["speech_config"]["voice_config"]
-        ["prebuilt_voice_config"]["voice_name"]
-    )
-    assert voice_cfg == "Achird"
+def test_synthesize_moss_mp3_raises_on_unavailable_model():
+    def missing_model_factory():
+        raise LocalTTSUnavailable("missing MOSS model")
+
+    with pytest.raises(DebriefGenerationError) as ei:
+        synthesize_moss_mp3("x", adapter_factory=missing_model_factory)
+    assert ei.value.reason == "tldr_generation_failed"
+    assert "MOSS TTS unavailable" in ei.value.message

@@ -110,7 +110,6 @@ def test_router_resolves_all_paths() -> None:
         ),
         "learn_tutor": ("gemini-3.5-flash", ServiceTier.STANDARD),
         "debrief": ("gemini-3.5-flash", ServiceTier.FLEX),
-        "debrief_tts": ("gemini-3-flash-tts-preview", ServiceTier.FLEX),
         "library_auto_tag": ("gemini-3.5-flash", ServiceTier.FLEX),
         # Source-audited cost/capability study candidates. The 3.1 Flash Live
         # model stays isolated under spikes/ until its LAT-09 verdict is written.

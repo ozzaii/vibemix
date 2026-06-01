@@ -6,7 +6,7 @@ These tests pin the router contract:
 - ``resolve(path)`` returns a ``(model_id, ServiceTier | None)`` tuple per
   the locked router-paths table in 41-01-PLAN.md.
 - Live coach + live-coach TTS dispatch to ``ServiceTier.STANDARD`` (LAT-07).
-- Debrief / library / legacy embedding dispatch to ``ServiceTier.FLEX``.
+- Debrief text / library / legacy embedding dispatch to ``ServiceTier.FLEX``.
 - The ``embedding`` route remains only for the old Gemini cache/migration
   helper; product library embeddings are local CLAP ONNX and do not use this
   router path.
@@ -94,7 +94,7 @@ def test_router_paths_is_frozen_tuple() -> None:
     # routes. Phase 92 Plan 92-01 (LESSON-06, Open Q1) adds ``learn_tutor`` for
     # the Learn module's AI tutor lens — decoupled from ``live_coach`` so
     # future model swaps don't drag both surfaces.
-    assert len(ROUTER_PATHS) == 12
+    assert len(ROUTER_PATHS) == 11
     expected = {
         "live_coach",
         "live_coach_openrouter",
@@ -103,7 +103,6 @@ def test_router_paths_is_frozen_tuple() -> None:
         "live_coach_tts_openrouter",
         "learn_tutor",
         "debrief",
-        "debrief_tts",
         "library_auto_tag",
         "embedding",
         # Cost+capability study (2026-05-30): candidate live-brain Gemini tiers
@@ -134,10 +133,3 @@ def test_live_coach_tts_fallback_returns_2_5() -> None:
     model, tier = resolve("live_coach_tts_fallback")
     assert model == "gemini-2.5-flash-preview-tts"
     assert tier == ServiceTier.STANDARD
-
-
-def test_debrief_tts_returns_flex_3_flash_tts() -> None:
-    """Debrief TTS shares the debrief Flex tier (cost lane)."""
-    model, tier = resolve("debrief_tts")
-    assert model == "gemini-3-flash-tts-preview"
-    assert tier == ServiceTier.FLEX

@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""DEBRIEF-04: TLDR narration text is bounded to 150-220 words (≈60-90s @ Achird WPM).
+"""DEBRIEF-04: TLDR narration text is bounded to 150-220 words (≈60-90s).
 
 Real Gemini calls are out of scope for offline tests — we verify the
 deterministic word-budget enforcement and the stripper integration via
-mocks. The cross-platform Achird voice MP3 duration smoke is verified in
-the manual smoke checklist (Plan 29-08).
+mocks. The local MOSS MP3 duration smoke is verified in the manual smoke
+checklist (Plan 29-08).
 """
 
 from __future__ import annotations

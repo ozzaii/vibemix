@@ -15,11 +15,20 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 from vibemix.debrief import run
 from vibemix.debrief.drills import Drill, Drills
 from vibemix.debrief.stripper import assert_all_cited
+
+
+def _patch_moss_tldr_audio(monkeypatch) -> None:
+    async def fake_line_synthesizer(_adapter, _text):
+        return np.zeros((24000, 2), dtype=np.float32), 24000
+
+    monkeypatch.setattr("vibemix.debrief.tldr.build_default_line_adapter", lambda: object())
+    monkeypatch.setattr("vibemix.debrief.tldr.synthesize_line", fake_line_synthesizer)
 
 
 def _build_full_session(tmp_path: Path) -> tuple[Path, Path]:
@@ -93,22 +102,14 @@ def _make_mock_client_with_uncited_sentences_in_tldr():
         )
     )
 
-    # TTS response — produce real PCM so PyAV can encode.
-    pcm = b"\x00\x00" * 24000
-    inline = SimpleNamespace(inline_data=SimpleNamespace(data=pcm))
-    tts_response = SimpleNamespace(
-        candidates=[SimpleNamespace(content=SimpleNamespace(parts=[inline]))]
-    )
-
     client.models.generate_content.side_effect = [
         drills_response,
         tldr_text_response,
-        tts_response,
     ]
     return client
 
 
-def test_no_uncited_critique_in_persisted_debrief(tmp_path: Path):
+def test_no_uncited_critique_in_persisted_debrief(tmp_path: Path, monkeypatch):
     """THE HARD GATE.
 
     After full pipeline, every advice-field sentence in the persisted
@@ -116,6 +117,7 @@ def test_no_uncited_critique_in_persisted_debrief(tmp_path: Path):
     """
     root, sess = _build_full_session(tmp_path)
     client = _make_mock_client_with_uncited_sentences_in_tldr()
+    _patch_moss_tldr_audio(monkeypatch)
 
     state = run(sess, client=client, recordings_root=root, serve=False)
     assert state["cache_hit"] is False

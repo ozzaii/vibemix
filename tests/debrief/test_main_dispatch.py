@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 from vibemix.debrief import EventsMissing, SessionTooShort
@@ -52,6 +53,14 @@ def _build_session(root: Path, name: str = "20260515-aaaaaa", duration_s: float 
     return sess
 
 
+def _patch_moss_tldr_audio(monkeypatch) -> None:
+    async def fake_line_synthesizer(_adapter, _text):
+        return np.zeros((24000, 2), dtype=np.float32), 24000
+
+    monkeypatch.setattr("vibemix.debrief.tldr.build_default_line_adapter", lambda: object())
+    monkeypatch.setattr("vibemix.debrief.tldr.synthesize_line", fake_line_synthesizer)
+
+
 def test_run_with_cached_debrief_skips_gemini(tmp_path: Path):
     """When session_debrief.json + tldr.mp3 are present with matching
     sha256, ``run`` returns the cached state without calling Gemini."""
@@ -90,10 +99,11 @@ def test_run_with_cached_debrief_skips_gemini(tmp_path: Path):
 
 
 def test_run_first_time_generation_calls_gemini(tmp_path: Path, monkeypatch):
-    """First-time run with no cache calls drills + tldr Gemini paths."""
+    """First-time run with no cache calls Gemini text paths + MOSS audio."""
     root = tmp_path / "recordings"
     root.mkdir()
     sess = _build_session(root)
+    _patch_moss_tldr_audio(monkeypatch)
 
     from vibemix.debrief.drills import Drill, Drills
 
@@ -113,13 +123,6 @@ def test_run_first_time_generation_calls_gemini(tmp_path: Path, monkeypatch):
         text="",
     )
 
-    # Build a fake TTS PCM response.
-    pcm = b"\x00\x00" * 24000  # 1 sec silence
-    inline = SimpleNamespace(inline_data=SimpleNamespace(data=pcm))
-    tts_response = SimpleNamespace(
-        candidates=[SimpleNamespace(content=SimpleNamespace(parts=[inline]))]
-    )
-
     text_response = SimpleNamespace(
         text="First cited [ev:MIX_MOVE@05:00]. Second [ev:TRACK_CHANGE@01:40]."
     )
@@ -128,14 +131,13 @@ def test_run_first_time_generation_calls_gemini(tmp_path: Path, monkeypatch):
     client.models.generate_content.side_effect = [
         drills_response,  # drills call
         text_response,    # tldr text
-        tts_response,     # tldr tts
     ]
     state = run(sess, client=client, recordings_root=root, serve=False)
     assert state["cache_hit"] is False
     assert (sess / "debrief_tldr.mp3").exists()
     assert (sess / "session_debrief.json").exists()
-    # All 3 Gemini calls happened.
-    assert client.models.generate_content.call_count == 3
+    # Only the Gemini text calls happened; narration audio is local MOSS.
+    assert client.models.generate_content.call_count == 2
 
 
 def test_run_invalid_session_dir_raises(tmp_path: Path):

@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Plan 41-01 / Task 2 — debrief/tldr.py routes via ModelRouter.
+"""Plan 41-01 / MOSS-only update — debrief/tldr.py routing contracts.
 
-Pins the contract that the migrating constants (DEBRIEF_TLDR_MODEL,
-DEBRIEF_TTS_MODEL) come from ``vibemix.llm.model_router.resolve`` so a
-future SKU bump is a one-file edit in ``_router_config.py``.
+Pins the contract that debrief text generation still comes from
+``vibemix.llm.model_router.resolve`` while debrief narration audio does not
+resolve a Gemini TTS route. MOSS is the single product voice source.
 """
 
 from __future__ import annotations
 
-from vibemix.debrief.tldr import DEBRIEF_TLDR_MODEL, DEBRIEF_TTS_MODEL
+from vibemix.debrief.tldr import DEBRIEF_TLDR_MODEL, DEBRIEF_TTS_PROVIDER
 from vibemix.llm.model_router import resolve
 
 
@@ -17,9 +17,9 @@ def test_debrief_tldr_model_matches_router() -> None:
     assert DEBRIEF_TLDR_MODEL == resolve("debrief")[0]
 
 
-def test_debrief_tts_model_matches_router() -> None:
-    """DEBRIEF_TTS_MODEL is router-derived (debrief_tts path)."""
-    assert DEBRIEF_TTS_MODEL == resolve("debrief_tts")[0]
+def test_debrief_tts_provider_is_moss_local() -> None:
+    """Debrief audio uses the local MOSS provider, not a Gemini TTS route."""
+    assert DEBRIEF_TTS_PROVIDER == "moss-local"
 
 
 def test_debrief_tldr_model_is_3_5_flash() -> None:
@@ -27,6 +27,8 @@ def test_debrief_tldr_model_is_3_5_flash() -> None:
     assert DEBRIEF_TLDR_MODEL == "gemini-3.5-flash"
 
 
-def test_debrief_tts_model_is_3_flash_tts_preview() -> None:
-    """Smoke: the resolved TTS id still equals the locked id."""
-    assert DEBRIEF_TTS_MODEL == "gemini-3-flash-tts-preview"
+def test_debrief_module_no_longer_exports_gemini_tts_model() -> None:
+    """No debrief-level Gemini TTS model constant should reappear."""
+    import vibemix.debrief.tldr as tldr
+
+    assert not hasattr(tldr, "DEBRIEF_TTS_MODEL")

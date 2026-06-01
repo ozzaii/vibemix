@@ -6,7 +6,7 @@ Emits Phase 25 + Plan 29-03 wrapper frames progressively:
   ipc.debrief.session-loaded  (immediate)
   ipc.debrief.chapter-list    (~ instant — Plan 29-01 derive_chapters)
   ipc.debrief.drills          (~ 5s — Gemini 3 Pro structured-output)
-  ipc.debrief.tldr-audio      (~ 30s — Gemini TTS + PyAV encode)
+  ipc.debrief.tldr-audio      (~ 30s — local MOSS TTS + PyAV encode)
 
 Plus on-demand replies to ``ipc.debrief.citation-tooltip-request``.
 

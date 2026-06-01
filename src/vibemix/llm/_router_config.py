@@ -66,7 +66,6 @@ _ROUTES: dict[str, tuple[str, ServiceTierName | None]] = {
     # not operational.
     "learn_tutor": ("gemini-3.5-flash", "STANDARD"),
     "debrief": ("gemini-3.5-flash", "FLEX"),
-    "debrief_tts": ("gemini-3-flash-tts-preview", "FLEX"),
     "library_auto_tag": ("gemini-3.5-flash", "FLEX"),
     # Legacy-only: migration/cache audit path for old Gemini embedding rows.
     # Normal library search/ingest/chat/build-set uses local CLAP ONNX/512.

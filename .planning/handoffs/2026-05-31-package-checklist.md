@@ -810,6 +810,61 @@ Remaining gate:
 - Include this package with the final debrief/observability staging batch or as
   its own small test-hygiene commit; do not mix it into product runtime hunks.
 
+## Package 1C - Debrief MOSS-Only TLDR Narration
+
+Suggested commit: `fix(debrief): use moss for tldr narration`
+
+Include:
+
+- `src/vibemix/debrief/tldr.py`
+- `src/vibemix/debrief/__init__.py`
+- `src/vibemix/debrief/ws_server.py`
+- `src/vibemix/llm/_router_config.py`
+- `src/vibemix/library/budget.py`
+- `tests/debrief/conftest.py`
+- `tests/debrief/test_main_dispatch.py`
+- `tests/debrief/test_no_uncited_critique_in_debrief_e2e.py`
+- `tests/debrief/test_tldr_length_60_to_90s.py`
+- `tests/debrief/test_tldr_model_dispatch.py`
+- `tests/debrief/test_tldr_mp3_codec.py`
+- `tests/e2e/test_phase_41_latency_stack_integration.py`
+- `tests/library/test_session_meter.py`
+- `tests/llm/test_model_router.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Live co-host speech / timing surfaces (`src/vibemix/runtime/coach.py`,
+  `src/vibemix/state/event_detector.py`, `src/vibemix/state/drop_predict.py`).
+- FLX4/deck-capture proof files; this package is source/test-only and does not
+  claim Deck B or controller behavior.
+- Legacy live-coach TTS compatibility constants and cost-study docs; this slice
+  only removes the debrief product's hidden Gemini TTS route.
+
+Reason:
+
+- Product voice policy is MOSS-only. Debrief TLDR text may still use the Gemini
+  `debrief` text route, but narration audio must share the local MOSS voice
+  provider instead of making a second Gemini TTS call or retaining a
+  `debrief_tts` router/cost lane.
+
+Proof already run:
+
+- `uv run pytest -q tests/debrief`
+  passed: 109 tests.
+- `uv run pytest -q tests/llm/test_model_router.py tests/e2e/test_phase_41_latency_stack_integration.py tests/library/test_session_meter.py`
+  passed: 42 tests.
+- `uv run pytest -q tests/llm/test_tts_3_1.py tests/agent/test_config.py tests/library/test_cost.py`
+  passed: 40 tests, 1 skipped.
+- `uv run ruff check src/vibemix/debrief/tldr.py src/vibemix/debrief/__init__.py src/vibemix/debrief/ws_server.py src/vibemix/llm/_router_config.py src/vibemix/library/budget.py tests/debrief/test_tldr_mp3_codec.py tests/debrief/test_tldr_model_dispatch.py tests/debrief/test_main_dispatch.py tests/debrief/test_no_uncited_critique_in_debrief_e2e.py tests/debrief/test_tldr_length_60_to_90s.py tests/debrief/conftest.py tests/llm/test_model_router.py tests/e2e/test_phase_41_latency_stack_integration.py tests/library/test_session_meter.py`
+  passed.
+
+Remaining gate:
+
+- Packaged debrief playback still needs the normal rebuilt-DMG smoke after the
+  release artifact is cut. This package proves the source route and offline
+  MP3 encoding seam only.
+
 ## Package 1B2 - Retire Python Ear-Test Writer
 
 Suggested commit: `refactor(debrief): remove duplicate python ear-test writer`
