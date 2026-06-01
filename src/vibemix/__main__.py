@@ -2379,32 +2379,63 @@ async def main() -> None:
     parent_watch_task = asyncio.create_task(watch_parent(stop_event))
 
     # --- Input stream — last because state must be ready ---
-    # 44.1k-native capture — open the master stream at the device's REAL rate
-    # and resample to 16k internally, instead of forcing 48k (which crashed a
-    # fresh user whose BlackHole/loopback runs at 44.1kHz). A 48k device is
-    # unchanged: capture_native_sr == INPUT_SR_NATIVE -> byte-identical.
+    # Open on a daemon thread so a wedged CoreAudio/PortAudio device cannot
+    # block the websocket and make the product look dead before it can explain
+    # the audio state. If it opens, the callback starts filling the buffers.
     capture_native_sr = _resolve_capture_native_sr(audio_capture_context)
-    input_stream = audio_backend.open_capture(
-        input_idx,
-        sample_rate=capture_native_sr,
-        channels=deck_audio_routing.opened_channels,
-        block_size=INPUT_CHUNK_FRAMES,
-        callback=_input_callback_factory(
-            levels,
-            passthrough,
-            mic,
-            audio_buf,
-            clean_audio_buf,
-            recorder,
-            deck_audio_capture,
-            audio_capture_context,
-            source_sr=capture_native_sr,
-        ),
-    )
-    print(
-        f"-> listening to {input_device_name} @ {capture_native_sr}Hz "
-        f"({deck_audio_routing.opened_channels}ch) -> audio_buf + clean_audio_buf"
-    )
+    input_stream = None
+
+    def _set_input_stream(stream: Any) -> None:
+        nonlocal input_stream
+        if stop_event.is_set():
+            try:
+                stream.stop()
+                stream.close()
+            except Exception:
+                pass
+            return
+        input_stream = stream
+        print(
+            f"-> listening to {input_device_name} @ {capture_native_sr}Hz "
+            f"({deck_audio_routing.opened_channels}ch) -> audio_buf + clean_audio_buf"
+        )
+
+    def _set_input_stream_error(exc: BaseException) -> None:
+        try:
+            tracer.error("input_stream_open_failed", err=repr(exc))
+        except Exception:
+            pass
+        print(f"-> input capture disabled: {exc}", file=sys.stderr, flush=True)
+
+    def _open_input_stream_worker() -> None:
+        try:
+            stream = audio_backend.open_capture(
+                input_idx,
+                sample_rate=capture_native_sr,
+                channels=deck_audio_routing.opened_channels,
+                block_size=INPUT_CHUNK_FRAMES,
+                callback=_input_callback_factory(
+                    levels,
+                    passthrough,
+                    mic,
+                    audio_buf,
+                    clean_audio_buf,
+                    recorder,
+                    deck_audio_capture,
+                    audio_capture_context,
+                    source_sr=capture_native_sr,
+                ),
+            )
+        except Exception as exc:
+            loop.call_soon_threadsafe(_set_input_stream_error, exc)
+            return
+        loop.call_soon_threadsafe(_set_input_stream, stream)
+
+    threading.Thread(
+        target=_open_input_stream_worker,
+        name="vibemix-input-open",
+        daemon=True,
+    ).start()
 
     try:
         await stop_event.wait()
@@ -2475,6 +2506,8 @@ async def main() -> None:
                 except (asyncio.CancelledError, Exception):
                     pass
         for stream in (voice_stream, pass_stream, input_stream):
+            if stream is None:
+                continue
             try:
                 stream.stop()
                 stream.close()
