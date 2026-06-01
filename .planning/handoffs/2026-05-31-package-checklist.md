@@ -596,6 +596,32 @@ Proof before staging:
 - `git diff --check -- tests/scripts/test_dayzero.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0V - Demo Film No-AI-VO Test Ruff Hygiene
+
+Suggested commit: `test(scripts): clean demo film no-ai-vo lint`
+
+Include:
+
+- `tests/scripts/test_demo_film_no_ai_vo.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Demo-film scripts, policy docs, launch assets, TTS code, and app runtime files.
+
+Reason:
+
+- The no-AI-VO demo-film guard had a placeholder-free f-string and an ambiguous
+  loop variable in its violation message builder. Cleaning those keeps the
+  focused scripts-test ruff gate clean without changing the forbidden-token scan.
+
+Proof before staging:
+
+- `uv run ruff check tests/scripts/test_demo_film_no_ai_vo.py`
+- `uv run pytest -q tests/scripts/test_demo_film_no_ai_vo.py`
+- `git diff --check -- tests/scripts/test_demo_film_no_ai_vo.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

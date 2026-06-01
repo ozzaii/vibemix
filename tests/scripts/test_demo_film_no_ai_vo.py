@@ -72,8 +72,8 @@ def test_no_ai_vo_in_scripts() -> None:
             if m:
                 violations.append((path.relative_to(REPO_ROOT), str(line_num), line.strip()))
     assert not violations, (
-        f"Pitfall P58 violation — AI-VO tokens found in demo_film/:\n"
-        + "\n".join(f"  - {p}:{n}: {l}" for p, n, l in violations)
+        "Pitfall P58 violation — AI-VO tokens found in demo_film/:\n"
+        + "\n".join(f"  - {p}:{n}: {text_line}" for p, n, text_line in violations)
     )
 
 
