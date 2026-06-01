@@ -1907,6 +1907,48 @@ Remaining gate:
 - Live DDJ/Viber proof. Preserve both `CuePoint.source` and `CuePoint.number`; cue-review
   uncertainty should surface as `CARE`.
 
+## Package 4B - Real-Audio Cue Detection Eval Gate
+
+Suggested commit: `test(library): add real-audio cue detection gate`
+
+Include:
+
+- `scripts/eval/cue_detect.py`
+- `tests/library/fixtures/cue_real_corpus/manifest.json`
+- `tests/library/test_cue_detect_eval.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime cue detector changes. This is an eval/test gate only.
+- Product copy claiming cue detection is perfect. The gate is a no-regression
+  floor over committed fixtures, not a published benchmark.
+
+Reason:
+
+- Package 4/Serato/cue GUI made auto cues valuable and visible, but most older
+  tests still exercise synthetic cue payloads or monkeypatched detectors. This
+  slice runs the shipped deterministic `vibemix.library.cue_detect.detect_cues`
+  on the committed DJ MP3 fixtures in `tests/bench/data/`.
+- The manifest checks real-audio labels plus coarse timing windows for
+  breakdown/drop anchors, and intentionally forbids dance labels on flatter
+  clips. That catches the dangerous regression class: fabricated drops that
+  still pass synthetic tests.
+
+Proof for this source slice:
+
+- `uv run python scripts/eval/cue_detect.py`
+- `uv run pytest -q tests/library/test_cue_detect_eval.py`
+- `uv run ruff check scripts/eval/cue_detect.py tests/library/test_cue_detect_eval.py`
+- `git diff --check -- scripts/eval/cue_detect.py tests/library/fixtures/cue_real_corpus/manifest.json tests/library/test_cue_detect_eval.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- Grow this corpus only with license-clean audio and grounded manifest windows.
+  If a future cue engine legitimately improves timing/labels, update the
+  manifest and document the measured change in the same commit.
+
 ## Package 5 - Library UI Live Read Context
 
 Suggested commit: `feat(library-ui): ground Viber live reads with deck-pair context`

@@ -1,0 +1,65 @@
+{
+  "schema": "cue_real_corpus_v1",
+  "source": "tests/bench/data/*.mp3 committed DJ audio fixtures",
+  "detector": "vibemix.library.cue_detect.detect_cues",
+  "min_label_recall": 1.0,
+  "max_unexpected_labels": 0,
+  "max_timing_misses": 0,
+  "notes": [
+    "This is a no-regression floor, not a public benchmark.",
+    "Intro/outro labels are checked by presence only; dance labels also carry coarse timing windows.",
+    "t1/t2 intentionally forbid dance labels so the detector cannot fabricate a drop on flatter clips."
+  ],
+  "tracks": [
+    {
+      "file": "t1_pyrez_darkside.mp3",
+      "expected": [
+        {"label": "intro"},
+        {"label": "outro"}
+      ]
+    },
+    {
+      "file": "t2_liltexas_ripcity.mp3",
+      "expected": [
+        {"label": "intro"},
+        {"label": "outro"}
+      ]
+    },
+    {
+      "file": "t3_igda_runthehill.mp3",
+      "expected": [
+        {"label": "intro"},
+        {"label": "breakdown", "start_min_s": 1.0, "start_max_s": 6.0},
+        {"label": "drop", "start_min_s": 6.0, "start_max_s": 12.0},
+        {"label": "outro"}
+      ]
+    },
+    {
+      "file": "t4_mitro_90s.mp3",
+      "expected": [
+        {"label": "intro"},
+        {"label": "breakdown", "start_min_s": 49.0, "start_max_s": 57.0},
+        {"label": "drop", "start_min_s": 62.0, "start_max_s": 70.0},
+        {"label": "outro"}
+      ]
+    },
+    {
+      "file": "t5_miquiztli_omnamah.mp3",
+      "expected": [
+        {"label": "intro"},
+        {"label": "breakdown", "start_min_s": 29.0, "start_max_s": 36.0},
+        {"label": "drop", "start_min_s": 46.0, "start_max_s": 54.0},
+        {"label": "outro"}
+      ]
+    },
+    {
+      "file": "t6_acidvars_freetekno.mp3",
+      "expected": [
+        {"label": "intro"},
+        {"label": "breakdown", "start_min_s": 46.0, "start_max_s": 53.0},
+        {"label": "drop", "start_min_s": 52.0, "start_max_s": 60.0},
+        {"label": "outro"}
+      ]
+    }
+  ]
+}
