@@ -2651,6 +2651,34 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_embed_folder.set_defaults(func=_cmd_library_embed_folder)
 
+    # Cue/export bridge: point at a folder and get structural hot cues without
+    # mutating the user's audio files.
+    sp_cue = sub.add_parser(
+        "cue",
+        help="Auto-cue a folder and export Rekordbox/M3U8 handoffs",
+        description=(
+            "Walk a raw audio folder, run the local auto-cue engine per track, "
+            "and emit a portable cue handoff. Default writes an additive "
+            "Rekordbox XML; --export m3u8 writes an order-only crate."
+        ),
+    )
+    sp_cue.add_argument("path", help="folder to cue (recursive)")
+    sp_cue.add_argument(
+        "--out",
+        default="vibemix-cues.xml",
+        help="output path for XML/M3U8 export",
+    )
+    sp_cue.add_argument(
+        "--export",
+        choices=("rekordbox", "m3u8", "both"),
+        default="rekordbox",
+        help="export format (default: rekordbox)",
+    )
+    sp_cue.add_argument("--name", default="vibemix cues", help="playlist name")
+    sp_cue.add_argument("--max-cues", type=int, default=8, help="max cues per track")
+    sp_cue.add_argument("--json", action="store_true")
+    sp_cue.set_defaults(func=_cmd_library_cue)
+
     # Viber Agent Phase 1 — theme → curated playlist (M3U/JSON)
     sp_curate = sub.add_parser(
         "curate",
@@ -5953,6 +5981,60 @@ def _cmd_library_export_set(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
     return 0
+
+
+def _cmd_library_cue(args: argparse.Namespace) -> int:
+    """Auto-cue a folder and export a portable cue handoff."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    folder = _Path(args.path)
+    as_json = bool(getattr(args, "json", False))
+
+    if not folder.is_dir():
+        payload = {"ok": False, "error": f"cue: {args.path!r} is not a directory"}
+        print(_json.dumps(payload), file=sys.stderr)
+        return 1
+
+    def _progress(idx: int, total: int, name: str) -> None:
+        if not as_json:
+            print(f"-> cue [{idx}/{total}] {name}", file=sys.stderr, flush=True)
+
+    try:
+        from vibemix.library.cue_folder import export_cued_folder
+
+        report = export_cued_folder(
+            folder,
+            getattr(args, "out", "vibemix-cues.xml"),
+            export=str(getattr(args, "export", "rekordbox")),
+            name=str(getattr(args, "name", "vibemix cues")),
+            max_cues=int(getattr(args, "max_cues", 8)),
+            on_progress=_progress,
+        )
+        payload = {
+            "ok": report.tracks_cued > 0,
+            "mode": "export",
+            "tracks_cued": report.tracks_cued,
+            "cues_total": report.cues_total,
+            "skipped": report.skipped,
+            "outputs": dict(report.outputs),
+        }
+    except Exception as exc:
+        payload = {"ok": False, "error": f"cue failed: {type(exc).__name__}: {exc}"}
+        print(_json.dumps(payload), file=sys.stderr)
+        return 1
+
+    if as_json:
+        _json.dump(payload, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+    else:
+        outputs = ", ".join(f"{k}={v}" for k, v in payload["outputs"].items())
+        print(
+            "cue done: "
+            f"tracks={payload['tracks_cued']} cues={payload['cues_total']} "
+            f"skipped={payload['skipped']} outputs={outputs}"
+        )
+    return 0 if payload.get("ok") else 1
 
 
 def _normalize_codex_curate_result(
