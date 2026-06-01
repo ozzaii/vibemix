@@ -2262,6 +2262,56 @@ Remaining gate:
 - Source-level only until a live Settings click proves a folder stale nudge
   starts folder re-index progress in the Tauri app.
 
+## Package 5R - Library Native Source Picker
+
+Suggested commit: `feat(settings): pick library sources natively`
+
+Include:
+
+- `tauri/ui/src/settings/components/library-panel.ts`
+- `tauri/ui/tests/settings/library-panel.spec.ts`
+- `tauri/ui/package.json`
+- `tauri/ui/package-lock.json`
+- `tauri/src-tauri/src/main.rs`
+- `tauri/src-tauri/Cargo.toml`
+- `tauri/src-tauri/Cargo.lock`
+- `tauri/src-tauri/capabilities/default.json`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/__main__.py`, `src/vibemix/runtime/coach.py`, and any co-host
+  speech / DROP-call timing hunks.
+- Library backend importer semantics; this package only lets the user choose a
+  source path and reuses the existing `ipc.library.import` path.
+
+Reason:
+
+- The Settings library panel had a visible `Choose file` button that did not
+  open a picker; it only told the user to drag files. That made first-run
+  library setup look interactive while the click path was fake.
+- This package adds the official Tauri dialog plugin, grants only
+  `dialog:allow-open`, registers the plugin in the shell, and wires native
+  `Choose file` / `Choose folder` actions into the existing import progress
+  flow.
+- It also accepts Traktor `.nml` drops now that the backend can route Traktor
+  imports. Single audio-file drops stay rejected so a stray track is not
+  silently treated as a library.
+
+Proof to run:
+
+- `npm --prefix tauri/ui test -- tests/settings/library-panel.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `cargo fmt --manifest-path tauri/src-tauri/Cargo.toml --check`
+- `cargo check --manifest-path tauri/src-tauri/Cargo.toml`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/settings/components/library-panel.ts tauri/ui/tests/settings/library-panel.spec.ts tauri/ui/package.json tauri/ui/package-lock.json tauri/src-tauri/src/main.rs tauri/src-tauri/Cargo.toml tauri/src-tauri/Cargo.lock tauri/src-tauri/capabilities/default.json .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- Live Tauri click proof should be captured before release notes claim the
+  packaged picker works on a clean install.
+
 ## Package 5K - Viber Library Setup Operator Action
 
 Suggested commit: `fix(viber): surface missing library setup action`

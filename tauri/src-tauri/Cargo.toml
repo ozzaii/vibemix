@@ -30,6 +30,7 @@ tauri = { version = "2.11", features = ["macos-private-api", "config-json5", "tr
 tauri-plugin-shell = "2.3"                                       # verified 2026-05-12 — sidecar spawn + shell.open
 tauri-plugin-store = "2.4"                                       # verified 2026-05-12 — config.json persistence
 tauri-plugin-fs = "2.5"                                          # verified 2026-05-12 — scoped log read for crash banner
+tauri-plugin-dialog = "2.7.1"                                    # verified 2026-06-02 — Settings library catalog/folder picker
 tauri-plugin-positioner = "2.3"                                  # verified 2026-05-12 — centre wizard window
 tauri-plugin-updater = "2.10"                                    # verified 2026-05-12 — live updater plugin; release proof still requires signed/notarized artifacts
 tauri-plugin-process = "2.3"                                     # verified 2026-05-12 — exit/relaunch helpers

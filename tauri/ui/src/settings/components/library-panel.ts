@@ -1,4 +1,4 @@
-/* Phase 28 Plan 06 — Library panel with drag-drop library import.
+/* Phase 28 Plan 06 — Library panel with drag-drop / native-pick library import.
  *
  * Pure vanilla TypeScript — no framework, no template engine. Mounts under the LIBRARY group in
  * SettingsDrawer alongside the Plan 28-07 staleness banner.
@@ -39,9 +39,10 @@ export async function renderLibraryPanel(
   root.className = "vmx-library-panel";
   root.innerHTML = `
     <div class="vmx-library-droptarget" role="region"
-         aria-label="Drop Rekordbox XML or a music folder here">
-      Drop Rekordbox XML or a music folder here, or click <button type="button"
-        class="vmx-library-pick-btn">Choose file</button>
+         aria-label="Drop Rekordbox XML, Traktor NML, VirtualDJ database, or a music folder here">
+      Drop Rekordbox XML, Traktor NML, VirtualDJ database, or a music folder here,
+      or click <button type="button" class="vmx-library-pick-btn">Choose file</button>
+      <button type="button" class="vmx-library-pick-folder-btn">Choose folder</button>
     </div>
     <div class="vmx-library-progress hidden">
       <div class="vmx-library-progress-track" aria-hidden="true">
@@ -55,6 +56,9 @@ export async function renderLibraryPanel(
 
   const drop = root.querySelector(".vmx-library-droptarget") as HTMLElement;
   const pickBtn = root.querySelector(".vmx-library-pick-btn") as HTMLButtonElement;
+  const pickFolderBtn = root.querySelector(
+    ".vmx-library-pick-folder-btn",
+  ) as HTMLButtonElement;
   const progress = root.querySelector(".vmx-library-progress") as HTMLElement;
   const fill = root.querySelector(
     ".vmx-library-progress-fill",
@@ -181,18 +185,67 @@ export async function renderLibraryPanel(
     return /\.[^./\\]+$/.test(leaf);
   }
 
+  function looksLikeCatalogPath(path: string): boolean {
+    const leaf = path.split(/[\\/]/).pop() ?? "";
+    return /\.(xml|nml)$/i.test(leaf);
+  }
+
+  function firstDialogPath(selection: unknown): string | null {
+    if (typeof selection === "string" && selection.length > 0) return selection;
+    if (Array.isArray(selection)) {
+      const first = selection.find(
+        (item): item is string => typeof item === "string" && item.length > 0,
+      );
+      return first ?? null;
+    }
+    return null;
+  }
+
+  async function chooseLibrarySource(kind: "file" | "folder"): Promise<void> {
+    if (disposed) return;
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selection =
+        kind === "folder"
+          ? await open({
+              title: "Choose music folder",
+              directory: true,
+              multiple: false,
+            })
+          : await open({
+              title: "Choose DJ library catalog",
+              directory: false,
+              multiple: false,
+              filters: [
+                {
+                  name: "DJ library catalogs",
+                  extensions: ["xml", "nml"],
+                },
+              ],
+            });
+      const sourcePath = firstDialogPath(selection);
+      if (!sourcePath) {
+        setStatus("No library source selected.");
+        return;
+      }
+      await beginImport(sourcePath);
+    } catch (e) {
+      const message = (e as Error).message ?? String(e);
+      setStatus(`File picker unavailable: ${message}`);
+    }
+  }
+
   cancelBtn.addEventListener("click", () => {
     if (disposed) return;
     void emitIpc("ipc.library.import_cancel", { schema_version: "1" });
   });
 
   pickBtn.addEventListener("click", () => {
-    if (disposed) return;
-    // Drag-drop is the primary UX. A click-to-pick fallback requires
-    // tauri-plugin-dialog which isn't bundled in v1 — show a prompt to
-    // drag instead. (Phase 28.x can add the plugin if Kaan wants
-    // single-click-pick.)
-    setStatus("Drag a Rekordbox XML or music folder onto this panel.");
+    void chooseLibrarySource("file");
+  });
+
+  pickFolderBtn.addEventListener("click", () => {
+    void chooseLibrarySource("folder");
   });
 
   // Drag-drop wiring — Tauri webview API. The dedupe via seenEventIds is
@@ -223,12 +276,14 @@ export async function renderLibraryPanel(
           }
         }
         const librarySource =
-          payload.paths.find((p) => /\.xml$/i.test(p)) ??
+          payload.paths.find(looksLikeCatalogPath) ??
           payload.paths.find((p) => !looksLikeFilePath(p));
         if (librarySource) {
           void beginImport(librarySource);
         } else {
-          setStatus("Drop a Rekordbox XML or a music folder.");
+          setStatus(
+            "Drop a Rekordbox XML, Traktor NML, VirtualDJ database, or a music folder.",
+          );
         }
       }
     });

@@ -12,6 +12,7 @@
     "core:path:default",
     "core:app:default",
     "store:default",
+    "dialog:allow-open",
     "positioner:default",
     "process:default",
     "updater:default",

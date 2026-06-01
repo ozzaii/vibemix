@@ -9,6 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const dragHandlers: Array<(event: { id: number; payload: unknown }) => void> = [];
 const subscribers = new Map<string, (msg: unknown) => void>();
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
+const dialogMocks = vi.hoisted(() => ({
+  open: vi.fn(),
+}));
 type SubscribeImpl = (
   type: string,
   cb: (msg: unknown) => void,
@@ -41,12 +44,18 @@ vi.mock("@tauri-apps/api/webview", () => ({
   }),
 }));
 
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: dialogMocks.open,
+}));
+
 import { renderLibraryPanel } from "../../src/settings/components/library-panel.js";
 
 beforeEach(() => {
   dragHandlers.length = 0;
   subscribers.clear();
   emitted.length = 0;
+  dialogMocks.open.mockReset();
+  dialogMocks.open.mockResolvedValue(null);
   subscribeImpl = async (type, cb) => {
     subscribers.set(type, cb);
     return () => subscribers.delete(type);
@@ -100,6 +109,22 @@ describe("library-panel — drag-drop dedupe (Tauri Issue #14134)", () => {
 });
 
 describe("library-panel — source drop routing", () => {
+  it("accepts a Traktor NML path as a library import source", async () => {
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    dispatchDrop(18, ["/Users/kaan/Music/Traktor/collection.nml"]);
+    await _flush();
+
+    expect(emitted).toContainEqual({
+      type: "ipc.library.import",
+      payload: {
+        path: "/Users/kaan/Music/Traktor/collection.nml",
+        schema_version: "1",
+      },
+    });
+  });
+
   it("accepts a music folder path as a library import source", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
@@ -122,20 +147,100 @@ describe("library-panel — source drop routing", () => {
 
     const status = handle.element.querySelector(".vmx-library-status");
     expect(status?.textContent).toContain(
-      "Drop a Rekordbox XML or a music folder.",
+      "Drop a Rekordbox XML, Traktor NML, VirtualDJ database, or a music folder.",
     );
   });
 
-  it("copy advertises folder setup, not XML-only setup", async () => {
+  it("copy advertises catalog and folder setup, not XML-only setup", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
 
     const drop = handle.element.querySelector(".vmx-library-droptarget");
     expect(drop?.getAttribute("aria-label")).toBe(
-      "Drop Rekordbox XML or a music folder here",
+      "Drop Rekordbox XML, Traktor NML, VirtualDJ database, or a music folder here",
     );
     expect(drop?.textContent).toContain(
-      "Drop Rekordbox XML or a music folder here",
+      "Drop Rekordbox XML, Traktor NML, VirtualDJ database, or a music folder here",
+    );
+  });
+});
+
+describe("library-panel — native picker", () => {
+  it("Choose file opens the native catalog picker and imports the selected path", async () => {
+    dialogMocks.open.mockResolvedValue("/Users/kaan/Music/Traktor/collection.nml");
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    const pickBtn = handle.element.querySelector(
+      ".vmx-library-pick-btn",
+    ) as HTMLButtonElement;
+    pickBtn.click();
+    await _flush();
+    await _flush();
+
+    expect(dialogMocks.open).toHaveBeenCalledWith({
+      title: "Choose DJ library catalog",
+      directory: false,
+      multiple: false,
+      filters: [
+        {
+          name: "DJ library catalogs",
+          extensions: ["xml", "nml"],
+        },
+      ],
+    });
+    expect(emitted).toContainEqual({
+      type: "ipc.library.import",
+      payload: {
+        path: "/Users/kaan/Music/Traktor/collection.nml",
+        schema_version: "1",
+      },
+    });
+  });
+
+  it("Choose folder opens the native folder picker and imports the selected path", async () => {
+    dialogMocks.open.mockResolvedValue("/Users/kaan/Music/PSYMIND");
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    const pickFolderBtn = handle.element.querySelector(
+      ".vmx-library-pick-folder-btn",
+    ) as HTMLButtonElement;
+    pickFolderBtn.click();
+    await _flush();
+    await _flush();
+
+    expect(dialogMocks.open).toHaveBeenCalledWith({
+      title: "Choose music folder",
+      directory: true,
+      multiple: false,
+    });
+    expect(emitted).toContainEqual({
+      type: "ipc.library.import",
+      payload: {
+        path: "/Users/kaan/Music/PSYMIND",
+        schema_version: "1",
+      },
+    });
+  });
+
+  it("cancelling the native picker leaves import untouched and reports no selection", async () => {
+    dialogMocks.open.mockResolvedValue(null);
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    const pickBtn = handle.element.querySelector(
+      ".vmx-library-pick-btn",
+    ) as HTMLButtonElement;
+    pickBtn.click();
+    await _flush();
+    await _flush();
+
+    expect(emitted).not.toContainEqual(
+      expect.objectContaining({ type: "ipc.library.import" }),
+    );
+    expect(handle.element.querySelector(".vmx-library-status")?.textContent).toBe(
+      "No library source selected.",
     );
   });
 });
