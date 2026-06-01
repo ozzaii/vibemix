@@ -74,6 +74,23 @@ TOOL_CALL_TIMEOUT_S = 30.0
 # Wiring (counter increment + threshold trip) lands in Plan 99-02 / 99-03.
 TOOL_STARVATION_THRESHOLD: int = 3
 
+FRESHNESS_GUARDED_TOOLS: frozenset[str] = frozenset(
+    {
+        "search_vibe",
+        "get_track_features",
+        "get_track_sections",
+        "transition_slate",
+        "compile_musical_context",
+        "smart_hot_cues",
+        "create_playlist",
+        "get_track_energy",
+        "discover_pool",
+        "sequence_set",
+        "export_set",
+        "export_smart_cues",
+        "quote_moment",
+    }
+)
 
 # Phase 100 HARDEN-CLARIFY (Decision 2, locked): choices-length bounds for
 # the Factor-7 request_clarification tool. 0/1 = no real disambiguation;
@@ -102,10 +119,13 @@ class LibraryToolset:
         embedder: _EmbeddingProvider,
         store: LibraryStore,
         library: RekordboxLibrary,
+        *,
+        freshness_provider: Callable[[], Any] | None = None,
     ) -> None:
         self._embedder = embedder
         self._store = store
         self._library = library
+        self._freshness_provider = freshness_provider
         # Lazily-loaded DJ-knowledge RAG store (retrieve_dj_knowledge). Built on
         # first use from disk; honest empty-results when no KB is present.
         self._knowledge_store: Any | None = None
@@ -142,6 +162,60 @@ class LibraryToolset:
         # genre_prototypes import here) and repeated feature lookups in one run
         # reuse the built prototype table.
         self._genre_lookup: Any | None = None
+
+    def _freshness_payload(self) -> dict[str, Any]:
+        """Return a dict freshness snapshot from the optional product provider."""
+        if self._freshness_provider is None:
+            return {"status": "unchecked", "stale": False, "reason": "freshness_guard_disabled"}
+        try:
+            status = self._freshness_provider()
+        except Exception as e:
+            return {
+                "status": "cache_unreadable",
+                "stale": True,
+                "reason": f"freshness_check_failed:{type(e).__name__}",
+            }
+        if hasattr(status, "to_dict") and callable(status.to_dict):
+            try:
+                payload = status.to_dict()
+            except Exception as e:
+                return {
+                    "status": "cache_unreadable",
+                    "stale": True,
+                    "reason": f"freshness_payload_failed:{type(e).__name__}",
+                }
+        elif isinstance(status, dict):
+            payload = dict(status)
+        else:
+            return {
+                "status": "cache_unreadable",
+                "stale": True,
+                "reason": f"freshness_payload_invalid:{type(status).__name__}",
+            }
+        payload.setdefault("status", "unknown")
+        payload.setdefault("stale", payload.get("status") != "fresh")
+        payload.setdefault("reason", "freshness_unknown")
+        return payload
+
+    def _freshness_guard_for_tool(self, name: str) -> dict[str, Any] | None:
+        """Block local-library tools when Viber's source/index state is stale."""
+        if self._freshness_provider is None or name not in FRESHNESS_GUARDED_TOOLS:
+            return None
+        payload = self._freshness_payload()
+        status = str(payload.get("status") or "unknown")
+        stale = payload.get("stale")
+        if status == "fresh" and stale is False:
+            return None
+        reason = str(payload.get("reason") or status)
+        return {
+            "error": (
+                "library freshness guard: the local library index is not current "
+                f"({status}: {reason}). Re-import or refresh the library before "
+                f"using Viber tool {name!r} for set generation."
+            ),
+            "blocked_by": "library_freshness",
+            "library_freshness": payload,
+        }
 
     # -- tool handlers (RETURN error strings, never raise) ------------------ #
 
@@ -1480,6 +1554,10 @@ class LibraryToolset:
         handler = handlers.get(name)
         if handler is None:
             return {"error": f"unknown tool {name!r}"}
+        freshness_block = self._freshness_guard_for_tool(name)
+        if freshness_block is not None:
+            self._emit_tool_event(name, freshness_block, args)
+            return freshness_block
         # Hard per-tool timeout — a pathological handler can never park the loop.
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
             fut = ex.submit(handler, args)

@@ -86,6 +86,7 @@ def build_toolset() -> Any:
 
     from vibemix.library.embed_factory import build_embedder
     from vibemix.library.rekordbox import RekordboxLibrary
+    from vibemix.library.staleness import library_freshness_status
     from vibemix.library.store import open_store
     from vibemix.library.toolset import LibraryToolset
 
@@ -100,7 +101,12 @@ def build_toolset() -> Any:
         )
     embedder = build_embedder()
     store = open_store()
-    return LibraryToolset(embedder, store, library)
+    return LibraryToolset(
+        embedder,
+        store,
+        library,
+        freshness_provider=library_freshness_status,
+    )
 
 
 class _ToolTapProxy:
@@ -123,7 +129,10 @@ class _ToolTapProxy:
             return attr
 
         def _tapped(*args: Any, **kwargs: Any) -> Any:
-            result = attr(*args, **kwargs)
+            guard = getattr(self._inner, "_freshness_guard_for_tool", None)
+            result = guard(name) if callable(guard) else None
+            if result is None:
+                result = attr(*args, **kwargs)
             try:
                 tool_args = args[0] if args and isinstance(args[0], dict) else None
                 self._inner._emit_tool_event(name, result, tool_args)

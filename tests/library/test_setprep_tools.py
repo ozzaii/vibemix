@@ -31,6 +31,7 @@ from vibemix.library.rekordbox import (
     TempoNode,
     TrackEntry,
 )
+from vibemix.library.staleness import LibraryFreshness
 from vibemix.library.toolset import LibraryToolset
 
 # --------------------------------------------------------------------------- #
@@ -92,6 +93,27 @@ def store() -> _FakeStore:
 def toolset(store, library) -> LibraryToolset:
     # embedder is unused on the ref-ids / no-text path.
     return LibraryToolset(embedder=None, store=store, library=library)
+
+
+def _fresh_library() -> LibraryFreshness:
+    return LibraryFreshness(
+        status="fresh",
+        stale=False,
+        reason="test_current",
+        age_days=0,
+        cache_path="/tmp/library.pkl",
+    )
+
+
+def _stale_library() -> LibraryFreshness:
+    return LibraryFreshness(
+        status="stale",
+        stale=True,
+        reason="source_newer_than_cache",
+        age_days=0,
+        cache_path="/tmp/library.pkl",
+        source_path="/tmp/collection.xml",
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -182,6 +204,54 @@ def test_discover_pool_adds_ids_to_seen(toolset):
     assert pool_ids.issubset(toolset.seen)
     # The reference itself is excluded from its own pool.
     assert "t000" not in pool_ids
+
+
+def test_dispatch_blocks_set_prep_when_library_freshness_is_stale(store, library):
+    guarded = LibraryToolset(
+        embedder=None,
+        store=store,
+        library=library,
+        freshness_provider=_stale_library,
+    )
+
+    out = guarded.dispatch("discover_pool", {"ref_track_ids": ["t000"], "k": 10})
+
+    assert out["blocked_by"] == "library_freshness"
+    assert out["library_freshness"]["reason"] == "source_newer_than_cache"
+    assert "not current" in out["error"]
+    assert guarded.seen == set()
+
+
+def test_dispatch_allows_set_prep_when_library_freshness_is_fresh(store, library):
+    guarded = LibraryToolset(
+        embedder=None,
+        store=store,
+        library=library,
+        freshness_provider=_fresh_library,
+    )
+
+    out = guarded.dispatch("discover_pool", {"ref_track_ids": ["t000"], "k": 10})
+
+    assert "pool" in out
+    assert {p["track_id"] for p in out["pool"]}.issubset(guarded.seen)
+
+
+def test_mcp_tool_proxy_blocks_direct_handler_calls_when_freshness_is_stale(store, library):
+    from vibemix.library.mcp_server import _ToolTapProxy
+
+    guarded = LibraryToolset(
+        embedder=None,
+        store=store,
+        library=library,
+        freshness_provider=_stale_library,
+    )
+    proxy = _ToolTapProxy(guarded)
+
+    out = proxy.discover_pool({"ref_track_ids": ["t000"], "k": 10})
+
+    assert out["blocked_by"] == "library_freshness"
+    assert out["library_freshness"]["status"] == "stale"
+    assert guarded.seen == set()
 
 
 def test_discover_pool_error_when_no_inputs(toolset):
