@@ -217,6 +217,24 @@ interface ExpectedActionPayload {
 
 const LEARN_ROOT_ID = "learn-root";
 const DEFAULT_PRACTICE_CONTROLLER_ID = "pioneer_ddj_flx4";
+const SCREEN_ONLY_LEARN_CONTROLS = new Set([
+  "headphone_cue",
+  "lesson_continue",
+  "master_vol",
+]);
+type LearnStartCourseWireId = "course_1" | "course_2" | "course_3";
+interface LearnStartCoursePayload extends Record<string, unknown> {
+  course_id: LearnStartCourseWireId;
+  controller_id: string;
+}
+const COURSE_START_WIRE_IDS: Readonly<Record<string, LearnStartCourseWireId>> = {
+  course_1: "course_1",
+  course_1_anatomy: "course_1",
+  course_2: "course_2",
+  course_2_transitions: "course_2",
+  course_3: "course_3",
+  course_3_play_mode: "course_3",
+};
 const ACTION_FEEDBACK_LABELS = [
   "clean touch",
   "right move",
@@ -569,7 +587,7 @@ function mountLearnWindow(root: HTMLElement): {
 
   const paintHighlightPayload = (payload: HighlightPayload): void => {
     updateScreenActionForHighlight(payload);
-    if (payload.expected_action.control === "lesson_continue") {
+    if (isScreenOnlyAction(payload.expected_action)) {
       clearHighlight(stageEl);
       return;
     }
@@ -602,6 +620,25 @@ function mountLearnWindow(root: HTMLElement): {
   });
   startRecommendedButton.addEventListener("click", () => {
     pickLesson(recommendedLessonId, recommendedLessonLevel);
+  });
+  addWindowListener("learn.start_course", (ev: Event) => {
+    const payload = normalizeStartCourseDetail(
+      (ev as CustomEvent<unknown>).detail,
+    );
+    if (payload === null) {
+      // eslint-disable-next-line no-console
+      console.warn("[learn] start_course event ignored: invalid payload");
+      return;
+    }
+    closeLessonMap(false);
+    boothPanel.dataset.visible = "false";
+    setBoothPulse("listening", "hands on deck");
+    void emitLearnIpc("ipc.learn.start_course", payload).catch(
+      (err: unknown) => {
+        // eslint-disable-next-line no-console
+        console.warn("[learn] start_course emit failed:", err);
+      },
+    );
   });
 
   // Phase 97 / ONBOARD-07 + RENDER-08 — disclaimer footer.
@@ -712,8 +749,9 @@ function mountLearnWindow(root: HTMLElement): {
    * exemplar_play / exemplar_stop) + a SECOND midi_position listener that
    * emits `ipc.learn.ack` whenever a controlled position changes while a
    * lesson is active. shell→sidecar envelopes (start_course /
-   * start_lesson) are not subscribed to here — only emitted by the mode
-   * picker (P97) and devtools-invoke during demos.
+   * start_lesson) are emitted here, not subscribed: start_course via the
+   * local `learn.start_course` automation hook, and start_lesson via the
+   * mode picker (P97) / devtools-invoke demos.
    *
    * The 3 lesson components (LessonHud / TutorSpeakDock /
    * LessonSkipButton) mount lazily on the first `ipc.learn.lesson_loaded`
@@ -1206,6 +1244,10 @@ function screenActionAccessibleLabel(
   return hasScreenTarget ? label : `screen fallback: ${label}`;
 }
 
+function isScreenOnlyAction(action: ExpectedActionPayload): boolean {
+  return SCREEN_ONLY_LEARN_CONTROLS.has(action.control);
+}
+
 function controlLabel(control: string): string {
   const labels: Record<string, string> = {
     eq_hi: "high EQ",
@@ -1307,6 +1349,37 @@ interface LessonSourceCounts {
 
 function freshLessonSourceCounts(): LessonSourceCounts {
   return { hardware: 0, screen: 0 };
+}
+
+function startCourseString(
+  detail: Record<string, unknown>,
+  snakeKey: string,
+  camelKey: string,
+): string | null {
+  const snakeValue = detail[snakeKey];
+  if (typeof snakeValue === "string" && snakeValue.length > 0) {
+    return snakeValue;
+  }
+  const camelValue = detail[camelKey];
+  if (typeof camelValue === "string" && camelValue.length > 0) {
+    return camelValue;
+  }
+  return null;
+}
+
+function normalizeStartCourseDetail(raw: unknown): LearnStartCoursePayload | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const detail = raw as Record<string, unknown>;
+  const courseIdRaw = startCourseString(detail, "course_id", "courseId");
+  if (courseIdRaw === null) return null;
+  const courseId = COURSE_START_WIRE_IDS[courseIdRaw];
+  if (courseId === undefined) return null;
+  return {
+    course_id: courseId,
+    controller_id:
+      startCourseString(detail, "controller_id", "controllerId") ??
+      DEFAULT_PRACTICE_CONTROLLER_ID,
+  };
 }
 
 function recordMatchedActionSource(

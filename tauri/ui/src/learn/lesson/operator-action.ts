@@ -9,6 +9,9 @@ export interface LearnOperatorActionDevice {
 export interface LearnOperatorAction {
   prompt: string;
   route?: string;
+  current_rekordbox_route?: string;
+  target_capture_route?: string;
+  route_mismatch?: boolean;
   nowplaying_blocker?: string;
   steps?: string[];
   recommended_output_devices?: LearnOperatorActionDevice[];
@@ -20,19 +23,25 @@ export function normalizeOperatorAction(raw: unknown): LearnOperatorAction | nul
   if (!prompt) return null;
 
   const route = cleanString(raw.route);
+  const currentRekordboxRoute = cleanString(raw.current_rekordbox_route);
+  const targetCaptureRoute = cleanString(raw.target_capture_route);
+  const routeMismatch = raw.route_mismatch === true;
   const nowplayingBlocker = cleanString(raw.nowplaying_blocker);
   const steps = Array.isArray(raw.steps)
     ? raw.steps.map(cleanString).filter((step): step is string => Boolean(step))
     : [];
   const recommendedOutputDevices = Array.isArray(raw.recommended_output_devices)
     ? raw.recommended_output_devices
-      .map(normalizeOperatorActionDevice)
-      .filter((device): device is LearnOperatorActionDevice => device !== null)
+        .map(normalizeOperatorActionDevice)
+        .filter((device): device is LearnOperatorActionDevice => device !== null)
     : [];
 
   return {
     prompt,
     ...(route ? { route } : {}),
+    ...(currentRekordboxRoute ? { current_rekordbox_route: currentRekordboxRoute } : {}),
+    ...(targetCaptureRoute ? { target_capture_route: targetCaptureRoute } : {}),
+    ...(routeMismatch ? { route_mismatch: true } : {}),
     ...(nowplayingBlocker ? { nowplaying_blocker: nowplayingBlocker } : {}),
     ...(steps.length > 0 ? { steps } : {}),
     ...(recommendedOutputDevices.length > 0
@@ -44,6 +53,10 @@ export function normalizeOperatorAction(raw: unknown): LearnOperatorAction | nul
 export function compactOperatorActionLabel(action: LearnOperatorAction): string {
   const route = action.route ?? "";
   const searchable = `${action.prompt} ${route}`.toLowerCase();
+  if (action.route_mismatch) {
+    const target = compactTargetRouteLabel(action);
+    return target ? `route Rekordbox to ${target}` : "route Rekordbox to capture";
+  }
   const rateFixLabel = compactRateFixLabel(searchable, route || action.prompt);
   if (rateFixLabel) {
     return rateFixLabel;
@@ -70,6 +83,15 @@ export function compactOperatorActionLabel(action: LearnOperatorAction): string 
 export function operatorActionAriaLabel(action: LearnOperatorAction): string {
   const parts = [action.prompt];
   if (action.route) parts.push(`route: ${action.route}`);
+  if (action.current_rekordbox_route) {
+    parts.push(`current Rekordbox route: ${action.current_rekordbox_route}`);
+  }
+  if (action.target_capture_route) {
+    parts.push(`target capture route: ${action.target_capture_route}`);
+  }
+  if (action.route_mismatch) {
+    parts.push("route mismatch: yes");
+  }
   const steps = action.steps?.filter(Boolean).slice(0, 3) ?? [];
   if (steps.length === 1) {
     parts.push(`next step: ${steps[0]}`);
@@ -94,9 +116,17 @@ function normalizeOperatorActionDevice(raw: unknown): LearnOperatorActionDevice 
 
 function compactRouteLabel(raw: string): string | null {
   if (!raw) return null;
-  const blackhole = raw.match(/BlackHole(?:\s+\d+ch)?/i);
-  if (blackhole) return "BlackHole";
+  const blackhole = raw.match(/BlackHole(?:\s+(\d+)ch)?/i);
+  if (blackhole) return blackhole[1] ? `BlackHole ${blackhole[1]}ch` : "BlackHole";
   return null;
+}
+
+function compactTargetRouteLabel(action: LearnOperatorAction): string | null {
+  const raw = action.target_capture_route ?? action.route ?? "";
+  if (!raw) return null;
+  const routeLabel = compactRouteLabel(raw);
+  if (routeLabel) return routeLabel;
+  return clampStatusText(compactDeviceName(raw), 28);
 }
 
 function compactRateFixLabel(searchable: string, routeOrPrompt: string): string | null {

@@ -20,7 +20,7 @@ interface CourseRegistryRow {
 
 export const COURSE_REGISTRY = {
   "course_1_anatomy": { label: "Course 1 · Anatomy", hud_label: "COURSE 1 · ANATOMY", unlock_gate: null, lock_reason: null, frontstage_mode: "practice_booth", capabilities: ["evidence_registry", "controller_state", "on_screen_deck", "library_exemplars", "recital_observer"] },
-  "course_2_transitions": { label: "Course 2 · Transitions", hud_label: "COURSE 2 · TRANSITIONS", unlock_gate: "course_2_unlocked", lock_reason: "pass the course 1 recital to unlock transitions", frontstage_mode: "practice_booth", capabilities: ["evidence_registry", "controller_state", "on_screen_deck", "recital_observer"] },
+  "course_2_transitions": { label: "Course 2 · Transitions", hud_label: "COURSE 2 · TRANSITIONS", unlock_gate: "course_2_unlocked", lock_reason: "pass the course 1 recital to unlock transitions", frontstage_mode: "practice_booth", capabilities: ["evidence_registry", "controller_state", "on_screen_deck", "library_suggestions", "recital_observer"] },
   "course_3_play_mode": { label: "Course 3 · Play Mode", hud_label: "COURSE 3 · PLAY-MODE", unlock_gate: "course_3_unlocked", lock_reason: "pass the course 2 recital to unlock play mode", frontstage_mode: "live_play_mode", capabilities: ["evidence_registry", "controller_state", "on_screen_deck", "live_audio", "cue_section_lookahead", "prepared_pool", "library_suggestions", "session_state", "session_recording", "debrief", "dj_profile", "recovery_drill"] },
 } as const satisfies Readonly<Record<string, CourseRegistryRow>>;
 

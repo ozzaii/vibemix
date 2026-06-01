@@ -22,7 +22,7 @@ describe("learn operator action projection", () => {
     });
 
     expect(action).not.toBeNull();
-    expect(compactOperatorActionLabel(action!)).toBe("play Rekordbox through BlackHole");
+    expect(compactOperatorActionLabel(action!)).toBe("play Rekordbox through BlackHole 2ch");
     expect(operatorActionAriaLabel(action!)).toContain(
       "Stop unrelated media",
     );
@@ -67,6 +67,35 @@ describe("learn operator action projection", () => {
     expect(operatorActionAriaLabel(action!)).toContain(
       "rekordbox Aggregate Device @ 48000Hz",
     );
+  });
+
+  it("preserves route-mismatch evidence while keeping the booth phrase calm", () => {
+    const action = normalizeOperatorAction({
+      prompt:
+        "Set Rekordbox audio to BlackHole 16ch @ 48000Hz, then play a real library track with channel and master faders up.",
+      route: "BlackHole 16ch @ 48000Hz",
+      current_rekordbox_route: "DDJ-FLX4 @ 48000Hz",
+      target_capture_route: "BlackHole 16ch @ 48000Hz",
+      route_mismatch: true,
+      steps: [
+        "In Rekordbox Audio preferences, set the audio output from DDJ-FLX4 @ 48000Hz to BlackHole 16ch @ 48000Hz.",
+        "In Rekordbox, load and play a real library track through BlackHole 16ch @ 48000Hz.",
+      ],
+    });
+
+    expect(action).toMatchObject({
+      current_rekordbox_route: "DDJ-FLX4 @ 48000Hz",
+      target_capture_route: "BlackHole 16ch @ 48000Hz",
+      route_mismatch: true,
+    });
+    expect(compactOperatorActionLabel(action!)).toBe("route Rekordbox to BlackHole 16ch");
+    expect(operatorActionAriaLabel(action!)).toContain(
+      "current Rekordbox route: DDJ-FLX4 @ 48000Hz",
+    );
+    expect(operatorActionAriaLabel(action!)).toContain(
+      "target capture route: BlackHole 16ch @ 48000Hz",
+    );
+    expect(operatorActionAriaLabel(action!)).toContain("route mismatch: yes");
   });
 
   it("rejects empty or non-string prompts", () => {

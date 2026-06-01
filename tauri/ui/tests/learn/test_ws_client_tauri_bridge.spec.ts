@@ -81,6 +81,7 @@ describe("LearnWsClient Tauri bridge selection", () => {
     const rawCallbacks = new Map<string, (event: { payload: unknown }) => void>();
     const unlisteners = new Map<string, ReturnType<typeof vi.fn>>();
     const course3LensUnlisten = vi.fn();
+    const operatorActionUnlisten = vi.fn();
     mocks.subscribeIpc.mockImplementation(
       async (type: string, callback: (envelope: LearnEnvelope) => void) => {
         callbacks.set(type, callback);
@@ -95,6 +96,10 @@ describe("LearnWsClient Tauri bridge selection", () => {
           rawCallbacks.set(event, callback);
           return course3LensUnlisten;
         }
+        if (event === "learn-operator-action") {
+          rawCallbacks.set(event, callback);
+          return operatorActionUnlisten;
+        }
         return () => undefined;
       },
     );
@@ -103,14 +108,19 @@ describe("LearnWsClient Tauri bridge selection", () => {
     const openSpy = vi.fn();
     const heard: CustomEvent[] = [];
     const heardCourse3: CustomEvent[] = [];
+    const heardOperatorAction: CustomEvent[] = [];
     const onTutor = (event: Event): void => {
       heard.push(event as CustomEvent);
     };
     const onCourse3 = (event: Event): void => {
       heardCourse3.push(event as CustomEvent);
     };
+    const onOperatorAction = (event: Event): void => {
+      heardOperatorAction.push(event as CustomEvent);
+    };
     window.addEventListener("ipc.learn.tutor_speak", onTutor);
     window.addEventListener("learn.course3_lens", onCourse3);
+    window.addEventListener("learn.operator_action", onOperatorAction);
     client.addEventListener("open", openSpy);
 
     try {
@@ -125,6 +135,10 @@ describe("LearnWsClient Tauri bridge selection", () => {
       expect(webSocketCtor).not.toHaveBeenCalled();
       expect(mocks.listenTauri).toHaveBeenCalledWith(
         "learn-course3-lens",
+        expect.any(Function),
+      );
+      expect(mocks.listenTauri).toHaveBeenCalledWith(
+        "learn-operator-action",
         expect.any(Function),
       );
 
@@ -152,6 +166,19 @@ describe("LearnWsClient Tauri bridge selection", () => {
           },
         },
       });
+      const emitOperatorAction = rawCallbacks.get("learn-operator-action");
+      expect(emitOperatorAction).toBeTypeOf("function");
+      if (!emitOperatorAction) throw new Error("missing operator-action listener");
+      emitOperatorAction({
+        payload: {
+          prompt:
+            "Set Rekordbox audio to BlackHole 16ch @ 48000Hz, then play a real library track with channel and master faders up.",
+          route: "BlackHole 16ch @ 48000Hz",
+          current_rekordbox_route: "DDJ-FLX4 @ 48000Hz",
+          target_capture_route: "BlackHole 16ch @ 48000Hz",
+          route_mismatch: true,
+        },
+      });
 
       expect(heard).toHaveLength(1);
       expect(heard[0]?.detail).toMatchObject({
@@ -165,13 +192,22 @@ describe("LearnWsClient Tauri bridge selection", () => {
         next_phrase_at: 64,
         next_phrase_cue_id: "cue:track-a:phrase",
       });
+      expect(heardOperatorAction).toHaveLength(1);
+      expect(heardOperatorAction[0]?.detail).toMatchObject({
+        route: "BlackHole 16ch @ 48000Hz",
+        current_rekordbox_route: "DDJ-FLX4 @ 48000Hz",
+        target_capture_route: "BlackHole 16ch @ 48000Hz",
+        route_mismatch: true,
+      });
 
       client.close();
       expect(unlisteners.get("ipc.learn.tutor_speak")).toHaveBeenCalledTimes(1);
       expect(course3LensUnlisten).toHaveBeenCalledTimes(1);
+      expect(operatorActionUnlisten).toHaveBeenCalledTimes(1);
     } finally {
       window.removeEventListener("ipc.learn.tutor_speak", onTutor);
       window.removeEventListener("learn.course3_lens", onCourse3);
+      window.removeEventListener("learn.operator_action", onOperatorAction);
       client.close();
     }
   });

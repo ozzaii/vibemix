@@ -363,7 +363,7 @@ describe("practice booth shell", () => {
         }),
       );
 
-      expect(hint.textContent).toBe("play Rekordbox through BlackHole");
+      expect(hint.textContent).toBe("play Rekordbox through BlackHole 2ch");
       expect(hint.dataset.course3Lens).toBe("operator-action");
       expect(hint.dataset.operatorAction).toBe("active");
       expect(hint.getAttribute("aria-label")).toContain(
@@ -413,6 +413,54 @@ describe("practice booth shell", () => {
       expect(hint.getAttribute("aria-label")).toContain("44100Hz to 48000Hz");
       expect(hint.getAttribute("title")).toContain(
         "rekordbox Aggregate Device @ 48000Hz",
+      );
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("keeps a Course 3 route mismatch as one calm booth fix", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      const hint = root.querySelector<HTMLElement>(".learn-status-hint")!;
+      dispatchLessonLoaded("L3.01", "course_3_play_mode");
+
+      window.dispatchEvent(
+        new CustomEvent("learn.course3_lens", {
+          detail: {
+            session_active: false,
+            phrase_position_confidence: 0,
+            next_phrase_at: null,
+            next_phrase_cue_id: null,
+            audio_active: false,
+            deck_attributed: false,
+            deck_track_citable: false,
+            cue_ready: false,
+            blockers: ["waiting_for_audio", "waiting_for_cue"],
+            operator_action: {
+              prompt:
+                "Set Rekordbox audio to BlackHole 16ch @ 48000Hz, then play a real library track with channel and master faders up.",
+              route: "BlackHole 16ch @ 48000Hz",
+              current_rekordbox_route: "DDJ-FLX4 @ 48000Hz",
+              target_capture_route: "BlackHole 16ch @ 48000Hz",
+              route_mismatch: true,
+              steps: [
+                "In Rekordbox Audio preferences, set the audio output from DDJ-FLX4 @ 48000Hz to BlackHole 16ch @ 48000Hz.",
+              ],
+            },
+          },
+        }),
+      );
+
+      expect(hint.textContent).toBe("route Rekordbox to BlackHole 16ch");
+      expect(hint.dataset.course3Lens).toBe("operator-action");
+      expect(hint.dataset.operatorAction).toBe("active");
+      expect(hint.getAttribute("aria-label")).toContain(
+        "current Rekordbox route: DDJ-FLX4 @ 48000Hz",
+      );
+      expect(hint.getAttribute("title")).toContain(
+        "target capture route: BlackHole 16ch @ 48000Hz",
       );
     } finally {
       ws.close();
@@ -488,6 +536,34 @@ describe("practice booth shell", () => {
       expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.start_lesson", {
         lesson_id: "L1.01",
         level: "fresh",
+      });
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("emits start_course from the dev automation event", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      const map = root.querySelector<HTMLElement>("#learn-progress-list-host")!;
+      const openButton = root.querySelector<HTMLButtonElement>("#learn-open-map")!;
+      openButton.click();
+      expect(map.dataset.visible).toBe("true");
+
+      mocks.emitIpc.mockClear();
+      window.dispatchEvent(
+        new CustomEvent("learn.start_course", {
+          detail: { course_id: "course_2_transitions" },
+        }),
+      );
+
+      expect(map.dataset.visible).toBe("false");
+      expect(map.getAttribute("aria-hidden")).toBe("true");
+      expect(openButton.getAttribute("aria-expanded")).toBe("false");
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.start_course", {
+        course_id: "course_2",
+        controller_id: "pioneer_ddj_flx4",
       });
     } finally {
       ws.close();
@@ -1521,6 +1597,7 @@ describe("practice booth shell", () => {
   ])("shows a screen fallback for $highlight.control_id", ({ lessonId, highlight, ack, label }) => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       dispatchLessonLoaded(lessonId);
       window.dispatchEvent(
@@ -1538,10 +1615,17 @@ describe("practice booth shell", () => {
         `screen fallback: ${label}`,
       );
       expect(action.getAttribute("title")).toBe(`screen fallback: ${label}`);
+      const warnMessages = warnSpy.mock.calls.map((args) => args.join(" "));
+      expect(
+        warnMessages.some((message) =>
+          message.includes("[learn] highlight: control_id"),
+        ),
+      ).toBe(false);
       action.click();
 
       expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.ack", ack);
     } finally {
+      warnSpy.mockRestore();
       ws.close();
     }
   });

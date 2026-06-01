@@ -173,6 +173,9 @@ describe("test_ws_client_filters_mascot.spec.ts (CR-03 regression guard)", () =>
               prompt:
                 "Play a real Rekordbox library track through BlackHole 2ch @ 48000Hz with channel and master faders up.",
               route: "BlackHole 2ch @ 48000Hz",
+              current_rekordbox_route: "DDJ-FLX4 @ 48000Hz",
+              target_capture_route: "BlackHole 2ch @ 48000Hz",
+              route_mismatch: true,
               steps: [
                 "Stop unrelated media or make Rekordbox the active playing source.",
               ],
@@ -187,10 +190,72 @@ describe("test_ws_client_filters_mascot.spec.ts (CR-03 regression guard)", () =>
         prompt:
           "Play a real Rekordbox library track through BlackHole 2ch @ 48000Hz with channel and master faders up.",
         route: "BlackHole 2ch @ 48000Hz",
+        current_rekordbox_route: "DDJ-FLX4 @ 48000Hz",
+        target_capture_route: "BlackHole 2ch @ 48000Hz",
+        route_mismatch: true,
         steps: ["Stop unrelated media or make Rekordbox the active playing source."],
       });
     } finally {
       window.removeEventListener("learn.course3_lens", listener);
+      client.close();
+    }
+  });
+
+  it("bridges a generic grounded operator action from a flat frame", () => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const client = new LearnWsClient();
+    const heard: CustomEvent[] = [];
+    const listener = (e: Event) => heard.push(e as CustomEvent);
+    window.addEventListener("learn.operator_action", listener);
+    try {
+      dispatchInto(
+        client,
+        JSON.stringify({
+          music: 0,
+          learn_operator_action: {
+            prompt:
+              "Set Rekordbox audio to BlackHole 16ch @ 48000Hz, then play a real library track with channel and master faders up.",
+            route: "BlackHole 16ch @ 48000Hz",
+            current_rekordbox_route: "DDJ-FLX4 @ 48000Hz",
+            target_capture_route: "BlackHole 16ch @ 48000Hz",
+            route_mismatch: true,
+            steps: [
+              "In Rekordbox Audio preferences, set the audio output from DDJ-FLX4 @ 48000Hz to BlackHole 16ch @ 48000Hz.",
+            ],
+          },
+        }),
+      );
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(heard).toHaveLength(1);
+      expect(heard[0]?.detail).toMatchObject({
+        prompt:
+          "Set Rekordbox audio to BlackHole 16ch @ 48000Hz, then play a real library track with channel and master faders up.",
+        route: "BlackHole 16ch @ 48000Hz",
+        current_rekordbox_route: "DDJ-FLX4 @ 48000Hz",
+        target_capture_route: "BlackHole 16ch @ 48000Hz",
+        route_mismatch: true,
+      });
+    } finally {
+      window.removeEventListener("learn.operator_action", listener);
+      client.close();
+    }
+  });
+
+  it("bridges an explicit generic operator action clear from a flat frame", () => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const client = new LearnWsClient();
+    const heard: CustomEvent[] = [];
+    const listener = (e: Event) => heard.push(e as CustomEvent);
+    window.addEventListener("learn.operator_action", listener);
+    try {
+      dispatchInto(client, JSON.stringify({ learn_operator_action: null }));
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(heard).toHaveLength(1);
+      expect(heard[0]?.detail).toBeNull();
+    } finally {
+      window.removeEventListener("learn.operator_action", listener);
       client.close();
     }
   });

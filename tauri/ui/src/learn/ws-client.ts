@@ -64,6 +64,8 @@ const MAX_OUTBOUND_QUEUE = 32;
 const MESSAGE_TYPE_PREFIX = "ipc.learn.";
 const COURSE3_LENS_EVENT = "learn.course3_lens";
 const COURSE3_LENS_TAURI_EVENT = "learn-course3-lens";
+const OPERATOR_ACTION_EVENT = "learn.operator_action";
+const OPERATOR_ACTION_TAURI_EVENT = "learn-operator-action";
 
 const LEARN_INBOUND_TYPES = [
   "ipc.learn.controller_detected",
@@ -217,7 +219,7 @@ export class LearnWsClient extends EventTarget {
 
   private async connectTauriEvents(): Promise<void> {
     try {
-      const [learnUnlisteners, course3LensUnlisten] = await Promise.all([
+      const [learnUnlisteners, course3LensUnlisten, operatorActionUnlisten] = await Promise.all([
         Promise.all(
           LEARN_INBOUND_TYPES.map((type) =>
             subscribeIpc<LearnEnvelope>(type, (envelope) => {
@@ -228,16 +230,19 @@ export class LearnWsClient extends EventTarget {
         listenTauri<unknown>(COURSE3_LENS_TAURI_EVENT, (event) => {
           this.dispatchCourse3LensFrame(event.payload);
         }),
+        listenTauri<unknown>(OPERATOR_ACTION_TAURI_EVENT, (event) => {
+          this.dispatchOperatorActionFrame(event.payload);
+        }),
       ]);
       if (this.stopped) {
-        for (const unlisten of [...learnUnlisteners, course3LensUnlisten]) {
+        for (const unlisten of [...learnUnlisteners, course3LensUnlisten, operatorActionUnlisten]) {
           void Promise.resolve(unlisten()).catch(() => {
             // swallow
           });
         }
         return;
       }
-      this.tauriUnlisteners = [...learnUnlisteners, course3LensUnlisten];
+      this.tauriUnlisteners = [...learnUnlisteners, course3LensUnlisten, operatorActionUnlisten];
       this.dispatchEvent(new CustomEvent("open"));
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -264,8 +269,11 @@ export class LearnWsClient extends EventTarget {
     // frame logged a missing-type warning to devtools (108k/hour) and
     // every status/snapshot envelope did wasted validate + dispatch work.
     // Course 3 is the only Learn-owned field riding on that flat frame:
-    // dispatch it through a small local event, then silently drop the rest.
+    // dispatch it through a small local event. Grounded one-action operator
+    // hints can also ride as ``learn_operator_action`` for future courses and
+    // readiness doctors without adding a new visible surface.
     this.dispatchCourse3LensFrame(envelope);
+    this.dispatchOperatorActionFrame(envelope);
     // Silent drop — no warn — keeps real schema-drift warnings legible.
     const t = envelope?.type;
     if (typeof t !== "string" || !t.startsWith(MESSAGE_TYPE_PREFIX)) {
@@ -301,6 +309,36 @@ export class LearnWsClient extends EventTarget {
     if (!lens) return;
     window.dispatchEvent(new CustomEvent(COURSE3_LENS_EVENT, { detail: lens }));
   }
+
+  private dispatchOperatorActionFrame(frame: unknown): void {
+    const extracted = extractOperatorActionFrame(frame);
+    if (!extracted.present) return;
+    window.dispatchEvent(new CustomEvent(OPERATOR_ACTION_EVENT, { detail: extracted.action }));
+  }
+}
+
+type OperatorActionExtraction =
+  | { present: true; action: LearnOperatorAction | null }
+  | { present: false };
+
+function extractOperatorActionFrame(frame: unknown): OperatorActionExtraction {
+  if (!isRecord(frame)) return { present: false };
+  if ("learn_operator_action" in frame) {
+    return normalizeExplicitOperatorAction(frame.learn_operator_action);
+  }
+  if ("operator_action" in frame) {
+    return normalizeExplicitOperatorAction(frame.operator_action);
+  }
+  if ("type" in frame || "course3_lens" in frame || !("prompt" in frame)) {
+    return { present: false };
+  }
+  return normalizeExplicitOperatorAction(frame);
+}
+
+function normalizeExplicitOperatorAction(raw: unknown): OperatorActionExtraction {
+  if (raw === null) return { present: true, action: null };
+  const action = normalizeOperatorAction(raw);
+  return action ? { present: true, action } : { present: false };
 }
 
 function extractCourse3Lens(frame: unknown): Course3LensPayload | null {

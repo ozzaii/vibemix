@@ -45,6 +45,9 @@ describe("curriculum meta projection", () => {
     expect(COURSE_REGISTRY.course_1_anatomy.capabilities).toContain(
       "library_exemplars",
     );
+    expect(COURSE_REGISTRY.course_2_transitions.capabilities).toContain(
+      "library_suggestions",
+    );
     expect(COURSE_REGISTRY.course_3_play_mode.frontstage_mode).toBe(
       "live_play_mode",
     );
