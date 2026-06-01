@@ -2,7 +2,7 @@
 """Local MOSS-TTS-Nano voice — the free, key-free, never-mute co-host voice.
 
 Covers: the mono int16 downmix, opt-in gating (VIBEMIX_LOCAL_TTS + cached model),
-the native-sample-rate probe, the FallbackAdapter wiring (MOSS leads when enabled),
+the native-sample-rate probe, the FallbackAdapter wiring (MOSS-only when enabled),
 and the LiveKit ChunkedStream plumbing via a fake engine (no 728MB model needed).
 A guarded integration test exercises the real ONNX engine when it's cached.
 """
@@ -22,7 +22,6 @@ from vibemix.agent.local_tts import (
     pcm16_mono_le,
     resolve_model_dir,
 )
-
 
 # ---------------- pure helpers ----------------
 
@@ -103,7 +102,7 @@ def test_moss_leads_chain_when_enabled(mocker, monkeypatch):
     chain = agents_tts.FallbackAdapter.__init__.call_args.kwargs["tts"]
     assert chain[0] is fake_moss_cls.return_value  # MOSS leads
     fake_moss_cls.return_value.prewarm.assert_called_once()  # background load kicked
-    assert len(chain) >= 2  # Gemini natives remain as graceful fallback
+    assert len(chain) == 1  # MOSS is the only voice — zero paid fallback (cost + no key)
 
 
 def test_moss_absent_when_disabled(mocker, monkeypatch):

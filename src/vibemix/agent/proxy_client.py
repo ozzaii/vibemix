@@ -61,11 +61,22 @@ def build_proxy_genai_client(jwt: str, proxy_base_url: str) -> genai.Client:
 def build_proxy_tts_chain(
     jwt: str, proxy_base_url: str, voice: str = VOICE
 ) -> agents_tts.FallbackAdapter:
-    """Single-entry FallbackAdapter via openai_plugin.TTS pointed at proxy/v1.
+    """Build the proxy-mode TTS chain.
 
-    No Gemini-native fallback on the client side — the proxy handles upstream
-    fallback internally (circuit breaker + future Gemini-native fallback route).
+    When local MOSS-TTS is explicitly enabled and cached, keep voice synthesis
+    on-device just like direct mode. Otherwise use a single proxy entry; the
+    proxy handles upstream fallback internally (circuit breaker + future
+    Gemini-native fallback route).
     """
+    from vibemix.agent.local_tts import local_tts_enabled
+
+    if local_tts_enabled():
+        from vibemix.agent.local_tts import MossLocalTTS
+
+        moss = MossLocalTTS()
+        moss.prewarm()
+        return agents_tts.FallbackAdapter(tts=[moss], max_retry_per_tts=1)
+
     return agents_tts.FallbackAdapter(
         tts=[
             openai_plugin.TTS(

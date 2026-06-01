@@ -13,10 +13,9 @@ LiveKit's ``AudioEmitter``. The model emits 48 kHz stereo; we downmix to mono an
 declare the native rate, letting the FallbackAdapter / playback sink resample to
 the 24 kHz output contract (``OUTPUT_SR``).
 
-Wiring: ``tts_chain._build_direct_chain`` prepends this as the PRIMARY voice when
-``VIBEMIX_LOCAL_TTS`` is enabled and the model is cached, with Cartesia/Gemini
-kept as graceful fallbacks. Off by default — flipping it to the default free-tier
-voice is a product decision, not a code one.
+Wiring: when ``VIBEMIX_LOCAL_TTS`` is enabled and the model is cached,
+``tts_chain._build_direct_chain`` uses this as the only voice. Off by default -
+flipping it to the default free-tier voice is a product decision, not a code one.
 
 The heavy ONNX runtime (~728 MB, 9 ORT sessions) loads once per instance, lazily,
 off the event loop. ``prewarm()`` kicks the load in the background so the first
@@ -30,15 +29,18 @@ from __future__ import annotations
 import asyncio
 import os
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from livekit.agents import tts as agents_tts
 from livekit.agents._exceptions import APIError
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 from livekit.agents.utils import shortuuid
 
-from vibemix.agent.config import VOICE as _GEMINI_VOICE  # noqa: F401  (kept for parity of voice config home)
+from vibemix.agent.config import (
+    VOICE as _GEMINI_VOICE,  # noqa: F401  (kept for parity of voice config home)
+)
 
 if TYPE_CHECKING:
     import numpy as np
@@ -97,7 +99,7 @@ def _read_native_sample_rate(model_dir: Path) -> int:
         return _DEFAULT_NATIVE_SR
 
 
-def pcm16_mono_le(audio_2d: "np.ndarray") -> bytes:
+def pcm16_mono_le(audio_2d: np.ndarray) -> bytes:
     """Downmix (channels, samples) | (samples,) float32 in [-1, 1] -> mono int16 LE bytes.
 
     The live sink is mono int16 (``playback_sink`` / sounddevice ``channels=1``);
@@ -136,7 +138,7 @@ class _OrtCpuEngine(MossEngine):
         self.voice_name = voice_name
 
     @classmethod
-    def load(cls, model_dir: Path, voice: str, thread_count: int) -> "_OrtCpuEngine":
+    def load(cls, model_dir: Path, voice: str, thread_count: int) -> _OrtCpuEngine:
         import sentencepiece as spm
 
         from vibemix.agent.moss_tts.ort_cpu_runtime import OrtCpuRuntime
@@ -308,7 +310,7 @@ class _MossChunkedStream(agents_tts.ChunkedStream):
             try:
                 engine = tts._get_engine()  # may lazy-load here (off the loop)
                 engine.synthesize(self._input_text, _on_pcm)
-            except BaseException as exc:  # noqa: BLE001 - surfaced below as APIError
+            except BaseException as exc:
                 loop.call_soon_threadsafe(queue.put_nowait, exc)
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, self._DONE)
