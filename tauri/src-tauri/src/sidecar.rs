@@ -61,10 +61,8 @@ fn sidecar_audio_env_defaults<F>(env: &F) -> Vec<(&'static str, String)>
 where
     F: Fn(&str) -> Option<String>,
 {
-    if env("VIBEMIX_INPUT_DEVICE").is_some() || env("VIBEMIX_AUTO_MASTER_INPUT").is_some() {
-        return Vec::new();
-    }
-    vec![("VIBEMIX_AUTO_MASTER_INPUT", "1".to_string())]
+    let _ = env;
+    Vec::new()
 }
 
 /// Target triple of the bundled sidecar. Matches the per-triple directory
@@ -896,13 +894,10 @@ mod tests {
     }
 
     #[test]
-    fn sidecar_audio_env_defaults_enable_auto_master_when_unset() {
+    fn sidecar_audio_env_defaults_do_not_enable_auto_master_implicitly() {
         let env = fake_env(&[]);
 
-        assert_eq!(
-            sidecar_audio_env_defaults(&env),
-            vec![("VIBEMIX_AUTO_MASTER_INPUT", "1".to_string())]
-        );
+        assert!(sidecar_audio_env_defaults(&env).is_empty());
     }
 
     #[test]
