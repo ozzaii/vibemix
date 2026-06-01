@@ -673,17 +673,6 @@
   color: var(--text-muted);
   margin-bottom: var(--sp-2);
 }
-/* Armed indicator on the Cited slot — a small static lit dot (the receipt is
- * live and listening). Static by design: the deck tail cursor is the screen's
- * one breathing mark (PRODUCT principle 3). */
-.panel-armed {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--brand);
-  box-shadow: 0 0 6px var(--brand-40);
-  flex: 0 0 auto;
-}
 .panel-placeholder {
   margin: 0;
   font-size: 13px;

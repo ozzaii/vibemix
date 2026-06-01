@@ -186,7 +186,7 @@ describe("DesktopShell", () => {
     expect(body.getAttribute("aria-hidden")).toBeNull();
   });
 
-  it("renders the grounding panel as a labeled receipt when live (not a prose promise)", () => {
+  it("renders the grounding panel as honest empty slots when live", () => {
     shell = mountDesktopShell(host);
     shell.store.setActivation("live");
     const sections = host.querySelectorAll(".shell-panel .panel-section");
@@ -194,7 +194,9 @@ describe("DesktopShell", () => {
     const labels = Array.from(host.querySelectorAll(".shell-panel .panel-label")).map(
       (el) => el.textContent,
     );
-    expect(labels).toContain("Cited");
+    expect(labels).toContain("Evidence");
+    expect(labels).not.toContain("Cited");
+    expect(host.querySelector(".shell-panel .panel-armed")).toBeNull();
     // Back to idle returns to the honest prose state (no leftover receipt slots).
     shell.store.setActivation("idle");
     expect(host.querySelectorAll(".shell-panel .panel-section").length).toBe(0);

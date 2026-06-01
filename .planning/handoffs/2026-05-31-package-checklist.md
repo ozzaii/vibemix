@@ -2400,6 +2400,47 @@ Remaining gate:
 - None for source behavior. This removes a simulation control; it does not claim
   a live-runtime activation proof.
 
+## Package 5G.4 - Shell Grounding Panel Honest Empty State
+
+Suggested commit: `fix(tauri-ui): stop faking shell grounding receipts`
+
+Include:
+
+- `tauri/ui/src/shell/GroundingPanel.ts`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/shell/grounding-panel.spec.ts`
+- `tauri/ui/tests/shell/shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime citation IPC, websocket/session state, and backend suggestion plumbing.
+- Any co-host speech, prompt, DROP-call, TTS, deck-audio capture, or pill surface
+  changes.
+
+Reason:
+
+- The shell panel opened on a real live activation, but it rendered a lit
+  "Cited" slot and "Listening for the next move" even though the panel has no
+  citation or next-suggestion feed. That made a real activation look like a
+  fake receipt.
+- This package keeps the panel as an honest empty state: live activation can
+  open it, but it says no cited move or suggestion exists yet until a real data
+  writer is added.
+
+Proof for this UI honesty slice:
+
+- `npm --prefix tauri/ui test -- tests/shell/grounding-panel.spec.ts tests/shell/shell.spec.ts tests/shell/activation-bridge.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/shell/GroundingPanel.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/grounding-panel.spec.ts tauri/ui/tests/shell/shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- Wiring this panel to actual citation/suggestion data is a separate product
+  package and should go through grounding review. This package only removes the
+  fake receipt claim.
+
 ## Package 5H - Viber Raw Cue Export Boundary
 
 Suggested commit: `fix(library): drop raw cue export from Viber tools`
