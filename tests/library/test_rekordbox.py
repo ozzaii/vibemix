@@ -193,6 +193,30 @@ def test_user_cache_ignores_repo_fixture_source(tmp_path, monkeypatch):
     assert user_cache.with_name("library.pkl.fixturebak").exists()
 
 
+def test_user_cache_accepts_relative_non_repo_tests_fixtures_path(
+    tmp_path, monkeypatch
+):
+    """A user folder named tests/fixtures is not the repo fixture corpus."""
+    user_cache = tmp_path / ".cache" / "vibemix" / "library.pkl"
+    collection = tmp_path / "tests" / "fixtures" / "collection.xml"
+    collection.parent.mkdir(parents=True)
+    collection.write_bytes(FIXTURE.read_bytes())
+
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", user_cache)
+    monkeypatch.chdir(tmp_path)
+
+    lib1 = RekordboxLibrary()
+    lib1.load_xml(Path("tests/fixtures/collection.xml"))
+    assert user_cache.exists()
+
+    lib2 = RekordboxLibrary()
+    assert lib2.try_load_cache() is True
+    assert len(lib2) == 5
+    assert lib2.xml_path == "tests/fixtures/collection.xml"
+    assert user_cache.exists()
+    assert not user_cache.with_name("library.pkl.fixturebak").exists()
+
+
 def test_cache_invalidated_when_xml_path_differs(
     isolated_cache, tmp_path
 ):

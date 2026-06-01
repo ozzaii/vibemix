@@ -89,12 +89,12 @@ def _is_repo_test_fixture_source_path(source_path: str) -> bool:
     """Return true when a cache source points at this repo's test fixtures."""
     source = Path(source_path).expanduser()
     repo_root = Path(__file__).resolve().parents[3]
+    if not source.is_absolute():
+        source = Path.cwd() / source
     try:
         relative = source.resolve(strict=False).relative_to(repo_root)
     except ValueError:
-        if source.is_absolute():
-            return False
-        relative = source
+        return False
     parts = relative.parts
     return "tests" in parts and "fixtures" in parts
 
