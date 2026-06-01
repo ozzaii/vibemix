@@ -3025,6 +3025,14 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="emit the IngestReport as JSON (suppress per-track progress)",
     )
+    sp_ingest.add_argument(
+        "--calibrate-cues",
+        action="store_true",
+        help=(
+            "opt-in: compare DJ/ANLZ cues against the auto-cue engine and report "
+            "agreement/weak-label counts without changing cached cues"
+        ),
+    )
     sp_ingest.set_defaults(func=_cmd_library_ingest)
 
 
@@ -6171,6 +6179,12 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
     print("-> library ingest: embedder=ClapEngine (on-device, keyless)", file=sys.stderr)
+    calibrate_cues = bool(getattr(args, "calibrate_cues", False))
+    if calibrate_cues:
+        print(
+            "-> library ingest: cue-agreement calibration=on (telemetry only)",
+            file=sys.stderr,
+        )
     try:
         anlz_index = build_anlz_index()
         anlz_count = sum(len(items) for items in anlz_index.by_basename.values())
@@ -6211,6 +6225,7 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
             persist_library=True,
             progress=_progress,
             anlz_index=anlz_index,
+            cue_agreement_calibration=calibrate_cues,
         )
     finally:
         store.close()
@@ -6225,6 +6240,14 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
         f"skipped_cached={report.skipped_cached} failed={report.failed} "
         f"total={report.total}"
     )
+    if calibrate_cues:
+        cue_report = report.as_dict()["cue_agreement"]
+        print(
+            "-> cue agreement: "
+            f"tracks={cue_report['tracks']} scored={cue_report['scored']} "
+            f"weak_labels={cue_report['weak_labels']} "
+            f"mean_score={cue_report['mean_score']}"
+        )
     print(f"-> library cache: {RekordboxLibrary.CACHE_PATH}")
     print(
         '-> query it: `vibemix library search "<vibe text>"` or '

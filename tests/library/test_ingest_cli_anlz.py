@@ -12,13 +12,23 @@ class _FakeReport:
     skipped_cached = 0
     failed = 0
     total = 1
+    cue_agreement_tracks = 1
+    cue_agreement_scored = 1
+    cue_agreement_weak_labels = 2
+    cue_agreement_score_sum = 0.75
 
-    def as_dict(self) -> dict[str, int]:
+    def as_dict(self) -> dict[str, object]:
         return {
             "embedded": self.embedded,
             "skipped_cached": self.skipped_cached,
             "failed": self.failed,
             "total": self.total,
+            "cue_agreement": {
+                "tracks": self.cue_agreement_tracks,
+                "scored": self.cue_agreement_scored,
+                "weak_labels": self.cue_agreement_weak_labels,
+                "mean_score": self.cue_agreement_score_sum,
+            },
         }
 
 
@@ -110,3 +120,27 @@ def test_library_ingest_cli_falls_back_when_anlz_index_fails(monkeypatch, capsys
     assert code == 0
     assert captured["kwargs"]["anlz_index"] is None
     assert "ANLZ structure index unavailable (fixture boom)" in capsys.readouterr().err
+
+
+def test_library_ingest_cli_can_enable_cue_agreement_calibration(
+    monkeypatch, capsys
+) -> None:
+    import vibemix.__main__ as main_mod
+
+    captured = {}
+    _patch_ingest_dependencies(
+        monkeypatch,
+        anlz_builder=lambda: SimpleNamespace(by_basename={}),
+        captured=captured,
+    )
+
+    code = main_mod._cmd_library_ingest(
+        argparse.Namespace(path="collection.xml", json=False, calibrate_cues=True)
+    )
+
+    assert code == 0
+    assert captured["kwargs"]["cue_agreement_calibration"] is True
+
+    out = capsys.readouterr()
+    assert "cue-agreement calibration=on (telemetry only)" in out.err
+    assert "-> cue agreement: tracks=1 scored=1 weak_labels=2 mean_score=0.75" in out.out
