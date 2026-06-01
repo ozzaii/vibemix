@@ -302,6 +302,34 @@ Proof before staging:
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- .planning/handoffs/2026-05-31-future-ai-routing.md .planning/handoffs/2026-05-31-package-checklist.md`
 
+## Package 0K - Integration Audit Ruff Hygiene
+
+Suggested commit: `chore(tooling): clean integration audit imports`
+
+Include:
+
+- `scripts/integration_audit.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Product source changes, generated audit outputs, and orphan baseline refreshes.
+
+Reason:
+
+- `scripts/integration_audit.py` carried two stale imports (`field`, `Any`) that
+  make the focused orphan-inventory tooling lint gate fail even though the audit
+  behavior is unchanged.
+- This is a tooling-only hygiene package so future baseline refreshes can run
+  the script's focused ruff gate without unrelated lint noise.
+
+Proof before staging:
+
+- `uv run ruff check scripts/integration_audit.py tests/scripts/test_orphan_inventory.py`
+- `uv run pytest -q tests/scripts/test_orphan_inventory.py`
+- `git diff --check -- scripts/integration_audit.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

@@ -51,9 +51,8 @@ import re
 import subprocess
 import sys
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 
