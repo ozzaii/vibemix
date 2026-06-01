@@ -1,0 +1,22 @@
+{
+  "schema": "clap_real_corpus_v1",
+  "embedding_dim": 512,
+  "track_ids": [
+    "t1_pyrez_darkside",
+    "t2_liltexas_ripcity",
+    "t3_igda_runthehill",
+    "t4_mitro_90s",
+    "t5_miquiztli_omnamah",
+    "t6_acidvars_freetekno"
+  ],
+  "window_a_s": [
+    5,
+    30
+  ],
+  "window_b_s": [
+    45,
+    70
+  ],
+  "ground_truth": "query i (window B of track i) -> corpus i (window A of track i)",
+  "source": "tests/bench/data/*.mp3 (in-repo real DJ tracks)"
+}
