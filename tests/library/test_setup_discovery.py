@@ -19,6 +19,19 @@ def test_setup_discovery_finds_standard_rekordbox_xml(tmp_path: Path) -> None:
     assert "library ingest" in candidates[0].command
 
 
+def test_setup_discovery_finds_standard_traktor_nml(tmp_path: Path) -> None:
+    nml = tmp_path / "Documents" / "Native Instruments" / "Traktor 4.0.0" / "collection.nml"
+    nml.parent.mkdir(parents=True)
+    nml.write_text("<NML />", encoding="utf-8")
+
+    candidates = discover_library_setup_candidates(home=tmp_path)
+
+    traktor = [candidate for candidate in candidates if candidate.kind == "traktor_nml"]
+    assert traktor
+    assert traktor[0].path == str(nml)
+    assert "library ingest --source traktor" in traktor[0].command
+
+
 def test_setup_discovery_finds_bounded_music_folder_candidate(tmp_path: Path) -> None:
     crate = tmp_path / "Music" / "PSYMIND"
     crate.mkdir(parents=True)

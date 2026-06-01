@@ -3,8 +3,9 @@
 
 Fresh installs often have no ``library.pkl`` yet, so Viber cannot ground deck
 identity or set-prep. This module provides a bounded, content-light discovery
-pass: standard Rekordbox XML export locations plus shallow music-folder
-candidates. It never reads Rekordbox's live database and never auto-ingests.
+pass: standard Rekordbox XML export locations, standard Traktor NML locations,
+plus shallow music-folder candidates. It never reads Rekordbox's live database
+and never auto-ingests.
 """
 
 from __future__ import annotations
@@ -14,8 +15,9 @@ from pathlib import Path
 from typing import Literal
 
 from vibemix.library.sources.rekordbox import RekordboxSource
+from vibemix.library.sources.traktor import TraktorSource
 
-CandidateKind = Literal["rekordbox_xml", "music_folder"]
+CandidateKind = Literal["rekordbox_xml", "traktor_nml", "music_folder"]
 SUPPORTED_AUDIO_SUFFIXES = (".mp3", ".m4a", ".wav", ".flac", ".aac")
 
 
@@ -77,6 +79,12 @@ def _music_roots(home: Path) -> list[Path]:
     return out
 
 
+def _path_at_home(candidate: Path, home: Path | None) -> Path:
+    if home is None:
+        return candidate
+    return Path(str(candidate).replace(str(Path.home()), str(home), 1))
+
+
 def discover_library_setup_candidates(
     *,
     home: Path | None = None,
@@ -87,7 +95,7 @@ def discover_library_setup_candidates(
     candidates: list[LibrarySetupCandidate] = []
 
     for xml in RekordboxSource().default_paths():
-        path = Path(str(xml).replace(str(Path.home()), str(base), 1)) if home else xml
+        path = _path_at_home(xml, base if home else None)
         try:
             if path.is_file():
                 candidates.append(
@@ -97,6 +105,22 @@ def discover_library_setup_candidates(
                         confidence="high",
                         reason="standard Rekordbox collection.xml export path exists",
                         command=f"uv run python -m vibemix library ingest {path}",
+                    )
+                )
+        except OSError:
+            continue
+
+    for nml in TraktorSource().default_paths():
+        path = _path_at_home(nml, base if home else None)
+        try:
+            if path.is_file():
+                candidates.append(
+                    LibrarySetupCandidate(
+                        kind="traktor_nml",
+                        path=str(path),
+                        confidence="high",
+                        reason="standard Traktor collection.nml path exists",
+                        command=f"uv run python -m vibemix library ingest --source traktor {path}",
                     )
                 )
         except OSError:

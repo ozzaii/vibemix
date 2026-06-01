@@ -2422,6 +2422,46 @@ Remaining gate:
   follow-up packages. This package proves parser correctness and the shared
   LibrarySource contract only.
 
+## Package 5O - Traktor Ingest CLI and Setup Discovery
+
+Suggested commit: `feat(library): wire traktor ingest setup path`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `src/vibemix/library/setup_discovery.py`
+- `tests/library/test_setup_discovery.py`
+- `tests/library/test_ingest_cli_anlz.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Live co-host speech, prompts, EventDetector timing, or DROP-call paths.
+- Automatic ingest/re-embed from discovery candidates.
+- Settings UI redesign; the existing Library setup surfaces consume candidates.
+- Serato/Engine/Rekordbox `master.db` readers.
+
+Reason:
+
+- Package 5N made Traktor `.nml` parseable, but discovery must not surface a
+  fake command. This slice makes `library ingest --source traktor <collection.nml>`
+  real, then lets Viber/library doctor recommend that exact command when a
+  standard Traktor export exists.
+- Rekordbox ANLZ enrichment remains Rekordbox-only and is skipped explicitly for
+  Traktor so the command is honest about what metadata it can add.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_setup_discovery.py tests/library/test_ingest_cli_anlz.py tests/library/test_sources_traktor.py`
+- `uv run ruff check src/vibemix/__main__.py src/vibemix/library/setup_discovery.py tests/library/test_setup_discovery.py tests/library/test_ingest_cli_anlz.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/__main__.py src/vibemix/library/setup_discovery.py tests/library/test_setup_discovery.py tests/library/test_ingest_cli_anlz.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- GUI one-click source selection remains a follow-up. This package gives the
+  CLI and Viber setup candidate a truthful, runnable Traktor import path.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`

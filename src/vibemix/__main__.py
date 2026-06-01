@@ -3377,13 +3377,13 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     # Phase 89 Plan 01 — ingest: auto-detect a DJ library + embed it on-device.
     sp_ingest = sub.add_parser(
         "ingest",
-        help="Auto-detect your DJ library (Rekordbox) and embed it on-device (CLAP)",
+        help="Auto-detect your DJ library and embed it on-device (CLAP)",
         description=(
-            "Detect your Rekordbox collection.xml at its standard export "
-            "location (or pass an explicit path), parse each track, embed it "
-            "ON-DEVICE via CLAP (512-dim, keyless — no Gemini, no API cost, "
-            "audio never leaves the machine), and store the vectors so "
-            "search/similar resolve your own crate. Resumable + "
+            "Detect a Rekordbox collection.xml or Traktor collection.nml at its "
+            "standard export location (or pass an explicit path), parse each "
+            "track, embed it ON-DEVICE via CLAP (512-dim, keyless — no Gemini, "
+            "no API cost, audio never leaves the machine), and store the "
+            "vectors so search/similar resolve your own crate. Resumable + "
             "partial-failure-tolerant."
         ),
     )
@@ -3392,9 +3392,15 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         nargs="?",
         default=None,
         help=(
-            "explicit path to a Rekordbox collection.xml (omit to auto-detect "
-            "the standard export location)"
+            "explicit path to a Rekordbox collection.xml or Traktor collection.nml "
+            "(omit to auto-detect the selected source's standard export location)"
         ),
+    )
+    sp_ingest.add_argument(
+        "--source",
+        choices=("rekordbox", "traktor"),
+        default="rekordbox",
+        help="DJ library source to parse (default: rekordbox)",
     )
     sp_ingest.add_argument(
         "--json",
@@ -6985,9 +6991,8 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
     """Phase 89 Plan 01 — detect → parse → CLAP-embed → store one DJ library.
 
     KEYLESS + on-device: ingest embeds via ``ClapEngine`` — no genai client, no
-    API cost, audio never leaves the machine. Auto-detects the Rekordbox
-    collection.xml at its standard export location, or accepts an explicit
-    ``path``.
+    API cost, audio never leaves the machine. Auto-detects the selected
+    source's standard export location, or accepts an explicit ``path``.
     """
     import json as _json
 
@@ -6996,25 +7001,39 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
     from vibemix.library.ingest import ingest_source
     from vibemix.library.rekordbox import RekordboxLibrary
     from vibemix.library.sources.rekordbox import RekordboxSource
+    from vibemix.library.sources.traktor import TraktorSource
     from vibemix.library.store import open_store
 
     explicit = getattr(args, "path", None)
-    source = RekordboxSource(xml_path=explicit) if explicit else RekordboxSource()
+    source_name = str(getattr(args, "source", "rekordbox") or "rekordbox").lower()
+    if source_name == "traktor":
+        source = TraktorSource(nml_path=explicit) if explicit else TraktorSource()
+        missing_msg = (
+            "[FATAL] library ingest: no Traktor collection.nml found. Export "
+            "one from Traktor, then re-run "
+            "`vibemix library ingest --source traktor <path>` (or place it at "
+            "a standard location)."
+        )
+    else:
+        source = RekordboxSource(xml_path=explicit) if explicit else RekordboxSource()
+        missing_msg = (
+            "[FATAL] library ingest: no Rekordbox collection.xml found. Export "
+            "one via Rekordbox → File → Export Collection in xml format, then "
+            "re-run `vibemix library ingest <path>` (or place it at a standard "
+            "location)."
+        )
 
     if not source.detect():
         probed = ", ".join(str(p) for p in source.default_paths())
         print(
-            "[FATAL] library ingest: no Rekordbox collection.xml found. Export "
-            "one via Rekordbox → File → Export Collection in xml format, then "
-            "re-run `vibemix library ingest <path>` (or place it at a standard "
-            f"location). Probed: {probed}",
+            f"{missing_msg} Probed: {probed}",
             file=sys.stderr,
             flush=True,
         )
         return 1
 
     print(
-        f"-> library ingest: source=rekordbox xml={source.resolved_path}",
+        f"-> library ingest: source={source.name} catalog={source.resolved_path}",
         file=sys.stderr,
     )
     print("-> library ingest: embedder=ClapEngine (on-device, keyless)", file=sys.stderr)
@@ -7024,24 +7043,31 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
             "-> library ingest: cue-agreement calibration=on (telemetry only)",
             file=sys.stderr,
         )
-    try:
-        anlz_index = build_anlz_index()
-        anlz_count = sum(len(items) for items in anlz_index.by_basename.values())
-        if anlz_count:
+    if source.name == "rekordbox":
+        try:
+            anlz_index = build_anlz_index()
+            anlz_count = sum(len(items) for items in anlz_index.by_basename.values())
+            if anlz_count:
+                print(
+                    f"-> library ingest: ANLZ structure index={anlz_count} tracks",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    "-> library ingest: ANLZ structure index empty (DJ/auto-cue fallback remains)",
+                    file=sys.stderr,
+                )
+                anlz_index = None
+        except Exception as e:
             print(
-                f"-> library ingest: ANLZ structure index={anlz_count} tracks",
-                file=sys.stderr,
-            )
-        else:
-            print(
-                "-> library ingest: ANLZ structure index empty (DJ/auto-cue fallback remains)",
+                f"-> library ingest: ANLZ structure index unavailable ({e}); "
+                "DJ/auto-cue fallback remains",
                 file=sys.stderr,
             )
             anlz_index = None
-    except Exception as e:
+    else:
         print(
-            f"-> library ingest: ANLZ structure index unavailable ({e}); "
-            "DJ/auto-cue fallback remains",
+            f"-> library ingest: ANLZ structure index skipped for source={source.name}",
             file=sys.stderr,
         )
         anlz_index = None
