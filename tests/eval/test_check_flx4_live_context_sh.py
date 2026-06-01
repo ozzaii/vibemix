@@ -165,6 +165,12 @@ payload = {{
         }},
         "blockers": [] if ready else ["no websocket frames arrived"],
     }},
+    "operator_actions": [] if ready else [
+        {{
+            "code": "start_live_session",
+            "detail": "Core proof says start the Vibemix live session.",
+        }}
+    ],
 }}
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(payload), encoding="utf-8")
@@ -295,6 +301,9 @@ def test_check_flx4_live_context_fails_when_socket_proof_missing(
     assert summary["action_hint"] == "start_live_session"
     assert len(summary["operator_actions"]) == 1
     assert summary["operator_actions"][0]["code"] == "start_live_session"
+    assert summary["operator_actions"][0]["detail"] == (
+        "Core proof says start the Vibemix live session."
+    )
     assert summary["top_blockers"] == ["no websocket frames arrived"]
     assert not any("deck_state" in blocker for blocker in summary["top_blockers"])
     assert summary["canaries"]["listener_read"] == "skipped"

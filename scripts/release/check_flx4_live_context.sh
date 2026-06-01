@@ -466,11 +466,64 @@ def add_action(actions: list[dict], code: str, detail: str) -> None:
     actions.append({"code": code, "detail": detail})
 
 
+def copy_proof_actions(
+    actions: list[dict],
+    raw_actions: object,
+    *,
+    skip_codes: set[str] | None = None,
+) -> None:
+    """Prefer the core live-context action queue when it is present.
+
+    The release checker still adds hardware-only diagnostics such as the direct
+    OS MIDI probe. Those overlays can skip broad core advice like
+    ``move_controller`` when we have stronger local evidence.
+    """
+    skip_codes = skip_codes or set()
+    if not isinstance(raw_actions, list):
+        return
+    for raw in raw_actions:
+        if not isinstance(raw, dict):
+            continue
+        code = str(raw.get("code") or "").strip()
+        detail = str(raw.get("detail") or "").strip()
+        if not code or not detail or code in skip_codes:
+            continue
+        if any(action.get("code") == code for action in actions):
+            continue
+        action = {"code": code, "detail": detail}
+        for key in ("recommended_env", "setup_hint", "diagnostic_commands", "artifacts"):
+            value = raw.get(key)
+            if value is not None:
+                action[key] = value
+        actions.append(action)
+
+
 setup_hint = proof.get("setup_hint") if isinstance(proof.get("setup_hint"), dict) else None
 operator_actions: list[dict] = []
 needs_operator_action = not bool(readiness.get("ready"))
 hardware_midi_seen = bool(midi_ports)
 physical_diagnosis = diagnosis not in {"live_socket_missing", "stale_live_runtime"}
+proof_operator_actions = proof.get("operator_actions")
+skip_proof_action_codes: set[str] = set()
+if needs_operator_action and physical_diagnosis and direct_midi_ran:
+    skip_proof_action_codes.add("move_controller")
+if (
+    needs_operator_action
+    and physical_diagnosis
+    and direct_midi_ran
+    and direct_midi_motion
+    and not checks.get("recent_moves_seen")
+):
+    add_action(
+        operator_actions,
+        "restart_live_midi_listener",
+        "The direct OS MIDI probe saw FLX4 frames, but live-context did not; restart the live session and inspect MIDI listener binding if it repeats.",
+    )
+copy_proof_actions(
+    operator_actions,
+    proof_operator_actions,
+    skip_codes=skip_proof_action_codes,
+)
 if needs_operator_action and diagnosis == "live_socket_missing":
     add_action(
         operator_actions,
