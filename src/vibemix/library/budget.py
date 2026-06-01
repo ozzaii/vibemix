@@ -11,8 +11,7 @@ Two surfaces:
        exposed via ``vibemix library budget``.
     2. ``BudgetTelemetry`` (singleton) — runtime counters for legacy embedding
        tests and current live Gemini token/cost meters. Warning logged at 90%
-       of ceiling. The Plan 09 ``LibraryConfidence.cost_warning`` boolean
-       surfaces the warning to the renderer.
+       of ceiling for operators and telemetry.
 
 Legacy Gemini pricing constants (Assumption A9 — Google pricing as of 2026-Q2):
     text:  $0.20 per 1M tokens
@@ -378,8 +377,7 @@ class BudgetTelemetry:
             logger.warning(
                 "BudgetTelemetry: 90%% ceiling crossed — "
                 "current=%.4f EUR, ceiling=%.2f EUR. "
-                "Plan 28-09 LibraryConfidence.cost_warning will surface "
-                "in the next IPC tick.",
+                "runtime telemetry warning is active.",
                 cost,
                 BUDGET_CEILING_EUR,
             )

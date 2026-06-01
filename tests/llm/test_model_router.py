@@ -94,7 +94,7 @@ def test_router_paths_is_frozen_tuple() -> None:
     # routes. Phase 92 Plan 92-01 (LESSON-06, Open Q1) adds ``learn_tutor`` for
     # the Learn module's AI tutor lens — decoupled from ``live_coach`` so
     # future model swaps don't drag both surfaces.
-    assert len(ROUTER_PATHS) == 10
+    assert len(ROUTER_PATHS) == 12
     expected = {
         "live_coach",
         "live_coach_openrouter",
@@ -106,6 +106,13 @@ def test_router_paths_is_frozen_tuple() -> None:
         "debrief_tts",
         "library_auto_tag",
         "embedding",
+        # Cost+capability study (2026-05-30): candidate live-brain Gemini tiers
+        # the pricing table + bench STUDY_C resolve. Kept Gemini-only and
+        # non-Live — the 3.1 Flash Live model remains isolated under spikes/,
+        # and Viber/DeepSeek is deliberately NOT a router entry (see
+        # _router_config.py), so test_no_non_gemini_models stays intact.
+        "live_coach_cand_25flash",
+        "live_coach_cand_3flash",
     }
     assert set(ROUTER_PATHS) == expected
 

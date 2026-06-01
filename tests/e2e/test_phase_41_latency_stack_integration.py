@@ -112,6 +112,10 @@ def test_router_resolves_all_paths() -> None:
         "debrief": ("gemini-3.5-flash", ServiceTier.FLEX),
         "debrief_tts": ("gemini-3-flash-tts-preview", ServiceTier.FLEX),
         "library_auto_tag": ("gemini-3.5-flash", ServiceTier.FLEX),
+        # Source-audited cost/capability study candidates. The 3.1 Flash Live
+        # model stays isolated under spikes/ until its LAT-09 verdict is written.
+        "live_coach_cand_25flash": ("gemini-2.5-flash", ServiceTier.STANDARD),
+        "live_coach_cand_3flash": ("gemini-3-flash-preview", ServiceTier.STANDARD),
         # Legacy Gemini cache/migration helper only. Product library embeddings
         # use local CLAP ONNX/512 via embed_factory.
         "embedding": ("gemini-embedding-2", ServiceTier.FLEX),

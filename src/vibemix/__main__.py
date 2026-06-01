@@ -2741,12 +2741,60 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     # Plan 28-08 — legacy Gemini embedding what-if + live token telemetry
     sp_budget = sub.add_parser(
         "budget",
-        help="Show legacy Gemini embedding what-if and live token telemetry",
+        help="Legacy Gemini embedding what-if, OR the real live co-host stack cost (--stack live)",
     )
     sp_budget.add_argument(
-        "--dau", type=int, default=1000, help="daily-active users (default 1000)"
+        "--dau",
+        type=int,
+        default=1000,
+        help="daily-active users (default 1000; use 10000 for the fleet anchor)",
     )
     sp_budget.add_argument("--json", action="store_true")
+    sp_budget.add_argument(
+        "--stack",
+        choices=("legacy", "live"),
+        default="legacy",
+        help="'legacy' = Gemini embedding what-if (default); 'live' = the real live co-host stack (brain + TTS + STT + Viber)",
+    )
+    sp_budget.add_argument(
+        "--cache-hit",
+        type=float,
+        default=0.90,
+        help="[--stack live] implicit input cache-hit rate, 0..1 (default 0.90)",
+    )
+    sp_budget.add_argument(
+        "--brain",
+        default="live_coach",
+        help="[--stack live] live-brain router path (e.g. live_coach_cand_25flash for the cheapest tier)",
+    )
+    sp_budget.add_argument(
+        "--tts",
+        default="live_coach_tts",
+        help="[--stack live] TTS router path or vendor id (e.g. live_coach_tts_fallback, eleven_flash_v2_5)",
+    )
+    sp_budget.add_argument(
+        "--stt",
+        default="gemini_part",
+        help="[--stack live] 'gemini_part' (mic→Gemini) or a dedicated STT id (e.g. nova-3-streaming)",
+    )
+    sp_budget.add_argument(
+        "--reactions-per-set",
+        type=int,
+        default=80,
+        help="[--stack live] reactions per DJ set (default 80)",
+    )
+    sp_budget.add_argument(
+        "--sessions-per-month",
+        type=int,
+        default=20,
+        help="[--stack live] sets per active DJ per month (default 20 ~ daily-active)",
+    )
+    sp_budget.add_argument(
+        "--livekit-per-min",
+        type=float,
+        default=0.0,
+        help="[--stack live] LiveKit USD/participant-minute (default 0 = local direct mode; set >0 for the Cloud what-if)",
+    )
     sp_budget.set_defaults(func=_cmd_library_budget)
 
     sp_stats = sub.add_parser(
@@ -5419,8 +5467,83 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_library_budget_live(args: argparse.Namespace) -> int:
+    """The real live co-host stack cost (--stack live): brain + TTS + STT + Viber."""
+    import json as _json
+
+    from vibemix.library.cost import (
+        LiveStackSpec,
+        TurnProfile,
+        UsageProfile,
+        live_budget_report,
+    )
+
+    spec = LiveStackSpec(
+        live_brain_path=args.brain,
+        tts_path=args.tts,
+        stt=args.stt,
+        livekit_per_min_usd=args.livekit_per_min,
+    )
+    turn = TurnProfile(cache_hit_rate=args.cache_hit)
+    usage = UsageProfile(
+        reactions_per_set=args.reactions_per_set,
+        sessions_per_month=args.sessions_per_month,
+    )
+    try:
+        rep = live_budget_report(spec, turn, usage, dau=args.dau)
+    except Exception as e:  # unknown model/path → actionable line, never a traceback
+        print(f"budget --stack live: {e}", file=sys.stderr)
+        return 2
+
+    if getattr(args, "json", False):
+        _json.dump(rep, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 0
+
+    a, s = rep["assumptions"], rep["stack"]
+    print(f"\nLive co-host stack cost @ DAU={rep['dau']:,}\n")
+    print(f"  Stack:  brain={s['brain']}  tts={s['tts']}  stt={s['stt']}  viber={s['viber']}")
+    print(
+        f"  Turn:   {a['input_tokens']} in / {a['output_tokens']} out tok, "
+        f"{a['speech_seconds']:.0f}s spoken, {a['audio_in_seconds']:.0f}s audio-in, "
+        f"cache-hit {a['cache_hit_rate']:.0%}"
+    )
+    print(
+        f"  Usage:  {a['reactions_per_set']} reactions/set x {a['sessions_per_month']} sets/mo "
+        f"(USD->EUR {a['usd_to_eur']})"
+    )
+    print()
+    print(f"  {'Leg':<8}{'EUR/session':>13}{'EUR/DJ-month':>14}{'fleet EUR/mo':>16}")
+    print("  " + "-" * 51)
+    for leg in rep["legs"]:
+        print(
+            f"  {leg['name']:<8}{leg['per_session_eur']:>13.4f}"
+            f"{leg['per_dj_month_eur']:>14.2f}{leg['fleet_month_eur']:>16,.0f}"
+        )
+    print("  " + "-" * 51)
+    t = rep["totals"]
+    print(
+        f"  {'TOTAL':<8}{t['per_session_eur']:>13.4f}"
+        f"{t['per_dj_month_eur']:>14.2f}{t['fleet_month_eur']:>16,.0f}"
+    )
+    print(f"\n  Dominant leg: {rep['dominant_leg'].upper()}")
+    print(f"\n  Sensitivity (fleet EUR/mo @ DAU={rep['dau']:,}):")
+    cur = None
+    for r in rep["sensitivity"]:
+        if r["axis"] != cur:
+            cur = r["axis"]
+            print(f"    [{cur}]")
+        flag = "" if r["verified"] else "   ! UNVERIFIED"
+        print(f"      {r['label']:<24}{r['fleet_month_eur']:>13,.0f}{flag}")
+    print()
+    return 0
+
+
 def _cmd_library_budget(args: argparse.Namespace) -> int:
     """Legacy Gemini Embedding projection plus current runtime telemetry."""
+    if getattr(args, "stack", "legacy") == "live":
+        return _cmd_library_budget_live(args)
+
     import json as _json
     from dataclasses import asdict as _asdict
 

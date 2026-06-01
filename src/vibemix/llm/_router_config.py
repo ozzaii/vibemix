@@ -43,6 +43,20 @@ _ROUTES: dict[str, tuple[str, ServiceTierName | None]] = {
         "google/gemini-3.1-flash-tts-preview",
         None,
     ),
+    # --- Cost + capability study (2026-05-30) — candidate LIVE-BRAIN aliases.
+    # The verified pricing table (``vibemix.library.pricing``) resolves each via
+    # ``resolve_model`` so NO Gemini literal escapes this allowlisted file, and
+    # the live-brain Gemini-TIER bench (bench ``STUDY_C``) sweeps these aliases.
+    # The live co-host brain STAYS Gemini (only Gemini "sees the listener" on the
+    # LiveKit pipeline); these are the cheaper tiers the bench proves
+    # good-enough-or-not against the current premium ``live_coach``
+    # (gemini-3.5-flash). NB: the Viber/set-prep brain (DeepSeek) is deliberately
+    # NOT a router entry — it runs through the ``codex_curate`` subprocess lane,
+    # and its price is keyed by model-id directly in ``pricing.py`` (deepseek-*
+    # is not grep-gated). Keeping this router Gemini-only preserves the
+    # ``test_no_non_gemini_models`` invariant.
+    "live_coach_cand_25flash": ("gemini-2.5-flash", "STANDARD"),
+    "live_coach_cand_3flash": ("gemini-3-flash-preview", "STANDARD"),
     # Phase 92 Plan 92-01 (LESSON-06 — Open Q1 resolution). The Learn module's
     # AI tutor lens. Decoupled from ``live_coach`` so future model swaps don't
     # drag both surfaces — the live co-host (party/coach) and the lesson tutor
