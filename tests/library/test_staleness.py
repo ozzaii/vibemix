@@ -27,6 +27,7 @@ from vibemix.library.staleness import (
     save_snooze_state,
     watch_library_freshness,
 )
+from vibemix.library.watcher import _freshness_watch_targets as _watcher_watch_targets
 
 
 def _touch_with_age(path: Path, age_seconds: float) -> None:
@@ -255,6 +256,24 @@ def test_freshness_watch_targets_include_cache_and_source(tmp_path: Path) -> Non
     )
 
     assert _freshness_watch_targets(status) == {cache, source}
+
+
+def test_watcher_module_target_planner_matches_legacy_import(tmp_path: Path) -> None:
+    """The dedicated watcher module preserves staleness.py's import surface."""
+    cache = tmp_path / "library.pkl"
+    source = tmp_path / "collection.xml"
+    status = LibraryFreshness(
+        status="fresh",
+        stale=False,
+        reason="cache_current",
+        age_days=0,
+        cache_path=str(cache),
+        source_path=str(source),
+        cache_mtime=1.0,
+        source_mtime=1.0,
+    )
+
+    assert _watcher_watch_targets(status) == _freshness_watch_targets(status)
 
 
 def test_watch_library_freshness_rechecks_on_file_change(tmp_path: Path) -> None:

@@ -994,6 +994,7 @@ Suggested commit: `fix(library): watch freshness during live sessions`
 
 Include:
 
+- `src/vibemix/library/watcher.py`
 - `src/vibemix/library/staleness.py`
 - `src/vibemix/__main__.py`
 - `src/vibemix/runtime/ws_bus.py`
@@ -1011,6 +1012,9 @@ Reason:
 - The watcher observes `library_freshness_status()` while the session is live
   and emits a nudge when the freshness signature changes into a stale state.
   It skips fresh installs and respects snooze state.
+- Codex maintainability follow-up, 2026-06-01: the live watcher mechanics live
+  in `src/vibemix/library/watcher.py`; `staleness.py` keeps the freshness
+  policy, snooze state, and backward-compatible import wrappers.
 - This is deliberately smaller than a full auto-ingest daemon: it tells the app
   and user that the local library context is stale now, while Package 5D blocks
   stale Viber tools.
@@ -1038,6 +1042,11 @@ Proof already run:
   `ws_observe(seconds=4, type_filter="ipc.library.staleness_nudge")` captured
   one nudge with `reason=source_newer_than_cache` and
   `source_path=tests/library/fixtures/synthetic_collection.xml`.
+- Codex watcher extraction follow-up, 2026-06-01:
+  `uv run pytest -q tests/library/test_staleness.py tests/library/test_stats_cli.py
+  tests/library/test_setprep_tools.py tests/runtime/test_ws_bus.py` passed with
+  76 tests, and `uv run ruff check src/vibemix/library/staleness.py
+  src/vibemix/library/watcher.py tests/library/test_staleness.py` passed.
 
 Remaining gate:
 
