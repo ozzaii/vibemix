@@ -18,7 +18,6 @@ from pathlib import Path
 
 import pytest
 
-
 pytestmark = pytest.mark.cli
 
 
@@ -35,9 +34,7 @@ def _seed_query_cache(
         "(key TEXT PRIMARY KEY, query_text TEXT NOT NULL, "
         "result_json TEXT NOT NULL, ts REAL NOT NULL)"
     )
-    cache_key = hashlib.sha256(
-        f"{query}|{snapshot}".encode("utf-8")
-    ).hexdigest()
+    cache_key = hashlib.sha256(f"{query}|{snapshot}".encode()).hexdigest()
     conn.execute(
         "INSERT OR REPLACE INTO query_cache "
         "(key, query_text, result_json, ts) VALUES (?, ?, ?, ?)",

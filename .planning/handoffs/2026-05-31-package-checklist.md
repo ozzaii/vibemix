@@ -702,6 +702,34 @@ Proof before staging:
 - `git diff --check -- tests/scripts/test_spike_gemini_text_ordering.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0Z - CLI Library Search Test Ruff Hygiene
+
+Suggested commit: `test(scripts): clean library search cli lint`
+
+Include:
+
+- `tests/scripts/test_cli_library_search.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- CLI implementation, `src/vibemix/__main__.py`, library cache code, app runtime
+  files, and generated files.
+
+Reason:
+
+- The library-search CLI test had a stale extra blank line before `pytestmark`
+  and an unnecessary explicit UTF-8 argument on a string encode. Cleaning those
+  keeps the focused scripts-test ruff gate clean without changing cached-query
+  behavior.
+
+Proof before staging:
+
+- `uv run ruff check tests/scripts/test_cli_library_search.py`
+- `uv run pytest -q tests/scripts/test_cli_library_search.py`
+- `git diff --check -- tests/scripts/test_cli_library_search.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
