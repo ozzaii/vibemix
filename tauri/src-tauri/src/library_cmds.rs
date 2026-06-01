@@ -38,6 +38,9 @@
 //!       final (stdout)              → `embed-folder done: embedded=… skipped_cached=… failed=… total=…  ~€…`
 //!       (with --json the per-track lines are suppressed + only an IngestReport
 //!        JSON is printed; we run WITHOUT --json so we can stream progress.)
+//!   * `library cue <path> --export rekordbox|m3u8|both --out <path> --json`
+//!       stdout → `{ "ok", "mode":"export", "tracks_cued", "cues_total",
+//!                    "skipped", "outputs": { "rekordbox"?: path, "m3u8"?: path } }`
 //!   * `library budget --json`  (OFFLINE — pure projection + in-proc telemetry,
 //!       no Gemini network call) → `{ "projection": {…}, "telemetry": {…}, "dau" }`
 //!
@@ -189,6 +192,47 @@ fn model_library_args(install: Option<&str>, force: bool) -> Vec<String> {
     args
 }
 
+fn normalize_cue_export_format(raw: Option<&str>) -> Result<&'static str, String> {
+    match raw
+        .unwrap_or("rekordbox")
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "" | "rekordbox" => Ok("rekordbox"),
+        "m3u8" => Ok("m3u8"),
+        "both" => Ok("both"),
+        other => Err(format!(
+            "invalid cue export {other:?} (expected rekordbox | m3u8 | both)"
+        )),
+    }
+}
+
+fn default_cue_export_path(export: &str) -> Result<String, String> {
+    let suffix = if export == "m3u8" { "m3u8" } else { "xml" };
+    let path = crate::recordings::app_data_dir_matching_sidecar()?
+        .join("exports")
+        .join(format!("vibemix-cues.{suffix}"));
+    Ok(path.to_string_lossy().to_string())
+}
+
+fn cue_library_args(path: &str, out: &str, export: &str, name: &str, max_cues: u32) -> Vec<String> {
+    vec![
+        "library".to_string(),
+        "cue".to_string(),
+        path.to_string(),
+        "--export".to_string(),
+        export.to_string(),
+        "--out".to_string(),
+        out.to_string(),
+        "--name".to_string(),
+        name.to_string(),
+        "--max-cues".to_string(),
+        max_cues.to_string(),
+        "--json".to_string(),
+    ]
+}
+
 fn normalize_model_install_target(raw: Option<String>) -> Result<Option<String>, String> {
     let Some(raw) = raw else {
         return Ok(None);
@@ -201,6 +245,35 @@ fn normalize_model_install_target(raw: Option<String>) -> Result<Option<String>,
             "invalid model install target {value:?} (expected required | clap | cue | all)"
         )),
     }
+}
+
+fn map_cue_result(raw: &Value) -> Value {
+    let outputs = raw
+        .get("outputs")
+        .and_then(|v| v.as_object())
+        .map(|obj| {
+            let mut mapped = serde_json::Map::new();
+            for key in ["rekordbox", "m3u8"] {
+                if let Some(path) = obj
+                    .get(key)
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                {
+                    mapped.insert(key.to_string(), Value::String(path.to_string()));
+                }
+            }
+            mapped
+        })
+        .unwrap_or_default();
+
+    json!({
+        "ok": raw.get("ok").and_then(Value::as_bool).unwrap_or(false),
+        "mode": raw.get("mode").and_then(Value::as_str).unwrap_or("export"),
+        "tracks_cued": raw.get("tracks_cued").and_then(Value::as_u64).unwrap_or(0),
+        "cues_total": raw.get("cues_total").and_then(Value::as_u64).unwrap_or(0),
+        "skipped": raw.get("skipped").and_then(Value::as_u64).unwrap_or(0),
+        "outputs": Value::Object(outputs),
+    })
 }
 
 /// Run a library subcommand to completion, returning (stdout, stderr, code).
@@ -734,6 +807,55 @@ pub async fn library_build_set(
     .await?;
     let raw = parse_cli_json(&stdout, &stderr, code)?;
     Ok(map_curate_result(&raw))
+}
+
+/// `library_cue_folder` — folder → auto-cued Rekordbox XML / M3U8 handoff.
+///
+/// This is the GUI-safe subset of `vibemix library cue`: it exports portable
+/// files only. It never passes `--write-tags`, so the app button cannot mutate
+/// Serato markers inside the user's audio files. The CLI still owns the cue
+/// engine and export implementation; this bridge only validates UI options and
+/// maps the JSON receipt into a stable DTO.
+#[tauri::command]
+pub async fn library_cue_folder(
+    app: AppHandle,
+    path: String,
+    export_format: Option<String>,
+    out: Option<String>,
+    name: Option<String>,
+    max_cues: Option<u32>,
+) -> Result<Value, String> {
+    let folder = path.trim();
+    if folder.is_empty() {
+        return Err("cue folder path is required".to_string());
+    }
+
+    let export = normalize_cue_export_format(export_format.as_deref())?;
+    let max_cues = max_cues.unwrap_or(8);
+    if !(1..=8).contains(&max_cues) {
+        return Err(format!(
+            "invalid max cues {max_cues} (expected an integer from 1 to 8)"
+        ));
+    }
+    let name = name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("vibemix cues")
+        .to_string();
+    let out = out
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .map(Ok)
+        .unwrap_or_else(|| default_cue_export_path(export))?;
+
+    let args = cue_library_args(folder, &out, export, &name, max_cues);
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    let (stdout, stderr, code) = run_library_to_completion(&app, &arg_refs).await?;
+    let raw = parse_cli_json(&stdout, &stderr, code)?;
+    Ok(map_cue_result(&raw))
 }
 
 /// `library_chat` — one conversational, tool-using Viber turn.
@@ -1811,6 +1933,70 @@ mod tests {
             model_library_args(Some("cue"), true),
             vec!["library", "models", "--json", "--install", "cue", "--force"]
         );
+    }
+
+    #[test]
+    fn cue_export_format_normalizes_and_rejects_unknown() {
+        assert_eq!(normalize_cue_export_format(None).unwrap(), "rekordbox");
+        assert_eq!(normalize_cue_export_format(Some(" M3U8 ")).unwrap(), "m3u8");
+        assert_eq!(normalize_cue_export_format(Some("both")).unwrap(), "both");
+        let err = normalize_cue_export_format(Some("serato"))
+            .expect_err("direct tag writes are not a GUI export format");
+        assert!(err.contains("rekordbox | m3u8 | both"));
+    }
+
+    #[test]
+    fn cue_library_args_never_write_serato_tags() {
+        let args = cue_library_args(
+            "/Users/ozai/Music",
+            "/Users/ozai/Library/Application Support/vibemix/exports/cues.xml",
+            "both",
+            "vibemix cues",
+            6,
+        );
+        assert_eq!(
+            args,
+            vec![
+                "library",
+                "cue",
+                "/Users/ozai/Music",
+                "--export",
+                "both",
+                "--out",
+                "/Users/ozai/Library/Application Support/vibemix/exports/cues.xml",
+                "--name",
+                "vibemix cues",
+                "--max-cues",
+                "6",
+                "--json",
+            ]
+        );
+        assert!(!args.iter().any(|arg| arg == "--write-tags"));
+    }
+
+    #[test]
+    fn maps_cue_result_to_ui_receipt() {
+        let raw = json!({
+            "ok": true,
+            "mode": "export",
+            "tracks_cued": 3,
+            "cues_total": 18,
+            "skipped": 1,
+            "outputs": {
+                "rekordbox": "/tmp/cues.xml",
+                "m3u8": "/tmp/cues.m3u8",
+                "debug": "/tmp/ignored.txt"
+            }
+        });
+        let mapped = map_cue_result(&raw);
+        assert_eq!(mapped["ok"], true);
+        assert_eq!(mapped["mode"], "export");
+        assert_eq!(mapped["tracks_cued"], 3);
+        assert_eq!(mapped["cues_total"], 18);
+        assert_eq!(mapped["skipped"], 1);
+        assert_eq!(mapped["outputs"]["rekordbox"], "/tmp/cues.xml");
+        assert_eq!(mapped["outputs"]["m3u8"], "/tmp/cues.m3u8");
+        assert!(mapped["outputs"].get("debug").is_none());
     }
 
     #[test]

@@ -6,12 +6,13 @@
  * state-machine.ts; all backend I/O goes through api.ts (typed invoke/event
  * client with a dev fallback so this window renders fully in plain `vite` dev).
  *
- * Six modes (mode switch in the left console):
+ * Seven modes (mode switch in the left console):
  *   - search   text query → librarySearch → results + scope
  *   - similar  seed (drop a file or keep the current) → librarySimilar → results + scope
  *   - ingest   folder + strategy → libraryEmbedFolder → progress bar + live log + running €
  *   - curate   theme → libraryCurate → numbered set + notes
  *   - build    brief + curve → libraryBuildSet → ordered set + Rekordbox export
+ *   - cue      folder + format → libraryCueFolder → portable cue export receipt
  *   - chat     message + history → libraryChat → reply, tools, artifacts
  *
  * Wire-vs-dev: every api.ts call falls back to the real 2026-05-25 subset-run
@@ -25,6 +26,7 @@ import {
   DEV_FALLBACK,
   libraryBuildSet,
   libraryChat,
+  libraryCueFolder,
   libraryCurate,
   libraryEmbedFolder,
   libraryModels,
@@ -40,6 +42,7 @@ import {
   onViberTool,
   type BuildSetResult,
   type CurateResult,
+  type CueExportFormat,
   type EmbedDone,
   type EmbedProgress,
   type EmbedStrategy,
@@ -49,6 +52,7 @@ import {
   type LibraryChatResult,
   type LibraryChatToolTrace,
   type LibraryChatTurn,
+  type LibraryCueResult,
   type LibraryLiveDeck,
   type LibraryLiveContext,
   type LibraryLiveEvidence,
@@ -71,6 +75,8 @@ import {
   runLabel,
   setBrief,
   setChatMessage,
+  setCueExport,
+  setCueFolder,
   setCurve,
   setFolder,
   setMode,
@@ -563,13 +569,80 @@ function renderBuildSetLoading(brief: string): void {
   $("vmx-lib-rcount").textContent = "building…";
 }
 
+function cueOutputPath(result: LibraryCueResult): string | null {
+  return result.outputs.rekordbox ?? result.outputs.m3u8 ?? null;
+}
+
+function cueOutputSummary(result: LibraryCueResult): string {
+  const formats = Object.keys(result.outputs);
+  return formats.length > 0 ? formats.join(" + ") : "no file";
+}
+
+function renderCueExport(result: LibraryCueResult): void {
+  $("vmx-lib-rationale-body").textContent = result.ok
+    ? `Cued ${result.tracks_cued} tracks with ${result.cues_total} hot cues.`
+    : "Cue export did not write a file.";
+  $("vmx-lib-rationale-meta").textContent =
+    `${cueOutputSummary(result)} · ${result.skipped} skipped`;
+
+  const exportEl = $("vmx-lib-export");
+  const path = cueOutputPath(result);
+  if (path) {
+    exportEl.style.display = "";
+    $("vmx-lib-export-path").textContent = path;
+  } else {
+    exportEl.style.display = "none";
+    $("vmx-lib-export-path").textContent = "";
+  }
+
+  const rows = $("vmx-lib-results");
+  rows.innerHTML = "";
+  const outputs = Object.entries(result.outputs).filter(
+    (entry): entry is [string, string] => typeof entry[1] === "string",
+  );
+  if (outputs.length === 0) {
+    rows.innerHTML = `<div class="vmx-lib-empty">No cue export written. Check the folder, CUE model setup, or try fewer cues.</div>`;
+  } else {
+    outputs.forEach(([format, output], index) => {
+      rows.insertAdjacentHTML(
+        "beforeend",
+        `<div class="vmx-lib-row${index === 0 ? " top" : ""}">
+          <div class="rank">${String(index + 1).padStart(2, "0")}</div>
+          <div><div class="title">${esc(format)}</div><div class="meta">${esc(output)}</div></div>
+          <div class="score"></div>
+        </div>`,
+      );
+    });
+  }
+  $("vmx-lib-rcount").textContent = `${result.tracks_cued} tracks`;
+}
+
+function renderCueLoading(folder: string): void {
+  $("vmx-lib-rationale-body").textContent = `Auto-cueing "${folder}"…`;
+  $("vmx-lib-rationale-meta").textContent = "cue export · working";
+  $("vmx-lib-export").style.display = "none";
+  const rows = $("vmx-lib-results");
+  rows.innerHTML = "";
+  for (let i = 0; i < 3; i++) {
+    rows.insertAdjacentHTML(
+      "beforeend",
+      `<div class="vmx-lib-row vmx-lib-skeleton"><div class="rank">${String(i + 1).padStart(2, "0")}</div><div><div class="title"></div><div class="meta"></div></div><div class="score"></div></div>`,
+    );
+  }
+  $("vmx-lib-rcount").textContent = "cueing…";
+}
+
 /** Idle state for agent-backed modes. Search/similar can refresh on tab switch;
  *  Codex-backed curate/build should wait for an explicit run or preset chip so
  *  merely opening the mode does not start a slow tool loop. */
-function renderAgentIdle(mode: "curate" | "build"): void {
+function renderAgentIdle(mode: "curate" | "build" | "cue"): void {
   clearRationale();
   $("vmx-lib-rationale-body").textContent =
-    mode === "build" ? "No set built yet." : "No playlist curated yet.";
+    mode === "build"
+      ? "No set built yet."
+      : mode === "cue"
+        ? "No cue export yet."
+        : "No playlist curated yet.";
   $("vmx-lib-rationale-meta").textContent = "idle";
   $("vmx-lib-results").innerHTML = "";
   $("vmx-lib-rcount").textContent = "ready";
@@ -1587,6 +1660,7 @@ export function mountLibrary(): void {
 
   const qInput = $("vmx-lib-q") as HTMLInputElement;
   const folderInput = $("vmx-lib-folder") as HTMLInputElement;
+  const cueFolderInput = $("vmx-lib-cue-folder") as HTMLInputElement;
   const themeInput = $("vmx-lib-theme") as HTMLInputElement;
   const briefInput = $("vmx-lib-brief") as HTMLTextAreaElement;
   const chatInput = $("vmx-lib-chat") as HTMLTextAreaElement;
@@ -1601,6 +1675,7 @@ export function mountLibrary(): void {
   // restore initial field values from state
   qInput.value = state.query;
   folderInput.value = state.folder;
+  cueFolderInput.value = state.cueFolder;
   themeInput.value = state.theme;
   briefInput.value = state.brief;
   chatInput.value = state.chatMessage;
@@ -1623,6 +1698,8 @@ export function mountLibrary(): void {
         ? "Viber"
         : state.mode === "build"
           ? "Built"
+          : state.mode === "cue"
+            ? "Cued"
           : state.mode === "curate"
             ? "Curated"
             : state.mode === "ingest"
@@ -1736,6 +1813,18 @@ export function mountLibrary(): void {
     const result = await libraryBuildSet(state.brief, state.curve);
     if (!isCurrentRun(runId, "build")) return;
     renderBuildSet(result);
+  }
+
+  async function runCueExport(runId: number): Promise<void> {
+    state = setCueFolder(
+      state,
+      cueFolderInput.value.trim() || state.cueFolder,
+    );
+    echoEl.textContent = state.cueFolder;
+    renderCueLoading(state.cueFolder);
+    const result = await libraryCueFolder(state.cueFolder, state.cueExport);
+    if (!isCurrentRun(runId, "cue")) return;
+    renderCueExport(result);
   }
 
   async function runChat(runId: number): Promise<void> {
@@ -1857,6 +1946,7 @@ export function mountLibrary(): void {
       else if (modeAtStart === "similar") await runSimilar(runId);
       else if (modeAtStart === "curate") await runCurate(runId);
       else if (modeAtStart === "build") await runBuildSet(runId);
+      else if (modeAtStart === "cue") await runCueExport(runId);
       else if (modeAtStart === "chat") await runChat(runId);
       else {
         await runIngest(runId);
@@ -1895,6 +1985,9 @@ export function mountLibrary(): void {
   folderInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && state.mode === "ingest") void run();
   });
+  cueFolderInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && state.mode === "cue") void run();
+  });
   themeInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && state.mode === "curate") void run();
   });
@@ -1925,8 +2018,12 @@ export function mountLibrary(): void {
         applyModeVisibility();
         // The set-notes block is shared by curate + build; only clear it when
         // leaving BOTH so a fresh build/curate keeps its own working state.
-        if (mode !== "curate" && mode !== "build") clearRationale();
-        if ((mode === "curate" || mode === "build") && previousMode !== mode) {
+        if (mode !== "curate" && mode !== "build" && mode !== "cue")
+          clearRationale();
+        if (
+          (mode === "curate" || mode === "build" || mode === "cue") &&
+          previousMode !== mode
+        ) {
           renderAgentIdle(mode);
         }
         if (mode === "build") syncCurvePicker();
@@ -1977,6 +2074,19 @@ export function mountLibrary(): void {
         const wire =
           c.dataset.strategy === "mean" ? "mean_excerpt" : "cue_anchored";
         c.setAttribute("aria-pressed", String(wire === strat));
+      });
+    });
+  });
+
+  document.querySelectorAll<HTMLElement>("[data-cue-export]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const format = (chip.dataset.cueExport ?? "rekordbox") as CueExportFormat;
+      state = setCueExport(state, format);
+      document.querySelectorAll<HTMLElement>("[data-cue-export]").forEach((c) => {
+        c.setAttribute(
+          "aria-pressed",
+          String((c.dataset.cueExport ?? "rekordbox") === format),
+        );
       });
     });
   });

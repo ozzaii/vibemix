@@ -1554,7 +1554,8 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
    restrained, not a decorative card. */
 .vmx-lib-rationale { display: none; }
 body[data-mode="curate"] .vmx-lib-rationale,
-body[data-mode="build"] .vmx-lib-rationale {
+body[data-mode="build"] .vmx-lib-rationale,
+body[data-mode="cue"] .vmx-lib-rationale {
   display: block;
   margin-bottom: 16px;
   padding: 15px 16px;

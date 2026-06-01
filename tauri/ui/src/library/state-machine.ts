@@ -12,15 +12,23 @@
  *   - search   ← text vibe query → ranked tracks + scope
  *   - similar  ← seed track (id or dropped file) → nearest neighbours + scope
  *   - ingest   ← folder path + strategy → embed progress + live log
+ *   - cue      ← folder path + export format → auto-cued XML/M3U8 receipt
  *   - curate   ← theme → AI-curated playlist (numbered set + rationale)
  *   - build    ← brief + energy curve → set-prep co-host: discovered + sequenced
  *               set, auto-exported to Rekordbox XML (v8.2 Vibe Mix surface)
  *   - chat     ← conversational Viber, grounded tool trace + artifacts
  */
 
-import type { EmbedStrategy } from "./api.js";
+import type { CueExportFormat, EmbedStrategy } from "./api.js";
 
-export type LibraryMode = "search" | "similar" | "ingest" | "curate" | "build" | "chat";
+export type LibraryMode =
+  | "search"
+  | "similar"
+  | "ingest"
+  | "cue"
+  | "curate"
+  | "build"
+  | "chat";
 
 /** Energy-curve preset for the set-prep co-host (build mode). The EXACT wire
  *  values the agent's CLI accepts (`--curve <preset>`); the UI shows nicer
@@ -37,6 +45,10 @@ export interface LibraryState {
   folder: string;
   /** Embed strategy chip (ingest mode). */
   strategy: EmbedStrategy;
+  /** Folder path to auto-cue (cue mode). */
+  cueFolder: string;
+  /** Portable cue export format (cue mode). */
+  cueExport: CueExportFormat;
   /** Free-text theme for the AI curator (curate mode). */
   theme: string;
   /** Natural-language set brief for the set-prep co-host (build mode). */
@@ -53,6 +65,8 @@ export const initialLibraryState: LibraryState = {
   seed: "ygmf_Remix.wav",
   folder: "~/Music",
   strategy: "cue_anchored",
+  cueFolder: "~/Music",
+  cueExport: "rekordbox",
   theme: "warm sunset rooftop, dusk to dark",
   brief: "warehouse opener, melodic into rolling — 90 min",
   curve: "peak_time",
@@ -66,6 +80,8 @@ export function fieldLabel(mode: LibraryMode): string {
       return "Seed track";
     case "ingest":
       return "Folder to embed";
+    case "cue":
+      return "Folder to cue";
     case "curate":
       return "Curate a set";
     case "build":
@@ -85,6 +101,8 @@ export function runLabel(mode: LibraryMode): string {
       return "▸ Find similar";
     case "ingest":
       return "▸ Embed folder";
+    case "cue":
+      return "▸ Export cues";
     case "curate":
       return "▸ Curate playlist";
     case "build":
@@ -106,6 +124,8 @@ export function echoText(state: LibraryState): string {
       return state.theme;
     case "build":
       return state.brief;
+    case "cue":
+      return state.cueFolder;
     case "chat":
       return "conversation";
     default:
@@ -129,6 +149,17 @@ export function setSeed(state: LibraryState, seed: string): LibraryState {
 
 export function setFolder(state: LibraryState, folder: string): LibraryState {
   return { ...state, folder };
+}
+
+export function setCueFolder(state: LibraryState, cueFolder: string): LibraryState {
+  return { ...state, cueFolder };
+}
+
+export function setCueExport(
+  state: LibraryState,
+  cueExport: CueExportFormat,
+): LibraryState {
+  return { ...state, cueExport };
 }
 
 export function setTheme(state: LibraryState, theme: string): LibraryState {

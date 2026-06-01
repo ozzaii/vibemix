@@ -9,6 +9,8 @@
  *   invoke("library_similar", { seed,  k })       -> SearchResult   (same shape)
  *   invoke("library_chat", { message, history, liveContext }) -> LibraryChatResult
  *   invoke("library_build_set", { brief, curve }) -> BuildSetResult
+ *   invoke("library_cue_folder", { path, exportFormat, out, name, maxCues })
+ *        -> LibraryCueResult
  *   invoke("library_stats")                        -> LibraryStats
  *   invoke("library_embed_folder", { path, strategy })
  *        -> kicks off a folder embed; progress arrives as Tauri events:
@@ -189,6 +191,20 @@ export type EnergyCurve = "opener" | "peak_time" | "after_hours" | "festival";
 export interface BuildSetResult extends CurateResult {
   /** Absolute path to the exported Rekordbox XML, or `null` if none. */
   export_path: string | null;
+}
+
+/** Portable cue export format for the GUI-safe folder cue bridge. The app
+ *  exposes file exports only; Serato tag writes remain CLI-only because they
+ *  mutate audio files and require explicit operator consent. */
+export type CueExportFormat = "rekordbox" | "m3u8" | "both";
+
+export interface LibraryCueResult {
+  ok: boolean;
+  mode: "export" | string;
+  tracks_cued: number;
+  cues_total: number;
+  skipped: number;
+  outputs: Partial<Record<"rekordbox" | "m3u8", string>>;
 }
 
 /** One previous Viber chat turn, oldest first. */
@@ -1728,6 +1744,29 @@ export function normalizeBuildSetResult(value: unknown): BuildSetResult {
   };
 }
 
+export function normalizeCueResult(
+  value: unknown,
+  label = "library_cue_folder",
+): LibraryCueResult {
+  const root = asRecord(value, label);
+  const rawOutputs = asRecord(root.outputs, `${label}.outputs`);
+  const outputs: LibraryCueResult["outputs"] = {};
+  for (const key of ["rekordbox", "m3u8"] as const) {
+    const value = rawOutputs[key];
+    if (value !== undefined && value !== null) {
+      outputs[key] = asString(value, `${label}.outputs.${key}`);
+    }
+  }
+  return {
+    ok: asBoolean(root.ok, `${label}.ok`),
+    mode: asString(root.mode, `${label}.mode`),
+    tracks_cued: asFiniteNumber(root.tracks_cued, `${label}.tracks_cued`),
+    cues_total: asFiniteNumber(root.cues_total, `${label}.cues_total`),
+    skipped: asFiniteNumber(root.skipped, `${label}.skipped`),
+    outputs,
+  };
+}
+
 function normalizeToolTrace(
   value: unknown,
   label: string,
@@ -2348,6 +2387,19 @@ const DEV_BUILD: BuildSetResult = {
   ],
 };
 
+// GUI-safe cue export sample. This mirrors `library cue <folder> --json` in
+// export mode only: no Serato tag writes, no fake pad-render claim.
+const DEV_CUE: LibraryCueResult = {
+  ok: true,
+  mode: "export",
+  tracks_cued: 8,
+  cues_total: 42,
+  skipped: 1,
+  outputs: {
+    rekordbox: "~/Library/Application Support/vibemix/exports/vibemix-cues.xml",
+  },
+};
+
 const DEV_CHAT: LibraryChatResult = {
   reply:
     "For the presentation, keep it tight: open with the pill listening, ask for a darker peak-time bridge, then show the grounded tool trace.",
@@ -2397,6 +2449,7 @@ export const DEV_FALLBACK = {
   similar: DEV_SIMILAR,
   curate: DEV_CURATE,
   build: DEV_BUILD,
+  cue: DEV_CUE,
   chat: DEV_CHAT,
   stats: DEV_STATS,
   models: DEV_MODELS,
@@ -2457,6 +2510,28 @@ export async function libraryBuildSet(
   // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
   return normalizeBuildSetResult(
     await invoke<unknown>("library_build_set", { brief, curve }),
+  );
+}
+
+/** Folder → auto-cued Rekordbox XML/M3U8. GUI-safe export path only: this never
+ *  invokes Serato tag writes, which remain an explicit CLI-only mutation. */
+export async function libraryCueFolder(
+  path: string,
+  exportFormat: CueExportFormat = "rekordbox",
+  out?: string,
+  name = "vibemix cues",
+  maxCues = 8,
+): Promise<LibraryCueResult> {
+  const invoke = await getInvoke();
+  if (!invoke) return DEV_CUE;
+  return normalizeCueResult(
+    await invoke<unknown>("library_cue_folder", {
+      path,
+      exportFormat,
+      out,
+      name,
+      maxCues,
+    }),
   );
 }
 

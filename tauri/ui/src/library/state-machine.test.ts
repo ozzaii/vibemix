@@ -19,6 +19,8 @@ import {
   runLabel,
   setBrief,
   setChatMessage,
+  setCueExport,
+  setCueFolder,
   setCurve,
   setFolder,
   setMode,
@@ -37,6 +39,7 @@ describe("mode switch + labels", () => {
     expect(fieldLabel("search")).toBe("Vibe query");
     expect(fieldLabel("similar")).toBe("Seed track");
     expect(fieldLabel("ingest")).toBe("Folder to embed");
+    expect(fieldLabel("cue")).toBe("Folder to cue");
     expect(fieldLabel("chat")).toBe("Talk to Viber");
   });
 
@@ -44,14 +47,16 @@ describe("mode switch + labels", () => {
     expect(runLabel("search")).toBe("▸ Run search");
     expect(runLabel("similar")).toBe("▸ Find similar");
     expect(runLabel("ingest")).toBe("▸ Embed folder");
+    expect(runLabel("cue")).toBe("▸ Export cues");
     expect(runLabel("chat")).toBe("▸ Ask Viber");
   });
 
-  it("echoes conversation in chat, query in search, and seed in similar", () => {
+  it("echoes conversation in chat, query in search, seed in similar, and folder in cue", () => {
     const s = initialLibraryState;
     expect(echoText(s)).toBe("conversation");
     expect(echoText(setMode(s, "search"))).toBe(s.query);
     expect(echoText(setMode(s, "similar"))).toBe(s.seed);
+    expect(echoText(setMode(s, "cue"))).toBe(s.cueFolder);
   });
 });
 
@@ -76,6 +81,16 @@ describe("transitions are immutable", () => {
     expect(s.strategy).toBe("mean_excerpt");
     // query survived the later mutations (immutable spread, not aliasing)
     expect(s.query).toBe("deep dub");
+  });
+
+  it("setCueFolder / setCueExport update only cue fields", () => {
+    let s = initialLibraryState;
+    s = setCueFolder(s, "/Music/set");
+    expect(s.cueFolder).toBe("/Music/set");
+    s = setCueExport(s, "both");
+    expect(s.cueExport).toBe("both");
+    expect(s.folder).toBe(initialLibraryState.folder);
+    expect(s.query).toBe(initialLibraryState.query);
   });
 
   it("setBrief / setCurve update only their field (build mode)", () => {

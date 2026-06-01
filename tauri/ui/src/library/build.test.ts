@@ -20,7 +20,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEV_FALLBACK, libraryBuildSet } from "./api.js";
 import type {
   BuildSetResult,
+  CueExportFormat,
   LibraryChatResult,
+  LibraryCueResult,
   LibraryLiveContext,
   LibraryModelInstallTarget,
   LibraryModelsResult,
@@ -97,6 +99,13 @@ describe("build — api dev fallback (no Tauri bridge)", () => {
 // api fns are stubbed inert so mount/status work stays offline and deterministic.
 
 const buildMock = vi.fn<(brief: string, curve: string) => Promise<BuildSetResult>>();
+const cueMock =
+  vi.fn<
+    (
+      path: string,
+      exportFormat: CueExportFormat,
+    ) => Promise<LibraryCueResult>
+  >();
 const modelsMock =
   vi.fn<(install?: LibraryModelInstallTarget) => Promise<LibraryModelsResult>>();
 const chatMock =
@@ -271,6 +280,8 @@ const CHAT_CODEX_MISSING: LibraryChatResult = {
 function doMockApi(): void {
   vi.doMock("./api.js", () => ({
     libraryBuildSet: (brief: string, curve: string) => buildMock(brief, curve),
+    libraryCueFolder: (path: string, exportFormat: CueExportFormat) =>
+      cueMock(path, exportFormat),
     // inert stubs — mountLibrary does a state-dependent boot run + status refresh.
     librarySearch: vi.fn(async () => ({ results: [], centered: true, corpus_size: 0 })),
     librarySimilar: vi.fn(async () => ({ results: [], centered: true, corpus_size: 0 })),
@@ -311,12 +322,14 @@ function mountSkeleton(): void {
       <button data-mode="similar" aria-selected="false">Similar</button>
       <button data-mode="curate" aria-selected="false">Curate</button>
       <button data-mode="build" aria-selected="false">Build</button>
+      <button data-mode="cue" aria-selected="false">Cue</button>
       <button data-mode="chat" aria-selected="true">Viber</button>
       <button data-mode="ingest" aria-selected="false">Ingest</button>
     </div>
     <span id="vmx-lib-qlabel"></span>
     <input id="vmx-lib-q" />
     <input id="vmx-lib-folder" value="~/Music" />
+    <input id="vmx-lib-cue-folder" value="~/Music" />
     <input id="vmx-lib-theme" />
     <textarea id="vmx-lib-brief"></textarea>
     <textarea id="vmx-lib-chat"></textarea>
@@ -326,6 +339,9 @@ function mountSkeleton(): void {
       <button class="vmx-lib-curveseg" data-curve="after_hours" aria-pressed="false">After hours</button>
       <button class="vmx-lib-curveseg" data-curve="festival" aria-pressed="false">Festival</button>
     </div>
+    <button data-cue-export="rekordbox" aria-pressed="true">Rekordbox XML</button>
+    <button data-cue-export="m3u8" aria-pressed="false">M3U8</button>
+    <button data-cue-export="both" aria-pressed="false">Both</button>
     <span id="vmx-lib-seed-name"></span>
     <button id="vmx-lib-runbtn"></button>
     <span id="vmx-lib-center-label"></span>
@@ -382,9 +398,34 @@ async function runRealBuild(
   for (let i = 0; i < 6; i++) await Promise.resolve();
 }
 
+async function runRealCue(
+  payload: LibraryCueResult,
+  clickFormat?: CueExportFormat,
+): Promise<void> {
+  cueMock.mockResolvedValue(payload);
+  vi.resetModules();
+  doMockApi();
+  const { mountLibrary } = await import("./index.js");
+  mountSkeleton();
+  mountLibrary();
+  await Promise.resolve();
+  await Promise.resolve();
+  document.querySelector<HTMLElement>('button[data-mode="cue"]')?.click();
+  for (let i = 0; i < 6; i++) await Promise.resolve();
+  if (clickFormat) {
+    document
+      .querySelector<HTMLElement>(`[data-cue-export="${clickFormat}"]`)
+      ?.click();
+  }
+  (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
+  for (let i = 0; i < 6; i++) await Promise.resolve();
+}
+
 describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
   beforeEach(() => {
     buildMock.mockReset();
+    cueMock.mockReset();
+    cueMock.mockResolvedValue(DEV_FALLBACK.cue);
     modelsMock.mockReset();
     modelsMock.mockResolvedValue(MODELS_READY);
     chatMock.mockReset();
@@ -648,5 +689,44 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
       "setup · codex_not_installed",
     );
+  });
+
+  it("renders cue export receipts without claiming Serato tag writes", async () => {
+    await runRealCue({
+      ok: true,
+      mode: "export",
+      tracks_cued: 3,
+      cues_total: 18,
+      skipped: 1,
+      outputs: {
+        rekordbox: "/tmp/vibemix-cues.xml",
+        m3u8: "/tmp/vibemix-cues.m3u8",
+      },
+    });
+
+    expect(cueMock).toHaveBeenCalledWith("~/Music", "rekordbox");
+    expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
+      "Cued 3 tracks with 18 hot cues.",
+    );
+    expect(document.getElementById("vmx-lib-rationale-meta")?.textContent).toContain(
+      "rekordbox + m3u8",
+    );
+    expect(document.getElementById("vmx-lib-export-path")?.textContent).toBe(
+      "/tmp/vibemix-cues.xml",
+    );
+    const text = document.body.textContent ?? "";
+    expect(text).not.toMatch(/serato tags/i);
+    expect(text).not.toMatch(/written into/i);
+  });
+
+  it("passes the selected cue export format to the bridge", async () => {
+    await runRealCue(DEV_FALLBACK.cue, "both");
+
+    const pressed = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-cue-export]"),
+    ).filter((s) => s.getAttribute("aria-pressed") === "true");
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0]?.dataset.cueExport).toBe("both");
+    expect(cueMock).toHaveBeenLastCalledWith("~/Music", "both");
   });
 });

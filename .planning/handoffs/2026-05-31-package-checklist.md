@@ -2277,6 +2277,56 @@ Remaining gate:
   Serato-tagged files in the target DJ app. Do not claim full Rekordbox/Serato
   compatibility from unit tests alone.
 
+### Cue Export App Surface - selected 2026-06-01
+
+Suggested commit if/when selected: `feat(library-ui): expose folder cue export`
+
+Include:
+
+- `tauri/src-tauri/src/library_cmds.rs`
+- `tauri/src-tauri/src/main.rs`
+- `tauri/ui/library.html`
+- `tauri/ui/src/library/api.ts`
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/library.css`
+- `tauri/ui/src/library/state-machine.ts`
+- `tauri/ui/src/mock-transfer/contract.ts`
+- `tauri/ui/src/library/api.test.ts`
+- `tauri/ui/src/library/build.test.ts`
+- `tauri/ui/src/library/state-machine.test.ts`
+
+Keep out:
+
+- `src/vibemix/runtime/coach.py` and all DROP-call speech/timing hunks.
+- `src/vibemix/audio/*`, `src/vibemix/midi/*`, and deck-audio hold-lane tests.
+- Serato file-tag mutation from the GUI. The app surface must call only the
+  export-safe `library cue <folder> --export ... --json` path and must never
+  pass `--write-tags`.
+
+Reason:
+
+- The Python cue engine and CLI already exist; the product gap is that the
+  library window has no visible button/Tauri command for it. This slice exposes
+  the existing engine through the same direct Tauri invoke pattern as search,
+  build-set, chat, models, and folder ingest.
+- The GUI claim is intentionally narrow: "export written" with returned file
+  paths and counts. It does not claim that Rekordbox, Mixxx, or Serato rendered
+  every cue pad until a real app import pass confirms it.
+
+Proof for this app-surface slice:
+
+- `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/state-machine.test.ts src/library/build.test.ts`
+- `cargo test --manifest-path tauri/src-tauri/Cargo.toml library_cmds`
+- `uv run pytest -q tests/library/test_cue_folder_cli.py tests/library/test_cue_folder.py tests/library/test_export_serato.py`
+- `npm --prefix tauri/ui run build`
+- `cargo check --manifest-path tauri/src-tauri/Cargo.toml`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- Run one real folder smoke on copied audio, then import the emitted XML/M3U8 in
+  the target DJ app before claiming visual pad compatibility.
+
 ## Hold Lane - Real CLAP Retrieval Eval Gate
 
 Suggested commit if/when selected: `test(library): add real CLAP retrieval eval gate`

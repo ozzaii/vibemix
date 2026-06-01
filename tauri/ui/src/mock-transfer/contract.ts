@@ -79,6 +79,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "library.search-field", purpose: "search and similar query field" },
       { wire: "library.similar-dropzone", purpose: "seed-track dropzone" },
       { wire: "library.ingest-field", purpose: "folder ingest controls" },
+      { wire: "library.cue-field", purpose: "auto-cue export folder controls" },
       { wire: "library.curate-field", purpose: "Viber curate theme input" },
       { wire: "library.build-field", purpose: "Viber build-set brief and curve controls" },
       { wire: "library.chat-field", purpose: "Viber chat prompt" },
@@ -140,6 +141,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       "library_curate",
       "library_build_set",
       "library_chat",
+      "library_cue_folder",
     ],
   },
   {

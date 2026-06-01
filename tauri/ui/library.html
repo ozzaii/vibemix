@@ -33,17 +33,18 @@
           <aside class="vmx-lib-panel" data-wire="library.console">
             <div class="vmx-lib-panel-hd"><span class="vmx-lib-label">Console</span></div>
             <div class="vmx-lib-panel-bd" style="display: flex; flex-direction: column">
-              <!-- Conversation-first, with two power tools kept as direct tabs.
+              <!-- Conversation-first, with three power tools kept as direct tabs.
                    Viber is the home — one agent you talk to that searches, finds
                    similar, curates and builds, showing each tool it fires live.
                    Build stays a direct tab because set-prep wants its instrument:
                    the energy-curve segmented picker a chat prompt can't express.
-                   Ingest is setup. Search/Similar/Curate fold into the conversation.
+                   Cue is an export instrument. Ingest is setup. Search/Similar/Curate fold into the conversation.
                    The `data-mode` contract (+ `.vmx-lib-modeswitch button`) is
                    unchanged — only the hierarchy is. -->
               <div class="vmx-lib-modeswitch" role="tablist" data-wire="library.mode-tabs">
                 <button role="tab" aria-selected="true" data-mode="chat">Viber</button>
                 <button role="tab" aria-selected="false" data-mode="build">Build</button>
+                <button role="tab" aria-selected="false" data-mode="cue">Cue</button>
                 <button role="tab" aria-selected="false" data-mode="ingest">Ingest</button>
               </div>
 
@@ -88,6 +89,26 @@
                 <div class="vmx-lib-chips">
                   <span class="vmx-lib-chip" data-strategy="mean" aria-pressed="false">strategy · mean</span>
                   <span class="vmx-lib-chip" data-strategy="cue-anchored" aria-pressed="true">strategy · cue-anchored</span>
+                </div>
+              </div>
+
+              <!-- cue export field — local auto-cue engine → portable files.
+                   The GUI intentionally exposes export-only modes. Direct
+                   Serato tag writes mutate audio files and stay CLI-only. -->
+              <div class="vmx-lib-field" data-for="cue" data-wire="library.cue-field" style="display: none">
+                <span class="vmx-lib-label">Folder to cue</span>
+                <div class="vmx-lib-qbox">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                       stroke="currentColor" stroke-width="2">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                  </svg>
+                  <input id="vmx-lib-cue-folder" value="~/Music" />
+                </div>
+                <div class="vmx-lib-chips" data-for="cue">
+                  <span class="vmx-lib-chip" data-cue-export="rekordbox" aria-pressed="true">Rekordbox XML</span>
+                  <span class="vmx-lib-chip" data-cue-export="m3u8" aria-pressed="false">M3U8</span>
+                  <span class="vmx-lib-chip" data-cue-export="both" aria-pressed="false">Both</span>
                 </div>
               </div>
 

@@ -13,6 +13,7 @@ import {
   DEV_FALLBACK,
   libraryBuildSet,
   libraryChat,
+  libraryCueFolder,
   libraryEmbedFolder,
   libraryModels,
   librarySearch,
@@ -21,6 +22,7 @@ import {
   normalizeBuildSetResult,
   normalizeChatResult,
   normalizeCurateResult,
+  normalizeCueResult,
   normalizeEmbedProgress,
   normalizeLiveContextPayload,
   normalizeLiveMovePayload,
@@ -148,6 +150,15 @@ describe("dev fallback (no Tauri bridge)", () => {
     expect(r.tracks[0]?.meta).toMatch(/^track /);
   });
 
+  it("libraryCueFolder returns the DEV_CUE export receipt", async () => {
+    const r = await libraryCueFolder("~/Music", "rekordbox");
+    expect(r.ok).toBe(true);
+    expect(r.mode).toBe("export");
+    expect(r.tracks_cued).toBe(8);
+    expect(r.cues_total).toBe(42);
+    expect(r.outputs.rekordbox).toMatch(/vibemix-cues\.xml$/);
+  });
+
   it("libraryChat returns the DEV_CHAT conversational sample", async () => {
     const r = await libraryChat("what should I demo?");
     expect(r.reply.length).toBeGreaterThan(20);
@@ -271,6 +282,37 @@ describe("runtime response normalizers", () => {
     expect(chat.live_verification?.guard_violations).toEqual([
       "unsupported_live_outcome_claim",
     ]);
+  });
+
+  it("accepts the cue export receipt and rejects malformed output paths", () => {
+    expect(
+      normalizeCueResult({
+        ok: true,
+        mode: "export",
+        tracks_cued: 2,
+        cues_total: 12,
+        skipped: 1,
+        outputs: { rekordbox: "/tmp/cues.xml", m3u8: "/tmp/cues.m3u8" },
+      }),
+    ).toEqual({
+      ok: true,
+      mode: "export",
+      tracks_cued: 2,
+      cues_total: 12,
+      skipped: 1,
+      outputs: { rekordbox: "/tmp/cues.xml", m3u8: "/tmp/cues.m3u8" },
+    });
+
+    expect(() =>
+      normalizeCueResult({
+        ok: true,
+        mode: "export",
+        tracks_cued: 2,
+        cues_total: 12,
+        skipped: 1,
+        outputs: { rekordbox: 12 },
+      }),
+    ).toThrow(/library_cue_folder\.outputs\.rekordbox/);
   });
 
   it("keeps supported live verdict verification receipts before UI render", () => {

@@ -106,6 +106,7 @@ fn main() {
             library_cmds::library_similar,
             library_cmds::library_curate,
             library_cmds::library_build_set,
+            library_cmds::library_cue_folder,
             library_cmds::library_chat,
             library_cmds::library_stats,
             library_cmds::library_models,
