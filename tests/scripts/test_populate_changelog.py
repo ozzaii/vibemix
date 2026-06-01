@@ -114,8 +114,6 @@ def test_dry_run_does_not_write_file(tmp_path):
     )
     assert result.returncode == 0
     assert "v2.1.0-rc1" in result.stdout
-    # No file should have been written at the default output path.
-    out_path = REPO_ROOT / "CHANGELOG-v2.1.0-rc1.md"
     # Don't strictly assert absence — the changelog may be committed
     # later in this phase. Just verify dry-run produced content.
     assert len(result.stdout) > 1000
