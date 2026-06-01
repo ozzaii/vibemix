@@ -319,9 +319,10 @@ def test_malformed_side_channel_falls_through(library, monkeypatch, tmp_path):
 # parallel class. The ``test_to_dict_serializes_starvation_shape`` test
 # pins all field keys so any future split of the dataclass surfaces here
 # with a precise field-name diff.
+from unittest.mock import MagicMock as _MagicMock  # noqa: E402
+
 from vibemix.library.rekordbox import RekordboxLibrary as _RekordboxLibrary  # noqa: E402
 from vibemix.library.toolset import LibraryToolset as _LibraryToolset  # noqa: E402
-from unittest.mock import MagicMock as _MagicMock  # noqa: E402
 
 
 def _empty_library() -> _RekordboxLibrary:
@@ -958,6 +959,7 @@ def test_clarification_full_chain_to_cli_curate(capsys):
     the test is the regression-pin for the full CLI chain.
     """
     import argparse
+
     import vibemix.__main__ as _main
 
     empty_lib = _empty_library()
@@ -1150,6 +1152,7 @@ def test_clarification_build_set_path_seal(capsys):
         the brief is echoed in place of the theme.
     """
     import argparse
+
     import vibemix.__main__ as _main
 
     lib = _RekordboxLibrary()

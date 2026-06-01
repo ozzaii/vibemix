@@ -1131,6 +1131,33 @@ Proof before staging:
 - `git diff --check -- tests/library/test_folder_ingest_band_shares.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AP - Codex Curate Stop-Reason Test Ruff Hygiene
+
+Suggested commit: `test(library): clean codex curate stop-reason lint`
+
+Include:
+
+- `tests/library/test_codex_curate_stop_reason.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/__main__.py`, library curate/toolset implementation, Viber/cohost
+  behavior, runtime files, and generated files.
+
+Reason:
+
+- The stop-reason seal tests had import ordering/spacing drift in local import
+  blocks. Cleaning those keeps the focused ruff gate green without changing the
+  CLI seal assertions or production entry point.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_codex_curate_stop_reason.py`
+- `uv run pytest -q tests/library/test_codex_curate_stop_reason.py`
+- `git diff --check -- tests/library/test_codex_curate_stop_reason.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Cohost Reaction Schema Drift
 
 Suggested commit if/when selected: `fix(ui-bus): reconcile cohost reaction schema`
