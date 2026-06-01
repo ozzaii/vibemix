@@ -352,11 +352,10 @@ def _build_sensor_mocks(mocker):
     """Patch screen / midi / track backends to no-op."""
     import vibemix.__main__ as main_mod
 
-    async def noop_async(*a, **kw):
-        return None
-
-    mocker.patch.object(main_mod.ScreenMacOS, "run_capture_loop", noop_async)
-    mocker.patch.object(main_mod.TrackMacOS, "run_poll_loop", noop_async)
+    screen_capture = AsyncMock(return_value=None)
+    track_poll = AsyncMock(return_value=None)
+    mocker.patch.object(main_mod.ScreenMacOS, "run_capture_loop", screen_capture)
+    mocker.patch.object(main_mod.TrackMacOS, "run_poll_loop", track_poll)
 
     fake_midi_thread = MagicMock()
     fake_midi_thread.is_alive = MagicMock(return_value=True)
@@ -365,6 +364,26 @@ def _build_sensor_mocks(mocker):
         "start_listener_thread",
         MagicMock(return_value=fake_midi_thread),
     )
+    return {
+        "screen_capture": screen_capture,
+        "track_poll": track_poll,
+    }
+
+
+def test_deck_vision_capture_env_gate_defaults_off(monkeypatch):
+    import vibemix.__main__ as main_mod
+
+    monkeypatch.delenv("VIBEMIX_DECK_VISION", raising=False)
+    assert main_mod._deck_vision_capture_enabled() is False
+
+    monkeypatch.setenv("VIBEMIX_DECK_VISION", "1")
+    assert main_mod._deck_vision_capture_enabled() is True
+
+    monkeypatch.setenv("VIBEMIX_DECK_VISION", "true")
+    assert main_mod._deck_vision_capture_enabled() is True
+
+    monkeypatch.setenv("VIBEMIX_DECK_VISION", "off")
+    assert main_mod._deck_vision_capture_enabled() is False
 
 
 def _build_state_refresh_noop(mocker):
@@ -493,6 +512,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     # MOSS is the only voice; keep old cloud voice env from affecting the
     # compatibility-call assertion.
     monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
+    monkeypatch.delenv("VIBEMIX_DECK_VISION", raising=False)
     # Pin per-deck OFF so the device-upgrade path is deterministic regardless of
     # the host's real rekordbox config — the zero-config global default reads
     # ~/Library Pioneer settings, and this is a wiring smoke, not a per-deck test.
@@ -500,7 +520,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     monkeypatch.setenv("VIBEMIX_ENABLE_MIC", "1")
 
     audio_mocks = _build_audio_mocks(mocker)
-    _build_sensor_mocks(mocker)
+    sensor_mocks = _build_sensor_mocks(mocker)
     _build_state_refresh_noop(mocker)
     livekit_mocks = _build_livekit_mocks(mocker)
     _patch_voice_recorder(mocker, tmp_path)
@@ -579,6 +599,46 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     assert "coach" in tasks_seen
     assert "diag" in tasks_seen
     assert "ws" in tasks_seen
+    sensor_mocks["screen_capture"].assert_not_called()
+    sensor_mocks["track_poll"].assert_called_once()
+
+
+def test_screen_vision_capture_opt_in_spawns_capture_task(monkeypatch, mocker, tmp_path):
+    """Screen capture is a dormant live leg unless the explicit eval flag is set."""
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
+    monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
+    monkeypatch.setenv("VIBEMIX_DECK_VISION", "1")
+
+    _build_audio_mocks(mocker)
+    sensor_mocks = _build_sensor_mocks(mocker)
+    _build_state_refresh_noop(mocker)
+    _build_livekit_mocks(mocker)
+    _patch_voice_recorder(mocker, tmp_path)
+
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen)
+
+    from vibemix.__main__ import main
+
+    async def driver():
+        main_task = asyncio.create_task(main())
+        await _REAL_SLEEP(0.05)
+        main_task.cancel()
+        try:
+            await asyncio.wait_for(main_task, timeout=3.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    asyncio.run(driver())
+
+    sensor_mocks["screen_capture"].assert_called_once()
+    sensor_mocks["track_poll"].assert_called_once()
 
 
 # ---------------------------------------------------------------------------

@@ -661,6 +661,15 @@ def _input_device_env_is_explicit() -> bool:
     return bool(str(os.environ.get("VIBEMIX_INPUT_DEVICE") or "").strip())
 
 
+def _deck_vision_capture_enabled() -> bool:
+    return str(os.environ.get("VIBEMIX_DECK_VISION") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def _maybe_upgrade_input_device_for_deck_audio(
     audio_backend: AudioMacOS,
     *,
@@ -1121,6 +1130,8 @@ async def main() -> None:
 
     # --- Phase 3 sensing/state backends ---
     screen_macos = ScreenMacOS()
+    deck_vision_capture_enabled = _deck_vision_capture_enabled()
+    screen_available = deck_vision_capture_enabled and screen_macos.is_available()
     midi_macos = MidiMacOS()
     # MIDI trace hook — every de-duplicated controller move (button/fader/knob)
     # is forwarded to the tracer. Set on the shared controller_state so the
@@ -1851,7 +1862,7 @@ async def main() -> None:
             levels=levels,
             playback_queue=playback,
             controller_state=midi_macos.controller_state,
-            screen_available=screen_macos.is_available(),
+            screen_available=screen_available,
             recordings_root=recordings_root,
             active_recorder=recorder,
             evidence_registry=evidence_registry,
@@ -2500,7 +2511,7 @@ async def main() -> None:
             suggestion_holder=suggestion_service,
             tracer=tracer,
             ipc_router=ipc_router,
-            screen_available=screen_macos.is_available(),
+            screen_available=screen_available,
             midi_mirror=midi_mirror,
             audio_capture_context=audio_capture_context,
         )
@@ -2515,7 +2526,11 @@ async def main() -> None:
     # tests/runtime/test_ws_broadcast_30hz_under_lesson_load.py).
     lesson_tick_task = asyncio.create_task(lesson_runtime.tick_loop(stop_event))
     diag_task = asyncio.create_task(diag_loop(levels, state, stop_event, tracer=tracer))
-    screen_task = asyncio.create_task(screen_macos.run_capture_loop(state, stop_event))
+    screen_task: asyncio.Task | None = None
+    if deck_vision_capture_enabled:
+        screen_task = asyncio.create_task(screen_macos.run_capture_loop(state, stop_event))
+    else:
+        print("-> screen vision capture disabled (set VIBEMIX_DECK_VISION=1 to enable)")
     track_task = asyncio.create_task(track_macos.run_poll_loop(stop_event))
 
     # Phase 59-04 (DECK-04/05) — the THIRD external snapshot producer. Reuses the
@@ -2673,7 +2688,6 @@ async def main() -> None:
         cleanup_tasks: list[asyncio.Task] = [
             coach_task,
             refresh_task,
-            screen_task,
             ws_task,
             diag_task,
             track_task,
@@ -2689,6 +2703,8 @@ async def main() -> None:
             # is clean.
             lesson_tick_task,
         ]
+        if screen_task is not None:
+            cleanup_tasks.append(screen_task)
         for t in cleanup_tasks:
             t.cancel()
             try:
