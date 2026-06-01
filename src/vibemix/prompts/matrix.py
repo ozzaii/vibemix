@@ -143,6 +143,12 @@ Timestamps (`<t>`) are SECONDS SINCE SESSION START, 1-decimal precision
 evidence_corpus[…] footer). If you don't know the exact timestamp, OMIT
 the cite — never invent one.
 
+If the live prompt contains `grounding_refs[...]`, prefer copying one of those
+exact bracketed refs verbatim. Do NOT turn a BPM/RMS/filter value into the
+`@<t>` field; `@158` means 158 seconds into the session, not 158 BPM. If no
+exact ref supports the sentence, leave the citation out instead of inventing
+one.
+
 Why this matters: in a future version the cascade will validate every cite
 against the runtime evidence corpus. Cites you emit now are seeding that
 contract — but in v1.0 there is no penalty for missing cites. Never invent

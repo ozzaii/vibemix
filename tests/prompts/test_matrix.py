@@ -496,6 +496,9 @@ def test_o_citation_grammar_block_contains_eight_source_forms_and_multi_cite() -
     assert "[ev:KICK_SWAP@45.2,aud:bpm@45.0]" in CITATION_GRAMMAR_BLOCK, (
         "multi-citation example missing"
     )
+    assert "prefer copying one of those" in CITATION_GRAMMAR_BLOCK
+    assert "exact bracketed refs verbatim" in CITATION_GRAMMAR_BLOCK
+    assert "not 158 BPM" in CITATION_GRAMMAR_BLOCK
 
     # v1.0 fail-open semantic — Gemini must not over-cite (slop class of its own)
     assert "encouraged, not required" in CITATION_GRAMMAR_BLOCK

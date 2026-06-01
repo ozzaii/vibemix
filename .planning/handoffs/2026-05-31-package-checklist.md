@@ -1439,6 +1439,15 @@ Proof already run:
   proves live boot/audio/MOSS/prompt behavior, not the final citation-lint gate.
 - `.planning/packets/2026-06-01/CODEX_READY-audio-vibe-contract-prompt-guard.md`
   records the current proof.
+- 2026-06-01 Codex follow-up from live FLX4/Rekordbox probe session
+  `20260601-154514`: Gemini emitted `[aud:bpm@158]`, incorrectly using the BPM
+  value as a citation timestamp while citation lint was off. This package now
+  tells the model to copy exact `grounding_refs[...]` brackets verbatim and
+  explicitly says `@158` means 158 seconds, not 158 BPM. Focused proof passed:
+  `uv run pytest -q tests/prompts/test_matrix.py::test_o_citation_grammar_block_contains_eight_source_forms_and_multi_cite tests/prompts/test_matrix.py::test_s_grammar_block_has_v1_no_enforcement_wording tests/agent/test_coach_prompt_grounding.py::test_build_prompt_uses_real_evidence_registry_not_mocks`;
+  broader prompt proof passed:
+  `uv run pytest -q tests/agent/test_coach_prompt_grounding.py tests/prompts/test_matrix.py`;
+  Ruff passed for the touched prompt/test files.
 
 Remaining gate:
 

@@ -826,6 +826,8 @@ class AICoach:
                 "Steady stretch. ONE sharp observation about the SOUND right "
                 "now — groove, texture, what the track is doing musically. "
                 "No coaching advice unless recent_moves[8s] names a real move. "
+                "If you cite, copy an exact bracket from grounding_refs; never "
+                "invent a timestamp from BPM/RMS values. "
                 "Always reply with something fresh; don't go silent."
             )
         # Phase 60-04 (HARMONIC-01) — CITED, NARRATE-ONLY clash fragment. The

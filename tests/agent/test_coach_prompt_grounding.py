@@ -184,6 +184,8 @@ def test_build_prompt_uses_real_evidence_registry_not_mocks():
     ev = Event("HEARTBEAT", _grounded_state())
     prompt = AICoach.build_prompt(ev, registry_snapshot=snap)
     assert "evidence_corpus[ev=1,aud=0,mix=0]" in prompt
+    assert "copy an exact bracket from grounding_refs" in prompt
+    assert "never invent a timestamp from BPM/RMS values" in prompt
     assert prompt.endswith("don't go silent.")  # the HEARTBEAT coach task tail
 
 
