@@ -861,6 +861,32 @@ Proof before staging:
 - `git diff --check -- tests/library/test_cli_exit_codes.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AF - Store Parity Test Ruff Hygiene
+
+Suggested commit: `test(library): clean store parity test lint`
+
+Include:
+
+- `tests/library/test_store_parity.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Store implementations, vector fixtures, runtime files, and generated files.
+
+Reason:
+
+- The store-parity tests had an obsolete import-only `noqa` and several equal
+  length zip operations. Removing the stale `noqa` and adding `strict=True`
+  keeps the focused library-test ruff gate clean without changing parity checks.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_store_parity.py`
+- `uv run pytest -q tests/library/test_store_parity.py`
+- `git diff --check -- tests/library/test_store_parity.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

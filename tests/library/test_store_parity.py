@@ -31,7 +31,7 @@ from vibemix.library.store import LibraryStore
 
 def _sqlite_vec_available() -> bool:
     try:
-        import sqlite_vec  # noqa: F401
+        import sqlite_vec
 
         db = sqlite3.connect(":memory:")
         db.enable_load_extension(True)
@@ -74,7 +74,7 @@ def test_numpy_topk_matches_fixture_ground_truth(
             vectors_path=tmp_path / "v.npy", ids_path=tmp_path / "i.json"
         )
     )
-    items = [(tid, vec) for tid, vec in zip(ids, vectors)]
+    items = [(tid, vec) for tid, vec in zip(ids, vectors, strict=True)]
     store.add_batch(items)
 
     for q in queries:
@@ -89,7 +89,7 @@ def test_numpy_topk_matches_fixture_ground_truth(
         assert [tid for tid, _ in result] == [
             r["track_id"] for r in expected
         ], f"rank order drift on {q['id']}"
-        for (tid, sim), exp in zip(result, expected):
+        for (tid, sim), exp in zip(result, expected, strict=True):
             assert tid == exp["track_id"]
             assert round(sim, 6) == round(exp["similarity"], 6), (
                 f"similarity drift on {q['id']}/{tid}: "
@@ -118,7 +118,7 @@ def test_sqlite_vec_topk_matches_numpy(
         SqliteVecStore(db_path=tmp_path / "library.db")
     )
 
-    items = [(tid, vec) for tid, vec in zip(ids, vectors)]
+    items = [(tid, vec) for tid, vec in zip(ids, vectors, strict=True)]
     numpy_store.add_batch(items)
     sqlite_store.add_batch(items)
 
@@ -129,7 +129,7 @@ def test_sqlite_vec_topk_matches_numpy(
         assert [tid for tid, _ in np_result] == [
             tid for tid, _ in sq_result
         ], f"Mac↔Win parity broken on {q['id']}"
-        for (np_tid, np_sim), (sq_tid, sq_sim) in zip(np_result, sq_result):
+        for (np_tid, np_sim), (sq_tid, sq_sim) in zip(np_result, sq_result, strict=True):
             assert np_tid == sq_tid
             assert round(np_sim, 6) == round(sq_sim, 6), (
                 f"similarity drift between backends on {q['id']}/{np_tid}"
