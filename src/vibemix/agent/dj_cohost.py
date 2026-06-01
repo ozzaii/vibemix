@@ -2997,16 +2997,17 @@ class DJCoHostAgent(Agent):
                         _push_silence_pad_and_cancel("live_claim_guard")
 
             spoken_text, emote_intents = strip_emote_tags(full_text)
-            spoken_stripped = spoken_text.strip()
+            audience_text = model_text_for_tts(full_text)
+            audience_stripped = audience_text.strip()
             if has_emote_tag(full_text):
                 # Post-stream re-yield paths consume buffered_chunks only when
                 # nothing has reached TTS yet. Collapse to the spoken response
-                # so bracketed [emote:*] control tags never leak to audio.
-                buffered_chunks = [spoken_text] if spoken_text else []
+                # so bracketed control/citation tags never leak to audio.
+                buffered_chunks = [audience_text] if audience_text else []
             if suppression is None and not (
                 live_claim_guard is not None and live_claim_guard.corrected
             ):
-                language_matches = english_only_violation_matches(spoken_text)
+                language_matches = english_only_violation_matches(audience_text)
                 if language_matches:
                     suppression = "non_english"
 
@@ -3047,7 +3048,8 @@ class DJCoHostAgent(Agent):
                     _push_silence_pad_and_cancel("non_english")
                 buffered_chunks = []
                 spoken_text = ""
-                spoken_stripped = ""
+                audience_text = ""
+                audience_stripped = ""
             elif live_claim_guard is not None and live_claim_guard.corrected:
                 # A live-claim guard hit means the model tried to say something
                 # we cannot ground. Do not convert that failure into a spoken
@@ -3067,7 +3069,8 @@ class DJCoHostAgent(Agent):
                 )
                 buffered_chunks = []
                 spoken_text = ""
-                spoken_stripped = ""
+                audience_text = ""
+                audience_stripped = ""
             else:
                 # Plan 20-01 — citation linter chokepoint runs HERE, after the
                 # silence/slop gate, before yielding chunks. The wired path
@@ -3104,17 +3107,17 @@ class DJCoHostAgent(Agent):
                                     yield tts_txt
                         if self._stripped_tracker is not None:
                             self._stripped_tracker.record(False)
-                        if spoken_stripped:
-                            print(f"[ai_text] {spoken_stripped!r}", flush=True)
+                        if audience_stripped:
+                            print(f"[ai_text] {audience_stripped!r}", flush=True)
                             self._recorder.log_event(
                                 "ai_text",
-                                text=spoken_text,
+                                text=audience_text,
                                 latency_s=round(elapsed, 2),
                             )
                             # WR-04 — stamp from event-fired set_seconds, not the
                             # post-stream/lint/bus set_seconds (multi-second drift).
-                            self._record_said(spoken_stripped[:140], set_s_at_event=ev_set_seconds)
-                            self._push_transcript(spoken_stripped[:140])
+                            self._record_said(audience_stripped[:140], set_s_at_event=ev_set_seconds)
+                            self._push_transcript(audience_stripped[:140])
                         else:
                             print("[ai_text] <empty> (skip TTS)", flush=True)
                     else:
@@ -3149,15 +3152,15 @@ class DJCoHostAgent(Agent):
                                 reason=lint_result.reason,
                                 latency_s=round(elapsed, 2),
                             )
-                            print(f"[ai_text:unverified] {spoken_stripped!r}", flush=True)
+                            print(f"[ai_text:unverified] {audience_stripped!r}", flush=True)
                             # History appended on bypass — the user heard the
                             # text, so the no-repeat memory must reflect it.
-                            if spoken_stripped:
+                            if audience_stripped:
                                 # WR-04 — stamp from event-fired set_seconds.
                                 self._record_said(
-                                    spoken_stripped[:140], set_s_at_event=ev_set_seconds
+                                    audience_stripped[:140], set_s_at_event=ev_set_seconds
                                 )
-                                self._push_transcript(spoken_stripped[:140])
+                                self._push_transcript(audience_stripped[:140])
                         else:
                             # Strip path — no chunks yielded. Pre-recorded
                             # ack substitution is retired (English placeholder
@@ -3203,14 +3206,14 @@ class DJCoHostAgent(Agent):
                             tts_txt = _prepare_tts_segment(txt)
                             if tts_txt:
                                 yield tts_txt
-                    if spoken_stripped:
-                        print(f"[ai_text] {spoken_stripped!r}", flush=True)
+                    if audience_stripped:
+                        print(f"[ai_text] {audience_stripped!r}", flush=True)
                         self._recorder.log_event(
-                            "ai_text", text=spoken_text, latency_s=round(elapsed, 2)
+                            "ai_text", text=audience_text, latency_s=round(elapsed, 2)
                         )
                         # WR-04 — stamp from event-fired set_seconds.
-                        self._record_said(spoken_stripped[:140], set_s_at_event=ev_set_seconds)
-                        self._push_transcript(spoken_stripped[:140])
+                        self._record_said(audience_stripped[:140], set_s_at_event=ev_set_seconds)
+                        self._push_transcript(audience_stripped[:140])
                     else:
                         print("[ai_text] <empty> (skip TTS)", flush=True)
                     # Legacy path = no linter wired; treat as if citation_action
@@ -3256,7 +3259,7 @@ class DJCoHostAgent(Agent):
                 except Exception:
                     pass
 
-            if citation_action in ("emit", "bypass") and emote_intents and spoken_stripped:
+            if citation_action in ("emit", "bypass") and emote_intents and audience_stripped:
                 reaction_intent = emote_intents[-1]
                 try:
                     self._state.last_reaction_intent = reaction_intent
@@ -3325,7 +3328,7 @@ class DJCoHostAgent(Agent):
                         else []
                     )
                     reaction_msg = SessionCohostReaction.make(
-                        text=spoken_text,
+                        text=audience_text,
                         event_id=ev_tag,
                         citation_strip=strip,
                     )
@@ -3449,7 +3452,7 @@ class DJCoHostAgent(Agent):
                 engine="live_coach",
                 surface="session",
                 direction="assistant",
-                text=spoken_text,
+                text=audience_text,
                 response_id=response_id,
                 event=ev_tag,
                 provider=ai_provider,
@@ -3484,7 +3487,7 @@ class DJCoHostAgent(Agent):
                     "language_defer_stream": language_defer_stream,
                     "language_matches": list(language_matches),
                     "raw_response_chars": len(full_text),
-                    "spoken_response_chars": len(spoken_text),
+                    "spoken_response_chars": len(audience_text),
                 },
             )
 

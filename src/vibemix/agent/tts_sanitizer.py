@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """TTS-only cleanup for model output.
 
-Visible transcript text may keep citation atoms such as ``[aud:rms@12.0]`` as
-grounding receipts. MOSS should not read those bracket tokens aloud.
+Raw response artifacts may keep citation atoms such as ``[aud:rms@12.0]`` as
+grounding receipts. Audience-facing text and MOSS speech should not carry those
+bracket tokens; structured citation chips carry the visible receipt instead.
 """
 
 from __future__ import annotations

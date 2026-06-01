@@ -197,8 +197,16 @@ def test_valid_response_passes_through_when_wired(mocker, tmp_path) -> None:
     kinds = [k for k, _ in recorder.events]
     assert "ai_text" in kinds
     assert next(f for k, f in recorder.events if k == "ai_text")["text"] == (
-        "that drop [ev:KICK_SWAP@45.2] was clean"
+        "that drop was clean"
     )
+    ai_row = next(f for k, f in recorder.events if k == "ai_message")
+    assert ai_row["message"] == "that drop was clean"
+    assert ai_row["extra"]["spoken_response_chars"] == len("that drop was clean")
+    assert (
+        Path(ai_row["artifacts"]["session_response_path"]).read_text(encoding="utf-8")
+        == "that drop [ev:KICK_SWAP@45.2] was clean"
+    )
+    assert "[ev:" not in agent._ai_text_history[0]
     assert "citation_strip" not in kinds
     assert "citation_bypass" not in kinds
     # Tracker was told the response was NOT stripped.
@@ -417,7 +425,13 @@ def test_live_claim_guard_allows_broad_audio_listener_read_before_tts(mocker, tm
     kinds = [kind for kind, _ in recorder.events]
     assert "ai_text" in kinds
     assert next(f for kind, f in recorder.events if kind == "ai_text")["text"] == (
-        "The low end got hollow for a moment [ev:BAND_SHIFT_LOW@12.3]"
+        "The low end got hollow for a moment "
+    )
+    ai_row = next(f for kind, f in recorder.events if kind == "ai_message")
+    assert ai_row["message"] == "The low end got hollow for a moment "
+    assert (
+        Path(ai_row["artifacts"]["session_response_path"]).read_text(encoding="utf-8")
+        == "The low end got hollow for a moment [ev:BAND_SHIFT_LOW@12.3]"
     )
     assert "live_claim_guard" not in kinds
     assert "citation_strip" not in kinds

@@ -83,6 +83,10 @@ def _overlay_only(bus: _FakeIpcBus) -> list[dict]:
     return [e for e in bus.emits if e.get("type") == "ipc.session.overlay-highlight"]
 
 
+def _cohost_reactions_only(bus: _FakeIpcBus) -> list[dict]:
+    return [e for e in bus.emits if e.get("type") == "ipc.session.cohost-reaction"]
+
+
 def _build_state() -> MusicState:
     s = MusicState()
     s.audible = True
@@ -198,6 +202,10 @@ def test_wired_valid_publishes_overlay(mocker, tmp_path) -> None:
     overlays = _overlay_only(bus)
     assert len(overlays) == 1
     assert overlays[0]["payload"]["element_id"] == "deck_a_low_eq"
+    reactions = _cohost_reactions_only(bus)
+    assert len(reactions) == 1
+    assert reactions[0]["payload"]["text"] == "nice move"
+    assert reactions[0]["payload"]["citation_strip"] == []
 
 
 # --------------------------------------------------------------------------

@@ -406,7 +406,7 @@ def test_llm_node_suppresses_non_english_spoken_text_but_keeps_raw_artifact(
 
 
 def test_llm_node_english_only_guard_preserves_grounded_english_response(mocker, tmp_path) -> None:
-    """English with citations keeps receipts in logs but not TTS chunks."""
+    """English with citations keeps raw receipts but not audience-facing text."""
     agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
@@ -421,15 +421,16 @@ def test_llm_node_english_only_guard_preserves_grounded_english_response(mocker,
 
     assert "".join(chunks) == "That low end is moving."
     ai_texts = [fields["text"] for kind, fields in recorder.events if kind == "ai_text"]
-    assert ai_texts == [response]
+    assert ai_texts == ["That low end is moving."]
     rows = [fields for kind, fields in recorder.events if kind == "ai_message"]
     assert len(rows) == 1
-    assert rows[0]["message"] == response
+    assert rows[0]["message"] == "That low end is moving."
     assert (
         Path(rows[0]["artifacts"]["session_response_path"]).read_text(encoding="utf-8") == response
     )
     assert rows[0]["suppression"] is None
     assert rows[0]["extra"]["language_matches"] == []
+    assert rows[0]["extra"]["spoken_response_chars"] == len("That low end is moving.")
 
 
 def test_llm_node_ai_message_uses_prompt_time_mixer_snapshot(mocker, tmp_path) -> None:

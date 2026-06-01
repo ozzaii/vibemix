@@ -1449,15 +1449,14 @@ class SessionOverlayHighlight:
 # ---------------------------------------------------------------------------
 # Sidecar → shell. Fired once per AI reaction the DJCoHostAgent emits to
 # the user (post citation-linter, post slop-filter). Carries the reaction
-# text + LLM event tag + the parsed structured citation_strip. The live
+# audience-facing text + LLM event tag + the parsed structured citation_strip. The live
 # session UI (tauri/ui/src/session/components/citation-strip.ts) renders
 # the chip strip below the matching transcript line; clicking a chip
 # invokes ``open_debrief_window`` with a ``deep_link`` payload.
 #
 # Anti-slop product principle made visible (LAUNCH-02 §6.2 white-space):
-# every reaction the user hears carries on-screen receipts. Replaces
-# nothing — the chips are an additive surface beneath the existing
-# transcript stream.
+# every reaction can carry on-screen receipts without making MOSS read
+# bracket atoms aloud or putting implementation tokens in the transcript.
 
 
 @dataclass(frozen=True, slots=True)

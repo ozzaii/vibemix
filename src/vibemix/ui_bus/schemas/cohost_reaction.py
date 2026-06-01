@@ -59,12 +59,12 @@ class SessionCohostReactionPayload:
     """Payload struct for ``ipc.session.cohost-reaction``.
 
     Fields:
-        text: the full reaction text the cohost emitted (post linter,
-            post slop filter). May contain bracketed citation atoms
-            verbatim — the UI does NOT strip them when rendering the
-            transcript; the chips are an additive surface, not a
-            replacement. Bounded to 2048 chars to refuse pathological
-            payloads.
+        text: the audience-facing reaction text the cohost emitted
+            (post linter, post slop filter, post citation cleanup).
+            Bracketed citation/control atoms are kept in raw artifacts,
+            not this field, so the transcript and TTS do not expose
+            implementation tokens. Bounded to 2048 chars to refuse
+            pathological payloads.
         event_id: the LLM event tag (``ev.type`` from the
             :class:`vibemix.state.Event` that triggered the reaction),
             e.g. ``"HEARTBEAT"``, ``"KAAN_SPOKE"``. Used as a stable
