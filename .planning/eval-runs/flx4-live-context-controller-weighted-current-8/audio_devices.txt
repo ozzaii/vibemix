@@ -1,0 +1,128 @@
+Audio:
+
+    Devices:
+
+        DDJ-FLX4:
+
+          Input Channels: 2
+          Manufacturer: AlphaTheta Corporation
+          Output Channels: 4
+          Current SampleRate: 48000
+          Transport: USB
+          Input Source: Default
+          Output Source: Default
+
+        BlackHole 16ch:
+
+          Input Channels: 16
+          Manufacturer: Existential Audio Inc.
+          Output Channels: 16
+          Current SampleRate: 48000
+          Transport: Virtual
+          Input Source: Default
+          Output Source: Default
+
+        BlackHole 2ch:
+
+          Input Channels: 2
+          Manufacturer: Existential Audio Inc.
+          Output Channels: 2
+          Current SampleRate: 48000
+          Transport: Virtual
+          Input Source: Default
+          Output Source: Default
+
+        MacBook Pro Microphone:
+
+          Default Input Device: Yes
+          Input Channels: 1
+          Manufacturer: Apple Inc.
+          Current SampleRate: 48000
+          Transport: Built-in
+          Input Source: MacBook Pro Microphone
+
+        MacBook Pro Speakers:
+
+          Default System Output Device: Yes
+          Manufacturer: Apple Inc.
+          Output Channels: 2
+          Current SampleRate: 48000
+          Transport: Built-in
+          Output Source: MacBook Pro Speakers
+
+        MacBook Pro Speakers (eqMac):
+
+          Default Output Device: Yes
+          Manufacturer: Bitgapp Ltd
+          Output Channels: 2
+          Current SampleRate: 48000
+          Transport: USB
+          Output Source: MacBook Pro Speakers (eqMac)
+
+        eqMac Export :
+
+          Input Channels: 2
+          Manufacturer: Bitgapp Ltd
+          Current SampleRate: 48000
+          Transport: USB
+          Input Source: eqMac Export
+
+        rekordbox Aggregate Device:
+
+          Input Channels: 2
+          Manufacturer: Apple Inc.
+          Output Channels: 4
+          Current SampleRate: 48000
+          Transport: Unknown
+          Input Source: Default
+          Output Source: Default
+
+        HEADPHONEMG:
+
+          Input Channels: 2
+          Manufacturer: Apple Inc.
+          Output Channels: 4
+          Current SampleRate: 48000
+          Transport: Unknown
+          Input Source: Default
+          Output Source: Default
+
+        Aggregate Device:
+
+          Manufacturer: Apple Inc.
+          Output Channels: 2
+          Current SampleRate: 48000
+          Transport: Unknown
+          Output Source: Default
+
+        AIDJ:
+
+          Manufacturer: Apple Inc.
+          Output Channels: 2
+          Current SampleRate: 48000
+          Transport: Unknown
+          Output Source: Default
+
+        AIDJ:
+
+          Manufacturer: Apple Inc.
+          Output Channels: 2
+          Current SampleRate: 48000
+          Transport: Unknown
+          Output Source: Default
+
+        Multi-Output Device:
+
+          Manufacturer: Apple Inc.
+          Output Channels: 2
+          Current SampleRate: 48000
+          Transport: Unknown
+          Output Source: Default
+
+        AI Capture:
+
+          Manufacturer: Apple Inc.
+          Output Channels: 2
+          Current SampleRate: 48000
+          Transport: Unknown
+          Output Source: Default

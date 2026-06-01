@@ -1,0 +1,123 @@
+{
+  "schema": "flx4_live_context_summary_v1",
+  "ok": false,
+  "midi_port": "DDJ-FLX4",
+  "audio_device_found": true,
+  "live_ok": true,
+  "live_ready": false,
+  "diagnosis": "missing_physical_proof",
+  "action_hint": "collect_remaining_blockers",
+  "operator_actions": [
+    {
+      "code": "resolve_deck_identity",
+      "detail": "Load identifiable tracks on both decks so live context can cite deck A and deck B instead of guessing."
+    },
+    {
+      "code": "feed_both_deck_lanes",
+      "detail": "The deck-pair route is configured, but proof does not show active audio on both deck lanes."
+    }
+  ],
+  "first_blocker": "deck_state had no resolved deck row",
+  "top_blockers": [
+    "deck_state had no resolved deck row",
+    "deck identity source: Now Playing is owned by a non-DJ app",
+    "screen vision is not currently resolving the independent second deck",
+    "deck_state had no citable track_id at confidence floor",
+    "deck_state did not resolve both deck A and deck B",
+    "deck_state did not have citable track_id for both deck A and deck B",
+    "deck_audio_capture did not show active audio on both deck lanes",
+    "deck identity source: controller posture did not identify one deck"
+  ],
+  "blocker_count": 9,
+  "proof_legs": [
+    {
+      "id": "live_socket_frames",
+      "status": "pass",
+      "detail": "Live ws:8765 produced bounded context frames."
+    },
+    {
+      "id": "live_context_schema",
+      "status": "pass",
+      "detail": "Live socket advertised schema v2 and required live-context capabilities."
+    },
+    {
+      "id": "controller_connected",
+      "status": "pass",
+      "detail": "DDJ-FLX4 is visible inside the live context packet."
+    },
+    {
+      "id": "recent_controller_move",
+      "status": "pass",
+      "detail": "A FLX4 move was observed inside the proof window."
+    },
+    {
+      "id": "audible_audio",
+      "status": "pass",
+      "detail": "Audible DJ app output crossed the live-context audio floor."
+    },
+    {
+      "id": "deck_identity",
+      "status": "missing",
+      "detail": "Deck A and Deck B identities are resolved enough to cite rather than guess.",
+      "blocker": "deck_state had no resolved deck row"
+    },
+    {
+      "id": "deck_pair_audio_capture",
+      "status": "missing",
+      "detail": "Per-deck audio capture is configured and active on both lanes.",
+      "blocker": "deck_audio_capture did not show active audio on both deck lanes"
+    },
+    {
+      "id": "reply_safety_canaries",
+      "status": "skipped",
+      "detail": "Listener-read canary passes while causal/source-detail hallucination canaries are rejected."
+    }
+  ],
+  "proof_legs_passed": 5,
+  "proof_legs_total": 8,
+  "direct_midi_probe": {
+    "ran": true,
+    "ok": true,
+    "rc": 0,
+    "seconds": "30",
+    "mode": "callback",
+    "sampling": "concurrent_with_live_context",
+    "motion_observed": true,
+    "frames": 358,
+    "unique_cc": [
+      33,
+      34
+    ],
+    "unique_notes": [
+      54,
+      88
+    ],
+    "jsonl": ".planning/eval-runs/flx4-live-context-controller-weighted-current-8/direct_midi_probe.jsonl",
+    "stderr": ".planning/eval-runs/flx4-live-context-controller-weighted-current-8/direct_midi_probe.stderr.log"
+  },
+  "midi_motion_diagnosis": "direct_midi_motion_observed",
+  "next_action": "Collect the missing live proof legs shown in blockers, then rerun `vibemix library live-context --require-proof`.",
+  "checks": {
+    "controller_connected": true,
+    "deck_state_resolved": false,
+    "deck_state_pair_resolved": false,
+    "recent_moves_seen": true,
+    "audio_observed": true,
+    "deck_pair_capture_configured": true,
+    "deck_audio_capture_both_active": false
+  },
+  "canaries": {
+    "listener_read": "skipped",
+    "audio_causality_rejected": "skipped",
+    "audio_source_detail_rejected": "skipped"
+  },
+  "setup_hint": null,
+  "artifacts": {
+    "proof_json": ".planning/eval-runs/flx4-live-context-controller-weighted-current-8/live_context_proof.json",
+    "listener_read_verification": ".planning/eval-runs/flx4-live-context-controller-weighted-current-8/listener_read_verification.json",
+    "audio_causality_rejection": ".planning/eval-runs/flx4-live-context-controller-weighted-current-8/audio_causality_rejection.json",
+    "audio_source_detail_rejection": ".planning/eval-runs/flx4-live-context-controller-weighted-current-8/audio_source_detail_rejection.json",
+    "direct_midi_probe": ".planning/eval-runs/flx4-live-context-controller-weighted-current-8/direct_midi_probe.jsonl",
+    "direct_midi_probe_stderr": ".planning/eval-runs/flx4-live-context-controller-weighted-current-8/direct_midi_probe.stderr.log"
+  }
+}

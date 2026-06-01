@@ -125,3 +125,99 @@ To promote this lane, rerun the same script while:
 
 Then update this packet or replace it with a `CODEX_READY-*` live acceptance
 packet.
+
+---
+
+## Current-source controller-weighted proof update
+
+Later current-source proof was run against the dirty controller-weighted deck
+audio lane, not the signed DMG above. The app was launched from source with
+`VIBEMIX_INPUT_DEVICE='BlackHole 16ch'`,
+`VIBEMIX_DECK_AUDIO_CHANNELS='A=0,1;B=2,3'`, and `VIBEMIX_LOCAL_TTS=0` so no
+cloud or MOSS voice could mask the evidence. Live session id:
+`20260601-171701`.
+
+Best combined run:
+
+```text
+COHOST_VIBER_FLX4_OUT_DIR=.planning/eval-runs/flx4-live-context-controller-weighted-current-8 \
+COHOST_VIBER_FLX4_WAIT_READY_S=1 \
+COHOST_VIBER_FLX4_TIMEOUT_S=6 \
+COHOST_VIBER_FLX4_FRAMES=360 \
+COHOST_VIBER_FLX4_DIRECT_MIDI_PROBE_S=30 \
+COHOST_VIBER_FLX4_DIRECT_MIDI_PROBE_MODE=callback \
+bash scripts/release/check_flx4_live_context.sh
+```
+
+Result:
+
+```text
+FAIL check_flx4_live_context: midi_port=DDJ-FLX4 audio_device=True live_ok=True live_ready=False diagnosis=missing_physical_proof frames=253 controller_connected=True recent_moves=True audio_observed=True blockers=9 direct_midi=True direct_midi_frames=358 midi_motion_diag=direct_midi_motion_observed listener_read_canary=skipped audio_causality_rejected=skipped audio_source_detail_rejected=skipped action_hint=collect_remaining_blockers first_blocker='deck_state had no resolved deck row' next_action='Collect the missing live proof legs shown in blockers, then rerun `vibemix library live-context --require-proof`.' proof=.planning/eval-runs/flx4-live-context-controller-weighted-current-8/live_context_proof.json
+```
+
+This is materially stronger than the signed-DMG attempt:
+
+```text
+live_socket_frames=pass
+live_context_schema=pass
+controller_connected=pass
+recent_controller_move=pass
+audible_audio=pass
+direct_midi_probe.motion_observed=true
+direct_midi_probe.frames=358
+```
+
+But final acceptance still stays **HOLD** because the remaining proof legs are
+the important anti-slop legs, not operator timing:
+
+```text
+deck_state_resolved=false
+deck_state_pair_resolved=false
+deck_audio_capture_both_active=false
+```
+
+Top current blockers:
+
+```text
+deck_state had no resolved deck row
+deck identity source: Now Playing is owned by a non-DJ app
+screen vision is not currently resolving the independent second deck
+deck_state had no citable track_id at confidence floor
+deck_state did not resolve both deck A and deck B
+deck_audio_capture did not show active audio on both deck lanes
+```
+
+Evidence details from the best frame:
+
+```text
+deck_source_status.nowplaying_owner=com.apple.webkit.gpu
+deck_source_status.resolution=no_single_attributable_deck
+deck_source_status.screen_vision=disabled
+deck_audio_separation_context=... mode=deck_pair_capture_configured ... deck_audio_activity=A_active+B_silent
+live_evidence=midi:A_jog_nudge_back + mix:deck_audio_capture=A_active+B_silent
+```
+
+Interpretation:
+
+- The FLX4 control feed is proven live. A standalone callback sniff in the same
+  session captured 3,579 frames in 10s, and the combined proof captured 358
+  direct MIDI frames while the app also saw a recent move.
+- The BlackHole 16ch deck-pair route is configured, but this Rekordbox/Multi
+  Output setup is not feeding active audio to both declared deck lanes. The
+  guard is correctly refusing to treat configured capture as separated-deck
+  proof.
+- Deck identity is still not citable. Rekordbox is not publishing trustworthy
+  Now Playing ownership; `nowplaying-cli` reports a WebKit GPU owner, and the
+  screen-vision leg is deliberately disabled/dormant. The app must keep saying
+  "unknown deck" until a real identity source lands.
+
+Promotion gate remains:
+
+1. Prove both deck lanes active as `deck_audio_capture=A_active+B_active` on the
+   configured route, or explicitly downgrade the package claim to single-lane
+   controller-weighted master context.
+2. Land a real independent deck-identity source (for example a verified
+   screen-vision path or a Rekordbox live source) before allowing citable Deck
+   A/B track claims.
+3. Rerun `check_flx4_live_context.sh` and require `ok=true`, `live_ready=true`,
+   recent moves, audible audio, deck identity, both-lane audio, and canaries.
