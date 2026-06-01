@@ -1,4 +1,4 @@
-/* Phase 28 Plan 06 — Library panel with drag-drop XML import.
+/* Phase 28 Plan 06 — Library panel with drag-drop library import.
  *
  * Pure vanilla TypeScript — no framework, no template engine. Mounts under the LIBRARY group in
  * SettingsDrawer alongside the Plan 28-07 staleness banner.
@@ -39,8 +39,8 @@ export async function renderLibraryPanel(
   root.className = "vmx-library-panel";
   root.innerHTML = `
     <div class="vmx-library-droptarget" role="region"
-         aria-label="Drop Rekordbox XML here">
-      Drop Rekordbox XML here, or click <button type="button"
+         aria-label="Drop Rekordbox XML or a music folder here">
+      Drop Rekordbox XML or a music folder here, or click <button type="button"
         class="vmx-library-pick-btn">Choose file</button>
     </div>
     <div class="vmx-library-progress hidden">
@@ -176,6 +176,11 @@ export async function renderLibraryPanel(
     );
   }
 
+  function looksLikeFilePath(path: string): boolean {
+    const leaf = path.split(/[\\/]/).pop() ?? "";
+    return /\.[^./\\]+$/.test(leaf);
+  }
+
   cancelBtn.addEventListener("click", () => {
     if (disposed) return;
     void emitIpc("ipc.library.import_cancel", { schema_version: "1" });
@@ -187,7 +192,7 @@ export async function renderLibraryPanel(
     // tauri-plugin-dialog which isn't bundled in v1 — show a prompt to
     // drag instead. (Phase 28.x can add the plugin if Kaan wants
     // single-click-pick.)
-    setStatus("Drag the Rekordbox XML onto this panel.");
+    setStatus("Drag a Rekordbox XML or music folder onto this panel.");
   });
 
   // Drag-drop wiring — Tauri webview API. The dedupe via seenEventIds is
@@ -217,11 +222,13 @@ export async function renderLibraryPanel(
             return;
           }
         }
-        const xml = payload.paths.find((p) => /\.xml$/i.test(p));
-        if (xml) {
-          void beginImport(xml);
+        const librarySource =
+          payload.paths.find((p) => /\.xml$/i.test(p)) ??
+          payload.paths.find((p) => !looksLikeFilePath(p));
+        if (librarySource) {
+          void beginImport(librarySource);
         } else {
-          setStatus("Need a .xml file (Rekordbox export).");
+          setStatus("Drop a Rekordbox XML or a music folder.");
         }
       }
     });

@@ -2215,6 +2215,7 @@ Include:
 - `tauri/ui/src/settings/SettingsDrawer.ts`
 - `tauri/ui/tests/settings/staleness-banner.spec.ts`
 - `tauri/ui/tests/settings/library-panel.spec.ts`
+- `tests/runtime_closeouts/test_register_library_invoked.py`
 - `tests/library/test_staleness.py`
 - `tests/ipc/test_library_schemas.py`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
@@ -2233,6 +2234,9 @@ Reason:
 - Consent stays intact: folders are not auto-detected on fresh install. A
   folder re-index appears only for a folder source already stored in the
   user's library cache.
+- The Settings drop target may also accept an explicitly dropped music folder;
+  the backend routes directory imports to `ingest_folder` before the Rekordbox
+  XML parser so first-time no-Rekordbox setup is not a dead end.
 
 Proof to run:
 

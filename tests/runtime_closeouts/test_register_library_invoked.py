@@ -58,7 +58,7 @@ def test_register_library_invoked_when_cache_exists(
 
     mocker.patch.object(RekordboxLibrary, "try_load_cache", new=fake_load)
 
-    status, _registry, lib = _run_wire_in_block()
+    status, _registry, _lib = _run_wire_in_block()
     assert status == "registered"
     assert spy.call_count == 1, (
         f"register_library not invoked when cache exists; spy={spy.call_args_list}"
@@ -131,3 +131,26 @@ def test_rekordbox_library_import_present_in_main() -> None:
         cwd=str(PROJECT_ROOT),
     )
     assert r.returncode == 0
+
+
+def test_library_import_routes_directories_to_folder_ingest_before_xml_import() -> None:
+    """Dropping a folder must not fall through to Rekordbox XML parsing."""
+    source = (PROJECT_ROOT / "src/vibemix/__main__.py").read_text()
+    branch_idx = source.index("if source_path.is_dir():")
+    folder_idx = source.index("await _start_folder_import(source_path", branch_idx)
+    return_idx = source.index("return", folder_idx)
+    xml_idx = source.index("xml_path = source_path", return_idx)
+    importer_idx = source.index("importer = LibraryImporter", xml_idx)
+
+    assert branch_idx < folder_idx < return_idx < xml_idx < importer_idx
+
+
+def test_stale_folder_reindex_uses_recorded_source_not_renderer_path() -> None:
+    """Folder re-index keeps the Package 5J consent boundary."""
+    source = (PROJECT_ROOT / "src/vibemix/__main__.py").read_text()
+
+    assert "async def _start_folder_import(" in source
+    assert "source_path, source_kind = refreshable_source(status)" in source
+    assert "await _start_folder_import(\n                    folder," in source
+    assert 'label="folder reindex"' in source
+    assert "clear_staleness=True" in source

@@ -99,8 +99,21 @@ describe("library-panel — drag-drop dedupe (Tauri Issue #14134)", () => {
   });
 });
 
-describe("library-panel — non-xml drop shows error", () => {
-  it("status carries 'Need a .xml file' for .mp3 drops", async () => {
+describe("library-panel — source drop routing", () => {
+  it("accepts a music folder path as a library import source", async () => {
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    dispatchDrop(19, ["/Users/kaan/Music/PSYMIND"]);
+    await _flush();
+
+    expect(emitted).toContainEqual({
+      type: "ipc.library.import",
+      payload: { path: "/Users/kaan/Music/PSYMIND", schema_version: "1" },
+    });
+  });
+
+  it("status tells DJs to drop XML or a folder for single audio-file drops", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
 
@@ -108,7 +121,22 @@ describe("library-panel — non-xml drop shows error", () => {
     await _flush();
 
     const status = handle.element.querySelector(".vmx-library-status");
-    expect(status?.textContent).toContain("Need a .xml file");
+    expect(status?.textContent).toContain(
+      "Drop a Rekordbox XML or a music folder.",
+    );
+  });
+
+  it("copy advertises folder setup, not XML-only setup", async () => {
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    const drop = handle.element.querySelector(".vmx-library-droptarget");
+    expect(drop?.getAttribute("aria-label")).toBe(
+      "Drop Rekordbox XML or a music folder here",
+    );
+    expect(drop?.textContent).toContain(
+      "Drop Rekordbox XML or a music folder here",
+    );
   });
 });
 

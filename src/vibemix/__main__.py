@@ -2045,6 +2045,99 @@ async def main() -> None:
                         file=sys.stderr,
                     )
 
+            async def _start_folder_import(
+                folder: Path,
+                *,
+                label: str,
+                clear_staleness: bool = False,
+            ) -> None:
+                _task = _import_state.get("task")
+                if _task is not None and not _task.done():
+                    return
+                folder = folder.expanduser()
+                if not folder.is_dir():
+                    print(
+                        f"-> library {label} rejected: folder is missing",
+                        file=sys.stderr,
+                    )
+                    return
+                if not _ensure_library_runtime(label):
+                    return
+
+                _import_state["importer"] = None
+                loop = asyncio.get_running_loop()
+                try:
+                    from vibemix.library import scan_folder as _scan_folder
+
+                    folder_total = len(_scan_folder(folder))
+                except Exception:
+                    folder_total = 0
+                progress_done = 0
+
+                def _on_folder_progress(line: str) -> None:
+                    nonlocal progress_done
+                    progress_done += 1
+
+                    def _send() -> None:
+                        _pt = loop.create_task(
+                            _emit_library(
+                                _progress_envelope(
+                                    {
+                                        "total": folder_total,
+                                        "done": progress_done,
+                                        "current_track_name": line[:200],
+                                        "cache_hits": 0,
+                                        "cancelled": False,
+                                    }
+                                )
+                            )
+                        )
+                        _background_tasks.add(_pt)
+                        _pt.add_done_callback(_background_tasks.discard)
+
+                    loop.call_soon_threadsafe(_send)
+
+                async def _run_folder_import() -> None:
+                    try:
+                        from vibemix.library import ingest_folder
+
+                        def _sync_import():
+                            return ingest_folder(
+                                folder,
+                                _library_embedder,
+                                _library_store,
+                                persist_library=True,
+                                progress=_on_folder_progress,
+                                embed_strategy=getattr(
+                                    _library_embedder,
+                                    "_embed_strategy",
+                                    "mean_excerpt",
+                                ),
+                            )
+
+                        report = await loop.run_in_executor(None, _sync_import)
+                        _refresh_library_registry()
+                        await _emit_library(
+                            _progress_envelope(
+                                {
+                                    "total": report.total,
+                                    "done": report.total,
+                                    "current_track_name": "",
+                                    "cache_hits": report.skipped_cached,
+                                    "cancelled": False,
+                                }
+                            )
+                        )
+                        if clear_staleness:
+                            ipc_router.clear_retained("ipc.library.staleness_nudge")
+                    except Exception as _e:
+                        print(f"-> library {label} failed: {_e!r}", file=sys.stderr)
+
+                _t = loop.create_task(_run_folder_import())
+                _import_state["task"] = _t
+                _background_tasks.add(_t)
+                _t.add_done_callback(_background_tasks.discard)
+
             async def _on_library_import(msg: dict) -> None:
                 _task = _import_state.get("task")
                 if _task is not None and not _task.done():
@@ -2053,7 +2146,11 @@ async def main() -> None:
                 raw_path = str(payload.get("path", "")).strip()
                 if not raw_path:
                     return
-                xml_path = Path(raw_path).expanduser()
+                source_path = Path(raw_path).expanduser()
+                if source_path.is_dir():
+                    await _start_folder_import(source_path, label="folder import")
+                    return
+                xml_path = source_path
                 # Lazily build embedder + store — import is the one path that
                 # must run cold (first-time user has no cache yet). build_embedder
                 # loads the local CLAP ONNX model.
@@ -2123,81 +2220,11 @@ async def main() -> None:
                         file=sys.stderr,
                     )
                     return
-                if not _ensure_library_runtime("folder reindex"):
-                    return
-
-                _import_state["importer"] = None
-                loop = asyncio.get_running_loop()
-                try:
-                    from vibemix.library import scan_folder as _scan_folder
-
-                    folder_total = len(_scan_folder(folder))
-                except Exception:
-                    folder_total = 0
-                progress_done = 0
-
-                def _on_folder_progress(line: str) -> None:
-                    nonlocal progress_done
-                    progress_done += 1
-
-                    def _send() -> None:
-                        _pt = loop.create_task(
-                            _emit_library(
-                                _progress_envelope(
-                                    {
-                                        "total": folder_total,
-                                        "done": progress_done,
-                                        "current_track_name": line[:200],
-                                        "cache_hits": 0,
-                                        "cancelled": False,
-                                    }
-                                )
-                            )
-                        )
-                        _background_tasks.add(_pt)
-                        _pt.add_done_callback(_background_tasks.discard)
-
-                    loop.call_soon_threadsafe(_send)
-
-                async def _run_folder_reindex() -> None:
-                    try:
-                        from vibemix.library import ingest_folder
-
-                        def _sync_reindex():
-                            return ingest_folder(
-                                folder,
-                                _library_embedder,
-                                _library_store,
-                                persist_library=True,
-                                progress=_on_folder_progress,
-                                embed_strategy=getattr(
-                                    _library_embedder,
-                                    "_embed_strategy",
-                                    "mean_excerpt",
-                                ),
-                            )
-
-                        report = await loop.run_in_executor(None, _sync_reindex)
-                        _refresh_library_registry()
-                        await _emit_library(
-                            _progress_envelope(
-                                {
-                                    "total": report.total,
-                                    "done": report.total,
-                                    "current_track_name": "",
-                                    "cache_hits": report.skipped_cached,
-                                    "cancelled": False,
-                                }
-                            )
-                        )
-                        ipc_router.clear_retained("ipc.library.staleness_nudge")
-                    except Exception as _e:
-                        print(f"-> library folder reindex failed: {_e!r}", file=sys.stderr)
-
-                _t = loop.create_task(_run_folder_reindex())
-                _import_state["task"] = _t
-                _background_tasks.add(_t)
-                _t.add_done_callback(_background_tasks.discard)
+                await _start_folder_import(
+                    folder,
+                    label="folder reindex",
+                    clear_staleness=True,
+                )
 
             async def _on_library_import_cancel(msg: dict) -> None:
                 importer = _import_state.get("importer")
