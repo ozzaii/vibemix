@@ -19,8 +19,6 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CUT_RELEASE_SH = REPO_ROOT / "scripts" / "launch" / "cut_release.sh"
 

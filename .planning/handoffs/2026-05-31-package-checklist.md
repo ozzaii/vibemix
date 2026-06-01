@@ -464,6 +464,33 @@ Proof before staging:
 - `git diff --check -- tests/repo/test_cut_release_invokes_bravoh_server.py tests/repo/test_cut_release_invokes_check_gate.py tests/repo/test_cut_release_no_autonomous_publish.py tests/repo/test_cut_release_tag_regex.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0Q - Cut Release Preflight Test Ruff Hygiene
+
+Suggested commit: `test(scripts): clean cut release preflight lint`
+
+Include:
+
+- `tests/scripts/test_cut_release_preflight.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Cut-release scripts, signing/notarization assets, packaged artifacts, and app
+  runtime files.
+
+Reason:
+
+- The cut-release preflight test imported `pytest` without using it. Removing
+  the dead import keeps the focused scripts-test ruff gate clean without
+  changing any release gate assertions.
+
+Proof before staging:
+
+- `uv run ruff check tests/scripts/test_cut_release_preflight.py`
+- `uv run pytest -q tests/scripts/test_cut_release_preflight.py`
+- `git diff --check -- tests/scripts/test_cut_release_preflight.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
