@@ -327,7 +327,8 @@ def _load_env_robust() -> None:
     _argv = sys.argv[1:]
     # Phase 81 — the `vibemix bench <sub>` CLI is a dev-instrument surface; like
     # `library`, it must not carry the live-runtime startup banner on stderr.
-    if not (_argv and _argv[0] in ("library", "bench")):
+    # `eval` follows the same source-only machine-readable posture.
+    if not (_argv and _argv[0] in ("library", "bench", "eval")):
         if loaded_from is None:
             print(
                 "-> env: no .env found; using inherited process environment",
@@ -3110,6 +3111,625 @@ def _run_bench_cli(argv: list[str]) -> int:
 
     parser = argparse.ArgumentParser(prog="vibemix bench")
     _build_bench_subparsers(parser)
+    args = parser.parse_args(argv)
+    return int(args.func(args) or 0)
+
+
+# =============================================================================
+# `vibemix eval <subcommand>` (source-only automation reports)
+# =============================================================================
+
+
+def _build_eval_subparsers(parser: argparse.ArgumentParser) -> None:
+    """Build the source-only eval automation command tree."""
+    sub = parser.add_subparsers(dest="eval_command", required=True)
+
+    sp_latest = sub.add_parser(
+        "latest-session",
+        help="Audit the latest cohost session plus recent Viber rows",
+        description=(
+            "Read a recorded session's events.jsonl and recent global Viber "
+            "ai_messages, then emit a deterministic repair queue for grounding, "
+            "citation, deck-proof, and Viber live-verification issues. No model "
+            "call, no audio device, no network."
+        ),
+    )
+    sp_latest.add_argument("--session-dir", type=Path, default=None)
+    sp_latest.add_argument(
+        "--recordings-root",
+        type=Path,
+        default=None,
+        help="recordings root; newest child is used when --session-dir is omitted",
+    )
+    sp_latest.add_argument(
+        "--global-root",
+        type=Path,
+        default=None,
+        help="app-data root containing ai_messages/ai_messages.jsonl",
+    )
+    sp_latest.add_argument(
+        "--no-viber",
+        action="store_true",
+        help="skip recent global Viber/Codex ai_message rows",
+    )
+    sp_latest.add_argument(
+        "--max-global-rows",
+        type=int,
+        default=25,
+        help="max recent Viber/Codex rows to inspect (default: 25)",
+    )
+    sp_latest.add_argument("--json", action="store_true", dest="as_json")
+    sp_latest.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="write report to this path (.json writes JSON, anything else Markdown)",
+    )
+    sp_latest.set_defaults(func=_cmd_eval_latest_session)
+
+    sp_reprompt = sub.add_parser(
+        "reprompt-pack",
+        help="Write reprompt jobs for cohost/Viber report failures",
+        description=(
+            "Build the same deterministic cohost/Viber report, then write a "
+            "reprompt/evaluation pack for every blocker/care item. The pack "
+            "contains original artifact links, a repair prompt, and candidate "
+            "gates so a repaired model answer can be scored without guessing."
+        ),
+    )
+    sp_reprompt.add_argument("--session-dir", type=Path, default=None)
+    sp_reprompt.add_argument("--recordings-root", type=Path, default=None)
+    sp_reprompt.add_argument("--global-root", type=Path, default=None)
+    sp_reprompt.add_argument("--no-viber", action="store_true")
+    sp_reprompt.add_argument("--max-global-rows", type=int, default=25)
+    sp_reprompt.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help="directory for manifest.json and per-issue reprompt jobs",
+    )
+    sp_reprompt.add_argument("--json", action="store_true", dest="as_json")
+    sp_reprompt.set_defaults(func=_cmd_eval_reprompt_pack)
+
+    sp_repair = sub.add_parser(
+        "repair-pack",
+        help="Generate and score deterministic repair candidates for a reprompt pack",
+        description=(
+            "Consume a reprompt-pack manifest, write candidate replies for every "
+            "repairable job, and score them with the same captured Viber gates. "
+            "This is the no-model baseline for the benchmark/reprompt/evaluate loop."
+        ),
+    )
+    sp_repair.add_argument("--pack-dir", type=Path, required=True)
+    sp_repair.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help="directory for candidate.json/score.json outputs (default: pack-dir/repair-run)",
+    )
+    sp_repair.add_argument(
+        "--backend",
+        choices=("deterministic", "codex"),
+        default="deterministic",
+        help="repair backend: deterministic baseline or a live Viber/Codex rerun",
+    )
+    sp_repair.add_argument("--codex-path", default=None, help="override Codex CLI path")
+    sp_repair.add_argument("--timeout-s", type=float, default=None, help="Codex repair timeout")
+    sp_repair.add_argument(
+        "--allow-shell",
+        action="store_true",
+        help="allow Codex MCP shell bypass for this repair run",
+    )
+    sp_repair.add_argument("--json", action="store_true", dest="as_json")
+    sp_repair.set_defaults(func=_cmd_eval_repair_pack)
+
+    sp_autopilot = sub.add_parser(
+        "autopilot",
+        help="Run report, reprompt pack, repair candidates, and one summary",
+        description=(
+            "One-shot cohost/Viber automation: audit the latest session, write "
+            "the report, build a reprompt pack, run repair candidates, score "
+            "them, and leave a single autopilot_summary.json."
+        ),
+    )
+    sp_autopilot.add_argument("--session-dir", type=Path, default=None)
+    sp_autopilot.add_argument("--recordings-root", type=Path, default=None)
+    sp_autopilot.add_argument("--global-root", type=Path, default=None)
+    sp_autopilot.add_argument(
+        "--global-since-iso",
+        default=None,
+        help="only include global Viber rows at or after this ISO timestamp",
+    )
+    sp_autopilot.add_argument("--no-viber", action="store_true")
+    sp_autopilot.add_argument("--max-global-rows", type=int, default=25)
+    sp_autopilot.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help="directory for report, reprompt-pack, repair-run, and summary",
+    )
+    sp_autopilot.add_argument(
+        "--backend",
+        choices=("deterministic", "codex"),
+        default="deterministic",
+        help="repair backend for the autopilot repair phase",
+    )
+    sp_autopilot.add_argument(
+        "--fail-on",
+        choices=("automation", "release", "first-pass", "audio-evidence"),
+        default="automation",
+        help=(
+            "exit-code policy: automation passes when a clean repair candidate "
+            "exists; release fails unless the original captured run has no "
+            "blockers; first-pass also fails on care/reprompt debt; "
+            "audio-evidence fails only on live/audio overclaim debt"
+        ),
+    )
+    sp_autopilot.add_argument("--codex-path", default=None, help="override Codex CLI path")
+    sp_autopilot.add_argument("--timeout-s", type=float, default=None, help="Codex repair timeout")
+    sp_autopilot.add_argument("--allow-shell", action="store_true")
+    sp_autopilot.add_argument("--json", action="store_true", dest="as_json")
+    sp_autopilot.set_defaults(func=_cmd_eval_autopilot)
+
+    sp_history = sub.add_parser(
+        "history-sweep",
+        help="Benchmark recent cohost sessions plus recent Viber rows",
+        description=(
+            "Scan the newest recorded sessions and one recent global Viber "
+            "window, then emit a compact trend report of blockers, care items, "
+            "watch items, and repeated issue codes."
+        ),
+    )
+    sp_history.add_argument("--recordings-root", type=Path, default=None)
+    sp_history.add_argument("--global-root", type=Path, default=None)
+    sp_history.add_argument("--no-viber", action="store_true")
+    sp_history.add_argument("--max-sessions", type=int, default=10)
+    sp_history.add_argument("--max-global-rows", type=int, default=25)
+    sp_history.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="write sweep report to this path (.json writes JSON, anything else Markdown)",
+    )
+    sp_history.add_argument("--json", action="store_true", dest="as_json")
+    sp_history.set_defaults(func=_cmd_eval_history_sweep)
+
+    sp_failure_corpus = sub.add_parser(
+        "failure-corpus",
+        help="Export recent cohost/Viber failures as a local regression corpus",
+        description=(
+            "Scan recent recording sessions plus one Viber window, then write "
+            "blocker/care failures as stable local cases. The corpus keeps "
+            "compact issue metadata, artifact pointers, request text, response "
+            "previews, and deterministic repair gates without dumping full prompts."
+        ),
+    )
+    sp_failure_corpus.add_argument("--recordings-root", type=Path, default=None)
+    sp_failure_corpus.add_argument(
+        "--session-dir",
+        action="append",
+        type=Path,
+        default=None,
+        help="specific recording session to scan; repeat to include more",
+    )
+    sp_failure_corpus.add_argument("--global-root", type=Path, default=None)
+    sp_failure_corpus.add_argument(
+        "--global-since-iso",
+        default=None,
+        help="only include global Viber rows at or after this ISO timestamp",
+    )
+    sp_failure_corpus.add_argument("--no-viber", action="store_true")
+    sp_failure_corpus.add_argument("--max-sessions", type=int, default=10)
+    sp_failure_corpus.add_argument("--max-global-rows", type=int, default=25)
+    sp_failure_corpus.add_argument(
+        "--severity",
+        action="append",
+        choices=("blocker", "care", "watch"),
+        default=None,
+        dest="severities",
+        help="severity to include; repeat to include more (default: blocker and care)",
+    )
+    sp_failure_corpus.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help="directory for manifest.json, cases.jsonl, and per-case JSON files",
+    )
+    sp_failure_corpus.add_argument(
+        "--no-policy-canaries",
+        action="store_true",
+        help="export only captured failures; skip built-in audio/vibe red-team cases",
+    )
+    sp_failure_corpus.add_argument("--json", action="store_true", dest="as_json")
+    sp_failure_corpus.set_defaults(func=_cmd_eval_failure_corpus)
+
+    sp_corpus_benchmark = sub.add_parser(
+        "corpus-benchmark",
+        help="Run repair candidates across a saved cohost/Viber failure corpus",
+        description=(
+            "Read a failure-corpus directory, generate one repair candidate per "
+            "case, score Viber cases against captured meta.json, score cohost "
+            "cases against corpus gates, and write a benchmark_manifest.json."
+        ),
+    )
+    sp_corpus_benchmark.add_argument("--corpus-dir", type=Path, required=True)
+    sp_corpus_benchmark.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help="directory for benchmark_manifest.json and per-case candidates",
+    )
+    sp_corpus_benchmark.add_argument(
+        "--backend",
+        choices=("deterministic", "codex"),
+        default="deterministic",
+        help="candidate backend: deterministic baseline or live Viber/Codex rerun",
+    )
+    sp_corpus_benchmark.add_argument("--codex-path", default=None, help="override Codex CLI path")
+    sp_corpus_benchmark.add_argument("--timeout-s", type=float, default=None, help="Codex repair timeout")
+    sp_corpus_benchmark.add_argument("--allow-shell", action="store_true")
+    sp_corpus_benchmark.add_argument("--json", action="store_true", dest="as_json")
+    sp_corpus_benchmark.set_defaults(func=_cmd_eval_corpus_benchmark)
+
+    sp_score = sub.add_parser(
+        "score-candidate",
+        help="Score one repaired Viber candidate against captured gates",
+    )
+    sp_score.add_argument("--meta", type=Path, required=True, help="captured meta.json")
+    sp_score.add_argument(
+        "--candidate",
+        type=Path,
+        required=True,
+        help="candidate JSON or plain reply text to score",
+    )
+    sp_score.add_argument(
+        "--issue-code",
+        default=None,
+        help="optional report/corpus issue code for issue-specific repair gates",
+    )
+    sp_score.add_argument("--json", action="store_true", dest="as_json")
+    sp_score.set_defaults(func=_cmd_eval_score_candidate)
+
+
+def _cmd_eval_latest_session(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vibemix.eval.session_report import (
+        build_cohost_viber_report,
+        format_cohost_viber_markdown,
+        latest_session,
+    )
+    from vibemix.runtime.config_store import app_data_dir
+
+    recordings_root = Path(args.recordings_root) if args.recordings_root else Path(_resolve_recordings_root())
+    session_dir = Path(args.session_dir) if args.session_dir else latest_session(recordings_root)
+    if session_dir is None:
+        print(f"vibemix eval: no recording sessions found under {recordings_root}", file=sys.stderr)
+        return 1
+    global_root = Path(args.global_root) if args.global_root else app_data_dir()
+    report = build_cohost_viber_report(
+        session_dir,
+        global_root=global_root,
+        include_viber=not bool(args.no_viber),
+        max_global_rows=int(args.max_global_rows or 25),
+    )
+    rendered = (
+        _json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+        if args.as_json
+        else format_cohost_viber_markdown(report)
+    )
+    if args.out:
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        if out_path.suffix.lower() == ".json":
+            out_path.write_text(_json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        else:
+            out_path.write_text(format_cohost_viber_markdown(report), encoding="utf-8")
+        print(f"-> eval report: {out_path}", file=sys.stderr)
+    else:
+        print(rendered, end="" if rendered.endswith("\n") else "\n")
+    return 0 if bool(report.get("ok")) else 1
+
+
+def _cmd_eval_reprompt_pack(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vibemix.eval.session_report import build_cohost_viber_report, write_reprompt_pack
+    from vibemix.runtime.config_store import app_data_dir
+
+    recordings_root = Path(args.recordings_root) if args.recordings_root else Path(_resolve_recordings_root())
+    from vibemix.eval.session_report import latest_session
+
+    session_dir = Path(args.session_dir) if args.session_dir else latest_session(recordings_root)
+    if session_dir is None:
+        print(f"vibemix eval: no recording sessions found under {recordings_root}", file=sys.stderr)
+        return 1
+    global_root = Path(args.global_root) if args.global_root else app_data_dir()
+    report = build_cohost_viber_report(
+        session_dir,
+        global_root=global_root,
+        include_viber=not bool(args.no_viber),
+        max_global_rows=int(args.max_global_rows or 25),
+    )
+    out_dir = Path(args.out_dir) if args.out_dir else Path(session_dir) / "eval" / "reprompt-pack"
+    manifest = write_reprompt_pack(report, out_dir)
+    if args.as_json:
+        print(_json.dumps(manifest, indent=2, ensure_ascii=False))
+    else:
+        print(f"-> reprompt pack: {manifest['out_dir']}")
+        print(f"jobs={manifest['job_count']} ok={bool(manifest['ok'])}")
+    return 0 if bool(manifest.get("ok")) else 1
+
+
+def _cmd_eval_repair_pack(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vibemix.eval.session_report import run_reprompt_pack_repair
+
+    repairer = None
+    if args.backend == "codex":
+        repairer = _build_eval_codex_repairer(
+            codex_path=getattr(args, "codex_path", None),
+            timeout_s=getattr(args, "timeout_s", None),
+            allow_shell=True if getattr(args, "allow_shell", False) else None,
+        )
+    summary = run_reprompt_pack_repair(
+        Path(args.pack_dir),
+        Path(args.out_dir) if args.out_dir else None,
+        backend=str(args.backend),
+        repairer=repairer,
+    )
+    if args.as_json:
+        print(_json.dumps(summary, indent=2, ensure_ascii=False))
+    else:
+        print(f"-> repair run: {summary['out_dir']}")
+        print(
+            f"jobs={summary['job_count']} passed={summary['passed']} "
+            f"failed={summary['failed']} skipped={summary['skipped']} "
+            f"ok={bool(summary['ok'])}"
+        )
+    return 0 if bool(summary.get("ok")) else 1
+
+
+def _cmd_eval_autopilot(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vibemix.eval.session_report import (
+        latest_session,
+        run_cohost_viber_autopilot,
+        session_start_iso,
+    )
+    from vibemix.runtime.config_store import app_data_dir
+
+    recordings_root = Path(args.recordings_root) if args.recordings_root else Path(_resolve_recordings_root())
+    session_dir = Path(args.session_dir) if args.session_dir else latest_session(recordings_root)
+    if session_dir is None:
+        print(f"vibemix eval: no recording sessions found under {recordings_root}", file=sys.stderr)
+        return 1
+    global_root = Path(args.global_root) if args.global_root else app_data_dir()
+    repairer = None
+    if args.backend == "codex":
+        repairer = _build_eval_codex_repairer(
+            codex_path=getattr(args, "codex_path", None),
+            timeout_s=getattr(args, "timeout_s", None),
+            allow_shell=True if getattr(args, "allow_shell", False) else None,
+        )
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else Path(session_dir) / "eval" / "cohost-viber-autopilot"
+    )
+    global_since_iso = getattr(args, "global_since_iso", None) or session_start_iso(session_dir)
+    summary = run_cohost_viber_autopilot(
+        session_dir,
+        out_dir,
+        global_root=global_root,
+        include_viber=not bool(args.no_viber),
+        max_global_rows=int(args.max_global_rows or 25),
+        global_since_iso=global_since_iso,
+        repair_backend=str(args.backend),
+        repairer=repairer,
+        gate_policy=str(args.fail_on),
+    )
+    if args.as_json:
+        print(_json.dumps(summary, indent=2, ensure_ascii=False))
+    else:
+        print(f"-> autopilot: {summary['out_dir']}")
+        print(
+            f"status={summary['status']} ok={bool(summary['ok'])} "
+            f"gate_ok={bool(summary['gate_ok'])} "
+            f"release_gate_ok={bool(summary['release_gate_ok'])} "
+            f"audio_evidence_debt={int(summary.get('audio_evidence_debt') or 0)} "
+            f"reprompt_jobs={summary['reprompt_jobs']}"
+        )
+    return 0 if bool(summary.get("gate_ok")) else 1
+
+
+def _cmd_eval_history_sweep(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vibemix.eval.session_report import (
+        build_cohost_viber_history_sweep,
+        format_cohost_viber_history_markdown,
+    )
+    from vibemix.runtime.config_store import app_data_dir
+
+    recordings_root = Path(args.recordings_root) if args.recordings_root else Path(_resolve_recordings_root())
+    global_root = Path(args.global_root) if args.global_root else app_data_dir()
+    sweep = build_cohost_viber_history_sweep(
+        recordings_root,
+        global_root=global_root,
+        include_viber=not bool(args.no_viber),
+        max_sessions=int(args.max_sessions or 10),
+        max_global_rows=int(args.max_global_rows or 25),
+    )
+    rendered = (
+        _json.dumps(sweep, indent=2, ensure_ascii=False) + "\n"
+        if args.as_json
+        else format_cohost_viber_history_markdown(sweep)
+    )
+    if args.out:
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        if out_path.suffix.lower() == ".json":
+            out_path.write_text(_json.dumps(sweep, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        else:
+            out_path.write_text(format_cohost_viber_history_markdown(sweep), encoding="utf-8")
+        print(f"-> history sweep: {out_path}", file=sys.stderr)
+    else:
+        print(rendered, end="" if rendered.endswith("\n") else "\n")
+    return 0 if bool(sweep.get("ok")) else 1
+
+
+def _cmd_eval_failure_corpus(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vibemix.eval.session_report import export_cohost_viber_failure_corpus
+    from vibemix.runtime.config_store import app_data_dir
+
+    recordings_root = Path(args.recordings_root) if args.recordings_root else Path(_resolve_recordings_root())
+    global_root = Path(args.global_root) if args.global_root else app_data_dir()
+    session_dirs = [Path(item) for item in (args.session_dir or [])]
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else Path(recordings_root) / "eval" / "cohost-viber-failure-corpus"
+    )
+    manifest = export_cohost_viber_failure_corpus(
+        recordings_root,
+        out_dir,
+        global_root=global_root,
+        include_viber=not bool(args.no_viber),
+        max_sessions=int(args.max_sessions or 10),
+        max_global_rows=int(args.max_global_rows or 25),
+        severities=set(args.severities) if args.severities else None,
+        include_policy_canaries=not bool(getattr(args, "no_policy_canaries", False)),
+        session_dirs=session_dirs or None,
+        global_since_iso=getattr(args, "global_since_iso", None),
+    )
+    if args.as_json:
+        print(_json.dumps(manifest, indent=2, ensure_ascii=False))
+    else:
+        print(f"-> failure corpus: {manifest['out_dir']}")
+        print(
+            f"cases={manifest['case_count']} ok={bool(manifest['ok'])} "
+            f"release_ready={bool(manifest['release_ready'])}"
+        )
+    return 0 if bool(manifest.get("ok")) else 1
+
+
+def _cmd_eval_corpus_benchmark(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vibemix.eval.session_report import run_failure_corpus_benchmark
+
+    repairer = None
+    if args.backend == "codex":
+        repairer = _build_eval_codex_repairer(
+            codex_path=getattr(args, "codex_path", None),
+            timeout_s=getattr(args, "timeout_s", None),
+            allow_shell=True if getattr(args, "allow_shell", False) else None,
+        )
+    summary = run_failure_corpus_benchmark(
+        Path(args.corpus_dir),
+        Path(args.out_dir) if args.out_dir else None,
+        backend=str(args.backend),
+        repairer=repairer,
+    )
+    if args.as_json:
+        print(_json.dumps(summary, indent=2, ensure_ascii=False))
+    else:
+        print(f"-> corpus benchmark: {summary['out_dir']}")
+        print(
+            f"cases={summary['case_count']} passed={summary['passed']} "
+            f"failed={summary['failed']} skipped={summary['skipped']} "
+            f"ok={bool(summary['ok'])} release_gate_ok={bool(summary['release_gate_ok'])}"
+        )
+    return 0 if bool(summary.get("ok")) else 1
+
+
+def _build_eval_codex_repairer(
+    *,
+    codex_path: str | None = None,
+    timeout_s: float | None = None,
+    allow_shell: bool | None = None,
+):
+    import json as _json
+
+    from vibemix.library import RekordboxLibrary
+    from vibemix.library.codex_curate import chat_with_codex
+
+    lib = RekordboxLibrary()
+    lib.try_load_cache()
+
+    def _repair(job: dict[str, Any]) -> dict[str, Any]:
+        paths = job.get("paths") if isinstance(job.get("paths"), dict) else {}
+        meta_path = paths.get("meta_path")
+        meta: dict[str, Any] = {}
+        if isinstance(meta_path, str) and meta_path:
+            try:
+                parsed = _json.loads(Path(meta_path).read_text(encoding="utf-8"))
+                if isinstance(parsed, dict):
+                    meta = parsed
+            except (OSError, ValueError, TypeError, _json.JSONDecodeError):
+                meta = {}
+        extra = meta.get("extra") if isinstance(meta.get("extra"), dict) else {}
+        request = str(job.get("request") or extra.get("request") or "").strip()
+        live_context = meta.get("moves") if isinstance(meta.get("moves"), dict) else None
+        if not request:
+            raise ValueError("repair job has no captured request")
+        kwargs: dict[str, Any] = {
+            "live_context": live_context,
+            "codex_path": codex_path,
+            "allow_shell": allow_shell,
+        }
+        if timeout_s is not None:
+            kwargs["timeout_s"] = float(timeout_s)
+        result = chat_with_codex(request, lib, **kwargs)
+        return {
+            "reply": result.reply or result.error or "",
+            "tools_used": list(result.tools_used),
+            "tool_trace": list(result.tool_trace),
+            "track_ids": list(result.track_ids),
+            "move_grades": list(result.move_grades),
+            "playlist": result.playlist,
+            "stop_reason": result.stop_reason,
+            **({"error": result.error} if result.error else {}),
+            **({"live_verification": result.live_verification} if result.live_verification else {}),
+        }
+
+    return _repair
+
+
+def _cmd_eval_score_candidate(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vibemix.eval.session_report import score_reprompt_candidate
+
+    score = score_reprompt_candidate(
+        Path(args.meta),
+        Path(args.candidate),
+        issue_code=getattr(args, "issue_code", None),
+    )
+    if args.as_json:
+        print(_json.dumps(score, indent=2, ensure_ascii=False))
+    else:
+        status = "ok" if score.get("ok") else "fail"
+        print(f"{status}: {', '.join(score.get('violations') or []) or 'no violations'}")
+    return 0 if bool(score.get("ok")) else 1
+
+
+def _run_eval_cli(argv: list[str]) -> int:
+    if getattr(sys, "frozen", False):
+        print(
+            "vibemix eval is a source-only dev/eval command and is not bundled in "
+            "the shipped sidecar.",
+            file=sys.stderr,
+        )
+        return 2
+
+    parser = argparse.ArgumentParser(prog="vibemix eval")
+    _build_eval_subparsers(parser)
     args = parser.parse_args(argv)
     return int(args.func(args) or 0)
 
@@ -5981,6 +6601,8 @@ def cli_entry(argv: list[str] | None = None) -> None:
     # dispatched the same way as `library` so the legacy flag layer is untouched.
     if raw_argv and raw_argv[0] == "bench":
         sys.exit(_run_bench_cli(raw_argv[1:]))
+    if raw_argv and raw_argv[0] == "eval":
+        sys.exit(_run_eval_cli(raw_argv[1:]))
     # Phase 92 (LESSON-03) — `vibemix learn <sub>` dispatch. v9.0 ships ONE
     # subcommand: `learn reset` (wipes ~/.cache/vibemix/learn-progress.json).
     # Dispatched the same way as `library` / `bench` — short-circuits BEFORE
