@@ -1023,6 +1023,33 @@ Proof before staging:
 - `git diff --check -- tests/library/test_energy.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AL - Embedding GA Probe Test Ruff Hygiene
+
+Suggested commit: `test(library): clean embedding ga probe lint`
+
+Include:
+
+- `tests/library/test_embedding_ga_probe.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Embedding implementation, Gemini/model routing behavior, runtime files, cache
+  migrations, and generated files.
+
+Reason:
+
+- The GA probe tests had an unused `numpy` import and an extra import-block
+  separator blank. Removing both keeps the focused ruff gate clean without
+  changing mocked probe behavior.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_embedding_ga_probe.py`
+- `uv run pytest -q tests/library/test_embedding_ga_probe.py`
+- `git diff --check -- tests/library/test_embedding_ga_probe.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Cohost Reaction Schema Drift
 
 Suggested commit if/when selected: `fix(ui-bus): reconcile cohost reaction schema`

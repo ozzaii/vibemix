@@ -21,7 +21,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import numpy as np
 import pytest
 
 from vibemix.library.embed import (
@@ -34,7 +33,6 @@ from vibemix.library.embed import (
     _probe_ga_model_id,
 )
 from vibemix.library.rekordbox import TrackEntry
-
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
