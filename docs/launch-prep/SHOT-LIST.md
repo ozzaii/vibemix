@@ -19,7 +19,7 @@ Sourced 1-to-1 from `mocks/vibemix-cinematic-storyboard.html` (8 `<section data-
 | 5 | AI line caption pop — "nice kick swap @ 2:33" | 0:14 – 0:17 (3s) | caption bubble fade-in over session UI; audio overlay of Gemini voice line at low EQ; mascot mood shifts to Hype-man |
 | 6 | EvidenceRegistry chip strip — anti-slop receipts | 0:17 – 0:20 (3s) | chip strip render: `[kick swap @ 2:33]` `[layer drop @ 4:50]` `[bpm shift @ 6:00]`; amber accent on the active chip; one-second hold per chip |
 | 7 | Mascot Hype-man celebrate animation (mid-track) | 0:20 – 0:25 (5s) | mascot full-frame; **Pioneer-CDJ headbob** (NOT generic VTuber dance per CDJ Whisper baseline); reserved energy, head-and-shoulders motion only |
-| 8 | End card — vibemix logo + altidus.world/vibemix + "open-source" | 0:25 – 0:30 (5s) | wordmark in Saira amber on warm-black; URL beneath in Geist Mono; "open-source · MIT · github.com/bravoh/vibemix" CTA; 1s logo dwell before fade |
+| 8 | End card — vibemix logo + altidus.world/vibemix + "Apache client" | 0:25 – 0:30 (5s) | wordmark in Saira amber on warm-black; URL beneath in Geist Mono; "Apache client · Bravoh managed service · github.com/bravoh/vibemix" CTA; 1s logo dwell before fade |
 
 ## Notes for Francesco
 

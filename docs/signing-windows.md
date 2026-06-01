@@ -1,18 +1,18 @@
 # Windows Code Signing — vibemix
 
-> Operational runbook for the SignPath Foundation OSS signing pipeline that
-> produces `vibemix-installer.exe`. Paired with `installer/windows/README.md`
-> (build script reference) and `.planning/signpath-application.md` (the
-> day-1 application record).
+> Operational runbook for the accepted Windows signing pipeline that produces
+> `vibemix-installer.exe`. Paired with `installer/windows/README.md` (build
+> script reference) and `docs/signpath-application.md` (historical SignPath
+> notes plus current signing-route caveats).
 
 ## Prerequisites
 
 Before this runbook can produce a signed `vibemix-installer.exe`:
 
-- [ ] **SignPath Foundation OSS approval** for the `vibemix` project — applied
-      on day 1 of Phase 1 per the 3-week buffer in `.planning/signpath-application.md`.
-      Approval email arrives at `oozzxaaii@gmail.com`. Confirmation includes
-      the SignPath organization slug and a project token.
+- [ ] **Accepted Windows signing route** for the `vibemix` project — either the
+      historical SignPath Foundation path or an approved commercial
+      Authenticode path. Confirmation includes the organization/account slug
+      and project token required by the release workflow.
 - [ ] **GitHub Actions secrets** set on the `ozzaii/vibemix` repo:
       - `SIGNPATH_API_TOKEN` — issued by SignPath after approval.
       - `SIGNPATH_ORGANIZATION_ID` — SignPath organization UUID.
@@ -159,8 +159,10 @@ few hundred downloads.
    Foundation certs auto-renew the same identity, so this is handled.
 
 EV (Extended Validation) certs bypass SmartScreen warm-up entirely but
-cost ~$300+/year and require a hardware token — explicitly out-of-scope
-for the OSS launch. SignPath Foundation OV is the right tradeoff for v1.
+cost ~$300+/year and require a hardware token. The commercial product path no
+longer excludes a paid signing route on open-source-positioning grounds; choose
+the Windows signing path that gets the accepted release artifact signed,
+verifiable, and supportable.
 
 ## Troubleshooting
 
@@ -232,8 +234,8 @@ Phase 19 README download buttons reference this exact name.
 
 - `installer/windows/vibemix-installer.iss` — the Inno Setup source.
 - `installer/windows/README.md` — local-build runbook.
-- `.planning/signpath-application.md` — the SignPath Foundation OSS
-  application record (filed day 1 of Phase 1).
+- `docs/signpath-application.md` — historical SignPath notes plus current
+  signing-route caveats.
 - `.planning/ROADMAP.md` Phase 18 — the distribution phase definition.
 - [SignPath docs](https://about.signpath.io/documentation) — pipeline reference.
 - [Microsoft signtool](https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool) — command reference.

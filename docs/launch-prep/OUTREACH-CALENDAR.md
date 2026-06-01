@@ -35,16 +35,16 @@ short on purpose — editors skim, and the demo link does the heavy lifting.
 - **Status:** ☐ Drafted ☐ Sent ☐ Acknowledged ☐ Published
 - **Pitch email body (draft):**
 
-  > Subject: open-source AI co-host that actually listens to your set
+  > Subject: AI co-host that actually listens to your set
   >
   > Hi DJ TechTools team,
   >
-  > I am Kaan — DJ + builder of vibemix, an open-source AI co-host for
+  > I am Kaan — DJ + builder of vibemix, an AI co-host for
   > live sets that just shipped its v1 on Mac + Windows. It listens to
   > your master output, watches your DJ app, reads your controller, and
   > talks back into your headphones as a hype-man or a coach. Your audio
   > doesn't leave your machine without you knowing. Built by DJs, on
-  > GitHub under Apache 2.0.
+  > GitHub under Apache 2.0; the hosted Bravoh co-host service is managed.
   >
   > The hook for your readers: it is the only AI co-host that is grounded
   > in the actual audio + screen + MIDI — no generic "wow that drop was
@@ -65,16 +65,16 @@ short on purpose — editors skim, and the demo link does the heavy lifting.
 - **Status:** ☐ Drafted ☐ Sent ☐ Acknowledged ☐ Published
 - **Pitch email body (draft):**
 
-  > Subject: real DJ friend in your ear — open-source AI co-host for DDJ controllers
+  > Subject: real DJ friend in your ear — AI co-host for DDJ controllers
   >
   > Hi DDJ Tips team,
   >
-  > Quick pitch: I built vibemix, an open-source AI co-host for live
+  > Quick pitch: I built vibemix, an AI co-host for live
   > DJ sets, and it ships with first-class Pioneer DDJ controller support
   > out of the box (DDJ-FLX4 is the daily-driver, 9 more mapped at launch).
   > It listens to your master output, watches your DJ app, and rides
-  > shotgun in your headphones — built by DJs, runs on your machine, open
-  > source under Apache 2.0.
+  > shotgun in your headphones — built by DJs, runs on your machine, with an
+  > Apache-licensed client and Bravoh-managed hosted service.
   >
   > Your readership is exactly the audience this was made for. The thing
   > that separates it from voice-assistant slop: it is grounded in real
@@ -96,18 +96,18 @@ short on purpose — editors skim, and the demo link does the heavy lifting.
 - **Status:** ☐ Drafted ☐ Sent ☐ Acknowledged ☐ Published
 - **Pitch email body (draft):**
 
-  > Subject: the only AI co-host that actually listens to your set — open-source, just shipped
+  > Subject: the only AI co-host that actually listens to your set — grounded, just shipped
   >
   > Hi Mixmag tech desk,
   >
-  > I built vibemix, a free open-source AI co-host for live DJ sets, and
+  > I built vibemix, an AI co-host for live DJ sets, and
   > v1 just shipped on Mac + Windows. The story angle for your readers:
   > most music-AI tooling right now generates noise about your set
   > without actually listening to it. vibemix is the opposite — it is
   > grounded in real audio + screen + MIDI, runs entirely on your
   > machine, and your audio doesn't leave without you knowing.
   >
-  > Built by DJs. Apache 2.0. The 60-second demo at the link shows
+  > Built by DJs. Apache-licensed client. The 60-second demo at the link shows
   > Francesco running a real club set with vibemix riding shotgun in his
   > headphones. Happy to offer Mixmag a Francesco-cut 30s exclusive demo
   > clip if you'd like a press asset to run with the piece.
@@ -122,7 +122,7 @@ short on purpose — editors skim, and the demo link does the heavy lifting.
 
 Show-HN-style framing per CONTEXT §LAUNCH-09. Reddit norms forbid the
 marketing tone of an editorial pitch — opens with the hero one-liner, the
-demo link, the open-source/Apache 2.0 anchor, and an explicit "feedback
+demo link, the Apache-licensed client anchor, and an explicit "feedback
 wanted on…" prompt so the post reads as a conversation-starter, not an
 ad. All three subreddits run on the same T-0 window — see
 [`LAUNCH-SEQUENCE.md`](./LAUNCH-SEQUENCE.md) T-0 row.
@@ -133,8 +133,8 @@ ad. All three subreddits run on the same T-0 window — see
   from their pinned launch guide / weekly thread cadence; subreddit
   discretion)
 - **Status:** ☐ Drafted ☐ Sent ☐ Acknowledged ☐ Published
-- **Title (draft):** "I built an open-source AI co-host that actually
-  listens to your set — free, Mac + Windows, feedback wanted"
+- **Title (draft):** "I built an AI co-host that actually
+  listens to your set — Mac + Windows, feedback wanted"
 - **Body (draft):**
 
   > Hey r/DJs — I am a DJ and I built vibemix because every "AI" tool I
@@ -144,8 +144,8 @@ ad. All three subreddits run on the same T-0 window — see
   > into your headphones as a hype-man or a coach. Your audio doesn't
   > leave your machine.
   >
-  > It is free and open-source (Apache 2.0), runs on Mac + Windows, ships
-  > with 10 controllers mapped out of the box, and works alongside
+  > The client is Apache-licensed, it runs on Mac + Windows, ships with 10
+  > controllers mapped out of the box, and works alongside
   > rekordbox / Serato / Traktor / djay Pro / VirtualDJ / Mixxx.
   >
   > Repo + 60-second demo: https://github.com/bravoh/vibemix
@@ -161,18 +161,18 @@ ad. All three subreddits run on the same T-0 window — see
   sub leans intermediate / learning, so the coach-mode framing carries
   more weight than the hype-man framing here)
 - **Status:** ☐ Drafted ☐ Sent ☐ Acknowledged ☐ Published
-- **Title (draft):** "Open-source AI co-host with a coach mode that
-  actually hears your transitions — free, feedback wanted"
+- **Title (draft):** "AI co-host with a coach mode that
+  actually hears your transitions — feedback wanted"
 - **Body (draft):**
 
-  > r/Beatmatch — I built vibemix, a free open-source AI co-host for
+  > r/Beatmatch — I built vibemix, an AI co-host for
   > learning DJs. It has a coach mode that listens to your master output,
   > watches your DJ app, reads your controller, and gives you grounded
   > feedback on the mix you just did — never invents a transition that
   > didn't happen, never compliments a train wreck. Built by a DJ. Your
   > audio doesn't leave your machine.
   >
-  > Free, open-source, Apache 2.0, Mac + Windows. Three skill levels
+  > Apache-licensed client, Mac + Windows. Three skill levels
   > (Beginner / Intermediate / Pro) with the prompts tuned per level so
   > the coach speaks to where you actually are.
   >
@@ -188,18 +188,18 @@ ad. All three subreddits run on the same T-0 window — see
   (this sub is producer-leaning; framing emphasises the workflow / live-
   performance angle, not the production-tool angle)
 - **Status:** ☐ Drafted ☐ Sent ☐ Acknowledged ☐ Published
-- **Title (draft):** "Open-source AI co-host for live sets — listens to
-  the audio, no slop, free on Mac + Windows"
+- **Title (draft):** "AI co-host for live sets — listens to
+  the audio, no slop, Mac + Windows"
 - **Body (draft):**
 
   > r/edmproduction — for the live-performance side of your workflow: I
-  > built vibemix, an open-source AI co-host that listens to your master
+  > built vibemix, an AI co-host that listens to your master
   > output, watches your DJ app, reads your controller, and talks back
   > into your headphones during a live set. Grounded in real audio +
   > screen + MIDI evidence, so it never invents a transition that didn't
   > happen.
   >
-  > Free, Apache 2.0, Mac + Windows. Built by a DJ. Your audio doesn't
+  > Apache-licensed client, Mac + Windows. Built by a DJ. Your audio doesn't
   > leave your machine.
   >
   > Repo + demo: https://github.com/bravoh/vibemix
@@ -226,7 +226,7 @@ so both audiences get a chance to react before the wide launch.
 - **Copy block (draft):**
 
   > hey team — soft-launching vibemix here 3 days before the wide ship.
-  > free open-source AI co-host for live sets, listens to your master
+  > AI co-host for live sets, listens to your master
   > output + watches your DJ app + reads your controller, talks back
   > into your headphones as hype-man or coach. built by a DJ, Mac +
   > Windows, Apache 2.0. would love this room's read on whether the

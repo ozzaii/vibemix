@@ -26,7 +26,7 @@ gh repo create ozzaii/vibemix \
     --source=. \
     --remote=origin \
     --push \
-    --description "Open-source AI DJ co-host. Listens, watches, talks back."
+    --description "AI DJ co-host. Listens, watches, talks back."
 
 # 3. Verify it landed
 gh repo view ozzaii/vibemix --web
@@ -37,7 +37,8 @@ git remote -v   # should show origin -> git@github.com:ozzaii/vibemix.git (or ht
 
 - `--source=.` uses local files as the seed (LICENSE, README.md, pyproject.toml, src/,
   etc. — all already committed locally by Phase 1's wave commits).
-- `--public` is required by SignPath OSS eligibility (Apache 2.0 + public repo).
+- `--public` is required if the Apache-licensed client is published from GitHub.
+  It is not a promise that every Bravoh-hosted service is open source.
 - `--push` automatically pushes all local commits to the new remote.
 - We skip `--add-readme` / `--license` / `--gitignore` because those generate files on
   the GitHub side, conflicting with `--source=.` (local files already exist).
@@ -55,7 +56,8 @@ SignPath survives a rename / ownership transfer without re-approval (per their t
 
 ## Next steps after repo creation
 
-- File the SignPath OSS application (see `.planning/signpath-application.md`).
+- Choose the Windows signing path (see `docs/signpath-application.md` for the
+  historical SignPath notes).
 - Verify the LICENSE displays correctly on GitHub
   (`https://github.com/ozzaii/vibemix/blob/main/LICENSE`).
 - Confirm the SignPath form's Section 2 (Repository) field is set to

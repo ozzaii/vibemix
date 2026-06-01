@@ -160,9 +160,9 @@ calendar references); Phase 39 deferred-item Substack draft slot
   it" post on the Bravoh Substack.
 - 5-7 bullet outline (the lock-in framing per CONTEXT §LAUNCH-10):
 
-  1. **Why we built it for DJs, not for VCs.** Bravoh's first OSS ship,
-     the warm-up signal for the closed beta — but vibemix has to stand
-     on its own as a real DJ utility first.
+  1. **Why we built it for DJs, not for VCs.** Bravoh's DJ co-host product,
+     with an Apache-licensed client and managed hosted service — vibemix has
+     to stand on its own as a real DJ utility first.
   2. **Anti-slop is a UX problem, not an LLM problem.** Every "AI for
      DJs" tool we'd tried was generic chatbot output; the bar we held
      was "real DJ friend in your ear, not voice-assistant slop".
@@ -260,7 +260,7 @@ follow-up close-out)
 
 - Pick one of: **cut v1.0.0** (numbers + DJ-ear both green) / **cycle
   RC2** (engineering green, DJ-ear has a load-bearing finding) /
-  **pause** (numbers indicate vibemix is not the v1 OSS warm-up Bravoh
+  **pause** (numbers indicate vibemix is not the v1 DJ co-host product Bravoh
   needs — pivot or absorb back into Bravoh main).
 
 **Verification:**

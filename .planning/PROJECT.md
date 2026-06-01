@@ -2,9 +2,9 @@
 
 ## What This Is
 
-A free, open-source AI co-host for live DJ sets. Runs locally on macOS or Windows: listens to your master output, watches your DJ software's screen, ingests your controller actions over MIDI, and talks back into your headphones or speakers as either a hype-man (party mode) or a coach (feedback mode). Three user levels — Beginner / Intermediate / Pro — with prompt templates tuned to each, plus a curated library of ~10 popular MIDI controllers mapped out of the box.
+A commercial AI co-host for live DJ sets with an Apache-licensed client. Runs locally on macOS or Windows: listens to your master output, watches your DJ software's screen, ingests your controller actions over MIDI, and talks back into your headphones or speakers as either a hype-man (party mode) or a coach (feedback mode). Three user levels — Beginner / Intermediate / Pro — with prompt templates tuned to each, plus a curated library of ~10 popular MIDI controllers mapped out of the box.
 
-Bravoh's first open-source release. Built as a polished, narrow-scope utility that warms an audience converting into Bravoh's waitlist.
+Built by Bravoh as a polished, narrow-scope product that earns DJ trust first and can convert real usage into Bravoh signups or paid hosted-service demand.
 
 ## Core Value
 
@@ -187,7 +187,7 @@ KAAN-ACTION queue parked for public-ship discharge (4 v10.0 items + the existing
 3. **OSS fully integrated** — close out v4.0 SHIP carryover (`v0.1.0` public RC publish actually goes out once Apple Dev + SignPath cert land); ship `CONTRIBUTING.md` / `CODE_OF_CONDUCT.md` / `SECURITY.md` / `MAINTAINERS.md` (LICENSE is already Apache 2.0 — keep); Bravoh-side proxy hardened to production-ready (per-client rate limit, abuse handling, observability, graceful fallback when proxy is offline, clean "BYO key" docs for self-hosters); release artifact UX (homebrew tap scaffold + scoop bucket scaffold ready, even if publish itself stays manual for v1).
 4. **GitHub sexified, generated, tested** — close the front-porch: replace the README `<video src="docs/assets/demo.mp4">` placeholder with the real 30-sec demo (§ASSETS-DEMO-CUT discharge); GitHub Pages landing in CDJ-Whisper aesthetic; OG/social card pinned at the right SHA; every visual asset auto-generated from sources (re-renders are reproducible — no hand-cut SVG bitrot); repo-presence test suite (badges resolve, demo asset under N MB, OG image present, hero hash matches sentinel); a "what is this in 30 seconds" landing-page hook that converts to the Bravoh waitlist.
 
-**Scope rule (anti-creep, locked):** v7.0 is **WIRING + DISCHARGE + POLISH**. **Zero new product capability.** **Zero new AI providers / managed-memory frameworks** (CLAP, MERT, OpenL3, torch, Mem0, Letta, Zep, Cognee all out — unchanged from v6.0). v6.0's deferred future items (multimodal moment-audio · cross-session arc priors · memory-driven pre-set prep · ProDJ Link as primary source) all stay deferred to a future milestone — they're explicitly **out of scope** for v7.0. This milestone earns the "first OSS release" stamp; it doesn't grow the product.
+**Scope rule (anti-creep, locked):** v7.0 is **WIRING + DISCHARGE + POLISH**. **Zero new product capability.** **Zero new AI providers / managed-memory frameworks** (CLAP, MERT, OpenL3, torch, Mem0, Letta, Zep, Cognee all out — unchanged from v6.0). v6.0's deferred future items (multimodal moment-audio · cross-session arc priors · memory-driven pre-set prep · ProDJ Link as primary source) all stay deferred to a future milestone — they're explicitly **out of scope** for v7.0. This milestone earns the "public client release" stamp; it doesn't grow the product.
 
 **Out of scope (this milestone):** any new feature, any new dep (red-class), any new ws port, any new IPC envelope (one-socket invariant unchanged), v6.0's `VIBEMIX_RECALL_ENABLED=1` flip (still gated on §RECALL-EAR Kaan-ear pass — independent KAAN-ACTION clock), `/hatch` user-gen mascot (still v2.x stretch — unchanged).
 
@@ -233,7 +233,7 @@ Full archive: `.planning/milestones/v6.0-ROADMAP.md` · Requirements: `.planning
 - Sexify finish (57) — impeccable CDJ-Whisper pass; v0.1.0-rc1 carryover bugs regression-pinned.
 - Ship readiness (58) — `cut_release.sh --dry-run v0.1.0-rc1` exits GREEN; publish hard-guard regression-pinned (never auto-runs); `v4.0-MILESTONE-AUDIT.md` generated.
 
-**Open at close (external clock):** Apple Dev Agreement (Francesco) + SignPath OSS cert (Kaan) gate the public RC publish; recorded §E2E walk + Gate-2b ear-passes are KAAN-ACTION. All in `KAAN-ACTION-LEGAL.md §SHIP-V4` + per-phase `*-HUMAN-UAT.md`.
+**Open at close (external clock):** Apple Dev Agreement (Francesco) + accepted Windows signing path (Kaan) gate the public RC publish; recorded §E2E walk + Gate-2b ear-passes are KAAN-ACTION. All in `KAAN-ACTION-LEGAL.md §SHIP-V4` + per-phase `*-HUMAN-UAT.md`.
 
 Roadmap: `.planning/ROADMAP.md` (v4.0 section) · Audit: `.planning/v4.0-MILESTONE-AUDIT.md`. Milestone intentionally left unarchived per Kaan directive 2026-05-21.
 
@@ -491,9 +491,9 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 
 ## Constraints
 
-- **Timeline**: No hard calendar target — ship-when-ready per `gsd-autonomous fully` mode. External Apple Developer Program Agreement + SignPath OSS approvals are the critical path; engineering parallelizes around the external clock.
+- **Timeline**: No hard calendar target — ship-when-ready per `gsd-autonomous fully` mode. External Apple Developer Program Agreement + accepted Windows signing approval are the critical path; engineering parallelizes around the external clock.
 - **Quality bar**: "Real DJ friend in your ear, no AI slop" — Kaan will block release if reactions feel scripted, late, hallucinated, or generic.
-- **Budget**: 150-200 € launch marketing (IG ads, paid posts), ~50 €/month ongoing Gemini API for end-user requests. Reassess if usage scales.
+- **Budget**: 150-200 € launch marketing (IG ads, paid posts). Hosted AI/proxy cost must be tied to the current billing model before public pricing or "free" claims; reassess with real usage.
 - **Tech stack**: Live co-host remains on the LiveKit pipeline + configured live/TTS brain. Library/Viber set-prep and chat use the local Codex CLI backend; library/search embeddings are local CLAP ONNX.
 - **Platforms**: macOS + Windows in v1. Linux explicitly excluded.
 - **Team**: Kaan (engineering + product), Francesco (cofounder — product/marketing/DJ network for outreach), Momo (Bravoh team). Bravoh main product takes priority — vibemix runs alongside.
@@ -513,7 +513,7 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 | **3 user modes × 2 interaction modes** (Beginner/Intermediate/Pro × Hype-man/Coach) | Wide audience coverage with a small prompt-template matrix | ✓ Good |
 | **Bravoh-managed API key**, free for end users | Friction kills virality; we treat cost as marketing spend | ✓ Good — Bravoh proxy with per-client rate limit; €50/month CI gate stays under budget |
 | **Genre picker at session start** | Phase-detection (drop/build/breakdown) thresholds depend heavily on genre; "auto-detect genre" is research-grade and would block shipping | ✓ Good |
-| **Open-source as Bravoh's first OSS** | Marketing wedge ahead of Bravoh public launch; gets attention, builds trust, funnels to waitlist | — Pending public RC publish (KAAN-ACTION-LEGAL §SHIP-07) |
+| **Apache-licensed client + Bravoh managed product** | Trust wedge ahead of Bravoh public launch; proves capability, builds confidence, funnels to waitlist or paid hosted demand | — Pending public RC publish (KAAN-ACTION-LEGAL §SHIP-07) |
 | **Workflow profile: Fine granularity, all Opus, all checkpoints on** | Kaan's directive: "do your deep research, don't go blind into coding, all checkpoints will be every agent will be Opus". | ✓ Good — `gsd-autonomous fully` mode validated across 4 milestones |
 | **Critique → execute → critique → execute loop per phase** | Kaan's directive: every phase runs a quality loop, not a one-shot. plan-checker before execute, verifier after execute, ui-checker/ui-auditor between polish iterations, code-reviewer on output. | ✓ Good — Phase 43 visual lock proved the loop end-to-end (zero HIGH findings on Tier-1 surfaces) |
 | **Reactive mascot as v1 feature, dedicated polish phase** | The mascot isn't just brand decoration — it's the visual feedback loop that telegraphs back what the system saw. Inspired by OpenAI Pets, lives in-app, reacts to MIDI/audio in real time. | ✓ Good — VTuber-style 3D character "Neon Rebel"; 4-layer mascot full additive state machine in production (Phase 31 v2.1); §VIS-04 Mixamo retargets pending |

@@ -1,20 +1,22 @@
 # vibemix — Code Signing Policy
 
-vibemix is an open-source AI co-host for live DJ sets. Its release binaries are
-code-signed so that users can verify they run the genuine build that came from
-this repository, untampered.
+vibemix is an AI co-host for live DJ sets with an Apache-licensed client and
+Bravoh-managed hosted services. Its release binaries are code-signed so that
+users can verify they run the genuine build that came from this repository,
+untampered.
 
-Windows code signing is provided by [SignPath.io](https://signpath.io), with a
-free certificate issued by the [SignPath Foundation](https://signpath.org) under
-its program for open-source projects. The certificate is held in the SignPath
-Foundation's name; a valid signature confirms the binary is an automated build
-produced from the source in this repository.
+Windows code signing uses the accepted release signing path for the current
+product cut. Historical SignPath Foundation notes remain in
+[`docs/signpath-application.md`](signpath-application.md), but the project no
+longer requires a no-cost Foundation certificate if a commercial signing route is
+the correct release choice. A valid signature confirms the binary is an
+automated build produced from the source in this repository.
 
 ## What gets signed
 
 | Artifact | Platform | Signing path |
 |----------|----------|--------------|
-| `vibemix-installer.exe` (Inno Setup installer) | Windows | SignPath Foundation (Authenticode) |
+| `vibemix-installer.exe` (Inno Setup installer) | Windows | Accepted Authenticode signing path |
 | `vibemix.dmg` | macOS (Apple Silicon) | Apple Developer ID + notarization |
 
 Only release builds are signed. Development and CI test builds are unsigned.
@@ -24,8 +26,7 @@ Only release builds are signed. Development and CI test builds are unsigned.
 - **Repository:** https://github.com/ozzaii/vibemix
 - **License:** Apache-2.0
 - **Build system:** GitHub Actions (`.github/workflows/release.yml`). Windows
-  binaries are submitted to SignPath via
-  `signpath/github-action-submit-signing-request`. The build is determined by
+  binaries are submitted through the accepted signing workflow. The build is determined by
   configuration under version control — no manual overrides of critical build
   settings in CI, and signing requests are tied to a specific commit.
 

@@ -8,13 +8,13 @@ product
 
 Solo DJs across three skill levels — Beginner, Intermediate, Pro — running live sets at home, in a bedroom studio, or in a club. The user is always in flow: cans on, hands on the controller, eyes locked to djay Pro / Rekordbox / Serato. They are not browsing, not reading, not configuring. They want a co-host that notices what they're doing and reacts in a way that feels alive and grounded — never late, never scripted, never generic.
 
-Macroaudience: the broader free-and-open-source DJ tooling community (Mixxx users, custom controller mappers, performance-focused producers) that Bravoh wants to warm into its waitlist via vibemix's GitHub release. The interface is judged by both audiences: the DJ in the moment and the developer skimming the repo.
+Macroaudience: the broader DJ tooling and developer community (Mixxx users, custom controller mappers, performance-focused producers) that Bravoh wants to earn trust from through vibemix's public client and product launch. The interface is judged by both audiences: the DJ in the moment and the developer skimming the repo.
 
 ## Product Purpose
 
-A free, open-source AI co-host for live DJ sets. Runs locally on macOS and Windows. Listens to the master output, watches the DJ software's window, ingests MIDI from the controller, and speaks back into headphones or speakers as either a hype-man (party mode) or a coach (feedback mode). Reactions are grounded in real evidence — audio features, current track, MIDI moves — never hallucinated commentary.
+A commercial AI co-host for live DJ sets with an Apache-licensed client. Runs locally on macOS and Windows. Listens to the master output, watches the DJ software's window, ingests MIDI from the controller, and speaks back into headphones or speakers as either a hype-man (party mode) or a coach (feedback mode). Reactions are grounded in real evidence — audio features, current track, MIDI moves — never hallucinated commentary.
 
-Bravoh's first open-source release. Built as a polished, narrow-scope utility that warms an audience into Bravoh's waitlist. Success looks like 500–1000+ GitHub stars, DJ-set testing that confirms the "real friend in your ear" feel, and a closed beta that converts into Bravoh signups.
+Built by Bravoh as a polished, narrow-scope product that earns trust with working DJs and can deserve monetization. Success looks like DJ-set testing that confirms the "real friend in your ear" feel, a clean install path, and a product funnel that converts real use into Bravoh signups or paid hosted-service demand.
 
 ## Brand Personality
 

@@ -36,7 +36,7 @@ vibemix is a real DJ friend in your ear. It reacts to the actual audio coming ou
 
 Built by DJs. The reactions are tuned against real sessions on rekordbox, Serato, Traktor, and djay Pro — not against a benchmark. Cuts that land late, hallucinated track names, and small-talk filler all fail the grading bar before any release ships.
 
-Your audio doesn't leave your machine without you knowing. vibemix is open source under Apache 2.0; v0.1.0-rc1 ships for macOS (Apple Silicon) today, with the Windows build landing in v0.1.0 stable. Live co-host calls go to Bravoh's Gemini proxy at `api.altidus.world` — analyzed in flight, never stored. Library embeddings/search run locally with CLAP ONNX (one-time ~785 MB model download on first Library open; live co-host works without it); the optional Viber library agent can use your local Codex login. Recordings stay local under `recordings/<session>/` with a 7-day default retention you can change in Settings.
+Your audio doesn't leave your machine without you knowing. The vibemix client is Apache-licensed; the hosted Bravoh proxy and Bravoh product services are managed commercial infrastructure. The macOS Apple Silicon release candidate is gated on producing and verifying a signed/notarized DMG, with the Windows build targeting v0.1.0 stable. Live co-host calls go to Bravoh's Gemini proxy at `api.altidus.world` — analyzed in flight, never stored. Library embeddings/search run locally with CLAP ONNX (one-time ~785 MB model download on first Library open; live co-host works without it); the optional Viber library agent can use your local Codex login. Recordings stay local under `recordings/<session>/` with a 7-day default retention you can change in Settings.
 
 <p align="center">
   <img alt="release" src="https://img.shields.io/github/v/release/bravoh-ai/vibemix?style=flat-square&color=ff8a3d" />
@@ -56,7 +56,7 @@ Your audio doesn't leave your machine without you knowing. vibemix is open sourc
 
 ---
 
-**A real DJ friend in your ear — no AI slop.** vibemix listens to your master output, watches your DJ software's screen, ingests your controller, and talks back into your headphones in a way that's grounded in what you actually just did. Not generic "AI assistant" commentary. Not hallucinated track names. Not late reactions to events that already passed. Built by [Bravoh](https://altidus.world) and released open-source as the warm-up for our main launch.
+**A real DJ friend in your ear — no AI slop.** vibemix listens to your master output, watches your DJ software's screen, ingests your controller, and talks back into your headphones in a way that's grounded in what you actually just did. Not generic "AI assistant" commentary. Not hallucinated track names. Not late reactions to events that already passed. Built by [Bravoh](https://altidus.world) as a commercial product with an Apache-licensed client.
 
 > **Audio privacy in one line:** live audio is streamed to Bravoh's Gemini proxy for analysis; library embeddings stay local. Recordings stay on your machine. See [FAQ](#faq) for the long version.
 
@@ -81,7 +81,7 @@ vibemix doesn't care which DJ app you run — it listens to the master output, w
   </tr>
 </table>
 
-Don't see your app? vibemix listens to the audio coming out of your machine — anything routed through BlackHole on Mac is fair game today (Windows WASAPI loopback ships with v0.1.0 stable). The grounding stack (audio + screen + MIDI) is app-agnostic.
+Don't see your app? vibemix listens to the audio coming out of your machine — anything routed through BlackHole on Mac is fair game in the macOS release-candidate path (Windows WASAPI loopback targets v0.1.0 stable). The grounding stack (audio + screen + MIDI) is app-agnostic.
 
 <!-- Logos are placeholder wordmarks per KAAN-ACTION-LEGAL.md §LAUNCH-03 — real trademark-compliant logos land via Kaan-discharge before public launch. -->
 
@@ -92,21 +92,22 @@ Don't see your app? vibemix listens to the audio coming out of your machine — 
 | OS | Download |
 |----|----------|
 | macOS (Apple Silicon) | [vibemix.dmg](https://github.com/bravoh-ai/vibemix/releases/latest) |
-| Windows 11 | coming in v0.1.0 stable (SignPath OSS-program signing in flight) |
+| Windows 11 | targeting v0.1.0 stable (release signing path in flight) |
 
 <!-- Launch note: install URLs go live with the first signed release. Verify the
      `bravoh-ai/vibemix` org/repo slug matches the final GitHub home before
      public launch. Install GIFs land in docs/assets/install/ with the first
      signed release cut. -->
 
-v0.1.0-rc1 ships signed + notarized for macOS Apple Silicon. The Windows build
-waits on SignPath OSS-program approval and ships with v0.1.0 stable.
+v0.1.0-rc1 public distribution is gated on producing and verifying a fresh
+signed/notarized macOS Apple Silicon DMG. The Windows build waits on the
+accepted Windows signing path and targets v0.1.0 stable.
 Auto-update is on by default for release builds; opt out in Settings.
 
-Windows binaries are code-signed by the [SignPath Foundation](https://signpath.org),
-which provides free code signing for open-source projects; macOS builds use Apple
-Developer ID + notarization. See the [Code Signing Policy](docs/code-signing-policy.md)
-and [Privacy Policy](PRIVACY.md).
+Windows binaries are code-signed through the release signing flow documented in
+the [Code Signing Policy](docs/code-signing-policy.md); macOS builds use Apple
+Developer ID + notarization. See the [Privacy Policy](PRIVACY.md) for data
+handling.
 
 ---
 
@@ -251,7 +252,7 @@ vibemix runs on your machine. The live co-host streams audio + screen frames + M
 
 ### 1. What is vibemix?
 
-An AI co-host for live DJ sets. It listens to your master output, watches your DJ software's screen, ingests your controller actions over MIDI, and talks back into your headphones — either as a hype-man during the set, or as a coach pointing out where you cut a beat early. Open source. macOS today; Windows ships with v0.1.0 stable.
+An AI co-host for live DJ sets. It listens to your master output, watches your DJ software's screen, ingests your controller actions over MIDI, and talks back into your headphones — either as a hype-man during the set, or as a coach pointing out where you cut a beat early. The client is Apache-licensed; hosted Bravoh services are managed commercially. macOS release-candidate path first; Windows targets v0.1.0 stable.
 
 ### 2. Is my audio sent to the cloud?
 
@@ -259,11 +260,11 @@ For the live co-host, yes. Audio chunks are streamed to Bravoh's proxy at `api.a
 
 ### 3. Is this free?
 
-Yes for v1. The ~50 €/month Gemini API cost is absorbed by Bravoh as part of the launch wedge. We may revisit this if usage scales past what we projected; if so, we'll announce before changing anything.
+The client source is Apache-licensed. Hosted live co-host access is a Bravoh-managed service; launch access may include trial or allowlist periods, but the docs should not promise permanent free operation. If you prefer to avoid the managed proxy, use the BYO-key path and run against your own provider account.
 
 ### 4. Why no Linux?
 
-Three reasons: djay Pro is Mac/Win only and that's our primary integration target; the loopback audio stack on Linux (PulseAudio / PipeWire) is different enough that the OS-platform layer triples in maintenance; and Bravoh's first OSS release optimizes for narrow scope. We'd consider it for v2 if there's community signal (a PR with the platform port already in shape).
+Three reasons: djay Pro is Mac/Win only and that's our primary integration target; the loopback audio stack on Linux (PulseAudio / PipeWire) is different enough that the OS-platform layer triples in maintenance; and the commercial product path optimizes for a narrow, supportable release surface. We'd consider it for v2 if there's community signal and a PR with the platform port already in shape.
 
 ### 5. Why Gemini and not GPT / Claude / Llama?
 
@@ -271,7 +272,7 @@ The live co-host uses Bravoh's Gemini path for grounded reactions and TTS. Libra
 
 ### 6. Is the AI actually listening to my music?
 
-Yes. It listens to your master output via virtual audio (BlackHole on Mac today; Windows WASAPI loopback ships with v0.1.0 stable), watches your DJ software's window via screen capture, and reads your MIDI controller. The "real friend" feel comes from grounding the reaction in all three sources simultaneously, not from clever prompting alone.
+Yes. It listens to your master output via virtual audio (BlackHole on Mac in the release-candidate path; Windows WASAPI loopback targets v0.1.0 stable), watches your DJ software's window via screen capture, and reads your MIDI controller. The "real friend" feel comes from grounding the reaction in all three sources simultaneously, not from clever prompting alone.
 
 ### 7. Can it hallucinate?
 
@@ -283,7 +284,7 @@ The vibemix client (this repo) is Apache 2.0. The Bravoh proxy and Bravoh's main
 
 ### 9. Why a Bravoh-managed proxy instead of bring-your-own-key?
 
-UX and ops: most DJs don't want to manage an API key, billing, or rate limits. Centralising those at Bravoh is part of the launch wedge. If you'd rather BYO, see CONTRIBUTING — there's an env-var path to point vibemix at your own Gemini endpoint.
+UX and ops: most DJs don't want to manage an API key, billing, or rate limits. Centralising those at Bravoh is part of the managed product. If you'd rather BYO, see CONTRIBUTING — there's an env-var path to point vibemix at your own Gemini endpoint.
 
 ### 10. Will my recordings be uploaded anywhere?
 
@@ -301,9 +302,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Three paths: bug fixes (standard PR with
 
 ## Built by [Bravoh](https://altidus.world)
 
-vibemix is Bravoh's first open-source release — a warm-up for our main product. If you like the energy here, the AI creative team for music artists is over there:
+vibemix is a Bravoh product with an Apache-licensed client and a managed hosted service. If you like the energy here, the AI creative team for music artists is over there:
 
-[**altidus.world →**](https://altidus.world/vibemix?utm_source=github&utm_medium=oss&utm_campaign=vibemix_launch)
+[**altidus.world →**](https://altidus.world/vibemix?utm_source=github&utm_medium=repo&utm_campaign=vibemix_launch)
 
 ---
 

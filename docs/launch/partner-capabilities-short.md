@@ -12,7 +12,7 @@ vibemix runs locally on a DJ's Mac or PC, listens to the master output, watches 
 
 Not generic AI commentary. Not hallucinated track names. Not late reactions. The whole product is engineered around one bar: *"does this feel like a real DJ friend in your ear, or does it feel like AI slop?"* If reactions are scripted, late, hallucinated, or generic, it has failed regardless of polish.
 
-Open source under Apache 2.0. Built by [Bravoh](https://bravoh.ai) as the open-source warm-up for our main product launch.
+Apache-licensed client with Bravoh-managed hosted services. Built by [Bravoh](https://bravoh.ai) as a DJ product that proves the main Bravoh standard in a live, high-trust setting.
 
 ---
 
@@ -47,7 +47,7 @@ A local-only search engine across the DJ's own collection.
 - **100% local** — on-device CLAP model (~785 MB, one-time). The DJ's library never leaves their machine.
 - **Cue-anchored** — fingerprints the mixable sections (intro, breakdown, drop, outro), not the random middle, so similarity reflects what a DJ would actually mix.
 
-Today: Rekordbox `collection.xml` ingest shipping. Serato and Traktor next.
+Built now: Rekordbox `collection.xml` ingest. Serato and Traktor next.
 
 ### 3. Set Builder ("Viber")
 
@@ -99,7 +99,7 @@ The difference between *"DJ tries it once, decides it's a gimmick"* and *"DJ kee
 - **Vibe Library** and **Set Builder** run 100% locally. Library never leaves the machine.
 - **Recordings** stay local under `recordings/<session>/`, 7-day default retention, configurable from 1 day to forever.
 - **No telemetry by default.** Anonymous crash reports are opt-in via the first-run wizard.
-- **BYO-key path** — point vibemix at your own model-provider API key via env var; Apache 2.0 makes a private fork trivial.
+- **BYO-key path** — point vibemix at your own model-provider API key via env var; the Apache-licensed client keeps that path auditable and forkable.
 
 Full disclosure in `SECURITY.md` (responsible disclosure, threat model, proxy's role).
 
@@ -107,10 +107,10 @@ Full disclosure in `SECURITY.md` (responsible disclosure, threat model, proxy's 
 
 ## Platforms & install
 
-- **macOS Apple Silicon** — signed and notarized, shipping today via DMG.
-- **Windows 11** — ships with v0.1.0 stable. SignPath OSS signing approval in flight.
+- **macOS Apple Silicon** — public distribution is gated on producing and verifying a signed and notarized DMG.
+- **Windows 11** — targets v0.1.0 stable. The accepted Windows signing path is in flight.
 - **Linux** — out for v1 (open to a community PR).
-- **License** — Apache 2.0. Fork it, point it at your own key, ship it inside something else. We're fine.
+- **License** — client Apache 2.0; Bravoh proxy and hosted product services remain managed commercial infrastructure. Fork it and point it at your own key if you want to run without the managed proxy.
 
 ---
 
@@ -132,7 +132,7 @@ Out of scope on purpose: stem separation, multi-provider AI, enterprise dashboar
 
 [Bravoh](https://bravoh.ai) is the AI creative team for music artists — four AI-powered agent personas helping artists with creative direction, marketing, production, release strategy. **Currently in closed beta.**
 
-vibemix is Bravoh's first open-source release — not a side project, the warm-up. A polished, narrow-scope utility for a community Bravoh wants to be trusted by. Target on its own: 500–1,000+ GitHub stars at launch, a working installed base across rekordbox / Serato / Traktor, and a Discord community giving real feedback against real sets.
+vibemix is a Bravoh product — not a side project. It is a polished, narrow-scope utility for a community Bravoh wants to be trusted by, with a public Apache-licensed client and managed hosted service. Target on its own: working installed usage across rekordbox / Serato / Traktor, feedback from DJs running real sets, and a funnel into Bravoh's wider product path.
 
 ---
 
@@ -140,7 +140,7 @@ vibemix is Bravoh's first open-source release — not a side project, the warm-u
 
 **Controller manufacturers** — official sign-off on the bundled mapping. Co-branded launch around the Beginner Module (the controller you make is the one the user sees on screen). Joint content for the DJ-school channel.
 
-**DJ software vendors** — deeper integration than the audio + screen + MIDI floor. OSC, direct library access, native co-host surface inside your app. Mixxx is the obvious open-source candidate; everyone else is a conversation.
+**DJ software vendors** — deeper integration than the audio + screen + MIDI floor. OSC, direct library access, native co-host surface inside your app. Mixxx is the obvious open DJ-tooling candidate; everyone else is a conversation.
 
 **DJ schools and educators** — the Beginner Module as a teaching surface. Branded curriculum slots. A measurable funnel from "first time touching a controller" to "first set played."
 

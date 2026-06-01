@@ -46,12 +46,13 @@
 
 ## §0 · Preamble — what this is, and how to use it
 
-**vibemix** = a free, open-source, **local** AI DJ co-host for live sets (macOS +
-Windows). It listens to your master output, watches your DJ-software screen, reads
-your MIDI controller, and talks back into your headphones as a **hype-man** (party
-mode) or a **coach** (feedback mode). Three skill levels (Beginner/Intermediate/Pro).
-It is **Bravoh's first open-source release** — a polished narrow utility that warms an
-audience into Bravoh's waitlist.
+**vibemix** = a commercial, **local** AI DJ co-host for live sets with an
+Apache-licensed client and Bravoh-managed hosted service (macOS + Windows). It
+listens to your master output, watches your DJ-software screen, reads your MIDI
+controller, and talks back into your headphones as a **hype-man** (party mode) or
+a **coach** (feedback mode). Three skill levels (Beginner/Intermediate/Pro). It
+is a polished Bravoh product that earns DJ trust directly and can convert real
+usage into Bravoh signups or paid hosted-service demand.
 
 **The product's whole soul:** *the AI reacts in a way that feels alive and grounded —
 never hallucinating, never breaking flow, never AI slop.* The bar is "a real DJ friend
@@ -341,16 +342,16 @@ your ear — not voice-assistant slop."*
 
 ---
 
-## §10 · Monetization — the OSS→revenue bridge *(decided)*
+## §10 · Monetization — the client→revenue bridge *(superseded posture)*
 
-A 3-tier model (the funnel: free vibemix → GitHub stars + waitlist → Bravoh, the AI
-Artist OS; Pro/Studio = direct revenue + the willingness-to-pay signal):
+A 3-tier model (the funnel: Apache-licensed client or trial access → real DJ usage →
+Bravoh, the AI Artist OS; Pro/Studio = direct revenue + the willingness-to-pay signal):
 
 | Tier | Price | What | Why |
 |---|---|---|---|
-| **Free** (OSS, BYO-key) | €0 | the full **live co-host** (hype + coach), library vibe-search, the Learn module | the GitHub-star magnet + Bravoh-waitlist top; BYO Gemini key solves the API-key-in-binary problem AND carries zero hosted cost |
+| **Client/BYO** | €0 hosted cost to Bravoh | Apache-licensed client with BYO provider key; exact managed-service allowance remains a pricing decision | trust/audit path; BYO Gemini key solves the API-key-in-binary problem AND carries zero hosted cost |
 | **Pro** | **€4.99/mo** | Viber set-prep (curate / build-set / energy-curve / Rekordbox export) + **hosted key** (no BYO) + Judge calibration + higher limits | the willingness-to-pay test; €4.99 caps the cost-spike on the expensive Codex/compute path |
-| **Studio** | **€9.99/mo** | everything + **Universal-Gobble** multi-ecosystem ingest (Serato/Traktor/Mixxx/Engine) + standalone `library cue` batch auto-cue export + priority | the free **Mixed In Key ($58-99) / KimiCue ($29) killer** as a paid convenience |
+| **Studio** | **€9.99/mo** | everything + **Universal-Gobble** multi-ecosystem ingest (Serato/Traktor/Mixxx/Engine) + standalone `library cue` batch auto-cue export + priority | the lower-cost **Mixed In Key ($58-99) / KimiCue ($29)** alternative as a paid convenience |
 
 **Cost guardrails:** Bravoh-side proxy + per-client rate limit + SessionMeter telemetry
 (NOT a client-side cap — trivially bypassable in an OSS binary). **API-key protection** =
@@ -628,8 +629,8 @@ Kaan-decision: full reaction text (perfect replay) vs truncated/hash (privacy). 
 observability milestone.
 
 **Kaan-action gates (external clock = the real critical path):** Apple Developer Program
-enrollment + Developer ID cert + ASC API key (8 secrets); SignPath OSS application (~1-week
-SLA); pin the BlackHole/VB-Cable driver SHAs after the cert; rotate the Tauri updater keypair
+enrollment + Developer ID cert + ASC API key (8 secrets); choose and complete the
+accepted Windows signing path; pin the BlackHole/VB-Cable driver SHAs after the cert; rotate the Tauri updater keypair
 to prod; run the legacy-delete + the first-run user-test on a clean machine. **Biggest risk:**
 the chain WARN-but-passes (not fail-closed) at 3 spots (placeholder SHAs, mock-signing) — a
 'clean build' can LOOK shippable yet not be trust-anchored. Fail closed before the real cut.
@@ -682,12 +683,13 @@ lands in the booth and is confused — same family as the §18 onboarding cliff)
 else is Kaan ear-passes (EQ exemplar tone, the rare Mastered-unlock vocal, Course-3
 routed-audio count-in).
 
-**Funnel + money (already wired in code):** free Learn (TikTok/Reels mega-magnet) → free
-co-host (the graduate flips coach→hype on the SAME grounding pipeline — a product-state
-change, not a re-acquisition) → €4.99/€9.99 Viber set-prep → Bravoh. `wizard.py` already
-self-segments Beginner/Intermediate/Pro. **Keep Learn 100% FREE** — incumbent courses are
-commoditized and cheap; Learn's strategic job is the top-of-funnel mega-magnet that warms an
-audience into Bravoh, not a price war.
+**Funnel + money (pricing still a product decision):** Learn/trial access can remain the
+top-of-funnel mega-magnet, but hosted co-host access must be tied to a real cost-control
+plane before public pricing claims. The graduate flips coach→hype on the SAME grounding
+pipeline — a product-state change, not a re-acquisition — and Viber set-prep remains the
+clearest willingness-to-pay test. `wizard.py` already self-segments
+Beginner/Intermediate/Pro. Keep Learn strategically accessible if it feeds Bravoh, but do
+not promise unlimited free hosted operation.
 
 **Priority (decisive):** Learn is the single biggest strategic lever AND the closest-to-done
 — but it blocks on **Kaan's EAR, not engineering.** So it must NOT consume an engineering
@@ -701,7 +703,7 @@ desktop app — the screen-record demos bridge it; a mobile surface is the event
 ## §20 · Final recommendations (the capstone)
 
 ### To KAAN (the founder — the things only you move)
-1. **Start the external clock TODAY — it's the longest pole, pure waiting:** enroll Bravoh in the Apple Developer Program + generate the Developer ID cert + ASC API key (8 secrets); apply to SignPath OSS (~1-week SLA). Nothing ships signed/notarized without these, and engineering can't shorten them.
+1. **Start the external clock TODAY — it's the longest pole, pure waiting:** enroll Bravoh in the Apple Developer Program + generate the Developer ID cert + ASC API key (8 secrets); choose and file the accepted Windows signing path. Nothing ships signed/notarized without these, and engineering can't shorten them.
 2. **Schedule your EAR-PASSES now — they're the real critical path, not code:** the Judge calibration (~20-30 labeled transitions → lock 3 thresholds), §EARNED-LIVE-MASTERED-VERIFY on a real FLX4, the EQ-exemplar tone, the Mastered-unlock vocal, persona/voice. These gate BOTH the Judge gold-flip AND Learn (the 15-90× market). Block 2-3 rig sessions — they parallelize the Apple/SignPath clock at zero eng cost.
 3. **Make the COST DECISION (the real 10k gate, yours not engineering's):** BYO-key as the default above a small free quota, OR fund the Bravoh server-side per-client cap (OPS-14-SERVER). And pick the TTS — pay for native cloud quality (Cartesia Sonic 3 / ElevenLabs Flash), not local.
 4. **The demo IS the launch — shoot it with Francesco.** The `demo.mp4` placeholder is the #1 GTM blocker; the silence-beat is the whole pitch. Lead the story with the grounded VOICE + Learn's "watches your hands," NEVER the contested next-track pill.

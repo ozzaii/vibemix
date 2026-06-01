@@ -12,7 +12,7 @@ Bravoh and Meturavers are each referred to as a "**Party**" and collectively as 
 
 ## 1. Purpose
 
-The Parties wish to explore a potential business relationship relating to **vibemix**, an open-source AI co-host for DJs built by Bravoh, and adjacent commercial collaborations (the "**Purpose**"). In connection with the Purpose, each Party may disclose to the other certain non-public, proprietary, or confidential information.
+The Parties wish to explore a potential business relationship relating to **vibemix**, an AI co-host for DJs built by Bravoh with an Apache-licensed client and managed hosted services, and adjacent commercial collaborations (the "**Purpose**"). In connection with the Purpose, each Party may disclose to the other certain non-public, proprietary, or confidential information.
 
 ## 2. Definition of Confidential Information
 

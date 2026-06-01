@@ -4,7 +4,7 @@
 
 vibemix runs locally on a DJ's Mac or PC, listens to the master output, watches the DJ software, reads the MIDI controller, and talks back into the headphones — as a hype-man or a coach — grounded in what the DJ actually just did. Not generic commentary. Not hallucinated track names. Not late reactions.
 
-Open source under Apache 2.0. macOS shipping signed today; Windows on v0.1.0 stable.
+Apache-licensed client with a Bravoh-managed hosted service. macOS distribution is gated on producing and verifying a signed/notarized DMG; Windows targets v0.1.0 stable.
 
 ---
 
@@ -21,7 +21,7 @@ Every reaction is cited against real evidence — the audio chunk, the MIDI move
 
 ## Built by [Bravoh](https://bravoh.ai)
 
-Bravoh is the AI creative team for music artists — currently in closed beta. vibemix is Bravoh's first open-source release: the warm-up that earns the trust of the DJ community.
+Bravoh is the AI creative team for music artists — currently in closed beta. vibemix is Bravoh's DJ co-host product: the live utility that earns the trust of the DJ community.
 
 ## Where Meturavers fits
 

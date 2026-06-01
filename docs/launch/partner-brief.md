@@ -4,15 +4,15 @@
 
 vibemix runs locally on a DJ's Mac or PC, listens to their master output, watches their DJ software, reads their MIDI controller, and talks back into their headphones as either a hype-man or a coach — grounded in what they actually just did. Not generic AI commentary. Not hallucinated track names. Not late reactions. Built by DJs, tuned against real sessions on rekordbox, Serato, Traktor, and djay Pro.
 
-Open source under Apache 2.0. macOS Apple Silicon shipping signed today; Windows lands with v0.1.0 stable.
+Apache-licensed client with a Bravoh-managed hosted service. macOS Apple Silicon distribution is gated on producing and verifying a signed/notarized DMG; Windows targets v0.1.0 stable.
 
 ---
 
 ## Who it's for
 
-Solo DJs across three skill levels — Beginner, Intermediate, Pro — running live sets at home, in a bedroom studio, or in a club. Plus the broader open-source DJ-tooling community (Mixxx, custom mappers, performance producers) we're warming into Bravoh's main waitlist.
+Solo DJs across three skill levels — Beginner, Intermediate, Pro — running live sets at home, in a bedroom studio, or in a club. Plus the broader DJ-tooling and developer community (Mixxx, custom mappers, performance producers) we're earning trust from through a public client and grounded product launch.
 
-## What's already shipping
+## What's already built
 
 - **Live co-host** — 6 voice modes (3 skill levels × hype/coach), 10 controllers mapped out of the box (Pioneer DDJ family, Hercules Inpulse, Numark Party Mix Live), app-agnostic via audio + screen + MIDI grounding
 - **Vibe Library** — local CLAP-based search across the DJ's own collection ("find me something darker", "tracks like this one"), no cloud upload
@@ -25,7 +25,7 @@ Every reaction is cited against real evidence — the audio chunk, the MIDI move
 
 ## Built by [Bravoh](https://bravoh.ai)
 
-Bravoh is the AI creative team for music artists — currently in closed beta. vibemix is the open-source warm-up: a polished, narrow-scope utility that earns trust with the DJ community and converts into the Bravoh waitlist. Target: 500–1000+ GitHub stars at launch.
+Bravoh is the AI creative team for music artists — currently in closed beta. vibemix is a polished, narrow-scope DJ product that earns trust with the DJ community and converts real usage into Bravoh signups or paid hosted demand.
 
 ## Where partners fit
 
