@@ -854,18 +854,6 @@ wheels = [
 ]
 
 [[package]]
-name = "livekit-plugins-cartesia"
-version = "1.5.14"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "livekit-agents" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/02/14/9293b46f7d4b8178a7e44c50d0f0251215d7652f1ad679cc055a24786bdb/livekit_plugins_cartesia-1.5.14.tar.gz", hash = "sha256:86173d8266cbc2c1f9b56a79f7c7a24f6757bc09e10fb0f35bd4183aed9a34ef", size = 12823, upload-time = "2026-05-27T23:16:36.021Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a4/19/b33fc14ebaeb609ca001ce59d290a7be8d0e60038255ce62b437f4538c4e/livekit_plugins_cartesia-1.5.14-py3-none-any.whl", hash = "sha256:98c05f159aae090809d7cd258b88fdeef5d786a0a4bebc7a76ba70576c28c3c7", size = 15753, upload-time = "2026-05-27T23:16:34.986Z" },
-]
-
-[[package]]
 name = "livekit-plugins-google"
 version = "1.5.14"
 source = { registry = "https://pypi.org/simple" }
@@ -2146,7 +2134,6 @@ dependencies = [
     { name = "keyring" },
     { name = "livekit" },
     { name = "livekit-agents" },
-    { name = "livekit-plugins-cartesia" },
     { name = "livekit-plugins-google" },
     { name = "livekit-plugins-openai" },
     { name = "mcp" },
@@ -2224,7 +2211,6 @@ requires-dist = [
     { name = "keyring", specifier = ">=25.7.0" },
     { name = "livekit", specifier = ">=1.1.8" },
     { name = "livekit-agents", specifier = ">=1.5.14" },
-    { name = "livekit-plugins-cartesia", specifier = ">=1.5.14" },
     { name = "livekit-plugins-google", specifier = ">=1.5.14" },
     { name = "livekit-plugins-openai", specifier = ">=1.5.14" },
     { name = "mcp", specifier = ">=1.2.0" },

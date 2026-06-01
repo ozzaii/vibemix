@@ -133,7 +133,6 @@ dependencies = [
     # install bar. Only the OPTIONAL playlist-curation agent needs it; the live
     # co-host never imports it.
     "mcp>=1.2.0",
-    "livekit-plugins-cartesia>=1.5.14",
 ]
 
 [project.optional-dependencies]

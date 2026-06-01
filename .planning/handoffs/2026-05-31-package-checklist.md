@@ -5912,6 +5912,45 @@ Current evidence, 2026-06-01:
   shares `src/vibemix/__main__.py` and `tests/test_main_smoke.py` with existing
   hold/land lanes and must be staged by hunk.
 
+## Package 14I - Retire Cartesia TTS Dependency
+
+Suggested commit: `fix(tts): remove cartesia voice dependency`
+
+Packaging decision: Package 14B made MOSS the only live voice source but left
+the Cartesia LiveKit plugin installed as a required dependency and kept a test
+that imported the provider only to assert it was not called. This package closes
+that residue by making Cartesia absent from the runtime dependency graph. The
+legacy ``cartesia_api_key`` parameter remains an accepted no-op for caller
+compatibility; it must not import or instantiate a Cartesia provider.
+
+Include:
+
+- `pyproject.toml`
+- `uv.lock`
+- `tests/agent/test_tts_chain_cartesia.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Provider-selection changes in `src/vibemix/agent/tts_chain.py`; MOSS-only
+  behavior is already structural there.
+- MOSS model download/ship UX and PyInstaller model bundling; those remain
+  Package 14C/14E/14H release gates.
+- Cloud LLM/OpenRouter brain routes. This package is voice-only.
+
+Proof to run:
+
+- `uv lock`
+- `uv run pytest -q tests/agent/test_tts_chain_cartesia.py tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_local_tts.py tests/test_phase05_verification.py::test_g8_direct_mode_phase4_regression_safe`
+- `uv run ruff check tests/agent/test_tts_chain_cartesia.py tests/agent/test_tts_chain.py src/vibemix/agent/tts_chain.py src/vibemix/agent/proxy_client.py`
+- `rg -n "livekit-plugins-cartesia|from livekit\\.plugins import cartesia" pyproject.toml uv.lock src tests --glob '!tauri/ui/node_modules/**' --glob '!tauri/src-tauri/target/**'`
+- `uv tree --locked | rg "livekit-plugins-cartesia"` returns no matches.
+
+Remaining gate:
+
+- Packaged voice readiness is unchanged by this cleanup: the app still needs
+  MOSS model availability/download/bundle proof before a release claim.
+
 ## Package 14C - MOSS-only Frozen Runtime Dependencies
 
 Suggested commit: `fix(packaging): bundle sentencepiece for moss tts`
