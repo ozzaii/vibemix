@@ -214,11 +214,31 @@ def test_output_stale_persisted_index_onto_blackhole_is_rejected() -> None:
     assert select_output_device(devices, preferred_index=0, fallback_name="MacBook Pro Speakers") == 1
 
 
+def test_output_stale_persisted_index_onto_aggregate_is_rejected() -> None:
+    # Real founder rig regression (2026-06-01): output_device_id=5 survived
+    # plug/unplug, then index 5 became "rekordbox Aggregate Device". PortAudio
+    # hung opening it before the websocket bound. Fall through to real speakers.
+    devices = [
+        _in("DDJ-FLX4", ich=2, och=4),
+        _in("MacBook Pro Speakers", ich=0, och=2),
+        _in("rekordbox Aggregate Device", ich=2, och=6),
+    ]
+    assert select_output_device(devices, preferred_index=2, fallback_name="MacBook Pro Speakers") == 1
+
+
 def test_output_os_default_onto_blackhole_is_rejected() -> None:
     # Same guard on the OS-default path: a BlackHole-inclusive default output is
     # skipped in favor of a real, non-loopback output.
     devices = [
         _in("BlackHole 2ch", ich=2, och=2),
+        _in("External DAC", ich=0, och=2),
+    ]
+    assert select_output_device(devices, fallback_name="nope", default_index=0) == 1
+
+
+def test_output_os_default_onto_multi_output_is_rejected() -> None:
+    devices = [
+        _in("Multi-Output Device", ich=0, och=2),
         _in("External DAC", ich=0, och=2),
     ]
     assert select_output_device(devices, fallback_name="nope", default_index=0) == 1

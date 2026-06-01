@@ -380,6 +380,38 @@ def test_find_device_auto_master_input_uses_preferred_fallback_when_silent(
     assert backend.find_device("BlackHole 2ch", "input") == 0
 
 
+def test_find_device_auto_master_input_honors_explicit_blackhole_variant(
+    mocker: MockerFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    make_backend,
+) -> None:
+    """The sidecar's auto-master env must not hijack an explicit 16ch upgrade."""
+    devices = [
+        {
+            "name": "BlackHole 2ch",
+            "max_input_channels": 2,
+            "max_output_channels": 2,
+            "default_samplerate": 48000.0,
+        },
+        {
+            "name": "BlackHole 16ch",
+            "max_input_channels": 16,
+            "max_output_channels": 16,
+            "default_samplerate": 48000.0,
+        },
+    ]
+    mocker.patch("vibemix.platform._audio_macos.sd.query_devices", return_value=devices)
+    rec = mocker.patch(
+        "vibemix.platform._audio_macos.sd.rec",
+        return_value=np.zeros((64, 2), dtype=np.float32),
+    )
+    monkeypatch.setenv("VIBEMIX_AUTO_MASTER_INPUT", "1")
+
+    backend = make_backend()
+    assert backend.find_device("BlackHole 16ch", "input") == 1
+    rec.assert_not_called()
+
+
 # ===== RATE-07: AudioMacOS satisfies @runtime_checkable AudioBackend =====
 
 

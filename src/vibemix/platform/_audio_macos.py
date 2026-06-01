@@ -598,7 +598,8 @@ class AudioMacOS:
         devices = sd.query_devices()
         low = name_substring.strip().lower()
         if kind == "input" and (
-            low in _AUTO_MASTER_REQUESTS or ("blackhole" in low and _env_enabled(_AUTO_MASTER_ENV))
+            low in _AUTO_MASTER_REQUESTS
+            or (low in {"blackhole", "blackhole 2ch"} and _env_enabled(_AUTO_MASTER_ENV))
         ):
             return select_active_master_input(devices)
         if kind == "input" and "blackhole" in low:

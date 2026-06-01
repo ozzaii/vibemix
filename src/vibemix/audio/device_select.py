@@ -75,6 +75,16 @@ _MIC_NAME_TOKENS: tuple[str, ...] = (
 _BLACKHOLE_EXACT = "blackhole 2ch"
 _BLACKHOLE_PREFIX = "blackhole"
 
+# Output devices that are virtual routing surfaces rather than stable "play the
+# AI voice here" endpoints. Positional ``output_device_id`` values are fragile
+# across plug/unplug, and stale indexes onto these devices have caused boot to
+# hang inside CoreAudio before the websocket can bind.
+_UNSTABLE_OUTPUT_TOKENS: tuple[str, ...] = (
+    "aggregate device",
+    "multi-output",
+    "ai capture",
+)
+
 
 def _is_input(info: dict[str, Any]) -> bool:
     try:
@@ -98,6 +108,12 @@ def is_mic_device(name: str) -> bool:
     """True if ``name`` looks like a microphone (excluded from music capture)."""
     low = name.lower()
     return any(tok in low for tok in _MIC_NAME_TOKENS)
+
+
+def is_unstable_output_device(name: str) -> bool:
+    """True for virtual aggregate outputs that should not win stale-index selection."""
+    low = name.lower()
+    return _BLACKHOLE_PREFIX in low or any(tok in low for tok in _UNSTABLE_OUTPUT_TOKENS)
 
 
 class MasterCaptureNotFoundError(RuntimeError):
@@ -246,14 +262,15 @@ def select_output_device(
         # on plug/unplug/reboot. A stale index that lands on a BlackHole output
         # variant would route the AI voice INTO the master-capture device — the
         # co-host would then hear itself (a feedback loop + an anti-slop hazard).
-        # So the persisted-index (step 1) and OS-default (step 3) paths reject a
-        # loopback device; only the explicit last-resort (step 5) may use one.
+        # So the persisted-index (step 1) and OS-default (step 3) paths reject
+        # loopback/aggregate virtual devices; only the explicit last-resort
+        # (step 5) may use one.
         # Controllers are NOT excluded here — a stale index onto a controller is
         # merely wrong-output, not a capture loop, and a user may legitimately
         # route the voice to a controller's headphone out.
         if not (isinstance(idx, int) and 0 <= idx < len(devices) and _is_output(devices[idx])):
             return False
-        return _BLACKHOLE_PREFIX not in _name_of(devices[idx]).lower()
+        return not is_unstable_output_device(_name_of(devices[idx]))
 
     # 1. Explicit wizard-persisted choice.
     if _resolvable(preferred_index):
@@ -272,7 +289,7 @@ def select_output_device(
         if not _is_output(info):
             continue
         low = _name_of(info).lower()
-        if not low or _BLACKHOLE_PREFIX in low or is_controller_device(low):
+        if not low or is_unstable_output_device(low) or is_controller_device(low):
             continue
         return idx
     # 5. Last resort: any output-capable device.
