@@ -340,13 +340,20 @@ def build_server(toolset: Any) -> Any:
 
     @mcp.tool()
     def sequence_set(
-        track_ids: list[str], curve: str, n_slots: int | None = None
+        track_ids: list[str],
+        curve: str,
+        n_slots: int | None = None,
+        novelty: float | None = None,
     ) -> dict[str, Any]:
         """Order grounded track_ids into a set following an energy CURVE preset
         (opener / peak_time / after_hours / festival). Returns 3-5 ranked
-        candidates with energy_fit / avg_coherence / relaxed_transitions. Every
-        track_id must come from a prior search_vibe/discover_pool result."""
-        return toolset.sequence_set({"track_ids": track_ids, "curve": curve, "n_slots": n_slots})
+        candidates with energy_fit / avg_coherence / relaxed_transitions.
+        Optional novelty 0..1 nudges toward lower-similarity deep cuts from the
+        already-grounded discovery pool. Every track_id must come from a prior
+        search_vibe/discover_pool result."""
+        return toolset.sequence_set(
+            {"track_ids": track_ids, "curve": curve, "n_slots": n_slots, "novelty": novelty}
+        )
 
     @mcp.tool()
     def export_set(name: str, track_ids: list[str], out_path: str | None = None) -> dict[str, Any]:

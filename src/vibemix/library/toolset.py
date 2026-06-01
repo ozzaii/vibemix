@@ -33,6 +33,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import logging
+import math
 import os
 from collections.abc import Callable
 from dataclasses import asdict
@@ -131,6 +132,9 @@ class LibraryToolset:
         self._knowledge_store: Any | None = None
         # The grounding spine: ids any search_vibe returned THIS run.
         self.seen: set[str] = set()
+        # Similarity/confidence issued by discovery tools. sequence_set can use
+        # the inverse as a bounded novelty signal without inventing any facts.
+        self.seen_similarity: dict[str, float] = {}
         # INTEL grounding holders. Track ids are discovered first, then section
         # and transition/context aliases are issued from deterministic code.
         self.seen_sections: dict[str, SectionRecord] = {}
@@ -238,6 +242,9 @@ class LibraryToolset:
             return {"error": f"search_vibe failed: {type(e).__name__}: {e}"}
         for r in results:
             self.seen.add(r.track_id)
+            score = _unit_float_or_none(r.confidence)
+            if score is not None:
+                self.seen_similarity[r.track_id] = score
         return {
             "results": [
                 {
@@ -697,6 +704,9 @@ class LibraryToolset:
             return {"error": f"discover_pool failed: {type(e).__name__}: {e}"}
         for item in pool:
             self.seen.add(item.track_id)
+            score = _unit_float_or_none(item.similarity)
+            if score is not None:
+                self.seen_similarity[item.track_id] = score
         return {
             "pool": [
                 {
@@ -781,7 +791,29 @@ class LibraryToolset:
                 n_slots = int(n_slots) if n_slots is not None else len(pool)
             except (TypeError, ValueError):
                 n_slots = len(pool)
-            candidates = sequencer.sequence_set(pool, curve=curve, n_slots=n_slots)
+            novelty = _bounded_float_arg(
+                args.get("novelty", args.get("novelty_weight", args.get("surprise_weight"))),
+                minimum=0.0,
+                maximum=1.0,
+                default=0.0,
+            )
+            weights = {"gamma": novelty} if novelty > 0.0 else None
+            surprise = (
+                {
+                    tid: 1.0 - score
+                    for tid in track_ids
+                    if (score := self.seen_similarity.get(tid)) is not None
+                }
+                if novelty > 0.0
+                else None
+            )
+            candidates = sequencer.sequence_set(
+                pool,
+                curve=curve,
+                n_slots=n_slots,
+                weights=weights,
+                surprise=surprise,
+            )
         except KeyError as e:  # unknown curve preset → actionable error
             return {"error": f"sequence_set: unknown curve preset {e}"}
         except Exception as e:
@@ -1343,6 +1375,9 @@ class LibraryToolset:
             parts = [text("curve", limit=40), f"{n} tracks" if n is not None else ""]
             if args.get("n_slots") is not None:
                 parts.append(f"slots={args.get('n_slots')}")
+            novelty = args.get("novelty", args.get("novelty_weight", args.get("surprise_weight")))
+            if novelty is not None:
+                parts.append(f"novelty={novelty}")
             return "; ".join(p for p in parts if p)[:160]
         if name in ("create_playlist", "export_set"):
             n = count("track_ids")
@@ -1689,6 +1724,26 @@ def _float_arg(raw: Any, *, default: float) -> float:
         return float(raw)
     except (TypeError, ValueError):
         return default
+
+
+def _bounded_float_arg(raw: Any, *, minimum: float, maximum: float, default: float) -> float:
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(value):
+        return default
+    return max(minimum, min(maximum, value))
+
+
+def _unit_float_or_none(raw: Any) -> float | None:
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value):
+        return None
+    return max(0.0, min(1.0, value))
 
 
 __all__ = [

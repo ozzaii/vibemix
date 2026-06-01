@@ -19,6 +19,7 @@ fake store + in-memory library; energy is monkeypatched.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -284,6 +285,40 @@ def test_sequence_set_orders_seen_pool(toolset):
     assert "avg_coherence" in first
     # Every sequenced id is a real, grounded id.
     assert set(first["track_ids"]).issubset(toolset.seen)
+
+
+def test_sequence_set_novelty_uses_discovery_similarity_as_surprise(toolset, monkeypatch):
+    from vibemix.library import sequencer as sequencer_mod
+
+    toolset.discover_pool({"ref_track_ids": ["t000"], "k": 10})
+    seen_ids = sorted(toolset.seen)
+    captured: dict[str, object] = {}
+
+    def fake_sequence_set(pool, *, curve, n_slots, weights=None, surprise=None, **_kwargs):
+        captured["track_ids"] = [p.track_id for p in pool]
+        captured["curve"] = curve
+        captured["n_slots"] = n_slots
+        captured["weights"] = weights
+        captured["surprise"] = surprise
+        return [
+            SimpleNamespace(
+                track_ids=[p.track_id for p in pool],
+                energy_fit=0.0,
+                avg_coherence=1.0,
+                relaxed_transitions=[],
+            )
+        ]
+
+    monkeypatch.setattr(sequencer_mod, "sequence_set", fake_sequence_set)
+
+    out = toolset.sequence_set({"track_ids": seen_ids, "curve": "peak_time", "novelty": 0.4})
+
+    assert "candidates" in out
+    assert captured["weights"] == {"gamma": 0.4}
+    surprise = captured["surprise"]
+    assert isinstance(surprise, dict)
+    # Lower discovery similarity means a higher deterministic novelty reward.
+    assert max(surprise.values()) > min(surprise.values())
 
 
 def test_sequence_set_unknown_curve_is_actionable(toolset):

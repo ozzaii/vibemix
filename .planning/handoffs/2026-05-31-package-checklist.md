@@ -2576,6 +2576,41 @@ Proof:
 - `uv run ruff check src/vibemix/intel/transition_scorer.py src/vibemix/library/track_relation.py src/vibemix/library/sequencer.py src/vibemix/library/next_suggestion.py tests/intel/test_transition_scorer.py tests/library/test_track_relation.py tests/library/test_sequencer.py tests/library/test_next_suggestion.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 17 - Viber Set Novelty Dial
+
+Suggested commit: `feat(library): expose sequence novelty dial`
+
+Include:
+
+- `src/vibemix/library/toolset.py`
+- `src/vibemix/library/mcp_server.py`
+- `src/vibemix/library/codex_curate.py`
+- `tests/library/test_setprep_tools.py`
+
+Keep out:
+
+- `src/vibemix/library/sequencer.py` behavior changes beyond using its existing
+  `surprise`/`gamma` input.
+- Live speech, DROP, deck-audio/controller, and packaging files.
+
+Reason:
+
+- The recovered goldmine flagged that the sequencer already has a default-off
+  surprise/novelty term, but no Viber-facing caller. This package exposes a
+  bounded `novelty` value on `sequence_set` so "deep cuts" and "surprise me"
+  requests can nudge toward lower-similarity tracks from the already-issued
+  discovery pool.
+- Grounding stays intact: the novelty signal is derived only from
+  `search_vibe`/`discover_pool` similarity/confidence for track ids already in
+  the per-run seen set. It cannot introduce a new track id and it does not
+  change set export validation.
+
+Proof:
+
+- `uv run pytest -q tests/library/test_setprep_tools.py`
+- `uv run ruff check src/vibemix/library/toolset.py src/vibemix/library/mcp_server.py src/vibemix/library/codex_curate.py tests/library/test_setprep_tools.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Cue Export Folder Bridge
 
 Suggested commit if/when selected: `feat(library): add folder cue export bridge`
