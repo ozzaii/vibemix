@@ -570,6 +570,32 @@ Proof before staging:
 - `git diff --check -- tests/scripts/test_populate_changelog.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0U - Dayzero Test Ruff Hygiene
+
+Suggested commit: `test(scripts): clean dayzero test lint`
+
+Include:
+
+- `tests/scripts/test_dayzero.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Dayzero scripts, release/proxy runtime files, and app runtime files.
+
+Reason:
+
+- The Day-Zero dry-run script tests imported `pytest` without using it.
+  Removing the dead import keeps the focused scripts-test ruff gate clean
+  without changing dry-run coverage.
+
+Proof before staging:
+
+- `uv run ruff check tests/scripts/test_dayzero.py`
+- `uv run pytest -q tests/scripts/test_dayzero.py`
+- `git diff --check -- tests/scripts/test_dayzero.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`

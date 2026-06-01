@@ -13,9 +13,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROXY_LOAD_TEST = REPO_ROOT / "scripts" / "dayzero" / "proxy_load_test.py"
 HEALTHZ_CHECK = REPO_ROOT / "scripts" / "dayzero" / "healthz_check.sh"
