@@ -996,6 +996,33 @@ Proof before staging:
 - `git diff --check -- tests/library/test_discovery.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AK - Library Energy Test Ruff Hygiene
+
+Suggested commit: `test(library): tighten energy frozen assertion`
+
+Include:
+
+- `tests/library/test_energy.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Energy implementation, audio decode/runtime files, live audio/controller files,
+  and generated files.
+
+Reason:
+
+- `EnergyScore` is a frozen dataclass. Replacing a blind `Exception` assertion
+  with `FrozenInstanceError` keeps the focused ruff gate clean while preserving
+  the frozen-slot regression check.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_energy.py`
+- `uv run pytest -q tests/library/test_energy.py`
+- `git diff --check -- tests/library/test_energy.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Cohost Reaction Schema Drift
 
 Suggested commit if/when selected: `fix(ui-bus): reconcile cohost reaction schema`

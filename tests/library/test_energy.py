@@ -13,6 +13,8 @@ return a synthetic array, so the public entrypoint is covered without I/O.
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
+
 import numpy as np
 import pytest
 
@@ -118,7 +120,7 @@ def test_score_energy_returns_energyscore(monkeypatch):
 
 def test_score_energy_frozen_slots():
     res = EnergyScore(score=50.0, breakdown={"loudness": 0.5})
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         res.score = 1.0  # frozen
 
 
