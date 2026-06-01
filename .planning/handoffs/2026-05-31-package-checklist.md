@@ -6650,3 +6650,39 @@ Run this when the DDJ, Tauri app runtime, and audible deck route are available:
    `transcript_delta`.
 7. Do a long-set pass with the controller plugged in before calling the release train
    product-ready.
+## Package 0P - Viber/Sven Product Boundary Wording Guard
+
+Suggested commit: `docs(product): separate viber agent from sven cohost`
+
+Include:
+
+- `README.md`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `src/vibemix/__main__.py`
+- `src/vibemix/library/codex_curate.py`
+- `tauri/ui/library.html`
+- `tauri/ui/src/library/api.ts`
+- `tauri/ui/src/library/library.css`
+- `tests/repo/test_phase20_docs.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Co-host prompt/runtime behavior, TTS implementation, Viber tool semantics,
+  live app control, package artifacts, and all DROP/Mix Timing Oracle hold-lane
+  hunks.
+
+Reason:
+
+- Viber is the library/set-prep agent/operator; Sven is the live co-host voice.
+  Active docs, comments, CLI help, and UI source comments must not call Viber
+  the co-host or describe live speech as Gemini/cloud TTS. This package fixes
+  the wording drift and adds an active-surface regression guard.
+
+Proof before staging:
+
+- `uv run pytest -q tests/repo/test_phase20_docs.py`
+- `uv run ruff check src/vibemix/__main__.py src/vibemix/library/codex_curate.py tests/repo/test_phase20_docs.py`
+- `git diff --check -- README.md AGENTS.md CLAUDE.md src/vibemix/__main__.py src/vibemix/library/codex_curate.py tauri/ui/library.html tauri/ui/src/library/api.ts tauri/ui/src/library/library.css tests/repo/test_phase20_docs.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

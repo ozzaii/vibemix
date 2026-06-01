@@ -7,9 +7,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **vibemix — AI DJ Co-Host**
 
-A free, open-source AI co-host for live DJ sets. Runs locally on macOS or Windows: listens to your master output, watches your DJ software's screen, ingests your controller actions over MIDI, and talks back into your headphones or speakers as either a hype-man (party mode) or a coach (feedback mode). Three user levels — Beginner / Intermediate / Pro — with prompt templates tuned to each, plus a curated library of ~10 popular MIDI controllers mapped out of the box.
+A commercial AI co-host product for live DJ sets, with an Apache-licensed client.
+Runs locally on macOS or Windows: listens to your master output, watches your DJ
+software's screen, ingests your controller actions over MIDI, and talks back into
+your headphones or speakers as either a hype-man (party mode) or a coach
+(feedback mode). Three user levels — Beginner / Intermediate / Pro — with prompt
+templates tuned to each, plus a curated library of ~10 popular MIDI controllers
+mapped out of the box.
 
-Bravoh's first open-source release. Built as a polished, narrow-scope utility that warms an audience converting into Bravoh's waitlist.
+Bravoh's first vibemix release is a monetized product path, not a
+fully-open-source promise. Keep public copy honest: the client is Apache-licensed;
+hosted Bravoh services and release infrastructure are commercial.
 
 **Core Value:** The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
@@ -18,7 +26,11 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 - **Timeline**: No hard calendar target — ship-when-ready per `gsd-autonomous fully` mode. External Apple + SignPath approvals are the critical path; engineering parallelizes around the external clock.
 - **Quality bar**: "Real DJ friend in your ear, no AI slop" — Kaan will block release if reactions feel scripted, late, hallucinated, or generic.
 - **Budget**: 150-200 € launch marketing (IG ads, paid posts), ~50 €/month ongoing Gemini API for end-user requests. Reassess if usage scales.
-- **Tech stack**: Live co-host is locked on LiveKit pipeline + Gemini Flash + Gemini TTS streaming (exact model versions resolved via `model_router`, never inlined). Library/Viber set-prep is pinned to local Codex for testing via MCP; do not route it through Gemini.
+- **Tech stack**: Sven, the live co-host, is locked on the LiveKit pipeline + Gemini
+  Flash for grounded reaction planning, with speech rendered by local MOSS only
+  (exact model versions resolved via `model_router`, never inlined). Viber is the
+  library/set-prep agent/operator, pinned to local Codex via MCP; do not call
+  Viber the co-host and do not route it through Gemini.
 - **Platforms**: macOS + Windows in v1. Linux explicitly excluded.
 - **Team**: Kaan (engineering + product), Francesco (cofounder — product/marketing/DJ network for outreach), Momo (Bravoh team). Bravoh main product takes priority — vibemix runs alongside.
 - **Open-source license**: Apache 2.0 (in `LICENSE`; `__main__.py` carries the SPDX header). Permits Bravoh internal reuse.
@@ -38,9 +50,12 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 - Packaged with **hatchling**; **`uv`** is the runner + lockfile tool (`uv.lock`).
 
 ### Core dependencies (pins in `pyproject.toml`)
-- `google-genai` — live co-host brain/TTS. It is **not** the Library/Viber reasoning or embedding path; library/search/curate embeddings use local CLAP ONNX and Viber set-prep runs through local Codex.
+- `google-genai` — Sven's live co-host reaction-planning brain. It is **not** the
+  Library/Viber reasoning, embedding, or speech path; speech is local MOSS,
+  library/search/curate embeddings use local CLAP ONNX, and Viber set-prep runs
+  through local Codex.
 - Codex CLI — current local Viber reasoning backend for chat/curate/build-set during testing, reached through `codex exec` + `library/mcp_server.py`.
-- `livekit` + `livekit-agents` + `livekit-plugins-google` + `livekit-plugins-openai` — LiveKit pipeline (Gemini Live `RealtimeModel` path; the openai plugin is the TTS-fallback seam, not a second AI provider).
+- `livekit` + `livekit-agents` + `livekit-plugins-google` + `livekit-plugins-openai` — LiveKit pipeline (Gemini Live `RealtimeModel` path; production speech is local MOSS, so do not reintroduce paid/cloud speech providers).
 - `numpy` + PyAV/FFmpeg — audio DSP, local model decode, and 48k→16k resample.
 - `sounddevice` — CoreAudio (macOS) / WASAPI (Windows) I/O.
 - `mido` + `python-rtmidi` — MIDI controller decode.
@@ -49,7 +64,10 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 - System (not pip): macOS — BlackHole 2ch, `nowplaying-cli` (Homebrew), `pyobjc-*` (Quartz window crop). Windows — WASAPI loopback (`docs/windows-setup.md`).
 
 ### Configuration
-- `.env` at repo root: `GEMINI_API_KEY` is required for the live Gemini co-host only; library embeddings and Viber/Codex set-prep are local/keyless. `OPENROUTER_API_KEY` is only for the opt-in TTS standby chain. Loaded via `python-dotenv`.
+- `.env` at repo root: `GEMINI_API_KEY` is required for Sven's live Gemini
+  reaction-planning brain only; library embeddings and Viber/Codex set-prep are
+  local/keyless. Do not treat `OPENROUTER_API_KEY` as a product speech provider.
+  Loaded via `python-dotenv`.
 - **Model selection is config-driven through `vibemix.llm.model_router` — zero hardcoded model literals in code (CI grep-gated).** Never inline a model name; resolve via `model_router.resolve(...)`.
 <!-- GSD:stack-end -->
 
@@ -77,7 +95,11 @@ Single packaged app under `src/vibemix/`. Entry point: `python -m vibemix` → `
 - `audio/` — capture/playback ring buffers, `Levels` (EMA RMS), mic gating, ws constants (`WS_HOST`/`WS_PORT`).
 - `platform/` — per-OS audio/screen/MIDI/track backends (`_audio_macos.py`, Windows WASAPI, etc.). The firewall that keeps `__main__` OS-agnostic; selected at runtime.
 - `state/` — **the brain.** `music_state.py` (`MusicState`, single source of truth) written ONLY by `refresh.py`'s state-refresh loop; `event_detector.py` emits typed events with per-type cooldowns (`TRACK_CHANGE`, `PHASE`, `LAYER_ARRIVAL`, `MIX_MOVE`, `HEARTBEAT`, …); `coach.py` builds evidence-grounded prompts; `evidence_registry.py` backs citation grounding; `deck_*` (deck-aware state), `harmonics.py` (Camelot), plus `genre/` + `detectors/`.
-- `agent/` — LiveKit `RealtimeModel` session + the Gemini reaction path (`dj_cohost.py`). **TTS voices** = `livekit.agents.tts.TTS` plugins assembled into a `FallbackAdapter` cascade in `tts_chain.py::_build_direct_chain`; a new voice is a `tts.TTS` subclass appended there. The adapter requires uniform `num_channels` (mono) across entries, auto-resamples differing sample rates, and auto-wraps non-streaming providers in a StreamAdapter. The local on-device voice (`local_tts.py` — MOSS-TTS-Nano, torch-free ONNX) is opt-in via `VIBEMIX_LOCAL_TTS`. The chain has TWO builders — `_build_direct_chain` (BYO-key) and `build_proxy_tts_chain` (`proxy_client.py`, keyless) — a voice change must be wired into BOTH or it only applies in one mode.
+- `agent/` — LiveKit `RealtimeModel` session + Sven's Gemini reaction path
+  (`dj_cohost.py`). **TTS voice** = local on-device MOSS-TTS-Nano
+  (`local_tts.py`, torch-free ONNX) through `tts_chain.py`; cloud TTS providers
+  are retired from the product path. `proxy_client.py` keeps a compatibility
+  builder signature, but proxy mode also resolves to local MOSS speech.
 - `llm/` — `model_router.py` (config-driven model resolution, no hardcoded literals) + `thinking_gate.py`.
 - `coach/`, `prompts/`, `profile/` — persona/prompt templates per user level; long-term DJ profile.
 - `library/` — local CLAP ONNX 512-dim embeddings + sqlite-vec vibe search (macOS sqlite-vec / Windows numpy, bit-identical top-K parity); also home to `next_suggestion.py` (the pill's mean-centered "what's next" engine, grounded by Invariant #2) and the Viber curator core (`toolset.py`/`codex_curate.py`/`mcp_server.py`/`telegram_bridge.py`). **State on disk** under `~/.cache/vibemix/`: `library-clap.db` (sqlite-vec vectors), `embeddings.db` / CLAP-tagged cache rows, `library.pkl` (track-title cache), `library-clap_centroid.npy` (cached query centroid, auto-recomputed on store change). Historical Gemini `library.db` may exist; do not clobber it during CLAP re-embed. **Gotcha:** library/rekordbox tests MUST monkeypatch `RekordboxLibrary.CACHE_PATH` to a tmp dir, or they overwrite the real `library.pkl`.
@@ -181,7 +203,7 @@ The Viber agent (`library/toolset.py` = shared grounded tool core) uses `codex` 
 Embeds need the CLAP ONNX model under `~/.cache/vibemix/clap-onnx/` or `VIBEMIX_CLAP_ONNX_DIR`; they do **not** need `GEMINI_API_KEY`. embed-folder is resumable: a content-hash cache skips already-embedded files for free, and per-file errors are logged + skipped, never fatal. Ranking is mean-centered by default (anisotropy fix) — query-side only, persisted vectors untouched.
 
 **Runtime environment:** live co-host direct mode needs `GEMINI_API_KEY` in the
-repo-root `.env`; `OPENROUTER_API_KEY` is only for the opt-in TTS standby chain.
+repo-root `.env`; do not treat `OPENROUTER_API_KEY` as a product speech fallback.
 Library search, ingest, chat, curate, and build-set use local CLAP/Codex paths
 and do not require a Gemini key.
 

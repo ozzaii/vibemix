@@ -1087,7 +1087,7 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   align-self: flex-start;
 }
 
-/* ── Viber (the co-host speaking): a lit console stream, no box ── */
+/* ── Viber (the library agent answering): a lit console stream, no box ── */
 .vmx-lib-chat-turn[data-role="viber"] {
   position: relative;
   padding-left: 17px;
@@ -1151,7 +1151,7 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   line-height: 1.55;
   white-space: pre-wrap;
 }
-/* Viber speaks warmer + larger — it is the co-host's voice, the read line. */
+/* Viber answers warmer + larger — it is the agent's read line. */
 .vmx-lib-chat-turn[data-role="viber"] .body {
   color: var(--text-primary);
   font-size: 16px;
@@ -1585,7 +1585,7 @@ body[data-mode="cue"] .vmx-lib-rationale {
   letter-spacing: 0.05em;
 }
 
-/* ── build mode: set-prep co-host ───────────────────────────
+/* ── build mode: Viber set-prep agent ───────────────────────
    The brief is a multi-line textarea (a set brief is a sentence, not a token)
    wearing the same .vmx-lib-qbox glass; the energy curve is a segmented
    hardware selector; the export block is the Rekordbox receipt. All reuse the

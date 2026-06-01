@@ -184,7 +184,7 @@ export interface CurateResult {
   count: number;
 }
 
-/** Energy-curve preset for the set-prep co-host (`--curve <preset>`). The EXACT
+/** Energy-curve preset for the Viber set-prep agent (`--curve <preset>`). The EXACT
  *  wire values the agent's CLI accepts; mirrors EnergyCurve in state-machine. */
 export type EnergyCurve = "opener" | "peak_time" | "after_hours" | "festival";
 
@@ -2515,7 +2515,7 @@ export async function libraryCurate(theme: string): Promise<CurateResult> {
   );
 }
 
-/** Brief + energy curve → set-prep co-host: a discovered + sequenced set,
+/** Brief + energy curve → Viber set-prep agent: a discovered + sequenced set,
  *  auto-exported to Rekordbox XML (`export_path` on the result). One-shot; the
  *  same propagate-don't-mask discipline as curate (a real backend error throws;
  *  a no-key run returns stop_reason "max_iters" with no tracks, surfaced honestly). */

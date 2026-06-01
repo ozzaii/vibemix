@@ -1708,8 +1708,8 @@ async def main() -> None:
 
     # ── Plan 28-04 — grounding pipeline (event-gated, local CLAP) ──
     # Build Grounding lazily when a library cache exists. Embeddings are local
-    # CLAP ONNX/512 through build_embedder(); the Gemini client is for the live
-    # co-host brain/TTS only, not for library grounding embeddings.
+    # CLAP ONNX/512 through build_embedder(); the Gemini client is for Sven's live
+    # reaction-planning brain only, not for speech or library grounding embeddings.
     grounding = None
     suggestion_service = None
     # One Mind W3 — pre-declare so the library-import handler (registered after
@@ -3026,12 +3026,12 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_curate.add_argument("--json", action="store_true")
     sp_curate.set_defaults(func=_cmd_library_curate)
 
-    # Vibe Mix engine — set-prep co-host flow (discover → sequence → export)
+    # Vibe Mix engine — Viber set-prep agent flow (discover → sequence → export)
     sp_build_set = sub.add_parser(
         "build-set",
         help="Prep a full DJ set from a brief (discover → sequence → export)",
         description=(
-            "Set-prep co-host: the Viber agent discovers a pool from YOUR "
+            "Set-prep agent: Viber discovers a pool from YOUR "
             "library, picks an energy curve, sequences it into a mixable set, "
             "and explains the critical transitions. Every track is grounded — "
             "the agent can only use tracks discovery returned, never invented "
@@ -3069,14 +3069,14 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_build_set.add_argument("--json", action="store_true")
     sp_build_set.set_defaults(func=_cmd_library_build_set)
 
-    # Viber chat — the conversational co-host (one turn per invocation; the
+    # Viber chat — the conversational library agent (one turn per invocation; the
     # caller threads prior turns via --history so the CLI stays stateless and
     # the Tauri bridge can drive a live conversation).
     sp_chat = sub.add_parser(
         "chat",
-        help="Talk to Viber — conversational, tool-using DJ co-host (one turn)",
+        help="Talk to Viber — conversational, tool-using library agent (one turn)",
         description=(
-            "One conversational turn with the Viber co-host. The model may call "
+            "One conversational turn with the Viber agent. The model may call "
             "any grounded tool (search/discover/quote/web/knowledge/"
             "curate/build) before it replies. Stateless: pass the prior "
             "conversation via --history (JSON) to continue it. Emits a JSON "
@@ -4371,7 +4371,7 @@ def _viber_reply_from_chat_payload(payload: Any) -> tuple[str, list[dict[str, An
 
 
 def _cmd_library_chat(args: argparse.Namespace) -> int:
-    """Viber chat — one conversational, tool-using co-host turn → JSON.
+    """Viber chat — one conversational, tool-using library-agent turn → JSON.
 
     Stateless per invocation: the caller threads prior turns via ``--history``
     so the Tauri bridge can drive a live conversation. Unlike curate/build-set
@@ -6430,7 +6430,7 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
 
 
 def _cmd_library_build_set(args: argparse.Namespace) -> int:
-    """Vibe Mix set-prep co-host — brief → discovered + sequenced set.
+    """Vibe Mix set-prep agent — brief → discovered + sequenced set.
 
     Mirrors ``_cmd_library_curate``'s library-cache setup, then runs the local
     Codex/MCP set-prep surface. Prints the chosen sequence slot-by-slot + the

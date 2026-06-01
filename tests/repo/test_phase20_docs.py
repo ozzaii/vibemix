@@ -312,3 +312,30 @@ def test_active_planning_docs_pin_viber_to_codex_not_gemini_fallback():
     assert "Viber set-prep/chat uses local Codex" in _read(".planning/ROADMAP.md")
     assert "local Codex (Viber)" in _read(".planning/REQUIREMENTS.md")  # v11.0 wording
     assert "local Codex for set-prep/chat demo/test" in _read(".planning/phases/v8.2-STATUS.md")
+
+
+def test_active_surfaces_separate_viber_agent_from_sven_cohost():
+    docs = (
+        "README.md",
+        "AGENTS.md",
+        "src/vibemix/__main__.py",
+        "src/vibemix/library/codex_curate.py",
+        "tauri/ui/library.html",
+        "tauri/ui/src/library/api.ts",
+        "tauri/ui/src/library/library.css",
+    )
+    forbidden = (
+        "Set-Prep Co-Host Flow",
+        "set-prep co-host",
+        "conversational co-host",
+        "Viber co-host",
+        "tool-using DJ co-host",
+        "Viber (the co-host",
+        "co-host's voice",
+        "Gemini-TTS-streamed voice",
+        "Gemini path for grounded reactions and TTS",
+    )
+    for rel in docs:
+        body = _read(rel)
+        for phrase in forbidden:
+            assert phrase not in body, f"{rel} blurs the Viber/Sven product boundary: {phrase}"

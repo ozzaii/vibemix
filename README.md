@@ -144,7 +144,7 @@ Each cell speaks a different vocabulary on purpose. Beginner is encouragement-he
 | 84 | DISCOVER | Pool Building (library-local)** — `library/discovery.py` (intent centroid + hard filters + MMR) + `discover_pool` tool. |
 | 85 | SEQUENCE | Energy-Curved, Harmonically-Valid Ordering** — `library/sequencer.py` (curve presets + transition graph + beam search → 3-5 diverse paths, honest fit labels) + `sequence_set` tool. |
 | 86 | EXPORT | One-Click to Rekordbox** — `harmonics.to_classical` + `library/export_rekordbox.py` (RekordboxXml write path: order + key/BPM/genre + memory & hot cues + beatgrid) + `export_set` tool + `library export-set` CLI. |
-| 87 | AGENT | The Set-Prep Co-Host Flow** — Viber build-set backend (discover→sequence→explain each transition, mentor not black-box, grounded) + `library build-set` CLI, on the existing no-hang harness + shared persona/lens. |
+| 87 | AGENT | The Viber Set-Prep Agent Flow** — Viber build-set backend (discover→sequence→explain each transition, mentor not black-box, grounded) + `library build-set` CLI, on the existing no-hang harness + shared persona/lens. |
 | 88 | UI | "Build a Set" Path** — Tauri "Build a Set" path (brief + curve picker → sequenced result + per-transition why + Export) in CDJ-Whisper aesthetic. UI-02 funded-key ear-pass remains KAAN-ACTION, not an engineering gap. |
 | 80 | GROUND | Gemini as Secondary Ear** — audio part fed alongside structured evidence, hallucination-guarded; reaction model config-resolved by the bench. |
 | 67 | All Tests Pass (5/5 plans) | 2026-05-23 (TEST-01..04; default `pytest -q` 0-red, 21-job `full-test-matrix.yml` CI, static skip/flake gates, 10× flake-hunt baseline) |
@@ -226,7 +226,7 @@ Two ways to add it:
   </tr>
   <tr>
     <td width="50%"><img src="docs/assets/screenshots/mode-picker.png" alt="skill level and hype/teach/coach mode picker" width="100%" /><br/><sub><b>Mode.</b> Beginner / Intermediate / Pro × Hype-man / Coach. Pick the energy before the set.</sub></td>
-    <td width="50%"><img src="docs/assets/screenshots/voice-picker.png" alt="co-host voice picker" width="100%" /><br/><sub><b>Voice.</b> Three co-host voices — calm, warm, or gruff.</sub></td>
+    <td width="50%"><img src="docs/assets/screenshots/voice-picker.png" alt="local co-host voice setup" width="100%" /><br/><sub><b>Voice.</b> Sven speaks through the local MOSS voice path; Viber is the library/set-prep agent.</sub></td>
   </tr>
 </table>
 
@@ -238,7 +238,7 @@ Two ways to add it:
   <img src="docs/assets/architecture.svg" alt="vibemix architecture diagram" width="100%" />
 </p>
 
-vibemix runs on your machine. The live co-host streams audio + screen frames + MIDI events through Bravoh's proxy at `api.altidus.world`, which forwards to Google Gemini; nothing is stored on Bravoh's end. The reaction comes back as a Gemini-TTS-streamed voice into your headphones. Library embeddings/search are local CLAP ONNX (one-time ~785 MB weights download on first Library open), and the optional Viber library chat/build path can use your local Codex CLI account.
+vibemix runs on your machine. Sven, the live co-host, streams audio + screen frames + MIDI events through Bravoh's proxy at `api.altidus.world`, which forwards to Google Gemini for grounded reaction planning; nothing is stored on Bravoh's end. Speech is rendered locally through the MOSS voice path, not a cloud voice provider. Library embeddings/search are local CLAP ONNX (one-time ~785 MB weights download on first Library open), and the optional Viber library chat/build path can use your local Codex CLI account.
 
 ---
 
@@ -268,7 +268,7 @@ Three reasons: djay Pro is Mac/Win only and that's our primary integration targe
 
 ### 5. Why Gemini and not GPT / Claude / Llama?
 
-The live co-host uses Bravoh's Gemini path for grounded reactions and TTS. Library search and set prep are separate: embeddings run locally with CLAP ONNX (one-time ~785 MB weights download on first Library open), and Viber uses the local Codex CLI backend.
+Sven uses Bravoh's Gemini path for grounded live reaction planning, then speaks through the local MOSS voice path. Library search and set prep are separate: embeddings run locally with CLAP ONNX (one-time ~785 MB weights download on first Library open), and Viber uses the local Codex CLI backend as the library/set-prep agent.
 
 ### 6. Is the AI actually listening to my music?
 

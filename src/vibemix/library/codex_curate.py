@@ -1358,7 +1358,7 @@ def build_set_with_codex(
 
 
 # --------------------------------------------------------------------------- #
-# Viber CHAT over Codex — the conversational co-host on the agentic engine.    #
+# Viber CHAT over Codex — the conversational library agent on the engine.      #
 # Same MCP grounded-tool surface + same guards as curate; free-text reply.     #
 # --------------------------------------------------------------------------- #
 

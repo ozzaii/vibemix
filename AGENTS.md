@@ -44,6 +44,9 @@ only state refresh writes `MusicState`; AI reactions must resolve through
 `127.0.0.1:8765` and debrief uses `8766`. Do not hardcode model names; resolve through
 `vibemix.llm.model_router` or the existing library agent backend seams. For broad
 agent work, read `CLAUDE.md` and the active `.planning/research/` sweep notes first.
+Product naming is load-bearing: **Viber is the library/set-prep agent/operator**;
+**Sven is the live co-host voice**. Do not describe Viber as the co-host, and do
+not describe live speech as Gemini/cloud TTS; the product voice source is local MOSS.
 
 ## Supercharge Tooling (shared by Claude Code + Codex)
 
