@@ -1483,6 +1483,15 @@ _LIVE_CONTEXT_PUBLIC_DIAGNOSTIC_REPLY_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_LIBRARY_REQUEST_LIVE_LEAK_RE = re.compile(
+    r"\b("
+    r"live(?:[- ]?read|[- ]?move|[- ]?deck|[- ]?context)?|current deck|"
+    r"resolved decks?|deck blockers?|evidence gates?|claim_policy|"
+    r"sound change(?: right there)?|move right there|that drop|the drop|"
+    r"caught the live move|transition_block|transition_watch"
+    r")\b",
+    re.IGNORECASE,
+)
 _LIVE_GROUNDED_PUBLIC_REPLY = (
     "The live read is grounded now. I can score it from the locked deck context."
 )
@@ -1522,6 +1531,11 @@ def _live_context_use_mode(message: str) -> str:
     return "active_live_context"
 
 
+def _is_library_context_request(message: str) -> bool:
+    """Return true when the DJ is asking for crate/library/set help."""
+    return bool(_LIBRARY_CONTEXT_REQUEST_RE.search(_compact_chat_request(message)))
+
+
 def _live_context_transport_is_stale(live_context: dict[str, Any] | None) -> bool:
     if not live_context:
         return False
@@ -1559,7 +1573,9 @@ def _live_context_use_instruction(
         "as a hidden safety rail only: do not mention live_context, claim_policy, "
         "resolved decks, deck blockers, evidence gates, or live-read correction "
         "language. For crate, library search, vibe, playlist, or set-building "
-        "requests, answer the requested library job with grounded tool results."
+        "requests, answer the requested library job with grounded tool results. "
+        "If no grounded library tool result is available, say that plainly; never "
+        "fill the turn by describing a live move, current deck, or sound change."
     )
     if _live_context_transport_is_stale(live_context):
         text += " Stale transport remains hidden unless the DJ asks about current live proof."
@@ -1574,6 +1590,10 @@ def _looks_like_unprompted_live_correction(reply: str) -> bool:
             or _LIVE_CONTEXT_PUBLIC_DIAGNOSTIC_REPLY_RE.search(reply)
         )
     )
+
+
+def _looks_like_library_request_live_leak(reply: str) -> bool:
+    return bool(reply and _LIBRARY_REQUEST_LIVE_LEAK_RE.search(reply))
 
 
 def _clean_live_text(raw: Any, *, max_len: int = 96) -> str | None:
@@ -3799,13 +3819,22 @@ def chat_with_codex(
     track_ids = _validate_against_library(_dedupe_ordered(raw_ids), library)
 
     live_context_mode = _live_context_use_mode(message) if live_context else "none"
+    library_context_request = _is_library_context_request(message)
+    library_live_leak = bool(
+        live_context
+        and live_context_mode != "active_live_context"
+        and library_context_request
+        and _looks_like_library_request_live_leak(raw_reply)
+    )
     guarded_reply = _apply_live_claim_guard(raw_reply, live_context) if live_context else raw_reply
     if live_context_mode == "active_live_context":
         reply = guarded_reply
     elif live_context and (
-        _looks_like_unprompted_live_correction(raw_reply) or guarded_reply != raw_reply
+        library_live_leak
+        or _looks_like_unprompted_live_correction(raw_reply)
+        or guarded_reply != raw_reply
     ):
-        if playlist is not None or track_ids or tools_used or tool_trace:
+        if playlist is not None or track_ids or tools_used or tool_trace or library_context_request:
             reply = _library_request_fallback_reply(
                 playlist=playlist,
                 track_ids=track_ids,
@@ -3830,10 +3859,13 @@ def chat_with_codex(
                 live_context,
                 move_grades=move_grades,
             )
+            guard_violations = list(raw_verification.get("violations", []))
+            if library_live_leak and "library_request_live_leak" not in guard_violations:
+                guard_violations.append("library_request_live_leak")
             live_verification = {
                 **live_verification,
                 "guard_applied": True,
-                "guard_violations": list(raw_verification.get("violations", [])),
+                "guard_violations": guard_violations,
             }
         else:
             live_verification = {

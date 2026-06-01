@@ -747,6 +747,8 @@ def test_chat_prompt_marks_library_request_live_context_as_silent_guard():
     assert "do not mention live_context" in p
     assert "resolved decks" in p
     assert "answer the requested library job with grounded tool results" in p
+    assert "If no grounded library tool result is available, say that plainly" in p
+    assert "never fill the turn by describing a live move" in p
 
 
 def test_chat_prompt_marks_current_live_question_as_active_context():
@@ -1675,6 +1677,46 @@ def test_chat_with_codex_suppresses_live_correction_for_library_request(library)
     assert res.tools_used == ["discover_pool", "search_vibe", "sequence_set"]
 
 
+def test_chat_with_codex_suppresses_plain_live_leak_for_library_request(library):
+    runner = _runner_writing(
+        {
+            "reply": "I caught the live move. The useful note is the sound change right there.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "move_grades": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "find me dark rolling hypnotic techno",
+        library,
+        live_context={
+            "deck": "mix",
+            "audible": True,
+            "deck_state": {},
+            "deck_mixer": {"connected": True},
+            "live_evidence": {
+                "mix": ["transition_block=no_resolved_decks"],
+                "refs": ["mix:transition_block=no_resolved_decks"],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert "live move" not in res.reply
+    assert "sound change" not in res.reply
+    assert res.reply == "I kept that as a library request, but I do not have grounded results to show yet."
+    assert res.live_verification is not None
+    assert res.live_verification["ok"] is True
+    assert res.live_verification["guard_applied"] is True
+    assert "library_request_live_leak" in res.live_verification["guard_violations"]
+
+
 def test_chat_with_codex_uses_shared_guard_for_transition_synonyms(library):
     runner = _runner_writing(
         {
@@ -2390,6 +2432,44 @@ def test_chat_with_codex_replaces_non_live_outcome_hallucination_with_library_re
     assert res.track_ids == ["t000", "t001"]
     assert res.live_verification is not None
     assert res.live_verification["guard_applied"] is True
+
+
+def test_chat_with_codex_keeps_library_request_from_empty_live_fallback(library):
+    runner = _runner_writing(
+        {
+            "reply": "Great transition.",
+            "tools_used": [],
+            "tool_trace": [],
+            "track_ids": [],
+            "playlist": None,
+            "export_path": None,
+        }
+    )
+
+    res = chat_with_codex(
+        "find me dark rolling hypnotic techno",
+        library,
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "none",
+            "deck_state": {},
+            "live_evidence": {
+                "mix": ["transition_block=no_resolved_decks"],
+                "refs": ["mix:transition_block=no_resolved_decks"],
+            },
+        },
+        codex_path=sys.executable,
+        allow_shell=True,
+        _runner=runner,
+    )
+
+    assert res.reply == "I kept that as a library request, but I do not have grounded results to show yet."
+    assert "live move" not in res.reply
+    assert "sound change" not in res.reply
+    assert res.live_verification is not None
+    assert res.live_verification["ok"] is True
+    assert res.live_verification["guard_applied"] is True
+    assert "unsupported_live_outcome_claim" in res.live_verification["guard_violations"]
 
 
 def test_chat_with_codex_corrects_disclaimer_with_fresh_blend_claim(library):
