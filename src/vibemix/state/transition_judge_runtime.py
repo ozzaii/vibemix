@@ -39,6 +39,12 @@ def _verdict_citation_key(t_session: float) -> str:
     return f"transition@{round(t_session, 1)}"
 
 
+def verdict_citation_id(t_session: float) -> str:
+    """The fully-qualified citation id voiced for a judged transition."""
+
+    return f"{JUDGE_CITATION_SOURCE}:{_verdict_citation_key(t_session)}"
+
+
 def judge_and_record(
     frame: LiveSignalFrame,
     *,
@@ -62,7 +68,7 @@ def judge_and_record(
         key = _verdict_citation_key(t)
         if registry is not None:
             registry.write(JUDGE_CITATION_SOURCE, key, t)
-        citation_id = f"{JUDGE_CITATION_SOURCE}:{key}"
+        citation_id = verdict_citation_id(t)
 
     if recorder is not None:
         fields = verdict_event_fields(

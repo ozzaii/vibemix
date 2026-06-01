@@ -151,6 +151,46 @@ def test_run_live_judge_full_rig_judges_and_credits_harmonic():
     assert reg.has("ev", "transition_judged", max(0.0, time.time() - st.set_start_at), tol=2.0)
 
 
+def test_run_live_judge_full_rig_collects_voice_line():
+    reg = EvidenceRegistry()
+    prog = LearnProgress()
+    _competent(prog, "harmonic_mixing")
+    st = _two_deck_state(camelot_a="8A", camelot_b="8A")
+    lines: list[str] = []
+    verdict = _run_live_judge(
+        _Capture(enabled=True, bands_pcm=_bass_pcm()),
+        st,
+        policy="supported_verdict",
+        evidence_registry=reg,
+        recorder=None,
+        learn_progress=prog,
+        judge_voice_lines=lines,
+    )
+    assert verdict is not None and verdict.verdict_state == "judged"
+    assert len(lines) == 1
+    assert lines[0].startswith("[judge:transition@")
+    assert "compatible keys" in lines[0]
+
+
+def test_run_live_judge_abstain_collects_no_voice_line():
+    reg = EvidenceRegistry()
+    prog = LearnProgress()
+    _competent(prog, "harmonic_mixing")
+    st = _two_deck_state()
+    lines: list[str] = []
+    verdict = _run_live_judge(
+        _Capture(enabled=False),
+        st,
+        policy="supported_verdict",
+        evidence_registry=reg,
+        recorder=None,
+        learn_progress=prog,
+        judge_voice_lines=lines,
+    )
+    assert verdict is not None and verdict.verdict_state == "abstained"
+    assert lines == []
+
+
 def test_run_live_judge_never_raises_on_broken_capture():
     st = _two_deck_state()
 

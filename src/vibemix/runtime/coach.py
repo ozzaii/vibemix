@@ -289,6 +289,7 @@ def _run_live_judge(
     recorder: Any | None,
     learn_progress: Any | None,
     speak: Callable[[str], None] | None = None,
+    judge_voice_lines: list[str] | None = None,
 ) -> Any | None:
     """4d — run the Vibe Judge on the live capture for a transition, abstain-first.
 
@@ -310,7 +311,8 @@ def _run_live_judge(
         return None
     try:
         from vibemix.audio.deck_signal import signal_frame_from_capture
-        from vibemix.state.transition_judge_runtime import judge_and_record
+        from vibemix.intel.judge_voice import verdict_evidence_line
+        from vibemix.state.transition_judge_runtime import judge_and_record, verdict_citation_id
 
         decks = getattr(getattr(state, "deck_state", None), "decks", None) or {}
         lane_meta: dict[str, dict[str, object]] = {}
@@ -339,6 +341,10 @@ def _run_live_judge(
             track_a=lane_meta.get("A", {}).get("track_id"),  # type: ignore[arg-type]
             track_b=lane_meta.get("B", {}).get("track_id"),  # type: ignore[arg-type]
         )
+        if judge_voice_lines is not None:
+            line = verdict_evidence_line(verdict, citation_id=verdict_citation_id(t_session))
+            if line:
+                judge_voice_lines.append(line)
         _credit_judged_transition(
             verdict,
             state,
@@ -739,6 +745,7 @@ async def coach_loop(
                     audio_capture_context=audio_capture_context,
                     audio_delta_items=audio_delta_items,
                 )
+                judge_voice_lines: list[str] = []
                 _run_live_judge(
                     deck_audio_capture,
                     state,
@@ -747,7 +754,10 @@ async def coach_loop(
                     recorder=recorder,
                     learn_progress=learn_progress,
                     speak=mastered_speak,
+                    judge_voice_lines=judge_voice_lines,
                 )
+                if judge_voice_lines:
+                    ev.extra["judge_evidence_line"] = judge_voice_lines[0]
 
             if wired:
                 # ---- cancel-and-refire on stale in-flight ----

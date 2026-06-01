@@ -742,6 +742,16 @@ class AICoach:
                 "(audible event or recent move)."
             )
         if t == "TRACK_CHANGE":
+            judge_line = ev_extra.get("judge_evidence_line")
+            if isinstance(judge_line, str) and judge_line.strip():
+                return (
+                    f"{judge_line.strip()}. Use that measured Judge verdict as "
+                    "the hard transition read. Keep the bracketed citation exactly, "
+                    "translate the measured key/low-end result into one short DJ "
+                    "reaction, and do not add fader, EQ, or deck-control causes "
+                    "that are not in the Judge line. If it is not worth saying, "
+                    "output a single space to stay silent."
+                )
             prev = ev_extra.get("prev_track")
             prev_clause = f" (was: {prev!r})" if prev else ""
             return (
