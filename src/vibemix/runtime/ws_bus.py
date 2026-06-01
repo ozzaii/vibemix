@@ -695,6 +695,7 @@ class IpcRouterBus:
     def __init__(self) -> None:
         self._handlers: dict[str, Any] = {}
         self._emit: Any | None = None
+        self._latest_replayable: dict[str, dict] = {}
 
     def register_handler(self, message_type: str, handler: Any) -> None:
         self._handlers[message_type] = handler
@@ -704,8 +705,25 @@ class IpcRouterBus:
         self._emit = emit_fn
 
     async def emit(self, msg: dict) -> None:
+        mtype = msg.get("type")
+        if mtype == "ipc.library.staleness_nudge":
+            self._latest_replayable[mtype] = msg
         if self._emit is not None:
             await self._emit(msg)
+
+    def clear_retained(self, message_type: str) -> None:
+        self._latest_replayable.pop(message_type, None)
+
+    async def replay_to(self, ws: Any) -> None:
+        """Replay sticky status messages to a newly connected client.
+
+        Most bus frames are edge-triggered events and must not replay. Library
+        staleness is user-visible status: boot can detect it before the Tauri
+        bridge is connected, so late clients need the latest nudge once.
+        """
+
+        for msg in list(self._latest_replayable.values()):
+            await ws.send(json.dumps(msg))
 
     async def start(self) -> None:  # pragma: no cover — never called
         return None
@@ -795,6 +813,13 @@ async def ws_broadcast(
     async def handler(ws):
         clients.add(ws)
         _tr("client_connect", clients=len(clients))
+        if ipc_router is not None:
+            try:
+                await ipc_router.replay_to(ws)
+            except Exception:
+                clients.discard(ws)
+                _tr("client_disconnect", clients=len(clients))
+                return
         try:
             async for msg in ws:
                 try:

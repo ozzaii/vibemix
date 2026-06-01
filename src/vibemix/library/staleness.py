@@ -12,6 +12,7 @@ when to call ``emit_nudge_if_stale`` (once per boot).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -58,6 +59,17 @@ class LibraryFreshness:
 
 def _age_days_from_mtime(mtime: float, *, now: float) -> int:
     return max(0, int((now - mtime) // 86400))
+
+
+def _refreshable_source_path(status: LibraryFreshness) -> str | None:
+    """Return a source path the existing XML importer can refresh directly."""
+    source_path = status.source_path
+    if not source_path:
+        return None
+    path = Path(source_path)
+    if path.suffix.lower() != ".xml" or not path.exists():
+        return None
+    return source_path
 
 
 def is_stale(library_pkl: Path | None = None) -> tuple[bool, int]:
@@ -200,6 +212,78 @@ def library_freshness_status(
     )
 
 
+def freshness_nudge_payload(
+    library_pkl: Path | None = None,
+    state_path: Path | None = None,
+    *,
+    now: float | None = None,
+) -> dict[str, object] | None:
+    """Return an existing-schema nudge payload when freshness needs attention."""
+    status = library_freshness_status(library_pkl, now=now)
+    if status.status == "not_indexed" or not status.stale:
+        return None
+    if is_snoozed(state_path):
+        return None
+    return {
+        "age_days": status.age_days,
+        "snoozed_until_ts": load_snooze_state(state_path),
+        "source_path": _refreshable_source_path(status),
+        "reason": status.reason,
+        "schema_version": "1",
+    }
+
+
+async def watch_library_freshness(
+    emit_ipc: Callable[[str, dict], None],
+    stop_event: asyncio.Event,
+    *,
+    poll_seconds: float = 10.0,
+    library_pkl: Path | None = None,
+    state_path: Path | None = None,
+    status_provider: Callable[[], LibraryFreshness] | None = None,
+) -> None:
+    """Poll library freshness and emit a staleness nudge when it changes stale.
+
+    This intentionally reuses the existing closed IPC schema
+    ``ipc.library.staleness_nudge``. The richer status travels through
+    ``library stats``; the watcher is the lightweight "pay attention now" pulse.
+    """
+    poll = max(0.01, float(poll_seconds))
+    last_signature: tuple[object, ...] | None = None
+    while not stop_event.is_set():
+        try:
+            status = (
+                status_provider()
+                if status_provider is not None
+                else library_freshness_status(library_pkl)
+            )
+            signature = (
+                status.status,
+                status.reason,
+                status.cache_mtime,
+                status.source_mtime,
+            )
+            payload = None
+            if signature != last_signature and status.status != "not_indexed" and status.stale:
+                if not is_snoozed(state_path):
+                    payload = {
+                        "age_days": status.age_days,
+                        "snoozed_until_ts": load_snooze_state(state_path),
+                        "source_path": _refreshable_source_path(status),
+                        "reason": status.reason,
+                        "schema_version": "1",
+                    }
+            last_signature = signature
+            if payload is not None:
+                emit_ipc("ipc.library.staleness_nudge", payload)
+        except Exception as e:  # pragma: no cover - watcher must never kill live runtime
+            logger.warning("library freshness watcher failed: %s", e)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=poll)
+        except TimeoutError:
+            pass
+
+
 def load_snooze_state(state_path: Path | None = None) -> float | None:
     """Read the snooze timestamp from state.json.
 
@@ -282,20 +366,10 @@ def emit_nudge_if_stale(
     Returns ``True`` if the nudge was emitted, ``False`` otherwise. Pure —
     caller must invoke once per boot.
     """
-    stale, age_days = is_stale(library_pkl)
-    if not stale:
+    payload = freshness_nudge_payload(library_pkl, state_path)
+    if payload is None:
         return False
-    if is_snoozed(state_path):
-        return False
-    snoozed_until = load_snooze_state(state_path)
-    emit_ipc(
-        "ipc.library.staleness_nudge",
-        {
-            "age_days": age_days,
-            "snoozed_until_ts": snoozed_until,
-            "schema_version": "1",
-        },
-    )
+    emit_ipc("ipc.library.staleness_nudge", payload)
     return True
 
 
@@ -331,9 +405,11 @@ __all__ = [
     "LibraryFreshness",
     "apply_snooze_action",
     "emit_nudge_if_stale",
+    "freshness_nudge_payload",
     "is_snoozed",
     "is_stale",
     "library_freshness_status",
     "load_snooze_state",
     "save_snooze_state",
+    "watch_library_freshness",
 ]

@@ -629,6 +629,62 @@ def test_ipc_router_handler_exception_is_swallowed():
     assert handled is True  # recognized + ran (fault swallowed, no raise)
 
 
+def test_ws_broadcast_replays_staleness_nudge_to_late_client(mocker):
+    """Library freshness is sticky status, not a one-shot boot event.
+
+    The live runtime can detect a stale library before the Tauri bridge has
+    connected. A late client must still receive the latest nudge.
+    """
+    from vibemix.runtime.ws_bus import IpcRouterBus
+
+    mock_server = _build_mock_server()
+    serve_mock = AsyncMock(return_value=mock_server)
+    mocker.patch("vibemix.runtime.ws_bus.websockets.serve", new=serve_mock)
+
+    router = IpcRouterBus()
+    nudge = {
+        "type": "ipc.library.staleness_nudge",
+        "ts": "2026-06-01T00:00:00Z",
+        "payload": {
+            "age_days": 5,
+            "source_path": "tests/library/fixtures/synthetic_collection.xml",
+            "reason": "source_newer_than_cache",
+            "schema_version": "1",
+        },
+    }
+
+    async def driver():
+        await router.emit(nudge)
+
+        fake_levels = MagicMock()
+        fake_levels.snapshot = MagicMock(return_value={"music": 0.0, "voice": 0.0, "mic": 0.0})
+        state = MusicState()
+        manual_trigger = asyncio.Event()
+        stop_event = asyncio.Event()
+        stop_event.set()
+        await ws_broadcast(fake_levels, state, manual_trigger, stop_event, ipc_router=router)
+        handler = serve_mock.await_args.args[0]
+
+        sent: list[dict] = []
+
+        class LateClient:
+            async def send(self, payload: str) -> None:
+                sent.append(json.loads(payload))
+
+            def __aiter__(self):
+                async def gen():
+                    if False:  # pragma: no cover
+                        yield ""
+
+                return gen()
+
+        await handler(LateClient())
+        return sent
+
+    sent = asyncio.run(driver())
+    assert sent == [nudge]
+
+
 def test_ws_broadcast_accepts_ipc_router_param():
     """ws_broadcast must accept the optional ipc_router kwarg (the seam main()
     uses to wire SessionLoop's handlers onto the live socket)."""

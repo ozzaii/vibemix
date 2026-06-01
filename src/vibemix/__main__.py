@@ -1808,7 +1808,10 @@ async def main() -> None:
             import json as _json
 
             from vibemix.library.importer import LibraryImporter
-            from vibemix.library.staleness import apply_snooze_action
+            from vibemix.library.staleness import (
+                apply_snooze_action,
+                watch_library_freshness,
+            )
             from vibemix.ui_bus.messages import (
                 LibraryImportProgress,
                 LibraryStalenessNudge,
@@ -1924,6 +1927,7 @@ async def main() -> None:
                 action = str(payload.get("action", "")).strip()
                 try:
                     apply_snooze_action(action)
+                    ipc_router.clear_retained("ipc.library.staleness_nudge")
                 except ValueError as _e:
                     print(f"-> staleness action rejected: {_e}", file=sys.stderr)
 
@@ -1947,6 +1951,33 @@ async def main() -> None:
             if _pending_staleness_nudges:
                 _age = _pending_staleness_nudges[0].get("age_days")
                 print(f"-> staleness nudge emitted ({_age}d stale)")
+
+            def _watcher_staleness_emit(msg_type: str, payload: dict) -> None:
+                async def _send() -> None:
+                    await _emit_library(
+                        _json.loads(
+                            LibraryStalenessNudge.make(
+                                age_days=int(payload.get("age_days", 0)),
+                                snoozed_until_ts=payload.get("snoozed_until_ts"),
+                            ).to_json()
+                        )
+                    )
+
+                _wt = asyncio.create_task(_send())
+                _background_tasks.add(_wt)
+                _wt.add_done_callback(_background_tasks.discard)
+
+            _freshness_watch_task = asyncio.create_task(
+                watch_library_freshness(
+                    _watcher_staleness_emit,
+                    stop_event,
+                    poll_seconds=10.0,
+                    library_pkl=library_cache,
+                )
+            )
+            _background_tasks.add(_freshness_watch_task)
+            _freshness_watch_task.add_done_callback(_background_tasks.discard)
+            print("-> library freshness watcher armed")
         except Exception as _e:
             print(f"-> library import/staleness NOT wired: {_e!r}", file=sys.stderr)
 

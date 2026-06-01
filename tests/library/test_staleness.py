@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -14,13 +15,16 @@ import pytest
 from vibemix.library.staleness import (
     SNOOZE_DURATION_SECONDS,
     STALE_AGE_SECONDS,
+    LibraryFreshness,
     apply_snooze_action,
     emit_nudge_if_stale,
+    freshness_nudge_payload,
     is_snoozed,
     is_stale,
     library_freshness_status,
     load_snooze_state,
     save_snooze_state,
+    watch_library_freshness,
 )
 
 
@@ -140,6 +144,99 @@ def test_freshness_status_source_missing(tmp_path: Path) -> None:
     assert status.status == "source_missing"
     assert status.stale is True
     assert status.reason == "source_path_missing"
+
+
+def test_freshness_nudge_payload_source_newer_than_cache(tmp_path: Path) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    source = tmp_path / "collection.xml"
+    source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    old_mtime = time.time() - 100
+    os.utime(source, (old_mtime, old_mtime))
+    cache = tmp_path / "library.pkl"
+    old_cache = RekordboxLibrary.CACHE_PATH
+    RekordboxLibrary.CACHE_PATH = cache
+    try:
+        RekordboxLibrary()._write_cache(str(source), old_mtime)
+    finally:
+        RekordboxLibrary.CACHE_PATH = old_cache
+    new_mtime = old_mtime + 10
+    os.utime(source, (new_mtime, new_mtime))
+
+    payload = freshness_nudge_payload(cache, tmp_path / "state.json", now=new_mtime + 1)
+
+    assert payload is not None
+    assert payload["age_days"] == 0
+    assert payload["source_path"] == str(source)
+    assert payload["reason"] == "source_newer_than_cache"
+    assert payload["schema_version"] == "1"
+
+
+def test_freshness_nudge_payload_skips_fresh_install(tmp_path: Path) -> None:
+    payload = freshness_nudge_payload(tmp_path / "missing.pkl", tmp_path / "state.json")
+
+    assert payload is None
+
+
+def test_watch_library_freshness_emits_when_source_becomes_stale(tmp_path: Path) -> None:
+    fresh = LibraryFreshness(
+        status="fresh",
+        stale=False,
+        reason="cache_current",
+        age_days=0,
+        cache_path="/tmp/library.pkl",
+        cache_mtime=1.0,
+        source_mtime=1.0,
+    )
+    stale = LibraryFreshness(
+        status="stale",
+        stale=True,
+        reason="source_newer_than_cache",
+        age_days=0,
+        cache_path="/tmp/library.pkl",
+        cache_mtime=1.0,
+        source_mtime=2.0,
+    )
+    calls = {"n": 0}
+
+    def provider() -> LibraryFreshness:
+        calls["n"] += 1
+        return fresh if calls["n"] == 1 else stale
+
+    async def _run() -> list[tuple[str, dict]]:
+        stop = asyncio.Event()
+        emitted: list[tuple[str, dict]] = []
+
+        def emit(msg_type: str, payload: dict) -> None:
+            emitted.append((msg_type, payload))
+            stop.set()
+
+        await asyncio.wait_for(
+            watch_library_freshness(
+                emit,
+                stop,
+                poll_seconds=0.01,
+                state_path=tmp_path / "state.json",
+                status_provider=provider,
+            ),
+            timeout=0.5,
+        )
+        return emitted
+
+    emitted = asyncio.run(_run())
+
+    assert emitted == [
+        (
+            "ipc.library.staleness_nudge",
+            {
+                "age_days": 0,
+                "snoozed_until_ts": None,
+                "source_path": None,
+                "reason": "source_newer_than_cache",
+                "schema_version": "1",
+            },
+        )
+    ]
 
 
 def test_snooze_persists(tmp_path: Path) -> None:
