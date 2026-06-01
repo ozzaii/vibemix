@@ -21,7 +21,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -35,7 +35,6 @@ from vibemix.library.embed import (
     LibraryEmbedder,
 )
 from vibemix.library.rekordbox import TrackEntry
-
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
