@@ -39,14 +39,10 @@ from livekit.agents._exceptions import APIError
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 from livekit.agents.utils import shortuuid
 
-from vibemix.agent.config import (
-    VOICE as _GEMINI_VOICE,  # noqa: F401  (kept for parity of voice config home)
-)
-
 if TYPE_CHECKING:
     import numpy as np
 
-# --- config (plain env, NOT the Gemini-only model_router — see config.py/Cartesia) ---
+# --- config (plain env, not the Gemini-only model_router) ---
 # Native model output rate. The codec emits 48 kHz; we read the real value from
 # the model meta at construction and only fall back to this if that read fails.
 _DEFAULT_NATIVE_SR = 48000

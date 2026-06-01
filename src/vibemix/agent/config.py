@@ -1,21 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Agent-layer constants — verbatim port of cohost_v4.py:97-104.
+"""Agent-layer constants for the live co-host.
 
 I/O sample-rate / blocksize / gain constants live in ``vibemix.audio.constants``
 (already shipped by Phase 2). Phase 4's __main__ imports the audio-side
 constants from there; this module only holds the agent-layer string IDs
-(model names, legacy voice names, device names) that ride with the LiveKit/
-Gemini surface.
+(LLM model names and device names) that ride with the LiveKit/Gemini surface.
 
 Phase 11's calibration wizard will surface the device names as user-editable
 Settings; v4 hard-codes them so we port the v4 defaults verbatim.
 
-Plan 41-01 migration: the LLM and legacy TTS model strings are resolved through
-:func:`vibemix.llm.model_router.resolve` so a future SKU bump is a one-file edit
-in ``vibemix/llm/_router_config.py``. The legacy TTS constant *names* are
-preserved (``TTS_MODEL``, ``TTS_FALLBACK_MODEL``, …) for import compatibility
-only. Live co-host speech never uses those cloud TTS IDs; ``agent.tts_chain``
-resolves to local MOSS only.
+Plan 41-01 migration: the LLM model string is resolved through
+:func:`vibemix.llm.model_router.resolve_model` so a future SKU bump is a
+one-file edit in ``vibemix/llm/_router_config.py``. Live co-host speech never
+uses cloud TTS IDs; ``agent.tts_chain`` resolves to local MOSS only.
 """
 
 from __future__ import annotations
@@ -24,10 +21,8 @@ import os
 
 from vibemix.llm.model_router import resolve, resolve_model
 
-# ---- LLM + legacy TTS model identifiers (router-derived per Plan 41-01) ----
+# ---- LLM model identifiers (router-derived per Plan 41-01) ----
 LLM_MODEL: str = resolve_model("live_coach")
-TTS_MODEL: str = resolve_model("live_coach_tts")
-TTS_FALLBACK_MODEL: str = resolve_model("live_coach_tts_fallback")
 
 # OpenRouter-routed Gemini brain model id. The retired OpenRouter TTS id is not
 # exported from the agent layer; live speech resolves through local MOSS only.

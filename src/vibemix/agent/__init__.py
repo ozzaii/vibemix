@@ -28,8 +28,6 @@ from vibemix.agent.config import (
     LLM_MODEL,
     MIC_DEVICE,
     OUTPUT_DEVICE,
-    TTS_FALLBACK_MODEL,
-    TTS_MODEL,
     VOICE,
 )
 from vibemix.agent.persona import SYSTEM_INSTRUCTION
@@ -40,8 +38,6 @@ __all__ = [
     "MIC_DEVICE",
     "OUTPUT_DEVICE",
     "SYSTEM_INSTRUCTION",
-    "TTS_FALLBACK_MODEL",
-    "TTS_MODEL",
     "VOICE",
     "DJCoHostAgent",
     "PlaybackQueueAudioOutput",
