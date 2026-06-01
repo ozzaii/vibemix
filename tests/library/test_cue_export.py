@@ -20,7 +20,6 @@ from vibemix.library.cue_export import (
 )
 from vibemix.library.cue_types import CueAnchor
 
-
 # -- fakes ----------------------------------------------------------------- #
 
 
@@ -117,7 +116,7 @@ def test_export_maps_each_label_to_name_and_color(tmp_path) -> None:
     assert res["exported"] is True
     assert res["cue_count"] == 5
     assert len(fake.track.marks) == 5
-    for mark, cue in zip(fake.track.marks, cues):
+    for mark, cue in zip(fake.track.marks, cues, strict=True):
         assert mark.kwargs["Name"] == _LABEL_TO_MARK_NAME[cue.label]
         r, g, b = _LABEL_COLORS[cue.label]
         assert (mark.Red, mark.Green, mark.Blue) == (r, g, b)

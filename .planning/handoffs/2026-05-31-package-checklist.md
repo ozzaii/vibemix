@@ -808,6 +808,32 @@ Proof before staging:
 - `git diff --check -- tests/library/test_centering.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AD - Cue Export Test Ruff Hygiene
+
+Suggested commit: `test(library): clean cue export test lint`
+
+Include:
+
+- `tests/library/test_cue_export.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Cue export source, Viber/library tool code, runtime files, and generated files.
+
+Reason:
+
+- The cue-export test had a stale extra blank line and zips marks/cues with
+  equal expected lengths. Cleaning both keeps the focused library-test ruff gate
+  clean without changing cue mapping assertions.
+
+Proof before staging:
+
+- `uv run ruff check tests/library/test_cue_export.py`
+- `uv run pytest -q tests/library/test_cue_export.py`
+- `git diff --check -- tests/library/test_cue_export.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Claude Runtime Orientation Drift
 
 Suggested commit if/when selected: `docs(runtime): capture local live-run caveats`
