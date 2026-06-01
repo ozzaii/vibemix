@@ -76,6 +76,142 @@ def test_rekordbox_deck_output_routing_hint_reads_external_deck_outputs(tmp_path
     assert hint["rule"] == "rekordbox_output_routing_hint_not_live_audio_proof"
 
 
+def test_rekordbox_current_output_blocks_stale_external_deck_hint(tmp_path) -> None:
+    settings = tmp_path / "rekordbox3.settings"
+    settings.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<SETTINGS>
+  <VALUE name="audioDeviceManager">
+    <DEVICESETUP audioOutputDeviceName="Multi-Output Device" MixerMode_Is_Internal="1"
+                 Date="20" OutputChannel_Master_L="0" OutputChannel_Master_R="1"/>
+  </VALUE>
+  <VALUE name="audioDeviceManager_PerformanceMode_aggregate">
+    <DEVICESETUP audioOutputDeviceName="Aggregate Device" MixerMode_Is_Internal="0"
+                 Date="10" OutputChannel_Deck0_L="0" OutputChannel_Deck0_R="1"
+                 OutputChannel_Deck1_L="2" OutputChannel_Deck1_R="3"/>
+  </VALUE>
+</SETTINGS>
+""",
+        encoding="utf-8",
+    )
+
+    hint = rekordbox_deck_output_routing_hint(
+        settings_paths=(settings,),
+        capture_device_name="BlackHole 16ch",
+        input_channels=16,
+    )
+
+    assert hint is None
+
+
+def test_rekordbox_active_settings_block_legacy_current_output_hint(tmp_path) -> None:
+    active = tmp_path / "rekordbox6.settings"
+    active.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<SETTINGS>
+  <VALUE name="audioDeviceManager">
+    <DEVICESETUP audioOutputDeviceName="Multi-Output Device" MixerMode_Is_Internal="1"
+                 Date="30" OutputChannel_Master_L="0" OutputChannel_Master_R="1"/>
+  </VALUE>
+</SETTINGS>
+""",
+        encoding="utf-8",
+    )
+    legacy = tmp_path / "rekordbox.settings"
+    legacy.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<SETTINGS>
+  <VALUE name="audioDeviceManager">
+    <DEVICESETUP audioOutputDeviceName="DDJ-FLX4" MixerMode_Is_Internal="1"
+                 Date="20" OutputChannel_Master_L="0" OutputChannel_Master_R="1"/>
+  </VALUE>
+  <VALUE name="audioDeviceManager_PerformanceMode_0">
+    <DEVICESETUP audioOutputDeviceName="DDJ-FLX4" MixerMode_Is_Internal="1"
+                 Date="10" OutputChannel_Deck0_L="0" OutputChannel_Deck0_R="1"
+                 OutputChannel_Deck1_L="2" OutputChannel_Deck1_R="3"/>
+  </VALUE>
+</SETTINGS>
+""",
+        encoding="utf-8",
+    )
+
+    hint = rekordbox_deck_output_routing_hint(
+        settings_paths=(active, legacy),
+        capture_device_name="BlackHole 16ch",
+        input_channels=16,
+    )
+
+    assert hint is None
+
+
+def test_rekordbox_current_output_allows_matching_external_deck_hint(tmp_path) -> None:
+    settings = tmp_path / "rekordbox3.settings"
+    settings.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<SETTINGS>
+  <VALUE name="audioDeviceManager">
+    <DEVICESETUP audioOutputDeviceName="Aggregate Device" MixerMode_Is_Internal="0"
+                 Date="20" OutputChannel_Deck0_L="0" OutputChannel_Deck0_R="1"
+                 OutputChannel_Deck1_L="2" OutputChannel_Deck1_R="3"/>
+  </VALUE>
+  <VALUE name="audioDeviceManager_PerformanceMode_blackhole">
+    <DEVICESETUP audioOutputDeviceName="BlackHole 16ch" MixerMode_Is_Internal="0"
+                 Date="30" OutputChannel_Deck0_L="0" OutputChannel_Deck0_R="1"
+                 OutputChannel_Deck1_L="2" OutputChannel_Deck1_R="3"/>
+  </VALUE>
+</SETTINGS>
+""",
+        encoding="utf-8",
+    )
+
+    hint = rekordbox_deck_output_routing_hint(
+        settings_paths=(settings,),
+        capture_device_name="BlackHole 16ch",
+        input_channels=16,
+    )
+
+    assert hint is not None
+    assert hint["settings_entry"] == "audioDeviceManager"
+    assert hint["output_device"] == "Aggregate_Device"
+    assert hint["deck_channels"] == {"A": (0, 1), "B": (2, 3)}
+
+
+def test_global_per_deck_default_ignores_stale_external_hint_when_current_is_stereo(
+    monkeypatch, tmp_path
+) -> None:
+    settings = tmp_path / "rekordbox3.settings"
+    settings.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<SETTINGS>
+  <VALUE name="audioDeviceManager">
+    <DEVICESETUP audioOutputDeviceName="Multi-Output Device" MixerMode_Is_Internal="1"
+                 Date="20" OutputChannel_Master_L="0" OutputChannel_Master_R="1"/>
+  </VALUE>
+  <VALUE name="audioDeviceManager_PerformanceMode_aggregate">
+    <DEVICESETUP audioOutputDeviceName="Aggregate Device" MixerMode_Is_Internal="0"
+                 Date="10" OutputChannel_Deck0_L="0" OutputChannel_Deck0_R="1"
+                 OutputChannel_Deck1_L="2" OutputChannel_Deck1_R="3"/>
+  </VALUE>
+</SETTINGS>
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("VIBEMIX_DECK_AUDIO_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_INPUT_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_MASTER_AUDIO_CHANNELS", raising=False)
+
+    routing = deck_audio_routing_from_env(
+        input_channels=16,
+        capture_device_name="BlackHole 16ch",
+        rekordbox_settings_paths=(settings,),
+    )
+
+    assert routing.enabled is False
+    assert routing.deck_channels == {}
+    assert routing.reason == "disabled"
+    assert routing.source == "env"
+
+
 def test_deck_audio_routing_auto_uses_rekordbox_hint_when_requested(monkeypatch, tmp_path) -> None:
     settings = tmp_path / "rekordbox3.settings"
     settings.write_text(
@@ -110,6 +246,74 @@ def test_deck_audio_routing_auto_uses_rekordbox_hint_when_requested(monkeypatch,
     assert context["deck_audio_routing_source"] == "rekordbox_settings"
     assert "rekordbox_deck_routing_hint[" in context["deck_audio_routing_hint"]
     assert "deck_outputs=A:0,1+B:2,3" in context["deck_audio_routing_hint"]
+
+
+def test_deck_audio_capture_auto_rekordbox_map_requires_both_pairs_live(
+    monkeypatch, tmp_path
+) -> None:
+    settings = tmp_path / "rekordbox3.settings"
+    settings.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<SETTINGS>
+  <VALUE name="audioDeviceManager_PerformanceMode_aggregate">
+    <DEVICESETUP audioOutputDeviceName="Aggregate Device" MixerMode_Is_Internal="0"
+                 Date="2" OutputChannel_Deck0_L="0" OutputChannel_Deck0_R="1"
+                 OutputChannel_Deck1_L="2" OutputChannel_Deck1_R="3"/>
+  </VALUE>
+</SETTINGS>
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "auto")
+    monkeypatch.delenv("VIBEMIX_INPUT_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_MASTER_AUDIO_CHANNELS", raising=False)
+    routing = deck_audio_routing_from_env(
+        input_channels=16,
+        capture_device_name="BlackHole 16ch",
+        rekordbox_settings_paths=(settings,),
+    )
+    capture = DeckAudioCapture(routing, seconds=1.0)
+    master_only_on_first_pair = np.zeros((480, 4), dtype=np.float32)
+    master_only_on_first_pair[:, 0] = 0.2
+    master_only_on_first_pair[:, 1] = 0.2
+
+    capture.process(master_only_on_first_pair, source_sr=48000)
+    context = capture.context()
+
+    assert context["deck_audio_capture_configured"] is True
+    assert context["deck_audio_capture_enabled"] is False
+    assert context["deck_audio_capture_verified"] is False
+    assert context["deck_audio_capture_reason"] == "deck_pair_capture_unverified"
+    assert context["deck_audio_active_sides_seen"] == "A"
+    assert context["deck_audio_rms"]["A"] == pytest.approx(0.2)
+    assert context["deck_audio_rms"]["B"] == pytest.approx(0.0)
+
+    deck_b_on_second_pair = np.zeros((480, 4), dtype=np.float32)
+    deck_b_on_second_pair[:, 2] = 0.3
+    deck_b_on_second_pair[:, 3] = 0.3
+    capture.process(deck_b_on_second_pair, source_sr=48000)
+    context = capture.context()
+
+    assert context["deck_audio_capture_enabled"] is True
+    assert context["deck_audio_capture_verified"] is True
+    assert context["deck_audio_active_sides_seen"] == "A,B"
+
+
+def test_deck_audio_capture_manual_map_stays_operator_trusted(monkeypatch) -> None:
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "A=0,1;B=2,3")
+    routing = deck_audio_routing_from_env(input_channels=4)
+    capture = DeckAudioCapture(routing, seconds=1.0)
+    indata = np.zeros((480, 4), dtype=np.float32)
+    indata[:, 0] = 0.2
+    indata[:, 1] = 0.2
+
+    capture.process(indata, source_sr=48000)
+    context = capture.context()
+
+    assert context["deck_audio_capture_configured"] is True
+    assert context["deck_audio_capture_enabled"] is True
+    assert context["deck_audio_capture_verified"] is True
+    assert context["deck_audio_active_sides_seen"] == "A"
 
 
 def test_deck_audio_routing_auto_reports_too_narrow_capture_device(

@@ -20,6 +20,17 @@ def _routing(enabled=True):
     )
 
 
+def _auto_routing():
+    return DeckAudioRouting(
+        opened_channels=4,
+        master_channels=(0, 1, 2, 3),
+        deck_channels={"A": (0, 1), "B": (2, 3)},
+        enabled=True,
+        source="rekordbox_settings",
+        reason="rekordbox_settings_auto",
+    )
+
+
 def _meta():
     return {
         "A": {"camelot": "8A", "source_trusted": True, "track_id": "t1"},
@@ -38,6 +49,24 @@ def test_adapter_disabled_routing_marks_disabled():
     frame = signal_frame_from_capture(cap, t_session=5.0, policy="supported_verdict", lane_meta=_meta())
     assert isinstance(frame, LiveSignalFrame)
     assert frame.routing_enabled is False
+
+
+def test_adapter_treats_unverified_auto_rekordbox_pairs_as_disabled():
+    cap = DeckAudioCapture(_auto_routing())
+    indata = np.zeros((480, 4), dtype=np.float32)
+    indata[:, 0] = 0.2
+    indata[:, 1] = 0.2
+    cap.process(indata, source_sr=48000)
+
+    frame = signal_frame_from_capture(
+        cap,
+        t_session=5.0,
+        policy="supported_verdict",
+        lane_meta=_meta(),
+    )
+
+    assert frame.routing_enabled is False
+    assert frame.lane("A").bands is None
 
 
 def test_adapter_carries_lane_meta_and_bands():

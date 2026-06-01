@@ -88,6 +88,7 @@ class DeckAudioCapture:
             for side in routing.deck_channels
             if routing.enabled
         }
+        self._active_sides_seen: set[str] = set()
         self._clock_s: float = 0.0
         self._feature_history: list[tuple[float, dict[str, dict[str, object]]]] = []
         self.last_rms: dict[str, float] = {}
@@ -123,6 +124,8 @@ class DeckAudioCapture:
                     continue
                 deck_mono = indata[:, valid].mean(axis=1).astype(np.float32)
                 deck_rms[side] = float(np.sqrt(np.mean(deck_mono * deck_mono)))
+                if deck_rms[side] >= _DECK_ACTIVE_RMS:
+                    self._active_sides_seen.add(side)
                 deck_features[side] = _deck_frame_features(deck_mono, deck_rms[side])
                 delta = _feature_delta_tokens(deck_features[side], self.last_features.get(side))
                 if delta:
@@ -143,8 +146,35 @@ class DeckAudioCapture:
         self.last_deltas = deck_deltas
         return DeckAudioFrame(master_mono, passthrough, deck_rms, deck_features, deck_deltas)
 
+    def effective_enabled(self) -> bool:
+        """Return whether deck-pair isolation is verified enough to consume.
+
+        Rekordbox settings are a useful hint, not live proof. In the common
+        internal-mixer BlackHole setup, channels 0/1 carry the whole master mix
+        and 2/3 stay silent; treating that as A/B isolated decks makes Deck 2
+        look dead. Manual env maps remain operator-trusted, while auto-detected
+        Rekordbox maps must show activity on both configured deck pairs at
+        least once before downstream code consumes them as isolated lanes.
+        """
+        if not self.routing.enabled:
+            return False
+        if self.routing.source != "rekordbox_settings":
+            return True
+        return all(side in self._active_sides_seen for side in _DECK_SIDES)
+
     def context(self) -> dict[str, object]:
         ctx = self.routing.context()
+        if self.routing.enabled:
+            effective_enabled = self.effective_enabled()
+            ctx["deck_audio_capture_configured"] = True
+            ctx["deck_audio_capture_enabled"] = effective_enabled
+            ctx["deck_audio_capture_verified"] = effective_enabled
+            ctx["deck_audio_active_sides_seen"] = (
+                ",".join(side for side in _DECK_SIDES if side in self._active_sides_seen)
+                or "none"
+            )
+            if not effective_enabled:
+                ctx["deck_audio_capture_reason"] = "deck_pair_capture_unverified"
         if self.last_rms:
             ctx["deck_audio_rms"] = {
                 side: round(value, 6) for side, value in sorted(self.last_rms.items())
@@ -463,9 +493,22 @@ def rekordbox_deck_output_routing_hint(
     channels.
     """
     max_in = _bounded_channel_count(input_channels)
-    candidates: list[dict[str, object]] = []
+    fallback_candidates: list[dict[str, object]] = []
+    candidates: list[dict[str, object]] | None = None
     for path in settings_paths or _default_rekordbox_settings_paths():
-        candidates.extend(_rekordbox_settings_candidates(Path(path), max_input_channels=max_in))
+        settings_path = Path(path)
+        path_candidates = _rekordbox_settings_candidates(settings_path, max_input_channels=max_in)
+        current_output_tokens = _rekordbox_current_output_tokens(settings_path)
+        if current_output_tokens:
+            candidates = [
+                candidate
+                for candidate in path_candidates
+                if _device_token(candidate.get("output_device")) in current_output_tokens
+            ]
+            break
+        fallback_candidates.extend(path_candidates)
+    if candidates is None:
+        candidates = fallback_candidates
     if not candidates:
         return None
 
@@ -490,6 +533,28 @@ def rekordbox_deck_output_routing_hint(
 
     best = max(candidates, key=_score)
     return best if best.get("deck_channels") else None
+
+
+def _rekordbox_current_output_tokens(path: Path) -> set[str]:
+    """Return current rekordbox output device tokens from the top-level setup row."""
+    if not path.exists() or not path.is_file():
+        return set()
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError):
+        return set()
+
+    tokens: set[str] = set()
+    for value_node in root.iter("VALUE"):
+        if str(value_node.attrib.get("name") or "") != "audioDeviceManager":
+            continue
+        setup = value_node.find("DEVICESETUP")
+        if setup is None:
+            continue
+        token = _device_token(setup.attrib.get("audioOutputDeviceName"))
+        if token:
+            tokens.add(token)
+    return tokens
 
 
 def _default_rekordbox_settings_paths() -> tuple[Path, ...]:

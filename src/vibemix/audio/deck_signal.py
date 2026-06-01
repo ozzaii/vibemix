@@ -29,10 +29,14 @@ def signal_frame_from_capture(
     """Assemble the Judge's typed input from the live capture rings.
 
     `lane_meta[side]` carries the caller-resolved {camelot, source_trusted,
-    track_id}. `routing_enabled` mirrors the capture's routing — False on the
-    common master-only rig, which makes the executed-mix signals honest-null.
+    track_id}. `routing_enabled` mirrors the capture's effective routing —
+    False on master-only rigs and on unverified auto-Rekordbox deck-pair hints,
+    which makes the executed-mix signals honest-null.
     """
-    routing_enabled = capture.routing.enabled
+    effective_enabled = getattr(capture, "effective_enabled", None)
+    routing_enabled = (
+        bool(effective_enabled()) if callable(effective_enabled) else bool(capture.routing.enabled)
+    )
     lanes: dict[str, LaneObservation] = {}
     for side in _DECK_SIDES:
         meta = lane_meta.get(side, {})
