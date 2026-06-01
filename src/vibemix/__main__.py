@@ -241,6 +241,77 @@ async def _close_tts_chain(tts_inst: Any) -> None:
     await _close_one(tts_inst)
 
 
+def _best_effort_error(tracer: Any, event: str, stderr_line: str, **detail: Any) -> None:
+    """Record a runtime error without letting observability become the crash."""
+    try:
+        tracer.error(event, **detail)
+    except Exception:
+        pass
+    try:
+        print(stderr_line, file=sys.stderr)
+    except (BrokenPipeError, OSError):
+        pass
+
+
+def _record_task_exit(tracer: Any, name: str, task: asyncio.Task) -> None:
+    """Done-callback target: log crashed background tasks once, quietly."""
+    try:
+        exc = task.exception()
+    except asyncio.CancelledError:
+        return
+    except Exception as err:  # pragma: no cover - defensive observer only
+        exc = err
+    if exc is None:
+        return
+    _best_effort_error(
+        tracer,
+        "task_crashed",
+        f"[task {name} crashed] {exc!r}",
+        task=name,
+        err=repr(exc),
+    )
+
+
+def _attach_task_crash_observers(
+    tracer: Any, named_tasks: tuple[tuple[str, asyncio.Task], ...]
+) -> None:
+    """Attach crash observers without late-binding every callback to one name."""
+    for task_name, task in named_tasks:
+        task.add_done_callback(
+            lambda done_task, name=task_name: _record_task_exit(tracer, name, done_task)
+        )
+
+
+async def _run_ws_broadcast_supervised(
+    broadcast_once: Any,
+    stop_event: asyncio.Event,
+    tracer: Any,
+    *,
+    retry_delay_s: float = 0.5,
+    sleep: Any = asyncio.sleep,
+) -> None:
+    """Keep the websocket bus alive after unexpected runtime failures.
+
+    A crash in ``ws_broadcast`` should be visible in logs and telemetry, but it
+    should not permanently darken the product UI while the rest of the runtime
+    keeps playing.
+    """
+    while not stop_event.is_set():
+        try:
+            await broadcast_once()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            _best_effort_error(
+                tracer,
+                "ws_broadcast_crashed",
+                f"[ws_broadcast crashed] {exc!r}",
+                err=repr(exc),
+            )
+            if not stop_event.is_set():
+                await sleep(retry_delay_s)
+
+
 def _load_env_robust() -> None:
     """Load ``.env`` from any of the known vibemix locations, robust to CWD.
 
@@ -2279,8 +2350,8 @@ async def main() -> None:
             )
 
     # --- Asyncio tasks (6) ---
-    ws_task = asyncio.create_task(
-        ws_broadcast(
+    async def _ws_broadcast_once() -> None:
+        await ws_broadcast(
             levels,
             state,
             manual_trigger,
@@ -2294,6 +2365,9 @@ async def main() -> None:
             midi_mirror=midi_mirror,
             audio_capture_context=audio_capture_context,
         )
+
+    ws_task = asyncio.create_task(
+        _run_ws_broadcast_supervised(_ws_broadcast_once, stop_event, tracer)
     )
     # Phase 92 (LESSON-01) — drive LessonRuntime's 1 Hz tick_loop
     # alongside ws_broadcast's 30 Hz tick. The two coroutines share the
@@ -2377,6 +2451,19 @@ async def main() -> None:
     # dies abruptly so the live runtime closes audio streams + session
     # cleanly instead of orphaning under launchd with port 8765 held.
     parent_watch_task = asyncio.create_task(watch_parent(stop_event))
+
+    _attach_task_crash_observers(
+        tracer,
+        (
+            ("ws_broadcast", ws_task),
+            ("coach_loop", coach_task),
+            ("state_refresh", refresh_task),
+            ("diag_loop", diag_task),
+            ("track_poll", track_task),
+            ("deck_poll", deck_poll_task),
+            ("lesson_tick", lesson_tick_task),
+        ),
+    )
 
     # --- Input stream — last because state must be ready ---
     # Open on a daemon thread so a wedged CoreAudio/PortAudio device cannot
