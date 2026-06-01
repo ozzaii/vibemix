@@ -311,6 +311,8 @@ export const SESSION_RUNTIME_WIRES = [
   "session.vibe-engine",
   "session.now-line",
   "session.citation",
+  "session.drop",
+  "session.claim-policy",
   "session.meter",
   "session.status",
 ] as const;
@@ -322,6 +324,8 @@ export const SETTINGS_RUNTIME_WIRES = [
   "settings.close",
   "settings.body",
   "settings.modal-slot",
+  "settings.persona.voice.deferred-note",
+  "settings.output.deferred-note",
 ] as const;
 
 export const SETTINGS_GROUP_WIRES = [
@@ -331,6 +335,7 @@ export const SETTINGS_GROUP_WIRES = [
   "settings.group.recording",
   "settings.group.library",
   "settings.group.profile",
+  "settings.group.diagnostics",
   "settings.group.calibration",
   "settings.group.learn",
   "settings.group.mascot",
@@ -366,6 +371,8 @@ const SESSION_RUNTIME_WIRE_PURPOSES: Record<
   "session.vibe-engine": "Library/Viber and vibe-engine open control",
   "session.now-line": "current deck / phrase readout",
   "session.citation": "grounded evidence chip",
+  "session.drop": "runtime drop-countdown chip",
+  "session.claim-policy": "live claim-proof policy chip",
   "session.meter": "audio health meter",
   "session.status": "runtime status footer",
 };
@@ -380,6 +387,8 @@ const SETTINGS_RUNTIME_WIRE_PURPOSES: Record<
   "settings.close": "drawer close affordance",
   "settings.body": "settings group mount",
   "settings.modal-slot": "confirmation dialog portal",
+  "settings.persona.voice.deferred-note": "voice changes apply on next start",
+  "settings.output.deferred-note": "output changes apply on next start",
 };
 
 function wireEntries<const TWire extends string>(
@@ -406,6 +415,8 @@ export const MOCK_TRANSFER_RUNTIME_CONTRACT: readonly MockTransferRuntimeSurface
       "ipc.session.snapshot",
       "ipc.status.tick",
       "ipc.settings.state",
+      "ipc.error",
+      "ipc.session.citation",
       "ipc.session.mute",
       "ipc.recordings.usage",
       "ipc.session.cohost-reaction",
@@ -417,6 +428,7 @@ export const MOCK_TRANSFER_RUNTIME_CONTRACT: readonly MockTransferRuntimeSurface
       "ipc.settings.set",
       "ipc.session.set_mode",
       "ipc.session.mute",
+      "ipc.status.recheck",
       "restart_sidecar",
       "open_library_window",
       "open_debrief_window",

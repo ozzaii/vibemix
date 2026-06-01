@@ -52,6 +52,15 @@ export interface StatusFlags {
   screen: "ok" | "denied" | "unavailable" | null;
 }
 
+export type ClaimPolicyLevel = "green" | "yellow" | "red";
+
+export interface ClaimPolicyState {
+  policy: string;
+  level: ClaimPolicyLevel;
+  reason: string | null;
+  label: string;
+}
+
 /** Mascot personality + reaction-cadence preset (Phase 13 Area 4).
  *  Defended at every boundary: TS narrows here, sidecar schema validates
  *  on receive (Plan 13-05 extends ipc.settings.set). Invalid string values
@@ -148,6 +157,7 @@ export interface SessionState {
   cohostStatus: CohostStatus;
   latencyMs: number | null;
   grounded: boolean;
+  claimPolicy?: ClaimPolicyState | null;
   /** Wall-clock display string (HH:MM:SS) for the TITLEBAR. Recomputed
    *  locally in render-loop.ts; ws-bridge does not touch this. */
   clockText: string;
@@ -221,6 +231,7 @@ function makeDefault(): SessionState {
     cohostStatus: "IDLE",
     latencyMs: null,
     grounded: false,
+    claimPolicy: null,
     clockText: "00:00:00",
     elapsedText: "00:00:00",
     sessionStartMs: null,

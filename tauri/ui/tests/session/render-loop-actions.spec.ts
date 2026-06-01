@@ -43,6 +43,41 @@ function deferred<T = undefined>(): {
 }
 
 describe("render-loop mode picker actions", () => {
+  it("status recheck emits the sidecar probe request", () => {
+    _internals.statusRecheckHandler("midi");
+
+    expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.status.recheck", {
+      component: "midi",
+    });
+  });
+
+  it("mute action flips SessionState optimistically before the sidecar ack", async () => {
+    expect(getSessionState().muted).toBe(false);
+
+    _internals.cohostMuteHandler();
+    await Promise.resolve();
+
+    expect(getSessionState().muted).toBe(true);
+    expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.session.mute", {
+      toggle: true,
+    });
+  });
+
+  it("mute action reverts optimistic state when the emit fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mocks.emitIpc.mockRejectedValueOnce(new Error("WS down"));
+
+    _internals.cohostMuteHandler();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(getSessionState().muted).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      "[render-loop] mute emitIpc failed:",
+      expect.any(Error),
+    );
+  });
+
   it("build mode opens Vibe Engine and persists mode", async () => {
     _internals.modeChangeHandler("build");
     await flushModeChange();

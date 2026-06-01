@@ -108,6 +108,7 @@ class FakeMusicState:
         audible_track: str | None = "Foo - Bar",
         audible_deck: str = "A",
         recent_moves: list | None = None,
+        predicted_drop_in_sec: float | None = None,
     ) -> None:
         self.audible = audible
         self.phase = phase
@@ -115,6 +116,7 @@ class FakeMusicState:
         self.audible_track = audible_track
         self.audible_deck = audible_deck
         self.recent_moves = recent_moves or []
+        self.predicted_drop_in_sec = predicted_drop_in_sec
 
 
 class FakeLevels:
@@ -392,6 +394,29 @@ def test_status_recheck_emits_tick_for_known_component(
     assert ticks[0]["payload"]["screen"] == "ok"
 
 
+def test_status_recheck_accepts_legacy_numeric_ts(
+    fake_bus: FakeBus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    loop = SessionLoop(fake_bus)
+    loop.register_handlers()
+    monkeypatch.setattr(loop, "_probe_midi_count", lambda: 1)
+    monkeypatch.setattr(loop, "_probe_screen_status", lambda: "ok")
+
+    _drive(
+        fake_bus,
+        {
+            "type": "ipc.status.recheck",
+            "ts": 1_780_205_767.4745522,
+            "payload": {"component": "midi"},
+        },
+    )
+
+    assert fake_bus.emitted_by_type("ipc.error") == []
+    tick = fake_bus.emitted_by_type("ipc.status.tick")[-1]["payload"]
+    assert tick["midi"] == 1
+    assert tick["screen"] == "ok"
+
+
 def test_live_status_recheck_mirrors_attached_runtime(fake_bus: FakeBus) -> None:
     loop = SessionLoop(
         fake_bus,
@@ -460,6 +485,14 @@ def test_snapshot_with_music_state_audible(fake_bus: FakeBus) -> None:
     assert payload["grounded"] is True
     assert payload["bpm"] == 124.0
     assert payload["track"] == {"title": "Foo - Bar", "artist": None, "deck": "A"}
+
+
+def test_snapshot_with_drop_prediction_emits_bar_count(fake_bus: FakeBus) -> None:
+    ms = FakeMusicState(audible=True, bpm=128.0, predicted_drop_in_sec=15.0)
+    levels = FakeLevels(music=0.3, voice=0.0, mic=0.0)
+    loop = SessionLoop(fake_bus, music_state=ms, levels=levels)
+    payload = json.loads(loop._build_snapshot().to_json())["payload"]
+    assert payload["drop_pred_bars"] == 8
 
 
 def test_snapshot_talking_when_voice_loud(fake_bus: FakeBus) -> None:

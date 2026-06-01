@@ -125,12 +125,6 @@
       "$ref": "#/definitions/DebriefSessionLoaded"
     },
     {
-      "$ref": "#/definitions/DebriefCitationSummary"
-    },
-    {
-      "$ref": "#/definitions/DebriefEventTimeline"
-    },
-    {
       "$ref": "#/definitions/DebriefChapterList"
     },
     {
@@ -158,25 +152,10 @@
       "$ref": "#/definitions/LibraryImportCancel"
     },
     {
-      "$ref": "#/definitions/LibrarySearchRequest"
-    },
-    {
-      "$ref": "#/definitions/LibrarySearchResult"
-    },
-    {
-      "$ref": "#/definitions/LibraryConfidence"
-    },
-    {
       "$ref": "#/definitions/LibraryStalenessNudge"
     },
     {
       "$ref": "#/definitions/LibraryStalenessAction"
-    },
-    {
-      "$ref": "#/definitions/LibrarySimilarRequest"
-    },
-    {
-      "$ref": "#/definitions/LibrarySimilarResult"
     },
     {
       "$ref": "#/definitions/ProfileSetConsent"
@@ -1193,6 +1172,48 @@
               ],
               "minimum": 0
             },
+            "claim_policy": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "policy",
+                    "level",
+                    "reason"
+                  ],
+                  "properties": {
+                    "policy": {
+                      "type": "string",
+                      "enum": [
+                        "requires_more_evidence",
+                        "blocked",
+                        "watch_not_claim",
+                        "candidate_not_verdict",
+                        "supported_verdict"
+                      ]
+                    },
+                    "level": {
+                      "type": "string",
+                      "enum": [
+                        "green",
+                        "yellow",
+                        "red"
+                      ]
+                    },
+                    "reason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
             "grounded": {
               "type": "boolean"
             }
@@ -2127,7 +2148,7 @@
       }
     },
     "DebriefSessionLoaded": {
-      "$comment": "Phase 25 Plan 25-03 \u2014 DEBRIEF architectural slot (v2.0 reservation; full UI v2.1). Sidecar \u2192 shell. Fired once when the DEBRIEF sidecar opens a session_dir; carries session metadata so the v2.1 UI can render the top banner. DEBRIEF-01 + DEBRIEF-02. v2.0 does NOT emit this message \u2014 port 8766 is reserved but not bound.",
+      "$comment": "Phase 25/29 \u2014 DEBRIEF window. Sidecar \u2192 shell. Fired once when the DEBRIEF sidecar opens a session_dir; carries session metadata so the renderer can populate the top banner.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -2164,101 +2185,6 @@
             "duration_s": {
               "type": "number",
               "minimum": 0
-            }
-          }
-        }
-      }
-    },
-    "DebriefCitationSummary": {
-      "$comment": "Phase 25 Plan 25-03 \u2014 DEBRIEF architectural slot (v2.0 reservation; full UI v2.1). Sidecar \u2192 shell. Aggregate citation stats over the loaded session \u2014 mirrors Phase 20 CitationLinter + StrippedRateTracker telemetry. DEBRIEF-02.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "type",
-        "ts",
-        "payload"
-      ],
-      "properties": {
-        "type": {
-          "const": "ipc.debrief.citation-summary"
-        },
-        "ts": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "total",
-            "valid",
-            "stripped",
-            "bypassed"
-          ],
-          "properties": {
-            "total": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "valid": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "stripped": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "bypassed": {
-              "type": "integer",
-              "minimum": 0
-            }
-          }
-        }
-      }
-    },
-    "DebriefEventTimeline": {
-      "$comment": "Phase 25 Plan 25-03 \u2014 DEBRIEF architectural slot (v2.0 reservation; full UI v2.1). Sidecar \u2192 shell. Chronological event timeline (events.jsonl projection) for the v2.1 clickable-timeline UI. Each event row keeps additionalProperties:true so the row schema can grow in v2.1 without re-versioning this wrapper. DEBRIEF-02.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "type",
-        "ts",
-        "payload"
-      ],
-      "properties": {
-        "type": {
-          "const": "ipc.debrief.event-timeline"
-        },
-        "ts": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "events"
-          ],
-          "properties": {
-            "events": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": true,
-                "required": [
-                  "t",
-                  "kind"
-                ],
-                "properties": {
-                  "t": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "kind": {
-                    "type": "string"
-                  }
-                }
-              }
             }
           }
         }
@@ -2547,189 +2473,6 @@
         }
       }
     },
-    "LibrarySearchRequest": {
-      "$comment": "Plan 28-03 \u2014 renderer to sidecar. Natural-language vibe-search query.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "type",
-        "ts",
-        "payload"
-      ],
-      "properties": {
-        "type": {
-          "const": "ipc.library.search"
-        },
-        "ts": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "query",
-            "k",
-            "schema_version"
-          ],
-          "properties": {
-            "query": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 4096
-            },
-            "k": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 50
-            },
-            "schema_version": {
-              "const": "1"
-            }
-          }
-        }
-      }
-    },
-    "LibrarySearchResult": {
-      "$comment": "Plan 28-03 \u2014 sidecar to renderer. Vibe-search response.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "type",
-        "ts",
-        "payload"
-      ],
-      "properties": {
-        "type": {
-          "const": "ipc.library.search_result"
-        },
-        "ts": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "query",
-            "matches",
-            "cache_hit",
-            "schema_version"
-          ],
-          "properties": {
-            "query": {
-              "type": "string"
-            },
-            "matches": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "track_id",
-                  "title",
-                  "artist",
-                  "bpm",
-                  "confidence",
-                  "snippet"
-                ],
-                "properties": {
-                  "track_id": {
-                    "type": "string"
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "artist": {
-                    "type": "string"
-                  },
-                  "bpm": {
-                    "type": [
-                      "number",
-                      "null"
-                    ]
-                  },
-                  "confidence": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 1
-                  },
-                  "snippet": {
-                    "type": "string"
-                  }
-                }
-              }
-            },
-            "cache_hit": {
-              "type": "boolean"
-            },
-            "schema_version": {
-              "const": "1"
-            }
-          }
-        }
-      }
-    },
-    "LibraryConfidence": {
-      "$comment": "Plan 28-04 \u2014 sidecar to renderer. Grounding citation telemetry: cosine, decision, cost-warning flag.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "type",
-        "ts",
-        "payload"
-      ],
-      "properties": {
-        "type": {
-          "const": "ipc.library.confidence"
-        },
-        "ts": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "track_id",
-            "cosine",
-            "decision",
-            "event_id",
-            "cost_warning",
-            "schema_version"
-          ],
-          "properties": {
-            "track_id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "cosine": {
-              "type": "number",
-              "minimum": -1,
-              "maximum": 1
-            },
-            "decision": {
-              "enum": [
-                "cited",
-                "uncertain",
-                "below_threshold"
-              ]
-            },
-            "event_id": {
-              "type": "string"
-            },
-            "cost_warning": {
-              "type": "boolean"
-            },
-            "schema_version": {
-              "const": "1"
-            }
-          }
-        }
-      }
-    },
     "LibraryStalenessNudge": {
       "$comment": "Plan 28-07 \u2014 sidecar to renderer. 30-day staleness nudge to re-import.",
       "type": "object",
@@ -2816,120 +2559,6 @@
                 "dismiss",
                 "snooze_7d"
               ]
-            },
-            "schema_version": {
-              "const": "1"
-            }
-          }
-        }
-      }
-    },
-    "LibrarySimilarRequest": {
-      "$comment": "Plan 28-05 \u2014 renderer to sidecar. USER-ASKED-ONLY similar-track query. Anti-feature guard: never autosurface.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "type",
-        "ts",
-        "payload"
-      ],
-      "properties": {
-        "type": {
-          "const": "ipc.library.similar_request"
-        },
-        "ts": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "track_id",
-            "k",
-            "schema_version"
-          ],
-          "properties": {
-            "track_id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "k": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 50
-            },
-            "schema_version": {
-              "const": "1"
-            }
-          }
-        }
-      }
-    },
-    "LibrarySimilarResult": {
-      "$comment": "Plan 28-05 \u2014 sidecar to renderer. USER-ASKED-ONLY similar-track results.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "type",
-        "ts",
-        "payload"
-      ],
-      "properties": {
-        "type": {
-          "const": "ipc.library.similar_result"
-        },
-        "ts": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "track_id",
-            "results",
-            "schema_version"
-          ],
-          "properties": {
-            "track_id": {
-              "type": "string"
-            },
-            "results": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "track_id",
-                  "similarity",
-                  "title",
-                  "artist",
-                  "bpm"
-                ],
-                "properties": {
-                  "track_id": {
-                    "type": "string"
-                  },
-                  "similarity": {
-                    "type": "number",
-                    "minimum": -1,
-                    "maximum": 1
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "artist": {
-                    "type": "string"
-                  },
-                  "bpm": {
-                    "type": [
-                      "number",
-                      "null"
-                    ]
-                  }
-                }
-              }
             },
             "schema_version": {
               "const": "1"

@@ -45,6 +45,7 @@ vi.mock("../../src/ipc/client.js", () => ({
   subscribeIpc: vi.fn(async () => () => {}),
 }));
 
+import { subscribeIpc } from "../../src/ipc/client.js";
 import {
   _resetDrawerForTests,
   closeSettings,
@@ -65,10 +66,13 @@ import {
   wireSelector,
 } from "../../src/mock-transfer/contract.js";
 
+const subscribeIpcMock = vi.mocked(subscribeIpc);
+
 beforeEach(() => {
   _resetSettingsUIStateForTests();
   _resetDrawerForTests();
   sendIpcRequestMock.mockReset();
+  subscribeIpcMock.mockClear();
   // Default: never-resolves so non-Phase-15 tests don't hit a stub
   // resolution race. Specific cases override below.
   sendIpcRequestMock.mockImplementation(
@@ -91,6 +95,12 @@ describe("mountSettingsDrawer", () => {
     expect(
       document.querySelectorAll(".vmx-settings-drawer__modal-slot").length,
     ).toBe(1);
+  });
+
+  it("mounts citation diagnostics inside the drawer", () => {
+    mountSettingsDrawer(document.body);
+    expect(document.querySelector(".vmx-citation-diag")).not.toBeNull();
+    expect(document.body.textContent).toContain("DIAGNOSTICS");
   });
 
   it("exposes transfer anchors for the drawer shell", () => {
@@ -177,6 +187,36 @@ describe("openSettings / closeSettings", () => {
     expect(ui.hotkeyCaptureMode).toBe(false);
     expect(ui.confirmDialog).toBeNull();
   });
+
+  it("loads profile view only while open and does not duplicate on close", () => {
+    mountSettingsDrawer(document.body);
+    const profileCalls = () =>
+      sendIpcRequestMock.mock.calls.filter((c) => c[0] === "ipc.profile.view");
+
+    expect(profileCalls().length).toBe(0);
+
+    openSettings();
+    expect(profileCalls().length).toBe(1);
+
+    closeSettings();
+    expect(profileCalls().length).toBe(1);
+  });
+
+  it("keeps one library staleness subscription across open and close refreshes", () => {
+    mountSettingsDrawer(document.body);
+    const stalenessSubs = () =>
+      subscribeIpcMock.mock.calls.filter(
+        (c) => c[0] === "ipc.library.staleness_nudge",
+      );
+
+    expect(stalenessSubs().length).toBe(1);
+
+    openSettings();
+    expect(stalenessSubs().length).toBe(1);
+
+    closeSettings();
+    expect(stalenessSubs().length).toBe(1);
+  });
 });
 
 describe("dismiss paths", () => {
@@ -252,6 +292,23 @@ describe("group rendering", () => {
     expect(document.querySelectorAll(".vmx-hotkey-capture").length).toBe(1);
   });
 
+  it("labels deferred voice and output controls as next-start settings", () => {
+    mountSettingsDrawer(document.body);
+    openSettings();
+
+    const voiceNote = document.querySelector<HTMLElement>(
+      '[data-wire="settings.persona.voice.deferred-note"]',
+    );
+    const outputNote = document.querySelector<HTMLElement>(
+      '[data-wire="settings.output.deferred-note"]',
+    );
+
+    expect(voiceNote?.getAttribute("role")).toBe("note");
+    expect(voiceNote?.textContent).toBe("saved for next co-host start");
+    expect(outputNote?.getAttribute("role")).toBe("note");
+    expect(outputNote?.textContent).toBe("saved for next audio start");
+  });
+
   it("RECORDING group shows the retention slider with 6 knobs", () => {
     mountSettingsDrawer(document.body);
     openSettings();
@@ -285,10 +342,9 @@ describe("Phase 15: recording browser wiring", () => {
   });
 
   it("list_result populates 2 row elements in the recording browser DOM", async () => {
-    // Resolve only the recordings.list request — the drawer's profile panel
-    // also fires sendIpcRequest("ipc.profile.view") on every render (Phase 32),
-    // so a blanket mockResolvedValueOnce would be consumed by that render-time
-    // call before loadRecordings runs. Key on requestType instead.
+    // Resolve only the recordings.list request. When the drawer is open, the
+    // profile panel may also fire sendIpcRequest("ipc.profile.view"), so key on
+    // requestType instead of using a one-shot mock.
     sendIpcRequestMock.mockImplementation((requestType: string) => {
       if (requestType === "ipc.recordings.list") {
         return Promise.resolve({
@@ -317,8 +373,8 @@ describe("Phase 15: recording browser wiring", () => {
           },
         });
       }
-      // Everything else (e.g. ipc.profile.view) never resolves — matches the
-      // beforeEach default and keeps render-time IPC from interfering.
+      // Everything else (e.g. ipc.profile.view while open) never resolves —
+      // matches the beforeEach default and keeps render-time IPC from interfering.
       return new Promise(() => undefined);
     });
     // Mount + set drawer open via state (NOT openSettings, which would
@@ -393,7 +449,7 @@ describe("Phase 15: recording browser wiring", () => {
 
   it("list IPC timeout swaps the disk-usage line to UNAVAILABLE copy", async () => {
     // Reject only the recordings.list request (see the row-population test for
-    // why a one-shot mock is stolen by the profile panel's render-time IPC).
+    // why one-shot mocks are brittle when other open-drawer IPC exists).
     sendIpcRequestMock.mockImplementation((requestType: string) => {
       if (requestType === "ipc.recordings.list") {
         return Promise.reject(

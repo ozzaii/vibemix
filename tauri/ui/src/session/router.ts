@@ -20,6 +20,7 @@ import { mountSessionLayout, type Mounted } from "./SessionLayout.js";
 import { startRenderLoop, stopRenderLoop } from "./render-loop.js";
 import { mountSessionShortcuts } from "./session-shortcuts.js";
 import { installTrayMoodListener } from "./tray-mood.js";
+import { startOverlayHighlightListener } from "../overlay/overlay-highlight.js";
 import {
   mountSettingsDrawer,
   openSettings,
@@ -33,6 +34,7 @@ let unsubscribeShortcuts: (() => void) | null = null;
 let unsubscribeQuitGuard: (() => void) | null = null;
 let unsubscribeTrayQuit: (() => void) | null = null;
 let unsubscribeTrayMood: (() => void) | null = null;
+let unsubscribeOverlayHighlight: (() => void) | null = null;
 
 /** Mount the live session and start the bridge + render loop.
  *
@@ -95,6 +97,11 @@ export async function routeSession(rootEl?: HTMLElement): Promise<void> {
   // Teacher switch was dead. Forward it to the sidecar via the same
   // ipc.settings.set { field: "mood" } path the mascot-group pills use.
   unsubscribeTrayMood = await installTrayMoodListener();
+
+  // Plan 24-03 — start the screen-citation overlay consumer. Python already
+  // publishes ipc.session.overlay-highlight after spoken [screen:*] citations;
+  // this listener forwards those packets to the Rust AX/highlight command.
+  unsubscribeOverlayHighlight = await startOverlayHighlightListener();
 }
 
 /** Tear down the session — stop the rAF, unsubscribe IPC, unmount overlays,
@@ -147,6 +154,15 @@ export async function teardownSession(): Promise<void> {
       console.warn("[session-router] tray-mood unsubscribe failed:", e);
     }
     unsubscribeTrayMood = null;
+  }
+  if (unsubscribeOverlayHighlight) {
+    try {
+      unsubscribeOverlayHighlight();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[session-router] overlay-highlight unsubscribe failed:", e);
+    }
+    unsubscribeOverlayHighlight = null;
   }
   unmountSettingsDrawer();
   mounted = null;

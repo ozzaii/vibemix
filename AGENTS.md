@@ -101,8 +101,8 @@ and the library UI, including chat artifacts.
 For settings/session IPC, maintain parity across
 `src/vibemix/ui_bus/messages.py`, `tauri/ui/src/ipc/messages.schema.json`,
 generated TS/validator files, `src/vibemix/runtime/session_loop.py`, and
-`tauri/ui/src/session/ws-bridge.ts`. The current top-level IPC count is 78
-(`SessionSetMode` included); validate with
+`tauri/ui/src/session/ws-bridge.ts`. The current top-level IPC count is 72
+(`SessionSetMode` and `WizardSetSkill` included); validate with
 `uv run python scripts/check_ipc_schema.py`.
 
 Useful non-GSD, non-beginner verification from the sweep:

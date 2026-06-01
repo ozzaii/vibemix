@@ -260,33 +260,32 @@ def test_recordings_events_result_accepts_empty_events_array() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 8 — drift-gate count parity (49 oneOf == 49 wrapper dataclasses
-# after Phase 28 Plan 28-09 added 10 library.* messages on top of Phase 25)
+# Test 8 — drift-gate count parity.
 # ---------------------------------------------------------------------------
 
 
-def test_count_parity_at_79() -> None:
+def test_count_parity_at_72() -> None:
     """Phase 15 Plan 01 bumped the IPC count 27 → 34 (+7 recordings.* families);
     Phase 20-04 added SessionCitation → 35; Phase 24-02 added
-    SessionOverlayHighlight → 36; Phase 25 Plan 25-03 added 3 DEBRIEF
-    reservations → 39; Phase 28 Plan 28-09 added 10 library.* messages
-    (LibraryImport*, LibrarySearch*, LibraryConfidence, LibraryStaleness*,
-    LibrarySimilar*) → 49; Phase 29 Plan 29-03 added 6 DEBRIEF v2.1
-    additive wrappers (DebriefChapterList, DebriefTldrAudio, DebriefDrills,
-    DebriefCitationTooltipReq, DebriefCitationTooltip, DebriefError) → 55.
+    SessionOverlayHighlight → 36; Phase 25/29 keeps 1 DEBRIEF session wrapper
+    → 37; Phase 28 Plan 28-09 added 5 library import/staleness messages;
+    search/similar use Tauri commands → 42. Phase 29 Plan 29-03
+    added 6 DEBRIEF v2.1
+    wrappers (DebriefChapterList, DebriefTldrAudio, DebriefDrills,
+    DebriefCitationTooltipReq, DebriefCitationTooltip, DebriefError) → 48.
     Phase 32 Plans 32-04..05 added 8 profile.* messages (ProfileSetConsent,
     ProfileConsentState, ProfileView, ProfileViewResult, ProfileRegenerate,
-    ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 63. Phase
+    ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 56. Phase
     44 Plan 44-03 adds 1 (SessionCohostReaction — LAUNCH-02 anti-slop
-    citation strip broadcast) → 64. Phase 91 Plan 01 adds 2 (learn.*
+    citation strip broadcast) → 57. Phase 91 Plan 01 adds 2 (learn.*
     envelopes — LearnControllerDetected + LearnMidiPosition; wrappers
-    live in ``learn_messages.py``, a sibling module) → 66. Phase 92 Plan
+    live in ``learn_messages.py``, a sibling module) → 59. Phase 92 Plan
     92-01 adds 11 (learn.* lesson-runtime envelopes — LearnStartCourse /
     LearnStartLesson / LearnCompleteLesson / LearnLessonLoaded /
     LearnHighlight / LearnAdvance / LearnAck / LearnTutorSpeak /
-    LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 77.
-    Phase 97 adds SessionSetMode → 78. Quick 260529-ifq adds WizardSetSkill
-    (onboarding skill-level step) → 79.
+    LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 70.
+    Phase 97 adds SessionSetMode → 71. Quick 260529-ifq adds WizardSetSkill
+    (onboarding skill-level step) → 72.
     Both sides — schema oneOf and Python wrapper dataclasses — must match
     exactly.
 
@@ -323,8 +322,10 @@ def test_count_parity_at_79() -> None:
                 seen.add(obj)
                 wrapper_count += 1
 
-    assert len(_SCHEMA["oneOf"]) == 79, "schema oneOf count should be 79 after WizardSetSkill"
-    assert wrapper_count == 79, f"wrapper count {wrapper_count} != 79"
+    assert len(_SCHEMA["oneOf"]) == 72, (
+        "schema oneOf count should be 72 after pruning stale library/debrief IPC"
+    )
+    assert wrapper_count == 72, f"wrapper count {wrapper_count} != 72"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

@@ -41,12 +41,10 @@ from vibemix.ui_bus import (
     CalibrationWindowList,
     ChapterRegionPayload,
     DebriefChapterList,
-    DebriefCitationSummary,
     DebriefCitationTooltip,
     DebriefCitationTooltipReq,
     DebriefDrills,
     DebriefError,
-    DebriefEventTimeline,
     DebriefSessionLoaded,
     DebriefTldrAudio,
     DeviceInfo,
@@ -74,14 +72,9 @@ from vibemix.ui_bus import (
     LearnTeachingVerificationPayload,
     LearnTutorSpeak,
     LevelPair,
-    LibraryConfidence,
     LibraryImport,
     LibraryImportCancel,
     LibraryImportProgress,
-    LibrarySearchRequest,
-    LibrarySearchResult,
-    LibrarySimilarRequest,
-    LibrarySimilarResult,
     LibraryStalenessAction,
     LibraryStalenessNudge,
     MascotMoodChange,
@@ -333,28 +326,13 @@ def _make_examples() -> list[tuple[str, object]]:
                 ],
             ),
         ),
-        # Phase 25 Plan 25-03 — DEBRIEF architectural slot (3 reservations)
+        # Phase 25/29 — DEBRIEF window messages
         (
             "DebriefSessionLoaded",
             DebriefSessionLoaded.make(
                 session_id="20260513-210410",
                 started_at=1715616250.0,
                 duration_s=5040.0,
-            ),
-        ),
-        (
-            "DebriefCitationSummary",
-            DebriefCitationSummary.make(
-                total=120, valid=95, stripped=20, bypassed=5
-            ),
-        ),
-        (
-            "DebriefEventTimeline",
-            DebriefEventTimeline.make(
-                events=(
-                    {"t": 0.0, "kind": "session_start"},
-                    {"t": 3.21, "kind": "trigger"},
-                ),
             ),
         ),
         # Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers.
@@ -438,64 +416,12 @@ def _make_examples() -> list[tuple[str, object]]:
             LibraryImportCancel.make(),
         ),
         (
-            "LibrarySearchRequest",
-            LibrarySearchRequest.make(
-                query="driving acid techno around 138 BPM", k=10
-            ),
-        ),
-        (
-            "LibrarySearchResult",
-            LibrarySearchResult.make(
-                query="driving acid techno around 138 BPM",
-                matches=(
-                    {
-                        "track_id": "t-001",
-                        "title": "Spastik",
-                        "artist": "Plastikman",
-                        "bpm": 138.0,
-                        "confidence": 0.8423,
-                        "snippet": "Spastik — Plastikman @ 138 BPM",
-                    },
-                ),
-                cache_hit=False,
-            ),
-        ),
-        (
-            "LibraryConfidence",
-            LibraryConfidence.make(
-                track_id="t-001",
-                cosine=0.84,
-                decision="cited",
-                event_id="ev-abc123",
-                cost_warning=False,
-            ),
-        ),
-        (
             "LibraryStalenessNudge",
             LibraryStalenessNudge.make(age_days=37, snoozed_until_ts=None),
         ),
         (
             "LibraryStalenessAction",
             LibraryStalenessAction.make(action="snooze_7d"),
-        ),
-        (
-            "LibrarySimilarRequest",
-            LibrarySimilarRequest.make(track_id="t-001", k=10),
-        ),
-        (
-            "LibrarySimilarResult",
-            LibrarySimilarResult.make(
-                track_id="t-001",
-                results=(
-                    {
-                        "track_id": "t-007",
-                        "similarity": 0.78,
-                        "title": "Spastik (Original Mix)",
-                        "artist": "Plastikman",
-                        "bpm": 138.0,
-                    },
-                ),
-            ),
         ),
         # Phase 32 / PROFILE-04..07 — long-term DJ profile IPC (8 wrappers).
         ("ProfileSetConsent", ProfileSetConsent.make(consent=False)),
@@ -652,29 +578,27 @@ def test_example_count_matches_schema_oneof() -> None:
     7 (RecordingsList, RecordingsListResult, RecordingsDelete,
     RecordingsDeleteAck, RecordingsUsage, RecordingsEvents,
     RecordingsEventsResult) → 34. Phase 20-04 adds 1 (SessionCitation) → 35.
-    Phase 24-02 adds 1 (SessionOverlayHighlight) → 36. Phase 25 Plan 25-03
-    adds 3 DEBRIEF reservations (DebriefSessionLoaded, DebriefCitationSummary,
-    DebriefEventTimeline) → 39. Phase 28 Plan 28-09 adds 10 library.*
-    schemas (LibraryImport, LibraryImportProgress, LibraryImportCancel,
-    LibrarySearchRequest, LibrarySearchResult, LibraryConfidence,
-    LibraryStalenessNudge, LibraryStalenessAction, LibrarySimilarRequest,
-    LibrarySimilarResult) → 49. Phase 29 Plan 29-03 adds 6 DEBRIEF v2.1
-    additive wrappers (DebriefChapterList, DebriefTldrAudio, DebriefDrills,
-    DebriefCitationTooltipReq, DebriefCitationTooltip, DebriefError) → 55.
+    Phase 24-02 adds 1 (SessionOverlayHighlight) → 36. Phase 25/29 keeps 1
+    DEBRIEF session wrapper (DebriefSessionLoaded) → 37. Phase 28 Plan 28-09
+    adds 5 library import and staleness bus schemas (search/similar use Tauri
+    commands) → 42. Phase 29
+    Plan 29-03 adds 6 DEBRIEF v2.1 additive wrappers (DebriefChapterList,
+    DebriefTldrAudio, DebriefDrills, DebriefCitationTooltipReq,
+    DebriefCitationTooltip, DebriefError) → 48.
     Phase 32 Plans 32-04..05 add 8 profile.* schemas (ProfileSetConsent,
     ProfileConsentState, ProfileView, ProfileViewResult, ProfileRegenerate,
-    ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 63.
+    ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 56.
     Phase 44 Plan 44-03 adds 1 (SessionCohostReaction — LAUNCH-02 anti-slop
-    citation strip broadcast) → 64. Phase 91 Plan 01 adds 2 (learn.*
-    envelopes — LearnControllerDetected + LearnMidiPosition) → 66.
+    citation strip broadcast) → 57. Phase 91 Plan 01 adds 2 (learn.*
+    envelopes — LearnControllerDetected + LearnMidiPosition) → 59.
     Phase 92 Plan 92-01 adds 11 (learn.* lesson-runtime envelopes —
     LearnStartCourse / LearnStartLesson / LearnCompleteLesson /
     LearnLessonLoaded / LearnHighlight / LearnAdvance / LearnAck /
     LearnTutorSpeak / LearnExemplarPlay / LearnExemplarStop /
-    LearnProgressState) → 77. Phase 97 adds SessionSetMode → 78.
-    Quick 260529-ifq adds WizardSetSkill (onboarding skill-level step) → 79.
+    LearnProgressState) → 70. Phase 97 adds SessionSetMode → 71.
+    Quick 260529-ifq adds WizardSetSkill (onboarding skill-level step) → 72.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 79
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 72
 
 
 @pytest.mark.parametrize(
@@ -745,25 +669,26 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_79() -> None:
+def test_schema_oneof_count_is_72() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
     7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35;
-    Phase 24-02 adds 1 (SessionOverlayHighlight) → 36; Phase 25 Plan 25-03
-    adds 3 DEBRIEF architectural-slot reservations → 39; Phase 28 Plan 28-09
-    adds 10 library.* messages → 49; Phase 29 Plan 29-03 adds 6 DEBRIEF v2.1
-    additive wrappers → 55; Phase 32 Plans 32-04..05 add 8 profile.*
+    Phase 24-02 adds 1 (SessionOverlayHighlight) → 36; Phase 25/29 keeps 1
+    DEBRIEF session wrapper → 37; Phase 28 Plan 28-09 adds 5 library
+    import/staleness messages → 42; Phase 29 Plan 29-03 adds
+    6 DEBRIEF v2.1 wrappers → 48; Phase 32 Plans 32-04..05 add
+    8 profile.*
     messages (set_consent/consent_state/view/view_result/regenerate/
-    regenerate_result/delete/delete_ack) → 63. Phase 44 Plan 44-03 adds 1
+    regenerate_result/delete/delete_ack) → 56. Phase 44 Plan 44-03 adds 1
     (SessionCohostReaction — LAUNCH-02 anti-slop citation strip
-    broadcast) → 64. Phase 91 Plan 01 adds 2 (learn.* envelopes —
-    LearnControllerDetected + LearnMidiPosition) → 66. Phase 92 Plan 92-01
+    broadcast) → 57. Phase 91 Plan 01 adds 2 (learn.* envelopes —
+    LearnControllerDetected + LearnMidiPosition) → 59. Phase 92 Plan 92-01
     adds 11 (learn.* lesson-runtime envelopes — LearnStartCourse /
     LearnStartLesson / LearnCompleteLesson / LearnLessonLoaded /
     LearnHighlight / LearnAdvance / LearnAck / LearnTutorSpeak /
-    LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 77.
-    Phase 97 adds SessionSetMode → 78. Quick 260529-ifq adds WizardSetSkill
-    (onboarding skill-level step) → 79.
+    LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 70.
+    Phase 97 adds SessionSetMode → 71. Quick 260529-ifq adds WizardSetSkill
+    (onboarding skill-level step) → 72.
 
     ``definitions`` count grows alongside oneOf since every new wrapper
     adds one entry to both. ``LevelPair`` is a shared helper ref'd from
@@ -774,8 +699,8 @@ def test_schema_oneof_count_is_79() -> None:
     (``WizardSetSkill``'s payload is inlined, not a separate definition,
     so it adds 1 to both counts and the skew stays 2).
     """
-    assert len(_SCHEMA["oneOf"]) == 79
-    assert len(_SCHEMA["definitions"]) == 81
+    assert len(_SCHEMA["oneOf"]) == 72
+    assert len(_SCHEMA["definitions"]) == 74
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

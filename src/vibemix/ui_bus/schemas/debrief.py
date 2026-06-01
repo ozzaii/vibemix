@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 25 Plan 25-03 — DEBRIEF IPC payload structs (architectural slot).
+"""Phase 25/29 — DEBRIEF IPC payload structs.
 
-v2.0 reserves the surface; v2.1 implements the chaptered TL;DR + drill
-cards + clickable timeline behind these 3 message types without breaking
-the sidecar API. No emit path in v2.0 (DEBRIEF-01 + DEBRIEF-02 are
-reservation-only).
+The shippable debrief surface only keeps payloads that have a real sidecar
+producer and renderer consumer. The old ``citation-summary`` and
+``event-timeline`` placeholders were pruned rather than carried as
+schema-only reservations.
 
 Schema sources match the established pattern from Plan 20-04 (citation)
 and Plan 24-02 (overlay) — payload-only structs live here; wrapper
@@ -16,11 +16,6 @@ Locked field names + types (count-parity-tested at
 
 - ``DebriefSessionLoadedPayload``: ``session_id`` / ``started_at`` /
   ``duration_s``
-- ``DebriefCitationSummaryPayload``: ``total`` / ``valid`` / ``stripped``
-  / ``bypassed`` (all int, ≥0)
-- ``DebriefEventTimelinePayload``: ``events: tuple[dict, ...]``
-  (chronologically ordered events.jsonl projection; tuple is required
-  for dataclass-hashability under ``frozen=True, slots=True``)
 """
 
 from __future__ import annotations
@@ -44,62 +39,11 @@ class DebriefSessionLoadedPayload:
     started_at: float
     duration_s: float
 
-
-@dataclass(frozen=True, slots=True)
-class DebriefCitationSummaryPayload:
-    """Aggregate citation stats over the loaded session.
-
-    Fields mirror Phase 20 ``CitationLinter`` + ``StrippedRateTracker``
-    telemetry so the v2.1 UI can render "what the grounding stack caught
-    vs. let through" without re-deriving the numbers.
-
-    Fields:
-        total: total citations Gemini emitted during the session.
-        valid: count whose ``[source:body]`` resolved against the
-            ``EvidenceRegistry`` within ``tol=±2.0s`` (debrief tolerance
-            band per GROUND-07).
-        stripped: count the linter removed pre-TTS.
-        bypassed: count silenced by the bypass guard
-            (``StrippedRateTracker`` threshold trip).
-    """
-
-    total: int
-    valid: int
-    stripped: int
-    bypassed: int
-
-
-@dataclass(frozen=True, slots=True)
-class DebriefEventTimelinePayload:
-    """The session's event timeline rendered as a sortable tuple.
-
-    Each entry is a dict shaped like the events.jsonl rows
-    (``{"t": float, "kind": str, ...}``); the schema declares
-    ``additionalProperties: true`` so v2.1 can grow the event row shape
-    without versioning this wrapper.
-
-    Fields:
-        events: tuple of event dicts in chronological order. Each dict
-            MUST have at least ``t`` (seconds from session start) and
-            ``kind`` (event-type tag); both are required by the JSON
-            schema.
-
-    Tuple (not list) is required because ``@dataclass(frozen=True,
-    slots=True)`` rejects unhashable defaults; serialization to JSON
-    via ``messages._tuples_to_lists`` converts to array at write time.
-    """
-
-    events: tuple[dict, ...]
-
-
 # ---------------------------------------------------------------------------
 # Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers (P82 lock baseline)
 # ---------------------------------------------------------------------------
-# These 6 payload structs are appended BELOW the 3 Phase 25 baselines.
-# Phase 25 baselines are NEVER mutated (additive-only schema lock per
-# pitfall P82). Future plans that need new debrief surface area must
-# either extend optional fields on these structs OR add new structs
-# below.
+# Future plans that need new debrief surface area must either extend optional
+# fields on these structs OR add new structs below.
 
 
 @dataclass(frozen=True, slots=True)

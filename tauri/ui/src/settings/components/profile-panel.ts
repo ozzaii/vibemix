@@ -42,6 +42,13 @@ export interface ProfilePanelHandle {
   dispose(): void;
 }
 
+export interface ProfilePanelOptions {
+  /** When false, render the local empty state but wait for an explicit refresh.
+   *  The Settings drawer uses this while closed so boot does not emit profile
+   *  IPC requests before the user opens the drawer. */
+  autoload?: boolean;
+}
+
 interface ProfileViewSnapshot {
   profile: Record<string, unknown> | null;
   bytes: number;
@@ -237,10 +244,13 @@ async function fetchDelete(): Promise<ProfileDeleteAck> {
   )) as ProfileDeleteAck;
 }
 
-export function renderProfilePanel(): ProfilePanelHandle {
+export function renderProfilePanel(
+  options: ProfilePanelOptions = {},
+): ProfilePanelHandle {
   const root = document.createElement("section");
   root.className = "vmx-profile-panel";
   root.setAttribute("data-testid", "profile-panel");
+  const autoload = options.autoload ?? true;
 
   let disposed = false;
   let currentSnapshot: ProfileViewSnapshot = {
@@ -372,9 +382,12 @@ export function renderProfilePanel(): ProfilePanelHandle {
   async function refresh(): Promise<void> {
     if (disposed) return;
     try {
-      currentSnapshot = await fetchView();
+      const nextSnapshot = await fetchView();
+      if (disposed) return;
+      currentSnapshot = nextSnapshot;
       render();
     } catch (err) {
+      if (disposed) return;
       setStatus(`load failed: ${(err as Error).message ?? err}`, true);
     }
   }
@@ -435,7 +448,7 @@ export function renderProfilePanel(): ProfilePanelHandle {
 
   // Initial render with empty state; refresh() fills the actual snapshot.
   render();
-  void refresh();
+  if (autoload) void refresh();
 
   return {
     element: root,

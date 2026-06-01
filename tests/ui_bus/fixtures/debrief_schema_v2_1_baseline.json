@@ -1,5 +1,5 @@
 {
-  "comment": "P82 lock baseline \u2014 first commit of Plan 29-03. Mutations to these definitions fail test_debrief_schema_additive_only. New required fields on EXISTING debrief.* payloads are breaking; only adding new top-level debrief.* definitions or new optional fields is allowed.",
+  "comment": "P82 lock baseline after the May 31 shippable prune removed schema-only debrief reservations. Mutations to these definitions fail test_debrief_schema_additive_only. New required fields on EXISTING debrief.* payloads are breaking; only adding new top-level debrief.* definitions or new optional fields is allowed.",
   "definitions": {
     "DebriefChapterList": {
       "$comment": "Phase 29 Plan 29-03 \u2014 DEBRIEF v2.1 additive (P82 lock). Sidecar \u2192 shell. Chapter list emitted after debrief.chapters.derive_chapters runs. Renderer mounts ChapterList + Timeline regions.",
@@ -70,53 +70,6 @@
         },
         "type": {
           "const": "ipc.debrief.chapter-list"
-        }
-      },
-      "required": [
-        "type",
-        "ts",
-        "payload"
-      ],
-      "type": "object"
-    },
-    "DebriefCitationSummary": {
-      "$comment": "Phase 25 Plan 25-03 \u2014 DEBRIEF architectural slot (v2.0 reservation; full UI v2.1). Sidecar \u2192 shell. Aggregate citation stats over the loaded session \u2014 mirrors Phase 20 CitationLinter + StrippedRateTracker telemetry. DEBRIEF-02.",
-      "additionalProperties": false,
-      "properties": {
-        "payload": {
-          "additionalProperties": false,
-          "properties": {
-            "bypassed": {
-              "minimum": 0,
-              "type": "integer"
-            },
-            "stripped": {
-              "minimum": 0,
-              "type": "integer"
-            },
-            "total": {
-              "minimum": 0,
-              "type": "integer"
-            },
-            "valid": {
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          "required": [
-            "total",
-            "valid",
-            "stripped",
-            "bypassed"
-          ],
-          "type": "object"
-        },
-        "ts": {
-          "format": "date-time",
-          "type": "string"
-        },
-        "type": {
-          "const": "ipc.debrief.citation-summary"
         }
       },
       "required": [
@@ -309,56 +262,8 @@
       ],
       "type": "object"
     },
-    "DebriefEventTimeline": {
-      "$comment": "Phase 25 Plan 25-03 \u2014 DEBRIEF architectural slot (v2.0 reservation; full UI v2.1). Sidecar \u2192 shell. Chronological event timeline (events.jsonl projection) for the v2.1 clickable-timeline UI. Each event row keeps additionalProperties:true so the row schema can grow in v2.1 without re-versioning this wrapper. DEBRIEF-02.",
-      "additionalProperties": false,
-      "properties": {
-        "payload": {
-          "additionalProperties": false,
-          "properties": {
-            "events": {
-              "items": {
-                "additionalProperties": true,
-                "properties": {
-                  "kind": {
-                    "type": "string"
-                  },
-                  "t": {
-                    "minimum": 0,
-                    "type": "number"
-                  }
-                },
-                "required": [
-                  "t",
-                  "kind"
-                ],
-                "type": "object"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "events"
-          ],
-          "type": "object"
-        },
-        "ts": {
-          "format": "date-time",
-          "type": "string"
-        },
-        "type": {
-          "const": "ipc.debrief.event-timeline"
-        }
-      },
-      "required": [
-        "type",
-        "ts",
-        "payload"
-      ],
-      "type": "object"
-    },
     "DebriefSessionLoaded": {
-      "$comment": "Phase 25 Plan 25-03 \u2014 DEBRIEF architectural slot (v2.0 reservation; full UI v2.1). Sidecar \u2192 shell. Fired once when the DEBRIEF sidecar opens a session_dir; carries session metadata so the v2.1 UI can render the top banner. DEBRIEF-01 + DEBRIEF-02. v2.0 does NOT emit this message \u2014 port 8766 is reserved but not bound.",
+      "$comment": "Phase 25/29 \u2014 DEBRIEF window. Sidecar \u2192 shell. Fired once when the DEBRIEF sidecar opens a session_dir; carries session metadata so the renderer can populate the top banner.",
       "additionalProperties": false,
       "properties": {
         "payload": {
@@ -453,12 +358,6 @@
   "oneOf": [
     {
       "$ref": "#/definitions/DebriefSessionLoaded"
-    },
-    {
-      "$ref": "#/definitions/DebriefCitationSummary"
-    },
-    {
-      "$ref": "#/definitions/DebriefEventTimeline"
     },
     {
       "$ref": "#/definitions/DebriefChapterList"

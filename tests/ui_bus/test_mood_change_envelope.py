@@ -114,21 +114,21 @@ def test_count_parity_holds_after_addition():
 
     Plan 13-05 grew both 26 → 27. Plan 15-01 grew both 27 → 34 (+7 recordings.*
     families). Plan 20-04 grew both 34 → 35 (+1 SessionCitation). Plan 24-02
-    grew both 35 → 36 (+1 SessionOverlayHighlight). Plan 25-03 grew both
-    36 → 39 (+3 DEBRIEF architectural-slot reservations). Plan 28-09 grew
-    both 39 → 49 (+10 library.* families). Plan 29-03 grew both 49 → 55
-    (+6 DEBRIEF v2.1 additive wrappers). Plan 32-04/05 grew both 55 → 63
-    (+8 profile.* families). Plan 44-03 grows both 63 → 64 (+1
-    SessionCohostReaction — LAUNCH-02). Plan 91-01 grows both 64 → 66 (+2
+    grew both 35 → 36 (+1 SessionOverlayHighlight). Phase 25/29 keeps 1
+    DEBRIEF session wrapper → 37. Plan 28-09 keeps 5 library import/staleness
+    bus schemas → 42. Plan 29-03 adds 6 DEBRIEF v2.1 wrappers → 48.
+    Plan 32-04/05 grew both 48 → 56 (+8 profile.* families). Plan 44-03
+    grows both 56 → 57 (+1 SessionCohostReaction — LAUNCH-02). Plan 91-01
+    grows both 57 → 59 (+2
     learn.* envelopes — LearnControllerDetected + LearnMidiPosition; the
     wrappers live in ``learn_messages.py``, a sibling module to
-    ``messages.py``). Plan 92-01 grows both 66 → 77 (+11 learn.* lesson-
+    ``messages.py``). Plan 92-01 grows both 59 → 70 (+11 learn.* lesson-
     runtime envelopes — LearnStartCourse / LearnStartLesson /
     LearnCompleteLesson / LearnLessonLoaded / LearnHighlight /
     LearnAdvance / LearnAck / LearnTutorSpeak / LearnExemplarPlay /
     LearnExemplarStop / LearnProgressState). Phase 97 adds SessionSetMode
-    to 78. Quick 260529-ifq adds WizardSetSkill (onboarding skill-level
-    step) → 79. The check_ipc_schema.py
+    to 71. Quick 260529-ifq adds WizardSetSkill (onboarding skill-level
+    step) → 72. The check_ipc_schema.py
     invariant is what fails the CI build if either side regresses, so we
     assert it here directly. Introspection must filter on the ``type``
     field annotation starting with ``Literal["ipc.`` so nested
@@ -169,9 +169,9 @@ def test_count_parity_holds_after_addition():
     schema = json.loads(schema_path.read_text())
     oneof_count = len(schema["oneOf"])
 
-    assert wrapper_count == oneof_count == 79, (
+    assert wrapper_count == oneof_count == 72, (
         f"count parity violated: wrappers={wrapper_count} vs oneOf={oneof_count}; "
-        "expected both 79 after WizardSetSkill"
+        "expected both 72 after pruning stale library search IPC and debrief ghosts"
     )
 
 

@@ -38,7 +38,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { registerStyle } from "../session/components/_style-registry.js";
 import { disposePicker, renderPicker } from "../session/components/picker.js";
 import { renderRocker } from "../session/components/rocker.js";
-import { getSessionState } from "../session/state.js";
+import {
+  getSessionState,
+  setSessionState,
+  type MascotMood,
+  type SettingsView,
+  type SharedLens,
+  type SkillLevel,
+} from "../session/state.js";
 import { sendSettings, type SettingsField } from "../session/ws-bridge.js";
 import { emitIpc, sendIpcRequest } from "../ipc/client.js";
 import { vmxLog } from "../debug-log.js";
@@ -55,12 +62,19 @@ import {
   renderLibraryPanel,
   type LibraryPanelHandle,
 } from "./components/library-panel.js";
-import { renderProfilePanel } from "./components/profile-panel.js";
-import { renderStalenessBanner } from "./components/staleness-banner.js";
+import {
+  renderProfilePanel,
+  type ProfilePanelHandle,
+} from "./components/profile-panel.js";
+import {
+  renderStalenessBanner,
+  type StalenessBannerHandle,
+} from "./components/staleness-banner.js";
 import {
   renderRecordingBrowser,
   type RecordingBrowserHandle,
 } from "./components/recording-browser.js";
+import { mountCitationDiagnostics } from "./components/citation-diagnostics.js";
 import {
   renderRetentionSlider,
   type RetentionSliderHandle,
@@ -84,11 +98,11 @@ const CSS = `
     position: fixed;
     inset: 0;
     background:
-      linear-gradient(90deg, rgba(0, 0, 0, 0.24), rgba(0, 0, 0, 0.72)),
-      rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-    z-index: 49;
+      linear-gradient(90deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.58)),
+      rgba(0, 0, 0, 0.52);
+    backdrop-filter: blur(1.5px);
+    -webkit-backdrop-filter: blur(1.5px);
+    z-index: 39;
     opacity: 0;
     pointer-events: none;
     transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -102,7 +116,7 @@ const CSS = `
     top: 0;
     right: 0;
     bottom: 0;
-    width: clamp(420px, 31vw, 456px);
+    width: clamp(456px, 33vw, 520px);
     max-width: 100vw;
     z-index: 50;
     transform: translateX(100%);
@@ -112,9 +126,9 @@ const CSS = `
      * the warm void ladder, so the panel reads as milled obsidian catching the
      * room's one rose key-light as it floats over the live stage. */
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.030), transparent 16%),
-      linear-gradient(90deg, var(--brand-05), transparent 20%),
-      linear-gradient(180deg, var(--void-12) 0%, var(--void-5) 62%, var(--void-0) 100%),
+      linear-gradient(115deg, var(--brand-06), transparent 30%),
+      linear-gradient(180deg, rgba(255, 222, 242, 0.024), transparent 18%),
+      linear-gradient(180deg, var(--void-15) 0%, var(--void-6) 58%, var(--void-0) 100%),
       var(--glass-1);
     backdrop-filter: var(--blur-glass);
     -webkit-backdrop-filter: var(--blur-glass);
@@ -125,11 +139,11 @@ const CSS = `
     box-shadow:
       inset 1px 0 0 var(--glass-top),
       inset 0 1px 0 var(--glass-top),
-      inset 12px 0 28px var(--brand-04),
+      inset 10px 0 24px var(--brand-03),
       inset 0 -1px 0 rgba(0, 0, 0, 0.80),
       -2px 0 0 rgba(255, 222, 242, 0.020),
-      -24px 0 64px rgba(0, 0, 0, 0.62),
-      -8px 0 90px -30px var(--brand-10);
+      -20px 0 54px rgba(0, 0, 0, 0.58),
+      -1px 0 0 rgba(255, 222, 242, 0.040);
     transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
     display: flex;
     flex-direction: column;
@@ -145,9 +159,9 @@ const CSS = `
   }
   .vmx-settings-drawer::before {
     background:
-      linear-gradient(90deg, rgba(255, 165, 223, 0.075), transparent 18%),
-      linear-gradient(180deg, rgba(214, 207, 199, 0.030), transparent 22%);
-    opacity: 0.18;
+      linear-gradient(90deg, rgba(255, 165, 223, 0.055), transparent 20%),
+      linear-gradient(180deg, rgba(214, 207, 199, 0.024), transparent 22%);
+    opacity: 0.14;
     mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 88%, transparent 100%);
   }
   .vmx-settings-drawer::after {
@@ -155,8 +169,8 @@ const CSS = `
     right: auto;
     width: 1px;
     background: linear-gradient(180deg, transparent, var(--brand) 44%, var(--brand-40) 62%, transparent);
-    box-shadow: 0 0 18px var(--brand-22);
-    opacity: 0.7;
+    box-shadow: 0 0 10px var(--brand-12);
+    opacity: 0.46;
   }
   /* z-index discipline kept as a defensive baseline even after the
    * .border-anim removal (2026-05-19) so any future glass overlay in
@@ -171,12 +185,12 @@ const CSS = `
   }
   .vmx-settings-drawer__header {
     position: relative;
-    height: 56px;
+    height: 52px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 var(--sp-5);
+    padding: 0 22px;
     border-bottom: 1px solid var(--border-default);
     /* Lit header — a machined cap on the slide-over: a warm-rose top sheen over
      * a darker base, a top lip catching light, a hard floor, and a real ambient
@@ -188,7 +202,7 @@ const CSS = `
     box-shadow:
       inset 0 1px 0 var(--glass-top),
       inset 0 -1px 0 rgba(0, 0, 0, 0.74),
-      0 12px 26px rgba(0, 0, 0, 0.30);
+      0 10px 24px rgba(0, 0, 0, 0.26);
   }
   /* The lit under-rule — a rose ignition seam beneath the header, brightest at
    * the leading edge, so the header crown reads as actively lit. */
@@ -231,7 +245,7 @@ const CSS = `
     padding-left: 13px;
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 14px;
+    font-size: 13px;
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--text-primary);
@@ -312,7 +326,7 @@ const CSS = `
   .vmx-settings-drawer__body {
     flex: 1;
     overflow-y: auto;
-    padding: 22px var(--sp-4) 32px;
+    padding: 18px 20px 34px;
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -491,6 +505,29 @@ const CSS = `
     flex-shrink: 0;
     background: var(--brand-22);
   }
+  .vmx-settings-drawer__truth-note {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    align-self: flex-start;
+    max-width: 100%;
+    margin-top: calc(var(--sp-1) * -1);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    line-height: 1.35;
+    color: var(--text-muted);
+  }
+  .vmx-settings-drawer__truth-note::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--brand);
+    box-shadow: 0 0 6px var(--brand-22);
+    opacity: 0.72;
+  }
 `;
 
 registerStyle("vmx-settings-drawer", CSS);
@@ -643,14 +680,16 @@ export function mountSettingsDrawer(root: HTMLElement): void {
 export function openSettings(): void {
   if (!mountedHandle) return;
   vmxLog("[vmx:click]", "settings drawer open");
+  const wasOpen = getSettingsUIState().open;
   openSettingsState();
   // Arm the titlebar gear (lights amber while the drawer is open — the
   // [data-active] style already exists in titlebar.ts but nothing flipped
   // it). Queried by class to avoid a session→settings import cycle.
   setGearArmed(true);
   // Re-render with fresh settings (sidecar may have broadcast updates
-  // while the drawer was closed).
-  mountedHandle.refresh();
+  // while the drawer was closed). The state subscriber already refreshed
+  // closed→open; only force this when openSettings() is called idempotently.
+  if (wasOpen) mountedHandle.refresh();
   // P1-b finding #2 — STAGE 2 trigger. Stage 1 is the drawer's 250ms
   // translateX (CSS, fires on the data-open flip above). We arm the group
   // micro-settle ONLY on this explicit open path (not on the subscribeSettingsUI
@@ -689,9 +728,9 @@ function armDrawerSettle(): void {
 export function closeSettings(): void {
   if (!mountedHandle) return;
   vmxLog("[vmx:click]", "settings drawer close");
+  disposeProfilePanelHandle();
   closeSettingsState();
   setGearArmed(false);
-  mountedHandle.refresh();
 }
 
 /** Remove the singleton drawer from the DOM and drop its global listeners.
@@ -713,6 +752,8 @@ export function unmountSettingsDrawer(): void {
   if (handle) {
     bodyRenderId += 1;
     disposeDrawerBodyResources();
+    disposeProfilePanelHandle();
+    disposeStalenessBannerHandle();
     handle.unsubscribe();
     try {
       handle.backdrop.remove();
@@ -753,6 +794,9 @@ export function _resetDrawerForTests(): void {
 
 let hotkeyHandle: HotkeyCaptureHandle | null = null;
 let retentionHandle: RetentionSliderHandle | null = null;
+let profilePanelHandle: ProfilePanelHandle | null = null;
+let profilePanelLoadedThisOpen = false;
+let stalenessBannerHandle: StalenessBannerHandle | null = null;
 let libraryPanelHandle: LibraryPanelHandle | null = null;
 // Phase 15 Plan 05 — Recording browser handle persists across refreshes
 // so the loadRecordings() async resolver can push results into the live
@@ -766,6 +810,83 @@ let bodyDisposers: Array<() => void> = [];
 let lastLoadAt = 0;
 const LIST_DEBOUNCE_MS = 1000;
 
+const SETTINGS_MODES: readonly SettingsView["mode"][] = ["hype", "coach"];
+const SETTINGS_SKILLS: readonly SkillLevel[] = ["beginner", "intermediate", "pro"];
+const SETTINGS_LENSES: readonly SharedLens[] = ["hype", "critique", "tutor"];
+const SETTINGS_OUTPUT_PROFILES: readonly SettingsView["output_profile"][] = ["hp", "spk"];
+const SETTINGS_MOODS: readonly MascotMood[] = ["hype-man", "teacher", "coach"];
+
+function oneOf<T extends string>(
+  values: readonly T[],
+  value: unknown,
+): value is T {
+  return typeof value === "string" && (values as readonly string[]).includes(value);
+}
+
+function applySettingsOptimistic(
+  field: SettingsField,
+  value: string | number | boolean | null,
+): void {
+  const state = getSessionState();
+  const next: SettingsView = { ...state.settings };
+  let changed = false;
+
+  const set = <K extends keyof SettingsView>(key: K, nextValue: SettingsView[K]): void => {
+    if (Object.is(next[key], nextValue)) return;
+    next[key] = nextValue;
+    changed = true;
+  };
+
+  switch (field) {
+    case "voice":
+      if (typeof value === "string") set("voice", value);
+      break;
+    case "mode":
+      if (oneOf(SETTINGS_MODES, value)) set("mode", value);
+      break;
+    case "genre":
+      if (typeof value === "string") set("genre", value);
+      break;
+    case "output_device_id":
+      if (typeof value === "string" || value === null) set("output_device_id", value);
+      break;
+    case "output_profile":
+      if (oneOf(SETTINGS_OUTPUT_PROFILES, value)) set("output_profile", value);
+      break;
+    case "retention_days":
+      if (typeof value === "number" && Number.isFinite(value)) set("retention_days", value);
+      break;
+    case "push_to_mute_hotkey":
+      if (typeof value === "string") set("push_to_mute_hotkey", value);
+      break;
+    case "mood":
+      if (oneOf(SETTINGS_MOODS, value)) set("mood", value);
+      break;
+    case "click_through":
+      if (typeof value === "boolean") set("click_through", value);
+      break;
+    case "lighter_blur":
+      if (typeof value === "boolean") set("lighter_blur", value);
+      break;
+    case "skill":
+      if (oneOf(SETTINGS_SKILLS, value)) set("skill", value);
+      break;
+    case "lens":
+      if (oneOf(SETTINGS_LENSES, value)) set("lens", value);
+      break;
+    case "learn.headphone_device_index":
+      if (
+        value === null ||
+        (typeof value === "number" && Number.isInteger(value) && value >= 0)
+      ) {
+        set("learn_headphone_device_index", value);
+      }
+      break;
+  }
+
+  if (changed) setSessionState({ settings: next });
+}
+
 function rememberPicker(el: HTMLElement): HTMLElement {
   bodyDisposers.push(() => disposePicker(el));
   return el;
@@ -774,6 +895,15 @@ function rememberPicker(el: HTMLElement): HTMLElement {
 function withWire<T extends HTMLElement>(el: T, wire: string): T {
   el.dataset.wire = wire;
   return el;
+}
+
+function renderTruthNote(text: string, wire: string): HTMLElement {
+  const note = document.createElement("div");
+  note.className = "vmx-settings-drawer__truth-note";
+  note.dataset.wire = wire;
+  note.setAttribute("role", "note");
+  note.textContent = text;
+  return note;
 }
 
 function disposeDrawerBodyResources(): void {
@@ -787,6 +917,22 @@ function disposeDrawerBodyResources(): void {
   hotkeyHandle = null;
   retentionHandle = null;
   recordingBrowserHandle = null;
+  libraryPanelHandle = null;
+}
+
+function disposeProfilePanelHandle(): void {
+  if (profilePanelHandle) {
+    profilePanelHandle.dispose();
+    profilePanelHandle = null;
+  }
+  profilePanelLoadedThisOpen = false;
+}
+
+function disposeStalenessBannerHandle(): void {
+  if (stalenessBannerHandle) {
+    stalenessBannerHandle.dispose();
+    stalenessBannerHandle = null;
+  }
   libraryPanelHandle = null;
 }
 
@@ -820,6 +966,12 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     }),
   );
   personaBody.append(withWire(voicePicker, "settings.persona.voice"));
+  personaBody.append(
+    renderTruthNote(
+      "saved for next co-host start",
+      "settings.persona.voice.deferred-note",
+    ),
+  );
 
   // Mode rocker
   const modeRocker = renderRocker({
@@ -961,6 +1113,9 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
       },
     }),
   );
+  outputBody.append(
+    renderTruthNote("saved for next audio start", "settings.output.deferred-note"),
+  );
   body.append(
     renderSettingsGroup({
       header: "OUTPUT",
@@ -1052,17 +1207,18 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   const libraryBody = document.createElement("div");
   libraryBody.style.cssText =
     "display:flex; flex-direction:column; gap: var(--sp-2);";
-  const stalenessHandle = renderStalenessBanner({
-    onRefresh: async (path) => {
-      if (libraryPanelHandle) {
-        await libraryPanelHandle.beginImport(path);
-        return;
-      }
-      await emitIpc("ipc.library.import", { path, schema_version: "1" });
-    },
-  });
-  bodyDisposers.push(() => stalenessHandle.dispose());
-  libraryBody.append(stalenessHandle.element);
+  if (!stalenessBannerHandle) {
+    stalenessBannerHandle = renderStalenessBanner({
+      onRefresh: async (path) => {
+        if (libraryPanelHandle) {
+          await libraryPanelHandle.beginImport(path);
+          return;
+        }
+        await emitIpc("ipc.library.import", { path, schema_version: "1" });
+      },
+    });
+  }
+  libraryBody.append(stalenessBannerHandle.element);
   // Library panel is async; mount a placeholder + swap when ready.
   const libraryPanelSlot = document.createElement("div");
   libraryBody.append(libraryPanelSlot);
@@ -1098,12 +1254,34 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   // both are user-data groups; PROFILE is the more sensitive one so it sits
   // adjacent to LIBRARY for findability (32-RESEARCH §"Settings panel
   // insertion"). The panel renders synchronously with an empty state and
-  // fires ipc.profile.view on mount to populate.
-  const profileHandle = renderProfilePanel();
+  // fires ipc.profile.view only once per open cycle. The handle is preserved
+  // across open-drawer body refreshes (recordings loading, settings pushes), so
+  // those refreshes do not spam the sidecar or UI log.
+  if (!profilePanelHandle) {
+    profilePanelHandle = renderProfilePanel({ autoload: false });
+  }
+  if (ui.open && !profilePanelLoadedThisOpen) {
+    profilePanelLoadedThisOpen = true;
+    void profilePanelHandle.refresh();
+  }
   body.append(
     renderSettingsGroup({
       header: "PROFILE",
-      children: profileHandle.element,
+      children: profilePanelHandle.element,
+    }),
+  );
+
+  // --- DIAGNOSTICS ---------------------------------------------------------
+  // Anti-slop telemetry from ipc.session.citation. The handle subscribes to
+  // the component-local diagnostics store and updates in place, so the 0.5Hz
+  // co-host telemetry stream does not rebuild the entire drawer.
+  const citationDiagnostics = mountCitationDiagnostics();
+  bodyDisposers.push(() => citationDiagnostics.dispose());
+  body.append(
+    renderSettingsGroup({
+      header: "DIAGNOSTICS",
+      badge: "LIVE",
+      children: citationDiagnostics.root,
     }),
   );
 
@@ -1219,6 +1397,7 @@ async function sendSettingsField(
   // 14-04's lighter_blur). Without this, any future drawer-side toggle
   // wanting to flow through this try/catch wrapper would need a type
   // assertion to pass a boolean.
+  applySettingsOptimistic(field, value);
   try {
     await sendSettings(field, value);
   } catch (err) {

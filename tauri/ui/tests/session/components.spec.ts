@@ -758,6 +758,30 @@ describe("SessionLayout", () => {
     expect(muted).toBe(1);
   });
 
+  it("down status-row inputs call the latest rendered recheck handler", () => {
+    const root = host();
+    const mounted = mountSessionLayout(root, defaultState());
+    const rechecked: string[] = [];
+    renderSessionFrame(mounted, {
+      ...defaultState(),
+      status: {
+        ...defaultState().status,
+        gemini: "down",
+        onRecheck: (component) => rechecked.push(component),
+      },
+    });
+
+    const ai = root.querySelector<HTMLButtonElement>('.vmx-statusrow__i[data-input="ai"]');
+    expect(ai).toBeTruthy();
+    expect(ai?.disabled).toBe(false);
+    expect(ai?.dataset.down).toBe("true");
+    expect(ai?.getAttribute("aria-label")).toBe("recheck ai status");
+
+    ai?.click();
+
+    expect(rechecked).toEqual(["gemini"]);
+  });
+
   it("renderSessionFrame is idempotent — same state does not duplicate nodes", () => {
     const root = host();
     const mounted = mountSessionLayout(root);
@@ -779,6 +803,28 @@ describe("SessionLayout", () => {
     // Same node, new text
     expect(clockEl).toBe(mounted.titlebar.querySelector(".vmx-titlebar__clock"));
     expect(clockEl?.textContent).toBe("02:44:31");
+  });
+
+  it("mounts the live drop chip only while a drop prediction exists", () => {
+    const root = host();
+    const mounted = mountSessionLayout(root, defaultState());
+    expect(root.querySelector(".vmx-drop-chip")).toBeNull();
+
+    renderSessionFrame(mounted, {
+      ...defaultState(),
+      drop: { bars: 8, bpmPeriodMs: 500 },
+    });
+    const chip = root.querySelector<HTMLElement>(".vmx-drop-chip");
+    expect(chip).toBeTruthy();
+    expect(chip?.dataset.bars).toBe("8");
+    expect(chip?.querySelector(".vmx-drop-chip__count")?.textContent).toBe("08:00");
+    expect(chip?.style.getPropertyValue("--bpm-period-ms")).toBe("500ms");
+
+    renderSessionFrame(mounted, {
+      ...defaultState(),
+      drop: { bars: null, bpmPeriodMs: undefined },
+    });
+    expect(root.querySelector(".vmx-drop-chip")).toBeNull();
   });
 });
 

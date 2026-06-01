@@ -21,14 +21,9 @@ import jsonschema
 import pytest
 
 from vibemix.ui_bus import (
-    LibraryConfidence,
     LibraryImport,
     LibraryImportCancel,
     LibraryImportProgress,
-    LibrarySearchRequest,
-    LibrarySearchResult,
-    LibrarySimilarRequest,
-    LibrarySimilarResult,
     LibraryStalenessAction,
     LibraryStalenessNudge,
 )
@@ -58,58 +53,12 @@ def _library_wrappers() -> list[tuple[str, object]]:
         ),
         ("LibraryImportCancel", LibraryImportCancel.make()),
         (
-            "LibrarySearchRequest",
-            LibrarySearchRequest.make(query="acid techno", k=10),
-        ),
-        (
-            "LibrarySearchResult",
-            LibrarySearchResult.make(
-                query="acid techno",
-                matches=(
-                    {
-                        "track_id": "t1",
-                        "title": "X",
-                        "artist": "Y",
-                        "bpm": 138.0,
-                        "confidence": 0.87,
-                        "snippet": "X — Y",
-                    },
-                ),
-                cache_hit=False,
-            ),
-        ),
-        (
-            "LibraryConfidence",
-            LibraryConfidence.make(
-                track_id="t1",
-                cosine=0.85,
-                decision="cited",
-                event_id="ev-1",
-            ),
-        ),
-        (
             "LibraryStalenessNudge",
             LibraryStalenessNudge.make(age_days=45, snoozed_until_ts=None),
         ),
         (
             "LibraryStalenessAction",
             LibraryStalenessAction.make(action="snooze_7d"),
-        ),
-        ("LibrarySimilarRequest", LibrarySimilarRequest.make(track_id="t1", k=10)),
-        (
-            "LibrarySimilarResult",
-            LibrarySimilarResult.make(
-                track_id="t1",
-                results=(
-                    {
-                        "track_id": "t2",
-                        "similarity": 0.82,
-                        "title": "Z",
-                        "artist": "W",
-                        "bpm": 140.0,
-                    },
-                ),
-            ),
         ),
     ]
 
@@ -210,7 +159,7 @@ def test_renderer_outbound_messages_documented() -> None:
     library_defs = [
         k for k in _SCHEMA["definitions"] if k.startswith("Library")
     ]
-    assert len(library_defs) == 10
+    assert len(library_defs) == 5
     for name in library_defs:
         comment = _SCHEMA["definitions"][name].get("$comment", "")
         assert any(
@@ -219,16 +168,11 @@ def test_renderer_outbound_messages_documented() -> None:
 
 
 def test_library_wrapper_set_matches_expected() -> None:
-    """Catch missing wrapper imports — explicit allowlist of 10 Library*."""
+    """Catch missing wrapper imports — explicit allowlist of 5 Library*."""
     expected = {
-        "LibraryConfidence",
         "LibraryImport",
         "LibraryImportCancel",
         "LibraryImportProgress",
-        "LibrarySearchRequest",
-        "LibrarySearchResult",
-        "LibrarySimilarRequest",
-        "LibrarySimilarResult",
         "LibraryStalenessAction",
         "LibraryStalenessNudge",
     }

@@ -4,8 +4,8 @@
 ANTI-FEATURE GUARD (CONTEXT LIBRARY-14, memory `feedback_no_scope_creep`):
 This module NEVER autosurfaces suggestions. Every entrypoint is gated
 behind explicit user action — either the ``vibemix library similar
-<track_id>`` CLI command or the ``ipc.library.similar_request`` IPC
-message dispatched by the renderer in response to a user click.
+<track_id>`` CLI command or the library window's ``library_similar`` Tauri
+command in response to a user click.
 
 The agent path MUST NOT call ``similar_to`` from any background loop or
 event handler. The Phase 20 prompt linter rejects unsolicited "you might

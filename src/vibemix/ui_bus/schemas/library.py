@@ -11,8 +11,9 @@ payloads. Frozen + slotted so the wrappers stay hashable; the
 ``_tuples_to_lists`` helper in ``messages.py`` flips tuples to lists at
 serialise time (jsonschema's Draft-07 rejects tuples for ``type: array``).
 
-Plan: 28-09. Schemas added in same plan to
-``tauri/ui/src/ipc/messages.schema.json``.
+Plan: 28-09. Import/staleness schemas are declared in
+``tauri/ui/src/ipc/messages.schema.json``. Search/similar run through the
+library Tauri command bridge, not the live ``ipc.*`` bus.
 """
 
 from __future__ import annotations
@@ -62,53 +63,6 @@ class LibraryImportCancelPayload:
 
 
 @dataclass(frozen=True, slots=True)
-class LibrarySearchRequestPayload:
-    """Plan 28-03 — renderer → sidecar. Natural-language vibe-search query."""
-
-    query: str
-    k: int = 10
-    schema_version: str = "1"
-
-
-@dataclass(frozen=True, slots=True)
-class LibrarySearchResultPayload:
-    """Plan 28-03 — sidecar → renderer. Vibe-search response.
-
-    Fields:
-        query: echo of the requested query string.
-        matches: tuple of dicts with keys
-            ``track_id, title, artist, bpm, confidence, snippet``.
-        cache_hit: ``True`` when served from the 24h query cache.
-    """
-
-    query: str
-    matches: tuple[dict, ...]
-    cache_hit: bool
-    schema_version: str = "1"
-
-
-@dataclass(frozen=True, slots=True)
-class LibraryConfidencePayload:
-    """Plan 28-04 — sidecar → renderer. Grounding citation telemetry.
-
-    Fields:
-        track_id: cited track id (or ``None`` when below threshold).
-        cosine: similarity in ``[-1, 1]``. Typically ``[0, 1]`` for matches.
-        decision: ``"cited" | "uncertain" | "below_threshold"``.
-        event_id: stable id of the event that fired the grounding lookup.
-        cost_warning: ``True`` once monthly telemetry crosses 90% of the
-            €50 ceiling (Plan 28-08 budget gate).
-    """
-
-    track_id: str | None
-    cosine: float
-    decision: str
-    event_id: str
-    cost_warning: bool = False
-    schema_version: str = "1"
-
-
-@dataclass(frozen=True, slots=True)
 class LibraryStalenessNudgePayload:
     """Plan 28-07 — sidecar → renderer. 30-day re-import nudge.
 
@@ -136,31 +90,4 @@ class LibraryStalenessActionPayload:
     """
 
     action: str
-    schema_version: str = "1"
-
-
-@dataclass(frozen=True, slots=True)
-class LibrarySimilarRequestPayload:
-    """Plan 28-05 — renderer → sidecar. USER-ASKED similar-track query.
-
-    Anti-feature guard: never autosurfaced (CONTEXT LIBRARY-14).
-    """
-
-    track_id: str
-    k: int = 10
-    schema_version: str = "1"
-
-
-@dataclass(frozen=True, slots=True)
-class LibrarySimilarResultPayload:
-    """Plan 28-05 — sidecar → renderer. USER-ASKED similar-track results.
-
-    Fields:
-        track_id: echo of the seed track id.
-        results: tuple of dicts with keys
-            ``track_id, similarity, title, artist, bpm``.
-    """
-
-    track_id: str
-    results: tuple[dict, ...]
     schema_version: str = "1"

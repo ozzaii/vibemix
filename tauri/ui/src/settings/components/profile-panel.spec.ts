@@ -50,13 +50,17 @@ vi.mock("../../ipc/client.js", () => ({
   emitIpc: (t: string, p: Record<string, unknown>) => emitIpcMock(t, p),
 }));
 
+import { sendIpcRequest } from "../../ipc/client.js";
 import { renderProfilePanel } from "./profile-panel.js";
+
+const sendIpcRequestMock = vi.mocked(sendIpcRequest);
 
 beforeEach(() => {
   pendingView = null;
   pendingRegen = null;
   pendingDelete = null;
   emitIpcMock.mockClear();
+  sendIpcRequestMock.mockClear();
 });
 
 afterEach(() => {
@@ -94,6 +98,52 @@ describe("profile-panel — initial render before view resolves", () => {
       handle.element.querySelector('[data-testid="profile-panel-enable"]'),
     ).toBeTruthy();
     handle.dispose();
+  });
+
+  it("can mount without profile IPC until refresh is requested", async () => {
+    const handle = renderProfilePanel({ autoload: false });
+    document.body.append(handle.element);
+
+    expect(pendingView).toBeNull();
+    expect(sendIpcRequestMock).not.toHaveBeenCalled();
+
+    const refreshPromise = handle.refresh();
+    expect(sendIpcRequestMock).toHaveBeenCalledWith(
+      "ipc.profile.view",
+      {},
+      "ipc.profile.view_result",
+      5000,
+    );
+    resolveView({ profile: null, bytes: 0, consent: true });
+    await refreshPromise;
+    await flush();
+
+    expect(
+      handle.element.querySelector(".vmx-profile-panel__empty")?.textContent,
+    ).toContain("no profile yet");
+    handle.dispose();
+  });
+
+  it("ignores a pending profile view after disposal", async () => {
+    const handle = renderProfilePanel();
+    document.body.append(handle.element);
+    expect(pendingView).not.toBeNull();
+
+    handle.dispose();
+    resolveView({
+      profile: {
+        preferred_genre: "techno",
+      },
+      bytes: 88,
+      consent: true,
+    });
+    await flush();
+
+    const led = handle.element.querySelector(
+      ".vmx-profile-panel__consent-led",
+    ) as HTMLElement;
+    expect(led.dataset.on).toBe("false");
+    expect(handle.element.textContent).not.toContain("techno");
   });
 });
 

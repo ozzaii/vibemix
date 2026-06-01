@@ -27,6 +27,7 @@ import type {
   CohostReaction,
   SessionState as BridgeSessionState,
 } from "./state.js";
+import { sendMute } from "./ws-bridge.js";
 import type { ReactionsByTs } from "./components/cohost.js";
 import type { CitationChip } from "./components/citation-strip.js";
 
@@ -51,13 +52,24 @@ function cohostRetryHandler(): void {
 
 /** "The Deck Speaks" rebuild — the deck rail's mute control. Toggles the
  *  co-host mute over the same real channel the push-to-mute hotkey + status
- *  bar use (ipc.session.mute); the sidecar echoes `ipc.session.mute { muted }`
- *  which the bridge applies, and the control reflects it on the next frame.
- *  Fire-and-forget. */
+ *  bar use (ipc.session.mute). sendMute flips SessionState optimistically so
+ *  the button responds immediately; the sidecar ack remains authoritative. */
 function cohostMuteHandler(): void {
-  void emitIpc("ipc.session.mute", { toggle: true }).catch((err: unknown) => {
+  void sendMute(true).catch((err: unknown) => {
     // eslint-disable-next-line no-console
     console.warn("[render-loop] mute emitIpc failed:", err);
+  });
+}
+
+/** Compact status-row recovery. The deck row stays presentational; this
+ *  handler is the single bridge from a down input label to the sidecar probe
+ *  that emits a fresh ipc.status.tick. */
+function statusRecheckHandler(
+  component: "livekit" | "gemini" | "midi" | "screen",
+): void {
+  void emitIpc("ipc.status.recheck", { component }).catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.warn("[render-loop] status recheck emitIpc failed:", err);
   });
 }
 
@@ -351,8 +363,10 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       screen: s.status.screen,
       muted: s.muted,
       hotkey: formatHotkey(s.settings.push_to_mute_hotkey),
+      onRecheck: statusRecheckHandler,
       errors: {},
     },
+    claimPolicy: s.claimPolicy,
     persona: {
       // 2026-05-25 — the deck is now a read-only glanceable mirror; the
       // settings drawer owns every write. Skill round-trips through
@@ -543,7 +557,9 @@ function trackFrameTime(dtMs: number): void {
 export const _internals = {
   tick,
   projectToLayoutState,
+  cohostMuteHandler,
   modeChangeHandler,
+  statusRecheckHandler,
   formatHotkey,
   formatWallClock,
   formatElapsed,

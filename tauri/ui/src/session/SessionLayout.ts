@@ -34,10 +34,13 @@ import { registerStyle } from "./components/_style-registry.js";
 import { renderModePicker, setModePickerActive, type ModePickerMode } from "./components/mode-picker.js";
 import { renderTitlebar, setTitlebarClock, setTitlebarPill, type PillLevel } from "./components/titlebar.js";
 import { GROUNDING_FAILURE_MS, type CohostStatus, type ReactionsByTs, type TranscriptLine } from "./components/cohost.js";
+import { renderDropChip } from "./components/drop-chip.js";
 import type { CitationChip } from "./components/citation-strip.js";
 import { type PhaseChunk } from "./components/phase-tape.js";
 import { type MidiEvent } from "./components/event-ribbon.js";
 import type { BadgeState } from "./components/status-bar.js";
+
+type StatusRecheckComponent = "livekit" | "gemini" | "midi" | "screen";
 
 export interface SessionState {
   titlebar: {
@@ -96,8 +99,16 @@ export interface SessionState {
     screen: "ok" | "denied" | "unavailable" | null;
     muted: boolean;
     hotkey: string;
+    /** Recheck a down status input via ipc.status.recheck. */
+    onRecheck?: (component: StatusRecheckComponent) => void;
     errors?: Partial<Record<"livekit" | "gemini" | "midi" | "screen", string>>;
   };
+  claimPolicy?: {
+    level: "green" | "yellow" | "red";
+    label: string;
+    policy: string;
+    reason: string | null;
+  } | null;
   persona: {
     skill: "BEG" | "INT" | "PRO";
     /** Legacy 2-state — retained for back-compat with existing tests / wires. */
@@ -138,13 +149,20 @@ export interface Mounted {
   ghosts: [HTMLElement, HTMLElement];
   now: HTMLElement;
   receipt: HTMLElement;
+  dropSlot: HTMLElement;
   cite: HTMLElement;
   bpm: HTMLElement;
   key: HTMLElement;
   meterFill: HTMLElement;
   meterPeak: HTMLElement;
-  statusInputs: { audio: HTMLElement; screen: HTMLElement; midi: HTMLElement };
+  statusInputs: {
+    audio: HTMLButtonElement;
+    ai: HTMLButtonElement;
+    screen: HTMLButtonElement;
+    midi: HTMLButtonElement;
+  };
   statusRight: HTMLElement;
+  claimPolicy: HTMLElement;
   current: SessionState;
   /** Timestamp (Date.now()) of the most-recent grounded true→false transition.
    *  Null when grounded is currently true. Drives the >5s grounding-failure
@@ -182,7 +200,10 @@ const LAYOUT_CSS = `
     height: 100vh;
     position: relative;
     overflow: hidden;
-    background-color: var(--void);
+    background:
+      linear-gradient(112deg, rgba(255, 165, 223, 0.040), transparent 34%),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 24%),
+      var(--void-5);
   }
   /* Phase 97 / ONBOARD-01 — mode picker bar between titlebar and stage.
    * Sized by content (height: 34px from the picker itself + 12px padding
@@ -199,9 +220,20 @@ const LAYOUT_CSS = `
     z-index: 1;
   }
   .vmx-modebar .vmx-mode-picker { max-width: 480px; }
+  .vmx-drop-slot:empty { display: none; }
 
   /* === THE DECK — no card. Open void. Hero anchored low (mixer LCD). ==== */
   .vmx-stage { display: grid; place-items: stretch; min-height: 0; position: relative; z-index: 1; }
+  .vmx-stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(92% 76% at 50% 44%, rgba(255, 222, 242, 0.038), transparent 62%),
+      linear-gradient(180deg, transparent 0%, rgba(255, 165, 223, 0.030) 100%);
+    opacity: 0.9;
+  }
   .vmx-deck {
     position: relative;
     display: grid;
@@ -223,12 +255,12 @@ const LAYOUT_CSS = `
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-sm);
     background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.026), transparent 46%, rgba(0, 0, 0, 0.26)),
-      rgba(0, 0, 0, 0.24);
+      linear-gradient(180deg, rgba(255, 251, 244, 0.036), transparent 46%, rgba(0, 0, 0, 0.18)),
+      rgba(255, 251, 244, 0.020);
     box-shadow:
       inset 0 1px 0 rgba(255, 251, 244, 0.034),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.70),
-      0 1px 0 rgba(0, 0, 0, 0.62);
+      inset 0 -2px 0 rgba(0, 0, 0, 0.58),
+      0 1px 0 rgba(0, 0, 0, 0.48);
     min-width: 0;
   }
   .vmx-persona {
@@ -387,17 +419,17 @@ const LAYOUT_CSS = `
      * (bottom-left), a top sheen catches the lip, the floor falls into shadow.
      * The co-host's voice now reads as glowing up out of the obsidian. */
     background:
-      radial-gradient(88% 86% at 14% 102%, rgba(255, 165, 223, 0.10), transparent 56%),
-      radial-gradient(60% 50% at 92% 0%, rgba(255, 255, 255, 0.018), transparent 60%),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.022), transparent 26%, rgba(0, 0, 0, 0.34)),
-      rgba(0, 0, 0, 0.22);
+      radial-gradient(88% 86% at 14% 102%, rgba(255, 165, 223, 0.145), transparent 58%),
+      radial-gradient(64% 52% at 92% 0%, rgba(255, 255, 255, 0.034), transparent 62%),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.034), transparent 28%, rgba(0, 0, 0, 0.20)),
+      rgba(255, 251, 244, 0.026);
     box-shadow:
       inset 0 1px 0 rgba(255, 210, 240, 0.07),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.74),
-      inset 0 0 60px rgba(0, 0, 0, 0.30),
-      0 2px 0 rgba(0, 0, 0, 0.6),
-      0 24px 64px -12px rgba(0, 0, 0, 0.55),
-      0 0 90px -36px rgba(255, 165, 223, 0.14);
+      inset 0 -2px 0 rgba(0, 0, 0, 0.62),
+      inset 0 0 50px rgba(0, 0, 0, 0.18),
+      0 2px 0 rgba(0, 0, 0, 0.44),
+      0 22px 56px -14px rgba(0, 0, 0, 0.44),
+      0 0 90px -34px rgba(255, 165, 223, 0.18);
     overflow: hidden;
   }
   /* The engraved inner faceplate (2026-05-30 level-up): an inset machined frame
@@ -411,9 +443,9 @@ const LAYOUT_CSS = `
     border: 1px solid var(--border-subtle);
     border-radius: var(--rad-sm);
     background:
-      repeating-linear-gradient(90deg, transparent 0 46px, rgba(255, 222, 242, 0.022) 46px 47px),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.018) 0%, transparent 16%, transparent 100%);
-    box-shadow: inset 0 0.5px 0 rgba(255, 210, 240, 0.05);
+      repeating-linear-gradient(90deg, transparent 0 46px, rgba(255, 222, 242, 0.034) 46px 47px),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.026) 0%, transparent 16%, transparent 100%);
+    box-shadow: inset 0 0.5px 0 rgba(255, 210, 240, 0.07);
     pointer-events: none;
   }
   /* The readout dot-matrix (a speaker-grille / VFD-grille detail) top-right —
@@ -446,7 +478,7 @@ const LAYOUT_CSS = `
   .vmx-ghost {
     font-family: var(--type-serif);
     font-weight: 400;
-    font-size: clamp(18px, 1.7vw, 22px); line-height: 1.32; letter-spacing: -0.008em;
+    font-size: clamp(18px, 1.7vw, 22px); line-height: 1.32; letter-spacing: 0;
     transition: color 700ms ease-out;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: min(58ch, 100%);
   }
@@ -462,7 +494,7 @@ const LAYOUT_CSS = `
   .vmx-now {
     font-family: var(--type-serif);
     font-weight: 400;
-    font-size: clamp(44px, 5.6vw, 78px); line-height: 1.02; letter-spacing: -0.014em;
+    font-size: clamp(44px, 5.6vw, 78px); line-height: 1.02; letter-spacing: 0;
     color: var(--text-primary); text-wrap: balance; max-width: 18ch;
     text-shadow:
       0 1px 0 rgba(176, 112, 160, 0.20),
@@ -543,13 +575,13 @@ const LAYOUT_CSS = `
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-sm);
     background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.018), transparent 42%),
-      linear-gradient(90deg, rgba(255, 165, 223, 0.018), transparent 38%, transparent 62%, rgba(72, 152, 255, 0.014)),
-      rgba(0, 0, 0, 0.24);
+      linear-gradient(180deg, rgba(255, 251, 244, 0.030), transparent 42%),
+      linear-gradient(90deg, rgba(255, 165, 223, 0.024), transparent 38%, transparent 62%, rgba(255, 251, 244, 0.012)),
+      rgba(255, 251, 244, 0.018);
     box-shadow:
       inset 0 1px 0 rgba(255, 251, 244, 0.032),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.70),
-      0 1px 0 rgba(0, 0, 0, 0.62);
+      inset 0 -2px 0 rgba(0, 0, 0, 0.58),
+      0 1px 0 rgba(0, 0, 0, 0.46);
   }
   .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); }
   .vmx-read__lab {
@@ -602,8 +634,8 @@ const LAYOUT_CSS = `
   .vmx-statusrow {
     display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-5);
     background:
-      linear-gradient(90deg, rgba(255, 165, 223, 0.020), transparent 38%, transparent 62%, rgba(72, 152, 255, 0.016)),
-      rgba(0, 0, 0, 0.55);
+      linear-gradient(90deg, rgba(255, 165, 223, 0.026), transparent 38%, transparent 62%, rgba(255, 251, 244, 0.012)),
+      rgba(0, 0, 0, 0.42);
     backdrop-filter: var(--blur-glass-light);
     -webkit-backdrop-filter: var(--blur-glass-light); border-top: 1px solid var(--glass-edge);
   }
@@ -611,13 +643,72 @@ const LAYOUT_CSS = `
     display: flex; align-items: center;
     font-family: var(--type-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--silk-22);
   }
-  .vmx-statusrow__i { transition: color 700ms ease-out, text-shadow 700ms ease-out; }
+  .vmx-statusrow__i {
+    appearance: none; -webkit-appearance: none;
+    border: 0; background: transparent; margin: 0; padding: 0;
+    font: inherit; letter-spacing: inherit; text-transform: inherit;
+    color: inherit; opacity: 1;
+    cursor: default;
+    transition: color 700ms ease-out, text-shadow 700ms ease-out;
+  }
+  .vmx-statusrow__i[data-actionable="true"] { cursor: pointer; }
+  .vmx-statusrow__i[data-actionable="true"]:hover {
+    color: var(--amber-pale);
+    text-shadow: 0 0 6px var(--amber-22);
+  }
+  .vmx-statusrow__i:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 3px;
+    border-radius: var(--rad-sm);
+  }
   .vmx-statusrow__i[data-down="true"] { color: var(--led-fault); text-shadow: 0 0 6px rgba(212, 65, 58, 0.5); }
   .vmx-statusrow__sep { color: var(--silk-12); margin: 0 8px; }
+  .vmx-statusrow__meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+  }
   .vmx-statusrow__right { font-family: var(--type-mono); font-size: 11px; color: var(--silk-40); letter-spacing: 0.08em; }
+  .vmx-claim-policy {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-left: 14px;
+    padding: 3px 8px;
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--silk-40);
+    background: rgba(0, 0, 0, 0.18);
+    white-space: nowrap;
+  }
+  .vmx-claim-policy::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--led-warn);
+    box-shadow: 0 0 7px rgba(244, 197, 66, 0.35);
+  }
+  .vmx-claim-policy[data-level="green"]::before {
+    background: var(--led-ok);
+    box-shadow: 0 0 7px rgba(109, 212, 74, 0.32);
+  }
+  .vmx-claim-policy[data-level="red"] {
+    color: var(--silk-65);
+    border-color: rgba(212, 65, 58, 0.34);
+  }
+  .vmx-claim-policy[data-level="red"]::before {
+    background: var(--led-fault);
+    box-shadow: 0 0 7px rgba(212, 65, 58, 0.42);
+  }
 
   /* === SILENT + FAULT — the surface settles into listening / holds on a drop = */
-  .vmx-session[data-mode="silent"] .vmx-now,
+  .vmx-session[data-mode="silent"] .vmx-now { color: var(--text-muted); }
   .vmx-session[data-mode="fault"] .vmx-now { color: var(--silk-40); }
   /* Idle/fault hold a single grounded line (no live receipt), so center it in
    * the faceplate instead of pinning to the live receipt-floor — kills the vast
@@ -626,7 +717,7 @@ const LAYOUT_CSS = `
   .vmx-session[data-mode="silent"] .vmx-voice,
   .vmx-session[data-mode="fault"] .vmx-voice { justify-content: center; }
   .vmx-session[data-mode="silent"] .vmx-now {
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75), 0 0 18px rgba(255, 251, 244, 0.035);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.62), 0 0 20px rgba(255, 251, 244, 0.055);
   }
   .vmx-session[data-mode="fault"] .vmx-now {
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75), 0 0 18px rgba(212, 65, 58, 0.14);
@@ -721,12 +812,19 @@ const LAYOUT_CSS = `
     .vmx-statusrow__inputs {
       flex: none;
     }
-    .vmx-statusrow__right {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+  .vmx-statusrow__meta {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .vmx-statusrow__right {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .vmx-claim-policy {
+    display: none;
+  }
   }
 `;
 
@@ -856,7 +954,10 @@ export function mountSessionLayout(
   cite.className = "vmx-cite";
   cite.dataset.wire = "session.citation";
   receipt.append(rule, cite);
-  claim.append(now, receipt);
+  const dropSlot = document.createElement("div");
+  dropSlot.className = "vmx-drop-slot";
+  dropSlot.dataset.wire = "session.drop";
+  claim.append(now, receipt, dropSlot);
   voice.append(ghost2, ghost1, claim);
 
   speak.append(voice);
@@ -888,13 +989,21 @@ export function mountSessionLayout(
   statusRow.dataset.wire = "session.status";
   const inputsEl = document.createElement("div");
   inputsEl.className = "vmx-statusrow__inputs";
-  const inAudio = makeInput("audio");
-  const inScreen = makeInput("screen");
-  const inMidi = makeInput("midi");
-  inputsEl.append(inAudio, sep(), inScreen, sep(), inMidi);
+  const inAudio = makeInput("audio", "livekit", () => mountedHandle);
+  const inAi = makeInput("ai", "gemini", () => mountedHandle);
+  const inScreen = makeInput("screen", "screen", () => mountedHandle);
+  const inMidi = makeInput("midi", "midi", () => mountedHandle);
+  inputsEl.append(inAudio, sep(), inAi, sep(), inScreen, sep(), inMidi);
   const statusRight = document.createElement("div");
   statusRight.className = "vmx-statusrow__right";
-  statusRow.append(inputsEl, statusRight);
+  const claimPolicy = document.createElement("span");
+  claimPolicy.className = "vmx-claim-policy";
+  claimPolicy.dataset.wire = "session.claim-policy";
+  claimPolicy.hidden = true;
+  const statusMeta = document.createElement("div");
+  statusMeta.className = "vmx-statusrow__meta";
+  statusMeta.append(statusRight, claimPolicy);
+  statusRow.append(inputsEl, statusMeta);
   root.append(statusRow);
 
   rootEl.replaceChildren(root);
@@ -911,13 +1020,15 @@ export function mountSessionLayout(
     ghosts: [ghost1, ghost2],
     now,
     receipt,
+    dropSlot,
     cite,
     bpm,
     key,
     meterFill,
     meterPeak,
-    statusInputs: { audio: inAudio, screen: inScreen, midi: inMidi },
+    statusInputs: { audio: inAudio, ai: inAi, screen: inScreen, midi: inMidi },
     statusRight,
+    claimPolicy,
     current: state,
     groundedFalseSinceMs: state.cohost.grounded ? null : Date.now(),
     meterCur: 0,
@@ -956,11 +1067,20 @@ function makeReadout(label: string, isKey = false): { wrap: HTMLElement; value: 
   return { wrap, value };
 }
 
-function makeInput(name: string): HTMLElement {
-  const el = document.createElement("span");
+function makeInput(
+  name: string,
+  component: StatusRecheckComponent,
+  getMounted: () => Mounted | null,
+): HTMLButtonElement {
+  const el = document.createElement("button");
+  el.type = "button";
   el.className = "vmx-statusrow__i";
   el.dataset.input = name;
   el.textContent = name;
+  el.disabled = true;
+  el.addEventListener("click", () => {
+    getMounted()?.current.status.onRecheck?.(component);
+  });
   return el;
 }
 
@@ -1085,6 +1205,17 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   }
   mounted.lastNowTs = nowTs;
 
+  // --- drop countdown chip ---
+  if (
+    isMount
+    || prev.drop.bars !== next.drop.bars
+    || prev.drop.bpmPeriodMs !== next.drop.bpmPeriodMs
+  ) {
+    const dropChip = renderDropChip(next.drop);
+    if (dropChip) mounted.dropSlot.replaceChildren(dropChip);
+    else mounted.dropSlot.replaceChildren();
+  }
+
   // --- foot readouts ---
   const bpmText = next.timecode.bpm != null ? next.timecode.bpm.toFixed(1) : "—";
   if (mounted.bpm.textContent !== bpmText) mounted.bpm.textContent = bpmText;
@@ -1114,10 +1245,25 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
 
   // --- status row inputs (silk-dim; red on a dropped input) ---
   setInputDown(mounted.statusInputs.audio, next.status.livekit === "down");
+  setInputDown(
+    mounted.statusInputs.ai,
+    next.status.gemini === "down" || downInput === "gemini",
+  );
   setInputDown(mounted.statusInputs.screen, next.status.screen === "denied");
   setInputDown(mounted.statusInputs.midi, next.status.midi === 0);
   const rightText = `${outputLabel(next.output)} · ${next.persona.voice} · ${next.persona.genre}`;
   if (mounted.statusRight.textContent !== rightText) mounted.statusRight.textContent = rightText;
+  const claim = next.claimPolicy ?? null;
+  mounted.claimPolicy.hidden = !claim;
+  if (claim) {
+    if (mounted.claimPolicy.textContent !== claim.label) mounted.claimPolicy.textContent = claim.label;
+    mounted.claimPolicy.dataset.level = claim.level;
+    const title = claim.reason
+      ? `${claim.policy}: ${claim.reason}`
+      : claim.policy;
+    mounted.claimPolicy.setAttribute("title", title);
+    mounted.claimPolicy.setAttribute("aria-label", `live claim proof: ${claim.label}`);
+  }
 }
 
 function setGhost(el: HTMLElement, line: TranscriptLine | null): void {
@@ -1159,9 +1305,16 @@ function faultInput(
   return null;
 }
 
-function setInputDown(el: HTMLElement, down: boolean): void {
+function setInputDown(el: HTMLButtonElement, down: boolean): void {
   const v = down ? "true" : "false";
   if (el.dataset.down !== v) el.dataset.down = v;
+  el.disabled = !down;
+  el.dataset.actionable = down ? "true" : "false";
+  const label = el.dataset.input ?? "input";
+  el.setAttribute(
+    "aria-label",
+    down ? `recheck ${label} status` : `${label} status ok`,
+  );
 }
 
 /** Format a citation timestamp (seconds) as mm:ss (or h:mm:ss past an hour). */
@@ -1228,6 +1381,7 @@ export function defaultState(): SessionState {
       hotkey: "⌘⇧M",
       errors: {},
     },
+    claimPolicy: null,
     persona: { skill: "INT", interaction: "HYPE", mood: "HYPE", voice: "kore", genre: "techno" },
     output: { device: "MacBook Pro Speakers", profile: "HP" },
     mode: "cohost",

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC, datetime
 from typing import Any
 
 from tests.wizard.conftest import FakeBus
@@ -177,3 +178,46 @@ def test_invalid_inbound_logged_no_crash() -> None:
     fake = FakeWs(frames)
     asyncio.run(bus._handler(fake))
     assert handler_calls == []
+
+
+def test_numeric_inbound_ts_is_normalized_before_dispatch() -> None:
+    """Legacy local drive tools may send epoch seconds; runtime ingress normalizes."""
+    from vibemix.runtime.ws_bus import WizardBus
+
+    bus = WizardBus()
+    handler_calls: list[dict] = []
+
+    async def _h(msg: dict) -> None:
+        handler_calls.append(msg)
+
+    bus.register_handler("ipc.boot", _h)
+
+    class FakeWs:
+        def __init__(self, frames: list[str]) -> None:
+            self._frames = frames
+
+        def __aiter__(self) -> Any:
+            return self
+
+        async def __anext__(self) -> str:
+            if not self._frames:
+                raise StopAsyncIteration
+            return self._frames.pop(0)
+
+    fake = FakeWs(
+        [
+            json.dumps(
+                {
+                    "type": "ipc.boot",
+                    "ts": 1_780_205_767.4745522,
+                    "payload": {"ready": True},
+                }
+            )
+        ]
+    )
+
+    asyncio.run(bus._handler(fake))
+
+    assert len(handler_calls) == 1
+    assert isinstance(handler_calls[0]["ts"], str)
+    assert datetime.fromisoformat(handler_calls[0]["ts"]).tzinfo == UTC

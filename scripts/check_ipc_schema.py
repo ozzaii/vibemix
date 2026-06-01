@@ -46,12 +46,10 @@ from vibemix.ui_bus import (
     CalibrationWindowList,
     ChapterRegionPayload,
     DebriefChapterList,
-    DebriefCitationSummary,
     DebriefCitationTooltip,
     DebriefCitationTooltipReq,
     DebriefDrills,
     DebriefError,
-    DebriefEventTimeline,
     DebriefSessionLoaded,
     DebriefTldrAudio,
     DeviceInfo,
@@ -73,14 +71,9 @@ from vibemix.ui_bus import (
     LearnStartLesson,
     LearnTutorSpeak,
     LevelPair,
-    LibraryConfidence,
     LibraryImport,
     LibraryImportCancel,
     LibraryImportProgress,
-    LibrarySearchRequest,
-    LibrarySearchResult,
-    LibrarySimilarRequest,
-    LibrarySimilarResult,
     LibraryStalenessAction,
     LibraryStalenessNudge,
     MascotMoodChange,
@@ -320,26 +313,13 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 ],
             ),
         ),
-        # Phase 25 Plan 25-03 — DEBRIEF architectural slot (3 reservations)
+        # Phase 25/29 — DEBRIEF window messages
         (
             "DebriefSessionLoaded",
             DebriefSessionLoaded.make(
                 session_id="20260513-210410",
                 started_at=1715616250.0,
                 duration_s=5040.0,
-            ),
-        ),
-        (
-            "DebriefCitationSummary",
-            DebriefCitationSummary.make(total=120, valid=95, stripped=20, bypassed=5),
-        ),
-        (
-            "DebriefEventTimeline",
-            DebriefEventTimeline.make(
-                events=(
-                    {"t": 0.0, "kind": "session_start"},
-                    {"t": 3.21, "kind": "trigger"},
-                ),
             ),
         ),
         # Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers
@@ -419,61 +399,12 @@ def _minimal_examples() -> list[tuple[str, object]]:
         ),
         ("LibraryImportCancel", LibraryImportCancel.make()),
         (
-            "LibrarySearchRequest",
-            LibrarySearchRequest.make(query="acid techno", k=10),
-        ),
-        (
-            "LibrarySearchResult",
-            LibrarySearchResult.make(
-                query="acid techno",
-                matches=(
-                    {
-                        "track_id": "t1",
-                        "title": "X",
-                        "artist": "Y",
-                        "bpm": 138.0,
-                        "confidence": 0.87,
-                        "snippet": "X — Y",
-                    },
-                ),
-                cache_hit=False,
-            ),
-        ),
-        (
-            "LibraryConfidence",
-            LibraryConfidence.make(
-                track_id="t1",
-                cosine=0.85,
-                decision="cited",
-                event_id="ev-1",
-            ),
-        ),
-        (
             "LibraryStalenessNudge",
             LibraryStalenessNudge.make(age_days=45, snoozed_until_ts=None),
         ),
         (
             "LibraryStalenessAction",
             LibraryStalenessAction.make(action="snooze_7d"),
-        ),
-        (
-            "LibrarySimilarRequest",
-            LibrarySimilarRequest.make(track_id="t1", k=10),
-        ),
-        (
-            "LibrarySimilarResult",
-            LibrarySimilarResult.make(
-                track_id="t1",
-                results=(
-                    {
-                        "track_id": "t2",
-                        "similarity": 0.82,
-                        "title": "Z",
-                        "artist": "W",
-                        "bpm": 140.0,
-                    },
-                ),
-            ),
         ),
         # Phase 32 — long-term DJ profile wrappers (PROFILE-04/05/07)
         ("ProfileSetConsent", ProfileSetConsent.make(consent=False)),

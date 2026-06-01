@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   unsubscribeQuitGuard: vi.fn(),
   unsubscribeTrayQuit: vi.fn(),
   unsubscribeTrayMood: vi.fn(),
+  unsubscribeOverlayHighlight: vi.fn(),
   startRenderLoop: vi.fn(),
   stopRenderLoop: vi.fn(),
 }));
@@ -57,6 +58,12 @@ vi.mock("../../src/session/quit-guard.js", () => ({
 
 vi.mock("../../src/session/tray-mood.js", () => ({
   installTrayMoodListener: vi.fn(async () => mocks.unsubscribeTrayMood),
+}));
+
+vi.mock("../../src/overlay/overlay-highlight.js", () => ({
+  startOverlayHighlightListener: vi.fn(
+    async () => mocks.unsubscribeOverlayHighlight,
+  ),
 }));
 
 import {
@@ -113,5 +120,6 @@ describe("session router teardown", () => {
     expect(mocks.unsubscribeQuitGuard).toHaveBeenCalledTimes(1);
     expect(mocks.unsubscribeTrayQuit).toHaveBeenCalledTimes(1);
     expect(mocks.unsubscribeTrayMood).toHaveBeenCalledTimes(1);
+    expect(mocks.unsubscribeOverlayHighlight).toHaveBeenCalledTimes(1);
   });
 });

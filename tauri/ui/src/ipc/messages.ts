@@ -44,8 +44,6 @@ export type VibemixIPCMessages =
   | SessionOverlayHighlight
   | SessionCohostReaction
   | DebriefSessionLoaded
-  | DebriefCitationSummary
-  | DebriefEventTimeline
   | DebriefChapterList
   | DebriefTldrAudio
   | DebriefDrills
@@ -55,13 +53,8 @@ export type VibemixIPCMessages =
   | LibraryImport
   | LibraryImportProgress
   | LibraryImportCancel
-  | LibrarySearchRequest
-  | LibrarySearchResult
-  | LibraryConfidence
   | LibraryStalenessNudge
   | LibraryStalenessAction
-  | LibrarySimilarRequest
-  | LibrarySimilarResult
   | ProfileSetConsent
   | ProfileConsentState
   | ProfileView
@@ -271,6 +264,11 @@ export interface SessionSnapshot {
     };
     cohost_status: "LISTENING" | "TALKING" | "IDLE";
     latency_ms: number | null;
+    claim_policy?: null | {
+      policy: "requires_more_evidence" | "blocked" | "watch_not_claim" | "candidate_not_verdict" | "supported_verdict";
+      level: "green" | "yellow" | "red";
+      reason: string | null;
+    };
     grounded: boolean;
   };
 }
@@ -504,27 +502,6 @@ export interface DebriefSessionLoaded {
     duration_s: number;
   };
 }
-export interface DebriefCitationSummary {
-  type: "ipc.debrief.citation-summary";
-  ts: string;
-  payload: {
-    total: number;
-    valid: number;
-    stripped: number;
-    bypassed: number;
-  };
-}
-export interface DebriefEventTimeline {
-  type: "ipc.debrief.event-timeline";
-  ts: string;
-  payload: {
-    events: {
-      t: number;
-      kind: string;
-      [k: string]: unknown;
-    }[];
-  };
-}
 export interface DebriefChapterList {
   type: "ipc.debrief.chapter-list";
   ts: string;
@@ -643,44 +620,6 @@ export interface LibraryImportCancel {
     schema_version: "1";
   };
 }
-export interface LibrarySearchRequest {
-  type: "ipc.library.search";
-  ts: string;
-  payload: {
-    query: string;
-    k: number;
-    schema_version: "1";
-  };
-}
-export interface LibrarySearchResult {
-  type: "ipc.library.search_result";
-  ts: string;
-  payload: {
-    query: string;
-    matches: {
-      track_id: string;
-      title: string;
-      artist: string;
-      bpm: number | null;
-      confidence: number;
-      snippet: string;
-    }[];
-    cache_hit: boolean;
-    schema_version: "1";
-  };
-}
-export interface LibraryConfidence {
-  type: "ipc.library.confidence";
-  ts: string;
-  payload: {
-    track_id: string | null;
-    cosine: number;
-    decision: "cited" | "uncertain" | "below_threshold";
-    event_id: string;
-    cost_warning: boolean;
-    schema_version: "1";
-  };
-}
 export interface LibraryStalenessNudge {
   type: "ipc.library.staleness_nudge";
   ts: string;
@@ -697,30 +636,6 @@ export interface LibraryStalenessAction {
   ts: string;
   payload: {
     action: "dismiss" | "snooze_7d";
-    schema_version: "1";
-  };
-}
-export interface LibrarySimilarRequest {
-  type: "ipc.library.similar_request";
-  ts: string;
-  payload: {
-    track_id: string;
-    k: number;
-    schema_version: "1";
-  };
-}
-export interface LibrarySimilarResult {
-  type: "ipc.library.similar_result";
-  ts: string;
-  payload: {
-    track_id: string;
-    results: {
-      track_id: string;
-      similarity: number;
-      title: string;
-      artist: string;
-      bpm: number | null;
-    }[];
     schema_version: "1";
   };
 }

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Plan 29-03 Task 2 — P82 hard gate: debrief.v1 schema is additive-only.
+"""P82 hard gate: debrief schema changes stay intentional.
 
 Diffs the current ``messages.schema.json`` debrief.* slice against the
-v2.1 baseline fixture. Any of the following is a HARD FAILURE:
+shippable baseline fixture. Any of the following is a HARD FAILURE:
 
 - a baseline definition is removed
 - a property on a baseline definition is removed or renamed
@@ -20,6 +20,10 @@ The following are explicitly ALLOWED (additive):
 - removing a field from ``required`` (relaxation is fine for emitters
   but could break consumers — we WARN-flag it but don't fail)
 
+The baseline intentionally excludes the old ``citation-summary`` and
+``event-timeline`` reservation-only contracts. Re-add them only with a real
+producer, consumer, and package plan.
+
 DEBRIEF-10. P82 lock baseline lives at
 ``tests/ui_bus/fixtures/debrief_schema_v2_1_baseline.json``.
 """
@@ -29,8 +33,6 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
-
-import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = REPO_ROOT / "tauri" / "ui" / "src" / "ipc" / "messages.schema.json"
@@ -124,6 +126,17 @@ def test_current_schema_is_additive_only_vs_baseline():
     current = _load_current_debrief_slice()
     violations = _diff_violations(baseline, current)
     assert violations == [], "\n".join(violations)
+
+
+def test_pruned_debrief_reservations_stay_absent():
+    current = _load_current_debrief_slice()
+    defs = current["definitions"]
+    refs = {entry["$ref"] for entry in current["oneOf"]}
+
+    assert "DebriefCitationSummary" not in defs
+    assert "DebriefEventTimeline" not in defs
+    assert "#/definitions/DebriefCitationSummary" not in refs
+    assert "#/definitions/DebriefEventTimeline" not in refs
 
 
 def test_baseline_fixture_exists():

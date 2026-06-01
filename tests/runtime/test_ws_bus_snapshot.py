@@ -61,6 +61,29 @@ def test_snapshot_is_schema_valid_and_carries_fields():
     # Audible music + no AI voice → LISTENING; grounded mirrors audible.
     assert p["cohost_status"] == "LISTENING"
     assert p["grounded"] is True
+    assert p["claim_policy"] == {
+        "policy": "requires_more_evidence",
+        "level": "yellow",
+        "reason": None,
+    }
+
+
+def test_snapshot_carries_drop_prediction_as_bars():
+    msg = _build_session_snapshot(
+        _FakeLevels(0.42, 0.0, 0.01),
+        _fake_state(predicted_drop_in_sec=15.0, bpm=128.0),
+    )
+    validate_message(msg)
+    assert msg["payload"]["drop_pred_bars"] == 8
+
+
+def test_snapshot_hides_drop_prediction_without_bpm_lock():
+    msg = _build_session_snapshot(
+        _FakeLevels(0.42, 0.0, 0.01),
+        _fake_state(predicted_drop_in_sec=15.0, bpm=0.0),
+    )
+    validate_message(msg)
+    assert msg["payload"]["drop_pred_bars"] is None
 
 
 def test_cohost_status_talking_when_voice_active():
@@ -101,8 +124,8 @@ def test_transcript_delta_drains_sink():
     )
     validate_message(msg)
     lines = msg["payload"]["transcript_delta"]
-    assert [l["text"] for l in lines] == ["yo that drop", "keep it rolling"]
-    assert all(l["role"] == "ai" for l in lines)
+    assert [line["text"] for line in lines] == ["yo that drop", "keep it rolling"]
+    assert all(line["role"] == "ai" for line in lines)
     # Sink is drained — a second build yields nothing new.
     assert len(sink) == 0
     msg2 = _build_session_snapshot(

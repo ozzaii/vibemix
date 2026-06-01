@@ -55,6 +55,7 @@ from typing import Protocol
 import jsonschema
 
 from vibemix.runtime.config_store import ConfigStore, load_config, save_config
+from vibemix.runtime.drop_display import predicted_drop_bars
 from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.recordings_index import RecordingsIndex, run_retention_sweep
 from vibemix.runtime.settings import SettingsApplier
@@ -79,7 +80,7 @@ from vibemix.ui_bus.messages import (
     TrackInfo,
     TranscriptLine,
 )
-from vibemix.ui_bus.validator import validate_message
+from vibemix.ui_bus.validator import normalize_legacy_timestamp, validate_message
 
 log = logging.getLogger("vibemix.session")
 
@@ -1092,6 +1093,7 @@ class SessionLoop:
             cohost_status: str = "IDLE"
             grounded = False
             bpm: float | None = None
+            drop_bars: int | None = None
             track = None
         else:
             grounded = bool(self.music_state.audible)
@@ -1103,6 +1105,10 @@ class SessionLoop:
                 cohost_status = "IDLE"
             raw_bpm = float(getattr(self.music_state, "bpm", 0.0) or 0.0)
             bpm = raw_bpm if raw_bpm > 0.0 else None
+            drop_bars = predicted_drop_bars(
+                getattr(self.music_state, "predicted_drop_in_sec", None),
+                raw_bpm,
+            )
             audible_track = getattr(self.music_state, "audible_track", None)
             audible_deck = getattr(self.music_state, "audible_deck", None)
             if audible_track:
@@ -1141,7 +1147,7 @@ class SessionLoop:
             phase=(),
             phase_now_pct=0.0,
             bpm=bpm,
-            drop_pred_bars=None,
+            drop_pred_bars=drop_bars,
             transcript_delta=transcript_delta,
             midi_events=midi_events,
             track=track,
@@ -1329,6 +1335,7 @@ class SessionLoop:
         """
 
         async def _wrapped(msg: dict) -> None:
+            msg = normalize_legacy_timestamp(msg)
             try:
                 validate_message(msg)
             except jsonschema.ValidationError as e:

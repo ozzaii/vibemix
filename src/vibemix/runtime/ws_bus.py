@@ -26,6 +26,7 @@ import jsonschema as _jsonschema
 import websockets
 
 from vibemix.audio import SILENT_RMS, WS_HOST, WS_PORT, Levels
+from vibemix.runtime.drop_display import predicted_drop_bars
 from vibemix.state import MusicState
 from vibemix.state.deck_context import (
     live_evidence_packet,
@@ -41,6 +42,9 @@ from vibemix.state.deck_context import (
     render_deck_lane_context,
     render_deck_reference_context,
     render_deck_source_context,
+)
+from vibemix.ui_bus.validator import (
+    normalize_legacy_timestamp as _normalize_legacy_timestamp,
 )
 from vibemix.ui_bus.validator import validate_message as _validate_outbound
 
@@ -120,6 +124,13 @@ STATUS_EVERY_N: int = 30
 _COURSE3_CUE_CONFIDENCE_FLOOR: float = 0.7
 _COURSE3_DECK_CITE_MIN_CONF: float = 0.6
 _COURSE3_ATTRIBUTED_DECKS = frozenset({"A", "B", "mix"})
+
+
+def _safe_print(*args: object, **kwargs: object) -> None:
+    try:
+        print(*args, **kwargs)
+    except (BrokenPipeError, OSError):
+        pass
 
 
 def _probe_screen_status(screen_available: bool | None = None) -> str:
@@ -573,6 +584,7 @@ def _build_session_snapshot(
     transcript_buf: deque | None = None,
     controller_state: Any | None = None,
     last_move_ts: list[float] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
 ) -> dict:
     """Build a schema-valid ``ipc.session.snapshot`` dict from live refs.
 
@@ -586,6 +598,7 @@ def _build_session_snapshot(
     """
     from vibemix.ui_bus.messages import (
         LevelPair,
+        LiveClaimPolicyPayload,
         MetersTriple,
         MidiEventEntry,
         SessionSnapshot,
@@ -613,6 +626,7 @@ def _build_session_snapshot(
 
     raw_bpm = float(getattr(state, "bpm", 0.0) or 0.0)
     bpm = raw_bpm if raw_bpm > 0.0 else None
+    drop_bars = predicted_drop_bars(getattr(state, "predicted_drop_in_sec", None), raw_bpm)
 
     audible_track = getattr(state, "audible_track", None)
     audible_deck = getattr(state, "audible_deck", None)
@@ -640,31 +654,59 @@ def _build_session_snapshot(
     # ControllerState exposes ``moves_since(t) -> [(age_secs, label), ...]``;
     # we track an absolute wall-clock high-water mark in ``last_move_ts[0]``.
     midi_events: tuple[MidiEventEntry, ...] = ()
+    recent_move_labels: tuple[str, ...] = ()
     if controller_state is not None and last_move_ts is not None:
         try:
             now = time.time()
             moves = controller_state.moves_since(last_move_ts[0])
             last_move_ts[0] = now
             if moves:
+                recent_move_labels = tuple(
+                    str(label) for _age, label in moves[-_MIDI_EVENT_CAP:]
+                )
                 midi_events = tuple(
                     MidiEventEntry(control=str(label), value=None, ts=_now_iso())
-                    for _age, label in moves[-_MIDI_EVENT_CAP:]
+                    for label in recent_move_labels
                 )
         except Exception:
             midi_events = ()
+
+    try:
+        from vibemix.state.deck_context import live_claim_policy
+
+        policy, reason = live_claim_policy(
+            state,
+            recent_move_labels,
+            audio_capture_context=audio_capture_context,
+        )
+    except Exception:
+        policy, reason = "requires_more_evidence", None
+    level = {
+        "supported_verdict": "green",
+        "candidate_not_verdict": "yellow",
+        "watch_not_claim": "yellow",
+        "requires_more_evidence": "yellow",
+        "blocked": "red",
+    }.get(policy, "yellow")
+    claim_policy = LiveClaimPolicyPayload(
+        policy=policy,  # type: ignore[arg-type]
+        level=level,  # type: ignore[arg-type]
+        reason=reason,
+    )
 
     msg = SessionSnapshot.make(
         meters=meters,
         phase=(),
         phase_now_pct=0.0,
         bpm=bpm,
-        drop_pred_bars=None,
+        drop_pred_bars=drop_bars,
         transcript_delta=transcript_delta,
         midi_events=midi_events,
         track=track,
         cohost_status=cohost_status,  # type: ignore[arg-type]
         latency_ms=None,
         grounded=grounded,
+        claim_policy=claim_policy,
     )
     return json.loads(msg.to_json())
 
@@ -743,7 +785,7 @@ class IpcRouterBus:
         try:
             await handler(msg)
         except Exception as e:  # pragma: no cover — defensive
-            print(f"[ipc-router] handler {mtype} failed: {e!r}", file=sys.stderr)
+            _safe_print(f"[ipc-router] handler {mtype} failed: {e!r}", file=sys.stderr)
         return True
 
 
@@ -827,7 +869,7 @@ async def ws_broadcast(
                 except Exception:
                     data = {}
                 if data.get("action") == "trigger":
-                    print("\n[ws] manual trigger requested")
+                    _safe_print("\n[ws] manual trigger requested")
                     _tr("manual_trigger")
                     manual_trigger.set()
                 elif data.get("action") == "next_suggestion.choose":
@@ -841,7 +883,7 @@ async def ws_broadcast(
                                 state=state,
                             )
                         except Exception as e:
-                            print(f"[ws] suggestion choose failed: {e}", file=sys.stderr)
+                            _safe_print(f"[ws] suggestion choose failed: {e}", file=sys.stderr)
                             choice = None
                         _tr(
                             "next_suggestion_choose",
@@ -859,7 +901,7 @@ async def ws_broadcast(
                                 state=state,
                             )
                         except Exception as e:
-                            print(f"[ws] suggestion feedback failed: {e}", file=sys.stderr)
+                            _safe_print(f"[ws] suggestion feedback failed: {e}", file=sys.stderr)
                             event = None
                         _tr(
                             "next_suggestion_feedback",
@@ -879,7 +921,9 @@ async def ws_broadcast(
             _tr("client_disconnect", clients=len(clients))
 
     server = await websockets.serve(handler, WS_HOST, WS_PORT)
-    print(f"-> mascot bus on ws://{WS_HOST}:{WS_PORT} (send {{action: trigger}} for manual fire)")
+    _safe_print(
+        f"-> mascot bus on ws://{WS_HOST}:{WS_PORT} (send {{action: trigger}} for manual fire)"
+    )
 
     try:
         while not stop_event.is_set():
@@ -940,9 +984,7 @@ async def ws_broadcast(
             deck_audio_separation_context = render_deck_audio_separation_context(
                 audio_capture_context
             )
-            deck_audio_features_context = render_deck_audio_features_context(
-                audio_capture_context
-            )
+            deck_audio_features_context = render_deck_audio_features_context(audio_capture_context)
             deck_audio_delta_context = render_deck_audio_delta_context(audio_capture_context)
             deck_audio_window_context = render_deck_audio_window_context(audio_capture_context)
             deck_source_status = _serialize_deck_source_status(state)
@@ -1066,7 +1108,7 @@ async def ws_broadcast(
                     else:
                         mascot_frame["next_suggestion"] = suggestion_holder.current()
                 except Exception as e:
-                    print(f"[ws] suggestion read failed: {e}", file=sys.stderr)
+                    _safe_print(f"[ws] suggestion read failed: {e}", file=sys.stderr)
             # Emit-boundary guard (BRINGUP-04): never serialize an empty or
             # meter-less payload onto the wire. ``Levels.snapshot()`` always
             # returns the 3 meter keys and the static keys above are literal,
@@ -1077,7 +1119,7 @@ async def ws_broadcast(
             # tick keeps the loop + cadence intact; we just don't send a
             # malformed frame. Logged once-per-occurrence to stderr.
             if not mascot_frame or not all(k in mascot_frame for k in ("music", "voice", "mic")):
-                print(
+                _safe_print(
                     "[ws] skipped malformed mascot frame "
                     f"(missing meter keys; got {sorted(mascot_frame)})",
                     file=sys.stderr,
@@ -1114,13 +1156,13 @@ async def ws_broadcast(
                 try:
                     pending = midi_mirror.drain_pending_detected()
                 except Exception as e:
-                    print(f"[learn drain err] {e}", file=sys.stderr)
+                    _safe_print(f"[learn drain err] {e}", file=sys.stderr)
                     pending = []
                 for envelope in pending:
                     try:
                         await _send_all(envelope)
                     except Exception as e:
-                        print(f"[learn detected emit err] {e}", file=sys.stderr)
+                        _safe_print(f"[learn detected emit err] {e}", file=sys.stderr)
                 # 2) Pull position snapshot. midi_mirror.snapshot() returns
                 # None when no profile is bound or when no tracked control's
                 # integer LSB has changed since the last call (delta
@@ -1128,13 +1170,13 @@ async def ws_broadcast(
                 try:
                     pos_frame = midi_mirror.snapshot()
                 except Exception as e:
-                    print(f"[learn snapshot err] {e}", file=sys.stderr)
+                    _safe_print(f"[learn snapshot err] {e}", file=sys.stderr)
                     pos_frame = None
                 if pos_frame is not None:
                     try:
                         await _send_all(pos_frame)
                     except Exception as e:
-                        print(f"[learn pos emit err] {e}", file=sys.stderr)
+                        _safe_print(f"[learn pos emit err] {e}", file=sys.stderr)
 
             # Additive ipc.session.snapshot @ ~15Hz (every Nth tick). Built +
             # validated + sent in its OWN try/except so a bad snapshot frame
@@ -1148,6 +1190,7 @@ async def ws_broadcast(
                         transcript_buf=transcript_buf,
                         controller_state=controller_state,
                         last_move_ts=last_move_ts,
+                        audio_capture_context=audio_capture_context,
                     )
                     _validate_snapshot(snap_msg)
                     snap_payload = json.dumps(snap_msg, separators=(",", ":"))
@@ -1160,7 +1203,7 @@ async def ws_broadcast(
                     for c in snap_dead:
                         clients.discard(c)
                 except Exception as e:
-                    print(f"[ws snapshot] emit failed: {e}", file=sys.stderr)
+                    _safe_print(f"[ws snapshot] emit failed: {e}", file=sys.stderr)
 
             # Additive ipc.status.tick @ ~1Hz (every STATUS_EVERY_N ticks).
             # Lights the status-row badges (audio/screen/midi). Built + sent in
@@ -1188,7 +1231,7 @@ async def ws_broadcast(
                     for c in status_dead:
                         clients.discard(c)
                 except Exception as e:
-                    print(f"[ws status] emit failed: {e}", file=sys.stderr)
+                    _safe_print(f"[ws status] emit failed: {e}", file=sys.stderr)
 
             await asyncio.sleep(1 / 30)
     finally:
@@ -1257,7 +1300,7 @@ class WizardBus:
         if self._server is not None:
             return
         self._server = await websockets.serve(self._handler, WS_HOST, WS_PORT)
-        print(f"-> wizard bus on ws://{WS_HOST}:{WS_PORT} (handlers: {len(self._handlers)})")
+        _safe_print(f"-> wizard bus on ws://{WS_HOST}:{WS_PORT} (handlers: {len(self._handlers)})")
 
     async def stop(self) -> None:
         """Close the server. Safe to call multiple times."""
@@ -1300,23 +1343,24 @@ class WizardBus:
                 try:
                     msg = json.loads(raw)
                 except json.JSONDecodeError as e:
-                    print(f"[wizard bus] non-JSON frame: {e}", file=sys.stderr)
+                    _safe_print(f"[wizard bus] non-JSON frame: {e}", file=sys.stderr)
                     continue
                 if not isinstance(msg, dict):
-                    print(
+                    _safe_print(
                         f"[wizard bus] top-level not object: {type(msg).__name__}",
                         file=sys.stderr,
                     )
                     continue
+                msg = _normalize_legacy_timestamp(msg)
                 try:
                     validate_message(msg)
                 except _jsonschema.ValidationError as e:
-                    print(f"[wizard bus] schema violation: {e.message}", file=sys.stderr)
+                    _safe_print(f"[wizard bus] schema violation: {e.message}", file=sys.stderr)
                     continue
                 msg_type = msg.get("type", "")
                 handler = self._handlers.get(msg_type)
                 if handler is None:
-                    print(
+                    _safe_print(
                         f"[wizard bus] no handler for {msg_type}",
                         file=sys.stderr,
                     )
@@ -1325,7 +1369,7 @@ class WizardBus:
                     await handler(msg)
                 except Exception as e:
                     # Handler-internal failure must not close the WS.
-                    print(
+                    _safe_print(
                         f"[wizard bus] handler {msg_type} failed: {e}",
                         file=sys.stderr,
                     )

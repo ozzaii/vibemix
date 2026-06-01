@@ -216,7 +216,7 @@ def test_payload_struct_is_frozen_slots() -> None:
         color="amber",
         duration_ms=1300,
     )
-    with pytest.raises(Exception):  # FrozenInstanceError subclasses AttributeError
+    with pytest.raises(AttributeError):
         p.element_id = "deck_b_mid_eq"  # type: ignore[misc]
 
 

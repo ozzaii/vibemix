@@ -37,25 +37,18 @@ from vibemix.ui_bus.schemas.cohost_reaction import (
 from vibemix.ui_bus.schemas.debrief import (
     ChapterRegionPayload,
     DebriefChapterListPayload,
-    DebriefCitationSummaryPayload,
     DebriefCitationTooltipPayload,
     DebriefCitationTooltipReqPayload,
     DebriefDrillsPayload,
     DebriefErrorPayload,
-    DebriefEventTimelinePayload,
     DebriefSessionLoadedPayload,
     DebriefTldrAudioPayload,
     DrillPayload,
 )
 from vibemix.ui_bus.schemas.library import (
-    LibraryConfidencePayload,
     LibraryImportCancelPayload,
     LibraryImportPayload,
     LibraryImportProgressPayload,
-    LibrarySearchRequestPayload,
-    LibrarySearchResultPayload,
-    LibrarySimilarRequestPayload,
-    LibrarySimilarResultPayload,
     LibraryStalenessActionPayload,
     LibraryStalenessNudgePayload,
 )
@@ -313,6 +306,20 @@ class SessionSnapshotPayload:
     cohost_status: Literal["LISTENING", "TALKING", "IDLE"]
     latency_ms: float | None
     grounded: bool
+    claim_policy: LiveClaimPolicyPayload | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LiveClaimPolicyPayload:
+    policy: Literal[
+        "requires_more_evidence",
+        "blocked",
+        "watch_not_claim",
+        "candidate_not_verdict",
+        "supported_verdict",
+    ]
+    level: Literal["green", "yellow", "red"]
+    reason: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -853,6 +860,7 @@ class SessionSnapshot:
         cohost_status: Literal["LISTENING", "TALKING", "IDLE"] = "IDLE",
         latency_ms: float | None = None,
         grounded: bool = False,
+        claim_policy: LiveClaimPolicyPayload | None = None,
     ) -> SessionSnapshot:
         return cls(
             type="ipc.session.snapshot",
@@ -869,6 +877,7 @@ class SessionSnapshot:
                 cohost_status=cohost_status,
                 latency_ms=latency_ms,
                 grounded=grounded,
+                claim_policy=claim_policy,
             ),
         )
 
@@ -1506,13 +1515,11 @@ class SessionCohostReaction:
 
 
 # ---------------------------------------------------------------------------
-# Phase 25 Plan 25-03 — DEBRIEF architectural slot (3 wrappers)
+# Phase 25/29 — DEBRIEF window wrappers
 # ---------------------------------------------------------------------------
-# DEBRIEF-01 + DEBRIEF-02: reservation only in v2.0 — the sidecar
-# ``--debrief`` flag binds a separate ws bus on 127.0.0.1:8766 (port
-# constant in vibemix.__main__.DEBRIEF_PORT) and emits these 3 schemas.
-# v2.1 fills in the chaptered TL;DR + drill cards + clickable timeline
-# behind the SAME message types — schemas locked here.
+# The debrief sidecar binds a separate ws bus on 127.0.0.1:8766 (port constant
+# in vibemix.__main__.DEBRIEF_PORT). Keep this namespace limited to messages
+# with a real sidecar producer and renderer consumer.
 
 
 @dataclass(frozen=True, slots=True)
@@ -1542,69 +1549,10 @@ class DebriefSessionLoaded:
     def to_json(self) -> str:
         return _serialize(self)
 
-
-@dataclass(frozen=True, slots=True)
-class DebriefCitationSummary:
-    type: Literal["ipc.debrief.citation-summary"]
-    ts: str
-    payload: DebriefCitationSummaryPayload
-
-    @classmethod
-    def make(
-        cls,
-        *,
-        total: int,
-        valid: int,
-        stripped: int,
-        bypassed: int,
-    ) -> DebriefCitationSummary:
-        return cls(
-            type="ipc.debrief.citation-summary",
-            ts=_now_iso(),
-            payload=DebriefCitationSummaryPayload(
-                total=total,
-                valid=valid,
-                stripped=stripped,
-                bypassed=bypassed,
-            ),
-        )
-
-    def to_json(self) -> str:
-        return _serialize(self)
-
-
-@dataclass(frozen=True, slots=True)
-class DebriefEventTimeline:
-    type: Literal["ipc.debrief.event-timeline"]
-    ts: str
-    payload: DebriefEventTimelinePayload
-
-    @classmethod
-    def make(
-        cls,
-        *,
-        events: tuple[dict, ...] | list[dict],
-    ) -> DebriefEventTimeline:
-        # Normalize list→tuple for frozen dataclass hashability. The
-        # ``_tuples_to_lists`` helper above converts back to list at JSON
-        # serialization time so the schema's ``type: array`` is honored.
-        events_tuple = tuple(events)
-        return cls(
-            type="ipc.debrief.event-timeline",
-            ts=_now_iso(),
-            payload=DebriefEventTimelinePayload(events=events_tuple),
-        )
-
-    def to_json(self) -> str:
-        return _serialize(self)
-
-
 # ---------------------------------------------------------------------------
 # Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers (P82 lock baseline)
 # ---------------------------------------------------------------------------
-# These 6 wrappers extend the debrief.v1 namespace ADDITIVELY beside the
-# 3 Phase 25 baselines (DebriefSessionLoaded / DebriefCitationSummary /
-# DebriefEventTimeline). The baselines are frozen — see
+# These wrappers are schema-locked against
 # tests/ui_bus/test_debrief_schema_additive_only.py.
 
 
@@ -1826,82 +1774,6 @@ class LibraryImportCancel:
 
 
 @dataclass(frozen=True, slots=True)
-class LibrarySearchRequest:
-    type: Literal["ipc.library.search"]
-    ts: str
-    payload: LibrarySearchRequestPayload
-
-    @classmethod
-    def make(cls, *, query: str, k: int = 10) -> LibrarySearchRequest:
-        return cls(
-            type="ipc.library.search",
-            ts=_now_iso(),
-            payload=LibrarySearchRequestPayload(query=query, k=k),
-        )
-
-    def to_json(self) -> str:
-        return _serialize(self)
-
-
-@dataclass(frozen=True, slots=True)
-class LibrarySearchResult:
-    type: Literal["ipc.library.search_result"]
-    ts: str
-    payload: LibrarySearchResultPayload
-
-    @classmethod
-    def make(
-        cls,
-        *,
-        query: str,
-        matches: tuple[dict, ...] | list[dict],
-        cache_hit: bool,
-    ) -> LibrarySearchResult:
-        return cls(
-            type="ipc.library.search_result",
-            ts=_now_iso(),
-            payload=LibrarySearchResultPayload(
-                query=query, matches=tuple(matches), cache_hit=cache_hit
-            ),
-        )
-
-    def to_json(self) -> str:
-        return _serialize(self)
-
-
-@dataclass(frozen=True, slots=True)
-class LibraryConfidence:
-    type: Literal["ipc.library.confidence"]
-    ts: str
-    payload: LibraryConfidencePayload
-
-    @classmethod
-    def make(
-        cls,
-        *,
-        track_id: str | None,
-        cosine: float,
-        decision: str,
-        event_id: str,
-        cost_warning: bool = False,
-    ) -> LibraryConfidence:
-        return cls(
-            type="ipc.library.confidence",
-            ts=_now_iso(),
-            payload=LibraryConfidencePayload(
-                track_id=track_id,
-                cosine=cosine,
-                decision=decision,
-                event_id=event_id,
-                cost_warning=cost_warning,
-            ),
-        )
-
-    def to_json(self) -> str:
-        return _serialize(self)
-
-
-@dataclass(frozen=True, slots=True)
 class LibraryStalenessNudge:
     type: Literal["ipc.library.staleness_nudge"]
     ts: str
@@ -1943,47 +1815,6 @@ class LibraryStalenessAction:
             type="ipc.library.staleness_action",
             ts=_now_iso(),
             payload=LibraryStalenessActionPayload(action=action),
-        )
-
-    def to_json(self) -> str:
-        return _serialize(self)
-
-
-@dataclass(frozen=True, slots=True)
-class LibrarySimilarRequest:
-    type: Literal["ipc.library.similar_request"]
-    ts: str
-    payload: LibrarySimilarRequestPayload
-
-    @classmethod
-    def make(cls, *, track_id: str, k: int = 10) -> LibrarySimilarRequest:
-        return cls(
-            type="ipc.library.similar_request",
-            ts=_now_iso(),
-            payload=LibrarySimilarRequestPayload(track_id=track_id, k=k),
-        )
-
-    def to_json(self) -> str:
-        return _serialize(self)
-
-
-@dataclass(frozen=True, slots=True)
-class LibrarySimilarResult:
-    type: Literal["ipc.library.similar_result"]
-    ts: str
-    payload: LibrarySimilarResultPayload
-
-    @classmethod
-    def make(
-        cls,
-        *,
-        track_id: str,
-        results: tuple[dict, ...] | list[dict],
-    ) -> LibrarySimilarResult:
-        return cls(
-            type="ipc.library.similar_result",
-            ts=_now_iso(),
-            payload=LibrarySimilarResultPayload(track_id=track_id, results=tuple(results)),
         )
 
     def to_json(self) -> str:

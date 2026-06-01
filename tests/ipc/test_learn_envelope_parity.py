@@ -53,7 +53,6 @@ LearnMidiPosition = learn_messages.LearnMidiPosition
 # Shared validator from the canonical messages module (Draft-07; cached).
 from vibemix.ui_bus.messages import _VALIDATOR  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # LearnControllerDetected
 # ---------------------------------------------------------------------------

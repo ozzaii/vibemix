@@ -113,6 +113,14 @@ def test_top_level_additional_properties_rejected() -> None:
         jsonschema.validate(d, _SCHEMA)
 
 
+def test_parse_message_rejects_numeric_timestamp_without_ingress_normalizer() -> None:
+    """Strict schema parsing still rejects legacy numeric timestamps."""
+    msg = _wrap({"livekit": "ok", "gemini": "ok", "midi": 1, "screen": "ok"})
+    msg["ts"] = 1_780_205_767.4745522
+    with pytest.raises(jsonschema.ValidationError):
+        parse_message(msg)
+
+
 def test_parse_message_accepts_json_string() -> None:
     """``parse_message`` accepts a raw JSON string (typical ws_bus payload)."""
     msg = StatusTick.make(livekit="connecting", gemini="ok", midi=2, screen="ok")

@@ -1,9 +1,10 @@
 /* Phase 20 Plan 04 Task 2 — citation-diagnostics.ts.
  *
- * STUB component for Settings → Diagnostics. Plain TS DOM-API style to match
+ * Live Settings → Diagnostics component. Plain TS DOM-API style to match
  * the prevailing pattern in this directory (recording-row.ts, retention-slider.ts,
- * mascot-group.ts). Phase 14's Settings drawer wiring is out of scope; this
- * file ships only the renderer + a typed update API ready to drop in.
+ * mascot-group.ts). The session bridge writes the latest ipc.session.citation
+ * payload into the small module-local store below; the Settings drawer mounts
+ * a subscriber only while the diagnostics row is present.
  *
  * Inputs (typed via CitationDiagnosticsProps):
  *   - slopRatio:           cumulative stripped/total in [0, 1]
@@ -18,10 +19,9 @@
  *     a subtitle showing the first 60 chars + "..." + the full text in the
  *     `title` attribute (XSS-safe via element.textContent / .title assignment).
  *
- * The component returns a `CitationDiagnosticsHandle` exposing the root +
- * an `update(props)` setter so a future Settings-drawer subscriber can
- * push fresh props on every ipc.session.citation message without rebuilding
- * the DOM.
+ * The pure renderer still returns a `CitationDiagnosticsHandle` exposing the
+ * root + an `update(props)` setter for focused tests. Production uses
+ * `mountCitationDiagnostics()` so telemetry updates patch the DOM in place.
  */
 
 import { registerStyle } from "../../session/components/_style-registry.js";
@@ -38,7 +38,21 @@ export interface CitationDiagnosticsHandle {
   update(next: CitationDiagnosticsProps): void;
 }
 
+export interface MountedCitationDiagnosticsHandle extends CitationDiagnosticsHandle {
+  dispose(): void;
+}
+
+type CitationDiagnosticsListener = (next: CitationDiagnosticsProps) => void;
+
 const TRUNCATE_AT = 60;
+const DEFAULT_PROPS: CitationDiagnosticsProps = {
+  slopRatio: 0,
+  strippedRate15s: 0,
+  lastUnverifiedResponse: null,
+  bypassActive: false,
+};
+let currentProps: CitationDiagnosticsProps = DEFAULT_PROPS;
+const listeners = new Set<CitationDiagnosticsListener>();
 
 const CSS = `
   .vmx-citation-diag {
@@ -163,4 +177,43 @@ export function renderCitationDiagnostics(
       applyState(next);
     },
   };
+}
+
+export function getCitationDiagnosticsSnapshot(): CitationDiagnosticsProps {
+  return currentProps;
+}
+
+export function setCitationDiagnosticsSnapshot(next: CitationDiagnosticsProps): void {
+  currentProps = next;
+  for (const listener of listeners) {
+    try {
+      listener(next);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("[citation-diagnostics] listener failed:", err);
+    }
+  }
+}
+
+export function subscribeCitationDiagnostics(
+  listener: CitationDiagnosticsListener,
+): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function mountCitationDiagnostics(): MountedCitationDiagnosticsHandle {
+  const handle = renderCitationDiagnostics(currentProps);
+  const unsubscribe = subscribeCitationDiagnostics((next) => handle.update(next));
+  return {
+    ...handle,
+    dispose: unsubscribe,
+  };
+}
+
+export function _resetCitationDiagnosticsForTests(): void {
+  currentProps = DEFAULT_PROPS;
+  listeners.clear();
 }

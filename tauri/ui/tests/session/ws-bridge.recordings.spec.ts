@@ -11,9 +11,17 @@
  * drawer open. Both flow through the same `recordings` slice.
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { applyRecordingsUsage } from "../../src/session/ws-bridge.js";
+import {
+  applyIpcError,
+  applyRecordingsUsage,
+  applySessionCitation,
+} from "../../src/session/ws-bridge.js";
+import {
+  _resetCitationDiagnosticsForTests,
+  getCitationDiagnosticsSnapshot,
+} from "../../src/settings/components/citation-diagnostics.js";
 import {
   _resetSettingsUIStateForTests,
   getSettingsUIState,
@@ -22,6 +30,12 @@ import {
 
 beforeEach(() => {
   _resetSettingsUIStateForTests();
+  _resetCitationDiagnosticsForTests();
+});
+
+afterEach(() => {
+  _resetCitationDiagnosticsForTests();
+  vi.restoreAllMocks();
 });
 
 describe("applyRecordingsUsage", () => {
@@ -64,6 +78,41 @@ describe("applyRecordingsUsage", () => {
     applyRecordingsUsage({ sessions: 0, bytes_total: 0 });
     const ui = getSettingsUIState();
     expect(ui.recordings.usage).toEqual({ sessions: 0, bytes_total: 0 });
+  });
+});
+
+describe("applyIpcError", () => {
+  it("mirrors sidecar errors to the operator log", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    applyIpcError({
+      original_type: "ipc.session.set_mode",
+      reason: "session.set_mode rejected",
+    });
+
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("[vmx:error] ipc.error"),
+    );
+    expect(log.mock.calls[0]?.[0]).toContain("ipc.session.set_mode");
+    expect(log.mock.calls[0]?.[0]).toContain("session.set_mode rejected");
+  });
+});
+
+describe("applySessionCitation", () => {
+  it("writes anti-slop telemetry into the citation diagnostics store", () => {
+    applySessionCitation({
+      slop_ratio: 0.2,
+      stripped_rate_15s: 0.4,
+      last_unverified_response: "uncited line",
+      bypass_active: true,
+    });
+
+    expect(getCitationDiagnosticsSnapshot()).toEqual({
+      slopRatio: 0.2,
+      strippedRate15s: 0.4,
+      lastUnverifiedResponse: "uncited line",
+      bypassActive: true,
+    });
   });
 });
 

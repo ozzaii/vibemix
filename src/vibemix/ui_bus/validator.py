@@ -14,6 +14,9 @@ WebSocket, but tests prefer dicts).
 from __future__ import annotations
 
 import json
+import math
+from datetime import UTC, datetime
+from numbers import Real
 from typing import Any
 
 import jsonschema
@@ -29,6 +32,32 @@ def validate_message(raw: dict) -> None:
     ``jsonschema.validate(d, schema)`` which re-builds the resolver every call.
     """
     _VALIDATOR.validate(raw)
+
+
+def normalize_legacy_timestamp(raw: dict) -> dict:
+    """Return a copy with legacy numeric ``ts`` converted to schema-valid ISO.
+
+    Keep ``validate_message`` strict: generated wrappers, frontend codegen, and
+    schema tests must still reject non-string timestamps. This helper is only for
+    runtime ingress compatibility with older local drive tools that sent epoch
+    seconds before the live-verification helper was fixed.
+    """
+    ts = raw.get("ts")
+    msg_type = raw.get("type")
+    if (
+        isinstance(msg_type, str)
+        and msg_type.startswith("ipc.")
+        and isinstance(ts, Real)
+        and not isinstance(ts, bool)
+        and math.isfinite(float(ts))
+    ):
+        try:
+            normalized = dict(raw)
+            normalized["ts"] = datetime.fromtimestamp(float(ts), UTC).isoformat()
+            return normalized
+        except (OSError, OverflowError, ValueError):
+            return raw
+    return raw
 
 
 def parse_message(raw: dict | str) -> dict:
@@ -55,4 +84,4 @@ def parse_message(raw: dict | str) -> dict:
     return decoded
 
 
-__all__ = ["_SCHEMA", "parse_message", "validate_message"]
+__all__ = ["_SCHEMA", "normalize_legacy_timestamp", "parse_message", "validate_message"]

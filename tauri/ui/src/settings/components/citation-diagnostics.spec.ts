@@ -10,9 +10,16 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { renderCitationDiagnostics } from "./citation-diagnostics.js";
+import {
+  _resetCitationDiagnosticsForTests,
+  getCitationDiagnosticsSnapshot,
+  mountCitationDiagnostics,
+  renderCitationDiagnostics,
+  setCitationDiagnosticsSnapshot,
+} from "./citation-diagnostics.js";
 
 afterEach(() => {
+  _resetCitationDiagnosticsForTests();
   document.body.replaceChildren();
 });
 
@@ -221,5 +228,38 @@ describe("citation-diagnostics — Test 7: defensive clamp on out-of-range value
     );
     expect(line1!.textContent).toContain("Slop ratio: 100%");
     expect(line1!.textContent).toContain("Stripped rate (15s): 0%");
+  });
+});
+
+describe("citation-diagnostics — live telemetry store", () => {
+  it("mountCitationDiagnostics updates in place when the store changes", () => {
+    const handle = mountCitationDiagnostics();
+    document.body.append(handle.root);
+    const rootRef = handle.root;
+
+    setCitationDiagnosticsSnapshot({
+      slopRatio: 0.25,
+      strippedRate15s: 0.5,
+      lastUnverifiedResponse: "uncited claim",
+      bypassActive: true,
+    });
+
+    expect(handle.root).toBe(rootRef);
+    expect(handle.root.textContent).toContain("Slop ratio: 25%");
+    expect(handle.root.textContent).toContain("Stripped rate (15s): 50%");
+    expect(
+      handle.root.querySelector(".citation-diag-last-unverified"),
+    ).not.toBeNull();
+
+    handle.dispose();
+    setCitationDiagnosticsSnapshot({
+      slopRatio: 0.9,
+      strippedRate15s: 0.9,
+      lastUnverifiedResponse: null,
+      bypassActive: false,
+    });
+
+    expect(handle.root.textContent).toContain("Slop ratio: 25%");
+    expect(getCitationDiagnosticsSnapshot().slopRatio).toBe(0.9);
   });
 });

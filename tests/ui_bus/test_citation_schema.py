@@ -155,7 +155,7 @@ def test_payload_struct_is_frozen_slots() -> None:
         last_unverified_response=None,
         bypass_active=False,
     )
-    with pytest.raises(Exception):  # FrozenInstanceError subclasses AttributeError
+    with pytest.raises(AttributeError):
         p.slop_ratio = 0.5  # type: ignore[misc]
 
 

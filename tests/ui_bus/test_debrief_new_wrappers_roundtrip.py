@@ -26,7 +26,6 @@ from vibemix.ui_bus import (
 )
 from vibemix.ui_bus.messages import _SCHEMA
 
-
 # ---------------------------------------------------------------------------
 # DebriefChapterList
 # ---------------------------------------------------------------------------

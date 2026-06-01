@@ -17,9 +17,8 @@
  *   - sendSettings(field, value) — fire-and-forget ipc.settings.set;
  *     the sidecar replies with ipc.settings.state which we already
  *     subscribe to, so the UI reflects the change on the round-trip.
- *   - sendMute(toggle) — fire-and-forget ipc.session.mute; the sidecar
- *     replies with the same type carrying {muted: bool} which we already
- *     subscribe to.
+ *   - sendMute(toggle) — optimistic ipc.session.mute; the sidecar replies
+ *     with the same type carrying {muted: bool} which we already subscribe to.
  *
  * On boot the bridge fires a single ipc.settings.get so a freshly-mounted
  * session has the full settings tree before the user opens the drawer.
@@ -30,9 +29,12 @@
  * the bridge does NOT touch the DOM.
  */
 
+import { vmxLog } from "../debug-log.js";
 import { emitIpc, subscribeIpc } from "../ipc/client.js";
 import type {
+  IpcError,
   RecordingsUsage,
+  SessionCitation,
   SessionCohostReaction,
   SessionSnapshot,
   SessionMute,
@@ -40,6 +42,7 @@ import type {
   StatusTick,
 } from "../ipc/messages.js";
 import { setRecordingsSlice } from "../settings/state.js";
+import { setCitationDiagnosticsSnapshot } from "../settings/components/citation-diagnostics.js";
 import {
   appendMidiEvents,
   appendReaction,
@@ -48,6 +51,8 @@ import {
   setSessionState,
 } from "./state.js";
 import type {
+  ClaimPolicyLevel,
+  ClaimPolicyState,
   LevelPair,
   MascotMood,
   MetersTriple,
@@ -94,6 +99,11 @@ interface WireSnapshotPayload {
   cohost_status: "LISTENING" | "TALKING" | "IDLE";
   latency_ms: number | null;
   grounded: boolean;
+  claim_policy?: {
+    policy: string;
+    level: ClaimPolicyLevel;
+    reason: string | null;
+  } | null;
 }
 
 interface WireStatusTickPayload {
@@ -101,6 +111,18 @@ interface WireStatusTickPayload {
   gemini: "ok" | "down";
   midi: number | null;
   screen: "ok" | "denied" | "unavailable";
+}
+
+interface WireIpcErrorPayload {
+  reason: string;
+  original_type: string | null;
+}
+
+interface WireSessionCitationPayload {
+  slop_ratio: number;
+  stripped_rate_15s: number;
+  last_unverified_response: string | null;
+  bypass_active: boolean;
 }
 
 interface WireSettingsStatePayload {
@@ -219,6 +241,16 @@ export async function initSessionBridge(): Promise<{
     ),
   );
   unsubs.push(
+    await subscribeIpc<IpcError>("ipc.error", (msg) =>
+      applyIpcError(msg.payload as unknown as WireIpcErrorPayload),
+    ),
+  );
+  unsubs.push(
+    await subscribeIpc<SessionCitation>("ipc.session.citation", (msg) =>
+      applySessionCitation(msg.payload as unknown as WireSessionCitationPayload),
+    ),
+  );
+  unsubs.push(
     await subscribeIpc<SessionMute>("ipc.session.mute", (msg) =>
       applyMuteAck(msg.payload as unknown as WireMutePayload),
     ),
@@ -293,14 +325,20 @@ export async function sendSettings(
   await emitIpc("ipc.settings.set", { field, value });
 }
 
-/** Fire-and-forget: ipc.session.mute. The sidecar replies with the same
- *  type carrying {muted: bool} which writes SessionState.muted on the
- *  round-trip.
+/** Optimistic ipc.session.mute. The sidecar replies with the same type carrying
+ *  {muted: bool} which writes SessionState.muted on the round-trip.
  *
  *  When `toggle` is undefined the shell sends {toggle: true} — the
  *  global-shortcut handler in Rust calls this without args. */
 export async function sendMute(toggle: boolean = true): Promise<void> {
-  await emitIpc("ipc.session.mute", { toggle });
+  const wasMuted = getSessionState().muted;
+  if (toggle) setSessionState({ muted: !wasMuted });
+  try {
+    await emitIpc("ipc.session.mute", { toggle });
+  } catch (err) {
+    if (toggle) setSessionState({ muted: wasMuted });
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +370,7 @@ export function applySnapshot(p: WireSnapshotPayload): void {
     cohostStatus: p.cohost_status,
     latencyMs: p.latency_ms,
     grounded: p.grounded,
+    claimPolicy: normalizeClaimPolicy(p.claim_policy),
   });
 
   if (p.transcript_delta.length > 0) {
@@ -350,6 +389,33 @@ export function applySnapshot(p: WireSnapshotPayload): void {
       ageMs: 0,
     }));
     appendMidiEvents(events);
+  }
+}
+
+function normalizeClaimPolicy(
+  p: WireSnapshotPayload["claim_policy"],
+): ClaimPolicyState | null {
+  if (!p || !["green", "yellow", "red"].includes(p.level)) return null;
+  return {
+    policy: p.policy,
+    level: p.level,
+    reason: p.reason ?? null,
+    label: claimPolicyLabel(p.policy),
+  };
+}
+
+function claimPolicyLabel(policy: string): string {
+  switch (policy) {
+    case "supported_verdict":
+      return "verdict proof";
+    case "candidate_not_verdict":
+      return "candidate only";
+    case "watch_not_claim":
+      return "watch only";
+    case "blocked":
+      return "claims held";
+    default:
+      return "proof pending";
   }
 }
 
@@ -466,6 +532,28 @@ export function applyMuteAck(p: WireMutePayload): void {
   // {toggle: true} echoed back means the sidecar accepted the request
   // and emitted a fresh state — we don't need to flip locally because
   // the next ipc.settings.state will overwrite muted anyway.
+}
+
+/** Generic sidecar error broadcast. The live deck has no general toast rail,
+ *  so the shippable path is the operator log: visible in DevTools and in
+ *  ui.log via debug_log. */
+export function applyIpcError(p: WireIpcErrorPayload): void {
+  vmxLog("[vmx:error]", "ipc.error", {
+    original_type: p.original_type,
+    reason: p.reason,
+  });
+}
+
+/** Anti-slop telemetry from the co-host loop. Store it for the Settings
+ *  diagnostics row without routing through SettingsUIState, because the
+ *  telemetry cadence is independent from drawer rebuilds. */
+export function applySessionCitation(p: WireSessionCitationPayload): void {
+  setCitationDiagnosticsSnapshot({
+    slopRatio: p.slop_ratio,
+    strippedRate15s: p.stripped_rate_15s,
+    lastUnverifiedResponse: p.last_unverified_response,
+    bypassActive: p.bypass_active,
+  });
 }
 
 /** Phase 15 Plan 05 — apply a recordings.usage push. Writes the usage

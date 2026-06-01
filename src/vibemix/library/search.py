@@ -92,8 +92,8 @@ def vibe_search(
 ) -> tuple[list[VibeSearchResult], bool]:
     """Run a natural-language vibe-search query.
 
-    Returns ``(matches, cache_hit)``. ``cache_hit`` is the truth value used
-    by ``LibrarySearchResult`` IPC payload (Plan 09).
+    Returns ``(matches, cache_hit)``. The library window receives this through
+    the Tauri ``library_search`` command bridge.
 
     Empty library short-circuits — no embed call, no API spend.
     """

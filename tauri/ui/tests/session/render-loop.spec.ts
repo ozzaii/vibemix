@@ -22,6 +22,7 @@ import {
   setSessionState,
 } from "../../src/session/state.js";
 import {
+  defaultState,
   mountSessionLayout,
   renderSessionFrame,
 } from "../../src/session/SessionLayout.js";
@@ -228,6 +229,25 @@ describe("renderSessionFrame — CSS variable hot path", () => {
     renderSessionFrame(m, layout);
     // Property never set → empty string per CSSOM.
     expect(m.root.style.getPropertyValue("--bpm-period-ms")).toBe("");
+  });
+
+  it("renders the live claim proof chip from the snapshot policy", () => {
+    const root = host();
+    const state = defaultState();
+    state.claimPolicy = {
+      policy: "supported_verdict",
+      level: "green",
+      reason: "two_deck_audio_window_delta_proof",
+      label: "verdict proof",
+    };
+    const m = mountSessionLayout(root, state);
+    const chip = root.querySelector<HTMLElement>(".vmx-claim-policy");
+    expect(chip?.hidden).toBe(false);
+    expect(chip?.textContent).toBe("verdict proof");
+    expect(chip?.dataset.level).toBe("green");
+    expect(chip?.getAttribute("title")).toBe(
+      "supported_verdict: two_deck_audio_window_delta_proof",
+    );
   });
 });
 
