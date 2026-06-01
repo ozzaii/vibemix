@@ -1175,6 +1175,44 @@ Remaining gate:
   release copy claims. This package proves the UI contract and build, not final
   visual acceptance on the signed artifact.
 
+## Package 5G.1 - Library UI Fixture Skeleton Sync
+
+Suggested commit: `test(library-ui): sync Viber fixture skeletons`
+
+Include:
+
+- `tauri/ui/src/library/chat.test.ts`
+- `tauri/ui/src/library/curate.test.ts`
+
+Keep out:
+
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/library.html`
+- Backend/Rust/Python library commands.
+
+Reason:
+
+- Claude's capability inventory flagged stale jsdom fixtures, not a live app
+  gap. The real library markup and `build.test.ts` already contain the cue mode,
+  cue folder, curve segment classes, and cue export controls that
+  `mountLibrary()` queries.
+- This package only keeps the chat and curate test skeletons aligned with the
+  current window contract so fixture drift does not masquerade as a Viber
+  backend failure.
+
+Proof already run:
+
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/curate.test.ts`
+  passed: 40 tests.
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/curate.test.ts src/library/build.test.ts`
+  passed: 60 tests.
+- `git diff --check -- tauri/ui/src/library/chat.test.ts tauri/ui/src/library/curate.test.ts`
+  passed.
+
+Remaining gate:
+
+- None. This is a test-fixture sync only and does not change product behavior.
+
 ## Package 5H - Viber Raw Cue Export Boundary
 
 Suggested commit: `fix(library): drop raw cue export from Viber tools`

@@ -394,21 +394,26 @@ function mountSkeleton(): void {
       <button data-mode="similar" aria-selected="false">Similar</button>
       <button data-mode="curate" aria-selected="false">Curate</button>
       <button data-mode="build" aria-selected="false">Build</button>
+      <button data-mode="cue" aria-selected="false">Cue</button>
       <button data-mode="chat" aria-selected="true">Viber</button>
       <button data-mode="ingest" aria-selected="false">Ingest</button>
     </div>
     <span id="vmx-lib-qlabel"></span>
     <input id="vmx-lib-q" />
     <input id="vmx-lib-folder" value="~/Music" />
+    <input id="vmx-lib-cue-folder" value="~/Music" />
     <input id="vmx-lib-theme" />
     <textarea id="vmx-lib-brief"></textarea>
     <textarea id="vmx-lib-chat"></textarea>
     <div class="vmx-lib-curve">
-      <button data-curve="opener" aria-pressed="false">Opener</button>
-      <button data-curve="peak_time" aria-pressed="true">Peak time</button>
-      <button data-curve="after_hours" aria-pressed="false">After hours</button>
-      <button data-curve="festival" aria-pressed="false">Festival</button>
+      <button class="vmx-lib-curveseg" data-curve="opener" aria-pressed="false">Opener</button>
+      <button class="vmx-lib-curveseg" data-curve="peak_time" aria-pressed="true">Peak time</button>
+      <button class="vmx-lib-curveseg" data-curve="after_hours" aria-pressed="false">After hours</button>
+      <button class="vmx-lib-curveseg" data-curve="festival" aria-pressed="false">Festival</button>
     </div>
+    <button data-cue-export="rekordbox" aria-pressed="true">Rekordbox XML</button>
+    <button data-cue-export="m3u8" aria-pressed="false">M3U8</button>
+    <button data-cue-export="both" aria-pressed="false">Both</button>
     <span id="vmx-lib-seed-name"></span>
     <button id="vmx-lib-runbtn"></button>
     <span id="vmx-lib-center-label"></span>
