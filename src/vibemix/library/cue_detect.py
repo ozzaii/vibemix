@@ -208,7 +208,7 @@ _MAX_WINDOW_S: float = 80.0  # the embed single-call audio cap.
 # ``BPM_CONFIDENCE_MIN_FOR_DOWNBEAT`` floor).
 _SNAP_CONF_MIN: float = 0.5
 
-__all__ = ["ANALYSIS_SR", "decode_to_mono", "detect_cues"]
+__all__ = ["ANALYSIS_SR", "audible_bounds_s", "decode_to_mono", "detect_cues"]
 
 
 # ─── Decode ─────────────────────────────────────────────────────────────────────
@@ -596,6 +596,38 @@ def _last_sustained_frame(rms_curve: np.ndarray) -> int:
     return n - 1
 
 
+def audible_bounds_s(
+    samples: np.ndarray,
+    sample_rate: int = ANALYSIS_SR,
+) -> tuple[float, float] | None:
+    """Return the first/last audible bounds for decoded audio.
+
+    This is a deterministic floor for cue placement: structure anchors may be
+    rich and model-produced, but they must not resolve inside the silent lead-in
+    or silent tail of the file. Returns ``None`` for empty/all-silent audio.
+    """
+    if samples.size == 0:
+        return None
+    rms_peak = float(np.max(np.abs(samples))) if samples.size else 0.0
+    if rms_peak <= 1e-9:
+        return None
+    sub_curve = _sub_energy_curve(samples, sample_rate)
+    n_frames = sub_curve.size
+    if n_frames < 1:
+        return None
+    rms_curve = _rms_curve(samples, sample_rate, n_frames)
+    if not rms_curve.size or float(rms_curve.max()) <= 1e-9:
+        return None
+    duration_s = samples.size / float(sample_rate)
+    first_frame = _first_sustained_frame(sub_curve, rms_curve)
+    last_frame = _last_sustained_frame(rms_curve)
+    first_s = min(duration_s, max(0.0, first_frame * FRAME_HOP_S))
+    last_s = min(duration_s, max(first_s, (last_frame + 1) * FRAME_HOP_S))
+    if last_s <= first_s:
+        return None
+    return first_s, last_s
+
+
 def detect_cues(audio_path: Path, *, max_cues: int = 4) -> list[CueAnchor]:
     """Detect up to ``max_cues`` structural :class:`CueAnchor`s in ``audio_path``.
 
@@ -624,6 +656,9 @@ def detect_cues(audio_path: Path, *, max_cues: int = 4) -> list[CueAnchor]:
 
     # No audio / too short — no honest structure to cue.
     if samples.size == 0 or duration_s < MIN_TRACK_S:
+        return []
+    audible_bounds = audible_bounds_s(samples, ANALYSIS_SR)
+    if audible_bounds is None:
         return []
 
     # ── 1. Per-frame feature curves ──

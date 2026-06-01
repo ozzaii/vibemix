@@ -35,6 +35,7 @@ from vibemix.library.cue_detect import (
     _estimate_bpm,
     _rms_curve,
     _sub_energy_curve,
+    audible_bounds_s,
     decode_to_mono,
     detect_cues,
 )
@@ -89,6 +90,10 @@ def build_cue_anchors(
     duration_s = samples.size / float(ANALYSIS_SR) if samples.size else 0.0
     if duration_s < MIN_TRACK_S:
         return []
+    audible_bounds = audible_bounds_s(samples, ANALYSIS_SR)
+    if audible_bounds is None:
+        return []
+    first_sound_s, last_sound_s = audible_bounds
 
     refined = refine_cue_positions(audio_path, positions)
     if not refined:
@@ -112,7 +117,10 @@ def build_cue_anchors(
 
     anchors: list[CueAnchor] = []
     for cue in refined:
-        start_s = cue.position_s
+        raw_start_s = cue.position_s
+        if raw_start_s > last_sound_s:
+            continue
+        start_s = max(first_sound_s, raw_start_s)
         if start_s >= duration_s:
             continue
         i = min(int(start_s / FRAME_HOP_S), n - 1)
@@ -128,7 +136,7 @@ def build_cue_anchors(
             window_s = bars * bar_s
         else:
             window_s = _MAX_WINDOW_S
-        end_s = min(start_s + window_s, duration_s, start_s + _MAX_WINDOW_S)
+        end_s = min(start_s + window_s, last_sound_s, duration_s, start_s + _MAX_WINDOW_S)
         if end_s <= start_s:
             continue
 

@@ -24,6 +24,7 @@ from vibemix.library.cue_detr import (
     _positions_from_outputs,
 )
 from vibemix.library.cue_engine import build_cue_anchors, detect_cues_auto
+from vibemix.library.cue_refine import RefinedCue
 from vibemix.library.cue_types import CueAnchor
 
 _FAKE = Path("fake.mp3")
@@ -137,6 +138,46 @@ def test_build_cue_anchors_first_is_intro_last_is_outro(kick: np.ndarray) -> Non
     anchors = build_cue_anchors(_FAKE, [1.0, 30.0, 45.0, 88.0])
     assert anchors[0].label == "intro"
     assert anchors[-1].label == "outro"
+
+
+def test_build_cue_anchors_clamps_to_audible_bounds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    silence = np.zeros(int(10.0 * ANALYSIS_SR), dtype=np.float32)
+    core = _kick_track(seconds=70.0)
+    track = np.concatenate([silence, core, silence]).astype(np.float32)
+    monkeypatch.setattr(cue_engine, "decode_to_mono", lambda *_a, **_k: track)
+    monkeypatch.setattr(
+        cue_engine,
+        "refine_cue_positions",
+        lambda *_a, **_k: [
+            RefinedCue(1.0, False, 0.0),
+            RefinedCue(20.0, False, 0.0),
+            RefinedCue(88.0, False, 0.0),
+        ],
+    )
+
+    anchors = build_cue_anchors(_FAKE, [1.0, 20.0, 88.0])
+
+    assert anchors
+    _assert_anchor_contract(anchors)
+    assert all(a.start_s >= 9.0 for a in anchors)
+    assert all(a.end_s <= 82.0 for a in anchors)
+    assert all(a.start_s < 88.0 for a in anchors)
+
+
+def test_build_cue_anchors_suppresses_all_silent_audio(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    silent = np.zeros(int(90.0 * ANALYSIS_SR), dtype=np.float32)
+    monkeypatch.setattr(cue_engine, "decode_to_mono", lambda *_a, **_k: silent)
+    monkeypatch.setattr(
+        cue_engine,
+        "refine_cue_positions",
+        lambda *_a, **_k: [RefinedCue(10.0, False, 0.0)],
+    )
+
+    assert build_cue_anchors(_FAKE, [10.0]) == []
 
 
 # ─── detect_cues_auto orchestration ─────────────────────────────────────────────

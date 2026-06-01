@@ -37,6 +37,7 @@ from vibemix.library.cue_detect import (
     _find_sub_edges,
     _rms_curve,
     _sub_energy_curve,
+    audible_bounds_s,
     decode_to_mono,
     detect_cues,
 )
@@ -181,6 +182,25 @@ def test_silent_input_yields_no_edges() -> None:
     assert reentries == []
 
 
+def test_audible_bounds_ignore_silent_lead_in_and_tail() -> None:
+    silence = np.zeros(ANALYSIS_SR * 8, dtype=np.float32)
+    core = _steady_kick_track(seconds=60.0)
+    padded = np.concatenate([silence, core, silence]).astype(np.float32)
+
+    bounds = audible_bounds_s(padded, ANALYSIS_SR)
+
+    assert bounds is not None
+    first_s, last_s = bounds
+    assert 7.0 <= first_s <= 10.0
+    assert 66.0 <= last_s <= 70.0
+
+
+def test_audible_bounds_all_silence_is_none() -> None:
+    silent = np.zeros(ANALYSIS_SR * 90, dtype=np.float32)
+
+    assert audible_bounds_s(silent, ANALYSIS_SR) is None
+
+
 # ─── detect_cues → CueAnchor contract (decode monkeypatched) ──────────────────────
 
 
@@ -297,6 +317,16 @@ def test_detect_cues_empty_audio_empty(
 ) -> None:
     monkeypatch.setattr(
         cue_detect, "decode_to_mono", lambda *_a, **_k: np.zeros(0, dtype=np.float32)
+    )
+    anchors = detect_cues(Path("fake.mp3"), max_cues=4)
+    assert anchors == []
+
+
+def test_detect_cues_long_silence_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        cue_detect, "decode_to_mono", lambda *_a, **_k: np.zeros(ANALYSIS_SR * 90, dtype=np.float32)
     )
     anchors = detect_cues(Path("fake.mp3"), max_cues=4)
     assert anchors == []

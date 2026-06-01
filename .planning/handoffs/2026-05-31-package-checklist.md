@@ -2170,6 +2170,50 @@ Remaining gate:
   If a future cue engine legitimately improves timing/labels, update the
   manifest and document the measured change in the same commit.
 
+## Package 4C - Auto-Cue Audible Boundary Floor
+
+Suggested commit: `fix(library): bound auto cues to audible material`
+
+Include:
+
+- `src/vibemix/library/cue_detect.py`
+- `src/vibemix/library/cue_engine.py`
+- `tests/library/test_cue_detect.py`
+- `tests/library/test_cue_engine.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime/live DROP speech or timing changes.
+- Model hosting, CUE-DETR weight changes, or any published benchmark claim.
+
+Reason:
+
+- The recovered Mixxx goldmine identified a cheap deterministic cue floor:
+  first/last audible material should bound any model-produced structural cue.
+  The pure-DSP fallback already reasons about sustained intro/outro frames, but
+  the ONNX producer path could still turn a candidate inside silent lead-in or
+  silent tail into a hot-cue anchor.
+- This slice exposes a shared `audible_bounds_s()` helper and applies it to the
+  CUE-DETR → CueAnchor assembly. All-silent audio now returns no anchors, a
+  lead-in candidate clamps to first audible material, and tail candidates after
+  the last audible frame are suppressed.
+
+Proof for this source slice:
+
+- `uv run pytest -q tests/library/test_cue_detect.py tests/library/test_cue_engine.py tests/library/test_cue_detect_eval.py`
+  passed with 30 tests.
+- `uv run python scripts/eval/cue_detect.py` passed with `ok: true`,
+  `label_recall: 1.0`, `unexpected_labels: 0`, and `timing_misses: 0`.
+- `uv run ruff check src/vibemix/library/cue_detect.py src/vibemix/library/cue_engine.py tests/library/test_cue_detect.py tests/library/test_cue_engine.py`
+  passed.
+
+Remaining gate:
+
+- This hardens cue placement in source. It does not prove CUE-DETR model
+  availability, packaged-binary behavior, or cross-app render in Rekordbox /
+  Serato / Mixxx.
+
 ## Package 5 - Library UI Live Read Context
 
 Suggested commit: `feat(library-ui): ground Viber live reads with deck-pair context`
