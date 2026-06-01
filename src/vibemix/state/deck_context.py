@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from vibemix.intel.eq_move_model import canonical_eq_move, predicted_band_gains
 from vibemix.state.deck_state import DeckTrack
 from vibemix.state.deltas import DELTA_FLOOR, render_delta
 
@@ -127,6 +128,11 @@ _MOVE_EFFECT_DISCLAIMER_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_AUDIO_BAND_DELTA_RE = re.compile(
+    r"\b(sub|low|mid|high) energy (rose|fell)\b",
+    re.IGNORECASE,
+)
+_MOVE_EFFECT_MIN_PREDICTED_DB = 1.0
 _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE = re.compile(
     r"\b("
     r"vocal|vocals|voice|lyric|lyrics|kick|kickdrum|kick drum|snare|clap|"
@@ -363,6 +369,18 @@ class LiveClaimGuardResult:
     policy: str = "requires_more_evidence"
     reason: str | None = None
     summary: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class MoveEffectLicense:
+    """A narrow proof that an EQ move and measured band delta agree."""
+
+    move: str
+    band: str
+    predicted_db: float
+    measured_direction: str
+    evidence_key: str
+    context_token: str
 
 
 LIVE_TRANSITION_HELD_REPLY = (
@@ -1826,6 +1844,97 @@ def render_audio_delta_items(
     return out
 
 
+def _licensed_move_effect(
+    state: MusicState,
+    moves: list[str] | tuple[str, ...],
+    *,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
+) -> MoveEffectLicense | None:
+    """Return a move-effect license when prediction and measurement agree.
+
+    This is intentionally abstain-first: no move, unknown move, flat measured
+    bands, or mismatched direction all return ``None`` and the old refusal path
+    remains in force.
+    """
+    labels = [_move_label(item) for item in moves]
+    labels = [label for label in labels if label]
+    if not labels:
+        return None
+    measured = _measured_band_directions(audio_delta_items or render_audio_delta_items(state))
+    if not measured:
+        return None
+    sample_rate = _move_effect_sample_rate(state, audio_capture_context)
+
+    for label in reversed(labels[-3:]):
+        canonical = canonical_eq_move(label)
+        if canonical is None:
+            continue
+        predicted = predicted_band_gains(canonical, sample_rate)
+        if not predicted:
+            continue
+        for band in ("sub", "low", "mid", "high"):
+            measured_direction = measured.get(band)
+            if measured_direction is None:
+                continue
+            predicted_db = float(predicted.get(band, 0.0) or 0.0)
+            if abs(predicted_db) < _MOVE_EFFECT_MIN_PREDICTED_DB:
+                continue
+            predicted_direction = "rose" if predicted_db > 0.0 else "fell"
+            if predicted_direction != measured_direction:
+                continue
+            pred_token = f"pred_{predicted_direction}_{round(abs(predicted_db))}db"
+            context_token = f"{canonical}:{band}:{pred_token}:measured_{measured_direction}"
+            evidence_key = f"move_effect={context_token}"
+            return MoveEffectLicense(
+                move=canonical,
+                band=band,
+                predicted_db=round(predicted_db, 2),
+                measured_direction=measured_direction,
+                evidence_key=evidence_key,
+                context_token=context_token,
+            )
+    return None
+
+
+def _measured_band_directions(
+    audio_delta_items: list[str] | tuple[str, ...],
+) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for item in audio_delta_items:
+        match = _AUDIO_BAND_DELTA_RE.search(str(item))
+        if not match:
+            continue
+        out[match.group(1).lower()] = match.group(2).lower()
+    return out
+
+
+def _move_effect_sample_rate(
+    state: MusicState,
+    audio_capture_context: dict[str, object] | None,
+) -> int:
+    candidates = []
+    if isinstance(audio_capture_context, dict):
+        candidates.extend(
+            [
+                audio_capture_context.get("sample_rate"),
+                audio_capture_context.get("sample_rate_hz"),
+                audio_capture_context.get("deck_audio_sample_rate"),
+            ]
+        )
+    candidates.extend([getattr(state, "sample_rate", None), getattr(state, "audio_sample_rate", None)])
+    for raw in candidates:
+        if raw is None or isinstance(raw, bool):
+            continue
+        try:
+            value = int(float(str(raw)))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if value > 0:
+            return max(8_000, min(value, 384_000))
+    return 48_000
+
+
 def midi_evidence_key(label: str) -> str:
     """Return a citation-safe key for a controller move label."""
     return _evidence_token(label) or "unknown_move"
@@ -1932,6 +2041,18 @@ def live_mix_evidence_keys(
     if move_scope_key:
         keys.append(move_scope_key)
     deltas = [str(item) for item in (audio_delta_items or render_audio_delta_items(state)) if item]
+    license_ = (
+        _licensed_move_effect(
+            state,
+            labels,
+            audio_delta_items=deltas,
+            audio_capture_context=audio_capture_context,
+        )
+        if labels
+        else None
+    )
+    if license_ is not None:
+        keys.append(license_.evidence_key)
     prefix = "move_effect" if labels else "audio_delta"
     for delta in deltas[:4]:
         keys.append(f"{prefix}={_evidence_token(delta)}")
@@ -2078,6 +2199,12 @@ def render_move_effect_context(
     if not moves:
         return None
     deltas = [str(item) for item in (audio_delta_items or render_audio_delta_items(state)) if item]
+    license_ = _licensed_move_effect(
+        state,
+        moves,
+        audio_delta_items=deltas,
+        audio_capture_context=audio_capture_context,
+    )
     deck_delta = _move_deck_audio_delta_token(audio_capture_context)
     deck_window = _move_deck_audio_window_token(audio_capture_context)
     if not deltas and not deck_delta and not deck_window:
@@ -2092,7 +2219,10 @@ def render_move_effect_context(
         fields.append(f"deck_deltas={deck_delta}")
     if deck_window:
         fields.append(f"deck_windows={deck_window}")
-    if deck_delta or deck_window:
+    if license_ is not None:
+        fields.append(f"license={license_.context_token}")
+        fields.append("rule=move_effect_prediction_and_measurement_agree")
+    elif deck_delta or deck_window:
         fields.append("rule=move_audio_timing_not_causal_or_quality_proof")
     else:
         fields.append("rule=dsp_delta_not_causal_proof")
@@ -2339,6 +2469,11 @@ def apply_live_claim_guard(
     outcome_claim = has_multi_deck_outcome_claim(text)
     public_diagnostic = bool(_LIVE_PUBLIC_DIAGNOSTIC_RE.search(text))
     effect_deltas = [str(item) for item in (audio_delta_items or render_audio_delta_items(state))]
+    source_detail_reason = _unsupported_audio_source_detail_reason(
+        text,
+        state,
+        event_type=event_type,
+    )
     if _has_unsupported_mixer_low_kill_claim(text, state):
         summary = _live_guard_summary(state, moves)
         mixer_summary = _mixer_low_summary(state)
@@ -2377,6 +2512,27 @@ def apply_live_claim_guard(
         )
     )
     if effect_claim and not _MOVE_EFFECT_DISCLAIMER_RE.search(text):
+        causal_control_claim = bool(
+            _MOVE_EFFECT_CONTROL_RE.search(text) and _MOVE_EFFECT_CAUSAL_VERDICT_RE.search(text)
+        )
+        license_ = (
+            _licensed_move_effect(
+                state,
+                moves,
+                audio_delta_items=effect_deltas,
+                audio_capture_context=audio_capture_context,
+            )
+            if causal_control_claim and source_detail_reason is None
+            else None
+        )
+        if license_ is not None:
+            return LiveClaimGuardResult(
+                text=text,
+                corrected=False,
+                policy="move_effect_supported",
+                reason="prediction_and_measured_delta_agree",
+                summary=f"{license_.context_token}; evidence={_evidence_key(license_.evidence_key)}",
+            )
         summary = _live_guard_summary(state, moves)
         delta_hint = "; ".join(effect_deltas[:2])
         log_summary = summary + (
@@ -2389,11 +2545,6 @@ def apply_live_claim_guard(
             reason="dsp_delta_not_causal_proof",
             summary=log_summary,
         )
-    source_detail_reason = _unsupported_audio_source_detail_reason(
-        text,
-        state,
-        event_type=event_type,
-    )
     if source_detail_reason is not None:
         summary = _live_guard_summary(state, moves)
         return LiveClaimGuardResult(

@@ -1766,7 +1766,9 @@ def test_move_effect_context_maps_recent_move_to_dsp_delta() -> None:
     assert out is not None
     assert "move_effect_context[" in out
     assert "deltas=sub energy fell 50% (strong); low energy fell 50% (strong)" in out
-    assert "rule=dsp_delta_not_causal_proof" in out
+    assert "license=low_kill:sub:pred_fell_" in out
+    assert "measured_fell" in out
+    assert "rule=move_effect_prediction_and_measurement_agree" in out
 
 
 def test_move_effect_context_maps_recent_move_to_deck_audio_windows() -> None:
@@ -1807,6 +1809,7 @@ def test_grounding_refs_render_only_registered_deck_move_atoms() -> None:
     assert "deck_lanes=A_known_route_dominant+B_unknown_route_muted" in mix_keys
     assert "deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted" in mix_keys
     assert "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none" in mix_keys
+    assert "move_effect=low_kill:sub:pred_fell_19db:measured_fell" in mix_keys
     assert "move_effect=sub_energy_fell_50pct_strong" in mix_keys
 
     out = render_grounding_ref_context(
@@ -1824,6 +1827,7 @@ def test_grounding_refs_render_only_registered_deck_move_atoms() -> None:
     assert "[mix:deck_lanes=A_known_route_dominant+B_unknown_route_muted]" in out
     assert "[mix:deck_reference=deck1_A_known_route_dominant+deck2_B_unknown_route_muted]" in out
     assert "[mix:deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none]" in out
+    assert "[mix:move_effect=low_kill:sub:pred_fell_19db:measured_fell]" in out
     assert "[mix:move_effect=sub_energy_fell_50pct_strong]" in out
     assert render_grounding_ref_context(state, registry_snapshot={}) is None
 
@@ -1901,6 +1905,7 @@ def test_live_evidence_context_renders_deck_move_and_audio_categories() -> None:
     )
     assert "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none" in packet["mix"]
     assert "move_scope=single_deck_move_A" in packet["mix"]
+    assert "move_effect=low_kill:sub:pred_fell_19db:measured_fell" in packet["mix"]
     assert "move_effect=sub_energy_fell_50pct_strong" in packet["mix"]
     assert out is not None
     assert "live_evidence[" in out
@@ -1970,7 +1975,7 @@ def test_live_evidence_context_filters_stale_implicit_moves() -> None:
     assert "transition_block=single_resolved_deck" in out
 
 
-def test_live_claim_guard_corrects_move_effect_causal_verdict() -> None:
+def test_live_claim_guard_licenses_grounded_move_effect_causal_verdict() -> None:
     state = MusicState(audible=True, rms=0.12, audible_deck="A")
     state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
     state.prev_perceive = {
@@ -1987,12 +1992,34 @@ def test_live_claim_guard_corrects_move_effect_causal_verdict() -> None:
     result = apply_live_claim_guard("That low cut cleaned the mix.", state, moves)
 
     assert should_defer_live_claim_stream(state, moves) is True
+    assert result.corrected is False
+    assert result.policy == "move_effect_supported"
+    assert result.reason == "prediction_and_measured_delta_agree"
+    assert result.text == "That low cut cleaned the mix."
+    assert "low_kill:sub:pred_fell_19db:measured_fell" in result.summary
+    assert "move_effect=low_kill:sub:pred_fell_19db:measured_fell" in result.summary
+
+
+def test_live_claim_guard_refuses_move_effect_when_measured_bands_are_flat() -> None:
+    state = MusicState(audible=True, rms=0.12, audible_deck="A")
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
+    state.prev_perceive = {
+        "rms": 0.12,
+        "sub": 0.12,
+        "low": 0.16,
+        "mid": 0.40,
+        "high": 0.32,
+        "onset_density": 2.0,
+    }
+    state.deck_state = DeckState(decks={"A": _deck("OutA", camelot="8A")})
+    moves = ["A_low: flat→killed"]
+
+    result = apply_live_claim_guard("That low cut cleaned the mix.", state, moves)
+
     assert result.corrected is True
     assert result.policy == "move_effect_not_verdict"
     assert result.reason == "dsp_delta_not_causal_proof"
     assert "can't tell" in result.text.lower()
-    assert "control caused that" in result.text
-    assert "sub energy fell 50% (strong)" in result.summary
 
 
 def test_live_claim_guard_corrects_bare_move_effect_quality_verdict() -> None:
@@ -2197,7 +2224,7 @@ def test_live_claim_guard_keeps_move_present_effect_policy() -> None:
         "that EQ move cleaned up the low end",
         state,
         moves,
-        audio_delta_items=["low energy fell 50% (strong)"],
+        audio_delta_items=["high energy fell 50% (strong)"],
     )
 
     assert result.corrected is True

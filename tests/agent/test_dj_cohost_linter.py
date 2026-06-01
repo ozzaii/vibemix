@@ -319,8 +319,8 @@ def test_live_claim_guard_defers_watch_only_stream_before_correction(mocker, tmp
     assert "Nice handoff" in guard_log["raw_text"]
 
 
-def test_live_claim_guard_corrects_move_effect_verdict(mocker, tmp_path) -> None:
-    """DSP deltas may ground a change, not a causal/quality verdict."""
+def test_licensed_move_effect_still_requires_citation(mocker, tmp_path) -> None:
+    """A physics-licensed move effect is still silent without a citation."""
     registry = EvidenceRegistry()
     agent, gen, recorder, state, _, _, _ = _build_agent_wired(mocker, tmp_path, registry)
     state.audible = True
@@ -350,14 +350,11 @@ def test_live_claim_guard_corrects_move_effect_verdict(mocker, tmp_path) -> None
     assert chunks == []
     kinds = [kind for kind, _ in recorder.events]
     assert "ai_text" not in kinds
-    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
-    assert guard_log["action"] == "strip"
-    assert guard_log["policy"] == "move_effect_not_verdict"
-    assert guard_log["reason"] == "dsp_delta_not_causal_proof"
-    assert "Your low cut cleaned" in guard_log["raw_text"]
-    assert guard_log["corrected_text"] == (
-        "I can't tell from this live proof whether the control caused that."
-    )
+    assert "live_claim_guard" not in kinds
+    assert "citation_strip" in kinds
+    strip_log = next(fields for kind, fields in recorder.events if kind == "citation_strip")
+    assert strip_log["reason"] == "no_citations"
+    assert "Your low cut cleaned" in strip_log["raw_text"]
 
 
 def test_live_claim_guard_strips_hidden_source_detail_before_tts(mocker, tmp_path) -> None:
