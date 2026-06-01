@@ -760,9 +760,7 @@ def test_viber_live_context_readiness_explains_deck_identity_source_blockers():
         in readiness["blockers"]
     )
     assert "second deck identity source requires independent deck evidence" in readiness["blockers"]
-    assert "screen vision is not currently resolving the independent second deck" in readiness[
-        "blockers"
-    ]
+    assert "second deck identity source is not enabled" in readiness["blockers"]
 
 
 def test_viber_live_context_readiness_diagnoses_stale_socket_before_physical_proof():

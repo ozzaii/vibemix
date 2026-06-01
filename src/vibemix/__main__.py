@@ -5275,8 +5275,10 @@ def _viber_deck_source_status_blockers(source_status: dict[str, str]) -> list[st
         blockers.append("deck identity source: controller posture did not identify one deck")
     if status.get("second_deck_source") == "suppressed_requires_independent_source":
         blockers.append("second deck identity source requires independent deck evidence")
-    if status.get("screen_vision") in {"disabled", "enabled_no_reader"}:
-        blockers.append("screen vision is not currently resolving the independent second deck")
+    if status.get("screen_vision") == "enabled_no_reader":
+        blockers.append("deck identity source: screen vision reader is unavailable")
+    elif status.get("screen_vision") == "disabled":
+        blockers.append("second deck identity source is not enabled")
 
     out: list[str] = []
     seen: set[str] = set()
