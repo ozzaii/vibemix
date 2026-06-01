@@ -27,6 +27,7 @@ import {
 } from "./surface-mounts.js";
 import { extractSurfaceMarkup } from "./scaffolds.js";
 import { wireActivation } from "./activation-bridge.js";
+import { mountLibraryFreshnessBadge } from "./LibraryFreshnessBadge.js";
 import { routeSession } from "../session/router.js";
 import { closeSettings, openSettings } from "../settings/SettingsDrawer.js";
 import { getSettingsUIState, subscribeSettingsUI } from "../settings/state.js";
@@ -127,6 +128,8 @@ export async function mountShellApp(host: HTMLElement): Promise<MountedShellApp>
   const shell = mountDesktopShell(host);
   const surfaces = await mountSurfacesInto(host, appDeps);
   const unwireSettings = wireSettingsNav(shell);
+  const footer = host.querySelector<HTMLElement>(".shell-footer");
+  const freshnessBadge = footer ? mountLibraryFreshnessBadge(footer) : null;
   // Feed the live session onto the shell's self-arranging activation +
   // connection (energy field, connection dot, the grounding panel auto-open).
   const unwireActivation = wireActivation(shell.store);
@@ -137,6 +140,7 @@ export async function mountShellApp(host: HTMLElement): Promise<MountedShellApp>
     surfaces,
     teardown(): void {
       unwireActivation();
+      freshnessBadge?.teardown();
       unwireSettings();
       surfaces.teardown();
       shell.teardown();

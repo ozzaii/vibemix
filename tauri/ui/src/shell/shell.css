@@ -713,6 +713,44 @@
   border-radius: 50%;
   background: var(--text-disabled);
 }
+.shell-footer .footer-separator {
+  width: 1px;
+  height: 11px;
+  margin: 0 2px;
+  background: var(--border-default);
+  opacity: 0.9;
+}
+.shell-footer .library-freshness-badge {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: min(32vw, 180px);
+  gap: 5px;
+  color: var(--text-tertiary);
+}
+.shell-footer .library-freshness-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--text-disabled);
+}
+.shell-footer .library-freshness-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-footer .library-freshness-badge[data-state="ok"] .library-freshness-dot {
+  background: var(--led-ok);
+}
+.shell-footer .library-freshness-badge[data-state="warn"] .library-freshness-dot,
+.shell-footer .library-freshness-badge[data-state="empty"] .library-freshness-dot {
+  background: var(--led-warn);
+}
+.shell-footer .library-freshness-badge[data-state="fault"] .library-freshness-dot {
+  background: var(--led-fault);
+}
 /* Steady lit when connected — a stable power LED, not a breath. The deck tail
  * cursor owns the live breathing, so a connected dot does NOT animate; only
  * "reconnecting" pulses for attention. Keeps one breathing mark on screen. */

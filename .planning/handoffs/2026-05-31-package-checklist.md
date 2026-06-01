@@ -1117,6 +1117,46 @@ Remaining gate:
 - Trigger the refresh action from the stale banner, verify importer progress,
   and show Viber set-prep unblocks only after freshness returns current.
 
+## Package 5G - Shell Library Freshness Badge
+
+Suggested commit: `feat(tauri-ui): show library freshness in shell`
+
+Include:
+
+- `tauri/ui/src/shell/LibraryFreshnessBadge.ts`
+- `tauri/ui/src/shell/app.ts`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/shell/library-freshness-badge.spec.ts`
+- `.planning/packets/2026-06-01/CODEX_READY-library-freshness-badge.md`
+
+Reason:
+
+- Packages 5C through 5F made library freshness source-aware, actionable, and
+  replayed to late UI clients. This package makes the same truth glanceable in
+  the main shell footer so the DJ does not need to open Settings or Crate to
+  know whether Viber/set-prep is reading fresh library context.
+- The badge is display-only. It consumes `libraryStats()` and renders
+  `library fresh`, `library stale`, `library not indexed`, or `library unknown`
+  with an honest state dot. It does not add a backend command, watcher, or
+  automatic ingest loop.
+- Backend failures degrade to `library unknown`, not a fake green state.
+
+Proof already run:
+
+- `npm --prefix tauri/ui test -- tests/shell/library-freshness-badge.spec.ts tests/shell/shell.spec.ts`
+  passed: 15 tests.
+- `npm --prefix tauri/ui test -- tests/shell/library-freshness-badge.spec.ts src/library/api.test.ts`
+  passed: 47 tests.
+- `npm --prefix tauri/ui run build` passed.
+- `git diff --check -- tauri/ui/src/shell/LibraryFreshnessBadge.ts tauri/ui/src/shell/app.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/library-freshness-badge.spec.ts`
+  passed.
+
+Remaining gate:
+
+- Eye-check the badge inside a live or packaged shell before screenshot or
+  release copy claims. This package proves the UI contract and build, not final
+  visual acceptance on the signed artifact.
+
 ## Hold Lane - Rebuild Carry-Forward Cue Agreement Flywheel
 
 Suggested commit if/when selected: `feat(library): record cue agreement weak labels`
