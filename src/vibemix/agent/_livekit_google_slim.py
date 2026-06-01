@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Import only the LiveKit Google submodules VibeMix uses.
+"""Import only the LiveKit Google LLM submodule VibeMix uses.
 
 ``livekit.plugins.google.__init__`` eagerly imports Google Cloud STT/TTS,
 which pulls grpc and the cloud speech/text-to-speech clients into local/demo
-paths that only need Gemini LLM and native Gemini TTS.  These helpers install
+paths that only need Gemini LLM. These helpers install
 package stubs with the real package search paths, then import the exact leaf
 modules without executing the eager package initializer.
 """
@@ -30,12 +30,6 @@ def _google_package_getattr(name: str) -> Any:
     raise AttributeError(f"module 'livekit.plugins.google' has no attribute {name!r}")
 
 
-def _beta_package_getattr(name: str) -> Any:
-    if name in {"GeminiTTS", "TTS"}:
-        return gemini_native_tts_class()
-    raise AttributeError(f"module 'livekit.plugins.google.beta' has no attribute {name!r}")
-
-
 def _stub_package(name: str) -> ModuleType:
     existing = sys.modules.get(name)
     if existing is not None:
@@ -58,8 +52,6 @@ def _stub_package(name: str) -> ModuleType:
     module.__spec__ = package_spec
     if name == "livekit.plugins.google":
         module.__getattr__ = _google_package_getattr  # type: ignore[attr-defined]
-    elif name == "livekit.plugins.google.beta":
-        module.__getattr__ = _beta_package_getattr  # type: ignore[attr-defined]
     sys.modules[name] = module
     parent_name, _, child_name = name.rpartition(".")
     parent = sys.modules.get(parent_name)
@@ -70,7 +62,6 @@ def _stub_package(name: str) -> ModuleType:
 
 def _ensure_google_package_stubs() -> None:
     _stub_package("livekit.plugins.google")
-    _stub_package("livekit.plugins.google.beta")
 
 
 def google_llm_class() -> type[Any]:
@@ -79,12 +70,3 @@ def google_llm_class() -> type[Any]:
     google_pkg = sys.modules["livekit.plugins.google"]
     google_pkg.LLM = module.LLM  # type: ignore[attr-defined]
     return module.LLM
-
-
-def gemini_native_tts_class() -> type[Any]:
-    _ensure_google_package_stubs()
-    module = importlib.import_module("livekit.plugins.google.beta.gemini_tts")
-    beta_pkg = sys.modules["livekit.plugins.google.beta"]
-    beta_pkg.gemini_tts = module  # type: ignore[attr-defined]
-    beta_pkg.GeminiTTS = module.TTS  # type: ignore[attr-defined]
-    return module.TTS

@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 from livekit.agents import tts as agents_tts
 
 from vibemix.agent.proxy_client import build_proxy_genai_client, build_proxy_tts_chain
@@ -51,10 +54,21 @@ def test_proxy_03b_tts_chain_uses_local_moss_when_enabled(mocker):
     fake_moss_cls.return_value.prewarm.assert_called_once()
 
 
-def test_proxy_04_monkey_patch_active_after_proxy_client_import():
-    """PROXY-04: the legacy OpenRouter audio patch remains available."""
-    from livekit.plugins.openai import tts as t
-
-    import vibemix.agent.tts_chain  # noqa: F401
-
-    assert "google/gemini-3.1-flash-tts-preview" in t.AUDIO_STREAM_MODELS
+def test_proxy_04_tts_chain_does_not_import_openai_tts_plugin() -> None:
+    """PROXY-04: MOSS-only voice does not patch or import OpenAI TTS."""
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys\n"
+                "import vibemix.agent.tts_chain\n"
+                "assert 'livekit.plugins.openai.tts' not in sys.modules\n"
+                "print('OK')\n"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.stdout.strip() == "OK"

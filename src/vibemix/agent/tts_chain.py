@@ -5,10 +5,6 @@ The product voice has exactly one source: ``MossLocalTTS``. Direct and proxy
 sessions both build the same local provider; cloud TTS keys are intentionally
 ignored here so a missing or failing local voice cannot silently fall back to a
 paid/provider voice.
-
-The legacy OpenRouter audio-stream monkey patch stays at module load for
-backward compatibility with older imports/tests, but this module no longer
-instantiates OpenAI, Gemini-native, or Cartesia TTS providers.
 """
 
 from __future__ import annotations
@@ -16,11 +12,6 @@ from __future__ import annotations
 from typing import Literal
 
 from livekit.agents import tts as agents_tts
-from livekit.plugins.openai import tts as _openai_tts_mod
-
-from vibemix.agent.config import OPENROUTER_TTS_MODEL
-
-_openai_tts_mod.AUDIO_STREAM_MODELS.add(OPENROUTER_TTS_MODEL)
 
 
 def _build_moss_chain() -> agents_tts.FallbackAdapter:

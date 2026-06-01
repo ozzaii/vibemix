@@ -10,12 +10,12 @@ Gemini surface.
 Phase 11's calibration wizard will surface the device names as user-editable
 Settings; v4 hard-codes them so we port the v4 defaults verbatim.
 
-Plan 41-01 migration: the LLM and legacy TTS model strings are now resolved
-through :func:`vibemix.llm.model_router.resolve` so a future SKU bump is
-a one-file edit in ``vibemix/llm/_router_config.py``. The constant *names* are
-preserved (``LLM_MODEL``, ``TTS_MODEL``, …) for backward compatibility. Live
-co-host speech no longer uses those cloud TTS IDs; ``agent.tts_chain`` resolves
-to local MOSS only.
+Plan 41-01 migration: the LLM and legacy TTS model strings are resolved through
+:func:`vibemix.llm.model_router.resolve` so a future SKU bump is a one-file edit
+in ``vibemix/llm/_router_config.py``. The legacy TTS constant *names* are
+preserved (``TTS_MODEL``, ``TTS_FALLBACK_MODEL``, …) for import compatibility
+only. Live co-host speech never uses those cloud TTS IDs; ``agent.tts_chain``
+resolves to local MOSS only.
 """
 
 from __future__ import annotations
@@ -34,11 +34,6 @@ TTS_FALLBACK_MODEL: str = resolve_model("live_coach_tts_fallback")
 # outside ``llm/_router_config.py``.
 OPENROUTER_LLM_MODEL: str = resolve_model("live_coach_openrouter")
 OPENROUTER_TTS_MODEL: str = resolve_model("live_coach_tts_openrouter")
-# Cartesia (Sonic) legacy constant. It is not an active live-cohost voice
-# provider; MOSS is the single TTS source. Kept OUT of model_router by the SAME
-# convention as the Viber/DeepSeek brain: the router is deliberately Gemini-only
-# (test_no_non_gemini_models). Env-overridable for compatibility only.
-CARTESIA_TTS_MODEL: str = os.environ.get("VIBEMIX_CARTESIA_MODEL", "sonic-3")
 
 # ---- ServiceTier dispatch (Plan 41-01, LAT-07) ----
 # Exposed alongside LLM_MODEL so callers that need the tier (e.g. the
@@ -47,12 +42,6 @@ CARTESIA_TTS_MODEL: str = os.environ.get("VIBEMIX_CARTESIA_MODEL", "sonic-3")
 # want both values for a different path should import ``resolve`` directly.
 # ---- Voice id (v4:104) ----
 VOICE: str = "Achird"
-
-# Cartesia voice id retained for compatibility with old imports. A voice UUID is
-# not a Gemini model literal, so it lives here (not the router).
-CARTESIA_VOICE: str = os.environ.get(
-    "VIBEMIX_CARTESIA_VOICE", "f786b574-daa5-4673-aa0c-cbe3e8534c02"
-)
 
 # ---- Device names (v4:101-103) ----
 # Factory defaults stay pinned for ordinary installs. The env overrides are

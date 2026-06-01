@@ -21,17 +21,15 @@ def test_slim_livekit_google_leaves_do_not_load_cloud_stack() -> None:
     out = _run_probe(
         """
 import sys
-from vibemix.agent._livekit_google_slim import google_llm_class, gemini_native_tts_class
+from vibemix.agent._livekit_google_slim import google_llm_class
 
 LLM = google_llm_class()
-TTS = gemini_native_tts_class()
 from livekit.plugins import google as google_plugin
-from livekit.plugins.google.beta import gemini_tts
 
 assert google_plugin.LLM is LLM
-assert gemini_tts.TTS is TTS
 assert not [m for m in sys.modules if m.startswith("google.cloud")]
 assert not [m for m in sys.modules if m.startswith("grpc")]
+assert "livekit.plugins.google.beta" not in sys.modules
 assert "livekit.plugins.google.stt" not in sys.modules
 assert "livekit.plugins.google.tts" not in sys.modules
 print("OK")

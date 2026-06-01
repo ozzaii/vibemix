@@ -4545,6 +4545,53 @@ Remaining gate:
   This package makes the app honest about that readiness; it does not create the
   public artifact.
 
+## Package 14G - Retire Dead Cloud TTS Residue
+
+Suggested commit: `fix(tts): remove dead cloud tts residue`
+
+Packaging decision: MOSS is the only live co-host TTS source. This package
+removes source-level residue that still patched or exposed cloud TTS provider
+paths even though no live code may select them.
+
+Include:
+
+- `src/vibemix/agent/tts_chain.py`
+- `src/vibemix/agent/_livekit_google_slim.py`
+- `src/vibemix/agent/config.py`
+- `tests/agent/test_tts_chain.py`
+- `tests/agent/test_proxy_client.py`
+- `tests/agent/test_livekit_google_slim.py`
+- `tests/agent/test_config.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- LLM/OpenRouter brain dispatch.
+- MOSS local runtime, model download, and packaging behavior.
+- Any fallback to cloud/provider speech.
+
+Reason:
+
+- `tts_chain.py` was still importing `livekit.plugins.openai.tts` to patch the
+  legacy OpenRouter audio-stream model registry, and `_livekit_google_slim.py`
+  still exposed a Gemini-native TTS helper used only by tests. Those are
+  incompatible with the current "MOSS only" source-of-truth even if they were
+  not selected by `build_tts_chain()`.
+- The slice keeps legacy model constants only as import-compatibility strings;
+  it removes the provider side effects and orphaned Cartesia voice config.
+
+Proof for this cleanup slice:
+
+- `uv run pytest -q tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py`
+- `uv run ruff check src/vibemix/agent/tts_chain.py src/vibemix/agent/_livekit_google_slim.py src/vibemix/agent/config.py tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py`
+- `git diff --check -- src/vibemix/agent/tts_chain.py src/vibemix/agent/_livekit_google_slim.py src/vibemix/agent/config.py tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- This only removes dead cloud-TTS residue. It does not solve fresh-machine MOSS
+  model availability, packaged audio proof, or ear-pass quality.
+
 ## Hold Lane - Local MOSS TTS ONNX Runtime Spike
 
 Suggested commit if/when it ships: `feat(tts): add wrapped local moss onnx runtime`

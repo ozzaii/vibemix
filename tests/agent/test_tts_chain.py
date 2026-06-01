@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 from livekit.agents import tts as agents_tts
 
 
@@ -74,13 +77,23 @@ def test_tts_chain_unknown_mode_raises(mocker) -> None:
         raise AssertionError("unknown mode must raise")
 
 
-def test_tts_chain_keeps_legacy_openrouter_audio_stream_patch() -> None:
-    from livekit.plugins.openai import tts as openai_tts_mod
-
-    import vibemix.agent.tts_chain  # noqa: F401
-    from vibemix.agent.config import OPENROUTER_TTS_MODEL
-
-    assert OPENROUTER_TTS_MODEL in openai_tts_mod.AUDIO_STREAM_MODELS
+def test_tts_chain_does_not_import_openai_tts_plugin() -> None:
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys\n"
+                "import vibemix.agent.tts_chain\n"
+                "assert 'livekit.plugins.openai.tts' not in sys.modules\n"
+                "print('OK')\n"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.stdout.strip() == "OK"
 
 
 def test_pkg_02_build_tts_chain_exported() -> None:
