@@ -882,7 +882,7 @@ body {
 .vmx-lib-command-field {
   display: none;
 }
-body[data-mode="chat"] .vmx-lib-command-field {
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-command-field {
   position: absolute;
   inset: clamp(18px, 3vw, 42px);
   display: grid;
@@ -974,18 +974,18 @@ body[data-mode="chat"] .vmx-lib-command-field {
 .vmx-lib-chat-side {
   display: none;
 }
-body[data-mode="chat"] .vmx-lib-results,
-body[data-mode="chat"] .vmx-lib-rationale,
-body[data-mode="chat"] .vmx-lib-export,
-body[data-mode="chat"] .vmx-lib-ingest,
-body[data-mode="chat"] .vmx-lib-scope-wrap {
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-results,
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-rationale,
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-export,
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-ingest,
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-scope-wrap {
   display: none;
 }
-body[data-mode="chat"] .vmx-lib-panel:nth-child(2) .vmx-lib-panel-bd {
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:nth-child(2) .vmx-lib-panel-bd {
   display: flex;
   flex-direction: column;
 }
-body[data-mode="chat"] .vmx-lib-chat-thread {
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-thread {
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -1015,7 +1015,7 @@ body[data-mode="chat"] .vmx-lib-chat-thread {
 }
 /* The lit upper seam — a quiet rose hairline catching the slab's machined lip,
    echoing the .vmx-lib-frame::before edge so the console reads as one rack. */
-body[data-mode="chat"] .vmx-lib-chat-thread::before {
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-thread::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;
@@ -1024,7 +1024,7 @@ body[data-mode="chat"] .vmx-lib-chat-thread::before {
   pointer-events: none;
   z-index: 2;
 }
-body[data-mode="chat"] .vmx-lib-chat-side {
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-side {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1033,7 +1033,7 @@ body[data-mode="chat"] .vmx-lib-chat-side {
   background:
     linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 36%, rgba(0, 0, 0, 0.18));
 }
-body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-side:empty::before {
   content: "side rack idle";
   display: block;
   padding: 11px 12px;
@@ -1673,9 +1673,9 @@ body[data-mode="chat"] .vmx-lib-chat-side:empty::before {
    .vmx-lib-results rows). Material panel, single amber accent on the label —
    restrained, not a decorative card. */
 .vmx-lib-rationale { display: none; }
-body[data-mode="curate"] .vmx-lib-rationale,
-body[data-mode="build"] .vmx-lib-rationale,
-body[data-mode="cue"] .vmx-lib-rationale {
+:is(body, .vmx-lib-app)[data-mode="curate"] .vmx-lib-rationale,
+:is(body, .vmx-lib-app)[data-mode="build"] .vmx-lib-rationale,
+:is(body, .vmx-lib-app)[data-mode="cue"] .vmx-lib-rationale {
   display: block;
   margin-bottom: 16px;
   padding: 15px 16px;
@@ -1894,9 +1894,9 @@ body[data-mode="cue"] .vmx-lib-rationale {
 
 /* ── ingest mode (overlays center when active) ──────────── */
 .vmx-lib-ingest { display: none; flex-direction: column; gap: 14px; }
-body[data-mode="ingest"] .vmx-lib-results { display: none; }
-body[data-mode="ingest"] .vmx-lib-ingest { display: flex; }
-body[data-mode="ingest"] .vmx-lib-qecho { display: none; }
+:is(body, .vmx-lib-app)[data-mode="ingest"] .vmx-lib-results { display: none; }
+:is(body, .vmx-lib-app)[data-mode="ingest"] .vmx-lib-ingest { display: flex; }
+:is(body, .vmx-lib-app)[data-mode="ingest"] .vmx-lib-qecho { display: none; }
 
 .vmx-lib-progress {
   height: 10px;
@@ -2034,7 +2034,7 @@ body[data-mode="ingest"] .vmx-lib-qecho { display: none; }
     max-width: 360px;
     align-self: center;
   }
-  body[data-mode="chat"] .vmx-lib-command-field {
+  :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-command-field {
     inset: 18px;
     opacity: 0.26;
   }

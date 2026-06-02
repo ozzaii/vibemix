@@ -68,7 +68,7 @@ export const initialLibraryState: LibraryState = {
   cueFolder: "~/Music",
   cueExport: "rekordbox",
   theme: "warm sunset rooftop, dusk to dark",
-  brief: "warehouse opener, melodic into rolling — 90 min",
+  brief: "warehouse opener, melodic into rolling, 90 min",
   curve: "peak_time",
   chatMessage: "",
 };

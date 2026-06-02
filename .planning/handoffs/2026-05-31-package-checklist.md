@@ -9863,3 +9863,42 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/surfaces.ts tauri/ui/src/shell/surface-mounts.ts tauri/ui/tests/shell/shell.spec.ts tauri/ui/tests/shell/surface-mounts.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 67 - Folded Viber Crate Mount
+
+Suggested commit: `fix(crate-ui): mount viber inside shell crate`
+
+Include:
+
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/library.css`
+- `tauri/ui/src/library/state-machine.ts`
+- `tauri/ui/src/library/folded-mount.test.ts`
+- `tauri/ui/src/shell/app.ts`
+- `tauri/ui/src/shell/surface-mounts.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Viber backend/tool semantics, Learn, Deck, Settings drawer behavior, Sven
+  speech, runtime audio, packaging scripts, and broad shell layout. This package
+  only makes the existing Viber/library UI mount safely as the shell's Crate
+  interior and logs any future fold-in failures to `ui.log`.
+
+Reason:
+
+- The exact signed app at `7982a72d` showed the improved Crate fallback instead
+  of the real Viber operator. The folded mount path still treated the library
+  page as a document-wide surface: auto-boot could fire from injected scaffold
+  markup, selectors reached outside the Crate root, and mode CSS only listened
+  to `body[data-mode]`. Scope Viber DOM lookup/event binding to the provided
+  mount root, let folded mode drive `.vmx-lib-app[data-mode]`, preserve
+  standalone `library.html` auto-boot, and send mount failures into the
+  headless `ui.log` sink.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- src/library/folded-mount.test.ts src/library/chat.test.ts src/library/build.test.ts tests/shell/shell.spec.ts tests/shell/surface-mounts.spec.ts tests/shell/scaffolds.spec.ts tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/library/index.ts tauri/ui/src/library/library.css tauri/ui/src/library/state-machine.ts tauri/ui/src/library/folded-mount.test.ts tauri/ui/src/shell/app.ts tauri/ui/src/shell/surface-mounts.ts .planning/handoffs/2026-05-31-package-checklist.md`

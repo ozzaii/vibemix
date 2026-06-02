@@ -93,10 +93,28 @@ import {
 
 // ── DOM lookups ─────────────────────────────────────────────────────────────
 
+let libraryRoot: ParentNode = document;
+
+function setLibraryRoot(root: ParentNode): void {
+  libraryRoot = root;
+}
+
 function $(id: string): HTMLElement {
-  const el = document.getElementById(id);
+  const el = $maybe(id);
   if (!el) throw new Error(`vmx-lib: missing #${id}`);
   return el;
+}
+
+function $maybe(id: string): HTMLElement | null {
+  const el =
+    libraryRoot instanceof Document
+      ? libraryRoot.getElementById(id)
+      : libraryRoot.querySelector<HTMLElement>(`#${id}`);
+  return el;
+}
+
+function $all<E extends HTMLElement = HTMLElement>(selector: string): NodeListOf<E> {
+  return libraryRoot.querySelectorAll<E>(selector);
 }
 
 // ── Render helpers ──────────────────────────────────────────────────────────
@@ -471,10 +489,10 @@ function clearRationale(): void {
   $("vmx-lib-rationale-meta").textContent = "";
   // The export line is shared by build mode; clear it too so a stale "Exported
   // → …" never lingers under a fresh error or after leaving build/curate.
-  const exportEl = document.getElementById("vmx-lib-export");
+  const exportEl = $maybe("vmx-lib-export");
   if (exportEl) {
     exportEl.style.display = "none";
-    const p = document.getElementById("vmx-lib-export-path");
+    const p = $maybe("vmx-lib-export-path");
     if (p) p.textContent = "";
   }
 }
@@ -703,7 +721,7 @@ function renderStats(stats: LibraryStats): void {
   $("vmx-lib-stat-backend").textContent = libraryBackendLabel(stats.backend);
   $("vmx-lib-stat-spent").textContent = `€${stats.spent_eur.toFixed(2)}`;
   $("vmx-lib-stat-failed").textContent = String(stats.failed);
-  const engineLabelEl = document.getElementById("vmx-lib-engine-label");
+  const engineLabelEl = $maybe("vmx-lib-engine-label");
   if (engineLabelEl) engineLabelEl.textContent = embeddingLabel(stats);
   renderAgentSetup(stats);
   if (latestModels) renderModelSetup(latestModels);
@@ -715,7 +733,7 @@ function renderStatsError(err: unknown): void {
   $("vmx-lib-stat-backend").textContent = "unavailable";
   $("vmx-lib-stat-spent").textContent = "·";
   $("vmx-lib-stat-failed").textContent = "·";
-  const engineLabelEl = document.getElementById("vmx-lib-engine-label");
+  const engineLabelEl = $maybe("vmx-lib-engine-label");
   if (engineLabelEl) engineLabelEl.textContent = "library stats unavailable";
   renderAgentSetup(null);
   // eslint-disable-next-line no-console
@@ -917,8 +935,8 @@ function agentSetupHint(stats: LibraryStats | null): string | null {
 }
 
 function renderAgentSetup(stats: LibraryStats | null): void {
-  const setupEl = document.getElementById("vmx-lib-agent-setup");
-  const stateEl = document.getElementById("vmx-lib-agent-state");
+  const setupEl = $maybe("vmx-lib-agent-setup");
+  const stateEl = $maybe("vmx-lib-agent-state");
   if (!setupEl || !stateEl) return;
 
   const hint = agentSetupHint(stats);
@@ -1782,7 +1800,8 @@ function renderChatError(err: unknown): void {
 
 // ── Bootstrap ───────────────────────────────────────────────────────────────
 
-export function mountLibrary(): void {
+export function mountLibrary(root: ParentNode = document): void {
+  setLibraryRoot(root);
   let state: LibraryState = initialLibraryState;
   let busy = false;
   let runSeq = 0;
@@ -1812,13 +1831,15 @@ export function mountLibrary(): void {
   seedNameEl.textContent = state.seed;
 
   function applyModeVisibility(): void {
-    document.body.dataset.mode = state.mode;
-    document
-      .querySelectorAll<HTMLElement>(".vmx-lib-modeswitch button")
-      .forEach((b) => {
-        b.setAttribute("aria-selected", String(b.dataset.mode === state.mode));
-      });
-    document.querySelectorAll<HTMLElement>("[data-for]").forEach((el) => {
+    const app = runBtn.closest<HTMLElement>(".vmx-lib-app");
+    app?.setAttribute("data-mode", state.mode);
+    if (root instanceof Document) {
+      document.body.dataset.mode = state.mode;
+    }
+    $all(".vmx-lib-modeswitch button").forEach((b) => {
+      b.setAttribute("aria-selected", String(b.dataset.mode === state.mode));
+    });
+    $all("[data-for]").forEach((el) => {
       const modes = (el.dataset.for ?? "").split(" ");
       el.style.display = modes.includes(state.mode) ? "" : "none";
     });
@@ -1964,7 +1985,7 @@ export function mountLibrary(): void {
       renderChatIdleSide();
       return;
     }
-    document.getElementById("vmx-lib-chat-starters")?.setAttribute("hidden", "");
+    $maybe("vmx-lib-chat-starters")?.setAttribute("hidden", "");
     const message = state.chatMessage;
     const priorHistory = chatHistory.slice();
 
@@ -2014,7 +2035,7 @@ export function mountLibrary(): void {
 
   /** Reflect the active curve onto the segmented picker's pressed state. */
   function syncCurvePicker(): void {
-    document.querySelectorAll<HTMLElement>("[data-curve]").forEach((c) => {
+    $all("[data-curve]").forEach((c) => {
       c.setAttribute("aria-pressed", String(c.dataset.curve === state.curve));
     });
   }
@@ -2142,40 +2163,38 @@ export function mountLibrary(): void {
     }
   });
 
-  document
-    .querySelectorAll<HTMLElement>(".vmx-lib-modeswitch button")
-    .forEach((b) => {
-      b.addEventListener("click", () => {
-        const previousMode = state.mode;
-        const mode = (b.dataset.mode ?? "search") as LibraryMode;
-        if (mode !== previousMode) cancelRun();
-        state = setMode(state, mode);
-        applyModeVisibility();
-        // The set-notes block is shared by curate + build; only clear it when
-        // leaving BOTH so a fresh build/curate keeps its own working state.
-        if (mode !== "curate" && mode !== "build" && mode !== "cue")
-          clearRationale();
-        if (
-          (mode === "curate" || mode === "build" || mode === "cue") &&
-          previousMode !== mode
-        ) {
-          renderAgentIdle(mode);
-        }
-        if (mode === "build") syncCurvePicker();
-        if (mode === "ingest") {
-          // show last-known progress shape, don't auto-run
-          $("vmx-lib-loglist").innerHTML = "";
-          setProgress(0, DEV_FALLBACK.embedLog.length, 0, "");
-        } else if (mode === "chat") {
-          ensureChatIntro(chatThread);
-        } else if (mode === "search" || mode === "similar") {
-          void run();
-        }
-      });
+  $all(".vmx-lib-modeswitch button").forEach((b) => {
+    b.addEventListener("click", () => {
+      const previousMode = state.mode;
+      const mode = (b.dataset.mode ?? "search") as LibraryMode;
+      if (mode !== previousMode) cancelRun();
+      state = setMode(state, mode);
+      applyModeVisibility();
+      // The set-notes block is shared by curate + build; only clear it when
+      // leaving BOTH so a fresh build/curate keeps its own working state.
+      if (mode !== "curate" && mode !== "build" && mode !== "cue")
+        clearRationale();
+      if (
+        (mode === "curate" || mode === "build" || mode === "cue") &&
+        previousMode !== mode
+      ) {
+        renderAgentIdle(mode);
+      }
+      if (mode === "build") syncCurvePicker();
+      if (mode === "ingest") {
+        // show last-known progress shape, don't auto-run
+        $("vmx-lib-loglist").innerHTML = "";
+        setProgress(0, DEV_FALLBACK.embedLog.length, 0, "");
+      } else if (mode === "chat") {
+        ensureChatIntro(chatThread);
+      } else if (mode === "search" || mode === "similar") {
+        void run();
+      }
     });
+  });
 
   // vibe-query suggestion chips (search mode)
-  document.querySelectorAll<HTMLElement>("[data-chip]").forEach((chip) => {
+  $all("[data-chip]").forEach((chip) => {
     chip.addEventListener("click", () => {
       if (state.mode !== "search") return;
       const q = chip.dataset.chip ?? chip.textContent ?? "";
@@ -2186,7 +2205,7 @@ export function mountLibrary(): void {
   });
 
   // theme suggestion chips (curate mode) — set the theme + run.
-  document.querySelectorAll<HTMLElement>("[data-theme]").forEach((chip) => {
+  $all("[data-theme]").forEach((chip) => {
     chip.addEventListener("click", () => {
       if (state.mode !== "curate") return;
       const t = chip.dataset.theme ?? chip.textContent ?? "";
@@ -2200,12 +2219,12 @@ export function mountLibrary(): void {
   // strategy chips (ingest mode). The chip's `data-strategy` is the nice
   // user-facing token ("mean" / "cue-anchored"); map it to the EXACT wire
   // value the Rust bridge accepts ("mean_excerpt" / "cue_anchored").
-  document.querySelectorAll<HTMLElement>("[data-strategy]").forEach((chip) => {
+  $all("[data-strategy]").forEach((chip) => {
     chip.addEventListener("click", () => {
       const strat: EmbedStrategy =
         chip.dataset.strategy === "mean" ? "mean_excerpt" : "cue_anchored";
       state = setStrategy(state, strat);
-      document.querySelectorAll<HTMLElement>("[data-strategy]").forEach((c) => {
+      $all("[data-strategy]").forEach((c) => {
         const wire =
           c.dataset.strategy === "mean" ? "mean_excerpt" : "cue_anchored";
         c.setAttribute("aria-pressed", String(wire === strat));
@@ -2213,11 +2232,11 @@ export function mountLibrary(): void {
     });
   });
 
-  document.querySelectorAll<HTMLElement>("[data-cue-export]").forEach((chip) => {
+  $all("[data-cue-export]").forEach((chip) => {
     chip.addEventListener("click", () => {
       const format = (chip.dataset.cueExport ?? "rekordbox") as CueExportFormat;
       state = setCueExport(state, format);
-      document.querySelectorAll<HTMLElement>("[data-cue-export]").forEach((c) => {
+      $all("[data-cue-export]").forEach((c) => {
         c.setAttribute(
           "aria-pressed",
           String((c.dataset.cueExport ?? "rekordbox") === format),
@@ -2229,7 +2248,7 @@ export function mountLibrary(): void {
   // energy-curve preset picker (build mode) — a segmented hardware selector.
   // `data-curve` IS the exact wire value the agent's CLI accepts, so no label
   // mapping is needed (unlike the strategy chips).
-  document.querySelectorAll<HTMLElement>("[data-curve]").forEach((seg) => {
+  $all("[data-curve]").forEach((seg) => {
     seg.addEventListener("click", () => {
       const curve = (seg.dataset.curve ?? "peak_time") as EnergyCurve;
       state = setCurve(state, curve);
@@ -2238,7 +2257,7 @@ export function mountLibrary(): void {
   });
 
   // build-set theme chips — set the brief + run (mirrors the curate chips).
-  document.querySelectorAll<HTMLElement>("[data-brief]").forEach((chip) => {
+  $all("[data-brief]").forEach((chip) => {
     chip.addEventListener("click", () => {
       if (state.mode !== "build") return;
       const brief = chip.dataset.brief ?? chip.textContent ?? "";
@@ -2249,7 +2268,7 @@ export function mountLibrary(): void {
     });
   });
 
-  document.querySelectorAll<HTMLElement>("[data-chat]").forEach((chip) => {
+  $all("[data-chat]").forEach((chip) => {
     chip.addEventListener("click", () => {
       if (state.mode !== "chat") return;
       const message = chip.dataset.chat ?? chip.textContent ?? "";
@@ -2260,7 +2279,7 @@ export function mountLibrary(): void {
   });
 
   // drop a track to seed the similar search
-  void wireDropZone((path) => {
+  void wireDropZone(root, (path) => {
     const name = path.split(/[\\/]/).pop() ?? path;
     state = setSeed(state, name);
     seedNameEl.textContent = name;
@@ -2332,11 +2351,11 @@ export function mountLibrary(): void {
 
 /** Wire the similar-mode drop zone to the Tauri webview drag-drop API. No-op
  *  outside Tauri (plain dev / jsdom). */
-async function wireDropZone(onFile: (path: string) => void): Promise<void> {
+async function wireDropZone(root: ParentNode, onFile: (path: string) => void): Promise<void> {
   try {
     const { getCurrentWebview } = await import("@tauri-apps/api/webview");
     const webview = getCurrentWebview();
-    const drop = document.querySelector<HTMLElement>(".vmx-lib-dropzone");
+    const drop = root.querySelector<HTMLElement>(".vmx-lib-dropzone");
     const seen = new Set<number>();
     await webview.onDragDropEvent((event) => {
       const payload = event.payload as
@@ -2374,6 +2393,7 @@ async function wireDropZone(onFile: (path: string) => void): Promise<void> {
 // which imports the pure modules directly).
 if (
   typeof document !== "undefined" &&
+  document.body.dataset.mode !== undefined &&
   document.getElementById("vmx-lib-runbtn")
 ) {
   mountLibrary();

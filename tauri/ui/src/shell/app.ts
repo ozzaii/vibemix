@@ -58,7 +58,7 @@ const appDeps: SurfaceMountDeps = {
   mountCrate: async (mount) => {
     const { mountLibrary } = await import("../library/index.js");
     mount.innerHTML = extractSurfaceMarkup(libraryHtmlRaw, ".vmx-lib-app");
-    mountLibrary();
+    mountLibrary(mount);
   },
   // Learn folds in two stacked interiors, each in its OWN sub-container so
   // neither clobbers the other (the lesson window owns its host via

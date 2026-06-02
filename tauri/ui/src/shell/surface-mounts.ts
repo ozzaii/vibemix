@@ -18,6 +18,7 @@
 //     (a previous-sibling selector isn't expressible in CSS, so the class is
 //     the seam).
 
+import { vmxLog } from "../debug-log.js";
 import type { SurfaceId } from "./shell-store.js";
 
 /** The heavy, runtime-bound interior mounts, injected so the orchestration is
@@ -91,6 +92,11 @@ async function mountOne(
     await mount(target);
     revealMountedStub(target);
   } catch (err) {
+    const detail =
+      err instanceof Error
+        ? { message: err.message, stack: err.stack }
+        : { message: String(err) };
+    vmxLog("[vmx:error]", "shell surface failed to mount", { label, ...detail });
     // eslint-disable-next-line no-console
     console.error("[shell] surface failed to mount:", label, err);
   }
