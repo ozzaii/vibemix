@@ -464,6 +464,66 @@ def test_cue_placement_practice_tick_writes_receipt_and_credits_once(monkeypatch
     assert progress.skills["phrasing_performance"]["live_proof_count"] == 1
 
 
+def test_matched_cue_action_records_and_grades_immediately(monkeypatch) -> None:
+    """A matched hot-cue lesson action can arm the cue-placement grader."""
+    saved: list[LearnProgress] = []
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress()
+    _make_phrasing_competent(progress)
+    grid = _beat_grid()
+    target = grid.beat_at(16)
+    registry = EvidenceRegistry()
+    events: list[tuple[str, dict]] = []
+    recorded: list[tuple[str | None, dict]] = []
+    armed = False
+
+    def record_action(lesson_id: str | None, midi: dict) -> bool:
+        nonlocal armed
+        recorded.append((lesson_id, dict(midi)))
+        armed = True
+        return True
+
+    def load_snapshot() -> CuePlacementPracticeSnapshot | None:
+        if not armed:
+            return None
+        return CuePlacementPracticeSnapshot(grid=grid, cue_frame=target, target_frame=target)
+
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 73.5,
+        cue_placement_practice_loader=load_snapshot,
+        cue_placement_practice_action_recorder=record_action,
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+
+    midi = {
+        "type": "button",
+        "control": "hotcue",
+        "deck": "B",
+        "direction": "down",
+        "source": "midi",
+    }
+    runtime.send(
+        "load",
+        lesson_id="L2.10",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    runtime.send("ack_action", midi=midi)
+
+    assert recorded == [("L2.10", midi)]
+    assert registry.has("ev", "CUE_PLACEMENT_GRADED", 73.5, tol=1.0)
+    assert progress.skills["phrasing_performance"]["live_proof_count"] == 1
+    assert progress in saved
+    assert any(kind == "learn_cue_placement_practice_graded" for kind, _fields in events)
+
+
 def test_cue_placement_practice_rearms_after_wrong_drop(monkeypatch) -> None:
     """A sustained cue lock credits once, then a wrong drop re-arms the next lock."""
     monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)

@@ -25,11 +25,14 @@ _PRODUCER = str(_SRC / "learn" / "practice_loop.py")
 _RUNTIME = str(_SRC / "learn" / "runtime.py")
 _MAIN = str(_SRC / "__main__.py")
 _DRIVER = str(_SRC / "learn" / "beatmatch_practice_driver.py")
+_CUE_DRIVER = str(_SRC / "learn" / "cue_placement_practice_driver.py")
 _EMITTER_FNS = frozenset({"grade_beatmatch", "grade_to_event_extra"})
 _PRACTICE_PRODUCER_FNS = frozenset(
     {"grade_owned_beatmatch_attempt", "grade_minideck_beatmatch_attempt"}
 )
+_CUE_PRACTICE_PRODUCER_FNS = frozenset({"grade_owned_cue_placement_attempt"})
 _GRADED_EVENT_KIND = "BEATMATCH_GRADED"
+_CUE_GRADED_EVENT_KIND = "CUE_PLACEMENT_GRADED"
 
 
 def _src_py_files() -> list[pathlib.Path]:
@@ -69,6 +72,18 @@ def _practice_producer_call_sites() -> list[tuple[str, int, str]]:
             if isinstance(node, ast.Call):
                 name = _call_name(node)
                 if name in _PRACTICE_PRODUCER_FNS:
+                    hits.append((str(path), node.lineno, name))
+    return hits
+
+
+def _cue_practice_producer_call_sites() -> list[tuple[str, int, str]]:
+    hits: list[tuple[str, int, str]] = []
+    for path in _src_py_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                name = _call_name(node)
+                if name in _CUE_PRACTICE_PRODUCER_FNS:
                     hits.append((str(path), node.lineno, name))
     return hits
 
@@ -119,12 +134,40 @@ def test_live_lesson_runtime_supplies_beatmatch_practice_driver() -> None:
     assert "def snapshot(" in driver
 
 
+def test_live_lesson_runtime_supplies_cue_placement_practice_driver() -> None:
+    main = pathlib.Path(_MAIN).read_text(encoding="utf-8")
+    driver = pathlib.Path(_CUE_DRIVER).read_text(encoding="utf-8")
+    assert "CuePlacementPracticeDriver()" in main
+    assert "cue_placement_practice_loader=" in main
+    assert "cue_placement_practice_action_recorder=" in main
+    assert "def record_action(" in driver
+    assert "def snapshot(" in driver
+
+
 def test_beatmatch_credit_consumer_is_wired_to_the_producer_event() -> None:
     recognizer = (_SRC / "learn" / "skill_recognizer.py").read_text(encoding="utf-8")
     producer = (_SRC / "learn" / "practice_loop.py").read_text(encoding="utf-8")
     assert f'== "{_GRADED_EVENT_KIND}"' in recognizer
     assert f'BEATMATCH_GRADED_EVENT = "{_GRADED_EVENT_KIND}"' in producer
     assert '"beatmatching"' in recognizer
+
+
+def test_cue_placement_producer_has_a_runtime_caller() -> None:
+    call_sites = _cue_practice_producer_call_sites()
+    runtime_callers = {
+        (path, name)
+        for path, _lineno, name in call_sites
+        if path != str(_SRC / "learn" / "cue_practice.py")
+    }
+    assert (_RUNTIME, "grade_owned_cue_placement_attempt") in runtime_callers
+
+
+def test_cue_placement_credit_consumer_is_wired_to_the_producer_event() -> None:
+    recognizer = (_SRC / "learn" / "skill_recognizer.py").read_text(encoding="utf-8")
+    producer = (_SRC / "learn" / "cue_practice.py").read_text(encoding="utf-8")
+    assert f'== "{_CUE_GRADED_EVENT_KIND}"' in recognizer
+    assert f'CUE_PLACEMENT_GRADED_EVENT = "{_CUE_GRADED_EVENT_KIND}"' in producer
+    assert '"phrasing_performance"' in recognizer
 
 
 def test_pin_is_non_vacuous_emitter_signal_is_detectable() -> None:

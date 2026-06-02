@@ -2527,6 +2527,17 @@ async def main() -> None:
         )
         beatmatch_practice_driver = None
 
+    try:
+        from vibemix.learn.cue_placement_practice_driver import CuePlacementPracticeDriver
+
+        cue_placement_practice_driver: Any | None = CuePlacementPracticeDriver()
+    except Exception as _learn_cue_exc:  # pragma: no cover - defensive boot path
+        print(
+            f"[learn boot] cue placement practice driver disabled: {_learn_cue_exc!r}",
+            file=sys.stderr,
+        )
+        cue_placement_practice_driver = None
+
     lesson_runtime = LessonRuntime(
         learn_state=_learn_state,
         midi_mirror=midi_mirror,
@@ -2545,6 +2556,16 @@ async def main() -> None:
         beatmatch_practice_action_recorder=(
             beatmatch_practice_driver.record_action
             if beatmatch_practice_driver is not None
+            else None
+        ),
+        cue_placement_practice_loader=(
+            cue_placement_practice_driver.snapshot
+            if cue_placement_practice_driver is not None
+            else None
+        ),
+        cue_placement_practice_action_recorder=(
+            cue_placement_practice_driver.record_action
+            if cue_placement_practice_driver is not None
             else None
         ),
         session_event_logger=_learn_session_event,

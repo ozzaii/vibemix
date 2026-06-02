@@ -8276,3 +8276,44 @@ Proof before staging:
 - `uv run ruff check src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/repo/test_live_reality_pins.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_practice_loop.py tests/repo/test_live_reality_pins.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 30 - Learn Cue Placement Practice Driver
+
+Suggested commit: `feat(learn): wire owned cue placement practice driver`
+
+Include:
+
+- `src/vibemix/learn/cue_placement_practice_driver.py`
+- `src/vibemix/learn/runtime.py`
+- `src/vibemix/__main__.py`
+- `tests/learn/test_cue_placement_practice_driver.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `tests/learn/test_cue_practice.py`
+- `tests/repo/test_live_reality_pins.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Sven/co-host speech, prompt text, `src/vibemix/runtime/coach.py`, DROP-call
+  speech, and any external Rekordbox/FLX4 cue-placement claim.
+- User-library hot-cue writeback, Serato/Rekordbox tag mutation, L3 mastered
+  hotcue writeback, and any `library/export_serato.py` changes.
+- Any relaxation of the cited `CUE_PLACEMENT_GRADED` credit gate or the
+  Competent-before-Mastered skill-tree floor.
+
+Reason:
+
+- The Learn cue-placement producer and recognizer branch existed, and
+  `LessonRuntime` had a grading hook, but live boot never supplied the
+  `cue_placement_practice_loader`, leaving the shipped path functionally
+  orphaned. This package adds a small Learn-owned practice driver for L2.10,
+  records the authored hot-cue action on deck B, grades it immediately through
+  the existing EvidenceRegistry-backed producer, and strengthens the repo pin so
+  a future hook-only regression cannot pass green.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_cue_placement_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_cue_practice.py tests/repo/test_live_reality_pins.py`
+- `uv run ruff check src/vibemix/learn/cue_placement_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_cue_placement_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/repo/test_live_reality_pins.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/learn/cue_placement_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_cue_placement_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_cue_practice.py tests/repo/test_live_reality_pins.py .planning/handoffs/2026-05-31-package-checklist.md`

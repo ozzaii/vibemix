@@ -438,6 +438,8 @@ class LessonRuntime(StateMachine):
         beatmatch_practice_action_recorder: Callable[[str | None, dict[str, Any]], bool | None]
         | None = None,
         cue_placement_practice_loader: Callable[[], CuePlacementPracticeSnapshot | None] | None = None,
+        cue_placement_practice_action_recorder: Callable[[str | None, dict[str, Any]], bool | None]
+        | None = None,
         session_event_logger: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         """Build a LessonRuntime bound to its 5 collaborators.
@@ -491,6 +493,11 @@ class LessonRuntime(StateMachine):
                 the 1 Hz loop grades cue timing against the owned beatgrid and
                 lets the recognizer/progress gate decide whether phrasing earns
                 a live proof.
+            cue_placement_practice_action_recorder: Optional hook called after
+                a matched Learn action. It lets the live boot driver arm the
+                owned-deck cue-placement snapshot and immediately grade that
+                attempt through the same evidence path, rather than waiting for
+                the next 1 Hz tick after the lesson may have advanced.
             session_event_logger: Optional existing session-recorder seam. Live
                 wiring passes ``VoiceRecorder.log_event`` through a fail-soft
                 adapter so Learn milestones land in ``events.jsonl`` for later
@@ -509,6 +516,7 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_loader = beatmatch_practice_loader
         self._beatmatch_practice_action_recorder = beatmatch_practice_action_recorder
         self._cue_placement_practice_loader = cue_placement_practice_loader
+        self._cue_placement_practice_action_recorder = cue_placement_practice_action_recorder
         self._session_event_logger = session_event_logger
         # The wall-clock anchor for the 30 s strike escalation timer.
         # Reset on every ``on_enter_<state>`` callback for the states
@@ -863,6 +871,7 @@ class LessonRuntime(StateMachine):
             )
             self._mark_progress_practice_source(midi)
             self._record_beatmatch_practice_action(midi)
+            self._record_cue_placement_practice_action(midi)
 
         # Defensive legacy path: the IPC handler normally gives active
         # observers first claim on acks via handle_observer_ack(), which
@@ -906,6 +915,29 @@ class LessonRuntime(StateMachine):
             return
         self._beatmatch_practice_lock_active = False
         self._grade_beatmatch_practice_tick()
+
+    def _record_cue_placement_practice_action(self, midi: dict[str, Any]) -> None:
+        """Arm and grade an owned-deck cue placement practice attempt, if wired."""
+
+        if self._cue_placement_practice_action_recorder is None:
+            return
+        try:
+            should_grade = self._cue_placement_practice_action_recorder(
+                self._learn.current_lesson_id,
+                midi,
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] cue placement practice recorder failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return
+        if not should_grade:
+            return
+        self._cue_placement_practice_lock_active = False
+        self._grade_cue_placement_practice_tick()
 
     def on_skip(self, **_kwargs: Any) -> None:
         self._last_was_match = False
