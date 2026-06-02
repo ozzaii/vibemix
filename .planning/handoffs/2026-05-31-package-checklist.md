@@ -9124,3 +9124,34 @@ Proof before staging:
 - `npm --prefix tauri/ui test -- src/wizard/__tests__/blackhole-step.spec.ts`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/wizard/components/blackhole-step.ts tauri/ui/src/wizard/__tests__/blackhole-step.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 46 - Tauri MOSS Source Release Gate
+
+Suggested commit: `fix(packaging): require moss source for tauri builds`
+
+Include:
+
+- `tauri/src-tauri/tauri.conf.json5`
+- `tests/repo/test_tauri_dev_command.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- PyInstaller specs, model download manifests, local TTS runtime behavior,
+  `src/vibemix/__main__.py`, app UI copy, release workflow signing, and live
+  MOSS ear-pass claims.
+
+Reason:
+
+- Product speech is local MOSS-only. `prepare_tauri_build.py` already has a
+  `--require-moss-source` release gate that rejects packages without either a
+  bundled MOSS model tree or pinned `VIBEMIX_MOSS_TTS_ARCHIVE_*` metadata, but
+  direct local `cargo tauri build` still invoked the preparation script without
+  that flag. Wire the gate into `tauri.conf.json5` so the normal Tauri packaging
+  path cannot emit a voiceless app by accident.
+
+Proof before staging:
+
+- `uv run pytest -q tests/repo/test_tauri_dev_command.py tests/install/test_prepare_tauri_build.py tests/install/test_sidecar_bundle_ready.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/src-tauri/tauri.conf.json5 tests/repo/test_tauri_dev_command.py .planning/handoffs/2026-05-31-package-checklist.md`

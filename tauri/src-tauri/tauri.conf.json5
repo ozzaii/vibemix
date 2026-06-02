@@ -24,8 +24,9 @@
     // before Tauri packages resources. tauri-cli runs this command from the
     // `tauri/` directory (same cwd as beforeDevCommand), so the repo-root
     // script is one level up. Without this, a direct local `cargo tauri build`
-    // can silently ship the committed `.placeholder` sidecar directories.
-    "beforeBuildCommand": "uv run python ../scripts/dist/prepare_tauri_build.py"
+    // can silently ship the committed `.placeholder` sidecar directories, or
+    // a MOSS-only voice path with no bundled/downloadable model source.
+    "beforeBuildCommand": "uv run python ../scripts/dist/prepare_tauri_build.py --require-moss-source"
   },
   "app": {
     "windows": [
