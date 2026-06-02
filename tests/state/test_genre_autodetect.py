@@ -268,6 +268,7 @@ def test_env_pinned_does_not_flip_active_profile_but_surfaces_detection(monkeypa
     assert active is not None and active.name == "techno", "env pin was overridden"
     assert state.detected_genre == "psytrance", "detection not surfaced under env pin"
     assert state.genre_confidence == 0.9
+    assert state.active_genre == "techno", "pinned profile should route the event chain"
 
 
 def test_auto_enabled_flips_active_profile_to_detected(monkeypatch):
@@ -281,6 +282,7 @@ def test_auto_enabled_flips_active_profile_to_detected(monkeypatch):
     active = get_active_profile()
     assert active is not None and active.name == "psytrance", "auto-detect did not flip profile"
     assert state.detected_genre == "psytrance"
+    assert state.active_genre == "psytrance"
 
 
 # ---------- no heavy deps ----------

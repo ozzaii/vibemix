@@ -31,6 +31,7 @@ from vibemix.events.genres import (
     build_baseline_chain,
     build_hard_tek_chain,
     build_house_chain,
+    build_psytrance_chain,
     build_techno_chain,
 )
 from vibemix.state.detectors import (
@@ -44,7 +45,6 @@ from vibemix.state.detectors import (
     SubLayerArrivalDetector,
 )
 from vibemix.state.genre_router import GenreRouter
-
 
 # ---------- Test 1 ----------
 
@@ -245,6 +245,20 @@ def test_house_chain_does_not_contain_hard_tek_overlays():
     types = [type(d) for d in chain]
     assert DistortionClimbDetector not in types
     assert AcidLineEntryDetector not in types
+
+
+def test_psytrance_chain_is_kick_phrase_without_hard_tek_overlays():
+    """Psytrance gets the fast kick/phrase chain without acidcore overlays."""
+    chain = build_psytrance_chain()
+    types = [type(d) for d in chain]
+    assert KickSwapDetector in types
+    assert KickDensityShiftDetector in types
+    assert BreakdownKickKillDetector in types
+    assert ReentryKickLandDetector in types
+    assert PhraseBoundaryDetector in types
+    assert DistortionClimbDetector not in types
+    assert AcidLineEntryDetector not in types
+    assert len(chain) == 5
 
 
 # ---------- Test 10 ----------

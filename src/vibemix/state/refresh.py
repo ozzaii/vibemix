@@ -303,6 +303,29 @@ def _classify_active_genre(bpm: float, feats: dict) -> str:
     return "unknown"
 
 
+def _routeable_active_genre(
+    preferred_genre: str,
+    *,
+    bpm: float,
+    feats: dict,
+) -> str:
+    """Return the event-router genre, preferring a registered profile label.
+
+    ``detected_genre`` may be richer than the legacy coarse BPM buckets. When
+    that richer label has a detector chain, route events through it; otherwise
+    preserve the old coarse classifier as the honest fallback.
+    """
+    if preferred_genre != "unknown":
+        try:
+            from vibemix.events.genres import GENRE_REGISTRY
+
+            if preferred_genre in GENRE_REGISTRY:
+                return preferred_genre
+        except Exception:
+            pass
+    return _classify_active_genre(bpm, feats)
+
+
 def _course3_session_lens_active(learn_state) -> bool:
     """Return whether the current Learn lesson should activate live coaching.
 
@@ -877,8 +900,7 @@ def _tick_once(
         # library. Anti-slop: score_genre returns "unknown" below confidence /
         # on a tie, and GenreHysteresis debounces the committed label (no
         # bar-to-bar flicker; "unknown" commits immediately). Written here
-        # inside the single-writer batch — ADDITIVE; the coarse active_genre /
-        # _classify_active_genre signal below is untouched.
+        # inside the single-writer batch.
         raw_genre, raw_genre_conf = score_genre(
             bpm_cache,
             {
@@ -981,7 +1003,14 @@ def _tick_once(
         # `downbeat_phase` so SENSE-12 detector module imports don't reach
         # into Phase-13 naming. No new audio I/O — `feats` and `curve` are
         # already in scope from the Phase 6 path above.
-        state.active_genre = _classify_active_genre(bpm_cache, feats)
+        route_preference = committed_genre
+        if not is_auto_enabled() and profile_name != "unknown":
+            route_preference = profile_name
+        state.active_genre = _routeable_active_genre(
+            route_preference,
+            bpm=bpm_cache,
+            feats=feats,
+        )
         state.buildup_score = _compute_buildup_score(curve, BUILDUP_SLOPE_WINDOW_S)
         state.beat_phase = state.downbeat_phase
 

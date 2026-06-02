@@ -21,7 +21,12 @@ from unittest.mock import MagicMock
 from tests.audio.conftest import int16_sine
 from vibemix.audio import AudioBuffer
 from vibemix.state import EventDetector, MusicState
-from vibemix.state.detectors import KickSwapDetector, SubLayerArrivalDetector
+from vibemix.state.detectors import (
+    AcidLineEntryDetector,
+    DistortionClimbDetector,
+    KickSwapDetector,
+    SubLayerArrivalDetector,
+)
 from vibemix.state.refresh import _tick_once
 
 
@@ -141,6 +146,23 @@ def test_genre_flip_mid_session_swaps_chain_atomically(mocker):
     assert techno_chain is not house_chain
     # And the techno chain doesn't carry the house detector type at all.
     assert SubLayerArrivalDetector not in chain_types
+
+
+def test_genre_flip_mid_session_routes_psytrance_without_hard_tek_overlays(mocker):
+    """Psytrance is a first-class event-router genre, not fast Hard Tek."""
+    from vibemix.state import EventDetector, MusicState
+
+    mocker.patch("vibemix.state.event_detector.time.time", return_value=1000.0)
+    event_detector = EventDetector(audio_buf=_audible_buf())
+
+    state = MusicState(audible=False, bpm=0.0, active_genre="psytrance")
+    event_detector.detect(state, kaan_just_spoke=False, manual=False)
+
+    assert event_detector.router.current_genre == "psytrance"
+    chain_types = [type(d) for d in event_detector.router.active_chain()]
+    assert KickSwapDetector in chain_types
+    assert DistortionClimbDetector not in chain_types
+    assert AcidLineEntryDetector not in chain_types
 
 
 # ---------- Test 3 — __main__.py constructor wiring (skipped if no smoke ref) ----------

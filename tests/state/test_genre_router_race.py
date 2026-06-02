@@ -37,9 +37,15 @@ def test_genre_registry_is_immutable_mapping():
 
 
 def test_genre_registry_has_known_keys():
-    """Sanity: MappingProxyType doesn't drop entries. The 4 known genres
+    """Sanity: MappingProxyType doesn't drop entries. The known event-chain genres
     must remain accessible after the immutability refactor."""
-    assert set(GENRE_REGISTRY.keys()) == {"unknown", "house", "techno", "hard_tek"}
+    assert set(GENRE_REGISTRY.keys()) == {
+        "unknown",
+        "house",
+        "techno",
+        "psytrance",
+        "hard_tek",
+    }
 
 
 def test_genre_router_1000_cycle_concurrent_swap_no_race():

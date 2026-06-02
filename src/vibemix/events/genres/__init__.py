@@ -22,6 +22,7 @@ from types import MappingProxyType
 from vibemix.events.genres.baseline import build_baseline_chain
 from vibemix.events.genres.hard_tek import build_hard_tek_chain
 from vibemix.events.genres.house import build_house_chain
+from vibemix.events.genres.psytrance import build_psytrance_chain
 from vibemix.events.genres.techno import build_techno_chain
 
 # Single dispatch table — GenreRouter consults this mapping on every swap.
@@ -39,6 +40,7 @@ _GENRE_REGISTRY_RAW: dict[str, Callable[[], list]] = {
     "unknown": build_baseline_chain,
     "house": build_house_chain,
     "techno": build_techno_chain,
+    "psytrance": build_psytrance_chain,
     "hard_tek": build_hard_tek_chain,
 }
 GENRE_REGISTRY: MappingProxyType = MappingProxyType(_GENRE_REGISTRY_RAW)
@@ -48,5 +50,6 @@ __all__ = [
     "build_baseline_chain",
     "build_hard_tek_chain",
     "build_house_chain",
+    "build_psytrance_chain",
     "build_techno_chain",
 ]

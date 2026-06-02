@@ -7945,6 +7945,43 @@ Proof before staging:
 - `git diff --check -- src/vibemix/state/deck_state.py src/vibemix/state/deck_poller.py src/vibemix/runtime/ws_bus.py src/vibemix/state/prompt_builder.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py tests/state/test_coach.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 35C - Psytrance Event Chain Routing
+
+Suggested commit: `fix(genre): route psytrance through its own chain`
+
+Include:
+
+- `src/vibemix/events/genres/psytrance.py`
+- `src/vibemix/events/genres/__init__.py`
+- `src/vibemix/state/refresh.py`
+- `src/vibemix/state/music_state.py`
+- `tests/state/test_genre_router.py`
+- `tests/state/test_genre_router_race.py`
+- `tests/state/test_genre_router_integration.py`
+- `tests/state/test_genre_autodetect.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New detector algorithms, prompt persona wording, speech-bank text,
+  genre-profile JSON retuning, live app control, and Hard Tek detector
+  threshold changes.
+
+Reason:
+
+- The DSP/profile path can confidently detect `psytrance`, but the old
+  `active_genre` route was still a coarse BPM bucket. Fast psytrance could
+  route as Hard Tek and enable acid/distortion overlays. Register psytrance as
+  its own event-chain genre, reuse the existing kick/phrase structure for v1,
+  exclude Hard Tek-only overlays, and let a user-pinned profile keep winning.
+
+Proof before staging:
+
+- `uv run pytest -q tests/state/test_genre_router.py tests/state/test_genre_router_race.py tests/state/test_genre_router_integration.py tests/state/test_genre_autodetect.py tests/state/test_genre_router_integration.py tests/state/test_event_detector.py tests/state/test_refresh.py`
+- `uv run ruff check src/vibemix/events/genres/__init__.py src/vibemix/events/genres/psytrance.py src/vibemix/state/refresh.py src/vibemix/state/music_state.py tests/state/test_genre_router.py tests/state/test_genre_router_race.py tests/state/test_genre_router_integration.py tests/state/test_genre_autodetect.py`
+- `git diff --check -- src/vibemix/events/genres/__init__.py src/vibemix/events/genres/psytrance.py src/vibemix/state/refresh.py src/vibemix/state/music_state.py tests/state/test_genre_router.py tests/state/test_genre_router_race.py tests/state/test_genre_router_integration.py tests/state/test_genre_autodetect.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Package 20 - Retire Dead Tend Citation Source
 
 Suggested commit: `fix(grounding): remove dead tend citation source`

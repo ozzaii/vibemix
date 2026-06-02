@@ -125,10 +125,11 @@ class MusicState:
     # per CONTEXT D. Downstream consumers MUST treat it as Optional[float]
     # and honor None as "predictive firing OFF" (T-17-01-04 mitigation).
     #
-    # `active_genre` is one of "house" / "techno" / "hard_tek" / "unknown";
-    # invalid BPM yields "unknown" (anti-hallucination — no fabricated genre
-    # during BPM lock-up; mirrors the v4 `_music_truly_playing` rule and
-    # T-17-01-01 mitigation).
+    # `active_genre` is one of the registered event-chain genres
+    # ("house" / "techno" / "psytrance" / "hard_tek" / "unknown"). Invalid BPM
+    # or an unregistered detected profile yields "unknown" / coarse fallback
+    # (anti-hallucination — no fabricated genre during BPM lock-up; mirrors the
+    # v4 `_music_truly_playing` rule and T-17-01-01 mitigation).
     #
     # `beat_phase` is a Phase-17-named alias of `downbeat_phase` so SENSE-12
     # detector module imports don't reach into Phase-13 naming. Both fields
@@ -136,7 +137,7 @@ class MusicState:
     buildup_score: float = 0.0  # 0..1 — trailing 8s monotonic energy climb
     predicted_drop_in_sec: float | None = None  # OFF by default in v2.0
     beat_phase: float = 0.0  # 0..1 — Phase 17 alias of downbeat_phase
-    active_genre: str = "unknown"  # "house" | "techno" | "hard_tek" | "unknown"
+    active_genre: str = "unknown"
 
     # Controller (snapshot from MIDI thread)
     deck_a: dict = field(default_factory=dict)
