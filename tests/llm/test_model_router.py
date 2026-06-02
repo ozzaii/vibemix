@@ -37,6 +37,7 @@ from vibemix.llm.model_router import ROUTER_PATHS, RouterPathError, resolve
     ("path", "expected_model", "expected_tier"),
     [
         ("live_coach", "gemini-3.5-flash", ServiceTier.STANDARD),
+        ("live_coach_deep", "gemini-3.5-flash", ServiceTier.STANDARD),
         ("debrief", "gemini-3.5-flash", ServiceTier.FLEX),
         ("library_auto_tag", "gemini-3.5-flash", ServiceTier.FLEX),
         ("embedding", "gemini-embedding-2", ServiceTier.FLEX),
@@ -92,9 +93,10 @@ def test_router_paths_is_frozen_tuple() -> None:
     # (LESSON-06, Open Q1) adds ``learn_tutor`` for the Learn module's AI tutor
     # lens — decoupled from ``live_coach`` so future model swaps don't drag both
     # surfaces.
-    assert len(ROUTER_PATHS) == 8
+    assert len(ROUTER_PATHS) == 9
     expected = {
         "live_coach",
+        "live_coach_deep",
         "live_coach_openrouter",
         "learn_tutor",
         "debrief",

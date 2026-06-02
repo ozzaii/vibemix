@@ -98,6 +98,7 @@ def test_router_resolves_all_paths() -> None:
     # Path × (model, tier) — CONTEXT.md table mirror.
     expected: dict[str, tuple[str, ServiceTier | None]] = {
         "live_coach": ("gemini-3.5-flash", ServiceTier.STANDARD),
+        "live_coach_deep": ("gemini-3.5-flash", ServiceTier.STANDARD),
         "live_coach_openrouter": ("google/gemini-3.5-flash", None),
         "learn_tutor": ("gemini-3.5-flash", ServiceTier.STANDARD),
         "debrief": ("gemini-3.5-flash", ServiceTier.FLEX),

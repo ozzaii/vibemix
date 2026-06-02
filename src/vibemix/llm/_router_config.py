@@ -16,7 +16,7 @@ speech is local MOSS-only, so Gemini/OpenRouter TTS aliases do not belong in
 the live model router; paid voice vendors remain explicit cost-model what-ifs
 under ``vibemix.library.pricing`` / ``vibemix.library.cost``.
 
-- live_coach                         → STANDARD (latency-critical)
+- live_coach / live_coach_deep       → STANDARD (latency-critical)
 - debrief / library auto-tag / embedding  → FLEX     (cost lane)
 - live_coach_openrouter              → None     (non-Gemini API surface)
 """
@@ -36,6 +36,10 @@ _ROUTES: dict[str, tuple[str, ServiceTierName | None]] = {
     # no code change); it resolves at agent/config.py:25 via
     # resolve("live_coach") and flows to dj_cohost.py as model=LLM_MODEL.
     "live_coach": ("gemini-3.5-flash", "STANDARD"),
+    # X4 rich-context reserve. Same model + tier as ``live_coach`` today,
+    # but named separately so a future bench-proven deep-context swap is a
+    # one-line router edit instead of an inline model literal.
+    "live_coach_deep": ("gemini-3.5-flash", "STANDARD"),
     "live_coach_openrouter": ("google/gemini-3.5-flash", None),
     # --- Cost + capability study (2026-05-30) — candidate LIVE-BRAIN aliases.
     # The verified pricing table (``vibemix.library.pricing``) resolves each via

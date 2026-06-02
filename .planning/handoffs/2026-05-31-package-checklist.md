@@ -8602,3 +8602,37 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/VoiceReadinessBadge.ts tauri/ui/src/shell/app.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/voice-readiness-badge.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 37 - X4 Live Coach Deep Router Reserve
+
+Suggested commit: `fix(llm): reserve deep live coach route`
+
+Include:
+
+- `src/vibemix/llm/_router_config.py`
+- `tests/llm/test_model_router.py`
+- `tests/llm/test_model_router_live_coach_deep.py`
+- `tests/e2e/test_phase_41_latency_stack_integration.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Prompt text, `agent/dj_cohost.py`, `src/vibemix/runtime/coach.py`, and the
+  X4 sectioned context bundle implementation.
+- Any model upgrade claim. The deep route intentionally resolves to the same
+  model and STANDARD tier as `live_coach` today.
+
+Reason:
+
+- X4 needs a named model-router seam before the rich-context packet can become
+  a product path. Reserving `live_coach_deep` keeps future deep-context routing
+  in the allowlisted router table instead of creating hardcoded model literals
+  at call sites. This is structural only: no current speech behavior changes.
+
+Proof before staging:
+
+- `uv run pytest -q tests/llm/test_model_router.py tests/llm/test_model_router_live_coach_deep.py tests/e2e/test_phase_41_latency_stack_integration.py`
+- `uv run pytest -q tests/bench/test_no_model_literal.py tests/library/test_pricing.py tests/library/test_cost.py tests/library/test_session_meter.py`
+- `uv run ruff check src/vibemix/llm/_router_config.py tests/llm/test_model_router.py tests/llm/test_model_router_live_coach_deep.py tests/e2e/test_phase_41_latency_stack_integration.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/llm/_router_config.py tests/llm/test_model_router.py tests/llm/test_model_router_live_coach_deep.py tests/e2e/test_phase_41_latency_stack_integration.py .planning/handoffs/2026-05-31-package-checklist.md`
