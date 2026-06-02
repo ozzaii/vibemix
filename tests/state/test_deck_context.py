@@ -113,6 +113,15 @@ def _deck_pair_audio_capture(
     return capture
 
 
+def _deck_pair_audio_capture_with_rms_deltas(a_delta: str, b_delta: str) -> dict:
+    capture = _deck_pair_audio_capture(with_delta=False)
+    capture["deck_audio_deltas"] = {
+        "A": [a_delta],
+        "B": [b_delta],
+    }
+    return capture
+
+
 def test_empty_deck_state_emits_nothing() -> None:
     assert render_deck_context(MusicState()) is None
 
@@ -1816,6 +1825,48 @@ def test_move_effect_context_maps_recent_move_to_deck_audio_windows() -> None:
     assert "rule=move_audio_timing_not_causal_or_quality_proof" in out
 
 
+def test_move_effect_context_licenses_xfade_when_curve_and_deck_delta_agree() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.recent_moves = [(0.8, "xfader→center"), (0.2, "xfader→B-side")]
+    capture = _deck_pair_audio_capture_with_rms_deltas(
+        "rms_fell_60pct_strong",
+        "rms_rose_20pct_slight",
+    )
+
+    out = render_move_effect_context(
+        state,
+        ["xfader→B-side"],
+        audio_delta_items=[],
+        audio_capture_context=capture,
+    )
+
+    assert out is not None
+    assert "license=xfade:center_to_b_side:" in out
+    assert "A_pred_fell_7db+B_pred_rose_3db" in out
+    assert "measured_match" in out
+    assert "rule=move_effect_prediction_and_measurement_agree" in out
+
+
+def test_move_effect_context_keeps_xfade_watch_rule_when_previous_bucket_missing() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.recent_moves = [(0.2, "xfader→B-side")]
+    capture = _deck_pair_audio_capture_with_rms_deltas(
+        "rms_fell_60pct_strong",
+        "rms_rose_20pct_slight",
+    )
+
+    out = render_move_effect_context(
+        state,
+        ["xfader→B-side"],
+        audio_delta_items=[],
+        audio_capture_context=capture,
+    )
+
+    assert out is not None
+    assert "license=xfade:" not in out
+    assert "rule=move_audio_timing_not_causal_or_quality_proof" in out
+
+
 def test_grounding_refs_render_only_registered_deck_move_atoms() -> None:
     state = MusicState(audible=True, audible_deck="A")
     state.set_start_at = time.time() - 42.0
@@ -2042,6 +2093,51 @@ def test_live_claim_guard_refuses_move_effect_when_measured_bands_are_flat() -> 
     moves = ["A_low: flat→killed"]
 
     result = apply_live_claim_guard("That low cut cleaned the mix.", state, moves)
+
+    assert result.corrected is True
+    assert result.policy == "move_effect_not_verdict"
+    assert result.reason == "dsp_delta_not_causal_proof"
+    assert "can't tell" in result.text.lower()
+
+
+def test_live_claim_guard_licenses_xfade_effect_when_curve_and_deck_delta_agree() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.recent_moves = [(0.8, "xfader→center"), (0.2, "xfader→B-side")]
+    capture = _deck_pair_audio_capture_with_rms_deltas(
+        "rms_fell_60pct_strong",
+        "rms_rose_20pct_slight",
+    )
+
+    result = apply_live_claim_guard(
+        "The crossfader opened the blend.",
+        state,
+        ["xfader→B-side"],
+        audio_delta_items=[],
+        audio_capture_context=capture,
+    )
+
+    assert result.corrected is False
+    assert result.policy == "move_effect_supported"
+    assert result.reason == "prediction_and_measured_delta_agree"
+    assert "xfade:center_to_b_side:" in result.summary
+    assert "move_effect=xfade:center_to_b_side:" in result.summary
+
+
+def test_live_claim_guard_refuses_xfade_effect_when_deck_delta_disagrees() -> None:
+    state = MusicState(audible=True, audible_deck="mix")
+    state.recent_moves = [(0.8, "xfader→center"), (0.2, "xfader→B-side")]
+    capture = _deck_pair_audio_capture_with_rms_deltas(
+        "rms_rose_60pct_strong",
+        "rms_fell_20pct_slight",
+    )
+
+    result = apply_live_claim_guard(
+        "The crossfader opened the blend.",
+        state,
+        ["xfader→B-side"],
+        audio_delta_items=[],
+        audio_capture_context=capture,
+    )
 
     assert result.corrected is True
     assert result.policy == "move_effect_not_verdict"

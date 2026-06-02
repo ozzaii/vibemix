@@ -9,10 +9,12 @@ adding another model call or touching the Rekordbox live database.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from vibemix.audio.xfade import xfade_gains
 from vibemix.intel.eq_move_model import canonical_eq_move, predicted_band_gains
 from vibemix.state.deck_state import DeckTrack
 from vibemix.state.deltas import DELTA_FLOOR, render_delta
@@ -33,6 +35,20 @@ DECK_CONTEXT_TRUSTED_SOURCES: frozenset[str] = frozenset(
 )
 GEMINI_AUDIO_TOKENS_PER_SECOND: int = 32
 _MOVE_SIDE_RE = re.compile(r"\b([ABCD])_(?:low|mid|hi|filter|volume|play)")
+_XFADER_MOVE_RE = re.compile(
+    r"\bxfader\s*(?:→|->)\s*(full-A|A-side|center|B-side|full-B)\b",
+    re.IGNORECASE,
+)
+_XFADER_BUCKET_TO_X: dict[str, float] = {
+    "full-A": -1.0,
+    "A-side": -0.5,
+    "center": 0.0,
+    "B-side": 0.5,
+    "full-B": 1.0,
+}
+_XFADER_MIN_SIGNIFICANT_DB = 1.0
+_XFADER_MAX_TOKEN_DB = 24
+_DECK_RMS_DELTA_RE = re.compile(r"\brms_(rose|fell)_", re.IGNORECASE)
 _MULTI_DECK_OUTCOME_RE = re.compile(
     r"\b("
     r"transition(?:ed|ing)?|blend(?:ed|ing)?|mix(?:ed|ing)?|crossfade(?:d|s|ing)?|"
@@ -373,7 +389,7 @@ class LiveClaimGuardResult:
 
 @dataclass(frozen=True, slots=True)
 class MoveEffectLicense:
-    """A narrow proof that an EQ move and measured band delta agree."""
+    """A narrow proof that a move prediction and measured audio delta agree."""
 
     move: str
     band: str
@@ -1891,39 +1907,174 @@ def _licensed_move_effect(
     if not labels:
         return None
     measured = _measured_band_directions(audio_delta_items or render_audio_delta_items(state))
-    if not measured:
-        return None
     sample_rate = _move_effect_sample_rate(state, audio_capture_context)
 
-    for label in reversed(labels[-3:]):
-        canonical = canonical_eq_move(label)
-        if canonical is None:
+    if measured:
+        for label in reversed(labels[-3:]):
+            canonical = canonical_eq_move(label)
+            if canonical is None:
+                continue
+            predicted = predicted_band_gains(canonical, sample_rate)
+            if not predicted:
+                continue
+            for band in ("sub", "low", "mid", "high"):
+                measured_direction = measured.get(band)
+                if measured_direction is None:
+                    continue
+                predicted_db = float(predicted.get(band, 0.0) or 0.0)
+                if abs(predicted_db) < _MOVE_EFFECT_MIN_PREDICTED_DB:
+                    continue
+                predicted_direction = "rose" if predicted_db > 0.0 else "fell"
+                if predicted_direction != measured_direction:
+                    continue
+                pred_token = f"pred_{predicted_direction}_{round(abs(predicted_db))}db"
+                context_token = f"{canonical}:{band}:{pred_token}:measured_{measured_direction}"
+                evidence_key = f"move_effect={context_token}"
+                return MoveEffectLicense(
+                    move=canonical,
+                    band=band,
+                    predicted_db=round(predicted_db, 2),
+                    measured_direction=measured_direction,
+                    evidence_key=evidence_key,
+                    context_token=context_token,
+                )
+    return _licensed_xfade_effect(state, labels, audio_capture_context=audio_capture_context)
+
+
+def _licensed_xfade_effect(
+    state: MusicState,
+    labels: list[str],
+    *,
+    audio_capture_context: dict[str, object] | None,
+) -> MoveEffectLicense | None:
+    transition = _xfader_transition_from_recent_moves(state, labels)
+    if transition is None:
+        return None
+    prev_bucket, current_bucket = transition
+    expected = _xfader_expected_directions(prev_bucket, current_bucket)
+    if not expected:
+        return None
+    measured = _deck_audio_rms_delta_directions(audio_capture_context)
+    if not measured:
+        return None
+    matched: list[tuple[str, str, int]] = []
+    for side, (direction, delta_db) in expected.items():
+        observed = measured.get(side)
+        if observed is None:
             continue
-        predicted = predicted_band_gains(canonical, sample_rate)
-        if not predicted:
+        if observed != direction:
+            return None
+        matched.append((side, direction, round(min(abs(delta_db), _XFADER_MAX_TOKEN_DB))))
+    if not matched:
+        return None
+    from_token = _xfader_bucket_token(prev_bucket)
+    to_token = _xfader_bucket_token(current_bucket)
+    match_token = "+".join(
+        f"{side}_pred_{direction}_{db}db" for side, direction, db in matched
+    )
+    context_token = f"xfade:{from_token}_to_{to_token}:{match_token}:measured_match"
+    evidence_key = f"move_effect={context_token}"
+    return MoveEffectLicense(
+        move="xfade",
+        band="rms",
+        predicted_db=max(db for _, _, db in matched),
+        measured_direction="matched",
+        evidence_key=evidence_key,
+        context_token=context_token,
+    )
+
+
+def _xfader_transition_from_recent_moves(
+    state: MusicState,
+    labels: list[str],
+) -> tuple[str, str] | None:
+    history = [_move_label(item) for item in getattr(state, "recent_moves", [])]
+    sequence: list[str] = []
+    for label in [*history, *labels]:
+        bucket = _xfader_bucket(label)
+        if bucket is None:
             continue
-        for band in ("sub", "low", "mid", "high"):
-            measured_direction = measured.get(band)
-            if measured_direction is None:
-                continue
-            predicted_db = float(predicted.get(band, 0.0) or 0.0)
-            if abs(predicted_db) < _MOVE_EFFECT_MIN_PREDICTED_DB:
-                continue
-            predicted_direction = "rose" if predicted_db > 0.0 else "fell"
-            if predicted_direction != measured_direction:
-                continue
-            pred_token = f"pred_{predicted_direction}_{round(abs(predicted_db))}db"
-            context_token = f"{canonical}:{band}:{pred_token}:measured_{measured_direction}"
-            evidence_key = f"move_effect={context_token}"
-            return MoveEffectLicense(
-                move=canonical,
-                band=band,
-                predicted_db=round(predicted_db, 2),
-                measured_direction=measured_direction,
-                evidence_key=evidence_key,
-                context_token=context_token,
-            )
+        if sequence and sequence[-1] == bucket:
+            continue
+        sequence.append(bucket)
+    if len(sequence) < 2:
+        return None
+    return sequence[-2], sequence[-1]
+
+
+def _xfader_expected_directions(prev_bucket: str, current_bucket: str) -> dict[str, tuple[str, float]]:
+    prev_x = _XFADER_BUCKET_TO_X.get(prev_bucket)
+    current_x = _XFADER_BUCKET_TO_X.get(current_bucket)
+    if prev_x is None or current_x is None or prev_x == current_x:
+        return {}
+    prev_gains = xfade_gains(prev_x)
+    current_gains = xfade_gains(current_x)
+    out: dict[str, tuple[str, float]] = {}
+    for side, prev_gain, current_gain in (
+        ("A", prev_gains[0], current_gains[0]),
+        ("B", prev_gains[1], current_gains[1]),
+    ):
+        delta_db = _gain_delta_db(prev_gain, current_gain)
+        if abs(delta_db) < _XFADER_MIN_SIGNIFICANT_DB:
+            continue
+        out[side] = ("rose" if delta_db > 0.0 else "fell", delta_db)
+    return out
+
+
+def _deck_audio_rms_delta_directions(
+    capture: dict[str, object] | None,
+) -> dict[str, str]:
+    if not isinstance(capture, dict) or not bool(capture.get("deck_audio_capture_enabled")):
+        return {}
+    out: dict[str, str] = {}
+    for side, tokens in _deck_audio_delta_values(capture.get("deck_audio_deltas")).items():
+        for token in tokens:
+            match = _DECK_RMS_DELTA_RE.search(token)
+            if match is not None:
+                out[side] = match.group(1).lower()
+                break
+    return out
+
+
+def _deck_audio_delta_text_items(capture: dict[str, object] | None) -> list[str]:
+    if not isinstance(capture, dict) or not bool(capture.get("deck_audio_capture_enabled")):
+        return []
+    out: list[str] = []
+    for side, tokens in _deck_audio_delta_values(capture.get("deck_audio_deltas")).items():
+        for token in tokens[:2]:
+            out.append(f"{side} {token}")
+    return out[:4]
+
+
+def _xfader_bucket(label: str) -> str | None:
+    match = _XFADER_MOVE_RE.search(str(label))
+    if match is None:
+        return None
+    raw = match.group(1)
+    for bucket in _XFADER_BUCKET_TO_X:
+        if raw.lower() == bucket.lower():
+            return bucket
     return None
+
+
+def _xfader_bucket_token(bucket: str) -> str:
+    return bucket.lower().replace("-", "_")
+
+
+def _gain_delta_db(prev_gain: float, current_gain: float) -> float:
+    floor = 0.001
+    prev = max(float(prev_gain), floor)
+    current = max(float(current_gain), floor)
+    if prev <= 0.0 or current <= 0.0:
+        return 0.0
+    delta = 20.0 * math.log10(current / prev)
+    if not math.isfinite(delta):
+        return 0.0
+    if delta > _XFADER_MAX_TOKEN_DB:
+        return float(_XFADER_MAX_TOKEN_DB)
+    if delta < -_XFADER_MAX_TOKEN_DB:
+        return float(-_XFADER_MAX_TOKEN_DB)
+    return delta
 
 
 def _measured_band_directions(
@@ -2498,6 +2649,8 @@ def apply_live_claim_guard(
     outcome_claim = has_multi_deck_outcome_claim(text)
     public_diagnostic = bool(_LIVE_PUBLIC_DIAGNOSTIC_RE.search(text))
     effect_deltas = [str(item) for item in (audio_delta_items or render_audio_delta_items(state))]
+    capture_effect_deltas = _deck_audio_delta_text_items(audio_capture_context)
+    effect_signals = [*effect_deltas, *capture_effect_deltas]
     source_detail_reason = _unsupported_audio_source_detail_reason(
         text,
         state,
@@ -2534,7 +2687,7 @@ def apply_live_claim_guard(
         )
     effect_claim = bool(
         moves
-        and effect_deltas
+        and effect_signals
         and (
             (_MOVE_EFFECT_CONTROL_RE.search(text) and _MOVE_EFFECT_CAUSAL_VERDICT_RE.search(text))
             or _MOVE_EFFECT_BARE_VERDICT_RE.search(text)
@@ -2563,7 +2716,7 @@ def apply_live_claim_guard(
                 summary=f"{license_.context_token}; evidence={_evidence_key(license_.evidence_key)}",
             )
         summary = _live_guard_summary(state, moves)
-        delta_hint = "; ".join(effect_deltas[:2])
+        delta_hint = "; ".join(effect_signals[:2])
         log_summary = summary + (
             f"; DSP deltas around the move: {delta_hint}" if delta_hint else ""
         )
