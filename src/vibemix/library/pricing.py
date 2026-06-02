@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """Source-audited live-stack model pricing for `budget --stack live`.
 
-Every Gemini row is keyed by an id resolved through ``model_router`` at import
-time, so NO Gemini model literal is ever typed in this file (the CI grep gate in
-``scripts/release/check_no_hardcoded_model.sh`` only allowlists
-``_router_config.py``). Non-Gemini ids (DeepSeek, the premium TTS vendors,
-dedicated STT) are not grep-gated, so they are keyed by their literal id.
+Live Gemini brain rows are keyed by ids resolved through ``model_router`` at
+import time, so NO live Gemini model literal is ever typed in this file (the CI
+grep gate in ``scripts/release/check_no_hardcoded_model.sh`` only allowlists
+``_router_config.py``). Product speech is local MOSS-only: the old Gemini TTS
+entries remain as explicit historical what-if pricing rows, not router paths.
+Non-Gemini ids (DeepSeek, the premium TTS vendors, dedicated STT) are not
+grep-gated, so they are keyed by their literal id.
 
 Each :class:`PriceRow` carries ``source_url`` + ``source_date`` + ``verified`` so
 an UNVERIFIED price (a vendor page that does not publish a confirmable rate) can
@@ -82,6 +84,11 @@ def _gemini_row(alias: str, **kw: object) -> tuple[str, PriceRow]:
     return mid, PriceRow(model_id=mid, source_url=_GEMINI, source_date=_GEMINI_DATE, **kw)  # type: ignore[arg-type]
 
 
+def _historical_tts_row(key: str, **kw: object) -> tuple[str, PriceRow]:
+    """Build an explicit paid-TTS comparison row that is NOT a product route."""
+    return key, PriceRow(model_id=key, source_url=_GEMINI, source_date=_GEMINI_DATE, **kw)  # type: ignore[arg-type]
+
+
 MODEL_PRICING: dict[str, PriceRow] = dict(
     [
         # ─── LIVE-BRAIN candidates (Gemini, LLM) ──────────────────────────────
@@ -119,13 +126,15 @@ MODEL_PRICING: dict[str, PriceRow] = dict(
             ),
         ),
         # Historical Gemini TTS rows remain as explicit what-if comparison rows.
-        _gemini_row(
+        # They intentionally do NOT resolve through model_router: product speech
+        # is local MOSS-only, and these keys are sensitivity labels only.
+        _historical_tts_row(
             "live_coach_tts", kind="tts", verified=True,
             input_per_mtok_usd=1.00, tts_audio_out_per_mtok_usd=20.00,
             notes="Historical paid Gemini Flash TTS comparison row; production "
             "speech is local MOSS.",
         ),
-        _gemini_row(
+        _historical_tts_row(
             "live_coach_tts_fallback", kind="tts", verified=True,
             input_per_mtok_usd=0.50, tts_audio_out_per_mtok_usd=10.00,
             notes="Historical paid Gemini Flash TTS comparison row; production "

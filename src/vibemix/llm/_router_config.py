@@ -11,11 +11,14 @@ foundation Plans 41-02..06 consume — keep it stable.
 
 Tier dispatch follows CONTEXT.md (LAT-07). The ``embedding`` route is retained
 only for the legacy Gemini cache/migration helper in ``vibemix.library.embed``;
-the product library embedder is local CLAP ONNX via ``embed_factory``.
+the product library embedder is local CLAP ONNX via ``embed_factory``. Product
+speech is local MOSS-only, so Gemini/OpenRouter TTS aliases do not belong in
+the live model router; paid voice vendors remain explicit cost-model what-ifs
+under ``vibemix.library.pricing`` / ``vibemix.library.cost``.
 
-- live_coach + live_coach_tts (+ fallback) → STANDARD (latency-critical)
+- live_coach                         → STANDARD (latency-critical)
 - debrief / library auto-tag / embedding  → FLEX     (cost lane)
-- live_coach_openrouter / *_tts_openrouter → None     (non-Gemini API surface)
+- live_coach_openrouter              → None     (non-Gemini API surface)
 """
 
 from __future__ import annotations
@@ -34,15 +37,6 @@ _ROUTES: dict[str, tuple[str, ServiceTierName | None]] = {
     # resolve("live_coach") and flows to dj_cohost.py as model=LLM_MODEL.
     "live_coach": ("gemini-3.5-flash", "STANDARD"),
     "live_coach_openrouter": ("google/gemini-3.5-flash", None),
-    "live_coach_tts": ("gemini-3.1-flash-tts-preview", "STANDARD"),
-    "live_coach_tts_fallback": (
-        "gemini-2.5-flash-preview-tts",
-        "STANDARD",
-    ),
-    "live_coach_tts_openrouter": (
-        "google/gemini-3.1-flash-tts-preview",
-        None,
-    ),
     # --- Cost + capability study (2026-05-30) — candidate LIVE-BRAIN aliases.
     # The verified pricing table (``vibemix.library.pricing``) resolves each via
     # ``resolve_model`` so NO Gemini literal escapes this allowlisted file, and

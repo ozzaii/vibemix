@@ -5,13 +5,15 @@ These tests pin the router contract:
 
 - ``resolve(path)`` returns a ``(model_id, ServiceTier | None)`` tuple per
   the locked router-paths table in 41-01-PLAN.md.
-- Live coach + live-coach TTS dispatch to ``ServiceTier.STANDARD`` (LAT-07).
+- Live coach dispatches to ``ServiceTier.STANDARD`` (LAT-07).
 - Debrief text / library / legacy embedding dispatch to ``ServiceTier.FLEX``.
 - The ``embedding`` route remains only for the old Gemini cache/migration
   helper; product library embeddings are local CLAP ONNX and do not use this
   router path.
-- The OpenRouter paths return namespaced ``google/gemini-*`` ids and a
+- The OpenRouter brain path returns a namespaced ``google/gemini-*`` id and a
   ``None`` tier sentinel (they are not Gemini-API calls).
+- Product speech is local MOSS-only; retired Gemini/OpenRouter TTS aliases are
+  not valid router paths.
 - Unknown paths raise ``RouterPathError`` and the message lists every valid
   path so the caller can self-diagnose.
 - ``ROUTER_PATHS`` is a frozen ``tuple`` (defensive against mutation).
@@ -49,25 +51,21 @@ def test_resolve_ga_paths(
     assert tier == expected_tier
 
 
-def test_resolve_live_coach_tts_returns_standard_3_1() -> None:
-    """Live-coach TTS rides the live-coach Standard tier (LAT-07)."""
-    model, tier = resolve("live_coach_tts")
-    assert model == "gemini-3.1-flash-tts-preview"
-    assert tier == ServiceTier.STANDARD
-
-
-def test_resolve_openrouter_tts_returns_namespaced_id_and_none_tier() -> None:
-    """OpenRouter TTS is not a Gemini-API call — sentinel None tier."""
-    model, tier = resolve("live_coach_tts_openrouter")
-    assert model == "google/gemini-3.1-flash-tts-preview"
-    assert tier is None
-
-
 def test_resolve_openrouter_live_coach_returns_namespaced_id_and_none_tier() -> None:
     """OpenRouter brain is not a Gemini-API call — sentinel None tier."""
     model, tier = resolve("live_coach_openrouter")
     assert model == "google/gemini-3.5-flash"
     assert tier is None
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["live_coach_tts", "live_coach_tts_fallback", "live_coach_tts_openrouter"],
+)
+def test_cloud_tts_router_paths_are_retired(path: str) -> None:
+    """MOSS is the product voice; cloud TTS survives only as explicit cost what-ifs."""
+    with pytest.raises(RouterPathError):
+        resolve(path)
 
 
 def test_resolve_unknown_path_raises_router_path_error() -> None:
@@ -90,17 +88,14 @@ def test_router_paths_is_frozen_tuple() -> None:
     """ROUTER_PATHS is a tuple (not list) — defensive against mutation."""
     assert isinstance(ROUTER_PATHS, tuple)
     # The Library/Viber agent is local Codex now, so no Gemini `library_agent`
-    # route remains. OpenRouter live-coach/TTS aliases are the only non-SDK
-    # routes. Phase 92 Plan 92-01 (LESSON-06, Open Q1) adds ``learn_tutor`` for
-    # the Learn module's AI tutor lens — decoupled from ``live_coach`` so
-    # future model swaps don't drag both surfaces.
-    assert len(ROUTER_PATHS) == 11
+    # route remains. OpenRouter is brain-only. Phase 92 Plan 92-01
+    # (LESSON-06, Open Q1) adds ``learn_tutor`` for the Learn module's AI tutor
+    # lens — decoupled from ``live_coach`` so future model swaps don't drag both
+    # surfaces.
+    assert len(ROUTER_PATHS) == 8
     expected = {
         "live_coach",
         "live_coach_openrouter",
-        "live_coach_tts",
-        "live_coach_tts_fallback",
-        "live_coach_tts_openrouter",
         "learn_tutor",
         "debrief",
         "library_auto_tag",
@@ -126,10 +121,3 @@ def test_no_non_gemini_models() -> None:
         model, _ = resolve(path)
         ok = model.startswith("gemini-") or model.startswith("google/gemini-")
         assert ok, f"path {path!r} maps to non-Gemini model {model!r}"
-
-
-def test_live_coach_tts_fallback_returns_2_5() -> None:
-    """The TTS fallback chain still surfaces the 2.5 native fallback id."""
-    model, tier = resolve("live_coach_tts_fallback")
-    assert model == "gemini-2.5-flash-preview-tts"
-    assert tier == ServiceTier.STANDARD

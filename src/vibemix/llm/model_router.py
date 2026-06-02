@@ -74,8 +74,8 @@ def resolve(path: str) -> tuple[str, Any | None]:
 
     Returns:
         ``(model_id, ServiceTier | None)``. The tier is ``None`` for the
-        ``live_coach_tts_openrouter`` path (not a Gemini-API call —
-        consume the model_id only).
+        non-Gemini API paths such as ``live_coach_openrouter`` (consume the
+        model_id only).
 
     Raises:
         RouterPathError: If ``path`` is not a valid router-path key. The

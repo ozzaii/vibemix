@@ -15,7 +15,7 @@ import sys
 
 import pytest
 
-from vibemix.library.pricing import price_for_path
+from vibemix.library.pricing import price_for_model, price_for_path
 
 
 def test_brain_reaction_cost_applies_the_cache_blend() -> None:
@@ -48,7 +48,7 @@ def test_tts_reaction_cost_gemini_is_audio_token_billed() -> None:
     text-input charge for the words it speaks."""
     from vibemix.library.cost import tts_reaction_usd
 
-    row = price_for_path("live_coach_tts_fallback")  # 0.50 text-in / 10.00 audio-out /1M
+    row = price_for_model("live_coach_tts_fallback")  # 0.50 text-in / 10.00 audio-out /1M
     usd = tts_reaction_usd(row, speech_seconds=12.0, text_tokens=40)
     # audio = 12 * 25 = 300 tok * 10.00 / 1e6 = 0.003
     # text  = 40 * 0.50 / 1e6 = 0.00002

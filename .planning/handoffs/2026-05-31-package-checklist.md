@@ -1700,6 +1700,7 @@ Include:
 - `src/vibemix/debrief/__init__.py`
 - `src/vibemix/debrief/ws_server.py`
 - `src/vibemix/llm/_router_config.py`
+- `src/vibemix/llm/model_router.py`
 - `src/vibemix/library/budget.py`
 - `tests/debrief/conftest.py`
 - `tests/debrief/test_main_dispatch.py`
@@ -1710,6 +1711,7 @@ Include:
 - `tests/e2e/test_phase_41_latency_stack_integration.py`
 - `tests/library/test_session_meter.py`
 - `tests/llm/test_model_router.py`
+- `tests/llm/test_tts_3_1.py`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
 
 Keep out:
