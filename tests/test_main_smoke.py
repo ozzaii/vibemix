@@ -973,15 +973,15 @@ def _reset_active_profile_for_genre_tests():
     _mod._ACTIVE_PROFILE = None
 
 
-def test_main_genre_default_is_techno(monkeypatch):
-    """Default VIBEMIX_GENRE_PROFILE → 'techno' (CONTEXT D-LOCKED)."""
+def test_main_genre_default_is_unpinned(monkeypatch):
+    """Absent VIBEMIX_GENRE_PROFILE leaves live genre to auto-detect."""
     monkeypatch.delenv("VIBEMIX_GENRE_PROFILE", raising=False)
     from vibemix._main_helpers import apply_genre_env
     from vibemix.state import get_active_profile
 
     applied = apply_genre_env()
-    assert applied == "techno"
-    assert get_active_profile().name == "techno"
+    assert applied is None
+    assert get_active_profile() is None
 
 
 def test_main_genre_pop(monkeypatch):

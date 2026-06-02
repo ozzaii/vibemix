@@ -7877,6 +7877,35 @@ Proof before staging:
 - `git diff --check -- README.md AGENTS.md CLAUDE.md src/vibemix/__main__.py src/vibemix/library/codex_curate.py tauri/ui/library.html tauri/ui/src/library/api.ts tauri/ui/src/library/library.css tests/repo/test_phase20_docs.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 35 - Unpinned Genre Boot Default
+
+Suggested commit: `fix(genre): leave cold start unpinned`
+
+Include:
+
+- `src/vibemix/_main_helpers.py`
+- `tests/test_main_smoke.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Live genre scoring thresholds, detector profile JSON, prompt persona wording,
+  settings drawer UI, packaged defaults, and any event-detector behavior.
+
+Reason:
+
+- Absent `VIBEMIX_GENRE_PROFILE` should not fabricate a scene profile before the
+  live detector earns one. Explicit env pins still work and still disable
+  auto-detect; no-env cold start remains self-correcting.
+
+Proof before staging:
+
+- `uv run pytest -q tests/test_main_smoke.py -k genre`
+- `uv run pytest -q tests/test_main_smoke.py`
+- `uv run ruff check src/vibemix/_main_helpers.py tests/test_main_smoke.py`
+- `git diff --check -- src/vibemix/_main_helpers.py tests/test_main_smoke.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Package 20 - Retire Dead Tend Citation Source
 
 Suggested commit: `fix(grounding): remove dead tend citation source`

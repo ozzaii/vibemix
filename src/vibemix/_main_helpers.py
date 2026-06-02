@@ -18,17 +18,21 @@ def apply_genre_env() -> str | None:
     """Read ``VIBEMIX_GENRE_PROFILE`` and apply via ``set_active_profile``.
 
     Returns the applied profile name (e.g. ``'techno'``), or ``None`` when the
-    env var requested ``'none'`` / ``'unknown'`` / empty (Phase 3 absolute-
-    threshold fallback — Critical Constraint 8).
+    env var is absent or requested ``'none'`` / ``'unknown'`` / empty (Phase 3
+    absolute-threshold fallback — Critical Constraint 8).
 
-    Default is ``'techno'`` (06-CONTEXT.md §Settings Integration). The env
-    value is case-insensitive — ``TECHNO`` works.
+    No absent-env genre is fabricated; live auto-detect earns the active profile.
+    The env value is case-insensitive — ``TECHNO`` works.
 
     ``sys.exit`` with a clear error if the env var is set to an unknown
     profile name (anything not in ``list_profiles()`` and not in the explicit
     None aliases).
     """
-    genre = os.environ.get("VIBEMIX_GENRE_PROFILE", "techno").strip().lower()
+    raw = os.environ.get("VIBEMIX_GENRE_PROFILE")
+    if raw is None:
+        set_active_profile(None)
+        return None
+    genre = raw.strip().lower()
     valid = list_profiles()
     if genre in ("none", "unknown", ""):
         set_active_profile(None)
@@ -38,5 +42,5 @@ def apply_genre_env() -> str | None:
         return genre
     sys.exit(
         f"VIBEMIX_GENRE_PROFILE={genre!r} is not a known profile. "
-        f"Valid choices: {[*valid, 'none']}. Default: 'techno'."
+        f"Valid choices: {[*valid, 'none']}. Default: auto-detect."
     )
