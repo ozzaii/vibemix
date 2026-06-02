@@ -95,7 +95,8 @@ describe("wizard surface tokens (wave 1)", () => {
     });
     document.body.append(rendered);
     expect(rendered.textContent).toContain("DDJ-FLX4 over USB");
-    expect(rendered.textContent).toContain("Press a pad, cue, or play");
+    expect(rendered.textContent).toContain("Enable MIDI output in Rekordbox");
+    expect(rendered.textContent).toContain("move a fader, knob, pad, cue, or play");
   });
 
   it("DropdownDevice renders without legacy token refs", async () => {

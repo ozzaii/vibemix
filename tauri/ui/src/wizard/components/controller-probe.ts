@@ -211,7 +211,7 @@ const CSS = `
   }
   .cmp-ctrl-probe__hint {
     display: none;
-    max-width: 34ch;
+    max-width: 46ch;
     margin-top: calc(var(--sp-2) * -1);
     color: var(--silk-65);
     font-family: var(--type-mono);
@@ -306,7 +306,8 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
   caption.className = "cmp-ctrl-probe__caption";
   const hint = document.createElement("div");
   hint.className = "cmp-ctrl-probe__hint";
-  hint.textContent = "DDJ-FLX4 over USB. Press a pad, cue, or play.";
+  hint.textContent =
+    "DDJ-FLX4 over USB. Enable MIDI output in Rekordbox, then move a fader, knob, pad, cue, or play.";
 
   if (props.state === "caught") {
     lcd.textContent = "✓";
