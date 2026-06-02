@@ -109,6 +109,9 @@ interface MidiPositionPayload {
 
 interface StatusTickPayload {
   midi?: number;
+  payload?: {
+    midi?: number;
+  };
 }
 
 interface IpcEnvelopeMeta {
@@ -126,6 +129,10 @@ interface Course3LensPayload {
   cue_ready?: boolean;
   blockers?: string[];
   operator_action?: LearnOperatorAction;
+}
+
+function statusTickMidiCount(detail: StatusTickPayload | undefined): number {
+  return Number(detail?.midi ?? detail?.payload?.midi ?? 0);
 }
 
 /* ===================================================================
@@ -746,9 +753,12 @@ function mountLearnWindow(root: HTMLElement): {
   // deck ready" while the app already knows hardware is present.
   addWindowListener("ipc.status.tick", (ev: Event) => {
     const detail = (ev as CustomEvent<StatusTickPayload>).detail;
-    const nextMidiSeen = Number(detail?.midi ?? 0) > 0;
+    const nextMidiSeen = statusTickMidiCount(detail) > 0;
     if (midiSeenOnStatusTick === nextMidiSeen) return;
     midiSeenOnStatusTick = nextMidiSeen;
+    if (!controllerDetected) {
+      status.setMirrorStatus(nextMidiSeen ? "midi" : "screen");
+    }
     renderLessonChooser();
   });
 

@@ -30,8 +30,13 @@ describe("folded Learn shell layout", () => {
     const css = readUi("src/shell/shell.css");
     const learn = readUi("src/learn/learn-window.ts");
     expect(learn).toContain("interface StatusTickPayload");
+    expect(learn).toContain("payload?:");
+    expect(learn).toContain("function statusTickMidiCount");
+    expect(learn).toContain("detail?.payload?.midi");
     expect(learn).toContain('"ipc.status.tick"');
     expect(learn).toContain("midi signal ready");
+    expect(learn).toContain('status.setMirrorStatus(nextMidiSeen ? "midi" : "screen")');
+    expect(readUi("src/learn/components/status-bar.ts")).toContain('case "midi":');
     expect(learn).toContain("screen practice deck");
     expect(css).toContain(
       '.surface[data-surface="learn"].surface--mounted .surface-mount',

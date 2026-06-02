@@ -25,7 +25,7 @@ import {
   type LearnOperatorAction,
 } from "../lesson/operator-action.js";
 
-type MirrorStatus = "waiting" | "screen" | "live" | "unplugged";
+type MirrorStatus = "waiting" | "screen" | "midi" | "live" | "unplugged";
 
 type Course3LensStatus = {
   session_active: boolean;
@@ -121,6 +121,9 @@ export class StatusBar {
         break;
       case "screen":
         text = "on-screen deck";
+        break;
+      case "midi":
+        text = "midi signal";
         break;
       case "unplugged":
         text = "controller unplugged";

@@ -9534,3 +9534,37 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 58 - Packaged Learn MIDI Readiness Envelope
+
+Suggested commit: `fix(learn-ui): read packaged midi status envelope`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/learn/components/status-bar.ts`
+- `tauri/ui/tests/shell/learn-folded-layout.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Learn scoring, curriculum progression semantics, Python lesson runtime,
+  co-host speech, Settings drawer internals, and packaging scripts. This package
+  only fixes the mounted packaged Learn readiness display when the global status
+  stream sees MIDI before the Learn-specific controller mapper binds.
+
+Reason:
+
+- The signed packaged app at `6bf13c6f` saw `ipc.status.tick` with `midi:1` in
+  `ui.log`, but Learn still rendered "screen practice deck" and the bottom
+  status still said "on-screen deck". Read both raw-payload and envelope-shaped
+  status details, and surface the intermediate state as "midi signal" /
+  "midi signal ready" until `ipc.learn.controller_detected` can name the exact
+  controller.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/learn-folded-layout.spec.ts tests/shell/settings-nav.spec.ts tests/shell/shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/components/status-bar.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
