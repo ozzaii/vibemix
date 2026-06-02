@@ -177,6 +177,22 @@ def _candidate_skills(event: Any) -> list[str]:
             return ["beatmatching"]
         return []
 
+    if ev_type == "CUE_PLACEMENT_GRADED":
+        # Owned-deck cue placement practice. A beat-locked hot cue demonstrates
+        # phrasing/timing discipline; a drop target, when supplied, must be the
+        # intended absolute target rather than merely "some beat". This does NOT
+        # credit beatmatching and does not claim a full live blend.
+        extra = getattr(event, "extra", None)
+        if not isinstance(extra, dict):
+            return []
+        if not bool(extra.get("beat_aligned")):
+            return []
+        if extra.get("target_aligned") is False:
+            return []
+        if extra.get("verdict") in {"beat_locked", "drop_locked"}:
+            return ["phrasing_performance"]
+        return []
+
     return list(EVENT_SKILL_MAP.get(ev_type, ()))
 
 

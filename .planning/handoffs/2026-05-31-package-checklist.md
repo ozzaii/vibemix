@@ -4562,6 +4562,50 @@ Remaining gate:
   Learn/practice flow with cited evidence before any user-visible Mastered,
   cue-quality, or live-coach claim.
 
+## Package 8B - Cue Placement Practice Producer
+
+Suggested commit: `feat(learn): emit cited cue placement practice grades`
+
+Include:
+
+- `src/vibemix/learn/cue_practice.py`
+- `src/vibemix/learn/skill_recognizer.py`
+- `src/vibemix/learn/runtime.py`
+- `src/vibemix/learn/__init__.py`
+- `tests/learn/test_cue_practice.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Live co-host speech, runtime coach, DROP speech, and prompt wording changes.
+- Library-file mutation / hot-cue writeback.
+- Any new skill id or user-visible Mastered copy.
+
+Reason:
+
+- Package 8A intentionally stopped at the offline cue-placement judge. This
+  package turns that measured judge result into a cited Learn practice event
+  without making Sven speak or inferring from observational live audio.
+- `CUE_PLACEMENT_GRADED` credits `phrasing_performance` only when the owned cue
+  is beat-locked and, when a target is supplied, drop-locked to that absolute
+  target. Wrong-drop/off-beat grades write no EvidenceRegistry receipt and move
+  no skill wall count.
+
+Proof for this source slice:
+
+- `uv run pytest -q tests/learn/test_cue_practice.py tests/learn/test_cue_placement_judge.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_practice_loop.py tests/learn/test_skill_recognizer.py tests/learn/test_skill_wall_what_remains.py`
+- `uv run ruff check src/vibemix/learn/cue_practice.py src/vibemix/learn/runtime.py src/vibemix/learn/skill_recognizer.py src/vibemix/learn/__init__.py tests/learn/test_cue_practice.py tests/learn/test_runtime_evidence_grounding.py`
+- `git diff --check -- src/vibemix/learn/cue_practice.py src/vibemix/learn/skill_recognizer.py src/vibemix/learn/runtime.py src/vibemix/learn/__init__.py tests/learn/test_cue_practice.py tests/learn/test_runtime_evidence_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- SRC producer is real and cited. A future lesson-driver/UI package still needs
+  to supply real cue frames from an owned practice deck before this becomes
+  visible learner UX. Do not use this source proof to claim live hot-cue
+  writeback or co-host coaching.
+
 ## Hold Lane - Learn Beatmatch Producer Moat Plan
 
 Suggested commit if/when selected: `docs(learn): plan beatmatch graded producer`

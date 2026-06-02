@@ -8,7 +8,11 @@ from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import DeckState
 from vibemix.coach.citation_linter import CitationLinter
 from vibemix.learn.progress import LearnProgress
-from vibemix.learn.runtime import BeatmatchPracticeSnapshot, LessonRuntime
+from vibemix.learn.runtime import (
+    BeatmatchPracticeSnapshot,
+    CuePlacementPracticeSnapshot,
+    LessonRuntime,
+)
 from vibemix.learn.skill_tree import SKILL_MANIFEST
 from vibemix.learn.state import LearnState
 from vibemix.state.evidence_registry import EvidenceRegistry
@@ -70,6 +74,17 @@ def _drifting_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
 
 def _make_beatmatching_competent(progress: LearnProgress) -> None:
     spec = SKILL_MANIFEST["beatmatching"]
+    for lesson_id in spec.lesson_ids:
+        progress.lessons[lesson_id] = {
+            "completed": True,
+            "completed_at": "2026-06-02T00:00:00Z",
+            "strikes_used": 0,
+        }
+    setattr(progress, spec.gate, True)
+
+
+def _make_phrasing_competent(progress: LearnProgress) -> None:
+    spec = SKILL_MANIFEST["phrasing_performance"]
     for lesson_id in spec.lesson_ids:
         progress.lessons[lesson_id] = {
             "completed": True,
@@ -324,3 +339,92 @@ def test_beatmatch_practice_rearms_after_unlocked_grade(monkeypatch) -> None:
     assert drift is not None and drift.grade.verdict == "trainwreck"
     assert relock is not None and relock.credited == ("beatmatching",)
     assert progress.skills["beatmatching"]["live_proof_count"] == 2
+
+
+def test_cue_placement_practice_tick_writes_receipt_and_credits_once(monkeypatch) -> None:
+    """The owned cue-placement hook writes cited phrasing evidence."""
+    saved: list[LearnProgress] = []
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress()
+    _make_phrasing_competent(progress)
+    grid = _beat_grid()
+    target = grid.beat_at(16)
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    events: list[tuple[str, dict]] = []
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 64.0,
+        cue_placement_practice_loader=lambda: CuePlacementPracticeSnapshot(
+            grid=grid,
+            cue_frame=target,
+            target_frame=target,
+        ),
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+
+    result = runtime._grade_cue_placement_practice_tick()
+
+    assert result is not None
+    assert result.event is not None
+    assert result.grade.verdict == "drop_locked"
+    assert result.credited == ("phrasing_performance",)
+    assert registry.has("ev", "CUE_PLACEMENT_GRADED", 64.0, tol=1.0)
+    assert progress.skills["phrasing_performance"]["live_proof_count"] == 1
+    assert progress.skills.get("beatmatching", {}).get("live_proof_count", 0) == 0
+    assert saved == [progress]
+    assert any(
+        call.args[0].get("type") == "ipc.learn.progress_state"
+        for call in ipc.emit.call_args_list
+    )
+    assert events[-1][0] == "learn_cue_placement_practice_graded"
+    assert events[-1][1]["credited"] == ["phrasing_performance"]
+
+    repeated = runtime._grade_cue_placement_practice_tick()
+
+    assert repeated is not None
+    assert repeated.event is None
+    assert repeated.credited == ()
+    assert progress.skills["phrasing_performance"]["live_proof_count"] == 1
+
+
+def test_cue_placement_practice_rearms_after_wrong_drop(monkeypatch) -> None:
+    """A sustained cue lock credits once, then a wrong drop re-arms the next lock."""
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_phrasing_competent(progress)
+    grid = _beat_grid()
+    target = grid.beat_at(16)
+    snapshots = [
+        CuePlacementPracticeSnapshot(grid=grid, cue_frame=target, target_frame=target),
+        CuePlacementPracticeSnapshot(grid=grid, cue_frame=target, target_frame=target),
+        CuePlacementPracticeSnapshot(grid=grid, cue_frame=grid.beat_at(17), target_frame=target),
+        CuePlacementPracticeSnapshot(grid=grid, cue_frame=target, target_frame=target),
+    ]
+    registry = EvidenceRegistry()
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 72.0 + len(snapshots),
+        cue_placement_practice_loader=lambda: snapshots.pop(0) if snapshots else None,
+    )
+
+    first = runtime._grade_cue_placement_practice_tick()
+    sustained = runtime._grade_cue_placement_practice_tick()
+    wrong_drop = runtime._grade_cue_placement_practice_tick()
+    relock = runtime._grade_cue_placement_practice_tick()
+
+    assert first is not None and first.credited == ("phrasing_performance",)
+    assert sustained is not None and sustained.credited == ()
+    assert wrong_drop is not None and wrong_drop.grade.verdict == "wrong_drop"
+    assert relock is not None and relock.credited == ("phrasing_performance",)
+    assert progress.skills["phrasing_performance"]["live_proof_count"] == 2

@@ -49,6 +49,14 @@ from vibemix.learn.band_share_store import (
     top_for_band,
 )
 from vibemix.learn.band_share_store import upsert as upsert_band_shares
+from vibemix.learn.cue_practice import (
+    CUE_PLACEMENT_EVIDENCE_SOURCE,
+    CUE_PLACEMENT_GRADED_EVENT,
+    CuePlacementPracticeEvent,
+    CuePlacementPracticeResult,
+    cue_grade_to_event_extra,
+    grade_owned_cue_placement_attempt,
+)
 from vibemix.learn.curriculum import (
     COURSE_FRAMES,
     COURSE_REGISTRY,
@@ -108,7 +116,11 @@ from vibemix.learn.progress import (
 )
 from vibemix.learn.prompts import build_tutor_system_instruction
 from vibemix.learn.recital import RecitalRuntime
-from vibemix.learn.runtime import BeatmatchPracticeSnapshot, LessonRuntime
+from vibemix.learn.runtime import (
+    BeatmatchPracticeSnapshot,
+    CuePlacementPracticeSnapshot,
+    LessonRuntime,
+)
 from vibemix.learn.settings import read_learn_headphone_device_index
 from vibemix.learn.state import LearnState
 from vibemix.learn.teaching_loop import (
@@ -129,6 +141,8 @@ __all__ = [
     "BEATMATCH_GRADED_EVENT",
     "COURSE_FRAMES",
     "COURSE_REGISTRY",
+    "CUE_PLACEMENT_EVIDENCE_SOURCE",
+    "CUE_PLACEMENT_GRADED_EVENT",
     "CURRICULUM",
     "LEARN_TUTOR_ROUTE",
     "SCHEMA_VERSION",
@@ -140,6 +154,9 @@ __all__ = [
     "BeatmatchPracticeResult",
     "BeatmatchPracticeSnapshot",
     "CourseMeta",
+    "CuePlacementPracticeEvent",
+    "CuePlacementPracticeResult",
+    "CuePlacementPracticeSnapshot",
     "ExemplarFinder",
     "ExemplarLessonController",
     "ExemplarPick",
@@ -170,8 +187,10 @@ __all__ = [
     "build_tutor_system_instruction",
     "compute_band_shares",
     "course_lesson_ids",
+    "cue_grade_to_event_extra",
     "grade_minideck_beatmatch_attempt",
     "grade_owned_beatmatch_attempt",
+    "grade_owned_cue_placement_attempt",
     "graduation_citations",
     "harmonic_practice_citations",
     "init_schema",

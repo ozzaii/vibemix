@@ -83,6 +83,12 @@ from statemachine import State, StateMachine
 
 from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import DeckState
+from vibemix.learn.cue_practice import (
+    CuePlacementPracticeResult,
+    grade_owned_cue_placement_attempt,
+    grade_owned_cue_placement_state,
+    is_creditable_cue_placement_grade,
+)
 from vibemix.learn.curriculum import CURRICULUM
 from vibemix.learn.graduation import (
     GraduationSummary,
@@ -176,6 +182,15 @@ class BeatmatchPracticeSnapshot:
     grid_a: BeatGrid
     grid_b: BeatGrid
     deck_state: DeckState
+
+
+@dataclass(frozen=True, slots=True)
+class CuePlacementPracticeSnapshot:
+    """One owned-deck cue-placement practice tick supplied by a lesson driver."""
+
+    grid: BeatGrid
+    cue_frame: float
+    target_frame: float | None = None
 
 
 def _control_and_deck(action: dict[str, Any]) -> tuple[str, str]:
@@ -420,6 +435,7 @@ class LessonRuntime(StateMachine):
         harmonic_pair_loader: Callable[[], HarmonicPracticePair | None] | None = None,
         graduation_summary_loader: Callable[[Any], GraduationSummary | None] | None = None,
         beatmatch_practice_loader: Callable[[], BeatmatchPracticeSnapshot | None] | None = None,
+        cue_placement_practice_loader: Callable[[], CuePlacementPracticeSnapshot | None] | None = None,
         session_event_logger: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         """Build a LessonRuntime bound to its 5 collaborators.
@@ -463,6 +479,11 @@ class LessonRuntime(StateMachine):
                 that owned deck through ``learn.practice_loop`` and lets the
                 existing recognizer/progress gate decide whether beatmatching
                 earns a live proof.
+            cue_placement_practice_loader: Optional owned-deck hot-cue lesson
+                hook. When it returns a :class:`CuePlacementPracticeSnapshot`,
+                the 1 Hz loop grades cue timing against the owned beatgrid and
+                lets the recognizer/progress gate decide whether phrasing earns
+                a live proof.
             session_event_logger: Optional existing session-recorder seam. Live
                 wiring passes ``VoiceRecorder.log_event`` through a fail-soft
                 adapter so Learn milestones land in ``events.jsonl`` for later
@@ -479,6 +500,7 @@ class LessonRuntime(StateMachine):
         self._harmonic_pair_loader = harmonic_pair_loader
         self._graduation_summary_loader = graduation_summary_loader
         self._beatmatch_practice_loader = beatmatch_practice_loader
+        self._cue_placement_practice_loader = cue_placement_practice_loader
         self._session_event_logger = session_event_logger
         # The wall-clock anchor for the 30 s strike escalation timer.
         # Reset on every ``on_enter_<state>`` callback for the states
@@ -509,6 +531,7 @@ class LessonRuntime(StateMachine):
         self._active_step_index: int = 0
         self._last_mismatch_hint_at: float = 0.0
         self._beatmatch_practice_lock_active = False
+        self._cue_placement_practice_lock_active = False
         super().__init__()
 
     @property
@@ -1444,6 +1467,86 @@ class LessonRuntime(StateMachine):
         )
         return result
 
+    def _grade_cue_placement_practice_tick(self) -> CuePlacementPracticeResult | None:
+        """Grade the optional owned-deck cue-placement lane on a lock edge.
+
+        This hook only runs when a lesson driver owns the deck/grid and supplies
+        an explicit cue frame. A sustained beat/drop-locked cue credits once; the
+        edge re-arms only after the grade stops being creditable.
+        """
+        if self._cue_placement_practice_loader is None or self._evidence_registry is None:
+            return None
+        try:
+            snapshot = self._cue_placement_practice_loader()
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] cue placement practice loader failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return None
+        if snapshot is None:
+            self._cue_placement_practice_lock_active = False
+            return None
+
+        t_session = self._evidence_time()
+        grade = grade_owned_cue_placement_state(
+            snapshot.grid,
+            snapshot.cue_frame,
+            target_frame=snapshot.target_frame,
+        )
+        if not is_creditable_cue_placement_grade(grade):
+            self._cue_placement_practice_lock_active = False
+            return CuePlacementPracticeResult(
+                grade=grade,
+                event=None,
+                credited=(),
+                t_session=t_session,
+            )
+        if self._cue_placement_practice_lock_active:
+            return CuePlacementPracticeResult(
+                grade=grade,
+                event=None,
+                credited=(),
+                t_session=t_session,
+            )
+
+        self._cue_placement_practice_lock_active = True
+        result = grade_owned_cue_placement_attempt(
+            snapshot.grid,
+            snapshot.cue_frame,
+            target_frame=snapshot.target_frame,
+            evidence_registry=self._evidence_registry,
+            t_session=t_session,
+            progress=self._progress,
+            now=datetime.now(UTC).isoformat(),
+        )
+        if result.credited:
+            try:
+                from vibemix.learn.progress import LearnProgress, save_progress
+
+                if isinstance(self._progress, LearnProgress):
+                    save_progress(self._progress)
+            except Exception as exc:  # pragma: no cover - defensive
+                import sys
+
+                print(
+                    f"[learn.runtime] cue placement practice progress save failed: {exc!r}",
+                    file=sys.stderr,
+                )
+            self._emit_progress_snapshot()
+        self._log_session_event(
+            "learn_cue_placement_practice_graded",
+            lesson_id=self._learn.current_lesson_id or "",
+            course_id=self._learn.current_course_id or "",
+            step_id=self._current_step_id(),
+            evidence_time=t_session,
+            verdict=result.grade.verdict,
+            credited=list(result.credited),
+        )
+        return result
+
     def _record_action_evidence(
         self,
         *,
@@ -1903,6 +2006,7 @@ class LessonRuntime(StateMachine):
         while not stop_event.is_set():
             await asyncio.sleep(1.0)
             self._grade_beatmatch_practice_tick()
+            self._grade_cue_placement_practice_tick()
             cur = self.current_state.id
             if cur in ("awaiting_action", "hint_strike_1", "hint_strike_2"):
                 elapsed_in_state = (
