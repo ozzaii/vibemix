@@ -93,6 +93,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "library.export", purpose: "Rekordbox export result line" },
       { wire: "library.results", purpose: "search/set/build rows" },
       { wire: "library.chat-thread", purpose: "conversation transcript" },
+      { wire: "library.chat-starters", purpose: "Viber starter prompt actions" },
       { wire: "library.ingest-progress", purpose: "folder ingest progress log" },
       { wire: "library.grounding-panel", purpose: "right-side grounding/receipts panel" },
       { wire: "library.scope-wrap", purpose: "scope visualization frame" },

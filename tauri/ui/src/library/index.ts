@@ -982,7 +982,11 @@ function setChatTurnText(
 
 function ensureChatIntro(thread: HTMLElement): void {
   if (thread.childElementCount > 0) return;
-  appendChatTurn(thread, "viber", "In your library. What are we chasing?");
+  appendChatTurn(
+    thread,
+    "viber",
+    "Your crate is online. Give me a room, a moment, or a transition problem.",
+  );
 }
 
 function renderChatBusy(): void {
@@ -1248,7 +1252,7 @@ function appendLiveProofStatusToolRow(
   const text = document.createElement("div");
   const name = document.createElement("div");
   name.className = "name";
-  name.textContent = "live read";
+  name.textContent = "live proof";
   const arg = document.createElement("div");
   arg.className = "arg";
   arg.textContent = `${status.state} · ${status.detail}`;
@@ -1952,6 +1956,7 @@ export function mountLibrary(): void {
       renderChatIdleSide();
       return;
     }
+    document.getElementById("vmx-lib-chat-starters")?.setAttribute("hidden", "");
     const message = state.chatMessage;
     const priorHistory = chatHistory.slice();
 

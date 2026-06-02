@@ -486,7 +486,26 @@ function mountSkeleton(): void {
     <div id="vmx-lib-rationale-meta"></div>
     <div id="vmx-lib-export" style="display: none"><div id="vmx-lib-export-path"></div></div>
     <div id="vmx-lib-results"></div>
-    <div id="vmx-lib-chat-thread"></div>
+    <div id="vmx-lib-chat-thread">
+      <div class="vmx-lib-chat-turn" data-role="viber">
+        <div class="who">viber</div>
+        <div class="body">Your crate is online. Give me a room, a moment, or a transition problem.</div>
+      </div>
+      <div id="vmx-lib-chat-starters" data-wire="library.chat-starters">
+        <button type="button" data-chat="build a 45-minute psytrance set from my indexed tracks, clean energy arc, no fake genres">
+          <span>Build a set</span>
+          <b>45 min psytrance arc</b>
+        </button>
+        <button type="button" data-chat="what mixes cleanly out of the currently playing track? use only grounded live and library evidence">
+          <span>What mixes next</span>
+          <b>grounded transition</b>
+        </button>
+        <button type="button" data-chat="find deep cuts in my crate that fit this set but avoid the obvious repeats">
+          <span>Rediscover</span>
+          <b>deep cuts, no repeats</b>
+        </button>
+      </div>
+    </div>
     <span id="vmx-lib-rcount"></span>
     <div id="vmx-lib-prog-n"></div>
     <div id="vmx-lib-prog-cost"></div>
@@ -530,6 +549,41 @@ describe("chat - real runChat path", () => {
     document.body.innerHTML = "";
   });
 
+  it("opens Viber chat with real starter missions instead of a blank console", async () => {
+    await mountChat();
+
+    const threadText =
+      document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
+    expect(threadText).toContain("Your crate is online");
+    expect(threadText).toContain("Build a set");
+    expect(threadText).toContain("What mixes next");
+    expect(threadText).toContain("Rediscover");
+    expect(
+      document.querySelector('[data-wire="library.chat-starters"]'),
+    ).toBeTruthy();
+  });
+
+  it("runs a starter mission through the same Viber path and hides the starter rail", async () => {
+    await mountChat();
+
+    document
+      .querySelector<HTMLButtonElement>('[data-chat^="what mixes cleanly"]')
+      ?.click();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    expect(chatMock).toHaveBeenCalledWith(
+      "what mixes cleanly out of the currently playing track? use only grounded live and library evidence",
+      [],
+    );
+    expect(
+      document.getElementById("vmx-lib-chat-starters")?.hasAttribute("hidden"),
+    ).toBe(true);
+    const threadText =
+      document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
+    expect(threadText).toContain("what mixes cleanly out of the currently playing track");
+    expect(threadText).toContain("Pull SMOKED OUT");
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
@@ -541,7 +595,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
+    expect(toolText).toContain("live proof");
     expect(toolText).toContain("waiting");
 
     const proofRow = document.querySelector<HTMLElement>(
@@ -620,7 +674,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
+    expect(toolText).toContain("live proof");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("deck audio");
     expect(toolText).not.toContain("armed");
@@ -634,7 +688,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
+    expect(toolText).toContain("live proof");
     expect(toolText).toContain("armed");
     expect(toolText).toContain("deck1 A=known:dominant");
     expect(toolText).toContain("deck2 B=known:present");
@@ -652,7 +706,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
+    expect(toolText).toContain("live proof");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("deck identities");
     expect(toolText).not.toContain("armed");
@@ -701,7 +755,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
+    expect(toolText).toContain("live proof");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("both decks active");
     expect(toolText).not.toContain("armed");
@@ -784,7 +838,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
+    expect(toolText).toContain("live proof");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("feature receipt");
     expect(toolText).not.toContain("armed");

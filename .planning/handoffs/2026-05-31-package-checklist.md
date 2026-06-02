@@ -9648,3 +9648,41 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/shell.css tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/components/status-bar.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md .planning/handoffs/2026-06-02-learn-first-screen-product-qa.md`
+
+## Package 61 - Viber Crate First-Screen Missions
+
+Suggested commit: `fix(crate-ui): make viber first screen actionable`
+
+Include:
+
+- `tauri/ui/library.html`
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/library.css`
+- `tauri/ui/src/library/chat.test.ts`
+- `tauri/ui/src/mock-transfer/contract.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Viber backend/tool semantics, library ingest/freshness behavior, co-host/Sven
+  speech, Learn, Settings, packaging scripts, and any broad visual redesign.
+  This package only fixes the Crate/Viber first screen so the shipped app stops
+  opening onto an internal-looking console.
+
+Reason:
+
+- The signed packaged app at `a037a749` showed Crate/Viber with a real indexed
+  backend and live grounding sidecar, but the center of the surface still read
+  like a debug console: one vague line, no obvious first move, and side-rack
+  placeholders saying `trace idle` / `artifact idle`. Make Viber's money-making
+  actions visible at rest with three wired starter missions (build a set, solve
+  a grounded transition, rediscover deep cuts), hide them once the user asks
+  something, and rename the side rack to product receipt language while keeping
+  the live-proof state honest.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/library.html tauri/ui/src/library/index.ts tauri/ui/src/library/library.css tauri/ui/src/library/chat.test.ts tauri/ui/src/mock-transfer/contract.ts .planning/handoffs/2026-05-31-package-checklist.md`

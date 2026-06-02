@@ -167,12 +167,6 @@
                             rows="3"
                             placeholder="search a vibe, build a set, find what mixes next — just ask. Viber runs the tools and shows its work."></textarea>
                 </div>
-                <div class="vmx-lib-chips">
-                  <span class="vmx-lib-chip" data-chat="find me dark rolling hypnotic techno">find a vibe</span>
-                  <span class="vmx-lib-chip" data-chat="build me a 90-minute warehouse set, melodic into rolling">build a set</span>
-                  <span class="vmx-lib-chip" data-chat="curate a sunset rooftop set, dusk to dark">curate</span>
-                  <span class="vmx-lib-chip" data-chat="what mixes cleanly out of my last track?">what's next</span>
-                </div>
               </div>
 
               <button class="vmx-lib-run" id="vmx-lib-runbtn" data-wire="library.run">▸ Ask Viber</button>
@@ -254,7 +248,21 @@
               <div class="vmx-lib-chat-thread" id="vmx-lib-chat-thread" data-wire="library.chat-thread" aria-live="polite">
                 <div class="vmx-lib-chat-turn" data-role="viber">
                   <div class="who">viber</div>
-                  <div class="body">In your library. What are we chasing?</div>
+                  <div class="body">Your crate is online. Give me a room, a moment, or a transition problem.</div>
+                </div>
+                <div class="vmx-lib-chat-starters" id="vmx-lib-chat-starters" data-wire="library.chat-starters" aria-label="Viber starter prompts">
+                  <button type="button" data-chat="build a 45-minute psytrance set from my indexed tracks, clean energy arc, no fake genres">
+                    <span>Build a set</span>
+                    <b>45 min psytrance arc</b>
+                  </button>
+                  <button type="button" data-chat="what mixes cleanly out of the currently playing track? use only grounded live and library evidence">
+                    <span>What mixes next</span>
+                    <b>grounded transition</b>
+                  </button>
+                  <button type="button" data-chat="find deep cuts in my crate that fit this set but avoid the obvious repeats">
+                    <span>Rediscover</span>
+                    <b>deep cuts, no repeats</b>
+                  </button>
                 </div>
               </div>
 
