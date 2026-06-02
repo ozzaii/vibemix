@@ -95,6 +95,7 @@ from vibemix.state.harmonics import to_camelot
 from vibemix.state.loop_geometry import beatgrid_exact_atom, parse_loop_control_kind
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
+from vibemix.state.position_clock import virtual_position_sec
 from vibemix.state.set_plan import derive_set_progress
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
 
@@ -1116,11 +1117,23 @@ def _tick_once(
         state.audible_track = tt
         state.audible_track_confidence = tc
         position_s = _optional_float(tsnap.get("position_sec"))
+        position_sampled_at = _optional_float(tsnap.get("position_sampled_at"))
         duration_s = _optional_float(tsnap.get("duration_sec"))
+        playback_rate = _optional_float(tsnap.get("playback_rate"))
         if tt and tc >= 0.5 and position_s is not None:
-            state.audible_track_position_s = max(0.0, position_s)
+            vpos = virtual_position_sec(
+                position_sec=position_s,
+                position_sampled_at=position_sampled_at,
+                now=now,
+                duration_sec=duration_s,
+                playback_rate=playback_rate,
+                bpm=state.bpm,
+                bpm_confidence=state.bpm_confidence,
+                track_confidence=tc,
+            )
+            state.audible_track_position_s = vpos.position_sec
             state.audible_track_duration_s = duration_s if duration_s and duration_s > 0 else None
-            state.audible_track_position_confidence = tc
+            state.audible_track_position_confidence = vpos.confidence
         else:
             state.audible_track_position_s = None
             state.audible_track_duration_s = None

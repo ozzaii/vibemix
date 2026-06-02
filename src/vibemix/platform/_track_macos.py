@@ -46,6 +46,7 @@ class TrackInfo:
         self.title_changed_at: float = 0.0
         self.duration_sec: float | None = None
         self.position_sec: float | None = None
+        self.position_sampled_at: float | None = None
         self.playback_rate: float = 1.0
         self.client_bundle_id: str | None = None
         self._cli = shutil.which("nowplaying-cli") or "/opt/homebrew/bin/nowplaying-cli"
@@ -73,6 +74,7 @@ class TrackInfo:
         artist = out[1].strip() if len(out) > 1 else ""
         full = f"{artist} - {title}" if (artist and title) else title
         raw = self._poll_raw()
+        raw_sampled_at = time.time() if raw is not None else None
         position_sec = _float_or_none(
             raw.get("kMRMediaRemoteNowPlayingInfoElapsedTime") if raw else None
         )
@@ -92,6 +94,9 @@ class TrackInfo:
                 self.title_changed_at = time.time()
             if raw is not None:
                 self.position_sec = position_sec
+                self.position_sampled_at = (
+                    raw_sampled_at if position_sec is not None else None
+                )
                 self.duration_sec = duration_sec
                 self.playback_rate = playback_rate if playback_rate is not None else 1.0
                 self.client_bundle_id = (
@@ -124,6 +129,7 @@ class TrackInfo:
                 "title_changed_at": self.title_changed_at,
                 "duration_sec": self.duration_sec,
                 "position_sec": self.position_sec,
+                "position_sampled_at": self.position_sampled_at,
                 "playback_rate": self.playback_rate,
                 "client_bundle_id": self.client_bundle_id,
             }

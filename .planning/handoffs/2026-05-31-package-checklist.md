@@ -8880,3 +8880,45 @@ Proof before staging:
 - `uv run ruff check src/vibemix/events/genres src/vibemix/state/music_state.py src/vibemix/runtime/ws_bus.py tests/state/test_genre_router.py tests/state/test_genre_router_race.py tests/state/test_genre_autodetect.py tests/state/test_refresh.py tests/runtime/test_ws_bus_phase22_fields.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/events/genres/__init__.py src/vibemix/events/genres/disco.py src/vibemix/events/genres/drum_and_bass.py src/vibemix/events/genres/pop.py src/vibemix/state/music_state.py src/vibemix/runtime/ws_bus.py tests/state/test_genre_router.py tests/state/test_genre_router_race.py tests/state/test_genre_autodetect.py tests/state/test_refresh.py tests/runtime/test_ws_bus_phase22_fields.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 43 - Beat-Trusted Track Position Clock
+
+Suggested commit: `fix(state): dead-reckon track position between polls`
+
+Include:
+
+- `src/vibemix/state/position_clock.py`
+- `src/vibemix/platform/_track_macos.py`
+- `src/vibemix/state/refresh.py`
+- `tests/state/test_position_clock.py`
+- `tests/test_track_macos.py`
+- `tests/state/test_refresh.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/__main__.py`, `src/vibemix/runtime/coach.py`, DROP-call speech,
+  prompt text, new Mixxx dependencies, per-deck audio claims, and any live-proof
+  assertions. Do not change the public `NowPlayingSnapshot` protocol in this
+  slice; macOS keeps the legacy `track_info.snapshot()` dict extension.
+
+Reason:
+
+- The Mixxx goldmine packet identified track position as the load-bearing clock
+  for drop ETA, phrase anchors, and "N bars to" coaching. The current
+  nowplaying-cli source polls at about 1 Hz, while the state refresh loop runs
+  much faster. Add a small, deterministic position-clock helper that advances
+  the last raw seconds value between OS polls only when the BPM lock is
+  trustworthy. BPM is an honesty gate, not a seconds-to-beats unit conversion:
+  position advances by elapsed wall time times playback rate, clamps to
+  duration, and falls back to raw 1 Hz position when the beat lock is weak,
+  stale, or missing. This lands the substrate without enabling DROP speech or
+  claiming live on-beat proof.
+
+Proof before staging:
+
+- `uv run pytest -q tests/state/test_position_clock.py tests/test_track_macos.py tests/state/test_refresh.py`
+- `uv run pytest -q tests/state/test_drop_predict.py tests/state/test_event_detector_drop.py tests/runtime/test_drop_reaction.py`
+- `uv run ruff check src/vibemix/state/position_clock.py src/vibemix/platform/_track_macos.py src/vibemix/state/refresh.py tests/state/test_position_clock.py tests/test_track_macos.py tests/state/test_refresh.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/state/position_clock.py src/vibemix/platform/_track_macos.py src/vibemix/state/refresh.py tests/state/test_position_clock.py tests/test_track_macos.py tests/state/test_refresh.py .planning/handoffs/2026-05-31-package-checklist.md`

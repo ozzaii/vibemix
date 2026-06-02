@@ -71,13 +71,19 @@ def _track_mock(title: str = "") -> MagicMock:
     return m
 
 
-def _track_position_mock(title: str = "", position_s: float = 0.0) -> MagicMock:
+def _track_position_mock(
+    title: str = "",
+    position_s: float = 0.0,
+    *,
+    position_sampled_at: float | None = None,
+) -> MagicMock:
     m = MagicMock()
     m.snapshot.return_value = {
         "title": title,
         "prev_title": "",
         "title_changed_at": 0.0,
         "position_sec": position_s,
+        "position_sampled_at": position_sampled_at,
         "duration_sec": 300.0,
         "playback_rate": 1.0,
     }
@@ -837,6 +843,31 @@ def test_tick_writes_audible_track_position_when_confident():
     assert state.audible_track == "X"
     assert state.audible_track_position_s == 64.5
     assert state.audible_track_duration_s == 300.0
+    assert state.audible_track_position_confidence >= 0.8
+
+
+def test_tick_dead_reckons_track_position_between_nowplaying_polls(mocker):
+    state = MusicState()
+    state.audible = True
+    buf = _audible_buf()
+    mocker.patch(
+        "vibemix.state.refresh.compute_downbeat_phase",
+        return_value=(0.25, 0.95),
+    )
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_position_mock(title="X", position_s=64.5, position_sampled_at=999.5),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.0,
+    )
+
+    assert state.audible_track == "X"
+    assert state.audible_track_position_s == 65.0
     assert state.audible_track_position_confidence >= 0.8
 
 

@@ -128,6 +128,7 @@ def test_track_macos_poll_carries_raw_elapsed_position(mocker):
             json.dumps(raw).encode(),
         ],
     )
+    mocker.patch("vibemix.platform._track_macos.time.time", return_value=1234.0)
 
     t = TrackMacOS()
     snap = t.poll()
@@ -137,6 +138,7 @@ def test_track_macos_poll_carries_raw_elapsed_position(mocker):
     assert snap.duration_sec == 420.0
     info = t.track_info.snapshot()
     assert info["position_sec"] == 64.5
+    assert info["position_sampled_at"] == 1234.0
     assert info["duration_sec"] == 420.0
 
 
