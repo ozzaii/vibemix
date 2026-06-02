@@ -2118,6 +2118,74 @@ def test_live_claim_guard_licenses_grounded_move_effect_causal_verdict() -> None
     assert "move_effect=low_kill:sub:pred_fell_19db:measured_fell" in result.summary
 
 
+def test_live_claim_guard_licenses_grounded_control_texture_causality() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    state.controller_connected = True
+    state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.move_audio_delta = ["sub energy fell 50% (strong)", "low energy fell 50% (strong)"]
+    moves = ["A_low: flat->killed"]
+
+    result = apply_live_claim_guard("That low cut made it thin out.", state, moves)
+
+    assert result.corrected is False
+    assert result.policy == "move_effect_supported"
+    assert result.reason == "prediction_and_measured_delta_agree"
+    assert result.text == "That low cut made it thin out."
+    assert "low_kill:sub:pred_fell_" in result.summary
+
+
+def test_live_claim_guard_refuses_texture_word_when_direction_disagrees() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    state.controller_connected = True
+    state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.move_audio_delta = ["sub energy fell 50% (strong)", "low energy fell 50% (strong)"]
+
+    result = apply_live_claim_guard(
+        "That EQ move made the low end boomy.",
+        state,
+        ["A_low: flat->killed"],
+    )
+
+    assert result.corrected is True
+    assert result.policy == "move_effect_not_verdict"
+    assert result.reason == "dsp_delta_not_causal_proof"
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "That EQ move made the low end boomy.",
+        "That low cut took the weight out.",
+        "That low cut made the mix thinner.",
+    ],
+)
+def test_live_claim_guard_refuses_unlicensed_control_texture_causality(reply: str) -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    state.controller_connected = True
+    state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.move_audio_delta = ["mid energy rose 20% (slight)"]
+
+    result = apply_live_claim_guard(reply, state, ["A_low: flat->killed"])
+
+    assert result.corrected is True
+    assert result.policy == "move_effect_not_verdict"
+    assert result.reason == "dsp_delta_not_causal_proof"
+    assert "can't tell" in result.text.lower()
+
+
+def test_live_claim_guard_allows_broad_texture_read_without_control_causality() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    state.controller_connected = True
+    state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.move_audio_delta = ["sub energy fell 50% (strong)", "low energy fell 50% (strong)"]
+    reply = "The low end got boomy for a moment."
+
+    result = apply_live_claim_guard(reply, state, ["A_low: flat->killed"])
+
+    assert result.corrected is False
+    assert result.text == reply
+
+
 def test_live_claim_guard_refuses_move_effect_when_measured_bands_are_flat() -> None:
     state = MusicState(audible=True, rms=0.12, audible_deck="A")
     state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}

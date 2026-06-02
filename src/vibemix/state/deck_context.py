@@ -133,6 +133,32 @@ _MOVE_EFFECT_CAUSAL_VERDICT_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_MOVE_EFFECT_CAUSAL_TEXTURE_RE = re.compile(
+    r"\b("
+    r"eq|mixer|move|low cut|mid cut|high cut|low boost|mid boost|high boost|"
+    r"filter|fader|knob|cut|boost(?:ed)?|kill(?:ed)?|low|lows|mid|high|bass|sub"
+    r")\b"
+    r"[^.?!]{0,64}\b("
+    r"made|caused|turned|left|took|pulled|pushed"
+    r")\b"
+    r"[^.?!]{0,80}\b("
+    r"thin(?:ned|ner|ning)?(?:\s+out)?|boomy|boomier|boom|"
+    r"weight(?:ier|y)?|heavy|heavier|lost\s+weight|(?:the\s+)?weight\s+out"
+    r")\b",
+    re.IGNORECASE,
+)
+_MOVE_EFFECT_TEXTURE_FELL_RE = re.compile(
+    r"\b("
+    r"thin(?:ned|ner|ning)?(?:\s+out)?|lost\s+weight|(?:the\s+)?weight\s+out"
+    r")\b",
+    re.IGNORECASE,
+)
+_MOVE_EFFECT_TEXTURE_ROSE_RE = re.compile(
+    r"\b("
+    r"boomy|boomier|boom|weighty|weightier|heavy|heavier"
+    r")\b",
+    re.IGNORECASE,
+)
 _MOVE_EFFECT_BARE_VERDICT_RE = re.compile(
     r"\b(?:that|it|this|move)\b.{0,32}\b(?:landed|worked|nailed|fixed|saved|improved)\b",
     re.IGNORECASE,
@@ -2783,13 +2809,19 @@ def apply_live_claim_guard(
         and effect_signals
         and (
             (_MOVE_EFFECT_CONTROL_RE.search(text) and _MOVE_EFFECT_CAUSAL_VERDICT_RE.search(text))
+            or _MOVE_EFFECT_CAUSAL_TEXTURE_RE.search(text)
             or _MOVE_EFFECT_BARE_VERDICT_RE.search(text)
         )
     )
     if effect_claim and not _MOVE_EFFECT_DISCLAIMER_RE.search(text):
         causal_control_claim = bool(
-            _MOVE_EFFECT_CONTROL_RE.search(text) and _MOVE_EFFECT_CAUSAL_VERDICT_RE.search(text)
+            (
+                _MOVE_EFFECT_CONTROL_RE.search(text)
+                and _MOVE_EFFECT_CAUSAL_VERDICT_RE.search(text)
+            )
+            or _MOVE_EFFECT_CAUSAL_TEXTURE_RE.search(text)
         )
+        texture_direction = _move_effect_texture_claim_direction(text)
         license_ = (
             _licensed_move_effect(
                 state,
@@ -2800,7 +2832,9 @@ def apply_live_claim_guard(
             if causal_control_claim and source_detail_reason is None
             else None
         )
-        if license_ is not None:
+        if license_ is not None and (
+            texture_direction is None or license_.measured_direction == texture_direction
+        ):
             return LiveClaimGuardResult(
                 text=text,
                 corrected=False,
@@ -2904,6 +2938,15 @@ def apply_live_claim_guard(
         reason=reason,
         summary=summary,
     )
+
+
+def _move_effect_texture_claim_direction(text: str) -> str | None:
+    """Return the implied band-energy direction for causal texture words."""
+    if _MOVE_EFFECT_TEXTURE_FELL_RE.search(text):
+        return "fell"
+    if _MOVE_EFFECT_TEXTURE_ROSE_RE.search(text):
+        return "rose"
+    return None
 
 
 def _judge_score_from_evidence_line(judge_evidence_line: str | None) -> float | None:
