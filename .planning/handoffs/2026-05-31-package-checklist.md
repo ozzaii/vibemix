@@ -9499,3 +9499,38 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/app.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 57 - Folded Learn Readiness Rail
+
+Suggested commit: `fix(learn-ui): surface real practice readiness`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/shell/learn-folded-layout.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Learn scoring, curriculum progression semantics, Python lesson runtime,
+  co-host speech, Settings drawer internals, and packaging scripts. This package
+  only makes the shell-embedded Learn readiness state truthful and easier to
+  scan.
+
+Reason:
+
+- The packaged Learn view was technically working but still felt fake: it could
+  show "screen deck ready" while the runtime status stream already saw MIDI, and
+  the next-practice controls read as a centered popover instead of part of the
+  practice instrument. Listen to `ipc.status.tick` for the MIDI-present signal,
+  surface that as "midi signal ready" until the controller-specific Learn mapper
+  binds, and fold the next-practice module into a full-width command rail above
+  the deck.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/learn-folded-layout.spec.ts tests/shell/settings-nav.spec.ts tests/shell/shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

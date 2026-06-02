@@ -28,6 +28,11 @@ describe("folded Learn shell layout", () => {
 
   it("constrains Learn to the shell stage instead of the viewport", () => {
     const css = readUi("src/shell/shell.css");
+    const learn = readUi("src/learn/learn-window.ts");
+    expect(learn).toContain("interface StatusTickPayload");
+    expect(learn).toContain('"ipc.status.tick"');
+    expect(learn).toContain("midi signal ready");
+    expect(learn).toContain("screen practice deck");
     expect(css).toContain(
       '.surface[data-surface="learn"].surface--mounted .surface-mount',
     );
@@ -40,6 +45,10 @@ describe("folded Learn shell layout", () => {
     expect(css).toContain("position: absolute");
     expect(css).toContain("top: var(--sp-5)");
     expect(css).toContain("bottom: auto");
+    expect(css).toContain("grid-template-areas:");
+    expect(css).toContain('"kicker primary secondary"');
+    expect(css).toContain('"pulse primary secondary"');
+    expect(css).toContain("justify-content: stretch");
   });
 
   it("keeps Earned as compact context in the folded surface", () => {

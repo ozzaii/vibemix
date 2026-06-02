@@ -606,6 +606,40 @@
 .surface[data-surface="learn"].surface--mounted .learn-lesson-host .learn-booth-panel {
   top: var(--sp-5);
   bottom: auto;
+  left: var(--sp-5);
+  right: var(--sp-5);
+  transform: none;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "kicker primary secondary"
+    "pulse primary secondary";
+  justify-content: stretch;
+  justify-items: start;
+  padding: var(--sp-3);
+  gap: var(--sp-1) var(--sp-3);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 14px 42px rgba(0, 0, 0, 0.28);
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-booth-kicker,
+.surface[data-surface="learn"].surface--mounted .learn-booth-pulse {
+  text-align: left;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-booth-pulse {
+  max-width: none;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-booth-primary,
+.surface[data-surface="learn"].surface--mounted .learn-booth-secondary {
+  align-self: center;
+  min-width: 150px;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-booth-secondary {
+  min-width: 132px;
 }
 
 .surface[data-surface="learn"].surface--mounted .learn-earned-wall {

@@ -107,6 +107,10 @@ interface MidiPositionPayload {
   // (the canonical envelope ts is ISO-8601; we parse it on receive).
 }
 
+interface StatusTickPayload {
+  midi?: number;
+}
+
 interface IpcEnvelopeMeta {
   ts?: string;
 }
@@ -304,7 +308,7 @@ function mountLearnWindow(root: HTMLElement): {
     <section id="learn-booth-panel" class="learn-booth-panel" data-visible="true">
       <div class="learn-booth-kicker">next practice</div>
       <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">screen deck ready</div>
-      <button id="learn-start-recommended" class="learn-booth-primary" type="button">start opening dialog</button>
+      <button id="learn-start-recommended" class="learn-booth-primary" type="button">start practice</button>
       <button id="learn-open-map" class="learn-booth-secondary" type="button">choose lesson</button>
     </section>
     <button id="learn-screen-action" class="learn-screen-action" type="button" hidden>continue</button>
@@ -389,6 +393,8 @@ function mountLearnWindow(root: HTMLElement): {
   let recommendedLessonLevel: "fresh" | "replay" = "fresh";
   let exemplarHideTimer: ReturnType<typeof setTimeout> | null = null;
   let controllerDetected = false; // flipped by controller_detected handler
+  let midiSeenOnStatusTick = false;
+  let controllerDisplayName: string | null = null;
   let currentLessonId: string | null = null;
   let currentExpectedAction: ExpectedActionPayload | null = null;
   let lastHighlightPayload: HighlightPayload | null = null;
@@ -557,7 +563,15 @@ function mountLearnWindow(root: HTMLElement): {
     recommended: ProgressListEntry | undefined,
   ): void => {
     if (boothPanel.dataset.visible !== "true") return;
-    const cue = recommendationBoothCue(recommended, controllerDetected);
+    const cue = recommendationBoothCue(
+      recommended,
+      controllerDetected
+        ? "hardware"
+        : midiSeenOnStatusTick
+          ? "midi"
+          : "screen",
+      controllerDisplayName,
+    );
     setBoothPulse(cue.state, cue.text, {
       ariaLabel: cue.ariaLabel,
       title: cue.title,
@@ -667,6 +681,8 @@ function mountLearnWindow(root: HTMLElement): {
     if (!detail) return;
     if (detail.connected) {
       controllerDetected = true;
+      midiSeenOnStatusTick = true;
+      controllerDisplayName = detail.display_name;
       titlebar.setControllerName(detail.display_name);
       status.setMirrorStatus("live", detail.display_name);
       renderLessonChooser();
@@ -688,6 +704,7 @@ function mountLearnWindow(root: HTMLElement): {
       })();
     } else {
       controllerDetected = false;
+      controllerDisplayName = null;
       titlebar.setControllerName(null);
       status.setMirrorStatus("screen");
       renderLessonChooser();
@@ -722,6 +739,17 @@ function mountLearnWindow(root: HTMLElement): {
     // measurement lives in `tests/learn/highlight-latency.test.ts`.
     const envelopeMeta = (ev as CustomEvent<MidiPositionPayload> & { detail: { __envelope__?: IpcEnvelopeMeta } });
     void envelopeMeta;
+  });
+
+  // The main runtime can see a MIDI port before the Learn-specific controller
+  // map handshake emits `ipc.learn.controller_detected`. Do not show "screen
+  // deck ready" while the app already knows hardware is present.
+  addWindowListener("ipc.status.tick", (ev: Event) => {
+    const detail = (ev as CustomEvent<StatusTickPayload>).detail;
+    const nextMidiSeen = Number(detail?.midi ?? 0) > 0;
+    if (midiSeenOnStatusTick === nextMidiSeen) return;
+    midiSeenOnStatusTick = nextMidiSeen;
+    renderLessonChooser();
   });
 
   // learn.course3_lens: quiet Course 3 live-evidence indicator. This is
@@ -1440,7 +1468,8 @@ function recommendedActionVerb(status: LessonStatus | undefined): string {
 
 function recommendationBoothCue(
   recommended: ProgressListEntry | undefined,
-  hardwareReady: boolean,
+  readiness: "hardware" | "midi" | "screen",
+  controllerName: string | null,
 ): {
   state: "ready";
   text: string;
@@ -1468,10 +1497,44 @@ function recommendationBoothCue(
       title: label,
     };
   }
+  if (readiness === "hardware") {
+    const compactName = compactControllerName(controllerName);
+    const label = compactName
+      ? `${compactName} is mapped for this lesson.`
+      : "hardware is mapped for this lesson.";
+    return {
+      state: "ready",
+      text: compactName ? `${compactName} ready` : "hardware ready",
+      ariaLabel: label,
+      title: label,
+    };
+  }
+  if (readiness === "midi") {
+    const label =
+      "MIDI is visible. Start a lesson and Learn will bind the matching controller map.";
+    return {
+      state: "ready",
+      text: "midi signal ready",
+      ariaLabel: label,
+      title: label,
+    };
+  }
   return {
     state: "ready",
-    text: hardwareReady ? "hardware deck ready" : "screen deck ready",
+    text: "screen practice deck",
+    ariaLabel:
+      "screen practice deck ready. Connect a controller or use the highlighted on-screen control.",
   };
+}
+
+function compactControllerName(raw: string | null): string | null {
+  const text = raw?.trim();
+  if (!text) return null;
+  return text
+    .replace(/\bpioneer\b/gi, "")
+    .replace(/\bddj[-\s]?flx4\b/gi, "FLX4")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function lessonStrikeCount(lesson: ProgressListEntry): number {
