@@ -440,6 +440,34 @@ def test_live_status_recheck_mirrors_attached_runtime(fake_bus: FakeBus) -> None
     assert tick["screen"] == "unavailable"
 
 
+def test_live_status_recheck_reports_visible_controller_without_midi_as_down(
+    fake_bus: FakeBus,
+) -> None:
+    loop = SessionLoop(
+        fake_bus,
+        music_state=MagicMock(
+            controller_connected=True,
+            controller_midi_activity="connected_no_midi_traffic",
+            controller_midi_messages_seen=0,
+        ),
+        controller_state=MagicMock(port_name="DDJ-FLX4"),
+        screen_available=True,
+    )
+    loop.register_handlers()
+    _drive(
+        fake_bus,
+        {
+            "type": "ipc.status.recheck",
+            "ts": "2026-05-12T08:00:00+00:00",
+            "payload": {"component": "midi"},
+        },
+    )
+    tick = fake_bus.emitted_by_type("ipc.status.tick")[-1]["payload"]
+    assert tick["livekit"] == "ok"
+    assert tick["gemini"] == "ok"
+    assert tick["midi"] == 0
+
+
 def test_status_recheck_unknown_component_emits_ipc_error(fake_bus: FakeBus) -> None:
     loop = SessionLoop(fake_bus)
     loop.register_handlers()

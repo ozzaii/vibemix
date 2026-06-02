@@ -5346,10 +5346,13 @@ Include:
 - `src/vibemix/state/refresh.py`
 - `src/vibemix/state/deck_poller.py`
 - `src/vibemix/runtime/ws_bus.py`
+- `tauri/ui/src/session/components/status-bar.ts`
 - `tests/midi/test_flx4_synthetic_decode.py`
 - `tests/state/test_refresh.py`
 - `tests/state/test_deck_poller.py`
 - `tests/runtime/test_ws_bus_deck_state.py`
+- `tests/runtime/test_ws_bus_status_tick.py`
+- `tauri/ui/tests/session/components.spec.ts`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
 
 Reason:
@@ -5369,11 +5372,12 @@ Reason:
 
 Proof to run:
 
-- `uv run pytest -q tests/midi/test_flx4_synthetic_decode.py tests/state/test_refresh.py::test_tick_writes_recent_moves tests/state/test_refresh.py::test_tick_distinguishes_connected_controller_with_no_midi_traffic tests/state/test_deck_poller.py::test_source_status_distinguishes_visible_controller_with_no_midi_traffic tests/runtime/test_ws_bus_deck_state.py::test_payload_includes_bounded_deck_mixer_posture tests/runtime/test_ws_bus_deck_state.py::test_course3_operator_action_names_visible_controller_with_no_midi_traffic`
+- `uv run pytest -q tests/midi/test_flx4_synthetic_decode.py tests/state/test_refresh.py::test_tick_writes_recent_moves tests/state/test_refresh.py::test_tick_distinguishes_connected_controller_with_no_midi_traffic tests/state/test_deck_poller.py::test_source_status_distinguishes_visible_controller_with_no_midi_traffic tests/runtime/test_ws_bus_deck_state.py::test_payload_includes_bounded_deck_mixer_posture tests/runtime/test_ws_bus_deck_state.py::test_course3_operator_action_names_visible_controller_with_no_midi_traffic tests/runtime/test_ws_bus_status_tick.py`
+- `npm --prefix tauri/ui test -- tests/session/components.spec.ts`
 - `uv run pytest -q tests/midi tests/state/test_refresh.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_ws_bus_snapshot.py tests/runtime/test_live_course3_lens_probe.py tests/library/test_live_context_cli.py`
-- `uv run ruff check src/vibemix/midi/state.py src/vibemix/state/music_state.py src/vibemix/state/refresh.py src/vibemix/state/deck_poller.py src/vibemix/runtime/ws_bus.py tests/midi/test_flx4_synthetic_decode.py tests/state/test_refresh.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py`
+- `uv run ruff check src/vibemix/midi/state.py src/vibemix/state/music_state.py src/vibemix/state/refresh.py src/vibemix/state/deck_poller.py src/vibemix/runtime/ws_bus.py tests/midi/test_flx4_synthetic_decode.py tests/state/test_refresh.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_ws_bus_status_tick.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-- `git diff --check -- src/vibemix/midi/state.py src/vibemix/state/music_state.py src/vibemix/state/refresh.py src/vibemix/state/deck_poller.py src/vibemix/runtime/ws_bus.py tests/midi/test_flx4_synthetic_decode.py tests/state/test_refresh.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `git diff --check -- src/vibemix/midi/state.py src/vibemix/state/music_state.py src/vibemix/state/refresh.py src/vibemix/state/deck_poller.py src/vibemix/runtime/ws_bus.py tauri/ui/src/session/components/status-bar.ts tests/midi/test_flx4_synthetic_decode.py tests/state/test_refresh.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_ws_bus_status_tick.py tauri/ui/tests/session/components.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 
 Remaining gate:
 

@@ -59,7 +59,7 @@ from vibemix.runtime.drop_display import predicted_drop_bars
 from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.recordings_index import RecordingsIndex, run_retention_sweep
 from vibemix.runtime.settings import SettingsApplier
-from vibemix.runtime.ws_bus import WizardBus
+from vibemix.runtime.ws_bus import WizardBus, _probe_midi_count
 from vibemix.ui_bus.messages import (
     IpcBoot,
     IpcError,
@@ -1281,12 +1281,8 @@ class SessionLoop:
 
     def _probe_midi_count(self) -> int | None:
         """Mirror of WizardLoop._probe_midi_count — best-effort mido import."""
-        if self.controller_state is not None:
-            try:
-                port_name = getattr(self.controller_state, "port_name", "")
-                return 1 if port_name else 0
-            except Exception:
-                return None
+        if self.music_state is not None or self.controller_state is not None:
+            return _probe_midi_count(self.controller_state, self.music_state)
         try:
             import mido
 

@@ -151,12 +151,35 @@ def _probe_screen_status(screen_available: bool | None = None) -> str:
         return "unavailable"
 
 
-def _probe_midi_count(controller_state: Any | None) -> int | None:
-    """Honest count of the connected controller from the shared ControllerState.
+_MIDI_ACTIVITY_READY = {"active", "midi_events_no_moves", "midi_traffic_unmapped"}
+_MIDI_ACTIVITY_DOWN = {"connected_no_midi_traffic", "disconnected"}
 
-    v1 tracks a single active port (``port_name``) — 1 when a controller is
-    open, 0 when none. ``None`` when no controller_state is wired (the badge
-    then reads neutral, not a fabricated zero)."""
+
+def _probe_midi_count(
+    controller_state: Any | None,
+    music_state: MusicState | None = None,
+) -> int | None:
+    """Honest controller-readiness count for the status badge.
+
+    The UI payload is still a small count-like integer, but in live mode it
+    means "usable MIDI is reaching vibemix": 1 after any MIDI traffic is seen,
+    0 when the controller is merely visible but silent, and None when no live
+    probe is wired yet.
+    """
+    if music_state is not None:
+        try:
+            activity = str(getattr(music_state, "controller_midi_activity", "") or "")
+            if activity in _MIDI_ACTIVITY_READY:
+                return 1
+            if activity in _MIDI_ACTIVITY_DOWN:
+                return 0
+            messages = max(0, int(getattr(music_state, "controller_midi_messages_seen", 0) or 0))
+            if messages > 0:
+                return 1
+            if bool(getattr(music_state, "controller_connected", False)):
+                return 0
+        except Exception:
+            pass
     if controller_state is None:
         return None
     try:
@@ -1248,7 +1271,7 @@ async def ws_broadcast(
                     status_msg = StatusTick.make(
                         livekit="ok",
                         gemini="ok",
-                        midi=_probe_midi_count(controller_state),
+                        midi=_probe_midi_count(controller_state, state),
                         screen=_probe_screen_status(screen_available),
                     )
                     status_payload = status_msg.to_json()

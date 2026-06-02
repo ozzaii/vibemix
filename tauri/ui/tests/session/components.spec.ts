@@ -510,6 +510,12 @@ describe("renderStatusBar", () => {
     );
     expect(midiBadge?.dataset.clickable).toBe("true");
     expect(midiBadge?.dataset.state).toBe("down");
+    expect(
+      midiBadge?.querySelector(".vmx-statusbar__tooltip-msg")?.textContent,
+    ).toContain("no controller motion is reaching vibemix");
+    expect(
+      midiBadge?.querySelector(".vmx-statusbar__tooltip-msg")?.textContent,
+    ).toContain("enable MIDI output");
   });
 });
 

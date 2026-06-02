@@ -438,7 +438,7 @@ function defaultErrorMsg(key: BadgeKey): string {
   switch (key) {
     case "livekit": return "vibemix link to the realtime channel dropped. click to reconnect";
     case "gemini": return "AI service unreachable. recheck network + key";
-    case "midi": return "no controllers detected. plug one in";
+    case "midi": return "no controller motion is reaching vibemix. plug in the controller, enable MIDI output, then move a fader";
     case "screen": return "screen-capture permission denied. open system settings";
   }
 }

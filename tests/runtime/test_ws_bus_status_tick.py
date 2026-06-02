@@ -32,6 +32,33 @@ def test_probe_midi_count_reflects_active_port():
     assert _probe_midi_count(SimpleNamespace(port_name="")) == 0
 
 
+def test_probe_midi_count_uses_live_midi_traffic_over_visible_port():
+    controller = SimpleNamespace(port_name="DDJ-FLX4")
+
+    assert (
+        _probe_midi_count(
+            controller,
+            SimpleNamespace(
+                controller_connected=True,
+                controller_midi_activity="connected_no_midi_traffic",
+                controller_midi_messages_seen=0,
+            ),
+        )
+        == 0
+    )
+    assert (
+        _probe_midi_count(
+            controller,
+            SimpleNamespace(
+                controller_connected=True,
+                controller_midi_activity="active",
+                controller_midi_messages_seen=12,
+            ),
+        )
+        == 1
+    )
+
+
 def test_probe_midi_count_is_fail_soft():
     class _Boom:
         @property
