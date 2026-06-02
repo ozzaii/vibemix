@@ -13,6 +13,8 @@ the opposite:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from vibemix.llm.model_router import RouterPathError, resolve
@@ -57,3 +59,15 @@ def test_legacy_prompt_callers_can_still_opt_into_tag_dsl() -> None:
 
     found = sum(1 for tag in TTS_TAGS if tag in body)
     assert found == len(TTS_TAGS)
+
+
+def test_tts_tag_doc_matches_moss_only_policy() -> None:
+    """Docs must not re-advertise retired Gemini TTS as the live voice path."""
+    root = Path(__file__).resolve().parents[2]
+    doc = (root / "docs/prompts/tts-tags.md").read_text(encoding="utf-8")
+
+    assert "local MOSS-only" in doc
+    assert "include_tag_dsl=False" in doc
+    assert "live_coach_tts" not in doc
+    assert "gemini-3.1-flash-tts-preview" not in doc
+    assert "public-facing OSS surface" not in doc

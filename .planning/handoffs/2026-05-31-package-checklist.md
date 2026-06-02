@@ -6547,9 +6547,11 @@ Include:
 - `docs/AUDIT.md`
 - `docs/pricing/live-stack-economics.en.md`
 - `docs/pricing/live-stack-economics.it.md`
+- `docs/prompts/tts-tags.md`
 - `scripts/dist/render_architecture.py`
 - `docs/assets/architecture.svg`
 - `tests/repo/test_docs_assets.py`
+- `tests/llm/test_tts_3_1.py`
 - `tests/audit/test_dep_cull_complete.py`
 - `src/vibemix/agent/playback_sink.py`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
@@ -6568,8 +6570,9 @@ Proof to run:
 - `uv run python scripts/audit/gen_audit_md.py --check`
 - `uv run python scripts/dist/render_architecture.py --check`
 - `uv run pytest -q tests/audit/test_audit_md_generator.py tests/audit/test_dep_cull_complete.py tests/audit/test_opportunity_evaluations_schema.py tests/repo/test_docs_assets.py tests/library/test_cost.py tests/library/test_pricing.py`
-- `uv run ruff check src/vibemix/agent/playback_sink.py tests/audit/test_dep_cull_complete.py tests/repo/test_docs_assets.py scripts/audit/gen_audit_md.py scripts/dist/render_architecture.py`
-- `git diff --check -- scripts/audit/dep_ratings.yaml docs/AUDIT.md docs/pricing/live-stack-economics.en.md docs/pricing/live-stack-economics.it.md scripts/dist/render_architecture.py docs/assets/architecture.svg tests/repo/test_docs_assets.py tests/audit/test_dep_cull_complete.py src/vibemix/agent/playback_sink.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run pytest -q tests/llm/test_tts_3_1.py tests/llm/test_model_router.py tests/agent/test_tts_chain.py tests/agent/test_tts_chain_cartesia.py tests/agent/test_proxy_client.py`
+- `uv run ruff check src/vibemix/agent/playback_sink.py tests/audit/test_dep_cull_complete.py tests/repo/test_docs_assets.py tests/llm/test_tts_3_1.py scripts/audit/gen_audit_md.py scripts/dist/render_architecture.py`
+- `git diff --check -- scripts/audit/dep_ratings.yaml docs/AUDIT.md docs/pricing/live-stack-economics.en.md docs/pricing/live-stack-economics.it.md docs/prompts/tts-tags.md scripts/dist/render_architecture.py docs/assets/architecture.svg tests/repo/test_docs_assets.py tests/llm/test_tts_3_1.py tests/audit/test_dep_cull_complete.py src/vibemix/agent/playback_sink.py .planning/handoffs/2026-05-31-package-checklist.md`
 
 Remaining gate:
 

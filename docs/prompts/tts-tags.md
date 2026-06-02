@@ -1,137 +1,76 @@
-# Gemini 3.1 Flash TTS — Audio Tag DSL
+# Retired Gemini TTS Tags — MOSS Live Voice Policy
 
-vibemix's live coach speaks through Gemini 3.1 Flash TTS. The TTS supports
-six **inline audio tags** that the LLM emits as the first token of a
-response; the TTS reads them at synthesis time as expressivity directives
-(volume, cadence, pitch).
+vibemix's live co-host voice is **local MOSS-only**. The live product does not
+route speech through Gemini TTS, OpenAI TTS, Cartesia, or any other cloud voice
+provider, and the old cloud-TTS router aliases are intentionally invalid.
 
-This DSL replaces inline prose hints like "you whisper conspiratorially"
-with a structured marker the TTS understands directly.
+This page documents the retired Gemini TTS tag DSL so future work does not
+accidentally re-enable it. The constants still exist for compatibility tests and
+old prompt builders, but the live Sven/MOSS path opts out of the DSL.
 
-| Source | Constant |
-| ------ | -------- |
-| Tag set | [`vibemix.prompts.matrix.TTS_TAGS`](../../src/vibemix/prompts/matrix.py) |
-| Inline DSL block (rendered into every coach turn's system instruction) | [`vibemix.prompts.matrix.TTS_TAG_DSL_BLOCK`](../../src/vibemix/prompts/matrix.py) |
-| TTS model id | [`vibemix.llm.model_router.resolve("live_coach_tts")`](../../src/vibemix/llm/model_router.py) → `gemini-3.1-flash-tts-preview` |
+## Current Live Contract
 
-## The 6 supported tags
+| Surface | Contract |
+| --- | --- |
+| Voice source | `vibemix.agent.tts_chain.build_tts_chain(mode=...)` builds the single local `MossLocalTTS` provider. |
+| Live prompt | `DJCoHostAgent` calls `build_system_instruction(..., include_tag_dsl=False, include_audio_vibe_contract=True, include_coach_closing=True)`. |
+| Legacy tag cleanup | `vibemix.agent.emote_parser.strip_emote_tags` strips known voice tags before speech/transcript output. |
+| Router contract | `vibemix.llm.model_router.resolve(...)` has no product cloud-TTS route. |
+| Proof tests | `tests/llm/test_tts_3_1.py`, `tests/llm/test_model_router.py`, `tests/agent/test_tts_chain.py`, and `tests/agent/test_dj_cohost.py`. |
 
-| Tag | Intent | Example | Recommended events |
-| --- | ------ | ------- | ------------------ |
-| `[whisper]` | Lowered volume, intimate, sotto voce | `[whisper] insider tip — that loop's a sleeper` | KAAN_SPOKE replies that share insider knowledge; pre-drop hush moments |
-| `[laugh]` | Pre-recorded laughter overlay | `[laugh] yeah that bassline got me good` | Shared inside jokes; wild blend reactions. **Use sparingly** — overuse reads as theatrical. |
-| `[fast]` | Accelerated cadence, urgent | `[fast] DROP HERE — kick comes in 2 bars` | PHASE event hits; hyped drops; warning calls |
-| `[slow]` | Drawn-out cadence | `[slow] feel that bassline settling in` | Emotional anchors; deep grooves; ambient sections |
-| `[excited]` | Pitched-up, energetic | `[excited] THAT'S the drop right there` | PHASE event hits; build resolutions; peak energy |
-| `[chill]` | Relaxed, low-key | `[chill] easy now, just floating` | Warmup phase; late-set wind-downs; ambient sections |
+The important separation: the co-host still gets the audio-vibe contract and
+the professional coach closing, but it does **not** get prompted to write
+delivery tags such as `[chill]` or `[excited]`.
 
-## How the LLM uses tags
+## Legacy Tag Set
 
-The tag is the **first token** of the spoken reply (after optional
-whitespace). Scope is the rest of the line. **One tag per reply** is the
-norm; multi-tag is undefined behavior.
+These six tags are historical Gemini-TTS controls. Treat them as internal
+compatibility markers, not product behavior.
 
-```text
-[whisper] that one's a sleeper, watch what happens at 8 bars in
-```
+| Tag | Old intent | Current live behavior |
+| --- | --- | --- |
+| `[whisper]` | Lowered volume / intimate delivery | Not prompted; stripped if emitted. |
+| `[laugh]` | Pre-recorded laughter overlay | Not prompted; stripped if emitted. |
+| `[fast]` | Faster cadence | Not prompted; stripped if emitted. |
+| `[slow]` | Drawn-out cadence | Not prompted; stripped if emitted. |
+| `[excited]` | Pitched-up / energetic delivery | Not prompted; stripped if emitted. |
+| `[chill]` | Relaxed delivery | Not prompted; stripped if emitted. |
 
-vs the untagged default (casual studio-friend voice):
+Known tags may still appear in legacy fixtures, memory-ingest fixtures, and
+compatibility tests. They should not appear in live prompt text, spoken text, or
+new product-facing examples.
 
-```text
-that one's a sleeper, watch what happens at 8 bars in
-```
+## Compatibility API
 
-**Default is no tag.** Reach for one only when the moment warrants it —
-the "real DJ friend in your ear" anti-slop principle applies: tag-stuffing
-sounds like AI announcer voice, the opposite of what we ship.
+The compatibility constants live in `src/vibemix/prompts/matrix.py`:
 
-## Where the DSL lives in the prompt
+- `TTS_TAGS`
+- `TTS_TAG_DSL_BLOCK`
+- `COACH_TAG_DSL_BLOCK`
+- `build_system_instruction(include_tag_dsl=...)`
 
-The DSL block (`TTS_TAG_DSL_BLOCK`) is appended to every live coach
-system instruction by default via
-`build_system_instruction(include_tag_dsl=True)`. The block lives **after**
-the citation-grammar block and the fail-soft fragment — the LLM learns
-grounding first (load-bearing for the anti-hallucination thesis), then
-expressivity second.
+`build_system_instruction(...)` still defaults `include_tag_dsl=True` for old
+byte-identity callers and prompt tests. Live co-host callers must pass
+`include_tag_dsl=False` and separately keep `include_audio_vibe_contract=True`
+when they need audio-grounding instructions.
 
-```python
-# Default — tags rendered:
-body = build_system_instruction(skill="intermediate", mode="hype")
-# body contains all 6 tag examples + intent descriptions
+## Do Not Re-Introduce
 
-# Byte-identity callers (persona.SYSTEM_INSTRUCTION) — tags suppressed:
-body = build_system_instruction(
-    skill="intermediate",
-    mode="hype",
-    include_citation_grammar=False,
-    include_listening_fallback=False,
-    include_tag_dsl=False,
-)
-# body byte-identical to v4 HYPE_INTERMEDIATE
-```
+Do not add a new provider fallback or router alias to make the old DSL "work"
+again. If MOSS is unavailable, the app should surface that voice is unavailable
+or start muted by design; it must not silently route speech to paid/cloud TTS.
 
-## Persona overlay opt-in / opt-out
+Do not use tags as a style-control substitute for better prompting. For live
+Sven, the correct path is grounded, English-only, citation-checked text flowing
+through the MOSS sanitizer, not bracket controls in the model output.
 
-Persona overlays opt in by default (every live coach turn sees the DSL).
-To suppress tags for a specific persona (e.g. a minimal-affect "stoic
-coach" persona), pass `include_tag_dsl=False` at the dispatcher boundary.
-
-```python
-# Stoic-coach persona — no expressivity tags:
-body = build_system_instruction(
-    skill="pro",
-    mode="coach",
-    mood="teacher",  # or a future "stoic" mood
-    include_tag_dsl=False,
-)
-```
-
-There is currently no per-event-type tag whitelist; the LLM decides
-when to reach for a tag based on context + intent. Future iterations
-may add `{event_type: [allowed_tags]}` whitelisting if Phase 16 ear-test
-data shows overuse of a particular tag.
-
-## Unknown tags
-
-Behavior when the LLM emits a tag NOT in the canonical set (e.g.
-`[invented_tag] hi`):
-
-- **Pinned via VCR cassette** in
-  [`tests/llm/test_tts_3_1.py::test_unknown_tag_behavior_documented`](../../tests/llm/test_tts_3_1.py).
-- **Cassette recording is deferred to a Kaan-action item** — the test
-  is skipped until cassettes are recorded via
-  `VCR_RECORD_MODE=new_episodes uv run pytest tests/llm/test_tts_3_1.py`
-  with a real `GEMINI_API_KEY`.
-- Whichever shape Gemini 3.1 Flash TTS captures (pass-through-literal vs
-  strip-with-warning) IS the canonical contract. Once cassettes are
-  recorded, update this section to document the observed behavior.
-
-The threat model considers unknown tags low-risk (T-41-04-05):
-worst-case is a literal `[invented_tag]` audible in the output — a
-user-noticeable bug, not a security risk. No code execution surface;
-the LLM is not given filesystem / network access via tag syntax.
-
-## Where the spec came from
-
-- Gemini 2026-Q1 release notes — "200+ audio tags" for 3.1 Flash TTS.
-- vibemix's curated subset = 6 tags chosen for DJ-coach intent
-  coverage (insider/hype/anchor/build/chill spectrum), not the full
-  200+ set. Adding tags is a one-line edit to `TTS_TAGS` +
-  `TTS_TAG_DSL_BLOCK` + an entry in the table above.
-
-## Where the spec lives
+## Source Of Truth
 
 | Layer | Path |
-| ----- | ---- |
-| Tag set + DSL block constant | `src/vibemix/prompts/matrix.py` |
-| Per-turn injection point | `vibemix.prompts.matrix.build_system_instruction(include_tag_dsl=True)` |
-| Default-on for live coach | `DJCoHostAgent.__init__` (via `_resolve_prompt_cell`) |
-| TTS model resolution | `vibemix.llm.model_router.resolve("live_coach_tts")` |
-| Tests | `tests/llm/test_tts_3_1.py` + `tests/prompts/test_matrix.py` |
-
-## Public surface
-
-This document is part of the **public-facing OSS surface** post-v3.0
-ship — external contributors who want to extend the DSL (add tags,
-change intent mapping) start here. The DSL is intentionally short —
-new tags require a Phase-16 ear-test pass before landing.
+| --- | --- |
+| MOSS-only TTS factory | `src/vibemix/agent/tts_chain.py` |
+| Proxy-mode MOSS shim | `src/vibemix/agent/proxy_client.py` |
+| Legacy tag parser/sanitizer | `src/vibemix/agent/emote_parser.py` |
+| Prompt matrix compatibility constants | `src/vibemix/prompts/matrix.py` |
+| Live prompt opt-out | `src/vibemix/agent/dj_cohost.py` |
+| Router retirement tests | `tests/llm/test_tts_3_1.py` and `tests/llm/test_model_router.py` |
