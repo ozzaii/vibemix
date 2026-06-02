@@ -81,6 +81,22 @@ def _source_ipc_schema(root: Path) -> Path:
     return root / IPC_SCHEMA_REL
 
 
+def _is_test_fixture_path(path: Path) -> bool:
+    parts = path.parts
+    for index, part in enumerate(parts):
+        if part == "tests" and "fixtures" in parts[index + 1 :]:
+            return True
+    return False
+
+
+def _bundled_test_fixture_paths(bundle_dir: Path) -> list[Path]:
+    return sorted(
+        path.relative_to(bundle_dir)
+        for path in bundle_dir.rglob("*")
+        if _is_test_fixture_path(path.relative_to(bundle_dir))
+    )
+
+
 def _moss_archive_pin_errors() -> list[str]:
     """Return release-source pin errors for the hosted MOSS model archive."""
     url = os.environ.get(MOSS_ARCHIVE_URL_ENV, "").strip()
@@ -215,6 +231,16 @@ def check_sidecar_bundle_ready(
         return SidecarBundleStatus(
             False,
             f"PyInstaller _internal directory missing next to {binary}. Run `{build_cmd}`.",
+            binary,
+        )
+
+    fixture_hits = _bundled_test_fixture_paths(bundle_dir)
+    if fixture_hits:
+        preview = ", ".join(str(path) for path in fixture_hits[:5])
+        extra = "" if len(fixture_hits) <= 5 else f" (+{len(fixture_hits) - 5} more)"
+        return SidecarBundleStatus(
+            False,
+            f"test fixture payloads bundled in sidecar: {preview}{extra}. Run `{build_cmd}`.",
             binary,
         )
 

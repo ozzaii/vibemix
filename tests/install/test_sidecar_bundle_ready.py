@@ -203,6 +203,26 @@ def test_missing_pyinstaller_internal_dir_fails(tmp_path: Path) -> None:
     assert "_internal" in status.message
 
 
+def test_bundled_test_fixture_payloads_fail(tmp_path: Path) -> None:
+    _write_bundle(tmp_path, MAC_TRIPLE)
+    fixture = (
+        _bundle_dir(tmp_path, MAC_TRIPLE)
+        / "_internal"
+        / "tests"
+        / "library"
+        / "fixtures"
+        / "synthetic_collection.xml"
+    )
+    fixture.parent.mkdir(parents=True, exist_ok=True)
+    fixture.write_text("<DJ_PLAYLISTS />\n", encoding="utf-8")
+
+    status = gate.check_sidecar_bundle_ready(root=tmp_path, triple=MAC_TRIPLE)
+
+    assert status.ok is False
+    assert "test fixture payloads bundled in sidecar" in status.message
+    assert "tests/library/fixtures/synthetic_collection.xml" in status.message
+
+
 def test_require_moss_source_fails_without_bundle_or_archive(
     tmp_path: Path, monkeypatch
 ) -> None:
