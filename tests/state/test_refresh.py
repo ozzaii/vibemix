@@ -16,11 +16,13 @@ Test strategy:
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from tests.audio.conftest import int16_sine
 from vibemix.audio import AudioBuffer
+from vibemix.library.prepared_pool import PreparedPool, PreparedPoolTrack
 from vibemix.library.rekordbox import CuePoint, TrackEntry
 from vibemix.state import MusicState, state_refresh_loop
 from vibemix.state.deck_state import DeckTrack
@@ -1454,6 +1456,63 @@ def test_tick_registers_citable_deck_source_evidence_from_deck_snapshot() -> Non
 
     expected = "deck_source=deck1_A_known_src_rekordbox_xml+deck2_B_unknown_src_none"
     assert registry.snapshot()["mix"][expected] == (100.0,)
+
+
+def test_tick_writes_set_progress_from_latest_prepared_pool() -> None:
+    state = MusicState()
+    state.set_start_at = 900.0
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        "A": DeckTrack(
+            title="Opening Spiral",
+            track_id="track-a",
+            bpm=150.0,
+            key="Am",
+            confidence=0.95,
+            source="rekordbox_xml",
+        )
+    }
+    pool = PreparedPool(
+        name="Psy Plan",
+        created_at=1.0,
+        json_path=Path("psy-plan.json"),
+        tracks=(
+            PreparedPoolTrack("track-a", title="Opening Spiral", artist="One"),
+            PreparedPoolTrack("track-b", title="Next Portal", artist="Two"),
+            PreparedPoolTrack("track-c", title="Late Lift", artist="Three"),
+        ),
+    )
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _ctrl_mock(),
+        _track_position_mock(title="Opening Spiral", position_s=12.0),
+        now=1000.0,
+        last_audible_high=900.0,
+        last_audible_low=0.0,
+        bpm_cache=150.0,
+        last_bpm_at=999.5,
+        deck_source=deck_source,
+        prepared_pool=pool,
+    )
+
+    assert state.audible_deck == "A"
+    assert state.set_progress == {
+        "source": "prepared_pool",
+        "pool_name": "Psy Plan",
+        "pool_path": "psy-plan.json",
+        "audible_deck": "A",
+        "confidence": 0.95,
+        "current_track_id": "track-a",
+        "current_title": "Opening Spiral",
+        "current_artist": "One",
+        "current_index": 0,
+        "total": 3,
+        "next_track_id": "track-b",
+        "next_title": "Next Portal",
+        "next_artist": "Two",
+    }
 
 
 def test_tick_registers_citable_deck_audio_window_evidence() -> None:

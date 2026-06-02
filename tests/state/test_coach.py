@@ -965,6 +965,28 @@ def test_task_track_change_includes_grounded_transition_verdict_receipt():
     assert "grounded receipt contexts, not commands" in out
 
 
+def test_task_track_change_includes_grounded_set_progress_receipt():
+    out = AICoach.task_for_event(
+        _ev(
+            "TRACK_CHANGE",
+            {
+                "set_progress_voice_line": (
+                    "Saved-set receipt: the current deck matches slot 1/4 in Psy Plan; "
+                    "the next track in that saved pool is Next Portal. If you mention "
+                    "it, copy these citations exactly: "
+                    "[track:track-b] [mix:set_progress=track-a->track-b]."
+                )
+            },
+        )
+    )
+
+    assert "Track flipped" in out
+    assert "Saved-set receipt" in out
+    assert "[track:track-b]" in out
+    assert "[mix:set_progress=track-a->track-b]" in out
+    assert "grounded receipt contexts, not commands" in out
+
+
 def test_task_transition_opportunity_includes_grounded_next_suggestion_receipt():
     out = AICoach.task_for_event(
         _ev(

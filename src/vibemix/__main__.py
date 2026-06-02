@@ -2739,6 +2739,7 @@ async def main() -> None:
             evidence_registry=evidence_registry,
             deck_source=deck_poller,
             section_source=deck_library,
+            prepared_pool_loader=_load_latest_prepared_pool,
             learn_state=_learn_state,
             audio_capture_context=audio_capture_context,
         )

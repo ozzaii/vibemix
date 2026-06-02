@@ -85,6 +85,7 @@ from vibemix.state.deck_context import (
 )
 from vibemix.ui_bus import SessionCitation
 
+from .set_plan_voice import build_set_progress_voice_line
 from .suggestion_voice import build_next_suggestion_voice_line
 from .transition_verdict_voice import build_transition_verdict_voice_line
 
@@ -696,30 +697,38 @@ async def coach_loop(
         if ev is None:
             continue
 
-        if suggestion_service is not None and ev.type in (
+        if ev.type in (
             "TRACK_CHANGE",
             "TRANSITION_OPPORTUNITY",
         ):
             try:
-                current_suggestion = None
-                if hasattr(suggestion_service, "current_for_state"):
-                    current_suggestion = suggestion_service.current_for_state(state)
-                elif hasattr(suggestion_service, "current"):
-                    current_suggestion = suggestion_service.current()
-                voice_line = build_next_suggestion_voice_line(
-                    current_suggestion,
+                if suggestion_service is not None:
+                    current_suggestion = None
+                    if hasattr(suggestion_service, "current_for_state"):
+                        current_suggestion = suggestion_service.current_for_state(state)
+                    elif hasattr(suggestion_service, "current"):
+                        current_suggestion = suggestion_service.current()
+                    voice_line = build_next_suggestion_voice_line(
+                        current_suggestion,
+                        event_type=ev.type,
+                        evidence_registry=evidence_registry,
+                    )
+                    if voice_line:
+                        ev.extra["next_suggestion_voice_line"] = voice_line
+                    transition_line = build_transition_verdict_voice_line(
+                        current_suggestion,
+                        event_type=ev.type,
+                        evidence_registry=evidence_registry,
+                    )
+                    if transition_line:
+                        ev.extra["transition_verdict_voice_line"] = transition_line
+                set_line = build_set_progress_voice_line(
+                    getattr(state, "set_progress", None),
                     event_type=ev.type,
                     evidence_registry=evidence_registry,
                 )
-                if voice_line:
-                    ev.extra["next_suggestion_voice_line"] = voice_line
-                transition_line = build_transition_verdict_voice_line(
-                    current_suggestion,
-                    event_type=ev.type,
-                    evidence_registry=evidence_registry,
-                )
-                if transition_line:
-                    ev.extra["transition_verdict_voice_line"] = transition_line
+                if set_line:
+                    ev.extra["set_progress_voice_line"] = set_line
             except Exception as e:
                 _safe_print(f"\n[coach suggestion voice] {e}", file=sys.stderr)
 

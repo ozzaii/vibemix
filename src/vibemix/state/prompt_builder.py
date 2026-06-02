@@ -737,6 +737,7 @@ class AICoach:
             receipt_lines = []
             for key in (
                 "next_suggestion_voice_line",
+                "set_progress_voice_line",
                 "transition_verdict_voice_line",
             ):
                 line = ev_extra.get(key)

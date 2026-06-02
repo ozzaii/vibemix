@@ -92,6 +92,7 @@ from vibemix.state.genre.genre_reconcile import reconcile_genre
 from vibemix.state.harmonics import to_camelot
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
+from vibemix.state.set_plan import derive_set_progress
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
 
 # BPM stabilization — estimate_bpm is bimodal on dense material: a strong
@@ -109,6 +110,7 @@ _DROP_CUE_CONF_FLOOR = 0.5
 _DROP_HORIZON_S = 32.0
 _COURSE3_MIX_TITLE_MATCH_POSITION_CONF = 0.75
 _COURSE3_REVIEW_ONLY_LESSONS = frozenset({"L3.06"})
+_PREPARED_POOL_REFRESH_INTERVAL_S = 5.0
 
 # Phase 52 (GENRE-01): cache the loaded GenreProfile library once — the profile
 # JSONs do not change at runtime, so re-loading all of them every tick (10Hz)
@@ -559,6 +561,7 @@ def _tick_once(
     genre_source=None,
     learn_state=None,
     section_source=None,
+    prepared_pool=None,
     evidence_dedupe: set[str] | None = None,
     audio_capture_context: dict[str, object] | None = None,
 ) -> tuple[float, float, float, float]:
@@ -956,6 +959,13 @@ def _tick_once(
         else:
             deck_snap = None
 
+        state.set_progress = derive_set_progress(
+            prepared_pool,
+            audible_deck=state.audible_deck,
+            deck_state=state.deck_state,
+            min_deck_confidence=DECK_CITE_MIN_CONF,
+        )
+
         # Dormant drop-anticipation signal (SYSTEM-AUDIT C9 dead-end). Populate the
         # read-only predicted_drop_in_sec from the audible deck's OWN detected
         # structure (cue_detect / DJ sections — never a hand-fed time, compose-
@@ -1102,6 +1112,7 @@ async def state_refresh_loop(
     genre_source=None,
     learn_state=None,
     section_source=None,
+    prepared_pool_loader=None,
     audio_capture_context: dict[str, object] | None = None,
 ) -> None:
     """Updates MusicState every 100ms from all sources. The ONLY writer to state.
@@ -1126,6 +1137,11 @@ async def state_refresh_loop(
     reflects real Course 3 live coaching only when the deck is audible.
     ``section_source`` may be a read-only RekordboxLibrary; when present, Course
     3 count-ins can use DJ-authored cue sections instead of staying cold.
+
+    ``prepared_pool_loader`` is an optional low-frequency hook for the latest
+    saved Viber/prepared pool. The loader is polled outside the state lock and
+    the cached pool is passed into ``_tick_once`` so the hot path never scans
+    the playlist directory at 10Hz.
     """
     last_audible_high = 0.0
     last_audible_low = 0.0
@@ -1143,11 +1159,22 @@ async def state_refresh_loop(
     # state object from the phase HysteresisState above; threaded into _tick_once.
     genre_hysteresis = GenreHysteresis()
     evidence_dedupe: set[str] = set()
+    prepared_pool = None
+    last_prepared_pool_check_at = float("-inf")
 
     while not stop_event.is_set():
         await asyncio.sleep(0.1)
         try:
             now = time.time()
+            if (
+                prepared_pool_loader is not None
+                and now - last_prepared_pool_check_at >= _PREPARED_POOL_REFRESH_INTERVAL_S
+            ):
+                last_prepared_pool_check_at = now
+                try:
+                    prepared_pool = prepared_pool_loader()
+                except Exception:
+                    prepared_pool = None
             last_audible_high, last_audible_low, bpm_cache, last_bpm_at = _tick_once(
                 state,
                 audio_buf,
@@ -1169,6 +1196,7 @@ async def state_refresh_loop(
                 genre_source=genre_source,
                 learn_state=learn_state,
                 section_source=section_source,
+                prepared_pool=prepared_pool,
                 evidence_dedupe=evidence_dedupe,
                 audio_capture_context=audio_capture_context,
             )

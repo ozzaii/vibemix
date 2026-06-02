@@ -4628,6 +4628,80 @@ Remaining gate:
   practice lesson driven on the actual rig: lock two owned decks -> cited
   `BEATMATCH_GRADED` credit; deliberate trainwreck -> no credit.
 
+## Package W2 - Prep to Live Set Awareness
+
+2026-06-02 Codex refresh:
+
+- Packet: `.planning/packets/2026-06-01/CODEX_READY-W2-prep-live-set-awareness.md`
+- LAND as `feat(coach): surface saved set progress`.
+
+Include:
+
+- `src/vibemix/state/set_plan.py`
+- `src/vibemix/runtime/set_plan_voice.py`
+- `src/vibemix/state/music_state.py`
+- `src/vibemix/state/refresh.py`
+- `src/vibemix/runtime/coach.py`
+- `src/vibemix/state/prompt_builder.py`
+- `src/vibemix/__main__.py`
+- `tests/state/test_set_plan.py`
+- `tests/runtime/test_set_plan_voice.py`
+- `tests/runtime/test_coach.py`
+- `tests/state/test_coach.py`
+- `tests/state/test_refresh.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- DROP-call speech activation and any `VIBEMIX_DROP_CALL` default change.
+- Energy-curve/ahead-behind language until the saved set artifact persists a
+  citable planned curve or planned energy values.
+- Viber GUI/editor changes; this package only exposes the latest saved pool to
+  live state and the co-host prompt.
+
+Proof for this source slice:
+
+- `uv run pytest -q tests/state/test_set_plan.py tests/runtime/test_set_plan_voice.py tests/runtime/test_coach.py::test_coach_hands_grounded_set_progress_to_agent_without_suggestion_service tests/state/test_coach.py::test_task_track_change_includes_grounded_set_progress_receipt tests/state/test_refresh.py::test_tick_writes_set_progress_from_latest_prepared_pool`
+- `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py tests/learn/test_no_speculative_phrase.py tests/prompts/test_negative_dict.py tests/state/test_event_detector.py`
+- `uv run ruff check src/vibemix/state/set_plan.py src/vibemix/runtime/set_plan_voice.py src/vibemix/state/music_state.py src/vibemix/state/refresh.py src/vibemix/runtime/coach.py src/vibemix/state/prompt_builder.py tests/state/test_set_plan.py tests/runtime/test_set_plan_voice.py tests/runtime/test_coach.py tests/state/test_coach.py tests/state/test_refresh.py`
+- `git diff --check -- <Package W2 files>`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- LIVE proof remains open: load a saved Viber/prepared pool, play an in-pool
+  track on a citable deck, and confirm Sven receives a resolved saved-set
+  receipt; then play an off-plan track and confirm this axis stays silent.
+
+## Hold Lane - 2026-06-02 Learn Army Workflow Docs
+
+Hold:
+
+- `.planning/packets/2026-06-02/_learn-army.workflow.js`
+- `.planning/packets/2026-06-02/_learn-army-finish.workflow.js`
+- `.planning/packets/2026-06-02/learn-army/A1-engine-census.md`
+- `.planning/packets/2026-06-02/learn-army/A2-producer-gaps.md`
+- `.planning/packets/2026-06-02/learn-army/A3-livecoach-join.md`
+- `.planning/packets/2026-06-02/learn-army/A4-ipc-ui-surface.md`
+- `.planning/packets/2026-06-02/learn-army/B1-gamification.md`
+- `.planning/packets/2026-06-02/learn-army/B2-social-cert.md`
+- `.planning/packets/2026-06-02/learn-army/B3-mastery-moat.md`
+- `.planning/packets/2026-06-02/learn-army/B4-adaptive-personalization.md`
+- `.planning/packets/2026-06-02/learn-army/B5-new-lesson-content.md`
+- `.planning/packets/2026-06-02/learn-army/C1-dj-pedagogy.md`
+- `.planning/packets/2026-06-02/learn-army/C2-competitive-market.md`
+- `.planning/packets/2026-06-02/learn-army/C3-monetization.md`
+- `.planning/packets/2026-06-02/learn-army/C4-honesty-moat.md`
+- `.planning/packets/2026-06-02/learn-army/D1-build-roadmap.md`
+- `.planning/packets/2026-06-02/learn-army/D2-risks-failuremodes.md`
+- `.planning/packets/2026-06-02/learn-army/D3-graveyard-recovery.md`
+
+Reason:
+
+- These are Claude/read-only workflow planning artifacts for the Learn
+  re-architecture lane. Keep them out of source packages until Codex routes a
+  specific Learn implementation or docs package from them.
+
 ## Hold Lane - Singularity Research Census Briefs
 
 Suggested commit if/when selected: `docs(research): capture singularity subsystem census`

@@ -440,6 +440,60 @@ def test_coach_hands_grounded_next_suggestion_to_agent(
     assert "transition_risk=timing_low_confidence" in snapshot["mix"]
 
 
+def test_coach_hands_grounded_set_progress_to_agent_without_suggestion_service(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    music_state.set_progress = {
+        "pool_name": "Psy Plan",
+        "current_track_id": "track-a",
+        "current_index": 0,
+        "total": 4,
+        "next_track_id": "track-b",
+        "next_title": "Next Portal",
+        "next_artist": "Two",
+    }
+    ev = Event(type="TRACK_CHANGE", state=music_state, extra={})
+    fake_event_detector.detect.return_value = ev
+    registry = EvidenceRegistry()
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            asyncio.Event(),
+            {"in_flight": False},
+            stop_event,
+            evidence_registry=registry,
+        )
+    )
+
+    sent_ev = fake_agent.set_next_event.call_args.args[0]
+    line = sent_ev.extra["set_progress_voice_line"]
+    assert "Saved-set receipt" in line
+    assert "slot 1/4" in line
+    assert "Next Portal by Two" in line
+    assert "[track:track-b]" in line
+    assert "[mix:set_progress=track-a->track-b]" in line
+    snapshot = registry.snapshot()
+    assert "track-b" in snapshot["track"]
+    assert "set_progress=track-a->track-b" in snapshot["mix"]
+
+
 # ---------------------------------------------------------------------------
 # COACH-04 — in-flight blocks subsequent ticks
 # ---------------------------------------------------------------------------

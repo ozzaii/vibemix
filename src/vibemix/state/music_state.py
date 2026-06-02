@@ -156,6 +156,10 @@ class MusicState:
     long_arc: list = field(default_factory=list)  # ~120s RMS, 10s hop
     phase_history: list = field(default_factory=list)  # [(t, from, to)] last 6
     track_history: list = field(default_factory=list)  # [(t, title)] last 6 audible titles
+    # Prep→live context — derived by state_refresh_loop from the latest saved
+    # Viber/prepared pool and the currently citable audible deck track_id. None
+    # means no saved set, off-plan, mixed/uncertain deck, or no next slot.
+    set_progress: dict | None = None
 
     # Set timing
     set_start_at: float = 0.0
