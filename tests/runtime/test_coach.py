@@ -1110,6 +1110,50 @@ def test_coach_15_manual_heartbeat_reaches_model(
     fake_session.generate_reply.assert_called_once_with(allow_interruptions=False)
 
 
+def test_coach_16_live_credit_refreshes_coaching_aim(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    """A cited Learn credit can change the Competent-not-Mastered frontier.
+
+    The runtime asks the agent to rebuild the fixed coach AIM prefix only after
+    a real credit, keeping the refresh out of normal non-credit turns.
+    """
+    ev = Event("MIX_MOVE", music_state, extra={"moves": ["A_low: open->killed"]})
+    fake_event_detector.detect.return_value = ev
+    learn_progress = object()
+    fake_agent.refresh_coaching_aim = AsyncMock(return_value=True)
+    mocker.patch("vibemix.runtime.coach._credit_live_skill_demo", return_value=["eq_mixing"])
+    mocker.patch("vibemix.runtime.coach._emit_earned_wall_refresh", new=AsyncMock())
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            asyncio.Event(),
+            {"in_flight": False},
+            stop_event,
+            learn_progress=learn_progress,
+        )
+    )
+
+    fake_agent.refresh_coaching_aim.assert_awaited_once_with(learn_progress)
+
+
 # ---------------------------------------------------------------------------
 # CONST-WS-01 — WS_HOST / WS_PORT centralized
 # ---------------------------------------------------------------------------

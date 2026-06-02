@@ -25,13 +25,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+import vibemix.agent.cache as cache_module
 from vibemix.agent.cache import (
+    _CACHE_PAD_BLOCK,
     GEMINI_CACHE_TOKEN_FLOOR,
     GEMINI_CACHE_TTL_S,
     GeminiContextCache,
-    _CACHE_PAD_BLOCK,
 )
-import vibemix.agent.cache as cache_module
 
 # ---------- helpers ----------
 
@@ -87,6 +87,15 @@ def test_token_floor_unchanged() -> None:
     # Pad block must be ≥4096 chars (≥1024 token-proxy) so any short body +
     # pad is guaranteed above the floor.
     assert len(_CACHE_PAD_BLOCK) >= 4096
+
+
+def test_set_system_instruction_body_updates_future_padded_body() -> None:
+    cache = GeminiContextCache(client=MagicMock(), system_instruction_body="old")
+
+    cache.set_system_instruction_body("new")
+
+    assert cache.padded_body().startswith("new")
+    assert not cache.padded_body().startswith("old")
 
 
 # ---------- padded_body() — the floor-padding contract (Pitfall 5) ----------

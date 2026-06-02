@@ -8011,3 +8011,49 @@ Proof before staging:
 - `uv run ruff check src/vibemix/runtime/speak_gate.py src/vibemix/runtime/coach.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/runtime/speak_gate.py src/vibemix/runtime/coach.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 26 - Learn AIM Live Coach Frame
+
+Suggested commit: `feat(coach): frame live coaching with learn aim`
+
+Include:
+
+- `src/vibemix/coach/prompt_fragments.py`
+- `src/vibemix/learn/coaching_aim.py`
+- `src/vibemix/prompts/matrix.py`
+- `src/vibemix/agent/dj_cohost.py`
+- `src/vibemix/agent/cache.py`
+- `src/vibemix/runtime/coach.py`
+- `src/vibemix/__main__.py`
+- `tests/learn/test_coaching_aim.py`
+- `tests/prompts/test_coaching_aim.py`
+- `tests/agent/test_coaching_aim_prompt.py`
+- `tests/agent/test_cache.py`
+- `tests/runtime/test_coach.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Any new musical/audio claim, citation grammar source, slop-filter relaxation,
+  or learned-progress write path.
+- DROP-call speech / Mix Timing Oracle hold-lane files, MOSS provider behavior,
+  voice-picker UI, and long-window/rich-context X4 rewrites.
+- Hype-mode prompts. The AIM frame is coach-mode-only and fixed-string only.
+
+Reason:
+
+- X3's packet identifies a half-open Learn loop: the live runtime credits cited
+  demonstrations into the skill tree, but Sven has no fixed coaching aim from
+  the Competent-not-Mastered frontier. This package resolves a deterministic
+  Learn AIM at session start, injects it as a coach-mode relevance frame, and
+  refreshes that frame after a live credit can change the frontier. The AIM is
+  not evidence; it never lowers the grounding bar or licenses feed-forward
+  prescriptions in the live ear.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_coaching_aim.py tests/prompts/test_coaching_aim.py tests/agent/test_coaching_aim_prompt.py tests/agent/test_cache.py::test_set_system_instruction_body_updates_future_padded_body tests/runtime/test_coach.py::test_coach_16_live_credit_refreshes_coaching_aim`
+- `uv run pytest -q tests/learn/test_coaching_aim.py tests/learn/test_skill_tree.py tests/prompts/test_coaching_aim.py tests/prompts/test_matrix.py tests/agent/test_coaching_aim_prompt.py tests/agent/test_coach_prompt_grounding.py tests/agent/test_dj_cohost.py::test_resolve_prompt_cell_uses_shared_lens tests/agent/test_dj_cohost.py::test_resolve_prompt_cell_cold_path_byte_identical tests/agent/test_dj_cohost.py::test_resolve_prompt_cell_lens_wins_over_live_mood tests/agent/test_dj_cohost.py::test_resolve_prompt_cell_corrupt_lens_falls_back_no_crash tests/runtime/test_coach.py::test_coach_16_live_credit_refreshes_coaching_aim tests/runtime/test_coach.py::test_coach_14_plain_heartbeat_stays_silent tests/runtime/test_coach.py::test_coach_15_manual_heartbeat_reaches_model tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py`
+- `uv run ruff check src/vibemix/coach/prompt_fragments.py src/vibemix/learn/coaching_aim.py src/vibemix/prompts/matrix.py src/vibemix/agent/dj_cohost.py src/vibemix/agent/cache.py src/vibemix/runtime/coach.py src/vibemix/__main__.py tests/learn/test_coaching_aim.py tests/prompts/test_coaching_aim.py tests/agent/test_coaching_aim_prompt.py tests/agent/test_cache.py tests/runtime/test_coach.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/coach/prompt_fragments.py src/vibemix/learn/coaching_aim.py src/vibemix/prompts/matrix.py src/vibemix/agent/dj_cohost.py src/vibemix/agent/cache.py src/vibemix/runtime/coach.py src/vibemix/__main__.py tests/learn/test_coaching_aim.py tests/prompts/test_coaching_aim.py tests/agent/test_coaching_aim_prompt.py tests/agent/test_cache.py tests/runtime/test_coach.py .planning/handoffs/2026-05-31-package-checklist.md`

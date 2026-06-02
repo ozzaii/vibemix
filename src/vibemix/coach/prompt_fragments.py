@@ -66,5 +66,47 @@ FAIL_SOFT_EXAMPLES: tuple[str, ...] = (
     "Listening through this stretch.",
 )
 
+# ---------------------------------------------------------------------------
+# COACHING_AIM — fixed Learn skill-tree fragments for live coach mode.
+#
+# These phrases are a relevance frame, not evidence. They do not assert
+# anything about the current audio and must never lower the live grounding bar.
+# Selection happens by skill id only; no user text is interpolated here.
+# ---------------------------------------------------------------------------
 
-__all__ = ["FAIL_SOFT_EXAMPLES", "IM_LISTENING_FRAGMENT"]
+COACHING_AIM_SKILL_PHRASES: dict[str, str] = {
+    "harmonic_mixing": "smoother harmonic blends - keeping two keys in agreement",
+    "eq_mixing": "cleaner EQ swaps - trading low end without mud",
+    "transitions": "tighter transitions - bringing the next one in clean",
+    "beatmatching": "locked beatmatches - tempo and phase tight",
+    "phrasing_performance": "phrase-locked moves - hitting the 8s and 16s",
+    "deck_control": "confident deck control",
+}
+
+
+def render_coaching_aim_fragment(skill_id: str | None) -> str:
+    """Return a fixed coach-mode aim fragment for a known Learn skill id."""
+    if not skill_id:
+        return ""
+    phrase = COACHING_AIM_SKILL_PHRASES.get(skill_id)
+    if phrase is None:
+        return ""
+    return f"""
+
+--- LIVE COACHING AIM (Learn skill-tree frame) ---
+
+This DJ is currently working toward: {phrase}.
+
+Use that as a relevance frame ONLY when live evidence already supports a
+reaction about that move. The aim does not prove anything about the audio and
+does not lower the grounding bar. Frame the move, never the person. Never say
+always or usually. No feed-forward prescriptions in the live ear; debrief owns
+next-step drills."""
+
+
+__all__ = [
+    "COACHING_AIM_SKILL_PHRASES",
+    "FAIL_SOFT_EXAMPLES",
+    "IM_LISTENING_FRAGMENT",
+    "render_coaching_aim_fragment",
+]

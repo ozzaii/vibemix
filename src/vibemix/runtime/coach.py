@@ -636,6 +636,17 @@ async def coach_loop(
             # A live cited demo just advanced the Earned Wall — push the refresh
             # to the shell so the SkillWall trophy updates without a reload.
             await _emit_earned_wall_refresh(credited, learn_progress, ipc_bus)
+            if credited:
+                refresh_aim = getattr(agent, "refresh_coaching_aim", None)
+                if callable(refresh_aim):
+                    try:
+                        maybe_refreshed = refresh_aim(learn_progress)
+                        if asyncio.iscoroutine(maybe_refreshed):
+                            maybe_refreshed = await maybe_refreshed
+                        if maybe_refreshed:
+                            _tr("event", "coaching_aim_refreshed", credited=credited)
+                    except Exception as exc:
+                        _safe_print(f"\n[coach aim-refresh err] {exc}", file=sys.stderr)
             _tr(
                 "event",
                 "emit",

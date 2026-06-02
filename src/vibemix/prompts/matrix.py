@@ -42,7 +42,10 @@ from __future__ import annotations
 
 import os
 
-from vibemix.coach.prompt_fragments import IM_LISTENING_FRAGMENT
+from vibemix.coach.prompt_fragments import (
+    IM_LISTENING_FRAGMENT,
+    render_coaching_aim_fragment,
+)
 from vibemix.prompts.negative_dict import NEGATIVE_PHRASES
 
 # ---------------------------------------------------------------------------
@@ -846,6 +849,7 @@ def build_system_instruction(
     include_audio_vibe_contract: bool | None = None,
     include_coach_closing: bool | None = None,
     taste_persona_tags: tuple[str, ...] | list[str] | None = None,
+    coaching_aim_skill: str | None = None,
 ) -> str:
     """Return the prompt cell body for ``(skill, mode)`` rendered with ``mood``.
 
@@ -892,6 +896,9 @@ def build_system_instruction(
             ``include_tag_dsl`` for backward compatibility. Live MOSS-only
             coach calls can pass ``True`` so the professional-coach closing
             survives even when delivery tags are disabled.
+        coaching_aim_skill: Optional Learn skill id whose fixed phrase is
+            appended to coach-mode prompts as a relevance frame. It is ignored
+            outside coach mode and never interpolates user text.
 
     Returns:
         The prompt string for the requested cell, with ``{mood_persona}``
@@ -962,6 +969,9 @@ def build_system_instruction(
         # Coach mode gets the calm-only tag set (no [excited]/[fast]) so the
         # delivery never reads as hype; hype mode keeps the full 6-tag DSL.
         body = body + (COACH_TAG_DSL_BLOCK if mode_norm == "coach" else TTS_TAG_DSL_BLOCK)
+
+    if mode_norm == "coach" and coaching_aim_skill:
+        body = body + render_coaching_aim_fragment(coaching_aim_skill)
 
     # 2026-05-21 (Kaan): the LAST thing a coach reads — strongest recency.
     # Everything above is context to internalize, NOT a checklist to recite.

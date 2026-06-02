@@ -888,7 +888,7 @@ def _build_citation_strip(
     return chips
 
 
-def _resolve_prompt_cell(mood: str | None = None) -> str:
+def _resolve_prompt_cell(mood: str | None = None, learn_progress: Any | None = None) -> str:
     """Read the env vars and dispatch to the right matrix cell.
 
     Re-evaluated per ``DJCoHostAgent`` instantiation (no module-level
@@ -900,6 +900,10 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
             ``VIBEMIX_MOOD`` env var, falling back to ``"hype-man"``. A
             non-None ``mood`` arg wins over the env var (used by Plan
             13-06's agent-rebuild-on-mood-change path).
+        learn_progress: Optional already-loaded LearnProgress. When supplied,
+            a Competent-not-Mastered skill may add a fixed coach-mode aim
+            fragment. The resolver never loads progress from disk by itself;
+            callers must pass the session object intentionally.
 
     Phase 79 LENS-02 (CR-01 fix): when a shared lens is EXPLICITLY set in
     ``ConfigStore.extra["lens"]`` (the ONE selection shared with the curator),
@@ -969,6 +973,15 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
     except Exception:  # pragma: no cover — any read fail = no overlay
         taste_tags = ()
 
+    coaching_aim_skill: str | None = None
+    if learn_progress is not None:
+        try:
+            from vibemix.learn.coaching_aim import resolve_coaching_aim_skill
+
+            coaching_aim_skill = resolve_coaching_aim_skill(learn_progress)
+        except Exception:  # pragma: no cover — any read fail = no aim
+            coaching_aim_skill = None
+
     # CR-02: validate the persisted value against the lens enum BEFORE
     # subscripting. An unknown/foreign value (e.g. a stray mood name) falls
     # through to the cold path instead of raising a raw KeyError.
@@ -985,6 +998,7 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
                 include_audio_vibe_contract=True,
                 include_coach_closing=True,
                 taste_persona_tags=taste_tags,
+                coaching_aim_skill=coaching_aim_skill,
             )
 
     mode = os.environ.get(ENV_MODE, DEFAULT_MODE)
@@ -998,6 +1012,7 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
         include_audio_vibe_contract=True,
         include_coach_closing=True,
         taste_persona_tags=taste_tags,
+        coaching_aim_skill=coaching_aim_skill,
     )
 
 
@@ -1128,6 +1143,7 @@ class DJCoHostAgent(Agent):
         deck_audio_buffers: dict[str, AudioBuffer] | None = None,
         deck_audio_parts_mode: str | None = None,
         deck_audio_part_seconds: float | None = None,
+        learn_progress: Any | None = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -1140,7 +1156,7 @@ class DJCoHostAgent(Agent):
         # include_citation_grammar=True — Gemini SEES the grammar in the
         # system instruction (GROUND-03 prompt-only seeding).
         live_mood = getattr(state, "mood", None)
-        prompt_body = _resolve_prompt_cell(mood=live_mood)
+        prompt_body = _resolve_prompt_cell(mood=live_mood, learn_progress=learn_progress)
         super().__init__(
             instructions=prompt_body,
             llm=llm_inst,
@@ -1350,6 +1366,34 @@ class DJCoHostAgent(Agent):
         # llm_node uses its own pre-validated thinking_level="minimal"
         # literal, identical to this _gen_cfg, so it inherits the gate).
         validate_live_config(self._gen_cfg)
+
+    async def refresh_coaching_aim(self, learn_progress: Any | None) -> bool:
+        """Refresh the prompt prefix after Learn mastery changes.
+
+        The Learn aim is a cached system-instruction frame. When a live demo
+        flips a skill to Mastered, recompute the fixed fragment from the same
+        progress object and invalidate any remote cache carrying the old body.
+        Returns True only when the prompt body changed.
+        """
+
+        live_mood = getattr(self._state, "mood", None)
+        prompt_body = _resolve_prompt_cell(mood=live_mood, learn_progress=learn_progress)
+        if prompt_body == self._prompt_body:
+            return False
+
+        self._prompt_body = prompt_body
+        self._gen_cfg = types.GenerateContentConfig(
+            system_instruction=prompt_body,
+            thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+            temperature=1.0,
+            max_output_tokens=1024,
+        )
+        validate_live_config(self._gen_cfg)
+
+        if self._cache is not None:
+            self._cache.set_system_instruction_body(prompt_body)
+            await self._cache.invalidate()
+        return True
 
     def _push_transcript(self, text: str) -> None:
         """Best-effort push of a spoken AI line onto the snapshot sink.

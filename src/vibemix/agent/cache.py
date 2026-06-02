@@ -173,6 +173,14 @@ class GeminiContextCache:
         """Return the current cache name, or None if never created / invalidated."""
         return self._current_name
 
+    def set_system_instruction_body(self, body: str) -> None:
+        """Swap the prompt body used by future cache creates.
+
+        Callers should pair this with :meth:`invalidate` when an already-created
+        remote cache may contain the previous body.
+        """
+        self._body = body
+
     async def invalidate(self) -> None:
         """Clear _current_name AND best-effort server-side delete.
 

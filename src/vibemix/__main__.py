@@ -1398,6 +1398,13 @@ async def main() -> None:
     # citation-stripped responses.
     ttft_meter = TTFTMeter()
     cancel_gate = CancelGate()
+    # X3 — Learn skill-tree AIM for the live coach prompt. Load once before
+    # cache/agent construction so the context cache and direct genai path carry
+    # the same fixed coach-mode frame. LessonRuntime below receives this SAME
+    # object, preserving the existing mutate-save contract.
+    from vibemix.learn.progress import load_progress as _load_progress
+
+    _learn_progress, _learn_was_recovered = _load_progress()
     # Plan 32-02 / PROFILE-03 — load long-term DJ profile into the cache body.
     # P60: profile lives in the CACHE, never in the per-turn prompt. If the
     # file is missing or invalid, ``profile_dict`` is None and the cache section
@@ -1419,7 +1426,7 @@ async def main() -> None:
     # cell here so cache ≡ agent.
     from vibemix.agent.dj_cohost import _resolve_prompt_cell
 
-    cache_system_instruction = _resolve_prompt_cell()
+    cache_system_instruction = _resolve_prompt_cell(learn_progress=_learn_progress)
     _ensure_context_cache_dep()
     cache: GeminiContextCache | None = GeminiContextCache(
         client=genai_client,
@@ -1661,6 +1668,7 @@ async def main() -> None:
         secondary_ear=ground_secondary_ear,
         audio_capture_context=audio_capture_context,
         deck_audio_buffers=deck_audio_capture.buffers if deck_audio_capture is not None else None,
+        learn_progress=_learn_progress,
     )
 
     # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──
@@ -2435,7 +2443,6 @@ async def main() -> None:
     # failed) we still wire LessonRuntime so the FSM exists; emit calls
     # become no-ops via the sync-adapter's None branch. The live app
     # boots cleanly even when SessionLoop wiring degrades.
-    from vibemix.learn.progress import load_progress as _load_progress
     from vibemix.learn.runtime import LessonRuntime
     from vibemix.learn.state import LearnState
     from vibemix.ui_bus.learn_messages import LearnProgressState
@@ -2479,7 +2486,6 @@ async def main() -> None:
                 )
 
     _learn_state = LearnState()
-    _learn_progress, _learn_was_recovered = _load_progress()
     _lesson_ipc_adapter = _LessonRuntimeIpcAdapter(ipc_router)
 
     def _load_learn_harmonic_pair() -> Any | None:
