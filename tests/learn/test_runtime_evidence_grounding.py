@@ -306,6 +306,77 @@ def test_beatmatch_practice_tick_writes_receipt_and_credits_once(monkeypatch) ->
     assert progress.skills["beatmatching"]["live_proof_count"] == 1
 
 
+def test_matched_beatmatch_action_records_and_grades_immediately(monkeypatch) -> None:
+    """A live matched lesson action can arm the owned-deck beatmatch grader."""
+    saved: list[LearnProgress] = []
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    registry = EvidenceRegistry()
+    events: list[tuple[str, dict]] = []
+    recorded: list[tuple[str | None, dict]] = []
+    armed = False
+
+    def record_action(lesson_id: str | None, midi: dict) -> bool:
+        nonlocal armed
+        recorded.append((lesson_id, dict(midi)))
+        armed = True
+        return True
+
+    def load_snapshot() -> BeatmatchPracticeSnapshot | None:
+        return _locked_beatmatch_snapshot() if armed else None
+
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 91.2,
+        beatmatch_practice_loader=load_snapshot,
+        beatmatch_practice_action_recorder=record_action,
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.02",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+    runtime.send(
+        "ack_action",
+        midi={
+            "type": "button",
+            "control": "sync",
+            "deck": "B",
+            "direction": "down",
+            "value": 127,
+            "prev_value": 0,
+        },
+    )
+
+    assert recorded == [
+        (
+            "L2.02",
+            {
+                "type": "button",
+                "control": "sync",
+                "deck": "B",
+                "direction": "down",
+                "value": 127,
+                "prev_value": 0,
+            },
+        )
+    ]
+    assert registry.has("ev", "BEATMATCH_GRADED", 91.2, tol=1.0)
+    assert progress.skills["beatmatching"]["live_proof_count"] == 1
+    assert progress in saved
+    assert any(kind == "learn_beatmatch_practice_graded" for kind, _fields in events)
+
+
 def test_beatmatch_practice_rearms_after_unlocked_grade(monkeypatch) -> None:
     """A sustained lock credits once, then a drift grade re-arms the next lock."""
     monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)

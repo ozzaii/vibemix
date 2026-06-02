@@ -435,6 +435,8 @@ class LessonRuntime(StateMachine):
         harmonic_pair_loader: Callable[[], HarmonicPracticePair | None] | None = None,
         graduation_summary_loader: Callable[[Any], GraduationSummary | None] | None = None,
         beatmatch_practice_loader: Callable[[], BeatmatchPracticeSnapshot | None] | None = None,
+        beatmatch_practice_action_recorder: Callable[[str | None, dict[str, Any]], bool | None]
+        | None = None,
         cue_placement_practice_loader: Callable[[], CuePlacementPracticeSnapshot | None] | None = None,
         session_event_logger: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
@@ -479,6 +481,11 @@ class LessonRuntime(StateMachine):
                 that owned deck through ``learn.practice_loop`` and lets the
                 existing recognizer/progress gate decide whether beatmatching
                 earns a live proof.
+            beatmatch_practice_action_recorder: Optional hook called after a
+                matched Learn action. It lets the live boot driver arm the
+                owned-deck beatmatch snapshot and immediately grade that attempt
+                through the same evidence path, rather than waiting for the next
+                1 Hz tick after the lesson may have advanced.
             cue_placement_practice_loader: Optional owned-deck hot-cue lesson
                 hook. When it returns a :class:`CuePlacementPracticeSnapshot`,
                 the 1 Hz loop grades cue timing against the owned beatgrid and
@@ -500,6 +507,7 @@ class LessonRuntime(StateMachine):
         self._harmonic_pair_loader = harmonic_pair_loader
         self._graduation_summary_loader = graduation_summary_loader
         self._beatmatch_practice_loader = beatmatch_practice_loader
+        self._beatmatch_practice_action_recorder = beatmatch_practice_action_recorder
         self._cue_placement_practice_loader = cue_placement_practice_loader
         self._session_event_logger = session_event_logger
         # The wall-clock anchor for the 30 s strike escalation timer.
@@ -854,6 +862,7 @@ class LessonRuntime(StateMachine):
                 matched=True,
             )
             self._mark_progress_practice_source(midi)
+            self._record_beatmatch_practice_action(midi)
 
         # Defensive legacy path: the IPC handler normally gives active
         # observers first claim on acks via handle_observer_ack(), which
@@ -874,6 +883,29 @@ class LessonRuntime(StateMachine):
                     f"[learn.runtime] lesson observer ack failed: {exc!r}",
                     file=sys.stderr,
                 )
+
+    def _record_beatmatch_practice_action(self, midi: dict[str, Any]) -> None:
+        """Arm and grade an owned-deck beatmatch practice attempt, if wired."""
+
+        if self._beatmatch_practice_action_recorder is None:
+            return
+        try:
+            should_grade = self._beatmatch_practice_action_recorder(
+                self._learn.current_lesson_id,
+                midi,
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] beatmatch practice recorder failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return
+        if not should_grade:
+            return
+        self._beatmatch_practice_lock_active = False
+        self._grade_beatmatch_practice_tick()
 
     def on_skip(self, **_kwargs: Any) -> None:
         self._last_was_match = False

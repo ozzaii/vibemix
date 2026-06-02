@@ -23,6 +23,8 @@ _REPO = pathlib.Path(__file__).resolve().parents[2]
 _SRC = _REPO / "src" / "vibemix"
 _PRODUCER = str(_SRC / "learn" / "practice_loop.py")
 _RUNTIME = str(_SRC / "learn" / "runtime.py")
+_MAIN = str(_SRC / "__main__.py")
+_DRIVER = str(_SRC / "learn" / "beatmatch_practice_driver.py")
 _EMITTER_FNS = frozenset({"grade_beatmatch", "grade_to_event_extra"})
 _PRACTICE_PRODUCER_FNS = frozenset(
     {"grade_owned_beatmatch_attempt", "grade_minideck_beatmatch_attempt"}
@@ -105,6 +107,16 @@ def test_beatmatch_practice_producer_has_a_runtime_caller() -> None:
         if path != _PRODUCER
     }
     assert (_RUNTIME, "grade_owned_beatmatch_attempt") in runtime_callers
+
+
+def test_live_lesson_runtime_supplies_beatmatch_practice_driver() -> None:
+    main = pathlib.Path(_MAIN).read_text(encoding="utf-8")
+    driver = pathlib.Path(_DRIVER).read_text(encoding="utf-8")
+    assert "BeatmatchPracticeDriver()" in main
+    assert "beatmatch_practice_loader=" in main
+    assert "beatmatch_practice_action_recorder=" in main
+    assert "def record_action(" in driver
+    assert "def snapshot(" in driver
 
 
 def test_beatmatch_credit_consumer_is_wired_to_the_producer_event() -> None:

@@ -8235,3 +8235,44 @@ Proof before staging:
 - `uv run ruff check src/vibemix/audio/constants.py tests/audio/test_constants.py tests/state/test_event_detector.py tests/state/test_hype_cooldown_grounding.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/audio/constants.py tests/audio/test_constants.py tests/state/test_event_detector.py tests/state/test_hype_cooldown_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 29 - Learn Beatmatch Practice Driver
+
+Suggested commit: `feat(learn): wire owned beatmatch practice driver`
+
+Include:
+
+- `src/vibemix/learn/beatmatch_practice_driver.py`
+- `src/vibemix/learn/runtime.py`
+- `src/vibemix/__main__.py`
+- `tests/learn/test_beatmatch_practice_driver.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `tests/learn/test_practice_loop.py`
+- `tests/repo/test_live_reality_pins.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Sven/co-host speech, prompt text, `src/vibemix/runtime/coach.py`, DROP-call
+  speech, and any external Rekordbox/FLX4 beatmatch claim.
+- New live audio output devices, user-file mutation, packaged-build claims, or
+  fake external deck identity. This package is Learn-owned practice state only.
+- Any relaxation of the cited `BEATMATCH_GRADED` credit gate or the
+  Competent-before-Mastered skill-tree floor.
+
+Reason:
+
+- The Learn beatmatch producer and recognizer branch existed, and
+  `LessonRuntime` had a grading hook, but live boot never supplied the
+  `beatmatch_practice_loader`, leaving the shipped path functionally orphaned.
+  This package adds a small Learn-owned practice driver for L2.01/L2.02, records
+  matched beatmatch lesson actions, grades them immediately through the existing
+  EvidenceRegistry-backed producer, and strengthens the repo pin so a future
+  hook-only regression cannot pass green.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_practice_loop.py tests/repo/test_live_reality_pins.py`
+- `uv run ruff check src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/repo/test_live_reality_pins.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_practice_loop.py tests/repo/test_live_reality_pins.py .planning/handoffs/2026-05-31-package-checklist.md`

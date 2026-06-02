@@ -2516,6 +2516,17 @@ async def main() -> None:
                 file=sys.stderr,
             )
 
+    try:
+        from vibemix.learn.beatmatch_practice_driver import BeatmatchPracticeDriver
+
+        beatmatch_practice_driver: Any | None = BeatmatchPracticeDriver()
+    except Exception as _learn_beatmatch_exc:  # pragma: no cover - defensive boot path
+        print(
+            f"[learn boot] beatmatch practice driver disabled: {_learn_beatmatch_exc!r}",
+            file=sys.stderr,
+        )
+        beatmatch_practice_driver = None
+
     lesson_runtime = LessonRuntime(
         learn_state=_learn_state,
         midi_mirror=midi_mirror,
@@ -2526,6 +2537,16 @@ async def main() -> None:
         evidence_clock=lambda: state.set_seconds,
         prepared_pool_loader=_load_latest_prepared_pool,
         harmonic_pair_loader=_load_learn_harmonic_pair,
+        beatmatch_practice_loader=(
+            beatmatch_practice_driver.snapshot
+            if beatmatch_practice_driver is not None
+            else None
+        ),
+        beatmatch_practice_action_recorder=(
+            beatmatch_practice_driver.record_action
+            if beatmatch_practice_driver is not None
+            else None
+        ),
         session_event_logger=_learn_session_event,
     )
     print("-> lesson_runtime wired", file=sys.stderr)
