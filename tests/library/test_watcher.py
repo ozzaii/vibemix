@@ -5,8 +5,14 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+import pytest
+
 from vibemix.library.staleness import LibraryFreshness
-from vibemix.library.watcher import _freshness_watch_targets, watch_library_freshness
+from vibemix.library.watcher import (
+    _freshness_watch_targets,
+    _wait_for_watchfiles_or_timeout,
+    watch_library_freshness,
+)
 
 
 def _fresh_status(cache: Path, source: Path) -> LibraryFreshness:
@@ -130,3 +136,26 @@ def test_watch_library_freshness_suppresses_duplicate_stale_signature(tmp_path: 
 
     assert [msg_type for msg_type, _payload in emissions] == ["ipc.library.staleness_nudge"]
     assert emissions[0][1]["reason"] == "source_newer_than_cache"
+
+
+def test_wait_for_watchfiles_wakes_on_audio_file_change(tmp_path: Path) -> None:
+    pytest.importorskip("watchfiles")
+
+    async def _run() -> None:
+        stop = asyncio.Event()
+        task = asyncio.create_task(
+            _wait_for_watchfiles_or_timeout({tmp_path}, stop, poll_seconds=5.0)
+        )
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 2.0
+        writes = 0
+        while not task.done() and loop.time() < deadline:
+            (tmp_path / f"track-{writes}.mp3").write_bytes(b"audio")
+            writes += 1
+            await asyncio.sleep(0.1)
+
+        await asyncio.wait_for(task, timeout=1.0)
+        assert writes > 0
+        assert stop.is_set() is False
+
+    asyncio.run(_run())
