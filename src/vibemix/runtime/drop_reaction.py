@@ -4,9 +4,9 @@
 ``runtime.automix_demo`` emits semantic cue KEYS (``drop_incoming`` …); this is the
 "the persona turns each cue key into a line" step its docstring names. The lines are
 short DJ-friend interjections the co-host SPEAKS on the drop, kept tight so TTS lands
-them inside the ~2 s phrase window. Every line passes the SAME anti-slop wall the
-live co-host's reactions clear (``prompts.filter.filter_for_slop``) — the new spoken
-surface is graded by the existing release gate, not a parallel one (compose-existing).
+them inside the ~2 s phrase window. The selector passes each chosen line through the
+same anti-slop wall the live co-host's reactions clear
+(``prompts.filter.filter_for_slop``) and fails closed if a future bank edit trips it.
 
 The layer is pure + deterministic: a reel narrates to the same lines every run for a
 given ``variant_seed`` (the "lands every time" guarantee), and the seed walks each
@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from vibemix.prompts.filter import SILENCE_TOKEN, filter_for_slop
 from vibemix.runtime.automix_demo import AutomixReel
 
 # One bank of lines per cue key. Tight, spoken, no empty hype ("amazing"/"awesome"
@@ -71,9 +72,17 @@ def reaction_line(cue: str, *, variant: int = 0) -> str:
     Raises ``KeyError`` on an unknown cue — the cue keys come from the closed
     ``reaction_cue`` set, so an unknown key is a programming error, not user input;
     fail loud rather than speak a wrong-or-empty line over the drop.
+
+    Raises ``ValueError`` when a fixed bank line hits the anti-slop filter. The
+    live call-site catches exceptions and skips the call, so a bad bank edit
+    mutes the DROP line instead of bypassing the release speech guard.
     """
     bank = REACTION_LINES[cue]
-    return bank[variant % len(bank)]
+    line = bank[variant % len(bank)]
+    clean, matched = filter_for_slop(line)
+    if matched or clean == SILENCE_TOKEN:
+        raise ValueError(f"slop-filtered reaction line for {cue!r}: {matched!r}")
+    return clean
 
 
 def narrate_reel(reel: AutomixReel, *, variant_seed: int = 0) -> tuple[SpokenBeat, ...]:

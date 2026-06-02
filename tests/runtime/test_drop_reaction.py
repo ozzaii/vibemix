@@ -71,6 +71,14 @@ def test_every_line_survives_the_slop_filter() -> None:
             assert clean == line
 
 
+def test_reaction_line_fails_closed_when_bank_line_trips_slop_filter(monkeypatch) -> None:
+    import pytest
+
+    monkeypatch.setitem(REACTION_LINES, "drop_incoming", ("amazing mix",))
+    with pytest.raises(ValueError, match="slop-filtered reaction line"):
+        reaction_line("drop_incoming")
+
+
 def test_lines_are_short_spoken_interjections() -> None:
     # A drop reaction is a breath, not a sentence — keep them tight so TTS lands
     # them inside the ~2 s phrase window, not trailing past the next beat.
@@ -87,12 +95,12 @@ def test_narrate_reel_one_spoken_beat_per_demo_beat() -> None:
     )
     spoken = narrate_reel(reel)
     assert len(spoken) == len(reel.beats)
-    for sb, db in zip(spoken, reel.beats):
+    for sb, db in zip(spoken, reel.beats, strict=True):
         assert isinstance(sb, SpokenBeat)
         assert sb.t_sec == db.t_sec
         assert sb.cue == db.cue
         assert sb.text.strip()
-        clean, matched = filter_for_slop(sb.text)
+        _clean, matched = filter_for_slop(sb.text)
         assert matched == []
 
 
