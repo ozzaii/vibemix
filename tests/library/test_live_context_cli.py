@@ -1819,6 +1819,7 @@ def test_viber_live_context_operator_actions_promote_setup_hint():
     assert actions[0]["recommended_env"] == {"VIBEMIX_DECK_AUDIO_CHANNELS": "auto"}
     assert actions[0]["setup_hint"]["rule"] == "setup_hint_not_live_audio_proof"
     assert actions[1]["code"] == "configure_deck_pair_capture"
+    assert actions[1]["recommended_env"] == {"VIBEMIX_DECK_AUDIO_CHANNELS": "A=0,1;B=2,3"}
 
 
 def test_cmd_library_live_context_json_success(monkeypatch, capsys):

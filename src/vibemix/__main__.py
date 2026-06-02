@@ -5897,7 +5897,10 @@ def _viber_live_context_operator_actions(
     if physical_diagnosis and not checks.get("deck_pair_capture_configured"):
         add(
             "configure_deck_pair_capture",
-            "Use a multichannel route such as BlackHole 16ch with VIBEMIX_DECK_AUDIO_CHANNELS=auto for per-deck proof.",
+            "Use the standard Rekordbox/BlackHole deck-pair map "
+            "VIBEMIX_DECK_AUDIO_CHANNELS=A=0,1;B=2,3 for per-deck proof. "
+            "If your routing differs, the next proof run can recommend a corrected map.",
+            recommended_env={"VIBEMIX_DECK_AUDIO_CHANNELS": "A=0,1;B=2,3"},
         )
 
     if (
