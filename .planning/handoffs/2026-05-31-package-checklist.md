@@ -6983,8 +6983,10 @@ release blocker, not a cloud fallback.
 Include:
 
 - `scripts/dist/check_sidecar_bundle_ready.py`
+- `scripts/dist/prepare_tauri_build.py`
 - `scripts/dist/pretag_check.sh`
 - `tests/install/test_sidecar_bundle_ready.py`
+- `tests/install/test_prepare_tauri_build.py`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
 
 Keep out:
@@ -7002,15 +7004,17 @@ Reason:
   co-host is muted on a fresh machine.
 - `check_sidecar_bundle_ready.py --require-moss-source` now validates either a
   complete bundled model tree using the same manifest checker the runtime uses,
-  or a verified archive pin triple. `pretag_check.sh` opts into that stricter
-  release gate.
+  or a verified archive pin triple. `pretag_check.sh` and the Tauri prep script's
+  release-only `--require-moss-source`/`VIBEMIX_REQUIRE_MOSS_SOURCE` path opt into
+  that stricter release gate.
 
 Proof for this release-gate slice:
 
 - `uv run pytest -q tests/install/test_sidecar_bundle_ready.py`
-- `uv run ruff check scripts/dist/check_sidecar_bundle_ready.py tests/install/test_sidecar_bundle_ready.py`
+- `uv run pytest -q tests/install/test_prepare_tauri_build.py tests/install/test_sidecar_bundle_ready.py`
+- `uv run ruff check scripts/dist/check_sidecar_bundle_ready.py scripts/dist/prepare_tauri_build.py tests/install/test_prepare_tauri_build.py tests/install/test_sidecar_bundle_ready.py`
 - `uv run python -m scripts.dist.check_sidecar_bundle_ready --help`
-- `git diff --check -- scripts/dist/check_sidecar_bundle_ready.py scripts/dist/pretag_check.sh tests/install/test_sidecar_bundle_ready.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `git diff --check -- scripts/dist/check_sidecar_bundle_ready.py scripts/dist/prepare_tauri_build.py scripts/dist/pretag_check.sh tests/install/test_prepare_tauri_build.py tests/install/test_sidecar_bundle_ready.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
 Remaining gate:

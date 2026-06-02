@@ -27,6 +27,7 @@ from scripts.dist.check_sidecar_bundle_ready import (  # noqa: E402
 )
 
 _FORCE_SIDECAR_ENV = "VIBEMIX_FORCE_SIDECAR"
+_REQUIRE_MOSS_SOURCE_ENV = "VIBEMIX_REQUIRE_MOSS_SOURCE"
 
 
 def _run(cmd: list[str], *, cwd: Path = REPO_ROOT) -> None:
@@ -54,14 +55,20 @@ def prepare_tauri_build(
     skip_frontend: bool = False,
     check_only: bool = False,
     force_sidecar: bool = False,
+    require_moss_source: bool = False,
 ) -> None:
     target_triple = triple or detect_host_triple()
     force_sidecar = force_sidecar or _env_flag(_FORCE_SIDECAR_ENV)
+    require_moss_source = require_moss_source or _env_flag(_REQUIRE_MOSS_SOURCE_ENV)
 
     if not skip_frontend:
         _run(["npm", "--prefix", str(REPO_ROOT / "tauri" / "ui"), "run", "build"])
 
-    status = check_sidecar_bundle_ready(root=REPO_ROOT, triple=target_triple)
+    status = check_sidecar_bundle_ready(
+        root=REPO_ROOT,
+        triple=target_triple,
+        require_moss_source=require_moss_source,
+    )
     if check_only:
         if not status.ok:
             raise RuntimeError(status.message)
@@ -78,7 +85,11 @@ def prepare_tauri_build(
             cmd.extend(["--target-arch", target_arch])
         _run(cmd)
 
-    status = check_sidecar_bundle_ready(root=REPO_ROOT, triple=target_triple)
+    status = check_sidecar_bundle_ready(
+        root=REPO_ROOT,
+        triple=target_triple,
+        require_moss_source=require_moss_source,
+    )
     if not status.ok:
         raise RuntimeError(
             f"sidecar still not package-ready after `{build_command_for_triple(target_triple)}`: "
@@ -107,6 +118,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="rebuild the sidecar even if the readiness check already passes",
     )
+    parser.add_argument(
+        "--require-moss-source",
+        action="store_true",
+        help=(
+            "fail unless the MOSS-only release has a bundled model tree or pinned "
+            "VIBEMIX_MOSS_TTS_ARCHIVE_* metadata"
+        ),
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -115,6 +134,7 @@ def main(argv: list[str] | None = None) -> int:
             skip_frontend=args.skip_frontend,
             check_only=args.check_only,
             force_sidecar=args.force_sidecar,
+            require_moss_source=args.require_moss_source,
         )
     except (RuntimeError, subprocess.CalledProcessError) as exc:
         print(f"[prepare-tauri] FAIL: {exc}", file=sys.stderr)
