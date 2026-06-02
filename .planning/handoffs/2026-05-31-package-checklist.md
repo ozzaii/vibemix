@@ -7045,6 +7045,7 @@ Include:
 - `src/vibemix/agent/config.py`
 - `src/vibemix/agent/local_tts.py`
 - `src/vibemix/runtime/config_store.py`
+- `src/vibemix/runtime/settings.py`
 - `tauri/ui/src/settings/SettingsDrawer.ts`
 - `tauri/ui/src/session/state.ts`
 - `tauri/ui/src/session/SessionLayout.ts`

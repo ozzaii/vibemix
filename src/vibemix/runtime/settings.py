@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from vibemix.runtime.config_store import ConfigStore, save_config
+from vibemix.voice_presets import normalize_stored_voice
 
 log = logging.getLogger("vibemix.runtime.settings")
 
@@ -327,6 +328,7 @@ class SettingsApplier:
     async def _apply_voice(self, value: Any) -> tuple[bool, str | None]:
         if not isinstance(value, str) or not value:
             return (False, "voice must be a non-empty string")
+        value = normalize_stored_voice(value)
         if self.cascade_agent is None:
             # LiveKit path has no live set_voice hook (cascade-era). Mirror
             # _apply_genre: persist so the next session boots with this voice,

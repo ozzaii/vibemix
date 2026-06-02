@@ -131,6 +131,14 @@ def test_voice_happy_path(store, cascade, _redirect_config_path):
     assert _redirect_config_path.exists()
 
 
+def test_voice_legacy_cloud_id_normalizes_before_live_hook(store, cascade):
+    applier = SettingsApplier(config_store=store, cascade_agent=cascade)
+    success, error = _apply(applier, "voice", "kore")
+    assert (success, error) == (True, None)
+    cascade.set_voice.assert_called_once_with("Adam")
+    assert store.voice == "Adam"
+
+
 def test_voice_missing_hook_persists_with_warning(store, caplog):
     """No live cascade hook (LiveKit path) → persist + succeed (deferred-live),
     like genre — the voice sticks for the next session, not a dead error."""
@@ -141,6 +149,15 @@ def test_voice_missing_hook_persists_with_warning(store, caplog):
     assert error is None
     assert store.voice == "Bella"
     assert any("cascade_agent not wired" in r.message for r in caplog.records)
+
+
+def test_voice_legacy_cloud_id_normalizes_when_deferred(store, caplog):
+    applier = SettingsApplier(config_store=store)
+    with caplog.at_level("WARNING"):
+        success, error = _apply(applier, "voice", "puck")
+    assert (success, error) == (True, None)
+    assert store.voice == "Adam"
+    assert any("persisted voice='Adam'" in r.message for r in caplog.records)
 
 
 def test_voice_invalid_value(store, cascade):
