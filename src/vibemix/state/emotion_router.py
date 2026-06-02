@@ -8,7 +8,7 @@ subscribes and updates its priority-60 channel on change.
 4 emotions:
 
 - ``hyped`` — high RMS (any genre). Peak / drop landed.
-- ``focused`` — techno or house at mid RMS. Heads-down working groove.
+- ``focused`` — techno, house, or psytrance at mid RMS. Heads-down working groove.
 - ``concerned`` — low RMS persisting for >= 30s. Dead-air risk.
 - ``neutral`` — default fall-through.
 
@@ -44,7 +44,7 @@ LONG_PHASE_SEC = 30.0
 
 # Genres that get the "focused" mid-energy treatment. hard_tek skips
 # focused because hard_tek at mid-RMS is still a build, not a groove.
-FOCUSED_GENRES: frozenset[str] = frozenset({"techno", "house"})
+FOCUSED_GENRES: frozenset[str] = frozenset({"techno", "house", "psytrance"})
 
 
 def derive_emotion(
@@ -57,7 +57,7 @@ def derive_emotion(
     Priority order matches the contract above:
 
     1. ``hyped`` wins on high RMS regardless of genre.
-    2. ``focused`` for techno/house at mid RMS.
+    2. ``focused`` for techno/house/psytrance at mid RMS.
     3. ``concerned`` for sustained low RMS.
     4. ``neutral`` is the fall-through.
     """

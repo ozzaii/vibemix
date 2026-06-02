@@ -38,6 +38,9 @@ class TestFocusedPath:
     def test_house_at_mid_rms_returns_focused(self) -> None:
         assert derive_emotion("house", 0.10, 5.0) == "focused"
 
+    def test_psytrance_at_mid_rms_returns_focused(self) -> None:
+        assert derive_emotion("psytrance", 0.12, 5.0) == "focused"
+
     def test_hard_tek_at_mid_rms_does_not_return_focused(self) -> None:
         # hard_tek skips focused — Hard Tek at mid RMS is a build, not a groove.
         assert derive_emotion("hard_tek", 0.12, 5.0) == "neutral"
@@ -77,6 +80,7 @@ class TestThresholdSanity:
     [
         ("hard_tek", 0.20, 1.0, "hyped"),
         ("techno", 0.15, 5.0, "focused"),
+        ("psytrance", 0.15, 5.0, "focused"),
         ("house", 0.02, 60.0, "concerned"),
         ("unknown", 0.10, 5.0, "neutral"),
     ],

@@ -215,7 +215,7 @@ export interface StateRequest {
  * payload field.
  *
  * - neutral: default; everything baseline.
- * - focused: techno/house at mid energy — heads-down working groove.
+ * - focused: techno/house/psytrance at mid energy — heads-down working groove.
  * - hyped: any genre at high energy — crowd peak / drop landed.
  * - concerned: low energy persisting through a long phase — dead air risk.
  */
