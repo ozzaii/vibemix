@@ -55,7 +55,10 @@ COST_PER_AUDIO_EMBED_USD = (
 # Text query: variable length; ~500-token worst case × $0.20/1M (explicit est.).
 COST_PER_TEXT_QUERY_USD = 0.0001
 
-# Default call-rate assumptions (locked at "land under €50" rates).
+# Default call-rate assumptions for the legacy Gemini embedding what-if. The
+# production library path is local CLAP; these constants stay here so the old
+# cloud-embedding model remains auditable instead of quietly posing as current
+# product economics.
 DEFAULT_GROUNDING_EVENTS_PER_SESSION = 8
 DEFAULT_SESSIONS_PER_MONTH = 4
 DEFAULT_VIBE_SEARCHES_PER_DAY = 5
@@ -65,8 +68,9 @@ DEFAULT_SIMILAR_CACHE_HIT_RATE = 0.50
 # Average DJ library size; power-users at 1000+ tracks override at runtime.
 # At 1000 DAU × 500 tracks × 24mo amort, indexing alone = €34/mo.
 # At 1000 DAU × 1000 tracks × 24mo amort, indexing alone = €69/mo (over).
-# Phase 28 v1 ships at 500/36 — see COST-PROJECTION.md for the lock + revisit
-# criteria when real-world telemetry lands.
+# Phase 28 v1 locked the old cloud-embedding scenario at 500/36. Keep that
+# history visible: at corrected 2026 audio-embed prices it is over the €50 gate,
+# while the product path moved to local CLAP and is costed by ``--stack live``.
 DEFAULT_INDEXING_TRACKS = 500
 DEFAULT_INDEXING_AMORT_MONTHS = 36
 DEFAULT_SESSION_RETRIEVAL_PER_SESSION = 1

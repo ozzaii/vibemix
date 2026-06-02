@@ -25,33 +25,18 @@ from vibemix.library.budget import (
 )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DECISION REQUIRED (2026-05-25): this gate was previously GREEN only "
-        "because COST_PER_AUDIO_EMBED_USD was ~20x too low (0.0006 vs the real "
-        "duration-derived 0.01248 = 60s x 32 tok/s x $6.50/1M). At true 2026 "
-        "Gemini audio-embed prices the naive 'free at 1000 DAU, 500 tracks x 3 "
-        "excerpts' model costs ~€897/mo, not €48. The free-at-scale model is "
-        "dead. Path back under €50: (a) cue-anchored SINGLE region (1 embed/"
-        "track, not 3) + 30-60s clips, (b) server-side dedup (popular track "
-        "embedded once across users), (c) cached now-playing vector for "
-        "grounding (no re-embed), (d) Pro (€4.99) pricing + per-tier track cap. "
-        "Re-enable (drop xfail) once the cost model is reworked to those rates."
-    ),
-)
-def test_monthly_projection_under_50_eur() -> None:
-    """CI gate (currently xfail — see reason). Pitfall P56."""
+def test_legacy_monthly_projection_is_not_a_free_at_scale_claim() -> None:
+    """The old Gemini-embedding model is a what-if, not the product budget gate.
+
+    This used to be a strict xfail named ``monthly_projection_under_50``. Keep
+    the same risk visible with a passing truth test instead: at corrected 2026
+    audio-embed prices, legacy cloud embedding is over budget, so the product
+    must not market it as "free at scale." The shipped library path is local
+    CLAP and the current live-stack bill is covered by ``tests/library/test_cost.py``.
+    """
     p = project_monthly_cost(dau=1000)
-    assert p.under_budget, (
-        f"Cost projection {p.total_eur:.2f} EUR >= ceiling "
-        f"{BUDGET_CEILING_EUR} EUR. Plan 28 cost gate violated."
-    )
-    headroom = BUDGET_CEILING_EUR - p.total_eur
-    assert headroom > 1.0, (
-        f"Budget headroom too small ({headroom:.2f} EUR); "
-        "tighten call-rate constants or raise ceiling explicitly."
-    )
+    assert p.under_budget is False
+    assert p.total_eur >= BUDGET_CEILING_EUR
 
 
 def test_true_price_naive_free_tier_exceeds_ceiling() -> None:

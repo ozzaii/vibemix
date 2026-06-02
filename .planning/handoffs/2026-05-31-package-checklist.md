@@ -5775,6 +5775,7 @@ Include:
 - `src/vibemix/library/budget.py`
 - `src/vibemix/__main__.py`
 - `src/vibemix/llm/_router_config.py`
+- `tests/library/test_budget.py`
 - `tests/library/test_cost.py`
 - `tests/library/test_pricing.py`
 - `tests/library/test_session_meter.py`
@@ -5881,6 +5882,11 @@ Codex refresh, 2026-06-01 MOSS cost rebaseline:
   `verified: false`.
 - `git diff --check -- src/vibemix/library/cost.py src/vibemix/library/pricing.py src/vibemix/library/budget.py tests/library/test_cost.py tests/library/test_pricing.py tests/library/test_session_meter.py`
   passed with no output.
+- Follow-up, 2026-06-02: `tests/library/test_budget.py` is included in Package
+  10 because it owns the legacy Gemini-embedding what-if gate. The stale strict
+  xfail was converted into a passing truth gate: legacy cloud embedding remains
+  over the €50 ceiling, while production library embeddings are local CLAP and
+  the current live-stack bill is covered by `tests/library/test_cost.py`.
 
 ## Package 11 - Launch Collateral
 
