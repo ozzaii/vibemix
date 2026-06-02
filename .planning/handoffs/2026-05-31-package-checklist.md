@@ -2468,6 +2468,39 @@ Remaining gate:
 - Source-level setup visibility only. A future explicit action may start an
   ingest/re-embed run, but this package remains read-only.
 
+## Package 5M2 - Rekordbox Source Cache Boundary Regression
+
+Suggested commit: `test(library): pin rekordbox source cache boundary`
+
+Include:
+
+- `tests/library/test_sources_rekordbox.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/library/rekordbox.py`; the fixture-poison quarantine code is
+  already implemented.
+- `src/vibemix/library/sources/rekordbox.py`; this package adds coverage only.
+- Ingest CLI, setup discovery, Settings UI, or Viber/cohost behavior.
+
+Reason:
+
+- The primary cache quarantine is already covered at
+  `RekordboxLibrary.try_load_cache`, and `RekordboxSource.iter_tracks` already
+  recovers from a repo-fixture-poisoned user cache.
+- The remaining edge is a real user library whose relative path contains
+  `tests/fixtures`. That must remain accepted through `RekordboxSource` too,
+  because DJs can name folders anything. The test pins that source iteration
+  uses the accepted warm cache instead of quarantining it as repo test data.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_sources_rekordbox.py tests/library/test_rekordbox.py`
+- `uv run ruff check tests/library/test_sources_rekordbox.py tests/library/test_rekordbox.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tests/library/test_sources_rekordbox.py .planning/handoffs/2026-05-31-package-checklist.md`
+
 ## Package 5N - Traktor NML Library Source
 
 Suggested commit: `feat(library): add traktor nml source`

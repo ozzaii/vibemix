@@ -158,6 +158,39 @@ def test_rekordbox_source_iter_tracks_recovers_from_poisoned_user_cache(
     assert warm.xml_path == str(real_xml)
 
 
+def test_rekordbox_source_accepts_relative_user_tests_fixtures_cache(
+    tmp_path, monkeypatch
+):
+    """A user library under ``tests/fixtures`` must not look like the repo corpus."""
+    from vibemix.library.sources.rekordbox import RekordboxSource
+
+    user_cache = tmp_path / ".cache" / "vibemix" / "library.pkl"
+    collection = tmp_path / "tests" / "fixtures" / "collection.xml"
+    collection.parent.mkdir(parents=True)
+    collection.write_bytes(FIXTURE.read_bytes())
+
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", user_cache)
+    monkeypatch.chdir(tmp_path)
+
+    warm = RekordboxLibrary()
+    warm.load_xml(Path("tests/fixtures/collection.xml"))
+    assert user_cache.exists()
+
+    def _fail_load_xml(self, path):  # pragma: no cover - must not be reached
+        raise AssertionError(f"iter_tracks reparsed instead of using accepted cache: {path}")
+
+    monkeypatch.setattr(RekordboxLibrary, "load_xml", _fail_load_xml)
+
+    src = RekordboxSource(xml_path="tests/fixtures/collection.xml")
+    assert src.detect() is True
+    entries = list(src.iter_tracks())
+
+    assert len(entries) == 5
+    assert src.resolved_path == "tests/fixtures/collection.xml"
+    assert user_cache.exists()
+    assert not user_cache.with_name("library.pkl.fixturebak").exists()
+
+
 def test_rekordbox_source_satisfies_protocol(isolated_cache):
     """RekordboxSource is a structural LibrarySource."""
     from vibemix.library.sources.rekordbox import RekordboxSource
