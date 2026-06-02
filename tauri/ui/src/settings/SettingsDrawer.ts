@@ -544,15 +544,26 @@ let mountedHandle: DrawerHandle | null = null;
 
 // Mirrored from src/vibemix/voice_presets.py. These are real MOSS-TTS-Nano
 // manifest voices; retired Gemini voice ids must not re-enter this picker.
+// Grouped by gender/language: all 11 female voices + the two EN male voices.
 const VOICE_OPTIONS = [
+  // English male
   "Adam",
-  "Bella",
-  "Ava",
   "Nathan",
+  // English female
+  "Ava",
+  "Bella",
+  // Chinese female
+  "Xiaoyu",
+  "Yuewen",
+  "Lingyu",
+  // Japanese female
   "Soyo",
   "Mei",
   "Arisa",
-  "Xiaoyu",
+  "Saki",
+  "Mortis",
+  "Umiri",
+  "Anon",
 ] as const;
 
 const GENRE_OPTIONS = [

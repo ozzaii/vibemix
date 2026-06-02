@@ -11,15 +11,27 @@ DEFAULT_MOSS_VOICE = "Adam"
 # Product-facing subset of the voices present in the MOSS-TTS-Nano manifest.
 # Keep this mirrored in tauri/ui/src/settings/SettingsDrawer.ts until the UI
 # can read the model manifest through a settings IPC.
+# Grouped by the manifest `group` field (gender/language). All 11 female voices
+# are surfaced plus the two EN male voices for choice; the default stays Adam.
 MOSS_UI_VOICE_OPTIONS: tuple[str, ...] = (
+    # English male
     "Adam",
-    "Bella",
-    "Ava",
     "Nathan",
+    # English female
+    "Ava",
+    "Bella",
+    # Chinese female
+    "Xiaoyu",
+    "Yuewen",
+    "Lingyu",
+    # Japanese female
     "Soyo",
     "Mei",
     "Arisa",
-    "Xiaoyu",
+    "Saki",
+    "Mortis",
+    "Umiri",
+    "Anon",
 )
 
 LEGACY_CLOUD_TTS_VOICES = frozenset(

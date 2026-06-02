@@ -25,7 +25,11 @@ from vibemix.agent.local_tts import (
     pcm16_mono_le,
     resolve_model_dir,
 )
-from vibemix.voice_presets import select_moss_voice_row
+from vibemix.voice_presets import (
+    LEGACY_CLOUD_TTS_VOICES,
+    MOSS_UI_VOICE_OPTIONS,
+    select_moss_voice_row,
+)
 
 # ---------------- pure helpers ----------------
 
@@ -174,6 +178,29 @@ def test_select_moss_voice_row_uses_requested_voice():
     row = select_moss_voice_row(voices, "Bella")
 
     assert row["voice"] == "Bella"
+
+
+def test_moss_ui_voice_options_are_real_product_subset():
+    """Settings must expose real MOSS names, never retired cloud voice ids."""
+    expected = (
+        "Adam",
+        "Nathan",
+        "Ava",
+        "Bella",
+        "Xiaoyu",
+        "Yuewen",
+        "Lingyu",
+        "Soyo",
+        "Mei",
+        "Arisa",
+        "Saki",
+        "Mortis",
+        "Umiri",
+        "Anon",
+    )
+
+    assert MOSS_UI_VOICE_OPTIONS == expected
+    assert not (set(MOSS_UI_VOICE_OPTIONS) & LEGACY_CLOUD_TTS_VOICES)
 
 
 def test_select_moss_voice_row_falls_back_to_default_not_first_voice():

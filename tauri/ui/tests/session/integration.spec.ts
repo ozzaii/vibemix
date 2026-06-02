@@ -208,8 +208,22 @@ describe("Phase 12 — session + drawer integration", () => {
     const optionIds = Array.from(
       picker!.querySelectorAll<HTMLElement>(".vmx-picker__opt"),
     ).map((el) => el.dataset.id);
-    expect(optionIds).toContain("Adam");
-    expect(optionIds).toContain("Bella");
+    expect(optionIds).toEqual([
+      "Adam",
+      "Nathan",
+      "Ava",
+      "Bella",
+      "Xiaoyu",
+      "Yuewen",
+      "Lingyu",
+      "Soyo",
+      "Mei",
+      "Arisa",
+      "Saki",
+      "Mortis",
+      "Umiri",
+      "Anon",
+    ]);
     expect(optionIds).not.toContain("kore");
     expect(optionIds).not.toContain("puck");
 
