@@ -755,6 +755,7 @@
 }
 .shell-footer .library-freshness-badge[data-state="warn"] .library-freshness-dot,
 .shell-footer .library-freshness-badge[data-state="empty"] .library-freshness-dot,
+.shell-footer .library-freshness-badge[data-state="setup"] .library-freshness-dot,
 .shell-footer .voice-readiness-badge[data-state="warn"] .voice-readiness-dot {
   background: var(--led-warn);
 }

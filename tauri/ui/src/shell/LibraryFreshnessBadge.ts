@@ -4,9 +4,19 @@
 // computes source-aware freshness; this badge makes that truth visible without
 // opening Settings or Crate.
 
-import { libraryStats, type LibraryStats } from "../library/api.js";
+import {
+  libraryStats,
+  type LibrarySetupCandidate,
+  type LibraryStats,
+} from "../library/api.js";
 
-export type LibraryFreshnessBadgeState = "ok" | "warn" | "fault" | "empty" | "unknown";
+export type LibraryFreshnessBadgeState =
+  | "ok"
+  | "warn"
+  | "fault"
+  | "empty"
+  | "setup"
+  | "unknown";
 
 export interface LibraryFreshnessBadgeModel {
   readonly state: LibraryFreshnessBadgeState;
@@ -50,6 +60,24 @@ function readableStatus(status: string): string {
   return status.replace(/_/g, " ");
 }
 
+function librarySetupCandidateLabel(kind: string): string {
+  if (kind === "rekordbox_xml") return "Rekordbox XML";
+  if (kind === "traktor_nml") return "Traktor NML";
+  if (kind === "virtualdj_database") return "VirtualDJ database";
+  if (kind === "engine_database") return "Engine DJ database";
+  if (kind === "serato_database") return "Serato database";
+  if (kind === "music_folder") return "music folder";
+  return kind.replace(/_/g, " ");
+}
+
+function bestLibrarySetupCandidate(stats: LibraryStats | null): LibrarySetupCandidate | null {
+  return (
+    stats?.library_setup_candidates?.find(
+      (candidate) => candidate.import_action?.type === "ipc.library.import",
+    ) ?? null
+  );
+}
+
 export function libraryFreshnessBadgeModel(
   stats: LibraryStats | null,
   error?: unknown,
@@ -59,6 +87,18 @@ export function libraryFreshnessBadgeModel(
       state: "unknown",
       label: "library unknown",
       title: `Library freshness unavailable: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  const setupCandidate = bestLibrarySetupCandidate(stats);
+  if (setupCandidate) {
+    const source = librarySetupCandidateLabel(setupCandidate.kind);
+    const label = setupCandidate.kind === "music_folder" ? "index music" : "import library";
+    const reason = setupCandidate.reason ? ` · ${setupCandidate.reason}` : "";
+    return {
+      state: "setup",
+      label,
+      title: `Library setup: found ${source} at ${setupCandidate.path}${reason}`,
     };
   }
 

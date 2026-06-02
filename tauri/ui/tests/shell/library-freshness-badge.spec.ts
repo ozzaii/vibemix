@@ -78,6 +78,46 @@ describe("library freshness badge", () => {
     expect(footer.querySelector(".library-freshness-badge")).toBeNull();
   });
 
+  it("surfaces a discovered music folder as a first-run setup affordance", async () => {
+    const footer = document.createElement("footer");
+    const handle = mountLibraryFreshnessBadge(footer, {
+      autoload: false,
+      pollMs: null,
+      getStats: async () =>
+        stats({
+          indexed: 0,
+          library_freshness: {
+            status: "not_indexed",
+            stale: false,
+            reason: "library_cache_missing",
+            age_days: 0,
+            cache_path: "/tmp/library.pkl",
+          },
+          library_setup_candidates: [
+            {
+              kind: "music_folder",
+              path: "/Users/ozai/Downloads/Music",
+              reason: "187 audio files",
+              import_action: {
+                type: "ipc.library.import",
+                payload: {
+                  path: "/Users/ozai/Downloads/Music",
+                  schema_version: "1",
+                },
+              },
+            },
+          ],
+        }),
+    });
+
+    await handle.refresh();
+
+    expect(handle.element.dataset.state).toBe("setup");
+    expect(handle.element.textContent).toBe("index music");
+    expect(handle.element.title).toContain("found music folder");
+    expect(handle.element.title).toContain("/Users/ozai/Downloads/Music");
+  });
+
   it("can route first-run users from the shell badge into Crate setup", async () => {
     const footer = document.createElement("footer");
     const onOpenCrate = vi.fn();
@@ -94,6 +134,19 @@ describe("library freshness badge", () => {
             age_days: 0,
             cache_path: "/tmp/library.pkl",
           },
+          library_setup_candidates: [
+            {
+              kind: "rekordbox_xml",
+              path: "/Users/ozai/Library/Pioneer/rekordbox.xml",
+              import_action: {
+                type: "ipc.library.import",
+                payload: {
+                  path: "/Users/ozai/Library/Pioneer/rekordbox.xml",
+                  schema_version: "1",
+                },
+              },
+            },
+          ],
         }),
     });
 
@@ -101,7 +154,7 @@ describe("library freshness badge", () => {
     handle.element.click();
 
     expect(handle.element.tagName).toBe("BUTTON");
-    expect(handle.element.textContent).toBe("library not indexed");
+    expect(handle.element.textContent).toBe("import library");
     expect(onOpenCrate).toHaveBeenCalledOnce();
     handle.teardown();
   });
