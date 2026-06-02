@@ -8049,6 +8049,36 @@ Proof before staging:
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/audio/constants.py src/vibemix/state/refresh.py tests/audio/test_phase17_constants.py tests/state/test_refresh.py .planning/handoffs/2026-05-31-package-checklist.md`
 
+## Package 13E - Clean-Room Scratch Ignore Guard
+
+Suggested commit: `fix(repo): ignore local clean-room scratch`
+
+Include:
+
+- `.gitignore`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Deleting or moving `.mixxx-tmp-loop/`, `.cp_probe.txt`, or any planning
+  scratch files. Removal is a user/destructive-action call; this package only
+  prevents accidental staging.
+- Any Mixxx-derived implementation, spec prose, or GPL source copying.
+
+Reason:
+
+- The Mixxx verification lanes repeatedly found `.mixxx-tmp-loop/` holding
+  untracked verbatim GPL source inside the repo root. It is not committed, but
+  without a `.gitignore` guard a stray broad stage could absorb it into an
+  Apache-licensed tree. Add ignore rules for that clean-room scratch dir plus
+  two local probe/list files surfaced by the same dirty-tree audit.
+
+Proof before staging:
+
+- `git check-ignore -v .mixxx-tmp-loop/bpmcontrol.cpp .cp_probe.txt .planning/.tmp_filelist.txt`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- .gitignore .planning/handoffs/2026-05-31-package-checklist.md`
+
 ## Package 20 - Retire Dead Tend Citation Source
 
 Suggested commit: `fix(grounding): remove dead tend citation source`

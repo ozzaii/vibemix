@@ -218,6 +218,12 @@ tauri/src-tauri/keys/*.key.pub
 # any *new* .bak file is scratch and should not enter the repo.
 *.bak
 
+# Long-running agent scratch. Never commit local probe files or verbatim
+# third-party source used only for clean-room reading.
+.cp_probe.txt
+.planning/.tmp_filelist.txt
+.mixxx-tmp-loop/
+
 # v5 session screenshots produced by the design-iteration shoots cluttering
 # git status during Phase 11-14. They live under repo root and are scratch.
 v5-*.png
