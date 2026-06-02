@@ -250,9 +250,11 @@ def discover_library_setup_candidates(
                 )
             )
 
+    broad_roots = set(_music_roots(base))
     folder_candidates.sort(
         key=lambda item: (
             item.confidence != "high",
+            Path(item.path) in broad_roots,
             -item.audio_files_seen,
             -len(Path(item.path).parts),
             item.path.lower(),

@@ -114,6 +114,22 @@ def test_setup_discovery_finds_bounded_music_folder_candidate(tmp_path: Path) ->
     }
 
 
+def test_setup_discovery_prefers_specific_crate_over_broad_music_root(tmp_path: Path) -> None:
+    music = tmp_path / "Music"
+    crate = music / "PSYMIND"
+    crate.mkdir(parents=True)
+    for idx in range(12):
+        (crate / f"psymind-{idx}.mp3").write_bytes(b"audio")
+    for idx in range(20):
+        (music / f"loose-{idx}.mp3").write_bytes(b"audio")
+
+    candidates = discover_library_setup_candidates(home=tmp_path, max_candidates=4)
+
+    assert candidates[0].kind == "music_folder"
+    assert candidates[0].path == str(crate)
+    assert any(candidate.path == str(music) for candidate in candidates)
+
+
 def test_setup_discovery_quotes_shell_commands_but_keeps_ipc_path_raw(tmp_path: Path) -> None:
     crate = tmp_path / "Music" / "two words"
     crate.mkdir(parents=True)

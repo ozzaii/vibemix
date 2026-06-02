@@ -60,6 +60,11 @@ def _isolate_caches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         "discover_library_setup_candidate_dicts",
         lambda *, max_candidates=5: [],
     )
+    monkeypatch.setattr(
+        setup_discovery,
+        "discover_library_setup_candidates",
+        lambda *a, **k: [],
+    )
 
 
 def _seed_sqlite_store(db_path: Path, n: int) -> None:
