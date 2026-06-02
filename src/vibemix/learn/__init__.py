@@ -90,6 +90,14 @@ from vibemix.learn.lesson_flow import (
     verification_for_action,
 )
 from vibemix.learn.midi_mirror import MidiMirror
+from vibemix.learn.practice_loop import (
+    BEATMATCH_EVIDENCE_SOURCE,
+    BEATMATCH_GRADED_EVENT,
+    BeatmatchPracticeEvent,
+    BeatmatchPracticeResult,
+    grade_minideck_beatmatch_attempt,
+    grade_owned_beatmatch_attempt,
+)
 from vibemix.learn.progress import (
     SCHEMA_VERSION,
     LearnProgress,
@@ -117,6 +125,8 @@ from vibemix.learn.teaching_loop import (
 
 __all__ = [
     "BAND_SHARE_TABLE",
+    "BEATMATCH_EVIDENCE_SOURCE",
+    "BEATMATCH_GRADED_EVENT",
     "COURSE_FRAMES",
     "COURSE_REGISTRY",
     "CURRICULUM",
@@ -126,6 +136,8 @@ __all__ = [
     "AdaptiveHint",
     "BackstageDrill",
     "BackstageLens",
+    "BeatmatchPracticeEvent",
+    "BeatmatchPracticeResult",
     "CourseMeta",
     "ExemplarFinder",
     "ExemplarLessonController",
@@ -157,6 +169,8 @@ __all__ = [
     "build_tutor_system_instruction",
     "compute_band_shares",
     "course_lesson_ids",
+    "grade_minideck_beatmatch_attempt",
+    "grade_owned_beatmatch_attempt",
     "graduation_citations",
     "harmonic_practice_citations",
     "init_schema",

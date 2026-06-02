@@ -9,12 +9,11 @@ headline product spine is MAST-03: a fabricated / un-cited event grants ZERO
 mastery credit — the SAME event differing only in its citation predicate is the
 positive-vs-negative control (``test_uncited_event_grants_zero_mastery_credit``).
 
-The second headline is the honest-uncreditable decision (Finding #1): in v11.0
-``beatmatching`` + ``harmonic_mixing`` have NO clean citable production event
-(sync is sub-significance MIDI; harmonic events default-OFF). They are NEVER
-proxy-credited — no map entry, no MIX_MOVE resolution, capped at Competent. The
-unsignalled-skills test makes both Competent first, so the assertion isolates
-the no-creditable-event reason (NOT an accidental Competent gate).
+The second headline is the no-proxy-credit decision (Finding #1): skills are
+credited only from their own citable production signals. Ordinary events never
+proxy-credit beatmatching or harmonic_mixing; beatmatching now has its own
+``BEATMATCH_GRADED`` owned-deck signal, and harmonic_mixing has the Judge's
+``transition_judged`` signal.
 
 The recognizer is exercised entirely offline with synthetic events (a tiny
 SimpleNamespace, never a real MusicState) + synthetic predicates
@@ -204,18 +203,17 @@ def test_event_skill_map_credits_real_events() -> None:
 
 
 # ---------------------------------------------------------------------------
-# MAST-02 HEADLINE (anti-slop): beatmatching/harmonic_mixing never auto-master
+# MAST-02 HEADLINE (anti-slop): no ordinary event proxy-masters these skills
 # ---------------------------------------------------------------------------
 def test_unsignalled_skills_never_auto_master() -> None:
-    """Finding #1 — no PROXY event auto-masters these skills. beatmatching has no
-    citable production event at all; harmonic_mixing now has ONE (the Vibe Judge's
-    ``transition_judged`` — see ``test_judge_credits_harmonic.py``), but NONE of
-    the ordinary event types (MIX_MOVE / LAYER_ARRIVAL / PHASE / PHRASE_BOUNDARY)
-    resolve to either. Both are made Competent first, so the ONLY thing stopping a
-    proxy-Mastered is the ABSENCE of a proxy mapping (the honest decision), not an
-    accidental Competent gate. Feed a cited stream of every mapped *ordinary*
-    event type (NOT transition_judged) and assert both stay
-    live_proof_count=0 / mastered=False."""
+    """Finding #1 — no PROXY event auto-masters these skills.
+
+    beatmatching has its own ``BEATMATCH_GRADED`` owned-deck signal, and
+    harmonic_mixing has ``transition_judged``. NONE of the ordinary event types
+    (MIX_MOVE / LAYER_ARRIVAL / PHASE / PHRASE_BOUNDARY) resolve to either.
+    Both are made Competent first, so the assertion isolates the no-proxy-map
+    reason, not an accidental Competent gate.
+    """
     # Make every skill Competent — including the two unsignalled ones.
     progress = _competent_progress(
         "eq_mixing",

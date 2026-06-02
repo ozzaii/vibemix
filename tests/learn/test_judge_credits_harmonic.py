@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 """The keystone: a cited Judge verdict makes harmonic_mixing Mastered-creditable.
 
-Until v11.0 the Judge, beatmatching + harmonic_mixing were honest-uncreditable —
-no clean citable production event. The Vibe Judge supplies one: a
+Until v11.0 the Judge, harmonic_mixing had no clean citable production event.
+The Vibe Judge supplies one: a
 ``transition_judged`` event whose verdict carries a COMPATIBLE harmonic component
 (the DJ mixed in key) is a genuine harmonic-mixing demonstration. Crediting is
 still gated three ways: the move must be cited (MAST-03), Competent first
 (MAST-01), and the keys actually compatible (a clash is NOT a demonstration).
 
-beatmatching STAYS uncreditable — the Judge measures no tempo/phase signal yet,
-so crediting it off bass-collision would be the exact proxy-slop the product
-refuses. Honest-null applied to the keystone itself.
+The transition Judge still never credits beatmatching: it measures no tempo/phase
+signal. Beatmatching has its own owned-deck ``BEATMATCH_GRADED`` producer, so
+crediting it off bass-collision would be the exact proxy-slop the product refuses.
 """
 from __future__ import annotations
 
@@ -84,7 +84,8 @@ def test_uncited_verdict_grants_zero_credit():
 
 
 def test_judge_never_credits_beatmatching():
-    # No tempo/phase signal exists — beatmatching stays honest-uncreditable.
+    # No tempo/phase signal exists in this Judge; beatmatching credits only via
+    # the owned-deck BEATMATCH_GRADED producer.
     progress = LearnProgress()
     _make_competent(progress, "beatmatching")
     credited = recognize(

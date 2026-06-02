@@ -96,13 +96,12 @@ _MIX_MOVE_DECK_SUBSTRINGS: tuple[str, ...] = ("_play→", "xfader")
 #   - harmonic_mixing: the Judge's ``transition_judged`` event — a verdict with a
 #     COMPATIBLE harmonic component (the DJ blended two trusted in-key tracks) is
 #     resolved in ``_candidate_skills`` and credited under the MAST-03 gate.
-# Still uncreditable:
-#   - beatmatching: the owned-deck Judge and BEATMATCH_GRADED consumer are
-#     future-ready, but no production loop calls the grader or emits the event.
-#     The wall must not promise "3 more live demos" until that producer exists.
-#     Synthetic BEATMATCH_GRADED tests can still exercise the branch; production
-#     creditability is this list plus ``SkillSpec.live_creditable``.
-_HONEST_UNCREDITABLE_V11: tuple[str, ...] = ("beatmatching",)
+#   - beatmatching: ``learn.practice_loop`` now owns the measured two-deck
+#     producer. It calls the Beatmatch Judge, writes the matching
+#     ``("ev", "BEATMATCH_GRADED", t_session)`` receipt, and only then runs this
+#     recognizer branch. Any future skill that lacks a citable producer belongs
+#     here until the producer ships.
+_HONEST_UNCREDITABLE_V11: tuple[str, ...] = ()
 
 
 def _candidate_skills(event: Any) -> list[str]:
@@ -152,10 +151,10 @@ def _candidate_skills(event: Any) -> list[str]:
         return []
 
     if ev_type == "BEATMATCH_GRADED":
-        # The owned-deck Beatmatch Judge consumer branch. It is future-ready, but
-        # beatmatching stays honest-uncreditable until a production live loop can
-        # actually emit this cited event. Because the learn module OWNS both decks,
-        # the grade is MEASURED, not inferred.
+        # The owned-deck Beatmatch Judge consumer branch. The Learn practice loop
+        # emits this event only after writing the matching EvidenceRegistry
+        # receipt. Because the learn module OWNS both decks, the grade is
+        # MEASURED, not inferred.
         # A genuine demonstration is a LOCKED grade: tempo matched AND phase
         # locked AND not abstaining (== verdict "locked"). A trainwreck / drift /
         # tempo-off / abstain credits NOTHING — it proves the opposite, the exact

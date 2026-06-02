@@ -143,11 +143,9 @@ SKILL_MANIFEST: dict[str, SkillSpec] = {
     "beatmatching": SkillSpec(
         lesson_ids=("L2.01", "L2.02"),
         gate="course_3_unlocked",
-        # The owned-deck Beatmatch Judge and recognizer branch exist, but no
-        # production live loop emits ``BEATMATCH_GRADED`` yet. Keep the Earned Wall
-        # honest: Competent can be earned from lessons/recital, Mastered is not a
-        # live-graded promise until that emitter ships.
-        live_creditable=False,
+        # ``learn.practice_loop`` emits cited ``BEATMATCH_GRADED`` events from
+        # the owned-deck Judge, so Mastered credit is now a measured practice
+        # signal instead of proxy-slop.
     ),
     "eq_mixing": SkillSpec(
         lesson_ids=("L1.14", "L2.04", "L2.05"),

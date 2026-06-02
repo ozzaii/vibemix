@@ -4585,6 +4585,49 @@ Remaining gate:
   tests first: credit shim, practice controller, audio stream, grade debounce,
   `__main__` observer wiring, and by-ear/live proof.
 
+## Package B2 - Practice Deck Beatmatch Producer
+
+2026-06-02 Codex refresh:
+
+- Packet: `.planning/packets/2026-06-01/CODEX_READY-B2-practice-deck-beatmatch-producer.md`
+- LAND as `feat(learn): emit cited beatmatch practice grades`.
+
+Include:
+
+- `src/vibemix/learn/practice_loop.py`
+- `src/vibemix/learn/__init__.py`
+- `src/vibemix/learn/beatmatch_judge.py`
+- `src/vibemix/learn/skill_recognizer.py`
+- `src/vibemix/learn/skill_tree.py`
+- `tests/learn/test_practice_loop.py`
+- `tests/learn/test_creditability_drift.py`
+- `tests/learn/test_judge_credits_harmonic.py`
+- `tests/learn/test_skill_recognizer.py`
+- `tests/learn/test_skill_wall_what_remains.py`
+- `tests/repo/test_live_reality_pins.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Course 3 full routed-audio proof.
+- Frontend lesson UX polish and Tauri control-surface changes.
+- Live co-host speech, DROP speech, `runtime/coach.py`, and `__main__.py`.
+
+Proof for this source slice:
+
+- `uv run pytest -q tests/learn/test_practice_loop.py tests/learn/test_beatmatch_judge.py tests/learn/test_judge_credits_beatmatch.py tests/learn/test_judge_credits_harmonic.py tests/learn/test_creditability_drift.py tests/learn/test_skill_wall_what_remains.py tests/learn/test_skill_recognizer.py tests/repo/test_live_reality_pins.py`
+- `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py`
+- `uv run pytest -q tests/learn/test_no_speculative_phrase.py tests/prompts/test_negative_dict.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py tests/state/test_event_detector.py`
+- `uv run ruff check src/vibemix/learn/practice_loop.py src/vibemix/learn/__init__.py src/vibemix/learn/beatmatch_judge.py src/vibemix/learn/skill_recognizer.py src/vibemix/learn/skill_tree.py tests/learn/test_practice_loop.py tests/learn/test_creditability_drift.py tests/learn/test_judge_credits_harmonic.py tests/learn/test_skill_recognizer.py tests/learn/test_skill_wall_what_remains.py tests/repo/test_live_reality_pins.py`
+- `git diff --check -- <Package B2 files>`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+Remaining gate:
+
+- SRC producer is real and cited. LIVE proof still needs the Learn beatmatch
+  practice lesson driven on the actual rig: lock two owned decks -> cited
+  `BEATMATCH_GRADED` credit; deliberate trainwreck -> no credit.
+
 ## Hold Lane - Singularity Research Census Briefs
 
 Suggested commit if/when selected: `docs(research): capture singularity subsystem census`

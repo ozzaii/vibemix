@@ -148,8 +148,8 @@ def grade_to_event_extra(grade: BeatmatchGrade) -> dict[str, object]:
     The owned-deck Judge is the tempo/phase signal the v11.0 skill recognizer was
     explicitly waiting for (``skill_recognizer._HONEST_UNCREDITABLE_V11`` —
     *"Stays uncreditable until the deferred beatmatch_phase Judge signal ships."*).
-    A future owned-deck practice loop must fire a ``BEATMATCH_GRADED`` event
-    carrying this payload AND register the matching
+    The owned-deck practice loop fires a ``BEATMATCH_GRADED`` event carrying
+    this payload AND registers the matching
     ``("ev", "BEATMATCH_GRADED", t_session)`` citation; once that producer exists,
     ``skill_recognizer.recognize`` credits beatmatching ONLY on a cited,
     non-abstain, LOCKED grade (tempo matched AND phase locked) — a trainwreck /

@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Single-source pin: the manifest's `live_creditable=False` skills MUST equal the
-recognizer's `_HONEST_UNCREDITABLE_V11`.
+"""Single-source pin for skills that are not live-creditable.
 
 `what_remains` (SURF-01) reads `SkillSpec.live_creditable` to stay honest about which
 skills have a live Mastered path — but the AUTHORITATIVE truth of which event types
@@ -21,14 +20,7 @@ def test_manifest_uncreditable_matches_recognizer():
     assert manifest_uncreditable == set(_HONEST_UNCREDITABLE_V11)
 
 
-def test_beatmatching_is_the_only_honest_uncreditable_skill():
-    # The judge/consumer engine exists, but no production live loop emits
-    # BEATMATCH_GRADED yet. Keep the wall honest until that producer lands.
-    assert set(_HONEST_UNCREDITABLE_V11) == {"beatmatching"}
-    assert SKILL_MANIFEST["beatmatching"].live_creditable is False
-    assert SKILL_MANIFEST["harmonic_mixing"].live_creditable is True
-    assert all(
-        spec.live_creditable
-        for sid, spec in SKILL_MANIFEST.items()
-        if sid != "beatmatching"
-    )
+def test_no_honest_uncreditable_skill_remains_after_beatmatch_producer_lands():
+    # Beatmatching now has ``learn.practice_loop`` as its measured producer.
+    assert set(_HONEST_UNCREDITABLE_V11) == set()
+    assert all(spec.live_creditable for spec in SKILL_MANIFEST.values())
