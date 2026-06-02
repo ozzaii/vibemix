@@ -90,6 +90,29 @@ describe("test_controller_detected_mounts_svg.test.ts (RENDER-01)", () => {
     document.body.innerHTML = `<div id="learn-root"></div>`;
   });
 
+  it("first paint names the next lesson and the available practice path", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      const next = root.querySelector("#learn-booth-next") as HTMLElement;
+      expect(next).not.toBeNull();
+      expect(root.querySelector("#learn-booth-course")?.textContent).toContain(
+        "Course 1 Anatomy",
+      );
+      expect(root.querySelector("#learn-booth-title")?.textContent).toBe(
+        "opening dialog",
+      );
+      expect(root.querySelector("#learn-booth-proof")?.textContent).toBe(
+        "screen deck available",
+      );
+      expect(
+        root.querySelector("#learn-start-recommended")?.textContent,
+      ).toBe("start opening dialog");
+    } finally {
+      ws.close();
+    }
+  });
+
   it("ipc.learn.controller_detected mounts the matching SVG within 2000 ms", async () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     expect(root).not.toBeNull();

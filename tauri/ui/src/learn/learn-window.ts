@@ -314,6 +314,11 @@ function mountLearnWindow(root: HTMLElement): {
     <div id="learn-stage" class="learn-stage"></div>
     <section id="learn-booth-panel" class="learn-booth-panel" data-visible="true">
       <div class="learn-booth-kicker">ready to practice</div>
+      <div id="learn-booth-next" class="learn-booth-next">
+        <span id="learn-booth-course" class="learn-booth-course">Course 1</span>
+        <strong id="learn-booth-title" class="learn-booth-title">next lesson</strong>
+        <span id="learn-booth-proof" class="learn-booth-proof">screen deck available</span>
+      </div>
       <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">practice deck ready</div>
       <button id="learn-start-recommended" class="learn-booth-primary" type="button">start practice</button>
       <button id="learn-open-map" class="learn-booth-secondary" type="button">choose lesson</button>
@@ -382,6 +387,9 @@ function mountLearnWindow(root: HTMLElement): {
     "#learn-progress-list-body",
   ) as HTMLElement;
   const boothPanel = root.querySelector("#learn-booth-panel") as HTMLElement;
+  const boothCourse = root.querySelector("#learn-booth-course") as HTMLElement;
+  const boothTitle = root.querySelector("#learn-booth-title") as HTMLElement;
+  const boothProof = root.querySelector("#learn-booth-proof") as HTMLElement;
   const boothPulse = root.querySelector("#learn-booth-pulse") as HTMLElement;
   const screenAction = root.querySelector("#learn-screen-action") as HTMLButtonElement;
   const openMapButton = root.querySelector("#learn-open-map") as HTMLButtonElement;
@@ -576,6 +584,11 @@ function mountLearnWindow(root: HTMLElement): {
         ? "midi"
         : "screen";
     boothPanel.dataset.readiness = readiness;
+    boothCourse.textContent = recommended
+      ? compactCourseLabel(recommended.course_label, recommended.lesson_id)
+      : "Next lesson";
+    boothTitle.textContent = recommended?.title ?? "pick a first lesson";
+    boothProof.textContent = readinessProofLine(readiness, controllerDisplayName);
     const cue = recommendationBoothCue(
       recommended,
       readiness,
@@ -1476,6 +1489,23 @@ function recommendedActionVerb(status: LessonStatus | undefined): string {
   if (status === "completed") return "replay";
   if (status === "in-progress") return "retry";
   return "start";
+}
+
+function compactCourseLabel(courseLabel: string, lessonId: string): string {
+  const course = courseLabel.replace(/\s*·\s*/g, " ").trim();
+  return `${course} ${lessonId}`;
+}
+
+function readinessProofLine(
+  readiness: "hardware" | "midi" | "screen",
+  controllerName: string | null,
+): string {
+  if (readiness === "hardware") {
+    const compactName = compactControllerName(controllerName);
+    return compactName ? `${compactName} mapped` : "hardware mapped";
+  }
+  if (readiness === "midi") return "controller detected";
+  return "screen deck available";
 }
 
 function recommendationBoothCue(

@@ -9902,3 +9902,38 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/library/index.ts tauri/ui/src/library/library.css tauri/ui/src/library/state-machine.ts tauri/ui/src/library/folded-mount.test.ts tauri/ui/src/shell/app.ts tauri/ui/src/shell/surface-mounts.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 68 - Learn Next Practice Readout
+
+Suggested commit: `fix(learn-ui): clarify next practice`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/learn/test_controller_detected_mounts_svg.test.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- GSD, beginner-path suites, Python curriculum semantics, Learn backend
+  progression rules, Sven speech, Viber, Crate, Settings, packaging scripts,
+  and broad shell layout. This package only makes the existing Learn practice
+  booth name the next lesson and the available practice path.
+
+Reason:
+
+- The exact signed app at `0efab7da` showed Learn as a large faint controller
+  with two disconnected actions. It looked calm but not valuable: a learner had
+  to infer what lesson was next, why Start mattered, and whether the controller
+  state was usable. Keep the practice deck primary, but make the top strip name
+  the course, lesson title, and current practice path: hardware mapped,
+  controller detected, or screen deck available.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_controller_detected_mounts_svg.test.ts tests/learn/test_first_launch_announce.spec.ts tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/src/shell/shell.css tauri/ui/tests/learn/test_controller_detected_mounts_svg.test.ts .planning/handoffs/2026-05-31-package-checklist.md`

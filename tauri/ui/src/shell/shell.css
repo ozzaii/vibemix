@@ -648,6 +648,7 @@
   grid-template-columns: minmax(0, 1fr) auto auto;
   grid-template-areas:
     "kicker primary secondary"
+    "next primary secondary"
     "pulse primary secondary";
   justify-content: stretch;
   justify-items: start;
@@ -672,8 +673,18 @@
 }
 
 .surface[data-surface="learn"].surface--mounted .learn-booth-kicker,
-.surface[data-surface="learn"].surface--mounted .learn-booth-pulse {
+.surface[data-surface="learn"].surface--mounted .learn-booth-pulse,
+.surface[data-surface="learn"].surface--mounted .learn-booth-next {
   text-align: left;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-booth-next {
+  min-width: 0;
+  max-width: 56ch;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-booth-title {
+  font-size: 20px;
 }
 
 .surface[data-surface="learn"].surface--mounted .learn-booth-pulse {
