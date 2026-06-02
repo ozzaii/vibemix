@@ -8317,3 +8317,33 @@ Proof before staging:
 - `uv run ruff check src/vibemix/learn/cue_placement_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_cue_placement_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/repo/test_live_reality_pins.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/learn/cue_placement_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_cue_placement_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_cue_practice.py tests/repo/test_live_reality_pins.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 31 - Library Freshness Watcher Direct Tests
+
+Suggested commit: `test(library): pin freshness watcher loop`
+
+Include:
+
+- `tests/library/test_watcher.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/library/watcher.py`, `src/vibemix/library/staleness.py`, and
+  `src/vibemix/__main__.py`; this package is a regression pin only.
+- UI freshness copy, import actions, Viber setup flows, and any live app control.
+
+Reason:
+
+- The shipped library freshness watcher is user-visible Viber/set-prep
+  infrastructure. Existing `test_staleness.py` covers wrapper behavior and
+  payload policy; this package pins the dedicated watcher module directly:
+  cache-path fallback, dynamic cache/source watch targets across loop
+  iterations, and duplicate stale-signature suppression.
+
+Proof before staging:
+
+- `uv run pytest -q tests/library/test_watcher.py tests/library/test_staleness.py`
+- `uv run ruff check tests/library/test_watcher.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tests/library/test_watcher.py .planning/handoffs/2026-05-31-package-checklist.md`
