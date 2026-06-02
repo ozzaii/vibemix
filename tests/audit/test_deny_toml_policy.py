@@ -1,5 +1,5 @@
 """DEPS-02 / DEPS-03 static policy test — asserts cargo-deny license
-allowlist + GPL ban list + dep-audit workflow shape. Pure static
+allowlist + copyleft gate shape + dep-audit workflow shape. Pure static
 analysis; no cargo or npm execution."""
 
 import tomllib
@@ -21,15 +21,19 @@ REQUIRED_ALLOW = {
     "Unicode-DFS-2016",
     "MPL-2.0",
 }
-REQUIRED_DENY = {
+REQUIRED_COPYLEFT_ALLOW = {
     "GPL-2.0-only",
     "GPL-2.0-or-later",
     "GPL-3.0-only",
     "GPL-3.0-or-later",
-    "AGPL-3.0-only",
-    "AGPL-3.0-or-later",
+    "LGPL-2.1-only",
+    "LGPL-2.1-or-later",
     "LGPL-3.0-only",
     "LGPL-3.0-or-later",
+}
+REQUIRED_DENY = {
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later",
 }
 
 
@@ -48,11 +52,22 @@ def test_license_allowlist_contains_required():
     assert not missing, f"allowlist missing entries: {missing}"
 
 
-def test_license_deny_contains_gpl_family():
+def test_license_allowlist_contains_gpl_lgpl_family():
     d = _load_deny()
+    allow = set(d["licenses"]["allow"])
+    missing = REQUIRED_COPYLEFT_ALLOW - allow
+    assert not missing, f"allowlist missing GPL/LGPL entries: {missing}"
+
+
+def test_license_deny_contains_agpl_family_only():
+    d = _load_deny()
+    allow = set(d["licenses"]["allow"])
     deny = set(d["licenses"].get("deny", []))
     missing = REQUIRED_DENY - deny
-    assert not missing, f"deny list missing GPL family: {missing}"
+    forbidden_overlap = REQUIRED_COPYLEFT_ALLOW & deny
+    assert not missing, f"deny list missing AGPL family: {missing}"
+    assert not forbidden_overlap, f"GPL/LGPL must be allowed, not denied: {forbidden_overlap}"
+    assert not (REQUIRED_DENY & allow), "AGPL must stay out of the allowlist"
 
 
 def test_dep_audit_workflow_has_required_jobs():

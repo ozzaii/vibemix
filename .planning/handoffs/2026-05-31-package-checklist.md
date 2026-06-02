@@ -1929,6 +1929,40 @@ Proof to run:
 - `git diff --check -- NOTICE NOTICE.md THIRD_PARTY_LICENSES.md scripts/dist/gen_notice.py src/vibemix/learn/beatmatch_judge.py tests/learn/test_beatmatch_judge.py tests/repo/test_third_party_attribution.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 13F - GPL/LGPL Dependency Policy Allowance
+
+Suggested commit: `fix(audit): allow gpl and lgpl dependencies`
+
+Include:
+
+- `tauri/src-tauri/deny.toml`
+- `tests/audit/test_deny_toml_policy.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Adding new GPL/LGPL dependencies or vendored source in this policy slice.
+- Runtime Mixxx-derived implementation work.
+- AGPL allowance; keep AGPL as an explicit release/legal gate.
+- Co-host speech, prompt, DROP-call, or live deck behavior.
+
+Reason:
+
+- Product direction now allows GPL/Mixxx-derived work when the value is real.
+  The old static audit gate still encoded "GPL family is forbidden", which would
+  block useful GPL or LGPL Rust dependencies even when their attribution/source
+  obligations are accepted.
+- This package updates the gate from "GPL is prohibited" to "GPL/LGPL are
+  deliberate and visible; AGPL remains denied by default." It clears the false
+  blocker without landing any new copyleft code.
+
+Proof to run:
+
+- `uv run pytest -q tests/audit/test_deny_toml_policy.py`
+- `uv run ruff check tests/audit/test_deny_toml_policy.py`
+- `git diff --check -- tauri/src-tauri/deny.toml tests/audit/test_deny_toml_policy.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Rebuild Carry-Forward Serato Cue Carrier
 
 Suggested commit if/when selected: `feat(library): export cues as serato markers`
