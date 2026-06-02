@@ -708,7 +708,8 @@
   background: var(--border-default);
   opacity: 0.9;
 }
-.shell-footer .library-freshness-badge {
+.shell-footer .library-freshness-badge,
+.shell-footer .voice-readiness-badge {
   display: inline-flex;
   align-items: center;
   min-width: 0;
@@ -722,35 +723,43 @@
   cursor: pointer;
 }
 .shell-footer button.library-freshness-badge:hover,
-.shell-footer button.library-freshness-badge:focus-visible {
+.shell-footer button.library-freshness-badge:focus-visible,
+.shell-footer button.voice-readiness-badge:hover,
+.shell-footer button.voice-readiness-badge:focus-visible {
   color: var(--text-secondary);
 }
-.shell-footer button.library-freshness-badge:focus-visible {
+.shell-footer button.library-freshness-badge:focus-visible,
+.shell-footer button.voice-readiness-badge:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 3px;
   box-shadow: var(--glow-soft);
 }
-.shell-footer .library-freshness-dot {
+.shell-footer .library-freshness-dot,
+.shell-footer .voice-readiness-dot {
   width: 6px;
   height: 6px;
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--text-disabled);
 }
-.shell-footer .library-freshness-label {
+.shell-footer .library-freshness-label,
+.shell-footer .voice-readiness-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.shell-footer .library-freshness-badge[data-state="ok"] .library-freshness-dot {
+.shell-footer .library-freshness-badge[data-state="ok"] .library-freshness-dot,
+.shell-footer .voice-readiness-badge[data-state="ok"] .voice-readiness-dot {
   background: var(--led-ok);
 }
 .shell-footer .library-freshness-badge[data-state="warn"] .library-freshness-dot,
-.shell-footer .library-freshness-badge[data-state="empty"] .library-freshness-dot {
+.shell-footer .library-freshness-badge[data-state="empty"] .library-freshness-dot,
+.shell-footer .voice-readiness-badge[data-state="warn"] .voice-readiness-dot {
   background: var(--led-warn);
 }
-.shell-footer .library-freshness-badge[data-state="fault"] .library-freshness-dot {
+.shell-footer .library-freshness-badge[data-state="fault"] .library-freshness-dot,
+.shell-footer .voice-readiness-badge[data-state="fault"] .voice-readiness-dot {
   background: var(--led-fault);
 }
 /* Steady lit when connected — a stable power LED, not a breath. The deck tail

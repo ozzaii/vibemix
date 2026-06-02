@@ -8423,3 +8423,37 @@ Proof before staging:
 - `npm --prefix tauri/ui test -- src/wizard/__tests__/first-run-continuity.spec.ts tests/wizard.tokens.test.ts`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/wizard/components/controller-probe.ts tauri/ui/tests/wizard.tokens.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 34 - Shell MOSS Voice Readiness Badge
+
+Suggested commit: `fix(shell): surface moss voice readiness`
+
+Include:
+
+- `tauri/ui/src/shell/VoiceReadinessBadge.ts`
+- `tauri/ui/src/shell/app.ts`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/shell/voice-readiness-badge.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Backend model download/install logic, hosted MOSS archive decisions, PyInstaller
+  model bundling, startup stderr copy, and runtime TTS provider behavior.
+- Duplicating the Crate model setup card. This shell badge is a small readiness
+  readout and route into Crate, not a second installer.
+
+Reason:
+
+- MOSS is the only product voice. A clean machine can boot muted when the model
+  is absent, and the existing model setup card is inside Crate. The live deck
+  needs a compact, honest status surface so a user can see `voice missing` /
+  `voice manual` and click into the existing setup path instead of thinking Sven
+  is simply broken.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/voice-readiness-badge.spec.ts tests/shell/library-freshness-badge.spec.ts tests/shell/shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/VoiceReadinessBadge.ts tauri/ui/src/shell/app.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/voice-readiness-badge.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

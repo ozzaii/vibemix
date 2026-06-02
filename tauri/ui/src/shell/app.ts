@@ -28,6 +28,7 @@ import {
 import { extractSurfaceMarkup } from "./scaffolds.js";
 import { wireActivation } from "./activation-bridge.js";
 import { mountLibraryFreshnessBadge } from "./LibraryFreshnessBadge.js";
+import { mountVoiceReadinessBadge } from "./VoiceReadinessBadge.js";
 import { routeSession } from "../session/router.js";
 import { closeSettings, openSettings } from "../settings/SettingsDrawer.js";
 import { getSettingsUIState, subscribeSettingsUI } from "../settings/state.js";
@@ -134,6 +135,11 @@ export async function mountShellApp(host: HTMLElement): Promise<MountedShellApp>
         onOpenCrate: () => shell.store.setActiveSurface("crate"),
       })
     : null;
+  const voiceBadge = footer
+    ? mountVoiceReadinessBadge(footer, {
+        onOpenCrate: () => shell.store.setActiveSurface("crate"),
+      })
+    : null;
   // Feed the live session onto the shell's self-arranging activation +
   // connection (energy field, connection dot, the grounding panel auto-open).
   const unwireActivation = wireActivation(shell.store);
@@ -144,6 +150,7 @@ export async function mountShellApp(host: HTMLElement): Promise<MountedShellApp>
     surfaces,
     teardown(): void {
       unwireActivation();
+      voiceBadge?.teardown();
       freshnessBadge?.teardown();
       unwireSettings();
       surfaces.teardown();
