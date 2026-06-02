@@ -1,0 +1,140 @@
+# CLAUDE — LAND QUEUE (routing surface for Codex A)
+
+- **Date:** 2026-06-01 (re-pinned 2026-06-02) · **Pinned HEAD:** `80598f4f` (`fix(packaging): stop bundling gemini tts leaf` — Codex landing fast, HEAD moved 3× during the last census; re-pin before judging) · **Maintained by:** Claude read-only swarm.
+- **★★★★★ READ FIRST (NEWEST) → [`CLAUDE_BRUTE_FORCE_NEXT_GAPS.md`](../2026-06-02/CLAUDE_BRUTE_FORCE_NEXT_GAPS.md)** — 26-agent read-only brute-force gap census @ HEAD `80598f4f` (12 lane-sweeps → adversarial verify → critic → synth). Beside it: 12 `_brute-raw-*.md` + 12 `_brute-verify-*.md` + `_brute-critic.md` (the per-lane evidence; grep `.planning/packets/2026-06-02/_brute-*`). **Claude re-verified the top claims at live HEAD:** #1 slice = **vitest is RED** — `tauri/ui` `tests/mock-transfer-contract.spec.ts` fails `library missing IPC/event channels: ['ipc.library.import']` because that channel is in the mock-transfer block (`contract.ts:468`) but NOT in the SURFACE `outbound` list (`~:144`, beside `library_cue_folder`); add it there → `npx vitest run` 18 passed. Other confirmed live orphans: `beatgrid_exact_atom` (`state/loop_geometry.py:136`, zero product caller = loop-move citation receipt half) + MOSS release gate `require_moss_source` never threaded into `scripts/dist/prepare_tauri_build.py`. ⚠️ **HEAD moved DURING the run — `5f7deb69` cue-placement driver + `7cd4c5a5` watcher test LANDED mid-swarm → both ALREADY_LANDED, do NOT rebuild.** Anchors are ~10–180 lines stale (black-reflow) → **grep the SYMBOL, not the line.** TOP-10 ranked in the board; DROP-call trio stays OPEN_BUT_HOLD (needs grounding-review + on-beat proof, dormant behind `VIBEMIX_DROP_CALL`).
+- **★★★★ PRIOR DRIFT BOARD → [`CODEX_CONTEXT-current-head-drift-and-next-packages.md`](../2026-06-02/CODEX_CONTEXT-current-head-drift-and-next-packages.md)** — fresh drift audit @ HEAD `75a11735`, evidence-backed (test-passes + NOT-FOUND greps shown), index [`INDEX.md`](../2026-06-02/INDEX.md). Headlines: 🔴 **HOLD** — your in-flight DROP work (`drop_predict.py`/`event_detector.py`/`coach.py` DIRTY) wires a predicted-drop line into the spoken ear via `mastered_speak`, **dormant behind `VIBEMIX_DROP_CALL` (default OFF, verified)** — keep building, just don't flip the flag for a real listener before `vibemix-grounding-review` + on-beat/false-positive proof. **ALREADY_LANDED, do NOT rebuild:** X1 speak-gate (`e5d9c434`), X3 AIM (`b0df605e`), L2 bass (`cc1af8f4`), EQ keystone (`8c629905`/`bac2046e`/`68c62e28`), FLX4 truth surface (`c3b8928a`), MOSS-only voice (CLEAN, 44 tests), folder/setup + `reindex_folder` (CLEAN, 40 tests). **#1 REAL OPEN = L1 beatmatch wiring** (producer/grader/recognizer green but `beatmatch_practice_loader=` is **never supplied** to the live `LessonRuntime` — `runtime.py:1436` is **dead behind the `:1397 if … is None: return`**; the prior banner's "now HAS a live caller" claim was WRONG). Top-5 next + the cue-practice sibling orphan in §4 of the packet.
+- **★★★ PRIOR PACK → [`CODEX-CONTEXT-EVIDENCE-PACK.md`](../2026-06-02/CODEX-CONTEXT-EVIDENCE-PACK.md)** — Kaan's note: *"i am doing insanely bad nowadays so these are just for CONTEXT, not orders — build from what's solid, ignore the rest."* ⚠️ Citation-lint was OFF this session → the "75% describe-bank / keystone 2-14 / harmonic=1" live numbers are UNVERIFIED. The drift packet above supersedes this pack's "recommended next" (state-license + move-delta are now BOTH shipped). All line-anchors drift — grep by `def` name.
+- **⚠️ STALE-SKIP (Codex verified clean 2026-06-02 — do NOT route, do NOT fake-commit):** the `[tend:]` dead-citation-source removal (grammar+registry already 11 sources, no `tend`) and the `folder_ingest` folder-cache docstring (S11) are **already correct in current source**. Codex is right to skip them. Same for most of the dead-cloud-TTS family (S1): router aliases retired, direct+proxy both build local MOSS, Cartesia ignored by the runtime chain — verify-and-skip the residue, only cut what still *pretends* to be product voice.
+- **This is the terse routing surface.** Rationale + full evidence per item: [`CLAUDE_META_AUDIT_NEXT_BOARD.md`](CLAUDE_META_AUDIT_NEXT_BOARD.md) (board rows referenced as `B#`). Decisions: [`CLAUDE_OPEN_QUESTION_DECISION_LEDGER.md`](CLAUDE_OPEN_QUESTION_DECISION_LEDGER.md) (`Q#`). Full map: [`CLAUDE_EVERYTHING_CAPABILITY_INVENTORY.md`](CLAUDE_EVERYTHING_CAPABILITY_INVENTORY.md).
+- **Latest verifier packet:** [`CODEX_VERIFICATION-769e32a3-library-freshness.md`](CODEX_VERIFICATION-769e32a3-library-freshness.md) — `769e32a3`+`32873bcb` ACCEPTED (SRC); spawned S9/S10/S11 + H8 + R6 below.
+- **Proof tier** = where each item is stuck: `SRC`=source+unit-test ✓ · `PKG`=in the signed build · `LIVE`=real-rig FLX4/Rekordbox capture. (Read-only: all current "works" is `SRC` only — app never launched.)
+- **Codex A routes** each item to a lane. Claude does NOT implement — these are packets, not orders.
+- **⏹ B & C STOOD DOWN (Kaan, 2026-06-01).** Only **Codex A** is building now. Claude stays read-only verifier. A owns the whole tree.
+- **★★★ TOP BUILD — the narrator→coach unlock (NEW DIRECTION, 2026-06-01).** Root cause of "it just narrates" = the DJ intelligence is built/tested but ORPHANED from the live brain (`GOLD-WIRING-MAP.md`: ~70% is wiring, ~30% build). The keystone **`intel/eq_move_model.py` LANDED + WIRED** (`970e165b` → guard `deck_context.py:2519`) — narrator→coach for the EQ/filter axis is real in source. Claude owes the LIVE verify.
+
+---
+
+## 🔁 RE-PIN + WHAT CODEX LANDED (2026-06-02, HEAD `e49b2f63`)
+
+> The tree moved `769e32a3 → e49b2f63` (~80 commits). Codex A crushed the backlog. **Re-verified at `e49b2f63`** — these are CLOSED, do not re-route:
+> - **EQ keystone** `eq_move_model.py` built+wired (`970e165b`, guard `:2519`). · **Grounding siblings** `lufs.py` (`1e67ae61`), `loop_geometry.py` (`6117dffd`), **xfade move-effects licensed** (`7a9f2c45`) — GOLD Cards 2/3 + LAND H2 DONE. · **Universal Ingest** Traktor + Engine DJ + VirtualDJ readers landed (`sources/{traktor,engine,virtualdj}.py`). · **Spoken next-track recommendation** landed + cited (`runtime/suggestion_voice.py`, `coach.py:708`, `[track:]`/`[mix:]`, abstains). · **X1 voice-picker FUNCTIONALLY FIXED** — `voice_presets.py` ships real MOSS names (`MOSS_UI_VOICE_OPTIONS` Adam..Xiaoyu, mirrored in `SettingsDrawer.ts:547`), `LEGACY_CLOUD_TTS_VOICES` maps the 8 old Gemini names, `normalize_stored_voice` + `select_moss_voice_row` fallback → no more "8 picks → one wrong voice". *Residual nicety only:* `normalize_stored_voice` not called at the config read-site (legacy stored value falls to default gracefully, doesn't crash) → **VERIFY-and-close, not a build.** · **Heartbeat stays silent without a grounded read** (`953449bd`) — H3 done. · Deck-capture honesty fixes (`4f31b567`/`21af59d5`/`a836ae73`).
+
+## ★ NEW PACKETS (2026-06-02) — the post-blitz open gaps, grounded at `e49b2f63`
+
+> Written this session after the FEATURE-STATE / CRITIQUE / LICENSE / WIRING / FUTURE / MONEY workflow (`MASTER-WHERE-WE-WIN-2026-06-01.md`). Each re-verified against current HEAD (the synthesis docs' anchors were already going stale).
+
+| Pkt | Packet | What's left (gap re-verified) | Gate | Effort | Priority |
+|---|---|---|---|---|---|
+| **MOSS** | [`CODEX_READY-B1-moss-voice-default-host.md`](CODEX_READY-B1-moss-voice-default-host.md) | Download infra DONE; missing **default URL/SHA/SIZE pin + first-run auto-download wiring**. ⚠️ **Kaan/Momo ops action blocks it: host the 728MB archive → URL+SHA+size.** | LIVE clean-cache speak | small code + ops | **★★★ #1 ship-gate** — fresh machine MUTE until this |
+| **W1b** | [`CODEX_READY-W1b-transition-scorer-coach-line.md`](CODEX_READY-W1b-transition-scorer-coach-line.md) | next-track half LANDED; wire the **10-dim `score_transition_slate`** into coach (still zero coach callers). Insertion point ready at `coach.py:698-716`. | `vibemix-grounding-review` | ~0.5–1d | ★★★ sharpest wiring |
+| **B1b** | [`CODEX_READY-B1b-serato-library-reader.md`](CODEX_READY-B1b-serato-library-reader.md) | Last Universal-Ingest island — `sources/serato.py` NOT-FOUND; cue half FREE (own `decode_markers2`). Apache-clean. | `clean-checkout` | ~2d | ★★★ biggest installed base |
+| ~~B2~~ | ~~`CODEX_READY-B2-practice-deck-beatmatch-producer.md`~~ → **SUPERSEDED by L1.** STALE: claims "`BEATMATCH_GRADED` emitter NOT-FOUND" — false at HEAD `2b1e8a5a` (the `practice_loop.py` producer MODULE landed). The real gap is the missing live CALL-SITE; see L1. | — | — | ⛔ do not route |
+| **W2** | [`CODEX_READY-W2-prep-live-set-awareness.md`](CODEX_READY-W2-prep-live-set-awareness.md) | `built_set`/`set_plan` absent from state/coach — prep→live amnesia. Thread Viber set JSON → `refresh.py` computes `set_progress` → cited coach line. | `vibemix-grounding-review` | ~1d | ★★ "ahead of your curve" |
+
+**Suggested order:** MOSS (unblock ship, parallel with the ops hosting) → W1b + B1b (collision-free islands) → L1 → L2 → W2. After this drop, the remaining depth lane = house/DnB genre detectors (MONEY Phase 2 — *most of the paying market abstains into silence without it*) + the debrief Receipt-PNG viral graft (B5).
+
+## ★ LEARN-ARMY PACKETS (2026-06-02) — grounded at `2b1e8a5a` (supersede stale beatmatch rows below)
+
+> From the Learn exploration army (16 explorers + 4 cluster synths; `LEARN-*.md` + `LEARN-ARMY-HEAD-VERIFY.md`). Each NOT-FOUND-grep re-verified at HEAD minutes before writing. **L1 SUPERSEDES the stale B2 / R1 / DROP-beatmatch rows** (those say "emitter NOT-FOUND / cap=`('beatmatching',)`" — both false now: the producer MODULE landed, the cap is empty `()`, only the live CALL-SITE is missing).
+
+| Pkt | Packet | What's left (HEAD-verified gap) | Gate | Effort | Priority |
+|---|---|---|---|---|---|
+| **L1** | [`CODEX_READY-L1-beatmatch-practice-lesson-runtime.md`](../2026-06-02/CODEX_READY-L1-beatmatch-practice-lesson-runtime.md) | Producer `practice_loop.py` landed but **ZERO live callers** (grep-confirmed). Build a practice-lesson runtime that drives the owned `MiniDeck`→`grade_minideck_beatmatch_attempt`→cited event→`recognize()`. ⚠️ repo pin only asserts the emitter *source* exists, NOT a caller → orphan invisible to CI; add a caller-pin. | `vibemix-grounding-review` | ~2–3d | ★★★ #1 orphaned gold (4-cluster unanimous) |
+| **L2** | [`CODEX_READY-L2-credit-measured-bass-collision.md`](../2026-06-02/CODEX_READY-L2-credit-measured-bass-collision.md) | Judge **measures `bass_collision` then discards the credit** (recognizer reads only `harmonic`, `skill_recognizer.py:135-151`). Credit the measured signal to `transitions` (the honest multiplier). **NOT to beatmatching — code comment `:141-144` explicitly guards that proxy as slop.** | `vibemix-grounding-review` | ~0.5d | ★★ cheapest moat-densify |
+| **L3** | [`CODEX_READY-L3-mastered-moment-hotcue-writeback.md`](../2026-06-02/CODEX_READY-L3-mastered-moment-hotcue-writeback.md) | On the Mastered flip (`coach.py:198-207`) write a named, **additive** hot-cue into the user's track file (`export_serato.py` carrier). ⚠️ OPEN: resolve in-track POSITION source first (`t_session` is set-relative, NOT track position). | `vibemix-grounding-review` + library-file-mutation (additive only) | ~1–2d | ★★ B1+B3+B5 convergence (proof artifact) |
+
+## ★★★ X-SERIES — the co-host VOICE redesign (2026-06-02, LIVE-driven: Kaan "bok gibi, anca tarif")
+
+> LIVE root cause (session `20260602-075843`): 46 HEARTBEATs → 34 `citation_count=0`, 22 pure **describe-bank** ("a dry woodblock over a muffled kick"). NOT hallucination (grounds real audio) — it's a **pacing/value** failure: the 45s metronome + `matrix.py:333` actively encourages constant description. Kaan's direction: voice **rare + earned** (kill describe-bank) + routine read → **visual pill** + coaching → **debrief**, and when it DOES speak, hand it a **rich 4-5min context bundle**. Two research workflows backed these (`speak-gate-research/`, `context-engineering-research/` — both read in full by Claude). **Key finding: the system is already ~80% of the rich bundle; the 4-5min must be TEXT not audio (5× cost + Gemini can't localize long-audio timestamps).**
+
+| Pkt | Packet | What it does | Gate | Effort | Priority |
+|---|---|---|---|---|---|
+| **X1** | [`CODEX_READY-X1-live-speak-gate-kill-describe-bank.md`](../2026-06-02/CODEX_READY-X1-live-speak-gate-kill-describe-bank.md) | `should_speak()` gate UPSTREAM of the LLM call: SILENCE default, describe-bank → silent (HEARTBEAT_SEC 45→180 + session cap 3), voice only on graded-coachable+novel+urgent. Fixes "anca tarif". | `vibemix-grounding-review` | ~2–3d | ★★★ #1 (the live complaint) |
+| **X3** | [`CODEX_READY-X3-aim-wire-skilltree-to-live-coach.md`](../2026-06-02/CODEX_READY-X3-aim-wire-skilltree-to-live-coach.md) | Wire the **AIM** — skill-tree `competent`-not-`mastered` (ZPD) → live coach system-instruction (cached, coach-mode only). Orphaned gold; **closes the half-open learn loop**. Converts narration→coaching, ZERO new claims. | `vibemix-grounding-review` | ~1–2d | ★★★ highest-leverage, lowest-risk |
+| **X4** | [`CODEX_READY-X4-sectioned-rich-context-bundle.md`](../2026-06-02/CODEX_READY-X4-sectioned-rich-context-bundle.md) | Re-layout flat `evidence_line` → named edge-weighted sections (AIM first/TASK last) + `set_window_context` long-window **TEXT** digest (4-5min as text, audio stays 60-90s). Master-only honest. Deep tier = new model_router key (same Flash, no literal). | `vibemix-grounding-review` | ~3–5d | ★★ depth, A/B-gated |
+| **X2** | (half-spec, parked) route routine read → visual pill (`suggestion.py:233` SuggestionService) + coaching → debrief (`debrief/main.py:142` already harvests events.jsonl) | the "where the suppressed value goes" half of Kaan's option-2 | `vibemix-grounding-review` + `ipc-wiring-checker` | ~3-5d | 🅿️ after X1 |
+
+**X-series order:** X1 (kill the slop) → X3 (the aim, small+high-leverage) → X4 (the sectioned depth) → X2 (pill/debrief routing). X1+X3 are the narration→coaching core; X4 makes the rare line deep; X2 moves the routine value off the voice.
+
+---
+
+## 🟢 SAFE_NOW — land anytime, no gate (source hygiene; blocks nothing)
+
+| # | Item | Proof now | Evidence | Note |
+|---|------|-----------|----------|------|
+| S1 | Delete dead cloud-TTS seams (`GeminiTTS` class + only-caller test, OpenRouter `AUDIO_STREAM_MODELS.add` import-patch, orphaned `CARTESIA_*`) | SRC | `_livekit_google_slim.py:33-36`, `tts_chain.py:23,41`, `config.py:41-54` | Makes MOSS-only provable by *absence*. Keep `google_llm_class` (brain transport). B1. |
+| S2 | Add `NOTICE`/`THIRD_PARTY_LICENSES` for Mixxx clean-room ports | SRC | `xfade.py` + `beatmatch_judge.py` headers; `ls NOTICE* THIRD_PARTY*`=NOT-FOUND | **Release-legal** — needs 1-line Kaan posture sign-off. B2. |
+| S3 | Delete `runtime/demo_mode.py` + test | SRC | `rg "demo_mode\|DEMO_SEQUENCE" src/vibemix` (excl self+test)=EMPTY | Zero importers AND violates Invariant #3 (scripted ≠ trust-the-audio). B3. |
+| S4 | Fix 2 stale-golden tests (HEARTBEAT `test_coach.py:723`, `test_mastered_demo_reaches_the_envelope_wall`) | SRC | inventory `:151,:427`; drift `:96` | Green suite where asserts match hardened output. B4. |
+| S5 | Delete 5 dead `ipc.library.*` ws types + refresh stale Viber CORRECTION packet | SRC | ledger Q7; INDEX `:28` (reconcile `if ipc_router is not None` first) | Gate: `npm run codegen:ipc` + `npm run build && npm test` green + `rg "ipc.library." tauri/ui/src` empty. B5. |
+| S6 | Fix 3 stale doc-anchors → non-existent `debrief/ln.py` (lives in `ear_test_capture.py`) | SRC | inventory `:376,:415`; `ls debrief/ln.py`=NOT-FOUND | B6. |
+| S7 | Rename `state/coach.py` → `ai_coach.py`/`prompt_builder.py` (un-shadow `runtime/coach.py`) | SRC | importers `__main__.py:105`, `dj_cohost.py:90`, `bench/assemble.py:34` | 6 importers to update. B7. |
+| S8 | Surface auto-cue / smart-hot-cue export as a first-class Crate action | SRC (GUI nav owed) | producer `cue_folder.py:178`; GUI hook only raw input `library/index.ts:1689` | The named MOAT, end-to-end proven (label_recall=1.0 on 6 real mp3s) but undiscoverable. B8. |
+| S9 | Quarantine the poisoned primary on fixture-reject (rename/clear `library.pkl`) instead of only declining it | SRC + LIVE | poisoned 5-track fixture cache STILL on Kaan's disk (`library.pkl`→`tests/library/fixtures/…`); reject warns to stderr only `rekordbox.py:310` | HIGH hygiene. Boots fall through to `.v1bak` today (works by luck), but log-spam + latent trap if a reader trusts the primary. Verif packet ★/Secondary HIGH. |
+| S10 | Close PKG tier on fixture-reject: prove no `tests/fixtures` ship in the build | PKG (1-liner) | `find dist/ -path '*tests/fixtures*'` + grep build TOC — never run | Without it the guard is an unproven no-op in the signed build. Verif packet Secondary MED. |
+| S11 | Fix `folder_ingest._write_library_cache` docstring (`folder:<root>` marker → it writes a plain resolved path) | SRC (doc) | docstring `folder_ingest.py:288` vs code `:298`; `folder:` is `track_id` only `:214` | Latent trap: "fixing" code to match the doc would break `is_dir()` staleness detection. Fix the comment, not the code. |
+
+Also LAND-able now (cleanup, B§Architecture): delete dead `debrief/ear_test_capture.py::write_ear_test_log` duplicate (Rust-only live path) · strip `audio_decode.py` transformers dead branch · fix stale CLAUDE.md `tts_chain.py` "TWO builders" note (all return `_build_moss_chain()`).
+
+---
+
+## 🟡 HOLD_WITH_GATE — do not land without the named gate
+
+| # | Item | Stuck at | Gate to clear | Evidence |
+|---|------|----------|---------------|----------|
+| H1 | Loop/beatjump grounding rule (`state/loop_geometry.py` + beatgrid-exact atom) | SRC build | route loop events past the 400ms dedup (a 1/16 roll re-triggers ~58-117ms, INSIDE the window) OR make dedup label-unique-per-beat-size; unit-test a roll-stack survives to the registry | `loop_geometry.py`=NOT-FOUND; dedup `midi/state.py:226`; capture `:395-400` |
+| H2 | Wire existing `xfade.py` into the live R-SLOP guard (Move-Effect Resolver) | SRC | predict-on-lane/measure-on-lane only (never master-sum); keep `dsp_delta_not_causal_proof` humility | `audio/xfade.py` (zero import in `deck_context.py`); guard `deck_context.py:2236` |
+| H3 | Audit HEARTBEAT idle auto-speak (45s) for grounding | SRC (review) | `vibemix-grounding-review` on the HEARTBEAT branch: idle lines ack-bank/persona-only, cannot fire during BlackHole phantom-music | `audio/constants.py:65 HEARTBEAT_SEC=45.0` |
+| H4 | Verify Crate actions both-ends-wired before "Crate is fully wired" | SRC | `ipc-wiring-checker` on each (search/similar/curate/build-set/cue-folder/budget): sender + handler both exist | built-not-surfaced lens cites only FE `library/index.ts` |
+| H5 | Telegram "connect bot" affordance in Settings | SRC | product call: Telegram a v1 feature? If yes add token + chat-id pill, never auto-enable | `library/telegram_bridge.py`; `rg telegram tauri/ui/src`=no GUI |
+| H6 | Privacy-default audit of all local-persistence paths vs opt-in posture | RESEARCH (Kaan-gate) | enumerate every persistence path + default flag vs CLAUDE.md opt-in — Kaan decision-gate | `VIBEMIX_RECALL_ENABLED` default-off; memory `project_observability_milestone_direction` |
+| H7 | Don't ship `library budget` "< €50 / free at scale" claim | SRC (XFAIL) | re-baseline cost model (MOSS now local-free TTS), flip `test_monthly_projection_under_50_eur` XFAIL→pass; `budget` internal-only until then | inventory `:222,:416` |
+| H8 | **`folder-reindex-from-nudge`** — folder DJs get a correct stale nudge but only "Drop the Rekordbox XML" (no re-index button). Add a "Re-index folder" action routing the recorded folder path to `ingest_folder`. **Blocks: release-only.** | SRC | `vibemix-grounding-review` (changes UI library-state copy + triggers re-embed feeding EvidenceRegistry) + `ipc-wiring-checker` + `npm run codegen:ipc`. **Trap: do NOT reuse `ipc.library.import` — `load_xml` raises on a dir.** Files smallest-first: `staleness.py:67-75` (accept `is_dir`), payload+schema `source_kind`, `staleness-banner.ts:71-110`, `__main__.py:2057-2064` (`reindex`→`ingest_folder`, recorded path NOT renderer input). | Verif packet ★NEXT LAND PACKAGE |
+
+---
+
+## 🔴 BLOCKERS — release-gating (separate proof tiers; **blocks: see tag**)
+
+> These are the honest-ship gates. None block dev lanes A/B/C continuing; they block **release**. Sequenced, not parallel: #B1 in source → fresh rebuild (#B4) → live capture (#B3) against the *rebuilt* binary.
+
+| # | Blocker | Stuck at | Blocks | Gate | Evidence |
+|---|---------|----------|--------|------|----------|
+| B-1 | **MOSS weights not bundled/hosted** — fresh machine boots voice-mute | PKG | **release-only** (co-host can't speak on any machine but Kaan's) | bundle `moss-tts-onnx` into spec `datas` OR host archive + pin `VIBEMIX_MOSS_TTS_ARCHIVE_URL`/SHA/size | inventory `:262` (no moss in `vibemix-core.macos.spec` datas); `model_assets.py:571,576` |
+| B-2 | First-run "preparing voice / unavailable: [reason]" surface absent | PKG→LIVE | **release-only** | the #B1 fix MUST surface a first-run readiness state, `drive-vibemix`-captured when model absent | `tts_chain.py` `LocalTTSUnavailable`→`NOT_GIVEN`; Settings button `library/index.ts:2006` WIRED_BUT_UNPROVEN |
+| B-3 | **Proxy BRAIN passthrough not confirmed live** | LIVE (infra) | **release-only** (independent of B-1) | confirm proxy brain round-trip with a working upstream key AND MOSS reachable — two separate checks | `proxy_client.py:49-53`; memory `project_vibemix_proxy_deployed_altidus` |
+| B-4 | **Signed DMG 18+ commits stale + arm64-only** | PKG | **release-only** | rebuild+sign+notarize from clean HEAD after B-1; CI x86_64 leg for Intel OR scope v1 Apple-Silicon in launch copy | inventory `:261` (18-commit gap), `:259` (notarytool arm64 ×168, zero x86_64) |
+| B-5 | **No live-rig capture of the perception loop** | LIVE-FLX4 | **release-only** (validates cohost lane A) | `drive-vibemix` capture: real LAYER_ARRIVAL/MIX_MOVE/TRACK_CHANGE → EvidenceRegistry citation resolved → grounded reaction; re-run vs the rebuilt signed binary | inventory `:139,:47,:209`; ledger Q11 |
+| B-6 | **FLX4 deck-pair identity unresolved** (latest acceptance FAILED honestly) | LIVE-FLX4 | **release-only** + **lane A** (per-deck grounding) | real two-deck audio (not A_active+B_silent) + resolved deck_state row + direct OS MIDI motion in-window | `CODEX_HOLD-flx4-live-acceptance-current.md`; `deck_poller.py:315-421`; ledger Q3 |
+
+---
+
+## ⚫ DROP / DEFER — cut from coherent v1 + all launch copy
+
+| Item | Action | Evidence |
+|------|--------|----------|
+| Mascot 3D VTuber surface (53 FE modules + Rust window + CI) | DEFER-v2; FREEZE (no new wiring pre-launch) — already opt-in, Pill+speech delivers the value | `main.rs:186-218` built only if `primary_surface=mascot` |
+| Screen vision as a LIVE source | DROP live leg; quarantine `screen_task` behind off-by-default `VIBEMIX_DECK_VISION` (don't touch the `screen_jpeg=None` invariant) | `dj_cohost.py:2192-2199` hardcoded `None`; ledger Q5 |
+| Mixxx H1-H8 / OSC / `mixxxdb` writer | DROP — every producer CLAIMED_BUT_ABSENT; stock Mixxx has no OSC read. Keep only file-format SINKS (M3U8, Serato carrier) | `mixxx_osc.py`/`export_mixxxdb.py`/`detect_key.py`/`beatgrid_detect.py`=NOT-FOUND; `CODEX_GOLD_STRUCTURE.md:143` |
+| ~~Beatmatch "Mastered" live credit — KEEP MASKED~~ | **STALE/REVERSED at `2b1e8a5a`** — cap `_HONEST_UNCREDITABLE_V11 = ()` is now EMPTY, `beatmatching` is gated by per-skill `live_creditable` + the missing producer call-site, NOT a deny-list. Route via **L1** (wire the landed producer), do not "keep masked". | `skill_recognizer.py:104` (`()`); `skill_tree.py:143` |
+| DROP-call live hype line | KEEP OUT of any signed build (dirty/uncommitted); never whole-file `git add coach.py`/`__main__.py` | ledger Q10; WIRED_BUT_UNPROVEN |
+| Windows deck-pair grounding + live Judge | Scope v1 platform honestly — `_audio_windows.py` is master-loopback only, no per-deck capture | CLAUDE.md (Windows = v1) — resolve before a Windows release claim |
+| Crossing-detector / 14-bit "crossed the host's live value" | CUT the precision claim — un-computable for a passive listener; confident-but-blind slop | goldmine #3 |
+
+---
+
+## 🔵 RESEARCH_ONLY — needs a spike/workflow before any LAND
+
+| # | Item | Workflow to run | Evidence |
+|---|------|-----------------|----------|
+| ~~R1~~ | **FOLDED INTO L1** — `learn/practice_loop.py` (producer + grader + recognizer branch) all landed since this row was written; only the practice-runtime CALL-SITE remains. The build is now scoped + grounded in **L1**, not a research spike. | superseded — see L1 |
+| R2 | Carve `library/cli.py` + `library/service.py` out of 7,183-line `__main__.py` | isolated-branch Workflow (high collision risk on `__main__.py`); one service entry for CLI+IPC; resolves GUI-importer divergence | `__main__.py` 7,183 lines; CLI `:2760,3213`, IPC `:2066` |
+| R3 | BlackHole/Rekordbox setup UX + "routing-wrong" detector | spike: routing-wrong detector thresholds (phantom-music/feedback signature) | ledger Q4 |
+| R4 | Mixxx goldmine adopt: LUFS receipt → spectral EQ-move receipt → loop-geometry | adopt `audio/lufs.py` LUFS receipt (A) → research `intel/eq_move_model.py` (B) → loop-geometry spike (C) | ledger Q8 |
+| R5 | `library budget` cost-model rework | re-baseline now MOSS = local-free TTS; flip XFAIL → passing gate before any cost copy | ledger/inventory `:222` |
+| R6 | Coverage test for the 2nd cache-load entry `RekordboxSource.iter_tracks` (the curate/build-set read path) | add a test that a fixture-poisoned primary → empty `xml_path` → fresh XML parse (safe today, never traced); also the relative-path false-positive (`tests`+`fixtures` substring) rejecting a legit user lib with only a stderr warning | `sources/rekordbox.py:120`; `rekordbox.py:94-97`; Verif packet Secondary MED/LOW |
+
+---
+
+**KAAN-VERIFY (LIVE):** dev cache is self-healing via a 10-day-old `.v1bak` (1547 real tracks). Run a fresh `uv run python -m vibemix library ingest` (or `embed-folder ~/Music`) so LIVE proofs run against a *current* real library AND the poisoned primary gets overwritten by a clean v2 cache. See verifier packet ★ LIVE finding.
+
+*Re-pin HEAD and re-verify the SRC anchors before routing — this queue was verified at `769e32a3` on a moving tree. Paste a commit SHA and I'll write its verification packet; ask a keep/drop/change question and I'll append a ledger decision.*

@@ -1,0 +1,320 @@
+{
+  "summary": "Read-only drift audit: verify what changed since the last accepted packet/head; catch HOLD bleed, stale packet claims, checker/verifier regressions. No product edits/stage/commit/app-launch. args:{since,head}.",
+  "agentCount": 11,
+  "logs": [
+    "Drift audit: c88d5f56..HEAD (~26da514f). Scouting commits + dirty hunks + checker.",
+    "parallel[0] failed: agent({schema}): subagent completed without calling StructuredOutput (after 2 in-conversation nudges)"
+  ],
+  "result": {
+    "workflow": "last-delta-drift",
+    "baseline": "c88d5f56",
+    "findings": {
+      "scout": {
+        "baseline": "c88d5f566ee0658c88f9e3fdc4229851fec6ed41",
+        "head_now": "f29defb6a6f8066436c62264f958b933881b362d",
+        "commits": [
+          {
+            "sha": "f29defb6",
+            "subject": "fix(library): accept half-time bpm matches",
+            "touches_speech_or_timing": false,
+            "files": "src/vibemix/intel/transition_scorer.py, src/vibemix/library/next_suggestion.py, src/vibemix/library/sequencer.py, src/vibemix/library/track_relation.py + tests + .planning/handoffs/2026-05-31-package-checklist.md (no speech/timing files)"
+          },
+          {
+            "sha": "26da514f",
+            "subject": "fix(cohost): require proof for control-praise phrases",
+            "touches_speech_or_timing": true,
+            "files": "src/vibemix/prompts/matrix.py (prompts/*), src/vibemix/state/deck_context.py + tests"
+          },
+          {
+            "sha": "4446f674",
+            "subject": "fix(midi): accept live flx4 b-jog cc34",
+            "touches_speech_or_timing": false,
+            "files": "src/vibemix/midi/profiles/pioneer_ddj_flx4.json + midi tests (no speech/timing files)"
+          },
+          {
+            "sha": "4bc30e66",
+            "subject": "fix(release): reuse live-context proof actions",
+            "touches_speech_or_timing": false,
+            "files": "scripts/release/check_flx4_live_context.sh + tests/eval (scripts only)"
+          },
+          {
+            "sha": "1b51ef89",
+            "subject": "fix(live-context): return operator proof actions",
+            "touches_speech_or_timing": false,
+            "files": "src/vibemix/__main__.py + tests/library/test_live_context_cli.py (__main__ not in speech/timing file list)"
+          },
+          {
+            "sha": "a8562375",
+            "subject": "fix(prompts): prevent invented audio citation timestamps",
+            "touches_speech_or_timing": true,
+            "files": "src/vibemix/prompts/matrix.py (prompts/*), src/vibemix/state/coach.py (state/coach.py) + tests"
+          },
+          {
+            "sha": "de520ed9",
+            "subject": "fix(tts): disable audio output when moss is muted",
+            "touches_speech_or_timing": false,
+            "files": "src/vibemix/__main__.py + tests/test_main_smoke.py. NOTE: __main__.py is not in the explicit speech/timing file list, but this commit gates WHETHER the co-host is audible (MOSS-mute => no audio output) — semantically affects spoken output. Flag for review."
+          },
+          {
+            "sha": "54ec38be",
+            "subject": "fix(cohost): keep citation atoms out of tts",
+            "touches_speech_or_timing": true,
+            "files": "src/vibemix/agent/dj_cohost.py (agent/dj_cohost.py), src/vibemix/agent/tts_sanitizer.py (new) + tests"
+          },
+          {
+            "sha": "b5916eb0",
+            "subject": "fix(cohost): enforce english-only spoken output",
+            "touches_speech_or_timing": true,
+            "files": "src/vibemix/agent/dj_cohost.py (agent/dj_cohost.py), src/vibemix/agent/language_guard.py (new) + tests"
+          },
+          {
+            "sha": "c1b85304",
+            "subject": "fix(audio): reject stale rekordbox deck routing hints",
+            "touches_speech_or_timing": false,
+            "files": "src/vibemix/audio/deck_capture.py, src/vibemix/audio/deck_signal.py + tests (audio capture/routing, not in speech/timing file list)"
+          }
+        ],
+        "dirty_product_files": [
+          "src/vibemix/__main__.py",
+          "src/vibemix/audio/deck_capture.py",
+          "src/vibemix/library/codex_curate.py",
+          "src/vibemix/library/mcp_server.py",
+          "src/vibemix/library/toolset.py",
+          "src/vibemix/midi/state.py",
+          "src/vibemix/runtime/coach.py",
+          "src/vibemix/state/drop_predict.py",
+          "src/vibemix/state/event_detector.py"
+        ],
+        "staged_now": [],
+        "checker_status": "GREEN (exit 0). scripts/check_dirty_package_plan.py --strict-assignments --summary reports: 'OK: 5278 dirty paths covered by .planning/handoffs/2026-05-31-package-checklist.md; 3 generated launch previews ignored.' and 'OK: every dirty path is assigned to an Include/Hold lane.' All 9 dirty src/** product files are lane-assigned (no tauri/** dirty). Several src files are shared across multiple lanes (e.g. __main__.py spans 13 lanes, runtime/coach.py spans Package 8B + Package 9, library/{toolset,mcp_server}.py span 5D/5H/17) — checker accepts shared assignments. No unassigned paths."
+      },
+      "sweepLanes": [
+        {
+          "lane": "non-speech-commits",
+          "verdict": "CONCERN",
+          "summary": "Verified all 4 non-speech commits in c88d5f56..HEAD. Each confirmed at file:line; all touched tests pass on the repo .venv (25 + 42 + 9 + 40 = 116 passed). None touch the speech-rendering surface (coach.py / dj_cohost.py / prompts/). Three commits (c1b85304, 1b51ef89, 4bc30e66) are CLEAN — conservative honesty-improving changes with substantive tests. One commit (4446f674) is functionally correct and additive, but its live-causality justification cites a proof artifact that is NOT present in the tree (NOT-FOUND), and it does indirectly touch the speech path via recent_moves evidence — flagged HIGH for the missing proof and MEDIUM for the speech-path coupling that did not get a grounding-review.",
+          "items": [
+            {
+              "severity": "INFO",
+              "title": "c1b85304 (reject stale rekordbox deck routing hints) — VERIFIED CLEAN",
+              "file": "src/vibemix/audio/deck_capture.py",
+              "line": "93,124-125,149-161,496-512,684-701",
+              "disposition": "LAND",
+              "detail": "Adds DeckAudioCapture.effective_enabled() (deck_capture.py:149-161): manual/env deck maps stay operator-trusted, but auto-detected rekordbox_settings maps must show RMS>=_DECK_ACTIVE_RMS(0.003, line 24) on BOTH sides A and B at least once (_active_sides_seen, line 93 + 124-125) before downstream consumes them as isolated lanes. context() now exposes deck_audio_capture_verified/_enabled/_reason='deck_pair_capture_unverified' and active_sides_seen (lines 149-161). deck_signal.signal_frame_from_capture (deck_signal.py:35-39) now reads effective_enabled() via getattr so unverified auto-rekordbox pairs yield honest-null executed-mix signals (bands=None). Also adds _rekordbox_current_output_tokens (deck_capture.py:684-701) so stale settings-file deck hints are filtered against the CURRENT rekordbox output device. This makes grounding MORE conservative (fewer ungrounded per-deck claims), consistent with Invariant #3. Tests tests/audio/test_deck_capture.py + test_deck_signal.py: 25 passed; new tests exercise gate-off (active_sides='A', enabled=False), gate-on (A,B -> enabled=True), manual-trust path, and the adapter honest-null consumer."
+            },
+            {
+              "severity": "INFO",
+              "title": "1b51ef89 (return operator proof actions) — VERIFIED CLEAN, not a speech change",
+              "file": "src/vibemix/__main__.py",
+              "line": "5411-5505,5779-5825,5921-5933",
+              "disposition": "LAND",
+              "detail": "Adds _viber_live_context_operator_actions() (line 5411): translates live-context proof-readiness blockers into a deduped, machine-readable operator action queue (start_live_session / connect_controller / move_controller / configure_deck_pair_capture / feed_both_deck_lanes etc). Wired into _sample_viber_live_context results (5791,5820) and printed to STDERR by the `library live-context` CLI diagnostic (_cmd_library_live_context, 5921-5933, capped to 5 actions). This is an operator-facing setup-diagnostic CLI surface — it does NOT alter what the co-host says or when it speaks. Referenced helper _viber_setup_hint_from_source_status exists (line 4708). tests/library/test_live_context_cli.py: 42 passed; new tests assert action ordering, apply_route_hint recommended_env passthrough, and stderr rendering."
+            },
+            {
+              "severity": "INFO",
+              "title": "4bc30e66 (reuse live-context proof actions in release check) — VERIFIED CLEAN",
+              "file": "scripts/release/check_flx4_live_context.sh",
+              "line": "469-496 (embedded python heredoc)",
+              "disposition": "LAND",
+              "detail": "Adds copy_proof_actions() to the release-gate checker's embedded Python: prefers the core live-context operator_actions queue from the proof JSON, while letting the release overlay skip broad core advice (move_controller) when the direct OS MIDI probe ran, and adds a restart_live_midi_listener action when the direct probe saw FLX4 motion but live-context did not. Pure release/CI tooling — no runtime/speech impact. tests/eval/test_check_flx4_live_context_sh.py: 9 passed; updated test asserts the copied core action detail flows through to the summary."
+            },
+            {
+              "severity": "HIGH",
+              "title": "4446f674 — live-causality proof artifact NOT-FOUND in tree",
+              "file": ".planning/handoffs/2026-05-31-package-checklist.md",
+              "line": "2814-2823",
+              "disposition": "HOLD-EVIDENCE",
+              "detail": "The commit and its tests justify the new ch1/CC34 binding with a specific live claim: 'the 2026-06-01 FLX4 proof emitted B jog ticks as ch1/CC34 ... 134 MIDI frames, unique CC [34], unique note [54]', citing artifact `.planning/eval-runs/flx4-live-context-clean-head-4bc30e66/direct_midi_probe.jsonl`. NOT-FOUND: that path does not exist on disk (`ls` -> No such file), and it is untracked-by-design (.planning/eval-runs/* are `??` in git status, never committed). I grepped every direct_midi_probe.jsonl under .planning/ (and every unique_cc list in *.json*) — NONE contains a CC34 frame; the sampled probes show frames:0. So the live-hardware evidence for the CC34 claim is not independently verifiable from the repo. The code change itself is sound (see next item), but per the EVIDENCE RULE the live causality assertion 'real FLX4 hardware emitted CC34' currently rests only on an absent artifact + the commit's own self-citation. Recommend: attach the actual probe jsonl to a verifier packet, or soften the doc/test docstrings from 'live proof emitted' to 'observed/hypothesized variant' before treating the hardware claim as proven."
+            },
+            {
+              "severity": "MEDIUM",
+              "title": "4446f674 binding DOES touch the speech path (recent_moves) — no grounding-review attached",
+              "file": "src/vibemix/midi/state.py",
+              "line": "348-350",
+              "disposition": "HOLD-REVIEW",
+              "detail": "The profile change (pioneer_ddj_flx4.json: new `jog_move_b_alt` = {channel:1, cc:34, axis:relative, deck:B, field:jog}) is purely additive — the existing jog_move_b (CC33) and every other binding are byte-for-byte unchanged (confirmed via git show; the only +line is the one binding). BUT a relative jog CC routes through ControllerState at state.py:348-350, which calls _record_move('B_jog nudge forward/back') into the recent-moves ring — and recent_moves IS citable coach evidence. So this commit changes what controller evidence can reach a reaction: a real B-jog on CC34 that was previously invisible now surfaces as a citable move. This is HONEST/grounded behavior (it fires only on an actual CC34 tick, never invents a move — consistent with Invariant #3), so it is not slop, but it crosses the 'what feeds the speech surface' line and the task contract puts such changes on HOLD pending vibemix-grounding-review + proof. The proof half is the HIGH item above (CC34 artifact missing). The change is functionally correct and tests pass (test_flx4_decode_live_discovered_b_jog_cc34_variant + _cc_lookup count 15->16, all 40 touched MIDI tests pass); recommend a grounding-review sign-off given the recent_moves coupling, and resolve the missing-proof item, before landing toward release."
+            }
+          ]
+        },
+        {
+          "lane": "hold-bleed",
+          "verdict": "CLEAN",
+          "summary": "HOLD-BLEED SENTINEL: bleed_found=FALSE, proven. The gated DROP-call live hype SPEECH block is dirty-only — NOT committed at HEAD and NOT staged. (1) `git show HEAD:src/vibemix/runtime/coach.py` contains NO DROP block: the only `say()` paths at HEAD are `mastered_speak` (the v11.0 \"Earned\" Mastered vocal — already gated/shipped, fixed-text fire-once) and the LLM reaction path. The DROP block exists only in the working tree (coach.py:696-718, `mastered_speak(reaction_line(drop_cue))` then `continue` skipping the LLM). (2) Index is EMPTY — `git diff --cached --name-only` returns 0 files; nothing with a HOLD hunk is staged. (3) The on-by-default aggravator is GONE: no `VIBEMIX_DROP_CALL` setdefault in HEAD or dirty __main__.py; `_apply_packaged_defaults` (HEAD __main__.py:799) sets only `VIBEMIX_LOCAL_TTS=1` and explicitly comments \"Drop-call speech remains opt-in.\" The firing gate (`EventDetector._drop_call_enabled`, event_detector.py:172) is dormant unless `VIBEMIX_DROP_CALL` is opted in. (4) No NEW spoken trigger landed in any commit since c88d5f56 — the 4 committed speech changes (26da514f, a8562375, 54ec38be, b5916eb0) are all anti-slop TIGHTENING (require move-proof for control praise, prevent invented timestamps, strip citation atoms from TTS, english-only), never additions. The DROP-call lane stays correctly HARD-HELD pending vibemix-grounding-review + live on-beat proof + predicted_drop false-positive measurement.",
+          "items": [
+            {
+              "severity": "INFO",
+              "title": "DROP-call live hype SPEECH block is dirty-only — gate held, no bleed",
+              "detail": "The net-new spoken DROP surface is uncommitted and unstaged. At HEAD, `git show HEAD:src/vibemix/runtime/coach.py | rg 'reaction_line|drop_cue'` returns NOTHING — the only mastered_speak references at HEAD are the v11.0 Mastered vocal factory (_make_mastered_speak, coach.py:256) and its two pre-existing call sites (coach.py:629, :803), both fixed-text session.say (no LLM). The DROP block is ONLY in the working tree: `git diff HEAD -- src/vibemix/runtime/coach.py` shows a +24-line hunk at coach.py:696 that, on `ev.type == \"DROP\"`, calls `mastered_speak(reaction_line(drop_cue))` then `continue` (skips the LLM turn). This is HOLD-class net-new speech and it has stayed out of HEAD.",
+              "file": "/Users/ozai/projects/dj-set-ai/src/vibemix/runtime/coach.py",
+              "line": "696-718 (dirty only; absent at HEAD)",
+              "disposition": "HOLD — correctly held; no bleed"
+            },
+            {
+              "severity": "INFO",
+              "title": "Index is empty — nothing staged carries a HOLD hunk",
+              "detail": "`git diff --cached --name-only | wc -l` = 0. No file is staged, so no DROP-speech / MOSS-only / ungated-trigger hunk has been promoted toward a commit. The dirty DROP-call code across coach.py / event_detector.py / drop_predict.py / test_event_detector_drop.py remains unstaged working-tree only.",
+              "disposition": "CLEAN"
+            },
+            {
+              "severity": "INFO",
+              "title": "On-by-default DROP aggravator confirmed GONE in both HEAD and dirty __main__.py",
+              "detail": "Older planning docs (NEXT-LAND-BOARD-current-head.md:81) flagged `__main__.py:803 setdefault('VIBEMIX_DROP_CALL','1')` making the drop call ARMED by default in the packaged app — contradicting the code's 'dormant by default' comment. Verified directly: `rg 'VIBEMIX_DROP_CALL|setdefault.*DROP' src/vibemix/__main__.py` (dirty tree) = NOT-FOUND; `git show HEAD:src/vibemix/__main__.py | rg same` = NOT-FOUND. `_apply_packaged_defaults` (HEAD __main__.py:799-809) sets only VIBEMIX_LOCAL_TTS=1 and its docstring states 'Drop-call speech remains opt-in until the mix-timing oracle has live grounding proof.' The firing gate `EventDetector._drop_call_enabled` (event_detector.py:172) defaults OFF (reads VIBEMIX_DROP_CALL env, dormant). test_no_drop_when_disabled_by_default confirms env-absent → no DROP event.",
+              "file": "/Users/ozai/projects/dj-set-ai/src/vibemix/__main__.py",
+              "line": "799-809 (HEAD); no DROP setdefault anywhere",
+              "disposition": "CLEAN — aggravator removed"
+            },
+            {
+              "severity": "INFO",
+              "title": "No new spoken trigger introduced in any commit since c88d5f56; the 4 speech commits are anti-slop tightening",
+              "detail": "`git log c88d5f56..HEAD` over coach.py/dj_cohost.py/event_detector.py/refresh.py/drop_predict.py/prompts shows 4 speech-surface commits: 26da514f (require move-proof for control-praise — adds 'CONTROL PRAISE NEEDS PROOF' prompt guard gated on recent_moves/live_evidence), a8562375 (prevent invented audio citation timestamps), 54ec38be (keep citation atoms out of TTS), b5916eb0 (enforce english-only spoken output). `git log -p` for added session.say/generate_reply/.say(/reaction_line/DROP lines in committed coach/dj_cohost = NONE. All four REDUCE what the co-host may say; none add a trigger, so no grounding-review trail is owed for a committed addition.",
+              "disposition": "CLEAN"
+            },
+            {
+              "severity": "INFO",
+              "title": "DROP-call dirty code is functional and test-guarded (state assessment, not a regression)",
+              "detail": "`PYTHONPATH=src .venv/bin/python -m pytest tests/state/test_event_detector_drop.py tests/state/test_drop_predict.py tests/runtime/test_drop_reaction.py` → 30 passed. The DROP event ties MANUAL at EVENT_PRIORITY ceiling 10 (event.py:34), arms once on the 2s-window crossing (drop_predict.should_arm_drop_call), and speaks a closed slop-filtered bank (drop_reaction.REACTION_LINES, statically proven slop-free by test_every_line_survives_the_slop_filter). The voiced line bypasses citation grounding (Invariant #2/#3) — a PREDICTED drop that never lands = ungrounded 'here it comes' — which is exactly why this lane is HARD-HELD pending grounding-review + live on-beat proof + false-positive measurement. This is the correct posture; the code is contained behind its dormant gate.",
+              "file": "/Users/ozai/projects/dj-set-ai/src/vibemix/state/drop_predict.py",
+              "line": "58-92 (dirty); event_detector.py:277-290 (dirty)",
+              "disposition": "HOLD — gate not yet cleared; correctly not landed"
+            },
+            {
+              "severity": "INFO",
+              "title": "MOSS-only TTS lane (separate HOLD) also remains dirty-only, not bled",
+              "detail": "Per the 2026-06-01 verification packets and consistent with this tree, the MOSS-as-single-TTS-provider change (local_tts.py/tts_chain.py/proxy_client.py/line_voice.py default inversion + no cloud fallback) is a separate speech-surface HOLD lane. Those agent files are reported CLEAN at HEAD (cloud-primary, MOSS opt-in) with the no-fallback inversion living dirty-only. This sentinel scope did not re-diff every agent file, but no MOSS-only-without-model change is staged (index empty) and HEAD coach/dj_cohost speech paths are the committed tightened versions. Flagged for completeness; not a bleed at this HEAD.",
+              "disposition": "HOLD (separate lane) — no bleed detected"
+            }
+          ]
+        },
+        {
+          "lane": "stale-claims",
+          "verdict": "MIXED",
+          "summary": "HEAD moved from c88d5f56 (the pin of the freshest verification packet) to c2cb9aaa — 13 new commits. The two MEDIUM open findings in CODEX_VERIFICATION-cohost-grounding-tts-tags.md are now BOTH RESOLVED at HEAD by dedicated commits (b5916eb0 English-only runtime guard, 54ec38be citation-out-of-TTS sanitizer), each with a new module, live wiring in dj_cohost.py, and passing tests (10 passed). All other durable-packet claims I checked still hold: the DROP-call speech block remains DIRTY-ONLY (H1 HOLD intact, no bleed), VIBEMIX_DROP_CALL is still dormant/opt-in, package checker is GREEN (exit 0), the MOSS boot-crash is resolved, and the library fs-watcher (board L1 / DRIFT H-WATCH) still genuinely does not exist. Grounding tests green (49 passed). The only stale items are the two MEDIUMs that should be marked RESOLVED, plus the already-self-noted superseded DRIFT-current-head.md CRITICAL.",
+          "items": [
+            {
+              "severity": "MEDIUM",
+              "title": "STALE→RESOLVED: 'English-only UNENFORCED at runtime' is now backstopped at HEAD (b5916eb0)",
+              "detail": "CODEX_VERIFICATION-cohost-grounding-tts-tags.md:87,95 and NEXT-LAND-BOARD-after-c88d5f56.md:63 record the H2 finding 'English-only has no runtime backstop — only a prompt instruction; a fluent Turkish emission would reach TTS + transcript unfiltered (MEDIUM, new work).' CONTRADICTED at HEAD c2cb9aaa by commit b5916eb0 ('fix(cohost): enforce english-only spoken output', 2026-06-01 15:24, ~24min after the c88d5f56 pin). It adds src/vibemix/agent/language_guard.py (english_only_violation_matches: Turkish opener/phrase/prose-token + Turkish-char detector that strips citation atoms first so Turkish track names in an English sentence pass). Wired live in dj_cohost.py:62 (import), :2758 (mid-stream → language_defer_stream=True → continue, line 2760-2764) and :3009 (post-stream → suppression='non_english' → empties spoken_text + buffered_chunks and pushes a silence pad, lines 3034-3049). Tests tests/agent/test_language_guard.py + test_dj_cohost.py pass (verified 10 passed). Mark this MEDIUM RESOLVED; only a live-ear pass remains (Kaan-action), which the packet already lists separately.",
+              "file": "/Users/ozai/projects/dj-set-ai/.planning/packets/2026-06-01/CODEX_VERIFICATION-cohost-grounding-tts-tags.md",
+              "line": "87,95",
+              "disposition": "Mark RESOLVED — fix landed in b5916eb0; new module language_guard.py wired at dj_cohost.py:2758 and :3009, tests green."
+            },
+            {
+              "severity": "MEDIUM",
+              "title": "STALE→RESOLVED: 'citation atoms reach TTS verbatim' open question is now closed at HEAD (54ec38be)",
+              "detail": "CODEX_VERIFICATION-cohost-grounding-tts-tags.md:96 and NEXT-LAND-BOARD-after-c88d5f56.md:64 flag the open question 'citation atoms [aud:rms@45.2]/[ev:…] are preserved into spoken_text and passed to MOSS as literal bracket characters — unclear whether MOSS speaks them.' CONTRADICTED at HEAD by commit 54ec38be ('fix(cohost): keep citation atoms out of tts', 2026-06-01 15:35). It adds src/vibemix/agent/tts_sanitizer.py (model_text_for_tts → strip_emote_tags then strip_citations_for_tts using EVIDENCE_CITATION_RE), wired into the live TTS yield at dj_cohost.py:67 (import) and :2638 inside _prepare_tts_segment. This splits the surfaces exactly as the open question asked: the visible transcript keeps citation receipts while the TTS segment is citation-stripped. tests/agent/test_tts_sanitizer.py passes (part of the 10 passed). Mark this open question CLOSED.",
+              "file": "/Users/ozai/projects/dj-set-ai/.planning/packets/2026-06-01/CODEX_VERIFICATION-cohost-grounding-tts-tags.md",
+              "line": "96",
+              "disposition": "Mark CLOSED — sanitizer landed in 54ec38be; model_text_for_tts wired at dj_cohost.py:2638; tests green."
+            },
+            {
+              "severity": "INFO",
+              "title": "CONFIRMED STILL TRUE: library fs-watcher (board L1 / DRIFT H-WATCH) does NOT exist at HEAD",
+              "detail": "NEXT-LAND-BOARD-after-c88d5f56.md:14-19 (L1 'build src/vibemix/library/watcher.py — none exists') and DRIFT-current-head.md:33 ('H-WATCH — NO (moot). No watcher code exists; watchfiles only transitive') are NOT stale — both remain accurate at HEAD c2cb9aaa. Verified: src/vibemix/library/watcher.py does not exist (os error 2), and git log shows no commit ever created it. L1 is still a valid SAFE_NOW target; no contradiction.",
+              "file": "/Users/ozai/projects/dj-set-ai/.planning/packets/2026-06-01/NEXT-LAND-BOARD-after-c88d5f56.md",
+              "line": "14",
+              "disposition": "No change — claim still holds."
+            },
+            {
+              "severity": "INFO",
+              "title": "CONFIRMED STILL TRUE: DROP-call speech HOLD (H1) intact — dirty-only, no bleed, flag dormant",
+              "detail": "NEXT-LAND-BOARD-after-c88d5f56.md:36-40 (H1 DROP-call = DIRTY-ONLY, ungated, env flag dormant/opt-in) and CODEX_VERIFICATION correction #2/#3 (HOLD-bleed CLEAN, on-by-default aggravator GONE) remain accurate. Verified: the 'if ev.type == \"DROP\": ... mastered_speak(reaction_line(drop_cue))' block is a working-tree-only diff in src/vibemix/runtime/coach.py — git show HEAD:src/vibemix/runtime/coach.py has no DROP event block. __main__.py:809 setdefaults only VIBEMIX_LOCAL_TTS=1; no VIBEMIX_DROP_CALL setdefault in committed or dirty __main__.py. Package checker exits 0 (GREEN). H1 gate (grounding-review + on-beat live proof + FP-rate) still unmet and still required before this lands.",
+              "file": "/Users/ozai/projects/dj-set-ai/.planning/packets/2026-06-01/NEXT-LAND-BOARD-after-c88d5f56.md",
+              "line": "36",
+              "disposition": "No change — HOLD correctly intact; do not land without H1 gate."
+            },
+            {
+              "severity": "INFO",
+              "title": "CONFIRMED RESOLVED (already self-noted): DRIFT-current-head.md CRITICAL MOSS boot-crash + package-checker RED",
+              "detail": "DRIFT-current-head.md (HEAD dc4702eb) §3 blocker #1 (CRITICAL MOSS-model-absent boot crash) and §3 blocker #3 (dirty-package checker RED, 4 unassigned library-freshness paths) are CONTRADICTED at current HEAD — INDEX.md:20 already marks this doc SUPERSEDED and both items RESOLVED at c88d5f56. Re-confirmed at c2cb9aaa: __main__.py:212 _build_tts_chain_or_mute wraps both build_tts_chain call sites (:1336, :1348) in try/except LocalTTSUnavailable → boots muted with a banner ('-> tts: unavailable (MOSS local only; voice muted, no cloud fallback)'), and de520ed9 further disables audio output when MOSS is muted. Package checker exits 0. No action needed; flagging only because DRIFT-current-head.md was in the read-set and its headline CRITICAL is stale (already annotated as such in INDEX).",
+              "file": "/Users/ozai/projects/dj-set-ai/.planning/packets/2026-06-01/DRIFT-current-head.md",
+              "line": "26",
+              "disposition": "Already superseded per INDEX.md:20 — no action; confirmed resolved at HEAD."
+            },
+            {
+              "severity": "LOW",
+              "title": "Packet pins are stale by 13 commits — re-pin verification/board before reuse",
+              "detail": "CODEX_VERIFICATION-cohost-grounding-tts-tags.md and NEXT-LAND-BOARD-after-c88d5f56.md are both pinned to c88d5f56; HEAD is now c2cb9aaa (13 commits ahead: c1b85304, b5916eb0, 54ec38be, de520ed9, a8562375, 1b51ef89, 4bc30e66, 4446f674, 26da514f, f29defb6, c2cb9aaa, plus). The packets self-warn about a moving tree (verification line 115, board line 6). New speech-surface commits since the pin — a8562375 (prevent invented audio citation timestamps), 26da514f (require proof for control-praise phrases) — are additional anti-slop hardening, all with passing grounding tests (49 passed across deck_context + linter). Latest two commits (f29defb6 half-time bpm, c2cb9aaa novelty dial) are library/intel-only, no speech path, no HOLD-lane bleed. Recommend re-running the drift utility with since=c88d5f56 to re-pin the board.",
+              "file": "/Users/ozai/projects/dj-set-ai/.planning/packets/2026-06-01/CODEX_VERIFICATION-cohost-grounding-tts-tags.md",
+              "line": "4",
+              "disposition": "Re-pin: re-run _drift_verify.workflow.js with since=c88d5f566ee0 to cover the 13-commit delta."
+            }
+          ]
+        },
+        {
+          "lane": "checker-regression",
+          "verdict": "REGRESSION",
+          "summary": "Ran all four read-only repo guards on branch live-tuning-or-brain using the repo .venv (3.12). Three GREEN, one RED. (1) Dirty-package-plan checker GREEN (exit 0). (2) Model-literal grep gate GREEN (12 passed). (4) IPC codegen parity GREEN (check_ipc_schema.py OK + 149 ipc/schema tests passed). (3) tests/repo is RED: 1 failed / 363 passed — test_no_seen_relaxation.py::test_stop_reason_writes_confined_to_toolset fails because the AI-observability/spoken-turn-grounding feature (committed in b3828752 'feat(observability): ground spoken ai turns' and 4027dc18) added `stop_reason` to 8 non-whitelisted source files without expanding the Phase-99 Decision-4 STOP_REASON_WHITELIST. This is a COMMITTED regression on the branch (working tree is clean on all 8 offenders), not an uncommitted change. The two contract-named gates inside tests/repo (retired-poc scrub, clean-checkout imports) are individually GREEN. No app was launched; no files edited/staged.",
+          "items": [
+            {
+              "severity": "INFO",
+              "title": "Guard 1 GREEN — dirty-package-plan checker (strict assignments)",
+              "detail": "Command: .venv/bin/python scripts/check_dirty_package_plan.py --strict-assignments --summary  -> EXIT_CODE=0. Tail: 'OK: 5273 dirty paths covered by .planning/handoffs/2026-05-31-package-checklist.md; 3 generated launch previews ignored.' and 'OK: every dirty path is assigned to an Include/Hold lane.' Every dirty path lands in an Include/Hold lane; shared-path assignments (e.g. src/vibemix/__main__.py across 13 packages, src/vibemix/runtime/coach.py across Package 8B + Package 9) are explicitly enumerated and accepted by the checker.",
+              "file": "scripts/check_dirty_package_plan.py",
+              "disposition": "PASS"
+            },
+            {
+              "severity": "INFO",
+              "title": "Guard 2 GREEN — model-literal grep gate (no hardcoded model names outside model_router)",
+              "detail": "Command: .venv/bin/python -m pytest -q tests/repo/test_model_literal_gate.py tests/bench/test_no_model_literal.py  -> '12 passed in 2.59s'. Both the runtime model-literal gate (tests/repo/test_model_literal_gate.py) and the bench model-literal gate (tests/bench/test_no_model_literal.py) pass — confirms zero hardcoded Gemini/model literals leaked outside vibemix.llm.model_router.",
+              "file": "tests/repo/test_model_literal_gate.py",
+              "disposition": "PASS"
+            },
+            {
+              "severity": "HIGH",
+              "title": "Guard 3 RED — tests/repo: stop_reason confinement gate fails (committed regression)",
+              "detail": "Command: .venv/bin/python -m pytest -q tests/repo  -> '1 failed, 363 passed, 10 deselected in 25.68s'. FAILED: tests/repo/test_no_seen_relaxation.py::test_stop_reason_writes_confined_to_toolset (assert at tests/repo/test_no_seen_relaxation.py:335). The Phase-99 Decision-4 gate confines `stop_reason` (terminal-run-state propagation surface) to STOP_REASON_WHITELIST = [__main__.py, library/codex_curate.py, library/telegram_bridge.py, library/toolset.py]. 8 NON-whitelisted source files now reference it: src/vibemix/agent/dj_cohost.py (dj_cohost.py:2496 stop_reason='manual_no_live_evidence', :3457), src/vibemix/runtime/ai_observability.py (:231 param, :261 dict key), src/vibemix/learn/observability.py, src/vibemix/eval/session_report.py, src/vibemix/state/deck_vision.py (:220, :237), src/vibemix/bench/run.py (:153,:164), src/vibemix/debrief/drills.py, src/vibemix/debrief/tldr.py. EVIDENCE this is committed (not working-tree): `git status --porcelain` shows NONE of the 8 offenders dirty; they last changed in committed commits b3828752 'feat(observability): ground spoken ai turns' and 4027dc18 'feat(eval): report cohost and viber repair queue'. The whitelist itself (tests/repo/test_no_seen_relaxation.py) is clean and last edited 2026-05-28 (77b95563 / 819dc12b) — i.e. predates the observability feature that introduced the new references; `git show b3828752 --stat` does NOT touch the gate. These are genuine terminal-run-state uses in the spoken-AI-grounding path (the exact surface the gate guards), not a name collision. Resolution per the gate's own docstring: route through a whitelisted file OR expand STOP_REASON_WHITELIST with PR justification + docstring naming the authorizing plan. This is HOLD-relevant: ai_observability.py / dj_cohost.py sit on the path that decides WHAT/WHEN the co-host says — changes there need vibemix-grounding-review before landing.",
+              "file": "tests/repo/test_no_seen_relaxation.py",
+              "line": "335",
+              "disposition": "FAIL"
+            },
+            {
+              "severity": "INFO",
+              "title": "Guard 3 sub-gates GREEN — retired-POC scrub + clean-checkout imports (named in contract)",
+              "detail": "Command: .venv/bin/python -m pytest -q tests/repo/test_repo_scrub.py tests/repo/test_clean_checkout_imports.py  -> '13 passed in 4.64s'. The two gates the contract calls out by name (retired-poc scrub stays gone; clean-checkout imports) both pass. The single tests/repo failure is isolated to the stop_reason confinement gate above; the rest of the repo-guard suite is green (363 passed).",
+              "file": "tests/repo/test_repo_scrub.py",
+              "disposition": "PASS"
+            },
+            {
+              "severity": "INFO",
+              "title": "Guard 4 GREEN — IPC codegen / schema parity",
+              "detail": "Command A: .venv/bin/python scripts/check_ipc_schema.py  -> 'OK: 72 dataclasses validate against schema' / 'OK: count parity — 72 oneOf entries == 72 wrapper dataclasses' / 'OK: SettingsSet field enum parity' / 'OK: SettingsState payload parity'. Command B: .venv/bin/python -m pytest -q tests/ipc tests/ui_bus/test_messages_schema.py  -> '149 passed in 2.23s'. Python<->schema parity (oneOf count, dataclass shapes, SettingsSet/SettingsState enums) is intact. Note: the pre-compiled frontend ajv validator (tauri/ui validator.generated.mjs, regenerated by `npm run codegen:ipc`) is a JS/node gate not runnable from this read-only Python lane — Python-side parity is GREEN, which is the in-scope check here.",
+              "file": "scripts/check_ipc_schema.py",
+              "disposition": "PASS"
+            }
+          ]
+        }
+      ],
+      "skeptics": [
+        {
+          "lane": "non-speech-commits",
+          "upheld": true,
+          "confidence": "high",
+          "refutation": "Attempted to break the finding on five fronts; all survived. (1) HIGH missing-proof: independently confirmed `.planning/eval-runs/flx4-live-context-clean-head-4bc30e66/direct_midi_probe.jsonl` does NOT exist (ls error 2), is untracked-by-design (no eval-runs git-tracked), and exhaustively grepped every direct_midi_probe.jsonl in the tree — all show frames:0, unique_cc:[]; zero CC34 anywhere. git show of 4446f674 on the package-checklist confirms the exact claim text 'wrote .../direct_midi_probe.jsonl with 134 frames, CC34, and note54' citing the absent file. (2) MEDIUM speech coupling: the new jog_move_b_alt (ch1/CC34, field=jog, axis=relative, deck=B) routes through state.py:348-350 _record_move('B_jog nudge {dir}') into recent_moves, which is injected into the coach prompt at coach.py:512-519/703-709 — and the added test test_flx4_decode_live_discovered_b_jog_cc34_variant ITSELF asserts '\\\"B_jog nudge forward\\\" in _labels(cs)', proving the coupling; profile diff is a single additive +line (others byte-identical). (3) Test counts: ran all touched tests on the repo .venv — 25 + 42 + 9 + 40 = 116 passed, exactly as claimed; the CC34 test is a genuine guard (synthetic _cc(1,0x22,65), would fail unmapped). (4) 1b51ef89 operator_actions: grep confirms it is referenced only in __main__.py, never in coach/dj_cohost/prompts/runtime — CLI-only, label correct. (5) 4bc30e66: scripts/release + test only, not imported by runtime — correct.",
+          "corrected": "CONCERN — upheld. Two refinements, neither material: (a) the HIGH item's line citation '2814-2823' for the package-checklist is slightly off — the CC34 claim block 4446f674 added sits around lines 2790-2823; the quoted text and NOT-FOUND artifact are accurate. (b) The c1b85304 'not a speech change' title understates one coupling: deck_signal.signal_frame_from_capture (which c1b85304 gates via effective_enabled) IS consumed by runtime/coach.py:375 → judge_and_record → verdict → judge_voice_lines/_credit_judged_transition(speak=...), so it does influence the Judge's spoken verdicts. BUT the change is strictly conservative — it only adds honest-null (abstain) conditions for unverified auto-rekordbox deck pairs, so it can reduce ungrounded speech, never enable a new ungrounded claim (consistent with Invariant #3). The LAND disposition stands; the finding's own detail already notes 'makes grounding MORE conservative'. Net: verdict CONCERN with HIGH (4446f674 live-causality proof artifact NOT-FOUND, HOLD-EVIDENCE) + MEDIUM (4446f674 recent_moves speech-path coupling without grounding-review, HOLD-REVIEW) + three CLEAN (c1b85304, 1b51ef89, 4bc30e66, all tests pass, all LAND) is correct."
+        },
+        {
+          "lane": "hold-bleed",
+          "upheld": true,
+          "confidence": "high",
+          "refutation": "Tried to break bleed_found=FALSE and could NOT — the live-loop wiring that makes the co-host SPEAK a predicted drop is dirty-only and default-off, nothing speech-additive is staged or committed. Independently reproduced: (1) `git diff --cached --name-only`=0 (index empty). (2) HEAD coach.py has no DROP/reaction_line call site — only `_make_mastered_speak`+Mastered vocal at 256/447/629/803. (3) No `VIBEMIX_DROP_CALL` setdefault in HEAD OR dirty __main__.py; `_apply_packaged_defaults` (HEAD :799) sets only VIBEMIX_LOCAL_TTS=1 and keeps drop-call opt-in — aggravator confirmed gone. (4) `_drop_call_enabled_from_env()` defaults OFF; test_no_drop_when_disabled_by_default genuinely asserts env-absent→no DROP; 30 DROP tests pass in repo .venv. (5) All speech commits since c88d5f56 are anti-slop tightening; whole-repo diff for added spoken triggers (session.say/reaction_line/DROP/DROP_CALL setdefault) is EMPTY. (6) de520ed9 keeps muted-MOSS quiet WITHOUT cloud fallback — MOSS-only HOLD respected. (7) No live wiring of line_voice/voice_mix/automix in dirty __main__/session_loop/coach. The dirty coach.py DROP block (coach.py:696-718) speaks reaction_line via fixed-text say() then `continue`, bypassing LLM citation grounding on a PREDICTED cue — correctly HARD-HELD pending grounding-review + live on-beat proof + false-positive measurement.\n\nTHREE OVER-CLAIMS found (provenance framing, NOT bleed — disposition unchanged): (A) Sentinel summary \"the gated DROP-call live hype SPEECH block is dirty-only — NOT committed at HEAD\" is OVERSTATED. The spoken-drop MACHINERY is committed at HEAD via commit cee53119 (\"feat...make the AI SPEAK the drop — voiced auto-mix reaction\", dated May 31, predating the c88d5f56..HEAD census window so the sentinel missed it): drop_reaction.py (slop-filtered REACTION_LINES + reaction_line()), agent/line_voice.py (one-shot synth on the live Cartesia→Gemini chain), audio/voice_mix.py (voice-over-music ducking). Commit msg: \"Heard working...AI calls the drop @182.7s in the live Achird voice.\" What is dirty-only is the live-loop WIRING + arming gate, not the bank. The capability is committed but INERT — `reaction_line`/`narrate_reel` have no live caller at HEAD, line_voice/voice_mix have zero importers, automix_demo_smoke is a standalone scripts/ demo not reached by any runtime module. Bleed conclusion survives because nothing live calls it, but the \"not committed at HEAD\" framing is wrong. (B) Sentinel cited event_detector.py:172 `_drop_call_enabled` as if extant at HEAD; it is DIRTY-ONLY (HEAD event_detector.py has neither _drop_call_enabled nor VIBEMIX_DROP_CALL). (C) Census undercount: sentinel said \"4 speech commits since c88d5f56\" but there are 11 commits in that window; the missed ones (de520ed9, 1b51ef89, 4bc30e66) are benign.",
+          "corrected": "HOLD-BLEED SENTINEL: bleed_found=FALSE — UPHELD and independently reproduced. No staged/committed change adds what the co-host SAYS or WHEN it speaks; the DROP-call live-speech ACTIVATION (coach.py:696-718 say-block + event_detector _drop_call_enabled arming gate) is dirty-only AND default-off, correctly HARD-HELD pending vibemix-grounding-review + live on-beat proof + predicted_drop false-positive measurement. MOSS-only TTS HOLD also un-bled (de520ed9 keeps muted mode quiet without cloud fallback). CORRECTION to the sentinel's provenance framing (does not change the CLEAN/no-bleed disposition): the claim that the DROP SPEECH block is wholly \"dirty-only / NOT committed at HEAD\" is inaccurate — the spoken-drop MACHINERY (drop_reaction.py reaction bank, line_voice.py synth seam, voice_mix.py ducking) was committed earlier via cee53119 and exists at HEAD, but is INERT (no live caller, no importer, reachable only from a standalone scripts/ demo). Only the live-session wiring + arming gate are dirty. Also: event_detector.py:172 gate is dirty-only not HEAD, and the commit census undercounted (11 commits since c88d5f56, not 4 — the extras are benign). Disposition: CLEAN on bleed, HOLD correctly maintained on both the DROP-call and MOSS-only lanes."
+        },
+        {
+          "lane": "stale-claims",
+          "upheld": true,
+          "confidence": "high",
+          "corrected": "MIXED (upheld with one material correction). The finding's substantive claims hold under adversarial re-check: (1) pin c88d5f56 -> HEAD c2cb9aaa, 13 commits — exact. (2) b5916eb0 genuinely RESOLVES the H2 English-only MEDIUM: language_guard.py is a real impl wired live at dj_cohost.py:62/2758/3009 with real suppression (empties buffered_chunks/spoken_text + silence pad); tests assert the claimed behaviors incl. Turkish-artist-name-passes. (3) 54ec38be genuinely CLOSES the citation-atom open question: tts_sanitizer.py wired at :67/2638, splits transcript (keeps citations) vs TTS (strips). (4) H1 DROP-call HOLD intact and STRONGER than stated — committed HEAD event_detector.py emits NO DROP at all; the dirty speech block (coach.py:704) + its dirty emission gate are behind dormant VIBEMIX_DROP_CALL; no bleed. (5) watcher.py never existed; __main__.py:828 setdefaults only VIBEMIX_LOCAL_TTS; MOSS-mute wrapper real at :212. CORRECTION to LOW item #7: its blanket 'passing grounding tests (49 passed)' for the commit delta is OVER-CLAIMED. At HEAD, tests/agent/ shows 382 passed / 3 FAILED: (a) test_dj_cohost_linter.py::test_fabricated_recall_strips_turn passed at the pin, regressed at HEAD — bisected to 26da514f (NOT a verified commit; its widened deck_context.py _NO_MOVE_CONTROL_* regexes fire live_claim_guard before citation_failure, changing the asserted cancel reason); (b)+(c) test_overlay_publish.py::test_ipc_bus_none_is_silent and ::test_bus_emit_failure_is_swallowed passed at 54ec38be^ and fail at HEAD — caused by 54ec38be itself (model_text_for_tts now strips [screen:waveform_a] but these tests still assert verbatim passthrough and were not updated). None of the 3 alter spoken-safety posture (cancel-reason / test-expectation mismatches), but they are real red tests on committed HEAD that the finding labeled clean. Net: the two MEDIUM->RESOLVED dispositions and all HOLD/INFO items are UPHELD; the only break is the 'tests green' assurance over the 13-commit delta.",
+          "refutation": "I upheld the finding's core (both MEDIUMs genuinely resolved, H1 HOLD intact, watcher absent) by reading the new modules (not stubs), confirming live wiring at the exact claimed dj_cohost.py lines, running the 10 new tests green, and proving via git show that the DROP speech block is dirty-only with NO committed DROP emission. But I BROKE the finding's 'tests green' assurance: I ran the full tests/agent/ dir at HEAD (382 passed / 3 FAILED), then used detached worktrees at the pin and at 54ec38be^ plus a per-commit bisect to prove the 3 failures are real HEAD regressions — test_fabricated_recall_strips_turn from 26da514f's widened control-praise regexes (live_claim_guard fires before citation_failure), and 2 overlay_publish tests from 54ec38be's citation-stripper removing [screen:...] under unupdated verbatim-passthrough assertions. The finding labeled these commits all-green; they are not."
+        },
+        {
+          "lane": "checker-regression",
+          "upheld": true,
+          "confidence": "high",
+          "refutation": "Tried to break the REGRESSION verdict on five independent angles; all failed to refute it. (1) Substring false-positive angle: the gate matches `stop_reason` as a `git grep -F` substring, so I checked every hit in all 8 offenders — each is a genuine kwarg/dataclass-field/param/dict-key reference (dj_cohost.py:2496 stop_reason=\"manual_no_live_evidence\", :3457 stop_reason=llm_err or suppression or citation_action; ai_observability.py:231 param/:261 dict key; deck_vision.py:220/237; bench/run.py:153/164; debrief/drills.py+tldr.py multiple; eval/session_report.py:639/2196; learn/observability.py:64), NOT coincidental tokens or comments. The gate is not misfiring. (2) Committed-vs-working-tree angle: `git status --porcelain` on all 8 offenders + the gate file returns EMPTY — clean tree, so this is a COMMITTED regression on the branch, not an uncommitted artifact, exactly as the finding asserts. (3) Attribution angle: `git log --reverse -S stop_reason` per file shows 7/8 first added by b3828752 (\"feat(observability): ground spoken ai turns\") and eval/session_report.py by 4027dc18 (\"feat(eval): report cohost and viber repair queue\") — matches the finding precisely. (4) Whitelist-shrink angle: neither b3828752 nor 4027dc18 touches tests/repo/test_no_seen_relaxation.py; the gate last changed at 819dc12b/77b95563 (predates the feature) and was never modified b3828752..HEAD — so the whitelist was never expanded for the feature; genuine guard-without-update regression. Both introducing commits are ancestors of HEAD (on-branch). (5) Mislabel-as-resolved/CLEAN angle: the finding labels Guard 3 RED and does not claim resolution; the two contract-named sub-gates (repo-scrub, clean-checkout) are independently GREEN (13 passed) and not mislabeled. Independent reproduction matched every number: Guard 1 exit 0 GREEN; Guard 2 12 passed GREEN; Guard 3 tests/repo 1 failed/363 passed/10 deselected RED (assert at test_no_seen_relaxation.py:335, identical 8-file offender set); Guard 4 check_ipc_schema OK 72/72 + 149 passed GREEN. The HOLD framing is accurate — dj_cohost.py / ai_observability.py stop_reason values are the spoken-turn outcome reasons on the WHAT/WHEN-co-host-speaks path, so they need vibemix-grounding-review before any landing. No app launched; no files edited or staged. The finding stands as written.",
+          "corrected": "REGRESSION (upheld). tests/repo is RED on branch live-tuning-or-brain: tests/repo/test_no_seen_relaxation.py::test_stop_reason_writes_confined_to_toolset fails (1 failed, 363 passed, 10 deselected) because the AI-observability / spoken-turn-grounding feature (committed b3828752 + eval slice 4027dc18) introduced `stop_reason` into 8 non-whitelisted source files (agent/dj_cohost.py, runtime/ai_observability.py, learn/observability.py, eval/session_report.py, state/deck_vision.py, bench/run.py, debrief/drills.py, debrief/tldr.py) without expanding the Phase-99 Decision-4 STOP_REASON_WHITELIST. Verified COMMITTED (clean working tree on all offenders + gate), on-branch, gate untouched since before the feature, and all references genuine (not substring false positives). The other three guards are GREEN: dirty-package-plan (exit 0), model-literal gates (12 passed), IPC parity (check_ipc_schema OK 72/72 + 149 passed). HOLD-relevant: the dj_cohost.py / ai_observability.py stop_reason uses sit on the WHAT/WHEN-the-co-host-speaks path and require vibemix-grounding-review before landing the whitelist expansion."
+        }
+      ]
+    },
+    "docMarkdown": "# Verdict\n\n**SAFE TO KEEP LANDING — with ONE CRITICAL fix required.** No HOLD-bleed: nothing that changes WHAT or WHEN the co-host speaks is staged or committed. All landed speech-surface commits are anti-slop tightening, and the two stale MEDIUM findings are now resolved at HEAD. **CRITICAL: `tests/repo` is RED on this branch** — the Phase-99 `stop_reason` confinement gate fails on a *committed* regression (b3828752 + 4027dc18). This is a checker regression that blocks a clean landing until the whitelist is expanded with justification. Three of four repo guards are GREEN; the dirty-package plan stays covered.\n\n# Delta Table (c88d5f56..HEAD)\n\n| SHA | Subject | Speech/timing? | Verification | Disposition |\n|-----|---------|----------------|--------------|-------------|\n| f29defb6 | fix(library): accept half-time bpm matches | no | library/intel only | LAND |\n| 26da514f | fix(cohost): require proof for control-praise phrases | **yes** | anti-slop tightening; **regresses `test_fabricated_recall_strips_turn`** (skeptic) | LAND w/ caveat |\n| 4446f674 | fix(midi): accept live flx4 b-jog cc34 | indirect (recent_moves) | additive binding; tests pass | **HOLD-REVIEW** (proof + grounding-review) |\n| 4bc30e66 | fix(release): reuse live-context proof actions | no | scripts/CI only; 9 passed | LAND |\n| 1b51ef89 | fix(live-context): return operator proof actions | no | CLI diagnostic only; 42 passed | LAND |\n| a8562375 | fix(prompts): prevent invented audio citation timestamps | **yes** | anti-slop tightening | LAND (grounding-review owed) |\n| de520ed9 | fix(tts): disable audio output when moss is muted | gates audibility | MOSS-only respected, no cloud fallback | LAND |\n| 54ec38be | fix(cohost): keep citation atoms out of tts | **yes** | new `tts_sanitizer.py`; **regresses 2 overlay_publish tests** (skeptic) | LAND w/ caveat |\n| b5916eb0 | fix(cohost): enforce english-only spoken output | **yes** | new `language_guard.py`; wired + tested | LAND |\n| c1b85304 | fix(audio): reject stale rekordbox deck routing hints | no (but feeds Judge) | strictly conservative honest-null | LAND |\n\n**Dirty product files (9, all lane-assigned):** `__main__.py`, `audio/deck_capture.py`, `library/{codex_curate,mcp_server,toolset}.py`, `midi/state.py`, `runtime/coach.py`, `state/drop_predict.py`, `state/event_detector.py`. **Index: empty (0 staged).**\n\n**Checker status:** dirty-package plan **GREEN** (exit 0, all 9 src files covered); model-literal gate **GREEN** (12); IPC parity **GREEN** (72/72 + 149); `tests/repo` **RED** (1 failed / 363 passed).\n\n# Commit Verification\n\n**Speech-surface (4 committed):** all are anti-slop *tightening*, never additive triggers — `git log -p` for added `session.say`/`generate_reply`/`reaction_line`/`DROP` in committed coach/dj_cohost = NONE.\n\n- **b5916eb0 (english-only) — CONFIRMED FIXED.** Real impl `src/vibemix/agent/language_guard.py`, wired live at `dj_cohost.py:62` (import), `:2758` (mid-stream defer), `:3009`/`:3034-3049` (post-stream suppression empties `spoken_text` + `buffered_chunks`, pushes silence pad). Strips citation atoms first so a Turkish track name in an English sentence passes. Tests green.\n- **54ec38be (citation atoms out of TTS) — CONFIRMED FIXED.** Real impl `src/vibemix/agent/tts_sanitizer.py` (`model_text_for_tts` → `strip_emote_tags` + `strip_citations_for_tts`), wired at `dj_cohost.py:67`/`:2638`. Splits surfaces exactly as the open question asked: transcript keeps citation receipts, TTS segment is citation-stripped.\n- **a8562375 (no invented timestamps)** and **26da514f (control-praise needs proof)** — both verified as additional anti-slop hardening on the prompt/deck_context path.\n\n**Non-speech (4 verified + 2 benign):** c1b85304 / 1b51ef89 / 4bc30e66 are CLEAN (LAND), tests pass (25 + 42 + 9). de520ed9 keeps muted-MOSS quiet without cloud fallback (MOSS-only HOLD respected). **4446f674 is the only non-speech commit on HOLD** (see below).\n\n# HOLD-Bleed Verdict\n\n**CLEAN — `bleed_found=FALSE`, independently reproduced.** No staged/committed change adds spoken output or timing:\n\n1. Index empty (`git diff --cached --name-only` = 0).\n2. The DROP-call live-speech **activation** (`runtime/coach.py:696-718` say-block via `mastered_speak(reaction_line(drop_cue))` + `continue`) and its arming gate (`event_detector._drop_call_enabled`) are **dirty-only** — `git show HEAD:src/vibemix/runtime/coach.py` has no DROP block; HEAD `event_detector.py` emits no DROP at all.\n3. On-by-default aggravator **GONE**: no `VIBEMIX_DROP_CALL` setdefault in HEAD or dirty `__main__.py`; `_apply_packaged_defaults` sets only `VIBEMIX_LOCAL_TTS=1` and keeps drop-call opt-in.\n4. MOSS-only TTS HOLD un-bled (de520ed9 mutes without cloud fallback).\n\n**Provenance correction (skeptic, does not change CLEAN disposition):** the spoken-drop *machinery* (`drop_reaction.py` bank, `agent/line_voice.py` synth seam, `audio/voice_mix.py` ducking) was committed earlier via `cee53119` and **exists at HEAD but is INERT** — no live caller, no importer, reachable only from a standalone `scripts/` demo. Only the live-loop wiring + arming gate are dirty. The DROP-call and MOSS-only lanes stay correctly HARD-HELD pending vibemix-grounding-review + live on-beat proof + predicted-drop false-positive measurement.\n\n# Stale Packet Claims — Resolved / Contradicted\n\n- **RESOLVED — \"English-only UNENFORCED at runtime\"** (`CODEX_VERIFICATION-cohost-grounding-tts-tags.md:87,95`; `NEXT-LAND-BOARD-after-c88d5f56.md:63`): contradicted at HEAD by **b5916eb0**. Mark MEDIUM RESOLVED (live-ear pass = separate Kaan-action).\n- **CLOSED — \"citation atoms reach TTS verbatim\"** (`CODEX_VERIFICATION-...md:96`): contradicted by **54ec38be**. Mark open question CLOSED.\n- **Already-superseded CRITICALs (no action):** DRIFT-current-head.md MOSS boot-crash + package-checker-RED are both stale (annotated SUPERSEDED at `INDEX.md:20`); confirmed resolved at HEAD (`__main__.py:212` `_build_tts_chain_or_mute`, de520ed9, checker exit 0).\n- **Still TRUE (no change):** library fs-watcher (`watcher.py`) does NOT exist (board L1 / DRIFT H-WATCH accurate); DROP-call H1 HOLD intact.\n- **Stale by 13 commits:** both packets pinned to c88d5f56 — re-pin before reuse.\n\n# Checker / Verifier Regression Status\n\n| Guard | Result | Evidence |\n|-------|--------|----------|\n| 1. dirty-package plan (`--strict-assignments`) | **GREEN** (exit 0) | 5273 paths covered; every dirty path lane-assigned |\n| 2. model-literal grep gate | **GREEN** (12 passed) | zero hardcoded model literals outside `model_router` |\n| 3. `tests/repo` | **RED** (1 failed / 363 passed) | `test_no_seen_relaxation.py:335` |\n| 3a. retired-POC scrub + clean-checkout (named in contract) | **GREEN** (13 passed) | both contract-named sub-gates pass |\n| 4. IPC codegen / schema parity | **GREEN** (72/72 + 149 passed) | Python↔schema parity intact |\n\n**CRITICAL detail (Guard 3):** `tests/repo/test_no_seen_relaxation.py::test_stop_reason_writes_confined_to_toolset` fails. The Phase-99 Decision-4 `STOP_REASON_WHITELIST` confines `stop_reason` to 4 files; **8 non-whitelisted source files** now reference it, introduced by **committed** feature commits `b3828752` (\"feat(observability): ground spoken ai turns\") + `4027dc18` — clean working tree on all 8 offenders, gate untouched since before the feature (last edited 819dc12b/77b95563). Genuine terminal-run-state uses (not substring false positives). Resolution per the gate docstring: route through a whitelisted file OR expand `STOP_REASON_WHITELIST` with PR justification + a docstring naming the authorizing plan. **HOLD-relevant:** `agent/dj_cohost.py` (`:2496` `stop_reason=\"manual_no_live_evidence\"`, `:3457`) + `runtime/ai_observability.py` (`:231` param, `:261` dict key) sit on the WHAT/WHEN-co-host-speaks path — the whitelist expansion needs **vibemix-grounding-review** before landing.\n\n**Skeptic-found red tests on committed HEAD (3, none alter spoken-safety posture):** `test_dj_cohost_linter.py::test_fabricated_recall_strips_turn` (regressed by 26da514f — widened `_NO_MOVE_CONTROL_*` regexes fire `live_claim_guard` before `citation_failure`, changing the asserted cancel reason) and `test_overlay_publish.py::{test_ipc_bus_none_is_silent,test_bus_emit_failure_is_swallowed}` (regressed by 54ec38be — `model_text_for_tts` now strips `[screen:waveform_a]`, tests still assert verbatim passthrough). These are test-expectation mismatches, not safety regressions, but they are **real red tests** the stale-claims lane labeled clean.\n\n# File:Line Evidence (non-INFO)\n\n| Severity | Claim | Anchor |\n|----------|-------|--------|\n| CRITICAL | stop_reason confinement gate RED (committed regression) | `tests/repo/test_no_seen_relaxation.py:335`; offenders `agent/dj_cohost.py:2496,:3457`, `runtime/ai_observability.py:231,:261`, `state/deck_vision.py:220,:237`, `bench/run.py:153,:164`, `debrief/{drills,tldr}.py`, `learn/observability.py`, `eval/session_report.py`; introduced by `b3828752` + `4027dc18` |\n| HIGH | 4446f674 live-causality proof artifact NOT-FOUND | claim at `.planning/handoffs/2026-05-31-package-checklist.md:~2790-2823`; cited artifact `.planning/eval-runs/flx4-live-context-clean-head-4bc30e66/direct_midi_probe.jsonl` does NOT exist (ls error 2), untracked-by-design; every `direct_midi_probe.jsonl` in tree shows `frames:0`, zero CC34 |\n| MEDIUM | 4446f674 touches speech path (recent_moves) without grounding-review | binding `jog_move_b_alt` (ch1/CC34) → `midi/state.py:348-350` `_record_move('B_jog nudge')` → recent_moves → coach prompt (`coach.py:512-519`/`703-709`); additive +1 line, tests pass — HOLD pending vibemix-grounding-review + the HIGH proof item |\n| MEDIUM (test) | 3 red tests on committed HEAD | `test_dj_cohost_linter.py::test_fabricated_recall_strips_turn` (26da514f); `test_overlay_publish.py::test_ipc_bus_none_is_silent` + `::test_bus_emit_failure_is_swallowed` (54ec38be) |\n\n**Bottom line:** the speech surface is honest and tightening — no bleed, two stale MEDIUMs closed. Block a clean landing on the CRITICAL `stop_reason` whitelist regression (needs grounding-review for the dj_cohost/ai_observability entries), keep 4446f674 on HOLD until its CC34 proof artifact is attached, and update the 3 stale test expectations."
+  }
+}

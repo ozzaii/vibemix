@@ -1,0 +1,776 @@
+{
+  "summary": "Read-only verification of Codex cohost grounding/TTS-tag commits (de9a55f5/a9cb2193/c88d5f56) at HEAD c88d5f56 + next package board. No product edits/stage/commit/app-control. args:{head:\"<sha>\"}.",
+  "agentCount": 15,
+  "logs": [
+    "Verifying 6 items (3 commits + 3 contracts) at HEAD c88d5f56, each adversarially refuted."
+  ],
+  "result": {
+    "head": "c88d5f566ee0658c88f9e3fdc4229851fec6ed41",
+    "short": "c88d5f56",
+    "branch": "live-tuning-or-brain",
+    "commits_verified": [
+      "de9a55f5",
+      "a9cb2193",
+      "c88d5f56"
+    ],
+    "evidence": [
+      {
+        "item_id": "commit-de9a55f5",
+        "evidence": {
+          "item_id": "commit-de9a55f5",
+          "verdict": "ACCEPTED",
+          "one_line": "de9a55f5 blocks no-move coaching advice via a regex-backed result-boundary guard (apply_live_claim_guard) AND a streaming-defer in dj_cohost.py, with prompt-matrix reinforcement; new tests assert the block and all 237 pass on the project 3.12 venv.",
+          "file_cleanliness": "All 8 touched files CLEAN (== committed): src/vibemix/state/deck_context.py, src/vibemix/prompts/matrix.py, src/vibemix/state/coach.py, src/vibemix/agent/dj_cohost.py, tests/agent/test_dj_cohost_linter.py, tests/state/test_deck_context.py, tests/prompts/test_matrix.py, tests/agent/test_coach_prompt_grounding.py. (Note: session-start gitStatus snapshot showed coach.py/dj_cohost.py/deck_context.py as M, but `git status --porcelain` now reports them clean — HEAD has advanced to the pinned c88d5f56 and de9a55f5 is an ancestor.)",
+          "evidence": [
+            {
+              "file": "src/vibemix/state/deck_context.py",
+              "line": "2356-2364",
+              "kind": "source",
+              "detail": "(a) PRIMARY BLOCK MECHANISM — result-boundary guard. apply_live_claim_guard: `if not moves and _has_unsupported_no_move_coaching_advice(text):` returns LiveClaimGuardResult(text=LIVE_COACHING_ADVICE_HELD_REPLY, corrected=True, policy='coaching_advice_not_grounded', reason='advice_without_recent_move_proof'). When recent_moves is empty AND the text prescribes a DJ fix, the advice is replaced by the held reply."
+            },
+            {
+              "file": "src/vibemix/state/deck_context.py",
+              "line": "192-206 (committed diff), 2613-2620 (working tree)",
+              "kind": "source",
+              "detail": "(a) DETECTOR — _NO_MOVE_COACHING_ADVICE_RE matches coaching prescriptions ('try ... next time', 'next time', 'wait N bars', 'tighten', 'ride', 'bring ... back', 'hold ... longer', 'cut ... cleaner', 'kill ... next time', 'release on/at the 1/one'). _has_unsupported_no_move_coaching_advice(text) returns True on a match unless an audio-source-detail/move-effect disclaimer boundary is present."
+            },
+            {
+              "file": "src/vibemix/state/deck_context.py",
+              "line": "2298-2299",
+              "kind": "source",
+              "detail": "(a) should_defer_live_claim_stream now returns True for `not moves and event_type.upper()=='PHASE'` — a valid PHASE citation does NOT grant permission to coach without move proof."
+            },
+            {
+              "file": "src/vibemix/agent/dj_cohost.py",
+              "line": "2733-2739",
+              "kind": "source",
+              "detail": "(a) SECONDARY BLOCK — streaming defer in the live LLM stream consumer: `advice_risky = not live_claim_moves and has_unsupported_no_move_coaching_advice(full_text)`; `if source_detail_risky or advice_risky: live_claim_defer_stream = True` then `continue` — holds the chunk so no-move advice never streams to TTS; the held output is then re-decided by apply_live_claim_guard post-stream."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "324 (committed diff)",
+              "kind": "source",
+              "detail": "(a) PROMPT REINFORCEMENT — recent_moves NONE rule now appends: 'Skip move references entirely, and do not give \"try next time\" coaching advice or timing prescriptions. Sound-only listener read or silence.' Coach beginner/intermediate/pro EVIDENCE PACKET lines extended with 'don't prescribe a fix'; Hard-Tek/Acidcore taste hard-coding removed in favor of evidence-earned genre."
+            },
+            {
+              "file": "src/vibemix/state/coach.py",
+              "line": "763-768, 825-828 (committed diff)",
+              "kind": "source",
+              "detail": "(a) PHASE and HEARTBEAT coach-task fragments extended: PHASE adds 'If recent_moves[8s] is NONE ... do not give next-time advice or timing prescriptions; sound-only read or silence.'; HEARTBEAT adds 'No coaching advice unless recent_moves[8s] names a real move.'"
+            },
+            {
+              "file": "tests/state/test_deck_context.py",
+              "line": "2100-2117 (committed diff)",
+              "kind": "test",
+              "detail": "(b) test_live_claim_guard_strips_no_move_coaching_advice asserts should_defer_live_claim_stream(state, [], event_type='PHASE') is True; apply_live_claim_guard on 'build released on the 3 — try the 1 next time' yields corrected=True, policy=='coaching_advice_not_grounded', reason=='advice_without_recent_move_proof', and strips 'try the 1'/'next time' from result.text. Also a parametrize case ('The bass kept trying to crawl under the pads.') guards a false-positive on pure-audio descriptions."
+            },
+            {
+              "file": "tests/agent/test_dj_cohost_linter.py",
+              "line": "239-281 (committed diff)",
+              "kind": "test",
+              "detail": "(b) test_live_claim_guard_strips_cited_phase_advice_without_move_proof drives the full agent with a VALID [ev:PHASE@22.4] citation + recent_moves=[]; asserts chunks==[] (nothing spoken), 'ai_text' not emitted, live_claim_guard log action=='strip' policy=='coaching_advice_not_grounded' reason=='advice_without_recent_move_proof', and playback.push not called."
+            },
+            {
+              "file": "tests/prompts/test_matrix.py",
+              "line": "242-270 (committed diff)",
+              "kind": "test",
+              "detail": "(b) test_hype_prompt_blocks_no_move_coaching_advice asserts the built prompt contains 'do not give \"try next time\" coaching advice' and 'Sound-only listener read or silence'; test_hype_prompt_does_not_assume_kaans_genre asserts 'Kaan plays Hard Tek'/'Kaan plays' absent and 'Never assume a genre' present."
+            },
+            {
+              "file": "tests",
+              "line": "4 files",
+              "kind": "test",
+              "detail": "(c) RAN in project .venv (3.12): `PYTHONPATH=src python3 -m pytest -q tests/agent/test_dj_cohost_linter.py tests/state/test_deck_context.py tests/prompts/test_matrix.py tests/agent/test_coach_prompt_grounding.py` -> 237 passed in 1.05s. The 5 specifically-named new/changed assertion tests run in isolation -> 5 passed."
+            }
+          ],
+          "tests": [
+            {
+              "cmd": "PYTHONPATH=src python3 -m pytest -q tests/agent/test_dj_cohost_linter.py tests/state/test_deck_context.py tests/prompts/test_matrix.py tests/agent/test_coach_prompt_grounding.py  (in .venv 3.12)",
+              "result": "237 passed in 1.05s"
+            },
+            {
+              "cmd": "pytest -q the 5 named new tests (deck_context strip-no-move-advice, dj_cohost cited-phase-advice, matrix blocks-advice + no-assume-genre, coach_prompt phase-footer)",
+              "result": "5 passed in 1.11s"
+            },
+            {
+              "cmd": "PYTHONPATH=src python3 -m pytest (system Python 3.14) — first attempt",
+              "result": "ERROR: ModuleNotFoundError 'livekit' — system 3.14 lacks deps; re-ran under project .venv 3.12 which passed"
+            }
+          ],
+          "caveats": [
+            "The block is implemented at the SOURCE level (regex detector + result-boundary guard + streaming defer + prompt rules) and is fully test-verified. I did NOT and cannot observe the live packaged co-host actually muting a real ungrounded reaction in production audio (READ-ONLY contract; never launched the app) — that live-ear pass is a Kaan-action item, not something source/tests can prove.",
+            "The detector is regex-based (_NO_MOVE_COACHING_ADVICE_RE), so it is a heuristic, not a semantic guarantee — novel phrasings of coaching advice that dodge the pattern could slip through; the streaming-defer + post-stream guard reduce but do not eliminate this. The new false-positive parametrize case ('crawl under the pads') shows the author guarded one such edge.",
+            "Test environment matters: the repo .venv (Python 3.12) is required; the machine's default `python3` is 3.14 and lacks livekit/deps, so a naive PYTHONPATH=src run fails at collection. I ran inside `.venv`."
+          ]
+        },
+        "skeptic": {
+          "item_id": "commit-de9a55f5",
+          "upheld": true,
+          "confidence": "high",
+          "refutation": "Tried hard to break the ACCEPTED verdict; could not. (1) Ancestry: de9a55f5 is confirmed ancestor of pinned HEAD c88d5f56 (git merge-base --is-ancestor). (2) Cleanliness: all 8 touched files report CLEAN via `git status --porcelain` — matches the finding's note that the session gitStatus snapshot (showing M) is stale since HEAD advanced. (3) Re-read every cited source anchor in the WORKING TREE, not just the commit diff: apply_live_claim_guard guard block at deck_context.py:2356-2364 (policy='coaching_advice_not_grounded', reason='advice_without_recent_move_proof', returns LIVE_COACHING_ADVICE_HELD_REPLY) — exact match; PHASE defer at 2298-2299 — exact match; regex _NO_MOVE_COACHING_ADVICE_RE at 192-206 and detector _has_unsupported_no_move_coaching_advice at 2613-2620 with disclaimer-boundary escape — exact match; dj_cohost.py streaming defer at 2733-2739 (advice_risky gate) plus the post-stream re-decide via apply_live_claim_guard at 2939 logging action='strip' — exact match; matrix.py and coach.py prompt diffs — exact match. (4) Adversarially exercised the regex detector directly: all 6 finding-cited cases plus 9 extra probes behaved exactly as claimed — fires on 'try the 1 next time', 'next time', 'wait 8 bars', 'tighten', 'ride', 'bring...back', 'cut...cleaner', 'release on the one'; correctly MISSES the false-positive 'trying to crawl under the pads' (the \\btry word boundary fails inside 'trying') and all four pure-audio descriptions. (5) Ran tests in project .venv (Python 3.12.12) — `PYTHONPATH=src .venv/bin/python -m pytest -q tests/agent/test_dj_cohost_linter.py tests/state/test_deck_context.py tests/prompts/test_matrix.py tests/agent/test_coach_prompt_grounding.py` -> 237 passed in 1.09s; the 5 specifically-named new/changed tests in isolation -> 5 passed in 1.00s; read each test body and confirmed the assertions are real (block, policy/reason strings, chunks==[], 'do not give \\\"try next time\\\" coaching advice' / 'Never assume a genre' present, phase footer endswith 'sound-only read or silence.'). The streaming-defer gate uses live_claim_moves from _event_live_move_labels, so a real move correctly skips the block (not over-blocking). Verdict holds.",
+          "corrected_verdict": "ACCEPTED",
+          "holes": [
+            "Minor phrasing imprecision (not verdict-breaking): the dj_cohost test does NOT surgically strip 'try the 1'/'next time' from the spoken text — apply_live_claim_guard REPLACES the whole text with the generic held reply ('I can't give coaching advice from this live proof.'), so the assertion `\"try the 1\" not in corrected_text` passes by replacement, not excision. The finding's word 'strips' is loose but the assertion it cites is real and passes.",
+            "Scope omission (not a contradiction): the commit also rewrites _PSY_TRIPPER_TR_OVERLAY from Turkish to English and removes the Hard-Tek/Acidcore taste hard-coding across multiple prompt cells (matrix.py); the finding folds this only into its genre-removal evidence line rather than calling it out as a distinct change. No claim is contradicted.",
+            "Heuristic limit acknowledged by the finding and confirmed: the block rests on a single regex (_NO_MOVE_COACHING_ADVICE_RE); novel phrasings of coaching advice that dodge the pattern could slip past the post-stream guard. This is a real (disclosed) coverage limit, not a false claim.",
+            "Live behavior is unobservable under the READ-ONLY contract: I verified source + tests only and never launched the app, so production audio actually muting an ungrounded reaction is unproven (correctly flagged as a Kaan-action item in the finding's caveats)."
+          ]
+        }
+      },
+      {
+        "item_id": "commit-a9cb2193",
+        "evidence": {
+          "item_id": "commit-a9cb2193",
+          "verdict": "ACCEPTED",
+          "one_line": "emote_parser.strip_emote_tags now also strips the six legacy voice tags via a narrow exact-word regex while leaving [aud:...]/[src:...] citations untouched, all proven by 95 passing tests.",
+          "file_cleanliness": "All four target files CLEAN (== committed HEAD a9cb2193, pinned under c88d5f56): src/vibemix/agent/emote_parser.py, tests/agent/test_emote_parser.py, tests/agent/test_dj_cohost.py, tests/agent/test_dj_cohost_streaming_pipe.py — none appear in `git status --porcelain`.",
+          "evidence": [
+            {
+              "kind": "source",
+              "file": "src/vibemix/agent/emote_parser.py",
+              "line": "119",
+              "detail": "strip_emote_tags() strip line: `cleaned = _VOICE_TAG_RE.sub(\"\", _EMOTE_TAG_RE.sub(\"\", text))` — strips emote tags AND voice tags. This is the exact function the task asks to name: strip_emote_tags (def at line 106)."
+            },
+            {
+              "kind": "source",
+              "file": "src/vibemix/agent/emote_parser.py",
+              "line": "71-83",
+              "detail": "Precise stripped voice-tag set = VOICE_TAGS frozenset {whisper, laugh, fast, slow, excited, chill} (6 tags), matched by _VOICE_TAG_RE = re.compile(r'\\[(whisper|laugh|fast|slow|excited|chill)\\]'). Comment line 70 explicitly states citation brackets like [aud:rms@12.0] must remain visible to the linter."
+            },
+            {
+              "kind": "source",
+              "file": "src/vibemix/agent/emote_parser.py",
+              "line": "81-82",
+              "detail": "(b) Citation preservation by construction: the regex is an EXACT alternation of the six literal words inside brackets. A citation form [aud:rms@12.0] or [src:...] contains ':' and other chars not in the alternation, so it cannot match; the emote regex (line 65-67) requires literal 'emote:' prefix, also non-matching for citations."
+            },
+            {
+              "kind": "test",
+              "file": "tests/agent/test_emote_parser.py",
+              "line": "86-89",
+              "detail": "test_strip_voice_tag_preserves_citations_for_linter: strip_emote_tags('[excited] hit there [aud:rms@12.0]') == ('hit there [aud:rms@12.0]', []) — asserts the [aud:...] citation survives the strip. PASSED."
+            },
+            {
+              "kind": "test",
+              "file": "tests/agent/test_emote_parser.py",
+              "line": "83-85",
+              "detail": "test_strip_legacy_voice_tag_removes_from_text_but_not_intents: '[chill] A fast kick...' -> 'A fast kick...' with intents []. Note '[chill]' removed but the literal word 'fast' (no brackets) untouched. PASSED."
+            },
+            {
+              "kind": "test",
+              "file": "tests/agent/test_dj_cohost.py",
+              "line": "344-371",
+              "detail": "test_llm_node_strips_legacy_voice_tags_from_speech_and_ai_message: full llm_node path strips '[chill]' from both spoken chunks and the persisted ai_message; asserts '[chill]' not in message. PASSED."
+            },
+            {
+              "kind": "test",
+              "file": "tests/agent/test_emote_parser.py",
+              "line": "55-57",
+              "detail": "test_has_emote_tag_detects_legacy_voice_tags: has_emote_tag('[chill] easy now') / '[excited] drop' both True — voice tags now detected (emote_parser.py:101-103 OR-combines both regexes). PASSED."
+            },
+            {
+              "kind": "git-show",
+              "file": "src/vibemix/agent/emote_parser.py",
+              "line": "a9cb2193",
+              "detail": "git show a9cb2193 confirms commit 'fix(cohost): strip internal voice tags from speech' added VOICE_TAGS frozenset + _VOICE_TAG_RE and changed the strip line; working tree read matches the committed diff byte-for-byte."
+            }
+          ],
+          "tests": [
+            {
+              "cmd": "source .venv/bin/activate && PYTHONPATH=src python3 -m pytest -q tests/agent/test_emote_parser.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_streaming_pipe.py",
+              "result": "95 passed in 1.37s (Python 3.12.12, project .venv). NOTE: system python3.14 fails to collect — no 'livekit' module; must use .venv per project commands."
+            },
+            {
+              "cmd": "source .venv/bin/activate && PYTHONPATH=src python3 -m pytest -q test_strip_voice_tag_preserves_citations_for_linter + test_strip_legacy_voice_tag_removes... + test_llm_node_strips_legacy_voice_tags...",
+              "result": "3 passed in 0.94s — the named (a) strip and (b) citation-preserve assertions pass individually."
+            }
+          ],
+          "caveats": [
+            "The voice-tag strip set is intentionally narrow (exactly 6 words: whisper/laugh/fast/slow/excited/chill). Citation preservation holds for these literal alternations; it is NOT a general 'preserve anything with a colon' guard — but emote/voice regexes structurally cannot match [aud:...]/[src:...] forms, which is what was required and is test-proven.",
+            "Verdict covers committed source + targeted tests only; live packaged/TTS behavior was not (and per contract must not be) observed by running the app."
+          ]
+        },
+        "skeptic": {
+          "item_id": "commit-a9cb2193",
+          "upheld": true,
+          "confidence": "high",
+          "refutation": "Tried hard to break it on five fronts; all held. (1) File cleanliness: ran `git status --porcelain` on all 4 target files — none appear, so all are CLEAN == committed HEAD a9cb2193 (pinned under c88d5f56). (2) Diff fidelity: `git show a9cb2193 -- src/vibemix/agent/emote_parser.py` confirms the exact change — VOICE_TAGS frozenset of 6 words {whisper,laugh,fast,slow,excited,chill}, _VOICE_TAG_RE = re.compile(r'\\\\[(whisper|laugh|fast|slow|excited|chill)\\\\]'), strip line changed to `cleaned = _VOICE_TAG_RE.sub('', _EMOTE_TAG_RE.sub('', text))` at line 119, has_emote_tag OR-combining both regexes at line 103. Working-tree read matches byte-for-byte. (3) Test assertions: read every cited test at its exact line and ran them — 95 passed (.venv/Python 3.12). The (a) strip and (b) citation-preserve tests pass individually. (4) THE key adversarial probe — could a citation get clobbered? I tested `[aud:fast@1.0]`, a citation whose body is the literal voice word 'fast'. It is PRESERVED, because _VOICE_TAG_RE requires the voice word to be the ENTIRE bracket content `\\\\[word\\\\]`, and a citation always has the `source:body` form (colon present). Confirmed structurally: evidence_registry.py:185 `_INNER_ATOM = rf'(?:{_SOURCE_ALT}):[^\\\\s,\\\\]]+'` — every citation atom is `<source>:<body>` with a mandatory colon; none of the 12 EVIDENCE_SOURCES (ev/aud/midi/track/screen/mix/tend/key/recall/exemplar/cue/judge) equals a voice word, and no bare `[fast]` citation form exists. The two regexes are provably disjoint. (5) Dead-test check: strip_emote_tags is live-wired into the speech path at dj_cohost.py:2753, 2774 (streaming TTS segments) and 2974 (persisted full text) — it actually governs what the co-host speaks, not just a test. Could not refute the finding.",
+          "corrected_verdict": "ACCEPTED",
+          "holes": [
+            "Minor line-number drift in the finding's evidence: it anchors the dj_cohost test at 'lines 344-371' but the function test_llm_node_strips_legacy_voice_tags_from_speech_and_ai_message actually spans lines 348-374 (the '[chill]' not-in-message assertion is at line 373). Substance and pass-result identical — cosmetic, not a defect in the verdict.",
+            "Per contract, live packaged/TTS runtime behavior was not observed (app launch forbidden) — verdict rests on committed source + targeted tests only, which the finding correctly scopes via its caveat."
+          ]
+        }
+      },
+      {
+        "item_id": "commit-c88d5f56",
+        "evidence": {
+          "item_id": "commit-c88d5f56",
+          "verdict": "ACCEPTED",
+          "one_line": "The live co-host system instruction no longer prompts the model to emit voice/emote tags ([whisper]/[laugh]/[fast]/[slow]/[excited]/[chill]) — both _resolve_prompt_cell call sites now pass include_tag_dsl=False while keeping the audio-vibe contract and coach closing, proven by tag-free prompt assertions in 153 passing tests.</one_line>\n<parameter name=\"file_cleanliness\">All 4 touched targets CLEAN (== committed c88d5f56): src/vibemix/agent/dj_cohost.py, src/vibemix/prompts/matrix.py, tests/agent/test_dj_cohost.py, tests/prompts/test_matrix.py (git status --porcelain returned empty for all four).",
+          "evidence": [
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "189-237",
+              "kind": "source",
+              "detail": "TTS_TAG_DSL_BLOCK (189) and COACH_TAG_DSL_BLOCK (223) ARE the voice-tag-prompting text: they instruct the model to 'Inline these tags AT THE START of any reply' and enumerate [whisper]/[laugh]/[fast]/[slow]/[excited]/[chill]. These are the 'moss voice tags' the commit title removes."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "948-986",
+              "kind": "git-show",
+              "detail": "BEFORE: a single `if include_tag_dsl:` block bundled the tag DSL block, the COACH_CLOSING_BLOCK, the psy overlay, AND the AUDIO_VIBE_CONTRACT_BLOCK — so suppressing tags also dropped the contract/closing. AFTER: the tag DSL stays under `if include_tag_dsl:` (956), but COACH_CLOSING is regated to `if mode_norm=='coach' and include_coach_closing:` (966) and AUDIO_VIBE_CONTRACT to `if include_audio_vibe_contract:` (986). Two new kwargs include_audio_vibe_contract/include_coach_closing (839-840) default to None→mirror include_tag_dsl (906-909) for byte-identity callers."
+            },
+            {
+              "file": "src/vibemix/agent/dj_cohost.py",
+              "line": "978-999",
+              "kind": "git-show",
+              "detail": "BEFORE both _resolve_prompt_cell call sites called build_system_instruction(skill, mode, mood, taste_persona_tags=...) which defaulted include_tag_dsl=True → emitted the voice-tag DSL. AFTER both pass include_tag_dsl=False, include_audio_vibe_contract=True, include_coach_closing=True → tag-prompting removed, contract/closing kept. This is the live path: line 1141 prompt_body=_resolve_prompt_cell(...) feeds instructions=prompt_body into DJCoHostAgent (1143)."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "180-187",
+              "kind": "source",
+              "detail": "TTS_TAGS tuple enumerates all 6 voice tags. grep confirms these literals appear in matrix.py ONLY in comments, the TTS_TAGS def, and the two DSL blocks (gated by include_tag_dsl) — so include_tag_dsl=False removes every tag from the assembled prompt body."
+            },
+            {
+              "file": "tests/agent/test_dj_cohost.py",
+              "line": "193-198",
+              "kind": "test",
+              "detail": "test_agent_03_initial_state asserts AUDIO_VIBE_CONTRACT_BLOCK in agent._gen_cfg.system_instruction AND `for tag in TTS_TAGS: assert tag not in agent._gen_cfg.system_instruction` — the strongest proof: the real built live system instruction is tag-free yet keeps the contract."
+            },
+            {
+              "file": "tests/agent/test_dj_cohost.py",
+              "line": "2164-2256",
+              "kind": "test",
+              "detail": "Three _resolve_prompt_cell tests (cold-path, lens-wins, corrupt-lens-fallback) updated to expect include_tag_dsl=False/include_audio_vibe_contract=True/include_coach_closing=True and each asserts `for tag in TTS_TAGS: assert tag not in out`."
+            },
+            {
+              "file": "tests/prompts/test_matrix.py",
+              "line": "677-704",
+              "kind": "test",
+              "detail": "Two new tests: test_live_moss_prompt_can_keep_audio_contract_without_delivery_tags and test_live_moss_coach_prompt_can_keep_closing_without_delivery_tags assert the contract/closing survive while every TTS_TAG is absent."
+            }
+          ],
+          "tests": [
+            {
+              "cmd": "source .venv/bin/activate && PYTHONPATH=src python3 -m pytest -q tests/agent/test_dj_cohost.py tests/prompts/test_matrix.py",
+              "result": "153 passed in 1.08s"
+            },
+            {
+              "cmd": "pytest -q (6 targeted tag-freeness tests by name: test_agent_03_initial_state, 3x test_resolve_prompt_cell_*, 2x test_live_moss_*)",
+              "result": "6 passed in 0.95s"
+            }
+          ],
+          "caveats": [
+            ".venv (Python 3.12) is required to run the suite; system python3 is 3.14 and lacks the livekit dep (collection ImportError). Ran read-only test execution only — never launched the app.",
+            "Verification is source+test level: I confirmed the tag-prompting text is absent from the ASSEMBLED prompt/system instruction. I cannot observe the actual live model's spoken output or the packaged binary from source."
+          ]
+        },
+        "skeptic": {
+          "item_id": "commit-c88d5f56",
+          "upheld": true,
+          "confidence": "high",
+          "refutation": "Tried five attack vectors, all failed to break the finding. (1) FILE COVERAGE: git show --stat confirms 5 files; the 4 code/test targets are all CLEAN (git status --porcelain empty) == committed c88d5f56; the 5th is a doc. (2) MISSED LIVE CALL SITE: grep found 4 build_system_instruction callers in src — the two in _resolve_prompt_cell (dj_cohost.py:978,991), persona.py:32, learn/prompts.py:178. Read both extra callers: BOTH already passed include_tag_dsl=False BEFORE this commit, so the two _resolve_prompt_cell sites were the ONLY ones ever emitting tags, and the commit flips both to include_tag_dsl=False, include_audio_vibe_contract=True, include_coach_closing=True (git show confirms). The context-cache path (__main__.py:1385) routes through the SAME _resolve_prompt_cell, so cache==agent==tag-free. (3) TAG LEAK VIA A KEPT BLOCK: read COACH_CLOSING_BLOCK (245-255) and AUDIO_VIBE_CONTRACT_BLOCK (258-273) line by line — zero TTS_TAG literals. Exhaustive grep of all 6 tag literals in matrix.py shows they appear ONLY in a comment header (164-169), the TTS_TAGS def (181-186), TTS_TAG_DSL_BLOCK (198-210), a comment (218-219, 954), and COACH_TAG_DSL_BLOCK (231-234) — every tag-bearing block is gated by include_tag_dsl. So include_tag_dsl=False fully removes tag-prompting from the assembled body. grep across all of src/vibemix outside matrix.py found NO other module injecting the DSL (emote_parser.py is an OUTPUT-side stripper, ingest.py is a comment). (4) VACUOUS TESTS: git show of both test diffs confirms the `for tag in TTS_TAGS: assert tag not in ...` guards were ADDED in this commit (+ prefixed) and assert against the REAL built agent._gen_cfg.system_instruction (test_agent_03) and _resolve_prompt_cell output (3 tests) plus 2 new matrix tests. (5) TESTS PASS: ran .venv/3.12 targeted suite — 153 passed in 1.13s; the 6 named tag-freeness tests — 6 passed. The None->mirror-include_tag_dsl defaults (906-909) preserve byte-identity for the pre-existing False callers (their False mirrors closing/contract to False), so persona/learn produce their original bodies — no regression, byte-identity test passes. Every file:line anchor in the finding was independently confirmed accurate.",
+          "corrected_verdict": "ACCEPTED",
+          "holes": [
+            "Source+test-level verification only: I confirmed the ASSEMBLED system instruction / built agent._gen_cfg is tag-free, but cannot observe the actual MOSS-spoken output or the packaged/frozen binary from source (the finding's own stated caveat — not an over-claim, correctly scoped).",
+            "System python3 is 3.14 and cannot collect the suite (livekit ImportError); verification required activating .venv (3.12). This is an environment note, not a defect in the change."
+          ]
+        }
+      },
+      {
+        "item_id": "contract-no-legacy-tts-tags",
+        "evidence": {
+          "item_id": "contract-no-legacy-tts-tags",
+          "verdict": "ABSENT",
+          "one_line": "The live DJCoHostAgent instruction string is built via build_system_instruction(..., include_tag_dsl=False); every occurrence of [chill]/[excited]/[fast]/[whisper] in the prompt path is a comment, the TTS_TAGS reference tuple, or the two tag-DSL blocks gated behind include_tag_dsl=True — none enter the outgoing prompt. Contract holds; prompt is CLEAN.",
+          "file_cleanliness": "src/vibemix/agent/dj_cohost.py = CLEAN (== committed at HEAD c88d5f56); src/vibemix/prompts/matrix.py = CLEAN; src/vibemix/prompts/filter.py = CLEAN; src/vibemix/prompts/negative_dict.py = CLEAN (git status --porcelain returned empty for all)",
+          "evidence": [
+            {
+              "file": "src/vibemix/agent/dj_cohost.py",
+              "line": "1141-1143",
+              "kind": "source",
+              "detail": "LIVE-PROMPT ASSEMBLY: DJCoHostAgent.__init__ sets prompt_body = _resolve_prompt_cell(mood=live_mood) and passes it as super().__init__(instructions=prompt_body, ...). prompt_body IS the LiveKit agent's outgoing instruction/system string."
+            },
+            {
+              "file": "src/vibemix/agent/dj_cohost.py",
+              "line": "978-998",
+              "kind": "source",
+              "detail": "LIVE-PROMPT path: _resolve_prompt_cell calls build_system_instruction(...) at BOTH return branches (lens branch L978 and env branch L991), and BOTH pass include_tag_dsl=False (L982, L995). This is the gate that suppresses the legacy-tag DSL from the live prompt."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "953-956",
+              "kind": "source",
+              "detail": "GATING LOGIC in build_system_instruction: 'if include_tag_dsl:' then body = body + (COACH_TAG_DSL_BLOCK if mode=='coach' else TTS_TAG_DSL_BLOCK). The only place the two legacy-tag-bearing blocks are appended; gated entirely behind include_tag_dsl=True. With the live False arg, neither block enters body."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "180-187",
+              "kind": "source",
+              "detail": "STRIP-LIST/REFERENCE: TTS_TAGS tuple literals ['[whisper]','[laugh]','[fast]','[slow]','[excited]','[chill]'] — a tag-name reference tuple, NOT injected as prompt text. Not a violation."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "189-215",
+              "kind": "source",
+              "detail": "TAG-DSL BLOCK (not in live prompt): TTS_TAG_DSL_BLOCK body contains [whisper] L198, [fast] L203, [excited] L207, [chill] L209. Only appended when include_tag_dsl=True (hype mode), which the live path disables."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "223-237",
+              "kind": "source",
+              "detail": "TAG-DSL BLOCK (not in live prompt): COACH_TAG_DSL_BLOCK contains [chill] L231 and [whisper] L232 (no [excited]/[fast]). Only appended when include_tag_dsl=True (coach mode), disabled on the live path."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "164-169",
+              "kind": "source",
+              "detail": "COMMENT: docstring header listing tag intents ([whisper] L164, [fast] L166, [excited] L168, [chill] L169). Python comment, never emitted. Not a violation."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "218-219,954",
+              "kind": "source",
+              "detail": "COMMENT: developer notes mentioning [excited]/[fast] (L218-219) and L954 ('no [excited]/[fast]'). Comments, not prompt text. Not a violation."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "line": "933-946,985-986",
+              "kind": "source",
+              "detail": "LIVE-PROMPT blocks that DO enter the live instruction (CITATION_GRAMMAR_BLOCK L934, IM_LISTENING_FRAGMENT L946, AUDIO_VIBE_CONTRACT_BLOCK L986; COACH_CLOSING_BLOCK L966 for coach) — grepped clean of all four legacy tags."
+            },
+            {
+              "file": "src/vibemix/prompts/filter.py",
+              "line": "n/a",
+              "kind": "grep",
+              "detail": "NOT-FOUND: ripgrep of [chill]/[excited]/[fast]/[whisper] over filter.py returned zero matches. Clean."
+            },
+            {
+              "file": "src/vibemix/prompts/negative_dict.py",
+              "line": "n/a",
+              "kind": "grep",
+              "detail": "NOT-FOUND: ripgrep of the four legacy tags over negative_dict.py returned zero matches. Clean."
+            },
+            {
+              "file": "src/vibemix/agent/persona.py",
+              "line": "32-37",
+              "kind": "source",
+              "detail": "Other consumer of build_system_instruction (SYSTEM_INSTRUCTION byte-identity constant) ALSO passes include_tag_dsl=False (L37) — even the non-live persona constant suppresses the legacy DSL."
+            }
+          ],
+          "caveats": [
+            "This verifies prompt-STRING assembly from source at HEAD c88d5f56 — it does not observe the packaged binary or a live Gemini call. The instructions string passed to LiveKit Agent and the google.genai system_instruction are sourced from the same prompt_body (dj_cohost.py:1334 comment confirms both sides carry it), so suppression applies to both seams.",
+            "learn/prompts.py:178 calls build_system_instruction for the Lesson tutor surface (a separate, non-DJCoHostAgent prompt) and was NOT exhaustively checked for include_tag_dsl, as it is outside the contract scope (live DJCoHostAgent instruction). Out of scope per the contract check.",
+            "TTS_TAGS tuple and the two DSL blocks remain in source as the Gemini-3.1-TTS expressivity DSL feature (gated), not as dead code — the contract concern is solely that they do not reach the live prompt, which is satisfied by include_tag_dsl=False."
+          ]
+        },
+        "skeptic": {
+          "item_id": "contract-no-legacy-tts-tags",
+          "upheld": true,
+          "confidence": "high",
+          "refutation": "I attacked the finding on five fronts and could not break it. (1) DEFAULT-LEAK ANGLE: build_system_instruction defaults include_tag_dsl=True (matrix.py:837), so the contract hinges on every live call site passing False. I grepped all call sites — dj_cohost.py:982 and :995 (both _resolve_prompt_cell branches), persona.py:37, learn/prompts.py:184 — all pass include_tag_dsl=False. No live builder uses the True default. (2) ALTERNATE-PATH ANGLE: I traced where the live system instruction is actually consumed: dj_cohost.py:1143 (LiveKit instructions=), :1337 (genai _gen_cfg.system_instruction=), :2676 (OpenRouter self._prompt_body=) — ALL source the single prompt_body from _resolve_prompt_cell(False). No path rebuilds with the default. (3) ENV-OVERRIDE ANGLE: I ran _resolve_prompt_cell at runtime under default / hype / coach env permutations — leaked tags = [] in every case. The only thing that re-enables the DSL (matrix.py:971, _PSY_TRIPPER overlay) is itself gated behind include_tag_dsl, so the live False arg neutralizes it. (4) GATING ANGLE: matrix.py:953-956 confirms the two tag-bearing blocks (TTS_TAG_DSL_BLOCK / COACH_TAG_DSL_BLOCK) append ONLY when include_tag_dsl is truthy. (5) GREP/TEST ANGLE: I verified TTS_TAGS literally contains [whisper],[laugh],[fast],[slow],[excited],[chill] (matrix.py:180-187) — the four contract tags are a strict subset. test_agent_03_initial_state asserts `for tag in TTS_TAGS: assert tag not in agent._gen_cfg.system_instruction` on the REAL live genai config, not a mock. I ran 6 suppression tests in the 3.12 venv (system 3.14 lacks livekit) — all pass. filter.py and negative_dict.py grep returned exit-1 (zero matches), confirming the NOT-FOUND claims. The 'n' alias that appeared in one recursive grep was a substring-highlighter artifact (the letter n inside build_system_instructio_n_), not a separate builder — there is no n() alias. The only quibble: the finding's caveat says learn/prompts.py:178 was 'not exhaustively checked', but I checked it (L184 passes False) — it is clean too, which strengthens the finding. All four target files CLEAN at HEAD c88d5f56.",
+          "corrected_verdict": "ABSENT — the live DJCoHostAgent prompt (LiveKit instructions, google.genai system_instruction, and OpenRouter system message all sourced from one prompt_body built via _resolve_prompt_cell with include_tag_dsl=False) carries none of [chill]/[excited]/[fast]/[whisper]. Every occurrence in the prompt path is a comment, the TTS_TAGS reference tuple, or one of the two DSL blocks gated behind include_tag_dsl=True (off on the live path). Contract holds; verified by source trace, runtime env-permutation check, and 6 passing tests."
+        }
+      },
+      {
+        "item_id": "contract-audio-vibe-grounding",
+        "evidence": {
+          "item_id": "contract-audio-vibe-grounding",
+          "verdict": "PRESENT",
+          "one_line": "Audio-evidence + citation-grounding contract intact after all 3 commits; HEAD decoupled the audio-vibe contract from the obsolete TTS tag DSL and re-asserts it on the live path.",
+          "file_cleanliness": "All 6 targets CLEAN vs HEAD c88d5f56 (porcelain empty): coach.py, evidence_registry.py, citation_linter.py, matrix.py, dj_cohost.py, emote_parser.py.",
+          "evidence": [
+            {
+              "file": "src/vibemix/state/coach.py",
+              "kind": "source",
+              "line": "368-373",
+              "detail": "evidence_line still injects REAL audio rms/bands/bpm into hearing[...]; runtime-confirmed hearing[rms=0.210 ... bpm=172]."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "kind": "source",
+              "line": "121",
+              "detail": "CITATION_GRAMMAR_BLOCK keeps [aud:<key>@<t>] e.g. [aud:rms@45.2]; default-on, untouched by all 3 commits."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "kind": "git-show",
+              "line": "982-986",
+              "detail": "HEAD moved AUDIO_VIBE_CONTRACT gate to its own include_audio_vibe_contract param; block text unchanged, now independent of the dead TTS tag DSL."
+            },
+            {
+              "file": "src/vibemix/agent/dj_cohost.py",
+              "kind": "git-show",
+              "line": "983,996",
+              "detail": "Live _resolve_prompt_cell passes include_audio_vibe_contract=True at both call sites; live co-host keeps the contract, drops only the dead tag DSL."
+            },
+            {
+              "file": "src/vibemix/coach/citation_linter.py",
+              "kind": "source",
+              "line": "134-213",
+              "detail": "Response-level binary strip intact and untouched: un-cited/unregistered atom strips whole turn (Invariant #2)."
+            },
+            {
+              "file": "src/vibemix/state/evidence_registry.py",
+              "kind": "git-show",
+              "line": "129-130",
+              "detail": "EVIDENCE_SOURCES incl. aud and parse_citations regex UNCHANGED; not touched by any of the 3 commits."
+            },
+            {
+              "file": "src/vibemix/agent/emote_parser.py",
+              "kind": "git-show",
+              "line": "69-83",
+              "detail": "Only strips legacy voice tags; narrow regex deliberately preserves citation brackets (comment: [aud:rms@12.0] must stay visible to linter)."
+            },
+            {
+              "file": "src/vibemix/",
+              "kind": "grep",
+              "line": "de9a55f5~1..c88d5f56",
+              "detail": "Diff grep for deleted grounding-scaffolding lines -> NO deletions found."
+            }
+          ],
+          "tests": [
+            {
+              "cmd": "pytest -q tests/prompts/test_matrix.py tests/agent/test_coach_prompt_grounding.py",
+              "result": "109 passed"
+            },
+            {
+              "cmd": "runtime build_system_instruction(live flags) + AICoach.evidence_line(audible)",
+              "result": "AUDIO_VIBE_CONTRACT=True, CITATION_GRAMMAR=True, [aud:rms@45.2]=True, COACH_CLOSING=True, TTS_TAG_DSL suppressed=True, hearing[rms..bpm]=True"
+            }
+          ],
+          "caveats": [
+            "test_dj_cohost_linter.py uncollectable (no livekit in READ-ONLY env); linter live-path verified by source-read of dj_cohost.py:3041 not by running that file.",
+            "Source+targeted-test only; live app not launched per contract.",
+            "HEAD-pinned c88d5f56; shared tree may drift."
+          ]
+        },
+        "skeptic": {
+          "item_id": "contract-audio-vibe-grounding",
+          "upheld": true,
+          "confidence": "high",
+          "refutation": "(see refutation field)",
+          "corrected_verdict": "PRESENT — audio-evidence injection + citation-grounding contract intact across all 3 commits; HEAD c88d5f56 correctly decoupled AUDIO_VIBE_CONTRACT_BLOCK from the obsolete TTS tag DSL (gate changed to include_audio_vibe_contract) and the live path (_resolve_prompt_cell -> DJCoHostAgent) re-asserts it with include_tag_dsl=False, include_audio_vibe_contract=True at both call sites (dj_cohost.py:983,996). Linter, evidence registry, and the hearing[...] audio injection are untouched.",
+          "holes": [
+            "Finding caveat that test_dj_cohost_linter.py is uncollectable is inaccurate in this env (livekit importable; 20 tests collect + pass) — a conservative under-claim, not a verdict flaw.",
+            "Live-path verification is by source-read + targeted tests only; the running packaged app was not driven (READ-ONLY contract), so end-to-end emission of the AUDIO_VIBE_CONTRACT into a real Gemini system instruction at runtime is inferred from call-site source, not observed live.",
+            "HEAD-pinned at c88d5f56 on a shared working tree; all 6 targets are currently CLEAN but a concurrent session could drift them after this audit."
+          ]
+        }
+      },
+      {
+        "item_id": "contract-no-persona-hardcode",
+        "evidence": {
+          "item_id": "contract-no-persona-hardcode",
+          "verdict": "ABSENT",
+          "one_line": "No psytrance/hardtek persona hardcode in the default speech prompts; the default HYPE/COACH personas are genre-agnostic and react to what is HEARD, with genre entering only as gated live-detected evidence (genre=<detected> when detected_genre != \"unknown\" and confidence >= 0.5).",
+          "file_cleanliness": "All target files CLEAN (== committed at HEAD c88d5f56): src/vibemix/prompts/matrix.py, prompts/filter.py, prompts/negative_dict.py, state/coach.py, agent/dj_cohost.py, coach/citation_linter.py.",
+          "evidence": [
+            {
+              "file": "src/vibemix/prompts/",
+              "kind": "grep",
+              "detail": "rg -rni 'psytrance|psy-trance|hardtek|hard tek|hardtech|hard techno|hardtechno' over prompts/, state/coach.py, agent/dj_cohost.py, coach/ -> ZERO matches (output file 0 bytes, verified via od -c). Broadened grep adding psy|trance|goa|hard[_-]?tech also matched nothing in target files. (Note: a terminal-rendering artifact made an unrelated repo-wide grep DISPLAY 'ni'/'nino' in place of matched substrings, but raw od -c of psytrance.json confirms the on-disk genre PROFILE files truly contain the full strings; they are detector data, not default prompts.)",
+              "line": "n/a"
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "kind": "source",
+              "line": "310",
+              "detail": "HYPE_INTERMEDIATE (the default persona) is genre-agnostic: example genres listed are 'progressive house, melodic techno, French Touch, electroclash, IDM, deep house, nu-disco, minimal' with explicit instruction 'don't force a genre tag into every reply'. No psytrance/hardtek. CLASSIFICATION: not a violation (genre-agnostic default)."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "kind": "source",
+              "line": "325",
+              "detail": "Only BPM hint in default prompt is house/techno '125-128 BPM target; reject anything <90 or >180' — NOT the psytrance/hardtek 138-150 range. No covert genre default."
+            },
+            {
+              "file": "src/vibemix/prompts/matrix.py",
+              "kind": "source",
+              "line": "355,447,591",
+              "detail": "'Never assume a genre from Kaan's taste history; if the evidence is generic, keep the read generic' / 'use scene-correct refs only when the audio or detected genre supports them' — prompts actively FORBID assuming a default genre persona."
+            },
+            {
+              "file": "src/vibemix/state/coach.py",
+              "kind": "source",
+              "line": "500-501",
+              "detail": "Genre enters the prompt ONLY as data-driven evidence: `if state.detected_genre != \"unknown\" and state.genre_confidence >= 0.5: e.append(f\"genre={state.detected_genre}\")`. Default MusicState has detected_genre='unknown' -> emits zero bytes, so the no-genre-detected default outgoing prompt carries NO genre persona at all (comment at 492-499 documents this as byte-identical-to-silent-state intent). The matched detector/profile strings never flow into the default prompt."
+            },
+            {
+              "file": "src/vibemix/state/genre/profiles/psytrance.json",
+              "kind": "source",
+              "line": "1-3",
+              "detail": "ALLOWED — DETECTOR/PROFILE infra: a JSON genre profile ('name':'psytrance','label':'Psytrance / Goa / Full-On','bpm_range':[138,150]) consumed by state/genre/genre_autodetect.py as detection data, not a hardcoded speech persona. Lives outside the target prompt files."
+            }
+          ],
+          "caveats": [
+            "Verification is source/test only; live-audio and packaged-binary speech behavior were not observed (per READ-ONLY contract). The grounding contract is enforced at coach.py:500 (gate) and matrix.py anti-assumption clauses, but actual end-to-end Gemini output was not exercised.",
+            "Genre profile/detector files (e.g. state/genre/profiles/psytrance.json, intel/musical_ontology.py) DO contain the literal strings — these are correctly classified as DETECTOR/PROFILE infrastructure (explicitly allowed by the contract), and the trace at coach.py:500-501 confirms they only reach the prompt as gated runtime-detected evidence, never as a hardcoded default persona."
+          ]
+        },
+        "skeptic": {
+          "item_id": "contract-no-persona-hardcode",
+          "upheld": true,
+          "confidence": "high",
+          "refutation": "I attacked the finding on its weakest point: its grep used literal patterns (psytrance/psy-trance/hardtek) and could have missed a differently-named persona. I broadened the search and DID find one thing the finding missed — `_PSY_TRIPPER_TR_OVERLAY` at src/vibemix/prompts/matrix.py:774 (the name uses PSY_TRIPPER, not 'psytrance', so the finding's regex never caught it). I evaluated it independently and it does NOT break the contract: (a) the overlay's actual TEXT (matrix.py:774-785) is genre-AGNOSTIC — a 'grounded listener / honest DJ feedback' persona with zero psytrance/genre content; the name is documented 'historical' at line 771; (b) it is applied only at matrix.py:971 `if include_tag_dsl and _psy_tripper_overlay_enabled()`, which requires VIBEMIX_PROMPT_OVERLAY=psy_tripper_tr (matrix.py:788-790), 'never a global default' (comment 968-970). I also disproved the finding's own 'rendering artifact' worry: od -c showed the mangled ni0/ni2/ni grep hits were `PROMPT_TOKEN_CAP_FULL = 1500`, `spoken_stripped[:140]` slices, and a `v4:1502` comment — all non-genre numbers, ANSI-highlight mangled. Re-verified core claims by Read: coach.py:500-501 genre gate (detected_genre!='unknown' and genre_confidence>=0.5); default HYPE_INTERMEDIATE (matrix.py:310) genre-agnostic with house/techno BPM 125-128 at matrix.py:325 (NOT psytrance 138-150); anti-assumption clauses matrix.py:355/447/591; filter.py/negative_dict.py/citation_linter.py/persona.py/lens.py have ZERO genre references (grep EXIT 1). Tests are real and assert the claims: I RAN 6 of them green — test_hype_prompt_does_not_assume_kaans_genre (asserts 'Kaan plays Hard Tek' not in out AND 'Never assume a genre' in out), test_prompt_62/63 psy_tripper overlay not-default/opt-in, and 3 coach genre-gating tests (omitted-when-unknown, emitted-at-floor, default-state-byte-identical). All 6 target files CLEAN (== committed HEAD c88d5f56) via git status --porcelain. Could not refute the verdict; the only flaw was an incomplete grep that nonetheless surfaced a non-violating symbol.",
+          "corrected_verdict": "ABSENT — No genre-persona (psytrance/hardtek/etc.) is hardcoded into the default speech prompts. The default HYPE/COACH personas are genre-agnostic and explicitly forbid assuming a genre (matrix.py:355/447/591); genre enters the prompt ONLY as gated live-detected evidence at coach.py:500-501 (detected_genre != 'unknown' and genre_confidence >= 0.5). The one genre-named symbol the finding missed, _PSY_TRIPPER_TR_OVERLAY (matrix.py:774), is (a) genre-agnostic in its actual text and (b) explicit per-session opt-in via VIBEMIX_PROMPT_OVERLAY, never a default — so it does not constitute a hardcode. Verdict unchanged.",
+          "holes": [
+            "Finding's grep used literal genre strings and MISSED _PSY_TRIPPER_TR_OVERLAY at matrix.py:774 (name is PSY_TRIPPER, not 'psytrance'); however, independent evaluation shows that overlay is genre-agnostic in content and opt-in-gated, so the verdict is unaffected.",
+            "Verification is source + targeted-test only (READ-ONLY contract): live Gemini end-to-end speech output and packaged-binary behavior were not exercised, per the finding's own caveat. The grounding gate (coach.py:500) and matrix anti-assumption clauses are confirmed at source/test level, not at live-audio level."
+          ]
+        }
+      }
+    ],
+    "hunters": [
+      {
+        "scope": "sanitizer-bypass",
+        "bypass_found": false,
+        "conclusion": "Tried to disprove \"every spoken/user-visible co-host output is sanitized (internal [emote:*]/voice tags stripped, citations preserved, English-only)\" on PINNED HEAD c88d5f56. Could NOT find a bypass that routes RAW model text to TTS or the transcript. DJCoHostAgent is the ONLY Agent subclass and the ONLY llm_node override (no RealtimeModel/tts_node/transcription_node alternate). TTS text is fed exclusively by what llm_node yields, and EVERY model-text yield is wrapped in strip_emote_tags before the yield: the two mid-stream yields (dj_cohost.py:2753, 2774 — strip_emote_tags(segment, normalize=False)) and the three post-stream re-yields from buffered_chunks (valid 3052-3054, bypass 3084-3086, legacy 3151-3153). The re-yields are safe because buffered_chunks is collapsed to the stripped spoken_text whenever has_emote_tag(full_text) is True (2974-2980); when there is no tag, raw==stripped. The mid-stream segment clip uses last_balanced_position (only advances past CLOSED brackets), so a bracketed [chill]/[emote:x] tag is always whole inside one segment before strip runs — no split-across-chunk leak. The transcript_delta surface is fed only by _push_transcript, which always receives spoken_stripped[:140] (sanitized) or hardcoded English status lines; SessionLoop.append_transcript has NO production callers. The cohost-reaction bus (3275) sends text=spoken_text (emote-stripped). MOSS is the single TTS provider in both direct and proxy modes; proxy/local_tts add no separate text path. NUANCE on \"citations preserved\": strip_emote_tags intentionally does NOT remove citation atoms ([ev:...], [mix:...], [track:...]) — by design they stay in spoken_text and the visible transcript/hero line (preserved per contract; chip-strip renders receipts). The only spoken paths that bypass strip_emote_tags are the FIXED-TEXT session.say hooks (DROP reaction_line at coach.py:714, Mastered unlock vocal at coach.py:201) — but these speak hand-authored deterministic English templates (REACTION_LINES, mastered_vocals.json _FALLBACK), never model output, so they cannot leak internal tags or non-English. The Judge verdict_evidence_line is NOT spoken directly — it is routed back into the LLM prompt (coach.py:831 ev.extra[judge_evidence_line]) and voiced through llm_node (sanitized). synthesize_line (line_voice.py) has no production callers. Targeted tests green: tests/agent/test_emote_parser.py + test_dj_cohost.py + test_dj_cohost_streaming_pipe.py = 95 passed. STATUS: core sanitizer files (dj_cohost.py, emote_parser.py, tts_chain.py, local_tts.py, ws_bus.py, session_loop.py, prompts/matrix.py, ui_bus/messages.py) are CLEAN (== committed HEAD); runtime/coach.py is DIRTY (concurrent session) — its working-tree diff is exactly the DROP fixed-text path analyzed here.",
+        "spoken_paths": [
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:2753 (llm_node mid-stream head yield)",
+            "sanitized": true,
+            "field": "tts_segment = strip_emote_tags(segment, normalize=False)[0] then `yield tts_segment`",
+            "detail": "First speculative head to TTS. Segment is clipped at last_balanced_position (only past closed brackets) then passed through strip_emote_tags before yield. [emote:*]/voice tags removed; citations retained by design."
+          },
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:2774 (llm_node mid-stream trailing yield)",
+            "sanitized": true,
+            "field": "tts_segment = strip_emote_tags(segment, normalize=False)[0] then `yield tts_segment`",
+            "detail": "Post-head trailing chunks to TTS. Same clip+strip as the head yield."
+          },
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:3052-3054 / 3084-3086 / 3151-3153 (post-stream re-yield from buffered_chunks)",
+            "sanitized": true,
+            "field": "`for txt in buffered_chunks: yield txt`",
+            "detail": "Runs only when head NOT already yielded. buffered_chunks is collapsed to [spoken_text] (strip_emote_tags output) whenever has_emote_tag(full_text) (lines 2974-2980); when no tag present raw==stripped. So no untagged-but-tagged text reaches TTS."
+          },
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:3069/3110/3161 _push_transcript -> ws_bus transcript_delta",
+            "sanitized": true,
+            "field": "_push_transcript(spoken_stripped[:140])",
+            "detail": "Transcript surface. Always receives spoken_stripped (strip_emote_tags + .strip()) or hardcoded English status lines (1389/1416/1504/2842). ws_bus.py:642-651 drains this buffer verbatim into transcript_delta. SessionLoop.append_transcript has NO production callers."
+          },
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:3269/3275 SessionCohostReaction.make(text=spoken_text)",
+            "sanitized": true,
+            "field": "text=spoken_text (strip_emote_tags(full_text)[0])",
+            "detail": "cohost-reaction chip-strip bus surface. text is emote/voice-tag stripped. Citation atoms intentionally retained (chip strip renders them). messages.py:1502 passes text verbatim; frontend ws-bridge.ts:601 stores p.text without bracket strip (citations preserved per contract)."
+          },
+          {
+            "path": "src/vibemix/runtime/coach.py:714 mastered_speak(reaction_line(drop_cue)) -> session.say",
+            "sanitized": false,
+            "field": "reaction_line(drop_cue) — fixed template string from REACTION_LINES",
+            "detail": "BYPASSES strip_emote_tags (direct session.say fixed-text path). NOT a violation: drop_reaction.py REACTION_LINES are hand-authored deterministic English interjections with no internal tags and no non-English text. Not model output."
+          },
+          {
+            "path": "src/vibemix/runtime/coach.py:201 speak(mastered_unlock_line(sid,...)) -> session.say",
+            "sanitized": false,
+            "field": "mastered_unlock_line(sid) — fixed string from mastered_vocals.json / _FALLBACK",
+            "detail": "BYPASSES strip_emote_tags (direct session.say fixed-text path). NOT a violation: deterministic hand-authored English fixture text, not model output; cannot carry internal tags."
+          },
+          {
+            "path": "src/vibemix/intel/judge_voice.py:63 verdict_evidence_line (Judge)",
+            "sanitized": true,
+            "field": "line = f\"[{citation_id}] Judge graded the transition: {body}\" -> ev.extra['judge_evidence_line']",
+            "detail": "NOT spoken directly. coach.py:831 feeds it into the LLM prompt; the verdict is voiced through llm_node and therefore passes strip_emote_tags + the citation linter. The [citation_id] bracket is a grounded judge citation (preserved by design)."
+          }
+        ],
+        "findings": [
+          {
+            "file": "src/vibemix/agent/dj_cohost.py",
+            "line": "2753, 2774, 2974-2980, 3052-3161",
+            "severity": "INFO",
+            "detail": "All model-text-to-TTS and to-transcript emit points in llm_node provably pass through strip_emote_tags. Mid-stream segments are clipped at last_balanced_position so bracketed internal tags are never split across yields; buffered_chunks re-yield is collapsed to stripped spoken_text whenever a tag is present. No raw full_text/response.text reaches TTS or the transcript. No bypass."
+          },
+          {
+            "file": "src/vibemix/agent/emote_parser.py",
+            "line": "71-130",
+            "severity": "INFO",
+            "detail": "strip_emote_tags removes [emote:*] (any name) AND the 6 legacy voice tags (whisper/laugh/fast/slow/excited/chill). Citation atoms ([ev:/mix:/aud:/midi:/key:/track:/recall:/exemplar:/cue:/judge:/screen:]) are deliberately NOT stripped — they are preserved for the linter and the UI chip strip, matching the 'citations preserved' half of the contract. Confirmed by VOICE_TAGS regex narrowness."
+          },
+          {
+            "file": "src/vibemix/runtime/coach.py",
+            "line": "714, 201",
+            "severity": "LOW",
+            "detail": "Two spoken paths (DROP reaction line, Mastered unlock vocal) reach TTS via session.say WITHOUT passing strip_emote_tags. They are hand-authored deterministic English templates (REACTION_LINES / mastered_vocals.json), never model output, so they cannot emit internal tags or non-English text. Low risk only as a latent surface: if a future change ever routes model-generated or localized text through mastered_speak/session.say, it would bypass the sanitizer. Currently safe. NOTE: coach.py is DIRTY (concurrent session) — the DROP path at :704-718 is an un-landed working-tree addition; its content matches drop_reaction.py REACTION_LINES (clean)."
+          },
+          {
+            "file": "src/vibemix/agent/tts_chain.py + local_tts.py + proxy_client.py",
+            "line": "tts_chain.py:26-72, local_tts.py:404-462, proxy_client.py:49-56",
+            "severity": "INFO",
+            "detail": "MOSS is the single TTS provider in BOTH direct and proxy modes; MossLocalTTS.synthesize(text) speaks whatever the LiveKit tts_node feeds (i.e. the llm_node generator yields or session.say text). No second AI/text path, no raw-text re-injection at the TTS layer."
+          },
+          {
+            "file": "src/vibemix/runtime/session_loop.py",
+            "line": "236-248",
+            "severity": "INFO",
+            "detail": "SessionLoop.append_transcript accepts arbitrary text but has NO production callers (codegraph + grep confirm). The live transcript_delta surface is fed only by dj_cohost._push_transcript (sanitized) drained in ws_bus.py:642-651. Not a live bypass."
+          },
+          {
+            "file": "tauri/ui/src/session/ws-bridge.ts",
+            "line": "601, SessionLayout.ts:1178",
+            "severity": "INFO",
+            "detail": "Frontend renders cohost-reaction p.text and the transcript hero line verbatim (no client-side citation-bracket strip). This is consistent with 'citations preserved': the brackets the user may see are grounded citation atoms by design, and emote/voice tags were already removed server-side. Not a sanitizer bypass."
+          }
+        ]
+      },
+      {
+        "scope": "raw-vs-clean-and-english",
+        "bypass_found": true,
+        "conclusion": "Raw-vs-clean split is CORRECT: the raw model response (full_text) is logged raw only to observability surfaces (events.jsonl via record_session_ai_message response=full_text, and the response_path artifact) — never promoted to a spoken/visible surface. Every TTS yield and every user-visible transcript/overlay emit uses spoken_text = strip_emote_tags(full_text), which removes internal [emote:*] tags and legacy voice tags [whisper]/[laugh]/[fast]/[slow]/[excited]/[chill]. Confirmed across both the streaming-head path and the post-stream re-yield path, and the cohost-reaction broadcast (text=spoken_text). No raw field reaches TTS/transcript_delta/ai_message. Internal-tag stripping is solid (29/29 emote_parser tests pass on the current tree).\\n\\nHOWEVER bypass_found=true on the ENGLISH-ONLY axis: English is enforced ONLY as a prompt instruction (matrix.py cells + the psy_tripper overlay) with NO runtime backstop on the spoken path. There is no language-detection filter; the slop filter (negative_dict.py) is an English AI-slop phrase banlist with zero general-Turkish coverage — the only Turkish guard is ~4 canned-hype words banned in-prompt, not in a filter. The persona is explicitly Turkish-flavored (the prompt itself bans Turkish hype words süper/harika/muhteşem/evet and names abi/knk/lan/dostum), so a fluent non-English emission that is not a canned phrase would pass straight through strip_emote_tags + filter_for_slop and reach both TTS and the transcript unfiltered. English-only is unenforced on the spoken path.\\n\\nNote (INFO, not a violation): citation brackets like [aud:rms@45.2]/[ev:KICK_SWAP@45.2] survive into the yielded TTS text and the transcript verbatim — this matches the contract's 'citations preserved' rule, but they are passed to TTS as literal bracket characters with no human-readable rendering step. Files dirty/clean status: src/vibemix/agent/dj_cohost.py CLEAN (==committed), src/vibemix/agent/emote_parser.py CLEAN, src/vibemix/prompts/matrix.py CLEAN, src/vibemix/prompts/negative_dict.py CLEAN; only src/vibemix/runtime/coach.py is DIRTY (not on the verified spoken-emit path).",
+        "spoken_paths": [
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:2753 (streaming head yield)",
+            "field": "tts_segment = strip_emote_tags(segment, normalize=False)[0] — sanitized (emote/voice tags stripped); citations preserved",
+            "sanitized": true,
+            "detail": "Per-segment strip before the speculative head reaches TTS. last_balanced_position only defers UNCLOSED brackets; closed [aud:*]/[ev:*] citations pass through verbatim by design (contract: citations preserved). Internal [emote:*] + voice tags removed."
+          },
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:2774 (streaming post-head yield)",
+            "field": "tts_segment (strip_emote_tags) — sanitized of internal tags",
+            "sanitized": true,
+            "detail": "Same per-segment strip on the after-head-cleared frontier. No raw full_text reaches TTS here."
+          },
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:3053/3085/3152 (post-stream re-yield to TTS)",
+            "field": "buffered_chunks = [spoken_text] when emote tags present (dj_cohost.py:2980) — sanitized",
+            "sanitized": true,
+            "detail": "On the valid/bypass/legacy emit branches the buffered chunks are collapsed to the emote-stripped spoken_text before re-yield, so internal tags never reach TTS on the non-streaming path."
+          },
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:3069/3110/3161 (_push_transcript)",
+            "field": "spoken_stripped[:140] — sanitized of internal tags; citations preserved",
+            "sanitized": true,
+            "detail": "UI transcript sink receives the emote-stripped spoken text, not raw full_text. Citation brackets remain visible per contract."
+          },
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:3276 (SessionCohostReaction.make text=spoken_text)",
+            "field": "spoken_text — sanitized clean reaction broadcast to the UI overlay",
+            "sanitized": true,
+            "detail": "User-visible cohost-reaction message uses spoken_text (clean), citation_strip built from spoken_text via _build_citation_strip. Raw full_text is NOT used for the visible message."
+          },
+          {
+            "path": "src/vibemix/agent/dj_cohost.py:3399 + 3409 (record_session_ai_message)",
+            "field": "text=spoken_text (clean) for the message field; response=full_text (RAW) for the observability field",
+            "sanitized": true,
+            "detail": "This is an OBSERVABILITY writer (events.jsonl + response_path artifact via ai_observability.py:285-306,411). Raw response here is correct and contract-permitted; it is NOT a spoken/visible surface."
+          },
+          {
+            "path": "ENGLISH-ONLY enforcement (matrix.py:372/483/526/581/778)",
+            "field": "prompt instruction only — NO runtime filter on spoken text",
+            "sanitized": false,
+            "detail": "English is instructed in-prompt across all persona cells (test_matrix.py:825/833 pins presence) but there is no language-detection/strip on the TTS or transcript path. filter_for_slop (negative_dict.py) is English-only with no general-Turkish coverage. A non-English emission reaches TTS + transcript unfiltered."
+          }
+        ]
+      }
+    ],
+    "board": {
+      "packages": [
+        {
+          "name": "Event-driven library fs-watcher module (P0 freshness gap)",
+          "disposition": "SAFE_NOW",
+          "rank": 1,
+          "value": "high — closes the standout P0 from the Viber correction: a dedicated src/vibemix/library/watcher.py best-effort, off-loop, debounced watcher so a mid-session Rekordbox XML re-export or dropped track refreshes the index in real time instead of waiting on the poll interval. discover_pool/sequence_set/create_playlist/smart_hot_cues/Viber chat are only as fresh as the index they read. The dependency groundwork already landed (watchfiles>=1.1.1 in pyproject.toml:101, plus watchfiles in BOTH PyInstaller specs at vibemix-core.macos.spec:170 / windows.spec:181), and 1146bae2 added file-event acceleration inside staleness.py — but NO standalone watcher.py module exists yet (ls src/vibemix/library/watcher.py = NOT-FOUND). This is the remaining source slice.",
+          "risk": "med — must stay best-effort/off-loop/never wedge live audio and must degrade to the existing 10s poll (augment staleness.py, never rip it out). Source slice + tests are SAFE_NOW; packaged (frozen-.dmg) behavior that the watchfiles Rust native ext actually loads is a separate NEEDS_LIVE_PROOF gate, not a source blocker.",
+          "gate": "none for the source slice + tests (watchfiles is already a declared dep AND already in both specs, so the old 'must declare it' blocker is CLEARED). Packaged proof (frozen bundle loads the native ext) is deferred — do NOT claim packaged watcher behavior from source tests.",
+          "shared_files": [
+            "src/vibemix/__main__.py"
+          ],
+          "evidence": "NEXT-LAND-BOARD-current-head.md#5 (L5) + checklist:2610-2658 acceptance sketch; pyproject.toml:101 (watchfiles dep landed); vibemix-core.macos.spec:170 / windows.spec:181 (watchfiles in specs landed via 1146bae2); staleness.py file-event accel landed 1146bae2; watcher.py module = NOT-FOUND in tree. __main__.py boot-wire hunk MUST be hunk-staged (13-lane shared file)."
+        },
+        {
+          "name": "Real-audio auto-cue eval gate (extend the landed harness)",
+          "disposition": "SAFE_NOW",
+          "rank": 2,
+          "value": "med-high — the first slice of this already landed as 89447433 (scripts/eval/cue_detect.py + tests/library/fixtures/cue_real_corpus/manifest.json + tests/library/test_cue_detect_eval.py). The remaining value is populating real committed anchor fixtures and asserting CUE-DETR ONNX anchor quality on actual audio — every runtime cue test still injects a FAKE detect fn, so the real producer's anchor quality is still unproven. This de-risks the cue/Serato/Rekordbox/M3U8 moat now that its GUI shipped (e6c62cbe).",
+          "risk": "low-med — offline regression gate only; needs a small license-clean audio/anchor fixture and must keep ONNX out of CI (load committed embeddings/anchors, mirror scripts/eval/clap_retrieval.py). Touches NONE of the 5 shared files.",
+          "gate": "none — pure additive eval lane, no speech path, no shared-file contention. Do NOT modify the runtime detect_cues_auto producer (eval only).",
+          "shared_files": [],
+          "evidence": "89447433 landed the scaffold (git show --stat); NEXT-LAND-BOARD #4 / CODEX_READY L4; pattern at 'Hold Lane - Real CLAP Retrieval Eval Gate' (scripts/eval/clap_retrieval.py). Producer must stay untouched."
+        },
+        {
+          "name": "Rebuild + re-sign + notarize the macOS DMG from current HEAD",
+          "disposition": "SAFE_NOW",
+          "rank": 3,
+          "value": "high — every packaged/signed/boots-clean claim is currently UNPROVEN: newest dist/fresh-20260601-latest/vibemix-0.0.1.dmg mtime is 08:32, but ALL the MOSS/voice-tag/cohost fixes that define current behavior landed 13:53-14:56 (0b87e9e5..c88d5f56). The signed artifact predates the MOSS-only voice source, sentencepiece bundling, the MOSS boot-muted guard, AND the three voice-tag-stripping fixes. A fresh build is the gating step before ANY release acceptance.",
+          "risk": "med — this is a build/release op, not a code change. The MOSS-model-absent boot path is now guarded (7e496239 boot-muted), and sentencepiece is in both specs (07bf2f34), so the old fresh-machine crash blocker is mitigated in source. Real residual risk is human: notarization/staple/Gatekeeper round-trip + a live ear-pass that MOSS actually synthesizes in the frozen bundle. NOT a source-edit; touches none of the 5 shared files in the tree.",
+          "gate": "build hygiene only: build from clean HEAD c88d5f56 (the dirty DROP block in runtime/coach.py and the dirty __main__.py/perception files MUST NOT be included in the build tree, or ungated DROP speech ships). Then human eye/ear: Gatekeeper-accept + boot-clean + MOSS audible. Do NOT claim 'works in Serato' (cue render stays a separate human eye-check).",
+          "shared_files": [],
+          "evidence": "DRIFT-current-head.md blocker #2 (stale DMG, mtime 08:32 vs commits 12:33-12:59 at that HEAD; at c88d5f56 the gap is wider — commits to 14:56); ls dist/fresh-20260601-latest/*.dmg = 08:32; git log -6 --format times = 13:53-14:56. 7e496239 (boot-muted) + 07bf2f34 (sentencepiece) mitigate the crash blocker."
+        },
+        {
+          "name": "DROP-call live hype line (net-new fixed-text speech on 2s drop-arm window)",
+          "disposition": "HOLD",
+          "rank": 4,
+          "value": "high IF it lands ON beat and grounded — a deterministic on-beat hype line via the fixed-text say() path (no LLM). Catastrophic slop if it fires on a phantom predicted drop. This is exactly the 'real DJ friend, no AI slop' release gate.",
+          "risk": "high — net-new SPEECH + timing + the predicted-drop false-positive risk. The whole path is DIRTY-ONLY (uncommitted) across 4 shared files: runtime/coach.py:693-718 (WHAT it says — the single dirty hunk), state/event_detector.py (WHEN — fires the reserved DROP event), state/drop_predict.py (DROP_ARM_WINDOW_S=2.0, WHEN), and the voiced text in the committed-but-orphaned src/vibemix/runtime/drop_reaction.py (imported ONLY inside the dirty coach block). vibemix-grounding-review has NOT been run.",
+          "gate": "BEFORE any land: (1) run vibemix-grounding-review (5 cardinal invariants) and PASS; (2) live-rig proof the 2s window + TTS latency actually lands the line ON the drop, not late; (3) measure predicted_drop_in_sec false-positive rate on real sets. NOTE the old 'on-by-default' aggravator is already CLEARED: there is NO setdefault('VIBEMIX_DROP_CALL','1') anywhere (committed or dirty); event_detector reads VIBEMIX_DROP_CALL from env, dormant/opt-in by default.",
+          "shared_files": [
+            "src/vibemix/runtime/coach.py",
+            "src/vibemix/state/event_detector.py",
+            "src/vibemix/state/drop_predict.py",
+            "src/vibemix/__main__.py"
+          ],
+          "evidence": "git diff src/vibemix/runtime/coach.py = ONE hunk @@ -693,6 +693,30 @@ = the DROP speech block (mastered_speak(reaction_line(drop_cue)) then continue, skipping LLM); git show HEAD:runtime/coach.py has NO DROP block (dirty-only confirmed); drop_reaction.py is committed/clean but imported only at coach.py:706 inside the dirty block (orphaned); event_detector dirty adds _drop_call_enabled_from_env() reading VIBEMIX_DROP_CALL; drop_predict dirty adds DROP_ARM_WINDOW_S=2.0. No VIBEMIX_DROP_CALL setdefault in committed or dirty __main__.py."
+        },
+        {
+          "name": "BEATMATCH_GRADED production producer (owned-deck practice loop)",
+          "disposition": "HOLD",
+          "rank": 5,
+          "value": "high — completes the Learn/Earned 'Mastered' moat for the headline competency (beatmatching). The grading engine (learn/beatmatch_judge.grade_beatmatch / grade_to_event_extra) and the recognizer consumer (skill_recognizer.py:154) already exist; the missing piece is a real-time producer wired to owned-deck audio/MIDI that fires the BEATMATCH_GRADED event.",
+          "risk": "high — requires live owned-deck grading hardware + a Mastered vocal (speech → grounding-review if the vocal changes). Beatmatch 'Mastered' is intentionally uncreditable today by design (masked + reality-pinned).",
+          "gate": "NEEDS_LIVE_PROOF_FIRST: build the real-time owned-deck producer + live owned-deck proof BEFORE unmasking stored Beatmatch mastery. Do NOT unmask without the producer (the honesty boundary must hold). Existing pins guard the missing producer.",
+          "shared_files": [],
+          "evidence": "rg BEATMATCH_GRADED src/vibemix = consumer-only: beatmatch_judge.py:146-153 (canonical payload doc + 'A future owned-deck practice loop must fire...'), skill_recognizer.py:154 (if ev_type==BEATMATCH_GRADED consumer), skill_tree.py:147 ('no production live loop emits BEATMATCH_GRADED yet'). No producer found. NEXT-LAND-BOARD #8 / CODEX_READY H3."
+        }
+      ],
+      "shared_file_risk": [
+        {
+          "file": "src/vibemix/__main__.py",
+          "exists": true,
+          "dirty_now": true,
+          "contending_lanes": "13 lanes per the dirty-package checker: Package 1A (Observability Spine), 5C/5E/5F (library freshness status/watcher pulse/refresh action), Hold Lane - Cue Export Folder Bridge, 1C (Eval Session Report), 10 (Cost/Pricing), 14/14B/14D/14E (TTS shutdown + MOSS voice/boot-guard/readiness), 15 (16ch auto-master), Hold Lane - Deck Audio Controller-Weighted Master Context. Plus the DROP-call boot-wire would land here if that HOLD ever clears.",
+          "caution": "HIGHEST-contention shared file (~13 lanes). A whole-file `git add src/vibemix/__main__.py` would sweep an unknown mix of observability/freshness/cost/TTS/16ch/deck-audio hunks — and potentially a DROP-call boot-wire — into one LAND commit, bleeding HOLD or other-lane work. MUST hunk-stage: git diff the file, write a filtered patch with ONLY your slice's hunks, git apply --cached --recount, then verify git diff --cached shows only your hunks before commit. git add -p is unavailable here."
+        },
+        {
+          "file": "src/vibemix/runtime/coach.py",
+          "exists": true,
+          "dirty_now": true,
+          "contending_lanes": "Per the checker, assigned to Package 8B (Judge Voice Evidence Runtime Wire) and Package 9 (Earned Wall Live Refresh). But the ACTUAL single dirty hunk in the tree right now (@@ -693,6 +693,30 @@) is the DROP-call speech block (Hold Lane - Mix Timing Oracle / DROP HOLD), NOT 8B/9 work — those landed clean already (b3828752 ground spoken turns, 63cdca20 voice transition judge).",
+          "caution": "CRITICAL bleed risk. The ONLY dirty content is the 30-line net-new DROP-call SPEECH block (ungated by vibemix-grounding-review). A whole-file `git add src/vibemix/runtime/coach.py` would ship ungated drop-call speech into a LAND commit — a release-gate violation. Do NOT stage this file at all until the DROP HOLD clears its grounding-review gate. There are currently NO landable prose-only sub-hunks here (the file's only dirty hunk is pure speech logic)."
+        },
+        {
+          "file": "src/vibemix/state/coach.py",
+          "exists": true,
+          "dirty_now": false,
+          "contending_lanes": "none active (CLEAN). Recent landed work: de9a55f5 (block no-move coaching advice) touched it and is committed.",
+          "caution": "CLEAN == committed at HEAD c88d5f56. NOTE there are TWO coach.py files in the tree — src/vibemix/state/coach.py (the brain, clean) AND src/vibemix/runtime/coach.py (the reaction loop, DIRTY with the DROP block). Do not conflate them; only runtime/coach.py is dirty. No staging hazard here unless a new edit lands."
+        },
+        {
+          "file": "src/vibemix/agent/dj_cohost.py",
+          "exists": true,
+          "dirty_now": false,
+          "contending_lanes": "none active (CLEAN). Recent landed work: c88d5f56 (stop prompting moss voice tags) and de9a55f5 (block no-move coaching advice) both touched it and are committed.",
+          "caution": "CLEAN == committed at HEAD. This is the LiveKit RealtimeModel session + Gemini reaction path — any future edit is a SPEECH-surface change subject to vibemix-grounding-review. No current staging hazard."
+        },
+        {
+          "file": "src/vibemix/prompts/matrix.py",
+          "exists": true,
+          "dirty_now": false,
+          "contending_lanes": "none active (CLEAN). Recent landed work: c88d5f56 (stop prompting moss voice tags) and de9a55f5 (block no-move coaching advice) both touched it and are committed.",
+          "caution": "CLEAN == committed at HEAD. Prompt-composition surface — any future edit changes WHAT the co-host says and is subject to vibemix-grounding-review (and PROMPT-COMPOSITION.md contract). No current staging hazard."
+        }
+      ],
+      "notes": [
+        "PINNED HEAD c88d5f56 is 12 commits AHEAD of the board docs, which were authored at dc4702eb/e5c0e34e. The NEXT-LAND-BOARD and CODEX_READY-next-land-board L1-L5 queue is now LARGELY LANDED — verify before reusing: L1 settings-nav fix (b16a9bf2), L2 cue-export GUI (e6c62cbe — library_cmds.rs +186 lines, main.rs registered), L3 freshness badge (dc4702eb), L4 real-audio cue eval scaffold (89447433), and L5's watchfiles dep + spec entries (1146bae2) all landed. The old board is STALE for ranking; this answer re-derives NEXT against the live HEAD.",
+        "HOLD-bleed verdict at HEAD c88d5f56: CLEAN. The DROP-call speech path is DIRTY-ONLY (never committed). git show HEAD:src/vibemix/runtime/coach.py has no DROP block; the voiced text lives in committed-but-orphaned src/vibemix/runtime/drop_reaction.py, imported ONLY inside the dirty coach hunk. Perception-only dirty files (audio/deck_capture.py, audio/deck_signal.py, midi/state.py) carry ZERO say/speak/reaction_line in added lines — verified via git diff grep.",
+        "The on-by-default DROP aggravator that older docs flagged (setdefault('VIBEMIX_DROP_CALL','1') at __main__.py:803) is GONE — confirmed no VIBEMIX_DROP_CALL setdefault exists in committed OR dirty __main__.py. event_detector reads the env flag, dormant/opt-in by default. So the 'flip default OFF' sub-gate is already satisfied; the remaining DROP gate is vibemix-grounding-review + live on-beat proof + false-positive-rate measurement.",
+        "scripts/check_dirty_package_plan.py --strict-assignments --summary EXITS 0 (GREEN) at HEAD c88d5f56 — the RED that DRIFT-current-head.md flagged (4 unassigned library-freshness paths) has been RESOLVED. All dirty paths are now lane-assigned.",
+        "Nothing is currently staged (git diff --cached --name-only empty). MOSS-model-absent boot crash blocker from DRIFT is mitigated in source: 7e496239 boots muted when MOSS model unavailable, 07bf2f34 + the 1146bae2 spec edits put sentencepiece AND watchfiles in both PyInstaller specs.",
+        "Two coach.py files exist — do NOT conflate: src/vibemix/state/coach.py (the brain / prompt builder, CLEAN) and src/vibemix/runtime/coach.py (the reaction loop, DIRTY with the DROP speech block). Of the 5 target shared files, only __main__.py and runtime/coach.py are dirty; state/coach.py, agent/dj_cohost.py, prompts/matrix.py are all CLEAN at HEAD."
+      ]
+    }
+  }
+}
