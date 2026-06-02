@@ -946,6 +946,59 @@ describe("chat - real runChat path", () => {
     expect(artifactText).not.toContain("requires_more_evidence");
   });
 
+  it("keeps the library setup action visible when live proof is still waiting", async () => {
+    statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
+    chatMock.mockResolvedValueOnce({
+      ...CHAT_WITH_PLAYLIST,
+      reply:
+        "I need a stronger live read before I can grade that, and I found a likely library source.",
+      tool_trace: [
+        {
+          name: "live_context_required",
+          arg: "waiting for live deck feed",
+          ok: false,
+        },
+      ],
+      playlist: null,
+      seen_track_ids: [],
+      iterations: 0,
+      stop_reason: "live_context_required",
+      live_verification: {
+        ok: false,
+        violations: ["missing_library", "missing_live_context"],
+        reply: "Index the library first, then I can bind deck identity.",
+        corrected: false,
+        corrected_reply: null,
+        claim_policy: "requires_more_evidence",
+        transport_status: "missing_live_context",
+        move_grades_allowed: false,
+        move_grades_seen: 0,
+        guard_applied: false,
+        guard_violations: [],
+      },
+    } satisfies LibraryChatResult);
+
+    await mountChat();
+    await sendChat("why can't you read the decks?");
+
+    const artifact = document.getElementById("vmx-lib-chat-artifact");
+    const cards = artifact?.querySelectorAll<HTMLElement>(".vmx-lib-chat-card");
+    expect(cards).toHaveLength(2);
+    const firstCard = cards?.item(0);
+    expect(firstCard).not.toBeNull();
+    expect(firstCard?.textContent).toContain("live read");
+    expect(firstCard?.textContent).toContain("listening");
+
+    const setupCard = artifact?.querySelector<HTMLElement>(
+      '[data-wire="library.setup-candidate"]',
+    );
+    expect(setupCard).not.toBeNull();
+    expect(setupCard?.textContent).toContain("Viber found a likely music folder.");
+    expect(setupCard?.textContent).toContain("/Users/ozai/Music/PSYMIND");
+    expect(setupCard?.textContent).toContain("waiting for approval");
+    expect(emitIpcMock).not.toHaveBeenCalled();
+  });
+
   it("shows the live Viber tool tape while the chat turn is still running", async () => {
     let resolveChat!: (value: LibraryChatResult) => void;
     chatMock.mockImplementationOnce(

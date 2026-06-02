@@ -1406,10 +1406,8 @@ function renderChatSide(result: LibraryChatResult): void {
   artifact.replaceChildren();
   const card = chatArtifactCard(result);
   if (card) artifact.append(card);
-  else {
-    const setupCard = chatLibrarySetupCard(latestStats);
-    if (setupCard) artifact.append(setupCard);
-  }
+  const setupCard = chatLibrarySetupCard(latestStats);
+  if (setupCard) artifact.append(setupCard);
   $("vmx-lib-scope-state").textContent = chatScopeStateText(result);
 }
 
