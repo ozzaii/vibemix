@@ -249,6 +249,28 @@ def test_deck_audio_routing_auto_uses_rekordbox_hint_when_requested(monkeypatch,
     assert "deck_outputs=A:0,1+B:2,3" in context["deck_audio_routing_hint"]
 
 
+def test_deck_audio_routing_auto_uses_blackhole_standard_when_settings_missing(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "auto")
+    monkeypatch.delenv("VIBEMIX_INPUT_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_MASTER_AUDIO_CHANNELS", raising=False)
+
+    routing = deck_audio_routing_from_env(
+        input_channels=16,
+        capture_device_name="BlackHole 16ch",
+        rekordbox_settings_paths=(tmp_path / "missing.settings",),
+    )
+
+    assert routing.opened_channels == 4
+    assert routing.master_channels == (0, 1, 2, 3)
+    assert routing.master_source == "controller_weighted_deck_pairs"
+    assert routing.deck_channels == {"A": (0, 1), "B": (2, 3)}
+    assert routing.enabled is True
+    assert routing.reason == "blackhole_standard_auto"
+    assert routing.source == "blackhole_standard"
+
+
 def test_deck_audio_capture_auto_rekordbox_map_requires_both_pairs_live(
     monkeypatch, tmp_path
 ) -> None:
@@ -315,6 +337,46 @@ def test_deck_audio_capture_auto_rekordbox_map_requires_both_pairs_live(
         "status": "configured_deck_lanes_active",
         "rule": "live_audio_probe",
     }
+
+
+def test_deck_audio_capture_auto_blackhole_standard_requires_both_pairs_live(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "auto")
+    monkeypatch.delenv("VIBEMIX_INPUT_CHANNELS", raising=False)
+    monkeypatch.delenv("VIBEMIX_MASTER_AUDIO_CHANNELS", raising=False)
+    routing = deck_audio_routing_from_env(
+        input_channels=16,
+        capture_device_name="BlackHole 16ch",
+        rekordbox_settings_paths=(tmp_path / "missing.settings",),
+    )
+    capture = DeckAudioCapture(routing, seconds=1.0)
+    first_pair_only = np.zeros((480, 4), dtype=np.float32)
+    first_pair_only[:, 0] = 0.2
+    first_pair_only[:, 1] = 0.2
+
+    capture.process(first_pair_only, source_sr=48000)
+    context = capture.context()
+
+    assert context["deck_audio_capture_configured"] is True
+    assert context["deck_audio_capture_enabled"] is False
+    assert context["deck_audio_capture_verified"] is False
+    assert context["deck_audio_capture_reason"] == "deck_pair_capture_unverified"
+    assert context["deck_audio_active_sides_seen"] == "A"
+    assert context["deck_audio_route_diagnosis"]["status"] == "configured_deck_lane_missing_audio"
+    assert context["deck_audio_route_diagnosis"]["inactive_sides"] == "B"
+
+    both_pairs = np.zeros((480, 4), dtype=np.float32)
+    both_pairs[:, 0] = 0.2
+    both_pairs[:, 1] = 0.2
+    both_pairs[:, 2] = 0.3
+    both_pairs[:, 3] = 0.3
+    capture.process(both_pairs, source_sr=48000)
+    context = capture.context()
+
+    assert context["deck_audio_capture_enabled"] is True
+    assert context["deck_audio_capture_verified"] is True
+    assert context["deck_audio_active_sides_seen"] == "A,B"
 
 
 def test_deck_audio_capture_diagnoses_active_unassigned_pair(monkeypatch) -> None:

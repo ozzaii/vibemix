@@ -28,6 +28,9 @@ _WINDOW_PRE_START_S = -6.0
 _WINDOW_PRE_END_S = -1.0
 _WINDOW_CURRENT_START_S = -1.0
 _WINDOW_CURRENT_END_S = 0.0
+_DECK_PAIR_VERIFICATION_REQUIRED_SOURCES = frozenset(
+    {"blackhole_standard", "rekordbox_settings"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,7 +182,7 @@ class DeckAudioCapture:
         """
         if not self.routing.enabled:
             return False
-        if self.routing.source != "rekordbox_settings":
+        if self.routing.source not in _DECK_PAIR_VERIFICATION_REQUIRED_SOURCES:
             return True
         return all(side in self._active_sides_seen for side in _DECK_SIDES)
 
@@ -488,9 +491,17 @@ def deck_audio_routing_from_env(
         map_reason = "rekordbox_settings_auto"
         source = "rekordbox_settings"
     elif auto_requested:
-        deck_channels = {}
-        map_reason = "rekordbox_settings_unavailable"
-        source = "rekordbox_settings"
+        deck_channels = _blackhole_standard_deck_channels(
+            capture_device_name=capture_device_name,
+            input_channels=max_in,
+        )
+        if deck_channels:
+            map_reason = "blackhole_standard_auto"
+            source = "blackhole_standard"
+        else:
+            deck_channels = {}
+            map_reason = "rekordbox_settings_unavailable"
+            source = "rekordbox_settings"
     else:
         deck_channels, map_reason = _parse_deck_channels(raw_deck_channels)
         source = "env"
@@ -691,6 +702,27 @@ def _parse_deck_channels(raw: str | None) -> tuple[dict[str, tuple[int, ...]], s
         if channels:
             out[side] = channels
     return out, "configured" if out else "parse_error"
+
+
+def _blackhole_standard_deck_channels(
+    *,
+    capture_device_name: str | None,
+    input_channels: int | None,
+) -> dict[str, tuple[int, int]]:
+    """Return the practical BlackHole 16ch A/B deck-pair default.
+
+    `VIBEMIX_DECK_AUDIO_CHANNELS=auto` means the app should try to set itself
+    up, not quietly stay stereo when rekordbox settings are unavailable. The
+    standard BlackHole multi-output rig exposes A on 0/1 and B on 2/3; this is
+    still only a routing guess, so `DeckAudioCapture.effective_enabled()` keeps
+    it abstain-first until both pairs show live audio.
+    """
+    if not capture_device_name or (input_channels is not None and input_channels < 4):
+        return {}
+    token = _device_token(capture_device_name)
+    if "blackhole" not in token:
+        return {}
+    return {"A": (0, 1), "B": (2, 3)}
 
 
 def rekordbox_deck_output_routing_hint(
