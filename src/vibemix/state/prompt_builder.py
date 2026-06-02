@@ -733,13 +733,21 @@ class AICoach:
         t = ev.type
         ev_extra = ev.extra if isinstance(ev.extra, dict) else {}
 
-        def _with_next_suggestion(base: str) -> str:
-            line = ev_extra.get("next_suggestion_voice_line")
-            if not isinstance(line, str) or not line.strip():
+        def _with_grounded_receipts(base: str) -> str:
+            receipt_lines = []
+            for key in (
+                "next_suggestion_voice_line",
+                "transition_verdict_voice_line",
+            ):
+                line = ev_extra.get(key)
+                if isinstance(line, str) and line.strip():
+                    receipt_lines.append(line.strip())
+            if not receipt_lines:
                 return base
             return (
-                f"{base} {line.strip()} This is suggestion context, not a command; "
-                "do not force it if the live sound is more important."
+                f"{base} {' '.join(receipt_lines)} These are grounded receipt "
+                "contexts, not commands; do not force them if the live sound is "
+                "more important."
             )
 
         if t == "KAAN_SPOKE":
@@ -754,7 +762,7 @@ class AICoach:
         if t == "TRACK_CHANGE":
             judge_line = ev_extra.get("judge_evidence_line")
             if isinstance(judge_line, str) and judge_line.strip():
-                return _with_next_suggestion(
+                return _with_grounded_receipts(
                     f"{judge_line.strip()}. Use that measured Judge verdict as "
                     "the hard transition read. Keep the bracketed citation exactly, "
                     "translate the measured key/low-end result into one short DJ "
@@ -764,7 +772,7 @@ class AICoach:
                 )
             prev = ev_extra.get("prev_track")
             prev_clause = f" (was: {prev!r})" if prev else ""
-            return _with_next_suggestion(
+            return _with_grounded_receipts(
                 f"Track flipped{prev_clause}. React to the NEW track's vibe vs "
                 "the previous — heavier, weirder, darker, more euphoric?"
             )
@@ -892,7 +900,7 @@ class AICoach:
                 if clash
                 else "harmonically the keys sat fine together"
             )
-            return _with_next_suggestion(
+            return _with_grounded_receipts(
                 f"You just blended deck {a_side} ({a_cam}) into deck {b_side} "
                 f"({b_cam}) — {verdict}. Give Kaan the PAST-TENSE read on how that "
                 f"blend sat harmonically — nothing else, no present-tense advice, "

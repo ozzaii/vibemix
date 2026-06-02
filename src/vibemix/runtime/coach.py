@@ -86,6 +86,7 @@ from vibemix.state.deck_context import (
 from vibemix.ui_bus import SessionCitation
 
 from .suggestion_voice import build_next_suggestion_voice_line
+from .transition_verdict_voice import build_transition_verdict_voice_line
 
 if TYPE_CHECKING:
     from livekit.agents import AgentSession
@@ -712,6 +713,13 @@ async def coach_loop(
                 )
                 if voice_line:
                     ev.extra["next_suggestion_voice_line"] = voice_line
+                transition_line = build_transition_verdict_voice_line(
+                    current_suggestion,
+                    event_type=ev.type,
+                    evidence_registry=evidence_registry,
+                )
+                if transition_line:
+                    ev.extra["transition_verdict_voice_line"] = transition_line
             except Exception as e:
                 _safe_print(f"\n[coach suggestion voice] {e}", file=sys.stderr)
 

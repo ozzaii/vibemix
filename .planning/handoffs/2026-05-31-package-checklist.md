@@ -7591,9 +7591,11 @@ Suggested commit: `feat(coach): surface grounded next suggestions`
 Include:
 
 - `src/vibemix/runtime/suggestion_voice.py`
+- `src/vibemix/runtime/transition_verdict_voice.py`
 - `src/vibemix/runtime/coach.py`
-- `src/vibemix/state/coach.py`
+- `src/vibemix/state/prompt_builder.py`
 - `tests/runtime/test_suggestion_voice.py`
+- `tests/runtime/test_transition_verdict_voice.py`
 - `tests/runtime/test_coach.py`
 - `tests/state/test_coach.py`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
@@ -7620,9 +7622,9 @@ Reason:
 
 Proof before staging:
 
-- `uv run pytest -q tests/runtime/test_suggestion_voice.py tests/runtime/test_coach.py::test_coach_hands_grounded_next_suggestion_to_agent tests/state/test_coach.py::test_task_track_change_includes_grounded_next_suggestion_receipt tests/state/test_coach.py::test_task_transition_opportunity_includes_grounded_next_suggestion_receipt tests/coach/test_citation_linter.py::test_track_atom_existence_only tests/coach/test_citation_linter.py::test_screen_mix_key_existence_only`
+- `uv run pytest -q tests/runtime/test_transition_verdict_voice.py tests/runtime/test_suggestion_voice.py tests/runtime/test_coach.py::test_coach_hands_grounded_next_suggestion_to_agent tests/state/test_coach.py::test_task_track_change_includes_grounded_next_suggestion_receipt tests/state/test_coach.py::test_task_track_change_includes_grounded_transition_verdict_receipt tests/state/test_coach.py::test_task_transition_opportunity_includes_grounded_next_suggestion_receipt tests/state/test_coach.py::test_task_transition_opportunity_includes_grounded_transition_verdict_receipt tests/coach/test_citation_linter.py::test_track_atom_existence_only tests/coach/test_citation_linter.py::test_screen_mix_key_existence_only`
 - `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py`
-- `uv run ruff check src/vibemix/runtime/suggestion_voice.py src/vibemix/runtime/coach.py src/vibemix/state/coach.py tests/runtime/test_suggestion_voice.py tests/runtime/test_coach.py tests/state/test_coach.py`
+- `uv run ruff check src/vibemix/runtime/suggestion_voice.py src/vibemix/runtime/transition_verdict_voice.py src/vibemix/runtime/coach.py src/vibemix/state/prompt_builder.py tests/runtime/test_suggestion_voice.py tests/runtime/test_transition_verdict_voice.py tests/runtime/test_coach.py tests/state/test_coach.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check`
 

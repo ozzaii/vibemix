@@ -940,7 +940,29 @@ def test_task_track_change_includes_grounded_next_suggestion_receipt():
     assert "Next-suggestion receipt" in out
     assert "[track:track-42]" in out
     assert "[mix:next_suggestion=track-42]" in out
-    assert "suggestion context, not a command" in out
+    assert "grounded receipt contexts, not commands" in out
+
+
+def test_task_track_change_includes_grounded_transition_verdict_receipt():
+    out = AICoach.task_for_event(
+        _ev(
+            "TRACK_CHANGE",
+            {
+                "transition_verdict_voice_line": (
+                    "Transition-verdict receipt: the 10-signal transition scorer "
+                    "rated deck A to deck B with confidence 0.74. If you mention "
+                    "this transition read, copy these citations exactly: "
+                    "[track:target-2] [mix:transition_verdict=tr_001]."
+                )
+            },
+        )
+    )
+
+    assert "Track flipped" in out
+    assert "Transition-verdict receipt" in out
+    assert "[track:target-2]" in out
+    assert "[mix:transition_verdict=tr_001]" in out
+    assert "grounded receipt contexts, not commands" in out
 
 
 def test_task_transition_opportunity_includes_grounded_next_suggestion_receipt():
@@ -966,6 +988,32 @@ def test_task_transition_opportunity_includes_grounded_next_suggestion_receipt()
     assert "Next-suggestion receipt" in out
     assert "[track:next-one]" in out
     assert "[mix:next_suggestion=next-one]" in out
+
+
+def test_task_transition_opportunity_includes_grounded_transition_verdict_receipt():
+    out = AICoach.task_for_event(
+        _ev(
+            "TRANSITION_OPPORTUNITY",
+            {
+                "a_side": "A",
+                "a_camelot": "8A",
+                "b_side": "B",
+                "b_camelot": "9A",
+                "clash": False,
+                "transition_verdict_voice_line": (
+                    "Transition-verdict receipt: the 10-signal transition scorer "
+                    "rated deck A to deck B with confidence 0.74. If you mention "
+                    "this transition read, copy these citations exactly: "
+                    "[track:target-2] [mix:transition_verdict=tr_001]."
+                ),
+            },
+        )
+    )
+
+    assert "Cite both keys: [key:A:8A] and [key:B:9A]" in out
+    assert "Transition-verdict receipt" in out
+    assert "[track:target-2]" in out
+    assert "[mix:transition_verdict=tr_001]" in out
 
 
 # ---------- build_prompt: format wrapper ----------

@@ -379,7 +379,21 @@ def test_coach_hands_grounded_next_suggestion_to_agent(
                 "title": "Ananta Gathering",
                 "artist": "Crew",
                 "why": "similar vibe",
-                "transition": {"risk_flags": ["timing_low_confidence"]},
+                "transition": {
+                    "candidate_id": "tr_001",
+                    "source_deck": "A",
+                    "target_deck": "B",
+                    "from_track_id": "track-11",
+                    "to_track_id": "track-42",
+                    "from_role": "outro",
+                    "to_role": "intro",
+                    "from_camelot": "7B",
+                    "to_camelot": "8B",
+                    "score": 0.83,
+                    "confidence": 0.74,
+                    "risk_flags": ["timing_low_confidence"],
+                    "reasons": ["outro into intro is a strong role pair"],
+                },
             }
 
     ev = Event(type="TRACK_CHANGE", state=music_state, extra={})
@@ -413,9 +427,17 @@ def test_coach_hands_grounded_next_suggestion_to_agent(
     assert "[track:track-42]" in line
     assert "[mix:next_suggestion=track-42]" in line
     assert "[mix:next_suggestion_risk=timing_low_confidence]" in line
+    transition_line = sent_ev.extra["transition_verdict_voice_line"]
+    assert "10-signal transition scorer" in transition_line
+    assert "deck A to deck B" in transition_line
+    assert "[track:track-42]" in transition_line
+    assert "[mix:transition_verdict=tr_001]" in transition_line
+    assert "[mix:transition_risk=timing_low_confidence]" in transition_line
     snapshot = registry.snapshot()
     assert "track-42" in snapshot["track"]
     assert "next_suggestion=track-42" in snapshot["mix"]
+    assert "transition_verdict=tr_001" in snapshot["mix"]
+    assert "transition_risk=timing_low_confidence" in snapshot["mix"]
 
 
 # ---------------------------------------------------------------------------
