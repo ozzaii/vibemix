@@ -209,6 +209,10 @@ def test_payload_includes_bounded_deck_mixer_posture(mocker):
 
     assert payload["deck_mixer"] == {
         "connected": True,
+        "midi_activity": "unknown",
+        "midi_messages_seen": 0,
+        "midi_events_seen": 0,
+        "midi_moves_seen": 0,
         "xfader": 64,
         "deck_confidence": 0.75,
         "A": {
@@ -664,6 +668,29 @@ def test_payload_marks_controller_reference_without_resolved_decks(mocker):
         in evidence["refs"]
     )
     assert "mix:deck_source=deck1_A_unknown_src_none+deck2_B_unknown_src_none" in evidence["refs"]
+
+
+def test_course3_operator_action_names_visible_controller_with_no_midi_traffic(mocker):
+    """A visible FLX4 with zero MIDI frames needs setup guidance, not "open a channel"."""
+    state = MusicState()
+    state.audible = True
+    state.rms = 0.05
+    state.controller_connected = True
+    state.controller_midi_activity = "connected_no_midi_traffic"
+    state.deck_a = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+
+    payload = _capture_payload(state, mocker)
+
+    assert payload["deck_mixer"]["midi_activity"] == "connected_no_midi_traffic"
+    assert payload["course3_lens"]["operator_action"] == {
+        "prompt": "Enable FLX4 MIDI.",
+        "steps": [
+            "The FLX4 port is visible, but macOS has not delivered any MIDI frames to vibemix.",
+            "In Rekordbox controller/MIDI settings, enable FLX4 MIDI output or reconnect the controller.",
+            "Move an EQ knob or fader until the status changes from no MIDI traffic.",
+        ],
+    }
 
 
 def test_payload_unresolved_deck_is_honest_null(mocker):

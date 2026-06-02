@@ -54,6 +54,13 @@ def _ctrl_mock(connected: bool = True) -> MagicMock:
         "connected": connected,
     }
     m.moves_since.return_value = []
+    m.activity_snapshot.return_value = {
+        "connected": connected,
+        "messages_seen_total": 0,
+        "events_seen_total": 0,
+        "moves_seen_total": 0,
+        "recent_moves": 0,
+    }
     return m
 
 
@@ -863,6 +870,13 @@ def test_tick_writes_recent_moves():
     buf = _audible_buf()
     ctrl = _ctrl_mock()
     ctrl.moves_since.return_value = [(2.0, "A_play→ON"), (5.0, "xfader→full-A")]
+    ctrl.activity_snapshot.return_value = {
+        "connected": True,
+        "messages_seen_total": 3,
+        "events_seen_total": 3,
+        "moves_seen_total": 2,
+        "recent_moves": 2,
+    }
     _tick_once(
         state,
         buf,
@@ -875,8 +889,32 @@ def test_tick_writes_recent_moves():
         last_bpm_at=999.0,
     )
     assert state.recent_moves == [(2.0, "A_play→ON"), (5.0, "xfader→full-A")]
+    assert state.controller_midi_activity == "active"
+    assert state.controller_midi_messages_seen == 3
+    assert state.controller_midi_events_seen == 3
+    assert state.controller_midi_moves_seen == 2
     # moves_since was called with now - 12.0.
     ctrl.moves_since.assert_called_with(988.0)
+
+
+def test_tick_distinguishes_connected_controller_with_no_midi_traffic():
+    state = MusicState()
+    buf = _audible_buf()
+    ctrl = _ctrl_mock()
+    _tick_once(
+        state,
+        buf,
+        ctrl,
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.0,
+    )
+    assert state.controller_connected is True
+    assert state.controller_midi_activity == "connected_no_midi_traffic"
+    assert state.controller_midi_messages_seen == 0
 
 
 # ---------- Single-writer lock ----------

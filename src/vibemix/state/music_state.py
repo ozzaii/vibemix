@@ -143,6 +143,10 @@ class MusicState:
     deck_b: dict = field(default_factory=dict)
     xfader: int = 64
     controller_connected: bool = False
+    controller_midi_activity: str = "unknown"
+    controller_midi_messages_seen: int = 0
+    controller_midi_events_seen: int = 0
+    controller_midi_moves_seen: int = 0
 
     # Audible deck inference — which deck is producing the sound NOW
     audible_deck: str = "none"  # 'A' / 'B' / 'mix' / 'none'

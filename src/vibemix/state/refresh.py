@@ -64,6 +64,7 @@ from vibemix.audio.constants import (
 )
 from vibemix.audio.lufs import SHORT_TERM_WINDOW_S, short_term_lufs
 from vibemix.library.section_builder import next_section_after_position, sections_for_entry
+from vibemix.midi.state import classify_controller_midi_activity
 from vibemix.state.deck_context import (
     live_mix_evidence_keys,
     midi_evidence_key,
@@ -115,6 +116,7 @@ _PREPARED_POOL_REFRESH_INTERVAL_S = 5.0
 _MOVE_AUDIO_DELTA_WINDOW_S = 6.0
 _MOVE_AUDIO_BASELINE_TTL_S = 8.0
 _MOVE_AUDIO_BASELINE_RESET_S = 0.4
+
 
 # Phase 52 (GENRE-01): cache the loaded GenreProfile library once — the profile
 # JSONs do not change at runtime, so re-loading all of them every tick (10Hz)
@@ -979,6 +981,15 @@ def _tick_once(
         state.deck_b = cs["B"]
         state.xfader = cs["xfader"]
         state.controller_connected = cs["connected"]
+        (
+            state.controller_midi_activity,
+            state.controller_midi_messages_seen,
+            state.controller_midi_events_seen,
+            state.controller_midi_moves_seen,
+        ) = classify_controller_midi_activity(
+            controller_state,
+            connected=state.controller_connected,
+        )
 
         # Audible deck inference. Capture prev_deck BEFORE the assignment so
         # we can detect a deck flip and write a change-only "mix" observation

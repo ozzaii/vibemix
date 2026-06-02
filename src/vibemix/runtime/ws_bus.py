@@ -247,6 +247,10 @@ def _serialize_deck_state(state: MusicState) -> dict[str, dict[str, Any]]:
 _DECK_SOURCE_STATUS_KEYS: tuple[str, ...] = (
     "controller",
     "controller_connection",
+    "controller_midi_activity",
+    "controller_midi_messages",
+    "controller_midi_events",
+    "controller_midi_moves",
     "library",
     "library_tracks",
     "library_source",
@@ -319,6 +323,10 @@ def _serialize_deck_mixer(state: MusicState) -> dict[str, Any]:
     """Read-only serialize per-deck mixer posture for live deck reasoning."""
     return {
         "connected": bool(getattr(state, "controller_connected", False)),
+        "midi_activity": str(getattr(state, "controller_midi_activity", "unknown") or "unknown"),
+        "midi_messages_seen": max(0, int(getattr(state, "controller_midi_messages_seen", 0) or 0)),
+        "midi_events_seen": max(0, int(getattr(state, "controller_midi_events_seen", 0) or 0)),
+        "midi_moves_seen": max(0, int(getattr(state, "controller_midi_moves_seen", 0) or 0)),
         "xfader": _int_0_127(getattr(state, "xfader", 64), 64),
         "deck_confidence": max(
             0.0,
@@ -441,6 +449,7 @@ def _course3_operator_action(
     deck_attributed: bool,
     deck_track_citable: bool,
     cue_ready: bool,
+    controller_midi_activity: str,
 ) -> dict[str, Any] | None:
     """Return one calm Course 3 action from observed lens blockers.
 
@@ -460,6 +469,23 @@ def _course3_operator_action(
                 "Route Rekordbox to the routed master audio path selected by readiness.",
                 "Load and play a real Rekordbox library track.",
                 "Raise the playing channel fader and master until the status changes.",
+            ],
+        }
+    if audio_active and controller_midi_activity == "connected_no_midi_traffic":
+        return {
+            "prompt": "Enable FLX4 MIDI.",
+            "steps": [
+                "The FLX4 port is visible, but macOS has not delivered any MIDI frames to vibemix.",
+                "In Rekordbox controller/MIDI settings, enable FLX4 MIDI output or reconnect the controller.",
+                "Move an EQ knob or fader until the status changes from no MIDI traffic.",
+            ],
+        }
+    if audio_active and controller_midi_activity == "midi_traffic_unmapped":
+        return {
+            "prompt": "Map the controller.",
+            "steps": [
+                "MIDI frames are arriving, but the active controller profile is not decoding them.",
+                "Run the controller sniff tool and update the FLX4/profile mapping before trusting deck moves.",
             ],
         }
     if audio_active and not deck_attributed:
@@ -524,6 +550,9 @@ def _serialize_course3_lens(state: MusicState) -> dict[str, Any]:
         bool(getattr(state, "audible", False))
         and _course3_float(getattr(state, "rms", 0.0)) >= SILENT_RMS
     )
+    controller_midi_activity = str(
+        getattr(state, "controller_midi_activity", "unknown") or "unknown"
+    )
     audible_deck = str(getattr(state, "audible_deck", "none") or "none")
     deck_attributed = audible_deck in _COURSE3_ATTRIBUTED_DECKS
     deck_track_citable = _course3_deck_has_citable_track(state, audible_deck)
@@ -560,6 +589,7 @@ def _serialize_course3_lens(state: MusicState) -> dict[str, Any]:
         deck_attributed=deck_attributed,
         deck_track_citable=deck_track_citable,
         cue_ready=cue_ready,
+        controller_midi_activity=controller_midi_activity,
     )
     if operator_action is not None:
         lens["operator_action"] = operator_action

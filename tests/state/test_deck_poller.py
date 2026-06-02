@@ -86,6 +86,15 @@ class _FakeController:
         return self._snap
 
 
+class _FakeActivityController(_FakeController):
+    def __init__(self, snap: dict, activity: dict[str, object]):
+        super().__init__(snap)
+        self._activity = activity
+
+    def activity_snapshot(self) -> dict[str, object]:
+        return self._activity
+
+
 class _FakeTrackInfo:
     def __init__(self, title: str = "", *, client_bundle_id: str | None = None):
         self._title = title
@@ -313,6 +322,32 @@ def test_controller_connection_status_distinguishes_disconnected_controller():
     assert status["controller"] == "present"
     assert status["controller_connection"] == "disconnected"
     assert status["resolution"] == "no_single_attributable_deck"
+
+
+def test_source_status_distinguishes_visible_controller_with_no_midi_traffic():
+    """A connected port with zero frames is a setup state, not proof of deck moves."""
+    p = DeckPoller(
+        library=_lib(_entry("1", "Strobe")),
+        controller=_FakeActivityController(
+            _ctrl_snap(connected=True),
+            {
+                "connected": True,
+                "messages_seen_total": 0,
+                "events_seen_total": 0,
+                "moves_seen_total": 0,
+            },
+        ),
+        track_info=_FakeTrackInfo("Strobe"),
+    )
+
+    p.poll_once()
+
+    status = p.source_snapshot()
+    assert status["controller_connection"] == "connected"
+    assert status["controller_midi_activity"] == "connected_no_midi_traffic"
+    assert status["controller_midi_messages"] == "0"
+    assert status["controller_midi_events"] == "0"
+    assert status["controller_midi_moves"] == "0"
 
 
 def test_dj_nowplaying_source_can_resolve_deck_identity():

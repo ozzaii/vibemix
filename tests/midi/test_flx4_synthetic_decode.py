@@ -118,6 +118,12 @@ def test_flx4_synthetic_stream_decodes_end_to_end():
     cs.handle_msg(_note_on(0, 96, velocity=127))
     assert any("A_sync_hit" in lbl for lbl in _labels(cs))
 
+    activity = cs.activity_snapshot()
+    assert activity["connected"] is True
+    assert activity["messages_seen_total"] >= 8
+    assert activity["events_seen_total"] >= 8
+    assert activity["moves_seen_total"] >= 7
+
     # ----- whole-stream invariants -----
     assert cs.deck_snapshot()["connected"] is True  # we called mark_connected
     events = cs.events_since(0.0)

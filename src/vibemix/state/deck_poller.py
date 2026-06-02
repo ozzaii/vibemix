@@ -48,6 +48,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from vibemix.midi.state import classify_controller_midi_activity
 from vibemix.state.deck_state import DeckTrack
 from vibemix.state.track_resolver import derive_audible_deck
 
@@ -337,8 +338,15 @@ class DeckPoller:
         if cs is None:
             source_status["controller_connection"] = "unavailable"
         else:
+            controller_connected = bool(cs.get("connected", False))
             source_status["controller_connection"] = (
-                "connected" if bool(cs.get("connected", False)) else "disconnected"
+                "connected" if controller_connected else "disconnected"
+            )
+            source_status.update(
+                _controller_midi_activity_status(
+                    self._controller,
+                    connected=controller_connected,
+                )
             )
         title = None
         if self._track_info is not None:
@@ -602,6 +610,22 @@ def _nowplaying_source_status(snapshot: object) -> dict[str, str]:
     if bundle:
         status["nowplaying_owner"] = bundle
     return status
+
+
+def _controller_midi_activity_status(controller: object | None, *, connected: bool) -> dict[str, str]:
+    """Return bounded controller MIDI traffic diagnostics for source status."""
+    if controller is None:
+        return {}
+    activity, messages, events, moves = classify_controller_midi_activity(
+        controller,
+        connected=connected,
+    )
+    return {
+        "controller_midi_activity": activity,
+        "controller_midi_messages": str(messages),
+        "controller_midi_events": str(events),
+        "controller_midi_moves": str(moves),
+    }
 
 
 def nowplaying_source_is_deck_candidate(snapshot: object) -> bool:

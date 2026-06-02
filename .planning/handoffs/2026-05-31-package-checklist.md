@@ -5335,6 +5335,53 @@ Current proof:
   tests/midi/test_profile.py tests/midi/test_profile_flx4_golden.py
   tests/midi/test_flx4_synthetic_decode.py tests/midi/test_state.py`.
 
+## Package 1D3 - FLX4 No-MIDI-Traffic Diagnostic
+
+Suggested commit: `fix(controller): surface missing flx4 midi traffic`
+
+Include:
+
+- `src/vibemix/midi/state.py`
+- `src/vibemix/state/music_state.py`
+- `src/vibemix/state/refresh.py`
+- `src/vibemix/state/deck_poller.py`
+- `src/vibemix/runtime/ws_bus.py`
+- `tests/midi/test_flx4_synthetic_decode.py`
+- `tests/state/test_refresh.py`
+- `tests/state/test_deck_poller.py`
+- `tests/runtime/test_ws_bus_deck_state.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Reason:
+
+- A visible CoreMIDI port is not controller proof. On 2026-06-02, the live
+  FLX4/Rekordbox rig had audible BlackHole audio and `DDJ-FLX4` visible as an
+  input port, but both the running Vibemix session and direct
+  `scripts/sniff_controller.py --port FLX4 --seconds 12 --mode callback`
+  probes saw `frames: 0` while Kaan moved controls.
+- The old surface collapsed this into `controller_connected=true` and generic
+  "Open one channel" guidance. That made the app look confused: Sven could
+  truthfully say "no controller moves" while the DJ was physically moving the
+  FLX4. This package adds traffic counters and the explicit
+  `connected_no_midi_traffic` diagnostic so Viber/Sven/setup UI can ask for
+  the real next action: enable/reconnect FLX4 MIDI output before trusting deck
+  moves.
+
+Proof to run:
+
+- `uv run pytest -q tests/midi/test_flx4_synthetic_decode.py tests/state/test_refresh.py::test_tick_writes_recent_moves tests/state/test_refresh.py::test_tick_distinguishes_connected_controller_with_no_midi_traffic tests/state/test_deck_poller.py::test_source_status_distinguishes_visible_controller_with_no_midi_traffic tests/runtime/test_ws_bus_deck_state.py::test_payload_includes_bounded_deck_mixer_posture tests/runtime/test_ws_bus_deck_state.py::test_course3_operator_action_names_visible_controller_with_no_midi_traffic`
+- `uv run pytest -q tests/midi tests/state/test_refresh.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_ws_bus_snapshot.py tests/runtime/test_live_course3_lens_probe.py tests/library/test_live_context_cli.py`
+- `uv run ruff check src/vibemix/midi/state.py src/vibemix/state/music_state.py src/vibemix/state/refresh.py src/vibemix/state/deck_poller.py src/vibemix/runtime/ws_bus.py tests/midi/test_flx4_synthetic_decode.py tests/state/test_refresh.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/midi/state.py src/vibemix/state/music_state.py src/vibemix/state/refresh.py src/vibemix/state/deck_poller.py src/vibemix/runtime/ws_bus.py tests/midi/test_flx4_synthetic_decode.py tests/state/test_refresh.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- This is source-level readiness guidance. After the DJ-side FLX4/Rekordbox MIDI
+  setup is corrected, rerun the live proof and require the status to advance
+  from `connected_no_midi_traffic` to `active` with real `midi_events` before
+  claiming controller moves are grounded.
+
 ## Hold Lane - FLX4 Live Context Proof Artifacts
 
 Suggested commit: none by default; attach to verifier packet if needed.
