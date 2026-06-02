@@ -118,6 +118,10 @@ _PREPARED_POOL_REFRESH_INTERVAL_S = 5.0
 _MOVE_AUDIO_DELTA_WINDOW_S = 6.0
 _MOVE_AUDIO_BASELINE_TTL_S = 8.0
 _MOVE_AUDIO_BASELINE_RESET_S = 0.4
+_DECK_AUDIO_ACTIVE_RMS = 0.003
+_DECK_AUDIO_DOMINANCE_RATIO = 1.75
+_DECK_AUDIO_SINGLE_CONFIDENCE = 0.62
+_DECK_AUDIO_MIX_CONFIDENCE = 0.55
 
 
 # Phase 52 (GENRE-01): cache the loaded GenreProfile library once — the profile
@@ -411,6 +415,40 @@ def _optional_float(raw: object) -> float | None:
         return float(raw)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+
+
+def _verified_deck_audio_audible_deck(
+    audio_capture_context: dict[str, object] | None,
+) -> tuple[str, float] | None:
+    """Infer A/B/mix only from deck-pair audio routes that already proved both lanes."""
+    if not isinstance(audio_capture_context, dict):
+        return None
+    if not (
+        bool(audio_capture_context.get("deck_audio_capture_enabled"))
+        and bool(audio_capture_context.get("deck_audio_capture_verified"))
+    ):
+        return None
+    raw_rms = audio_capture_context.get("deck_audio_rms")
+    if not isinstance(raw_rms, dict):
+        return None
+
+    rms: dict[str, float] = {}
+    for side in ("A", "B"):
+        value = _optional_float(raw_rms.get(side))
+        if value is not None and value == value and value >= 0.0:
+            rms[side] = value
+    active = {side: value for side, value in rms.items() if value >= _DECK_AUDIO_ACTIVE_RMS}
+    if not active:
+        return None
+    if len(active) == 1:
+        return next(iter(active)), _DECK_AUDIO_SINGLE_CONFIDENCE
+
+    a_rms = active.get("A", 0.0)
+    b_rms = active.get("B", 0.0)
+    quieter = max(min(a_rms, b_rms), _DECK_AUDIO_ACTIVE_RMS)
+    if max(a_rms, b_rms) / quieter >= _DECK_AUDIO_DOMINANCE_RATIO:
+        return ("A" if a_rms > b_rms else "B"), _DECK_AUDIO_SINGLE_CONFIDENCE
+    return "mix", _DECK_AUDIO_MIX_CONFIDENCE
 
 
 def _write_live_grounding_evidence(
@@ -1077,6 +1115,10 @@ def _tick_once(
         # to the EvidenceRegistry (Phase 18 Plan 02).
         prev_deck = state.audible_deck
         aud_deck, deck_conf = derive_audible_deck(cs["A"], cs["B"], cs["xfader"], cs["connected"])
+        if aud_deck == "none":
+            deck_audio_fallback = _verified_deck_audio_audible_deck(audio_capture_context)
+            if deck_audio_fallback is not None:
+                aud_deck, deck_conf = deck_audio_fallback
         state.audible_deck = aud_deck
         state.deck_confidence = deck_conf
         course3_live = _course3_session_lens_active(learn_state)

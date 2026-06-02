@@ -65,6 +65,18 @@ def _ctrl_mock(connected: bool = True) -> MagicMock:
     return m
 
 
+def _silent_ctrl_mock(connected: bool = True) -> MagicMock:
+    """Controller snapshot with no usable deck evidence."""
+    m = _ctrl_mock(connected=connected)
+    m.deck_snapshot.return_value = {
+        "A": {"vol": 0, "play": False, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+        "B": {"vol": 0, "play": False, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+        "xfader": 64,
+        "connected": connected,
+    }
+    return m
+
+
 def _track_mock(title: str = "") -> MagicMock:
     m = MagicMock()
     m.snapshot.return_value = {"title": title, "prev_title": "", "title_changed_at": 0.0}
@@ -897,6 +909,87 @@ def test_tick_writes_audible_deck_and_track():
     assert state.deck_confidence > 0.5
     assert state.audible_track == "Daft Punk - Around the World"
     assert state.audible_track_confidence >= 0.5
+
+
+def test_tick_infers_audible_deck_from_verified_deck_audio_when_controller_silent():
+    state = MusicState()
+    state.set_start_at = 900.0
+    registry = EvidenceRegistry()
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _silent_ctrl_mock(),
+        _track_mock(title="Deck B Tune"),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.0,
+        evidence_registry=registry,
+        audio_capture_context={
+            "deck_audio_capture_enabled": True,
+            "deck_audio_capture_verified": True,
+            "deck_audio_rms": {"A": 0.001, "B": 0.04},
+        },
+    )
+
+    assert state.audible_deck == "B"
+    assert state.deck_confidence >= 0.6
+    assert state.audible_track == "Deck B Tune"
+    assert registry.snapshot()["mix"]["audible_deck=B"] == (100.0,)
+
+
+def test_tick_marks_verified_dual_deck_audio_as_mix_when_controller_silent():
+    state = MusicState()
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _silent_ctrl_mock(),
+        _track_mock(title="Either Deck"),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.0,
+        audio_capture_context={
+            "deck_audio_capture_enabled": True,
+            "deck_audio_capture_verified": True,
+            "deck_audio_rms": {"A": 0.04, "B": 0.03},
+        },
+    )
+
+    assert state.audible_deck == "mix"
+    assert state.deck_confidence >= 0.5
+    assert state.audible_track == "Either Deck"
+    assert state.audible_track_confidence == 0.4
+
+
+def test_tick_refuses_unverified_deck_audio_fallback_when_controller_silent():
+    state = MusicState()
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _silent_ctrl_mock(),
+        _track_mock(title="Unproven Route"),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.0,
+        audio_capture_context={
+            "deck_audio_capture_enabled": False,
+            "deck_audio_capture_verified": False,
+            "deck_audio_rms": {"A": 0.001, "B": 0.04},
+        },
+    )
+
+    assert state.audible_deck == "none"
+    assert state.deck_confidence == 0.0
+    assert state.audible_track == "Unproven Route"
+    assert state.audible_track_confidence == 0.3
 
 
 def test_tick_writes_recent_moves():
