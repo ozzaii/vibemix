@@ -489,20 +489,20 @@ function mountSkeleton(): void {
     <div id="vmx-lib-chat-thread">
       <div class="vmx-lib-chat-turn" data-role="viber">
         <div class="who">viber</div>
-        <div class="body">Your crate is online. Give me a room, a moment, or a transition problem.</div>
+        <div class="body">I can build a set, solve a transition, or find deep cuts. I will show receipts before you trust it.</div>
       </div>
       <div id="vmx-lib-chat-starters" data-wire="library.chat-starters">
         <button type="button" data-chat="build a 45-minute psytrance set from my indexed tracks, clean energy arc, no fake genres">
           <span>Build a set</span>
-          <b>45 min psytrance arc</b>
+          <b>Build 45 min psytrance</b>
         </button>
         <button type="button" data-chat="what mixes cleanly out of the currently playing track? use only grounded live and library evidence">
           <span>What mixes next</span>
-          <b>grounded transition</b>
+          <b>Find grounded transition</b>
         </button>
         <button type="button" data-chat="find deep cuts in my crate that fit this set but avoid the obvious repeats">
           <span>Rediscover</span>
-          <b>deep cuts, no repeats</b>
+          <b>Find deep cuts, no repeats</b>
         </button>
       </div>
     </div>
@@ -554,7 +554,7 @@ describe("chat - real runChat path", () => {
 
     const threadText =
       document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
-    expect(threadText).toContain("Your crate is online");
+    expect(threadText).toContain("I can build a set");
     expect(threadText).toContain("Build a set");
     expect(threadText).toContain("What mixes next");
     expect(threadText).toContain("Rediscover");
@@ -595,7 +595,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live proof");
+    expect(toolText).toContain("proof gate");
     expect(toolText).toContain("waiting");
 
     const proofRow = document.querySelector<HTMLElement>(
@@ -674,7 +674,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live proof");
+    expect(toolText).toContain("proof gate");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("deck audio");
     expect(toolText).not.toContain("armed");
@@ -688,7 +688,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live proof");
+    expect(toolText).toContain("proof gate");
     expect(toolText).toContain("armed");
     expect(toolText).toContain("deck1 A=known:dominant");
     expect(toolText).toContain("deck2 B=known:present");
@@ -706,7 +706,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live proof");
+    expect(toolText).toContain("proof gate");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("deck identities");
     expect(toolText).not.toContain("armed");
@@ -755,7 +755,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live proof");
+    expect(toolText).toContain("proof gate");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("both decks active");
     expect(toolText).not.toContain("armed");
@@ -838,7 +838,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live proof");
+    expect(toolText).toContain("proof gate");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("feature receipt");
     expect(toolText).not.toContain("armed");
@@ -1026,7 +1026,7 @@ describe("chat - real runChat path", () => {
     expect(toolText).toContain("waiting");
     expect(toolText).toContain("listening");
     expect(toolText).not.toContain("live_context_required");
-    expect(toolText).not.toContain("live proof not armed");
+    expect(toolText).not.toContain("proof gate not armed");
     expect(toolText).not.toContain("requires_more_evidence");
 
     expect(document.querySelectorAll(".vmx-lib-chat-tool")).toHaveLength(1);
@@ -1042,7 +1042,7 @@ describe("chat - real runChat path", () => {
     expect(artifactText).not.toContain("requires_more_evidence");
   });
 
-  it("keeps the library setup action visible when live proof is still waiting", async () => {
+  it("keeps the library setup action visible when proof gate is still waiting", async () => {
     statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
     chatMock.mockResolvedValueOnce({
       ...CHAT_WITH_PLAYLIST,
@@ -1719,6 +1719,23 @@ describe("chat - real runChat path", () => {
       document.getElementById("vmx-lib-stat-indexed")?.textContent ?? "";
     expect(indexed).toBe("12");
     expect(indexed).not.toContain("1547");
+  });
+
+  it("keeps the idle Crate face product-readable, not backend-readable", async () => {
+    await mountChat();
+
+    const search =
+      document.getElementById("vmx-lib-stat-backend")?.textContent ?? "";
+    const setup =
+      document.getElementById("vmx-lib-model-state")?.textContent ?? "";
+
+    expect(search).toBe("local");
+    expect(setup).toContain("search ready");
+    expect(setup).toContain("cue export ready");
+    expect(search).not.toContain("sqlite-vec");
+    expect(setup).not.toContain("CLAP ready");
+    expect(setup).not.toContain("MOSS ready");
+    expect(setup).not.toContain("CUE ready");
   });
 
   it("renders honest setup errors when boot stats or model checks fail", async () => {

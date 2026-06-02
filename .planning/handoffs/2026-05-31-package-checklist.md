@@ -9790,3 +9790,40 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/settings/SettingsDrawer.ts tauri/ui/tests/settings/drawer.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 65 - Crate Operator Labels
+
+Suggested commit: `fix(crate-ui): clarify viber operator labels`
+
+Include:
+
+- `tauri/ui/library.html`
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/chat.test.ts`
+- `tauri/ui/src/library/build.test.ts`
+- `tauri/ui/src/library/model-setup.test.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Viber backend/tool semantics, library ingest/freshness behavior, settings,
+  Learn, Deck, Sven speech, runtime audio, packaging scripts, and any broad
+  Crate redesign. This package only changes product-facing Crate/Viber labels
+  and tests that pin those labels.
+
+Reason:
+
+- The exact signed app at `70d520a0` made Crate more actionable, but the idle
+  surface still looked like a debug console: `BACKEND sqlite-vec`, `MODELS CLAP
+  ready · MOSS ready · CUE ready`, a prompt with generated-copy punctuation, and
+  `LIVE PROOF partial · transport state`. Keep the same truthful readiness
+  states while translating the resting product face to Viber operator language:
+  local search, search/voice/cue export readiness, proof gate, and receipt-first
+  starter missions.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/model-setup.test.ts src/library/build.test.ts tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/library.html tauri/ui/src/library/index.ts tauri/ui/src/library/chat.test.ts tauri/ui/src/library/build.test.ts tauri/ui/src/library/model-setup.test.ts .planning/handoffs/2026-05-31-package-checklist.md`

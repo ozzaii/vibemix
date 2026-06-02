@@ -75,7 +75,7 @@ describe("deriveModelSetupView", () => {
   it("hides the install button when CLAP, MOSS, and CUE are ready", () => {
     const view = deriveModelSetupView(payload());
 
-    expect(view.stateText).toBe("CLAP ready · MOSS ready · CUE ready");
+    expect(view.stateText).toBe("search ready · voice ready · cue export ready");
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });
@@ -93,7 +93,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP missing · MOSS ready · CUE optional");
+    expect(view.stateText).toBe("search missing · voice ready · cue export optional");
     expect(view.installTarget).toBe("required");
     expect(view.installButtonHidden).toBe(false);
     expect(view.installButtonText).toBe("Install Required Models");
@@ -116,7 +116,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP ready · MOSS manual setup · CUE ready");
+    expect(view.stateText).toBe("search ready · voice manual setup · cue export ready");
     expect(view.installTarget).toBe("required");
     expect(view.installButtonHidden).toBe(false);
     expect(view.installButtonText).toBe("Install Required Models");
@@ -139,7 +139,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP ready · MOSS missing · CUE ready");
+    expect(view.stateText).toBe("search ready · voice missing · cue export ready");
     expect(view.installTarget).toBe("required");
   });
 
@@ -155,7 +155,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP ready · MOSS ready · CUE optional");
+    expect(view.stateText).toBe("search ready · voice ready · cue export optional");
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });
@@ -176,12 +176,12 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP ready · MOSS ready · CUE optional");
+    expect(view.stateText).toBe("search ready · voice ready · cue export optional");
     expect(view.installTarget).toBe("cue");
     expect(view.installButtonText).toBe("Check Optional CUE");
   });
 
-  it("surfaces optional CUE repair separately from required CLAP setup", () => {
+  it("surfaces optional cue export repair separately from required CLAP setup", () => {
     const view = deriveModelSetupView(
       payload({
         models: [
@@ -198,7 +198,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP ready · MOSS ready · CUE repair");
+    expect(view.stateText).toBe("search ready · voice ready · cue export repair");
     expect(view.installTarget).toBe("cue");
     expect(view.installButtonText).toBe("Repair CUE");
   });
@@ -220,7 +220,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("CLAP ready · MOSS ready · CUE manual repair");
+    expect(view.stateText).toBe("search ready · voice ready · cue export manual repair");
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });

@@ -665,10 +665,10 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(modelsMock).toHaveBeenCalledWith("required");
     expect(modelsMock).not.toHaveBeenCalledWith("all");
     expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
-      "CLAP ready",
+      "search ready",
     );
     expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
-      "MOSS ready",
+      "voice ready",
     );
     expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
       "Required models ready: downloaded 1/3",
@@ -690,9 +690,9 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     for (let i = 0; i < 6; i++) await Promise.resolve();
 
     const setupText = document.getElementById("vmx-lib-model-state")?.textContent ?? "";
-    expect(setupText).toContain("CLAP ready");
-    expect(setupText).toContain("MOSS ready");
-    expect(setupText).toContain("CUE ready");
+    expect(setupText).toContain("search ready");
+    expect(setupText).toContain("voice ready");
+    expect(setupText).toContain("cue export ready");
     expect(setupText).not.toContain("codex login");
 
     const agentSetup = document.getElementById("vmx-lib-agent-setup") as HTMLElement;

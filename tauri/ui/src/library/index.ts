@@ -677,22 +677,30 @@ function embeddingLabel(stats: LibraryStats): string {
   const model =
     backend === "clap"
       ? stats.clap_model_installed === false
-        ? "CLAP missing"
-        : "CLAP ready"
+        ? "search missing"
+        : "search ready"
       : backend;
   const agent = (stats.agent_backend ?? "codex").toLowerCase();
   const agentLabel =
-    stats.agent_ready === false ? `Viber ${agent} setup` : `Viber ${agent}`;
+    stats.agent_ready === false ? `Viber setup` : `Viber ready`;
   const freshness = stats.library_freshness_status
     ? `library ${stats.library_freshness_status.replace(/_/g, " ")}`
     : "library unknown";
-  return `${agentLabel} / ${model} / ${dim}d / ${stats.backend} / ${freshness}`;
+  return `${agentLabel} / ${model} / ${dim}d / ${freshness}`;
+}
+
+function libraryBackendLabel(backend: string): string {
+  const normalized = backend.trim().toLowerCase();
+  if (normalized === "sqlite-vec") return "local";
+  if (normalized === "chroma") return "local";
+  if (normalized === "unavailable") return "unavailable";
+  return normalized.replace(/[_-]+/g, " ");
 }
 
 function renderStats(stats: LibraryStats): void {
   latestStats = stats;
   $("vmx-lib-stat-indexed").textContent = String(stats.indexed);
-  $("vmx-lib-stat-backend").textContent = stats.backend;
+  $("vmx-lib-stat-backend").textContent = libraryBackendLabel(stats.backend);
   $("vmx-lib-stat-spent").textContent = `€${stats.spent_eur.toFixed(2)}`;
   $("vmx-lib-stat-failed").textContent = String(stats.failed);
   const engineLabelEl = document.getElementById("vmx-lib-engine-label");
@@ -815,28 +823,28 @@ export function deriveModelSetupView(
   const hasInstallError =
     installErrors.length > 0 || (models.install ? !models.install.ok : false);
   const clapLabel = clap?.installed
-    ? "CLAP ready"
+    ? "search ready"
     : clapMismatched
-      ? "CLAP repair"
-      : "CLAP missing";
+      ? "search repair"
+      : "search missing";
   const mossLabel = moss
     ? moss.installed
-      ? "MOSS ready"
+      ? "voice ready"
       : mossMismatched
         ? mossInstallable
-          ? "MOSS repair"
-          : "MOSS manual repair"
+          ? "voice repair"
+          : "voice manual repair"
         : mossInstallable
-          ? "MOSS missing"
-          : "MOSS manual setup"
+          ? "voice missing"
+          : "voice manual setup"
     : null;
   const cueLabel = cue?.installed
-    ? "CUE ready"
+    ? "cue export ready"
     : cueMismatched
       ? cueInstallable
-        ? "CUE repair"
-        : "CUE manual repair"
-      : "CUE optional";
+        ? "cue export repair"
+        : "cue export manual repair"
+      : "cue export optional";
   const needsRequired =
     clap?.installed === false ||
     clapMismatched ||
@@ -985,7 +993,7 @@ function ensureChatIntro(thread: HTMLElement): void {
   appendChatTurn(
     thread,
     "viber",
-    "Your crate is online. Give me a room, a moment, or a transition problem.",
+    "I can build a set, solve a transition, or find deep cuts. I will show receipts before you trust it.",
   );
 }
 
@@ -1157,7 +1165,7 @@ function liveProofStatus(context: LibraryLiveContext | null): {
   detail: string;
 } {
   if (!context) {
-    return { ok: false, state: "waiting", detail: "live deck feed" };
+    return { ok: false, state: "waiting", detail: "ask Viber for receipts" };
   }
   const capabilities = new Set(context.live_context_capabilities ?? []);
   const transportOk =
@@ -1174,7 +1182,7 @@ function liveProofStatus(context: LibraryLiveContext | null): {
       "live_evidence",
     ].every((capability) => capabilities.has(capability));
   if (!transportOk) {
-    return { ok: false, state: "partial", detail: "transport stale" };
+    return { ok: false, state: "partial", detail: "deck feed warming" };
   }
   const missing: string[] = [];
   if (!context.deck_lanes_context || !context.deck_reference_context) {
@@ -1252,7 +1260,7 @@ function appendLiveProofStatusToolRow(
   const text = document.createElement("div");
   const name = document.createElement("div");
   name.className = "name";
-  name.textContent = "live proof";
+  name.textContent = "proof gate";
   const arg = document.createElement("div");
   arg.className = "arg";
   arg.textContent = `${status.state} · ${status.detail}`;
