@@ -17,6 +17,7 @@ from typing import Literal
 
 from vibemix.library.sources.engine import EngineDJSource
 from vibemix.library.sources.rekordbox import RekordboxSource
+from vibemix.library.sources.serato import SeratoSource
 from vibemix.library.sources.traktor import TraktorSource
 from vibemix.library.sources.virtualdj import VirtualDJSource
 
@@ -25,6 +26,7 @@ CandidateKind = Literal[
     "traktor_nml",
     "virtualdj_database",
     "engine_database",
+    "serato_database",
     "music_folder",
 ]
 SUPPORTED_AUDIO_SUFFIXES = (".mp3", ".m4a", ".wav", ".flac", ".aac")
@@ -191,6 +193,27 @@ def discover_library_setup_candidates(
                             f"{_quote_path(path)}"
                         ),
                         import_action=_ipc_import_action(path),
+                    )
+                )
+        except OSError:
+            continue
+
+    for database in SeratoSource().default_paths():
+        path = _path_at_home(database, base if home else None)
+        database_path = path if path.name == "database V2" else path / "database V2"
+        try:
+            if database_path.is_file():
+                candidates.append(
+                    LibrarySetupCandidate(
+                        kind="serato_database",
+                        path=str(database_path),
+                        confidence="high",
+                        reason="standard Serato _Serato_/database V2 path exists",
+                        command=(
+                            "uv run python -m vibemix library ingest --source serato "
+                            f"{_quote_path(database_path)}"
+                        ),
+                        import_action=_ipc_import_action(database_path),
                     )
                 )
         except OSError:

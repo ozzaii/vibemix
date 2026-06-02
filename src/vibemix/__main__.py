@@ -2152,6 +2152,10 @@ async def main() -> None:
                     from vibemix.library.sources.engine import EngineDJSource
 
                     return EngineDJSource(database_path=str(source_path))
+                if name == "database v2" and "_serato_" in text:
+                    from vibemix.library.sources.serato import SeratoSource
+
+                    return SeratoSource(library_path=str(source_path))
                 return None
 
             async def _start_catalog_source_import(source: object, *, label: str) -> None:
@@ -3497,7 +3501,7 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_ingest.add_argument(
         "--source",
-        choices=("rekordbox", "traktor", "virtualdj", "engine"),
+        choices=("rekordbox", "traktor", "virtualdj", "engine", "serato"),
         default="rekordbox",
         help="DJ library source to parse (default: rekordbox)",
     )
@@ -7148,6 +7152,7 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
     from vibemix.library.rekordbox import RekordboxLibrary
     from vibemix.library.sources.engine import EngineDJSource
     from vibemix.library.sources.rekordbox import RekordboxSource
+    from vibemix.library.sources.serato import SeratoSource
     from vibemix.library.sources.traktor import TraktorSource
     from vibemix.library.sources.virtualdj import VirtualDJSource
     from vibemix.library.store import open_store
@@ -7176,6 +7181,14 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
             "[FATAL] library ingest: no Engine DJ m.db found. Point vibemix at "
             "your Engine DJ Database2/m.db, then re-run "
             "`vibemix library ingest --source engine <path>` (or place it at a "
+            "standard location)."
+        )
+    elif source_name == "serato":
+        source = SeratoSource(library_path=explicit) if explicit else SeratoSource()
+        missing_msg = (
+            "[FATAL] library ingest: no Serato _Serato_/database V2 found. Point "
+            "vibemix at your Serato database V2 file, then re-run "
+            "`vibemix library ingest --source serato <path>` (or place it at a "
             "standard location)."
         )
     else:

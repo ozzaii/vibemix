@@ -1530,6 +1530,7 @@ function librarySetupCandidateLabel(kind: string): string {
   if (kind === "traktor_nml") return "Traktor NML";
   if (kind === "virtualdj_database") return "VirtualDJ database";
   if (kind === "engine_database") return "Engine DJ database";
+  if (kind === "serato_database") return "Serato database";
   if (kind === "music_folder") return "music folder";
   return kind.replace(/_/g, " ");
 }

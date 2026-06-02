@@ -77,6 +77,23 @@ def test_setup_discovery_finds_standard_engine_database(tmp_path: Path) -> None:
     }
 
 
+def test_setup_discovery_finds_standard_serato_database(tmp_path: Path) -> None:
+    database = tmp_path / "Music" / "_Serato_" / "database V2"
+    database.parent.mkdir(parents=True)
+    database.write_bytes(b"Serato fixture")
+
+    candidates = discover_library_setup_candidates(home=tmp_path)
+
+    serato = [candidate for candidate in candidates if candidate.kind == "serato_database"]
+    assert serato
+    assert serato[0].path == str(database)
+    assert "library ingest --source serato" in serato[0].command
+    assert serato[0].import_action == {
+        "type": "ipc.library.import",
+        "payload": {"path": str(database), "schema_version": "1"},
+    }
+
+
 def test_setup_discovery_finds_bounded_music_folder_candidate(tmp_path: Path) -> None:
     crate = tmp_path / "Music" / "PSYMIND"
     crate.mkdir(parents=True)

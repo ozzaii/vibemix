@@ -2750,6 +2750,52 @@ Remaining gate:
   Engine import parity. This package proves the existing app/CLI setup path can
   reach the source without changing live/cohost behavior.
 
+## Package 5U - Serato Database Library Source and Setup Path
+
+Suggested commit: `feat(library): add serato database source`
+
+Include:
+
+- `src/vibemix/library/sources/serato.py`
+- `src/vibemix/library/sources/__init__.py`
+- `src/vibemix/__main__.py`
+- `src/vibemix/library/setup_discovery.py`
+- `tests/library/test_sources_serato.py`
+- `tests/library/test_setup_discovery.py`
+- `tests/library/test_ingest_cli_anlz.py`
+- `tauri/ui/src/library/index.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Serato write-back, crate mutation, or audio-file tag writes.
+- Live co-host speech, prompts, EventDetector timing, or DROP-call paths.
+- Automatic ingest/re-embed from discovery candidates.
+- Any new dependency; Markers2 cues use the existing Serato tag reader.
+
+Reason:
+
+- Universal Library Ingest should cover the last major DJ-library island.
+  Serato exposes a documented `_Serato_/database V2` plus `.crate` chunk
+  format, while vibemix already owns the Markers2 cue decoder. This package
+  parses the read-only database/crate metadata into `TrackEntry`, routes
+  `library ingest --source serato`, and lets first-run setup discovery surface a
+  labeled Serato database candidate.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_sources_serato.py tests/library/test_sources_traktor.py tests/library/test_sources_virtualdj.py tests/library/test_sources_engine.py tests/library/test_ingest_cli_anlz.py tests/library/test_setup_discovery.py`
+- `uv run ruff check src/vibemix/library/sources/serato.py src/vibemix/library/sources/__init__.py src/vibemix/library/setup_discovery.py src/vibemix/__main__.py tests/library/test_sources_serato.py tests/library/test_ingest_cli_anlz.py tests/library/test_setup_discovery.py`
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/api.test.ts`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/library/sources/serato.py src/vibemix/library/sources/__init__.py src/vibemix/__main__.py src/vibemix/library/setup_discovery.py tests/library/test_sources_serato.py tests/library/test_setup_discovery.py tests/library/test_ingest_cli_anlz.py tauri/ui/src/library/index.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- A real Serato library capture remains the LIVE proof before claiming full
+  Serato import parity. This package proves the source/CLI/setup path, and it
+  reads cues only where existing Markers2 tags are available.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`
