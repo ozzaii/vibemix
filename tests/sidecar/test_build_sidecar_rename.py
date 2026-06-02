@@ -362,7 +362,7 @@ def test_pyinstaller_specs_collect_local_ai_runtime(spec_name: str) -> None:
     ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
 )
 def test_pyinstaller_specs_use_slim_livekit_google_collection(spec_name: str) -> None:
-    """Gemini LLM/TTS leaves are bundled without Google Cloud STT/TTS."""
+    """Gemini LLM is bundled without cloud speech/TTS leaves."""
     text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
     dynamic_block = text.split("_DYNAMIC_PKGS = (", 1)[1].split(")", 1)[0]
     assert '"livekit.plugins.google",' not in dynamic_block
@@ -370,7 +370,6 @@ def test_pyinstaller_specs_use_slim_livekit_google_collection(spec_name: str) ->
     required = [
         "_livekit_google_slim",
         '"livekit.plugins.google.llm"',
-        '"livekit.plugins.google.beta.gemini_tts"',
         '"livekit.plugins.google.stt"',
         '"livekit.plugins.google.tts"',
         '"google.cloud"',
@@ -378,6 +377,7 @@ def test_pyinstaller_specs_use_slim_livekit_google_collection(spec_name: str) ->
     ]
     for token in required:
         assert token in text, f"{spec_name} missing {token}"
+    assert '"livekit.plugins.google.beta.gemini_tts"' not in text
 
 
 @pytest.mark.parametrize(

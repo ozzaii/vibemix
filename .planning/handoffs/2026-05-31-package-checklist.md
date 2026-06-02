@@ -8347,3 +8347,40 @@ Proof before staging:
 - `uv run ruff check tests/library/test_watcher.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tests/library/test_watcher.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 32 - MOSS-only PyInstaller TTS Hidden Import Cleanup
+
+Suggested commit: `fix(packaging): stop bundling gemini tts leaf`
+
+Include:
+
+- `vibemix-core.macos.spec`
+- `vibemix-core.windows.spec`
+- `tests/sidecar/test_build_sidecar_rename.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/agent/_livekit_google_slim.py`, `src/vibemix/agent/tts_chain.py`,
+  MOSS runtime/model download behavior, and LiveKit Gemini LLM brain transport.
+- Google Cloud STT/TTS exclusion strings in the sidecar test; those remain
+  intentional negative guards.
+
+Reason:
+
+- Product speech is local MOSS only, and local import proof shows
+  `livekit.plugins.google.llm` does not import the beta `gemini_tts` leaf. The
+  PyInstaller specs still bundled that dead TTS leaf and described "Gemini
+  LLM/TTS" packaging. Remove the unused hidden import while keeping the slim
+  Google LLM leaf and the explicit Google Cloud STT/TTS anti-collection guard.
+
+Proof before staging:
+
+- `uv run python - <<'PY'` local import proof that
+  `vibemix.agent._livekit_google_slim.google_llm_class()` resolves and
+  `livekit.plugins.google.llm` source does not reference `gemini_tts`, `tts`,
+  `stt`, `google.cloud`, or `grpc`.
+- `uv run pytest -q tests/sidecar/test_build_sidecar_rename.py::test_pyinstaller_specs_use_slim_livekit_google_collection`
+- `uv run ruff check tests/sidecar/test_build_sidecar_rename.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- vibemix-core.macos.spec vibemix-core.windows.spec tests/sidecar/test_build_sidecar_rename.py .planning/handoffs/2026-05-31-package-checklist.md`

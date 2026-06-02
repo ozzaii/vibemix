@@ -130,14 +130,12 @@ for _pkg in _DYNAMIC_PKGS:
     except Exception as exc:  # pragma: no cover — defensive
         print(f"[spec] collect_submodules({_pkg!r}) skipped: {exc}", file=sys.stderr)
 
-# VibeMix uses LiveKit's Gemini LLM + native Gemini TTS leaves only. The
+# VibeMix uses LiveKit's Gemini LLM leaf only. Product speech is local MOSS; the
 # package initializer eagerly imports Google Cloud STT/TTS; keep the frozen
 # hiddenimports to the exact leaves used by vibemix.agent._livekit_google_slim.
 hiddenimports.extend(
     [
         "livekit.plugins.google",
-        "livekit.plugins.google.beta",
-        "livekit.plugins.google.beta.gemini_tts",
         "livekit.plugins.google.llm",
         "livekit.plugins.google.log",
         "livekit.plugins.google.models",
