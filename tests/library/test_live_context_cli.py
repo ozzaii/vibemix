@@ -1279,10 +1279,14 @@ def test_viber_live_context_readiness_requires_both_deck_audio_lanes_active():
     )
 
     assert readiness["ready"] is False
+    assert readiness["checks"]["deck_pair_capture_configured"] is True
     assert readiness["checks"]["deck_audio_capture_active"] is True
     assert readiness["checks"]["deck_audio_capture_both_active"] is False
     assert readiness["deck_audio_route_diagnosis"]["inactive_sides"] == "B"
     assert readiness["deck_audio_route_diagnosis"]["active_unassigned_pairs"] == "none"
+    assert "deck-pair audio capture was not configured in the live packet" not in readiness[
+        "blockers"
+    ]
     assert "deck_audio_capture did not show active audio on both deck lanes" in readiness[
         "blockers"
     ]

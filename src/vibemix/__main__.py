@@ -5260,7 +5260,7 @@ def _viber_deck_pair_capture_configured(
     text = str(raw_context or "")
     if "deck_audio_separation_context[" not in text:
         text = preview
-    return all(
+    configured = all(
         atom in text
         for atom in (
             "mode=deck_pair_capture_configured",
@@ -5270,6 +5270,17 @@ def _viber_deck_pair_capture_configured(
             "isolated_decks=runtime_capture_available",
         )
     )
+    unverified = all(
+        atom in text
+        for atom in (
+            "mode=deck_pair_capture_unverified",
+            "deckA_audio=captured_unverified",
+            "deckB_audio=captured_unverified",
+            "per_deck_audio=unverified_not_attached",
+            "deck_pairs=",
+        )
+    )
+    return configured or unverified
 
 
 def _viber_deck_audio_capture_evidence_seen(evidence_items: list[str]) -> bool:
