@@ -8835,3 +8835,48 @@ Proof before staging:
 - `uv run ruff check src/vibemix/profile/builder.py tests/profile/test_builder.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/profile/builder.py tests/profile/test_builder.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 42 - Shipped Genre Event-Chain Coverage
+
+Suggested commit: `fix(genre): route shipped profiles safely`
+
+Include:
+
+- `src/vibemix/events/genres/__init__.py`
+- `src/vibemix/events/genres/disco.py`
+- `src/vibemix/events/genres/drum_and_bass.py`
+- `src/vibemix/events/genres/pop.py`
+- `src/vibemix/state/music_state.py`
+- `src/vibemix/runtime/ws_bus.py`
+- `tests/state/test_genre_router.py`
+- `tests/state/test_genre_router_race.py`
+- `tests/state/test_genre_autodetect.py`
+- `tests/state/test_refresh.py`
+- `tests/runtime/test_ws_bus_phase22_fields.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Prompt text, Sven speech, `src/vibemix/__main__.py`, `src/vibemix/runtime/coach.py`,
+  new DSP thresholds, arbitrary genre strings outside the shipped profile
+  allowlist, and live FLX4/Rekordbox proof.
+
+Reason:
+
+- Packages 39-41 made the profile layer recognize the shipped profile labels,
+  but the event router still only had chains for `house`, `techno`,
+  `psytrance`, `hard_tek`, and `unknown`. That meant a grounded full-library
+  detection of `disco`, `drum_and_bass`, or `pop` could render as genre
+  evidence while the live event chain still fell back to a coarse/unknown path.
+  Add conservative routeable chains for the remaining shipped profiles:
+  disco/pop get sub-arrival + phrase structure; drum-and-bass gets bass/drop
+  structure with paired kill/re-entry. None inherit Hard Tek-only
+  acid/distortion overlays.
+
+Proof before staging:
+
+- `uv run pytest -q tests/state/test_genre_router.py tests/state/test_genre_router_race.py tests/state/test_genre_autodetect.py tests/state/test_refresh.py tests/runtime/test_ws_bus_phase22_fields.py`
+- `uv run pytest -q tests/state/test_genre_profile.py tests/state/test_genre_autodetect.py tests/profile/test_schema.py tests/profile/test_builder.py tests/audio/test_phase17_constants.py`
+- `uv run ruff check src/vibemix/events/genres src/vibemix/state/music_state.py src/vibemix/runtime/ws_bus.py tests/state/test_genre_router.py tests/state/test_genre_router_race.py tests/state/test_genre_autodetect.py tests/state/test_refresh.py tests/runtime/test_ws_bus_phase22_fields.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/events/genres/__init__.py src/vibemix/events/genres/disco.py src/vibemix/events/genres/drum_and_bass.py src/vibemix/events/genres/pop.py src/vibemix/state/music_state.py src/vibemix/runtime/ws_bus.py tests/state/test_genre_router.py tests/state/test_genre_router_race.py tests/state/test_genre_autodetect.py tests/state/test_refresh.py tests/runtime/test_ws_bus_phase22_fields.py .planning/handoffs/2026-05-31-package-checklist.md`

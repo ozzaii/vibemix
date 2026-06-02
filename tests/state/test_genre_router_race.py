@@ -41,7 +41,10 @@ def test_genre_registry_has_known_keys():
     must remain accessible after the immutability refactor."""
     assert set(GENRE_REGISTRY.keys()) == {
         "unknown",
+        "disco",
+        "drum_and_bass",
         "house",
+        "pop",
         "techno",
         "psytrance",
         "hard_tek",

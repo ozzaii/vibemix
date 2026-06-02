@@ -48,9 +48,9 @@ class MusicState:
     # Phase 52 (GENRE-01) — grounded DSP genre auto-detection. SINGLE-WRITER
     # (_tick_once only). `detected_genre` is the FULL-LIBRARY auto-detected
     # profile name (any of list_profiles(), or "unknown" when the detector is
-    # below confidence) — distinct from the coarse `active_genre`
-    # house/techno/hard_tek renderer signal below. `genre_confidence` is the
-    # detector's score in [0, 1]. Additive defaults preserve golden-equivalence:
+    # below confidence) — distinct from the routeable `active_genre`
+    # event-chain signal below. `genre_confidence` is the detector's score in
+    # [0, 1]. Additive defaults preserve golden-equivalence:
     # no behavior changes until _tick_once writes them. Anti-slop is enforced at
     # the SOURCE (the scorer's unknown fallback) — the wire carries these as-is.
     detected_genre: str = "unknown"
@@ -125,11 +125,10 @@ class MusicState:
     # per CONTEXT D. Downstream consumers MUST treat it as Optional[float]
     # and honor None as "predictive firing OFF" (T-17-01-04 mitigation).
     #
-    # `active_genre` is one of the registered event-chain genres
-    # ("house" / "techno" / "psytrance" / "hard_tek" / "unknown"). Invalid BPM
-    # or an unregistered detected profile yields "unknown" / coarse fallback
-    # (anti-hallucination — no fabricated genre during BPM lock-up; mirrors the
-    # v4 `_music_truly_playing` rule and T-17-01-01 mitigation).
+    # `active_genre` is one of the registered event-chain genres, or "unknown".
+    # Invalid BPM or an unregistered detected profile yields "unknown" / coarse
+    # fallback (anti-hallucination — no fabricated genre during BPM lock-up;
+    # mirrors the v4 `_music_truly_playing` rule and T-17-01-01 mitigation).
     #
     # `beat_phase` is a Phase-17-named alias of `downbeat_phase` so SENSE-12
     # detector module imports don't reach into Phase-13 naming. Both fields

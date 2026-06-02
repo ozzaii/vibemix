@@ -3,7 +3,7 @@
 
 Adds two MusicState fields to the mascot bus:
   - beat_phase (Phase 17 alias of downbeat_phase, ∈ [0, 1))
-  - active_genre ("house" / "techno" / "hard_tek" / "unknown")
+  - active_genre (registered event-chain genre, or "unknown")
 
 The renderer (Wave 2) subscribes to beat_phase per CONTEXT; downbeat_phase
 stays on the wire for Phase 13-06 dispatcher backward-compat.

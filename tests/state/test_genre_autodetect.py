@@ -271,18 +271,21 @@ def test_env_pinned_does_not_flip_active_profile_but_surfaces_detection(monkeypa
     assert state.active_genre == "techno", "pinned profile should route the event chain"
 
 
-def test_auto_enabled_flips_active_profile_to_detected(monkeypatch):
-    """set_auto_enabled(True): the active profile DOES flip to the committed
-    detected genre (psytrance)."""
+@pytest.mark.parametrize("forced_genre", ["disco", "drum_and_bass", "pop", "psytrance"])
+def test_auto_enabled_flips_active_profile_to_detected_routeable_genre(
+    monkeypatch,
+    forced_genre: str,
+):
+    """set_auto_enabled(True): detected profile labels also route active_genre."""
     from vibemix.state.genre import get_active_profile
 
     set_auto_enabled(True)
-    state = _drive_tick_with_forced_genre(monkeypatch)
+    state = _drive_tick_with_forced_genre(monkeypatch, forced=(forced_genre, 0.9))
 
     active = get_active_profile()
-    assert active is not None and active.name == "psytrance", "auto-detect did not flip profile"
-    assert state.detected_genre == "psytrance"
-    assert state.active_genre == "psytrance"
+    assert active is not None and active.name == forced_genre, "auto-detect did not flip profile"
+    assert state.detected_genre == forced_genre
+    assert state.active_genre == forced_genre
 
 
 # ---------- no heavy deps ----------

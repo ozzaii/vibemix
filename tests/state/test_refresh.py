@@ -2156,8 +2156,7 @@ def test_tick_lazy_defaults_genre_hysteresis_kwarg():
 
 
 def test_tick_does_not_touch_active_genre_path():
-    """The coarse active_genre / _classify_active_genre signal is still written
-    and is independent of detected_genre (parallel, not replaced)."""
+    """The routeable active_genre path stays honest on cold/unknown input."""
     from vibemix.state.genre import set_active_profile, set_auto_enabled
 
     set_active_profile(None)
@@ -2175,8 +2174,7 @@ def test_tick_does_not_touch_active_genre_path():
             bpm_cache=0.0,
             last_bpm_at=0.0,
         )
-        # active_genre is still one of the coarse renderer values.
-        assert state.active_genre in {"house", "techno", "hard_tek", "unknown"}
+        assert state.active_genre == "unknown"
     finally:
         set_active_profile(None)
         set_auto_enabled(True)

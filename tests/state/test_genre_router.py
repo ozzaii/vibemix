@@ -29,11 +29,15 @@ from vibemix.audio.constants import GENRE_BPM_BANDS
 from vibemix.events.genres import (
     GENRE_REGISTRY,
     build_baseline_chain,
+    build_disco_chain,
+    build_drum_and_bass_chain,
     build_hard_tek_chain,
     build_house_chain,
+    build_pop_chain,
     build_psytrance_chain,
     build_techno_chain,
 )
+from vibemix.profile.schema import GENRES as PROFILE_GENRES
 from vibemix.state.detectors import (
     AcidLineEntryDetector,
     BreakdownKickKillDetector,
@@ -247,6 +251,49 @@ def test_house_chain_does_not_contain_hard_tek_overlays():
     assert AcidLineEntryDetector not in types
 
 
+def test_disco_chain_is_phrase_and_sub_without_hard_tek_overlays():
+    """Disco / nu-disco gets conservative structure, not Hard Tek overlays."""
+    chain = build_disco_chain()
+    types = [type(d) for d in chain]
+    assert SubLayerArrivalDetector in types
+    assert PhraseBoundaryDetector in types
+    assert DistortionClimbDetector not in types
+    assert AcidLineEntryDetector not in types
+    assert len(chain) == 2
+
+
+def test_pop_chain_is_phrase_and_sub_without_hard_tek_overlays():
+    """Pop gets broad structure only; no fabricated scene grammar."""
+    chain = build_pop_chain()
+    types = [type(d) for d in chain]
+    assert SubLayerArrivalDetector in types
+    assert PhraseBoundaryDetector in types
+    assert DistortionClimbDetector not in types
+    assert AcidLineEntryDetector not in types
+    assert len(chain) == 2
+
+
+def test_drum_and_bass_chain_is_bass_drop_structure_without_hard_tek_overlays():
+    """D&B gets bass/drop structure but never acid/distortion overlays."""
+    chain = build_drum_and_bass_chain()
+    types = [type(d) for d in chain]
+    assert SubLayerArrivalDetector in types
+    assert BreakdownKickKillDetector in types
+    assert ReentryKickLandDetector in types
+    assert PhraseBoundaryDetector in types
+    assert DistortionClimbDetector not in types
+    assert AcidLineEntryDetector not in types
+    assert len(chain) == 4
+
+    kill = next(d for d in chain if isinstance(d, BreakdownKickKillDetector))
+    reentry = next(d for d in chain if isinstance(d, ReentryKickLandDetector))
+    phrase = next(d for d in chain if isinstance(d, PhraseBoundaryDetector))
+    assert reentry.kill_detector is kill
+    assert phrase.kill_detector is kill
+    assert chain.index(kill) < chain.index(reentry)
+    assert chain.index(kill) < chain.index(phrase)
+
+
 def test_psytrance_chain_is_kick_phrase_without_hard_tek_overlays():
     """Psytrance gets the fast kick/phrase chain without acidcore overlays."""
     chain = build_psytrance_chain()
@@ -277,3 +324,15 @@ def test_genre_registry_keys_match_genre_bpm_bands():
         f"(GENRE_BPM_BANDS={sorted(bpm_band_keys)}, "
         f"GENRE_REGISTRY={sorted(registry_keys)})"
     )
+
+
+def test_genre_registry_covers_shipped_profile_genres():
+    """Every persisted profile label is routeable, even when the chain is generic.
+
+    This keeps detected profile labels like disco / D&B / pop from falling back
+    to "unknown" or the coarse Hard Tek BPM bucket after the detector already
+    made a grounded profile decision.
+    """
+    profile_genres = set(PROFILE_GENRES) - {"unknown", "hard_tek"}
+    missing = profile_genres - set(GENRE_REGISTRY.keys())
+    assert not missing, f"GENRE_REGISTRY missing shipped profile genre(s): {sorted(missing)}"

@@ -20,8 +20,11 @@ from collections.abc import Callable
 from types import MappingProxyType
 
 from vibemix.events.genres.baseline import build_baseline_chain
+from vibemix.events.genres.disco import build_disco_chain
+from vibemix.events.genres.drum_and_bass import build_drum_and_bass_chain
 from vibemix.events.genres.hard_tek import build_hard_tek_chain
 from vibemix.events.genres.house import build_house_chain
+from vibemix.events.genres.pop import build_pop_chain
 from vibemix.events.genres.psytrance import build_psytrance_chain
 from vibemix.events.genres.techno import build_techno_chain
 
@@ -38,7 +41,10 @@ from vibemix.events.genres.techno import build_techno_chain
 # add a genre is to edit this file + ship a new release.
 _GENRE_REGISTRY_RAW: dict[str, Callable[[], list]] = {
     "unknown": build_baseline_chain,
+    "disco": build_disco_chain,
+    "drum_and_bass": build_drum_and_bass_chain,
     "house": build_house_chain,
+    "pop": build_pop_chain,
     "techno": build_techno_chain,
     "psytrance": build_psytrance_chain,
     "hard_tek": build_hard_tek_chain,
@@ -48,8 +54,11 @@ GENRE_REGISTRY: MappingProxyType = MappingProxyType(_GENRE_REGISTRY_RAW)
 __all__ = [
     "GENRE_REGISTRY",
     "build_baseline_chain",
+    "build_disco_chain",
+    "build_drum_and_bass_chain",
     "build_hard_tek_chain",
     "build_house_chain",
+    "build_pop_chain",
     "build_psytrance_chain",
     "build_techno_chain",
 ]

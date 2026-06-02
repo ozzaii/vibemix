@@ -994,8 +994,8 @@ async def ws_broadcast(
             # Plan 13-06 dispatcher binds to `downbeat_phase` and the
             # Phase 22 anticipation/hip-bob layers bind to `beat_phase`;
             # carrying both lets the renderer migrate incrementally
-            # without breaking existing subscribers. `active_genre`
-            # ("house"/"techno"/"hard_tek"/"unknown") feeds the
+            # without breaking existing subscribers. `active_genre` is a
+            # registered event-chain genre (or "unknown") and feeds the
             # GenreRouter on the renderer side. Anti-hallucination is
             # the renderer's job (the bus is a dumb wire) — under low
             # bpm_confidence the bus still emits beat_phase as-is and
@@ -1057,8 +1057,8 @@ async def ws_broadcast(
                 "active_genre": state.active_genre,
                 # Phase 52 (GENRE-02) — additive. `detected_genre` is the FULL-
                 # LIBRARY auto-detected genre name (Plan 52-03), distinct from
-                # the coarse `active_genre` house/techno/hard_tek renderer
-                # signal above. Anti-hallucination is honored at the SOURCE: the
+                # the routeable `active_genre` event-chain signal above.
+                # Anti-hallucination is honored at the SOURCE: the
                 # detector writes "unknown" when it is unsure, so the bus is a
                 # dumb wire that carries the value as-is — never a fabricated
                 # label. `genre_confidence` is the detector's score in [0,1].
