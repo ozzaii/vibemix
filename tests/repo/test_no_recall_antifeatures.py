@@ -85,7 +85,7 @@ Executed during planning, 2026-05-22 (recorded in 66-VALIDATION.md
     grep -nE "you tend to|you usually|you always|next track|\\
               you should play|your tendency|based on your past|\\
               I recommend|my recommendation|you should try" \\
-        src/vibemix/state/coach.py src/vibemix/prompts/matrix.py
+        src/vibemix/state/prompt_builder.py src/vibemix/prompts/matrix.py
 
 Returned ZERO hits. Re-verified during this Wave 0 commit — still zero.
 
@@ -149,7 +149,7 @@ FORBIDDEN_RECALL_PHRASES: tuple[str, ...] = (
 # Hardcoded (not a glob) so the gate's reach is unambiguous and a future
 # file split must explicitly opt-in by editing this tuple.
 TARGET_FILES: tuple[str, ...] = (
-    "src/vibemix/state/coach.py",
+    "src/vibemix/state/prompt_builder.py",
     "src/vibemix/prompts/matrix.py",
 )
 
@@ -235,7 +235,7 @@ def test_strip_comments_and_docstrings_removes_string_content() -> None:
 def test_no_recall_antifeatures_in_coach_surface_after_string_and_comment_scrub_COPILOT03() -> None:
     """COPILOT-03 — no forbidden anti-feature phrase survives the
     string-and-comment scrub of the coach / prompt surface
-    (state/coach.py + prompts/matrix.py).
+    (state/prompt_builder.py + prompts/matrix.py).
 
     Scans tokenize-stripped + lowercased executable source of every file
     in TARGET_FILES for substring presence of any phrase in

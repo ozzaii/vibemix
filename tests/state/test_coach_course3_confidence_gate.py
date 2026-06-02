@@ -17,13 +17,13 @@ from __future__ import annotations
 
 import dataclasses
 
-from vibemix.state.coach import (
+from vibemix.state.music_state import MusicState
+from vibemix.state.prompt_builder import (
     _COUNT_IN_BPM_FLOOR,
     _COUNT_IN_PHRASE_FLOOR,
     AICoach,
     _count_in_eligible,
 )
-from vibemix.state.music_state import MusicState
 
 
 def test_constants_locked_at_orchestrator_brief_thresholds() -> None:

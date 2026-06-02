@@ -23,8 +23,8 @@ from tests.audio.conftest import int16_sine
 from vibemix.audio import AudioBuffer
 from vibemix.library.rekordbox import CuePoint, TrackEntry
 from vibemix.state import MusicState, state_refresh_loop
-from vibemix.state.coach import AICoach
 from vibemix.state.deck_state import DeckTrack
+from vibemix.state.prompt_builder import AICoach
 from vibemix.state.refresh import _tick_once
 
 

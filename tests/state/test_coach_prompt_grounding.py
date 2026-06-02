@@ -17,9 +17,9 @@ Plan 59-04 wires the deck block into evidence_line, so:
 
 from __future__ import annotations
 
-from vibemix.state.coach import AICoach
 from vibemix.state.deck_state import DeckState, DeckTrack
 from vibemix.state.music_state import MusicState
+from vibemix.state.prompt_builder import AICoach
 
 
 def _grounded_state(*, bpm: float = 128.0, rms: float = 0.06) -> MusicState:

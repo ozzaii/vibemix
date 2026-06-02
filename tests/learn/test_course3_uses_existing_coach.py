@@ -2,7 +2,7 @@
 """Phase 96 Plan 01 — reuse-existing-coach AST gate (CONTEXT.md §Decisions).
 
 Every tutor-narration prompt builder under ``src/vibemix/learn/`` MUST
-compose its prompt body via :func:`vibemix.state.coach.AICoach.build_prompt`.
+compose its prompt body via :func:`vibemix.state.prompt_builder.AICoach.build_prompt`.
 The lens never rolls its own LLM prompt body — pin invariant-#1-by-
 construction at the prompt-composition seam: if ``learn/`` owns prompt
 building, it grows incentives to write MusicState; routing through
@@ -83,7 +83,7 @@ def _function_calls_aicoach_build_prompt(
     ``Attribute(value=Name("AICoach"), attr="build_prompt")`` OR
     ``Attribute(value=Attribute(...), attr="build_prompt")`` (handles
     module-qualified ``coach.AICoach.build_prompt`` /
-    ``vibemix.state.coach.AICoach.build_prompt`` shapes), OR a local
+    ``vibemix.state.prompt_builder.AICoach.build_prompt`` shapes), OR a local
     coach-named binding like ``coach.build_prompt(...)``.
     """
     for sub in ast.walk(node):
@@ -167,7 +167,7 @@ def test_learn_prompt_builders_route_through_aicoach() -> None:
     """CURR-3.07 + reuse-existing-coach binding (CONTEXT.md §Decisions).
 
     Every tutor-narration prompt builder under ``src/vibemix/learn/``
-    composes its prompt via ``state.coach.AICoach.build_prompt``. The
+    composes its prompt via ``state.prompt_builder.AICoach.build_prompt``. The
     lens never rolls a fresh LLM prompt body. This pins
     invariant-#1-by-construction at the prompt-composition seam: if
     learn/ owns prompt building, it grows incentives to write
@@ -184,7 +184,7 @@ def test_learn_prompt_builders_route_through_aicoach() -> None:
     assert not all_offenders, (
         "CURR-3.07 violation — a ``learn/`` prompt-composition module "
         "rolled its own LLM prompt body without calling "
-        "AICoach.build_prompt. Route through state.coach.AICoach.build_prompt "
+        "AICoach.build_prompt. Route through state.prompt_builder.AICoach.build_prompt "
         "(the v8.0 evidence_line + task_for_event + format_wrapper triad) "
         "or attach ``# allow-tutor-prompt-without-coach: <reason>`` to "
         "the function if it genuinely is not a prompt builder.\n\n"
@@ -208,7 +208,7 @@ def test_synthetic_complier_passes(tmp_path: pathlib.Path) -> None:
     """Positive-control proof."""
     complier = tmp_path / "prompts.py"
     complier.write_text(
-        "from vibemix.state.coach import AICoach\n"
+        "from vibemix.state.prompt_builder import AICoach\n"
         "def build_tutor_prompt(state, event):\n"
         "    return AICoach.build_prompt(state, event)\n",
         encoding="utf-8",

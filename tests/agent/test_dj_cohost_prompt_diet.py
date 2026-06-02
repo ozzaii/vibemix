@@ -26,7 +26,7 @@ from vibemix.agent import DJCoHostAgent
 from vibemix.agent.dj_cohost import SCREEN_SKIP_EVENTS
 from vibemix.audio import INVOKE_AUDIO_SECONDS
 from vibemix.state import AICoach, Event, MusicState
-from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
+from vibemix.state.prompt_builder import ACK_ELIGIBLE_EVENTS
 
 # 6s window from Plan 19-02 — diet path payload.
 DIET_AUDIO_SECONDS = 6.0

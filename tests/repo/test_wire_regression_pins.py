@@ -19,11 +19,11 @@ No re-implementation: assertions only against the existing public surface.
 No genai.Client, no API key.
 
 Mechanism located this session:
-  * WIRE-02 — ``src/vibemix/state/coach.py::AICoach.task_for_event`` branches
+  * WIRE-02 — ``src/vibemix/state/prompt_builder.py::AICoach.task_for_event`` branches
     at lines 598-694 (ACID_LINE_ENTRY / KICK_SWAP / SUB_LAYER_ARRIVAL /
     KICK_DENSITY_SHIFT / DISTORTION_CLIMB / BREAKDOWN_KICK_KILL /
     REENTRY_KICK_LAND / PHRASE_BOUNDARY); fallthrough "React naturally." at :695.
-  * WIRE-03 — ``src/vibemix/state/coach.py::AICoach.evidence_line`` gate at
+  * WIRE-03 — ``src/vibemix/state/prompt_builder.py::AICoach.evidence_line`` gate at
     :334 (``detected_genre != "unknown" and genre_confidence >= 0.5`` →
     ``e.append(f"genre={state.detected_genre}")``).
 """

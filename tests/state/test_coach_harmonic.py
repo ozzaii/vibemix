@@ -26,9 +26,9 @@ from __future__ import annotations
 import pytest
 
 from vibemix.coach.citation_linter import CitationLinter
-from vibemix.state.coach import ACK_ELIGIBLE_EVENTS, AICoach
 from vibemix.state.event import Event
 from vibemix.state.music_state import MusicState
+from vibemix.state.prompt_builder import ACK_ELIGIBLE_EVENTS, AICoach
 
 
 def _clash_event() -> Event:

@@ -24,9 +24,9 @@ from vibemix.library.prepared_pool import PreparedPool, PreparedPoolTrack
 from vibemix.library.rekordbox import CuePoint, RekordboxLibrary, TrackEntry
 from vibemix.runtime.suggestion import SuggestionService
 from vibemix.state import MusicState
-from vibemix.state.coach import AICoach
 from vibemix.state.deck_state import DeckState, DeckTrack
 from vibemix.state.evidence_registry import EvidenceRegistry
+from vibemix.state.prompt_builder import AICoach
 from vibemix.state.refresh import _tick_once
 
 

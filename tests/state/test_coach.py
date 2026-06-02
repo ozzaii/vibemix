@@ -207,7 +207,7 @@ def test_evidence_line_audible_no_recall_byte_identical_v5_baseline(mocker):
     field, or shifts the corpus footer also breaks ``recall_moments=None`` —
     not just the recall comparison.
     """
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = MusicState(
         audible=True,
         rms=0.094,
@@ -235,7 +235,7 @@ def test_evidence_line_audible_no_recall_byte_identical_v5_baseline(mocker):
 
 def test_evidence_line_audible_block_format(mocker):
     """Pin the exact audible-block format from v4:1336-1339."""
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = MusicState(
         audible=True,
         rms=0.094,
@@ -369,7 +369,7 @@ def test_evidence_line_HAS_NO_phase_field():
 
 def test_evidence_line_phase_age_when_history_present(mocker):
     """phase_history non-empty → `phase_age=...s` (note: trailing 's')."""
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = MusicState(
         audible=True,
         rms=0.05,
@@ -381,7 +381,7 @@ def test_evidence_line_phase_age_when_history_present(mocker):
 
 
 def test_evidence_line_track_age_when_history_present(mocker):
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = MusicState(
         audible=True,
         rms=0.05,
@@ -1092,7 +1092,7 @@ def test_18_02_build_prompt_threads_snapshot_kwarg():
 # Fragment-unique substring locks (verified absent from current source at
 # Wave 0 land — recorded in 66-VALIDATION.md §Wave 0 Requirements + the
 # task <action> grep evidence; the executor reproduced each substring grep
-# returning ZERO hits on src/vibemix/state/coach.py + src/vibemix/prompts/matrix.py
+# returning ZERO hits on src/vibemix/state/prompt_builder.py + src/vibemix/prompts/matrix.py
 # before committing):
 #
 #   - "in the live audio"        → transition-shape fragment unique marker
@@ -1165,20 +1165,20 @@ def test_transition_recall_fragment_appears():
     fence AND the transition-shape fragment's unique substring.
 
     Fragment-unique substring: "in the live audio" — verified absent from
-    src/vibemix/state/coach.py AND src/vibemix/prompts/matrix.py at Wave 0
+    src/vibemix/state/prompt_builder.py AND src/vibemix/prompts/matrix.py at Wave 0
     land (zero hits in the pre-grep recorded in the section header above).
 
     RED reason: `recall_fragment_for_event` symbol does not exist in
-    vibemix.state.coach yet — Plan 02 Task 2 adds it.
+    vibemix.state.prompt_builder yet — Plan 02 Task 2 adds it.
     """
     try:
-        from vibemix.state.coach import recall_fragment_for_event  # noqa: F401
+        from vibemix.state.prompt_builder import recall_fragment_for_event  # noqa: F401
     except ImportError:
         import pytest
 
         pytest.fail(
             "recall_fragment_for_event symbol missing from "
-            "vibemix.state.coach — Plan 02 Task 2 must add it (COPILOT-01)"
+            "vibemix.state.prompt_builder — Plan 02 Task 2 must add it (COPILOT-01)"
         )
 
     survivors = _phase_66_record_stubs(n=2)
@@ -1199,20 +1199,20 @@ def test_vocabulary_recall_fragment_appears():
     output contains the vocabulary fragment's unique substring.
 
     Fragment-unique substring: "echo your own past words" — verified absent
-    from src/vibemix/state/coach.py AND src/vibemix/prompts/matrix.py at
+    from src/vibemix/state/prompt_builder.py AND src/vibemix/prompts/matrix.py at
     Wave 0 land.
 
     RED reason: `recall_fragment_for_event` symbol does not exist yet —
     Plan 02 Task 2 must add it.
     """
     try:
-        from vibemix.state.coach import recall_fragment_for_event  # noqa: F401
+        from vibemix.state.prompt_builder import recall_fragment_for_event  # noqa: F401
     except ImportError:
         import pytest
 
         pytest.fail(
             "recall_fragment_for_event symbol missing from "
-            "vibemix.state.coach — Plan 02 Task 2 must add it (COPILOT-02)"
+            "vibemix.state.prompt_builder — Plan 02 Task 2 must add it (COPILOT-02)"
         )
 
     survivors = _phase_66_record_stubs(n=1)
@@ -1310,13 +1310,13 @@ def test_only_strongest_survivor_record_id_in_fragment():
     the kwarg until Plan 02 adds the integration).
     """
     try:
-        from vibemix.state.coach import recall_fragment_for_event  # noqa: F401
+        from vibemix.state.prompt_builder import recall_fragment_for_event  # noqa: F401
     except ImportError:
         import pytest
 
         pytest.fail(
             "recall_fragment_for_event symbol missing from "
-            "vibemix.state.coach — Plan 02 Task 2 must add it (COPILOT-02)"
+            "vibemix.state.prompt_builder — Plan 02 Task 2 must add it (COPILOT-02)"
         )
 
     survivors = _phase_66_record_stubs(n=3)
@@ -1380,13 +1380,13 @@ def test_transition_wins_track_change_overlap():
     RED reason: helper does not exist yet.
     """
     try:
-        from vibemix.state.coach import recall_fragment_for_event  # noqa: F401
+        from vibemix.state.prompt_builder import recall_fragment_for_event  # noqa: F401
     except ImportError:
         import pytest
 
         pytest.fail(
             "recall_fragment_for_event symbol missing from "
-            "vibemix.state.coach — Plan 02 Task 2 must add it (COPILOT-02)"
+            "vibemix.state.prompt_builder — Plan 02 Task 2 must add it (COPILOT-02)"
         )
 
     survivors = _phase_66_record_stubs(n=2)

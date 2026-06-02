@@ -26,8 +26,8 @@ from __future__ import annotations
 
 from vibemix.prompts.matrix import build_system_instruction
 from vibemix.state import Event, MusicState
-from vibemix.state.coach import AICoach
 from vibemix.state.evidence_registry import EvidenceRegistry
+from vibemix.state.prompt_builder import AICoach
 
 # The citation-grammar marker (matrix.CITATION_GRAMMAR_BLOCK header) + the
 # anti-slop-footer marker (the ban-block header inside matrix._ANTI_SLOP_FOOTER).

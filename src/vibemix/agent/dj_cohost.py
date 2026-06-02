@@ -87,7 +87,6 @@ from vibemix.runtime.debug_flags import debug_log_enabled
 from vibemix.runtime.llm_to_tts_delta_meter import LLMToTTSDeltaMeter
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
-from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
 from vibemix.state.deck_context import (
     GEMINI_AUDIO_TOKENS_PER_SECOND,
     apply_live_claim_guard,
@@ -116,6 +115,7 @@ from vibemix.state.deck_context import (
     render_move_effect_context,
     should_defer_live_claim_stream,
 )
+from vibemix.state.prompt_builder import ACK_ELIGIBLE_EVENTS
 from vibemix.ui_bus import SessionCohostReaction, SessionOverlayHighlight
 
 if TYPE_CHECKING:  # pragma: no cover — typing-only

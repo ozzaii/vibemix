@@ -23,12 +23,12 @@ from types import SimpleNamespace
 import pytest
 
 from vibemix.state import AICoach, Event, MusicState
-from vibemix.state.coach import (
+from vibemix.state.deck_state import DeckState, DeckTrack
+from vibemix.state.prompt_builder import (
     ACK_ELIGIBLE_EVENTS,
     PROMPT_TOKEN_CAP_ACK,
     PROMPT_TOKEN_CAP_FULL,
 )
-from vibemix.state.deck_state import DeckState, DeckTrack
 
 # 4 chars/token proxy — pyproject.toml has no tiktoken dep, so we use the
 # cl100k empirical baseline ratio.
@@ -120,14 +120,14 @@ def test_diet_false_byte_identical_with_snapshot():
 
 
 def test_diet_true_heartbeat_under_cap(mocker):
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     ev = _ev("HEARTBEAT", _populated_state())
     out = AICoach.build_prompt(ev, diet=True)
     assert _tokens(out) <= PROMPT_TOKEN_CAP_ACK
 
 
 def test_diet_true_mix_move_under_cap_with_moves_inline(mocker):
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     ev = _ev(
         "MIX_MOVE",
         _populated_state(),
@@ -141,14 +141,14 @@ def test_diet_true_mix_move_under_cap_with_moves_inline(mocker):
 
 
 def test_diet_true_layer_arrival_under_cap(mocker):
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     ev = _ev("LAYER_ARRIVAL", _populated_state())
     out = AICoach.build_prompt(ev, diet=True)
     assert _tokens(out) <= PROMPT_TOKEN_CAP_ACK
 
 
 def test_diet_true_kaan_spoke_under_cap(mocker):
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     ev = _ev("KAAN_SPOKE", _populated_state())
     out = AICoach.build_prompt(ev, diet=True)
     assert _tokens(out) <= PROMPT_TOKEN_CAP_ACK
@@ -160,7 +160,7 @@ def test_diet_true_kaan_spoke_under_cap(mocker):
 def test_diet_true_drops_history_fields(mocker):
     """The diet path drops phase_age / track_age / set_arc / phase_history /
     recent_tracks — only the 5 strictly-needed fields stay."""
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     ev = _ev("HEARTBEAT", _populated_state())
     out = AICoach.build_prompt(ev, diet=True)
     assert "phase_age=" not in out
@@ -172,7 +172,7 @@ def test_diet_true_drops_history_fields(mocker):
 
 def test_diet_true_keeps_required_grounding_fields(mocker):
     """The compact evidence_line keeps core hearing/track/deck/time/move grounding."""
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     ev = _ev("MIX_MOVE", _populated_state(), extra={"moves": ["A_play→ON"]})
     out = AICoach.build_prompt(ev, diet=True)
     assert "hearing[" in out
@@ -185,7 +185,7 @@ def test_diet_true_keeps_required_grounding_fields(mocker):
 def test_diet_true_mix_move_keeps_deck_context_for_single_deck_guard(mocker):
     """MIX_MOVE uses the diet path, so the one-deck transition guard must
     survive the compact prompt."""
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = _populated_state()
     state.deck_state = DeckState(
         decks={
@@ -214,7 +214,7 @@ def test_diet_true_mix_move_keeps_deck_context_for_single_deck_guard(mocker):
 
 def test_diet_true_mix_move_can_include_compact_recall_context(mocker):
     """Hot MIX_MOVE recall stays diet-sized but shows the past signature."""
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = _populated_state()
     state.audio_delta = ["low energy fell 50% (strong)"]
     ev = _ev("MIX_MOVE", state, extra={"moves": ["A_low: flat→killed"]})
@@ -239,7 +239,7 @@ def test_diet_true_mix_move_can_include_compact_recall_context(mocker):
 
 
 def test_diet_true_mix_move_sanitizes_compact_recall_context(mocker):
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = _populated_state()
     state.audio_delta = ["low energy fell 50% (strong)"]
     ev = _ev("MIX_MOVE", state, extra={"moves": ["A_low: flat->killed"]})
@@ -312,7 +312,7 @@ def test_full_event_cap_pinned_at_1500(mocker):
     """diet=False on a maximally-populated state stays under 1500 token-proxy.
     Asserted via test only — golden parity is the runtime invariant for
     diet=False, NOT a runtime cap check."""
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = _populated_state()
     snap = {
         "ev": {

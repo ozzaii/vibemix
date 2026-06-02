@@ -38,7 +38,7 @@ MEM = REPO / "src" / "vibemix" / "memory"
 
 # The runtime leak that once forced these gates to xfail (eager
 # ``library/__init__`` -> ``library.toolset`` -> ``from vibemix.state import
-# harmonics`` -> ``state/__init__`` eagerly importing ``state.coach`` +
+# harmonics`` -> ``state/__init__`` eagerly importing ``state.prompt_builder`` +
 # ``state.refresh``) is FIXED: ``state/__init__`` now lazy-loads ``AICoach`` +
 # ``state_refresh_loop`` via PEP 562 ``__getattr__``, so importing a pure state
 # helper no longer drags the live stack into ``sys.modules``. These gates are
@@ -46,7 +46,7 @@ MEM = REPO / "src" / "vibemix" / "memory"
 
 # The live reaction path + state surfaces memory must never import.
 FORBIDDEN_IMPORTS: tuple[str, ...] = (
-    "vibemix.state.coach",
+    "vibemix.state.prompt_builder",
     "vibemix.state.refresh",
     "vibemix.agent",
     "vibemix.prompts",
@@ -117,7 +117,7 @@ def test_importing_memory_loads_no_coach_loop() -> None:
         "import vibemix.memory.store  # noqa: F401\n"
         "leak = sorted(\n"
         "    m for m in sys.modules\n"
-        "    if m.startswith('vibemix.state.coach')\n"
+        "    if m.startswith('vibemix.state.prompt_builder')\n"
         "    or m.startswith('vibemix.state.refresh')\n"
         "    or m.startswith('vibemix.agent')\n"
         "    or m.startswith('vibemix.prompts')\n"
@@ -167,7 +167,7 @@ def test_importing_ingest_loads_no_coach_loop() -> None:
         "import vibemix.memory.ingest  # noqa: F401\n"
         "leak = sorted(\n"
         "    m for m in sys.modules\n"
-        "    if m.startswith('vibemix.state.coach')\n"
+        "    if m.startswith('vibemix.state.prompt_builder')\n"
         "    or m.startswith('vibemix.state.refresh')\n"
         "    or m.startswith('vibemix.agent')\n"
         "    or m.startswith('vibemix.prompts')\n"

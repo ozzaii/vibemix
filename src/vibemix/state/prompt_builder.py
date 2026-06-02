@@ -48,10 +48,10 @@ from vibemix.state.deltas import DELTA_FLOOR, render_delta
 from vibemix.state.event import Event
 from vibemix.state.music_state import MusicState
 
-if TYPE_CHECKING:  # pragma: no cover — typing-only, keeps coach.py import-light
+if TYPE_CHECKING:  # pragma: no cover — typing-only, keeps prompt_builder.py import-light
     # Forward reference for Phase 65 RECALL-02 — the recall_moments list is a
     # list[Record] from vibemix.memory.store. Imported under TYPE_CHECKING so
-    # state/coach.py never pulls memory/ at module import time (the no-live-
+    # state/prompt_builder.py never pulls memory/ at module import time (the no-live-
     # path / no-extraction static gates over memory/ still hold; the coupling
     # here is one-way and lazy, only for the type hint).
     from vibemix.memory.store import Record

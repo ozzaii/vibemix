@@ -3396,6 +3396,57 @@ Remaining gate:
   same move during a bassless breakdown stays silent/held. Do not claim this
   commit proves LIVE or PKG behavior.
 
+## Package 8L - AI Coach Prompt Builder Rename
+
+Suggested commit: `refactor(state): rename ai coach prompt builder`
+
+Include:
+
+- `src/vibemix/state/prompt_builder.py`
+- `src/vibemix/state/__init__.py`
+- `src/vibemix/agent/dj_cohost.py`
+- `src/vibemix/bench/assemble.py`
+- `src/vibemix/learn/prompts.py`
+- `src/vibemix/library/cue_detect.py`
+- `tests/agent/test_coach_prompt_grounding.py`
+- `tests/agent/test_dj_cohost_prompt_diet.py`
+- `tests/agent/test_hype_prompt_grounding.py`
+- `tests/learn/test_course3_live_set_rehearsal.py`
+- `tests/learn/test_course3_uses_existing_coach.py`
+- `tests/memory/test_no_live_path_import.py`
+- `tests/repo/test_no_recall_antifeatures.py`
+- `tests/repo/test_wire_regression_pins.py`
+- `tests/state/test_coach.py`
+- `tests/state/test_coach_course3_confidence_gate.py`
+- `tests/state/test_coach_harmonic.py`
+- `tests/state/test_coach_perceive.py`
+- `tests/state/test_coach_prompt_diet.py`
+- `tests/state/test_coach_prompt_grounding.py`
+- `tests/state/test_refresh.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/runtime/coach.py` and its DROP-call hold-lane hunk.
+- `src/vibemix/state/drop_predict.py`, `src/vibemix/state/event_detector.py`,
+  `tests/state/test_drop_predict.py`, and `tests/state/test_event_detector_drop.py`.
+- Any prompt wording, live-claim policy, or co-host speech behavior change.
+
+Reason:
+
+- The state-layer `AICoach` module builds grounded prompt text; it is not the
+  runtime co-host loop. Renaming the implementation from `state/coach.py` to
+  `state/prompt_builder.py` removes the long-running name collision with
+  `runtime/coach.py` while preserving the public lazy export
+  `from vibemix.state import AICoach`.
+
+Proof before staging:
+
+- `uv run pytest -q tests/state/test_coach.py tests/state/test_coach_prompt_diet.py tests/state/test_coach_perceive.py tests/state/test_coach_prompt_grounding.py tests/state/test_coach_harmonic.py tests/state/test_coach_course3_confidence_gate.py tests/agent/test_dj_cohost_prompt_diet.py tests/agent/test_coach_prompt_grounding.py tests/agent/test_hype_prompt_grounding.py tests/learn/test_course3_uses_existing_coach.py tests/learn/test_course3_live_set_rehearsal.py tests/memory/test_no_live_path_import.py tests/bench/test_assemble.py tests/repo/test_no_recall_antifeatures.py`
+- `uv run ruff check src/vibemix/state/__init__.py src/vibemix/state/prompt_builder.py src/vibemix/agent/dj_cohost.py src/vibemix/bench/assemble.py src/vibemix/learn/prompts.py src/vibemix/library/cue_detect.py tests/agent/test_coach_prompt_grounding.py tests/agent/test_dj_cohost_prompt_diet.py tests/agent/test_hype_prompt_grounding.py tests/learn/test_course3_uses_existing_coach.py tests/learn/test_course3_live_set_rehearsal.py tests/memory/test_no_live_path_import.py tests/repo/test_no_recall_antifeatures.py tests/repo/test_wire_regression_pins.py tests/state/test_coach.py tests/state/test_coach_course3_confidence_gate.py tests/state/test_coach_harmonic.py tests/state/test_coach_perceive.py tests/state/test_coach_prompt_diet.py tests/state/test_coach_prompt_grounding.py tests/state/test_refresh.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check`
+
 ## Hold Lane - Rebuild Carry-Forward Live Reality Pins
 
 Suggested commit if/when selected: `test(repo): pin live reality gaps`

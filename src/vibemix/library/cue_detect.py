@@ -120,7 +120,7 @@ from vibemix.library.cue_types import CueAnchor
 # ``._phrase_dsp``) are imported LAZILY inside the functions below, NOT at
 # module top-level. Importing the ``vibemix.state.detectors`` package runs its
 # ``__init__`` which eagerly imports every live detector — and those
-# transitively pull in ``vibemix.state.coach`` / ``vibemix.state.refresh``.
+# transitively pull in ``vibemix.state.prompt_builder`` / ``vibemix.state.refresh``.
 # vibemix.library.__init__ imports this module, and vibemix.memory imports
 # vibemix.library, so an eager top-level import here would leak the live
 # reaction path into the memory storage spine (the no-live-path import-boundary

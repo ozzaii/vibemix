@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from vibemix.prompts.matrix import build_system_instruction
 from vibemix.state import Event, MusicState
-from vibemix.state.coach import AICoach
+from vibemix.state.prompt_builder import AICoach
 
 
 def _grounded_state(*, bpm: float = 130.0, rms: float = 0.06) -> MusicState:

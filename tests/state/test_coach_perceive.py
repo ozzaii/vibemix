@@ -24,8 +24,6 @@ NO ``GEMINI_API_KEY``, NO live API on any path.
 
 from __future__ import annotations
 
-import pytest
-
 from vibemix.state import AICoach, MusicState
 
 # v8.0 baseline audible-block golden — copied VERBATIM from
@@ -105,7 +103,7 @@ def test_cold_path_byte_identical(mocker):
     new render branch is ``if <field>:``-gated, so the cold path is unchanged.
     Passes today; MUST stay green after Plan 02/04 lands.
     """
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = _audible_baseline_state()
     out = AICoach.evidence_line(state)
 
@@ -139,7 +137,7 @@ def test_empty_trajectory_omitted(mocker):
     xfail) because it asserts an ABSENCE that holds on the current baseline — the
     cold byte-identity contract from the other angle.
     """
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = _audible_baseline_state()
     out = AICoach.evidence_line(state)
     assert "trajectory[" not in out
@@ -155,7 +153,7 @@ def test_delta_rendered_when_change_significant(mocker):
     RED today: ``MusicState`` has no ``prev_perceive`` field (TypeError on the
     kwarg) and coach.py has no delta branch. Plan 02 adds both → real pass.
     """
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = MusicState(
         audible=True,
         rms=0.094,
@@ -184,7 +182,7 @@ def test_delta_abstains_below_floor(mocker):
     RED today (no ``prev_perceive`` field). Plan 02's render helper returns
     ``None`` below floor → the bare scalar stands, no delta line.
     """
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = MusicState(
         audible=True,
         rms=0.094,
@@ -215,7 +213,7 @@ def test_trajectory_rendered_when_warm(mocker):
     the kwarg). Plan 02 adds the field + the ``if state.trajectory_narrative:``
     gated render branch → real pass.
     """
-    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    mocker.patch("vibemix.state.prompt_builder.time.time", return_value=1000.0)
     state = MusicState(
         audible=True,
         rms=0.094,

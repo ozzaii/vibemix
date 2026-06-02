@@ -31,8 +31,8 @@ from vibemix.prompts.matrix import (
     build_lens_instruction,
     build_parts_description,
 )
-from vibemix.state.coach import AICoach
 from vibemix.state.event import Event
+from vibemix.state.prompt_builder import AICoach
 
 __all__ = ["build_cell_prompt"]
 

@@ -5,7 +5,7 @@ This package is THE sensing + state layer ported from cohost_v4.py:1005-1751.
 
 - ``MusicState`` (music_state.py) is the mutable, lock-protected dataclass written
   ONCE every 100ms by ``state_refresh_loop`` (refresh.py — wave 4) and read by
-  ``EventDetector`` (event_detector.py — wave 2) and ``AICoach`` (coach.py — wave 3).
+  ``EventDetector`` (event_detector.py — wave 2) and ``AICoach`` (prompt_builder.py — wave 3).
 - ``classify_phase`` (phase.py) is kept as a free function so Phase 6 can swap in
   the percentile-per-genre detector without touching the class hierarchy.
 - ``derive_audible_deck`` + ``derive_audible_track`` (track_resolver.py) are the
@@ -54,7 +54,7 @@ from vibemix.state.phase import classify_phase
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
 
 if TYPE_CHECKING:  # type-only; never executed at runtime → no live-path import
-    from vibemix.state.coach import AICoach
+    from vibemix.state.prompt_builder import AICoach
     from vibemix.state.refresh import state_refresh_loop
 
 # PEP 562 lazy re-export. ``AICoach`` (the live AI coach) and
@@ -66,7 +66,7 @@ if TYPE_CHECKING:  # type-only; never executed at runtime → no live-path impor
 # on first attribute access keeps ``from vibemix.state import AICoach`` working
 # for the live agent while leaving them dormant for pure-helper importers.
 _LAZY_EXPORTS = {
-    "AICoach": ("vibemix.state.coach", "AICoach"),
+    "AICoach": ("vibemix.state.prompt_builder", "AICoach"),
     "state_refresh_loop": ("vibemix.state.refresh", "state_refresh_loop"),
 }
 
