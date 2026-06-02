@@ -57,12 +57,14 @@ def _deck(
     camelot: str | None = "8A",
     confidence: float = 0.8,
     bpm: float = 128.0,
+    genre: str | None = None,
     source: str = "rekordbox_xml",
 ) -> DeckTrack:
     return DeckTrack(
         title=title,
         track_id="t1" if title else None,
         bpm=bpm,
+        genre=genre,
         camelot=camelot,
         confidence=confidence,
         source=source,
@@ -243,6 +245,16 @@ def test_title_without_key_still_counts_as_deck_identity() -> None:
     assert "resolved=B" in out
     assert "B='Readable Title'" in out
     assert "key=" not in out
+
+
+def test_deck_context_carries_source_genre_next_to_loaded_track() -> None:
+    state = MusicState(audible_deck="A")
+    state.deck_state = DeckState(decks={"A": _deck("Varazslo", genre="psytrance")})
+
+    out = render_deck_context(state)
+
+    assert out is not None
+    assert "loaded=A='Varazslo' key=8A bpm=128 genre='psytrance' src=rekordbox_xml" in out
 
 
 def test_single_deck_play_move_blocks_transition_language() -> None:
@@ -842,13 +854,16 @@ def test_deck_lane_context_maps_identity_route_and_controls_per_lane() -> None:
         "filter": 100,
         "play": False,
     }
-    state.deck_state = DeckState(decks={"A": _deck("Strobe")})
+    state.deck_state = DeckState(decks={"A": _deck("Strobe", genre="psytrance")})
 
     out = render_deck_lane_context(state)
 
     assert out is not None
     assert out.startswith("deck_lanes_context[")
-    assert "A(identity=known title='Strobe' key=8A bpm=128 src=rekordbox_xml conf=0.80" in out
+    assert (
+        "A(identity=known title='Strobe' key=8A bpm=128 genre='psytrance' "
+        "src=rekordbox_xml conf=0.80"
+    ) in out
     assert "route=dominant vol=open low=killed mid=flat hi=boost filter=flat play=on" in out
     assert "B(identity=unknown route=muted vol=closed" in out
     assert "lane_aliases=deck1:A,deck2:B" in out
@@ -882,7 +897,7 @@ def test_deck_reference_context_names_deck_one_and_deck_two_without_stems() -> N
         "filter": 64,
         "play": False,
     }
-    state.deck_state = DeckState(decks={"A": _deck("Strobe")})
+    state.deck_state = DeckState(decks={"A": _deck("Strobe", genre="psytrance")})
 
     out = render_deck_reference_context(state)
 
@@ -891,6 +906,7 @@ def test_deck_reference_context_names_deck_one_and_deck_two_without_stems() -> N
     assert "deck1=A" in out
     assert "identity=known" in out
     assert "title='Strobe'" in out
+    assert "genre='psytrance'" in out
     assert "route=dominant" in out
     assert "low=killed" in out
     assert "hi=max" in out

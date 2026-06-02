@@ -3779,6 +3779,9 @@ def _deck_summary(side: str, deck: DeckTrack) -> str:
         parts.append(f"key={deck.camelot}")
     if deck.bpm and deck.bpm > 0:
         parts.append(f"bpm={deck.bpm:.0f}")
+    genre = _deck_genre_field(deck)
+    if genre:
+        parts.append(genre)
     parts.append(f"src={deck.source}")
     parts.append(f"conf={deck.confidence:.2f}")
     return " ".join(parts)
@@ -3800,6 +3803,9 @@ def _deck_lane_summary(
             parts.append(f"key={resolved_deck.camelot}")
         if resolved_deck.bpm and resolved_deck.bpm > 0:
             parts.append(f"bpm={resolved_deck.bpm:.0f}")
+        genre = _deck_genre_field(resolved_deck)
+        if genre:
+            parts.append(genre)
         parts.append(f"src={resolved_deck.source}")
         parts.append(f"conf={resolved_deck.confidence:.2f}")
     elif deck is not None:
@@ -3872,6 +3878,9 @@ def _deck_reference_lane(
                 fields.append(f"key={resolved_deck.camelot}")
             if resolved_deck.bpm and resolved_deck.bpm > 0:
                 fields.append(f"bpm={resolved_deck.bpm:.0f}")
+            genre = _deck_genre_field(resolved_deck)
+            if genre:
+                fields.append(genre)
             fields.append(f"src={resolved_deck.source}")
             fields.append(f"conf={resolved_deck.confidence:.2f}")
     elif deck is not None:
@@ -3910,6 +3919,18 @@ def _deck_reference_lane(
 def _prompt_quote(raw: str, *, max_len: int = 48) -> str:
     text = " ".join(str(raw).replace("|", "/").split())[:max_len]
     return repr(text)
+
+
+def _deck_genre_field(deck: DeckTrack) -> str | None:
+    """Return source genre for deck identity packets, or None when absent.
+
+    This is source metadata, not DSP inference. Keeping it next to title/key/BPM
+    gives the live prompt a citable genre anchor for the actual loaded song.
+    """
+    genre = getattr(deck, "genre", None)
+    if not genre:
+        return None
+    return f"genre={_prompt_quote(str(genre), max_len=40)}"
 
 
 def _int_0_127(raw: object, default: int) -> int:
