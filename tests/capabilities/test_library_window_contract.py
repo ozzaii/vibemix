@@ -23,6 +23,7 @@ LIBRARY_COMMANDS = (
     "library_similar",
     "library_curate",
     "library_build_set",
+    "library_cue_folder",
     "library_chat",
     "library_stats",
     "library_models",
@@ -88,3 +89,13 @@ def test_library_desktop_bridge_pins_codex_agent_path() -> None:
     assert 'cmd.env("VIBEMIX_LIBRARY_AGENT_BACKEND", LIBRARY_AGENT_BACKEND)' in body
     assert 'cmd.env("VIBEMIX_CODEX_ALLOW_SHELL", "1")' in body
     assert '"library", "chat", "hello", "--backend", "codex", "--json"' in body
+
+
+def test_library_desktop_bridge_surfaces_viber_tool_tape() -> None:
+    """Viber/Crate runs must show the user the live tool trace, not a black box."""
+    rust_body = LIBRARY_CMDS_RS.read_text(encoding="utf-8")
+    api_body = LIBRARY_API.read_text(encoding="utf-8")
+
+    assert "[viber-tool] " in rust_body
+    assert 'app.emit("library://viber-tool", payload)' in rust_body
+    assert 'tauriListen<unknown>("library://viber-tool"' in api_body

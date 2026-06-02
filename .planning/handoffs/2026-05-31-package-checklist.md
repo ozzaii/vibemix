@@ -7512,3 +7512,40 @@ Proof before staging:
 - `uv run ruff check src/vibemix/state/loop_geometry.py src/vibemix/midi/state.py src/vibemix/midi/profile.py tests/state/test_loop_geometry.py tests/midi/test_state.py tests/midi/test_profile.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/state/loop_geometry.py src/vibemix/midi/state.py src/vibemix/midi/profile.py tests/state/test_loop_geometry.py tests/midi/test_state.py tests/midi/test_profile.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 23 - Crate Invoke Bridge SRC Gate
+
+Suggested commit: `test(library-ui): pin crate invoke bridge contract`
+
+Include:
+
+- `tests/capabilities/test_library_window_contract.py`
+- `tauri/src-tauri/capabilities/default.json`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Viber agent/tool implementation, library backend behavior, and generated IPC
+  schema files.
+- Co-host speech, prompt text, Sven TTS paths, runtime coach, and DROP-call hold
+  lanes.
+- Broad cleanup of `ipc.library.*` import/staleness messages. Current source
+  still uses those for renderer↔sidecar library import and staleness actions;
+  Crate's search/similar/curate/build-set/cue/chat/stats/model/embed actions use
+  the separate Tauri `invoke()` bridge.
+
+Reason:
+
+- H4 asks for a source-level proof that Crate/Viber actions are both-ends wired
+  before anyone says "Crate is fully wired." This package strengthens the
+  existing desktop capability contract so it pins every Crate Tauri command,
+  including the previously omitted `library_cue_folder`, and also pins the live
+  `library://viber-tool` event tape from Rust bridge to frontend listener.
+
+Proof before staging:
+
+- `uv run pytest -q tests/capabilities/test_library_window_contract.py`
+- `uv run pytest -q tests/security/test_tauri_plugin_macos_permissions_wired.py tests/repo/test_tauri_activation_policy.py tests/repo/test_tauri_dev_command.py`
+- `uv run ruff check tests/capabilities/test_library_window_contract.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tests/capabilities/test_library_window_contract.py tauri/src-tauri/capabilities/default.json .planning/handoffs/2026-05-31-package-checklist.md`
