@@ -1022,6 +1022,95 @@ def test_coach_13_stop_event_exits_cleanly(
 
 
 # ---------------------------------------------------------------------------
+# COACH-14 — HEARTBEAT speak gate
+# ---------------------------------------------------------------------------
+
+
+def test_coach_14_plain_heartbeat_stays_silent(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    """Plain HEARTBEATs are true-but-low-value describe-bank candidates.
+
+    The runtime should record the suppression and avoid the LLM call entirely.
+    """
+    fake_event_detector.detect.return_value = Event("HEARTBEAT", music_state, extra={})
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)  # 1 warmup + 1 tick
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            asyncio.Event(),
+            {"in_flight": False},
+            stop_event,
+        )
+    )
+
+    assert fake_agent.set_next_event.call_count == 0
+    assert fake_session.generate_reply.call_count == 0
+    fake_recorder.log_event.assert_called_once_with(
+        "speak_gate",
+        type="HEARTBEAT",
+        verdict="silent",
+        reason="heartbeat_describe_bank_only",
+        tier="runtime_value_gate",
+        schema_version="1",
+    )
+
+
+def test_coach_15_manual_heartbeat_reaches_model(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    """Manual trigger stays high priority even if the detector returns HEARTBEAT."""
+    ev = Event("HEARTBEAT", music_state, extra={})
+    fake_event_detector.detect.return_value = ev
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)  # 1 warmup + 1 tick
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+
+    manual_trigger = asyncio.Event()
+    manual_trigger.set()
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            manual_trigger,
+            {"in_flight": False},
+            stop_event,
+        )
+    )
+
+    fake_agent.set_next_event.assert_called_once_with(ev)
+    fake_session.generate_reply.assert_called_once_with(allow_interruptions=False)
+
+
+# ---------------------------------------------------------------------------
 # CONST-WS-01 — WS_HOST / WS_PORT centralized
 # ---------------------------------------------------------------------------
 

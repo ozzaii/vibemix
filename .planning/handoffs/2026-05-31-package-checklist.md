@@ -7072,6 +7072,9 @@ Suggested commit if/when it ships: `feat(tts): add wrapped local moss onnx runti
 Hold:
 
 - `pyproject.toml`
+- `.tmp_gemini_ttft.py`
+- `.tmp_tts_bench.py`
+- `.tmp_tts_bench.log`
 - `scripts/local_tts_speak.py`
 - `src/vibemix/agent/local_tts.py`
 - `src/vibemix/agent/moss_tts/__init__.py`
@@ -7969,3 +7972,42 @@ Proof before staging:
 - `uv run ruff check src/vibemix/state/prompt_builder.py tests/state/test_coach.py tests/agent/test_coach_prompt_grounding.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/state/prompt_builder.py tests/state/test_coach.py tests/agent/test_coach_prompt_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 25 - Runtime HEARTBEAT Speak Gate
+
+Suggested commit: `fix(cohost): silence low-value heartbeat narration`
+
+Include:
+
+- `src/vibemix/runtime/speak_gate.py`
+- `src/vibemix/runtime/coach.py`
+- `tests/runtime/test_speak_gate.py`
+- `tests/runtime/test_coach.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Prompt/persona copy in `src/vibemix/prompts/matrix.py` and
+  `src/vibemix/state/prompt_builder.py`.
+- Fixed-text `session.say()` paths, DROP-call / Mix Timing Oracle hold-lane
+  files, TTS provider behavior, and any change to MOSS voice selection.
+- Novelty scoring or long-window context rewrites. This is the first safe
+  runtime gate, not the full X1 value model.
+
+Reason:
+
+- X1's live capture showed Sven speaking accurate but low-value HEARTBEAT
+  descriptions too often. This package moves the first value decision upstream
+  of the LLM: a plain HEARTBEAT with no grounded voice payload is silent by
+  default, while manual/user speech and structural events keep the existing
+  reaction path. The citation/slop filters remain the safety gate; this only
+  prevents true-but-worthless describe-bank calls from being generated.
+
+Proof before staging:
+
+- `uv run pytest -q tests/runtime/test_speak_gate.py tests/runtime/test_coach.py::test_coach_03_event_fire_path tests/runtime/test_coach.py::test_coach_10_manual_trigger tests/runtime/test_coach.py::test_coach_14_plain_heartbeat_stays_silent tests/runtime/test_coach.py::test_coach_15_manual_heartbeat_reaches_model`
+- `uv run pytest -q tests/runtime/test_speak_gate.py tests/runtime/test_coach.py tests/runtime/test_coach_cancel_wiring.py tests/runtime/test_coach_citation_publish.py`
+- `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py`
+- `uv run ruff check src/vibemix/runtime/speak_gate.py src/vibemix/runtime/coach.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/runtime/speak_gate.py src/vibemix/runtime/coach.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py .planning/handoffs/2026-05-31-package-checklist.md`

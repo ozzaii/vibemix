@@ -86,6 +86,7 @@ from vibemix.state.deck_context import (
 from vibemix.ui_bus import SessionCitation
 
 from .set_plan_voice import build_set_progress_voice_line
+from .speak_gate import decide_speak_gate
 from .suggestion_voice import build_next_suggestion_voice_line
 from .transition_verdict_voice import build_transition_verdict_voice_line
 
@@ -732,6 +733,45 @@ async def coach_loop(
             except Exception as e:
                 _safe_print(f"\n[coach suggestion voice] {e}", file=sys.stderr)
 
+        if wired:
+            # ---- cancel-and-refire stale handle maintenance ----
+            # This must run before the speak gate too: a low-priority
+            # HEARTBEAT may now stay silent, but it should still let the wired
+            # cancellation contract inspect any stale in-flight handle.
+            in_flight_handle = trigger_state.get("in_flight_handle")
+            in_flight_prev_ev = trigger_state.get("in_flight_ev")
+            if in_flight_handle is not None and in_flight_prev_ev is not None:
+                if cancel_gate.try_cancel(in_flight_handle, ev, in_flight_prev_ev):
+                    await agent.invalidate_cache()
+                    trigger_state["in_flight_handle"] = None
+                    trigger_state["in_flight_ev"] = None
+
+        speak_gate = decide_speak_gate(
+            ev,
+            manual=manual,
+            kaan_just_spoke=kaan_just_spoke,
+        )
+        if not speak_gate.should_speak:
+            try:
+                recorder.log_event(
+                    "speak_gate",
+                    type=ev.type,
+                    verdict=speak_gate.verdict,
+                    reason=speak_gate.reason,
+                    tier=speak_gate.tier,
+                    schema_version="1",
+                )
+            except Exception:
+                pass
+            _tr(
+                "ai_call",
+                "speak_gate_suppressed",
+                type=ev.type,
+                verdict=speak_gate.verdict,
+                reason=speak_gate.reason,
+            )
+            continue
+
         try:
             trigger_state["in_flight"] = True
             trigger_state["in_flight_at"] = now
@@ -844,19 +884,6 @@ async def coach_loop(
                 )
                 if judge_voice_lines:
                     ev.extra["judge_evidence_line"] = judge_voice_lines[0]
-
-            if wired:
-                # ---- cancel-and-refire on stale in-flight ----
-                # Reachable when the prior tick's wait_for_playout TimeoutError'd
-                # but left in_flight_handle/in_flight_ev populated. Also the
-                # seam v2.x asynchronous fan-in will use.
-                in_flight_handle = trigger_state.get("in_flight_handle")
-                in_flight_prev_ev = trigger_state.get("in_flight_ev")
-                if in_flight_handle is not None and in_flight_prev_ev is not None:
-                    if cancel_gate.try_cancel(in_flight_handle, ev, in_flight_prev_ev):
-                        await agent.invalidate_cache()
-                        trigger_state["in_flight_handle"] = None
-                        trigger_state["in_flight_ev"] = None
 
             # Hand the event to the agent so llm_node can build the grounded
             # multimodal prompt (text evidence + audio Part + screen Part).
