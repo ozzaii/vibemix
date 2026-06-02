@@ -289,6 +289,7 @@ def test_mastered_flip_speaks_the_vocal_exactly_once(_redirect_progress: Path) -
     reg = EvidenceRegistry()
     reg.write("ev", "MIX_MOVE", 10.0)
     spoken: list[str] = []
+    marker_calls: list[tuple[str, object]] = []
 
     # the flip demo — count crosses threshold this call → vocal fires once
     credited = _credit_live_skill_demo(
@@ -297,11 +298,13 @@ def test_mastered_flip_speaks_the_vocal_exactly_once(_redirect_progress: Path) -
         evidence_registry=reg,
         learn_progress=progress,
         speak=spoken.append,
+        mastered_marker_writer=lambda sid, state: marker_calls.append((sid, state)),
     )
     assert credited == ["eq_mixing"]
     assert progress.skills["eq_mixing"]["mastered"] is True
     expected = mastered_unlock_line("eq_mixing", was_mastered=False, now_mastered=True)
     assert spoken == [expected]
+    assert marker_calls and marker_calls[0][0] == "eq_mixing"
 
     # a SECOND cited demo — already mastered → NO second vocal (rare, earned, once)
     reg.write("ev", "MIX_MOVE", 11.0)
@@ -311,8 +314,10 @@ def test_mastered_flip_speaks_the_vocal_exactly_once(_redirect_progress: Path) -
         evidence_registry=reg,
         learn_progress=progress,
         speak=spoken.append,
+        mastered_marker_writer=lambda sid, state: marker_calls.append((sid, state)),
     )
     assert spoken == [expected]  # still exactly one
+    assert [sid for sid, _state in marker_calls] == ["eq_mixing"]
 
 
 def test_non_flip_credit_is_silent(_redirect_progress: Path) -> None:
@@ -373,3 +378,29 @@ def test_speak_failure_never_wedges_the_loop(_redirect_progress: Path) -> None:
     # credit still lands + persists despite the vocal blowing up
     assert credited == ["eq_mixing"]
     assert progress.skills["eq_mixing"]["mastered"] is True
+
+
+def test_mastered_marker_failure_never_wedges_the_loop(_redirect_progress: Path) -> None:
+    # A marker write failure must not break the live credit or the vocal. User-file
+    # writes sit behind their own opt-in, but even the hook is fail-soft.
+    progress = LearnProgress()
+    _one_below_mastered(progress, "eq_mixing")
+    reg = EvidenceRegistry()
+    reg.write("ev", "MIX_MOVE", 10.0)
+    spoken: list[str] = []
+
+    def _marker_boom(_sid: str, _state: object) -> None:
+        raise RuntimeError("marker boom")
+
+    credited = _credit_live_skill_demo(
+        _event("MIX_MOVE", moves=["A_low: open→killed"]),
+        _state(10.0),
+        evidence_registry=reg,
+        learn_progress=progress,
+        speak=spoken.append,
+        mastered_marker_writer=_marker_boom,
+    )
+
+    assert credited == ["eq_mixing"]
+    assert progress.skills["eq_mixing"]["mastered"] is True
+    assert spoken

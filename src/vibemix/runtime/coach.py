@@ -132,6 +132,7 @@ def _credit_live_skill_demo(
     evidence_registry: EvidenceRegistry | None,
     learn_progress: Any | None,
     speak: Callable[[str], None] | None = None,
+    mastered_marker_writer: Callable[[str, MusicState], Any] | None = None,
 ) -> list[str]:
     """Credit the v11.0 skill(s) a CITED live event demonstrates (the
     ``§EARNED-LIVE-MASTERED-VERIFY`` backend wiring — finally giving the
@@ -192,14 +193,22 @@ def _credit_live_skill_demo(
             # normal demo, not again after the flip). Hand-authored fixture copy
             # via the existing co-host ``speak`` path (no LLM, no new provider).
             # Guarded never-raises: a vocal failure must never wedge the loop.
-            if speak is not None:
-                from vibemix.learn.mastered_vocal import mastered_unlock_line
+            from vibemix.learn.mastered_vocal import mastered_unlock_line
 
-                for sid in credited:
-                    now_mastered = bool(
-                        (learn_progress.skills.get(sid) or {}).get("mastered", False)
-                    )
-                    if now_mastered and not before_mastered.get(sid, False):
+            for sid in credited:
+                now_mastered = bool(
+                    (learn_progress.skills.get(sid) or {}).get("mastered", False)
+                )
+                if now_mastered and not before_mastered.get(sid, False):
+                    if mastered_marker_writer is not None:
+                        try:
+                            mastered_marker_writer(sid, state)
+                        except Exception as exc:
+                            _safe_print(
+                                f"\n[coach mastered-marker err] {exc}",
+                                file=sys.stderr,
+                            )
+                    if speak is not None:
                         line = mastered_unlock_line(sid, was_mastered=False, now_mastered=True)
                         if line:
                             try:
@@ -429,6 +438,7 @@ async def coach_loop(
     evidence_registry: EvidenceRegistry | None = None,
     learn_progress: Any | None = None,
     deck_audio_capture: Any | None = None,
+    mastered_marker_writer: Callable[[str, MusicState], Any] | None = None,
 ) -> None:
     """Polls MusicState for events at 10Hz. On event → prompt AI. Single
     in-flight generation at a time. Mic detection happens here against
@@ -632,6 +642,7 @@ async def coach_loop(
                 evidence_registry=evidence_registry,
                 learn_progress=learn_progress,
                 speak=mastered_speak,
+                mastered_marker_writer=mastered_marker_writer,
             )
             # A live cited demo just advanced the Earned Wall — push the refresh
             # to the shell so the SkillWall trophy updates without a reload.

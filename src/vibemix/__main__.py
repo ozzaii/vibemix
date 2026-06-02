@@ -1690,6 +1690,48 @@ async def main() -> None:
             "-> library: no cache at ~/.cache/vibemix/library.pkl — citations limited to nowplaying-cli"
         )
 
+    mastered_marker_allow_write = os.environ.get(
+        "VIBEMIX_WRITE_MASTERED_MARKERS", ""
+    ).strip().lower() in {"1", "on", "true", "yes"}
+    if deck_library is not None:
+        print(
+            "-> mastered markers: "
+            + (
+                "write enabled (VIBEMIX_WRITE_MASTERED_MARKERS=1)"
+                if mastered_marker_allow_write
+                else "dry-run; set VIBEMIX_WRITE_MASTERED_MARKERS=1 to write hot cues"
+            )
+        )
+
+    def _write_mastered_marker(skill_id: str, live_state: Any) -> Any | None:
+        if deck_library is None:
+            return None
+        try:
+            from vibemix.learn.mastered_marker_writer import write_mastered_marker_from_state
+
+            result = write_mastered_marker_from_state(
+                skill_id=skill_id,
+                state=live_state,
+                library=deck_library,
+                allow_write=mastered_marker_allow_write,
+            )
+            try:
+                recorder.log_event(
+                    "mastered_marker",
+                    skill_id=skill_id,
+                    written=bool(getattr(result, "written", False)),
+                    reason=str(getattr(result, "reason", "")),
+                    index=getattr(result, "index", None),
+                    position_ms=getattr(result, "position_ms", None),
+                    name=str(getattr(result, "name", "")),
+                )
+            except Exception:
+                pass
+            return result
+        except Exception as _marker_exc:  # pragma: no cover - defensive live path
+            print(f"[learn mastered marker] disabled: {_marker_exc!r}", file=sys.stderr)
+            return None
+
     # ── Plan 28-07 / One Mind W3 — 30-day staleness nudge ──
     # Once-per-boot check (cheap file-stat). The nudge payload is CAPTURED here
     # and flushed onto the live ipc_router below (the router is created
@@ -2823,6 +2865,7 @@ async def main() -> None:
             # the LearnProgress loaded at boot (also passed to the LessonRuntime).
             evidence_registry=evidence_registry,
             learn_progress=_learn_progress,
+            mastered_marker_writer=_write_mastered_marker,
             # 4d — the live Vibe Judge needs the per-deck rings to assemble its
             # typed frame; None on a 2ch/master-only-incapable rig (the Judge
             # then abstains by construction). Constructed at __main__:1056.
