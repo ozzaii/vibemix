@@ -9288,3 +9288,38 @@ Proof before staging:
 - `uv run pytest -q tests/prompts/test_negative_dict.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py tests/state/test_event_detector.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/runtime/speak_gate.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 51 - Bundled MOSS Runtime Discovery
+
+Suggested commit: `fix(tts): load bundled moss model in packaged sidecar`
+
+Include:
+
+- `src/vibemix/agent/local_tts.py`
+- `scripts/dist/moss_bundle.py`
+- `vibemix-core.macos.spec`
+- `vibemix-core.windows.spec`
+- `tests/agent/test_local_tts.py`
+- `tests/install/test_moss_bundle_data.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Hosted MOSS archive decisions, Tauri UI voice-readiness copy, `src/vibemix/__main__.py`,
+  runtime coach/speech behavior, live MOSS ear-pass claims, signing/notarization, and
+  generated sidecar binaries.
+
+Reason:
+
+- MOSS is the only product voice. The release gates can require a complete bundled model
+  tree, but the runtime still looked only at `VIBEMIX_MOSS_TTS_DIR` or the user's cache.
+  That lets Kaan's dev cache mask a packaged clean-machine mute. Bundle the configured or
+  cached MOSS tree into PyInstaller's `_internal/models/moss-tts-onnx/` layout and make
+  the frozen runtime resolve that bundled tree before falling back to the dev cache.
+
+Proof before staging:
+
+- `uv run pytest -q tests/agent/test_local_tts.py tests/install/test_moss_bundle_data.py tests/install/test_sidecar_bundle_ready.py::test_require_moss_source_accepts_complete_bundled_model`
+- `uv run ruff check src/vibemix/agent/local_tts.py scripts/dist/moss_bundle.py tests/agent/test_local_tts.py tests/install/test_moss_bundle_data.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/agent/local_tts.py scripts/dist/moss_bundle.py vibemix-core.macos.spec vibemix-core.windows.spec tests/agent/test_local_tts.py tests/install/test_moss_bundle_data.py .planning/handoffs/2026-05-31-package-checklist.md`

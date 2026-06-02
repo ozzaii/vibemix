@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import sys
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -54,25 +55,68 @@ _DEFAULT_VOICE = os.environ.get(
 _DEFAULT_THREADS = int(os.environ.get("VIBEMIX_MOSS_TTS_THREADS", "4") or "4")
 MOSS_MODEL_DIR_ENV = "VIBEMIX_MOSS_TTS_DIR"
 _MOSS_MANIFEST = "browser_poc_manifest.json"
+_MOSS_MODEL_DIRNAME = "MOSS-TTS-Nano-100M-ONNX"
+_BUNDLED_MODEL_ROOT = Path("models") / "moss-tts-onnx"
 
 
 def default_model_dir() -> Path:
     """The cached MOSS-TTS-Nano ONNX model dir (mirrors the CLAP/CUE model caches)."""
     cache = os.environ.get("VIBEMIX_CACHE_DIR") or os.path.join(Path.home(), ".cache", "vibemix")
-    return Path(cache) / "moss-tts-onnx" / "MOSS-TTS-Nano-100M-ONNX"
+    return Path(cache) / "moss-tts-onnx" / _MOSS_MODEL_DIRNAME
+
+
+def _bundled_model_dir_candidates() -> list[Path]:
+    """Return possible PyInstaller/Tauri bundled MOSS model dirs.
+
+    Release builds put the sidecar in a Tauri resource directory with a
+    PyInstaller ``_internal`` tree beside it. In that layout ``sys._MEIPASS``
+    normally points at ``_internal``; some smoke/frozen contexts are easier to
+    reason about from ``sys.executable``. Probe both so a clean packaged app can
+    find its bundled MOSS model without relying on Kaan's dev cache or a
+    process-env override.
+    """
+    roots: list[Path] = []
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        roots.append(Path(meipass))
+    if getattr(sys, "frozen", False):
+        try:
+            exe_dir = Path(sys.executable).resolve().parent
+            roots.extend([exe_dir / "_internal", exe_dir])
+        except Exception:
+            pass
+
+    candidates: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        candidate = root / _BUNDLED_MODEL_ROOT / _MOSS_MODEL_DIRNAME
+        try:
+            key = candidate.resolve(strict=False)
+        except Exception:
+            key = candidate
+        if key not in seen:
+            seen.add(key)
+            candidates.append(candidate)
+    return candidates
 
 
 def candidate_model_dir() -> Path:
     """Return the configured MOSS model dir, even when it is not installed."""
     override = os.environ.get(MOSS_MODEL_DIR_ENV)
-    return Path(override).expanduser() if override else default_model_dir()
+    if override:
+        return Path(override).expanduser()
+    for candidate in _bundled_model_dir_candidates():
+        if candidate.exists():
+            return candidate
+    return default_model_dir()
 
 
 def resolve_model_dir() -> Path | None:
     """Return the usable MOSS model dir, or ``None`` if not present/cached.
 
     ``VIBEMIX_MOSS_TTS_DIR`` overrides; it must point at the ``*-Nano-100M-ONNX``
-    dir (the dir holding ``browser_poc_manifest.json``).
+    dir (the dir holding ``browser_poc_manifest.json``). Without an override,
+    a frozen sidecar first checks its bundled model tree, then the user cache.
     """
     candidate = candidate_model_dir()
     if not model_status()["installed"]:

@@ -28,6 +28,7 @@ from PyInstaller.utils.hooks import (
     collect_dynamic_libs,
     collect_submodules,
 )
+from scripts.dist.moss_bundle import collect_moss_model_datas
 
 block_cipher = None
 
@@ -254,6 +255,7 @@ if not _GENRE_PROFILES.is_dir():
     raise RuntimeError(f"vibemix-core.windows.spec: missing {_GENRE_PROFILES}")
 
 datas = [item for item in datas if _runtime_data_file(item)]
+datas.extend(collect_moss_model_datas())
 
 _ANALYSIS_EXCLUDES = [
     "tkinter",

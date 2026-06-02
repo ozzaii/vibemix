@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 
 import numpy as np
 import pytest
@@ -20,6 +21,7 @@ from vibemix.agent.local_tts import (
     MossLocalTTS,
     _read_native_sample_rate,
     build_local_tts_adapter,
+    candidate_model_dir,
     local_tts_enabled,
     model_status,
     pcm16_mono_le,
@@ -86,6 +88,25 @@ def test_enabled_with_flag_and_cached_model(monkeypatch, tmp_path):
     monkeypatch.setenv("VIBEMIX_LOCAL_TTS", "true")
     monkeypatch.setenv("VIBEMIX_MOSS_TTS_DIR", str(_fake_model_dir(tmp_path)))
     assert resolve_model_dir() == tmp_path
+    assert local_tts_enabled() is True
+
+
+def test_resolves_bundled_pyinstaller_model_before_dev_cache(monkeypatch, tmp_path):
+    bundled = (
+        tmp_path
+        / "_internal"
+        / "models"
+        / "moss-tts-onnx"
+        / "MOSS-TTS-Nano-100M-ONNX"
+    )
+    bundled.mkdir(parents=True)
+    _fake_model_dir(bundled)
+    monkeypatch.delenv("VIBEMIX_MOSS_TTS_DIR", raising=False)
+    monkeypatch.setenv("VIBEMIX_CACHE_DIR", str(tmp_path / "empty-cache"))
+    monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path / "_internal"), raising=False)
+
+    assert candidate_model_dir() == bundled
+    assert resolve_model_dir() == bundled
     assert local_tts_enabled() is True
 
 
