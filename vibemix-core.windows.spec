@@ -23,6 +23,10 @@
 import sys
 from pathlib import Path
 
+_PROJECT_ROOT = Path(globals().get("SPECPATH", Path.cwd())).resolve()
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 from PyInstaller.utils.hooks import (
     collect_data_files,
     collect_dynamic_libs,

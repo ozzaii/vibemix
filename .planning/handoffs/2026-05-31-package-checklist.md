@@ -9354,3 +9354,31 @@ Proof before staging:
 - `uv run ruff check scripts/build_sidecar.py tests/sidecar/test_build_sidecar_rename.py tests/runtime_closeouts/test_universal2_sidecar.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- scripts/build_sidecar.py tests/sidecar/test_build_sidecar_rename.py tests/runtime_closeouts/test_universal2_sidecar.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 53 - PyInstaller Spec Helper Import Path
+
+Suggested commit: `fix(packaging): let specs import bundle helpers`
+
+Include:
+
+- `vibemix-core.macos.spec`
+- `vibemix-core.windows.spec`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Sidecar build wrapper behavior, runtime MOSS lookup, tests, generated sidecar binaries,
+  Tauri UI, signing/notarization, and app speech behavior.
+
+Reason:
+
+- PyInstaller executes the `.spec` file in a namespace that did not include the repo
+  root on `sys.path`, so importing `scripts.dist.moss_bundle` failed before Analysis
+  could run. Add the spec directory to `sys.path` before importing shared bundle
+  helpers so release builds can use the MOSS data collector.
+
+Proof before staging:
+
+- `uv run python scripts/build_sidecar.py --spec vibemix-core.macos.spec --target-arch arm64`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- vibemix-core.macos.spec vibemix-core.windows.spec .planning/handoffs/2026-05-31-package-checklist.md`
