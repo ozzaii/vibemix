@@ -250,6 +250,7 @@ def _serialize_deck_state(state: MusicState) -> dict[str, dict[str, Any]]:
             "track_id": dt.track_id,
             "camelot": dt.camelot,  # honest-null: None -> JSON null, never fabricated
             "key": dt.key,  # honest-null: None -> JSON null, never fabricated
+            "genre": dt.genre,  # honest-null: source metadata only, never inferred here
             # honest-null: DeckTrack defaults bpm to 0.0 (typed-empty), NOT None.
             # An unresolved deck (0.0) must NOT serialize a fabricated "0 BPM" on
             # the pill — treat a non-positive bpm as unknown (JSON null), same

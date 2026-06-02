@@ -7910,6 +7910,41 @@ Proof before staging:
 - `git diff --check -- src/vibemix/_main_helpers.py tests/test_main_smoke.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 35B - Source Genre Prompt Precedence
+
+Suggested commit: `fix(cohost): prefer source genre for citable decks`
+
+Include:
+
+- `src/vibemix/state/deck_state.py`
+- `src/vibemix/state/deck_poller.py`
+- `src/vibemix/runtime/ws_bus.py`
+- `src/vibemix/state/prompt_builder.py`
+- `tests/state/test_deck_poller.py`
+- `tests/runtime/test_ws_bus_deck_state.py`
+- `tests/state/test_coach.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- DSP genre thresholds/profiles, prompt persona wording, Viber tool semantics,
+  live app control, and any speech-bank text.
+
+Reason:
+
+- When the deck is citable and the loaded source/library row has a genre tag,
+  that song/source fact should outrank a short-window DSP/prototype guess in the
+  co-host prompt. If the source genre is absent or the deck is not citable,
+  the existing confidence-gated detector remains the fallback; otherwise Sven
+  stays silent about genre.
+
+Proof before staging:
+
+- `uv run pytest -q tests/state/test_coach.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_ws_bus_genre_fields.py tests/state/test_refresh_perceive.py tests/state/test_genre_reconcile.py`
+- `uv run ruff check src/vibemix/state/deck_state.py src/vibemix/state/deck_poller.py src/vibemix/runtime/ws_bus.py src/vibemix/state/prompt_builder.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py tests/state/test_coach.py`
+- `git diff --check -- src/vibemix/state/deck_state.py src/vibemix/state/deck_poller.py src/vibemix/runtime/ws_bus.py src/vibemix/state/prompt_builder.py tests/state/test_deck_poller.py tests/runtime/test_ws_bus_deck_state.py tests/state/test_coach.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Package 20 - Retire Dead Tend Citation Source
 
 Suggested commit: `fix(grounding): remove dead tend citation source`

@@ -270,6 +270,7 @@ class DeckPoller:
             track_id=entry.track_id or None,
             bpm=float(entry.bpm or 0.0),
             key=raw_key,
+            genre=entry.genre or None,
             camelot=None,  # normalized by _tick_once via harmonics.to_camelot
             open_key=None,
             energy=None,

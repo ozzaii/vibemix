@@ -41,6 +41,7 @@ def _entry(
     key: str = "Am",
     bpm: float = 128.0,
     filepath: str = "",
+    genre: str = "",
 ) -> TrackEntry:
     return TrackEntry(
         track_id=track_id,
@@ -52,6 +53,7 @@ def _entry(
         duration_s=300.0,
         cues=(),
         filepath=filepath,
+        genre=genre,
     )
 
 
@@ -192,6 +194,19 @@ def test_xml_match_resolves_deck_with_rekordbox_source():
     assert dt.bpm == pytest.approx(128.0)
     assert dt.source == "rekordbox_xml"
     assert dt.confidence >= XML_CONF_FLOOR
+
+
+def test_xml_match_carries_source_genre_metadata():
+    lib = _lib(_entry("1", "Strobe", genre="psytrance"))
+    p = DeckPoller(
+        library=lib,
+        controller=_FakeController(_ctrl_snap(vol_a=127, vol_b=0, xfader=0)),
+        track_info=_FakeTrackInfo("Strobe"),
+    )
+
+    p.poll_once()
+
+    assert p.snapshot()["A"].genre == "psytrance"
 
 
 def test_folder_cache_match_carries_folder_source(tmp_path):

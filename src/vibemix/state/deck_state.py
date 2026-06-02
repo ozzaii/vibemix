@@ -38,6 +38,7 @@ class DeckTrack:
     track_id: str | None = None  # RekordboxLibrary TrackEntry.track_id — feeds [track:<id>]
     bpm: float = 0.0  # from source metadata (AverageBpm), NOT audio autocorr
     key: str | None = None  # RAW tag as the source gives it ("Am", "F#m")
+    genre: str | None = None  # source metadata genre/style; None when absent
     camelot: str | None = None  # normalized via harmonics.to_camelot() ("8A", "11A")
     open_key: str | None = None  # open-key form ("1m"/"1d") for honesty/UI
     energy: int | None = None  # 1..10 if source exposes it (rekordbox), else None

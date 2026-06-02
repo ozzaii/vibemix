@@ -30,6 +30,8 @@ import time
 from typing import TYPE_CHECKING
 
 from vibemix.state.deck_context import (
+    DECK_CONTEXT_MIN_CONF,
+    DECK_CONTEXT_TRUSTED_SOURCES,
     render_audio_window_context,
     render_deck_audio_context,
     render_deck_change_context,
@@ -296,6 +298,44 @@ def _compact_recall_signature(signature: str, *, cap: int = 120) -> str:
     return sanitize_historical_move_signature_for_prompt(signature, cap=cap)
 
 
+def _clean_genre_label(raw: object, *, max_len: int = 48) -> str | None:
+    """Bound a source/detected genre label before it enters the prompt."""
+    text = " ".join(str(raw or "").split())
+    if not text:
+        return None
+    text = "".join(ch for ch in text if ch.isalnum() or ch in {" ", "_", "-", "/", "&", "+"})
+    text = text.strip(" -_/&+")
+    if not text:
+        return None
+    return text[:max_len]
+
+
+def _source_genre_from_decks(state: MusicState) -> str | None:
+    """Return a citable deck/library genre when one trusted track owns it.
+
+    Source metadata should outrank DSP/prototype guessing, but only when the
+    deck itself is citable: real track id, trusted provenance, and confidence at
+    the same deck-context floor used for harmonic/key evidence.
+    """
+    decks = getattr(getattr(state, "deck_state", None), "decks", None) or {}
+    candidates: list[tuple[float, str]] = []
+    for deck in decks.values():
+        if not getattr(deck, "track_id", None):
+            continue
+        if float(getattr(deck, "confidence", 0.0) or 0.0) < DECK_CONTEXT_MIN_CONF:
+            continue
+        source = str(getattr(deck, "source", "") or "").strip().lower()
+        if source not in DECK_CONTEXT_TRUSTED_SOURCES:
+            continue
+        label = _clean_genre_label(getattr(deck, "genre", None))
+        if label is not None:
+            candidates.append((float(getattr(deck, "confidence", 0.0) or 0.0), label))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return candidates[0][1]
+
+
 # ---- Plan 96-01 — Course 3 proactive tutor lens confidence floors ----
 #
 # Above floors → forward-looking count-in language ("breakdown in 16
@@ -497,8 +537,13 @@ class AICoach:
         # priming than a wrong title, so it demands more certainty). Below
         # floor / unknown → nothing. NOT added to _evidence_line_compact
         # (diet/ack path stays lean).
-        if state.detected_genre != "unknown" and state.genre_confidence >= 0.5:
-            e.append(f"genre={state.detected_genre}")
+        source_genre = _source_genre_from_decks(state)
+        if source_genre is not None:
+            e.append(f"genre={source_genre}")
+        elif state.detected_genre != "unknown" and state.genre_confidence >= 0.5:
+            detected_genre = _clean_genre_label(state.detected_genre)
+            if detected_genre is not None:
+                e.append(f"genre={detected_genre}")
 
         # Per-event ages so the AI can reason in seconds (e.g. "you held that 6s").
         now_ts = time.time()

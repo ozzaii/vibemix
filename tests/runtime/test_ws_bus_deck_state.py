@@ -133,6 +133,7 @@ def test_payload_includes_populated_deck_state(mocker):
                 track_id="track-1",
                 camelot="8A",
                 key="Am",
+                genre="psytrance",
                 bpm=128.0,
                 confidence=0.8,
                 source="rekordbox_xml",
@@ -174,6 +175,7 @@ def test_payload_includes_populated_deck_state(mocker):
     assert deck_a["track_id"] == "track-1"
     assert deck_a["camelot"] == "8A"
     assert deck_a["key"] == "Am"
+    assert deck_a["genre"] == "psytrance"
     assert deck_a["bpm"] == 128.0
     # confidence rides too (the consumer can dim a low-confidence chip).
     assert deck_a["confidence"] == 0.8

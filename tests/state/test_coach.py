@@ -305,6 +305,60 @@ def test_evidence_line_genre_emitted_when_confident():
     assert "genre=hard_techno" in out
 
 
+def test_evidence_line_prefers_citable_deck_source_genre_over_detector():
+    state = MusicState(
+        audible=True,
+        rms=0.05,
+        bpm=150.0,
+        bands={"sub": 0.2, "low": 0.3, "mid": 0.3, "high": 0.2},
+        detected_genre="techno",
+        genre_confidence=0.91,
+        deck_state=DeckState(
+            decks={
+                "A": DeckTrack(
+                    title="Varazslo",
+                    track_id="track-psy",
+                    genre="psytrance",
+                    confidence=0.8,
+                    source="rekordbox_xml",
+                )
+            }
+        ),
+    )
+
+    out = AICoach.evidence_line(state)
+
+    assert "genre=psytrance" in out
+    assert "genre=techno" not in out
+
+
+def test_evidence_line_ignores_uncitable_deck_source_genre():
+    state = MusicState(
+        audible=True,
+        rms=0.05,
+        bpm=150.0,
+        bands={"sub": 0.2, "low": 0.3, "mid": 0.3, "high": 0.2},
+        detected_genre="techno",
+        genre_confidence=0.91,
+        deck_state=DeckState(
+            decks={
+                "A": DeckTrack(
+                    title="Untrusted",
+                    track_id="track-untrusted",
+                    genre="psytrance",
+                    confidence=0.2,
+                    source="unknown",
+                )
+            }
+        ),
+    )
+
+    out = AICoach.evidence_line(state)
+
+    assert "genre=techno" in out
+    assert "genre=psytrance" not in out
+
+
 def test_evidence_line_genre_omitted_when_unknown():
     state = MusicState(
         audible=True,
