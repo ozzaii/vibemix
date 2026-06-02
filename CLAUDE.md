@@ -158,6 +158,8 @@ uv run python -m vibemix          # launches the real session loop (vibemix.__ma
 
 > **Local AI features (CLAP / CUE / local-TTS) need their extras at run time:** `uv run --extra ai-local python -m vibemix`. Plain `uv run python -m vibemix` syncs to BASE deps and PRUNES `onnxruntime`/`sentencepiece`/`tokenizers` → those features silently fall back (no error). The uv venv has no `pip` — install with `uv pip install`.
 
+> **Local MOSS TTS:** `VIBEMIX_LOCAL_TTS=1 uv run --extra ai-local python -m vibemix` -> free on-device voice (model `~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX/`, `local_tts_enabled()` = flag + cache present). The product voice path is MOSS-only: the startup `-> tts:` banner reports `MOSS-TTS-Nano local only (provider=moss-local)` when the cache is ready, or `unavailable (MOSS local only; voice muted, no cloud fallback)` when it is not. Do not reintroduce Cartesia/cloud TTS as a speech fallback.
+
 **Run the test suite** (the authoritative dev workflow, per CONTRIBUTING.md):
 
 ```bash
@@ -176,6 +178,8 @@ npm run codegen:ipc                          # REQUIRED after editing src/ipc/me
 ```
 
 The bundled Python sidecar in `cargo tauri dev` is FROZEN (lags edited `src/`) → false negatives. Verify backend wiring by running `main()` on current source, not the bundled binary.
+
+**Run the packaged GUI with env flags:** launch the binary directly — `VIBEMIX_LOCAL_TTS=1 VIBEMIX_DROP_DEBUG=1 ".../vibemix.app/Contents/MacOS/vibemix"` — Tauri inherits the shell env and passes it to the spawned sidecar (verify: `ps eww <sidecar_pid>`). `open -a vibemix` does NOT pass env (launchd strips it) → the packaged app defaults all `VIBEMIX_*` flags OFF. One instance only (socket `127.0.0.1:8765`); `pkill -f "python -m vibemix"` (or kill the sidecar PID) before relaunch.
 
 The PyInstaller specs (`vibemix-core.{macos,windows}.spec`) auto-bundle every `vibemix.*` submodule via `collect_submodules` — a new vibemix module ships even when only lazily imported (no spec edit needed), but a new THIRD-PARTY dep must be added to the spec. To check what a rebuild actually bundled, grep the build TOC (`build/vibemix-core.macos/*.toc`) — `find dist/` only shows binary packages and misses pure-Python modules archived in the PYZ. `dist/*.dmg` is rebuilt separately from the loose `dist/vibemix-core` sidecar binary, so a sidecar rebuild does NOT refresh the .dmg.
 
@@ -208,6 +212,8 @@ Library search, ingest, chat, curate, and build-set use local CLAP/Codex paths
 and do not require a Gemini key.
 
 **macOS prerequisites:** BlackHole 2ch (`brew install blackhole-2ch`), `nowplaying-cli` (`brew install nowplaying-cli`), a DJ app routed through BlackHole as the audio source, Pioneer DDJ-FLX4 over USB (optional, graceful fallback). Windows uses WASAPI loopback — see `docs/windows-setup.md`.
+
+The deck passthrough stream exists to keep the output callback alive, but it ships silent: `PASSTHROUGH_GAIN=0.0` in `audio/constants.py`. It only mirrors BlackHole -> speakers if that gain is deliberately raised to `1.0`. In **Audio MIDI Setup route only the DJ app into BlackHole**; if system output or a Multi-Output device also feeds BlackHole, the co-host can hear its own voice as phantom music. Idle heartbeats are `HEARTBEAT_SEC=180.0` and speak-gated, not an automatic 45s speech loop. `VIBEMIX_DROP_DEBUG=1` prints the live drop countdown.
 
 ## Planning Home
 
