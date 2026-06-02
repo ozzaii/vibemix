@@ -66,6 +66,7 @@ python3 "$REPO_ROOT/scripts/dist/repair_macos_app_sidecar_symlinks.py" "$APP"
 echo "[local-dmg] checking repaired .app"
 python3 "$REPO_ROOT/scripts/dist/check_macos_app_bundle_ready.py" \
   "$APP" \
+  --require-moss-source \
   --smoke "$SMOKE"
 
 rm -f "$OUT"
@@ -93,6 +94,7 @@ fi
 echo "[local-dmg] checking DMG drag-install smoke"
 python3 "$REPO_ROOT/scripts/dist/check_macos_dmg_artifact_ready.py" \
   "$OUT" \
+  --require-moss-source \
   --smoke "$SMOKE"
 
 echo "$OUT"

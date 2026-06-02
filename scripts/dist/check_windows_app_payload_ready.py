@@ -14,7 +14,10 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from scripts.dist.check_sidecar_bundle_ready import DEFAULT_MIN_BYTES  # noqa: E402
+from scripts.dist.check_sidecar_bundle_ready import (  # noqa: E402
+    DEFAULT_MIN_BYTES,
+    moss_release_source_ready,
+)
 
 DEFAULT_TRIPLE = "x86_64-pc-windows-msvc"
 
@@ -27,6 +30,7 @@ class WindowsAppPayloadStatus:
     errors: list[str] = field(default_factory=list)
     app_binary: str = ""
     sidecar_binary: str = ""
+    moss_source: str = ""
     smoke_stdout: str = ""
 
     def fail(self, message: str) -> None:
@@ -78,6 +82,7 @@ def check_windows_app_payload_ready(
     *,
     triple: str = DEFAULT_TRIPLE,
     min_bytes: int = DEFAULT_MIN_BYTES,
+    require_moss_source: bool = False,
     smoke: str = "none",
     smoke_timeout_s: float = 20.0,
 ) -> WindowsAppPayloadStatus:
@@ -124,6 +129,12 @@ def check_windows_app_payload_ready(
         status.fail(f"Windows sidecar _internal directory missing: {internal}")
         return status
 
+    if require_moss_source:
+        moss_ok, moss_message = moss_release_source_ready(sidecar_dir)
+        status.moss_source = moss_message
+        if not moss_ok:
+            status.fail(moss_message)
+
     if status.ok:
         _run_smoke(sidecar_binary, smoke, smoke_timeout_s, status)
     return status
@@ -147,6 +158,14 @@ def main(argv: list[str] | None = None) -> int:
         default="none",
         help="sidecar command to run after structural checks",
     )
+    parser.add_argument(
+        "--require-moss-source",
+        action="store_true",
+        help=(
+            "release gate: require either a complete bundled MOSS model tree or "
+            "verified VIBEMIX_MOSS_TTS_ARCHIVE_* pins"
+        ),
+    )
     parser.add_argument("--smoke-timeout-s", type=float, default=20.0)
     parser.add_argument("--json", action="store_true", help="print machine-readable status")
     parser.add_argument("--quiet", action="store_true", help="print only failures")
@@ -156,6 +175,7 @@ def main(argv: list[str] | None = None) -> int:
         args.payload,
         triple=args.triple,
         min_bytes=args.min_bytes,
+        require_moss_source=args.require_moss_source,
         smoke=args.smoke,
         smoke_timeout_s=args.smoke_timeout_s,
     )

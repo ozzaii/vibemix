@@ -68,6 +68,7 @@ def check_macos_updater_artifact_ready(
     *,
     triple: str | None = None,
     install_dir: Path | None = None,
+    require_moss_source: bool = False,
     smoke: str = "version",
     smoke_timeout_s: float = 20.0,
 ) -> MacOSUpdaterArtifactStatus:
@@ -97,6 +98,7 @@ def check_macos_updater_artifact_ready(
         app_status = check_macos_app_bundle_ready(
             app,
             triple=triple,
+            require_moss_source=require_moss_source,
             smoke=smoke,
             smoke_timeout_s=smoke_timeout_s,
         )
@@ -130,6 +132,14 @@ def main(argv: list[str] | None = None) -> int:
         default="version",
         help="sidecar command to run after extracting the app",
     )
+    parser.add_argument(
+        "--require-moss-source",
+        action="store_true",
+        help=(
+            "release gate: require either a complete bundled MOSS model tree or "
+            "verified VIBEMIX_MOSS_TTS_ARCHIVE_* pins"
+        ),
+    )
     parser.add_argument("--smoke-timeout-s", type=float, default=20.0)
     parser.add_argument("--json", action="store_true", help="print machine-readable status")
     parser.add_argument("--quiet", action="store_true", help="print only failures")
@@ -139,6 +149,7 @@ def main(argv: list[str] | None = None) -> int:
         args.artifact,
         triple=args.triple,
         install_dir=args.install_dir,
+        require_moss_source=args.require_moss_source,
         smoke=args.smoke,
         smoke_timeout_s=args.smoke_timeout_s,
     )

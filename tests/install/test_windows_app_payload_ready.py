@@ -112,6 +112,43 @@ def test_smoke_runs_sidecar_command(tmp_path: Path, monkeypatch) -> None:
     assert status.smoke_stdout == "vibemix 0.1.0"
 
 
+def test_require_moss_source_fails_without_bundle_or_archive(
+    tmp_path: Path, monkeypatch
+) -> None:
+    payload = _fake_payload(tmp_path)
+    monkeypatch.delenv("VIBEMIX_MOSS_TTS_ARCHIVE_URL", raising=False)
+    monkeypatch.delenv("VIBEMIX_MOSS_TTS_ARCHIVE_SHA256", raising=False)
+    monkeypatch.delenv("VIBEMIX_MOSS_TTS_ARCHIVE_SIZE", raising=False)
+
+    status = gate.check_windows_app_payload_ready(
+        payload,
+        triple=WIN_TRIPLE,
+        require_moss_source=True,
+    )
+
+    assert status.ok is False
+    assert any("MOSS-only release has no model source" in error for error in status.errors)
+    assert "VIBEMIX_MOSS_TTS_ARCHIVE_URL is not set" in status.moss_source
+
+
+def test_require_moss_source_accepts_release_archive_pins(
+    tmp_path: Path, monkeypatch
+) -> None:
+    payload = _fake_payload(tmp_path)
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_URL", "https://models.example/moss.zip")
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_SHA256", "c" * 64)
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_SIZE", "123")
+
+    status = gate.check_windows_app_payload_ready(
+        payload,
+        triple=WIN_TRIPLE,
+        require_moss_source=True,
+    )
+
+    assert status.ok is True
+    assert "MOSS archive pins configured" in status.moss_source
+
+
 def test_main_returns_one_for_missing_payload(tmp_path: Path, capsys) -> None:
     rc = gate.main([str(tmp_path / "missing")])
 

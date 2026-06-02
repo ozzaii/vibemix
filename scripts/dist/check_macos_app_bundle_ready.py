@@ -19,6 +19,7 @@ from scripts.dist.check_sidecar_bundle_ready import (  # noqa: E402
     DEFAULT_MIN_BYTES,
     detect_host_triple,
     exe_suffix_for_triple,
+    moss_release_source_ready,
 )
 from scripts.dist.repair_macos_app_sidecar_symlinks import DYLIB_DIRS  # noqa: E402
 
@@ -31,6 +32,7 @@ class MacOSAppBundleStatus:
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     sidecar_binary: str = ""
+    moss_source: str = ""
     smoke_stdout: str = ""
 
     def fail(self, message: str) -> None:
@@ -119,6 +121,7 @@ def check_macos_app_bundle_ready(
     *,
     triple: str | None = None,
     min_bytes: int = DEFAULT_MIN_BYTES,
+    require_moss_source: bool = False,
     smoke: str = "version",
     smoke_timeout_s: float = 20.0,
 ) -> MacOSAppBundleStatus:
@@ -158,6 +161,11 @@ def check_macos_app_bundle_ready(
 
     _check_no_test_fixtures(app, status)
     _check_repaired_dylib_links(internal, status)
+    if require_moss_source:
+        moss_ok, moss_message = moss_release_source_ready(bundle_dir)
+        status.moss_source = moss_message
+        if not moss_ok:
+            status.fail(moss_message)
     if status.ok:
         _run_smoke(sidecar, smoke, smoke_timeout_s, status)
     return status
@@ -181,6 +189,14 @@ def main(argv: list[str] | None = None) -> int:
         default="version",
         help="sidecar command to run after structural checks",
     )
+    parser.add_argument(
+        "--require-moss-source",
+        action="store_true",
+        help=(
+            "release gate: require either a complete bundled MOSS model tree or "
+            "verified VIBEMIX_MOSS_TTS_ARCHIVE_* pins"
+        ),
+    )
     parser.add_argument("--smoke-timeout-s", type=float, default=20.0)
     parser.add_argument("--json", action="store_true", help="print machine-readable status")
     parser.add_argument("--quiet", action="store_true", help="print only failures")
@@ -191,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
             args.app,
             triple=args.triple,
             min_bytes=args.min_bytes,
+            require_moss_source=args.require_moss_source,
             smoke=args.smoke,
             smoke_timeout_s=args.smoke_timeout_s,
         )

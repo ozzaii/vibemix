@@ -9185,3 +9185,46 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/session/quit-guard.ts tauri/ui/tests/session/quit-guard.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 48 - Release Artifact MOSS Source Gate
+
+Suggested commit: `fix(release): require moss source in artifact verifiers`
+
+Include:
+
+- `scripts/dist/check_sidecar_bundle_ready.py`
+- `scripts/dist/check_macos_app_bundle_ready.py`
+- `scripts/dist/check_macos_dmg_artifact_ready.py`
+- `scripts/dist/check_macos_updater_artifact_ready.py`
+- `scripts/dist/check_windows_app_payload_ready.py`
+- `scripts/dist/build_macos_local_dmg.sh`
+- `scripts/win/build_local.ps1`
+- `.github/workflows/release.yml`
+- `tests/install/test_sidecar_bundle_ready.py`
+- `tests/install/test_macos_app_bundle_ready.py`
+- `tests/install/test_macos_local_dmg_build.py`
+- `tests/install/test_windows_app_payload_ready.py`
+- `tests/install/test_windows_packaging_paths.py`
+- `tests/security/test_release_yml_signing_skips.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Bundling or hosting the MOSS model archive, PyInstaller spec data additions,
+  runtime TTS behavior, `src/vibemix/__main__.py`, app UI voice-readiness copy,
+  signing secrets, and live MOSS ear-pass claims.
+
+Reason:
+
+- MOSS is the only product voice. The sidecar checker already knows how to fail
+  a release without a complete bundled MOSS model tree or pinned hosted archive
+  metadata, but the macOS app/DMG/updater and Windows payload artifact verifiers
+  did not expose or use that gate. Thread `--require-moss-source` through the
+  artifact verifiers and turn it on in CI plus local rehearsal scripts so a
+  voiceless package cannot pass readiness before signing/upload.
+
+Proof before staging:
+
+- `uv run pytest -q tests/install/test_sidecar_bundle_ready.py tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_local_dmg_build.py tests/install/test_windows_app_payload_ready.py tests/install/test_windows_packaging_paths.py tests/security/test_release_yml_signing_skips.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- scripts/dist/check_sidecar_bundle_ready.py scripts/dist/check_macos_app_bundle_ready.py scripts/dist/check_macos_dmg_artifact_ready.py scripts/dist/check_macos_updater_artifact_ready.py scripts/dist/build_macos_local_dmg.sh scripts/win/build_local.ps1 .github/workflows/release.yml tests/install/test_sidecar_bundle_ready.py tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_local_dmg_build.py tests/install/test_windows_app_payload_ready.py tests/install/test_windows_packaging_paths.py tests/security/test_release_yml_signing_skips.py .planning/handoffs/2026-05-31-package-checklist.md`

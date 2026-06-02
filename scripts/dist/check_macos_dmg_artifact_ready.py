@@ -87,6 +87,7 @@ def check_macos_dmg_artifact_ready(
     triple: str | None = None,
     install_dir: Path | None = None,
     app_name: str | None = "vibemix.app",
+    require_moss_source: bool = False,
     smoke: str = "version",
     smoke_timeout_s: float = 20.0,
 ) -> MacOSDmgArtifactStatus:
@@ -126,6 +127,7 @@ def check_macos_dmg_artifact_ready(
         app_status = check_macos_app_bundle_ready(
             Path(status.installed_app),
             triple=triple,
+            require_moss_source=require_moss_source,
             smoke=smoke,
             smoke_timeout_s=smoke_timeout_s,
         )
@@ -153,6 +155,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--app-name", default="vibemix.app")
     parser.add_argument(
+        "--require-moss-source",
+        action="store_true",
+        help=(
+            "release gate: require either a complete bundled MOSS model tree or "
+            "verified VIBEMIX_MOSS_TTS_ARCHIVE_* pins"
+        ),
+    )
+    parser.add_argument(
         "--smoke",
         choices=("version", "library-stats", "none"),
         default="version",
@@ -168,6 +178,7 @@ def main(argv: list[str] | None = None) -> int:
         triple=args.triple,
         install_dir=args.install_dir,
         app_name=args.app_name,
+        require_moss_source=args.require_moss_source,
         smoke=args.smoke,
         smoke_timeout_s=args.smoke_timeout_s,
     )

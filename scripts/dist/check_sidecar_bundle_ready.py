@@ -159,7 +159,8 @@ def _bundled_moss_model_status(bundle_dir: Path) -> tuple[bool, str]:
     return (False, "bundled MOSS model incomplete: " + " | ".join(details))
 
 
-def _moss_release_source_ready(bundle_dir: Path) -> tuple[bool, str]:
+def moss_release_source_ready(bundle_dir: Path) -> tuple[bool, str]:
+    """Return whether a sidecar bundle has a release-usable MOSS model source."""
     bundled_ok, bundled_detail = _bundled_moss_model_status(bundle_dir)
     if bundled_ok:
         return (True, bundled_detail)
@@ -261,7 +262,7 @@ def check_sidecar_bundle_ready(
             )
 
     if require_moss_source:
-        moss_ok, moss_message = _moss_release_source_ready(bundle_dir)
+        moss_ok, moss_message = moss_release_source_ready(bundle_dir)
         if not moss_ok:
             return SidecarBundleStatus(False, moss_message, binary)
 

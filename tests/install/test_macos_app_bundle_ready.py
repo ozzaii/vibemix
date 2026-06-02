@@ -130,6 +130,47 @@ def test_bundled_test_fixture_payloads_fail(tmp_path: Path) -> None:
     assert any("synthetic_collection.xml" in error for error in status.errors)
 
 
+def test_require_moss_source_fails_without_bundle_or_archive(
+    tmp_path: Path, monkeypatch
+) -> None:
+    app = _fake_app(tmp_path)
+    monkeypatch.delenv("VIBEMIX_MOSS_TTS_ARCHIVE_URL", raising=False)
+    monkeypatch.delenv("VIBEMIX_MOSS_TTS_ARCHIVE_SHA256", raising=False)
+    monkeypatch.delenv("VIBEMIX_MOSS_TTS_ARCHIVE_SIZE", raising=False)
+
+    status = gate.check_macos_app_bundle_ready(
+        app,
+        triple=MAC_TRIPLE,
+        min_bytes=1,
+        require_moss_source=True,
+        smoke="none",
+    )
+
+    assert status.ok is False
+    assert any("MOSS-only release has no model source" in error for error in status.errors)
+    assert "VIBEMIX_MOSS_TTS_ARCHIVE_URL is not set" in status.moss_source
+
+
+def test_require_moss_source_accepts_release_archive_pins(
+    tmp_path: Path, monkeypatch
+) -> None:
+    app = _fake_app(tmp_path)
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_URL", "https://models.example/moss.zip")
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_SHA256", "b" * 64)
+    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_SIZE", "123")
+
+    status = gate.check_macos_app_bundle_ready(
+        app,
+        triple=MAC_TRIPLE,
+        min_bytes=1,
+        require_moss_source=True,
+        smoke="none",
+    )
+
+    assert status.ok is True
+    assert "MOSS archive pins configured" in status.moss_source
+
+
 def test_main_returns_one_for_flattened_links(tmp_path: Path, capsys) -> None:
     app = _fake_app(tmp_path, repaired_links=False)
 

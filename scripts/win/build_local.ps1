@@ -83,6 +83,7 @@ pwsh scripts\win\stage_app_payload.ps1 -OutputDir dist\windows-app
 uv run python scripts/dist/check_windows_app_payload_ready.py `
     dist/windows-app `
     --triple x86_64-pc-windows-msvc `
+    --require-moss-source `
     --smoke version
 
 Write-Host "[build_local] === Stage 5: Inno Setup compile (unsigned) ==="
