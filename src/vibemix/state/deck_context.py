@@ -1174,6 +1174,9 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
         and capture_reason in {"capture_device_too_few_channels", "opened_channels_too_few"}
     ):
         fields.append(f"setup_block={capture_reason}")
+    route_diagnosis = _deck_audio_route_diagnosis_token(
+        capture.get("deck_audio_route_diagnosis")
+    )
     if deck_capture_enabled:
         activity = _deck_audio_activity_token(capture.get("deck_audio_rms"))
         fields.extend(
@@ -1190,12 +1193,11 @@ def render_deck_audio_separation_context(capture: dict[str, object] | None = Non
         )
         if activity:
             fields.append(f"deck_audio_activity={activity}")
+        if route_diagnosis:
+            fields.append(f"route_diagnosis={route_diagnosis}")
     elif deck_capture_configured:
         activity = _deck_audio_activity_token(capture.get("deck_audio_rms"))
         active_seen = _evidence_token(str(capture.get("deck_audio_active_sides_seen") or "none"))
-        route_diagnosis = _deck_audio_route_diagnosis_token(
-            capture.get("deck_audio_route_diagnosis")
-        )
         fields.extend(
             [
                 "current_capture=P1_global_mix_plus_unverified_deck_pairs",

@@ -1543,6 +1543,17 @@ def test_deck_audio_separation_context_marks_configured_deck_pair_capture() -> N
             "deck_channels": {"A": "0,1", "B": "2,3"},
             "deck_audio_capture_enabled": True,
             "deck_audio_rms": {"A": 0.02, "B": 0.0},
+            "deck_audio_route_diagnosis": {
+                "status": "configured_deck_lane_missing_audio",
+                "inactive_sides": "B",
+                "active_sides": "A",
+                "configured_pairs": "A:0,1+B:2,3",
+                "opened_active_pairs": "0,1",
+                "active_unassigned_pairs": "none",
+                "likely_cause": "inactive_deck_pair_route",
+                "next_action": "route_inactive_deck_to_configured_pair",
+                "rule": "opened_channel_probe_not_rekordbox_control",
+            },
         }
     )
 
@@ -1555,6 +1566,9 @@ def test_deck_audio_separation_context_marks_configured_deck_pair_capture() -> N
     assert "isolated_decks=runtime_capture_available" in out
     assert "deck_pairs=A:0,1+B:2,3" in out
     assert "deck_audio_activity=A_active+B_silent" in out
+    assert "route_diagnosis=configured_deck_lane_missing_audio" in out
+    assert "likely_cause_inactive_deck_pair_route" in out
+    assert "next_action_route_inactive_deck_to_configured_pair" in out
     assert normalize_deck_audio_separation_context_text(out) == out
 
 
