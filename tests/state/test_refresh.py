@@ -54,6 +54,7 @@ def _ctrl_mock(connected: bool = True) -> MagicMock:
         "connected": connected,
     }
     m.moves_since.return_value = []
+    m.events_since.return_value = []
     m.activity_snapshot.return_value = {
         "connected": connected,
         "messages_seen_total": 0,
@@ -1414,6 +1415,7 @@ def test_state_refresh_loop_swallows_tick_exceptions(mocker, capsys):
 # =============================================================================
 
 from vibemix.state import EvidenceRegistry  # noqa: E402
+from vibemix.state.loop_geometry import beatgrid_exact_atom  # noqa: E402
 
 
 def test_18_02_per_tick_aud_writes_when_audible():
@@ -1459,6 +1461,40 @@ def test_18_02_per_tick_aud_writes_when_audible():
         assert len(aud[k]) == 1, f"{k} has {len(aud[k])} observations, expected 1"
         # t_session = now - set_start_at = 1000.0 - 900.0 = 100.0
         assert abs(aud[k][0] - 100.0) < 0.001
+
+
+def test_tick_writes_loop_geometry_receipts_from_typed_controller_events() -> None:
+    registry = EvidenceRegistry()
+    state = MusicState()
+    state.set_start_at = 900.0
+    ctrl = _ctrl_mock()
+    ctrl.moves_since.return_value = [(2.0, "A_loop_roll:1/4beat")]
+    ctrl.events_since.return_value = [
+        SimpleNamespace(
+            at=998.0,
+            kind="beatloop_roll_1_4",
+            deck="A",
+        )
+    ]
+    dedupe: set[str] = set()
+
+    kwargs = dict(
+        audio_buf=_audible_buf(),
+        controller_state=ctrl,
+        track_info=_track_mock(),
+        last_audible_high=900.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.5,
+        evidence_registry=registry,
+        evidence_dedupe=dedupe,
+    )
+    _tick_once(state, now=1000.0, **kwargs)
+    _tick_once(state, now=1000.1, **kwargs)
+
+    key = beatgrid_exact_atom("A", "loop_roll", 0.25)
+    assert registry.snapshot()["mix"][key] == (98.0,)
+    ctrl.events_since.assert_called_with(992.1)
 
 
 def test_tick_registers_citable_deck_source_evidence_from_deck_snapshot() -> None:

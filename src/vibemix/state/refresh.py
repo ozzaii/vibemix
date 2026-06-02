@@ -92,6 +92,7 @@ from vibemix.state.genre import (
 )
 from vibemix.state.genre.genre_reconcile import reconcile_genre
 from vibemix.state.harmonics import to_camelot
+from vibemix.state.loop_geometry import beatgrid_exact_atom, parse_loop_control_kind
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
 from vibemix.state.set_plan import derive_set_progress
@@ -420,6 +421,49 @@ def _write_live_grounding_evidence(
             audio_capture_context=audio_capture_context,
         ):
             dedupe_key = f"mix:{key}"
+            if evidence_dedupe is not None and dedupe_key in evidence_dedupe:
+                continue
+            evidence_registry.write("mix", key, t_session)
+            if evidence_dedupe is not None:
+                evidence_dedupe.add(dedupe_key)
+    except Exception:
+        pass
+
+
+def _write_loop_geometry_evidence(
+    evidence_registry: EvidenceRegistry | None,
+    controller_state,
+    *,
+    now: float,
+    set_start_at: float,
+    evidence_dedupe: set[str] | None,
+) -> None:
+    """Register beat-sized loop/beatjump receipts from typed controller events."""
+    if evidence_registry is None:
+        return
+    events_since = getattr(controller_state, "events_since", None)
+    if not callable(events_since):
+        return
+    try:
+        events = events_since(now - 8.0)
+        for event in events:
+            event_at = getattr(event, "at", None)
+            try:
+                event_at_f = float(event_at)
+            except (TypeError, ValueError):
+                continue
+            age = now - event_at_f
+            if age < 0.0 or age > 8.0:
+                continue
+            control = parse_loop_control_kind(str(getattr(event, "kind", "")))
+            if control is None or control.size_beats is None:
+                continue
+            action = control.action
+            if action == "beatjump":
+                action = "beatjump_back" if control.direction < 0 else "beatjump_fwd"
+            key = beatgrid_exact_atom(getattr(event, "deck", None), action, control.size_beats)
+            t_session = round(max(0.0, event_at_f - set_start_at), 1)
+            dedupe_key = f"mix:{key}@{t_session:.1f}"
             if evidence_dedupe is not None and dedupe_key in evidence_dedupe:
                 continue
             evidence_registry.write("mix", key, t_session)
@@ -1185,6 +1229,13 @@ def _tick_once(
             evidence_dedupe=evidence_dedupe,
             audio_delta_items=audio_delta_items,
             audio_capture_context=audio_capture_context,
+        )
+        _write_loop_geometry_evidence(
+            evidence_registry,
+            controller_state,
+            now=now,
+            set_start_at=state.set_start_at,
+            evidence_dedupe=evidence_dedupe,
         )
 
         # Long arc — recompute every cycle is fine (cheap reduction over the
