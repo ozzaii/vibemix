@@ -227,6 +227,18 @@ _NO_MOVE_COACHING_ADVICE_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_UNSUPPORTED_TRANSITION_COACHING_RE = re.compile(
+    r"\b("
+    r"kicks?\b[^.?!]{0,56}\b(?:step(?:ped|ping)?|clash(?:ed|ing)?|collid(?:ed|ing)|"
+    r"fight(?:ing)?|flam(?:med|ming)?|phase(?:d)?|double(?:d)?)|"
+    r"(?:tighten|clean|fix|lock|line)\b[^.?!]{0,48}\b(?:sync|beatmatch|beat match|phase)|"
+    r"(?:sync|beatmatch|beat match|phase)\b[^.?!]{0,48}\b(?:before|next time|tighter|"
+    r"off|late|early|mismatch|matched|lock)|"
+    r"(?:half[- ]?bar|one[- ]?beat|1[- ]?beat|phrase)\b[^.?!]{0,40}\b(?:off|late|early|"
+    r"mismatch)"
+    r")\b",
+    re.IGNORECASE,
+)
 _MIXER_LOW_KILL_CLAIM_RE = re.compile(
     r"\b(?:eq|mixer|move|it|that|you)\b[^.?!]{0,80}\bkilled\s+(?:the\s+)?(?:low|lows|bass|sub)\b|"
     r"\b(?:low|lows|bass|sub)\b[^.?!]{0,40}\b(?:was|were|got|is|are)?\s*killed\b",
@@ -2685,6 +2697,18 @@ def apply_live_claim_guard(
             reason="advice_without_recent_move_proof",
             summary=summary,
         )
+    if (
+        policy in {"blocked", "watch_not_claim", "candidate_not_verdict", "requires_more_evidence"}
+        and _has_unsupported_transition_coaching_advice(text)
+    ):
+        summary = _live_guard_summary(state, moves)
+        return LiveClaimGuardResult(
+            text=LIVE_COACHING_ADVICE_HELD_REPLY,
+            corrected=True,
+            policy="transition_coaching_not_grounded",
+            reason=reason or "transition_advice_without_supported_verdict",
+            summary=summary,
+        )
     effect_claim = bool(
         moves
         and effect_signals
@@ -2957,6 +2981,16 @@ def _has_unsupported_no_move_coaching_advice(text: str) -> bool:
     if _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(raw) or _MOVE_EFFECT_DISCLAIMER_RE.search(raw):
         return False
     return bool(_NO_MOVE_COACHING_ADVICE_RE.search(raw))
+
+
+def _has_unsupported_transition_coaching_advice(text: str) -> bool:
+    """Return True for sync/transition prescriptions that need supported two-deck proof."""
+    raw = str(text or "").strip()
+    if not raw:
+        return False
+    if _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(raw) or _MOVE_EFFECT_DISCLAIMER_RE.search(raw):
+        return False
+    return bool(_UNSUPPORTED_TRANSITION_COACHING_RE.search(raw))
 
 
 def _strip_unsupported_no_move_control_clause(text: str) -> str:

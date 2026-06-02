@@ -2280,6 +2280,30 @@ def test_live_claim_guard_strips_no_move_coaching_advice() -> None:
     assert "next time" not in result.text.lower()
 
 
+def test_live_claim_guard_strips_sync_advice_when_decks_unresolved_even_with_moves() -> None:
+    state = MusicState(audible=True, controller_connected=True, audible_deck="mix")
+    moves = ["A_vol up (medium)", "B_vol up (medium)", "B_jog nudge forward"]
+
+    result = apply_live_claim_guard(
+        (
+            "That heavy scratching texture was scraping over the kick, but the kicks stepped "
+            "on each other for a half-bar — tighten up the sync before pushing both channel "
+            "faders to the top."
+        ),
+        state,
+        moves,
+        event_type="HEARTBEAT",
+    )
+
+    assert should_defer_live_claim_stream(state, moves, event_type="HEARTBEAT") is True
+    assert result.corrected is True
+    assert result.policy == "transition_coaching_not_grounded"
+    assert result.reason == "no_resolved_decks"
+    assert "tighten" not in result.text.lower()
+    assert "sync" not in result.text.lower()
+    assert "kicks stepped" not in result.text.lower()
+
+
 @pytest.mark.parametrize(
     "reply",
     [

@@ -319,6 +319,58 @@ def test_live_claim_guard_defers_watch_only_stream_before_correction(mocker, tmp
     assert "Nice handoff" in guard_log["raw_text"]
 
 
+def test_live_claim_guard_strips_sync_advice_when_move_scope_is_unresolved(
+    mocker, tmp_path
+) -> None:
+    """Recent controller moves are not enough to coach sync without deck proof."""
+    registry = EvidenceRegistry()
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "mix"
+    state.controller_connected = True
+    state.deck_state = DeckState(decks={})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                "That heavy scratching texture was scraping over the kick, ",
+                "but the kicks stepped on each other for a half-bar — ",
+                "tighten up the sync before pushing both channel faders to the top.",
+            ]
+        )
+    )
+
+    agent.set_next_event(
+        Event(
+            type="HEARTBEAT",
+            state=state,
+            extra={
+                "moves": [
+                    "A_vol up (medium)",
+                    "B_vol up (medium)",
+                    "B_jog nudge forward",
+                ]
+            },
+        )
+    )
+    chunks = _drive(agent)
+
+    assert chunks == []
+    kinds = [kind for kind, _ in recorder.events]
+    assert "ai_text" not in kinds
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "strip"
+    assert guard_log["policy"] == "transition_coaching_not_grounded"
+    assert guard_log["reason"] == "no_resolved_decks"
+    assert "kicks stepped on each other" in guard_log["raw_text"]
+    assert "tighten up the sync" not in guard_log["corrected_text"].lower()
+    assert tracker.rate() == 1.0
+    playback.push.assert_not_called()
+
+
 def test_licensed_move_effect_still_requires_citation(mocker, tmp_path) -> None:
     """A physics-licensed move effect is still silent without a citation."""
     registry = EvidenceRegistry()
