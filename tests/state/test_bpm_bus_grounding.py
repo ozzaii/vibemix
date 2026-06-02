@@ -23,12 +23,11 @@ from statistics import median
 
 import pytest
 
+from tests.state.test_refresh import _audible_buf, _ctrl_mock, _track_mock
 from vibemix.audio.constants import BPM_VALID_MAX
 from vibemix.state import MusicState
 from vibemix.state.genre import list_profiles, set_active_profile
 from vibemix.state.refresh import _tick_once
-
-from tests.state.test_refresh import _audible_buf, _ctrl_mock, _track_mock
 
 
 @pytest.fixture(autouse=True)
@@ -73,7 +72,7 @@ def _replay_through_tick(monkeypatch, profile_name: str | None) -> list[float]:
 
     samples = iter(_harmonic_leak_sequence())
 
-    def _fake_estimate_bpm(audio_buf, seconds=6.0):  # noqa: ANN001, ARG001
+    def _fake_estimate_bpm(audio_buf, seconds=6.0):
         return next(samples)
 
     # Patch the name as bound inside refresh.py.
