@@ -101,6 +101,7 @@ def test_build_sidecar_supports_target_arch() -> None:
     text = BUILD_SIDECAR.read_text(encoding="utf-8")
     assert "--target-arch" in text
     assert "aarch64-apple-darwin" in text or "_target_arch_to_triple" in text
+    assert "assert_single_arch_macho" in text
 
 
 def test_sidecar_rs_uses_runtime_triple_resolver() -> None:

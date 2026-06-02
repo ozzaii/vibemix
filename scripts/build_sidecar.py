@@ -164,12 +164,12 @@ def run_pyinstaller(
     recommended flag for CI matrix builds (RESEARCH §Pitfall + STACK).
 
     ``target_arch`` (Plan 27-06 / REC-09): when set to "arm64" or "x86_64"
-    on macOS, passes ``--target-arch <arch>`` to PyInstaller so the produced
-    Mach-O binary matches the requested arch. Per RESEARCH §Critical
-    Correction, the matrix-build path uses ``--target-arch`` explicitly on
-    each runner — NEVER lipo-merge the two outputs (PyInstaller embeds its
-    PKG archive in only the last merged slice → silent segfault on launch
-    for the other arch).
+    on macOS, it is validated after the build by ``assert_single_arch_macho``.
+    PyInstaller 6.20 rejects ``--target-arch`` when a ``.spec`` file is used,
+    so the matrix must run each arch on a matching runner instead of passing
+    the option through this wrapper. NEVER lipo-merge the two outputs
+    (PyInstaller embeds its PKG archive in only the last merged slice → silent
+    segfault on launch for the other arch).
     """
     if not spec.exists():
         raise FileNotFoundError(f"spec file not found: {spec}")
@@ -190,9 +190,6 @@ def run_pyinstaller(
     ]
     if clean:
         cmd.append("--clean")
-    if target_arch:
-        cmd.extend(["--target-arch", target_arch])
-
     print(f"[build_sidecar] running: {' '.join(cmd)}", file=sys.stderr)
     subprocess.run(cmd, check=True, cwd=_PROJECT_ROOT)
 
@@ -441,10 +438,10 @@ def build_and_install(
     print this path for visual verification.
 
     ``target_arch`` (Plan 27-06 / REC-09): when set to "arm64" or "x86_64",
-    overrides triple detection AND passes ``--target-arch <arch>`` to
-    PyInstaller for cross-arch builds on the GitHub Actions matrix.
-    Adds a post-build ``lipo -archs`` single-arch assertion (T-27-06-01
-    mitigation against the lipo-merge pitfall).
+    overrides triple detection and adds a post-build ``lipo -archs``
+    single-arch assertion (T-27-06-01 mitigation against the lipo-merge
+    pitfall). The value is not passed to PyInstaller for spec builds because
+    current PyInstaller rejects ``--target-arch`` with a ``.spec`` file.
     """
     if target_arch is not None:
         derived_triple = _target_arch_to_triple(target_arch)
@@ -514,9 +511,9 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "Plan 27-06 / REC-09: friendly arch alias (arm64 → "
             "aarch64-apple-darwin; x86_64 → x86_64-apple-darwin). Also "
-            "passes --target-arch to PyInstaller for cross-arch build. "
-            "Mutually exclusive with --triple. Use this on the GitHub "
-            "Actions macOS matrix runners; --triple is for finer control."
+            "asserts the produced Mach-O matches that arch after the spec "
+            "build. Mutually exclusive with --triple. Use this on matching "
+            "GitHub Actions macOS matrix runners; --triple is for finer control."
         ),
     )
     parser.add_argument(

@@ -99,6 +99,30 @@ def test_run_pyinstaller_installs_local_ai_extra(
     assert captured[:5] == ["uv", "run", "--extra", "ai-local", "pyinstaller"]
 
 
+def test_run_pyinstaller_does_not_pass_target_arch_with_spec(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PyInstaller 6.20 rejects --target-arch when a .spec file is supplied."""
+    monkeypatch.setattr(build_sidecar, "_PROJECT_ROOT", tmp_path)
+    spec = tmp_path / "vibemix-core.macos.spec"
+    spec.write_text("# fake spec\n", encoding="utf-8")
+    captured: list[str] = []
+
+    def fake_run(cmd, **kwargs):
+        captured.extend(cmd)
+        out = tmp_path / "dist" / "vibemix-core"
+        out.mkdir(parents=True)
+        (out / "vibemix-core").write_bytes(b"fake")
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    build_sidecar.run_pyinstaller(spec, target_arch="arm64")
+
+    assert "--target-arch" not in captured
+
+
 def test_pyav_is_a_direct_runtime_dependency() -> None:
     """Local model/debrief audio paths import PyAV directly, not via LiveKit."""
     text = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")

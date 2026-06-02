@@ -9323,3 +9323,34 @@ Proof before staging:
 - `uv run ruff check src/vibemix/agent/local_tts.py scripts/dist/moss_bundle.py tests/agent/test_local_tts.py tests/install/test_moss_bundle_data.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/agent/local_tts.py scripts/dist/moss_bundle.py vibemix-core.macos.spec vibemix-core.windows.spec tests/agent/test_local_tts.py tests/install/test_moss_bundle_data.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 52 - PyInstaller Spec Target-Arch Build Fix
+
+Suggested commit: `fix(packaging): stop passing target-arch to spec builds`
+
+Include:
+
+- `scripts/build_sidecar.py`
+- `tests/sidecar/test_build_sidecar_rename.py`
+- `tests/runtime_closeouts/test_universal2_sidecar.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- PyInstaller spec data changes, MOSS runtime behavior, generated sidecar binaries,
+  Tauri UI, signing/notarization, and app runtime speech code.
+
+Reason:
+
+- Current PyInstaller rejects `--target-arch` when a `.spec` file is supplied, so
+  the release sidecar rebuild fails before it can refresh IPC or bundle MOSS. Keep
+  `--target-arch` as the requested matrix arch/triple selector, but do not pass it
+  through to PyInstaller; the post-build `lipo -archs` assertion remains the actual
+  single-arch safety gate.
+
+Proof before staging:
+
+- `uv run pytest -q tests/sidecar/test_build_sidecar_rename.py::test_run_pyinstaller_does_not_pass_target_arch_with_spec tests/sidecar/test_build_sidecar_rename.py::test_run_pyinstaller_installs_local_ai_extra tests/runtime_closeouts/test_universal2_sidecar.py::test_build_sidecar_supports_target_arch`
+- `uv run ruff check scripts/build_sidecar.py tests/sidecar/test_build_sidecar_rename.py tests/runtime_closeouts/test_universal2_sidecar.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- scripts/build_sidecar.py tests/sidecar/test_build_sidecar_rename.py tests/runtime_closeouts/test_universal2_sidecar.py .planning/handoffs/2026-05-31-package-checklist.md`
