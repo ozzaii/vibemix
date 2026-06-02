@@ -3658,6 +3658,54 @@ Remaining gate:
   master signal during a measurable loudness move and remains absent on silence
   or a flat window.
 
+## Package 8K3 - Move-Aligned EQ Audio Delta
+
+Suggested commit: `fix(cohost): use move-aligned audio deltas for eq claims`
+
+Include:
+
+- `src/vibemix/state/music_state.py`
+- `src/vibemix/state/refresh.py`
+- `src/vibemix/state/deck_context.py`
+- `tests/state/test_deck_context.py`
+- `tests/state/test_refresh.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- No `runtime/coach.py` wording rewrite or DROP-call speech.
+- No `src/vibemix/__main__.py` startup/config changes.
+- No claim that source tests prove the FLX4/Rekordbox live rig.
+
+Reason:
+
+- The EQ move-effect gate already requires a recent move, predicted EQ physics,
+  current controller state support, and measured audio direction. The remaining
+  source gap was the audio window: consumers could read a generic tick-to-tick
+  `audio_delta` after `prev_perceive` had advanced, so a real EQ move could be
+  flattened by the next stable tick or confused with an unrelated delta.
+- This slice adds a single-writer `move_audio_delta` cache in `MusicState`, seeded
+  from the pre-move `prev_perceive` snapshot and kept briefly for the freshest
+  controller move. EQ move-effect rendering, evidence keys, and the live claim
+  guard prefer that move-aligned delta when it exists; otherwise the existing
+  abstain/refuse path remains unchanged.
+
+Proof to run:
+
+- `uv run pytest -q tests/state/test_deck_context.py::test_move_effect_context_prefers_move_aligned_delta_over_flat_tick_delta tests/state/test_deck_context.py::test_live_claim_guard_prefers_move_aligned_delta_over_flat_tick_delta tests/state/test_refresh.py::test_tick_keeps_move_aligned_audio_delta_when_next_tick_is_flat`
+- `uv run pytest -q tests/intel/test_eq_move_model.py tests/state/test_deck_context.py tests/state/test_refresh.py`
+- `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py`
+- `uv run pytest -q tests/learn/test_no_speculative_phrase.py tests/prompts/test_negative_dict.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py tests/state/test_event_detector.py`
+- `uv run ruff check src/vibemix/state/music_state.py src/vibemix/state/refresh.py src/vibemix/state/deck_context.py tests/state/test_deck_context.py tests/state/test_refresh.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check` across the Package 8K3 file set.
+
+Remaining gate:
+
+- SRC-only. A future LIVE pass on the FLX4/Rekordbox rig must show a real EQ move
+  licenses a grounded causal line only when the move-aligned measured delta and
+  current mixer state both agree.
+
 ## Package 8L - AI Coach Prompt Builder Rename
 
 Suggested commit: `refactor(state): rename ai coach prompt builder`

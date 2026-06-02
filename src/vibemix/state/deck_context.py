@@ -1875,6 +1875,22 @@ def render_audio_delta_items(
     return out
 
 
+def _move_effect_audio_delta_items(
+    state: MusicState,
+    moves: list[str] | tuple[str, ...],
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    *,
+    cap: int = 4,
+) -> list[str]:
+    labels = [_move_label(item) for item in (moves or ())]
+    labels = [label for label in labels if label]
+    if labels and any(canonical_eq_move(label) is not None for label in labels):
+        move_delta = getattr(state, "move_audio_delta", None)
+        if isinstance(move_delta, (list, tuple)) and move_delta:
+            return [str(item) for item in move_delta if item][:cap]
+    return [str(item) for item in (audio_delta_items or render_audio_delta_items(state)) if item][:cap]
+
+
 def _render_lufs_delta(cur: object, prev: object, *, floor_lu: float = 1.0) -> str | None:
     if cur is None or prev is None:
         return None
@@ -1918,7 +1934,9 @@ def _licensed_move_effect(
     labels = [label for label in labels if label]
     if not labels:
         return None
-    measured = _measured_band_directions(audio_delta_items or render_audio_delta_items(state))
+    measured = _measured_band_directions(
+        _move_effect_audio_delta_items(state, labels, audio_delta_items)
+    )
     sample_rate = _move_effect_sample_rate(state, audio_capture_context)
 
     if measured:
@@ -2283,7 +2301,7 @@ def live_mix_evidence_keys(
 
     if move_scope_key:
         keys.append(move_scope_key)
-    deltas = [str(item) for item in (audio_delta_items or render_audio_delta_items(state)) if item]
+    deltas = _move_effect_audio_delta_items(state, labels, audio_delta_items)
     license_ = (
         _licensed_move_effect(
             state,
@@ -2441,7 +2459,7 @@ def render_move_effect_context(
     """Return move-scoped DSP deltas without treating them as proof of skill."""
     if not moves:
         return None
-    deltas = [str(item) for item in (audio_delta_items or render_audio_delta_items(state)) if item]
+    deltas = _move_effect_audio_delta_items(state, moves, audio_delta_items)
     license_ = _licensed_move_effect(
         state,
         moves,
@@ -2679,7 +2697,7 @@ def should_defer_live_claim_stream(
     if moves and getattr(state, "audible", False):
         return True
     return policy in {"blocked", "watch_not_claim", "candidate_not_verdict"} or bool(
-        moves and (audio_delta_items or render_audio_delta_items(state) or capture_deltas)
+        moves and (_move_effect_audio_delta_items(state, moves, audio_delta_items) or capture_deltas)
     )
 
 
@@ -2711,7 +2729,7 @@ def apply_live_claim_guard(
     )
     outcome_claim = has_multi_deck_outcome_claim(text)
     public_diagnostic = bool(_LIVE_PUBLIC_DIAGNOSTIC_RE.search(text))
-    effect_deltas = [str(item) for item in (audio_delta_items or render_audio_delta_items(state))]
+    effect_deltas = _move_effect_audio_delta_items(state, moves, audio_delta_items)
     capture_effect_deltas = _deck_audio_delta_text_items(audio_capture_context)
     effect_signals = [*effect_deltas, *capture_effect_deltas]
     source_detail_reason = _unsupported_audio_source_detail_reason(

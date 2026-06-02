@@ -74,12 +74,19 @@ class MusicState:
     # read this cached field instead of trying to diff after the refresh loop has
     # already moved the prior snapshot forward.
     #
+    # `move_audio_delta` is the bounded before→after DSP delta tied to the
+    # freshest recent controller move. It is seeded from the pre-move
+    # `prev_perceive` snapshot and kept briefly so EQ move-effect claims do not
+    # confuse an unrelated tick-to-tick flat window with the move's measured
+    # result.
+    #
     # Additive falsy defaults preserve golden-equivalence: a cold MusicState
     # renders byte-identical to the v8.0 baseline until _tick_once writes these
     # AND coach.py's `if <field>:`-gated branches fire. Anti-slop lives at the
     # render edge (render_delta abstains below floor; trajectory gate omits on "").
     prev_perceive: dict = field(default_factory=dict)
     audio_delta: list[str] = field(default_factory=list)
+    move_audio_delta: list[str] = field(default_factory=list)
     trajectory_narrative: str = ""
 
     # Phase 59 (DECK-01) — embedded per-deck state (currently-loaded track +

@@ -1801,6 +1801,25 @@ def test_move_effect_context_refuses_stale_eq_move_when_controller_state_disagre
     assert "rule=dsp_delta_not_causal_proof" in out
 
 
+def test_move_effect_context_prefers_move_aligned_delta_over_flat_tick_delta() -> None:
+    state = MusicState(audible=True, rms=0.12, audible_deck="A")
+    state.controller_connected = True
+    state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
+    state.move_audio_delta = ["sub energy fell 50% (strong)", "low energy fell 50% (strong)"]
+
+    out = render_move_effect_context(
+        state,
+        ["A_low: flat->killed"],
+        audio_delta_items=[],
+    )
+
+    assert out is not None
+    assert "deltas=sub energy fell 50% (strong); low energy fell 50% (strong)" in out
+    assert "license=low_kill:sub:pred_fell_" in out
+    assert "rule=move_effect_prediction_and_measurement_agree" in out
+
+
 def test_audio_delta_items_include_bounded_master_lufs_receipt() -> None:
     state = MusicState(audible=True, rms=0.12, onset_density=3.0, master_lufs=-11.0)
     state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
@@ -2163,6 +2182,28 @@ def test_live_claim_guard_refuses_stale_eq_boost_when_controller_state_disagrees
     assert result.policy == "move_effect_not_verdict"
     assert result.reason == "dsp_delta_not_causal_proof"
     assert "can't tell" in result.text.lower()
+
+
+def test_live_claim_guard_prefers_move_aligned_delta_over_flat_tick_delta() -> None:
+    state = MusicState(audible=True, rms=0.12, audible_deck="A")
+    state.controller_connected = True
+    state.deck_a = {"vol": 112, "eq_low": 2, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
+    state.move_audio_delta = ["sub energy fell 50% (strong)", "low energy fell 50% (strong)"]
+
+    result = apply_live_claim_guard(
+        "That low cut cleaned the mix.",
+        state,
+        ["A_low: flat->killed"],
+        audio_delta_items=[],
+    )
+    mix_keys = live_mix_evidence_keys(state, ["A_low: flat->killed"], audio_delta_items=[])
+
+    assert result.corrected is False
+    assert result.policy == "move_effect_supported"
+    assert "low_kill:sub:pred_fell_" in result.summary
+    assert "move_effect=low_kill:sub:pred_fell_19db:measured_fell" in mix_keys
+    assert "move_effect=sub_energy_fell_50pct_strong" in mix_keys
 
 
 def test_live_claim_guard_licenses_xfade_effect_when_curve_and_deck_delta_agree() -> None:

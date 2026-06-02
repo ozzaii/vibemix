@@ -1573,6 +1573,63 @@ def test_tick_registers_citable_deck_audio_window_evidence() -> None:
     ) in mix
 
 
+def test_tick_keeps_move_aligned_audio_delta_when_next_tick_is_flat(mocker) -> None:
+    state = MusicState(audible=True)
+    state.prev_perceive = {
+        "rms": 0.10,
+        "sub": 0.24,
+        "low": 0.32,
+        "mid": 0.30,
+        "high": 0.20,
+        "onset_density": 2.0,
+    }
+    ctrl = _ctrl_mock()
+    ctrl.moves_since.return_value = [(0.2, "A_low: flat->killed")]
+    baselines: dict[str, dict[str, object]] = {}
+    features = {
+        "rms": 0.12,
+        "sub_share": 0.12,
+        "low_share": 0.16,
+        "mid_share": 0.40,
+        "high_share": 0.32,
+        "onsets_per_sec": 3.0,
+    }
+    mocker.patch("vibemix.state.refresh.snapshot_features", return_value=features)
+    mocker.patch("vibemix.state.refresh.energy_curve", return_value=[0.12] * 12)
+    mocker.patch("vibemix.state.refresh.long_arc_curve", return_value=[0.12] * 12)
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        ctrl,
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=999.5,
+        move_audio_baselines=baselines,
+    )
+    first_move_delta = list(state.move_audio_delta)
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        ctrl,
+        _track_mock(),
+        now=1000.1,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=999.5,
+        move_audio_baselines=baselines,
+    )
+
+    assert "sub energy fell 50% (strong)" in first_move_delta
+    assert state.audio_delta == []
+    assert "sub energy fell 50% (strong)" in state.move_audio_delta
+
+
 def test_18_02_aud_NOT_written_when_silent():
     """Test F — per-tick aud writes ONLY when audible (anti-noise).
 

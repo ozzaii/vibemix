@@ -70,6 +70,7 @@ from vibemix.state.deck_context import (
     render_audio_delta_items,
 )
 from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
+from vibemix.state.deltas import DELTA_FLOOR, render_delta
 from vibemix.state.drop_predict import predict_drop_in_sec
 from vibemix.state.emotion_router import derive_emotion
 from vibemix.state.evidence_registry import EvidenceRegistry
@@ -111,6 +112,9 @@ _DROP_HORIZON_S = 32.0
 _COURSE3_MIX_TITLE_MATCH_POSITION_CONF = 0.75
 _COURSE3_REVIEW_ONLY_LESSONS = frozenset({"L3.06"})
 _PREPARED_POOL_REFRESH_INTERVAL_S = 5.0
+_MOVE_AUDIO_DELTA_WINDOW_S = 6.0
+_MOVE_AUDIO_BASELINE_TTL_S = 8.0
+_MOVE_AUDIO_BASELINE_RESET_S = 0.4
 
 # Phase 52 (GENRE-01): cache the loaded GenreProfile library once — the profile
 # JSONs do not change at runtime, so re-loading all of them every tick (10Hz)
@@ -141,6 +145,128 @@ def _stabilize_bpm(ring: list[float]) -> float:
     if not valid:
         return 0.0
     return float(valid[len(valid) // 2])
+
+
+def _float_field(value: object) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _current_perceive_snapshot(state: MusicState) -> dict[str, float | None]:
+    bands = getattr(state, "bands", {}) if isinstance(getattr(state, "bands", {}), dict) else {}
+    return {
+        "rms": _float_field(getattr(state, "rms", 0.0)),
+        "sub": _float_field(bands.get("sub", 0.0)),
+        "low": _float_field(bands.get("low", 0.0)),
+        "mid": _float_field(bands.get("mid", 0.0)),
+        "high": _float_field(bands.get("high", 0.0)),
+        "onset_density": _float_field(getattr(state, "onset_density", 0.0)),
+    }
+
+
+def _render_move_audio_delta_items(
+    state: MusicState,
+    baseline: dict[str, object],
+    *,
+    cap: int = 4,
+) -> list[str]:
+    if not getattr(state, "audible", False) or not baseline:
+        return []
+    current = _current_perceive_snapshot(state)
+    candidates = (
+        ("sub energy", current.get("sub"), "sub"),
+        ("low energy", current.get("low"), "low"),
+        ("mid energy", current.get("mid"), "mid"),
+        ("high energy", current.get("high"), "high"),
+        ("RMS", current.get("rms"), "rms"),
+        ("onset density", current.get("onset_density"), "onset_density"),
+    )
+    out: list[str] = []
+    for label, cur, key in candidates:
+        if cur is None:
+            continue
+        phr = render_delta(label, cur, _float_field(baseline.get(key)), floor=DELTA_FLOOR)
+        if phr is not None:
+            out.append(phr)
+        if len(out) >= cap:
+            break
+    return out
+
+
+def _update_move_audio_delta(
+    state: MusicState,
+    *,
+    now: float,
+    move_audio_baselines: dict[str, dict[str, object]] | None,
+) -> None:
+    state.move_audio_delta = []
+    if move_audio_baselines is None:
+        return
+    if not getattr(state, "audible", False):
+        move_audio_baselines.clear()
+        return
+    recent: list[tuple[float, str]] = []
+    for raw in getattr(state, "recent_moves", []) or []:
+        if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+            continue
+        try:
+            age = float(raw[0])
+        except (TypeError, ValueError):
+            continue
+        if age < 0.0 or age > _MOVE_AUDIO_BASELINE_TTL_S:
+            continue
+        label = str(raw[1])
+        key = midi_evidence_key(label)
+        if not key:
+            continue
+        move_at = now - age
+        rec = move_audio_baselines.get(key)
+        prev = getattr(state, "prev_perceive", None)
+        if (
+            isinstance(prev, dict)
+            and prev
+            and (
+                not isinstance(rec, dict)
+                or _float_field(rec.get("move_at")) is None
+                or move_at
+                > (_float_field(rec.get("move_at")) or float("-inf"))
+                + _MOVE_AUDIO_BASELINE_RESET_S
+            )
+        ):
+            move_audio_baselines[key] = {
+                "move_at": move_at,
+                "last_seen": now,
+                "snapshot": dict(prev),
+            }
+        elif isinstance(rec, dict):
+            rec["last_seen"] = now
+        recent.append((age, key))
+
+    for key, rec in list(move_audio_baselines.items()):
+        if not isinstance(rec, dict):
+            move_audio_baselines.pop(key, None)
+            continue
+        last_seen = _float_field(rec.get("last_seen"))
+        move_at = _float_field(rec.get("move_at"))
+        if (
+            last_seen is None
+            or move_at is None
+            or now - last_seen > _MOVE_AUDIO_BASELINE_TTL_S
+            or now - move_at > _MOVE_AUDIO_BASELINE_TTL_S
+        ):
+            move_audio_baselines.pop(key, None)
+
+    if not recent:
+        return
+    age, key = min(recent, key=lambda item: item[0])
+    if age > _MOVE_AUDIO_DELTA_WINDOW_S:
+        return
+    rec = move_audio_baselines.get(key)
+    snapshot = rec.get("snapshot") if isinstance(rec, dict) else None
+    if isinstance(snapshot, dict):
+        state.move_audio_delta = _render_move_audio_delta_items(state, snapshot)
 
 
 def _classify_active_genre(bpm: float, feats: dict) -> str:
@@ -564,6 +690,7 @@ def _tick_once(
     prepared_pool=None,
     evidence_dedupe: set[str] | None = None,
     audio_capture_context: dict[str, object] | None = None,
+    move_audio_baselines: dict[str, dict[str, object]] | None = None,
 ) -> tuple[float, float, float, float]:
     """One iteration of the state_refresh_loop body. Extracted so tests can
     drive single ticks deterministically with fake time and fake snapshots.
@@ -1033,6 +1160,11 @@ def _tick_once(
 
         # Recent moves
         state.recent_moves = controller_state.moves_since(now - 12.0)
+        _update_move_audio_delta(
+            state,
+            now=now,
+            move_audio_baselines=move_audio_baselines,
+        )
         audio_delta_items = render_audio_delta_items(state, use_cached=False)
         state.audio_delta = audio_delta_items
         _write_live_grounding_evidence(
@@ -1161,6 +1293,7 @@ async def state_refresh_loop(
     evidence_dedupe: set[str] = set()
     prepared_pool = None
     last_prepared_pool_check_at = float("-inf")
+    move_audio_baselines: dict[str, dict[str, object]] = {}
 
     while not stop_event.is_set():
         await asyncio.sleep(0.1)
@@ -1199,6 +1332,7 @@ async def state_refresh_loop(
                 prepared_pool=prepared_pool,
                 evidence_dedupe=evidence_dedupe,
                 audio_capture_context=audio_capture_context,
+                move_audio_baselines=move_audio_baselines,
             )
         except Exception as e:
             print(f"[state refresh err] {e}", file=sys.stderr)
