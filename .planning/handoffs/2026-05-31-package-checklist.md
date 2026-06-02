@@ -9093,3 +9093,34 @@ Proof before staging:
 - `uv run ruff check src/vibemix/agent/dj_cohost.py src/vibemix/state/deck_context.py tests/agent/test_dj_cohost.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/agent/dj_cohost.py src/vibemix/state/deck_context.py tests/agent/test_dj_cohost.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 45 - First-Run Deck Route Clarity
+
+Suggested commit: `fix(wizard): explain deck-aware blackhole routing`
+
+Include:
+
+- `tauri/ui/src/wizard/components/blackhole-step.ts`
+- `tauri/ui/src/wizard/__tests__/blackhole-step.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Audio capture/runtime routing, `src/vibemix/__main__.py`, `src/vibemix/runtime/coach.py`,
+  co-host speech, Tauri IPC schema changes, installer downloads, and live FLX4 proof claims.
+
+Reason:
+
+- The first-run BlackHole step previously went silent once any BlackHole variant
+  was installed. That hides the load-bearing product distinction users hit on
+  real Rekordbox rigs: BlackHole 2ch is enough for master-output listening, but
+  deck-aware proof needs a Multi-Output/Aggregate route with the FLX4 plus
+  BlackHole 16ch, with deck 1 on channels 1/2 and deck 2 on channels 3/4.
+  Surface that distinction in the wizard so setup failure reads as an actionable
+  route issue, not an invisible model/co-host problem.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- src/wizard/__tests__/blackhole-step.spec.ts`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/wizard/components/blackhole-step.ts tauri/ui/src/wizard/__tests__/blackhole-step.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

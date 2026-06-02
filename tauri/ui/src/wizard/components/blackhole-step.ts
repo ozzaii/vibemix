@@ -5,7 +5,7 @@
  * driven rendering:
  *
  *   - probe.installed === false → render BlackHoleBanner (install affordance)
- *   - probe.installed === true  → render nothing (banner hidden)
+ *   - probe.installed === true  → render route status (master-only or deck-capable)
  *
  * The wizard step calls into the sidecar via `install.blackhole_probe`
  * IPC (Plan 33-03 backend). The "Install BlackHole 2ch" button shells
@@ -19,6 +19,7 @@
  */
 
 import { BlackHoleBanner } from "./blackhole-banner.js";
+import { registerStyle } from "./_style-registry.js";
 
 export interface BlackHoleProbeResult {
   installed: boolean;
@@ -33,12 +34,42 @@ export interface BlackHoleStepCallbacks {
   postClickState?: boolean;
 }
 
+const CSS = `
+  .cmp-bh-route {
+    display: grid;
+    gap: var(--sp-2);
+    padding: var(--sp-4) var(--sp-5);
+    margin-bottom: var(--sp-4);
+  }
+  .cmp-bh-route__label {
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--silk);
+  }
+  .cmp-bh-route__body {
+    max-width: 68ch;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--silk-65);
+  }
+  .cmp-bh-route__body strong {
+    color: var(--silk);
+    font-weight: 600;
+  }
+`;
+
+registerStyle("cmp-bh-route", CSS);
+
 /**
  * Render the BlackHole step body for the given probe result.
  *
  * Returns a container with EITHER the install banner (when absent) OR
- * an empty container (when present). The caller picks whether to also
- * show a follow-on success indicator.
+ * the current route capability (when present).
  */
 export function renderBlackHoleStep(
   probe: BlackHoleProbeResult,
@@ -56,8 +87,39 @@ export function renderBlackHoleStep(
         postClickState: cb.postClickState,
       }),
     );
+  } else {
+    root.append(renderRouteStatus(probe.device_name));
   }
 
+  return root;
+}
+
+function renderRouteStatus(deviceName: string | null): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "cmp-bh-route vmx-tile";
+  root.dataset.tile = "hero";
+  const normalized = (deviceName ?? "").toLowerCase();
+  const deckCapable =
+    normalized.includes("16ch") ||
+    normalized.includes("64ch") ||
+    normalized.includes("aggregate") ||
+    normalized.includes("multi-output");
+  root.dataset.deckCapable = deckCapable ? "true" : "false";
+
+  const label = document.createElement("div");
+  label.className = "cmp-bh-route__label";
+  label.textContent = deckCapable ? "DECK ROUTE READY" : "MASTER ROUTE READY";
+
+  const body = document.createElement("div");
+  body.className = "cmp-bh-route__body";
+  if (deckCapable) {
+    body.innerHTML =
+      "<strong>BlackHole 16ch or aggregate routing is present.</strong> Keep Rekordbox on a Multi-Output/Aggregate device with the FLX4, and route deck 1 to channels 1/2 and deck 2 to 3/4 for deck-aware proof.";
+  } else {
+    body.innerHTML =
+      "<strong>BlackHole 2ch lets vibemix hear the master output.</strong> For deck-aware proof, use a Multi-Output/Aggregate device that includes the FLX4 plus BlackHole 16ch.";
+  }
+  root.append(label, body);
   return root;
 }
 
