@@ -76,10 +76,13 @@ import asyncio
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from statemachine import State, StateMachine
 
+from vibemix.audio.grid import BeatGrid
+from vibemix.audio.miniplayer import DeckState
 from vibemix.learn.curriculum import CURRICULUM
 from vibemix.learn.graduation import (
     GraduationSummary,
@@ -94,6 +97,12 @@ from vibemix.learn.harmonic_practice import (
 )
 from vibemix.learn.lesson_flow import LessonFlow, LessonStep, build_lesson_flow
 from vibemix.learn.observability import learn_tutor_speak_observability_events
+from vibemix.learn.practice_loop import (
+    BeatmatchPracticeResult,
+    grade_owned_beatmatch_attempt,
+    grade_owned_beatmatch_state,
+    is_creditable_locked_grade,
+)
 from vibemix.learn.state import LearnState
 from vibemix.learn.teaching_loop import (
     TeachingTurn,
@@ -158,6 +167,15 @@ _CONTROL_LABELS = {
 class _AdaptiveMismatchHint:
     text: str
     citations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BeatmatchPracticeSnapshot:
+    """One owned-deck beatmatch practice tick supplied by a lesson driver."""
+
+    grid_a: BeatGrid
+    grid_b: BeatGrid
+    deck_state: DeckState
 
 
 def _control_and_deck(action: dict[str, Any]) -> tuple[str, str]:
@@ -401,6 +419,7 @@ class LessonRuntime(StateMachine):
         prepared_pool_loader: Callable[[], PreparedPool | None] | None = None,
         harmonic_pair_loader: Callable[[], HarmonicPracticePair | None] | None = None,
         graduation_summary_loader: Callable[[Any], GraduationSummary | None] | None = None,
+        beatmatch_practice_loader: Callable[[], BeatmatchPracticeSnapshot | None] | None = None,
         session_event_logger: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         """Build a LessonRuntime bound to its 5 collaborators.
@@ -439,6 +458,11 @@ class LessonRuntime(StateMachine):
             graduation_summary_loader: Optional L3.06 hook that reads the
                 existing progress/profile/debrief seams. None uses the shipped
                 local storage readers.
+            beatmatch_practice_loader: Optional owned-deck lesson hook. When it
+                returns a :class:`BeatmatchPracticeSnapshot`, the 1 Hz loop grades
+                that owned deck through ``learn.practice_loop`` and lets the
+                existing recognizer/progress gate decide whether beatmatching
+                earns a live proof.
             session_event_logger: Optional existing session-recorder seam. Live
                 wiring passes ``VoiceRecorder.log_event`` through a fail-soft
                 adapter so Learn milestones land in ``events.jsonl`` for later
@@ -454,6 +478,7 @@ class LessonRuntime(StateMachine):
         self._prepared_pool_loader = prepared_pool_loader
         self._harmonic_pair_loader = harmonic_pair_loader
         self._graduation_summary_loader = graduation_summary_loader
+        self._beatmatch_practice_loader = beatmatch_practice_loader
         self._session_event_logger = session_event_logger
         # The wall-clock anchor for the 30 s strike escalation timer.
         # Reset on every ``on_enter_<state>`` callback for the states
@@ -483,6 +508,7 @@ class LessonRuntime(StateMachine):
         self._active_flow: LessonFlow | None = None
         self._active_step_index: int = 0
         self._last_mismatch_hint_at: float = 0.0
+        self._beatmatch_practice_lock_active = False
         super().__init__()
 
     @property
@@ -1336,6 +1362,88 @@ class LessonRuntime(StateMachine):
                 file=sys.stderr,
             )
 
+    def _grade_beatmatch_practice_tick(self) -> BeatmatchPracticeResult | None:
+        """Grade the optional owned-deck beatmatch practice lane on a lock edge.
+
+        Normal live co-host audio is observational and cannot honestly grade
+        beatmatching. This hook only runs when Learn owns both practice decks and
+        an explicit loader supplies exact grids + deck state. A sustained locked
+        state credits once; the edge re-arms only after the grade stops being
+        creditable.
+        """
+        if self._beatmatch_practice_loader is None or self._evidence_registry is None:
+            return None
+        try:
+            snapshot = self._beatmatch_practice_loader()
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] beatmatch practice loader failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return None
+        if snapshot is None:
+            self._beatmatch_practice_lock_active = False
+            return None
+
+        t_session = self._evidence_time()
+        grade = grade_owned_beatmatch_state(
+            snapshot.grid_a,
+            snapshot.grid_b,
+            snapshot.deck_state,
+        )
+        if not is_creditable_locked_grade(grade):
+            self._beatmatch_practice_lock_active = False
+            return BeatmatchPracticeResult(
+                grade=grade,
+                event=None,
+                credited=(),
+                t_session=t_session,
+            )
+        if self._beatmatch_practice_lock_active:
+            return BeatmatchPracticeResult(
+                grade=grade,
+                event=None,
+                credited=(),
+                t_session=t_session,
+            )
+
+        self._beatmatch_practice_lock_active = True
+        result = grade_owned_beatmatch_attempt(
+            snapshot.grid_a,
+            snapshot.grid_b,
+            snapshot.deck_state,
+            evidence_registry=self._evidence_registry,
+            t_session=t_session,
+            progress=self._progress,
+            now=datetime.now(UTC).isoformat(),
+        )
+        if result.credited:
+            try:
+                from vibemix.learn.progress import LearnProgress, save_progress
+
+                if isinstance(self._progress, LearnProgress):
+                    save_progress(self._progress)
+            except Exception as exc:  # pragma: no cover - defensive
+                import sys
+
+                print(
+                    f"[learn.runtime] beatmatch practice progress save failed: {exc!r}",
+                    file=sys.stderr,
+                )
+            self._emit_progress_snapshot()
+        self._log_session_event(
+            "learn_beatmatch_practice_graded",
+            lesson_id=self._learn.current_lesson_id or "",
+            course_id=self._learn.current_course_id or "",
+            step_id=self._current_step_id(),
+            evidence_time=t_session,
+            verdict=result.grade.verdict,
+            credited=list(result.credited),
+        )
+        return result
+
     def _record_action_evidence(
         self,
         *,
@@ -1794,6 +1902,7 @@ class LessonRuntime(StateMachine):
         """
         while not stop_event.is_set():
             await asyncio.sleep(1.0)
+            self._grade_beatmatch_practice_tick()
             cur = self.current_state.id
             if cur in ("awaiting_action", "hint_strike_1", "hint_strike_2"):
                 elapsed_in_state = (

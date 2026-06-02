@@ -4,11 +4,16 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from vibemix.audio.grid import BeatGrid
+from vibemix.audio.miniplayer import DeckState
 from vibemix.coach.citation_linter import CitationLinter
 from vibemix.learn.progress import LearnProgress
-from vibemix.learn.runtime import LessonRuntime
+from vibemix.learn.runtime import BeatmatchPracticeSnapshot, LessonRuntime
+from vibemix.learn.skill_tree import SKILL_MANIFEST
 from vibemix.learn.state import LearnState
 from vibemix.state.evidence_registry import EvidenceRegistry
+
+_SR = 44100
 
 
 def _runtime_with_evidence(
@@ -27,6 +32,51 @@ def _runtime_with_evidence(
         evidence_clock=lambda: clock_value,
     )
     return runtime, registry, ipc
+
+
+def _beat_grid(bpm: float = 128.0) -> BeatGrid:
+    return BeatGrid(anchor_frame=0.0, bpm=bpm, sample_rate=_SR)
+
+
+def _locked_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
+    grid = _beat_grid()
+    return BeatmatchPracticeSnapshot(
+        grid_a=grid,
+        grid_b=grid,
+        deck_state=DeckState(
+            a_frame=0.0,
+            b_frame=0.0,
+            rate_a=1.0,
+            rate_b=1.0,
+            xfader=0.5,
+        ),
+    )
+
+
+def _drifting_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
+    grid = _beat_grid()
+    return BeatmatchPracticeSnapshot(
+        grid_a=grid,
+        grid_b=grid,
+        deck_state=DeckState(
+            a_frame=0.0,
+            b_frame=grid.beat_len_frames * 0.25,
+            rate_a=1.0,
+            rate_b=1.0,
+            xfader=0.5,
+        ),
+    )
+
+
+def _make_beatmatching_competent(progress: LearnProgress) -> None:
+    spec = SKILL_MANIFEST["beatmatching"]
+    for lesson_id in spec.lesson_ids:
+        progress.lessons[lesson_id] = {
+            "completed": True,
+            "completed_at": "2026-06-02T00:00:00Z",
+            "strikes_used": 0,
+        }
+    setattr(progress, spec.gate, True)
 
 
 def _hint_payloads(ipc: MagicMock) -> list[dict]:
@@ -194,3 +244,83 @@ def test_runtime_logs_learn_milestones_to_session_event_sink() -> None:
     assert action["expected_control_id"] == "eq_hi:A"
     assert action["matched"] is True
     assert isinstance(action["evidence_time"], float)
+
+
+def test_beatmatch_practice_tick_writes_receipt_and_credits_once(monkeypatch) -> None:
+    """The Learn-owned beatmatch practice hook uses the exact evidence clock."""
+    saved: list[LearnProgress] = []
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    events: list[tuple[str, dict]] = []
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 42.4,
+        beatmatch_practice_loader=_locked_beatmatch_snapshot,
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+
+    result = runtime._grade_beatmatch_practice_tick()
+
+    assert result is not None
+    assert result.event is not None
+    assert result.grade.verdict == "locked"
+    assert result.credited == ("beatmatching",)
+    assert registry.has("ev", "BEATMATCH_GRADED", 42.4, tol=1.0)
+    assert progress.skills["beatmatching"]["live_proof_count"] == 1
+    assert saved == [progress]
+    assert any(
+        call.args[0].get("type") == "ipc.learn.progress_state"
+        for call in ipc.emit.call_args_list
+    )
+    assert events[-1][0] == "learn_beatmatch_practice_graded"
+    assert events[-1][1]["credited"] == ["beatmatching"]
+
+    repeated = runtime._grade_beatmatch_practice_tick()
+
+    assert repeated is not None
+    assert repeated.event is None
+    assert repeated.credited == ()
+    assert progress.skills["beatmatching"]["live_proof_count"] == 1
+
+
+def test_beatmatch_practice_rearms_after_unlocked_grade(monkeypatch) -> None:
+    """A sustained lock credits once, then a drift grade re-arms the next lock."""
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    snapshots = [
+        _locked_beatmatch_snapshot(),
+        _locked_beatmatch_snapshot(),
+        _drifting_beatmatch_snapshot(),
+        _locked_beatmatch_snapshot(),
+    ]
+    registry = EvidenceRegistry()
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 50.0 + len(snapshots),
+        beatmatch_practice_loader=lambda: snapshots.pop(0) if snapshots else None,
+    )
+
+    first = runtime._grade_beatmatch_practice_tick()
+    sustained = runtime._grade_beatmatch_practice_tick()
+    drift = runtime._grade_beatmatch_practice_tick()
+    relock = runtime._grade_beatmatch_practice_tick()
+
+    assert first is not None and first.credited == ("beatmatching",)
+    assert sustained is not None and sustained.credited == ()
+    assert drift is not None and drift.grade.verdict == "trainwreck"
+    assert relock is not None and relock.credited == ("beatmatching",)
+    assert progress.skills["beatmatching"]["live_proof_count"] == 2

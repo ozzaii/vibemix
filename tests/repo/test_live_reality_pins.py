@@ -22,7 +22,11 @@ import pathlib
 _REPO = pathlib.Path(__file__).resolve().parents[2]
 _SRC = _REPO / "src" / "vibemix"
 _PRODUCER = str(_SRC / "learn" / "practice_loop.py")
+_RUNTIME = str(_SRC / "learn" / "runtime.py")
 _EMITTER_FNS = frozenset({"grade_beatmatch", "grade_to_event_extra"})
+_PRACTICE_PRODUCER_FNS = frozenset(
+    {"grade_owned_beatmatch_attempt", "grade_minideck_beatmatch_attempt"}
+)
 _GRADED_EVENT_KIND = "BEATMATCH_GRADED"
 
 
@@ -55,6 +59,18 @@ def _emitter_call_sites() -> list[tuple[str, int, str]]:
     return hits
 
 
+def _practice_producer_call_sites() -> list[tuple[str, int, str]]:
+    hits: list[tuple[str, int, str]] = []
+    for path in _src_py_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                name = _call_name(node)
+                if name in _PRACTICE_PRODUCER_FNS:
+                    hits.append((str(path), node.lineno, name))
+    return hits
+
+
 def _src_files_importing_judge() -> list[str]:
     found: list[str] = []
     for path in _src_py_files():
@@ -79,6 +95,16 @@ def test_beatmatch_judge_has_one_owned_deck_production_emitter() -> None:
 
 def test_beatmatch_judge_import_is_limited_to_practice_loop() -> None:
     assert _src_files_importing_judge() == [_PRODUCER]
+
+
+def test_beatmatch_practice_producer_has_a_runtime_caller() -> None:
+    call_sites = _practice_producer_call_sites()
+    runtime_callers = {
+        (path, name)
+        for path, _lineno, name in call_sites
+        if path != _PRODUCER
+    }
+    assert (_RUNTIME, "grade_owned_beatmatch_attempt") in runtime_callers
 
 
 def test_beatmatch_credit_consumer_is_wired_to_the_producer_event() -> None:

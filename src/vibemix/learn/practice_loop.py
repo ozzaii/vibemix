@@ -73,8 +73,8 @@ def grade_owned_beatmatch_attempt(
     """
 
     t = float(t_session)
-    grade = grade_beatmatch(grid_a, grid_b, state)
-    if not _is_creditable_locked_grade(grade):
+    grade = grade_owned_beatmatch_state(grid_a, grid_b, state)
+    if not is_creditable_locked_grade(grade):
         return BeatmatchPracticeResult(grade=grade, event=None, credited=(), t_session=t)
 
     event = BeatmatchPracticeEvent(extra=grade_to_event_extra(grade))
@@ -97,6 +97,22 @@ def grade_owned_beatmatch_attempt(
         )
 
     return BeatmatchPracticeResult(grade=grade, event=event, credited=credited, t_session=t)
+
+
+def grade_owned_beatmatch_state(
+    grid_a: BeatGrid,
+    grid_b: BeatGrid,
+    state: DeckState,
+) -> BeatmatchGrade:
+    """Measure the owned-deck beatmatch grade without writing credit evidence."""
+
+    return grade_beatmatch(grid_a, grid_b, state)
+
+
+def is_creditable_locked_grade(grade: BeatmatchGrade) -> bool:
+    """Return True only for the measured LOCKED grade that may earn credit."""
+
+    return bool(grade.tempo_matched and grade.phase_locked and not grade.abstain)
 
 
 def grade_minideck_beatmatch_attempt(
@@ -127,7 +143,7 @@ def grade_minideck_beatmatch_attempt(
 
 
 def _is_creditable_locked_grade(grade: BeatmatchGrade) -> bool:
-    return bool(grade.tempo_matched and grade.phase_locked and not grade.abstain)
+    return is_creditable_locked_grade(grade)
 
 
 __all__ = [
@@ -137,4 +153,6 @@ __all__ = [
     "BeatmatchPracticeResult",
     "grade_minideck_beatmatch_attempt",
     "grade_owned_beatmatch_attempt",
+    "grade_owned_beatmatch_state",
+    "is_creditable_locked_grade",
 ]

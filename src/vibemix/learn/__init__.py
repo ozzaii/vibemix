@@ -108,7 +108,7 @@ from vibemix.learn.progress import (
 )
 from vibemix.learn.prompts import build_tutor_system_instruction
 from vibemix.learn.recital import RecitalRuntime
-from vibemix.learn.runtime import LessonRuntime
+from vibemix.learn.runtime import BeatmatchPracticeSnapshot, LessonRuntime
 from vibemix.learn.settings import read_learn_headphone_device_index
 from vibemix.learn.state import LearnState
 from vibemix.learn.teaching_loop import (
@@ -138,6 +138,7 @@ __all__ = [
     "BackstageLens",
     "BeatmatchPracticeEvent",
     "BeatmatchPracticeResult",
+    "BeatmatchPracticeSnapshot",
     "CourseMeta",
     "ExemplarFinder",
     "ExemplarLessonController",
