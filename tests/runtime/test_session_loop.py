@@ -440,7 +440,7 @@ def test_live_status_recheck_mirrors_attached_runtime(fake_bus: FakeBus) -> None
     assert tick["screen"] == "unavailable"
 
 
-def test_live_status_recheck_reports_visible_controller_without_midi_as_down(
+def test_live_status_recheck_reports_visible_controller_without_midi_as_connected(
     fake_bus: FakeBus,
 ) -> None:
     loop = SessionLoop(
@@ -465,7 +465,7 @@ def test_live_status_recheck_reports_visible_controller_without_midi_as_down(
     tick = fake_bus.emitted_by_type("ipc.status.tick")[-1]["payload"]
     assert tick["livekit"] == "ok"
     assert tick["gemini"] == "ok"
-    assert tick["midi"] == 0
+    assert tick["midi"] == 1
 
 
 def test_status_recheck_unknown_component_emits_ipc_error(fake_bus: FakeBus) -> None:

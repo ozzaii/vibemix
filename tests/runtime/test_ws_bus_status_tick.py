@@ -9,9 +9,11 @@ built from them passes the SAME outbound validator the bus uses.
 
 Honesty + never-fault contract (see STATUS_EVERY_N comment in ws_bus.py):
 livekit/gemini are "ok" (the real gemini-down signal is the SessionLayout
-grounding-failure timer, not this tick); midi is the real connected count;
-screen is a live non-prompting probe used ONLY to light the badge — denied or
-unavailable is NOT a deck fault (faultInput drops screen; audio-only is valid).
+grounding-failure timer, not this tick); midi is the connected-controller count
+for the compact footer LED, while no-frame/no-move detail stays in the
+deck_mixer.midi_activity proof channel; screen is a live non-prompting probe
+used ONLY to light the badge — denied or unavailable is NOT a deck fault
+(faultInput drops screen; audio-only is valid).
 """
 
 from __future__ import annotations
@@ -32,7 +34,7 @@ def test_probe_midi_count_reflects_active_port():
     assert _probe_midi_count(SimpleNamespace(port_name="")) == 0
 
 
-def test_probe_midi_count_uses_live_midi_traffic_over_visible_port():
+def test_probe_midi_count_treats_visible_controller_as_connected():
     controller = SimpleNamespace(port_name="DDJ-FLX4")
 
     assert (
@@ -44,7 +46,7 @@ def test_probe_midi_count_uses_live_midi_traffic_over_visible_port():
                 controller_midi_messages_seen=0,
             ),
         )
-        == 0
+        == 1
     )
     assert (
         _probe_midi_count(
@@ -56,6 +58,17 @@ def test_probe_midi_count_uses_live_midi_traffic_over_visible_port():
             ),
         )
         == 1
+    )
+    assert (
+        _probe_midi_count(
+            controller,
+            SimpleNamespace(
+                controller_connected=False,
+                controller_midi_activity="disconnected",
+                controller_midi_messages_seen=0,
+            ),
+        )
+        == 0
     )
 
 

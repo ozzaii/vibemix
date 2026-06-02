@@ -9228,3 +9228,32 @@ Proof before staging:
 - `uv run pytest -q tests/install/test_sidecar_bundle_ready.py tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_local_dmg_build.py tests/install/test_windows_app_payload_ready.py tests/install/test_windows_packaging_paths.py tests/security/test_release_yml_signing_skips.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- scripts/dist/check_sidecar_bundle_ready.py scripts/dist/check_macos_app_bundle_ready.py scripts/dist/check_macos_dmg_artifact_ready.py scripts/dist/check_macos_updater_artifact_ready.py scripts/dist/build_macos_local_dmg.sh scripts/win/build_local.ps1 .github/workflows/release.yml tests/install/test_sidecar_bundle_ready.py tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_local_dmg_build.py tests/install/test_windows_app_payload_ready.py tests/install/test_windows_packaging_paths.py tests/security/test_release_yml_signing_skips.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 49 - Honest Connected Controller Status
+
+Suggested commit: `fix(status): show connected flx4 as controller-ready`
+
+Include:
+
+- `src/vibemix/runtime/ws_bus.py`
+- `tests/runtime/test_ws_bus_status_tick.py`
+- `tests/runtime/test_session_loop.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Controller decoder semantics, Course 3 operator actions, `src/vibemix/__main__.py`,
+  co-host speech, runtime coach, and frontend layout.
+
+Reason:
+
+- The compact footer status badge should answer whether a controller is connected
+  to vibemix. A connected DDJ-FLX4 with no decoded movement yet must not paint the
+  controller LED red; the no-frame/no-move truth remains available in
+  `deck_mixer.midi_activity` and Course 3 guidance.
+
+Proof before staging:
+
+- `uv run pytest -q tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py::test_live_status_recheck_reports_visible_controller_without_midi_as_connected tests/runtime/test_ws_bus_deck_state.py::test_course3_operator_action_names_visible_controller_with_no_midi_traffic`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/runtime/ws_bus.py tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py .planning/handoffs/2026-05-31-package-checklist.md`

@@ -152,33 +152,29 @@ def _probe_screen_status(screen_available: bool | None = None) -> str:
         return "unavailable"
 
 
-_MIDI_ACTIVITY_READY = {"active", "midi_events_no_moves", "midi_traffic_unmapped"}
-_MIDI_ACTIVITY_DOWN = {"connected_no_midi_traffic", "disconnected"}
-
-
 def _probe_midi_count(
     controller_state: Any | None,
     music_state: MusicState | None = None,
 ) -> int | None:
-    """Honest controller-readiness count for the status badge.
+    """Controller connection count for the compact status badge.
 
-    The UI payload is still a small count-like integer, but in live mode it
-    means "usable MIDI is reaching vibemix": 1 after any MIDI traffic is seen,
-    0 when the controller is merely visible but silent, and None when no live
-    probe is wired yet.
+    Detailed movement honesty still lives in ``deck_mixer.midi_activity`` and
+    Course 3 operator actions. The footer LED answers the simpler product
+    question: is a controller connected to vibemix?
     """
     if music_state is not None:
         try:
             activity = str(getattr(music_state, "controller_midi_activity", "") or "")
-            if activity in _MIDI_ACTIVITY_READY:
+            connected = bool(getattr(music_state, "controller_connected", False))
+            if connected and activity != "disconnected":
                 return 1
-            if activity in _MIDI_ACTIVITY_DOWN:
+            if activity == "disconnected":
                 return 0
             messages = max(0, int(getattr(music_state, "controller_midi_messages_seen", 0) or 0))
             if messages > 0:
                 return 1
-            if bool(getattr(music_state, "controller_connected", False)):
-                return 0
+            if connected:
+                return 1
         except Exception:
             pass
     if controller_state is None:
