@@ -829,6 +829,34 @@ const SETTINGS_LENSES: readonly SharedLens[] = ["hype", "critique", "tutor"];
 const SETTINGS_OUTPUT_PROFILES: readonly SettingsView["output_profile"][] = ["hp", "spk"];
 const SETTINGS_MOODS: readonly MascotMood[] = ["hype-man", "teacher", "coach"];
 
+const MODE_LABELS: Record<SettingsView["mode"], string> = {
+  hype: "Hype",
+  coach: "Coach",
+};
+
+const LENS_LABELS: Record<SharedLens, string> = {
+  hype: "Hype",
+  critique: "Critique",
+  tutor: "Tutor",
+};
+
+const SKILL_LABELS: Record<SkillLevel, string> = {
+  beginner: "Beginner",
+  intermediate: "Intermediate",
+  pro: "Pro",
+};
+
+const OUTPUT_PROFILE_LABELS: Record<SettingsView["output_profile"], string> = {
+  hp: "Headphones",
+  spk: "Speakers",
+};
+
+function formatOutputDeviceLabel(id: string | null): string {
+  if (!id) return "Auto device";
+  if (/^\d+$/.test(id)) return `Device ${id}`;
+  return id;
+}
+
 function oneOf<T extends string>(
   values: readonly T[],
   value: unknown,
@@ -972,7 +1000,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
       label: "VOICE",
       value: settings.voice,
       avatar: true,
-      options: VOICE_OPTIONS.map((v) => ({ id: v, label: v })),
+      options: VOICE_OPTIONS.map((v) => ({ id: v, label: v, sub: "MOSS" })),
       onChange: (id) => {
         void sendSettingsField("voice", id);
       },
@@ -981,7 +1009,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   personaBody.append(withWire(voicePicker, "settings.persona.voice"));
   personaBody.append(
     renderTruthNote(
-      "saved for next co-host start",
+      "voice changes when Sven restarts",
       "settings.persona.voice.deferred-note",
     ),
   );
@@ -990,8 +1018,8 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   const modeRocker = renderRocker({
     ariaLabel: "interaction mode",
     options: [
-      { id: "hype", label: "HYPE" },
-      { id: "coach", label: "COACH" },
+      { id: "hype", label: MODE_LABELS.hype },
+      { id: "coach", label: MODE_LABELS.coach },
     ],
     active: settings.mode,
     variant: "interaction",
@@ -1012,9 +1040,9 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     renderRocker({
       ariaLabel: "shared persona lens",
       options: [
-        { id: "hype", label: "HYPE" },
-        { id: "critique", label: "CRITIQUE" },
-        { id: "tutor", label: "TUTOR" },
+        { id: "hype", label: LENS_LABELS.hype },
+        { id: "critique", label: LENS_LABELS.critique },
+        { id: "tutor", label: LENS_LABELS.tutor },
       ],
       active: settings.lens,
       variant: "rocker",
@@ -1064,9 +1092,9 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   const skillRocker = renderRocker({
     ariaLabel: "skill level",
     options: [
-      { id: "beginner", label: "BEG" },
-      { id: "intermediate", label: "INT" },
-      { id: "pro", label: "PRO" },
+      { id: "beginner", label: SKILL_LABELS.beginner },
+      { id: "intermediate", label: SKILL_LABELS.intermediate },
+      { id: "pro", label: SKILL_LABELS.pro },
     ],
     active: settings.skill,
     variant: "rocker",
@@ -1079,7 +1107,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   body.append(
     renderSettingsGroup({
       header: "PERSONA",
-      badge: "CFG",
+      badge: "VOICE",
       children: personaBody,
     }),
   );
@@ -1091,16 +1119,22 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     rememberPicker(
       renderPicker({
         label: "DEVICE",
-        value: settings.output_device_id ?? "default",
+        value: formatOutputDeviceLabel(settings.output_device_id),
         autoPill: !settings.output_device_id,
         options: [
-          { id: "auto", label: "default" },
+          { id: "auto", label: "Auto device", sub: "system default" },
           // Real device list is populated by the sidecar at boot and lives
           // off ipc.settings.state; the picker here lets the user fall
           // back to "auto" or pick a known id. v1 ships with a "auto"
           // default — Phase 15 expands.
           ...(settings.output_device_id
-            ? [{ id: settings.output_device_id, label: settings.output_device_id }]
+            ? [
+                {
+                  id: settings.output_device_id,
+                  label: formatOutputDeviceLabel(settings.output_device_id),
+                  sub: settings.output_device_id,
+                },
+              ]
             : []),
         ],
         onChange: (id) => {
@@ -1116,8 +1150,8 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     renderRocker({
       ariaLabel: "output profile",
       options: [
-        { id: "hp", label: "HP" },
-        { id: "spk", label: "SPK" },
+        { id: "hp", label: OUTPUT_PROFILE_LABELS.hp },
+        { id: "spk", label: OUTPUT_PROFILE_LABELS.spk },
       ],
       active: settings.output_profile,
       variant: "rocker",
@@ -1127,7 +1161,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     }),
   );
   outputBody.append(
-    renderTruthNote("saved for next audio start", "settings.output.deferred-note"),
+    renderTruthNote("routing changes when audio restarts", "settings.output.deferred-note"),
   );
   body.append(
     renderSettingsGroup({

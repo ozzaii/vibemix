@@ -56,6 +56,10 @@ import {
   unmountSettingsDrawer,
 } from "../../src/settings/SettingsDrawer.js";
 import {
+  getSessionState,
+  setSessionState,
+} from "../../src/session/state.js";
+import {
   _resetSettingsUIStateForTests,
   getSettingsUIState,
   setRecordingsSlice,
@@ -304,9 +308,31 @@ describe("group rendering", () => {
     );
 
     expect(voiceNote?.getAttribute("role")).toBe("note");
-    expect(voiceNote?.textContent).toBe("saved for next co-host start");
+    expect(voiceNote?.textContent).toBe("voice changes when Sven restarts");
     expect(outputNote?.getAttribute("role")).toBe("note");
-    expect(outputNote?.textContent).toBe("saved for next audio start");
+    expect(outputNote?.textContent).toBe("routing changes when audio restarts");
+  });
+
+  it("uses product labels instead of wire abbreviations in the top controls", () => {
+    const state = getSessionState();
+    setSessionState({
+      settings: {
+        ...state.settings,
+        skill: "intermediate",
+        output_device_id: "5",
+        output_profile: "spk",
+      },
+    });
+
+    mountSettingsDrawer(document.body);
+    openSettings();
+
+    const drawer = document.querySelector<HTMLElement>(".vmx-settings-drawer");
+    expect(drawer?.textContent).toContain("VOICE");
+    expect(drawer?.textContent).toContain("Intermediate");
+    expect(drawer?.textContent).toContain("Device 5");
+    expect(drawer?.textContent).toContain("Speakers");
+    expect(drawer?.textContent).not.toContain("CFG");
   });
 
   it("RECORDING group shows the retention slider with 6 knobs", () => {

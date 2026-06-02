@@ -9756,3 +9756,37 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/surfaces.ts tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 64 - Settings Drawer Human Labels
+
+Suggested commit: `fix(settings-ui): clarify drawer labels`
+
+Include:
+
+- `tauri/ui/src/settings/SettingsDrawer.ts`
+- `tauri/ui/tests/settings/drawer.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Settings IPC schemas, sidecar config persistence, audio routing behavior,
+  wizard/calibration behavior, Learn/Deck/Crate/Debrief surfaces, runtime
+  co-host speech, and packaging scripts. This package only changes the
+  user-facing labels and notes inside the existing Settings drawer.
+
+Reason:
+
+- The signed packaged app at `506795a2` showed the real Settings drawer, but
+  the top controls still leaked internal abbreviations and raw IDs: `CFG`,
+  `HP`, `SPK`, `INT`, and output device `5`. That makes the product feel like
+  a debug config panel even when the wires are working. Keep the exact backend
+  values (`hp`, `spk`, `intermediate`, raw device id) but render commercial
+  language: `Headphones`, `Speakers`, `Intermediate`, `Device 5`, and short
+  notes that explain when a change takes effect.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/settings/drawer.spec.ts tests/session/integration.spec.ts tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/settings/SettingsDrawer.ts tauri/ui/tests/settings/drawer.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
