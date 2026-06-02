@@ -40,7 +40,7 @@ def test_profile_additional_properties_false_rejects_recent_tracks() -> None:
     """
     bad = _valid_profile()
     bad["recent_tracks"] = ["Daft Punk - Around the World"]
-    with pytest.raises(ProfileError, match="recent_tracks|additional"):
+    with pytest.raises(ProfileError, match=r"recent_tracks|additional"):
         validate_profile(bad)
 
 
@@ -58,9 +58,16 @@ def test_profile_rejects_free_form_personality_field() -> None:
         validate_profile(bad)
 
 
+def test_profile_accepts_psytrance_preferred_genre() -> None:
+    profile = _valid_profile()
+    profile["preferred_genre"] = "psytrance"
+
+    validate_profile(profile)
+
+
 def test_profile_rejects_unknown_genre() -> None:
     bad = _valid_profile()
-    bad["preferred_genre"] = "psytrance"
+    bad["preferred_genre"] = "dubstep"
     with pytest.raises(ProfileError):
         validate_profile(bad)
 

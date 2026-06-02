@@ -8736,3 +8736,36 @@ Proof before staging:
 - `uv run ruff check src/vibemix/state/deck_context.py tests/state/test_deck_context.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/state/deck_context.py tests/state/test_deck_context.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 39 - Psytrance Profile Memory Allowlist
+
+Suggested commit: `fix(profile): allow psytrance taste memory`
+
+Include:
+
+- `src/vibemix/profile/schema.py`
+- `tests/profile/test_schema.py`
+- `tests/profile/test_builder.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Event-router chains, BPM fallback bands, runtime prompt text, Sven speech,
+  Viber tools, deck polling, genre profile JSON, and live FLX4/Rekordbox proof.
+
+Reason:
+
+- Packages 35C/35D made `psytrance` a citable source genre and a routeable
+  coarse event-chain genre, but the long-term DJ profile privacy schema still
+  rejected `preferred_genre="psytrance"`. That made the profile builder ignore
+  sustained psytrance evidence and fall back to a prior/unknown taste memory.
+  This package aligns the privacy allowlist with the already-shipped genre
+  profile/event-router surface without widening the schema to arbitrary genres.
+
+Proof before staging:
+
+- `uv run pytest -q tests/profile/test_schema.py tests/profile/test_builder.py`
+- `uv run pytest -q tests/state/test_genre_router.py tests/audio/test_phase17_constants.py tests/state/test_genre_autodetect.py`
+- `uv run ruff check src/vibemix/profile/schema.py tests/profile/test_schema.py tests/profile/test_builder.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/profile/schema.py tests/profile/test_schema.py tests/profile/test_builder.py .planning/handoffs/2026-05-31-package-checklist.md`

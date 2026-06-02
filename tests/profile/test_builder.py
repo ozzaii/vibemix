@@ -234,6 +234,13 @@ def test_genre_above_threshold_updates() -> None:
     assert result["preferred_genre"] == "hard_tek"
 
 
+def test_genre_above_threshold_updates_to_psytrance() -> None:
+    evidence = {"genre": {"psytrance": (1.0, 2.0, 3.0)}}
+    result = build_profile(None, [], evidence, consent=True)
+    assert result is not None
+    assert result["preferred_genre"] == "psytrance"
+
+
 def test_tempo_below_2_observations_retains_prior() -> None:
     prior = {"tempo_preference_bin": "120-128"}
     result = build_profile(prior, [_make_event(bpm=145)], {}, consent=True)
