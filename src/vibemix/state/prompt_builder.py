@@ -838,7 +838,8 @@ class AICoach:
                 "No coaching advice unless recent_moves[8s] names a real move. "
                 "If you cite, copy an exact bracket from grounding_refs; never "
                 "invent a timestamp from BPM/RMS values. "
-                "Always reply with something fresh; don't go silent."
+                "If there is no grounded sound read worth saying, output a single "
+                "space to stay silent."
             )
         # Phase 60-04 (HARMONIC-01) — CITED, NARRATE-ONLY clash fragment. The
         # verdict is the system's (is_clash() in the detector), NOT the LLM's.

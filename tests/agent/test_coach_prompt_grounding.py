@@ -186,7 +186,8 @@ def test_build_prompt_uses_real_evidence_registry_not_mocks():
     assert "evidence_corpus[ev=1,aud=0,mix=0]" in prompt
     assert "copy an exact bracket from grounding_refs" in prompt
     assert "never invent a timestamp from BPM/RMS values" in prompt
-    assert prompt.endswith("don't go silent.")  # the HEARTBEAT coach task tail
+    assert "Always reply" not in prompt
+    assert prompt.endswith("space to stay silent.")  # HEARTBEAT honesty hatch
 
 
 # =========================================================================== #

@@ -7549,3 +7549,44 @@ Proof before staging:
 - `uv run ruff check tests/capabilities/test_library_window_contract.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tests/capabilities/test_library_window_contract.py tauri/src-tauri/capabilities/default.json .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 24 - HEARTBEAT Silence Escape Hatch
+
+Suggested commit: `fix(coach): let heartbeat stay silent without a grounded read`
+
+Include:
+
+- `src/vibemix/state/prompt_builder.py`
+- `tests/state/test_coach.py`
+- `tests/agent/test_coach_prompt_grounding.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime loop scheduling, `src/vibemix/runtime/coach.py`, `session.say()`, TTS
+  behavior, and live app control.
+- DROP-call / Mix Timing Oracle hold-lane files:
+  `src/vibemix/state/drop_predict.py`,
+  `src/vibemix/state/event_detector.py`,
+  `tests/state/test_drop_predict.py`, and
+  `tests/state/test_event_detector_drop.py`.
+- New audio/device heuristics. EventDetector already gates auto-events on true
+  music presence; this package only changes the HEARTBEAT task's model contract.
+
+Reason:
+
+- H3 asks for a grounding audit of idle HEARTBEAT speech. Current source still
+  told the co-host "Always reply with something fresh; don't go silent," which
+  pushes the model toward filler when the correct no-slop behavior is silence.
+  This package changes HEARTBEAT to sound-only-or-silence, preserves the no
+  coaching-advice-without-real-move rule, and pins tests so the old anti-mute
+  wording cannot return unnoticed.
+
+Proof before staging:
+
+- `uv run pytest -q tests/state/test_coach.py::test_task_heartbeat_LOAD_BEARING_silence_escape_hatch tests/state/test_coach.py::test_build_prompt_format tests/agent/test_coach_prompt_grounding.py::test_build_prompt_uses_real_evidence_registry_not_mocks`
+- `uv run pytest -q tests/state/test_coach.py tests/agent/test_coach_prompt_grounding.py tests/state/test_coach_anti_slop.py tests/state/test_event_detector.py tests/prompts/test_negative_dict.py`
+- `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py`
+- `uv run ruff check src/vibemix/state/prompt_builder.py tests/state/test_coach.py tests/agent/test_coach_prompt_grounding.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/state/prompt_builder.py tests/state/test_coach.py tests/agent/test_coach_prompt_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`

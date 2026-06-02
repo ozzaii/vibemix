@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """AICoach golden-string tests — every byte matters.
 
-Pins the v4:1331-1433 output byte-for-byte. The MIX_MOVE 'do NOT name controls'
-clause and the HEARTBEAT 'don't go silent' clause are LOAD-BEARING IP — tests
-would catch any paraphrase or accidental tightening on a refactor.
+Pins the v4:1331-1433 output byte-for-byte where still intentional. The
+MIX_MOVE grounding clauses and the HEARTBEAT silence escape hatch are
+LOAD-BEARING IP — tests would catch accidental loosening on a refactor.
 
 The v4:1350-1351 anti-hallucination invariant (NO ``phase=`` in evidence_line)
 is pinned by exclusion: a state with ``phase`` set to every non-silent label
@@ -716,17 +716,20 @@ def test_task_mix_move_includes_move_effect_context_when_dsp_delta_is_grounded()
     assert "rule=move_effect_prediction_and_measurement_agree" in out
 
 
-def test_task_heartbeat_LOAD_BEARING_anti_silence_clause():
-    """The 'don't go silent' clause is the v4 anti-mute tightening."""
+def test_task_heartbeat_LOAD_BEARING_silence_escape_hatch():
+    """HEARTBEAT must be allowed to stay silent when there is no grounded read."""
     out = AICoach.task_for_event(_ev("HEARTBEAT"))
-    assert "don't go silent" in out
+    assert "Always reply" not in out
+    assert "don't go silent" not in out
+    assert "output a single space to stay silent" in out
     assert out == (
         "Steady stretch. ONE sharp observation about the SOUND right "
         "now — groove, texture, what the track is doing musically. "
         "No coaching advice unless recent_moves[8s] names a real move. "
         "If you cite, copy an exact bracket from grounding_refs; never "
         "invent a timestamp from BPM/RMS values. "
-        "Always reply with something fresh; don't go silent."
+        "If there is no grounded sound read worth saying, output a single "
+        "space to stay silent."
     )
 
 
