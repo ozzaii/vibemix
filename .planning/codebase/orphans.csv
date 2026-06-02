@@ -60,6 +60,8 @@ SmartCuePolicy,src/vibemix/library/smart_cues.py,class
 default_model_dir,src/vibemix/agent/local_tts.py,function
 replace_decktrack,src/vibemix/state/deck_poller.py,function
 compact_recall_context_for_event,src/vibemix/state/prompt_builder.py,function
+LoopControl,src/vibemix/state/loop_geometry.py,class
+is_loop_control_kind,src/vibemix/state/loop_geometry.py,function
 DeckSlot,src/vibemix/state/deck_vision.py,class
 DeckRead,src/vibemix/state/deck_vision.py,class
 LiveClaimGuardResult,src/vibemix/state/deck_context.py,class
