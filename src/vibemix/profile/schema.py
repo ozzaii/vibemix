@@ -48,7 +48,16 @@ EVENT_TYPES_FOR_PREFS: Final[tuple[str, ...]] = (
 )
 
 #: Allowed genre enums. ``"unknown"`` is the cold-start value.
-GENRES: Final[tuple[str, ...]] = ("hard_tek", "techno", "psytrance", "house", "unknown")
+GENRES: Final[tuple[str, ...]] = (
+    "hard_tek",
+    "techno",
+    "psytrance",
+    "house",
+    "drum_and_bass",
+    "disco",
+    "pop",
+    "unknown",
+)
 
 #: Tempo bins (BPM ranges). Closed-open semantics: a track at exactly 128.0
 #: belongs to "128-138".

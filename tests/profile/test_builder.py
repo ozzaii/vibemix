@@ -22,6 +22,7 @@ from vibemix.profile import (
     build_profile,
     serialize_profile,
 )
+from vibemix.state.genre.profile import list_profiles
 
 
 @dataclass
@@ -234,11 +235,12 @@ def test_genre_above_threshold_updates() -> None:
     assert result["preferred_genre"] == "hard_tek"
 
 
-def test_genre_above_threshold_updates_to_psytrance() -> None:
-    evidence = {"genre": {"psytrance": (1.0, 2.0, 3.0)}}
+@pytest.mark.parametrize("genre", list_profiles())
+def test_genre_above_threshold_updates_to_any_shipped_profile(genre: str) -> None:
+    evidence = {"genre": {genre: (1.0, 2.0, 3.0)}}
     result = build_profile(None, [], evidence, consent=True)
     assert result is not None
-    assert result["preferred_genre"] == "psytrance"
+    assert result["preferred_genre"] == genre
 
 
 def test_tempo_below_2_observations_retains_prior() -> None:

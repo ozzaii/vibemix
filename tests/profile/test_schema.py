@@ -6,6 +6,8 @@ from __future__ import annotations
 import pytest
 
 from vibemix.profile import ProfileError, validate_profile
+from vibemix.profile.schema import GENRES
+from vibemix.state.genre.profile import list_profiles
 
 
 def _valid_profile() -> dict:
@@ -63,6 +65,11 @@ def test_profile_accepts_psytrance_preferred_genre() -> None:
     profile["preferred_genre"] = "psytrance"
 
     validate_profile(profile)
+
+
+def test_preferred_genres_cover_all_shipped_genre_profiles() -> None:
+    missing = set(list_profiles()) - set(GENRES)
+    assert not missing
 
 
 def test_profile_rejects_unknown_genre() -> None:

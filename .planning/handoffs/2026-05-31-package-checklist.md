@@ -8769,3 +8769,37 @@ Proof before staging:
 - `uv run ruff check src/vibemix/profile/schema.py tests/profile/test_schema.py tests/profile/test_builder.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/profile/schema.py tests/profile/test_schema.py tests/profile/test_builder.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 40 - Shipped Genre Profile Memory Allowlist
+
+Suggested commit: `fix(profile): remember all shipped genre profiles`
+
+Include:
+
+- `src/vibemix/profile/schema.py`
+- `tests/profile/test_schema.py`
+- `tests/profile/test_builder.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New genre profiles, event-router chain registration for non-router genres,
+  prompt text, Sven speech, DSP scoring thresholds, runtime settings UI, and
+  live FLX4/Rekordbox proof.
+
+Reason:
+
+- Package 39 fixed the immediate psytrance miss, but the long-term profile
+  allowlist still did not cover every shipped genre profile. The live
+  profile detector can produce `disco`, `drum_and_bass`, and `pop`; if those
+  evidence labels are sustained, the privacy schema should allow the compact
+  local taste memory to remember them. This remains a closed allowlist:
+  arbitrary labels such as `dubstep` still fail schema validation.
+
+Proof before staging:
+
+- `uv run pytest -q tests/profile/test_schema.py tests/profile/test_builder.py`
+- `uv run pytest -q tests/state/test_genre_profile.py tests/state/test_genre_autodetect.py`
+- `uv run ruff check src/vibemix/profile/schema.py tests/profile/test_schema.py tests/profile/test_builder.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/profile/schema.py tests/profile/test_schema.py tests/profile/test_builder.py .planning/handoffs/2026-05-31-package-checklist.md`
