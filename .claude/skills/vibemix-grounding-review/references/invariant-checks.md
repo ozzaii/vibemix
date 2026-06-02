@@ -28,8 +28,8 @@ and collides with any running session. Every gate here is static or unit-level.
 
 **Sources**
 - `src/vibemix/state/evidence_registry.py` — `EvidenceRegistry` (append-only,
-  `threading.Lock`-guarded), `EVIDENCE_SOURCES` frozenset (12 sources: `ev`,
-  `aud`, `midi`, `track`, `screen`, `mix`, `tend`, `key`, `recall`, `exemplar`,
+  `threading.Lock`-guarded), `EVIDENCE_SOURCES` frozenset (11 sources: `ev`,
+  `aud`, `midi`, `track`, `screen`, `mix`, `key`, `recall`, `exemplar`,
   `cue`, `judge`), `EVIDENCE_CITATION_RE`, `parse_citations`, `register_library`,
   `has(source, key, t, tol)`, `snapshot()`.
 - `src/vibemix/coach/citation_linter.py` — `CitationLinter.check(text, snapshot,
@@ -43,7 +43,7 @@ and collides with any running session. Every gate here is static or unit-level.
   pad if a speculative head was in flight), one-shot bypass via
   `StrippedRateTracker.should_bypass()`. `_build_citation_strip` builds the UI
   chip strip (cap 3, empty list never None, never fabricates a timestamp).
-- `src/vibemix/state/coach.py` — `AICoach.build_prompt(..., registry_snapshot=)`
+- `src/vibemix/state/prompt_builder.py` — `AICoach.build_prompt(..., registry_snapshot=)`
   bakes the citation grammar into the prompt.
 - `src/vibemix/prompts/matrix.py` — `CITATION_GRAMMAR_BLOCK` (the prompt-side
   copy of the source list).
