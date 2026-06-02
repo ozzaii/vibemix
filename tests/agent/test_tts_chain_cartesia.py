@@ -44,3 +44,11 @@ def test_cartesia_env_is_ignored_by_tts_chain(mocker, monkeypatch) -> None:
     kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
     assert kwargs["tts"] == [fake_moss_cls.return_value]
     assert "livekit.plugins.cartesia" not in sys.modules
+
+
+def test_automix_demo_source_does_not_request_cartesia_key() -> None:
+    """Manual demo comments must not imply Cartesia is still a voice input."""
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "scripts" / "automix_demo_smoke.py").read_text(encoding="utf-8")
+
+    assert "CARTESIA_API_KEY" not in text

@@ -161,8 +161,8 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="print plan+reel, no audio")
     args = parser.parse_args()
 
-    # Load the repo-root .env so the live voice chain sees GEMINI_API_KEY /
-    # CARTESIA_API_KEY (the app does this in __main__; a standalone script must too).
+    # Load the repo-root .env for local runtime knobs. The voice chain is still
+    # MOSS-only; cloud TTS keys in .env must not become demo voice fallbacks.
     try:
         from dotenv import load_dotenv
 
