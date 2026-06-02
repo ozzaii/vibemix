@@ -1626,6 +1626,7 @@ def test_viber_live_context_operator_actions_name_connected_controller_gaps():
                 "deck_state_resolved": False,
                 "deck_state_pair_resolved": False,
                 "deck_pair_capture_configured": True,
+                "deck_audio_capture_active": True,
                 "deck_audio_capture_both_active": False,
             },
             "blockers": [
@@ -1644,6 +1645,46 @@ def test_viber_live_context_operator_actions_name_connected_controller_gaps():
     assert "BlackHole channels 1/2" in actions[-1]["detail"]
     assert "Deck 2 to channels 3/4" in actions[-1]["detail"]
     assert "deck_audio_capture=A_active+B_active" in actions[-1]["detail"]
+
+
+def test_viber_live_context_operator_actions_name_silent_blackhole_route():
+    actions = main_mod._viber_live_context_operator_actions(
+        {
+            "ready": False,
+            "diagnosis": "missing_physical_proof",
+            "next_action": "Collect the missing live proof legs shown in blockers.",
+            "checks": {
+                "frames_seen": True,
+                "flat_deck_frame_seen": True,
+                "controller_connected": True,
+                "recent_moves_seen": True,
+                "audio_observed": False,
+                "deck_state_resolved": True,
+                "deck_state_pair_resolved": True,
+                "deck_pair_capture_configured": True,
+                "deck_audio_capture_active": False,
+                "deck_audio_capture_both_active": False,
+            },
+            "blockers": [
+                "deck_audio_capture showed no active deck audio lane",
+                "live master audio was not observed above the audible floor",
+            ],
+        }
+    )
+
+    assert [action["code"] for action in actions] == [
+        "route_dj_audio_to_capture",
+        "feed_both_deck_lanes",
+    ]
+    assert "receiving silence" in actions[0]["detail"]
+    assert "Rekordbox audio output is not feeding BlackHole" in actions[0]["detail"]
+    assert actions[0]["recommended_surfaces"] == [
+        "rekordbox.preferences.audio",
+        "macos.audio_midi_setup",
+        "settings.audio.input",
+    ]
+    assert "no active deck lane" in actions[1]["detail"]
+    assert "only one active deck lane" not in actions[1]["detail"]
 
 
 def test_viber_live_context_operator_actions_include_library_index_setup():

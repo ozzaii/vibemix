@@ -5892,10 +5892,25 @@ def _viber_live_context_operator_actions(
         )
 
     if physical_diagnosis and not checks.get("audio_observed"):
-        add(
-            "play_audible_audio",
-            "Play audible DJ app output into the configured capture route during the proof window.",
-        )
+        if checks.get("deck_pair_capture_configured"):
+            add(
+                "route_dj_audio_to_capture",
+                "Deck-pair capture is configured, but Vibemix is receiving silence. "
+                "Route Rekordbox output into the BlackHole/Aggregate capture device "
+                "before rerunning proof; if you hear the decks locally but this stays "
+                "silent, the macOS Multi-Output or Rekordbox audio output is not feeding "
+                "BlackHole.",
+                recommended_surfaces=[
+                    "rekordbox.preferences.audio",
+                    "macos.audio_midi_setup",
+                    "settings.audio.input",
+                ],
+            )
+        else:
+            add(
+                "play_audible_audio",
+                "Play audible DJ app output into the configured capture route during the proof window.",
+            )
 
     if physical_diagnosis and (
         not checks.get("deck_state_resolved") or not checks.get("deck_state_pair_resolved")
@@ -5919,13 +5934,22 @@ def _viber_live_context_operator_actions(
         and checks.get("deck_pair_capture_configured")
         and not checks.get("deck_audio_capture_both_active")
     ):
-        detail = (
-            "Deck-pair capture is configured, but live proof still has only one active "
-            "deck lane. For a BlackHole 16ch/Rekordbox rig, route Deck 1 to "
-            "BlackHole channels 1/2 and Deck 2 to channels 3/4, or update "
-            "VIBEMIX_DECK_AUDIO_CHANNELS to the actual A/B channel map; rerun until "
-            "deck_audio_capture=A_active+B_active."
-        )
+        if checks.get("deck_audio_capture_active"):
+            detail = (
+                "Deck-pair capture is configured, but live proof still has only one active "
+                "deck lane. For a BlackHole 16ch/Rekordbox rig, route Deck 1 to "
+                "BlackHole channels 1/2 and Deck 2 to channels 3/4, or update "
+                "VIBEMIX_DECK_AUDIO_CHANNELS to the actual A/B channel map; rerun until "
+                "deck_audio_capture=A_active+B_active."
+            )
+        else:
+            detail = (
+                "Deck-pair capture is configured, but live proof has no active deck "
+                "lane. For a BlackHole 16ch/Rekordbox rig, make Rekordbox feed the "
+                "BlackHole/Aggregate input first; then route Deck 1 to BlackHole "
+                "channels 1/2 and Deck 2 to channels 3/4, or update "
+                "VIBEMIX_DECK_AUDIO_CHANNELS to the actual A/B channel map."
+            )
         recommended_env: dict[str, str] | None = None
         if route_diagnosis:
             inactive = str(route_diagnosis.get("inactive_sides") or "")
