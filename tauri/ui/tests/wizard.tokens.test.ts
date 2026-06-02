@@ -85,6 +85,19 @@ describe("wizard surface tokens (wave 1)", () => {
     expect(containsLegacyToken(renderedHtmlPlusStyles(rendered))).toBe(false);
   });
 
+  it("ControllerProbe timeout names the DDJ-FLX4 USB path", async () => {
+    const { ControllerProbe } = await import("../src/wizard/components/controller-probe.js");
+    const rendered = ControllerProbe({
+      state: "timeout",
+      secondsLeft: 0,
+      onListenAgain: () => {},
+      onSkip: () => {},
+    });
+    document.body.append(rendered);
+    expect(rendered.textContent).toContain("DDJ-FLX4 over USB");
+    expect(rendered.textContent).toContain("Press a pad, cue, or play");
+  });
+
   it("DropdownDevice renders without legacy token refs", async () => {
     const { DropdownDevice } = await import("../src/wizard/components/dropdown-device.js");
     const rendered = DropdownDevice({

@@ -8384,3 +8384,36 @@ Proof before staging:
 - `uv run ruff check tests/sidecar/test_build_sidecar_rename.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- vibemix-core.macos.spec vibemix-core.windows.spec tests/sidecar/test_build_sidecar_rename.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 33 - First-run FLX4 Controller Hint
+
+Suggested commit: `fix(wizard): name flx4 usb setup on controller timeout`
+
+Include:
+
+- `tauri/ui/src/wizard/components/controller-probe.ts`
+- `tauri/ui/tests/wizard.tokens.test.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- MIDI probe runtime behavior, `tauri/ui/src/wizard/router.ts`, backend MIDI
+  listen IPC, Learn controller SVGs, and any live hardware claim. This package
+  is UI copy plus a render regression only.
+- Wizard audio/BlackHole setup, MOSS model install, and library import CTAs.
+
+Reason:
+
+- The controller step could time out while only saying generic "no midi
+  received" / "plug one in" copy. For a first-run user with the documented
+  default controller, that misses the practical setup clue: connect the
+  DDJ-FLX4 over USB and press a physical pad/cue/play control. This package adds
+  that short timeout hint without adding a modal, changing probe behavior, or
+  claiming the controller is detected.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/wizard.tokens.test.ts`
+- `npm --prefix tauri/ui test -- src/wizard/__tests__/first-run-continuity.spec.ts tests/wizard.tokens.test.ts`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/wizard/components/controller-probe.ts tauri/ui/tests/wizard.tokens.test.ts .planning/handoffs/2026-05-31-package-checklist.md`

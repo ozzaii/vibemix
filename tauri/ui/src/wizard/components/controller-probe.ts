@@ -209,6 +209,20 @@ const CSS = `
   .cmp-ctrl-probe[data-state="caught"] .cmp-ctrl-probe__caption {
     color: var(--led-ok);
   }
+  .cmp-ctrl-probe__hint {
+    display: none;
+    max-width: 34ch;
+    margin-top: calc(var(--sp-2) * -1);
+    color: var(--silk-65);
+    font-family: var(--type-mono);
+    font-size: 11px;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    text-align: center;
+  }
+  .cmp-ctrl-probe[data-state="timeout"] .cmp-ctrl-probe__hint {
+    display: block;
+  }
   .cmp-ctrl-probe__zone-c {
     display: flex;
     justify-content: space-between;
@@ -290,6 +304,9 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
 
   const caption = document.createElement("div");
   caption.className = "cmp-ctrl-probe__caption";
+  const hint = document.createElement("div");
+  hint.className = "cmp-ctrl-probe__hint";
+  hint.textContent = "DDJ-FLX4 over USB. Press a pad, cue, or play.";
 
   if (props.state === "caught") {
     lcd.textContent = "✓";
@@ -306,7 +323,7 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
   }
 
   frame.append(rings, lcd);
-  zoneB.append(frame, caption);
+  zoneB.append(frame, caption, hint);
 
   // --- Zone C ---
   const zoneC = document.createElement("div");
