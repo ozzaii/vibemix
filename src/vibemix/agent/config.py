@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 
 from vibemix.llm.model_router import resolve, resolve_model
+from vibemix.voice_presets import DEFAULT_MOSS_VOICE
 
 # ---- LLM model identifiers (router-derived per Plan 41-01) ----
 LLM_MODEL: str = resolve_model("live_coach")
@@ -33,8 +34,10 @@ OPENROUTER_LLM_MODEL: str = resolve_model("live_coach_openrouter")
 # coach loop wiring up ``GenerateContentConfig(service_tier=...)``) don't
 # need to round-trip back through ``resolve()``. Other call sites that
 # want both values for a different path should import ``resolve`` directly.
-# ---- Voice id (v4:104) ----
-VOICE: str = "Achird"
+# ---- Voice id ----
+# Source-facing default only. Runtime persistence and local synthesis normalize
+# through the MOSS preset list, so never pin a retired cloud-era voice here.
+VOICE: str = DEFAULT_MOSS_VOICE
 
 # ---- Device names (v4:101-103) ----
 # Factory defaults stay pinned for ordinary installs. The env overrides are

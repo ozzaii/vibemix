@@ -7038,12 +7038,14 @@ instead of selecting the first arbitrary voice in the MOSS manifest.
 Include:
 
 - `src/vibemix/voice_presets.py`
+- `src/vibemix/agent/config.py`
 - `src/vibemix/agent/local_tts.py`
 - `src/vibemix/runtime/config_store.py`
 - `tauri/ui/src/settings/SettingsDrawer.ts`
 - `tauri/ui/src/session/state.ts`
 - `tauri/ui/src/session/SessionLayout.ts`
 - `tests/agent/test_local_tts.py`
+- `tests/agent/test_config.py`
 - `tests/runtime/test_config_store.py`
 - `tests/runtime/test_config_store_bravoh_waitlist.py`
 - `tests/runtime/test_settings_apply.py`

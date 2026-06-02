@@ -27,7 +27,7 @@ def test_config_01_constants_pinned() -> None:
     """
     assert LLM_MODEL == "gemini-3.5-flash"
     assert OPENROUTER_LLM_MODEL == "google/gemini-3.5-flash"
-    assert VOICE == "Achird"
+    assert VOICE == "Adam"
     assert INPUT_DEVICE == "BlackHole 2ch"
     assert OUTPUT_DEVICE == "MacBook Pro Speakers"
     assert MIC_DEVICE == "MacBook Pro Microphone"
