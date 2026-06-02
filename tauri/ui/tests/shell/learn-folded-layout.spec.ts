@@ -29,15 +29,18 @@ describe("folded Learn shell layout", () => {
   it("constrains Learn to the shell stage instead of the viewport", () => {
     const css = readUi("src/shell/shell.css");
     const learn = readUi("src/learn/learn-window.ts");
+    const shell = readUi("src/shell/DesktopShell.ts");
+    expect(shell).toContain("host.dataset.surface = model.activeSurface");
     expect(learn).toContain("interface StatusTickPayload");
     expect(learn).toContain("payload?:");
     expect(learn).toContain("function statusTickMidiCount");
     expect(learn).toContain("detail?.payload?.midi");
     expect(learn).toContain('"ipc.status.tick"');
-    expect(learn).toContain("midi signal ready");
+    expect(learn).toContain("controller visible");
     expect(learn).toContain('status.setMirrorStatus(nextMidiSeen ? "midi" : "screen")');
     expect(readUi("src/learn/components/status-bar.ts")).toContain('case "midi":');
-    expect(learn).toContain("screen practice deck");
+    expect(readUi("src/learn/components/status-bar.ts")).toContain("controller visible");
+    expect(learn).toContain("practice deck ready");
     const wsClient = readUi("src/learn/ws-client.ts");
     expect(wsClient).toContain('const STATUS_TICK_TYPE = "ipc.status.tick"');
     expect(wsClient).toContain("subscribeIpc<StatusTickEnvelope>");
@@ -55,6 +58,10 @@ describe("folded Learn shell layout", () => {
     expect(css).toContain("position: absolute");
     expect(css).toContain("top: var(--sp-5)");
     expect(css).toContain("bottom: auto");
+    expect(css).toContain(".learn-lesson-host .learn-footer");
+    expect(css).toContain(".learn-earned-wall:has(.skill-wall__empty)");
+    expect(css).toContain('#shell-root[data-surface="learn"]');
+    expect(css).toContain("--panel-w: 228px");
     expect(css).toContain("grid-template-areas:");
     expect(css).toContain('"kicker primary secondary"');
     expect(css).toContain('"pulse primary secondary"');

@@ -157,6 +157,7 @@ export function mountDesktopShell(host: HTMLElement, store: ShellStore = new She
     host.dataset.panel = model.panelOpen ? "open" : "closed";
     host.dataset.state = model.activation;
     host.dataset.conn = model.connection;
+    host.dataset.surface = model.activeSurface;
     for (const [id, region] of regions) {
       region.classList.toggle("is-active", id === model.activeSurface);
     }

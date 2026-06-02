@@ -123,7 +123,7 @@ export class StatusBar {
         text = "on-screen deck";
         break;
       case "midi":
-        text = "midi signal";
+        text = "controller visible";
         break;
       case "unplugged":
         text = "controller unplugged";

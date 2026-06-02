@@ -9601,3 +9601,47 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/learn/ws-client.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 60 - Learn First-Screen Clarity
+
+Suggested commit: `fix(learn-ui): clarify folded practice screen`
+
+Include:
+
+- `tauri/ui/src/shell/DesktopShell.ts`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/learn/components/status-bar.ts`
+- `tauri/ui/tests/shell/learn-folded-layout.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Lesson scoring, controller SVG semantics, Learn runtime progression, co-host
+  speech, packaging scripts, and any broad shell redesign. This package only
+  changes the folded Learn first screen so the shipped app stops hiding the
+  ready state inside clutter.
+
+Reason:
+
+- The freshly signed packaged app at `68da49e6` finally proved the MIDI bridge:
+  Learn displayed `midi signal ready` and the bottom rail showed `midi signal`.
+  That fixed the lie, but the product surface still read poorly: the first
+  viewport gave a huge ghost controller schematic more weight than the next
+  action, kept the full trademark footer visible inside the practice cockpit,
+  rendered an empty Earned Wall as a framed bottom card, and let the right
+  grounding drawer compete with Learn while saying nothing useful. Technically
+  ready but visually unclear is still a broken shipped state. Hide only the
+  folded legal footer, hide the empty Earned wall until it has rows, and demote
+  the Learn grounding drawer width. The packaged proof then exposed one more
+  honesty edge: `ipc.status.tick.midi=1` means a controller port is visible, not
+  that movement frames are flowing. The intermediate rail must therefore say
+  `controller visible`, leaving `Enable FLX4 MIDI` free to remain the next
+  action when deck-mixer evidence still reports no traffic.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/learn-folded-layout.spec.ts tests/shell/settings-nav.spec.ts tests/shell/shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/shell.css tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/components/status-bar.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

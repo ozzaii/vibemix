@@ -314,7 +314,7 @@ function mountLearnWindow(root: HTMLElement): {
     <div id="learn-stage" class="learn-stage"></div>
     <section id="learn-booth-panel" class="learn-booth-panel" data-visible="true">
       <div class="learn-booth-kicker">next practice</div>
-      <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">screen deck ready</div>
+      <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">practice deck ready</div>
       <button id="learn-start-recommended" class="learn-booth-primary" type="button">start practice</button>
       <button id="learn-open-map" class="learn-booth-secondary" type="button">choose lesson</button>
     </section>
@@ -1521,19 +1521,19 @@ function recommendationBoothCue(
   }
   if (readiness === "midi") {
     const label =
-      "MIDI is visible. Start a lesson and Learn will bind the matching controller map.";
+      "A controller port is visible. Start a lesson or enable MIDI output so Learn can bind live moves.";
     return {
       state: "ready",
-      text: "midi signal ready",
+      text: "controller visible",
       ariaLabel: label,
       title: label,
     };
   }
   return {
     state: "ready",
-    text: "screen practice deck",
+    text: "practice deck ready",
     ariaLabel:
-      "screen practice deck ready. Connect a controller or use the highlighted on-screen control.",
+      "practice deck ready. Connect a controller or use the highlighted on-screen control.",
   };
 }
 
