@@ -38,19 +38,25 @@ export interface MountedSurfaces {
 }
 
 /**
- * Reveal a stub surface's hidden mount and drop its at-rest empty state.
+ * Resolve a stub surface's hidden mount. The caller reveals it only after the
+ * heavy interior mount succeeds, so a failed Crate/Learn boot leaves the
+ * designed empty state visible instead of blanking the surface.
  * Returns the `.surface-mount` element where the real interior is injected.
  */
-export function revealStubMount(region: HTMLElement): HTMLElement {
+export function getStubMount(region: HTMLElement): HTMLElement {
   const mount = region.querySelector<HTMLElement>(".surface-mount");
   if (!mount) {
     throw new Error(
       `surface-mounts: region [data-surface="${region.dataset.surface ?? "?"}"] has no .surface-mount anchor`,
     );
   }
-  mount.hidden = false;
-  region.classList.add("surface--mounted");
   return mount;
+}
+
+function revealMountedStub(target: HTMLElement): void {
+  if (!target.classList.contains("surface-mount")) return;
+  target.hidden = false;
+  target.closest<HTMLElement>(".surface")?.classList.add("surface--mounted");
 }
 
 /**
@@ -70,7 +76,7 @@ export function prepareSurfaceMount(shellRoot: HTMLElement, id: SurfaceId): HTML
     }
     return stage;
   }
-  return revealStubMount(region);
+  return getStubMount(region);
 }
 
 /** Mount one interior, swallowing + logging any failure so a single surface's
@@ -83,6 +89,7 @@ async function mountOne(
 ): Promise<void> {
   try {
     await mount(target);
+    revealMountedStub(target);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("[shell] surface failed to mount:", label, err);

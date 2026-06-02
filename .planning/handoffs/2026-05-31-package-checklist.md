@@ -9827,3 +9827,39 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/library.html tauri/ui/src/library/index.ts tauri/ui/src/library/chat.test.ts tauri/ui/src/library/build.test.ts tauri/ui/src/library/model-setup.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 66 - Crate Shell Fallback Resilience
+
+Suggested commit: `fix(shell): keep crate fallback useful on mount failure`
+
+Include:
+
+- `tauri/ui/src/shell/surfaces.ts`
+- `tauri/ui/src/shell/surface-mounts.ts`
+- `tauri/ui/tests/shell/shell.spec.ts`
+- `tauri/ui/tests/shell/surface-mounts.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Library/Viber backend behavior, `tauri/ui/library.html`, Learn/Deck/Settings
+  interiors, Sven speech, runtime audio, packaging scripts, and broad shell
+  layout. This package only changes the shell fallback copy and the fold-in
+  mount protocol for failed stub interiors.
+
+Reason:
+
+- The exact signed app at `e955c106` could still show the Crate route as
+  `Nothing loaded yet.` if the folded library/Viber interior did not appear in
+  time. Worse, the mount protocol revealed a stub mount before the heavy interior
+  succeeded, so a Crate mount failure could blank the useful fallback. Keep the
+  fallback visible until mount success, and make the Crate fallback preview
+  Viber's operator jobs: build sets, solve grounded transitions, and find deep
+  cuts with receipts.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/shell.spec.ts tests/shell/surface-mounts.spec.ts tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/surfaces.ts tauri/ui/src/shell/surface-mounts.ts tauri/ui/tests/shell/shell.spec.ts tauri/ui/tests/shell/surface-mounts.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

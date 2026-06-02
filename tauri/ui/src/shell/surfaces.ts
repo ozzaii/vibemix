@@ -67,8 +67,13 @@ export const SURFACES: readonly SurfaceDef[] = [
     hint: "library and Viber",
     wire: "shell.surface.crate",
     empty: {
-      title: "Nothing loaded yet.",
-      sub: "Open Rekordbox or drop a folder. I learn your crate by ear, then tell you what's next.",
+      title: "Viber is waiting for your crate.",
+      sub: "Open Rekordbox or add a music folder. I can build sets, solve transitions, and show receipts.",
+      proof: [
+        { label: "Build", value: "set arcs from indexed tracks" },
+        { label: "Mix", value: "grounded transitions only" },
+        { label: "Find", value: "deep cuts without repeats" },
+      ],
     },
   },
   {

@@ -90,6 +90,23 @@ describe("DesktopShell", () => {
     expect(debrief.textContent).not.toContain("No set to review.");
   });
 
+  it("makes the Crate empty state a Viber operator preview, not a dead void", () => {
+    shell = mountDesktopShell(host);
+    const crate = host.querySelector<HTMLElement>('.surface[data-surface="crate"]')!;
+
+    expect(crate.querySelector(".se-title")?.textContent).toBe(
+      "Viber is waiting for your crate.",
+    );
+    expect(crate.textContent).toContain("build sets, solve transitions, and show receipts");
+    expect(crate.textContent).toContain("Build");
+    expect(crate.textContent).toContain("set arcs from indexed tracks");
+    expect(crate.textContent).toContain("Mix");
+    expect(crate.textContent).toContain("grounded transitions only");
+    expect(crate.textContent).toContain("Find");
+    expect(crate.textContent).toContain("deep cuts without repeats");
+    expect(crate.textContent).not.toContain("Nothing loaded yet.");
+  });
+
   it("carries the deck tail cursor as the live speaking sign-of-life", () => {
     shell = mountDesktopShell(host);
     const deck = host.querySelector<HTMLElement>('.surface[data-surface="deck"]')!;

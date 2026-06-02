@@ -5,17 +5,18 @@
  * cohesive shell's keep-alive anchors. The orchestration takes the heavy mount
  * functions (routeSession / mountLibrary / mountLearnWindow — all ws/Tauri-bound
  * and not unit-testable in jsdom) as injected deps, so this exercises the mount
- * PROTOCOL (clear the hidden mount, hide the at-rest empty state, hand each
- * interior the right anchor) with real shell DOM and fake interiors.
+ * PROTOCOL (hand each interior the hidden anchor, reveal it only after success,
+ * keep the at-rest empty state on failure) with real shell DOM and fake
+ * interiors.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { mountDesktopShell, type MountedShell } from "../../src/shell/DesktopShell.js";
 import {
+  getStubMount,
   mountSurfacesInto,
   prepareSurfaceMount,
-  revealStubMount,
   type SurfaceMountDeps,
 } from "../../src/shell/surface-mounts.js";
 
@@ -36,19 +37,16 @@ afterEach(() => {
 });
 
 describe("surface-mount layer", () => {
-  it("reveals a stub surface's hidden mount and hides its empty state", () => {
+  it("resolves a stub surface's hidden mount without blanking its empty state", () => {
     const region = host.querySelector<HTMLElement>('.surface[data-surface="crate"]')!;
     const mount = region.querySelector<HTMLElement>(".surface-mount")!;
     expect(mount.hidden).toBe(true);
 
-    const returned = revealStubMount(region);
+    const returned = getStubMount(region);
 
     expect(returned).toBe(mount);
-    expect(mount.hidden).toBe(false);
-    // The region is flagged mounted so CSS drops the at-rest empty state
-    // (previous-sibling selection isn't expressible in CSS, so a class on the
-    // region is the seam).
-    expect(region.classList.contains("surface--mounted")).toBe(true);
+    expect(mount.hidden).toBe(true);
+    expect(region.classList.contains("surface--mounted")).toBe(false);
   });
 
   it("resolves the deck's visible stage as its mount target (no hidden mount)", () => {
@@ -62,15 +60,15 @@ describe("surface-mount layer", () => {
     ).toBeNull();
   });
 
-  it("resolves + reveals a stub surface's mount target", () => {
+  it("resolves a stub surface's mount target without revealing it early", () => {
     const mount = prepareSurfaceMount(host, "crate");
     expect(mount.classList.contains("surface-mount")).toBe(true);
-    expect(mount.hidden).toBe(false);
+    expect(mount.hidden).toBe(true);
     expect(
       host.querySelector('.surface[data-surface="crate"]')!.classList.contains(
         "surface--mounted",
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("hands each interior its correct anchor and reveals the folded stubs", async () => {
@@ -134,5 +132,21 @@ describe("surface-mount layer", () => {
     // The shell must survive a single surface's mount failure — partial app
     // beats a blank window (mirrors main.ts's per-surface non-fatal discipline).
     await expect(mountSurfacesInto(host, deps)).resolves.toBeTruthy();
+  });
+
+  it("keeps a stub surface readable when its heavy mount fails", async () => {
+    await mountSurfacesInto(host, {
+      mountDeck: () => {},
+      mountCrate: () => {
+        throw new Error("crate boom");
+      },
+    });
+
+    const crate = host.querySelector<HTMLElement>('.surface[data-surface="crate"]')!;
+    expect(crate.classList.contains("surface--mounted")).toBe(false);
+    expect(crate.querySelector<HTMLElement>(".surface-mount")!.hidden).toBe(true);
+    expect(crate.querySelector(".surface-empty")?.textContent).toContain(
+      "Viber is waiting for your crate.",
+    );
   });
 });
