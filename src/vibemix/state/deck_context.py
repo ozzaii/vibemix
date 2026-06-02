@@ -238,6 +238,16 @@ _NO_MOVE_CONTROL_INSTRUCTION_RE = re.compile(
     r")\b[^.?!]{0,32}\b(back|down|up|to)\b",
     re.IGNORECASE,
 )
+_NO_MOVE_CONTROL_ABSENCE_RE = re.compile(
+    r"\byou\b[^.?!]{0,24}\b("
+    r"didn['’]?t|did\s+not|haven['’]?t|have\s+not|never"
+    r")\b[^.?!]{0,24}\b("
+    r"touch|move|adjust|ride|work|use"
+    r")\b[^.?!]{0,32}\b("
+    r"controller|controls?|mixer|deck|fader|faders|eq|knob|knobs|filter"
+    r")\b",
+    re.IGNORECASE,
+)
 _NO_MOVE_COACHING_ADVICE_RE = re.compile(
     r"\b("
     r"try\b[^.?!]{0,48}\b(?:next time|later|earlier|on the|at the|for the|"
@@ -3078,10 +3088,15 @@ def _mixer_low_summary(state: MusicState) -> str:
 def _has_unsupported_no_move_control_claim(text: str) -> bool:
     if _MOVE_EFFECT_DISCLAIMER_RE.search(text):
         return False
+    return _has_unsupported_no_move_control_text(text)
+
+
+def _has_unsupported_no_move_control_text(text: str) -> bool:
     return bool(
         _NO_MOVE_CONTROL_ACTION_RE.search(text)
         or _NO_MOVE_CONTROL_NOUN_RE.search(text)
         or _NO_MOVE_CONTROL_INSTRUCTION_RE.search(text)
+        or _NO_MOVE_CONTROL_ABSENCE_RE.search(text)
     )
 
 
@@ -3115,6 +3130,15 @@ def _strip_unsupported_no_move_control_clause(text: str) -> str:
         kept = stripped[: match.start()].strip(" ,;:")
         if kept:
             return kept if kept.endswith((".", "!", "?")) else f"{kept}."
+    sentences = re.findall(r"[^.!?]+[.!?]?", stripped)
+    kept_sentences = [
+        sentence.strip()
+        for sentence in sentences
+        if sentence.strip() and not _has_unsupported_no_move_control_text(sentence)
+    ]
+    if kept_sentences and len(kept_sentences) < len(sentences):
+        out = " ".join(kept_sentences).strip()
+        return out if out.endswith((".", "!", "?")) else f"{out}."
     return ""
 
 

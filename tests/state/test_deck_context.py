@@ -2436,6 +2436,26 @@ def test_live_claim_guard_salvages_sound_clause_before_no_move_control_claim() -
     assert result.text == "That synth clashed with the pad."
 
 
+def test_live_claim_guard_strips_no_move_controller_absence_claim() -> None:
+    state = MusicState(audible=True, controller_connected=True, audible_deck="none")
+
+    result = apply_live_claim_guard(
+        (
+            "That high-speed drum pattern dropped into a stripped-back synth texture. "
+            "Since you didn't touch the controller, the track's own layout created the space."
+        ),
+        state,
+        [],
+        event_type="PHASE",
+    )
+
+    assert result.corrected is True
+    assert result.policy == "single_deck_control_not_grounded"
+    assert result.reason == "control_causality_without_moves"
+    assert result.text == "That high-speed drum pattern dropped into a stripped-back synth texture."
+    assert "controller" not in result.text.lower()
+
+
 def test_live_claim_guard_strips_no_move_coaching_advice() -> None:
     state = MusicState(audible=True, controller_connected=True, audible_deck="none")
 
