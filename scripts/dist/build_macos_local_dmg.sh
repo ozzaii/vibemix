@@ -15,6 +15,7 @@ APP="${TAURI_DIR}/target/release/bundle/macos/vibemix.app"
 OUT_DIR="${TAURI_DIR}/target/release/bundle/dmg"
 OUT="${OUT_DIR}/vibemix_0.0.1_aarch64.dmg"
 SMOKE="${VIBEMIX_LOCAL_DMG_SMOKE:-library-stats}"
+PYTHON=(uv run python)
 
 usage() {
   cat <<'EOF'
@@ -61,10 +62,10 @@ echo "[local-dmg] building unsigned .app"
 (cd "$TAURI_DIR" && VIBEMIX_FORCE_SIDECAR=1 cargo tauri build --bundles app --no-sign --ci)
 
 echo "[local-dmg] repairing app-side sidecar symlinks"
-python3 "$REPO_ROOT/scripts/dist/repair_macos_app_sidecar_symlinks.py" "$APP"
+"${PYTHON[@]}" "$REPO_ROOT/scripts/dist/repair_macos_app_sidecar_symlinks.py" "$APP"
 
 echo "[local-dmg] checking repaired .app"
-python3 "$REPO_ROOT/scripts/dist/check_macos_app_bundle_ready.py" \
+"${PYTHON[@]}" "$REPO_ROOT/scripts/dist/check_macos_app_bundle_ready.py" \
   "$APP" \
   --require-moss-source \
   --smoke "$SMOKE"
@@ -92,7 +93,7 @@ else
 fi
 
 echo "[local-dmg] checking DMG drag-install smoke"
-python3 "$REPO_ROOT/scripts/dist/check_macos_dmg_artifact_ready.py" \
+"${PYTHON[@]}" "$REPO_ROOT/scripts/dist/check_macos_dmg_artifact_ready.py" \
   "$OUT" \
   --require-moss-source \
   --smoke "$SMOKE"

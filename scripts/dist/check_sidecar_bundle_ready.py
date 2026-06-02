@@ -17,6 +17,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
 BINARIES_REL = Path("tauri/src-tauri/binaries")
 IPC_SCHEMA_REL = Path("tauri/ui/src/ipc/messages.schema.json")
 DEFAULT_MIN_BYTES = 4096
