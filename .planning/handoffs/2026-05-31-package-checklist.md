@@ -7982,6 +7982,37 @@ Proof before staging:
 - `git diff --check -- src/vibemix/events/genres/__init__.py src/vibemix/events/genres/psytrance.py src/vibemix/state/refresh.py src/vibemix/state/music_state.py tests/state/test_genre_router.py tests/state/test_genre_router_race.py tests/state/test_genre_router_integration.py tests/state/test_genre_autodetect.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 36 - Mastered Marker Writer Safety Spine
+
+Suggested commit: `fix(learn): add mastered marker writer`
+
+Include:
+
+- `src/vibemix/learn/mastered_marker_writer.py`
+- `tests/learn/test_mastered_marker_writer.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/runtime/coach.py`, `src/vibemix/__main__.py`, live speech,
+  Earned Wall credit/vocal behavior, automatic library-file mutation, CUE-DETR
+  snapping, and any claim that the L3 live hook is complete.
+
+Reason:
+
+- L3 needs a safe writer before it can be called from the Mastered flip branch.
+  This package lands only the non-speaking, opt-in, never-raises helper: it
+  refuses set-relative timing, requires an explicit in-track position, chooses
+  an unused hot-cue pad so hand-set cues are preserved, and returns an honest
+  abstain reason when the write is unsafe.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_mastered_marker_writer.py tests/library/test_export_serato.py tests/learn/test_mastered_vocal_fires_once.py`
+- `uv run ruff check src/vibemix/learn/mastered_marker_writer.py tests/learn/test_mastered_marker_writer.py`
+- `git diff --check -- src/vibemix/learn/mastered_marker_writer.py tests/learn/test_mastered_marker_writer.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Package 20 - Retire Dead Tend Citation Source
 
 Suggested commit: `fix(grounding): remove dead tend citation source`
