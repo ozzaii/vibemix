@@ -746,6 +746,28 @@ describe("SessionLayout", () => {
     expect(btn?.getAttribute("title")).toContain("Viber library");
   });
 
+  it("renders the idle Deck as an actionable readiness state, not vague listening copy", () => {
+    const root = host();
+    const mounted = mountSessionLayout(root, defaultState());
+    renderSessionFrame(mounted, {
+      ...defaultState(),
+      status: {
+        ...defaultState().status,
+        livekit: "ok",
+        gemini: "ok",
+        midi: 1,
+        screen: "unavailable",
+      },
+    });
+
+    expect(root.querySelector(".vmx-now")?.textContent).toBe("Ready for the first move.");
+    expect(root.textContent).toContain("audio armed · Sven ready · controller seen");
+    expect(root.textContent).toContain(
+      "screen proof unavailable · Start playback, I will not guess.",
+    );
+    expect(root.textContent).not.toContain("listening for the mix");
+  });
+
   it("rail controls call the latest rendered handlers", () => {
     const root = host();
     const mounted = mountSessionLayout(root, defaultState());

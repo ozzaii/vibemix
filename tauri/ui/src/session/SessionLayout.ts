@@ -185,9 +185,9 @@ export interface MountSessionLayoutOptions {
   onOpenSettings?: () => void;
 }
 
-// Calm idle hero line shown in silent mode before the co-host's first reaction
-// (honest placeholder, dimmed by the silent CSS — never a fabricated reaction).
-const IDLE_HERO_LINE = "listening for the mix…";
+// Calm idle hero shown before the co-host's first reaction. It is an operating
+// state, not a fabricated reaction: why the deck is quiet and what arms proof.
+const IDLE_HERO_LINE = "Ready for the first move.";
 
 const METER_ATTACK = 0.16;
 const METER_PEAK_DECAY = 0.04;
@@ -719,6 +719,32 @@ const LAYOUT_CSS = `
   .vmx-session[data-mode="silent"] .vmx-now {
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.62), 0 0 20px rgba(255, 251, 244, 0.055);
   }
+  .vmx-session[data-mode="silent"] .vmx-ghost {
+    font-family: var(--type-mono);
+    font-size: clamp(11px, 1vw, 13px);
+    line-height: 1.45;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+    max-width: min(72ch, 100%);
+    white-space: normal;
+    text-overflow: clip;
+  }
+  .vmx-session[data-mode="silent"] .vmx-ghost--g2 {
+    color: var(--text-disabled);
+    opacity: 1;
+  }
+  .vmx-session[data-mode="silent"] .vmx-ghost--g1 {
+    color: var(--text-muted);
+  }
+  .vmx-session[data-mode="silent"] .vmx-claim {
+    align-items: center;
+    margin-top: var(--sp-2);
+  }
+  .vmx-session[data-mode="silent"] .vmx-now {
+    max-width: min(20ch, 100%);
+    text-align: center;
+  }
   .vmx-session[data-mode="fault"] .vmx-now {
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75), 0 0 18px rgba(212, 65, 58, 0.14);
   }
@@ -1177,8 +1203,14 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   // the co-host speaks. Live mode keeps "" (a live deck always has a line).
   const nowText = nowLine ? nowLine.text : mode === "silent" ? IDLE_HERO_LINE : "";
   if (mounted.now.textContent !== nowText) mounted.now.textContent = nowText;
-  setGhost(mounted.ghosts[0], g1Line);
-  setGhost(mounted.ghosts[1], g2Line);
+  if (!nowLine && mode === "silent") {
+    const idle = idleReadinessLines(next);
+    setGhostText(mounted.ghosts[0], idle.action);
+    setGhostText(mounted.ghosts[1], idle.inputs);
+  } else {
+    setGhost(mounted.ghosts[0], g1Line);
+    setGhost(mounted.ghosts[1], g2Line);
+  }
 
   // --- the receipt (cite for the now-line) ---
   const chips = nowLine && next.cohost.reactions ? next.cohost.reactions.get(nowLine.ts) : undefined;
@@ -1268,8 +1300,41 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
 
 function setGhost(el: HTMLElement, line: TranscriptLine | null): void {
   const text = line ? line.text : "";
+  setGhostText(el, text);
+}
+
+function setGhostText(el: HTMLElement, text: string): void {
   if (el.textContent !== text) el.textContent = text;
   el.style.display = text ? "" : "none";
+}
+
+function idleReadinessLines(state: SessionState): { inputs: string; action: string } {
+  const audio = state.status.livekit === "ok"
+    ? "audio armed"
+    : state.status.livekit === "connecting"
+      ? "audio connecting"
+      : "audio checking";
+  const ai = state.status.gemini === "ok"
+    ? "Sven ready"
+    : state.status.gemini === "down"
+      ? "Sven down"
+      : "Sven checking";
+  const controller = state.status.midi != null && state.status.midi > 0
+    ? "controller seen"
+    : state.status.midi === 0
+      ? "controller missing"
+      : "controller checking";
+  const screen = state.status.screen === "ok"
+    ? "screen proof ready"
+    : state.status.screen === "denied"
+      ? "screen proof denied"
+      : state.status.screen === "unavailable"
+        ? "screen proof unavailable"
+        : "screen proof checking";
+  return {
+    inputs: `${audio} · ${ai} · ${controller}`,
+    action: `${screen} · Start playback, I will not guess.`,
+  };
 }
 
 /** Re-trigger the rise + draw + ignite CSS animations on a new reaction.

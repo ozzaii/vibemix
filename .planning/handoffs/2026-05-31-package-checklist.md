@@ -9686,3 +9686,38 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/library.html tauri/ui/src/library/index.ts tauri/ui/src/library/library.css tauri/ui/src/library/chat.test.ts tauri/ui/src/mock-transfer/contract.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 62 - Deck Idle Readiness Contract
+
+Suggested commit: `fix(deck-ui): make idle deck state actionable`
+
+Include:
+
+- `tauri/ui/src/session/SessionLayout.ts`
+- `tauri/ui/tests/session/components.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Co-host speech generation, claim guards, DROP-call behavior, runtime audio,
+  Viber/Crate, Learn, Settings, packaging scripts, and any broad shell redesign.
+  This package only fixes the signed app's first Deck read when the live session
+  is mounted but no reaction has landed yet.
+
+Reason:
+
+- The signed packaged app at `a1c7014f` still opened Deck onto a giant
+  `listening for the mix...` line even while the footer carried useful truth:
+  library fresh, voice ready, proof pending, and current routing/persona. That
+  made a quiet but working product look like the same old broken void. Replace
+  the vague mood line with a precise idle contract: the app is ready for the
+  first move, it shows audio/Sven/controller readiness, it names screen-proof
+  availability, and it says it will not guess. No fake live
+  claims, no new controls, no card clutter.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/session/components.spec.ts tests/session/grounding-failure.spec.ts tests/session/render-loop.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/session/SessionLayout.ts tauri/ui/tests/session/components.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
