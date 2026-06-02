@@ -1859,10 +1859,9 @@ def render_set_window_context(
 ) -> str | None:
     """Return the X4 long-window TEXT digest for deep live-coach context.
 
-    This is deliberately source-only scaffolding: it is not called from Sven's
-    prompt yet. The packet summarizes the last few minutes from existing state
-    fields while preserving the master-only honesty contract: history is text,
-    P1 is the only attached audio, and isolated/per-deck audio is not claimed.
+    The packet summarizes the last few minutes from existing state fields while
+    preserving the master-only honesty contract: history is text, P1 is the
+    only attached audio, and isolated/per-deck audio is not claimed.
     """
     has_context = bool(
         force

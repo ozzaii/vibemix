@@ -8923,3 +8923,37 @@ Proof before staging:
 - `uv run ruff check src/vibemix/state/position_clock.py src/vibemix/platform/_track_macos.py src/vibemix/state/refresh.py tests/state/test_position_clock.py tests/test_track_macos.py tests/state/test_refresh.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/state/position_clock.py src/vibemix/platform/_track_macos.py src/vibemix/state/refresh.py tests/state/test_position_clock.py tests/test_track_macos.py tests/state/test_refresh.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 44 - X4 Set Window Context Prompt Attachment
+
+Suggested commit: `fix(cohost): attach set window context on full prompts`
+
+Include:
+
+- `src/vibemix/agent/dj_cohost.py`
+- `src/vibemix/state/deck_context.py`
+- `tests/agent/test_dj_cohost.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/__main__.py`, `src/vibemix/runtime/coach.py`, DROP-call speech,
+  new co-host line templates, new model literals, sectioned prompt relayout,
+  live-proof claims, and any change to the diet/ack prompt cadence.
+
+Reason:
+
+- X4's safe substrate already exists in source: `render_set_window_context()`
+  builds a normalized master-only long-window text digest, and
+  `live_coach_deep` is already reserved in the model router. The missing wire is
+  that the digest is not attached to Sven's live prompt. Add it only to the full
+  60s audio path, not the 6s diet path, so the contract atom
+  `audio_attached=P1_only_last_60-90s` stays true and routine ack prompts stay
+  small.
+
+Proof before staging:
+
+- `uv run pytest -q tests/agent/test_dj_cohost.py tests/state/test_deck_context.py tests/llm/test_model_router_live_coach_deep.py tests/prompts/test_negative_dict.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py tests/state/test_event_detector.py`
+- `uv run ruff check src/vibemix/agent/dj_cohost.py src/vibemix/state/deck_context.py tests/agent/test_dj_cohost.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/agent/dj_cohost.py src/vibemix/state/deck_context.py tests/agent/test_dj_cohost.py .planning/handoffs/2026-05-31-package-checklist.md`

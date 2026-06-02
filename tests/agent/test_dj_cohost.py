@@ -921,6 +921,38 @@ def test_attached_audio_contract_orders_mic_lookahead_and_deck_parts() -> None:
     assert "deck_separation=structured_text_only" not in prompt
 
 
+def test_attached_audio_context_adds_set_window_only_on_full_audio_prompt() -> None:
+    state = _build_state()
+    state.long_arc = [0.10, 0.14, 0.18]
+    state.trajectory_narrative = "phrase=build; energy rising"
+    state.recent_moves = [(2.0, "A_low: flat→killed")]
+    state.phase_history = [(940.0, "build", "drop")]
+    state.deck_state = DeckState(
+        decks={"A": _deck_track("Deck Left"), "B": _deck_track("Deck Right", camelot="9A")}
+    )
+
+    full_prompt = _build_attached_audio_context_clause(
+        state,
+        ["A_low: flat→killed"],
+        audio_seconds=60.0,
+    )
+    diet_prompt = _build_attached_audio_context_clause(
+        state,
+        ["A_low: flat→killed"],
+        audio_seconds=6.0,
+    )
+
+    assert "set_window_context[" in full_prompt
+    assert "audio_attached=P1_only_last_60-90s" in full_prompt
+    assert "history=structured_text_only" in full_prompt
+    assert "per_deck_audio=not_attached" in full_prompt
+    assert "isolated_decks=false" in full_prompt
+    assert "rule=long_window_is_structured_history_not_audio_proof" in full_prompt
+    assert "isolated_decks=true" not in full_prompt
+    assert "transition_verdict=" not in full_prompt
+    assert "set_window_context[" not in diet_prompt
+
+
 def test_attached_audio_contract_falls_back_on_conflicting_deck_part_labels() -> None:
     state = _build_state()
     state.audible_deck = "mix"

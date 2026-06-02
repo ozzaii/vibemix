@@ -113,6 +113,7 @@ from vibemix.state.deck_context import (
     render_mixer_context,
     render_move_context,
     render_move_effect_context,
+    render_set_window_context,
     should_defer_live_claim_stream,
 )
 from vibemix.state.prompt_builder import ACK_ELIGIBLE_EVENTS
@@ -448,6 +449,9 @@ def _build_attached_audio_context_clause(
             lookahead_horizon_s=lookahead_horizon_s,
             force=True,
         ),
+        render_set_window_context(state, audio_seconds=audio_seconds)
+        if audio_seconds >= INVOKE_AUDIO_SECONDS
+        else None,
         _render_audio_window_map_line(
             render_audio_window_map(
                 state,
