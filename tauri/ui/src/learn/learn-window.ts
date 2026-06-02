@@ -313,7 +313,7 @@ function mountLearnWindow(root: HTMLElement): {
     <div id="learn-titlebar"></div>
     <div id="learn-stage" class="learn-stage"></div>
     <section id="learn-booth-panel" class="learn-booth-panel" data-visible="true">
-      <div class="learn-booth-kicker">next practice</div>
+      <div class="learn-booth-kicker">ready to practice</div>
       <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">practice deck ready</div>
       <button id="learn-start-recommended" class="learn-booth-primary" type="button">start practice</button>
       <button id="learn-open-map" class="learn-booth-secondary" type="button">choose lesson</button>
@@ -570,13 +570,15 @@ function mountLearnWindow(root: HTMLElement): {
     recommended: ProgressListEntry | undefined,
   ): void => {
     if (boothPanel.dataset.visible !== "true") return;
+    const readiness = controllerDetected
+      ? "hardware"
+      : midiSeenOnStatusTick
+        ? "midi"
+        : "screen";
+    boothPanel.dataset.readiness = readiness;
     const cue = recommendationBoothCue(
       recommended,
-      controllerDetected
-        ? "hardware"
-        : midiSeenOnStatusTick
-          ? "midi"
-          : "screen",
+      readiness,
       controllerDisplayName,
     );
     setBoothPulse(cue.state, cue.text, {
@@ -1521,10 +1523,10 @@ function recommendationBoothCue(
   }
   if (readiness === "midi") {
     const label =
-      "A controller port is visible. Start a lesson or enable MIDI output so Learn can bind live moves.";
+      "A controller is detected. Start a lesson; if Learn does not react, enable FLX4 MIDI output so live moves can bind.";
     return {
       state: "ready",
-      text: "controller visible",
+      text: "controller detected",
       ariaLabel: label,
       title: label,
     };

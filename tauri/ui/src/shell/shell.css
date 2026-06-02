@@ -627,12 +627,16 @@
     0 14px 42px rgba(0, 0, 0, 0.28);
 }
 
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host .learn-booth-panel[data-readiness="midi"] {
+  border-color: var(--brand-22);
+}
+
 .surface[data-surface="learn"].surface--mounted .learn-lesson-host .learn-stage {
   padding: calc(var(--sp-8) + 36px) var(--sp-5) var(--sp-5);
 }
 
 .surface[data-surface="learn"].surface--mounted .learn-lesson-host .learn-stage svg.learn-controller-schematic {
-  opacity: 0.82;
+  opacity: 0.74;
 }
 
 .surface[data-surface="learn"].surface--mounted .learn-booth-kicker,

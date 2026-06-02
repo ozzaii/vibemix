@@ -36,10 +36,12 @@ describe("folded Learn shell layout", () => {
     expect(learn).toContain("function statusTickMidiCount");
     expect(learn).toContain("detail?.payload?.midi");
     expect(learn).toContain('"ipc.status.tick"');
-    expect(learn).toContain("controller visible");
+    expect(learn).toContain("ready to practice");
+    expect(learn).toContain("controller detected");
+    expect(learn).toContain("dataset.readiness = readiness");
     expect(learn).toContain('status.setMirrorStatus(nextMidiSeen ? "midi" : "screen")');
     expect(readUi("src/learn/components/status-bar.ts")).toContain('case "midi":');
-    expect(readUi("src/learn/components/status-bar.ts")).toContain("controller visible");
+    expect(readUi("src/learn/components/status-bar.ts")).toContain("controller detected");
     expect(learn).toContain("practice deck ready");
     const wsClient = readUi("src/learn/ws-client.ts");
     expect(wsClient).toContain('const STATUS_TICK_TYPE = "ipc.status.tick"');
@@ -58,6 +60,7 @@ describe("folded Learn shell layout", () => {
     expect(css).toContain("position: absolute");
     expect(css).toContain("top: var(--sp-5)");
     expect(css).toContain("bottom: auto");
+    expect(css).toContain('[data-readiness="midi"]');
     expect(css).toContain(".learn-lesson-host .learn-footer");
     expect(css).toContain(".learn-earned-wall:has(.skill-wall__empty)");
     expect(css).toContain('#shell-root[data-surface="learn"]');

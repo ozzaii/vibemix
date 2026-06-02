@@ -9545,6 +9545,7 @@ Include:
 - `tauri/ui/src/learn/components/status-bar.ts`
 - `tauri/ui/tests/shell/learn-folded-layout.spec.ts`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
+- `.planning/handoffs/2026-06-02-learn-first-screen-product-qa.md`
 
 Keep out:
 
@@ -9636,12 +9637,14 @@ Reason:
   the Learn grounding drawer width. The packaged proof then exposed one more
   honesty edge: `ipc.status.tick.midi=1` means a controller port is visible, not
   that movement frames are flowing. The intermediate rail must therefore say
-  `controller visible`, leaving `Enable FLX4 MIDI` free to remain the next
-  action when deck-mixer evidence still reports no traffic.
+  a plain product state, `controller detected`, leaving `Enable FLX4 MIDI`
+  free to remain the next action when deck-mixer evidence still reports no
+  traffic. Record the failure mode in a short QA note so future agents treat
+  confusing signed-app UI as a product bug, not a documentation problem.
 
 Proof before staging:
 
 - `npm --prefix tauri/ui test -- tests/shell/learn-folded-layout.spec.ts tests/shell/settings-nav.spec.ts tests/shell/shell.spec.ts`
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-- `git diff --check -- tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/shell.css tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/components/status-bar.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `git diff --check -- tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/shell.css tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/components/status-bar.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md .planning/handoffs/2026-06-02-learn-first-screen-product-qa.md`
