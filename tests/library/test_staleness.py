@@ -8,10 +8,12 @@ import json
 import os
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
+import vibemix.library.staleness as staleness_mod
 from vibemix.library.staleness import (
     SNOOZE_DURATION_SECONDS,
     STALE_AGE_SECONDS,
@@ -83,19 +85,50 @@ def test_freshness_status_not_indexed(tmp_path: Path) -> None:
 def test_freshness_status_not_indexed_attaches_detected_source(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    cache = tmp_path / "library.pkl"
     source = tmp_path / "collection.xml"
     source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", cache)
     monkeypatch.setattr(
         "vibemix.library.staleness._detect_library_source_path",
         lambda: str(source),
     )
 
-    status = library_freshness_status(tmp_path / "library.pkl")
+    status = library_freshness_status(cache)
 
     assert status.status == "not_indexed"
     assert status.stale is False
     assert status.reason == "source_detected_not_indexed"
     assert status.source_path == str(source)
+
+
+def test_detect_library_source_path_reuses_bounded_setup_discovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import vibemix.library.setup_discovery as setup_discovery_mod
+
+    source = tmp_path / "Documents" / "Native Instruments" / "Traktor" / "collection.nml"
+    source.parent.mkdir(parents=True)
+    source.write_text("<NML />", encoding="utf-8")
+
+    def discover(*, max_candidates: int):
+        assert max_candidates == 8
+        return [
+            SimpleNamespace(
+                kind="traktor_nml",
+                path=str(source),
+            )
+        ]
+
+    monkeypatch.setattr(
+        setup_discovery_mod,
+        "discover_library_setup_candidates",
+        discover,
+    )
+
+    assert staleness_mod._detect_library_source_path() == str(source)
 
 
 def test_freshness_status_fresh_when_cache_matches_source(tmp_path: Path) -> None:
@@ -324,19 +357,71 @@ def test_freshness_nudge_payload_refreshes_folder_source(tmp_path: Path) -> None
 def test_freshness_nudge_payload_imports_detected_source(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    cache = tmp_path / "library.pkl"
     source = tmp_path / "collection.xml"
     source.write_text("<DJ_PLAYLISTS />", encoding="utf-8")
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", cache)
     monkeypatch.setattr(
         "vibemix.library.staleness._detect_library_source_path",
         lambda: str(source),
     )
 
-    payload = freshness_nudge_payload(tmp_path / "missing.pkl", tmp_path / "state.json")
+    payload = freshness_nudge_payload(cache, tmp_path / "state.json")
 
     assert payload is not None
     assert payload["age_days"] == 0
     assert payload["source_path"] == str(source)
     assert payload["source_kind"] == "xml"
+    assert payload["reason"] == "source_detected_not_indexed"
+    assert payload["schema_version"] == "1"
+
+
+def test_freshness_nudge_payload_imports_detected_non_xml_catalog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    cache = tmp_path / "library.pkl"
+    source = tmp_path / "collection.nml"
+    source.write_text("<NML />", encoding="utf-8")
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", cache)
+    monkeypatch.setattr(
+        "vibemix.library.staleness._detect_library_source_path",
+        lambda: str(source),
+    )
+
+    payload = freshness_nudge_payload(cache, tmp_path / "state.json")
+
+    assert payload is not None
+    assert payload["age_days"] == 0
+    assert payload["source_path"] == str(source)
+    assert payload["source_kind"] is None
+    assert payload["reason"] == "source_detected_not_indexed"
+    assert payload["schema_version"] == "1"
+
+
+def test_freshness_nudge_payload_imports_detected_music_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    cache = tmp_path / "library.pkl"
+    source = tmp_path / "Music" / "PSYMIND"
+    source.mkdir(parents=True)
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", cache)
+    monkeypatch.setattr(
+        "vibemix.library.staleness._detect_library_source_path",
+        lambda: str(source),
+    )
+
+    payload = freshness_nudge_payload(cache, tmp_path / "state.json")
+
+    assert payload is not None
+    assert payload["age_days"] == 0
+    assert payload["source_path"] == str(source)
+    assert payload["source_kind"] == "folder"
     assert payload["reason"] == "source_detected_not_indexed"
     assert payload["schema_version"] == "1"
 

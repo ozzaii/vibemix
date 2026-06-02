@@ -75,6 +75,8 @@ def _refreshable_source(status: LibraryFreshness) -> tuple[str | None, Refreshab
         return source_path, "xml"
     if path.is_dir():
         return source_path, "folder"
+    if path.is_file():
+        return source_path, None
     return None, None
 
 
@@ -93,20 +95,53 @@ def _refreshable_source_kind(status: LibraryFreshness) -> RefreshableSourceKind 
     return _refreshable_source(status)[1]
 
 
+def _path_identity(path: Path) -> Path:
+    """Stable path key for comparing a missing cache path to configured defaults."""
+    return path.expanduser().resolve(strict=False)
+
+
+def _should_auto_detect_sources_for_cache(cache_path: Path) -> bool:
+    """Only auto-discover setup inputs for the configured user cache.
+
+    Tests and diagnostics may pass arbitrary cache paths. Those should not
+    unexpectedly scan the real user's Music/Documents folders just because a
+    temp ``library.pkl`` is absent.
+    """
+    try:
+        from vibemix.library.rekordbox import RekordboxLibrary
+
+        configured = Path(RekordboxLibrary.CACHE_PATH)
+    except Exception:
+        configured = DEFAULT_LIBRARY_PKL
+    cache_key = _path_identity(cache_path)
+    return cache_key in {
+        _path_identity(DEFAULT_LIBRARY_PKL),
+        _path_identity(configured),
+    }
+
+
 def _detect_library_source_path() -> str | None:
     """Return a local source catalog the app can import without user browsing.
 
-    This is intentionally narrow: today only a Rekordbox ``collection.xml`` at
-    the known export locations is auto-detected. Raw music folders still require
-    an explicit user action via ``embed-folder`` so we never recursively scan a
-    DJ's whole Music tree without consent.
+    Reuse the bounded first-run setup discovery instead of keeping a narrower
+    Rekordbox-only probe here. Catalog hits stay file-only; music-folder hits
+    are shallow candidates that the renderer can import only after an explicit
+    button click.
     """
     try:
-        from vibemix.library.sources.rekordbox import RekordboxSource
+        from vibemix.library.setup_discovery import discover_library_setup_candidates
 
-        source = RekordboxSource()
-        if source.detect():
-            return source.resolved_path
+        for candidate in discover_library_setup_candidates(max_candidates=8):
+            path = Path(candidate.path).expanduser()
+            try:
+                if candidate.kind == "music_folder":
+                    if path.is_dir():
+                        return str(path)
+                    continue
+                if path.is_file():
+                    return str(path)
+            except OSError:
+                continue
     except Exception as e:
         logger.debug("library source auto-detect failed: %s", e)
     return None
@@ -192,7 +227,11 @@ def library_freshness_status(
         legacy_pkl = _legacy_cache_path(pkl)
         if legacy_pkl is not None and legacy_pkl.exists():
             return library_freshness_status(legacy_pkl, now=now_ts)
-        detected_source = _detect_library_source_path()
+        detected_source = (
+            _detect_library_source_path()
+            if _should_auto_detect_sources_for_cache(pkl)
+            else None
+        )
         return LibraryFreshness(
             status="not_indexed",
             stale=False,
@@ -264,7 +303,11 @@ def library_freshness_status(
             legacy_status = library_freshness_status(legacy_pkl, now=now_ts)
             if legacy_status.reason != "cache_points_to_test_fixture":
                 return legacy_status
-        detected_source = _detect_library_source_path()
+        detected_source = (
+            _detect_library_source_path()
+            if _should_auto_detect_sources_for_cache(pkl)
+            else None
+        )
         return LibraryFreshness(
             status="cache_unreadable",
             stale=True,
