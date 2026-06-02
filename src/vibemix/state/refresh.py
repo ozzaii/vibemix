@@ -62,14 +62,15 @@ from vibemix.audio.constants import (
     GENRE_BPM_BANDS,
     GENRE_CENTROID_HARD_TEK_MIN,
 )
+from vibemix.audio.lufs import SHORT_TERM_WINDOW_S, short_term_lufs
 from vibemix.library.section_builder import next_section_after_position, sections_for_entry
-from vibemix.state.drop_predict import predict_drop_in_sec
 from vibemix.state.deck_context import (
     live_mix_evidence_keys,
     midi_evidence_key,
     render_audio_delta_items,
 )
 from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
+from vibemix.state.drop_predict import predict_drop_in_sec
 from vibemix.state.emotion_router import derive_emotion
 from vibemix.state.evidence_registry import EvidenceRegistry
 from vibemix.state.genre import (
@@ -609,6 +610,13 @@ def _tick_once(
     # Audio features (cheap — ~5-10ms)
     feats = snapshot_features(audio_buf, seconds=4.0)
     curve = energy_curve(audio_buf, seconds=12.0, hop=1.0)
+    try:
+        master_lufs = short_term_lufs(
+            audio_buf.snapshot(int(audio_buf._sr * SHORT_TERM_WINDOW_S)),
+            audio_buf._sr,
+        )
+    except Exception:
+        master_lufs = None
     rms = feats.get("rms", 0.0)
     currently_loud = rms > SILENT_RMS
 
@@ -670,6 +678,7 @@ def _tick_once(
                 state.audible = True
 
         state.rms = rms
+        state.master_lufs = master_lufs if currently_loud else None
         state.bands = {
             "sub": feats.get("sub_share", 0.0),
             "low": feats.get("low_share", 0.0),
@@ -1068,6 +1077,7 @@ def _tick_once(
         # Default {} (no prior) makes the first tick abstain in coach.render_delta.
         state.prev_perceive = {
             "rms": state.rms,
+            "master_lufs": state.master_lufs,
             "sub": state.bands.get("sub", 0.0),
             "low": state.bands.get("low", 0.0),
             "mid": state.bands.get("mid", 0.0),

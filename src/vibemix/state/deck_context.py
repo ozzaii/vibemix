@@ -1835,6 +1835,9 @@ def render_audio_delta_items(
         ("onset density", float(getattr(state, "onset_density", 0.0) or 0.0), "onset_density"),
     )
     out: list[str] = []
+    lufs_delta = _render_lufs_delta(getattr(state, "master_lufs", None), prev.get("master_lufs"))
+    if lufs_delta is not None:
+        out.append(lufs_delta)
     for label, cur, key in candidates:
         phr = render_delta(label, cur, prev.get(key), floor=DELTA_FLOOR)
         if phr is not None:
@@ -1842,6 +1845,32 @@ def render_audio_delta_items(
         if len(out) >= cap:
             break
     return out
+
+
+def _render_lufs_delta(cur: object, prev: object, *, floor_lu: float = 1.0) -> str | None:
+    if cur is None or prev is None:
+        return None
+    try:
+        cur_f = float(cur)
+        prev_f = float(prev)
+    except (TypeError, ValueError):
+        return None
+    if not (-120.0 < cur_f < 20.0 and -120.0 < prev_f < 20.0):
+        return None
+    delta = cur_f - prev_f
+    if abs(delta) < floor_lu:
+        return None
+    verb = "rose" if delta > 0.0 else "fell"
+    magnitude = round(abs(delta))
+    if magnitude <= 0:
+        return None
+    if magnitude >= 6:
+        confidence = "strong"
+    elif magnitude >= 3:
+        confidence = "clear"
+    else:
+        confidence = "slight"
+    return f"master lufs delta {verb} {magnitude} lu ({confidence})"
 
 
 def _licensed_move_effect(

@@ -87,8 +87,10 @@ def test_prev_snapshot_written_in_lock():
     assert isinstance(snap, dict) and snap, "prev_perceive must be captured after a tick"
     # The captured prior reflects THIS tick's writes (so next tick diffs against it).
     assert "rms" in snap
+    assert "master_lufs" in snap
     assert "bpm" in snap
     assert snap["rms"] == pytest.approx(state.rms)
+    assert snap["master_lufs"] == state.master_lufs
 
 
 # ---------- PERCEIVE-02 — trajectory compose, bounded ----------

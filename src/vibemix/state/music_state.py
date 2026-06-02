@@ -33,6 +33,7 @@ class MusicState:
     onset_density: float = 0.0
     bpm: float = 0.0
     energy_curve: list = field(default_factory=list)  # last ~12s, 1s hop
+    master_lufs: float | None = None  # short-term BS.1770 receipt; None = no trusted window
 
     # Phase (derived from energy curve, only valid when audible)
     phase: str = "silent"  # silent / low / groove / build / drop / peak / breakdown

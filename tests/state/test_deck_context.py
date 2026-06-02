@@ -1771,6 +1771,33 @@ def test_move_effect_context_maps_recent_move_to_dsp_delta() -> None:
     assert "rule=move_effect_prediction_and_measurement_agree" in out
 
 
+def test_audio_delta_items_include_bounded_master_lufs_receipt() -> None:
+    state = MusicState(audible=True, rms=0.12, onset_density=3.0, master_lufs=-11.0)
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
+    state.prev_perceive = {
+        "rms": 0.12,
+        "master_lufs": -14.0,
+        "sub": 0.12,
+        "low": 0.16,
+        "mid": 0.40,
+        "high": 0.32,
+        "onset_density": 3.0,
+    }
+
+    items = render_audio_delta_items(state)
+    mix_keys = live_mix_evidence_keys(state, audio_delta_items=items)
+
+    assert items == ["master lufs delta rose 3 lu (clear)"]
+    assert "audio_delta=master_lufs_delta_rose_3_lu_clear" in mix_keys
+
+
+def test_audio_delta_items_strip_flat_master_lufs_receipt() -> None:
+    state = MusicState(audible=True, rms=0.12, onset_density=3.0, master_lufs=-13.8)
+    state.prev_perceive = {"master_lufs": -14.0}
+
+    assert render_audio_delta_items(state) == []
+
+
 def test_move_effect_context_maps_recent_move_to_deck_audio_windows() -> None:
     state = MusicState(audible=True, audible_deck="A")
 

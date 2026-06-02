@@ -3398,6 +3398,55 @@ Remaining gate:
   same move during a bassless breakdown stays silent/held. Do not claim this
   commit proves LIVE or PKG behavior.
 
+## Package 8K2 - Short-Term LUFS Grounding Receipt
+
+Suggested commit: `feat(audio): add short-term lufs grounding receipt`
+
+Include:
+
+- `src/vibemix/audio/lufs.py`
+- `src/vibemix/state/music_state.py`
+- `src/vibemix/state/refresh.py`
+- `src/vibemix/state/deck_context.py`
+- `tests/audio/test_lufs.py`
+- `tests/state/test_deck_context.py`
+- `tests/state/test_refresh_perceive.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Any co-host wording rewrite, prompt persona change, or DROP-call speech/timing.
+- Any new citation source; the LUFS receipt rides the existing `mix:audio_delta`
+  evidence key path.
+- Any claim that LUFS alone proves a move's quality or causal effect. It is a
+  loudness receipt only; EQ/fader causality stays behind the existing
+  prediction-and-measurement guard.
+
+Reason:
+
+- Claude's Mixxx/R-SLOP backlog called for a short-term BS.1770 LUFS receipt as
+  the next cheap grounding sibling after the EQ move-effect keystone. This
+  package adds a dependency-free, K-weighted mono short-term loudness primitive,
+  writes it through the state-refresh single writer, and renders a bounded
+  `master_lufs_delta` atom only when the loudness window actually moves.
+- Silence, cold windows, and flat/near-flat deltas abstain. The package does not
+  make the co-host speak more often by itself; it gives the existing guard one
+  more grounded receipt when a line is otherwise allowed.
+
+Proof to run:
+
+- `uv run pytest -q tests/audio/test_lufs.py tests/state/test_deck_context.py tests/state/test_refresh_perceive.py`
+- `uv run pytest -q tests/learn/test_no_speculative_phrase.py tests/prompts/test_negative_dict.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py tests/state/test_event_detector.py tests/state/test_refresh.py tests/state/test_music_state.py tests/agent/test_dj_cohost_grounding.py tests/coach/test_citation_linter.py`
+- `uv run ruff check src/vibemix/audio/lufs.py src/vibemix/state/music_state.py src/vibemix/state/refresh.py src/vibemix/state/deck_context.py tests/audio/test_lufs.py tests/state/test_deck_context.py tests/state/test_refresh_perceive.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check` across the Package 8K2 file set.
+
+Remaining gate:
+
+- SRC-only. A future LIVE pass must show the receipt appears on a real routed
+  master signal during a measurable loudness move and remains absent on silence
+  or a flat window.
+
 ## Package 8L - AI Coach Prompt Builder Rename
 
 Suggested commit: `refactor(state): rename ai coach prompt builder`
