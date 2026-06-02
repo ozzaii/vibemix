@@ -8803,3 +8803,35 @@ Proof before staging:
 - `uv run ruff check src/vibemix/profile/schema.py tests/profile/test_schema.py tests/profile/test_builder.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/profile/schema.py tests/profile/test_schema.py tests/profile/test_builder.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 41 - Profile Genre Evidence Alias Normalization
+
+Suggested commit: `fix(profile): normalize genre evidence aliases`
+
+Include:
+
+- `src/vibemix/profile/builder.py`
+- `tests/profile/test_builder.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Schema expansion beyond the closed allowlist, runtime settings behavior,
+  event-router chains, prompt text, Sven speech, source parsers, and live
+  FLX4/Rekordbox proof.
+
+Reason:
+
+- Source/library/prototype evidence can carry real scene labels that are not
+  byte-identical to profile filenames: `goa`, `full-on`, `trance`, `dnb`,
+  `jungle`, `hardtechno`, `hard-tek`, `tech house`, and `nu-disco`. The profile
+  builder previously ignored those keys even when they had sustained citations.
+  Normalize only known aliases into the closed profile allowlist; unknown
+  labels still degrade to `unknown` and cannot pollute local taste memory.
+
+Proof before staging:
+
+- `uv run pytest -q tests/profile/test_builder.py tests/profile/test_schema.py`
+- `uv run ruff check src/vibemix/profile/builder.py tests/profile/test_builder.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/profile/builder.py tests/profile/test_builder.py .planning/handoffs/2026-05-31-package-checklist.md`

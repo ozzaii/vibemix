@@ -57,6 +57,23 @@ _CADENCE_CUTOFFS: Final[tuple[tuple[int, str], ...]] = (
     (1, "rarely"),
 )
 
+_GENRE_ALIASES: Final[dict[str, str]] = {
+    "tech_house": "house",
+    "deep_house": "house",
+    "dnb": "drum_and_bass",
+    "jungle": "drum_and_bass",
+    "neurofunk": "drum_and_bass",
+    "goa": "psytrance",
+    "full_on": "psytrance",
+    "trance": "psytrance",
+    "nu_disco": "disco",
+    "funk": "disco",
+    "hardtek": "hard_tek",
+    "hardtechno": "hard_tek",
+    "hard_techno": "hard_tek",
+    "acidcore": "hard_tek",
+}
+
 
 def _bpm_to_bin(bpm: float) -> str | None:
     """Map a BPM value to a tempo bin. Returns None for non-positive / NaN."""
@@ -71,6 +88,15 @@ def _bpm_to_bin(bpm: float) -> str | None:
     if bpm < 150:
         return "138-150"
     return "150+"
+
+
+def _normalize_genre_key(value: str | None) -> str | None:
+    """Normalize observed genre labels onto the profile privacy allowlist."""
+    if not value:
+        return None
+    normalized = str(value).strip().lower().replace("-", "_").replace(" ", "_")
+    normalized = _GENRE_ALIASES.get(normalized, normalized)
+    return normalized if normalized in GENRES else None
 
 
 def _aggregate_tempo_bin(
@@ -168,8 +194,9 @@ def _aggregate_genre(
     genre_obs = evidence_snapshot.get("genre", {})
     counts: Counter[str] = Counter()
     for key, timestamps in genre_obs.items():
-        if key in GENRES:
-            counts[key] += len(timestamps)
+        genre_key = _normalize_genre_key(key)
+        if genre_key is not None:
+            counts[genre_key] += len(timestamps)
     total = sum(counts.values())
     if total < MIN_CITATIONS_PER_TENDENCY:
         return prior if prior in GENRES else "unknown"

@@ -243,6 +243,37 @@ def test_genre_above_threshold_updates_to_any_shipped_profile(genre: str) -> Non
     assert result["preferred_genre"] == genre
 
 
+@pytest.mark.parametrize(
+    ("observed", "expected"),
+    [
+        ("goa", "psytrance"),
+        ("full-on", "psytrance"),
+        ("trance", "psytrance"),
+        ("dnb", "drum_and_bass"),
+        ("jungle", "drum_and_bass"),
+        ("hardtechno", "hard_tek"),
+        ("hard-tek", "hard_tek"),
+        ("tech house", "house"),
+        ("nu-disco", "disco"),
+    ],
+)
+def test_genre_evidence_aliases_normalize_to_profile_memory(
+    observed: str,
+    expected: str,
+) -> None:
+    evidence = {"genre": {observed: (1.0, 2.0, 3.0)}}
+    result = build_profile(None, [], evidence, consent=True)
+    assert result is not None
+    assert result["preferred_genre"] == expected
+
+
+def test_unknown_genre_evidence_does_not_pollute_profile_memory() -> None:
+    evidence = {"genre": {"dubstep": (1.0, 2.0, 3.0)}}
+    result = build_profile(None, [], evidence, consent=True)
+    assert result is not None
+    assert result["preferred_genre"] == "unknown"
+
+
 def test_tempo_below_2_observations_retains_prior() -> None:
     prior = {"tempo_preference_bin": "120-128"}
     result = build_profile(prior, [_make_event(bpm=145)], {}, consent=True)
