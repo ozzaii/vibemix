@@ -1690,6 +1690,36 @@ Remaining gate:
 - Include this package with the final debrief/observability staging batch or as
   its own small test-hygiene commit; do not mix it into product runtime hunks.
 
+## Package 1B4 - Debrief Cached Profile Write-Back
+
+Suggested commit: `fix(debrief): write profile on cached reviews`
+
+Include:
+
+- `src/vibemix/debrief/main.py`
+- `tests/debrief/test_main_dispatch.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Free-text drill mining, debrief prompt rewrites, Learn UI changes, live co-host
+  speech/timing surfaces, and `src/vibemix/__main__.py`.
+
+Reason:
+
+- First-time debrief generation already feeds structured session events +
+  grounded evidence back into the long-term DJ profile. Cache-hit reviews skipped
+  that loop, so older generated debriefs stayed a review-only dead end. This
+  slice keeps the no-Gemini cache fast path while still updating the profile from
+  structured evidence when the DJ reviews a cached debrief.
+
+Proof before staging:
+
+- `uv run pytest -q tests/debrief/test_main_dispatch.py tests/debrief/test_profile_writeback.py`
+- `uv run ruff check src/vibemix/debrief/main.py tests/debrief/test_main_dispatch.py tests/debrief/test_profile_writeback.py`
+- `git diff --check -- src/vibemix/debrief/main.py tests/debrief/test_main_dispatch.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Package 1C - Debrief MOSS-Only TLDR Narration
 
 Suggested commit: `fix(debrief): use moss for tldr narration`

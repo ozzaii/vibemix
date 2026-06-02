@@ -98,12 +98,56 @@ def test_run_with_cached_debrief_skips_gemini(tmp_path: Path):
     client.models.generate_content.assert_not_called()
 
 
+def test_run_with_cached_debrief_still_updates_profile(tmp_path: Path, monkeypatch):
+    """A cached review is still a reviewed session, so it feeds profile signal."""
+    root = tmp_path / "recordings"
+    root.mkdir()
+    sess = _build_session(root)
+    mp3 = b"FAKEMP3BYTES" * 200
+    sha = hashlib.sha256(mp3).hexdigest()
+    (sess / "debrief_tldr.mp3").write_bytes(mp3)
+    (sess / "session_debrief.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1",
+                "chapters": [],
+                "drills": [],
+                "tldr_sha256": sha,
+                "tldr_path": "debrief_tldr.mp3",
+                "generated_at": "2026-05-15T12:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    calls: list[tuple[list[dict], dict]] = []
+    monkeypatch.setattr(
+        "vibemix.debrief.main._write_back_profile_best_effort",
+        lambda events, evidence: calls.append((events, evidence)),
+    )
+
+    client = MagicMock()
+    state = run(sess, client=client, recordings_root=root, serve=False)
+
+    assert state["cache_hit"] is True
+    client.models.generate_content.assert_not_called()
+    assert len(calls) == 1
+    events, evidence = calls[0]
+    assert any(e.get("type") == "MIX_MOVE" for e in events)
+    assert evidence["ev"]["MIX_MOVE"] == [300.0]
+
+
 def test_run_first_time_generation_calls_gemini(tmp_path: Path, monkeypatch):
     """First-time run with no cache calls Gemini text paths + MOSS audio."""
     root = tmp_path / "recordings"
     root.mkdir()
     sess = _build_session(root)
     _patch_moss_tldr_audio(monkeypatch)
+    profile_updates: list[tuple[list[dict], dict]] = []
+    monkeypatch.setattr(
+        "vibemix.debrief.main._write_back_profile_best_effort",
+        lambda events, evidence: profile_updates.append((events, evidence)),
+    )
 
     from vibemix.debrief.drills import Drill, Drills
 
@@ -138,6 +182,10 @@ def test_run_first_time_generation_calls_gemini(tmp_path: Path, monkeypatch):
     assert (sess / "session_debrief.json").exists()
     # Only the Gemini text calls happened; narration audio is local MOSS.
     assert client.models.generate_content.call_count == 2
+    assert len(profile_updates) == 1
+    events, evidence = profile_updates[0]
+    assert any(e.get("type") == "TRACK_CHANGE" for e in events)
+    assert evidence["ev"]["TRACK_CHANGE"] == [100.0]
 
 
 def test_run_invalid_session_dir_raises(tmp_path: Path):
