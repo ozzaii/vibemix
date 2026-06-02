@@ -374,6 +374,12 @@ def _deck_route_diagnosis(
         pair for pair, rms in sorted(pair_rms.items()) if float(rms) >= _DECK_ACTIVE_RMS
     ]
     unassigned_active = [pair for pair in active_pairs if pair not in configured_pair_values]
+    likely_cause = "channel_map_mismatch" if unassigned_active else "inactive_deck_pair_route"
+    next_action = (
+        "try_active_unassigned_pair_as_inactive_deck"
+        if unassigned_active
+        else "route_inactive_deck_to_configured_pair"
+    )
     return {
         "status": "configured_deck_lane_missing_audio",
         "inactive_sides": ",".join(inactive),
@@ -384,6 +390,8 @@ def _deck_route_diagnosis(
         or "none",
         "opened_active_pairs": "+".join(active_pairs) or "none",
         "active_unassigned_pairs": "+".join(unassigned_active) or "none",
+        "likely_cause": likely_cause,
+        "next_action": next_action,
         "rule": "opened_channel_probe_not_rekordbox_control",
     }
 

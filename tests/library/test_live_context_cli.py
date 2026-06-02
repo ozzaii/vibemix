@@ -195,6 +195,8 @@ def _deck_pair_audio_separation_context_with_route_diagnosis(
         "route_diagnosis=configured_deck_lane_missing_audio__inactive_sides_B"
         "__active_sides_A__configured_pairs_A:0_1+B:2_3__opened_active_pairs_0_1"
         f"__active_unassigned_pairs_{active_unassigned_token}"
+        "__likely_cause_inactive_deck_pair_route"
+        "__next_action_route_inactive_deck_to_configured_pair"
         "__rule_opened_channel_probe_not_rekordbox_control "
         "rule=separation_capability_not_outcome]"
     )

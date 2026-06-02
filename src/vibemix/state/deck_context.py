@@ -3741,6 +3741,8 @@ def _deck_audio_route_diagnosis_token(raw: object) -> str | None:
         "configured_pairs",
         "opened_active_pairs",
         "active_unassigned_pairs",
+        "likely_cause",
+        "next_action",
         "rule",
     ):
         token = _evidence_token(str(raw.get(key) or ""))

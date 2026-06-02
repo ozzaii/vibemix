@@ -319,6 +319,8 @@ def test_deck_audio_capture_auto_rekordbox_map_requires_both_pairs_live(
         "configured_pairs": "A:0,1+B:2,3",
         "opened_active_pairs": "0,1",
         "active_unassigned_pairs": "none",
+        "likely_cause": "inactive_deck_pair_route",
+        "next_action": "route_inactive_deck_to_configured_pair",
         "rule": "opened_channel_probe_not_rekordbox_control",
     }
 
@@ -365,6 +367,11 @@ def test_deck_audio_capture_auto_blackhole_standard_requires_both_pairs_live(
     assert context["deck_audio_active_sides_seen"] == "A"
     assert context["deck_audio_route_diagnosis"]["status"] == "configured_deck_lane_missing_audio"
     assert context["deck_audio_route_diagnosis"]["inactive_sides"] == "B"
+    assert context["deck_audio_route_diagnosis"]["likely_cause"] == "inactive_deck_pair_route"
+    assert (
+        context["deck_audio_route_diagnosis"]["next_action"]
+        == "route_inactive_deck_to_configured_pair"
+    )
 
     both_pairs = np.zeros((480, 4), dtype=np.float32)
     both_pairs[:, 0] = 0.2
@@ -399,6 +406,8 @@ def test_deck_audio_capture_diagnoses_active_unassigned_pair(monkeypatch) -> Non
         "configured_pairs": "A:0,1+B:2,3",
         "opened_active_pairs": "0,1+4,5",
         "active_unassigned_pairs": "4,5",
+        "likely_cause": "channel_map_mismatch",
+        "next_action": "try_active_unassigned_pair_as_inactive_deck",
         "rule": "opened_channel_probe_not_rekordbox_control",
     }
 

@@ -1581,6 +1581,8 @@ def test_deck_audio_separation_context_marks_unverified_auto_deck_pair_capture()
                 "configured_pairs": "A:0,1+B:2,3",
                 "opened_active_pairs": "0,1",
                 "active_unassigned_pairs": "none",
+                "likely_cause": "inactive_deck_pair_route",
+                "next_action": "route_inactive_deck_to_configured_pair",
                 "rule": "opened_channel_probe_not_rekordbox_control",
             },
         }
@@ -1599,6 +1601,8 @@ def test_deck_audio_separation_context_marks_unverified_auto_deck_pair_capture()
     assert "inactive_sides_B" in out
     assert "opened_active_pairs_0_1" in out
     assert "active_unassigned_pairs_none" in out
+    assert "likely_cause_inactive_deck_pair_route" in out
+    assert "next_action_route_inactive_deck_to_configured_pair" in out
     assert normalize_deck_audio_separation_context_text(out) == out
 
 
