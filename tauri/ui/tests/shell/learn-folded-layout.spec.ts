@@ -38,6 +38,11 @@ describe("folded Learn shell layout", () => {
     expect(learn).toContain('status.setMirrorStatus(nextMidiSeen ? "midi" : "screen")');
     expect(readUi("src/learn/components/status-bar.ts")).toContain('case "midi":');
     expect(learn).toContain("screen practice deck");
+    const wsClient = readUi("src/learn/ws-client.ts");
+    expect(wsClient).toContain('const STATUS_TICK_TYPE = "ipc.status.tick"');
+    expect(wsClient).toContain("subscribeIpc<StatusTickEnvelope>");
+    expect(wsClient).toContain("dispatchStatusTickEnvelope");
+    expect(wsClient).toContain("new CustomEvent(STATUS_TICK_TYPE");
     expect(css).toContain(
       '.surface[data-surface="learn"].surface--mounted .surface-mount',
     );

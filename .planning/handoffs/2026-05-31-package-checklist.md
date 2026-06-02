@@ -9568,3 +9568,36 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/components/status-bar.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 59 - Learn Status Tick Bridge
+
+Suggested commit: `fix(learn-ui): bridge status ticks into learn readiness`
+
+Include:
+
+- `tauri/ui/src/learn/ws-client.ts`
+- `tauri/ui/tests/shell/learn-folded-layout.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Broader session snapshot forwarding, Learn runtime semantics, controller SVG
+  rendering, co-host speech, and packaging scripts. This package only forwards
+  the validated `ipc.status.tick` frame that Learn needs for honest MIDI
+  readiness.
+
+Reason:
+
+- Package 58 made Learn able to parse a MIDI-bearing status detail, but the
+  Learn event client never forwarded `ipc.status.tick`: the Tauri path
+  subscribed only to `ipc.learn.*`, and the websocket fallback intentionally
+  dropped non-Learn frames. Bridge exactly `ipc.status.tick`, still validate it,
+  and keep all other session bus traffic filtered so Learn does not drown in
+  snapshot/mascot noise.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/learn-folded-layout.spec.ts tests/shell/settings-nav.spec.ts tests/shell/shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/learn/ws-client.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

@@ -62,6 +62,7 @@ const MAX_OUTBOUND_QUEUE = 32;
 // second from the mascot frame alone (~108k/hour) and real schema-drift
 // warnings get buried.
 const MESSAGE_TYPE_PREFIX = "ipc.learn.";
+const STATUS_TICK_TYPE = "ipc.status.tick";
 const COURSE3_LENS_EVENT = "learn.course3_lens";
 const COURSE3_LENS_TAURI_EVENT = "learn-course3-lens";
 const OPERATOR_ACTION_EVENT = "learn.operator_action";
@@ -85,6 +86,7 @@ type AjvValidator = ((data: unknown) => boolean) & {
 };
 
 type LearnEnvelope = Extract<IpcMessage, { type: (typeof LEARN_INBOUND_TYPES)[number] }>;
+type StatusTickEnvelope = Extract<IpcMessage, { type: typeof STATUS_TICK_TYPE }>;
 type LearnOutboundEnvelope = {
   type: string;
   ts: string;
@@ -219,7 +221,12 @@ export class LearnWsClient extends EventTarget {
 
   private async connectTauriEvents(): Promise<void> {
     try {
-      const [learnUnlisteners, course3LensUnlisten, operatorActionUnlisten] = await Promise.all([
+      const [
+        learnUnlisteners,
+        statusTickUnlisten,
+        course3LensUnlisten,
+        operatorActionUnlisten,
+      ] = await Promise.all([
         Promise.all(
           LEARN_INBOUND_TYPES.map((type) =>
             subscribeIpc<LearnEnvelope>(type, (envelope) => {
@@ -227,6 +234,9 @@ export class LearnWsClient extends EventTarget {
             }),
           ),
         ),
+        subscribeIpc<StatusTickEnvelope>(STATUS_TICK_TYPE, (envelope) => {
+          this.dispatchStatusTickEnvelope(envelope);
+        }),
         listenTauri<unknown>(COURSE3_LENS_TAURI_EVENT, (event) => {
           this.dispatchCourse3LensFrame(event.payload);
         }),
@@ -235,14 +245,24 @@ export class LearnWsClient extends EventTarget {
         }),
       ]);
       if (this.stopped) {
-        for (const unlisten of [...learnUnlisteners, course3LensUnlisten, operatorActionUnlisten]) {
+        for (const unlisten of [
+          ...learnUnlisteners,
+          statusTickUnlisten,
+          course3LensUnlisten,
+          operatorActionUnlisten,
+        ]) {
           void Promise.resolve(unlisten()).catch(() => {
             // swallow
           });
         }
         return;
       }
-      this.tauriUnlisteners = [...learnUnlisteners, course3LensUnlisten, operatorActionUnlisten];
+      this.tauriUnlisteners = [
+        ...learnUnlisteners,
+        statusTickUnlisten,
+        course3LensUnlisten,
+        operatorActionUnlisten,
+      ];
       this.dispatchEvent(new CustomEvent("open"));
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -276,6 +296,10 @@ export class LearnWsClient extends EventTarget {
     this.dispatchOperatorActionFrame(envelope);
     // Silent drop — no warn — keeps real schema-drift warnings legible.
     const t = envelope?.type;
+    if (t === STATUS_TICK_TYPE) {
+      this.dispatchStatusTickEnvelope(envelope);
+      return;
+    }
     if (typeof t !== "string" || !t.startsWith(MESSAGE_TYPE_PREFIX)) {
       return;
     }
@@ -302,6 +326,17 @@ export class LearnWsClient extends EventTarget {
     // string from the prefix filter above; using it (not `envelope.type`)
     // keeps the type system happy without re-asserting non-undefined.
     window.dispatchEvent(new CustomEvent(t, { detail: envelope.payload }));
+  }
+
+  private dispatchStatusTickEnvelope(envelope: { type?: string; payload?: unknown }): void {
+    if (envelope.type !== STATUS_TICK_TYPE) return;
+    const ok = validate(envelope);
+    if (!ok) {
+      // eslint-disable-next-line no-console
+      console.warn("[learn:ws] validate failed for ipc.status.tick; dropping");
+      return;
+    }
+    window.dispatchEvent(new CustomEvent(STATUS_TICK_TYPE, { detail: envelope.payload }));
   }
 
   private dispatchCourse3LensFrame(frame: unknown): void {
