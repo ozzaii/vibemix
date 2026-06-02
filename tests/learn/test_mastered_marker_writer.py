@@ -4,9 +4,45 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from vibemix.learn import mastered_marker_writer as writer
 from vibemix.library.export_serato import SeratoCue
+from vibemix.state.deck_state import DeckState, DeckTrack
+from vibemix.state.music_state import MusicState
+
+
+class _Library:
+    def __init__(self, *entries):
+        self._entries = {entry.track_id: entry for entry in entries}
+
+    def lookup_by_id(self, track_id: str):
+        return self._entries.get(track_id)
+
+
+def _state(
+    *,
+    deck: str = "A",
+    track_id: str = "track-1",
+    deck_confidence: float = 0.95,
+    position_s: float | None = 64.25,
+    position_confidence: float = 0.85,
+) -> MusicState:
+    state = MusicState()
+    state.audible_deck = deck
+    state.audible_track_position_s = position_s
+    state.audible_track_position_confidence = position_confidence
+    state.deck_state = DeckState(
+        decks={
+            deck: DeckTrack(
+                title="Live Track",
+                track_id=track_id,
+                confidence=deck_confidence,
+                source="rekordbox_xml",
+            )
+        }
+    )
+    return state
 
 
 def test_mastered_marker_requires_in_track_position(tmp_path: Path) -> None:
@@ -153,3 +189,77 @@ def test_mastered_marker_never_raises_on_export_error(
 
     assert result.written is False
     assert result.reason == "write_error:RuntimeError"
+
+
+def test_mastered_marker_request_resolves_current_track_path_and_position(tmp_path: Path) -> None:
+    track = tmp_path / "Live Track.mp3"
+    library = _Library(
+        SimpleNamespace(track_id="track-1", filepath=f"file://localhost{track.as_posix()}")
+    )
+
+    request = writer.resolve_mastered_marker_request(
+        skill_id="harmonic_mixing",
+        state=_state(),
+        library=library,
+    )
+
+    assert request.ok is True
+    assert request.reason == "ready"
+    assert request.deck == "A"
+    assert request.track_id == "track-1"
+    assert request.track_path == str(track)
+    assert request.position_s == 64.25
+
+
+def test_mastered_marker_request_refuses_mixed_deck_and_set_time() -> None:
+    state = _state(deck="mix")
+    library = _Library(SimpleNamespace(track_id="track-1", filepath="/music/track.mp3"))
+
+    request = writer.resolve_mastered_marker_request(
+        skill_id="harmonic_mixing",
+        state=state,
+        library=library,
+    )
+
+    assert request.ok is False
+    assert request.reason == "missing_audible_deck"
+
+
+def test_mastered_marker_request_refuses_untrusted_position(tmp_path: Path) -> None:
+    track = tmp_path / "Live Track.mp3"
+    library = _Library(SimpleNamespace(track_id="track-1", filepath=str(track)))
+
+    request = writer.resolve_mastered_marker_request(
+        skill_id="harmonic_mixing",
+        state=_state(position_s=64.25, position_confidence=0.2),
+        library=library,
+    )
+
+    assert request.ok is False
+    assert request.reason == "position_untrusted"
+    assert request.position_s == 64.25
+
+
+def test_mastered_marker_from_state_preserves_opt_in_write_gate(
+    tmp_path: Path, monkeypatch
+) -> None:
+    track = tmp_path / "Live Track.mp3"
+    track.write_bytes(b"fake")
+    library = _Library(SimpleNamespace(track_id="track-1", filepath=str(track)))
+    monkeypatch.setattr(writer, "read_serato_cues", lambda path: [])
+    monkeypatch.setattr(
+        writer,
+        "write_serato_cues",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not write")),
+    )
+
+    result = writer.write_mastered_marker_from_state(
+        skill_id="harmonic_mixing",
+        state=_state(),
+        library=library,
+        allow_write=False,
+    )
+
+    assert result.written is False
+    assert result.reason == "opt_in_required"
+    assert result.position_ms == 64250
