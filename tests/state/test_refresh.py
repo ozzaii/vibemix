@@ -1333,6 +1333,67 @@ def test_tick_writes_active_genre_psytrance_before_hard_tek_overlay(mocker):
     assert state2.active_genre == "hard_tek"
 
 
+def test_tick_writes_active_genre_drum_and_bass_before_hard_tek_overlay(mocker):
+    """D&B should not abstain or fall into Hard Tek solely because its BPM is
+    high. Low mid/high share at 174 BPM routes D&B; high mid/high share at the
+    same tempo still routes hard_tek."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    def dnb_feats(buf, seconds=4.0):
+        return {
+            "rms": 0.1,
+            "onsets_per_sec": 5.0,
+            "sub_share": 0.40,
+            "low_share": 0.20,
+            "mid_share": 0.15,
+            "high_share": 0.20,  # mid+high = 0.35 < 0.55 → "drum_and_bass"
+        }
+
+    def hard_tek_feats(buf, seconds=4.0):
+        return {
+            "rms": 0.1,
+            "onsets_per_sec": 5.0,
+            "sub_share": 0.15,
+            "low_share": 0.20,
+            "mid_share": 0.35,
+            "high_share": 0.30,  # mid+high = 0.65 ≥ 0.55 → "hard_tek"
+        }
+
+    buf = _audible_buf()
+
+    state = MusicState()
+    mocker.patch("vibemix.state.refresh.snapshot_features", side_effect=dnb_feats)
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=174.0,
+        last_bpm_at=1000.0,
+    )
+    assert state.active_genre == "drum_and_bass"
+
+    state2 = MusicState()
+    mocker.patch("vibemix.state.refresh.snapshot_features", side_effect=hard_tek_feats)
+    _tick_once(
+        state2,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=174.0,
+        last_bpm_at=1000.0,
+    )
+    assert state2.active_genre == "hard_tek"
+
+
 def test_tick_writes_buildup_score_from_energy_curve_slope(mocker):
     """Monotonic-climb energy_curve → positive buildup_score in [0.0, 1.0].
     Flat curve → buildup_score ≈ 0.0. Negative slopes clamp to 0.0

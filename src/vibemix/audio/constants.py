@@ -136,8 +136,9 @@ BPM_VALID_MAX = 180.0  # v4:1182 — autocorr-noise reject upper bound
 # ---- Phase 17 — Hard Tek detectors v1 (SENSE-13/SENSE-15) ----
 # Coarse BPM-band + spectral-centroid heuristic for `MusicState.active_genre`
 # (no ML in v2.0 per CONTEXT D-04). The core house/techno/hard_tek bands are
-# intentionally non-overlapping; psytrance intentionally overlaps the lower
-# hard_tek tempo range and is disambiguated by the same spectral gate below.
+# intentionally non-overlapping where possible; psytrance and drum_and_bass
+# intentionally overlap hard_tek tempo ranges and are disambiguated by the same
+# spectral gate below.
 # The hard_tek upper bound is anchored to
 # `BPM_VALID_MAX` so a spurious 250 BPM autocorr lock can never silently flip
 # the active genre — the genre router shares the autocorr-noise-reject ceiling
@@ -146,6 +147,7 @@ GENRE_BPM_BANDS: dict[str, tuple[float, float]] = {
     "house": (118.0, 128.0),
     "techno": (128.0, 138.0),
     "psytrance": (138.0, 150.0),
+    "drum_and_bass": (165.0, BPM_VALID_MAX),
     "hard_tek": (140.0, BPM_VALID_MAX),
     "unknown": (0.0, 0.0),
 }
