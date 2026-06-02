@@ -2662,6 +2662,49 @@ Remaining gate:
 - GUI one-click source selection remains a follow-up. This package gives the
   CLI and Viber setup candidate a truthful, runnable VirtualDJ import path.
 
+## Package 5S - Engine DJ m.db Library Source
+
+Suggested commit: `feat(library): add engine dj database source`
+
+Include:
+
+- `src/vibemix/library/sources/engine.py`
+- `src/vibemix/library/sources/__init__.py`
+- `tests/library/test_sources_engine.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/__main__.py` CLI/source-selection hooks.
+- `src/vibemix/library/setup_discovery.py` setup-candidate wiring.
+- Live co-host speech, prompts, event timing, or deck-identity changes.
+- Engine DJ write-back or opaque `PerformanceData` blob decoding.
+
+Reason:
+
+- Universal Library Ingest should cover Engine DJ / Denon Prime users without
+  making the live app guess from stale or missing Rekordbox XML. Engine DJ
+  exposes a plain SQLite `m.db`, so the first honest slice is a stdlib-only,
+  read-only source parser that feeds existing `TrackEntry`, cue, and beatgrid
+  rows when those rows are relationally available.
+- This deliberately mirrors Package 5N/5P: prove the source seam first, then
+  wire CLI/setup discovery in a separate package so the shared `__main__.py`
+  file is not swept into a parser commit.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_sources_engine.py tests/library/test_sources_traktor.py tests/library/test_sources_virtualdj.py tests/library/test_sources_rekordbox.py`
+- `uv run ruff check src/vibemix/library/sources/engine.py src/vibemix/library/sources/__init__.py tests/library/test_sources_engine.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/library/sources/engine.py src/vibemix/library/sources/__init__.py tests/library/test_sources_engine.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- CLI/setup discovery for Engine DJ is a separate follow-up package. This
+  package proves parser correctness and the shared `LibrarySource` contract
+  only. A real Engine library capture remains the LIVE proof before claiming
+  full Engine DJ import parity.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`
