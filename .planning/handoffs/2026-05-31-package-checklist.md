@@ -9465,3 +9465,37 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/app.ts tauri/ui/tests/shell/settings-nav.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 56 - Folded Learn Practice-First Layout
+
+Suggested commit: `fix(learn-ui): make folded learn practice first`
+
+Include:
+
+- `tauri/ui/src/shell/app.ts`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/shell/learn-folded-layout.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Learn runtime semantics, lesson transcript copy, Earned Wall scoring rules,
+  Settings drawer internals, packaging scripts, and any claim that the whole Learn
+  journey is finished. This package only fixes the shell-embedded Learn hierarchy
+  and layout.
+
+Reason:
+
+- The shipped app opened Learn as a cluttered stack: the Earned Wall dominated the
+  surface while the actual next practice CTA floated near the bottom, and the
+  embedded lesson window still behaved like a standalone `100vh` window inside the
+  shell. Fold Learn practice-first, constrain the embedded root to the shell stage,
+  make viewport-fixed Learn controls absolute inside that stage, and compact the
+  Earned Wall into progress context below the practice surface.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/learn-folded-layout.spec.ts tests/shell/settings-nav.spec.ts tests/shell/shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/app.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

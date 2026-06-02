@@ -578,6 +578,85 @@
   overflow: auto;
 }
 
+/* Learn is folded into the shell stage, not launched as a full standalone
+ * window. Keep the practice deck as the primary surface and turn the Earned
+ * Wall into compact progress context. */
+.surface[data-surface="learn"].surface--mounted .surface-mount {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-root {
+  height: 100%;
+  min-height: 0;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host .learn-booth-panel,
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host .learn-screen-action,
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host .learn-exemplar-chip {
+  position: absolute;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host .learn-booth-panel {
+  top: var(--sp-5);
+  bottom: auto;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-earned-wall {
+  min-height: 0;
+  padding: 0 var(--sp-4) var(--sp-4);
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-earned-wall .skill-wall {
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--rad-md);
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-earned-wall .skill-wall__head {
+  display: none;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-earned-wall .skill-wall__list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-earned-wall .skill-wall__row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+  min-height: 42px;
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-earned-wall .skill-wall__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-earned-wall .skill-wall__fill {
+  grid-column: 2 / -1;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-earned-wall .skill-wall__remains,
+.surface[data-surface="learn"].surface--mounted .learn-earned-wall .skill-wall__proof {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .surface[data-surface="learn"].surface--mounted .learn-earned-wall .skill-wall__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* The deck: the live session was built to fill the whole window (height:100vh,
  * its own titlebar). Folded onto the deck stage it must fill its CONTAINER and
  * shed its window titlebar (the shell provides chrome). Keyed on the session's

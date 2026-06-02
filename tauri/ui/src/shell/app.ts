@@ -62,20 +62,20 @@ const appDeps: SurfaceMountDeps = {
   },
   // Learn folds in two stacked interiors, each in its OWN sub-container so
   // neither clobbers the other (the lesson window owns its host via
-  // `root.innerHTML`): the Earned Wall (v11.0 — your six skills at a glance,
-  // Mastered only from a cited live set) on top, the lesson runner below. The
-  // wall reads `skill_wall` straight off the `ipc.learn.progress_state` window
-  // event the lesson runner already requests on mount, so no extra wiring.
+  // `root.innerHTML`). The lesson runner is first: Learn is a practice
+  // surface, not a trophy case. The Earned Wall remains visible as compact
+  // progress context below it and reads `skill_wall` straight off the same
+  // `ipc.learn.progress_state` event the lesson runner already requests.
   mountLearn: async (mount) => {
-    const wallHost = document.createElement("div");
-    wallHost.className = "learn-earned-wall";
     const lessonHost = document.createElement("div");
     lessonHost.className = "learn-lesson-host";
-    mount.append(wallHost, lessonHost);
-    const { mountSkillWall } = await import("../learn/SkillWall.js");
-    mountSkillWall(wallHost);
+    const wallHost = document.createElement("div");
+    wallHost.className = "learn-earned-wall";
+    mount.append(lessonHost, wallHost);
     const { mountLearnWindow } = await import("../learn/learn-window.js");
     mountLearnWindow(lessonHost);
+    const { mountSkillWall } = await import("../learn/SkillWall.js");
+    mountSkillWall(wallHost);
   },
 };
 

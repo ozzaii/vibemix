@@ -1,0 +1,52 @@
+/**
+ * @vitest-environment node
+ *
+ * Folded Learn layout contract. The shipped app embeds Learn inside the shell
+ * stage; it must not behave like a full standalone window there. The product
+ * regression this covers: Learn opened as a cluttered Earned wall with the
+ * actual practice action floating near the bottom of the whole screen.
+ */
+
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const ROOT = resolve(__dirname, "../../");
+
+function readUi(path: string): string {
+  return readFileSync(resolve(ROOT, path), "utf8");
+}
+
+describe("folded Learn shell layout", () => {
+  it("mounts the lesson runner before the Earned wall", () => {
+    const app = readUi("src/shell/app.ts");
+    expect(app).toContain("mount.append(lessonHost, wallHost)");
+    expect(app.indexOf("mountLearnWindow(lessonHost)")).toBeLessThan(
+      app.indexOf("mountSkillWall(wallHost)"),
+    );
+  });
+
+  it("constrains Learn to the shell stage instead of the viewport", () => {
+    const css = readUi("src/shell/shell.css");
+    expect(css).toContain(
+      '.surface[data-surface="learn"].surface--mounted .surface-mount',
+    );
+    expect(css).toContain("grid-template-rows: minmax(0, 1fr) auto");
+    expect(css).toContain(
+      '.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-root',
+    );
+    expect(css).toContain("height: 100%");
+    expect(css).toContain(".learn-lesson-host .learn-booth-panel");
+    expect(css).toContain("position: absolute");
+    expect(css).toContain("top: var(--sp-5)");
+    expect(css).toContain("bottom: auto");
+  });
+
+  it("keeps Earned as compact context in the folded surface", () => {
+    const css = readUi("src/shell/shell.css");
+    expect(css).toContain(".learn-earned-wall .skill-wall__head");
+    expect(css).toContain("display: none");
+    expect(css).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
+    expect(css).toContain(".learn-earned-wall .skill-wall__remains");
+  });
+});
