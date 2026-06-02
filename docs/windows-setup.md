@@ -37,8 +37,10 @@ Paste-able PowerShell block:
 git clone https://github.com/ozzaii/vibemix.git
 cd vibemix
 
-# uv sync picks up Windows-only deps automatically via sys_platform markers in pyproject.toml.
-uv sync
+# uv sync picks up Windows-only deps automatically via sys_platform markers.
+# --extra ai-local adds the local CLAP/CUE/MOSS ONNX runtime deps used by the
+# product path.
+uv sync --extra ai-local
 
 # pywin32 sometimes needs a post-install step on Windows.
 # The script ships inside the installed pywin32 package — locate via:
@@ -51,13 +53,48 @@ Set-Content .env "GEMINI_API_KEY=your_key_here"
 
 If `uv run python` complains about a missing `pyaudiowpatch` wheel, run `uv pip install pyaudiowpatch` manually.
 
-## 4. Sample-rate calibration
+## 4. Local MOSS voice model
+
+Sven's product voice is local MOSS only. There is no Cartesia, Gemini, OpenAI,
+or other cloud TTS fallback in the runtime. If the MOSS model is absent, the app
+must degrade as muted/unready rather than silently choosing a paid voice.
+
+Check the local model state:
+
+```powershell
+uv run python -m vibemix library models --json
+```
+
+Install required local models when your release/test environment provides the
+pinned MOSS archive metadata:
+
+```powershell
+$env:VIBEMIX_MOSS_TTS_ARCHIVE_URL = "https://example.invalid/MOSS-TTS-Nano-100M-ONNX.zip"
+$env:VIBEMIX_MOSS_TTS_ARCHIVE_SHA256 = "<64-character lowercase sha256>"
+$env:VIBEMIX_MOSS_TTS_ARCHIVE_SIZE = "<archive byte count>"
+uv run python -m vibemix library models --install required --json
+```
+
+Without those archive pins, the CLI reports the exact manual setup needed. The
+manual path is to place a complete `MOSS-TTS-Nano-100M-ONNX` directory in the
+vibemix cache, or point vibemix at it:
+
+```powershell
+$env:VIBEMIX_MOSS_TTS_DIR = "C:\path\to\MOSS-TTS-Nano-100M-ONNX"
+uv run python -m vibemix library models --json
+```
+
+The required directory is the one containing `browser_poc_manifest.json`.
+Source installs need `onnxruntime` and `sentencepiece`; `uv sync --extra
+ai-local` installs both.
+
+## 5. Sample-rate calibration
 
 Control Panel → Sound → Playback → (your default playback device) → Properties → Advanced → Default Format → **48000 Hz, 16-bit, Stereo**.
 
 This is the Windows analogue of macOS's Audio MIDI Setup. Phase 7's `AudioWindows.assert_wasapi_loopback_rate` will refuse to start if the loopback device reports a mismatched rate — same guard as macOS's BlackHole-Sonoma rate-halving detector.
 
-## 5. Run
+## 6. Run
 
 Sanity check that the platform selector resolved to the Windows backends:
 
@@ -72,7 +109,7 @@ Smoke run (Phase 11 ships the full entry point — for now the smoke main is the
 uv run python -m vibemix
 ```
 
-## 6. DJ controller setup
+## 7. DJ controller setup
 
 1. Plug in the DDJ-FLX4 via USB.
 2. Windows auto-installs the Pioneer driver. (No manual driver download needed for FLX4.)
@@ -81,15 +118,16 @@ uv run python -m vibemix
 
 Phase 9 expands this to a 10-controller library (DDJ-200, DDJ-400, DDJ-FLX6, Hercules Inpulse 300, NI Traktor S2 MK3, Reloop Beatmix 2/4, Numark Mixtrack, etc.) with generic-MIDI fallback for unmapped controllers.
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
+- **Sven is silent / voice is unavailable** — run `uv run python -m vibemix library models --json` and inspect the `moss-tts` row. If `installed` is `false`, complete Section 4. This app does not fall back to cloud TTS.
 - **`WASAPI loopback device not found`** — confirm default playback device is set and not muted. Reboot may help after a driver install. Check via `uv run python -c "import pyaudiowpatch as pya; p = pya.PyAudio(); print(p.get_default_wasapi_loopback())"`.
-- **`SampleRateMismatchError`** — repeat Section 4 and set Default Format = 48000 Hz, 16-bit, Stereo.
+- **`SampleRateMismatchError`** — repeat Section 5 and set Default Format = 48000 Hz, 16-bit, Stereo.
 - **`pywin32 ImportError`** — re-run the `pywin32_postinstall.py -install` step from Section 3.
 - **`winsdk ImportError`** — `uv pip install winsdk` manually if the sys_platform marker didn't fire. Rare; report as an issue if it happens on a clean Windows install.
 - **SMTC returns no title** — expected for some DJ apps. Serato / Traktor / rekordbox / VirtualDJ all expose to SMTC differently; djay Pro on Windows is known to not expose to SMTC in all builds. This is a documented v1 limitation; `TrackWindows` gracefully returns `None` and the AI runs without track-title context (still works on audio + screen + MIDI).
 
-## 8. Related release docs
+## 9. Related release docs
 
 - **Windows installer**: `installer/windows/README.md` builds `vibemix-installer.exe`.
 - **Signing**: `docs/signing-windows.md` covers SignPath and Authenticode checks.

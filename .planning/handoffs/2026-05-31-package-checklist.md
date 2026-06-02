@@ -7129,6 +7129,40 @@ Remaining gate:
 - This is a docs/contract cleanup only. It does not prove packaged MOSS voice,
   release artifact readiness, or live FLX4 audio behavior.
 
+## Package 14K2 - Windows MOSS Source Setup Notes
+
+Suggested commit: `docs(windows): document moss voice setup`
+
+Packaging decision: Windows source testers need the same MOSS-only truth as the
+runtime. The app voice is local MOSS only; if the MOSS model is absent, Sven is
+muted/unready instead of falling back to a cloud TTS provider. The Windows source
+setup page previously documented Python/audio/controller setup but did not tell a
+tester how to inspect or satisfy the required local voice model.
+
+Include:
+
+- `docs/windows-setup.md`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime TTS provider selection.
+- MOSS archive hosting, SHA/size pin decisions, or model bundling.
+- Tauri setup UI changes.
+- Co-host prompt, speech, grounding, DROP-call, or deck-timing behavior.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_models_cli.py tests/install/test_prepare_tauri_build.py tests/install/test_sidecar_bundle_ready.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- docs/windows-setup.md .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- A real Windows release still needs ops/release to provide the MOSS archive
+  pins or bundle a complete model tree. This package only prevents the source
+  setup docs from pretending voice readiness is automatic.
+
 ## Package 14L - MOSS-only Source Notes Contract
 
 Suggested commit: `docs(tts): remove stale cloud voice source notes`
