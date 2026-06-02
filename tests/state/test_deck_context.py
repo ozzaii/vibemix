@@ -1780,6 +1780,27 @@ def test_move_effect_context_maps_recent_move_to_dsp_delta() -> None:
     assert "rule=move_effect_prediction_and_measurement_agree" in out
 
 
+def test_move_effect_context_refuses_stale_eq_move_when_controller_state_disagrees() -> None:
+    state = MusicState(audible=True, rms=0.12, onset_density=3.0)
+    state.controller_connected = True
+    state.deck_a = {"vol": 112, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
+    state.prev_perceive = {
+        "rms": 0.10,
+        "sub": 0.24,
+        "low": 0.32,
+        "mid": 0.30,
+        "high": 0.20,
+        "onset_density": 2.0,
+    }
+
+    out = render_move_effect_context(state, ["A_low: flat->killed"])
+
+    assert out is not None
+    assert "license=low_kill:" not in out
+    assert "rule=dsp_delta_not_causal_proof" in out
+
+
 def test_audio_delta_items_include_bounded_master_lufs_receipt() -> None:
     state = MusicState(audible=True, rms=0.12, onset_density=3.0, master_lufs=-11.0)
     state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
@@ -2093,6 +2114,50 @@ def test_live_claim_guard_refuses_move_effect_when_measured_bands_are_flat() -> 
     moves = ["A_low: flat→killed"]
 
     result = apply_live_claim_guard("That low cut cleaned the mix.", state, moves)
+
+    assert result.corrected is True
+    assert result.policy == "move_effect_not_verdict"
+    assert result.reason == "dsp_delta_not_causal_proof"
+    assert "can't tell" in result.text.lower()
+
+
+def test_live_claim_guard_refuses_stale_eq_kill_when_controller_state_disagrees() -> None:
+    state = MusicState(audible=True, rms=0.12, audible_deck="A")
+    state.controller_connected = True
+    state.deck_a = {"vol": 112, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
+    state.prev_perceive = {
+        "rms": 0.10,
+        "sub": 0.24,
+        "low": 0.32,
+        "mid": 0.30,
+        "high": 0.20,
+        "onset_density": 2.0,
+    }
+
+    result = apply_live_claim_guard("That low cut cleaned the mix.", state, ["A_low: flat->killed"])
+
+    assert result.corrected is True
+    assert result.policy == "move_effect_not_verdict"
+    assert result.reason == "dsp_delta_not_causal_proof"
+    assert "can't tell" in result.text.lower()
+
+
+def test_live_claim_guard_refuses_stale_eq_boost_when_controller_state_disagrees() -> None:
+    state = MusicState(audible=True, rms=0.12, audible_deck="A")
+    state.controller_connected = True
+    state.deck_a = {"vol": 112, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.bands = {"sub": 0.24, "low": 0.32, "mid": 0.30, "high": 0.20}
+    state.prev_perceive = {
+        "rms": 0.10,
+        "sub": 0.12,
+        "low": 0.16,
+        "mid": 0.30,
+        "high": 0.20,
+        "onset_density": 2.0,
+    }
+
+    result = apply_live_claim_guard("That low boost opened the mix.", state, ["A_low: flat->boosted"])
 
     assert result.corrected is True
     assert result.policy == "move_effect_not_verdict"

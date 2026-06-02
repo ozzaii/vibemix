@@ -1926,6 +1926,8 @@ def _licensed_move_effect(
             canonical = canonical_eq_move(label)
             if canonical is None:
                 continue
+            if not _eq_move_current_state_supports(state, label, canonical):
+                continue
             predicted = predicted_band_gains(canonical, sample_rate)
             if not predicted:
                 continue
@@ -1951,6 +1953,55 @@ def _licensed_move_effect(
                     context_token=context_token,
                 )
     return _licensed_xfade_effect(state, labels, audio_capture_context=audio_capture_context)
+
+
+def _eq_move_current_state_supports(
+    state: MusicState,
+    label: str,
+    canonical: str,
+) -> bool:
+    """Return True only when controller state still supports the EQ move.
+
+    The prediction+measurement gate proves a band moved in the expected
+    direction. This additional check keeps stale or ambiguous move labels from
+    licensing a causal line after the knob has settled somewhere contradictory.
+    When no controller snapshot is available, keep the older master-only path:
+    abstention still depends on measured audio, not on controller presence.
+    """
+    side = _move_primary_side(label)
+    control = _eq_move_control(canonical)
+    direction = _eq_move_direction(canonical)
+    if control is None or direction is None:
+        return True
+    raw = _deck_raw(state, side)
+    if not raw:
+        return not getattr(state, "controller_connected", False)
+    now = _control_now_tier(raw, control)
+    if direction == "cut":
+        return now in {"killed", "deep-cut", "cut"}
+    if direction == "boost":
+        return now in {"boost", "max"}
+    return False
+
+
+def _eq_move_control(canonical: str) -> str | None:
+    if canonical.startswith("low_"):
+        return "low"
+    if canonical.startswith("mid_"):
+        return "mid"
+    if canonical.startswith("high_"):
+        return "hi"
+    if canonical.startswith("filter_"):
+        return "filter"
+    return None
+
+
+def _eq_move_direction(canonical: str) -> str | None:
+    if canonical.endswith("_kill") or canonical == "filter_hp":
+        return "cut"
+    if canonical.endswith("_boost") or canonical == "filter_lp":
+        return "boost"
+    return None
 
 
 def _licensed_xfade_effect(

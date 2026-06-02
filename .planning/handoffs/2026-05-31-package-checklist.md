@@ -3551,10 +3551,14 @@ Proof to run:
 
 ## Package 8K - EQ Move Physics Full-Suite Cleanup
 
-Suggested commit: `fix(cohost): keep eq move license full-suite clean`
+Suggested commit: `fix(cohost): require eq state for move-effect license`
 
 Include:
 
+- `src/vibemix/state/deck_context.py` (state-aware EQ move license gate only;
+  do not stage unrelated judge/voice/lufs/deck-audio hunks)
+- `tests/state/test_deck_context.py` (state-aware stale EQ false-positive pins
+  only)
 - `src/vibemix/library/codex_curate.py`
 - `src/vibemix/__main__.py` (only the `_load_env_robust` first-existing `.env`
   hunk; do not stage unrelated formatting/Viber setup hunks)
@@ -3577,12 +3581,20 @@ Reason:
   stale expectations and one Viber guard edge: a licensed
   `move_effect_supported` verdict must be allowed to keep the grounded causal
   line instead of being flattened into the old generic refusal.
+- The 2026-06-02 evidence pack then identified the remaining source-level
+  keystone gap: prediction + measured delta can still be state-blind. This
+  slice requires the current controller snapshot to agree with the canonical EQ
+  move (`low_kill` needs the low tier to be killed/deep-cut/cut, boosts need a
+  boost/max tier) before Sven may keep a causal move-effect line. Master-only
+  rigs without a controller snapshot keep the older abstain-first measured-audio
+  path; contradictory controller state always refuses.
 - The cleanup keeps the default abstain/refuse posture intact, updates canaries
   and generated docs to the new guard behavior, and removes an oversized tracked
   live trace artifact while preserving the smaller proof summary files.
 
 Proof to run:
 
+- `uv run pytest -q tests/intel/test_eq_move_model.py tests/state/test_deck_context.py::test_move_effect_context_maps_recent_move_to_dsp_delta tests/state/test_deck_context.py::test_move_effect_context_refuses_stale_eq_move_when_controller_state_disagrees tests/state/test_deck_context.py::test_live_claim_guard_licenses_grounded_move_effect_causal_verdict tests/state/test_deck_context.py::test_live_claim_guard_refuses_move_effect_when_measured_bands_are_flat tests/state/test_deck_context.py::test_live_claim_guard_refuses_stale_eq_kill_when_controller_state_disagrees tests/state/test_deck_context.py::test_live_claim_guard_refuses_stale_eq_boost_when_controller_state_disagrees tests/state/test_deck_context.py::test_live_claim_guard_corrects_bare_move_effect_quality_verdict tests/state/test_deck_context.py::test_live_claim_guard_suppresses_eq_audio_song_detail_verdict`
 - `uv run pytest -q tests/intel/test_eq_move_model.py tests/state/test_deck_context.py tests/agent/test_dj_cohost_linter.py tests/library/test_codex_curate.py::test_chat_with_codex_licenses_grounded_move_effect_causal_verdict tests/library/test_codex_curate.py::test_chat_prompt_includes_recent_move_context_guard tests/state/test_coach.py::test_task_mix_move_includes_move_effect_context_when_dsp_delta_is_grounded`
 - `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py`
 - `uv run pytest -q tests/learn/test_no_speculative_phrase.py tests/prompts/test_negative_dict.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py tests/state/test_event_detector.py`
