@@ -1995,6 +1995,10 @@ def render_audio_delta_items(
             out.append(phr)
         if len(out) >= cap:
             break
+    if len(out) < cap:
+        brightness_delta = _render_brightness_delta(bands, prev)
+        if brightness_delta is not None:
+            out.append(brightness_delta)
     return out
 
 
@@ -2038,6 +2042,43 @@ def _render_lufs_delta(cur: object, prev: object, *, floor_lu: float = 1.0) -> s
     else:
         confidence = "slight"
     return f"master lufs delta {verb} {magnitude} lu ({confidence})"
+
+
+def _render_brightness_delta(
+    bands: dict[str, object],
+    prev: dict[str, object],
+    *,
+    floor: float = 0.15,
+) -> str | None:
+    """Render a compact mid+high movement receipt.
+
+    This is not a full spectral-centroid claim. It is a prompt-safe receipt
+    from the already-cached four-band shares: mids plus highs rose/fell enough
+    to be worth citing.
+    """
+    cur_brightness = _finite_band_sum(bands, "mid", "high")
+    prev_brightness = _finite_band_sum(prev, "mid", "high")
+    if cur_brightness is None or prev_brightness is None:
+        return None
+    return render_delta(
+        "brightness share",
+        cur_brightness,
+        prev_brightness,
+        floor=floor,
+    )
+
+
+def _finite_band_sum(values: dict[str, object], *keys: str) -> float | None:
+    total = 0.0
+    for key in keys:
+        try:
+            value = float(values.get(key, 0.0) or 0.0)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(value) or value < 0.0:
+            return None
+        total += value
+    return total
 
 
 def _licensed_move_effect(

@@ -1945,9 +1945,48 @@ def test_audio_delta_items_include_bounded_master_lufs_receipt() -> None:
     assert "audio_delta=master_lufs_delta_rose_3_lu_clear" in mix_keys
 
 
+def test_audio_delta_items_include_brightness_share_receipt() -> None:
+    state = MusicState(audible=True, rms=0.12, onset_density=3.0, master_lufs=-14.0)
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
+    state.prev_perceive = {
+        "rms": 0.12,
+        "master_lufs": -14.0,
+        "sub": 0.12,
+        "low": 0.16,
+        "mid": 0.25,
+        "high": 0.25,
+        "onset_density": 3.0,
+    }
+
+    items = render_audio_delta_items(state)
+    mix_keys = live_mix_evidence_keys(state, audio_delta_items=items)
+
+    assert items == [
+        "mid energy rose 60% (strong)",
+        "high energy rose 28% (clear)",
+        "brightness share rose 44% (strong)",
+    ]
+    assert "audio_delta=brightness_share_rose_44pct_strong" in mix_keys
+
+
 def test_audio_delta_items_strip_flat_master_lufs_receipt() -> None:
     state = MusicState(audible=True, rms=0.12, onset_density=3.0, master_lufs=-13.8)
     state.prev_perceive = {"master_lufs": -14.0}
+
+    assert render_audio_delta_items(state) == []
+
+
+def test_audio_delta_items_strip_flat_brightness_share_receipt() -> None:
+    state = MusicState(audible=True, rms=0.12, onset_density=3.0)
+    state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.27, "high": 0.24}
+    state.prev_perceive = {
+        "sub": 0.12,
+        "low": 0.16,
+        "mid": 0.25,
+        "high": 0.25,
+        "rms": 0.12,
+        "onset_density": 3.0,
+    }
 
     assert render_audio_delta_items(state) == []
 
