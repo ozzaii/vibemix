@@ -8013,6 +8013,42 @@ Proof before staging:
 - `git diff --check -- src/vibemix/learn/mastered_marker_writer.py tests/learn/test_mastered_marker_writer.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 35D - Psytrance BPM Fallback Band
+
+Suggested commit: `fix(genre): classify psytrance bpm fallback`
+
+Include:
+
+- `src/vibemix/audio/constants.py`
+- `src/vibemix/state/refresh.py`
+- `tests/audio/test_phase17_constants.py`
+- `tests/state/test_refresh.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New detector algorithms, prompt persona wording, speech-bank text, profile
+  JSON retuning, and any live hardware claim.
+- Rebuilding the psytrance event chain. Package 35C already registered the
+  chain; this package only fixes the cold/coarse BPM fallback.
+
+Reason:
+
+- Psytrance is now a first-class event-router genre, but the coarse
+  `GENRE_BPM_BANDS` fallback could still not emit `psytrance`. A fast
+  low-centroid psytrance track around 145-150 BPM could therefore fall through
+  into Hard Tek or unknown routing. Add a 138-150 psytrance band and use the
+  existing Hard Tek spectral gate to disambiguate the overlapping 140-150
+  region: low mid/high share routes psytrance; high mid/high share still routes
+  Hard Tek.
+
+Proof before staging:
+
+- `uv run pytest -q tests/audio/test_phase17_constants.py tests/state/test_refresh.py tests/state/test_genre_router.py tests/state/test_genre_router_integration.py tests/state/test_genre_autodetect.py`
+- `uv run ruff check src/vibemix/audio/constants.py src/vibemix/state/refresh.py tests/audio/test_phase17_constants.py tests/state/test_refresh.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/audio/constants.py src/vibemix/state/refresh.py tests/audio/test_phase17_constants.py tests/state/test_refresh.py .planning/handoffs/2026-05-31-package-checklist.md`
+
 ## Package 20 - Retire Dead Tend Citation Source
 
 Suggested commit: `fix(grounding): remove dead tend citation source`

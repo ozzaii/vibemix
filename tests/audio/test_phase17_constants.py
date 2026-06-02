@@ -21,12 +21,15 @@ from vibemix.audio.constants import (
 
 
 def test_genre_bpm_bands_constant_shape() -> None:
-    """GENRE_BPM_BANDS is a dict of {"house"/"techno"/"hard_tek"/"unknown":
-    (min_bpm, max_bpm)} per CONTEXT D-04. Bands intentionally non-overlapping;
-    gaps (128-128, 138-140) → "unknown" (per "trust the audio" — don't
-    force-classify ambiguous)."""
+    """GENRE_BPM_BANDS lists every coarse event-router fallback genre."""
     assert isinstance(GENRE_BPM_BANDS, dict)
-    assert set(GENRE_BPM_BANDS.keys()) == {"house", "techno", "hard_tek", "unknown"}
+    assert set(GENRE_BPM_BANDS.keys()) == {
+        "house",
+        "techno",
+        "psytrance",
+        "hard_tek",
+        "unknown",
+    }
 
     for name, band in GENRE_BPM_BANDS.items():
         assert isinstance(band, tuple), f"{name} band must be a tuple"
@@ -37,10 +40,12 @@ def test_genre_bpm_bands_constant_shape() -> None:
 
 
 def test_genre_bpm_bands_values_match_context_d04() -> None:
-    """Per CONTEXT D-04: house 118-128, techno 128-138, hard_tek 140-160+
-    (upper sentinel = BPM_VALID_MAX). Locks the SENSE-15 contract."""
+    """Per CONTEXT D-04 plus the psytrance profile: psytrance covers the
+    low-centroid 138-150 fast-trance band while Hard Tek keeps the high-centroid
+    140-BPM_VALID_MAX lane."""
     assert GENRE_BPM_BANDS["house"] == (118.0, 128.0)
     assert GENRE_BPM_BANDS["techno"] == (128.0, 138.0)
+    assert GENRE_BPM_BANDS["psytrance"] == (138.0, 150.0)
     # hard_tek upper bound MUST equal BPM_VALID_MAX so genre router shares
     # the autocorr-noise-reject ceiling (anti-hallucination).
     assert GENRE_BPM_BANDS["hard_tek"][0] == 140.0

@@ -275,20 +275,21 @@ def _update_move_audio_delta(
 def _classify_active_genre(bpm: float, feats: dict) -> str:
     """Coarse BPM-band + spectral-centroid heuristic for `active_genre`.
 
-    Per CONTEXT D-04: house 118-128, techno 128-138, hard_tek 140-BPM_VALID_MAX,
-    "unknown" otherwise. Bands intentionally non-overlapping; the gaps
-    (128-128, 138-140) → "unknown" (per "trust the audio" — don't force-classify
-    ambiguous tempos).
+    Per CONTEXT D-04: house 118-128, techno 128-138,
+    psytrance 138-150 when the spectrum is not Hard Tek-like, hard_tek
+    140-BPM_VALID_MAX, "unknown" otherwise. The 128 and 138 boundaries stay
+    exact and a high-centroid 138-140 slice stays "unknown" rather than forcing
+    a scene profile.
 
     Anti-hallucination: invalid BPM (≤ 0 or outside the autocorr-noise-reject
     window BPM_VALID_MIN..BPM_VALID_MAX) yields "unknown" — no fabricated genre
     during BPM lock-up. Mirrors the v4 `_music_truly_playing` rule
     (T-17-01-01 mitigation in 17-01-PLAN threat register).
 
-    Hard Tek extra gate: when BPM lands in the hard_tek band, also require
-    `(mid_share + high_share) >= GENRE_CENTROID_HARD_TEK_MIN` — distorted-kick
-    spectral signature gate, anti-misclassify-on-house-with-fast-tempo. Below
-    floor → "unknown" (we'd rather not classify than mis-classify).
+    Psytrance / Hard Tek disambiguation: both can live around 140-150 BPM. A
+    low `(mid_share + high_share)` routes psytrance; a high one routes Hard Tek.
+    Below the Hard Tek floor outside the psytrance band → "unknown" (we'd
+    rather not classify than mis-classify).
     """
     if bpm <= 0 or not (BPM_VALID_MIN <= bpm <= BPM_VALID_MAX):
         return "unknown"
@@ -297,6 +298,10 @@ def _classify_active_genre(bpm: float, feats: dict) -> str:
         if name == "unknown":
             continue
         if lo <= bpm < hi or (name == "hard_tek" and bpm == hi):
+            if name == "psytrance":
+                if centroid < GENRE_CENTROID_HARD_TEK_MIN:
+                    return name
+                continue
             if name == "hard_tek" and centroid < GENRE_CENTROID_HARD_TEK_MIN:
                 return "unknown"
             return name
