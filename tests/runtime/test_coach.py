@@ -1066,7 +1066,54 @@ def test_coach_14_plain_heartbeat_stays_silent(
         "speak_gate",
         type="HEARTBEAT",
         verdict="silent",
-        reason="heartbeat_describe_bank_only",
+        reason="describe_bank_only",
+        tier="runtime_value_gate",
+        schema_version="1",
+    )
+
+
+def test_coach_14_plain_phase_stays_silent(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    """Plain PHASE events can be true but still just describe-bank narration."""
+    fake_event_detector.detect.return_value = Event(
+        "PHASE",
+        music_state,
+        extra={"prev_phase": "groove", "new_phase": "low"},
+    )
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)  # 1 warmup + 1 tick
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            asyncio.Event(),
+            {"in_flight": False},
+            stop_event,
+        )
+    )
+
+    assert fake_agent.set_next_event.call_count == 0
+    assert fake_session.generate_reply.call_count == 0
+    fake_recorder.log_event.assert_called_once_with(
+        "speak_gate",
+        type="PHASE",
+        verdict="silent",
+        reason="describe_bank_only",
         tier="runtime_value_gate",
         schema_version="1",
     )

@@ -3,9 +3,9 @@
 
 The citation/slop filters decide whether a generated line is safe to speak.
 This gate runs earlier: it decides whether a live event is worth asking the
-LLM about at all. The first hard rule is intentionally conservative: a plain
-HEARTBEAT with no grounded voice payload is describe-bank territory, so it
-stays silent by default.
+LLM about at all. The first hard rule is intentionally conservative: plain
+low-value narration events with no grounded voice payload are describe-bank
+territory, so they stay silent by default.
 """
 
 from __future__ import annotations
@@ -25,6 +25,8 @@ _GROUNDED_VOICE_EXTRA_KEYS = frozenset(
         "judge_evidence_line",
     }
 )
+
+_DESCRIBE_BANK_EVENT_TYPES = frozenset({"HEARTBEAT", "PHASE", "LAYER_ARRIVAL"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,19 +53,20 @@ def decide_speak_gate(
 ) -> SpeakGateDecision:
     """Return whether the runtime should ask Sven to generate a line.
 
-    Manual/user speech paths always pass. Non-HEARTBEAT events keep the existing
-    event priority ladder. HEARTBEAT is the only event muted here, and only when
-    it has no deterministic grounded voice payload; that prevents low-value
-    texture narration while preserving future cited HEARTBEAT receipts.
+    Manual/user speech paths always pass. MIX_MOVE, TRACK_CHANGE, DROP, and
+    genre-specific structural events keep the event priority ladder. The
+    describe-bank-prone automatic events (plain HEARTBEAT / PHASE /
+    LAYER_ARRIVAL) only reach Sven when code has already attached a grounded
+    deterministic voice payload.
     """
 
     if manual or kaan_just_spoke or ev.type in {"MANUAL", "KAAN_SPOKE"}:
         return SpeakGateDecision("speak", "human_or_manual")
-    if ev.type != "HEARTBEAT":
-        return SpeakGateDecision("speak", "event_priority")
-    if _has_grounded_voice_payload(ev):
-        return SpeakGateDecision("speak", "heartbeat_grounded_voice_payload")
-    return SpeakGateDecision("silent", "heartbeat_describe_bank_only")
+    if ev.type in _DESCRIBE_BANK_EVENT_TYPES:
+        if _has_grounded_voice_payload(ev):
+            return SpeakGateDecision("speak", "grounded_voice_payload")
+        return SpeakGateDecision("silent", "describe_bank_only")
+    return SpeakGateDecision("speak", "event_priority")
 
 
 __all__ = [

@@ -9257,3 +9257,34 @@ Proof before staging:
 - `uv run pytest -q tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py::test_live_status_recheck_reports_visible_controller_without_midi_as_connected tests/runtime/test_ws_bus_deck_state.py::test_course3_operator_action_names_visible_controller_with_no_midi_traffic`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/runtime/ws_bus.py tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 50 - Speak Gate Describe-Bank Suppression
+
+Suggested commit: `fix(cohost): suppress plain phase describe-bank turns`
+
+Include:
+
+- `src/vibemix/runtime/speak_gate.py`
+- `tests/runtime/test_speak_gate.py`
+- `tests/runtime/test_coach.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/runtime/coach.py`, `src/vibemix/__main__.py`, prompts, MOSS/TTS,
+  DROP-call speech, event detector timing, and citation grammar.
+
+Reason:
+
+- Sven should not spend voice on plain texture narration. The runtime already
+  gates HEARTBEAT describe-bank turns, but plain PHASE and LAYER_ARRIVAL events
+  can still ask the LLM for narration with no deterministic grounded voice
+  payload. Extend the same subtractive gate to those low-value automatic events
+  while preserving MIX_MOVE/TRACK_CHANGE and grounded payloads.
+
+Proof before staging:
+
+- `uv run pytest -q tests/runtime/test_speak_gate.py tests/runtime/test_coach.py::test_coach_14_plain_heartbeat_stays_silent tests/runtime/test_coach.py::test_coach_14_plain_phase_stays_silent`
+- `uv run pytest -q tests/prompts/test_negative_dict.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py tests/state/test_event_detector.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/runtime/speak_gate.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py .planning/handoffs/2026-05-31-package-checklist.md`
