@@ -60,6 +60,23 @@ def test_setup_discovery_finds_standard_virtualdj_database(tmp_path: Path) -> No
     }
 
 
+def test_setup_discovery_finds_standard_engine_database(tmp_path: Path) -> None:
+    database = tmp_path / "Music" / "Engine Library" / "Database2" / "m.db"
+    database.parent.mkdir(parents=True)
+    database.write_bytes(b"SQLite fixture")
+
+    candidates = discover_library_setup_candidates(home=tmp_path)
+
+    engine = [candidate for candidate in candidates if candidate.kind == "engine_database"]
+    assert engine
+    assert engine[0].path == str(database)
+    assert "library ingest --source engine" in engine[0].command
+    assert engine[0].import_action == {
+        "type": "ipc.library.import",
+        "payload": {"path": str(database), "schema_version": "1"},
+    }
+
+
 def test_setup_discovery_finds_bounded_music_folder_candidate(tmp_path: Path) -> None:
     crate = tmp_path / "Music" / "PSYMIND"
     crate.mkdir(parents=True)

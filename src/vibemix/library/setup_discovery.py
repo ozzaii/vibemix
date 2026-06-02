@@ -4,8 +4,8 @@
 Fresh installs often have no ``library.pkl`` yet, so Viber cannot ground deck
 identity or set-prep. This module provides a bounded, content-light discovery
 pass: standard Rekordbox XML export locations, standard Traktor NML locations,
-standard VirtualDJ database locations, plus shallow music-folder candidates. It
-never reads Rekordbox's live database and never auto-ingests.
+standard VirtualDJ/Engine DJ database locations, plus shallow music-folder
+candidates. It never reads Rekordbox's live database and never auto-ingests.
 """
 
 from __future__ import annotations
@@ -15,11 +15,18 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 
+from vibemix.library.sources.engine import EngineDJSource
 from vibemix.library.sources.rekordbox import RekordboxSource
 from vibemix.library.sources.traktor import TraktorSource
 from vibemix.library.sources.virtualdj import VirtualDJSource
 
-CandidateKind = Literal["rekordbox_xml", "traktor_nml", "virtualdj_database", "music_folder"]
+CandidateKind = Literal[
+    "rekordbox_xml",
+    "traktor_nml",
+    "virtualdj_database",
+    "engine_database",
+    "music_folder",
+]
 SUPPORTED_AUDIO_SUFFIXES = (".mp3", ".m4a", ".wav", ".flac", ".aac")
 
 
@@ -161,6 +168,26 @@ def discover_library_setup_candidates(
                         reason="standard VirtualDJ database.xml path exists",
                         command=(
                             "uv run python -m vibemix library ingest --source virtualdj "
+                            f"{_quote_path(path)}"
+                        ),
+                        import_action=_ipc_import_action(path),
+                    )
+                )
+        except OSError:
+            continue
+
+    for database in EngineDJSource().default_paths():
+        path = _path_at_home(database, base if home else None)
+        try:
+            if path.is_file():
+                candidates.append(
+                    LibrarySetupCandidate(
+                        kind="engine_database",
+                        path=str(path),
+                        confidence="high",
+                        reason="standard Engine DJ Database2/m.db path exists",
+                        command=(
+                            "uv run python -m vibemix library ingest --source engine "
                             f"{_quote_path(path)}"
                         ),
                         import_action=_ipc_import_action(path),

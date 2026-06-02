@@ -146,6 +146,30 @@ function statsWithSetupCandidate(): LibraryStats {
   };
 }
 
+function statsWithEngineSetupCandidate(): LibraryStats {
+  const path = "/Users/ozai/Music/Engine Library/Database2/m.db";
+  return {
+    ...STATS_READY,
+    indexed: 0,
+    library_freshness_status: "not_indexed",
+    library_stale: false,
+    library_staleness_reason: "library_cache_missing",
+    library_age_days: 0,
+    library_setup_candidates: [
+      {
+        kind: "engine_database",
+        path,
+        confidence: "high",
+        reason: "standard Engine DJ Database2/m.db path exists",
+        import_action: {
+          type: "ipc.library.import",
+          payload: { path, schema_version: "1" },
+        },
+      },
+    ],
+  };
+}
+
 const CHAT_WITH_PLAYLIST: LibraryChatResult = {
   reply: "Pull SMOKED OUT after the current track and keep the low end clean.",
   tool_trace: [
@@ -542,6 +566,24 @@ describe("chat - real runChat path", () => {
     expect(setupCard?.textContent).toContain("waiting for approval");
     expect(setupCard?.textContent).toContain("Index folder");
     expect(emitIpcMock).not.toHaveBeenCalled();
+  });
+
+  it("labels Engine DJ setup candidates as importable databases", async () => {
+    statsMock.mockResolvedValueOnce(statsWithEngineSetupCandidate());
+
+    await mountChat();
+
+    const setupCard = document.querySelector<HTMLElement>(
+      '[data-wire="library.setup-candidate"]',
+    );
+    expect(setupCard).not.toBeNull();
+    expect(setupCard?.textContent).toContain(
+      "Viber found a likely Engine DJ database.",
+    );
+    expect(setupCard?.textContent).toContain(
+      "/Users/ozai/Music/Engine Library/Database2/m.db",
+    );
+    expect(setupCard?.textContent).toContain("Import source");
   });
 
   it("sends the safe library import action only after the user clicks it", async () => {

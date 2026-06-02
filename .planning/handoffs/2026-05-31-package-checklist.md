@@ -2705,6 +2705,51 @@ Remaining gate:
   only. A real Engine library capture remains the LIVE proof before claiming
   full Engine DJ import parity.
 
+## Package 5T - Engine DJ Ingest CLI and Setup Discovery
+
+Suggested commit: `feat(library): wire engine dj ingest setup path`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `src/vibemix/library/setup_discovery.py`
+- `tests/library/test_setup_discovery.py`
+- `tests/library/test_ingest_cli_anlz.py`
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/chat.test.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Live co-host speech, prompts, EventDetector timing, or DROP-call paths.
+- Automatic ingest/re-embed from discovery candidates.
+- Engine DJ write-back or opaque `PerformanceData` blob decoding.
+- Full Settings UI redesign; this slice uses the existing setup candidate card.
+
+Reason:
+
+- Package 5S made Engine DJ `m.db` parseable, but discovery must not surface a
+  dead or unlabeled action. This slice makes
+  `library ingest --source engine <m.db>` real, lets setup discovery recommend
+  that command when a standard Engine DJ `Database2/m.db` exists, and lets the
+  Library/Viber setup card label it as an Engine DJ database.
+- Rekordbox ANLZ enrichment remains Rekordbox-only and is skipped explicitly
+  for Engine DJ so the command is honest about what metadata it can add.
+
+Proof to run:
+
+- `uv run pytest -q tests/library/test_setup_discovery.py tests/library/test_ingest_cli_anlz.py tests/library/test_sources_engine.py`
+- `uv run ruff check src/vibemix/__main__.py src/vibemix/library/setup_discovery.py tests/library/test_setup_discovery.py tests/library/test_ingest_cli_anlz.py`
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/__main__.py src/vibemix/library/setup_discovery.py tests/library/test_setup_discovery.py tests/library/test_ingest_cli_anlz.py tauri/ui/src/library/index.ts tauri/ui/src/library/chat.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+Remaining gate:
+
+- A real Engine DJ library capture remains the LIVE proof before claiming full
+  Engine import parity. This package proves the existing app/CLI setup path can
+  reach the source without changing live/cohost behavior.
+
 ## Package 5G - Shell Library Freshness Badge
 
 Suggested commit: `feat(tauri-ui): show library freshness in shell`

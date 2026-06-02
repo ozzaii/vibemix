@@ -69,6 +69,13 @@ class _FakeVirtualDJSource(_FakeSource):
         return [Path("/fixture/database.xml")]
 
 
+class _FakeEngineDJSource(_FakeSource):
+    name = "engine"
+
+    def default_paths(self) -> list[Path]:
+        return [Path("/fixture/m.db")]
+
+
 class _FakeStore:
     closed = False
 
@@ -84,12 +91,14 @@ def _patch_ingest_dependencies(monkeypatch, *, anlz_builder, captured):
     import vibemix.library.anlz_ingest as anlz_mod
     import vibemix.library.clap_engine as clap_mod
     import vibemix.library.ingest as ingest_mod
+    import vibemix.library.sources.engine as engine_source_mod
     import vibemix.library.sources.rekordbox as source_mod
     import vibemix.library.sources.traktor as traktor_source_mod
     import vibemix.library.sources.virtualdj as virtualdj_source_mod
     import vibemix.library.store as store_mod
 
     monkeypatch.setattr(source_mod, "RekordboxSource", _FakeSource)
+    monkeypatch.setattr(engine_source_mod, "EngineDJSource", _FakeEngineDJSource)
     monkeypatch.setattr(traktor_source_mod, "TraktorSource", _FakeTraktorSource)
     monkeypatch.setattr(virtualdj_source_mod, "VirtualDJSource", _FakeVirtualDJSource)
     monkeypatch.setattr(clap_mod, "ClapEngine", _FakeClapEngine)
@@ -231,3 +240,33 @@ def test_library_ingest_cli_can_select_virtualdj_source(monkeypatch, capsys) -> 
     assert json.loads(out.out)["embedded"] == 1
     assert "source=virtualdj" in out.err
     assert "ANLZ structure index skipped for source=virtualdj" in out.err
+
+
+def test_library_ingest_cli_can_select_engine_source(monkeypatch, capsys) -> None:
+    import vibemix.__main__ as main_mod
+
+    captured = {}
+    _patch_ingest_dependencies(
+        monkeypatch,
+        anlz_builder=lambda: SimpleNamespace(by_basename={"should-not": (object(),)}),
+        captured=captured,
+    )
+
+    code = main_mod._cmd_library_ingest(
+        argparse.Namespace(
+            path="m.db",
+            source="engine",
+            json=True,
+            calibrate_cues=False,
+        )
+    )
+
+    assert code == 0
+    assert isinstance(captured["source"], _FakeEngineDJSource)
+    assert captured["source"].database_path == "m.db"
+    assert captured["kwargs"]["anlz_index"] is None
+
+    out = capsys.readouterr()
+    assert json.loads(out.out)["embedded"] == 1
+    assert "source=engine" in out.err
+    assert "ANLZ structure index skipped for source=engine" in out.err

@@ -1529,6 +1529,7 @@ function librarySetupCandidateLabel(kind: string): string {
   if (kind === "rekordbox_xml") return "Rekordbox XML";
   if (kind === "traktor_nml") return "Traktor NML";
   if (kind === "virtualdj_database") return "VirtualDJ database";
+  if (kind === "engine_database") return "Engine DJ database";
   if (kind === "music_folder") return "music folder";
   return kind.replace(/_/g, " ");
 }
