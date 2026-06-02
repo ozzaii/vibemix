@@ -8702,3 +8702,37 @@ Proof before staging:
 - `uv run ruff check src/vibemix/llm/_router_config.py tests/llm/test_model_router.py tests/llm/test_model_router_live_coach_deep.py tests/e2e/test_phase_41_latency_stack_integration.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/llm/_router_config.py tests/llm/test_model_router.py tests/llm/test_model_router_live_coach_deep.py tests/e2e/test_phase_41_latency_stack_integration.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 38 - X4 Set Window Context Renderer
+
+Suggested commit: `fix(cohost): add set window context renderer`
+
+Include:
+
+- `src/vibemix/state/deck_context.py`
+- `tests/state/test_deck_context.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/runtime/coach.py`, `src/vibemix/__main__.py`,
+  `src/vibemix/agent/dj_cohost.py`, prompt text, model route selection, live
+  speech, TTS behavior, and any live FLX4/Rekordbox proof claim.
+- The sectioned `AICoach.evidence_line` prompt rewrite. This package is only
+  the bounded long-window TEXT packet and its validator.
+
+Reason:
+
+- X4 needs a 4-5 minute deep-context artifact before it can be wired into Sven.
+  The renderer summarizes existing state streams as structured text, lifts the
+  move-history cap only inside that packet, and hard-codes the master-only
+  honesty atoms: one bounded P1 master mix, no attached per-deck audio, no
+  isolated-deck claim, and no transition/quality verdict field.
+
+Proof before staging:
+
+- `uv run pytest -q tests/state/test_deck_context.py -k set_window_context`
+- `uv run pytest -q tests/state/test_deck_context.py tests/state/test_coach.py tests/state/test_coach_perceive.py tests/state/test_coach_prompt_diet.py`
+- `uv run ruff check src/vibemix/state/deck_context.py tests/state/test_deck_context.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/state/deck_context.py tests/state/test_deck_context.py .planning/handoffs/2026-05-31-package-checklist.md`

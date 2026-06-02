@@ -24,6 +24,7 @@ from vibemix.state.deck_context import (
     normalize_deck_lanes_context_text,
     normalize_deck_reference_context_text,
     normalize_deck_source_context_text,
+    normalize_set_window_context_text,
     render_audio_delta_items,
     render_audio_part_context,
     render_audio_window_context,
@@ -44,6 +45,7 @@ from vibemix.state.deck_context import (
     render_mixer_context,
     render_move_context,
     render_move_effect_context,
+    render_set_window_context,
     sanitize_historical_move_signature_for_prompt,
     should_defer_live_claim_stream,
 )
@@ -158,6 +160,93 @@ def test_context_feed_contract_labels_cache_history_and_speed() -> None:
 
 def test_context_feed_contract_stays_silent_when_no_live_packet() -> None:
     assert render_context_feed_contract(MusicState()) is None
+
+
+def test_set_window_context_stays_silent_when_cold() -> None:
+    assert render_set_window_context(MusicState()) is None
+
+
+def test_set_window_context_master_only_honesty_contract(mocker) -> None:
+    mocker.patch("vibemix.state.deck_context.time.time", return_value=1000.0)
+    state = MusicState(
+        audible=True,
+        rms=0.08,
+        bpm=149.0,
+        long_arc=[0.10, 0.13, 0.17, 0.21],
+        trajectory_narrative="phrase=build; energy rising; newest move A_low at 2s",
+        recent_moves=[
+            (2.0, "A_low: flat→killed (big twist)"),
+            (7.5, "xfader→center"),
+        ],
+        phase_history=[
+            (880.0, "groove", "build"),
+            (940.0, "build", "drop"),
+        ],
+        track_history=[
+            (760.0, "Intro Track"),
+            (910.0, "Incoming Track"),
+        ],
+        audio_delta=["sub energy fell 50% (strong)"],
+        move_audio_delta=["low energy fell 40% (clear)"],
+    )
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("Varazslo", bpm=163.0, camelot="7B", genre="psytrance"),
+            "B": _deck("Ananta Gathering", bpm=159.0, camelot="8A", genre="psytrance"),
+        }
+    )
+
+    out = render_set_window_context(state)
+
+    assert out is not None
+    assert out.startswith("set_window_context[")
+    assert normalize_set_window_context_text(out) == out
+    assert "span=-300..0.0" in out
+    assert "audio_attached=P1_only_last_60-90s" in out
+    assert "history=structured_text_only" in out
+    assert "energy_arc=up:4" in out
+    assert "moves=A_low_flat_to_killed_big_twist@-2.0s,xfader_to_center@-7.5s" in out
+    assert "events=PHASE_build_to_drop@-60.0s,TRACK_Incoming_Track@-90.0s" in out
+    assert "transitions=1" in out
+    assert "phase_boundaries=2" in out
+    assert "decks=deck1:A(" in out
+    assert "deck2:B(" in out
+    assert "genre=psytrance" in out
+    assert "trajectory=phrase_build_energy_rising_newest_move_A_low_at_2s" in out
+    assert "per_deck_audio=not_attached" in out
+    assert "isolated_decks=false" in out
+    assert "rule=long_window_is_structured_history_not_audio_proof" in out
+    assert "isolated_decks=true" not in out
+    assert "deckA_audio=attached" not in out
+    assert "transition_verdict=" not in out
+    assert "quality_verdict=" not in out
+
+
+def test_set_window_context_lifts_moves_to_twelve_but_stays_bounded(mocker) -> None:
+    mocker.patch("vibemix.state.deck_context.time.time", return_value=1000.0)
+    state = MusicState(
+        recent_moves=[(float(i), f"A_low: move {i}") for i in range(14)],
+        phase_history=[(999.0, "groove", "build")],
+    )
+
+    out = render_set_window_context(state)
+
+    assert out is not None
+    assert "A_low_move_0@-0.0s" in out
+    assert "A_low_move_11@-11.0s" in out
+    assert "A_low_move_12@-12.0s" not in out
+    assert "A_low_move_13@-13.0s" not in out
+
+
+def test_set_window_context_normalizer_rejects_per_deck_audio_claims() -> None:
+    bad = (
+        "set_window_context[span=-300..0.0 audio_attached=P1_only_last_60-90s "
+        "history=structured_text_only moves=none events=none transitions=0 phase_boundaries=0 "
+        "decks=unknown per_deck_audio=not_attached isolated_decks=true "
+        "rule=long_window_is_structured_history_not_audio_proof]"
+    )
+
+    assert normalize_set_window_context_text(bad) is None
 
 
 def test_single_resolved_deck_blocks_transition_language() -> None:

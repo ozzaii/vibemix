@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import re
+import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -414,6 +415,26 @@ _DECK_AUDIO_WINDOW_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
     "great_transition",
     "clean_transition",
 )
+_SET_WINDOW_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
+    "audio_attached=P1_only_last_60-90s",
+    "history=structured_text_only",
+    "per_deck_audio=not_attached",
+    "isolated_decks=false",
+    "rule=long_window_is_structured_history_not_audio_proof",
+)
+_SET_WINDOW_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
+    "deckA_audio=attached",
+    "deckB_audio=attached",
+    "deckA_audio=stem",
+    "deckB_audio=stem",
+    "deckA_audio=captured",
+    "deckB_audio=captured",
+    "per_deck_audio=attached",
+    "per_deck_audio=deck_pair_parts",
+    "isolated_decks=true",
+    "transition_verdict=",
+    "quality_verdict=",
+)
 _HISTORICAL_CITATION_RE = re.compile(
     r"\[(?:ev|aud|midi|track|screen|mix|key|recall|exemplar|cue):[^\]]+\]"
 )
@@ -708,6 +729,17 @@ def normalize_deck_audio_delta_context_text(raw: object, *, max_len: int = 900) 
     if not any(f"{side}_delta=" in text for side in ("A", "B")):
         return None
     return text
+
+
+def normalize_set_window_context_text(raw: object, *, max_len: int = 1400) -> str | None:
+    """Return trusted ``set_window_context[...]`` text, or ``None``."""
+    return _normalize_live_context_text(
+        raw,
+        prefix="set_window_context",
+        required_atoms=_SET_WINDOW_CONTEXT_REQUIRED_ATOMS,
+        forbidden_atoms=_SET_WINDOW_CONTEXT_FORBIDDEN_ATOMS,
+        max_len=max_len,
+    )
 
 
 def normalize_deck_audio_window_context_text(raw: object, *, max_len: int = 1100) -> str | None:
@@ -1814,6 +1846,62 @@ def render_context_feed_contract(
         "rule=label_provenance_freshness_before_reasoning",
     ]
     return "context_feed_contract[" + " ".join(fields) + "]"
+
+
+def render_set_window_context(
+    state: MusicState,
+    *,
+    span_seconds: float = 300.0,
+    audio_seconds: float = 90.0,
+    max_moves: int = 12,
+    max_events: int = 8,
+    force: bool = False,
+) -> str | None:
+    """Return the X4 long-window TEXT digest for deep live-coach context.
+
+    This is deliberately source-only scaffolding: it is not called from Sven's
+    prompt yet. The packet summarizes the last few minutes from existing state
+    fields while preserving the master-only honesty contract: history is text,
+    P1 is the only attached audio, and isolated/per-deck audio is not claimed.
+    """
+    has_context = bool(
+        force
+        or getattr(state, "trajectory_narrative", "")
+        or getattr(state, "long_arc", None)
+        or getattr(state, "recent_moves", None)
+        or getattr(state, "phase_history", None)
+        or getattr(state, "track_history", None)
+        or getattr(getattr(state, "deck_state", None), "decks", None)
+        or getattr(state, "audio_delta", None)
+        or getattr(state, "move_audio_delta", None)
+    )
+    if not has_context:
+        return None
+
+    span = _bounded_seconds(span_seconds, default=300.0, minimum=60.0, maximum=300.0)
+    audio_span = _bounded_seconds(audio_seconds, default=90.0, minimum=30.0, maximum=90.0)
+    move_cap = max(0, min(12, int(max_moves)))
+    event_cap = max(0, min(8, int(max_events)))
+    fields = [
+        f"span=-{span:.0f}..0.0",
+        "audio_attached=P1_only_last_60-90s",
+        f"audio_window_s={audio_span:.0f}",
+        "history=structured_text_only",
+        _set_window_energy_arc(state),
+        _set_window_moves(state, move_cap),
+        _set_window_events(state, event_cap),
+        f"transitions={_bounded_count(max(0, len(getattr(state, 'track_history', [])) - 1))}",
+        f"phase_boundaries={_bounded_count(len(getattr(state, 'phase_history', [])))}",
+        _set_window_decks(state),
+        _set_window_recent_tracks(state),
+        _set_window_audio_delta(state),
+        _set_window_trajectory(state),
+        "per_deck_audio=not_attached",
+        "isolated_decks=false",
+        "rule=long_window_is_structured_history_not_audio_proof",
+    ]
+    text = "set_window_context[" + " ".join(field for field in fields if field) + "]"
+    return normalize_set_window_context_text(text)
 
 
 def render_move_context(state: MusicState, moves: list[str] | tuple[str, ...]) -> str | None:
@@ -3683,6 +3771,143 @@ def _capture_sample_rate_token(raw: object) -> str:
     if value <= 0:
         return "unknown"
     return str(min(value, 384000))
+
+
+def _bounded_seconds(raw: object, *, default: float, minimum: float, maximum: float) -> float:
+    if raw is None or isinstance(raw, bool):
+        return default
+    try:
+        value = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    if not math.isfinite(value):
+        return default
+    return max(minimum, min(maximum, value))
+
+
+def _bounded_count(raw: object) -> int:
+    try:
+        value = int(raw)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+    return max(0, min(99, value))
+
+
+def _set_window_energy_arc(state: MusicState) -> str:
+    arc = [float(v) for v in getattr(state, "long_arc", []) if isinstance(v, (int, float))]
+    if len(arc) < 2:
+        return "energy_arc=unknown:0"
+    delta = arc[-1] - arc[0]
+    if abs(delta) < 0.03:
+        direction = "flat"
+    else:
+        direction = "up" if delta > 0 else "down"
+    return f"energy_arc={direction}:{min(len(arc), 99)}"
+
+
+def _set_window_moves(state: MusicState, cap: int) -> str:
+    moves: list[tuple[float, str]] = []
+    for raw in getattr(state, "recent_moves", []) or []:
+        if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+            continue
+        try:
+            age = max(0.0, float(raw[0]))
+        except (TypeError, ValueError):
+            continue
+        label = _evidence_token(_move_label(raw[1]).replace(":", " "))
+        if label:
+            moves.append((age, label))
+    moves.sort(key=lambda item: item[0])
+    if not moves or cap <= 0:
+        return "moves=none"
+    items = [f"{label}@-{age:.1f}s" for age, label in moves[:cap]]
+    return "moves=" + ",".join(items)
+
+
+def _set_window_events(state: MusicState, cap: int) -> str:
+    if cap <= 0:
+        return "events=none"
+    now = time.time()
+    events: list[tuple[float, str]] = []
+    for raw in getattr(state, "phase_history", []) or []:
+        if not isinstance(raw, (list, tuple)) or len(raw) < 3:
+            continue
+        age = _history_age(now, raw[0])
+        if age is None:
+            continue
+        label = _evidence_token(f"PHASE_{raw[1]}_to_{raw[2]}")
+        if label:
+            events.append((age, label))
+    for raw in getattr(state, "track_history", []) or []:
+        if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+            continue
+        age = _history_age(now, raw[0])
+        if age is None:
+            continue
+        label = _evidence_token(f"TRACK_{raw[1]}")
+        if label:
+            events.append((age, label))
+    events.sort(key=lambda item: item[0])
+    if not events:
+        return "events=none"
+    items = [f"{label}@-{age:.1f}s" for age, label in events[:cap]]
+    return "events=" + ",".join(items)
+
+
+def _history_age(now: float, raw_ts: object) -> float | None:
+    if raw_ts is None or isinstance(raw_ts, bool):
+        return None
+    try:
+        ts = float(raw_ts)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(ts):
+        return None
+    return max(0.0, now - ts)
+
+
+def _set_window_decks(state: MusicState) -> str:
+    decks = getattr(getattr(state, "deck_state", None), "decks", {}) or {}
+    if not decks:
+        return "decks=unknown"
+    side_alias = {"A": "deck1", "B": "deck2", "C": "deck3", "D": "deck4"}
+    parts: list[str] = []
+    for side, deck in sorted(decks.items()):
+        alias = side_alias.get(str(side), f"deck_{_evidence_token(str(side)) or 'unknown'}")
+        track = _evidence_token(str(deck.track_id or deck.title or "unknown")) or "unknown"
+        bpm = f"{float(deck.bpm):.0f}" if deck.bpm and deck.bpm > 0 else "unknown"
+        camelot = _evidence_token(str(deck.camelot or "unknown")) or "unknown"
+        genre = _evidence_token(str(deck.genre or "unknown")) or "unknown"
+        parts.append(f"{alias}:{side}({track},{bpm},{camelot},genre={genre},cue_next=unknown)")
+    return "decks=" + "+".join(parts)
+
+
+def _set_window_recent_tracks(state: MusicState) -> str:
+    titles: list[str] = []
+    for raw in getattr(state, "track_history", [])[-4:] or []:
+        if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+            continue
+        token = _evidence_token(str(raw[1]))
+        if token:
+            titles.append(token)
+    return "recent_tracks=" + ("+".join(titles) if titles else "none")
+
+
+def _set_window_audio_delta(state: MusicState) -> str:
+    items = [
+        _evidence_token(str(item))
+        for item in (
+            list(getattr(state, "move_audio_delta", []) or [])
+            + list(getattr(state, "audio_delta", []) or [])
+        )
+    ]
+    items = [item for item in items if item][:6]
+    return "audio_delta=" + ("+".join(items) if items else "none")
+
+
+def _set_window_trajectory(state: MusicState) -> str:
+    trajectory = _evidence_token(str(getattr(state, "trajectory_narrative", "") or ""))
+    return f"trajectory={trajectory}" if trajectory else "trajectory=none"
 
 
 def _move_age_for_label(state: MusicState, label: str) -> float | None:
