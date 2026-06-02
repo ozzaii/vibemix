@@ -16,6 +16,7 @@ not in this unit test suite (per 11-02-PLAN.md task 2 item 4).
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import shutil
@@ -458,6 +459,45 @@ def test_pyinstaller_specs_filter_test_submodules(spec_name: str) -> None:
     ]
     for token in required:
         assert token in text, f"{spec_name} missing {token}"
+
+
+@pytest.mark.parametrize(
+    "spec_name",
+    ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
+)
+def test_pyinstaller_specs_filter_test_fixture_data(spec_name: str) -> None:
+    """Frozen bundles must not carry repo test fixtures as runtime data.
+
+    A fixture-backed ``library.pkl`` once made Viber look wired while answering
+    from five fake tracks. Runtime code now quarantines that cache; this pins
+    the packaging half so the sidecar does not ship the fake corpus either.
+    """
+    text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
+    module = ast.parse(text, filename=spec_name)
+    fn = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_runtime_data_file"
+    )
+    harness = ast.Module(body=[fn], type_ignores=[])
+    ast.fix_missing_locations(harness)
+    namespace = {"Path": Path}
+    exec(compile(harness, spec_name, "exec"), namespace)
+    runtime_data_file = namespace["_runtime_data_file"]
+
+    assert (
+        runtime_data_file(
+            ("tests/library/fixtures/synthetic_collection.xml", "vibemix/library/fixtures")
+        )
+        is False
+    )
+    assert runtime_data_file(("src/vibemix/examples/demo.json", "vibemix/examples")) is False
+    assert (
+        runtime_data_file(
+            ("src/vibemix/state/genre/profiles/goa.json", "vibemix/state/genre/profiles")
+        )
+        is True
+    )
 
 
 @pytest.mark.parametrize(
