@@ -9,6 +9,10 @@ what-if sensitivity row.
 
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
+
 import pytest
 
 from vibemix.library.pricing import price_for_path
@@ -260,3 +264,32 @@ def test_live_budget_report_is_a_complete_serializable_dict() -> None:
     assert set(rep["stack"]) == {"brain", "tts", "stt", "viber"}
     # Round-trips through JSON (the --json path must not choke).
     json.dumps(rep)
+
+
+@pytest.mark.cli
+def test_live_budget_cli_defaults_to_moss_local_voice() -> None:
+    """The real CLI default must match the product voice policy: MOSS-only."""
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vibemix",
+            "library",
+            "budget",
+            "--stack",
+            "live",
+            "--dau",
+            "100",
+            "--json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert payload["stack"]["tts"] == "moss-local"
+    tts_leg = next(leg for leg in payload["legs"] if leg["name"] == "tts")
+    assert tts_leg["per_session_eur"] == 0.0

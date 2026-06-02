@@ -3384,8 +3384,8 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_budget.add_argument(
         "--tts",
-        default="live_coach_tts",
-        help="[--stack live] TTS router path or vendor id (e.g. live_coach_tts_fallback, eleven_flash_v2_5)",
+        default="moss-local",
+        help="[--stack live] TTS provider id or paid what-if (default moss-local; e.g. live_coach_tts_fallback, eleven_flash_v2_5)",
     )
     sp_budget.add_argument(
         "--stt",
