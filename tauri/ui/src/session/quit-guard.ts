@@ -1,5 +1,5 @@
 /* quit-guard.ts — confirm-on-quit when the user closes the window during
- * a live recording session (impeccable Wave 6 + pass-3 Rust wiring).
+ * an active live session (impeccable Wave 6 + pass-3 Rust wiring).
  *
  * Three surfaces:
  *
@@ -23,25 +23,27 @@
  * wiring the Rust tray-side handshake. Cmd+Q on a live recording no
  * longer drops the take.
  *
- * The recording-active check uses `status.livekit === "ok"` as a proxy
- * for "session is recording" — the recording pipeline (cohost_v4.py)
- * writes WAVs continuously once the LiveKit session is up, so an "ok"
- * livekit pill is functionally equivalent to "recording in progress". */
+ * The active-live-session check uses `status.livekit === "ok"`. That is
+ * intentionally not called "recording" here: the current UI does not carry
+ * a dedicated recording-consent/recorder-active bit, so the guard protects
+ * the running session without claiming more than the state can prove. */
 
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import { renderConfirmDialog } from "../settings/components/confirm-dialog.js";
 import { getSessionState } from "./state.js";
 
-/** Returns true when the cohost is actively recording — currently a proxy
- *  for "livekit session is up". Exported for tests. */
-export function isRecording(): boolean {
+/** Returns true when the cohost has an active live session. Exported for tests. */
+export function isLiveSessionActive(): boolean {
   try {
     return getSessionState().status.livekit === "ok";
   } catch {
     return false;
   }
 }
+
+/** Back-compat alias for older tests/importers. Prefer isLiveSessionActive. */
+export const isRecording = isLiveSessionActive;
 
 /** Mount the styled "STILL LIVE" confirm dialog and resolve with the
  *  user's choice. The dialog auto-focuses Cancel so an accidental Enter
@@ -58,7 +60,7 @@ export function confirmQuitDuringRecording(
   return new Promise((resolve) => {
     const dialog = renderConfirmDialog({
       heading: "STILL LIVE",
-      body: "your set is recording. quit anyway?",
+      body: "your live session is running. quit anyway?",
       confirmLabel: "QUIT ANYWAY",
       cancelLabel: "STAY",
       variant: "danger",
@@ -84,10 +86,10 @@ export function confirmQuitDuringRecording(
  *  Quit menu click. */
 export function installQuitGuard(): () => void {
   const listener = (e: BeforeUnloadEvent): string | undefined => {
-    if (!isRecording()) return undefined;
+    if (!isLiveSessionActive()) return undefined;
     e.preventDefault();
-    e.returnValue = "your set is recording. quit anyway?";
-    return "your set is recording. quit anyway?";
+    e.returnValue = "your live session is running. quit anyway?";
+    return "your live session is running. quit anyway?";
   };
   window.addEventListener("beforeunload", listener);
   return (): void => {
@@ -106,7 +108,7 @@ export async function installTrayQuitListener(): Promise<() => void> {
   let dialogOpen = false;
   const unlisten: UnlistenFn = await listen("tray-quit-requested", () => {
     if (dialogOpen) return;
-    if (!isRecording()) {
+    if (!isLiveSessionActive()) {
       void emit("confirmed-quit");
       return;
     }

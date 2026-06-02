@@ -9155,3 +9155,33 @@ Proof before staging:
 - `uv run pytest -q tests/repo/test_tauri_dev_command.py tests/install/test_prepare_tauri_build.py tests/install/test_sidecar_bundle_ready.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/src-tauri/tauri.conf.json5 tests/repo/test_tauri_dev_command.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 47 - Honest Live Quit Guard Copy
+
+Suggested commit: `fix(session): stop calling live quit guard a recording proof`
+
+Include:
+
+- `tauri/ui/src/session/quit-guard.ts`
+- `tauri/ui/tests/session/quit-guard.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Recorder consent/runtime plumbing, `src/vibemix/__main__.py`, local audio
+  capture behavior, titlebar layout, Tauri tray Rust code, and co-host speech.
+
+Reason:
+
+- The quit guard is keyed off `status.livekit === "ok"` because that is the
+  frontend's active live-session signal. The UI does not currently carry a
+  dedicated recorder-active/recording-consent bit, so the previous warning
+  text "your set is recording" overclaimed what the state can prove. Keep the
+  quit protection, but make the wording honest: the live session is running.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/session/quit-guard.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/session/quit-guard.ts tauri/ui/tests/session/quit-guard.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

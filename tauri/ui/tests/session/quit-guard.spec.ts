@@ -5,7 +5,7 @@
  *     STILL LIVE copy and the expected button labels.
  *   - Clicking STAY resolves the promise with false (don't quit).
  *   - Clicking QUIT ANYWAY resolves with true (close).
- *   - isRecording() reads the SessionState.status.livekit flag.
+ *   - isLiveSessionActive() reads the SessionState.status.livekit flag.
  *   - The dialog uses the danger variant (red-tinted destructive button).
  *
  * The beforeunload listener itself is harder to assert directly — vitest's
@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   confirmQuitDuringRecording,
   installQuitGuard,
+  isLiveSessionActive,
   isRecording,
 } from "../../src/session/quit-guard.js";
 import {
@@ -35,9 +36,9 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-describe("isRecording", () => {
+describe("isLiveSessionActive", () => {
   it("returns false when livekit is null", () => {
-    expect(isRecording()).toBe(false);
+    expect(isLiveSessionActive()).toBe(false);
   });
 
   it("returns true when livekit === 'ok'", () => {
@@ -49,6 +50,7 @@ describe("isRecording", () => {
         screen: "ok",
       },
     });
+    expect(isLiveSessionActive()).toBe(true);
     expect(isRecording()).toBe(true);
   });
 
@@ -61,7 +63,7 @@ describe("isRecording", () => {
         screen: "ok",
       },
     });
-    expect(isRecording()).toBe(false);
+    expect(isLiveSessionActive()).toBe(false);
   });
 });
 
@@ -75,7 +77,7 @@ describe("confirmQuitDuringRecording", () => {
       "STILL LIVE",
     );
     expect(document.querySelector(".vmx-confirm__body")?.textContent).toBe(
-      "your set is recording. quit anyway?",
+      "your live session is running. quit anyway?",
     );
     const buttons = Array.from(
       document.querySelectorAll<HTMLButtonElement>(".vmx-confirm__btn"),
@@ -112,7 +114,7 @@ describe("confirmQuitDuringRecording", () => {
 });
 
 describe("installQuitGuard beforeunload listener", () => {
-  it("sets returnValue when isRecording=true so the browser shows native confirm", () => {
+  it("sets returnValue when live session is active so the browser shows native confirm", () => {
     setSessionState({
       status: {
         livekit: "ok",
@@ -131,13 +133,13 @@ describe("installQuitGuard beforeunload listener", () => {
     });
     window.dispatchEvent(event);
     expect((event as BeforeUnloadEvent).returnValue).toBe(
-      "your set is recording. quit anyway?",
+      "your live session is running. quit anyway?",
     );
     unregister();
   });
 
   it("is a no-op when isRecording=false", () => {
-    // Default state: livekit=null → isRecording=false
+    // Default state: livekit=null → isLiveSessionActive=false
     const unregister = installQuitGuard();
     const event = new Event("beforeunload", { cancelable: true });
     Object.defineProperty(event, "returnValue", {
