@@ -64,6 +64,10 @@ function createSurfaceRegion(def: SurfaceDef): HTMLElement {
       `</div></div>`;
   } else {
     const empty = def.empty;
+    const proofRows = empty?.proof?.map((row) =>
+      `<div class="se-proof-row"><dt>${row.label}</dt><dd>${row.value}</dd></div>`,
+    ).join("") ?? "";
+    const proof = proofRows ? `<dl class="se-proof">${proofRows}</dl>` : "";
     region.innerHTML =
       `<div class="surface-empty">` +
       `<span class="se-glyph" aria-hidden="true">${def.glyph}</span>` +
@@ -71,6 +75,7 @@ function createSurfaceRegion(def: SurfaceDef): HTMLElement {
       // get a document outline to navigate by, not just landmark regions.
       `<h2 class="se-title">${empty?.title ?? def.label}</h2>` +
       `<p class="se-sub">${empty?.sub ?? def.hint}</p>` +
+      proof +
       `</div>` +
       `<div class="surface-mount" data-wire="${def.wire}" hidden></div>`;
   }

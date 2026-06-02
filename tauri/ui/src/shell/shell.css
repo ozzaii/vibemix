@@ -539,6 +539,38 @@
   line-height: 1.5;
   color: var(--text-muted);
 }
+.se-proof {
+  width: min(440px, 100%);
+  margin: var(--sp-4) 0 0;
+  padding: var(--sp-2) 0 0;
+  border-top: 1px solid var(--border-subtle);
+  display: grid;
+  gap: var(--sp-2);
+}
+.se-proof-row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-3);
+  text-align: left;
+}
+.se-proof dt,
+.se-proof dd {
+  margin: 0;
+}
+.se-proof dt {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+.se-proof dd {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
 
 /* ── Folded interiors — when a real surface mounts into the shell. ─────────
  * The five surfaces were built as standalone windows each with their own

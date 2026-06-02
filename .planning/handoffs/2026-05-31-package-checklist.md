@@ -9721,3 +9721,38 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/session/SessionLayout.ts tauri/ui/tests/session/components.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 63 - Debrief Empty Review Dock
+
+Suggested commit: `fix(shell): make debrief empty state valuable`
+
+Include:
+
+- `tauri/ui/src/shell/surfaces.ts`
+- `tauri/ui/src/shell/DesktopShell.ts`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/shell/shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Debrief generation, standalone debrief window behavior, recordings, co-host
+  speech, runtime audio, Learn, Crate/Viber, Settings, and packaging scripts.
+  This package only fixes the folded shell Debrief route when no review is
+  available yet.
+
+Reason:
+
+- The signed packaged app at `2846ef10` showed Debrief as a giant void with
+  `No set to review.` and one vague sentence. That is honest but too weak for a
+  commercial product: it makes a powerful post-set engine read like an empty
+  placeholder. Replace it with a compact review dock that previews the actual
+  value Debrief will deliver after a real set: timeline, grounded receipts, and
+  next action. It still does not claim any review exists before evidence lands.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/shell.spec.ts tests/shell/settings-nav.spec.ts tests/shell/surface-mounts.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/surfaces.ts tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

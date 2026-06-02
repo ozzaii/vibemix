@@ -75,6 +75,21 @@ describe("DesktopShell", () => {
     }
   });
 
+  it("makes the Debrief empty state a product preview, not a dead void", () => {
+    shell = mountDesktopShell(host);
+    const debrief = host.querySelector<HTMLElement>('.surface[data-surface="debrief"]')!;
+
+    expect(debrief.querySelector(".se-title")?.textContent).toBe("Your set review lands here.");
+    expect(debrief.textContent).toContain("timeline, skill receipts, and the next move");
+    expect(debrief.textContent).toContain("Timeline");
+    expect(debrief.textContent).toContain("drops, recoveries, energy shape");
+    expect(debrief.textContent).toContain("Receipts");
+    expect(debrief.textContent).toContain("why a praise or critique was grounded");
+    expect(debrief.textContent).toContain("Next move");
+    expect(debrief.textContent).toContain("practice drill or crate follow-up");
+    expect(debrief.textContent).not.toContain("No set to review.");
+  });
+
   it("carries the deck tail cursor as the live speaking sign-of-life", () => {
     shell = mountDesktopShell(host);
     const deck = host.querySelector<HTMLElement>('.surface[data-surface="deck"]')!;

@@ -31,6 +31,13 @@ export interface SurfaceEmptyState {
   readonly title: string;
   /** One grounded co-host line on what unlocks it. No marketing, no slop. */
   readonly sub: string;
+  /** Optional compact proof rows for surfaces whose value is invisible at rest. */
+  readonly proof?: readonly SurfaceEmptyProofRow[];
+}
+
+export interface SurfaceEmptyProofRow {
+  readonly label: string;
+  readonly value: string;
 }
 
 export interface SurfaceDef {
@@ -84,8 +91,13 @@ export const SURFACES: readonly SurfaceDef[] = [
     hint: "post-set review",
     wire: "shell.surface.debrief",
     empty: {
-      title: "No set to review.",
-      sub: "When the set's done, I'll show you where it dipped and where it landed.",
+      title: "Your set review lands here.",
+      sub: "After a real set, I turn cited moments into a timeline, skill receipts, and the next move.",
+      proof: [
+        { label: "Timeline", value: "drops, recoveries, energy shape" },
+        { label: "Receipts", value: "why a praise or critique was grounded" },
+        { label: "Next move", value: "practice drill or crate follow-up" },
+      ],
     },
   },
   {
