@@ -115,14 +115,14 @@ def test_in_bar_tolerance_is_in_sane_bar_length_band():
 
 
 def test_v4_cooldown_baseline_values_are_pinned():
-    """The v4-tuned cooldown VALUES are the locked baseline. Any future re-tune
-    must be a deliberate, visible diff (data-driven from a --print-cooldowns
-    delta), not an accidental edit. Plan 54-02 changes NONE of these."""
+    """The tuned cooldown VALUES are pinned. Any future re-tune must be a
+    deliberate, visible diff, not an accidental edit. X1 intentionally slowed
+    HEARTBEAT after the runtime speak-gate made plain HEARTBEATs silent."""
     assert MIN_EVENT_GAP_PER_TYPE["PHASE"] == 10.0
     assert MIN_EVENT_GAP_PER_TYPE["MIX_MOVE"] == 14.0
     assert MIN_EVENT_GAP_PER_TYPE["LAYER_ARRIVAL"] == 10.0
     assert MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"] == 5.0
     assert EVENT_GLOBAL_MIN_GAP == 22.0
-    assert HEARTBEAT_SEC == 45.0
+    assert HEARTBEAT_SEC == 180.0
     # HEARTBEAT per-type gap flows from HEARTBEAT_SEC.
     assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == HEARTBEAT_SEC

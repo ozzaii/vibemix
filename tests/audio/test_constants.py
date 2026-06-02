@@ -44,11 +44,10 @@ from vibemix.audio import (
 def test_engine_constants_match_v4() -> None:
     """Engine tuning constants — v4:127-133 (the FT profile retune from v3).
 
-    HEARTBEAT_SEC re-tuned by Plan 40-04 / AUDIO-03 from 70.0 → 45.0 to match
-    the v4 chat-tested 2026-05-11 "harikaydı" baseline (memory:
-    project_v4_canonical_baseline). The OLD 70s was a v4-shipped-file literal
-    that diverged from the chat-tested ear-test value; locked target is the
-    chat-tested baseline.
+    HEARTBEAT_SEC first re-tuned by Plan 40-04 / AUDIO-03 from 70.0 → 45.0 to
+    match the v4 chat-tested 2026-05-11 "harikaydı" baseline. X1 speak-gate
+    later made plain HEARTBEAT turns silent by default; this 2026-06-02 retune
+    slows the remaining grounded HEARTBEAT opportunities.
     """
     assert SILENT_RMS == 0.012
     assert LOW_RMS == 0.040
@@ -56,7 +55,7 @@ def test_engine_constants_match_v4() -> None:
     assert AUDIBLE_DEBOUNCE_SEC == 0.6
     assert SILENCE_DEBOUNCE_SEC == 1.2
     assert EVENT_GLOBAL_MIN_GAP == 22.0  # 2026-05-21 Kaan live retune — was 10.0, talked back-to-back; 22s lets the music breathe
-    assert HEARTBEAT_SEC == 45.0  # Plan 40-04 — was 70.0; v4 chat-tested 2026-05-11 baseline
+    assert HEARTBEAT_SEC == 180.0  # X1 follow-up — was 45.0 after Plan 40-04
 
 
 def test_io_constants_match_v4() -> None:
@@ -95,7 +94,7 @@ def test_event_gap_dict_shape_and_values() -> None:
     Plan 40-04 / AUDIO-03 re-tuned the v4 baseline entries to match the
     chat-tested 2026-05-11 "harikaydı" session ear-test:
         TRACK_CHANGE 6 → 5, PHASE 18 → 10, LAYER_ARRIVAL 16 → 10,
-        MIX_MOVE 20 → 14, HEARTBEAT 70 → 45.
+        MIX_MOVE 20 → 14, HEARTBEAT 70 → 45. X1 later retuned HEARTBEAT 45 → 180.
     Phase 17 SENSE-12 / Phase 30 SENSE-17/18 detector cooldowns and MIC /
     MANUAL UNCHANGED.
     """
@@ -128,7 +127,7 @@ def test_event_gap_dict_shape_and_values() -> None:
     assert MIN_EVENT_GAP_PER_TYPE["PHASE"] == 10.0  # Plan 40-04 — was 18.0
     assert MIN_EVENT_GAP_PER_TYPE["LAYER_ARRIVAL"] == 10.0  # Plan 40-04 — was 16.0
     assert MIN_EVENT_GAP_PER_TYPE["MIX_MOVE"] == 14.0  # Plan 40-04 — was 20.0
-    assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == 45.0  # Plan 40-04 — was 70.0
+    assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == 180.0  # X1 follow-up — was 45.0
     assert MIN_EVENT_GAP_PER_TYPE["MIC"] == 3.0  # unchanged
     assert MIN_EVENT_GAP_PER_TYPE["MANUAL"] == 1.5  # unchanged
     # Plan 17-02 kick-side detector cooldowns — UNCHANGED by Plan 40-04

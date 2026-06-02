@@ -58,11 +58,12 @@ SILENCE_DEBOUNCE_SEC = 1.2  # v4:131 — debounce audible→silent
 EVENT_GLOBAL_MIN_GAP = (
     22.0  # 2026-05-21 (Kaan live): was 10.0 — co-host talked back-to-back ("peş peşe"). With ~6s LLM latency, a 10s gap = a reaction every ~16s = constant chatter. 22s gives real breathing room between ANY two reactions (gates every event type). v4:132 "let the music breathe".
 )
-# Plan 40-04 / AUDIO-03 — was 70.0; v4 chat-tested 2026-05-11 baseline
-# ("harikaydı" session). See project memory project_v4_canonical_baseline.
-# The OLD 70s value was a v4-shipped-file literal that diverged from the
-# chat-tested ear-test; locked target is the chat-tested baseline.
-HEARTBEAT_SEC = 45.0
+# Plan 40-04 / AUDIO-03 moved the v4 shipped-file literal (70s) back to the
+# 2026-05-11 ear-test baseline (45s). X1 speak-gate (2026-06-02) then made
+# plain HEARTBEAT turns silent by default; this follow-up slows the remaining
+# grounded HEARTBEAT opportunities so Sven does not keep pumping low-value
+# "still hearing the groove" narration while nothing coachable is happening.
+HEARTBEAT_SEC = 180.0
 
 # Plan 54-02 / LIVE-03 — in-bar reaction-timing tolerance. One bar = 4 beats *
 # 60/bpm: ~1.65s @145 BPM .. ~1.85s @130 BPM; conservative upper bound 2.0 so a
@@ -81,7 +82,7 @@ MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 +
     "PHASE": 10.0,          # Plan 40-04 — was 18.0; v4 2026-05-11 baseline
     "LAYER_ARRIVAL": 10.0,  # Plan 40-04 — was 16.0; v4 2026-05-11 baseline
     "MIX_MOVE": 14.0,       # Plan 40-04 — was 20.0; v4 2026-05-11 baseline
-    "HEARTBEAT": HEARTBEAT_SEC,  # Plan 40-04 — flows from HEARTBEAT_SEC (45.0)
+    "HEARTBEAT": HEARTBEAT_SEC,  # X1 follow-up — flows from HEARTBEAT_SEC (180.0)
     "MIC": 3.0,
     "MANUAL": 1.5,
     # Phase 17 SENSE-12 — kick-side cross-genre detectors (per CONTEXT D-cooldown

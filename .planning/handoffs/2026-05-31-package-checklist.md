@@ -8199,3 +8199,39 @@ Proof before staging:
 - `uv run ruff check scripts/sniff_controller.py tests/midi/test_sniff_controller.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- scripts/sniff_controller.py tests/midi/test_sniff_controller.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 28 - HEARTBEAT Pacing Retune
+
+Suggested commit: `fix(cohost): slow heartbeat pacing after speak gate`
+
+Include:
+
+- `src/vibemix/audio/constants.py`
+- `tests/audio/test_constants.py`
+- `tests/state/test_event_detector.py`
+- `tests/state/test_hype_cooldown_grounding.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/runtime/coach.py`, prompt text, `src/vibemix/state/event_detector.py`,
+  DROP-call speech, and any session-cap or describe-bank-budget implementation.
+- New generated text, new citation grammar, new claim permissions, or any live app
+  control. This package only changes the HEARTBEAT metronome constant and its pins.
+
+Reason:
+
+- X1's runtime speak gate already makes a plain HEARTBEAT with no grounded voice
+  payload silent before the LLM call, but the detector can still offer HEARTBEAT
+  opportunities every 45 seconds. Retuning `HEARTBEAT_SEC` to 180 seconds follows
+  the verified X1 threshold while avoiding the dirty speech/drop lanes. It reduces
+  residual low-value "still hearing the groove" opportunities without changing
+  structural events, manual reactions, or grounded coach lines.
+
+Proof before staging:
+
+- `uv run pytest -q tests/audio/test_constants.py tests/state/test_event_detector.py tests/state/test_hype_cooldown_grounding.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py::test_coach_14_plain_heartbeat_stays_silent tests/runtime/test_coach.py::test_coach_15_manual_heartbeat_reaches_model`
+- `uv run pytest -q tests/prompts/test_negative_dict.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py tests/state/test_event_detector.py`
+- `uv run ruff check src/vibemix/audio/constants.py tests/audio/test_constants.py tests/state/test_event_detector.py tests/state/test_hype_cooldown_grounding.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/audio/constants.py tests/audio/test_constants.py tests/state/test_event_detector.py tests/state/test_hype_cooldown_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`

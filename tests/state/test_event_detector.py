@@ -12,10 +12,10 @@ with Plan 40-04 / AUDIO-03 re-tune to the v4 chat-tested 2026-05-11 ear-test):
     BPM_VALID_MIN              = 100.0
     BPM_VALID_MAX              = 180.0
     EVENT_GLOBAL_MIN_GAP       = 10.0
-    HEARTBEAT_SEC              = 45.0   # Plan 40-04 — was 70.0
+    HEARTBEAT_SEC              = 180.0  # X1 follow-up — was 45.0
     TRACK_CHANGE_MIN_CONFIDENCE = 0.5
     MIN_EVENT_GAP_PER_TYPE = {TRACK_CHANGE: 5.0, PHASE: 10.0, LAYER_ARRIVAL: 10.0,
-                              MIX_MOVE: 14.0, HEARTBEAT: 45.0, MIC: 3.0, MANUAL: 1.5}
+                              MIX_MOVE: 14.0, HEARTBEAT: 180.0, MIC: 3.0, MANUAL: 1.5}
 """
 
 from __future__ import annotations
