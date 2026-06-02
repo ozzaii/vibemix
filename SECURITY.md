@@ -71,7 +71,7 @@ vibemix talks to a closed list of network endpoints. Anything else is a bug.
 
 | Endpoint | When | Direction |
 |----------|------|-----------|
-| `https://api.bravoh.altidus.world` | Every AI reaction + TTS request | client → Bravoh proxy |
+| `https://api.bravoh.altidus.world` | Every AI reaction-planning request | client → Bravoh proxy |
 | `https://api.altidus.world/vibemix/latest.json` | Updater check (~once/day) | client → updater |
 | `https://github.com/bravoh-ai/vibemix` | User click in settings | shell-out only |
 | `https://existential.audio/blackhole` | User click in wizard install hint | shell-out only |

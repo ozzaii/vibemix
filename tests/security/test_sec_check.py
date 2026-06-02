@@ -16,7 +16,6 @@ import pytest
 
 from vibemix.runtime import sec_check
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SECURITY_MD = REPO_ROOT / "SECURITY.md"
 
@@ -63,6 +62,14 @@ def test_endpoint_urls_returns_full_inventory():
     assert "https://telemetry.altidus.world/vibemix/v1/event" in urls
 
 
+def test_proxy_endpoint_purpose_does_not_claim_remote_tts():
+    proxy = next(
+        ep for ep in sec_check.OUTBOUND_ENDPOINTS if ep.url == "https://api.bravoh.altidus.world"
+    )
+    assert "reaction planning" in proxy.purpose
+    assert "TTS" not in proxy.purpose
+
+
 # ---------------------------------------------------------------------------
 # Sync gate: banner ↔ SECURITY.md
 # ---------------------------------------------------------------------------
@@ -88,6 +95,7 @@ def _security_md_outbound_urls() -> set[str]:
 def test_security_md_outbound_section_exists():
     text = SECURITY_MD.read_text(encoding="utf-8")
     assert "## Outbound endpoints" in text
+    assert "Every AI reaction + TTS request" not in text
 
 
 def test_banner_outbound_list_matches_security_md():

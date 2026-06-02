@@ -51,7 +51,7 @@ class OutboundEndpoint:
 OUTBOUND_ENDPOINTS: tuple[OutboundEndpoint, ...] = (
     OutboundEndpoint(
         url="https://api.bravoh.altidus.world",
-        purpose="Bravoh proxy — Gemini reactions + TTS",
+        purpose="Bravoh proxy — Gemini reaction planning",
         condition="always",
     ),
     OutboundEndpoint(
