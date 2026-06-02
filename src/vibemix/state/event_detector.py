@@ -42,6 +42,7 @@ Priority order with the genre chain inserted:
 
 from __future__ import annotations
 
+import os
 import time
 from typing import TYPE_CHECKING
 
@@ -55,11 +56,19 @@ from vibemix.audio.constants import (
     TRACK_CHANGE_MIN_CONFIDENCE,
 )
 from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
+from vibemix.state.drop_predict import drop_call_cue, should_arm_drop_call
 from vibemix.state.event import Event
 from vibemix.state.evidence_registry import EvidenceRegistry
 from vibemix.state.genre_router import GenreRouter
 from vibemix.state.harmonics import is_clash, semitone_distance
 from vibemix.state.music_state import MusicState
+
+
+def _drop_call_enabled_from_env() -> bool:
+    """Opt-in gate for the live drop call (``VIBEMIX_DROP_CALL``). Dormant by
+    default — the v2.0 anti-slop firing gate (CONTEXT D) stays closed until a live
+    operator flips it, after validating the countdown against a real drop."""
+    return (os.environ.get("VIBEMIX_DROP_CALL") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 if TYPE_CHECKING:
     from vibemix.audio.buffers import AudioBuffer
@@ -103,6 +112,7 @@ class EventDetector:
         *,
         evidence_registry: EvidenceRegistry | None = None,
         harmonic_clash_enabled: bool = False,
+        drop_call_enabled: bool | None = None,
     ) -> None:
         """Construct EventDetector with optional ``audio_buf`` for genre-chain
         detectors that need raw samples (KickSwap, PhraseBoundary).
@@ -151,6 +161,18 @@ class EventDetector:
         # even with a fully-resolved clashing deck pair. The kwarg shape mirrors
         # ``vision_enabled`` so a caller / test flips it without monkeypatching.
         self._harmonic_clash_enabled = bool(harmonic_clash_enabled)
+
+        # DROP CALL gate (CONTEXT D / SYSTEM-AUDIT C9). Mirrors the
+        # harmonic-clash flag: dormant by default so the predicted-drop signal
+        # is computed but NEVER fires a spoken call until VIBEMIX_DROP_CALL is
+        # opted in. ``drop_call_enabled=None`` reads the env (live runs auto-arm
+        # from the flag without a __main__ change); an explicit bool overrides
+        # for tests. ``_last_predicted_drop`` tracks the prior tick's countdown
+        # so the arm fires once on the crossing, not every tick inside the window.
+        self._drop_call_enabled = (
+            _drop_call_enabled_from_env() if drop_call_enabled is None else bool(drop_call_enabled)
+        )
+        self._last_predicted_drop: float | None = None
 
     def attach_evidence_registry(self, evidence_registry: EvidenceRegistry | None) -> None:
         """Post-construction wiring for live runtime evidence registration.
@@ -251,6 +273,21 @@ class EventDetector:
         if not self._music_truly_playing(state, now):
             self._reset_change_refs(state)
             return None
+
+        # 0) DROP CALL signal. When the predicted drop countdown crosses into
+        # the arm window, emit one deterministic DROP event. This module does
+        # not speak; runtime coach owns any audible reaction and remains a
+        # separate grounding-review gate. DORMANT unless VIBEMIX_DROP_CALL is
+        # opted in.
+        if self._drop_call_enabled:
+            predicted_drop = state.predicted_drop_in_sec
+            arm = should_arm_drop_call(predicted_drop, self._last_predicted_drop)
+            self._last_predicted_drop = predicted_drop
+            if arm and self._cooldown_ok("DROP", now):
+                self._fire("DROP", now, state)
+                return Event(
+                    "DROP", state, extra={"cue": drop_call_cue(predicted_drop), "eta": predicted_drop}
+                )
 
         # 1) Track change — new audible track different from last seen.
         # Gate on confidence so stale nowplaying-cli entries from other apps

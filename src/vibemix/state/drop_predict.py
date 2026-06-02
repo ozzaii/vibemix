@@ -56,3 +56,37 @@ def predict_drop_in_sec(
     if max_horizon_s is not None and best > max_horizon_s:
         return None
     return max(0.0, best)
+
+
+#: Seconds before the drop to fire the call. Sized so the spoken line + TTS
+#: latency lands the punchline ON the drop, not after it.
+DROP_ARM_WINDOW_S = 2.0
+
+
+def should_arm_drop_call(
+    predicted_now: float | None,
+    predicted_prev: float | None,
+    *,
+    arm_window_s: float = DROP_ARM_WINDOW_S,
+) -> bool:
+    """True on the SINGLE tick the drop countdown crosses DOWN into the arm window.
+
+    Fires once per approach: the current reading sits inside ``arm_window_s`` while
+    the previous reading was outside it (or unknown). A reading already inside the
+    window on the prior tick does not re-fire, so one approach yields at most one
+    call. ``None`` (no predicted drop) never arms.
+    """
+    if predicted_now is None:
+        return False
+    if predicted_now > arm_window_s:
+        return False
+    if predicted_prev is not None and predicted_prev <= arm_window_s:
+        return False
+    return True
+
+
+def drop_call_cue(predicted_now: float | None, *, arm_window_s: float = DROP_ARM_WINDOW_S) -> str:
+    """Reaction-bank key for a drop call at this ETA — the anticipation "here it
+    comes" call while the drop is still inside the arm window. Kept a function so
+    the cue can be tuned by ETA later without touching callers."""
+    return "drop_incoming"

@@ -12,7 +12,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from vibemix.state.drop_predict import predict_drop_in_sec
+from vibemix.state.drop_predict import (
+    DROP_ARM_WINDOW_S,
+    drop_call_cue,
+    predict_drop_in_sec,
+    should_arm_drop_call,
+)
 
 
 @dataclass(frozen=True)
@@ -80,3 +85,45 @@ def test_non_negative_result() -> None:
     # never returns a negative ETA even with odd inputs.
     out = predict_drop_in_sec(_track(), 31.999)
     assert out is not None and out >= 0.0
+
+
+# --- arming: when the countdown crosses into the window, fire exactly once ---
+
+
+def test_arms_when_countdown_crosses_into_window() -> None:
+    # prev was outside the 2s window (3.0s), now inside (1.5s) → arm.
+    assert should_arm_drop_call(1.5, 3.0) is True
+
+
+def test_does_not_arm_while_drop_is_still_far() -> None:
+    assert should_arm_drop_call(5.0, 8.0) is False
+
+
+def test_does_not_refire_once_already_inside_window() -> None:
+    # both readings inside the window → already called, stay quiet.
+    assert should_arm_drop_call(0.5, 1.5) is False
+
+
+def test_arms_on_first_reading_when_prev_unknown() -> None:
+    # no prior reading but already inside the window → arm (e.g. cue jump).
+    assert should_arm_drop_call(1.0, None) is True
+
+
+def test_none_prediction_never_arms() -> None:
+    assert should_arm_drop_call(None, 1.0) is False
+    assert should_arm_drop_call(None, None) is False
+
+
+def test_exactly_on_window_edge_counts_as_inside() -> None:
+    assert should_arm_drop_call(DROP_ARM_WINDOW_S, DROP_ARM_WINDOW_S + 0.5) is True
+
+
+def test_custom_arm_window_respected() -> None:
+    assert should_arm_drop_call(3.5, 6.0, arm_window_s=4.0) is True
+    assert should_arm_drop_call(3.5, 6.0, arm_window_s=2.0) is False
+
+
+def test_drop_call_cue_is_a_known_reaction_key() -> None:
+    from vibemix.runtime.drop_reaction import REACTION_LINES
+
+    assert drop_call_cue(1.5) in REACTION_LINES
