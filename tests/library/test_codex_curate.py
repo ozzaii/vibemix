@@ -353,6 +353,8 @@ def test_chat_prompt_includes_bounded_live_deck_context_guard():
             "audible": True,
             "phase": "groove",
             "bpm": 128.0,
+            "detected_genre": "psytrance",
+            "genre_confidence": 0.82,
             "deck_state": {
                 "A": {
                     "title": "Strobe",
@@ -434,6 +436,7 @@ def test_chat_prompt_includes_bounded_live_deck_context_guard():
 
     assert "CURRENT LIVE DECK CONTEXT" in p
     assert "live_context[" in p
+    assert "genre=psytrance" in p
     assert "live_context_transport[" in p
     assert "schema=2" in p
     assert (
@@ -1059,6 +1062,27 @@ def test_chat_prompt_sanitizes_live_context_and_keeps_master_music_scalar():
     assert "A_low_cut_to_killed@7.2" in p
     assert "bad key" not in p
     assert "bad_ref" not in p
+
+
+def test_chat_prompt_omits_low_confidence_live_genre():
+    p = chat_prompt(
+        "what style is this?",
+        live_context={
+            **_fresh_live_transport(),
+            "deck": "A",
+            "audible": True,
+            "phase": "groove",
+            "bpm": 146.0,
+            "detected_genre": "psytrance",
+            "genre_confidence": 0.42,
+            "deck_state": {},
+            "deck_mixer": {},
+        },
+    )
+
+    assert "CURRENT LIVE DECK CONTEXT" in p
+    assert "genre=psytrance" not in p
+    assert "genre=unknown" not in p
 
 
 def test_chat_prompt_preserves_explicit_empty_live_deck_clear():

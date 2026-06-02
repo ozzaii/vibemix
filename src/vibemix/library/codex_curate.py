@@ -2321,6 +2321,12 @@ def _normalize_live_context(raw: Any) -> dict[str, Any] | None:
     music = _clean_live_float(raw.get("music"))
     if music is not None and music >= 0:
         out["music"] = min(1.0, music)
+    detected_genre = _clean_live_evidence_token(raw.get("detected_genre"), max_len=48)
+    if detected_genre:
+        out["detected_genre"] = detected_genre
+    genre_confidence = _clean_live_float(raw.get("genre_confidence"))
+    if genre_confidence is not None and genre_confidence >= 0.0:
+        out["genre_confidence"] = min(1.0, genre_confidence)
 
     schema_version = _clean_live_float(raw.get("live_context_schema_version"))
     if schema_version is not None and schema_version >= 1:
@@ -2479,6 +2485,12 @@ def _music_state_from_live_context(context: dict[str, Any]) -> MusicState:
     bpm = _clean_live_float(context.get("bpm"))
     if bpm is not None and bpm > 0:
         state.bpm = bpm
+    detected_genre = _clean_live_evidence_token(context.get("detected_genre"), max_len=48)
+    genre_confidence = _clean_live_float(context.get("genre_confidence"))
+    if detected_genre:
+        state.detected_genre = detected_genre
+    if genre_confidence is not None and genre_confidence >= 0.0:
+        state.genre_confidence = min(1.0, genre_confidence)
 
     mixer = context.get("deck_mixer")
     if isinstance(mixer, dict):
@@ -3076,6 +3088,10 @@ def _render_live_context(raw: Any) -> str | None:
     music = _clean_live_float(context.get("music"))
     if music is not None and music >= 0:
         header_parts.append(f"music={music:.3f}")
+    detected_genre = _clean_live_evidence_token(context.get("detected_genre"), max_len=48)
+    genre_confidence = _clean_live_float(context.get("genre_confidence"))
+    if detected_genre and detected_genre != "unknown" and (genre_confidence or 0.0) >= 0.5:
+        header_parts.append(f"genre={detected_genre}")
     header_parts.append(f"resolved={'+'.join(resolved_sides) if resolved_sides else 'none'}")
     deck_context = _shared_render_deck_context(state)
     live_status = _transition_context_token(deck_context) or _live_context_transition_status(
