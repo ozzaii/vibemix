@@ -85,6 +85,11 @@ MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 +
     "HEARTBEAT": HEARTBEAT_SEC,  # X1 follow-up — flows from HEARTBEAT_SEC (180.0)
     "MIC": 3.0,
     "MANUAL": 1.5,
+    # DROP-call signal is opt-in and speech remains separately gated, but once
+    # armed it needs its own phrase-level throttle. 24s matches the structural
+    # phrase-boundary wall: it blocks repeated approaches to the same drop while
+    # still allowing the next real phrase-level drop in fast music.
+    "DROP": 24.0,
     # Phase 17 SENSE-12 — kick-side cross-genre detectors (per CONTEXT D-cooldown
     # locked rule "matches G-followup-1"). Tuned on the v4 coexistence matrix:
     # KICK_SWAP slightly faster than LAYER_ARRIVAL since kick character changes

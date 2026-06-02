@@ -106,6 +106,7 @@ def test_event_gap_dict_shape_and_values() -> None:
         "HEARTBEAT",
         "MIC",
         "MANUAL",
+        "DROP",
         # Phase 17 SENSE-12 — kick-side cross-genre detectors (Plan 17-02)
         "KICK_SWAP",
         "SUB_LAYER_ARRIVAL",
@@ -130,6 +131,7 @@ def test_event_gap_dict_shape_and_values() -> None:
     assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == 180.0  # X1 follow-up — was 45.0
     assert MIN_EVENT_GAP_PER_TYPE["MIC"] == 3.0  # unchanged
     assert MIN_EVENT_GAP_PER_TYPE["MANUAL"] == 1.5  # unchanged
+    assert MIN_EVENT_GAP_PER_TYPE["DROP"] == 24.0
     # Plan 17-02 kick-side detector cooldowns — UNCHANGED by Plan 40-04
     assert MIN_EVENT_GAP_PER_TYPE["KICK_SWAP"] == 14.0
     assert MIN_EVENT_GAP_PER_TYPE["SUB_LAYER_ARRIVAL"] == 16.0
