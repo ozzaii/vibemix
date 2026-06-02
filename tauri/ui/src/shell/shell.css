@@ -713,8 +713,22 @@
   align-items: center;
   min-width: 0;
   max-width: min(32vw, 180px);
+  padding: 0;
   gap: 5px;
+  border: 0;
+  background: transparent;
   color: var(--text-tertiary);
+  font: inherit;
+  cursor: pointer;
+}
+.shell-footer button.library-freshness-badge:hover,
+.shell-footer button.library-freshness-badge:focus-visible {
+  color: var(--text-secondary);
+}
+.shell-footer button.library-freshness-badge:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  box-shadow: var(--glow-soft);
 }
 .shell-footer .library-freshness-dot {
   width: 6px;

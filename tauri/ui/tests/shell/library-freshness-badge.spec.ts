@@ -6,7 +6,7 @@
  * cannot be read.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   libraryFreshnessBadgeModel,
@@ -76,6 +76,34 @@ describe("library freshness badge", () => {
     expect(handle.element.textContent).toBe("library not indexed");
     handle.teardown();
     expect(footer.querySelector(".library-freshness-badge")).toBeNull();
+  });
+
+  it("can route first-run users from the shell badge into Crate setup", async () => {
+    const footer = document.createElement("footer");
+    const onOpenCrate = vi.fn();
+    const handle = mountLibraryFreshnessBadge(footer, {
+      autoload: false,
+      pollMs: null,
+      onOpenCrate,
+      getStats: async () =>
+        stats({
+          library_freshness: {
+            status: "not_indexed",
+            stale: false,
+            reason: "library_cache_missing",
+            age_days: 0,
+            cache_path: "/tmp/library.pkl",
+          },
+        }),
+    });
+
+    await handle.refresh();
+    handle.element.click();
+
+    expect(handle.element.tagName).toBe("BUTTON");
+    expect(handle.element.textContent).toBe("library not indexed");
+    expect(onOpenCrate).toHaveBeenCalledOnce();
+    handle.teardown();
   });
 
   it("keeps backend failures honest as unknown", async () => {

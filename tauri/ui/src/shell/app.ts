@@ -129,7 +129,11 @@ export async function mountShellApp(host: HTMLElement): Promise<MountedShellApp>
   const surfaces = await mountSurfacesInto(host, appDeps);
   const unwireSettings = wireSettingsNav(shell);
   const footer = host.querySelector<HTMLElement>(".shell-footer");
-  const freshnessBadge = footer ? mountLibraryFreshnessBadge(footer) : null;
+  const freshnessBadge = footer
+    ? mountLibraryFreshnessBadge(footer, {
+        onOpenCrate: () => shell.store.setActiveSurface("crate"),
+      })
+    : null;
   // Feed the live session onto the shell's self-arranging activation +
   // connection (energy field, connection dot, the grounding panel auto-open).
   const unwireActivation = wireActivation(shell.store);

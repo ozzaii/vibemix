@@ -24,6 +24,7 @@ export interface LibraryFreshnessBadgeOptions {
   getStats?: () => Promise<LibraryStats>;
   autoload?: boolean;
   pollMs?: number | null;
+  onOpenCrate?: () => void;
 }
 
 const DEFAULT_POLL_MS = 60_000;
@@ -88,13 +89,21 @@ export function mountLibraryFreshnessBadge(
   const getStats = options.getStats ?? libraryStats;
   const autoload = options.autoload ?? true;
   const pollMs = options.pollMs === undefined ? DEFAULT_POLL_MS : options.pollMs;
+  const onOpenCrate = options.onOpenCrate;
 
   const separator = document.createElement("span");
   separator.className = "footer-separator";
   separator.setAttribute("aria-hidden", "true");
 
-  const badge = document.createElement("span");
+  const badge =
+    onOpenCrate === undefined
+      ? document.createElement("span")
+      : document.createElement("button");
   badge.className = "library-freshness-badge";
+  if (onOpenCrate !== undefined && badge instanceof HTMLButtonElement) {
+    badge.type = "button";
+    badge.addEventListener("click", onOpenCrate);
+  }
   badge.setAttribute("data-wire", "shell.library-freshness");
   badge.innerHTML =
     '<span class="library-freshness-dot" aria-hidden="true"></span>' +
