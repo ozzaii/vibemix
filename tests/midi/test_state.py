@@ -294,6 +294,41 @@ def test_dedup_within_400ms_collapses_repeated_label(mocker):
     assert len(cs._moves) == 1
 
 
+def test_loop_roll_stack_bypasses_400ms_move_dedup(mocker):
+    profile = ControllerProfile(
+        id="synthetic_loop_deck",
+        display_name="Synthetic Loop Deck",
+        port_name_hints=("SYN",),
+        decks=("A",),
+        controls={},
+        buttons={
+            "roll_1_4": ButtonBinding("roll_1_4", "beatloop_roll_1_4", 0, 20, "A"),
+            "roll_1_2": ButtonBinding("roll_1_2", "beatloop_roll_1_2", 0, 21, "A"),
+        },
+    )
+    cs = ControllerState(profile=profile)
+
+    mocker.patch("vibemix.midi.state.time.time", return_value=1000.0)
+    cs.handle_msg(_note_on(0, 20, velocity=127))
+    mocker.patch("vibemix.midi.state.time.time", return_value=1000.1)
+    cs.handle_msg(_note_on(0, 20, velocity=127))
+    mocker.patch("vibemix.midi.state.time.time", return_value=1000.2)
+    cs.handle_msg(_note_on(0, 21, velocity=127))
+
+    labels = [label for _, label in cs._moves]
+
+    assert labels == [
+        "A_loop_roll:1/4beat",
+        "A_loop_roll:1/4beat",
+        "A_loop_roll:1/2beat",
+    ]
+    assert [event.kind for event in cs.events_since(999.0)] == [
+        "beatloop_roll_1_4",
+        "beatloop_roll_1_4",
+        "beatloop_roll_1_2",
+    ]
+
+
 def test_moves_ring_drops_entries_older_than_12s(mocker):
     cs = ControllerState(profile=_flx4())
     mocker.patch("vibemix.midi.state.time.time", return_value=1000.0)

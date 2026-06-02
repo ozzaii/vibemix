@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import importlib.resources
 import json
+import re
 from dataclasses import dataclass
 
 _PROFILES_PKG = "vibemix.midi.profiles"
@@ -73,6 +74,12 @@ _VALID_BUTTON_KINDS = frozenset(
         "filter_fx",
         "tap_tempo",
     }
+)
+_LOOP_PERFORMANCE_KIND_RE = re.compile(
+    r"^(?:beatloop|loop)_roll_[0-9][0-9_p./]*$|"
+    r"^(?:beatloop|loop)_[0-9][0-9_p./]*$|"
+    r"^beatjump_(?:fwd|forward|back|backward|rev|reverse|plus|minus|\+|-)_"
+    r"[0-9][0-9_p./]*$"
 )
 
 # CC binding kind — only `cc` Wave 1+2 (no aftertouch / pitch-bend yet).
@@ -237,10 +244,10 @@ def _parse_button_binding(binding_name: str, payload: dict, *, profile_name: str
             f"got {type(payload).__name__}"
         )
     kind = payload.get("kind")
-    if kind not in _VALID_BUTTON_KINDS:
+    if not _is_valid_button_kind(kind):
         raise ValueError(
             f"profile {profile_name}: button binding {binding_name!r} field 'kind' must be one of "
-            f"{sorted(_VALID_BUTTON_KINDS)}, got {kind!r}"
+            f"{sorted(_VALID_BUTTON_KINDS)} or a loop performance kind, got {kind!r}"
         )
     channel = _require_int_in_range(
         payload, "channel", 0, 15, profile_name=profile_name, binding_name=binding_name
@@ -261,6 +268,12 @@ def _parse_button_binding(binding_name: str, payload: dict, *, profile_name: str
         note=note,
         deck=deck,
     )
+
+
+def _is_valid_button_kind(kind: object) -> bool:
+    if not isinstance(kind, str):
+        return False
+    return kind in _VALID_BUTTON_KINDS or bool(_LOOP_PERFORMANCE_KIND_RE.match(kind))
 
 
 def _parse_profile(payload: dict) -> ControllerProfile:

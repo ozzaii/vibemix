@@ -7472,3 +7472,43 @@ Proof before staging:
 - `uv run ruff check src/vibemix/runtime/suggestion_voice.py src/vibemix/runtime/coach.py src/vibemix/state/coach.py tests/runtime/test_suggestion_voice.py tests/runtime/test_coach.py tests/state/test_coach.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check`
+
+## Package 22 - Loop Beatjump Geometry SRC Gate
+
+Suggested commit: `feat(state): add loop geometry grounding primitive`
+
+Include:
+
+- `src/vibemix/state/loop_geometry.py`
+- `src/vibemix/midi/state.py`
+- `src/vibemix/midi/profile.py`
+- `tests/state/test_loop_geometry.py`
+- `tests/midi/test_state.py`
+- `tests/midi/test_profile.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Co-host speech, prompt text, `session.say()` paths, and any live claim about
+  loop quality or deck intent.
+- DROP-call / Mix Timing Oracle hold-lane files:
+  `src/vibemix/runtime/coach.py`, `src/vibemix/state/drop_predict.py`,
+  `src/vibemix/state/event_detector.py`, `tests/state/test_drop_predict.py`, and
+  `tests/state/test_event_detector_drop.py`.
+- Beatmatch producer wiring and live deck-identity changes.
+
+Reason:
+
+- H1 loop/beatjump research needs a source-level primitive before any live
+  speech can be grounded. This package preserves rapid loop-roll MIDI evidence
+  past the legacy 400ms same-label dedup, accepts future loop/beatjump profile
+  button kinds, and provides a citation-safe `mix:` atom shape for a future
+  beatgrid-exact receipt. It does not make the co-host speak about loops.
+
+Proof before staging:
+
+- `uv run pytest -q tests/state/test_loop_geometry.py tests/midi/test_state.py::test_loop_roll_stack_bypasses_400ms_move_dedup tests/midi/test_state.py::test_dedup_within_400ms_collapses_repeated_label tests/midi/test_state.py::test_handle_msg_loop_in_implicit_play_workaround_preserved tests/midi/test_profile.py::test_schema_validator_accepts_loop_performance_button_kinds tests/midi/test_profile.py::test_pioneer_ddj_flx4_json_buttons_section_lists_all_v4_notes tests/midi/test_profile_flx4_golden.py::test_pioneer_flx4_profile_internal_lookup_byte_equivalent_to_v4 tests/midi/test_profile_flx4_golden.py::test_pioneer_flx4_full_message_replay_byte_equivalent`
+- `uv run pytest -q tests/state/test_loop_geometry.py tests/midi/test_state.py tests/midi/test_profile.py tests/midi/test_profile_flx4_golden.py tests/test_midi_macos.py tests/midi/test_profiles_all_controllers.py`
+- `uv run ruff check src/vibemix/state/loop_geometry.py src/vibemix/midi/state.py src/vibemix/midi/profile.py tests/state/test_loop_geometry.py tests/midi/test_state.py tests/midi/test_profile.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/state/loop_geometry.py src/vibemix/midi/state.py src/vibemix/midi/profile.py tests/state/test_loop_geometry.py tests/midi/test_state.py tests/midi/test_profile.py .planning/handoffs/2026-05-31-package-checklist.md`

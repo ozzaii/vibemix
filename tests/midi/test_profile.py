@@ -155,6 +155,19 @@ def test_schema_validator_rejects_unknown_axis():
     assert "relative" in msg
 
 
+def test_schema_validator_accepts_loop_performance_button_kinds():
+    payload = _baseline_payload()
+    payload["buttons"] = {
+        "roll_a": {"kind": "beatloop_roll_1_4", "channel": 0, "note": 20, "deck": "A"},
+        "jump_a": {"kind": "beatjump_back_8", "channel": 0, "note": 21, "deck": "A"},
+    }
+
+    profile = _parse_profile(payload)
+
+    assert profile.buttons["roll_a"].kind == "beatloop_roll_1_4"
+    assert profile.buttons["jump_a"].kind == "beatjump_back_8"
+
+
 def test_schema_validator_rejects_cc_out_of_range():
     payload = _baseline_payload()
     payload["controls"]["vol_a"]["cc"] = 200

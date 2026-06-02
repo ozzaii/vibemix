@@ -47,6 +47,7 @@ from typing import Any
 
 from vibemix.midi.generic import GENERIC_MIDI_ID
 from vibemix.midi.profile import ButtonBinding, ControlBinding, ControllerProfile
+from vibemix.state.loop_geometry import loop_move_label
 
 
 def _knob_label(v: int) -> str:
@@ -222,12 +223,17 @@ class ControllerState:
         with self._lock:
             return self._connected
 
-    def _record_move(self, label: str, now: float) -> None:
+    def _record_move(self, label: str, now: float, *, dedupe: bool = True) -> None:
         """Append to v4 moves ring. Dedup same-label-within-400ms; trim 12s.
 
         Caller must hold ``self._lock``.
         """
-        if self._moves and (now - self._moves[-1][0] < 0.4) and self._moves[-1][1] == label:
+        if (
+            dedupe
+            and self._moves
+            and (now - self._moves[-1][0] < 0.4)
+            and self._moves[-1][1] == label
+        ):
             return
         self._moves.append((now, label))
         cutoff = now - 12.0
@@ -377,7 +383,13 @@ class ControllerState:
                 deck = binding.deck if binding.deck is not None else "M"
                 kind = binding.kind
                 with self._lock:
-                    if kind == "play":
+                    loop_label = loop_move_label(deck, kind, play_on=(kind == "loop_in"))
+                    if loop_label is not None:
+                        if kind == "loop_in":
+                            # Workaround — loop_in implicitly starts play (v4:700).
+                            self.deck[deck]["play"] = True
+                        self._record_move(loop_label, now, dedupe=False)
+                    elif kind == "play":
                         # KNOWN ISSUE (Phase 9): the FLX4 firmware sometimes
                         # doesn't emit note_on for play while djay Pro is in
                         # focus → play flag stays at boot default False. See
@@ -392,12 +404,6 @@ class ControllerState:
                         self._record_move(f"{deck}_sync_hit", now)
                     elif kind == "jog_touch":
                         self.deck[deck]["jog_touched"] = msg.velocity > 0
-                    elif kind == "loop_in":
-                        # Workaround — loop_in implicitly starts play (v4:700).
-                        self.deck[deck]["play"] = True
-                        self._record_move(f"{deck}_loop_in_hit (play=ON)", now)
-                    elif kind == "loop_out":
-                        self._record_move(f"{deck}_loop_out_hit", now)
                     # Always record the typed event (no magnitude for buttons).
                     self._record_event(
                         kind=kind,
