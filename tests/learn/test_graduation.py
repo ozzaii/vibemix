@@ -88,6 +88,83 @@ def test_graduation_summary_reads_profile_and_latest_debrief(tmp_path: Path) -> 
     )
 
 
+def test_graduation_summary_maps_cited_debrief_action_to_next_lesson(
+    tmp_path: Path,
+) -> None:
+    session = tmp_path / "20260529-010000"
+    write_debrief(
+        session,
+        {
+            "summary": "new",
+            "drills": [
+                {
+                    "situation": "S",
+                    "behavior": "Deck B arrived late [ev:MIX_MOVE@30.000]",
+                    "impact": "The phrase landed rough [ev:MIX_MOVE@30.000]",
+                    "action_recommended": (
+                        "Practice phrase matching before the next transition "
+                        "[ev:MIX_MOVE@30.000]"
+                    ),
+                    "citation": "[ev:MIX_MOVE@30.000]",
+                }
+            ],
+        },
+        b"new mp3",
+    )
+
+    summary = build_graduation_summary(
+        _completed_progress(5),
+        profile_loader=lambda: None,
+        consent_loader=lambda: False,
+        recordings_root_loader=lambda: tmp_path,
+    )
+
+    assert summary.debrief_recommended_lesson_id == "L2.12"
+    assert summary.debrief_recommended_lesson_title == "phrase matching"
+    assert summary.debrief_recommendation_reason == "phrase matching"
+    assert build_graduation_tutor_line(summary) == (
+        "saved: 5/36 lessons. latest debrief: 20260529-010000. "
+        "profile consent off. next lesson from debrief: L2.12 phrase matching."
+    )
+
+
+def test_graduation_summary_refuses_uncited_or_unknown_debrief_advice(
+    tmp_path: Path,
+) -> None:
+    session = tmp_path / "20260529-010000"
+    write_debrief(
+        session,
+        {
+            "summary": "new",
+            "drills": [
+                {
+                    "situation": "S",
+                    "behavior": "The set felt intense.",
+                    "impact": "The room wanted more.",
+                    "action_recommended": "Try a darker mood next time.",
+                    "citation": "",
+                }
+            ],
+        },
+        b"new mp3",
+    )
+
+    summary = build_graduation_summary(
+        _completed_progress(5),
+        profile_loader=lambda: None,
+        consent_loader=lambda: False,
+        recordings_root_loader=lambda: tmp_path,
+    )
+
+    assert summary.debrief_recommended_lesson_id is None
+    assert summary.debrief_recommended_lesson_title is None
+    assert summary.debrief_recommendation_reason is None
+    assert build_graduation_tutor_line(summary) == (
+        "saved: 5/36 lessons. latest debrief: 20260529-010000. "
+        "profile consent off."
+    )
+
+
 def test_graduation_line_names_practice_surface_without_counts() -> None:
     """The capstone can admire how the learner practiced without a data wall."""
     progress = _completed_progress(5)

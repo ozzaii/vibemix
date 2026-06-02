@@ -8014,6 +8014,38 @@ Proof before staging:
 - `git diff --check -- src/vibemix/learn/mastered_marker_writer.py tests/learn/test_mastered_marker_writer.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 45 - Debrief to Learn Recommendation Bridge
+
+Suggested commit: `feat(learn): recommend graduation lesson from debrief`
+
+Include:
+
+- `src/vibemix/learn/graduation.py`
+- `tests/learn/test_graduation.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/__main__.py`, `src/vibemix/runtime/coach.py`, Sven/live speech,
+  Learn window UI rewrites, debrief generation prompts, and any uncited
+  model-text recommendation.
+
+Reason:
+
+- L3.06 already checks whether a real debrief exists. This package lets the
+  graduation surface derive one deterministic next lesson from the latest
+  persisted debrief drill only when the drill field still carries a locked
+  citation and names a concrete authored technique such as phrase matching,
+  harmonic mixing, filter fade, or recovery. Vague or uncited advice stays
+  silent.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_graduation.py`
+- `uv run ruff check src/vibemix/learn/graduation.py tests/learn/test_graduation.py`
+- `git diff --check -- src/vibemix/learn/graduation.py tests/learn/test_graduation.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Package 35D - Psytrance BPM Fallback Band
 
 Suggested commit: `fix(genre): classify psytrance bpm fallback`
