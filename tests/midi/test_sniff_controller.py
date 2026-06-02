@@ -209,6 +209,39 @@ def test_summarize_empty_frames():
     assert summary["unique_notes"] == []
 
 
+def test_diagnose_summary_marks_visible_port_with_no_supported_frames():
+    mod = _fresh_module()
+    summary = mod.diagnose_summary(mod.summarize([], duration_s=12.0))
+
+    assert summary["frames"] == 0
+    assert summary["diagnosis"] == "port_visible_no_supported_midi_frames"
+    assert "enable controller MIDI output" in summary["next_action"]
+    assert "exclusive access" in summary["next_action"]
+
+
+def test_diagnose_summary_marks_observed_frames():
+    mod = _fresh_module()
+    summary = mod.diagnose_summary(
+        mod.summarize(
+            [
+                {
+                    "type": "cc",
+                    "channel": 0,
+                    "data1": 7,
+                    "data1_hex": "0x07",
+                    "data2": 64,
+                    "ts": 0.0,
+                }
+            ],
+            duration_s=1.0,
+        )
+    )
+
+    assert summary["frames"] == 1
+    assert summary["diagnosis"] == "midi_frames_observed"
+    assert "map or verify" in summary["next_action"]
+
+
 # ---------------------------------------------------------------------------
 # CLI surface — --list, --help (sanity)
 # ---------------------------------------------------------------------------
@@ -304,3 +337,4 @@ def test_main_callback_mode_captures_callback_frames(capsys):
     assert [line["type"] for line in lines[:2]] == ["cc", "note_on"]
     assert lines[-1]["summary"] is True
     assert lines[-1]["frames"] == 2
+    assert lines[-1]["diagnosis"] == "midi_frames_observed"

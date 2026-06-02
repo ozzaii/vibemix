@@ -25,6 +25,7 @@ from typing import Any
 
 __all__ = [
     "AmbiguousPortError",
+    "diagnose_summary",
     "enumerate_ports",
     "format_frame",
     "main",
@@ -125,6 +126,29 @@ def summarize(frames: list[dict], duration_s: float) -> dict:
     }
 
 
+def diagnose_summary(summary: dict) -> dict:
+    """Add a bounded setup diagnosis to a capture summary.
+
+    The sniff tool is often used when macOS can see a controller port but the
+    app receives no usable controller data. Preserve the small JSONL schema for
+    frames, but make the final summary actionable enough to archive as proof.
+    """
+    frames = int(summary.get("frames") or 0)
+    out = dict(summary)
+    if frames > 0:
+        out["diagnosis"] = "midi_frames_observed"
+        out["next_action"] = "Use the emitted CC/note rows to map or verify the controller."
+        return out
+
+    out["diagnosis"] = "port_visible_no_supported_midi_frames"
+    out["next_action"] = (
+        "Move an EQ knob, fader, jog, or pad while sniffing. If this still shows "
+        "zero frames, enable controller MIDI output in DJ software or close any "
+        "app that has exclusive access to the controller port."
+    )
+    return out
+
+
 def _emit(frame: dict) -> None:
     """Write one JSONL line to stdout, flushed."""
     sys.stdout.write(json.dumps(frame) + "\n")
@@ -167,7 +191,7 @@ def _run_poll_capture(mido: Any, port_name: str, seconds: int) -> int:
     except KeyboardInterrupt:
         pass
     duration = time.monotonic() - start
-    _emit(summarize(frames, duration))
+    _emit(diagnose_summary(summarize(frames, duration)))
     return 0
 
 
@@ -191,7 +215,7 @@ def _run_callback_capture(mido: Any, port_name: str, seconds: int) -> int:
     except KeyboardInterrupt:
         pass
     duration = time.monotonic() - start
-    _emit(summarize(frames, duration))
+    _emit(diagnose_summary(summarize(frames, duration)))
     return 0
 
 

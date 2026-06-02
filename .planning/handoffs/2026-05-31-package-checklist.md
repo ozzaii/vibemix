@@ -8164,3 +8164,38 @@ Proof before staging:
 - `uv run ruff check src/vibemix/coach/prompt_fragments.py src/vibemix/learn/coaching_aim.py src/vibemix/prompts/matrix.py src/vibemix/agent/dj_cohost.py src/vibemix/agent/cache.py src/vibemix/runtime/coach.py src/vibemix/__main__.py tests/learn/test_coaching_aim.py tests/prompts/test_coaching_aim.py tests/agent/test_coaching_aim_prompt.py tests/agent/test_cache.py tests/runtime/test_coach.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/coach/prompt_fragments.py src/vibemix/learn/coaching_aim.py src/vibemix/prompts/matrix.py src/vibemix/agent/dj_cohost.py src/vibemix/agent/cache.py src/vibemix/runtime/coach.py src/vibemix/__main__.py tests/learn/test_coaching_aim.py tests/prompts/test_coaching_aim.py tests/agent/test_coaching_aim_prompt.py tests/agent/test_cache.py tests/runtime/test_coach.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 27 - FLX4 Zero-Traffic Sniff Diagnostic
+
+Suggested commit: `fix(midi): explain zero-frame controller sniffs`
+
+Include:
+
+- `scripts/sniff_controller.py`
+- `tests/midi/test_sniff_controller.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime MIDI listener behavior, FLX4 profile mappings, controller-state
+  decoding, live co-host claim guards, and any app-control automation.
+- Live proof archives. This package makes the diagnostic JSON more actionable;
+  it does not claim a live controller fix.
+
+Reason:
+
+- Live FLX4 proof on 2026-06-02 repeatedly showed macOS exposing a `DDJ-FLX4`
+  input port while both poll and callback sniffs saw zero supported CC/note
+  frames during physical controller movement. The raw summary (`frames: 0`) was
+  easy to misread as an app bug or missing proof. This package keeps the frame
+  JSON schema unchanged and adds a bounded diagnosis plus next action to the
+  final summary line so future Codex/Claude/live rig passes can archive the
+  exact setup state: frames observed versus visible port with no supported MIDI
+  traffic.
+
+Proof before staging:
+
+- `uv run pytest -q tests/midi/test_sniff_controller.py`
+- `uv run ruff check scripts/sniff_controller.py tests/midi/test_sniff_controller.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- scripts/sniff_controller.py tests/midi/test_sniff_controller.py .planning/handoffs/2026-05-31-package-checklist.md`
