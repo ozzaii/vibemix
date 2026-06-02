@@ -2642,6 +2642,70 @@ def test_live_claim_guard_strips_sync_advice_when_decks_unresolved_even_with_mov
     assert "kicks stepped" not in result.text.lower()
 
 
+def test_live_claim_guard_blocks_harmonic_claim_when_decks_unresolved() -> None:
+    state = MusicState(audible=True, controller_connected=True, audible_deck="none")
+
+    result = apply_live_claim_guard(
+        (
+            "You had two separate tracks playing there with a major harmonic clash. "
+            "Keep your ears on the key compatibility before you bring them up."
+        ),
+        state,
+        [],
+        event_type="HEARTBEAT",
+    )
+
+    assert result.corrected is True
+    assert result.policy == "harmonic_claim_not_grounded"
+    assert result.reason == "no_citable_key_clash_evidence"
+    assert "clear two-deck proof" in result.text
+    assert "two separate tracks" not in result.text.lower()
+    assert "harmonic clash" not in result.text.lower()
+    assert "key compatibility" not in result.text.lower()
+
+
+def test_live_claim_guard_blocks_harmonic_claim_without_key_event() -> None:
+    state = MusicState(audible=True, controller_connected=True, audible_deck="mix")
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A"),
+            "B": _deck("InB", camelot="9A"),
+        }
+    )
+    capture = _deck_pair_audio_capture()
+    moves = ["xfader→center"]
+
+    result = apply_live_claim_guard(
+        "That was a smooth transition, but the keys had a major harmonic clash.",
+        state,
+        moves,
+        audio_capture_context=capture,
+    )
+
+    assert result.corrected is True
+    assert result.policy == "harmonic_claim_not_grounded"
+    assert "harmonic clash" not in result.text.lower()
+
+
+def test_live_claim_guard_allows_key_clash_event_claim() -> None:
+    state = MusicState(audible=True, controller_connected=True, audible_deck="mix")
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A"),
+            "B": _deck("InB", camelot="9A"),
+        }
+    )
+
+    result = apply_live_claim_guard(
+        "Those keys are clashing.",
+        state,
+        event_type="KEY_CLASH",
+    )
+
+    assert result.corrected is False
+    assert result.text == "Those keys are clashing."
+
+
 @pytest.mark.parametrize(
     "reply",
     [

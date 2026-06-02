@@ -61,7 +61,8 @@ _MULTI_DECK_OUTCOME_RE = re.compile(
 _MULTI_DECK_PHRASE_RE = re.compile(
     r"\b("
     r"other deck|second deck|incoming deck|incoming track|new track came in|"
-    r"came in clean|brought (?:the )?(?:other|second|incoming) deck in"
+    r"came in clean|two separate tracks|two tracks|both tracks|"
+    r"brought (?:the )?(?:other|second|incoming) deck in"
     r")\b",
     re.IGNORECASE,
 )
@@ -273,6 +274,15 @@ _UNSUPPORTED_TRANSITION_COACHING_RE = re.compile(
     r"off|late|early|mismatch|matched|lock)|"
     r"(?:half[- ]?bar|one[- ]?beat|1[- ]?beat|phrase)\b[^.?!]{0,40}\b(?:off|late|early|"
     r"mismatch)"
+    r")\b",
+    re.IGNORECASE,
+)
+_HARMONIC_DECK_CLAIM_RE = re.compile(
+    r"\b("
+    r"harmonic\s+clash|key\s+clash|key\s+compatibility|compatible\s+keys|"
+    r"incompatible\s+keys|camelot|semitones?|major\s+harmonic\s+clash|"
+    r"keys?\b[^.?!]{0,48}\b(?:clash(?:ed|ing)?|compatible|incompatible|fight(?:ing)?)|"
+    r"harmonic\b[^.?!]{0,48}\b(?:clash(?:ed|ing)?|compatible|incompatible)"
     r")\b",
     re.IGNORECASE,
 )
@@ -2901,6 +2911,22 @@ def apply_live_claim_guard(
         state,
         event_type=event_type,
     )
+    if _has_unsupported_harmonic_deck_claim(
+        text,
+        state,
+        moves,
+        policy=policy,
+        event_type=event_type,
+        judge_evidence_line=judge_evidence_line,
+    ):
+        summary = _live_guard_summary(state, moves)
+        return LiveClaimGuardResult(
+            text=LIVE_TRANSITION_HELD_REPLY,
+            corrected=True,
+            policy="harmonic_claim_not_grounded",
+            reason="no_citable_key_clash_evidence",
+            summary=summary,
+        )
     if _has_unsupported_mixer_low_kill_claim(text, state):
         summary = _live_guard_summary(state, moves)
         mixer_summary = _mixer_low_summary(state)
@@ -3246,6 +3272,35 @@ def _has_unsupported_transition_coaching_advice(text: str) -> bool:
     if _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(raw) or _MOVE_EFFECT_DISCLAIMER_RE.search(raw):
         return False
     return bool(_UNSUPPORTED_TRANSITION_COACHING_RE.search(raw))
+
+
+def _has_unsupported_harmonic_deck_claim(
+    text: str,
+    state: MusicState,
+    moves: list[str] | tuple[str, ...],
+    *,
+    policy: str,
+    event_type: str | None,
+    judge_evidence_line: str | None,
+) -> bool:
+    """Return True when a key/harmonic verdict lacks citable deck-pair proof."""
+    raw = str(text or "").strip()
+    if not raw or not _HARMONIC_DECK_CLAIM_RE.search(raw):
+        return False
+    event = str(event_type or "").strip().upper()
+    if event in {"KEY_CLASH", "TRANSITION_OPPORTUNITY"}:
+        return False
+    if policy != "supported_verdict":
+        return True
+    resolved = _resolved_decks(state.deck_state.decks)
+    if not all(
+        side in resolved and bool(str(resolved[side].camelot or "").strip())
+        for side in ("A", "B")
+    ):
+        return True
+    if judge_evidence_line and _HARMONIC_DECK_CLAIM_RE.search(judge_evidence_line):
+        return False
+    return True
 
 
 def _strip_unsupported_no_move_control_clause(text: str) -> str:
