@@ -2856,7 +2856,13 @@ class DJCoHostAgent(Agent):
                 # existing per-error messaging surfaces unchanged.
                 _unavail = classify_proxy_error(e)
                 if _unavail is not None:
-                    self._maybe_emit_proxy_unavailable(_unavail.reason)
+                    if self._proxy_base_url is not None:
+                        self._maybe_emit_proxy_unavailable(_unavail.reason)
+                    else:
+                        # Direct Gemini mode has no proxy fallback flag to arm.
+                        # Still surface the outage loudly; otherwise 5xx/timeouts
+                        # become stderr-only and the UI looks merely "listening".
+                        self._emit_connection_error(e)
                 else:
                     # NOT a proxy-classified transient (5xx/timeout/refused/bad
                     # body). This is the silent-death class: a direct-mode auth

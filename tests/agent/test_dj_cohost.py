@@ -1312,6 +1312,35 @@ def test_llm_node_11_exception_does_not_propagate(mocker, tmp_path) -> None:
     assert "boom" in meta["llm_error"]
 
 
+def test_llm_node_direct_mode_5xx_surfaces_connection_error(mocker, tmp_path) -> None:
+    """Direct-mode transient LLM outages must not vanish as LISTENING silence."""
+    from tests.integration.test_proxy_fallback import _make_5xx_exc
+
+    transcript_sink: collections.deque[str] = collections.deque()
+    agent, gen_client, recorder, state = _build_agent(
+        mocker,
+        tmp_path,
+        transcript_sink=transcript_sink,
+    )
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="x")
+
+    async def _raise(*_a, **_kw):
+        raise _make_5xx_exc()
+
+    gen_client.aio.models.generate_content_stream = _raise
+
+    agent.set_next_event(Event(type="HEARTBEAT", state=state, extra={}))
+    chunks = _drive_llm_node(agent)
+
+    assert chunks == []
+    conn_events = [fields for kind, fields in recorder.events if kind == "connection_error"]
+    assert len(conn_events) == 1
+    assert conn_events[0]["path"] == "live_coach"
+    assert any("can't reach Gemini" in line for line in transcript_sink)
+    assert not any(kind == "ai_text" for kind, _fields in recorder.events)
+
+
 # ---------- PKG-03 ----------
 
 
