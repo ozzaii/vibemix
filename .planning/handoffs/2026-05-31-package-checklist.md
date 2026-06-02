@@ -4677,8 +4677,10 @@ Remaining gate:
 
 Hold:
 
+- `.planning/packets/2026-06-02/`
 - `.planning/packets/2026-06-02/_learn-army.workflow.js`
 - `.planning/packets/2026-06-02/_learn-army-finish.workflow.js`
+- `.planning/packets/2026-06-02/LEARN-ROADMAP-RISK-GRAVEYARD.md`
 - `.planning/packets/2026-06-02/learn-army/A1-engine-census.md`
 - `.planning/packets/2026-06-02/learn-army/A2-producer-gaps.md`
 - `.planning/packets/2026-06-02/learn-army/A3-livecoach-join.md`
