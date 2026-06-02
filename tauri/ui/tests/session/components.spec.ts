@@ -735,8 +735,9 @@ describe("SessionLayout", () => {
     const btn = root.querySelector<HTMLElement>('[data-action="vibe-engine"]');
     expect(btn).toBeTruthy();
     expect(btn?.dataset.primary).toBe("true");
-    expect(btn?.textContent).toBe("vibe engine");
-    expect(btn?.getAttribute("title")).toContain("Viber chat");
+    expect(btn?.textContent).toBe("crate");
+    expect(btn?.getAttribute("aria-label")).toBe("open Viber crate");
+    expect(btn?.getAttribute("title")).toContain("Viber library");
   });
 
   it("rail controls call the latest rendered handlers", () => {

@@ -903,9 +903,9 @@ export function mountSessionLayout(
   vibeEngineBtn.dataset.action = "vibe-engine";
   vibeEngineBtn.dataset.wire = "session.vibe-engine";
   vibeEngineBtn.dataset.primary = "true";
-  vibeEngineBtn.textContent = "vibe engine";
-  vibeEngineBtn.setAttribute("aria-label", "open vibe engine");
-  vibeEngineBtn.setAttribute("title", "open Viber chat and set builder");
+  vibeEngineBtn.textContent = "crate";
+  vibeEngineBtn.setAttribute("aria-label", "open Viber crate");
+  vibeEngineBtn.setAttribute("title", "open Viber library and set builder");
   vibeEngineBtn.addEventListener("click", () => mountedHandle?.current.actions.onOpenVibeEngine?.());
   const muteBtn = document.createElement("button");
   muteBtn.type = "button";
