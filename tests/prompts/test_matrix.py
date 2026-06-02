@@ -90,11 +90,11 @@ ANCHOR_PHRASES = {
         "kicks stepped on each other for a half-bar",
         "EQ killed the lows too aggressively",
         "build release missed the one",
-        "phrase mismatch in the blend",
+        "unsupported blend verdict — stay on sound",
         "for a half-bar",
         "killed the lows",
         "missed the one",
-        "phrase mismatch",
+        "unsupported phrase verdict",
     ],
     ("pro", "coach"): [
         "phrase ended on the 3",

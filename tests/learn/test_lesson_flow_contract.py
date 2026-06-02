@@ -152,7 +152,8 @@ def test_control_lessons_use_the_action_prompt_as_the_practice_step() -> None:
     assert len(channel_strip.steps) == 1
     assert channel_strip.steps[0].step_id == "L1.03.practice"
     assert channel_strip.steps[0].prompt == (
-        "turn the top EQ knob on deck A all the way one direction, then the other."
+        "twist the top EQ knob on deck A and listen for the cymbals "
+        "getting brighter or darker."
     )
     assert channel_strip.steps[0].tts_marker == "L103.beat1"
 

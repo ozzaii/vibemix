@@ -457,6 +457,58 @@ def test_ack_dispatch_uses_real_prev_value_for_cc_actions() -> None:
     assert runtime.current_state.id in {"advancing", "completed"}
 
 
+def test_hardware_cc_ack_advances_even_when_sample_delta_is_small() -> None:
+    """Real hardware acks should not require an 80-point single-frame jump.
+
+    The Learn webview only emits ``ipc.learn.ack`` for MIDI after observing a
+    position change while a lesson is active. On a live FLX4 the sampled frames
+    can arrive as smaller deltas even when the user is doing the right knob
+    motion, so the sidecar must trust the exact-control hardware ack instead
+    of wedging L1.03 until one frame clears the fixture's large min_delta.
+    """
+    runtime, progress, _ = _make_runtime()
+    router = IpcRouterBus()
+    midi_mirror = MagicMock(name="midi_mirror_inbound")
+    midi_mirror.current_profile.return_value = None
+    register_learn_handlers(
+        ipc_router=router,
+        lesson_runtime=runtime,
+        midi_mirror=midi_mirror,
+        progress=progress,
+    )
+
+    runtime.send(
+        "load",
+        lesson_id="L1.03",
+        course_id="course_1_anatomy",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    assert runtime.current_state.id == "awaiting_action"
+
+    async def go() -> bool:
+        return await router.dispatch(
+            {
+                "type": "ipc.learn.ack",
+                "payload": {
+                    "control_id": "eq_hi:A",
+                    "source": "midi",
+                    "value": 65,
+                    "prev_value": 64,
+                    "direction": "down",
+                },
+            }
+        )
+
+    handled = asyncio.run(go())
+    assert handled is True
+    assert runtime.current_state.id in {"advancing", "completed"}
+    assert progress.lessons["L1.03"]["practice_sources"] == {
+        "hardware": 1,
+        "screen": 0,
+    }
+
+
 def test_ack_dispatch_normalizes_jog_touch_to_jog_cc() -> None:
     """Physical jog-touch events satisfy the curriculum's jog action."""
     runtime, progress, _ = _make_runtime()
@@ -797,7 +849,8 @@ def test_control_lesson_speaks_action_prompt_before_verification() -> None:
     assert tutor_lines[:2] == [
         "the channel strip is the vertical column above each deck: "
         "gain on top, three EQ knobs, fader at the bottom.",
-        "turn the top EQ knob on deck A all the way one direction, then the other.",
+        "twist the top EQ knob on deck A and listen for the cymbals "
+        "getting brighter or darker.",
     ]
 
 
@@ -900,8 +953,8 @@ def test_wrong_deck_ack_points_back_to_expected_deck() -> None:
     assert hints[-1]["citations"] == ["[screen:eq_hi:B]", "[screen:eq_hi:A]"]
 
 
-def test_tiny_cc_ack_asks_for_a_larger_movement() -> None:
-    """The right knob with too little delta should get a magnitude hint."""
+def test_tiny_screen_cc_ack_asks_for_a_larger_movement() -> None:
+    """A synthetic/screen CC nudge with too little delta gets a hint."""
     runtime, progress, runtime_emit_sink = _make_runtime()
     router = IpcRouterBus()
     midi_mirror = MagicMock(name="midi_mirror_inbound")
@@ -930,7 +983,7 @@ def test_tiny_cc_ack_asks_for_a_larger_movement() -> None:
                 "type": "ipc.learn.ack",
                 "payload": {
                     "control_id": "eq_hi:A",
-                    "source": "midi",
+                    "source": "click",
                     "value": 45,
                     "prev_value": 20,
                     "direction": "down",
@@ -944,9 +997,7 @@ def test_tiny_cc_ack_asks_for_a_larger_movement() -> None:
 
     hints = _hint_payloads(runtime_emit_sink)
     assert hints[-1]["text"] == "move deck A high EQ farther."
-    assert hints[-1]["citations"][0].startswith("[midi:eq_hi:A@")
-    assert hints[-1]["citations"][0].endswith("]")
-    assert hints[-1]["citations"][1] == "[screen:eq_hi:A]"
+    assert hints[-1]["citations"] == ["[screen:eq_hi:A]"]
 
 
 def test_button_release_ack_restates_the_press_action() -> None:

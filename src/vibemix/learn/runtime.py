@@ -774,9 +774,14 @@ class LessonRuntime(StateMachine):
 
           * ``midi["type"] == "cc"``,
           * ``midi["control"] == expected["control"]``, AND
-          * ``abs(midi["value"] - midi["prev_value"])`` >=
-            ``expected.get("min_delta", 38)`` (30% of the 127 CC range
-            by default).
+          * for hardware ``source="midi"`` a changed value is enough. The
+            webview only emits an ack after it has observed a position
+            change while the lesson is active; requiring that single sampled
+            frame to clear a large ``min_delta`` wedged real FLX4 practice
+            when the user moved the right knob in smaller/sparser steps.
+          * otherwise, ``abs(midi["value"] - midi["prev_value"])`` >=
+            ``expected.get("min_delta", 38)`` (30% of the 127 CC range by
+            default).
 
         Button branch: matches when
 
@@ -812,6 +817,8 @@ class LessonRuntime(StateMachine):
                     return False
             cur = int(midi.get("value", 0))
             prev = int(midi.get("prev_value", cur))
+            if midi.get("source") == "midi" and cur != prev:
+                return True
             min_delta = int(expected.get("min_delta", _CC_DEFAULT_MIN_DELTA))
             return abs(cur - prev) >= min_delta
 
@@ -1140,9 +1147,8 @@ class LessonRuntime(StateMachine):
     def on_enter_advancing(self, **_kwargs: Any) -> None:
         """Emit :class:`LearnAdvance` with the reason set by the
         triggering transition (``on_ack_action`` → ``"action_matched"``;
-        ``on_skip`` → ``"user_skip"``). Then schedule
-        ``_finish_when_dwelled`` to move into ``completed`` after the
-        45 s min-dwell + a small settle for the UI advance animation.
+        ``on_skip`` → ``"user_skip"``). Matched actions finish after a
+        short UI settle; only user-skip waits for the 45 s min-dwell.
 
         Scheduling falls back to a no-op when no asyncio event loop is
         running (the synchronous unit-test path) — state stays in
@@ -1171,9 +1177,14 @@ class LessonRuntime(StateMachine):
             # no-ops, but the leaked coroutine references accumulate.
             if self._finish_task is not None and not self._finish_task.done():
                 self._finish_task.cancel()
-            self._finish_task = asyncio.create_task(
-                self._finish_when_dwelled()
-            )
+            if self._last_was_match:
+                self._finish_task = asyncio.create_task(
+                    self._finish_after_action_settle()
+                )
+            else:
+                self._finish_task = asyncio.create_task(
+                    self._finish_when_dwelled()
+                )
 
     async def _finish_when_dwelled(self) -> None:
         """Wait for the remaining min-dwell window + ~0.7 s UI settle,
@@ -1183,6 +1194,11 @@ class LessonRuntime(StateMachine):
             45.0 - (time.monotonic() - self._learn.lesson_started_at),
         )
         await asyncio.sleep(remaining + 0.7)
+        self.send("finish")
+
+    async def _finish_after_action_settle(self) -> None:
+        """Let the success animation breathe briefly, then complete."""
+        await asyncio.sleep(0.7)
         self.send("finish")
 
     def on_enter_completed(self, **_kwargs: Any) -> None:

@@ -575,3 +575,33 @@ def test_finish_task_cancelled_on_reload(monkeypatch: pytest.MonkeyPatch) -> Non
                 pass
 
     asyncio.run(run_lifecycle())
+
+
+def test_matched_action_completes_after_short_settle() -> None:
+    """A correct physical action should not wait out the skip dwell floor."""
+
+    import asyncio
+
+    async def run_lifecycle() -> None:
+        runtime, _ipc = _make_runtime()
+        runtime.send(
+            "load",
+            lesson_id="L0.00-press-play",
+            course_id="course_0",
+            controller_id="pioneer_ddj_flx4",
+        )
+        runtime.send("begin")
+        runtime.send(
+            "ack_action",
+            midi={
+                "type": "button",
+                "control": "play",
+                "deck": "A",
+                "direction": "down",
+            },
+        )
+        assert runtime.current_state.id == "advancing"
+        await asyncio.sleep(0.85)
+        assert runtime.current_state.id == "completed"
+
+    asyncio.run(run_lifecycle())

@@ -39,6 +39,8 @@ Run standalone (what an MCP host's config points at):
 Tools (all fail-soft, actionable on error):
   * ``ws_observe(seconds, type_filter?)`` — client-attach, collect inbound frames.
   * ``ws_trigger(action, payload?)`` — send one inbound control frame.
+  * ``learn_probe(...)`` — start a Learn lesson, send one learner action, and
+    return the observed Learn frames (a QA hand for the lesson surface).
   * ``tail_ui_log(lines=80)`` — last N lines of the bundle-id ui.log.
   * ``tail_events(lines=40, session?)`` — recent events.jsonl from a session dir.
   * ``which_handler(type_or_control)`` — resolve an ipc type to TS sender + Py handler.
@@ -339,6 +341,130 @@ async def _ws_send_one(uri: str, frame: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _typed_ipc_frame(message_type: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Build the typed IPC envelope the ws bus dispatch path expects."""
+    return {
+        "type": message_type,
+        "ts": datetime.now(UTC).isoformat(),
+        "payload": payload,
+    }
+
+
+def _summarize_learn_frames(frames: list[dict[str, Any]]) -> dict[str, Any]:
+    """Extract the human QA signal from collected ``ipc.learn.*`` frames."""
+    types = [str(f.get("type", "")) for f in frames]
+    tutor_texts: list[str] = []
+    highlights: list[dict[str, Any]] = []
+    progress_states: list[dict[str, Any]] = []
+    for frame in frames:
+        payload = frame.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        ftype = frame.get("type")
+        if ftype == "ipc.learn.tutor_speak":
+            text = payload.get("text")
+            if isinstance(text, str):
+                tutor_texts.append(text)
+        elif ftype == "ipc.learn.highlight":
+            highlights.append(payload)
+        elif ftype == "ipc.learn.progress_state":
+            progress_states.append(payload)
+    return {
+        "frame_types": types,
+        "lesson_loaded": "ipc.learn.lesson_loaded" in types,
+        "highlighted_controls": [
+            p.get("control_id") for p in highlights if isinstance(p.get("control_id"), str)
+        ],
+        "tutor_texts": tutor_texts,
+        "advanced": "ipc.learn.advance" in types,
+        "completed": "ipc.learn.complete_lesson" in types,
+        "progress_states": progress_states,
+    }
+
+
+async def _ws_learn_probe(
+    uri: str,
+    *,
+    lesson_id: str,
+    level: str,
+    control_id: str,
+    source: str,
+    value: int,
+    prev_value: int,
+    direction: str,
+    settle_seconds: float,
+) -> dict[str, Any]:
+    """Drive one Learn action over the live ws bus and collect broadcasts.
+
+    This is intentionally tiny and client-only: no second listener, no GUI
+    automation dependency, no hidden fixture server. It is the same wire path a
+    user-facing Learn window uses after a click or a MIDI movement.
+    """
+    try:
+        import websockets
+        from websockets.exceptions import WebSocketException
+    except ImportError:
+        return {"error": "websockets not importable in the MCP child.", "frames": []}
+
+    start_frame = _typed_ipc_frame(
+        "ipc.learn.start_lesson",
+        {"lesson_id": lesson_id, "level": level},
+    )
+    ack_frame = _typed_ipc_frame(
+        "ipc.learn.ack",
+        {
+            "control_id": control_id,
+            "source": source,
+            "value": int(value),
+            "prev_value": int(prev_value),
+            "direction": direction,
+        },
+    )
+    settle_seconds = max(0.1, float(settle_seconds))
+    frames: list[dict[str, Any]] = []
+
+    async def _collect_until(deadline: float) -> None:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            try:
+                raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
+            except TimeoutError:
+                return
+            except WebSocketException:
+                return
+            if not isinstance(raw, str):
+                continue
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(data, dict) and str(data.get("type", "")).startswith("ipc.learn."):
+                frames.append(data)
+
+    try:
+        async with websockets.connect(uri) as ws:
+            await ws.send(json.dumps(start_frame))
+            await _collect_until(time.monotonic() + settle_seconds)
+            await ws.send(json.dumps(ack_frame))
+            await _collect_until(time.monotonic() + settle_seconds)
+    except (ConnectionRefusedError, OSError, WebSocketException) as e:
+        return {
+            "error": f"cannot reach {uri} ({e}). Is the co-host running? "
+            "This probe is client-only and never opens a second listener.",
+            "frames": [],
+        }
+
+    return {
+        "uri": uri,
+        "sent": [start_frame, ack_frame],
+        "count": len(frames),
+        "frames": frames,
+        "summary": _summarize_learn_frames(frames),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Server config (DI — paths arrive as ARGS, env does not cross to MCP children)
 # ---------------------------------------------------------------------------
@@ -525,14 +651,45 @@ async def tool_ws_trigger_async(
     """
     payload = payload or {}
     if action.startswith("ipc."):
-        frame: dict[str, Any] = {
-            "type": action,
-            "ts": datetime.now(UTC).isoformat(),
-            "payload": payload,
-        }
+        frame: dict[str, Any] = _typed_ipc_frame(action, payload)
     else:
         frame = {"action": action, **payload}
     return await _ws_send_one(cfg.ws_uri, frame)
+
+
+async def tool_learn_probe_async(
+    cfg: DevServerConfig,
+    *,
+    lesson_id: str = "L1.03",
+    control_id: str = "eq_hi:A",
+    source: str = "midi",
+    value: int = 65,
+    prev_value: int = 64,
+    direction: str = "down",
+    level: str = "fresh",
+    settle_seconds: float = 1.2,
+) -> dict[str, Any]:
+    """QA hand for Learn: start a lesson, send one action, return Learn frames.
+
+    Defaults reproduce the live FLX4 failure class: L1.03 plus a tiny sampled
+    hardware movement on ``eq_hi:A``. A healthy runtime advances despite the
+    small frame delta because the highlighted physical control moved.
+    """
+    if source not in {"midi", "click"}:
+        return {"error": "source must be 'midi' or 'click'", "frames": []}
+    if direction not in {"", "up", "down"}:
+        return {"error": "direction must be '', 'up', or 'down'", "frames": []}
+    return await _ws_learn_probe(
+        cfg.ws_uri,
+        lesson_id=lesson_id,
+        level=level,
+        control_id=control_id,
+        source=source,
+        value=value,
+        prev_value=prev_value,
+        direction=direction,
+        settle_seconds=settle_seconds,
+    )
 
 
 async def tool_sidecar_status_async(cfg: DevServerConfig) -> dict[str, Any]:
@@ -640,6 +797,34 @@ def build_server(cfg: DevServerConfig) -> Any:
         confirmation plus an immediate reply when available; use ws_observe for
         broader broadcasts."""
         return await tool_ws_trigger_async(cfg, action=action, payload=payload)
+
+    @mcp.tool()
+    async def learn_probe(
+        lesson_id: str = "L1.03",
+        control_id: str = "eq_hi:A",
+        source: str = "midi",
+        value: int = 65,
+        prev_value: int = 64,
+        direction: str = "down",
+        level: str = "fresh",
+        settle_seconds: float = 1.2,
+    ) -> dict[str, Any]:
+        """QA-hand the Learn surface over the live ws bus: send
+        ``ipc.learn.start_lesson`` followed by one ``ipc.learn.ack`` and return
+        every observed ``ipc.learn.*`` frame plus a compact summary. Defaults
+        target the FLX4 L1.03 knob failure class (tiny hardware delta on
+        ``eq_hi:A``). CLIENT-only — never opens a second listener."""
+        return await tool_learn_probe_async(
+            cfg,
+            lesson_id=lesson_id,
+            control_id=control_id,
+            source=source,
+            value=value,
+            prev_value=prev_value,
+            direction=direction,
+            level=level,
+            settle_seconds=settle_seconds,
+        )
 
     @mcp.tool()
     def tail_ui_log(lines: int = 80) -> dict[str, Any]:

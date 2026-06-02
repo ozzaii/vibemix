@@ -58,7 +58,7 @@ test.describe("Learn browser plus Python sidecar path", () => {
     await page.locator('[data-lesson-id="L1.03"]').click();
 
     await expect(page.locator(".tutor-dock .now")).toHaveText(
-      "turn the top EQ knob on deck A all the way one direction, then the other.",
+      "twist the top EQ knob on deck A and listen for the cymbals getting brighter or darker.",
     );
     await expect(page.locator('[data-control-id="eq_hi:A"]')).toHaveAttribute(
       "data-cue-color",

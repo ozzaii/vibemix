@@ -8600,6 +8600,9 @@ Include:
 - `src/vibemix/learn/runtime.py`
 - `src/vibemix/__main__.py`
 - `tests/learn/test_beatmatch_practice_driver.py`
+- `tests/learn/test_ipc_handlers_dispatch.py`
+- `tests/learn/test_lesson_flow_contract.py`
+- `tests/learn/test_lesson_runtime_smoke.py`
 - `tests/learn/test_runtime_evidence_grounding.py`
 - `tests/learn/test_practice_loop.py`
 - `tests/repo/test_live_reality_pins.py`
@@ -8626,10 +8629,10 @@ Reason:
 
 Proof before staging:
 
-- `uv run pytest -q tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_practice_loop.py tests/repo/test_live_reality_pins.py`
-- `uv run ruff check src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/repo/test_live_reality_pins.py`
+- `uv run pytest -q tests/learn/test_beatmatch_practice_driver.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_lesson_flow_contract.py tests/learn/test_lesson_runtime_smoke.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_practice_loop.py tests/repo/test_live_reality_pins.py`
+- `uv run ruff check src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_lesson_flow_contract.py tests/learn/test_lesson_runtime_smoke.py tests/learn/test_runtime_evidence_grounding.py tests/repo/test_live_reality_pins.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-- `git diff --check -- src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_practice_loop.py tests/repo/test_live_reality_pins.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `git diff --check -- src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/__main__.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_lesson_flow_contract.py tests/learn/test_lesson_runtime_smoke.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_practice_loop.py tests/repo/test_live_reality_pins.py .planning/handoffs/2026-05-31-package-checklist.md`
 
 ## Package 30 - Learn Cue Placement Practice Driver
 
@@ -9382,3 +9385,51 @@ Proof before staging:
 - `uv run python scripts/build_sidecar.py --spec vibemix-core.macos.spec --target-arch arm64`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- vibemix-core.macos.spec vibemix-core.windows.spec .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 54 - Live Learn QA Hands And L1.03 Hardware Action Fix
+
+Suggested commit: `fix(learn): accept live hardware practice actions`
+
+Include:
+
+- `src/vibemix/runtime/dev_mcp_server.py`
+- `tests/runtime/test_dev_mcp_server.py`
+- `src/vibemix/learn/runtime.py`
+- `src/vibemix/learn/transcripts/course_1_anatomy/03_channel_strip.json`
+- `tests/learn/test_ipc_handlers_dispatch.py`
+- `tests/learn/test_lesson_flow_contract.py`
+- `tests/learn/test_lesson_runtime_smoke.py`
+- `tauri/ui/tests/learn/browser-python-beginner-path.pw.ts`
+- `src/vibemix/prompts/matrix.py`
+- `tests/prompts/test_matrix.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Tauri UI visual redesign, packaged-build claims, generated sidecar binaries, Sven
+  fixed-line/DROP speech, real FLX4 beatmatch scoring claims, and any claim that
+  Viber is the live co-host. This package adds an operator QA hand and fixes the
+  first Learn hardware action getting stuck; it does not claim the whole Learn
+  product is complete.
+
+Reason:
+
+- The signed app opened into a stale/broken Learn experience: L1.03 kept asking for
+  a huge extreme EQ motion even though live FLX4 MIDI was observed. Add an MCP QA
+  hand that can start a lesson, send the same typed websocket frames a human action
+  would produce, and summarize Learn frames. Then make matched hardware CC actions
+  advance and complete after a short action settle instead of sitting behind the
+  skip-only dwell floor. Tighten the prompt matrix at the same time so Sven does
+  not turn unsupported transition/blend guesses into confident coaching.
+
+Proof before staging:
+
+- Source live run with `VIBEMIX_DEV_SIDECAR=1 uv run python -m vibemix`; MCP
+  `tool_learn_probe_async(... lesson_id="L1.03", control_id="eq_hi:A", source="midi",
+  value=65, prev_value=64 ...)` observed `ipc.learn.lesson_loaded`,
+  `ipc.learn.highlight`, `ipc.learn.advance`, `ipc.learn.complete_lesson`, and final
+  progress with `L1.03.completed: true`.
+- `uv run pytest -q tests/runtime/test_dev_mcp_server.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_advancement_gates.py tests/learn/test_lesson_flow_contract.py tests/learn/test_lesson_runtime_smoke.py tests/prompts/test_matrix.py`
+- `uv run ruff check src/vibemix/runtime/dev_mcp_server.py src/vibemix/learn/runtime.py src/vibemix/prompts/matrix.py tests/runtime/test_dev_mcp_server.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_lesson_flow_contract.py tests/learn/test_lesson_runtime_smoke.py tests/prompts/test_matrix.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/runtime/dev_mcp_server.py tests/runtime/test_dev_mcp_server.py src/vibemix/learn/runtime.py src/vibemix/learn/transcripts/course_1_anatomy/03_channel_strip.json tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_lesson_flow_contract.py tests/learn/test_lesson_runtime_smoke.py tauri/ui/tests/learn/browser-python-beginner-path.pw.ts src/vibemix/prompts/matrix.py tests/prompts/test_matrix.py .planning/handoffs/2026-05-31-package-checklist.md`

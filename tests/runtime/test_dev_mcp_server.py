@@ -62,11 +62,11 @@ def test_parse_args_overrides_resolve_absolute(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Tool registration — all six tools live on the FastMCP server
+# Tool registration — all seven tools live on the FastMCP server
 # ---------------------------------------------------------------------------
 
 
-def test_build_server_registers_all_six_tools(tmp_path):
+def test_build_server_registers_all_seven_tools(tmp_path):
     cfg = _cfg(tmp_path)
     server = dms.build_server(cfg)
     tools = asyncio.run(server.list_tools())
@@ -74,6 +74,7 @@ def test_build_server_registers_all_six_tools(tmp_path):
     assert names == {
         "ws_observe",
         "ws_trigger",
+        "learn_probe",
         "tail_ui_log",
         "tail_events",
         "which_handler",
@@ -333,6 +334,104 @@ def test_ws_trigger_sends_frame_to_fake_bus():
         "type": "ipc.settings.get_result",
         "payload": {"key": "voice", "value": "on"},
     }
+
+
+def test_learn_probe_starts_lesson_sends_ack_and_summarizes_frames():
+    websockets = pytest.importorskip("websockets")
+
+    async def scenario():
+        port = _free_port()
+        received: list[dict] = []
+
+        async def handler(ws):
+            raw_start = await ws.recv()
+            start = json.loads(raw_start)
+            received.append(start)
+            assert start["type"] == "ipc.learn.start_lesson"
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "ipc.learn.lesson_loaded",
+                        "payload": {"lesson_id": "L1.03"},
+                    }
+                )
+            )
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "ipc.learn.highlight",
+                        "payload": {"control_id": "eq_hi:A"},
+                    }
+                )
+            )
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "ipc.learn.tutor_speak",
+                        "payload": {
+                            "text": (
+                                "twist the top EQ knob on deck A and listen "
+                                "for the cymbals getting brighter or darker."
+                            )
+                        },
+                    }
+                )
+            )
+
+            raw_ack = await ws.recv()
+            ack = json.loads(raw_ack)
+            received.append(ack)
+            assert ack["type"] == "ipc.learn.ack"
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "ipc.learn.advance",
+                        "payload": {"lesson_id": "L1.03", "reason": "action_matched"},
+                    }
+                )
+            )
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "ipc.learn.complete_lesson",
+                        "payload": {"lesson_id": "L1.03", "reason": "completed"},
+                    }
+                )
+            )
+            await asyncio.sleep(0.1)
+
+        server = await websockets.serve(handler, "127.0.0.1", port)
+        try:
+            cfg = dms.DevServerConfig(ws_uri=f"ws://127.0.0.1:{port}")
+            out = await dms.tool_learn_probe_async(
+                cfg,
+                lesson_id="L1.03",
+                control_id="eq_hi:A",
+                value=65,
+                prev_value=64,
+                settle_seconds=0.4,
+            )
+            return out, received
+        finally:
+            server.close()
+            await server.wait_closed()
+
+    out, received = asyncio.run(scenario())
+    assert [frame["type"] for frame in received] == [
+        "ipc.learn.start_lesson",
+        "ipc.learn.ack",
+    ]
+    assert received[1]["payload"] == {
+        "control_id": "eq_hi:A",
+        "source": "midi",
+        "value": 65,
+        "prev_value": 64,
+        "direction": "down",
+    }
+    assert out["summary"]["lesson_loaded"] is True
+    assert out["summary"]["highlighted_controls"] == ["eq_hi:A"]
+    assert out["summary"]["advanced"] is True
+    assert out["summary"]["completed"] is True
 
 
 def test_ws_trigger_refused_is_actionable():
