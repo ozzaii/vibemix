@@ -52,6 +52,19 @@ def test_drop_fires_when_countdown_crosses_into_window(monkeypatch) -> None:
     assert ev2.priority == 10  # ties MANUAL at the ceiling (event.py EVENT_PRIORITY)
 
 
+def test_drop_event_carries_virtual_beat_timing_when_available(monkeypatch) -> None:
+    d = EventDetector(drop_call_enabled=True)
+    ms = _playing_state(1.5)
+    ms.audible_track_beat_fraction = 0.2498
+    ms.audible_track_seconds_to_nearest_beat = 0.1246
+
+    ev = _tick(d, ms, monkeypatch, t=1000.0)
+
+    assert ev is not None and ev.type == "DROP"
+    assert ev.extra["beat_fraction"] == 0.25
+    assert ev.extra["seconds_to_nearest_beat"] == 0.125
+
+
 def test_no_drop_when_disabled_by_default(monkeypatch) -> None:
     monkeypatch.delenv("VIBEMIX_DROP_CALL", raising=False)
     d = EventDetector()  # reads env → off

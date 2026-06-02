@@ -158,6 +158,8 @@ class MusicState:
     audible_track_position_s: float | None = None
     audible_track_duration_s: float | None = None
     audible_track_position_confidence: float = 0.0
+    audible_track_beat_fraction: float | None = None
+    audible_track_seconds_to_nearest_beat: float | None = None
     last_audible_track: str | None = None  # what was audible last refresh (for change detection)
 
     # Recent moves (within last 12s, deck-attributed)

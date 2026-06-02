@@ -14,6 +14,8 @@ class VirtualTrackPosition:
     position_sec: float | None
     confidence: float
     source: str
+    beat_fraction: float | None = None
+    seconds_to_nearest_beat: float | None = None
 
 
 def virtual_position_sec(
@@ -46,7 +48,12 @@ def virtual_position_sec(
         or bpm <= 0.0
         or bpm_confidence < BEAT_TRUST_CONFIDENCE_FLOOR
     ):
-        return VirtualTrackPosition(raw, raw_confidence, "raw")
+        beat_fraction, beat_offset = _beat_timing(
+            raw,
+            bpm=bpm,
+            bpm_confidence=bpm_confidence,
+        )
+        return VirtualTrackPosition(raw, raw_confidence, "raw", beat_fraction, beat_offset)
 
     age_s = now - position_sampled_at
     if age_s > max_age_s:
@@ -54,10 +61,17 @@ def virtual_position_sec(
 
     rate = 1.0 if playback_rate is None else max(0.0, float(playback_rate))
     virtual = _bounded_position(raw + age_s * rate, duration_sec)
+    beat_fraction, beat_offset = _beat_timing(
+        virtual,
+        bpm=bpm,
+        bpm_confidence=bpm_confidence,
+    )
     return VirtualTrackPosition(
         virtual,
         min(raw_confidence, _bounded_confidence(bpm_confidence)),
         "dead_reckoned",
+        beat_fraction,
+        beat_offset,
     )
 
 
@@ -72,3 +86,26 @@ def _bounded_position(value: float | None, duration_sec: float | None) -> float 
 
 def _bounded_confidence(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
+
+
+def _beat_timing(
+    position_sec: float | None,
+    *,
+    bpm: float,
+    bpm_confidence: float,
+) -> tuple[float | None, float | None]:
+    """Return beat-distance metadata for the current virtual playhead.
+
+    ``beat_fraction`` is the fraction through the current beat, not a bar. The
+    paired offset is distance to the nearest beat boundary in seconds, so live
+    proof can judge whether a predicted DROP was actually beat-aligned without
+    pretending the slow OS now-playing poll is a high-rate clock.
+    """
+    if position_sec is None or bpm <= 0.0 or bpm_confidence < BEAT_TRUST_CONFIDENCE_FLOOR:
+        return None, None
+    beat_len_s = 60.0 / float(bpm)
+    if beat_len_s <= 0.0:
+        return None, None
+    fraction = (float(position_sec) / beat_len_s) % 1.0
+    nearest = min(fraction, 1.0 - fraction) * beat_len_s
+    return fraction, nearest

@@ -869,6 +869,8 @@ def test_tick_dead_reckons_track_position_between_nowplaying_polls(mocker):
     assert state.audible_track == "X"
     assert state.audible_track_position_s == 65.0
     assert state.audible_track_position_confidence >= 0.8
+    assert state.audible_track_beat_fraction is not None
+    assert state.audible_track_seconds_to_nearest_beat is not None
 
 
 # ---------- Audible deck + track wiring ----------

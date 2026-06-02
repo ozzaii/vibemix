@@ -1136,10 +1136,14 @@ def _tick_once(
             state.audible_track_position_s = vpos.position_sec
             state.audible_track_duration_s = duration_s if duration_s and duration_s > 0 else None
             state.audible_track_position_confidence = vpos.confidence
+            state.audible_track_beat_fraction = vpos.beat_fraction
+            state.audible_track_seconds_to_nearest_beat = vpos.seconds_to_nearest_beat
         else:
             state.audible_track_position_s = None
             state.audible_track_duration_s = None
             state.audible_track_position_confidence = 0.0
+            state.audible_track_beat_fraction = None
+            state.audible_track_seconds_to_nearest_beat = None
 
         # Phase 59-04 (DECK-04) — deck-state single-writer copy. The deck poller
         # is the THIRD external snapshot producer (after ControllerState /

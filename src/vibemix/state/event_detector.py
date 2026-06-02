@@ -285,8 +285,17 @@ class EventDetector:
             self._last_predicted_drop = predicted_drop
             if arm and self._cooldown_ok("DROP", now):
                 self._fire("DROP", now, state)
+                extra = {"cue": drop_call_cue(predicted_drop), "eta": predicted_drop}
+                beat_fraction = getattr(state, "audible_track_beat_fraction", None)
+                beat_offset_s = getattr(state, "audible_track_seconds_to_nearest_beat", None)
+                if beat_fraction is not None:
+                    extra["beat_fraction"] = round(float(beat_fraction), 3)
+                if beat_offset_s is not None:
+                    extra["seconds_to_nearest_beat"] = round(float(beat_offset_s), 3)
                 return Event(
-                    "DROP", state, extra={"cue": drop_call_cue(predicted_drop), "eta": predicted_drop}
+                    "DROP",
+                    state,
+                    extra=extra,
                 )
 
         # 1) Track change — new audible track different from last seen.

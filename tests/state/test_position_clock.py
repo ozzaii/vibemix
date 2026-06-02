@@ -22,6 +22,8 @@ def test_virtual_position_dead_reckons_seconds_when_bpm_lock_is_trusted():
     assert math.isclose(out.position_sec or 0.0, 65.0)
     assert out.confidence == 0.85
     assert out.source == "dead_reckoned"
+    assert out.beat_fraction is not None
+    assert out.seconds_to_nearest_beat is not None
 
 
 def test_virtual_position_uses_playback_rate_not_bpm_units():
@@ -54,6 +56,8 @@ def test_virtual_position_falls_back_to_raw_when_bpm_lock_is_weak():
     assert out.position_sec == 64.5
     assert out.confidence == 0.85
     assert out.source == "raw"
+    assert out.beat_fraction is None
+    assert out.seconds_to_nearest_beat is None
 
 
 def test_virtual_position_falls_back_when_sample_is_stale():
@@ -70,6 +74,8 @@ def test_virtual_position_falls_back_when_sample_is_stale():
 
     assert out.position_sec == 64.5
     assert out.source == "stale_raw"
+    assert out.beat_fraction is None
+    assert out.seconds_to_nearest_beat is None
 
 
 def test_virtual_position_clamps_to_duration():
@@ -102,3 +108,22 @@ def test_virtual_position_missing_raw_is_honest_none():
     assert out.position_sec is None
     assert out.confidence == 0.0
     assert out.source == "missing"
+    assert out.beat_fraction is None
+    assert out.seconds_to_nearest_beat is None
+
+
+def test_virtual_position_reports_fraction_through_current_beat():
+    out = virtual_position_sec(
+        position_sec=10.0,
+        position_sampled_at=100.0,
+        now=100.125,
+        duration_sec=None,
+        playback_rate=1.0,
+        bpm=120.0,
+        bpm_confidence=0.9,
+        track_confidence=0.8,
+    )
+
+    assert math.isclose(out.position_sec or 0.0, 10.125)
+    assert math.isclose(out.beat_fraction or 0.0, 0.25)
+    assert math.isclose(out.seconds_to_nearest_beat or 0.0, 0.125)
