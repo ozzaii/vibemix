@@ -1,10 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * Regression coverage for the shell Settings nav <-> drawer bridge. Closing
- * the drawer from inside Settings must move shell navigation back to the last
- * real surface, otherwise clicking Settings again is a no-op because the shell
- * still thinks that surface is active.
+ * Regression coverage for the shell Settings nav <-> drawer bridge. Settings
+ * is an overlay, not a real stage surface: opening it must keep the last task
+ * surface active behind the drawer so the user never sees a fake Settings
+ * empty route.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,12 +91,12 @@ afterEach(() => {
 });
 
 describe("wireSettingsNav", () => {
-  it("returns to the last surface when the drawer closes so Settings can reopen", () => {
+  it("opens Settings over the last real surface so no blank Settings route appears", () => {
     shell!.store.setActiveSurface("crate");
     shell!.store.setActiveSurface("settings");
 
     expect(settings.openSettings).toHaveBeenCalledTimes(1);
-    expect(shell!.store.getState().activeSurface).toBe("settings");
+    expect(shell!.store.getState().activeSurface).toBe("crate");
 
     settings.setOpen(false);
 
@@ -105,12 +105,13 @@ describe("wireSettingsNav", () => {
     shell!.store.setActiveSurface("settings");
 
     expect(settings.openSettings).toHaveBeenCalledTimes(2);
-    expect(shell!.store.getState().activeSurface).toBe("settings");
+    expect(shell!.store.getState().activeSurface).toBe("crate");
   });
 
-  it("closes the drawer when shell navigation leaves Settings", () => {
+  it("closes the drawer on later real-surface navigation", () => {
     shell!.store.setActiveSurface("settings");
     expect(settings.openSettings).toHaveBeenCalledTimes(1);
+    expect(shell!.store.getState().activeSurface).toBe("deck");
 
     shell!.store.setActiveSurface("learn");
 

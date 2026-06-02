@@ -87,16 +87,23 @@ const appDeps: SurfaceMountDeps = {
 /**
  * The Settings surface is the drawer routeSession already mounted (a fixed
  * overlay). Since the shell suppresses the session's own titlebar gear, the
- * shell's Settings nav (click / Cmd+5 / palette) is the opener: navigating TO
- * settings slides the drawer in, navigating away slides it out. Returns an
- * unsubscribe.
+ * shell's Settings nav (click / Cmd+5 / palette) is the opener. Settings is
+ * not a real stage surface, though: it is a drawer over the DJ's current task.
+ * When navigation lands on Settings, open the drawer and immediately restore
+ * the last non-settings surface so the main stage never shows the fake
+ * "Settings" empty route behind the drawer.
  */
 export function wireSettingsNav(shell: MountedShell): () => void {
   let prev = shell.store.getState().activeSurface;
   let lastNonSettings = prev === "settings" ? "deck" : prev;
+  let restoringSettingsSurface = false;
 
   if (prev === "settings") {
     openSettings();
+    restoringSettingsSurface = true;
+    shell.store.setActiveSurface(lastNonSettings);
+    restoringSettingsSurface = false;
+    prev = lastNonSettings;
   }
 
   const unstore = shell.store.subscribe((model) => {
@@ -106,7 +113,12 @@ export function wireSettingsNav(shell: MountedShell): () => void {
     if (model.activeSurface === prev) return;
     if (model.activeSurface === "settings") {
       openSettings();
-    } else if (prev === "settings" && getSettingsUIState().open) {
+      restoringSettingsSurface = true;
+      shell.store.setActiveSurface(lastNonSettings);
+      restoringSettingsSurface = false;
+      prev = lastNonSettings;
+      return;
+    } else if (getSettingsUIState().open && !restoringSettingsSurface) {
       closeSettings();
     }
     prev = model.activeSurface;

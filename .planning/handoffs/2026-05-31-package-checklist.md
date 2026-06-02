@@ -9433,3 +9433,35 @@ Proof before staging:
 - `uv run ruff check src/vibemix/runtime/dev_mcp_server.py src/vibemix/learn/runtime.py src/vibemix/prompts/matrix.py tests/runtime/test_dev_mcp_server.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_lesson_flow_contract.py tests/learn/test_lesson_runtime_smoke.py tests/prompts/test_matrix.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/runtime/dev_mcp_server.py tests/runtime/test_dev_mcp_server.py src/vibemix/learn/runtime.py src/vibemix/learn/transcripts/course_1_anatomy/03_channel_strip.json tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_lesson_flow_contract.py tests/learn/test_lesson_runtime_smoke.py tauri/ui/tests/learn/browser-python-beginner-path.pw.ts src/vibemix/prompts/matrix.py tests/prompts/test_matrix.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 55 - Settings Overlay Keeps Current Surface
+
+Suggested commit: `fix(shell): keep settings as an overlay`
+
+Include:
+
+- `tauri/ui/src/shell/app.ts`
+- `tauri/ui/tests/shell/settings-nav.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Settings drawer group internals, visual theme/token rewrites, Learn runtime
+  behavior, native packaging scripts, and product claims that the whole first-run
+  flow is complete. This package only removes the fake Settings stage behind the
+  existing drawer.
+
+Reason:
+
+- In the packaged app, choosing Settings switched the main stage to a blank
+  "Not set up yet" Settings placeholder while also opening the real Settings
+  drawer. That made the app feel unfinished and cluttered. Settings is an
+  overlay control surface, not a task route; keep the current Deck/Crate/Learn
+  surface active behind it and close the drawer on later real-surface navigation.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/settings-nav.spec.ts tests/shell/shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/app.ts tauri/ui/tests/shell/settings-nav.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
