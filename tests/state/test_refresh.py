@@ -16,6 +16,7 @@ Test strategy:
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -883,6 +884,50 @@ def test_tick_dead_reckons_track_position_between_nowplaying_polls(mocker):
     assert state.audible_track_position_confidence >= 0.8
     assert state.audible_track_beat_fraction is not None
     assert state.audible_track_seconds_to_nearest_beat is not None
+
+
+def test_tick_writes_recent_band_envelope_from_feature_history(mocker):
+    state = MusicState()
+    state.audible = True
+    feature_history: deque[dict] = deque(maxlen=5)
+    base = {
+        "rms": 0.08,
+        "sub_share": 0.10,
+        "low_share": 0.18,
+        "mid_share": 0.36,
+        "high_share": 0.20,
+        "onsets_per_sec": 2.0,
+    }
+    current = {
+        "rms": 0.10,
+        "sub_share": 0.34,
+        "low_share": 0.19,
+        "mid_share": 0.12,
+        "high_share": 0.25,
+        "onsets_per_sec": 2.5,
+    }
+    mocker.patch("vibemix.state.refresh.snapshot_features", side_effect=[base, current])
+
+    kwargs = dict(
+        audio_buf=_audible_buf(),
+        controller_state=_ctrl_mock(),
+        track_info=_track_mock(),
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.5,
+        feature_history=feature_history,
+    )
+
+    _tick_once(state, now=1000.0, **kwargs)
+    _tick_once(state, now=1001.0, **kwargs)
+
+    assert state.band_env == [
+        "sub=high_rising",
+        "low=mid_steady",
+        "mid=low_falling",
+        "high=mid_rising",
+    ]
 
 
 # ---------- Audible deck + track wiring ----------

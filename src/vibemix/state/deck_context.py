@@ -2014,6 +2014,31 @@ def render_audio_delta_items(
     return out
 
 
+def _band_env_tokens(state: MusicState) -> list[str]:
+    tokens = []
+    for raw in getattr(state, "band_env", []) or []:
+        text = str(raw).strip().lower()
+        if re.fullmatch(r"(?:sub|low|mid|high)=(?:low|mid|high)_(?:rising|falling|steady)", text):
+            tokens.append(text)
+    return tokens[:4]
+
+
+def render_band_env_context(state: MusicState) -> str | None:
+    """Return recent per-band level+trend context without making a genre verdict."""
+    if not getattr(state, "audible", False):
+        return None
+    tokens = _band_env_tokens(state)
+    if not tokens:
+        return None
+    fields = [
+        "source=master_global_mix",
+        "window=recent_feature_history",
+        "bands=" + ",".join(tokens),
+        "rule=band_envelope_not_genre_or_quality_verdict",
+    ]
+    return "band_env_context[" + " ".join(fields) + "]"
+
+
 def _move_effect_audio_delta_items(
     state: MusicState,
     moves: list[str] | tuple[str, ...],
@@ -2493,6 +2518,9 @@ def live_mix_evidence_keys(
     prefix = "move_effect" if labels else "audio_delta"
     for delta in deltas[:4]:
         keys.append(f"{prefix}={_evidence_token(delta)}")
+    band_env = "+".join(_evidence_token(token) for token in _band_env_tokens(state))
+    if band_env:
+        keys.append(f"band_env={band_env}")
     if route_key:
         keys.append(route_key)
 

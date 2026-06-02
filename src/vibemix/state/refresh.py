@@ -122,6 +122,9 @@ _DECK_AUDIO_ACTIVE_RMS = 0.003
 _DECK_AUDIO_DOMINANCE_RATIO = 1.75
 _DECK_AUDIO_SINGLE_CONFIDENCE = 0.62
 _DECK_AUDIO_MIX_CONFIDENCE = 0.55
+_BAND_ENV_TREND_FLOOR = 0.04
+_BAND_ENV_LEVEL_LOW = 0.14
+_BAND_ENV_LEVEL_HIGH = 0.32
 
 
 # Phase 52 (GENRE-01): cache the loaded GenreProfile library once — the profile
@@ -200,6 +203,41 @@ def _render_move_audio_delta_items(
             out.append(phr)
         if len(out) >= cap:
             break
+    return out
+
+
+def _compose_band_env(feature_history: deque[dict]) -> list[str]:
+    """Return compact recent per-band level+trend tokens from feature history."""
+    rows = [row for row in feature_history if isinstance(row, dict)]
+    if len(rows) < 2:
+        return []
+    first = rows[0]
+    last = rows[-1]
+    out: list[str] = []
+    for band, key in (
+        ("sub", "sub_share"),
+        ("low", "low_share"),
+        ("mid", "mid_share"),
+        ("high", "high_share"),
+    ):
+        current = _float_field(last.get(key))
+        previous = _float_field(first.get(key))
+        if current is None or previous is None:
+            continue
+        if current >= _BAND_ENV_LEVEL_HIGH:
+            level = "high"
+        elif current <= _BAND_ENV_LEVEL_LOW:
+            level = "low"
+        else:
+            level = "mid"
+        delta = current - previous
+        if delta >= _BAND_ENV_TREND_FLOOR:
+            trend = "rising"
+        elif delta <= -_BAND_ENV_TREND_FLOOR:
+            trend = "falling"
+        else:
+            trend = "steady"
+        out.append(f"{band}={level}_{trend}")
     return out
 
 
@@ -933,6 +971,7 @@ def _tick_once(
         state.onset_density = feats.get("onsets_per_sec", 0.0)
         state.bpm = bpm_cache
         state.energy_curve = curve
+        state.band_env = _compose_band_env(feature_history) if state.audible else []
 
         # Phase 6: write the 4 new fields.
         state.crest_factor = round(smoothed_crest, 2)

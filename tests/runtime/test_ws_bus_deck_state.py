@@ -356,6 +356,19 @@ def test_payload_includes_bounded_audio_delta(mocker):
     ]
 
 
+def test_payload_includes_band_env_context(mocker):
+    state = MusicState()
+    state.audible = True
+    state.band_env = ["sub=high_rising", "low=mid_steady"]
+
+    payload = _capture_payload(state, mocker)
+
+    assert "band_env_context" in payload["live_context_capabilities"]
+    assert payload["band_env_context"].startswith("band_env_context[")
+    assert "bands=sub=high_rising,low=mid_steady" in payload["band_env_context"]
+    assert "band_env=sub_high_rising+low_mid_steady" in payload["live_evidence"]["mix"]
+
+
 def test_payload_includes_bounded_live_evidence_refs(mocker):
     """Structured live evidence rides beside prose context for Viber grounding."""
     mocker.patch("vibemix.state.music_state.time.time", return_value=1010.0)

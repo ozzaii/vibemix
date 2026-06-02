@@ -34,6 +34,7 @@ from vibemix.state.deck_context import (
     render_audio_part_context,
     render_audio_window_context,
     render_audio_window_map,
+    render_band_env_context,
     render_deck_audio_context,
     render_deck_audio_delta_context,
     render_deck_audio_features_context,
@@ -211,6 +212,7 @@ LIVE_CONTEXT_CAPABILITIES: tuple[str, ...] = (
     "audio_part_context",
     "audio_window_context",
     "audio_window_map",
+    "band_env_context",
     "audio_delta",
     "live_evidence",
 )
@@ -1041,6 +1043,7 @@ async def ws_broadcast(
             deck_audio_features_context = render_deck_audio_features_context(audio_capture_context)
             deck_audio_delta_context = render_deck_audio_delta_context(audio_capture_context)
             deck_audio_window_context = render_deck_audio_window_context(audio_capture_context)
+            band_env_context = render_band_env_context(state)
             deck_source_status = _serialize_deck_source_status(state)
             mascot_frame = {
                 **levels.snapshot(),
@@ -1122,6 +1125,7 @@ async def ws_broadcast(
                 # gives Viber/Gemini a cheap "what changed in the sound" hint
                 # around recent moves without adding another model/audio pass.
                 "audio_delta": audio_delta,
+                **({"band_env_context": band_env_context} if band_env_context else {}),
                 # Time-aligned "old/action/future" context for Viber/Gemini.
                 # This is a live timing contract, not an audio stem and not a
                 # quality verdict. Recent moves annotate it when present; cold

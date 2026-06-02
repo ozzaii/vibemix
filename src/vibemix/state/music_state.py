@@ -87,6 +87,7 @@ class MusicState:
     prev_perceive: dict = field(default_factory=dict)
     audio_delta: list[str] = field(default_factory=list)
     move_audio_delta: list[str] = field(default_factory=list)
+    band_env: list[str] = field(default_factory=list)
     trajectory_narrative: str = ""
 
     # Phase 59 (DECK-01) — embedded per-deck state (currently-loaded track +

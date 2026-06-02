@@ -98,6 +98,7 @@ from vibemix.state.deck_context import (
     render_audio_part_context,
     render_audio_window_context,
     render_audio_window_map,
+    render_band_env_context,
     render_context_feed_contract,
     render_deck_audio_context,
     render_deck_audio_delta_context,
@@ -437,6 +438,7 @@ def _build_attached_audio_context_clause(
         render_deck_audio_features_context(audio_capture_context),
         render_deck_audio_delta_context(audio_capture_context),
         render_deck_audio_window_context(audio_capture_context),
+        render_band_env_context(state),
         render_audio_window_context(
             state,
             move_items,
@@ -644,6 +646,7 @@ def _build_recall_query_context(ev: Event) -> str:
         ("deck_audio_features", render_deck_audio_features_context(audio_capture_context)),
         ("deck_audio_delta", render_deck_audio_delta_context(audio_capture_context)),
         ("deck_audio_window", render_deck_audio_window_context(audio_capture_context)),
+        ("band_env", render_band_env_context(state)),
         (
             "audio_window",
             render_audio_window_context(

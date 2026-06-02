@@ -29,6 +29,7 @@ from vibemix.state.deck_context import (
     render_audio_part_context,
     render_audio_window_context,
     render_audio_window_map,
+    render_band_env_context,
     render_context_feed_contract,
     render_deck_audio_context,
     render_deck_audio_delta_context,
@@ -2007,6 +2008,35 @@ def test_audio_delta_items_strip_flat_brightness_share_receipt() -> None:
     }
 
     assert render_audio_delta_items(state) == []
+
+
+def test_band_env_context_renders_recent_band_envelope_without_genre_verdict() -> None:
+    state = MusicState(audible=True)
+    state.band_env = [
+        "sub=high_rising",
+        "low=mid_steady",
+        "mid=low_falling",
+        "high=mid_rising",
+    ]
+
+    out = render_band_env_context(state)
+
+    assert out is not None
+    assert out.startswith("band_env_context[")
+    assert "source=master_global_mix" in out
+    assert "window=recent_feature_history" in out
+    assert "bands=sub=high_rising,low=mid_steady,mid=low_falling,high=mid_rising" in out
+    assert "rule=band_envelope_not_genre_or_quality_verdict" in out
+    assert "psytrance" not in out
+
+
+def test_live_mix_evidence_keys_include_band_env_receipt() -> None:
+    state = MusicState(audible=True)
+    state.band_env = ["sub=high_rising", "low=mid_steady"]
+
+    keys = live_mix_evidence_keys(state)
+
+    assert "band_env=sub_high_rising+low_mid_steady" in keys
 
 
 def test_move_effect_context_maps_recent_move_to_deck_audio_windows() -> None:
