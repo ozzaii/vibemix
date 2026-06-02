@@ -11,11 +11,11 @@
 #   - docs / mocks / tauri are OUT of scope.
 #
 # Patterns banned (kept in sync with tests/repo/test_model_literal_gate.py):
-#   - gemini-3-flash        (live coach + library auto-tag + debrief TTS)
+#   - gemini-3-flash        (live coach + library auto-tag + debrief)
 #   - gemini-3-pro          (debrief)
 #   - gemini-embedding-     (embedding 2 + defensive against legacy 001)
-#   - gemini-3.1-flash      (TTS + Live API)
-#   - gemini-2.5-flash      (fallback TTS)
+#   - gemini-3.1-flash      (legacy Live API literal)
+#   - gemini-2.5-flash      (legacy fallback literal)
 #   - gemini-3.1-flash-live (future Live API surface)
 #
 # Comments containing literals count as violations. A docstring that

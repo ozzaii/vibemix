@@ -7132,6 +7132,9 @@ Include:
 - `src/vibemix/library/pricing.py`
 - `tests/library/test_pricing.py`
 - `scripts/automix_demo_smoke.py`
+- `scripts/dayzero/launch_copy/linkedin.txt`
+- `scripts/launch/social_templates/hackernews.txt.jinja`
+- `scripts/release/check_no_hardcoded_model.sh`
 - `src/vibemix/prompts/matrix.py`
 - `src/vibemix/platform/_audio_windows.py`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
@@ -7147,8 +7150,8 @@ Proof to run:
 
 - `uv run pytest -q tests/library/test_pricing.py tests/library/test_cost.py tests/scripts/test_demo_film_no_ai_vo.py tests/test_audio_macos.py`
 - `uv run ruff check src/vibemix/library/pricing.py tests/library/test_pricing.py scripts/automix_demo_smoke.py src/vibemix/prompts/matrix.py src/vibemix/platform/_audio_windows.py`
-- `rg -n "Live primary voice|Cartesia Sonic .*Gemini|Cartesia.*fallback|Gemini TTS expressivity|Gemini TTS streams produce|Cartesia needs it" src scripts tests docs --glob '!docs/launch/**' --glob '!scripts/local_tts_speak.py' --glob '!tests/library/test_pricing.py'`
-- `git diff --check -- src/vibemix/library/pricing.py tests/library/test_pricing.py scripts/automix_demo_smoke.py src/vibemix/prompts/matrix.py src/vibemix/platform/_audio_windows.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `rg -n "Live primary voice|Cartesia Sonic .*Gemini|Cartesia.*fallback|Gemini TTS expressivity|Gemini TTS streams produce|Cartesia needs it|live reactions/TTS|native-audio TTS|debrief TTS|fallback TTS" src scripts tests docs --glob '!docs/launch/**' --glob '!scripts/local_tts_speak.py' --glob '!tests/library/test_pricing.py'`
+- `git diff --check -- src/vibemix/library/pricing.py tests/library/test_pricing.py scripts/automix_demo_smoke.py scripts/dayzero/launch_copy/linkedin.txt scripts/launch/social_templates/hackernews.txt.jinja scripts/release/check_no_hardcoded_model.sh src/vibemix/prompts/matrix.py src/vibemix/platform/_audio_windows.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
 Remaining gate:
