@@ -1800,6 +1800,38 @@ Proof before staging:
   - `git diff --check -- eval/EAR-TEST-PROTOCOL.md KAAN-ACTION-LEGAL.md .planning/handoffs/2026-05-31-package-checklist.md`
     passed.
 
+## Package 1B3 - Retire Transformers Audio Feature Test Oracle
+
+Suggested commit: `test(library): pin audio features without transformers`
+
+Include:
+
+- `tests/library/test_audio_decode.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `src/vibemix/library/audio_decode.py`; the runtime decoder is already PyAV/numpy-only.
+- `src/vibemix/library/audio_features.py`; this is a test-oracle cleanup, not a DSP rewrite.
+- Sidecar specs or dependency files; Transformers is already excluded from frozen builds.
+
+Reason:
+
+- `audio_decode.py` no longer has a Transformers runtime path, but
+  `tests/library/test_audio_decode.py` still used
+  `pytest.importorskip("transformers.audio_utils")` as its DSP reference. On
+  normal local/CI installs that silently skipped the mel/spectrogram regression
+  instead of proving it.
+- Replace the optional external oracle with deterministic numpy regression
+  anchors from the existing local implementation, keeping the no-Transformers
+  packaging posture testable without installing a dead dependency.
+
+Proof before staging:
+
+- `uv run pytest -q tests/library/test_audio_decode.py`
+- `uv run ruff check tests/library/test_audio_decode.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Hold Lane - Deck Vision Live Source Gate
 
 Suggested commit if/when selected: `feat(state): enable evaluated deck vision source`

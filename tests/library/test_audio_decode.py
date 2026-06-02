@@ -8,7 +8,6 @@ import wave
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from vibemix.library.audio_decode import (
     cue_log_mel_spectrogram_db,
@@ -77,13 +76,12 @@ def test_cue_log_mel_spectrogram_db_is_finite() -> None:
     assert np.isfinite(mel).all()
 
 
-def test_local_audio_features_match_transformers_reference() -> None:
-    hf_audio = pytest.importorskip("transformers.audio_utils")
+def test_local_audio_features_regression_without_transformers_reference() -> None:
     rng = np.random.default_rng(42)
     samples = rng.normal(0.0, 0.1, size=4096).astype(np.float32)
     n_fft = 512
     hop = 128
-    local_filters = mel_filter_bank(
+    filters = mel_filter_bank(
         num_frequency_bins=(n_fft // 2) + 1,
         num_mel_filters=32,
         min_frequency=50.0,
@@ -91,16 +89,20 @@ def test_local_audio_features_match_transformers_reference() -> None:
         sampling_rate=22050,
         norm="slaney",
     )
-    hf_filters = hf_audio.mel_filter_bank(
-        num_frequency_bins=(n_fft // 2) + 1,
-        num_mel_filters=32,
-        min_frequency=50.0,
-        max_frequency=7000.0,
-        sampling_rate=22050,
-        norm="slaney",
-        mel_scale="slaney",
+    assert filters.shape == (257, 32)
+    assert int(np.count_nonzero(filters)) == 306
+    np.testing.assert_allclose(
+        filters[[2, 3, 4, 14, 162], [0, 0, 1, 5, 31]],
+        [
+            0.004889261991116496,
+            0.010716733715663455,
+            0.004911766781032001,
+            0.006608147928568878,
+            0.00006882002573064168,
+        ],
+        rtol=1e-7,
+        atol=1e-9,
     )
-    np.testing.assert_allclose(local_filters, hf_filters, rtol=1e-7, atol=1e-9)
 
     local = spectrogram(
         samples,
@@ -108,19 +110,34 @@ def test_local_audio_features_match_transformers_reference() -> None:
         frame_length=n_fft,
         hop_length=hop,
         power=2.0,
-        mel_filters=local_filters,
+        mel_filters=filters,
         log_mel="dB",
     )
-    ref = hf_audio.spectrogram(
-        samples.astype(np.float64),
-        hf_audio.window_function(n_fft, "hann"),
-        frame_length=n_fft,
-        hop_length=hop,
-        power=2.0,
-        mel_filters=hf_filters,
-        log_mel="dB",
+    assert local.shape == (32, 33)
+    np.testing.assert_allclose(
+        [
+            local[0, 0],
+            local[1, 0],
+            local[7, 3],
+            local[15, 10],
+            local[31, 25],
+            local.min(),
+            local.max(),
+            local.mean(),
+        ],
+        [
+            -15.198233604431152,
+            -14.414022445678711,
+            -11.929098129272461,
+            -10.671599388122559,
+            -13.749622344970703,
+            -28.05942153930664,
+            -6.768868446350098,
+            -14.061027526855469,
+        ],
+        rtol=1e-6,
+        atol=1e-5,
     )
-    np.testing.assert_allclose(local, ref, rtol=1e-6, atol=1e-5)
 
 
 def test_frames_to_time_uses_default_librosa_hop_formula() -> None:
