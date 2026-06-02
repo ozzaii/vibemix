@@ -269,6 +269,38 @@ def test_hype_prompt_does_not_assume_kaans_genre() -> None:
     assert "Never assume a genre" in out
 
 
+def test_hype_prompt_requires_grounded_genre_for_scene_tags() -> None:
+    """Track-unknown must not license generic scene guessing.
+
+    The live issue: when the library/deck identity is cold, mood words can make
+    the model call psytrance or another scene "dark warehouse" or similar. The
+    prompt should use `genre=<label>` as a style prior when present, and stay on
+    audible elements when it is absent.
+    """
+    out = build_system_instruction(
+        "intermediate",
+        "hype",
+        include_citation_grammar=False,
+        include_listening_fallback=False,
+        include_tag_dsl=False,
+    )
+
+    assert "Genre/scene talk is allowed ONLY when the evidence packet shows `genre=<label>`" in out
+    assert "never infer a scene from mood words alone" in out
+    assert "If absent, do not guess a genre from mood/tempo alone" in out
+    assert "the genre/style is fair game even without a track name" not in out.lower()
+
+
+@pytest.mark.parametrize("skill,mode", NEW_CELLS)
+def test_new_prompt_cells_share_grounded_genre_rule(skill: str, mode: str) -> None:
+    body = build_system_instruction(skill, mode)
+
+    assert "GENRE GROUNDING" in body
+    assert "if the evidence packet contains `genre=<label>`" in body
+    assert "do NOT guess a" in body
+    assert "Kaan's taste history" in body
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher correctness
 # ---------------------------------------------------------------------------
