@@ -134,6 +134,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       "ipc-session-snapshot",
     ],
     outbound: [
+      "ipc.library.import",
       "library_embed_folder",
       "library_models",
       "library_search",
