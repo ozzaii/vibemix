@@ -11,6 +11,9 @@ still gated three ways: the move must be cited (MAST-03), Competent first
 The transition Judge still never credits beatmatching: it measures no tempo/phase
 signal. Beatmatching has its own owned-deck ``BEATMATCH_GRADED`` producer, so
 crediting it off bass-collision would be the exact proxy-slop the product refuses.
+The same Judge verdict may credit ``transitions`` when the measured
+``bass_collision`` component is clean; that is low-end transition control, not a
+tempo proxy.
 """
 from __future__ import annotations
 
@@ -42,10 +45,13 @@ def _make_competent(progress: LearnProgress, skill_id: str) -> None:
     assert SkillTree().compute(progress)[skill_id].competent is True
 
 
-def _judge_event(harmonic: float):
-    return SimpleNamespace(
-        type="transition_judged", extra={"components": {"harmonic": harmonic}}
-    )
+def _judge_event(harmonic: float | None = None, bass_collision: object = None):
+    components = {}
+    if harmonic is not None:
+        components["harmonic"] = harmonic
+    if bass_collision is not None:
+        components["bass_collision"] = bass_collision
+    return SimpleNamespace(type="transition_judged", extra={"components": components})
 
 
 def _count(progress: LearnProgress, skill_id: str) -> int:
@@ -93,3 +99,69 @@ def test_judge_never_credits_beatmatching():
     )
     assert "beatmatching" not in credited
     assert _count(progress, "beatmatching") == 0
+
+
+def test_cited_clean_bass_collision_credits_transitions():
+    progress = LearnProgress()
+    _make_competent(progress, "transitions")
+
+    credited = recognize(
+        _judge_event(bass_collision=1.0),
+        citation_check=_cited,
+        progress=progress,
+        now=_NOW,
+        event_t=_T,
+    )
+
+    assert credited == ["transitions"]
+    assert _count(progress, "transitions") == 1
+
+
+def test_bass_collision_absent_or_zero_does_not_credit_transitions():
+    for extra in ({}, {"bass_collision": 0.0}, {"bass_collision": float("nan")}):
+        progress = LearnProgress()
+        _make_competent(progress, "transitions")
+        credited = recognize(
+            SimpleNamespace(type="transition_judged", extra={"components": extra}),
+            citation_check=_cited,
+            progress=progress,
+            now=_NOW,
+            event_t=_T,
+        )
+
+        assert credited == []
+        assert _count(progress, "transitions") == 0
+
+
+def test_uncited_bass_collision_grants_zero_transition_credit():
+    progress = LearnProgress()
+    _make_competent(progress, "transitions")
+
+    credited = recognize(
+        _judge_event(bass_collision=1.0),
+        citation_check=_uncited,
+        progress=progress,
+        now=_NOW,
+        event_t=_T,
+    )
+
+    assert credited == []
+    assert _count(progress, "transitions") == 0
+
+
+def test_harmonic_and_bass_collision_credit_distinct_skills():
+    progress = LearnProgress()
+    _make_competent(progress, "harmonic_mixing")
+    _make_competent(progress, "transitions")
+
+    credited = recognize(
+        _judge_event(harmonic=0.75, bass_collision=1.0),
+        citation_check=_cited,
+        progress=progress,
+        now=_NOW,
+        event_t=_T,
+    )
+
+    assert credited == ["harmonic_mixing", "transitions"]
+    assert _count(progress, "harmonic_mixing") == 1
+    assert _count(progress, "transitions") == 1

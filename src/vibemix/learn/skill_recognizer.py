@@ -51,6 +51,7 @@ citation gate; un-cited/fabricated → zero credit; Invariants #2 + #3 binding).
 """
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -137,18 +138,24 @@ def _candidate_skills(event: Any) -> list[str]:
         # harmonic_mixing from honest-uncreditable. The verdict's COMPATIBLE
         # harmonic component (> 0 = the Camelot prior; a clash is 0.0) is a real
         # harmonic-mixing demonstration: the DJ blended two trusted, in-key
-        # tracks. A clash / absent component credits NOTHING (it proves the
-        # opposite). beatmatching is deliberately NOT resolved here — the Judge
-        # measures no tempo/phase signal yet, and proxying it onto bass-collision
-        # is the exact false-expertise slop ``_HONEST_UNCREDITABLE_V11`` guards.
+        # tracks. A clean bass_collision component (> 0 = low end did not
+        # collide) is a measured transition-control demonstration. A clash /
+        # absent / non-finite component credits NOTHING (it proves the opposite).
+        # beatmatching is deliberately NOT resolved here — the Judge measures no
+        # tempo/phase signal yet, and proxying it onto bass-collision is the
+        # exact false-expertise slop ``_HONEST_UNCREDITABLE_V11`` guards.
         extra = getattr(event, "extra", None)
         components = extra.get("components", {}) if isinstance(extra, dict) else {}
         if not isinstance(components, dict):
             return []
+        candidates: list[str] = []
         harmonic = components.get("harmonic")
-        if isinstance(harmonic, (int, float)) and not isinstance(harmonic, bool) and harmonic > 0.0:
-            return ["harmonic_mixing"]
-        return []
+        if _positive_numeric_component(harmonic):
+            candidates.append("harmonic_mixing")
+        bass_collision = components.get("bass_collision")
+        if _positive_numeric_component(bass_collision):
+            candidates.append("transitions")
+        return candidates
 
     if ev_type == "BEATMATCH_GRADED":
         # The owned-deck Beatmatch Judge consumer branch. The Learn practice loop
@@ -171,6 +178,12 @@ def _candidate_skills(event: Any) -> list[str]:
         return []
 
     return list(EVENT_SKILL_MAP.get(ev_type, ()))
+
+
+def _positive_numeric_component(value: object) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return math.isfinite(float(value)) and float(value) > 0.0
 
 
 def _event_time(event: Any) -> float:
