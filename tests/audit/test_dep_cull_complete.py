@@ -2,8 +2,9 @@
   - For deps with zero direct imports under src/vibemix/, dep is removed from
     pyproject.toml OR documented as retained-as-transitive in AUDIT.md § Decisions
   - For deps still declared in pyproject.toml after their runtime use has been
-    removed (e.g., livekit-plugins-openai), the cull is BLOCKED and documented
-    as such in AUDIT.md § Decisions
+    removed, the cull is BLOCKED and documented as such in AUDIT.md § Decisions
+  - For deps removed from pyproject.toml, the completed cull is documented
+    in AUDIT.md § Decisions
   - docs/AUDIT.md § Decisions documents each cull decision
 """
 
@@ -55,25 +56,34 @@ def test_pyproject_either_culls_or_documents_each_cull_target():
     audit_text = (REPO / "docs" / "AUDIT.md").read_text()
 
     cull_targets_and_markers = {
-        "livekit-plugins-openai": "cull-blocked-livekit-plugins-openai",
-        "google-cloud-speech": "defer-google-cloud-speech",
-        "google-cloud-texttospeech": "defer-google-cloud-texttospeech",
+        "livekit-plugins-openai": (
+            "cull-blocked-livekit-plugins-openai",
+            "cull-livekit-plugins-openai",
+        ),
+        "google-cloud-speech": (
+            "defer-google-cloud-speech",
+            "defer-google-cloud-speech",
+        ),
+        "google-cloud-texttospeech": (
+            "defer-google-cloud-texttospeech",
+            "defer-google-cloud-texttospeech",
+        ),
     }
-    for dep, marker in cull_targets_and_markers.items():
+    for dep, (declared_marker, removed_marker) in cull_targets_and_markers.items():
         if dep in declared:
             # Still declared — must be documented as cull-blocked or deferred.
-            assert marker in audit_text, \
-                f"{dep} still declared in pyproject.toml but AUDIT.md missing decision marker: {marker}"
+            assert declared_marker in audit_text, \
+                f"{dep} still declared in pyproject.toml but AUDIT.md missing decision marker: {declared_marker}"
         else:
             # Removed — also documented.
-            assert marker in audit_text, \
-                f"{dep} removed from pyproject.toml but AUDIT.md missing decision marker: {marker}"
+            assert removed_marker in audit_text, \
+                f"{dep} removed from pyproject.toml but AUDIT.md missing decision marker: {removed_marker}"
 
 
 def test_audit_md_documents_cull_decisions():
     text = (REPO / "docs" / "AUDIT.md").read_text()
     for marker in (
-        "cull-blocked-livekit-plugins-openai",
+        "cull-livekit-plugins-openai",
         "defer-google-cloud-speech",
         "defer-google-cloud-texttospeech",
     ):
@@ -86,7 +96,7 @@ def test_dep_ratings_decisions_block_matches():
     decisions = data.get("decisions", [])
     ids = {d["id"] for d in decisions}
     assert ids >= {
-        "cull-blocked-livekit-plugins-openai",
+        "cull-livekit-plugins-openai",
         "defer-google-cloud-speech",
         "defer-google-cloud-texttospeech",
     }, f"decisions block missing IDs: {ids}"

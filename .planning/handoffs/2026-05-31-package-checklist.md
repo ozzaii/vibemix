@@ -6768,6 +6768,12 @@ Include:
 - `tests/agent/test_proxy_client.py`
 - `tests/agent/test_livekit_google_slim.py`
 - `tests/agent/test_config.py`
+- `pyproject.toml`
+- `uv.lock`
+- `scripts/audit/dep_ratings.yaml`
+- `docs/AUDIT.md`
+- `tests/audit/test_dep_cull_complete.py`
+- `tests/audit/test_opportunity_evaluations_schema.py`
 - `.planning/handoffs/2026-05-31-package-checklist.md`
 
 Keep out:
@@ -6789,11 +6795,20 @@ Reason:
   `OPENROUTER_TTS_MODEL` export was also import-only residue. `OPENROUTER_LLM_MODEL`
   stays because it is brain transport; the retired OpenRouter TTS id is no
   longer exported from `vibemix.agent` or `vibemix.agent.config`.
+- Codex follow-up, 2026-06-02: after the source-level OpenAI TTS plugin imports
+  were gone, the direct `livekit-plugins-openai` dependency/audit entry became
+  dead residue too. Removing it is dependency hygiene only; OpenRouter brain
+  streaming still uses the first-party `openai` SDK, not the LiveKit OpenAI TTS
+  provider plugin.
 
 Proof for this cleanup slice:
 
 - `uv run pytest -q tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py`
+- `uv run pytest -q tests/audit/test_dep_cull_complete.py tests/audit/test_opportunity_evaluations_schema.py tests/audit/test_audit_md_generator.py tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py`
 - `uv run ruff check src/vibemix/agent/tts_chain.py src/vibemix/agent/_livekit_google_slim.py src/vibemix/agent/config.py src/vibemix/agent/__init__.py tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py`
+- `uv run python scripts/audit/gen_audit_md.py --check`
+- `! rg -q "livekit-plugins-openai" pyproject.toml uv.lock`
+- `! rg -q "from livekit\\.plugins import openai|import livekit\\.plugins\\.openai|livekit\\.plugins\\.openai\\.tts" src/vibemix/agent`
 - `git diff --check -- src/vibemix/agent/tts_chain.py src/vibemix/agent/_livekit_google_slim.py src/vibemix/agent/config.py src/vibemix/agent/__init__.py tests/agent/test_tts_chain.py tests/agent/test_proxy_client.py tests/agent/test_livekit_google_slim.py tests/agent/test_config.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 

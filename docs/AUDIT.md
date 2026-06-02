@@ -33,7 +33,6 @@
 | `livekit` | 1.1.8 | see uv.lock | WebRTC client; transitively pulls av + aiortc. Prebuilt wheels for Mac+Win64. | 🟡 Yellow |  |
 | `livekit-agents` | 1.5.14 | see uv.lock | Gemini Live API wrapper (cohost_v2/lk variants). Pure-Python. | 🟢 Green |  |
 | `livekit-plugins-google` | 1.5.14 | see uv.lock | LiveKit Gemini adapter — the seam through which all Gemini Live audio flows. | 🟢 Green |  |
-| `livekit-plugins-openai` | 1.5.14 | see uv.lock | [CULL-BLOCKED] Legacy direct dependency retained only until the dependency-cull lane removes the pyproject/lock residue and legacy import test. MOSS-only TTS does not import or instantiate the OpenAI LiveKit voice plugin. | 🟡 Yellow |  |
 | `mcp` | 1.27.1 | see uv.lock | Codex MCP bridge for the local Viber tool surface. Pure-Python; optional at runtime outside Codex-backed chat/curate/build-set. | 🟢 Green |  |
 | `mido` | 1.3.3 | see uv.lock | MIDI message parsing (DDJ-FLX4 controller decode). Pure-Python. | 🟢 Green |  |
 | `mss` | 10.2.0 | see uv.lock | Win32 screen capture (CoreGraphics on Mac uses ScreenCaptureKit). Pure-Python. | 🟢 Green |  |
@@ -119,22 +118,21 @@ Per-dep deferral / cull decisions land here. Plan 04 of Phase 46
 populates the dep-cull entries; future re-justifications append.
 
 
-### cull-blocked-livekit-plugins-openai
+### cull-livekit-plugins-openai
 
 **Date:** 2026-06-01
 
 **Target:** `livekit-plugins-openai`
 
-**Action:** cull-blocked
+**Action:** removed
 
-Cull still blocked only because `livekit-plugins-openai` remains declared
-in pyproject.toml and legacy phase-05 verification imports the provider
-package. The old runtime blocker is gone: src/vibemix/agent/tts_chain.py
-is MOSS-only and tests/agent/test_proxy_client.py plus
-tests/agent/test_tts_chain.py assert it does not patch, import, or
-instantiate the OpenAI LiveKit TTS plugin. Removal now belongs to a
-dependency-cull package that updates pyproject.toml, uv.lock, and the
-legacy verification test together.
+Removed from pyproject.toml and uv.lock after the MOSS-only TTS chain
+made the LiveKit OpenAI voice plugin unreachable. src/vibemix/agent/
+tts_chain.py builds only local MOSS, tests/agent/test_proxy_client.py
+plus tests/agent/test_tts_chain.py assert it does not patch, import, or
+instantiate the OpenAI LiveKit TTS plugin, and direct OpenRouter brain
+streaming uses the first-party `openai` SDK rather than this LiveKit TTS
+plugin.
 
 
 ### defer-google-cloud-speech

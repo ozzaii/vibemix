@@ -31,7 +31,6 @@ dependencies = [
     "keyring>=25.7.0",
     "livekit-agents>=1.5.14",
     "livekit-plugins-google>=1.5.14",
-    "livekit-plugins-openai>=1.5.14",
     "livekit>=1.1.8",
     "numpy>=2.4.4",
     # Direct runtime dependency: local CLAP/CUE decode and debrief MP3 encode

@@ -52,8 +52,9 @@ def test_schema_phase46_rating_entry_untouched():
 
 def test_yaml_phase46_ecosystem_maps_intact():
     d = _load_yaml()
-    assert "livekit-plugins-openai" in d["python"]
-    assert d["python"]["livekit-plugins-openai"]["rating"] == "yellow"
+    assert "livekit-plugins-google" in d["python"]
+    assert d["python"]["livekit-plugins-google"]["rating"] == "green"
+    assert "livekit-plugins-openai" not in d["python"]
 
 
 def test_synthetic_green_adopt_row_validates():

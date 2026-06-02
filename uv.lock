@@ -817,14 +817,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/8e/78/b46829c226f1d2c2fb2f600856af801bd7c5a8b27392bd8a4cc307917fa8/livekit_agents-1.5.14-py3-none-any.whl", hash = "sha256:ae01ee2bdaf9e577e260ae5570d6029db84bc8a4d66bf32302f02d793e50a8d3", size = 2608945, upload-time = "2026-05-27T23:16:13.186Z" },
 ]
 
-[package.optional-dependencies]
-codecs = [
-    { name = "numpy" },
-]
-images = [
-    { name = "pillow" },
-]
-
 [[package]]
 name = "livekit-api"
 version = "1.1.0"
@@ -867,19 +859,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/68/ab/b7f81f6ca0c19537916a942eb76bc971eef443b5742b9f54dad69695380c/livekit_plugins_google-1.5.14.tar.gz", hash = "sha256:250644267920f7cb034f51b5710a61fd2d90150729d485d1e957f91e41db0e48", size = 44467, upload-time = "2026-05-27T23:17:04.095Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/89/70/0edaf8ce16b07a74b5e6db78c90b0b867488b41e6339c0142c26f6d06bfc/livekit_plugins_google-1.5.14-py3-none-any.whl", hash = "sha256:e1154c0820141dcceeaf840738cfc6af2a5bc897cd3d34059f79108a9c79e6c4", size = 52066, upload-time = "2026-05-27T23:17:02.907Z" },
-]
-
-[[package]]
-name = "livekit-plugins-openai"
-version = "1.5.14"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "livekit-agents", extra = ["codecs", "images"] },
-    { name = "openai", extra = ["realtime"] },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/82/75/91dd47180ba2c340f651fec72fffe0fedfd2d2bdd235242f22b713f875d3/livekit_plugins_openai-1.5.14.tar.gz", hash = "sha256:69a8805e9f8a2bef31149dea4052d49ac2d917a4e130cc54e284473a6995e3a6", size = 44085, upload-time = "2026-05-27T23:17:45.891Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/5e/4b0ebb8737d669e3a563638f0b1c2c97556ffbe530d2d3f3650926257cfb/livekit_plugins_openai-1.5.14-py3-none-any.whl", hash = "sha256:0918cfcc773b940d6837b32e983648e9cea49cbb587afe2268950d4fe64b8090", size = 50905, upload-time = "2026-05-27T23:17:44.766Z" },
 ]
 
 [[package]]
@@ -1101,11 +1080,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f4/a1/4d5e84cf51720fc1526cc49e10ac1961abcccb55b0efb3d970db1e9a2728/openai-2.36.0.tar.gz", hash = "sha256:139dea0edd2f1b30c33d46ae1a6929e03906254140318e4608e98fe8c566f2e7", size = 753003, upload-time = "2026-05-07T17:33:17.075Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9d/1c/5d43735b2553baae2a5e899dcbcd0670a86930d993184d72ca909bf11c9b/openai-2.36.0-py3-none-any.whl", hash = "sha256:143f6194b548dbc2c921af1f1b03b9f14c85fed8a75b5b516f5bcc11a2a50c63", size = 1302361, upload-time = "2026-05-07T17:33:15.063Z" },
-]
-
-[package.optional-dependencies]
-realtime = [
-    { name = "websockets" },
 ]
 
 [[package]]
@@ -2135,7 +2109,6 @@ dependencies = [
     { name = "livekit" },
     { name = "livekit-agents" },
     { name = "livekit-plugins-google" },
-    { name = "livekit-plugins-openai" },
     { name = "mcp" },
     { name = "mido" },
     { name = "mss", marker = "sys_platform == 'win32'" },
@@ -2212,7 +2185,6 @@ requires-dist = [
     { name = "livekit", specifier = ">=1.1.8" },
     { name = "livekit-agents", specifier = ">=1.5.14" },
     { name = "livekit-plugins-google", specifier = ">=1.5.14" },
-    { name = "livekit-plugins-openai", specifier = ">=1.5.14" },
     { name = "mcp", specifier = ">=1.2.0" },
     { name = "mido", specifier = ">=1.3.3" },
     { name = "mss", marker = "sys_platform == 'win32'", specifier = ">=10.2.0" },
