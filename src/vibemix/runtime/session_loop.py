@@ -59,7 +59,7 @@ from vibemix.runtime.drop_display import predicted_drop_bars
 from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.recordings_index import RecordingsIndex, run_retention_sweep
 from vibemix.runtime.settings import SettingsApplier
-from vibemix.runtime.ws_bus import WizardBus, _probe_midi_count
+from vibemix.runtime.ws_bus import WizardBus, _probe_midi_count, _trusted_bpm_for_display
 from vibemix.ui_bus.messages import (
     IpcBoot,
     IpcError,
@@ -1108,11 +1108,16 @@ class SessionLoop:
                 cohost_status = "LISTENING"
             else:
                 cohost_status = "IDLE"
-            raw_bpm = float(getattr(self.music_state, "bpm", 0.0) or 0.0) if grounded else 0.0
+            raw_bpm = _trusted_bpm_for_display(
+                self.music_state,
+                grounded=grounded,
+                speaking=cohost_status == "TALKING",
+            )
             bpm = raw_bpm if raw_bpm > 0.0 else None
+            drop_bpm = raw_bpm if grounded else 0.0
             drop_bars = predicted_drop_bars(
                 getattr(self.music_state, "predicted_drop_in_sec", None),
-                raw_bpm,
+                drop_bpm,
             )
             audible_track = getattr(self.music_state, "audible_track", None)
             audible_deck = getattr(self.music_state, "audible_deck", None)

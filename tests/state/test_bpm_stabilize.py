@@ -45,6 +45,22 @@ def test_hard_tek_upper_band_survives():
     assert _stabilize_bpm([176.0, 200.0, 176.0]) == 176.0
 
 
+def test_previous_bpm_holds_on_in_range_alternate_lock():
+    # Live 2026-06-03: the public counter hopped across several plausible
+    # in-range locks (166.7 -> 171.4 -> 150 -> 125). A single far-away median
+    # must not replace an already visible BPM without a small agreeing cluster.
+    assert _stabilize_bpm([166.7, 171.4, 150.0], previous=171.4) == 171.4
+    assert _stabilize_bpm([166.7, 171.4, 150.0, 125.0, 150.0], previous=171.4) == 171.4
+
+
+def test_previous_bpm_switches_after_cluster_forms():
+    assert _stabilize_bpm([171.4, 150.0, 150.0, 125.0, 150.0], previous=171.4) == 150.0
+
+
+def test_previous_bpm_allows_small_drift():
+    assert _stabilize_bpm([166.7, 169.0], previous=166.7) == 169.0
+
+
 def test_rolling_ring_replay_never_leaks_out_of_range():
     # Replay the measured bimodal distribution through a rolling ring of 5.
     # Stabilized output must never exceed BPM_VALID_MAX and must settle at 130.

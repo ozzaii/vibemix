@@ -551,6 +551,23 @@ def test_snapshot_talking_when_voice_loud(fake_bus: FakeBus) -> None:
     assert payload["cohost_status"] == "TALKING"
 
 
+def test_snapshot_talking_holds_bpm_without_grounding_music(fake_bus: FakeBus) -> None:
+    ms = FakeMusicState(
+        audible=False,
+        bpm=117.6,
+        audible_track="Cached Track",
+        predicted_drop_in_sec=15.0,
+    )
+    levels = FakeLevels(music=0.0, voice=0.4)
+    loop = SessionLoop(fake_bus, music_state=ms, levels=levels)
+    payload = json.loads(loop._build_snapshot().to_json())["payload"]
+    assert payload["cohost_status"] == "TALKING"
+    assert payload["grounded"] is False
+    assert payload["bpm"] == 117.6
+    assert payload["drop_pred_bars"] is None
+    assert payload["track"] is None
+
+
 def test_snapshot_clamps_meters_to_unit_range(fake_bus: FakeBus) -> None:
     """Schema requires rms/peak in [0, 1]; values outside must be clamped."""
     levels = FakeLevels(music=1.5, voice=-0.2, mic=0.0)

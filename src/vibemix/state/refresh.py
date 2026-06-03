@@ -106,6 +106,8 @@ from vibemix.state.track_resolver import derive_audible_deck, derive_audible_tra
 # active_genre to unknown/house, which destabilised the genre profile and let
 # phase classification fall back to the no-hysteresis path → live phase flicker.
 _BPM_RING_MAXLEN = 5  # ~15 s at the 3 s estimate cadence
+_BPM_SWITCH_TOLERANCE = 0.02
+_BPM_SWITCH_MIN_CLUSTER = 3
 _COURSE3_CUE_CONF_FLOOR = 0.7
 
 # Dormant drop-anticipation signal (SYSTEM-AUDIT C9). Only anticipate a drop the
@@ -144,7 +146,7 @@ def _cached_profiles() -> list:
     return _PROFILE_CACHE
 
 
-def _stabilize_bpm(ring: list[float]) -> float:
+def _stabilize_bpm(ring: list[float], *, previous: float = 0.0) -> float:
     """Lower-median of the in-range BPM samples in ``ring`` (0.0 if none).
 
     Drops anything outside [BPM_VALID_MIN, BPM_VALID_MAX] before taking the
@@ -153,11 +155,34 @@ def _stabilize_bpm(ring: list[float]) -> float:
     is an actually-observed sample — never a manufactured between-samples value
     that could fall in a cross-genre gap. A mean/EMA would average 130+200 into
     the ~165 'unknown' gap, which is strictly worse — hence median, not EMA.
+
+    If a previous public BPM exists, a far-away in-range candidate must have a
+    small cluster behind it before replacing the cache. Dense material can flip
+    between multiple plausible in-range locks; a single median hop should not
+    make the UI counter stutter.
     """
     valid = sorted(b for b in ring if BPM_VALID_MIN <= b <= BPM_VALID_MAX)
     if not valid:
         return 0.0
-    return float(valid[len(valid) // 2])
+    candidate = float(valid[len(valid) // 2])
+    if previous <= 0.0:
+        return candidate
+    try:
+        prev = float(previous)
+    except (TypeError, ValueError):
+        return candidate
+    if prev <= 0.0:
+        return candidate
+    if abs(candidate - prev) / prev <= _BPM_SWITCH_TOLERANCE:
+        return candidate
+    cluster = sum(
+        1
+        for bpm in valid
+        if abs(float(bpm) - candidate) / candidate <= _BPM_SWITCH_TOLERANCE
+    )
+    if cluster >= _BPM_SWITCH_MIN_CLUSTER:
+        return candidate
+    return prev
 
 
 def _float_field(value: object) -> float | None:
@@ -958,8 +983,10 @@ def _tick_once(
     else:
         smoothed_crest = crest_smoother.value
 
-    # BPM updated every 3s — autocorr is heavier
-    if now - last_bpm_at > 3.0 and currently_loud:
+    # BPM updated every 3s — autocorr is heavier. Freeze while Sven is talking:
+    # even when music remains audible, voice loopback can dominate the
+    # autocorr and make the public BPM counter wobble.
+    if now - last_bpm_at > 3.0 and currently_loud and voice_level <= AI_TALK_THRESHOLD:
         raw_bpm = estimate_bpm(audio_buf, seconds=6.0)
         last_bpm_at = now
         if bpm_ring is not None:
@@ -968,7 +995,7 @@ def _tick_once(
             bpm_ring.append(raw_bpm)
             if len(bpm_ring) > _BPM_RING_MAXLEN:
                 del bpm_ring[0]
-            stabilized = _stabilize_bpm(bpm_ring)
+            stabilized = _stabilize_bpm(bpm_ring, previous=bpm_cache)
             if stabilized > 0:  # keep last-good until an in-range sample lands
                 bpm_cache = stabilized
         else:

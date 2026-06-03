@@ -17,7 +17,11 @@ from __future__ import annotations
 from collections import deque
 from types import SimpleNamespace
 
-from vibemix.runtime.ws_bus import _build_session_snapshot
+from vibemix.runtime.ws_bus import (
+    _build_session_snapshot,
+    _trusted_bpm_for_display,
+    _trusted_flat_bpm,
+)
 from vibemix.ui_bus.validator import validate_message
 
 
@@ -119,6 +123,39 @@ def test_cohost_status_talking_when_voice_active():
     msg = _build_session_snapshot(_FakeLevels(0.3, 0.2, 0.0), _fake_state())
     validate_message(msg)
     assert msg["payload"]["cohost_status"] == "TALKING"
+
+
+def test_snapshot_holds_bpm_while_sven_is_talking_without_grounding_music():
+    msg = _build_session_snapshot(
+        _FakeLevels(0.0, 0.2, 0.0),
+        _fake_state(
+            audible=False,
+            bpm=117.6,
+            audible_track="Cached Track",
+            audible_deck="A",
+            predicted_drop_in_sec=15.0,
+        ),
+    )
+    validate_message(msg)
+    p = msg["payload"]
+    assert p["cohost_status"] == "TALKING"
+    assert p["grounded"] is False
+    assert p["bpm"] == 117.6
+    assert p["drop_pred_bars"] is None
+    assert p["track"] is None
+
+
+def test_flat_bpm_readout_holds_only_while_sven_is_talking():
+    state = _fake_state(audible=False, bpm=117.6)
+
+    assert _trusted_bpm_for_display(state, grounded=False, speaking=True) == 117.6
+    assert _trusted_bpm_for_display(state, grounded=False, speaking=False) == 0.0
+
+
+def test_flat_bpm_readout_uses_debounced_audible_state_by_default():
+    state = _fake_state(audible=True, bpm=113.2)
+
+    assert _trusted_flat_bpm(state) == 113.2
 
 
 def test_cohost_status_idle_and_grounded_false_when_silent():

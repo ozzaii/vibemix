@@ -679,9 +679,14 @@ def _build_session_snapshot(
     else:
         cohost_status = "IDLE"
 
-    raw_bpm = float(getattr(state, "bpm", 0.0) or 0.0) if grounded else 0.0
+    raw_bpm = _trusted_bpm_for_display(
+        state,
+        grounded=grounded,
+        speaking=cohost_status == "TALKING",
+    )
     bpm = raw_bpm if raw_bpm > 0.0 else None
-    drop_bars = predicted_drop_bars(getattr(state, "predicted_drop_in_sec", None), raw_bpm)
+    drop_bpm = raw_bpm if grounded else 0.0
+    drop_bars = predicted_drop_bars(getattr(state, "predicted_drop_in_sec", None), drop_bpm)
 
     audible_track = getattr(state, "audible_track", None)
     audible_deck = getattr(state, "audible_deck", None)
@@ -766,9 +771,21 @@ def _build_session_snapshot(
     return json.loads(msg.to_json())
 
 
-def _trusted_flat_bpm(state: MusicState) -> float:
-    """Return a legacy numeric BPM only when the music state is grounded."""
-    if not bool(getattr(state, "audible", False)):
+def _trusted_bpm_for_display(
+    state: MusicState,
+    *,
+    grounded: bool,
+    speaking: bool = False,
+) -> float:
+    """Return last-known BPM for UI readouts without treating voice as music.
+
+    ``grounded`` remains the source of truth for live musical evidence. While
+    Sven is talking, TTS loopback can briefly make the trusted music gate go
+    false; the public counter should hold the cached tempo instead of blinking
+    to zero. This never makes ``grounded`` true and never refreshes the BPM from
+    the voice-contaminated capture.
+    """
+    if not (grounded or speaking):
         return 0.0
     try:
         bpm = float(getattr(state, "bpm", 0.0) or 0.0)
@@ -777,6 +794,18 @@ def _trusted_flat_bpm(state: MusicState) -> float:
     if not (bpm > 0.0):
         return 0.0
     return bpm
+
+
+def _trusted_flat_bpm(
+    state: MusicState,
+    *,
+    grounded: bool | None = None,
+    speaking: bool = False,
+) -> float:
+    """Return the legacy numeric BPM for the flat mascot/pill frame."""
+    if grounded is None:
+        grounded = bool(getattr(state, "audible", False))
+    return _trusted_bpm_for_display(state, grounded=grounded, speaking=speaking)
 
 
 class IpcRouterBus:
@@ -1057,14 +1086,24 @@ async def ws_broadcast(
             deck_audio_window_context = render_deck_audio_window_context(audio_capture_context)
             band_env_context = render_band_env_context(state)
             deck_source_status = _serialize_deck_source_status(state)
+            level_snap = levels.snapshot()
+            level_voice_rms = max(0.0, min(1.0, float(level_snap.get("voice", 0.0))))
+            # The flat mascot/pill frame is a compact UI readout, so hold BPM
+            # against the debounced MusicState audible flag. The richer
+            # ipc.session.snapshot still carries the stricter grounded flag.
+            level_grounded = bool(getattr(state, "audible", False))
             mascot_frame = {
-                **levels.snapshot(),
+                **level_snap,
                 "live_context_schema_version": LIVE_CONTEXT_SCHEMA_VERSION,
                 "live_context_capabilities": list(LIVE_CONTEXT_CAPABILITIES),
                 "audible": state.audible,
                 "deck": state.audible_deck,
                 "phase": state.phase,
-                "bpm": _trusted_flat_bpm(state),
+                "bpm": _trusted_flat_bpm(
+                    state,
+                    grounded=level_grounded,
+                    speaking=level_voice_rms > 0.05,
+                ),
                 "mood": state.mood,
                 "bpm_confidence": state.bpm_confidence,
                 "downbeat_phase": state.downbeat_phase,

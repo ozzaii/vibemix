@@ -623,6 +623,34 @@ def test_tick_bpm_and_audible_gate_skip_voice_dominant_capture(mocker):
     assert last_bpm_at == 0.0
 
 
+def test_tick_bpm_freezes_while_voice_active_over_music(mocker):
+    """Mixed music+Sven should stay audible but not re-estimate BPM from voice."""
+    state = MusicState(audible=True)
+    buf = _audible_buf()
+    estimate = mocker.patch("vibemix.state.refresh.estimate_bpm", return_value=150.0)
+
+    out = _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=132.0,
+        last_bpm_at=0.0,
+        levels=SimpleNamespace(voice=0.05),
+    )
+
+    _last_high, _last_low, bpm_cache, last_bpm_at = out
+    estimate.assert_not_called()
+    assert state.rms > 0.0
+    assert state.audible is True
+    assert state.bpm == 132.0
+    assert bpm_cache == 132.0
+    assert last_bpm_at == 0.0
+
+
 def test_tick_bpm_gate_skips_when_within_3s_window():
     """last_bpm_at within 3.0s of now → skip estimate_bpm even if currently_loud."""
     state = MusicState()
