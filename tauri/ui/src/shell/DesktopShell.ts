@@ -20,7 +20,11 @@ import { SURFACES, type SurfaceDef } from "./surfaces.js";
 import { createSidebar } from "./Sidebar.js";
 import { createGroundingPanel } from "./GroundingPanel.js";
 import { createStatusFooter } from "./StatusFooter.js";
-import { createCommandPalette, type PaletteAction } from "./CommandPalette.js";
+import {
+  createCommandPalette,
+  type PaletteAction,
+  type PaletteSummaryCell,
+} from "./CommandPalette.js";
 
 export interface MountedShell {
   readonly store: ShellStore;
@@ -82,24 +86,83 @@ function createSurfaceRegion(def: SurfaceDef): HTMLElement {
   return region;
 }
 
+const SURFACE_ALIASES: Readonly<Record<SurfaceId, readonly string[]>> = {
+  deck: ["live", "sven", "cohost", "voice", "moss", "play"],
+  crate: ["library", "viber", "set prep", "search", "tracks", "transitions"],
+  learn: ["lesson", "practice", "controller", "hands"],
+  debrief: ["review", "timeline", "receipts", "proof", "set review"],
+  settings: ["setup", "audio", "output", "hotkey", "persona", "recordings"],
+};
+
+function sentenceCase(value: string): string {
+  if (!value) return value;
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+}
+
 function buildPaletteActions(store: ShellStore): PaletteAction[] {
+  const model = store.getState();
   const goTo: PaletteAction[] = SURFACES.map((surface) => ({
     id: `go.${surface.id}`,
     label: `Go to ${surface.label}`,
+    section: "navigate",
     hint: surface.hint,
     // The same bare digit the sidebar nav shows — the palette teaches the
     // surface accelerators it dropped before, in one consistent token.
     accel: surface.kbd,
     glyph: surface.glyph,
+    aliases: SURFACE_ALIASES[surface.id],
+    status: model.activeSurface === surface.id ? "current" : "surface",
+    statusKind: model.activeSurface === surface.id ? "current" : "quiet",
     run: () => store.setActiveSurface(surface.id),
   }));
 
   const commands: PaletteAction[] = [
-    { id: "toggle.sidebar", label: "Toggle sidebar", accel: "Ctrl+\\", glyph: "‹", run: () => store.toggleCollapsed() },
-    { id: "toggle.panel", label: "Toggle grounding panel", accel: "Ctrl+]", glyph: "▸", run: () => store.togglePanel() },
+    {
+      id: "toggle.sidebar",
+      label: "Toggle sidebar",
+      section: "control",
+      hint: "compact navigation rail",
+      accel: "Ctrl+\\",
+      glyph: "‹",
+      aliases: ["collapse", "expand", "chrome", "nav"],
+      status: model.collapsed ? "compact" : "full",
+      statusKind: "ready",
+      run: () => store.toggleCollapsed(),
+    },
+    {
+      id: "toggle.panel",
+      label: "Toggle grounding panel",
+      section: "control",
+      hint: "evidence receipts",
+      accel: "Ctrl+]",
+      glyph: "▸",
+      aliases: ["evidence", "receipts", "proof", "citations"],
+      status: model.panelOpen ? "open" : "closed",
+      statusKind: model.panelOpen ? "current" : "ready",
+      run: () => store.togglePanel(),
+    },
   ];
 
   return [...goTo, ...commands];
+}
+
+function buildPaletteSummary(store: ShellStore): readonly PaletteSummaryCell[] {
+  const model = store.getState();
+  const surface = SURFACES.find((entry) => entry.id === model.activeSurface);
+  return [
+    { label: "Surface", value: surface?.label ?? sentenceCase(model.activeSurface), tone: "ok" },
+    {
+      label: "State",
+      value: sentenceCase(model.activation),
+      tone: model.activation === "live" ? "ok" : "muted",
+    },
+    {
+      label: "Bus",
+      value: model.connection === "connected" ? "Connected" : sentenceCase(model.connection),
+      tone: model.connection === "connected" ? "ok" : "warn",
+    },
+    { label: "Proof", value: model.panelOpen ? "Open" : "Closed", tone: model.panelOpen ? "ok" : "muted" },
+  ];
 }
 
 export function mountDesktopShell(host: HTMLElement, store: ShellStore = new ShellStore()): MountedShell {
@@ -140,6 +203,7 @@ export function mountDesktopShell(host: HTMLElement, store: ShellStore = new She
   // screen-reader browse cursor reaches the background (honors aria-modal=true).
   const palette = createCommandPalette(() => buildPaletteActions(store), {
     inertWhileOpen: [chrome, body, footer],
+    summaryProvider: () => buildPaletteSummary(store),
   });
 
   host.append(chrome, body, footer, palette.el);

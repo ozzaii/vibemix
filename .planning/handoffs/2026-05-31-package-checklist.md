@@ -10048,3 +10048,39 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/settings/SettingsDrawer.ts tauri/ui/src/mock-transfer/contract.ts tauri/ui/tests/settings/drawer.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 72 - Command Deck Palette
+
+Suggested commit: `feat(shell-ui): upgrade command palette`
+
+Include:
+
+- `tauri/ui/src/shell/CommandPalette.ts`
+- `tauri/ui/src/shell/DesktopShell.ts`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/shell/command-palette.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Backend/runtime IPC, settings drawer behavior, Deck/Crate/Learn/Debrief
+  surface interiors, Sven speech, Viber tooling, packaging scripts, and new
+  dependencies. This package only makes the existing Cmd+K shell palette feel
+  like a real navigation/control deck using current shell state and local
+  commands.
+
+Reason:
+
+- The exact signed app at `8bda1a1d` showed a functional but underpowered
+  palette: rows navigated and taught shortcuts, but the surface did not show
+  current readiness, grouped intent, product aliases such as Viber/proof, or
+  enough control context to feel like a native vibemix command surface. Add a
+  compact status strip, grouped rows, state chips, alias-backed search, and
+  footer key hints without changing IPC or pretending live audio is present.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/command-palette.spec.ts tests/shell/shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/CommandPalette.ts tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/command-palette.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

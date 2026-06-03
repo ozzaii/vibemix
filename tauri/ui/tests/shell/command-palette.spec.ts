@@ -44,6 +44,39 @@ afterEach(() => {
 });
 
 describe("command palette — accelerators teach the shortcuts", () => {
+  it("renders a compact shell status strip when opened", () => {
+    shell = mountDesktopShell(host);
+    shell.store.setConnection("connected");
+    shell.store.setActivation("live");
+
+    const palette = openPalette();
+    const summary = palette.querySelector<HTMLElement>(".palette-summary")!;
+    expect(summary.textContent).toContain("Surface");
+    expect(summary.textContent).toContain("Deck");
+    expect(summary.textContent).toContain("State");
+    expect(summary.textContent).toContain("Live");
+    expect(summary.textContent).toContain("Bus");
+    expect(summary.textContent).toContain("Connected");
+    expect(summary.textContent).toContain("Proof");
+    expect(summary.textContent).toContain("Open");
+  });
+
+  it("groups navigation above controls and marks the current surface", () => {
+    shell = mountDesktopShell(host);
+    const palette = openPalette();
+
+    const sections = Array.from(palette.querySelectorAll(".palette-section")).map((el) =>
+      el.textContent?.trim(),
+    );
+    expect(sections).toEqual(["Surfaces", "Controls"]);
+
+    const deck = rowFor(palette, "Go to Deck");
+    expect(deck.querySelector(".pi-state")?.textContent?.trim()).toBe("current");
+
+    const togglePanel = rowFor(palette, "Toggle grounding panel");
+    expect(togglePanel.querySelector(".pi-state")?.textContent?.trim()).toBe("closed");
+  });
+
   it("surfaces every Go-to row's 1–5 accelerator, matching the sidebar", () => {
     shell = mountDesktopShell(host);
     const palette = openPalette();
@@ -91,5 +124,22 @@ describe("command palette — accelerators teach the shortcuts", () => {
     input.dispatchEvent(new Event("input"));
     const labels = Array.from(palette.querySelectorAll(".pi-label")).map((e) => e.textContent?.trim());
     expect(labels).toContain("Go to Deck");
+  });
+
+  it("filters by product aliases such as Viber and proof", () => {
+    shell = mountDesktopShell(host);
+    const palette = openPalette();
+    const input = palette.querySelector<HTMLInputElement>(".palette-input")!;
+
+    input.value = "viber";
+    input.dispatchEvent(new Event("input"));
+    let labels = Array.from(palette.querySelectorAll(".pi-label")).map((e) => e.textContent?.trim());
+    expect(labels).toEqual(["Go to Crate"]);
+
+    input.value = "proof";
+    input.dispatchEvent(new Event("input"));
+    labels = Array.from(palette.querySelectorAll(".pi-label")).map((e) => e.textContent?.trim());
+    expect(labels).toContain("Go to Debrief");
+    expect(labels).toContain("Toggle grounding panel");
   });
 });

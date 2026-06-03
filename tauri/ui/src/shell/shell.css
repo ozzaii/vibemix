@@ -968,7 +968,7 @@
   display: none;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 14vh;
+  padding-top: 9vh;
   background: rgba(0, 0, 0, 0.6);
 }
 /* Spotlight-style entrance: the scrim fades up (no harsh dark flash) and the
@@ -977,8 +977,8 @@
 .shell-palette.is-open { display: flex; animation: palette-scrim-in 130ms var(--ease-brand); }
 .shell-palette.is-open .palette-panel { animation: palette-panel-in 165ms var(--ease-brand) both; }
 .palette-panel {
-  width: min(640px, 92vw);
-  max-height: 60vh;
+  width: min(720px, 92vw);
+  max-height: 78vh;
   display: flex;
   flex-direction: column;
   background: var(--surface-base);
@@ -987,9 +987,61 @@
   box-shadow: 0 24px 72px rgba(0, 0, 0, 0.55), var(--chrome-highlight);
   overflow: hidden;
 }
+.palette-head {
+  flex: 0 0 auto;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent),
+    rgba(255, 255, 255, 0.018);
+}
+.palette-title {
+  color: var(--text-primary);
+  font-family: var(--type-display);
+  font-size: 18px;
+  line-height: 1.1;
+}
+.palette-subtitle {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.palette-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.palette-summary-cell {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.16);
+}
+.palette-summary-cell[data-tone="ok"] { border-color: color-mix(in srgb, var(--led-ok) 42%, var(--border-subtle)); }
+.palette-summary-cell[data-tone="warn"] { border-color: color-mix(in srgb, var(--led-warn) 45%, var(--border-subtle)); }
+.palette-summary-cell .ps-label,
+.palette-summary-cell .ps-value {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette-summary-cell .ps-label {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.palette-summary-cell .ps-value {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-family: var(--type-mono);
+  font-size: 11px;
+}
 .palette-input {
   flex: 0 0 auto;
-  height: 48px;
+  height: 44px;
   padding: 0 var(--sp-4);
   background: transparent;
   border: none;
@@ -1000,13 +1052,19 @@
   outline: none;
 }
 .palette-input::placeholder { color: var(--text-disabled); }
-.palette-list { flex: 1 1 auto; overflow: auto; padding: 6px; } /* tight list inset (sub --sp-2) */
+.palette-list { flex: 1 1 auto; overflow: auto; padding: 8px; } /* tight list inset (sub --sp-2) */
+.palette-section {
+  padding: 7px var(--sp-3) 4px;
+  color: var(--text-muted);
+  font-family: var(--type-mono);
+  font-size: 10px;
+}
 .palette-item {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  min-height: 44px;
-  padding: 0 var(--sp-3);
+  min-height: 48px;
+  padding: 6px var(--sp-3);
   border-radius: var(--r-sm);
   color: var(--text-secondary);
   font-size: 13px;
@@ -1028,7 +1086,20 @@
  * its .sb-kbd — so the "lit row lights its mark AND its shortcut" read is the
  * same in the palette as in the nav. */
 .palette-item[aria-selected="true"] .pi-accel { color: var(--text-secondary); }
-.palette-item .pi-label { flex: 0 0 auto; }
+.palette-item .pi-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.palette-item .pi-title {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.palette-item .pi-label { flex: 0 0 auto; color: var(--text-primary); }
 /* The inline description sits right after the label as a quiet subtitle (the
  * Raycast "title · subtitle" read). It yields first when the row is tight —
  * truncating with an ellipsis rather than shoving the accelerator off-row. */
@@ -1041,20 +1112,73 @@
   font-size: 12px;
   color: var(--text-muted);
 }
-/* The accelerator pins to the right edge (margin-left:auto), so every row's
- * shortcut lines up in a single column — the palette reads as a shortcut
- * cheat-sheet. Bare mono, no keycap box: the same treatment as the sidebar
- * .sb-kbd, so an accelerator looks identical wherever it appears. */
+.palette-item .pi-state {
+  flex: 0 0 auto;
+  max-width: 90px;
+  margin-left: auto;
+  padding: 2px 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  font-family: var(--type-mono);
+  font-size: 10px;
+}
+.palette-item .pi-state[data-kind="current"] {
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--border-subtle));
+  color: var(--text-secondary);
+  background: var(--brand-08);
+}
+.palette-item .pi-state[data-kind="ready"] {
+  border-color: color-mix(in srgb, var(--led-ok) 38%, var(--border-subtle));
+  color: var(--text-secondary);
+}
+.palette-item .pi-state[data-kind="warn"] {
+  border-color: color-mix(in srgb, var(--led-warn) 45%, var(--border-subtle));
+  color: var(--text-secondary);
+}
+/* The accelerator stays in the final fixed slot, so every row's shortcut lines
+ * up in a single column — the palette reads as a shortcut cheat-sheet. Bare
+ * mono, no keycap box: the same treatment as the sidebar .sb-kbd, so an
+ * accelerator looks identical wherever it appears. */
 .palette-item .pi-accel {
   flex: 0 0 auto;
-  margin-left: auto;
   padding-left: var(--sp-3);
   font-family: var(--type-mono);
   font-size: 10px;
   /* --text-muted: informational, must clear AA on the panel surface. */
   color: var(--text-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   white-space: nowrap;
+}
+.palette-footer {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--sp-3);
+  justify-content: flex-end;
+  padding: 7px var(--sp-4) 9px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.palette-footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.palette-footer kbd {
+  min-width: 18px;
+  padding: 1px 5px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--text-secondary);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: center;
 }
 .palette-empty {
   padding: var(--sp-4);
@@ -1063,6 +1187,37 @@
   color: var(--text-muted);
   font-size: 13px;
   text-align: center;
+}
+
+@media (max-width: 620px) {
+  .shell-palette {
+    padding-top: 8vh;
+  }
+  .palette-panel {
+    width: min(94vw, 520px);
+    max-height: 78vh;
+  }
+  .palette-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .palette-item {
+    align-items: flex-start;
+    gap: var(--sp-2);
+  }
+  .palette-item .pi-main,
+  .palette-item .pi-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .palette-item .pi-state {
+    max-width: 100%;
+    margin-left: 0;
+  }
+  .palette-footer {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 
 /* ── Motion ──────────────────────────────────────────────────────────────── */
