@@ -146,7 +146,12 @@ def _cached_profiles() -> list:
     return _PROFILE_CACHE
 
 
-def _stabilize_bpm(ring: list[float], *, previous: float = 0.0) -> float:
+def _stabilize_bpm(
+    ring: list[float],
+    *,
+    previous: float = 0.0,
+    allow_far_switch: bool = True,
+) -> float:
     """Lower-median of the in-range BPM samples in ``ring`` (0.0 if none).
 
     Drops anything outside [BPM_VALID_MIN, BPM_VALID_MAX] before taking the
@@ -159,7 +164,9 @@ def _stabilize_bpm(ring: list[float], *, previous: float = 0.0) -> float:
     If a previous public BPM exists, a far-away in-range candidate must have a
     small cluster behind it before replacing the cache. Dense material can flip
     between multiple plausible in-range locks; a single median hop should not
-    make the UI counter stutter.
+    make the UI counter stutter. When ``allow_far_switch`` is false, even a
+    clustered alternate lock is held; the live refresh loop uses title boundaries
+    to clear the cache before accepting a different far-away tempo.
     """
     valid = sorted(b for b in ring if BPM_VALID_MIN <= b <= BPM_VALID_MAX)
     if not valid:
@@ -180,7 +187,7 @@ def _stabilize_bpm(ring: list[float], *, previous: float = 0.0) -> float:
         for bpm in valid
         if abs(float(bpm) - candidate) / candidate <= _BPM_SWITCH_TOLERANCE
     )
-    if cluster >= _BPM_SWITCH_MIN_CLUSTER:
+    if allow_far_switch and cluster >= _BPM_SWITCH_MIN_CLUSTER:
         return candidate
     return prev
 
@@ -995,7 +1002,12 @@ def _tick_once(
             bpm_ring.append(raw_bpm)
             if len(bpm_ring) > _BPM_RING_MAXLEN:
                 del bpm_ring[0]
-            stabilized = _stabilize_bpm(bpm_ring, previous=bpm_cache)
+            allow_far_switch = not bool(getattr(state, "audible_track", None))
+            stabilized = _stabilize_bpm(
+                bpm_ring,
+                previous=bpm_cache,
+                allow_far_switch=allow_far_switch,
+            )
             if stabilized > 0:  # keep last-good until an in-range sample lands
                 bpm_cache = stabilized
         else:

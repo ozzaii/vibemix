@@ -145,3 +145,53 @@ def test_steady_state_bpm_tracks_real_tempo(monkeypatch):
     assert median(nonzero) == pytest.approx(130.0, abs=1.0), (
         f"steady-state median {median(nonzero)} should track the real ~130 tempo"
     )
+
+
+def test_state_bpm_holds_far_away_alternate_lock_inside_same_title(monkeypatch):
+    """Live 2026-06-03: a confirmed title later walked 171.4 -> 113.2 -> 115.4.
+
+    Once a title is already attributed, a far-away alternate autocorr lock should
+    not replace the public BPM. The title boundary clears the cache for a new
+    track; inside the same title, the counter should hold instead of stutter.
+    """
+    samples = iter([113.2, 113.2, 113.2, 113.2, 115.4, 115.4])
+
+    def _fake_estimate_bpm(audio_buf, seconds=6.0):
+        return next(samples)
+
+    monkeypatch.setattr("vibemix.state.refresh.estimate_bpm", _fake_estimate_bpm)
+
+    state = MusicState()
+    state.audible = True
+    state.audible_track = "Same Tune"
+    state.track_history = [(900.0, "Same Tune")]
+    audio_buf = _audible_buf()
+    ctrl = _ctrl_mock()
+    track = _track_mock(title="Same Tune")
+
+    bpm_ring: list[float] = [171.4, 171.4]
+    bpm_cache = 171.4
+    last_bpm_at = 0.0
+    last_high = 0.0
+    last_low = 0.0
+    recorded: list[float] = []
+
+    now = 1000.0
+    for _ in range(6):
+        now += 3.5
+        last_high, last_low, bpm_cache, last_bpm_at = _tick_once(
+            state,
+            audio_buf,
+            ctrl,
+            track,
+            now=now,
+            last_audible_high=last_high,
+            last_audible_low=last_low,
+            bpm_cache=bpm_cache,
+            last_bpm_at=last_bpm_at,
+            bpm_ring=bpm_ring,
+        )
+        recorded.append(state.bpm)
+
+    assert recorded
+    assert set(recorded) == {171.4}

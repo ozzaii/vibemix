@@ -58,6 +58,17 @@ def test_previous_bpm_switches_after_cluster_forms():
     assert _stabilize_bpm([150.0, 150.0, 125.0, 150.0, 150.0], previous=171.4) == 150.0
 
 
+def test_previous_bpm_holds_clustered_alternate_lock_when_far_switch_disallowed():
+    assert (
+        _stabilize_bpm(
+            [113.2, 113.2, 113.2, 113.2, 115.4],
+            previous=171.4,
+            allow_far_switch=False,
+        )
+        == 171.4
+    )
+
+
 def test_previous_bpm_allows_small_drift():
     assert _stabilize_bpm([166.7, 169.0], previous=166.7) == 169.0
 
