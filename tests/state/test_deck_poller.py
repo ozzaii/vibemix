@@ -42,6 +42,7 @@ def _entry(
     bpm: float = 128.0,
     filepath: str = "",
     genre: str = "",
+    key_source: str = "",
 ) -> TrackEntry:
     return TrackEntry(
         track_id=track_id,
@@ -54,6 +55,7 @@ def _entry(
         cues=(),
         filepath=filepath,
         genre=genre,
+        key_source=key_source,
     )
 
 
@@ -410,6 +412,44 @@ def test_nowplaying_playback_seeds_deck_when_controller_has_no_midi_motion():
     assert status["resolution"] == "nowplaying_playback_library_match"
     assert status["resolved_side_rule"] == "nominal_nowplaying_seed_not_physical_deck_proof"
     assert status["controller_midi_activity"] == "connected_no_midi_traffic"
+
+
+def test_audio_estimated_key_does_not_become_live_deck_proof():
+    """Offline K-S keys can score suggestions, but they are not citable deck tags."""
+    lib = _lib(
+        _entry(
+            "1",
+            "Strobe",
+            artist="Deadmau5",
+            key="Am",
+            key_source="numpy_ks",
+        )
+    )
+    p = DeckPoller(
+        library=lib,
+        controller=_FakeActivityController(
+            _ctrl_snap(vol_a=0, vol_b=0, xfader=64, connected=True),
+            {
+                "connected": True,
+                "messages_seen_total": 0,
+                "events_seen_total": 0,
+                "moves_seen_total": 0,
+            },
+        ),
+        track_info=_FakeTrackInfo(
+            "Deadmau5 - Strobe",
+            client_bundle_id="com.pioneerdj.rekordbox",
+            position_sec=12.0,
+            playback_rate=1.0,
+        ),
+    )
+
+    p.poll_once()
+
+    decks = p.snapshot()
+    assert decks["A"].track_id == "1"
+    assert decks["A"].key is None
+    assert decks["A"].camelot is None
 
 
 def test_nowplaying_playback_fallback_requires_active_position():

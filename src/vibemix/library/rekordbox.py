@@ -196,6 +196,7 @@ class TrackEntry:
     comments: str = ""
     camelot: str | None = None  # to_camelot(key) at parse; None on odd/empty key
     beatgrid: tuple[TempoNode, ...] = ()  # TEMPO nodes; () when absent
+    key_source: str = ""  # e.g. "numpy_ks" for offline audio-estimated keys
 
 
 @dataclass(slots=True)
@@ -430,6 +431,7 @@ def _coerce_cache_tracks(tracks: dict[str, Any]) -> dict[str, TrackEntry]:
             comments=str(getattr(entry, "comments", "") or ""),
             camelot=getattr(entry, "camelot", None),
             beatgrid=tuple(getattr(entry, "beatgrid", ()) or ()),
+            key_source=str(getattr(entry, "key_source", "") or ""),
         )
     return out
 
@@ -511,6 +513,7 @@ def _track_to_entry(track: Any) -> TrackEntry:
         comments=comments,
         camelot=camelot,
         beatgrid=beatgrid,
+        key_source="",
     )
 
 

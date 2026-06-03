@@ -44,13 +44,14 @@ import shutil
 import subprocess
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Protocol
 
 import numpy as np
 
 from vibemix.library._cosine import EMBEDDING_DIM
+from vibemix.library.key_estimator import estimate_key
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry, _CacheBlob
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,8 @@ class IngestReport:
     cue_agreement_score_sum: float = 0.0
     cue_agreement_offset_sum_s: float = 0.0
     cue_agreement_offset_count: int = 0
+    key_estimated_tracks: int = 0
+    key_estimation_failed: int = 0
 
     def as_dict(self) -> dict:
         mean_score = (
@@ -126,6 +129,10 @@ class IngestReport:
                 "mean_abs_offset_s": (
                     round(mean_offset_s, 6) if mean_offset_s is not None else None
                 ),
+            },
+            "key_estimation": {
+                "estimated": self.key_estimated_tracks,
+                "failed": self.key_estimation_failed,
             },
             "cost_estimate_eur": round(self.cost_estimate_eur, 6),
             "failures": [
@@ -323,6 +330,7 @@ def ingest_folder(
     probe: ProbeFn = probe_duration_s,
     embed_strategy: str | None = None,
     compute_band_shares: bool = False,
+    compute_key: bool = True,
 ) -> IngestReport:
     """Walk ``root``, embed each supported audio file, persist to ``store``.
 
@@ -347,6 +355,8 @@ def ingest_folder(
             scalars + kick-correlation and write to the side-car band_shares
             table inside library-clap.db. Best-effort — failures log and skip.
             Default False keeps legacy callers byte-identical (Plan 93-06).
+        compute_key: when True, estimate a missing musical key offline with a
+            pure-numpy K-S estimator. Existing key tags are never clobbered.
 
     Returns:
         :class:`IngestReport`.
@@ -375,6 +385,18 @@ def ingest_folder(
             continue
 
         entry = folder_to_track_entry(path, duration)
+        if compute_key and not entry.key:
+            est = estimate_key(path)
+            if est is not None:
+                entry = replace(
+                    entry,
+                    key=est.musical,
+                    camelot=est.camelot,
+                    key_source=est.source,
+                )
+                report.key_estimated_tracks += 1
+            else:
+                report.key_estimation_failed += 1
 
         # Resumable accounting — was this content already embedded?
         try:

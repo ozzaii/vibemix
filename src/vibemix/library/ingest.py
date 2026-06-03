@@ -55,6 +55,7 @@ from vibemix.library.cache_paths import CLAP_EMBED_CACHE_DB_PATH
 from vibemix.library.cue_types import CueAnchor
 from vibemix.library.excerpt import MAX_CUES_PER_TRACK, anchors_for_track, cut_windows
 from vibemix.library.folder_ingest import IngestReport, _write_library_cache
+from vibemix.library.key_estimator import estimate_key
 from vibemix.library.rekordbox import CuePoint, TrackEntry
 from vibemix.library.section_builder import sections_for_entry
 from vibemix.library.section_vectors import (
@@ -764,6 +765,7 @@ def ingest_source(
     section_cache: sqlite3.Connection | None = None,
     anlz_index: object | None = None,
     cue_agreement_calibration: bool = False,
+    compute_key: bool = True,
 ) -> IngestReport:
     """Detect → iter → CLAP embed → store one source, resumably + honestly.
 
@@ -785,6 +787,8 @@ def ingest_source(
         cue_agreement_calibration: when True, run the auto-cue engine against
             DJ/ANLZ-cued tracks too and report agreement/weak-label counts.
             This is telemetry only; it never changes cached cues or vectors.
+        compute_key: when True, estimate missing keys from local audio files.
+            Existing library/DJ tags win and are never clobbered.
 
     Returns:
         :class:`~vibemix.library.folder_ingest.IngestReport` (same shape).
@@ -824,11 +828,25 @@ def ingest_source(
                 _emit(progress, idx, "err", label)
                 continue
 
+            working_key_track = track
+            if compute_key and not working_key_track.key:
+                est = estimate_key(local)
+                if est is not None:
+                    working_key_track = replace(
+                        working_key_track,
+                        key=est.musical,
+                        camelot=est.camelot,
+                        key_source=est.source,
+                    )
+                    report.key_estimated_tracks += 1
+                else:
+                    report.key_estimation_failed += 1
+
             # Resumable: content-hash cache probe.
             try:
-                anlz_meta = _match_anlz_for_cache(track, anlz_index)
+                anlz_meta = _match_anlz_for_cache(working_key_track, anlz_index)
                 strategy_tag = _cue_strategy_tag_for_anlz(anlz_meta)
-                working_track = _materialize_anlz_cues(track, anlz_meta)
+                working_track = _materialize_anlz_cues(working_key_track, anlz_meta)
                 if cue_agreement_calibration:
                     _record_cue_agreement_calibration(report, working_track, local)
                 precomputed_anchors: list[CueAnchor] | None = None

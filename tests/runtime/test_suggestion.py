@@ -325,6 +325,56 @@ def test_resolve_seed_from_audible_deck():
     assert resolve_seed(state) == ("t42", "8A", 128.0)
 
 
+def test_compute_uses_library_key_when_deck_seed_withholds_estimated_key():
+    from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
+
+    lib = RekordboxLibrary()
+    lib.tracks = {
+        "s": TrackEntry(
+            track_id="s",
+            title="Seed",
+            artist="A",
+            album="X",
+            bpm=128.0,
+            key="Am",
+            duration_s=300.0,
+            cues=(),
+            filepath="/s.mp3",
+            key_source="numpy_ks",
+        ),
+        "bad": TrackEntry(
+            track_id="bad",
+            title="Bad",
+            artist="A",
+            album="X",
+            bpm=128.0,
+            key="3A",
+            duration_s=300.0,
+            cues=(),
+            filepath="/bad.mp3",
+        ),
+        "good": TrackEntry(
+            track_id="good",
+            title="Good",
+            artist="A",
+            album="X",
+            bpm=128.0,
+            key="8A",
+            duration_s=300.0,
+            cues=(),
+            filepath="/good.mp3",
+        ),
+    }
+    store = _FakeStore(["s", "bad", "good"], [("bad", 0.99), ("good", 0.8)])
+    svc = SuggestionService(store, lib)
+
+    suggestion = svc.compute("s", seed_camelot=None, seed_bpm=None)
+
+    assert suggestion is not None
+    assert suggestion["track_id"] == "good"
+    assert suggestion["camelot"] == "8A"
+
+
 def test_resolve_seed_context_names_source_and_target_decks():
     state = MusicState()
     state.audible_deck = "A"

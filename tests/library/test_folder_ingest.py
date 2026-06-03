@@ -33,6 +33,7 @@ from vibemix.library import (
 )
 from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
 from vibemix.library.index_numpy import NumpyStore
+from vibemix.library.key_estimator import KeyEstimate
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.library.store import LibraryStore
 
@@ -251,6 +252,59 @@ def test_library_pkl_written_and_loadable(
     assert lib.try_load_cache() is True
     titles = {t.title for t in lib.tracks.values()}
     assert "trackone" in titles
+
+
+def test_folder_ingest_estimates_missing_key_into_cache(
+    tmp_path: Path, numpy_store: LibraryStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    music = tmp_path / "music"
+    _touch(music / "tonal.wav")
+
+    monkeypatch.setattr(
+        "vibemix.library.folder_ingest.estimate_key",
+        lambda _path: KeyEstimate(camelot="8A", musical="Am", confidence=0.31),
+    )
+
+    report = ingest_folder(music, FakeEmbedder(), numpy_store, probe=_const_probe())
+
+    assert report.key_estimated_tracks == 1
+    assert report.key_estimation_failed == 0
+    lib = RekordboxLibrary()
+    assert lib.try_load_cache() is True
+    entry = next(iter(lib.tracks.values()))
+    assert entry.key == "Am"
+    assert entry.camelot == "8A"
+    assert entry.key_source == "numpy_ks"
+
+
+def test_folder_ingest_no_key_flag_skips_estimator(
+    tmp_path: Path, numpy_store: LibraryStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    music = tmp_path / "music"
+    _touch(music / "plain.wav")
+    calls: list[Path] = []
+
+    def _fake_estimate(path: Path):
+        calls.append(path)
+        return KeyEstimate(camelot="8A", musical="Am", confidence=0.31)
+
+    monkeypatch.setattr("vibemix.library.folder_ingest.estimate_key", _fake_estimate)
+
+    report = ingest_folder(
+        music,
+        FakeEmbedder(),
+        numpy_store,
+        probe=_const_probe(),
+        compute_key=False,
+    )
+
+    assert calls == []
+    assert report.key_estimated_tracks == 0
+    lib = RekordboxLibrary()
+    assert lib.try_load_cache() is True
+    entry = next(iter(lib.tracks.values()))
+    assert entry.key == ""
+    assert entry.key_source == ""
 
 
 # ─── ingest_folder: dim-mismatch guard ───────────────────────────────────────

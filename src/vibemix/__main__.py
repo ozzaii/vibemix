@@ -3398,7 +3398,8 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         description=(
             "Walk a raw audio folder, embed each track locally with CLAP ONNX, "
             "persist 512-d vectors + a library.pkl so search/similar resolve "
-            "filenames. Resumable, partial-failure-tolerant, and keyless."
+            "filenames. Resumable, partial-failure-tolerant, with missing-key "
+            "audio estimation on by default."
         ),
     )
     sp_embed_folder.add_argument("path", help="folder to ingest (recursive)")
@@ -3417,6 +3418,20 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
             "offline auto-cue detection, embed ~80s windows anchored at the "
             "mixable structural points, mean of cue-region vectors."
         ),
+    )
+    key_group = sp_embed_folder.add_mutually_exclusive_group()
+    key_group.add_argument(
+        "--compute-key",
+        dest="compute_key",
+        action="store_true",
+        default=True,
+        help="estimate missing musical keys from audio during ingest (default)",
+    )
+    key_group.add_argument(
+        "--no-key",
+        dest="compute_key",
+        action="store_false",
+        help="skip offline audio key estimation",
     )
     sp_embed_folder.set_defaults(func=_cmd_library_embed_folder)
 
@@ -3918,6 +3933,20 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
             "opt-in: compare DJ/ANLZ cues against the auto-cue engine and report "
             "agreement/weak-label counts without changing cached cues"
         ),
+    )
+    key_group = sp_ingest.add_mutually_exclusive_group()
+    key_group.add_argument(
+        "--compute-key",
+        dest="compute_key",
+        action="store_true",
+        default=True,
+        help="estimate missing musical keys from local audio during ingest (default)",
+    )
+    key_group.add_argument(
+        "--no-key",
+        dest="compute_key",
+        action="store_false",
+        help="skip offline audio key estimation",
     )
     sp_ingest.set_defaults(func=_cmd_library_ingest)
 
@@ -7544,6 +7573,7 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
         return 1
 
     strategy = getattr(args, "strategy", "mean_excerpt")
+    compute_key = bool(getattr(args, "compute_key", True))
     embedder = build_embedder(embed_strategy=strategy)
     store = open_store()
     as_json = bool(getattr(args, "json", False))
@@ -7563,6 +7593,7 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
             persist_library=True,
             progress=_progress,
             embed_strategy=strategy,
+            compute_key=compute_key,
         )
     finally:
         store.close()
@@ -7666,6 +7697,7 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
     )
     print("-> library ingest: embedder=ClapEngine (on-device, keyless)", file=sys.stderr)
     calibrate_cues = bool(getattr(args, "calibrate_cues", False))
+    compute_key = bool(getattr(args, "compute_key", True))
     if calibrate_cues:
         print(
             "-> library ingest: cue-agreement calibration=on (telemetry only)",
@@ -7719,6 +7751,7 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
             progress=_progress,
             anlz_index=anlz_index,
             cue_agreement_calibration=calibrate_cues,
+            compute_key=compute_key,
         )
     finally:
         store.close()

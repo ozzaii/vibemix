@@ -269,7 +269,11 @@ class DeckPoller:
         lock batch (RESEARCH §Code Examples). ``bpm`` comes from source metadata
         (``AverageBpm``), NOT audio autocorrelation.
         """
-        raw_key = entry.key or None
+        # Audio-estimated folder/catalog keys improve offline next-song/Viber
+        # scoring, but they are not live deck proof. Keep them out of DeckTrack
+        # so Sven does not receive an estimated key as a citable deck fact.
+        key_source = str(getattr(entry, "key_source", "") or "")
+        raw_key = None if key_source == "numpy_ks" else entry.key or None
         return DeckTrack(
             title=entry.title or None,
             track_id=entry.track_id or None,

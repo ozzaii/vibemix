@@ -943,6 +943,15 @@ class SuggestionService:
         """Recompute from a seed track_id. Marks the seed played, returns +
         stores the new suggestion dict (or None). Sync — run in an executor.
         """
+        if seed_camelot is None or seed_bpm is None:
+            seed_entry = self._library.lookup_by_id(seed_track_id)
+            if seed_entry is not None:
+                if seed_camelot is None:
+                    from vibemix.state import harmonics
+
+                    seed_camelot = harmonics.to_camelot(seed_entry.key) if seed_entry.key else None
+                if seed_bpm is None and seed_entry.bpm and seed_entry.bpm > 0:
+                    seed_bpm = float(seed_entry.bpm)
         vec = seed_vector_for_track_id(self._store, seed_track_id)
         if vec is None:
             with self._lock:
