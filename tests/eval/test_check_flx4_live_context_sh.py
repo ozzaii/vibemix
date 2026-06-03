@@ -265,6 +265,18 @@ def test_check_flx4_live_context_passes_when_hardware_and_live_proof_ready(
     assert summary["ok"] is True
     assert summary["diagnosis"] == "ready"
     assert summary["operator_actions"] == []
+    assert summary["operator_action_queue"] == []
+    assert summary["next_operator_action"] == {
+        "code": "ready",
+        "source": "flx4",
+        "detail": "FLX4 live-context proof is ready.",
+    }
+    assert summary["operator_action_runbook_sh"] == str(
+        tmp_path / "out" / "operator_action_runbook.sh"
+    )
+    runbook = (tmp_path / "out" / "operator_action_runbook.sh").read_text()
+    assert "FLX4 live-context operator action runbook" in runbook
+    assert "No operator action required; FLX4 proof is ready." in runbook
     assert summary["canaries"]["listener_read"] is True
     assert summary["canaries"]["audio_causality_rejected"] is True
     assert summary["canaries"]["audio_source_detail_rejected"] is True
@@ -401,6 +413,19 @@ def test_check_flx4_live_context_records_direct_midi_probe_no_motion(
         "uv run python scripts/sniff_controller.py --port DDJ-FLX4 --seconds 20 --mode callback",
         "uv run python scripts/sniff_controller.py --port DDJ-FLX4 --seconds 20 --mode poll",
     ]
+    assert summary["operator_action_queue"][0]["source"] == "flx4"
+    assert summary["next_operator_action"]["code"] == "prove_os_midi_motion"
+    assert summary["next_operator_action"]["source"] == "flx4"
+    assert summary["next_operator_action"]["diagnostic_commands"] == [
+        "uv run python scripts/sniff_controller.py --port DDJ-FLX4 --seconds 20 --mode callback",
+        "uv run python scripts/sniff_controller.py --port DDJ-FLX4 --seconds 20 --mode poll",
+    ]
+    assert summary["operator_action_runbook_sh"] == str(
+        tmp_path / "out" / "operator_action_runbook.sh"
+    )
+    runbook = (tmp_path / "out" / "operator_action_runbook.sh").read_text()
+    assert "Set RUN_OPERATOR_COMMANDS=1 to execute diagnostic commands" in runbook
+    assert "uv run python scripts/sniff_controller.py --port DDJ-FLX4 --seconds 20 --mode callback" in runbook
 
 
 def test_check_flx4_live_context_writes_summary_when_midi_port_missing(

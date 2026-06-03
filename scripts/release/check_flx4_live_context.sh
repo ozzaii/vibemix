@@ -845,6 +845,68 @@ elif direct_midi_ran and not direct_midi_motion and not checks.get("recent_moves
 elif direct_midi_ran and direct_midi_motion:
     midi_motion_diagnosis = "direct_midi_motion_observed"
 
+operator_runbook_path = summary_path.parent / "operator_action_runbook.sh"
+
+
+def _with_source(action: dict, source: str = "flx4") -> dict:
+    out = dict(action)
+    out.setdefault("source", source)
+    return out
+
+
+def _write_operator_runbook(path: Path, actions: list[dict]) -> None:
+    lines = [
+        "#!/usr/bin/env bash",
+        "# SPDX-License-Identifier: Apache-2.0",
+        "# FLX4 live-context operator action runbook.",
+        "# Dry-run by default. Set RUN_OPERATOR_COMMANDS=1 to execute diagnostic commands.",
+        "set -euo pipefail",
+        'echo "FLX4 live-context operator action runbook"',
+        'echo "Set RUN_OPERATOR_COMMANDS=1 to execute diagnostic commands"',
+    ]
+    if not actions:
+        lines.append('echo "No operator action required; FLX4 proof is ready."')
+    for index, action in enumerate(actions, start=1):
+        code = str(action.get("code") or "unknown")
+        detail = str(action.get("detail") or "")
+        lines.append(f'echo "action {index}: {code}"')
+        if detail:
+            lines.append(f"echo {shlex.quote('detail: ' + detail)}")
+        recommended_env = action.get("recommended_env")
+        if isinstance(recommended_env, dict):
+            for key, value in recommended_env.items():
+                env_line = f"export {key}={shlex.quote(str(value))}"
+                lines.append(f"echo {shlex.quote('+ ' + env_line)}")
+                lines.append(
+                    f'if [ "${{RUN_OPERATOR_COMMANDS:-0}}" = "1" ]; then {env_line}; fi'
+                )
+        commands = action.get("diagnostic_commands")
+        if isinstance(commands, list):
+            for command in commands:
+                command_text = str(command).strip()
+                if not command_text:
+                    continue
+                lines.append(f"echo {shlex.quote('+ ' + command_text)}")
+                lines.append(
+                    "if [ \"${RUN_OPERATOR_COMMANDS:-0}\" = \"1\" ]; then "
+                    f"eval {shlex.quote(command_text)}; fi"
+                )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.chmod(0o755)
+
+
+operator_action_queue = [_with_source(action) for action in operator_actions]
+next_operator_action = (
+    operator_action_queue[0]
+    if operator_action_queue
+    else {
+        "code": "ready",
+        "source": "flx4",
+        "detail": "FLX4 live-context proof is ready.",
+    }
+)
+_write_operator_runbook(operator_runbook_path, operator_action_queue)
+
 summary = {
     "schema": "flx4_live_context_summary_v1",
     "ok": live_rc == 0 and os.environ["REPLY_CANARIES_OK"] == "true",
@@ -855,6 +917,9 @@ summary = {
     "diagnosis": readiness.get("diagnosis"),
     "action_hint": action_hint,
     "operator_actions": operator_actions,
+    "operator_action_queue": operator_action_queue,
+    "next_operator_action": next_operator_action,
+    "operator_action_runbook_sh": str(operator_runbook_path),
     "first_blocker": first_blocker,
     "top_blockers": top_blockers,
     "blocker_count": len(blockers),
