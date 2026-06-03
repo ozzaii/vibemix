@@ -562,6 +562,9 @@ class LessonRuntime(StateMachine):
         self._last_mismatch_hint_at: float = 0.0
         self._beatmatch_practice_lock_active = False
         self._last_beatmatch_live_grade_verdict: str | None = None
+        self._last_beatmatch_live_grade_signature: tuple[str, float, float, str | None] | None = (
+            None
+        )
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
         self._cue_placement_practice_lock_active = False
@@ -1579,6 +1582,7 @@ class LessonRuntime(StateMachine):
         """
         if self._beatmatch_practice_loader is None or self._evidence_registry is None:
             self._last_beatmatch_live_grade_verdict = None
+            self._last_beatmatch_live_grade_signature = None
             return None
         try:
             snapshot = self._beatmatch_practice_loader()
@@ -1593,6 +1597,7 @@ class LessonRuntime(StateMachine):
         if snapshot is None:
             self._beatmatch_practice_lock_active = False
             self._last_beatmatch_live_grade_verdict = None
+            self._last_beatmatch_live_grade_signature = None
             return None
 
         t_session = self._evidence_time()
@@ -1662,6 +1667,7 @@ class LessonRuntime(StateMachine):
         """
         if result is None or result.grade.abstain:
             self._last_beatmatch_live_grade_verdict = None
+            self._last_beatmatch_live_grade_signature = None
             return
 
         verdict = result.grade.verdict
@@ -1690,16 +1696,19 @@ class LessonRuntime(StateMachine):
         if not math.isfinite(score):
             score = 0.0
         score = max(0.0, min(1.0, score))
+        signature = (verdict, round(phase_error, 3), round(score, 3), citation)
 
         lesson_id = self._learn.current_lesson_id or "learn"
         try:
-            live_grade = LearnLiveGrade.make(
-                verdict=verdict,
-                phase_error_beats=phase_error,
-                score=score,
-                citation=citation,
-            ).to_dict()
-            self._ipc.emit(live_grade)
+            if signature != self._last_beatmatch_live_grade_signature:
+                self._last_beatmatch_live_grade_signature = signature
+                live_grade = LearnLiveGrade.make(
+                    verdict=verdict,
+                    phase_error_beats=phase_error,
+                    score=score,
+                    citation=citation,
+                ).to_dict()
+                self._ipc.emit(live_grade)
 
             if verdict == self._last_beatmatch_live_grade_verdict:
                 return
@@ -1728,6 +1737,7 @@ class LessonRuntime(StateMachine):
         ):
             self._beatmatch_practice_lock_active = False
             self._last_beatmatch_live_grade_verdict = None
+            self._last_beatmatch_live_grade_signature = None
             return
         self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
 

@@ -439,7 +439,7 @@ def test_live_beatmatch_grade_abstain_emits_nothing() -> None:
 
 
 def test_live_beatmatch_grade_dedupes_sustained_same_verdict() -> None:
-    """The 1 Hz grade loop must not turn one drift into repeated Sven chatter."""
+    """The 1 Hz grade loop must not pulse unchanged drift as fresh feedback."""
     registry = EvidenceRegistry()
     ipc = MagicMock(name="ipc_router")
     runtime = LessonRuntime(
@@ -457,7 +457,58 @@ def test_live_beatmatch_grade_dedupes_sustained_same_verdict() -> None:
     runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
 
     assert len(_tutor_speak_payloads(ipc)) == 1
-    assert len(_live_grade_payloads(ipc)) == 2
+    assert len(_live_grade_payloads(ipc)) == 1
+
+
+def test_live_beatmatch_grade_keeps_meter_updates_when_phase_changes() -> None:
+    """Meaningful phase movement still reaches the meter without repeat speech."""
+    grid = _beat_grid()
+    snapshots = [
+        BeatmatchPracticeSnapshot(
+            grid_a=grid,
+            grid_b=grid,
+            deck_state=DeckState(
+                a_frame=0.0,
+                b_frame=grid.beat_len_frames * -0.05,
+                rate_a=1.0,
+                rate_b=1.0,
+                xfader=0.5,
+            ),
+        ),
+        BeatmatchPracticeSnapshot(
+            grid_a=grid,
+            grid_b=grid,
+            deck_state=DeckState(
+                a_frame=0.0,
+                b_frame=grid.beat_len_frames * -0.08,
+                rate_a=1.0,
+                rate_b=1.0,
+                xfader=0.5,
+            ),
+        ),
+    ]
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=LearnProgress(),
+        evidence_registry=registry,
+        evidence_clock=lambda: 13.0,
+        beatmatch_practice_loader=lambda: snapshots.pop(0) if snapshots else None,
+    )
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    assert len(_tutor_speak_payloads(ipc)) == 1
+    grades = _live_grade_payloads(ipc)
+    assert len(grades) == 2
+    assert grades[0]["verdict"] == "drifting"
+    assert grades[1]["verdict"] == "drifting"
+    assert grades[1]["phase_error_beats"] > grades[0]["phase_error_beats"]
 
 
 def test_live_beatmatch_grade_tick_stops_after_completion(monkeypatch) -> None:
