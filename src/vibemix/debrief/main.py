@@ -171,6 +171,10 @@ def _build_cited_critique(events: list[dict], chapters: list[ChapterRegion]) -> 
             text = _learn_tutor_critique_line(e)
             if text:
                 out.append(text)
+        elif kind == "transition_judged":
+            text = _transition_judged_critique_line(e)
+            if text:
+                out.append(text)
     return " ".join(out)
 
 
@@ -208,6 +212,45 @@ def _learn_tutor_critique_line(event: dict) -> str:
     tts_marker = str(event.get("tts_marker") or "").strip()
     marker = f" {tts_marker}" if tts_marker else ""
     return f"Learn tutor {lesson_id}{marker}: {text} {' '.join(citation_list)}"
+
+
+def _transition_judged_critique_line(event: dict) -> str:
+    if event.get("verdict_state") != "judged":
+        return ""
+    citation_id = str(event.get("citation_id") or "").strip()
+    if not citation_id:
+        return ""
+    components = event.get("components")
+    if not isinstance(components, dict):
+        components = {}
+
+    clauses: list[str] = []
+    harmonic = _metric_value(components.get("harmonic"))
+    if harmonic is not None:
+        clauses.append("key clash" if harmonic <= 0.0 else "compatible keys")
+    bass = _metric_value(components.get("bass_collision"))
+    if bass is not None:
+        clauses.append(
+            "both basslines up, low-end mud"
+            if bass <= 0.0
+            else "clean low end, one bass ducked"
+        )
+    if not clauses:
+        return ""
+
+    line = f"[{citation_id}] Judge graded the transition: {'; '.join(clauses)}"
+    score = _metric_value(event.get("score"))
+    if score is not None:
+        line += f" (blend score {score:.2f}/1)"
+    return f"{line}."
+
+
+def _metric_value(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
 
 
 def _learn_event_time(event: dict) -> float:

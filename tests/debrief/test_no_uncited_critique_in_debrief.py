@@ -37,7 +37,7 @@ def test_strip_empty_input():
 
 @pytest.mark.parametrize(
     "source",
-    ["ev", "track", "mix", "aud", "midi", "screen", "key"],
+    ["ev", "track", "mix", "aud", "midi", "screen", "key", "judge"],
 )
 def test_strip_accepts_all_debrief_ebnf_sources(source: str):
     text = f"This works [{source}:something@1.0]."
