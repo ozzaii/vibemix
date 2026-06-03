@@ -75,10 +75,12 @@ const CSS = `
   .debrief-dock__status,
   .debrief-dock__label,
   .debrief-dock__readiness-kicker,
+  .debrief-dock__payback-label,
   .debrief-dock__readiness-metric dt,
   .debrief-dock__meta,
   .debrief-dock__row-state,
-  .debrief-dock__reason {
+  .debrief-dock__reason,
+  .debrief-dock__payoff {
     font-family: var(--type-mono);
     font-size: 10px;
     letter-spacing: 0.12em;
@@ -202,6 +204,40 @@ const CSS = `
     font-size: 13px;
     line-height: 1.35;
   }
+  .debrief-dock__payback {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: var(--sp-2);
+    min-width: 0;
+  }
+  .debrief-dock__payback-cell {
+    min-width: 0;
+    padding: 8px 9px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 222, 242, 0.018), transparent 62%),
+      rgba(0, 0, 0, 0.18);
+  }
+  .debrief-dock__payback-label {
+    display: block;
+    color: var(--text-disabled);
+  }
+  .debrief-dock__payback-value {
+    display: block;
+    margin-top: 3px;
+    color: var(--text-secondary);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 88, "wght" 620;
+    font-size: 13px;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .debrief-dock__readiness[data-state="ready"] .debrief-dock__payback-value {
+    color: var(--text-primary);
+  }
   .debrief-dock__readiness-metrics {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -303,6 +339,13 @@ const CSS = `
     margin-top: var(--sp-2);
     color: var(--text-disabled);
   }
+  .debrief-dock__payoff {
+    margin-top: var(--sp-1);
+    color: var(--text-muted);
+  }
+  .debrief-dock__row[data-ready="true"] .debrief-dock__payoff {
+    color: var(--brand);
+  }
   .debrief-dock__meter {
     position: relative;
     height: 4px;
@@ -362,6 +405,9 @@ const CSS = `
     .debrief-dock__readiness {
       grid-template-columns: 1fr;
     }
+    .debrief-dock__payback {
+      grid-template-columns: 1fr;
+    }
     .debrief-dock__readiness-metrics {
       min-width: 0;
       grid-template-columns: 1fr;
@@ -399,6 +445,12 @@ export function mountDebriefDock(host: HTMLElement): DebriefDockHandle {
     '<div><div class="debrief-dock__readiness-kicker">next review</div>' +
     '<h3 class="debrief-dock__readiness-title">checking recorder</h3>' +
     '<p class="debrief-dock__readiness-sub">Waiting for local session evidence.</p></div>' +
+    '<div class="debrief-dock__payback" aria-label="fastest payback path">' +
+    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">target</span><strong class="debrief-dock__payback-value" data-payback="target">pending</strong></div>' +
+    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">blocker</span><strong class="debrief-dock__payback-value" data-payback="blocker">checking</strong></div>' +
+    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">action</span><strong class="debrief-dock__payback-value" data-payback="action">wait</strong></div>' +
+    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">unlocks</span><strong class="debrief-dock__payback-value" data-payback="unlocks">review</strong></div>' +
+    "</div>" +
     '<dl class="debrief-dock__readiness-metrics">' +
     '<div class="debrief-dock__readiness-metric"><dt>length</dt><dd>pending</dd></div>' +
     '<div class="debrief-dock__readiness-metric"><dt>events</dt><dd>pending</dd></div>' +
@@ -537,10 +589,14 @@ function renderSessionRow(summary: RecordingSummary): HTMLElement {
   reasonEl.className = "debrief-dock__reason";
   reasonEl.textContent = reason;
 
+  const payoff = document.createElement("div");
+  payoff.className = "debrief-dock__payoff";
+  payoff.textContent = rowPayoffLine(summary, eligibility.ready, readiness);
+
   const meter = document.createElement("div");
   meter.className = "debrief-dock__meter";
   meter.setAttribute("aria-label", `review readiness ${readiness.percent}%`);
-  copy.append(head, meta, reasonEl, meter);
+  copy.append(head, meta, reasonEl, payoff, meter);
 
   const open = document.createElement("button");
   open.className = "debrief-dock__open";
@@ -566,11 +622,18 @@ function renderReadiness(readiness: HTMLElement, summary: RecordingSummary | nul
   const metrics = Array.from(
     readiness.querySelectorAll<HTMLElement>(".debrief-dock__readiness-metric dd"),
   );
+  const payback = paybackTargets(readiness);
 
   if (!summary) {
     readiness.dataset.state = "empty";
     title.textContent = "record a real set";
     sub.textContent = "Debrief arms after five minutes and enough evidence events.";
+    setPayback(payback, {
+      target: "no recording yet",
+      blocker: "needs a set",
+      action: "record from Deck",
+      unlocks: "timeline, receipts, drill",
+    });
     setMetric(metrics[0], "0m");
     setMetric(metrics[1], "0 events");
     setMetric(metrics[2], "waiting");
@@ -579,6 +642,7 @@ function renderReadiness(readiness: HTMLElement, summary: RecordingSummary | nul
 
   const eligibility = debriefEligibility(summary);
   const progress = reviewReadiness(summary);
+  const path = paybackPath(summary, eligibility.ready, progress);
   readiness.dataset.state = eligibility.ready ? "ready" : "warming";
   if (eligibility.ready) {
     title.textContent = "review is armed";
@@ -590,6 +654,7 @@ function renderReadiness(readiness: HTMLElement, summary: RecordingSummary | nul
     title.textContent = `capture ${progress.remainingLabel} more`;
     sub.textContent = "Keep Deck running until the recorder has enough context to judge fairly.";
   }
+  setPayback(payback, path);
   setMetric(metrics[0], formatDuration(summary.duration_s));
   setMetric(metrics[1], `${summary.event_count} events`);
   setMetric(metrics[2], eligibility.ready ? "open" : progress.gateLabel);
@@ -599,13 +664,81 @@ function setMetric(target: HTMLElement | undefined, value: string): void {
   if (target) target.textContent = value;
 }
 
+type PaybackSlot = "target" | "blocker" | "action" | "unlocks";
+
+function paybackTargets(readiness: HTMLElement): Record<PaybackSlot, HTMLElement | null> {
+  return {
+    target: readiness.querySelector<HTMLElement>('[data-payback="target"]'),
+    blocker: readiness.querySelector<HTMLElement>('[data-payback="blocker"]'),
+    action: readiness.querySelector<HTMLElement>('[data-payback="action"]'),
+    unlocks: readiness.querySelector<HTMLElement>('[data-payback="unlocks"]'),
+  };
+}
+
+function setPayback(
+  targets: Record<PaybackSlot, HTMLElement | null>,
+  values: Record<PaybackSlot, string>,
+): void {
+  if (targets.target) targets.target.textContent = values.target;
+  if (targets.blocker) targets.blocker.textContent = values.blocker;
+  if (targets.action) targets.action.textContent = values.action;
+  if (targets.unlocks) targets.unlocks.textContent = values.unlocks;
+}
+
+function paybackPath(
+  summary: RecordingSummary,
+  ready: boolean,
+  progress: ReturnType<typeof reviewReadiness>,
+): Record<PaybackSlot, string> {
+  const target = formatTimestamp(summary.started_at_iso);
+  if (ready) {
+    return {
+      target,
+      blocker: "none",
+      action: "open cited review",
+      unlocks: "drill, Viber follow-up",
+    };
+  }
+  if (summary.crashed) {
+    return {
+      target,
+      blocker: "partial evidence",
+      action: "record a clean pass",
+      unlocks: "reliable review",
+    };
+  }
+  return {
+    target,
+    blocker: `needs ${progress.remainingLabel}`,
+    action: "keep Deck running",
+    unlocks: "cited review",
+  };
+}
+
+function rowPayoffLine(
+  summary: RecordingSummary,
+  ready: boolean,
+  readiness: ReturnType<typeof reviewReadiness>,
+): string {
+  if (ready) return "Payback: open review to leave with one drill or crate move.";
+  if (summary.crashed) return "Payback path: record a clean pass before judging this set.";
+  return `Payback path: ${readiness.remainingLabel} more unlocks the cited review.`;
+}
+
 function bestReviewCandidate(sessions: RecordingSummary[]): RecordingSummary | null {
   if (sessions.length === 0) return null;
   const ready = sessions.find((session) => debriefEligibility(session).ready);
   if (ready) return ready;
   return sessions.reduce((best, session) =>
-    reviewReadiness(session).percent > reviewReadiness(best).percent ? session : best,
+    reviewCandidateScore(session) > reviewCandidateScore(best) ? session : best,
   );
+}
+
+function reviewCandidateScore(summary: RecordingSummary): number {
+  if (summary.crashed) return -1;
+  const durationPct = Math.min(1, Math.max(0, summary.duration_s / MIN_DEBRIEF_SECONDS));
+  const eventPct = Math.min(1, Math.max(0, summary.event_count / MIN_DEBRIEF_EVENTS));
+  return durationPct + eventPct;
 }
 
 function reviewReadiness(summary: RecordingSummary): {

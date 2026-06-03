@@ -10266,3 +10266,37 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/src/shell/shell.css tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 78 - Debrief Payback Path
+
+Suggested commit: `feat(debrief-ui): add review payback path`
+
+Include:
+
+- `tauri/ui/src/shell/DebriefDock.ts`
+- `tauri/ui/tests/shell/debrief-dock.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Dedicated debrief window internals, recordings backend, sidecar/debrief port
+  8766 behavior, recording IPC schema, Deck/Crate/Learn/Settings surfaces,
+  Sven speech, Viber tooling, packaging scripts, and new dependencies. This
+  package only upgrades the folded shell Debrief dock using existing recording
+  summaries and the current honest eligibility gate.
+
+Reason:
+
+- The exact signed app at `1981b071` showed Debrief as the next weakest
+  commercial-value module after Learn: the shell route has honest recording
+  rows and a readiness console, but still reads like a passive recording
+  ledger. Add a compact payback path that names the closest review target, the
+  blocker, the next action, and the unlocked value, while row copy keeps weak
+  recordings visible without allowing fake debrief launches.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/debrief-dock.spec.ts tests/debrief/no-legacy-amber.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/DebriefDock.ts tauri/ui/tests/shell/debrief-dock.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

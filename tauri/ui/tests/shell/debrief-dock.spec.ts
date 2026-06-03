@@ -78,10 +78,15 @@ describe("DebriefDock", () => {
     expect(host.textContent).toContain("next review");
     expect(host.textContent).toContain("review is armed");
     expect(host.textContent).toContain("can open with cited moments");
+    expect(host.textContent).toContain("target");
+    expect(host.textContent).toContain("blocker");
+    expect(host.textContent).toContain("open cited review");
+    expect(host.textContent).toContain("drill, Viber follow-up");
     expect(host.textContent).toContain("2026-06-03 00:15");
     expect(host.textContent).toContain("42m");
     expect(host.textContent).toContain("19 events");
     expect(host.textContent).toContain("ready for cited review");
+    expect(host.textContent).toContain("Payback: open review to leave with one drill or crate move.");
 
     const openButtons = Array.from(
       host.querySelectorAll<HTMLButtonElement>(".debrief-dock__open"),
@@ -107,9 +112,58 @@ describe("DebriefDock", () => {
     expect(openButtons[1]?.disabled).toBe(true);
     expect(openButtons[1]?.title).toBe("needs at least 5 minutes");
     expect(host.textContent).toContain("capture more");
+    expect(host.textContent).toContain("Payback path: 4m more unlocks the cited review.");
     openButtons[1]?.click();
 
     expect(mocks.invokeTauri).not.toHaveBeenCalled();
+  });
+
+  it("selects the closest weak recording and tells the DJ the fastest payback action", async () => {
+    mocks.sendIpcRequest.mockResolvedValueOnce({
+      type: "ipc.recordings.list_result",
+      ts: "2026-06-03T00:00:00Z",
+      payload: {
+        bytes_total: 35 * 1024 * 1024,
+        sessions: [
+          {
+            session_dir: "20260603-003000",
+            started_at_iso: "2026-06-03T00:30:00Z",
+            duration_s: 4 * 60 + 12,
+            event_count: 7,
+            bytes_total: 20 * 1024 * 1024,
+            crashed: false,
+          },
+          {
+            session_dir: "20260602-233000",
+            started_at_iso: "2026-06-02T23:30:00Z",
+            duration_s: 6 * 60,
+            event_count: 2,
+            bytes_total: 15 * 1024 * 1024,
+            crashed: false,
+          },
+          {
+            session_dir: "20260603-004500",
+            started_at_iso: "2026-06-03T00:45:00Z",
+            duration_s: 0,
+            event_count: 0,
+            bytes_total: 1 * 1024 * 1024,
+            crashed: true,
+          },
+        ],
+      },
+    });
+    const host = document.createElement("div");
+
+    mountDebriefDock(host);
+    await flush();
+
+    expect(host.textContent).toContain("capture 1m more");
+    expect(host.textContent).toContain("2026-06-03 00:30");
+    expect(host.textContent).toContain("needs 1m");
+    expect(host.textContent).toContain("keep Deck running");
+    expect(host.textContent).toContain("cited review");
+    expect(host.querySelector('[data-payback="target"]')?.textContent).toBe("2026-06-03 00:30");
+    expect(host.querySelector('[data-payback="blocker"]')?.textContent).toBe("needs 1m");
   });
 
   it("explains the empty recording state without pretending a review exists", async () => {
