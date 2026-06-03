@@ -302,3 +302,52 @@
   Windows updater artifacts. This increment hardens the publish gate that will
   run once those artifacts exist.
 - No live app, TTS, sounddevice stream, or co-host speech was run.
+
+---
+
+## Increment 9 — Final Release Upload Directory Gate
+
+- Item: verify the final flat GitHub Release upload directory before POSTing
+  the updater manifest or creating the draft release.
+- SHA: `e08f2c1b` (`fix(release): verify staged release upload assets`).
+- User value: the release can no longer stage an incomplete or unsafe asset set
+  that looks fine from individual build jobs but is missing a final download,
+  updater archive, `latest.json`, or clean leak-scan report.
+
+## By-Eye / Source Evidence
+
+- Added `scripts/dist/check_release_upload_dir_ready.py`.
+- The checker requires the staged upload directory to contain:
+  - `vibemix-<tag>-arm64.dmg`
+  - `vibemix-<tag>-x86_64.dmg`
+  - `vibemix-installer.exe`
+  - one macOS arm64 `.app.tar.gz` updater archive
+  - one macOS x86_64 `.app.tar.gz` updater archive
+  - one Windows NSIS `*setup*.exe` updater installer
+  - `latest.json`
+  - `verify-report-macos-arm64.json`
+  - `verify-report-macos-x86_64.json`
+  - `verify-report-windows.json`
+- It calls `check_updater_manifest_ready.py` on the staged `latest.json`.
+- It parses the three verify reports and requires `status="clean"` and no
+  `hits`.
+- It blocks obviously wrong final assets such as `.msi`, `.pkg`, raw `.app`,
+  or a stale `vibemix-0.0.1.dmg`.
+- `.github/workflows/release.yml` now runs this checker immediately after
+  staging `release-artifacts/upload`.
+
+## Gates
+
+- `uv run pytest -q tests/install/test_release_upload_dir_ready.py tests/install/test_updater_manifest_ready.py tests/security/test_release_yml_signing_skips.py` -> `29 passed`.
+- `uv run ruff check scripts/dist/check_release_upload_dir_ready.py scripts/dist/check_updater_manifest_ready.py tests/install/test_release_upload_dir_ready.py tests/install/test_updater_manifest_ready.py tests/security/test_release_yml_signing_skips.py` -> pass.
+- `git diff --check -- .github/workflows/release.yml scripts/dist/check_release_upload_dir_ready.py tests/install/test_release_upload_dir_ready.py tests/security/test_release_yml_signing_skips.py .planning/handoffs/2026-05-31-package-checklist.md` -> pass.
+- `python3 scripts/dist/check_release_upload_dir_ready.py <temp upload> --tag v0.1.0 --json` -> `ok=true` with all ten expected upload files.
+- `uv run python scripts/check_dirty_package_plan.py --summary` -> pass
+  (`Package 48 - Release Artifact MOSS Source Gate: 5 dirty paths` during the
+  slice).
+
+## Notes
+
+- No real `release-artifacts/upload` directory exists locally because a complete
+  tagged release run has not produced the cross-platform artifacts yet.
+- No live app, TTS, sounddevice stream, or co-host speech was run.
