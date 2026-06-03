@@ -83,6 +83,9 @@ describe("surface-mount layer", () => {
       mountLearn: (el) => {
         got.learn = el;
       },
+      mountDebrief: (el) => {
+        got.debrief = el;
+      },
     };
 
     const mounted = await mountSurfacesInto(host, deps);
@@ -91,16 +94,20 @@ describe("surface-mount layer", () => {
     expect(got.deck).toBe(
       host.querySelector('.surface[data-surface="deck"] .deck-stage'),
     );
-    // Crate + Learn fold into their (now-revealed) keep-alive mounts.
+    // Crate, Learn, and Debrief fold into their revealed keep-alive mounts.
     const crateMount = got.crate;
     const learnMount = got.learn;
+    const debriefMount = got.debrief;
     expect(crateMount).toBeDefined();
     expect(learnMount).toBeDefined();
+    expect(debriefMount).toBeDefined();
     expect(crateMount!.classList.contains("surface-mount")).toBe(true);
     expect(crateMount!.hidden).toBe(false);
     expect(learnMount!.classList.contains("surface-mount")).toBe(true);
     expect(learnMount!.hidden).toBe(false);
-    for (const id of ["crate", "learn"]) {
+    expect(debriefMount!.classList.contains("surface-mount")).toBe(true);
+    expect(debriefMount!.hidden).toBe(false);
+    for (const id of ["crate", "learn", "debrief"]) {
       expect(
         host.querySelector(`.surface[data-surface="${id}"]`)!.classList.contains(
           "surface--mounted",

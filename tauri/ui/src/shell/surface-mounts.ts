@@ -32,6 +32,8 @@ export interface SurfaceMountDeps {
   /** Mount the Learn interior into the learn keep-alive mount. When absent, the
    *  learn surface keeps its designed at-rest empty state (folds in later). */
   mountLearn?(mount: HTMLElement): void | Promise<void>;
+  /** Mount the Debrief launch dock into the debrief keep-alive mount. */
+  mountDebrief?(mount: HTMLElement): void | Promise<void>;
 }
 
 export interface MountedSurfaces {
@@ -105,8 +107,8 @@ async function mountOne(
 /**
  * Fold the real interiors into the shell. Each interior is mounted independently
  * and non-fatally; the deck is the hero (visible stage), crate + learn fold into
- * their revealed keep-alive mounts. Debrief + settings are wired at the app level
- * (debrief opens per-session via its window; settings is the drawer overlay).
+ * their revealed keep-alive mounts. Settings is wired at the app level because
+ * it is the drawer overlay.
  */
 export async function mountSurfacesInto(
   shellRoot: HTMLElement,
@@ -121,6 +123,9 @@ export async function mountSurfacesInto(
   }
   if (deps.mountLearn) {
     await mountOne("learn", prepareSurfaceMount(shellRoot, "learn"), deps.mountLearn);
+  }
+  if (deps.mountDebrief) {
+    await mountOne("debrief", prepareSurfaceMount(shellRoot, "debrief"), deps.mountDebrief);
   }
 
   return {

@@ -25,7 +25,7 @@ export interface MockTransferSurface {
 }
 
 export interface MockTransferRuntimeSurface {
-  surface: "session-runtime" | "settings";
+  surface: "session-runtime" | "settings" | "shell-debrief";
   productionFile: string;
   mockSources: readonly string[];
   requiredWires: readonly MockTransferWire[];
@@ -359,6 +359,10 @@ export const SETTINGS_MOCK_SOURCES = [
   "mocks/vibemix-settings-drawer.html",
 ] as const;
 
+export const SHELL_DEBRIEF_RUNTIME_WIRES = [
+  "shell.debrief.dock",
+] as const;
+
 export const ACTIVE_MOCK_ITERATION_DIR = "mocks/iterations";
 export const ACTIVE_MOCK_ITERATION_INDEX = `${ACTIVE_MOCK_ITERATION_DIR}/_index.html`;
 export const ACTIVE_MOCK_ITERATION_TEMPLATE = `${ACTIVE_MOCK_ITERATION_DIR}/_template.html`;
@@ -393,6 +397,13 @@ const SETTINGS_RUNTIME_WIRE_PURPOSES: Record<
   "settings.modal-slot": "confirmation dialog portal",
   "settings.persona.voice.deferred-note": "voice changes apply on next start",
   "settings.output.deferred-note": "output changes apply on next start",
+};
+
+const SHELL_DEBRIEF_RUNTIME_WIRE_PURPOSES: Record<
+  (typeof SHELL_DEBRIEF_RUNTIME_WIRES)[number],
+  string
+> = {
+  "shell.debrief.dock": "folded shell Debrief route listing recent review sessions",
 };
 
 function wireEntries<const TWire extends string>(
@@ -485,6 +496,17 @@ export const MOCK_TRANSFER_RUNTIME_CONTRACT: readonly MockTransferRuntimeSurface
       "open_input_wav",
       "plugin:shell|open",
     ],
+  },
+  {
+    surface: "shell-debrief",
+    productionFile: "src/shell/DebriefDock.ts",
+    mockSources: ["mocks/vibemix-cinematic-storyboard.html"],
+    requiredWires: wireEntries(
+      SHELL_DEBRIEF_RUNTIME_WIRES,
+      SHELL_DEBRIEF_RUNTIME_WIRE_PURPOSES,
+    ),
+    inbound: ["ipc.recordings.list_result"],
+    outbound: ["ipc.recordings.list", "open_debrief_window"],
   },
 ] as const;
 

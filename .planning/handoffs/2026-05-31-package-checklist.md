@@ -9972,3 +9972,43 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/shell-store.ts tauri/ui/src/shell/Sidebar.ts tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/app.ts tauri/ui/tests/shell/settings-nav.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 70 - Debrief Review Dock
+
+Suggested commit: `fix(debrief-ui): surface recent review sessions`
+
+Include:
+
+- `tauri/ui/src/shell/DebriefDock.ts`
+- `tauri/ui/src/shell/app.ts`
+- `tauri/ui/src/shell/surface-mounts.ts`
+- `tauri/ui/src/mock-transfer/contract.ts`
+- `tauri/ui/tests/shell/debrief-dock.spec.ts`
+- `tauri/ui/tests/shell/surface-mounts.spec.ts`
+- `tauri/ui/tests/mock-transfer-contract.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Debrief sidecar generation, TLDR/chapter semantics, recordings deletion or
+  reveal flows, Settings drawer behavior, Deck, Crate, Learn, IPC schema,
+  Sven speech, Viber tooling, packaging scripts, and broad shell layout. This
+  package only makes the folded Debrief shell route list recent recordings and
+  open the existing dedicated review window for sessions with enough evidence.
+
+Reason:
+
+- The exact signed app at `9d0aa0d4` showed Debrief as a clean but inert
+  placeholder: "Your set review lands here" plus proof rows. That tells a
+  product story without letting the user do anything. Keep Debrief's full
+  analysis in the dedicated `debrief.html` window, but make the shell route a
+  real review dock: request the real recording list, show readiness honestly,
+  keep short/crashed sessions visible but disabled, and launch
+  `open_debrief_window` for eligible sessions.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/debrief-dock.spec.ts tests/shell/surface-mounts.spec.ts tests/shell/shell.spec.ts tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/DebriefDock.ts tauri/ui/src/shell/app.ts tauri/ui/src/shell/surface-mounts.ts tauri/ui/src/mock-transfer/contract.ts tauri/ui/tests/shell/debrief-dock.spec.ts tauri/ui/tests/shell/surface-mounts.spec.ts tauri/ui/tests/mock-transfer-contract.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

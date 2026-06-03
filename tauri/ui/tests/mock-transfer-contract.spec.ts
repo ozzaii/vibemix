@@ -39,6 +39,7 @@ import {
   type MockTransferRuntimeSurface,
 } from "../src/mock-transfer/contract.js";
 import { mountSessionLayout } from "../src/session/SessionLayout.js";
+import { mountDebriefDock } from "../src/shell/DebriefDock.js";
 import {
   _resetDrawerForTests,
   mountSettingsDrawer,
@@ -66,6 +67,9 @@ const SETTINGS_RUNTIME_PRODUCER_FILES = [
   "src/settings/components/recording-row.ts",
   "src/settings/components/staleness-banner.ts",
 ] as const;
+const SHELL_DEBRIEF_RUNTIME_PRODUCER_FILES = [
+  "src/shell/DebriefDock.ts",
+] as const;
 const STATIC_SURFACE_PRODUCER_FILES: Partial<
   Record<MockTransferSurface["surface"], readonly string[]>
 > = {
@@ -82,7 +86,7 @@ const STATIC_SURFACE_PRODUCER_FILES: Partial<
 
 const IPC_LITERAL_PATTERN = /["'](ipc\.[a-zA-Z0-9_.-]+)["']/g;
 const TAURI_INVOKE_PATTERN =
-  /\b(?:invoke|invokeFn|localInvoke)(?:<[^>]+>)?\(\s*["']([^"']+)["']/g;
+  /\b(?:invoke|invokeFn|localInvoke|invokeTauri)(?:<[^>]+>)?\(\s*["']([^"']+)["']/g;
 const TAURI_LISTEN_PATTERN =
   /\b(?:tauriListen|event\.listen|listen)(?:<[^>]+>)?\(\s*["']([^"']+)["']/g;
 const TAURI_EMIT_PATTERN =
@@ -90,7 +94,7 @@ const TAURI_EMIT_PATTERN =
 const LIBRARY_EVENT_PATTERN =
   /["'](library:\/\/(?:embed-progress|embed-done|model-progress))["']/g;
 const ACTION_PRODUCER_PATTERN =
-  /import\s+\{[^}]*\b(?:invoke|emit|listen|tauriListen|emitIpc|sendIpcRequest|subscribeIpc|sendSettings|sendMute|openInputWav|revealInOS)\b[^}]*\}\s+from\s+["'][^"']+["']|\b(?:invoke|invokeFn|localInvoke|emitIpc|sendIpcRequest|subscribeIpc|sendSettings|sendMute|openInputWav|revealInOS|tauriListen)\s*\(|\bevent\.(?:listen|emit)\s*\(/g;
+  /import\s+\{[^}]*\b(?:invoke|invokeTauri|emit|listen|tauriListen|emitIpc|sendIpcRequest|subscribeIpc|sendSettings|sendMute|openInputWav|revealInOS)\b[^}]*\}\s+from\s+["'][^"']+["']|\b(?:invoke|invokeFn|localInvoke|invokeTauri|emitIpc|sendIpcRequest|subscribeIpc|sendSettings|sendMute|openInputWav|revealInOS|tauriListen)\s*\(|\bevent\.(?:listen|emit)\s*\(/g;
 
 function parseHtml(file: string): Document {
   const src = readFileSync(resolve(TAURI_UI_ROOT, file), "utf-8");
@@ -237,6 +241,10 @@ function mountRuntimeSurface(surface: MockTransferRuntimeSurface): void {
     mountSessionLayout(host);
     return;
   }
+  if (surface.surface === "shell-debrief") {
+    mountDebriefDock(document.body);
+    return;
+  }
   mountSettingsDrawer(document.body);
 }
 
@@ -356,6 +364,7 @@ describe("mock transfer contract", () => {
     }> = [
       { surface: "session-runtime", files: SESSION_RUNTIME_PRODUCER_FILES },
       { surface: "settings", files: SETTINGS_RUNTIME_PRODUCER_FILES },
+      { surface: "shell-debrief", files: SHELL_DEBRIEF_RUNTIME_PRODUCER_FILES },
     ];
 
     for (const entry of cases) {
@@ -448,6 +457,7 @@ describe("mock transfer contract", () => {
     }> = [
       { surface: "session-runtime", files: SESSION_RUNTIME_PRODUCER_FILES },
       { surface: "settings", files: SETTINGS_RUNTIME_PRODUCER_FILES },
+      { surface: "shell-debrief", files: SHELL_DEBRIEF_RUNTIME_PRODUCER_FILES },
     ];
 
     for (const entry of cases) {

@@ -77,6 +77,10 @@ const appDeps: SurfaceMountDeps = {
     const { mountSkillWall } = await import("../learn/SkillWall.js");
     mountSkillWall(wallHost);
   },
+  mountDebrief: async (mount) => {
+    const { mountDebriefDock } = await import("./DebriefDock.js");
+    mountDebriefDock(mount);
+  },
 };
 
 /**
