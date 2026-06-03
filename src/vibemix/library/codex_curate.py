@@ -171,11 +171,11 @@ DEFAULT_TIMEOUT_S = 120.0
 # Set-prep is multi-step, but it is still an interactive app action. Keep the
 # wall-clock short enough that the Library UI can degrade during a demo instead
 # of looking wedged for several minutes.
-BUILD_SET_TIMEOUT_S = 90.0
+BUILD_SET_TIMEOUT_S = 180.0
 # MCP tool/startup timeouts handed to Codex via -c overrides (its harness owns
 # enforcement; we only set the values).
 _MCP_STARTUP_TIMEOUT_S = 15
-_MCP_TOOL_TIMEOUT_S = 30
+_MCP_TOOL_TIMEOUT_S = 60
 
 # Substrings in Codex stderr that mean "not authenticated" rather than a
 # genuine runtime error — used to surface the actionable `codex login` hint.
@@ -992,15 +992,20 @@ def curate_with_codex(
 _BUILD_SET_RULES = (
     "You are preparing a DJ SET (an ordered, mixable sequence), not just a "
     "playlist. Use ONLY the provided tools.\n"
+    "FAST PATH: for normal set prep, use one discover_pool call, one sequence_set "
+    "call over the discovered pool, and one export_set call. Do NOT inspect every "
+    "candidate one by one: sequence_set already resolves BPM, key, stored vectors, "
+    "and perceived energy for the whole pool deterministically.\n"
     "WORKFLOW (in order):\n"
     "1. discover_pool — find a grounded candidate pool for the brief (normally "
     "k=15 unless the user asked for a long set; optionally bounded by "
     "bpm/duration). This is the ONLY way to introduce track_ids.\n"
-    "2. get_track_energy — inspect candidates' perceived energy as needed.\n"
-    "3. sequence_set — order the chosen track_ids on the requested energy curve. "
+    "2. sequence_set — order the chosen track_ids on the requested energy curve. "
     "Pass ONLY track_ids returned by discover_pool this run. If the DJ asks for "
     "deep cuts / surprise / less obvious picks, pass novelty in the 0..1 range; "
     "otherwise leave novelty unset.\n"
+    "3. get_track_energy — optional spot-check only when you need to explain a "
+    "specific disputed track. Never loop over the whole pool with this tool.\n"
     "4. For set-aware mix points, use get_track_sections on the ordered tracks, "
     "then transition_slate for adjacent moves you need to explain. The tr_* "
     "candidate ids come from the tool; never invent them.\n"

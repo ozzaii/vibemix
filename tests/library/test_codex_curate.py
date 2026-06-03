@@ -252,6 +252,8 @@ def test_build_set_prompt_has_set_prep_workflow():
     assert "export requested" in p
     assert "discover_pool" in p
     assert "sequence_set" in p
+    assert "Do NOT inspect every candidate one by one" in p
+    assert "sequence_set already resolves BPM, key, stored vectors" in p
     assert "get_track_sections" in p
     assert "transition_slate" in p
     assert "smart_hot_cues" in p
@@ -261,6 +263,7 @@ def test_build_set_prompt_has_set_prep_workflow():
 
 def test_chat_timeout_is_interactive():
     assert CHAT_TIMEOUT_S <= BUILD_SET_TIMEOUT_S
+    assert BUILD_SET_TIMEOUT_S >= 180.0
 
 
 def test_chat_prompt_threads_history_and_rules():
@@ -2887,6 +2890,7 @@ def test_build_argv_injects_mcp_config_and_schema(tmp_path):
     assert "--output-schema" in argv and "--sandbox" in argv
     joined = " ".join(argv)
     assert "mcp_servers.vibemix_library.command=" in joined
+    assert "mcp_servers.vibemix_library.tool_timeout_sec=60" in joined
     assert '"-m", "vibemix.library.mcp_server"' in joined.replace("'", '"') or any(
         "vibemix.library.mcp_server" in a for a in argv
     )
