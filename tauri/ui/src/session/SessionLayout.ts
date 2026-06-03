@@ -147,6 +147,14 @@ export interface Mounted {
   /** Cross-fade liveness labels (always mounted; opacity toggled by mode). */
   liveFault: HTMLElement;
   ghosts: [HTMLElement, HTMLElement];
+  idleProof: HTMLElement;
+  idleProofCells: {
+    audio: HTMLElement;
+    sven: HTMLElement;
+    controller: HTMLElement;
+    screen: HTMLElement;
+  };
+  idleProofNext: HTMLElement;
   now: HTMLElement;
   receipt: HTMLElement;
   dropSlot: HTMLElement;
@@ -485,6 +493,72 @@ const LAYOUT_CSS = `
   .vmx-ghost--g2 { color: var(--text-disabled); opacity: 0.7; }
   .vmx-ghost--g1 { color: var(--text-muted); }
   .vmx-claim { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); margin-top: var(--sp-2); }
+  .vmx-idle-proof {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    width: min(760px, 100%);
+    margin: 0 auto var(--sp-2);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.024), rgba(0, 0, 0, 0.18)),
+      rgba(0, 0, 0, 0.16);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.028),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.58);
+    overflow: hidden;
+  }
+  .vmx-idle-proof[hidden] { display: none; }
+  .vmx-idle-proof__cell {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    padding: 10px 12px;
+    background: rgba(255, 251, 244, 0.018);
+  }
+  .vmx-idle-proof__k {
+    font-family: var(--type-display);
+    font-variation-settings: 'wdth' 85, 'wght' 650;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--silk-22);
+  }
+  .vmx-idle-proof__v {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--type-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--silk-65);
+  }
+  .vmx-idle-proof__cell[data-state="ok"] .vmx-idle-proof__v {
+    color: var(--amber-pale);
+    text-shadow: 0 0 7px var(--amber-22);
+  }
+  .vmx-idle-proof__cell[data-state="warn"] .vmx-idle-proof__v {
+    color: var(--silk-40);
+  }
+  .vmx-idle-proof__cell[data-state="fault"] .vmx-idle-proof__v {
+    color: var(--led-fault);
+    text-shadow: 0 0 6px rgba(212, 65, 58, 0.42);
+  }
+  .vmx-idle-proof__next {
+    grid-column: 1 / -1;
+    padding: 8px 12px 9px;
+    border-top: 1px solid var(--border-subtle);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--silk-40);
+    background: rgba(0, 0, 0, 0.16);
+  }
   /* The co-host SPEAKING — set in the one warm human face of the system
    * (Instrument Serif, the documented hero voice per DESIGN.md §3). The impl
    * had been rendering this in condensed Saira display, which read industrial /
@@ -813,6 +887,17 @@ const LAYOUT_CSS = `
       font-size: 14px;
       max-width: 100%;
     }
+    .vmx-idle-proof {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+    }
+    .vmx-idle-proof__cell {
+      padding: 9px 10px;
+    }
+    .vmx-idle-proof__v {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+    }
     .vmx-now {
       font-size: clamp(28px, 9vw, 42px);
       max-width: 12ch;
@@ -964,6 +1049,18 @@ export function mountSessionLayout(
   ghost2.className = "vmx-ghost vmx-ghost--g2";
   const ghost1 = document.createElement("p");
   ghost1.className = "vmx-ghost vmx-ghost--g1";
+  const idleProof = document.createElement("div");
+  idleProof.className = "vmx-idle-proof";
+  idleProof.dataset.wire = "session.idle-proof";
+  idleProof.hidden = true;
+  const idleAudio = makeIdleProofCell("audio");
+  const idleSven = makeIdleProofCell("sven");
+  const idleController = makeIdleProofCell("controller");
+  const idleScreen = makeIdleProofCell("proof");
+  const idleProofNext = document.createElement("div");
+  idleProofNext.className = "vmx-idle-proof__next";
+  idleProofNext.dataset.wire = "session.idle-proof.next";
+  idleProof.append(idleAudio.cell, idleSven.cell, idleController.cell, idleScreen.cell, idleProofNext);
   const claim = document.createElement("div");
   claim.className = "vmx-claim";
   const now = document.createElement("p");
@@ -984,7 +1081,7 @@ export function mountSessionLayout(
   dropSlot.className = "vmx-drop-slot";
   dropSlot.dataset.wire = "session.drop";
   claim.append(now, receipt, dropSlot);
-  voice.append(ghost2, ghost1, claim);
+  voice.append(ghost2, ghost1, idleProof, claim);
 
   speak.append(voice);
   deck.append(speak);
@@ -1044,6 +1141,14 @@ export function mountSessionLayout(
     muteButton: muteBtn,
     liveFault,
     ghosts: [ghost1, ghost2],
+    idleProof,
+    idleProofCells: {
+      audio: idleAudio.value,
+      sven: idleSven.value,
+      controller: idleController.value,
+      screen: idleScreen.value,
+    },
+    idleProofNext,
     now,
     receipt,
     dropSlot,
@@ -1091,6 +1196,20 @@ function makeReadout(label: string, isKey = false): { wrap: HTMLElement; value: 
   value.className = isKey ? "vmx-read__key" : "vmx-read__num";
   wrap.append(lab, value);
   return { wrap, value };
+}
+
+function makeIdleProofCell(label: string): { cell: HTMLElement; value: HTMLElement } {
+  const cell = document.createElement("div");
+  cell.className = "vmx-idle-proof__cell";
+  cell.dataset.axis = label;
+  const lab = document.createElement("span");
+  lab.className = "vmx-idle-proof__k";
+  lab.textContent = label;
+  const value = document.createElement("span");
+  value.className = "vmx-idle-proof__v";
+  value.dataset.value = label;
+  cell.append(lab, value);
+  return { cell, value };
 }
 
 function makeInput(
@@ -1207,9 +1326,11 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     const idle = idleReadinessLines(next);
     setGhostText(mounted.ghosts[0], idle.action);
     setGhostText(mounted.ghosts[1], idle.inputs);
+    setIdleProof(mounted, next);
   } else {
     setGhost(mounted.ghosts[0], g1Line);
     setGhost(mounted.ghosts[1], g2Line);
+    mounted.idleProof.hidden = true;
   }
 
   // --- the receipt (cite for the now-line) ---
@@ -1335,6 +1456,71 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
     inputs: `${audio} · ${ai} · ${controller}`,
     action: `${screen} · Start playback, I will not guess.`,
   };
+}
+
+type IdleProofState = "ok" | "warn" | "fault";
+
+function setIdleProof(mounted: Mounted, state: SessionState): void {
+  mounted.idleProof.hidden = false;
+  const audio = livekitProof(state.status.livekit);
+  const sven = svenProof(state.status.gemini);
+  const controller = controllerProof(state.status.midi);
+  const screen = screenProof(state.status.screen);
+  setIdleCell(mounted.idleProofCells.audio, audio);
+  setIdleCell(mounted.idleProofCells.sven, sven);
+  setIdleCell(mounted.idleProofCells.controller, controller);
+  setIdleCell(mounted.idleProofCells.screen, screen);
+  const next = screen.state === "ok"
+    ? "Start playback. Sven will cite what lands."
+    : "Start playback. Sven waits for proof.";
+  if (mounted.idleProofNext.textContent !== next) mounted.idleProofNext.textContent = next;
+}
+
+function setIdleCell(
+  value: HTMLElement,
+  proof: { label: string; state: IdleProofState },
+): void {
+  if (value.textContent !== proof.label) value.textContent = proof.label;
+  const cell = value.parentElement;
+  if (cell && cell.dataset.state !== proof.state) cell.dataset.state = proof.state;
+}
+
+function livekitProof(status: SessionState["status"]["livekit"]): {
+  label: string;
+  state: IdleProofState;
+} {
+  if (status === "ok") return { label: "armed", state: "ok" };
+  if (status === "down") return { label: "dropped", state: "fault" };
+  if (status === "connecting") return { label: "connecting", state: "warn" };
+  return { label: "checking", state: "warn" };
+}
+
+function svenProof(status: SessionState["status"]["gemini"]): {
+  label: string;
+  state: IdleProofState;
+} {
+  if (status === "ok") return { label: "ready", state: "ok" };
+  if (status === "down") return { label: "offline", state: "fault" };
+  return { label: "checking", state: "warn" };
+}
+
+function controllerProof(status: SessionState["status"]["midi"]): {
+  label: string;
+  state: IdleProofState;
+} {
+  if (status != null && status > 0) return { label: "seen", state: "ok" };
+  if (status === 0) return { label: "missing", state: "warn" };
+  return { label: "checking", state: "warn" };
+}
+
+function screenProof(status: SessionState["status"]["screen"]): {
+  label: string;
+  state: IdleProofState;
+} {
+  if (status === "ok") return { label: "screen ready", state: "ok" };
+  if (status === "denied") return { label: "denied", state: "fault" };
+  if (status === "unavailable") return { label: "unavailable", state: "warn" };
+  return { label: "checking", state: "warn" };
 }
 
 /** Re-trigger the rise + draw + ignite CSS animations on a new reaction.

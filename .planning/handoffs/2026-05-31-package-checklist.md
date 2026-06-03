@@ -10157,3 +10157,38 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/DebriefDock.ts tauri/ui/tests/shell/debrief-dock.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 75 - Deck Live Proof Readiness Rail
+
+Suggested commit: `feat(deck-ui): add live proof readiness rail`
+
+Include:
+
+- `tauri/ui/src/session/SessionLayout.ts`
+- `tauri/ui/tests/session/render-loop.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Sven speech, prompt wording, co-host runtime behavior, LiveKit/Gemini/MOSS
+  backends, IPC schema/codegen, Viber/Crate, Learn, Debrief, Settings, shell
+  navigation, packaging scripts, and new dependencies. This package only
+  upgrades the Deck first-move idle surface using already-projected session
+  status.
+
+Reason:
+
+- The exact signed app at `14bfd8fc` showed Deck as the primary remaining
+  product-value target: visually central, but too passive at rest. It said the
+  first move was pending and marked screen proof unavailable, yet did not give a
+  compact booth-readable answer to what is armed, what is blocked, and what
+  Sven will do next. Add a first-move readiness rail inside the existing deck
+  slab so audio, Sven, controller, and screen proof are visible without
+  implying missing screen evidence has landed.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/session/render-loop.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/session/SessionLayout.ts tauri/ui/tests/session/render-loop.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

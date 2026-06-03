@@ -249,6 +249,36 @@ describe("renderSessionFrame — CSS variable hot path", () => {
       "supported_verdict: two_deck_audio_window_delta_proof",
     );
   });
+
+  it("renders the first-move readiness rail without claiming missing screen proof", () => {
+    const root = host();
+    const state = defaultState();
+    state.status.livekit = "ok";
+    state.status.gemini = "ok";
+    state.status.midi = 1;
+    state.status.screen = "unavailable";
+    const m = mountSessionLayout(root, state);
+
+    const rail = root.querySelector<HTMLElement>('[data-wire="session.idle-proof"]');
+    expect(rail?.hidden).toBe(false);
+    expect(rail?.textContent).toContain("audioarmed");
+    expect(rail?.textContent).toContain("svenready");
+    expect(rail?.textContent).toContain("controllerseen");
+    expect(rail?.textContent).toContain("proofunavailable");
+    expect(rail?.textContent).toContain("Start playback. Sven waits for proof.");
+    expect(
+      rail
+        ?.querySelector<HTMLElement>('[data-axis="proof"]')
+        ?.dataset.state,
+    ).toBe("warn");
+
+    state.cohost.status = "LISTENING";
+    state.cohost.grounded = true;
+    state.cohost.transcript = [{ role: "ai", text: "bar 16 is clean", ts: "00:00:16" }];
+    renderSessionFrame(m, state);
+
+    expect(rail?.hidden).toBe(true);
+  });
 });
 
 describe("hotkey formatter", () => {
