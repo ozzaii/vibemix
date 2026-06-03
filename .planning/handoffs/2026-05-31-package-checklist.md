@@ -10084,3 +10084,42 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/CommandPalette.ts tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/shell.css tauri/ui/tests/shell/command-palette.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 73 - Learn Practice Brief Rail
+
+Suggested commit: `feat(learn-ui): add practice brief rail`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `tauri/ui/tests/shell/learn-folded-layout.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Learn curriculum/backend lesson flow, beginner-path/GSD suites, controller
+  SVG geometry, Course 3 live evidence semantics, Deck, Crate, Debrief,
+  Settings, Sven speech, Viber tooling, IPC schema, and packaging scripts. This
+  package only upgrades the folded Learn first-screen practice booth using
+  already-known recommendation and readiness state.
+
+Reason:
+
+- The exact signed app at `18a6e593` showed Learn as the next commercial-value
+  target: controller-forward and ready to practice, but still too passive. The
+  DJ sees a large dim schematic plus Start/Choose controls, yet not enough
+  immediate answer to "what am I about to practice, what proof path is active,
+  and why does this matter?" Add a compact target/proof/payoff brief rail to
+  the existing booth, keep it tied to the current recommended lesson and
+  readiness mode, and adjust the folded shell spacing so the practice deck
+  remains readable.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/shell/learn-folded-layout.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/src/shell/shell.css tauri/ui/tests/learn/test_practice_booth_shell.spec.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

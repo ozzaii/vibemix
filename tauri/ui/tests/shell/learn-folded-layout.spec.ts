@@ -57,6 +57,7 @@ describe("folded Learn shell layout", () => {
     );
     expect(css).toContain("height: 100%");
     expect(css).toContain(".learn-lesson-host .learn-booth-panel");
+    expect(css).toContain(".learn-booth-brief");
     expect(css).toContain("position: absolute");
     expect(css).toContain("top: var(--sp-5)");
     expect(css).toContain("bottom: auto");
@@ -67,6 +68,7 @@ describe("folded Learn shell layout", () => {
     expect(css).toContain("--panel-w: 228px");
     expect(css).toContain("grid-template-areas:");
     expect(css).toContain('"kicker primary secondary"');
+    expect(css).toContain('"brief primary secondary"');
     expect(css).toContain('"pulse primary secondary"');
     expect(css).toContain("justify-content: stretch");
   });

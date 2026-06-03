@@ -649,6 +649,7 @@
   grid-template-areas:
     "kicker primary secondary"
     "next primary secondary"
+    "brief primary secondary"
     "pulse primary secondary";
   justify-content: stretch;
   justify-items: start;
@@ -673,6 +674,7 @@
 }
 
 .surface[data-surface="learn"].surface--mounted .learn-booth-kicker,
+.surface[data-surface="learn"].surface--mounted .learn-booth-brief,
 .surface[data-surface="learn"].surface--mounted .learn-booth-pulse,
 .surface[data-surface="learn"].surface--mounted .learn-booth-next {
   text-align: left;
@@ -691,6 +693,19 @@
   max-width: none;
 }
 
+.surface[data-surface="learn"].surface--mounted .learn-booth-brief {
+  width: 100%;
+  max-width: 70ch;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-booth-brief div {
+  padding: 5px 7px;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-booth-brief dd {
+  font-size: 11px;
+}
+
 .surface[data-surface="learn"].surface--mounted .learn-booth-primary,
 .surface[data-surface="learn"].surface--mounted .learn-booth-secondary {
   align-self: center;
@@ -699,6 +714,10 @@
 
 .surface[data-surface="learn"].surface--mounted .learn-booth-secondary {
   min-width: 132px;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-stage {
+  padding-top: calc(var(--sp-8) + 92px);
 }
 
 .surface[data-surface="learn"].surface--mounted .learn-earned-wall {

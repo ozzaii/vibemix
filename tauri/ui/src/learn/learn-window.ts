@@ -320,6 +320,20 @@ function mountLearnWindow(root: HTMLElement): {
         <span id="learn-booth-proof" class="learn-booth-proof">screen deck available</span>
       </div>
       <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">practice deck ready</div>
+      <dl class="learn-booth-brief" aria-label="practice brief">
+        <div>
+          <dt>target</dt>
+          <dd id="learn-booth-target">first clean move</dd>
+        </div>
+        <div>
+          <dt>proof</dt>
+          <dd id="learn-booth-brief-proof">on-screen controls emit moves</dd>
+        </div>
+        <div>
+          <dt>payoff</dt>
+          <dd id="learn-booth-payoff">next skill receipt</dd>
+        </div>
+      </dl>
       <button id="learn-start-recommended" class="learn-booth-primary" type="button">start practice</button>
       <button id="learn-open-map" class="learn-booth-secondary" type="button">choose lesson</button>
     </section>
@@ -391,6 +405,9 @@ function mountLearnWindow(root: HTMLElement): {
   const boothTitle = root.querySelector("#learn-booth-title") as HTMLElement;
   const boothProof = root.querySelector("#learn-booth-proof") as HTMLElement;
   const boothPulse = root.querySelector("#learn-booth-pulse") as HTMLElement;
+  const boothTarget = root.querySelector("#learn-booth-target") as HTMLElement;
+  const boothBriefProof = root.querySelector("#learn-booth-brief-proof") as HTMLElement;
+  const boothPayoff = root.querySelector("#learn-booth-payoff") as HTMLElement;
   const screenAction = root.querySelector("#learn-screen-action") as HTMLButtonElement;
   const openMapButton = root.querySelector("#learn-open-map") as HTMLButtonElement;
   const closeMapButton = root.querySelector("#learn-close-map") as HTMLButtonElement;
@@ -589,6 +606,9 @@ function mountLearnWindow(root: HTMLElement): {
       : "Next lesson";
     boothTitle.textContent = recommended?.title ?? "pick a first lesson";
     boothProof.textContent = readinessProofLine(readiness, controllerDisplayName);
+    boothTarget.textContent = practiceTargetLine(recommended);
+    boothBriefProof.textContent = readinessBriefLine(readiness, controllerDisplayName);
+    boothPayoff.textContent = practicePayoffLine(recommended);
     const cue = recommendationBoothCue(
       recommended,
       readiness,
@@ -1506,6 +1526,34 @@ function readinessProofLine(
   }
   if (readiness === "midi") return "controller detected";
   return "screen deck available";
+}
+
+function practiceTargetLine(recommended: ProgressListEntry | undefined): string {
+  if (!recommended) return "pick one move";
+  const title = recommended.title.trim();
+  if (!title) return "one clean practice move";
+  if (recommended.status === "completed") return `replay ${title}`;
+  if (recommended.status === "in-progress") return `finish ${title}`;
+  return title;
+}
+
+function readinessBriefLine(
+  readiness: "hardware" | "midi" | "screen",
+  controllerName: string | null,
+): string {
+  if (readiness === "hardware") {
+    const compactName = compactControllerName(controllerName);
+    return compactName ? `${compactName} mapped` : "hardware mapped";
+  }
+  if (readiness === "midi") return "MIDI visible";
+  return "screen controls emit";
+}
+
+function practicePayoffLine(recommended: ProgressListEntry | undefined): string {
+  if (!recommended) return "practice map";
+  if (recommended.status === "completed") return "receipt stays warm";
+  if (recommended.status === "in-progress") return "fewer hints";
+  return "next skill receipt";
 }
 
 function recommendationBoothCue(

@@ -137,6 +137,11 @@ describe("practice booth shell", () => {
       );
       expect(root.querySelector('[data-control-id="eq_hi:A"]')).not.toBeNull();
       expect(root.textContent).toContain("on-screen deck");
+      expect(root.querySelector(".learn-booth-brief")).toBeTruthy();
+      expect(root.textContent).toContain("target");
+      expect(root.textContent).toContain("proof");
+      expect(root.textContent).toContain("payoff");
+      expect(root.textContent).toContain("next skill receipt");
     } finally {
       ws.close();
     }
