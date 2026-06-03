@@ -1373,9 +1373,9 @@ def build_set_with_codex(
 # Same MCP grounded-tool surface + same guards as curate; free-text reply.     #
 # --------------------------------------------------------------------------- #
 
-# Chat is an interactive UI turn. It may chain tools, but a stalled Codex loop
-# must degrade quickly enough that the Library window does not look frozen.
-CHAT_TIMEOUT_S = 90.0
+# Chat may chain the same grounded tools as build-set. The live tool tape keeps
+# the Library window visibly moving, so chat gets the same wall-clock budget.
+CHAT_TIMEOUT_S = BUILD_SET_TIMEOUT_S
 
 # Structured final message for a chat turn. Like _OUTPUT_SCHEMA: every property
 # is `required` + additionalProperties:false (structured-output constraint).

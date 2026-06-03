@@ -10,6 +10,7 @@ spawn → timeout → parse → degrade → grounding-revalidation logic without
 from __future__ import annotations
 
 import importlib
+import inspect
 import json
 import sqlite3
 import subprocess
@@ -263,7 +264,8 @@ def test_build_set_prompt_has_set_prep_workflow():
 
 
 def test_chat_timeout_is_interactive():
-    assert CHAT_TIMEOUT_S <= BUILD_SET_TIMEOUT_S
+    assert CHAT_TIMEOUT_S == BUILD_SET_TIMEOUT_S
+    assert inspect.signature(chat_with_codex).parameters["timeout_s"].default == BUILD_SET_TIMEOUT_S
     assert BUILD_SET_TIMEOUT_S >= 180.0
 
 
