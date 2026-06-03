@@ -10229,3 +10229,40 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/library.html tauri/ui/src/library/index.ts tauri/ui/src/library/library.css tauri/ui/src/library/chat.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 77 - Learn Mission Contract
+
+Suggested commit: `feat(learn-ui): add practice mission contract`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Learn curriculum/backend lesson flow, beginner-path/GSD suites, controller
+  SVG semantics, IPC schema/codegen, Deck, Crate, Debrief, Settings, Sven
+  speech, packaging scripts, and new dependencies. This package only upgrades
+  the folded Learn first screen using already-rendered recommended lesson and
+  readiness state.
+
+Reason:
+
+- The exact signed app at `f344c4c9` showed Learn as the next commercial-value
+  target after Crate: the controller stage looks like a real training surface,
+  but the top rail still asks the DJ to infer the actual mission from small
+  target/proof/payoff labels. Add a compact mission contract that says what to
+  practice and what proof source must land before a receipt unlocks, while
+  preserving the existing screen deck, mapped-controller, and MIDI-only fallback
+  truthfulness.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/shell/learn-folded-layout.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/src/shell/shell.css tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

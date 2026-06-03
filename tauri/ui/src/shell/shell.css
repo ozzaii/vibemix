@@ -649,6 +649,7 @@
   grid-template-areas:
     "kicker primary secondary"
     "next primary secondary"
+    "command primary secondary"
     "brief primary secondary"
     "pulse primary secondary";
   justify-content: stretch;
@@ -691,6 +692,15 @@
 
 .surface[data-surface="learn"].surface--mounted .learn-booth-pulse {
   max-width: none;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-booth-command {
+  width: 100%;
+  max-width: 70ch;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-booth-command__text {
+  display: block;
 }
 
 .surface[data-surface="learn"].surface--mounted .learn-booth-brief {

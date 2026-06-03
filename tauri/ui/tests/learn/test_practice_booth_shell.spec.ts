@@ -138,6 +138,9 @@ describe("practice booth shell", () => {
       expect(root.querySelector('[data-control-id="eq_hi:A"]')).not.toBeNull();
       expect(root.textContent).toContain("on-screen deck");
       expect(root.querySelector(".learn-booth-brief")).toBeTruthy();
+      expect(root.querySelector(".learn-booth-command")).toBeTruthy();
+      expect(root.textContent).toContain("mission");
+      expect(root.textContent).toContain("Use the on-screen control");
       expect(root.textContent).toContain("target");
       expect(root.textContent).toContain("proof");
       expect(root.textContent).toContain("payoff");
@@ -1155,6 +1158,9 @@ describe("practice booth shell", () => {
         }),
       );
       await waitForMountedControl(root, "eq_hi:A");
+      expect(root.textContent).toContain(
+        "FLX4 proof must land before the receipt unlocks",
+      );
 
       window.dispatchEvent(
         new CustomEvent("ipc.learn.controller_detected", {
@@ -1175,6 +1181,9 @@ describe("practice booth shell", () => {
       expect(map.dataset.visible).toBe("false");
       expect(map.getAttribute("aria-hidden")).toBe("true");
       expect(status.textContent).toBe("on-screen deck");
+      expect(root.textContent).toContain(
+        "MIDI is visible; bind the lesson move to earn the receipt",
+      );
       expect(root.querySelector('[data-control-id="eq_hi:A"]')).not.toBeNull();
       expect(
         Array.from(booth.querySelectorAll("button")).map((button) => button.id),

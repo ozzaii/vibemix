@@ -282,6 +282,7 @@
   grid-template-areas:
     "kicker kicker"
     "next next"
+    "command command"
     "brief brief"
     "pulse pulse"
     "primary secondary";
@@ -356,6 +357,37 @@
 .learn-booth-proof {
   color: var(--brand);
   text-shadow: var(--text-emboss);
+}
+
+.learn-booth-command {
+  grid-area: command;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-3);
+  width: min(560px, calc(100vw - var(--sp-8)));
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.learn-booth-command__label {
+  color: var(--silk-40);
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.learn-booth-command__text {
+  min-width: 0;
+  color: var(--text-primary);
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 100, "wght" 500;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .learn-booth-pulse {
@@ -481,6 +513,12 @@
   .learn-booth-brief {
     width: 100%;
     grid-template-columns: 1fr;
+  }
+
+  .learn-booth-command {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: var(--sp-1);
   }
 
   .learn-booth-brief dd {

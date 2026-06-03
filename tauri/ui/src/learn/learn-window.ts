@@ -319,6 +319,12 @@ function mountLearnWindow(root: HTMLElement): {
         <strong id="learn-booth-title" class="learn-booth-title">next lesson</strong>
         <span id="learn-booth-proof" class="learn-booth-proof">screen deck available</span>
       </div>
+      <div class="learn-booth-command" aria-label="practice mission">
+        <span class="learn-booth-command__label">mission</span>
+        <strong id="learn-booth-command-text" class="learn-booth-command__text">
+          practice one clean move. Learn waits for proof.
+        </strong>
+      </div>
       <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">practice deck ready</div>
       <dl class="learn-booth-brief" aria-label="practice brief">
         <div>
@@ -404,6 +410,7 @@ function mountLearnWindow(root: HTMLElement): {
   const boothCourse = root.querySelector("#learn-booth-course") as HTMLElement;
   const boothTitle = root.querySelector("#learn-booth-title") as HTMLElement;
   const boothProof = root.querySelector("#learn-booth-proof") as HTMLElement;
+  const boothCommandText = root.querySelector("#learn-booth-command-text") as HTMLElement;
   const boothPulse = root.querySelector("#learn-booth-pulse") as HTMLElement;
   const boothTarget = root.querySelector("#learn-booth-target") as HTMLElement;
   const boothBriefProof = root.querySelector("#learn-booth-brief-proof") as HTMLElement;
@@ -606,6 +613,11 @@ function mountLearnWindow(root: HTMLElement): {
       : "Next lesson";
     boothTitle.textContent = recommended?.title ?? "pick a first lesson";
     boothProof.textContent = readinessProofLine(readiness, controllerDisplayName);
+    boothCommandText.textContent = practiceCommandLine(
+      recommended,
+      readiness,
+      controllerDisplayName,
+    );
     boothTarget.textContent = practiceTargetLine(recommended);
     boothBriefProof.textContent = readinessBriefLine(readiness, controllerDisplayName);
     boothPayoff.textContent = practicePayoffLine(recommended);
@@ -1535,6 +1547,39 @@ function practiceTargetLine(recommended: ProgressListEntry | undefined): string 
   if (recommended.status === "completed") return `replay ${title}`;
   if (recommended.status === "in-progress") return `finish ${title}`;
   return title;
+}
+
+function practiceCommandLine(
+  recommended: ProgressListEntry | undefined,
+  readiness: "hardware" | "midi" | "screen",
+  controllerName: string | null,
+): string {
+  const target = practiceTargetLine(recommended);
+  const proof = missionProofPhrase(readiness, controllerName);
+  if (!recommended) return `Pick a move. ${proof}`;
+  if (recommended.status === "completed") {
+    return `${target}. Replay it clean or choose a harder lesson.`;
+  }
+  if (recommended.status === "in-progress") {
+    return `${target}. ${proof}`;
+  }
+  return `Practice ${target}. ${proof}`;
+}
+
+function missionProofPhrase(
+  readiness: "hardware" | "midi" | "screen",
+  controllerName: string | null,
+): string {
+  if (readiness === "hardware") {
+    const compactName = compactControllerName(controllerName);
+    return compactName
+      ? `${compactName} proof must land before the receipt unlocks.`
+      : "Hardware proof must land before the receipt unlocks.";
+  }
+  if (readiness === "midi") {
+    return "MIDI is visible; bind the lesson move to earn the receipt.";
+  }
+  return "Use the on-screen control; proof must land before the receipt unlocks.";
 }
 
 function readinessBriefLine(
