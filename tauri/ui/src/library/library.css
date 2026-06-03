@@ -877,6 +877,42 @@ body {
 .vmx-lib-clarification-hint {
   color: var(--silk-58);
 }
+.vmx-lib-agent-failure {
+  display: grid;
+  gap: 10px;
+  max-width: 580px;
+  padding-left: 40px;
+}
+.vmx-lib-agent-failure-title {
+  color: var(--silk-92);
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+.vmx-lib-agent-failure-detail {
+  max-width: 62ch;
+  color: var(--silk-72);
+}
+.vmx-lib-agent-failure-receipt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 2px;
+}
+.vmx-lib-agent-failure-receipt span {
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-sm);
+  padding: 5px 8px;
+  color: var(--silk-58);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.vmx-lib-agent-failure-next {
+  color: var(--amber-pale);
+  font-weight: 650;
+}
 
 /* Center well: a composed idle field so chat mode never reads as an empty app. */
 .vmx-lib-command-field {

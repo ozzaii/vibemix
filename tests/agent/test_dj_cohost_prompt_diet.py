@@ -216,7 +216,7 @@ def test_log_event_payload_mix_move_has_full_audio_window(mocker, tmp_path):
 
 
 def test_log_event_payload_diet_false_on_phase(mocker, tmp_path):
-    """Mirror — PHASE event logs diet=False + audio_seconds=INVOKE_AUDIO_SECONDS (30)."""
+    """PHASE logs diet=False + the current full INVOKE_AUDIO_SECONDS window."""
     _, recorder, _ = _drive_with_event(mocker, tmp_path, "PHASE")
     invoke_events = [e for e in recorder.events if e[0] == "llm_invoke"]
     assert len(invoke_events) == 1

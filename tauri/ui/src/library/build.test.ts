@@ -561,8 +561,11 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(results.querySelector(".vmx-lib-empty")?.textContent).toContain(
       "codex_not_installed",
     );
-    expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
+    expect(results.querySelector(".vmx-lib-agent-failure")?.textContent).toContain(
       "codex login",
+    );
+    expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
+      "set-prep agent cannot start",
     );
   });
 
@@ -590,6 +593,27 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect((document.getElementById("vmx-lib-export") as HTMLElement).style.display).toBe(
       "none",
     );
+  });
+
+  it("turns a set-prep timeout into an actionable Viber receipt", async () => {
+    const timeout: BuildSetResult = {
+      name: "warehouse",
+      stop_reason: "timeout",
+      rationale: "Codex did not finish within 90s.",
+      count: 0,
+      tracks: [],
+      export_path: null,
+    };
+    await runRealBuild(timeout);
+    const results = document.getElementById("vmx-lib-results") as HTMLElement;
+    const receipt = results.querySelector(".vmx-lib-agent-failure");
+    expect(receipt).not.toBeNull();
+    expect(receipt?.textContent).toContain("Viber kept working too long");
+    expect(receipt?.textContent).toContain("Codex did not finish within 90s.");
+    expect(receipt?.textContent).toContain("timeout");
+    expect(receipt?.textContent).toContain("No Rekordbox XML was written.");
+    expect(receipt?.textContent).toContain("venue, BPM lane, energy curve");
+    expect(document.querySelectorAll(".vmx-lib-row")).toHaveLength(0);
   });
 
   it("escapes a hostile rationale/title — no raw HTML injection (real esc())", async () => {

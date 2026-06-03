@@ -165,6 +165,102 @@ function clarificationMarkup(
   </div>`;
 }
 
+type AgentFailureMode = "curate" | "build";
+
+interface AgentFailureCopy {
+  title: string;
+  detail: string;
+  next: string;
+}
+
+const AGENT_FAILURE_COPY: Record<string, AgentFailureCopy> = {
+  codex_not_installed: {
+    title: "Local Viber brain missing",
+    detail: "The library is indexed, but the set-prep agent cannot start.",
+    next: "Install Codex, run codex login, then run this brief again.",
+  },
+  codex_auth_required: {
+    title: "Viber account session offline",
+    detail: "The agent exists, but it cannot use the signed-in Codex session.",
+    next: "Run codex login, then retry the same brief.",
+  },
+  codex_mcp_blocked: {
+    title: "Viber tools blocked",
+    detail: "The agent cannot call the grounded library tools from this launch path.",
+    next: "Enable the Codex shell bridge, then reopen vibemix and retry.",
+  },
+  timeout: {
+    title: "Viber kept working too long",
+    detail: "No set was trusted because the tool loop did not finish inside the live UI window.",
+    next: "Make the brief tighter: venue, BPM lane, energy curve, and target slot count.",
+  },
+  tool_starvation: {
+    title: "Library search starved",
+    detail: "Viber asked the grounded tools, but they returned too little usable material.",
+    next: "Broaden the vibe, embed more tracks, or start from a reference track.",
+  },
+  empty_output: {
+    title: "Viber returned no usable plan",
+    detail: "The run ended without a parseable set plan.",
+    next: "Retry with one concrete direction and one energy curve.",
+  },
+  no_playlist: {
+    title: "No grounded tracks survived",
+    detail: "The agent output did not resolve to real tracks in this library.",
+    next: "Search the crate first, then use those words in the set brief.",
+  },
+  max_iters: {
+    title: "Viber stopped before a set",
+    detail: "The agent ran out of reasoning turns before choosing a grounded order.",
+    next: "Shorten the brief and ask for fewer slots.",
+  },
+  error: {
+    title: "Viber hit a runtime fault",
+    detail: "The set-prep run stopped before writing a trusted result.",
+    next: "Check the detail above, then retry after setup is stable.",
+  },
+};
+
+function agentFailureCopy(stopReason: string): AgentFailureCopy {
+  return (
+    AGENT_FAILURE_COPY[stopReason] ?? {
+      title: "No trusted set yet",
+      detail: "Viber did not return a grounded set from this run.",
+      next: "Try a narrower brief, or run Search first and reuse the strongest terms.",
+    }
+  );
+}
+
+function agentFailureMarkup(
+  result: CurateResult,
+  mode: AgentFailureMode,
+): string {
+  const copy = agentFailureCopy(result.stop_reason);
+  const artifactLine =
+    mode === "build"
+      ? "No Rekordbox XML was written."
+      : "No playlist file was saved.";
+  const rawDetail = (result.rationale || "").trim();
+  const detail = rawDetail || copy.detail;
+  return `<div class="vmx-lib-empty vmx-lib-agent-failure">
+    <div class="vmx-lib-empty-kicker">Viber stopped</div>
+    <div class="vmx-lib-agent-failure-title">${esc(copy.title)}</div>
+    <div class="vmx-lib-agent-failure-detail">${esc(detail)}</div>
+    <div class="vmx-lib-agent-failure-receipt">
+      <span>${esc(result.stop_reason)}</span>
+      <span>${esc(artifactLine)}</span>
+    </div>
+    <div class="vmx-lib-agent-failure-next">${esc(copy.next)}</div>
+  </div>`;
+}
+
+function renderAgentFailureRationale(result: CurateResult, mode: AgentFailureMode): void {
+  const copy = agentFailureCopy(result.stop_reason);
+  $("vmx-lib-rationale-body").textContent = copy.detail;
+  $("vmx-lib-rationale-meta").textContent =
+    `${mode === "build" ? "no export" : "no playlist"} · ${result.stop_reason}`;
+}
+
 let latestStats: LibraryStats | null = null;
 let latestModels: LibraryModelsResult | null = null;
 let latestLiveContext: LibraryLiveContext | null = null;
@@ -444,10 +540,16 @@ function renderResults(result: SearchResult, mode: LibraryMode): void {
  *  whatever the CLI gave (often the id when no human title exists — honest, no
  *  fabrication). */
 function renderCurate(result: CurateResult): void {
-  const bodyEl = $("vmx-lib-rationale-body");
-  bodyEl.textContent = result.rationale || "No set notes returned.";
-  $("vmx-lib-rationale-meta").textContent =
-    `${result.count} tracks · ${result.stop_reason}`;
+  const isAgentFailure =
+    result.tracks.length === 0 && result.stop_reason !== "clarification_needed";
+  if (isAgentFailure) {
+    renderAgentFailureRationale(result, "curate");
+  } else {
+    const bodyEl = $("vmx-lib-rationale-body");
+    bodyEl.textContent = result.rationale || "No set notes returned.";
+    $("vmx-lib-rationale-meta").textContent =
+      `${result.count} tracks · ${result.stop_reason}`;
+  }
 
   const el = $("vmx-lib-results");
   el.innerHTML = "";
@@ -457,7 +559,7 @@ function renderCurate(result: CurateResult): void {
         result,
         "Add one choice to the theme and run Viber again.",
       ) ||
-      `<div class="vmx-lib-empty">No set built (${esc(result.stop_reason)}). Try a different theme, or embed more tracks first.</div>`;
+      agentFailureMarkup(result, "curate");
   } else {
     result.tracks.forEach((t, i) => {
       const top = i === 0 ? " top" : "";
@@ -523,10 +625,16 @@ function renderCurateLoading(theme: string): void {
  *  show an "Exported → <path>" line with a one-line import hint; honest empty
  *  state otherwise (a no-key run returns max_iters with no tracks — never faked). */
 function renderBuildSet(result: BuildSetResult): void {
-  const bodyEl = $("vmx-lib-rationale-body");
-  bodyEl.textContent = result.rationale || "No set notes returned.";
-  $("vmx-lib-rationale-meta").textContent =
-    `${result.count} tracks · ${result.stop_reason}`;
+  const isAgentFailure =
+    result.tracks.length === 0 && result.stop_reason !== "clarification_needed";
+  if (isAgentFailure) {
+    renderAgentFailureRationale(result, "build");
+  } else {
+    const bodyEl = $("vmx-lib-rationale-body");
+    bodyEl.textContent = result.rationale || "No set notes returned.";
+    $("vmx-lib-rationale-meta").textContent =
+      `${result.count} tracks · ${result.stop_reason}`;
+  }
 
   // Export line — the build flow auto-exports to Rekordbox XML. Shown only when
   // the agent actually wrote a file (anti-slop: no path, no claim of an export).
@@ -547,7 +655,7 @@ function renderBuildSet(result: BuildSetResult): void {
         result,
         "Add one choice to the brief and run set prep again.",
       ) ||
-      `<div class="vmx-lib-empty">No set built (${esc(result.stop_reason)}). Check AI setup, embed more tracks, or refine the brief.</div>`;
+      agentFailureMarkup(result, "build");
   } else {
     result.tracks.forEach((t, i) => {
       const top = i === 0 ? " top" : "";
