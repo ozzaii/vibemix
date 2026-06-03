@@ -1680,6 +1680,8 @@ def test_viber_live_context_operator_actions_name_silent_blackhole_route():
     ]
     assert "receiving silence" in actions[0]["detail"]
     assert "Rekordbox audio output is not feeding BlackHole" in actions[0]["detail"]
+    assert "speaker/Bluetooth output such as JBL" in actions[0]["detail"]
+    assert "speaker sound alone is not capture proof" in actions[0]["detail"]
     assert actions[0]["recommended_surfaces"] == [
         "rekordbox.preferences.audio",
         "macos.audio_midi_setup",

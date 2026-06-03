@@ -6369,7 +6369,9 @@ def _viber_live_context_operator_actions(
                 "Route Rekordbox output into the BlackHole/Aggregate capture device "
                 "before rerunning proof; if you hear the decks locally but this stays "
                 "silent, the macOS Multi-Output or Rekordbox audio output is not feeding "
-                "BlackHole.",
+                "BlackHole. When using a speaker/Bluetooth output such as JBL, make the "
+                "DJ app feed an Aggregate/Multi-Output device that includes BlackHole plus "
+                "the speaker path; speaker sound alone is not capture proof.",
                 recommended_surfaces=[
                     "rekordbox.preferences.audio",
                     "macos.audio_midi_setup",
