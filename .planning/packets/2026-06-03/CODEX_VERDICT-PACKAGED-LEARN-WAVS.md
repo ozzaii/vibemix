@@ -87,3 +87,45 @@
 
 - No live app, TTS, sounddevice stream, or sidecar smoke command was run; the artifact checks mounted/copied DMGs only.
 - Answer to the BPM package question from current evidence: the `fresh-20260603-bpm` DMG exists, but it is not release-ready under the current guard. The package needs a fresh sidecar/app/DMG rebuild from `00eca14f` or later so the WAV bank is actually present.
+
+---
+
+## Increment 4 — Fresh Local DMG With WAV Bank
+
+- Item: rebuild the macOS sidecar and local unsigned DMG from the fixed spec, then prove the package carries the Learn WAV bank.
+- Artifact: `dist/fresh-20260604-wav/vibemix-0.0.1.dmg` (`486,977,797` bytes, unsigned local rehearsal DMG).
+- User value: a local drag-install package now contains both bundled MOSS and the Learn EQ exemplar WAVs instead of only detecting the stale package failure.
+
+## By-Eye / Artifact Evidence
+
+- Rebuilt the macOS sidecar via `uv run python scripts/dist/prepare_tauri_build.py --skip-frontend --force-sidecar --require-moss-source`.
+- Sidecar build output:
+  - `[moss_bundle] bundled 16 MOSS model file(s)`
+  - `OK: no AIza-pattern strings found in bundle (406 file(s) scanned)`
+  - `OK: sidecar bundle ready`
+- Verified the rebuilt sidecar contains all four Learn WAVs under:
+  - `tauri/src-tauri/binaries/vibemix-core-aarch64-apple-darwin/_internal/vibemix/learn/assets/band_exemplars/high/vibemix_internal_high_hat_air.wav`
+  - `.../low/vibemix_internal_low_bass_gate.wav`
+  - `.../mid/vibemix_internal_mid_chord_body.wav`
+  - `.../sub/vibemix_internal_sub_pulse.wav`
+- Rebuilt unsigned Tauri `.app` with `VIBEMIX_REQUIRE_MOSS_SOURCE=1 cargo tauri build --bundles app --no-sign --ci`.
+- Repaired app-side PyInstaller symlinks:
+  - `scanned=1 relinked=36 already_linked=0 missing_top_level=0`
+- App readiness passed:
+  - `ok=true`
+  - `moss_source=bundled MOSS model ready`
+  - `errors=[]`
+- Created fresh local DMG from the repaired app and checked drag-install readiness twice:
+  - `--smoke none --require-moss-source` -> `ok=true`
+  - `--smoke version --require-moss-source` -> `ok=true`, `smoke_stdout="vibemix 0.1.0-dev0"`
+
+## Gates
+
+- `python3 scripts/dist/check_sidecar_bundle_ready.py --triple aarch64-apple-darwin --require-moss-source --quiet` -> pass.
+- `python3 scripts/dist/check_macos_app_bundle_ready.py tauri/src-tauri/target/release/bundle/macos/vibemix.app --triple aarch64-apple-darwin --smoke none --require-moss-source --json` -> `ok=true`.
+- `python3 scripts/dist/check_macos_dmg_artifact_ready.py dist/fresh-20260604-wav/vibemix-0.0.1.dmg --triple aarch64-apple-darwin --smoke version --require-moss-source --json` -> `ok=true`.
+
+## Notes
+
+- No live app, TTS, sounddevice stream, or co-host speech was run. The sidecar smoke was `--version` only.
+- This is a local unsigned rehearsal DMG. Signing/notarization/stapling remain separate release gates.
