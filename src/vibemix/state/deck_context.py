@@ -3420,7 +3420,7 @@ def _strip_unsupported_audio_source_detail_clause(
             continue
 
         clauses = re.split(
-            r"\s+(?:and then|then|but|however|and)\s+|,\s+",
+            r"\s+(?:and then|then|but|however|and)\s+",
             sentence,
             flags=re.IGNORECASE,
         )

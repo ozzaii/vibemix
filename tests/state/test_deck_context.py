@@ -2545,6 +2545,24 @@ def test_live_claim_guard_suppresses_eq_audio_song_detail_verdict() -> None:
     assert "tighter" not in result.text.lower()
 
 
+def test_live_claim_guard_salvages_source_detail_without_comma_shredding() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    reply = (
+        "The whole space opened up with that cold, metallic sub-bass drone and "
+        "those slow, sharp synth plucks cutting through the top "
+        "[track:Varg²™, Ecco2k, & Bladee - H2D]."
+    )
+
+    result = apply_live_claim_guard(reply, state, event_type="TRACK_CHANGE")
+
+    assert result.corrected is True
+    assert result.emit_corrected is True
+    assert result.policy == "audio_source_detail_not_proof"
+    assert result.text == "The whole space opened up with that cold, metallic sub-bass drone."
+    assert "Ecco2k" not in result.text
+    assert "]" not in result.text
+
+
 def test_live_claim_guard_preserves_move_effect_correlation_disclaimer() -> None:
     state = MusicState(audible=True, rms=0.12, audible_deck="A")
     state.bands = {"sub": 0.12, "low": 0.16, "mid": 0.40, "high": 0.32}
