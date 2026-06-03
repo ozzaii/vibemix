@@ -170,3 +170,40 @@
 
 - No live app, TTS, sounddevice stream, or co-host speech was run. The only sidecar execution was `--version` from the copied DMG app.
 - This is the current strongest macOS package artifact from this loop. It still needs whatever external release-channel upload/update-manifest steps the release process requires; those were not performed here.
+
+---
+
+## Increment 6 — macOS Arm64 Updater Artifact
+
+- Item: create and verify the Tauri updater archive for the signed macOS arm64 app.
+- Artifact: `dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1-arm64.app.tar.gz`.
+- Signature sidecar: `dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1-arm64.app.tar.gz.sig`.
+- User value: the release now has the macOS arm64 updater payload shape that `latest.json` must point at; the DMG is not misused as the updater artifact.
+
+## By-Eye / Artifact Evidence
+
+- Created archive via:
+  - `scripts/dist/create_macos_updater_artifact.sh --arch arm64 --output-dir dist/fresh-20260604-wav-signed-v2 tauri/src-tauri/target/release/bundle/macos/vibemix.app`
+- The local updater keypair exists under `~/.tauri/vibemix_updater.key{,.pub}`; exported it to the script environment and produced `.sig`.
+- Artifact sizes:
+  - archive: `481M`
+  - signature: `684B`
+- Archive TOC contains:
+  - `vibemix.app/Contents/_CodeSignature/CodeResources`
+  - bundled MOSS manifest
+  - all four Learn exemplar WAVs.
+- Extracted archive readiness:
+  - `ok=true`
+  - `errors=[]`
+  - `moss_source=bundled MOSS model ready`
+  - `smoke_stdout="vibemix 0.1.0-dev0"`
+
+## Gates
+
+- `python3 scripts/dist/check_macos_updater_artifact_ready.py dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1-arm64.app.tar.gz --triple aarch64-apple-darwin --smoke version --require-moss-source --json` -> `ok=true`.
+- `tar -tzf ... | rg 'band_exemplars/.+\\.wav$|_CodeSignature/CodeResources|MOSS-TTS-Nano-100M-ONNX/browser_poc_manifest.json'` -> expected seal, MOSS manifest, and four WAV entries present.
+
+## Notes
+
+- No live app, TTS, sounddevice stream, or co-host speech was run. The only sidecar execution was `--version` from the extracted updater app.
+- Full signed `latest.json` still requires the release workflow's remaining platform artifacts (`darwin-x86_64` updater archive and Windows Tauri NSIS updater installer). Those were not produced on this arm64 macOS loop.
