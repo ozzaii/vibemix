@@ -129,3 +129,44 @@
 
 - No live app, TTS, sounddevice stream, or co-host speech was run. The sidecar smoke was `--version` only.
 - This is a local unsigned rehearsal DMG. Signing/notarization/stapling remain separate release gates.
+
+---
+
+## Increment 5 — Signed + Notarized DMG
+
+- Item: run the real macOS signing/notarization chain on the fresh WAV/MOSS package and fix the signer gate that assessed the wrong artifact.
+- SHA: `cdd24e5c` (`fix(signing): assess notarized DMG and assert Developer ID seal`).
+- Artifact: `dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1.dmg`.
+- User value: the macOS package now clears Apple notarization, stapling, Gatekeeper, drag-install sidecar readiness, MOSS source, Learn WAV bank, and secret scanning.
+
+## By-Eye / Artifact Evidence
+
+- First signing attempt notarized and stapled the DMG, but Stage 7 checked the unstapled source `.app` and failed. It also lacked an immediate Developer ID resource-seal assertion.
+- `scripts/dist/sign_macos.sh` now:
+  - asserts the `.app` is signed by `Developer ID Application`, has the expected `TeamIdentifier`, and has `Contents/_CodeSignature/CodeResources`;
+  - asserts the DMG is signed by `Developer ID Application`;
+  - runs Gatekeeper against the stapled DMG with `spctl --assess --type open --context context:primary-signature`.
+- Patched signer run completed:
+  - `Developer ID signature OK: .app bundle`
+  - `Developer ID signature OK: DMG`
+  - Notary submission `1625dae0-06b0-442d-ba64-4840775bb6e7`
+  - Stapler: `The validate action worked!`
+  - `spctl`: `accepted`, `source=Notarized Developer ID`
+  - `verify_binary`: `scanned=414 hits=0`
+- Final drag-install package check:
+  - `python3 scripts/dist/check_macos_dmg_artifact_ready.py dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1.dmg --triple aarch64-apple-darwin --smoke version --require-moss-source --json`
+  - Result: `ok=true`, `errors=[]`, `smoke_stdout="vibemix 0.1.0-dev0"`, `moss_source=bundled MOSS model ready`.
+
+## Gates
+
+- `bash -n scripts/dist/sign_macos.sh` -> pass.
+- `uv run pytest -q tests/security/test_release_yml_signing_skips.py` -> `18 passed`.
+- `spctl --assess --type open --context context:primary-signature -vvv dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1.dmg` -> `accepted`, `source=Notarized Developer ID`.
+- `xcrun stapler validate dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1.dmg` -> `The validate action worked!`.
+- Notary detail: `status=Accepted`, `issues=0`.
+- `verify-report.json`: `status=clean`, `scanned=414`, `hits=[]`.
+
+## Notes
+
+- No live app, TTS, sounddevice stream, or co-host speech was run. The only sidecar execution was `--version` from the copied DMG app.
+- This is the current strongest macOS package artifact from this loop. It still needs whatever external release-channel upload/update-manifest steps the release process requires; those were not performed here.
