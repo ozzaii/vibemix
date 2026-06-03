@@ -88,6 +88,40 @@ fatal() {
     exit "$code"
 }
 
+assert_developer_id_signature() {
+    local target="$1"
+    local label="$2"
+    local details
+    if ! details="$(codesign -dv --verbose=4 "$target" 2>&1)"; then
+        log "FAIL: could not inspect $label signature: $target"
+        echo "$details" >&2
+        exit 1
+    fi
+    if ! echo "$details" | grep -q "Authority=Developer ID Application:"; then
+        log "FAIL: $label is not signed with a Developer ID Application identity"
+        echo "$details" >&2
+        exit 1
+    fi
+    if ! echo "$details" | grep -q "TeamIdentifier=$APPLE_TEAM_ID"; then
+        log "FAIL: $label TeamIdentifier does not match APPLE_TEAM_ID=$APPLE_TEAM_ID"
+        echo "$details" >&2
+        exit 1
+    fi
+    if [[ -d "$target/Contents" ]]; then
+        if [[ ! -f "$target/Contents/_CodeSignature/CodeResources" ]]; then
+            log "FAIL: $label missing bundle resource seal: $target/Contents/_CodeSignature/CodeResources"
+            echo "$details" >&2
+            exit 1
+        fi
+        if ! echo "$details" | grep -q "Sealed Resources version="; then
+            log "FAIL: $label has no sealed resources"
+            echo "$details" >&2
+            exit 1
+        fi
+    fi
+    log "Developer ID signature OK: $label"
+}
+
 # Repo root = parent of scripts/dist/.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." &> /dev/null && pwd)"
@@ -428,6 +462,7 @@ codesign --sign "$APPLE_DEVELOPER_ID" \
 
 log "verifying strict signature on $APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
+assert_developer_id_signature "$APP" ".app bundle"
 
 if [[ "$SKIP_DMG" -eq 1 ]]; then
     log "SKIP-DMG mode: jumping past Stage 4-6, running Stage 7-8 against .app only"
@@ -476,6 +511,7 @@ else
     # container, not just the inner .app.
     log "signing DMG: $DMG_OUT"
     codesign --sign "$APPLE_DEVELOPER_ID" --force --timestamp "$DMG_OUT"
+    assert_developer_id_signature "$DMG_OUT" "DMG"
 
     # -----------------------------------------------------------------------
     # Stage 5 — notarytool submit --wait (idempotent retry x3, exponential backoff)
@@ -537,17 +573,21 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Stage 7 — spctl --assess --type execute (Gatekeeper acceptance, final gate)
+# Stage 7 — spctl Gatekeeper acceptance, final gate
 # ---------------------------------------------------------------------------
 
-stage 7 "spctl --assess --type execute (Gatekeeper acceptance)"
-
-SPCTL_OUT=$(spctl --assess --type execute --verbose=4 "$APP" 2>&1) || SPCTL_RC=$?
+if [[ -n "${DMG_OUT:-}" ]]; then
+    stage 7 "spctl --assess --type open (Gatekeeper acceptance for stapled DMG)"
+    SPCTL_OUT=$(spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_OUT" 2>&1) || SPCTL_RC=$?
+else
+    stage 7 "spctl --assess --type execute (Gatekeeper acceptance for signed .app)"
+    SPCTL_OUT=$(spctl --assess --type execute --verbose=4 "$APP" 2>&1) || SPCTL_RC=$?
+fi
 SPCTL_RC=${SPCTL_RC:-0}
 echo "$SPCTL_OUT" >&2
 
 if [[ "$SPCTL_RC" -ne 0 ]] || ! echo "$SPCTL_OUT" | grep -q "accepted"; then
-    log "spctl rejected the signed bundle — release blocked"
+    log "spctl rejected the signed artifact — release blocked"
     exit 4
 fi
 

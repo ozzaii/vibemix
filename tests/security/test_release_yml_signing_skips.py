@@ -130,6 +130,24 @@ def test_macos_signing_repairs_sidecar_symlinks_before_codesign():
     assert script.index(repair) < script.index(stage2)
 
 
+def test_sign_macos_asserts_developer_id_resource_seal():
+    script = (REPO_ROOT / "scripts/dist/sign_macos.sh").read_text(encoding="utf-8")
+    assert "assert_developer_id_signature()" in script
+    assert "Authority=Developer ID Application:" in script
+    assert "TeamIdentifier=$APPLE_TEAM_ID" in script
+    assert "Contents/_CodeSignature/CodeResources" in script
+    assert 'assert_developer_id_signature "$APP" ".app bundle"' in script
+    assert 'assert_developer_id_signature "$DMG_OUT" "DMG"' in script
+
+
+def test_sign_macos_assesses_stapled_dmg_not_source_app():
+    script = (REPO_ROOT / "scripts/dist/sign_macos.sh").read_text(encoding="utf-8")
+    assert "Gatekeeper acceptance for stapled DMG" in script
+    assert "--type open --context context:primary-signature" in script
+    assert 'spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_OUT"' in script
+    assert "Gatekeeper acceptance for signed .app" in script
+
+
 def test_release_yml_skip_on_empty_apple_secret(workflow_yaml):
     """The Apple annotation step fires on the inverse condition."""
     build_macos = workflow_yaml["jobs"]["build-macos"]
