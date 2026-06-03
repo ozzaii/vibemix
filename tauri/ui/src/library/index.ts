@@ -1013,7 +1013,7 @@ function ensureChatIntro(thread: HTMLElement): void {
   appendChatTurn(
     thread,
     "viber",
-    "I can build a set, solve a transition, or find deep cuts. I will show receipts before you trust it.",
+    "I can build a set, score a transition, or rediscover deep cuts. I will show the tool trace and export receipt before you trust it.",
   );
 }
 
@@ -1351,18 +1351,72 @@ function appendLiveProofStatusToolRow(
   tools.append(row);
 }
 
+function idleMissionArtifact(
+  stats: LibraryStats | null,
+  proof: ReturnType<typeof liveProofStatus>,
+): HTMLElement {
+  const card = document.createElement("div");
+  card.className = "vmx-lib-idle-mission";
+  card.dataset.wire = "library.idle-mission";
+
+  const head = document.createElement("div");
+  head.className = "vmx-lib-idle-mission__head";
+  const titleWrap = document.createElement("div");
+  const kicker = document.createElement("span");
+  kicker.textContent = "Viber runbook";
+  const title = document.createElement("b");
+  title.textContent = proof.ok ? "Live mix receipt armed" : "Set prep console armed";
+  titleWrap.append(kicker, title);
+  const state = document.createElement("em");
+  state.textContent = proof.ok ? "armed" : operatorState(stats, proof);
+  head.append(titleWrap, state);
+  card.append(head);
+
+  const rows = document.createElement("div");
+  rows.className = "vmx-lib-idle-mission__rows";
+  const trackCount = stats?.indexed ?? 0;
+  const buildValue =
+    trackCount > 0 ? `${trackCount} indexed tracks` : "index crate first";
+  const searchValue = stats ? operatorSearchLabel(stats) : "search checking";
+  const steps: Array<[string, string, string]> = [
+    ["01", "Build set", buildValue],
+    ["02", "Score transition", `${proof.state} · ${proof.detail}`],
+    ["03", "Export receipt", `${searchValue} · Rekordbox / M3U after grounded set`],
+  ];
+  steps.forEach(([step, label, value]) => {
+    const row = document.createElement("div");
+    row.className = "vmx-lib-idle-mission__row";
+    const idx = document.createElement("span");
+    idx.textContent = step;
+    const copy = document.createElement("div");
+    const name = document.createElement("b");
+    name.textContent = label;
+    const detail = document.createElement("small");
+    detail.textContent = value;
+    copy.append(name, detail);
+    row.append(idx, copy);
+    rows.append(row);
+  });
+  card.append(rows);
+
+  const foot = document.createElement("div");
+  foot.className = "vmx-lib-idle-mission__foot";
+  foot.textContent = "No fake tracks. No uncited transition advice.";
+  card.append(foot);
+  return card;
+}
+
 function renderChatIdleSide(): void {
   const tools = $("vmx-lib-chat-tools");
   if (tools.dataset.live === "true") return;
   tools.replaceChildren();
+  const proof = liveProofStatus(latestLiveContext);
   appendLiveProofStatusToolRow(tools, latestLiveContext);
   const artifact = $("vmx-lib-chat-artifact");
   artifact.replaceChildren();
   const setupCard = chatLibrarySetupCard(latestStats);
-  if (setupCard) artifact.append(setupCard);
-  $("vmx-lib-scope-state").textContent = liveProofStatus(latestLiveContext).ok
-    ? "live read armed"
-    : "ready";
+  artifact.append(setupCard ?? idleMissionArtifact(latestStats, proof));
+  $("vmx-lib-scope-state").textContent = proof.ok ? "live read armed" : "ready";
   renderOperatorBrief();
 }
 

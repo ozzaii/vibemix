@@ -582,6 +582,15 @@ describe("chat - real runChat path", () => {
     expect(
       document.querySelector('[data-wire="library.operator-brief"]'),
     ).toBeTruthy();
+    const idleMission = document.querySelector<HTMLElement>(
+      '[data-wire="library.idle-mission"]',
+    );
+    expect(idleMission).not.toBeNull();
+    expect(idleMission?.textContent).toContain("Viber runbook");
+    expect(idleMission?.textContent).toContain("12 indexed tracks");
+    expect(idleMission?.textContent).toContain(
+      "No fake tracks. No uncited transition advice.",
+    );
     expect(document.getElementById("vmx-lib-operator-state")?.textContent).toBe(
       "set prep ready",
     );
@@ -614,6 +623,10 @@ describe("chat - real runChat path", () => {
     expect(document.getElementById("vmx-lib-operator-proof")?.textContent).toBe(
       "deck1 A=known:dominant / deck2 B=known:present",
     );
+    expect(
+      document.querySelector<HTMLElement>('[data-wire="library.idle-mission"]')
+        ?.textContent,
+    ).toContain("Live mix receipt armed");
     expect(
       document
         .querySelector<HTMLElement>('[data-operator="mix"]')

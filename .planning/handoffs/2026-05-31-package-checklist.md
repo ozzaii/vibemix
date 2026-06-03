@@ -10336,3 +10336,40 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/DebriefDock.ts tauri/ui/tests/shell/debrief-dock.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 80 - Crate Viber Runbook Receipt
+
+Suggested commit: `feat(library-ui): add viber runbook receipt`
+
+Include:
+
+- `tauri/ui/library.html`
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/library.css`
+- `tauri/ui/src/library/chat.test.ts`
+- `tauri/ui/src/mock-transfer/contract.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Viber tool implementations, library search/ranking semantics, backend
+  commands, IPC schema/codegen, Deck, Learn, Debrief, Settings, Sven speech,
+  packaging scripts, and new dependencies. This package only upgrades the
+  Crate/Viber idle receipt rack using already-rendered library stats and live
+  proof status.
+
+Reason:
+
+- The exact signed app at `ad32fd18` showed Crate as the next weakest
+  commercial-value module: the chat starters and operator brief are present,
+  but the right grounding rack still waits empty until a run. Add an at-rest
+  Viber runbook that names the build, transition, and export path from existing
+  stats/proof gates so the first screen reads like a working DJ set-prep
+  console without implying missing live transition evidence has landed.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/library.html tauri/ui/src/library/index.ts tauri/ui/src/library/library.css tauri/ui/src/library/chat.test.ts tauri/ui/src/mock-transfer/contract.ts .planning/handoffs/2026-05-31-package-checklist.md`

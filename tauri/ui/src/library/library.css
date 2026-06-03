@@ -1457,6 +1457,114 @@ body {
   border-top: 1px solid var(--glass-edge);
   padding-top: 14px;
 }
+.vmx-lib-idle-mission {
+  border: 1px solid var(--border-default);
+  border-radius: var(--rad-md);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 22%, rgba(0, 0, 0, 0.28)),
+    var(--glass-1);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.62),
+    var(--shadow-raised);
+  overflow: hidden;
+}
+.vmx-lib-idle-mission__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px;
+  border-bottom: 1px solid var(--border-default);
+  background:
+    linear-gradient(90deg, var(--brand-08), transparent 68%),
+    rgba(0, 0, 0, 0.20);
+}
+.vmx-lib-idle-mission__head div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.vmx-lib-idle-mission__head span,
+.vmx-lib-idle-mission__head em {
+  font-family: var(--type-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+}
+.vmx-lib-idle-mission__head b {
+  min-width: 0;
+  font-family: var(--type-display);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.18;
+  color: var(--text-primary);
+}
+.vmx-lib-idle-mission__head em {
+  flex: 0 0 auto;
+  max-width: 44%;
+  color: var(--brand);
+  font-style: normal;
+  text-align: right;
+  overflow-wrap: anywhere;
+  text-shadow: var(--text-emboss);
+}
+.vmx-lib-idle-mission__rows {
+  display: grid;
+}
+.vmx-lib-idle-mission__row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 11px;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 251, 244, 0.010);
+}
+.vmx-lib-idle-mission__row > span {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  text-align: right;
+  text-shadow: 0 0 6px var(--gold-glow);
+}
+.vmx-lib-idle-mission__row div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.vmx-lib-idle-mission__row b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--silk);
+}
+.vmx-lib-idle-mission__row small {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--silk-55);
+  overflow-wrap: anywhere;
+}
+.vmx-lib-idle-mission__foot {
+  padding: 10px 13px 11px;
+  font-family: var(--type-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand);
+  background: linear-gradient(90deg, var(--brand-06), transparent 72%);
+}
 /* The artifact = a premium lit readout card (a built set / playlist receipt).
    Crisp machined edges, a lit caption header, real labels. Gold reserved for
    key/BPM/energy numerics only — everywhere else stays rose + ink. */
