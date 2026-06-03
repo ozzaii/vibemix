@@ -96,7 +96,8 @@ def test_event_gap_dict_shape_and_values() -> None:
         TRACK_CHANGE 6 → 5, PHASE 18 → 10, LAYER_ARRIVAL 16 → 10,
         MIX_MOVE 20 → 14, HEARTBEAT 70 → 45. X1 later retuned HEARTBEAT 45 → 180.
     Phase 17 SENSE-12 / Phase 30 SENSE-17/18 detector cooldowns and MIC /
-    MANUAL UNCHANGED.
+    MANUAL stayed unchanged until the 2026-06-03 live run slowed
+    KICK_DENSITY_SHIFT to stop onset-density wobble from dominating Sven.
     """
     assert set(MIN_EVENT_GAP_PER_TYPE.keys()) == {
         "TRACK_CHANGE",
@@ -132,10 +133,10 @@ def test_event_gap_dict_shape_and_values() -> None:
     assert MIN_EVENT_GAP_PER_TYPE["MIC"] == 3.0  # unchanged
     assert MIN_EVENT_GAP_PER_TYPE["MANUAL"] == 1.5  # unchanged
     assert MIN_EVENT_GAP_PER_TYPE["DROP"] == 24.0
-    # Plan 17-02 kick-side detector cooldowns — UNCHANGED by Plan 40-04
+    # Plan 17-02 kick-side detector cooldowns.
     assert MIN_EVENT_GAP_PER_TYPE["KICK_SWAP"] == 14.0
     assert MIN_EVENT_GAP_PER_TYPE["SUB_LAYER_ARRIVAL"] == 16.0
-    assert MIN_EVENT_GAP_PER_TYPE["KICK_DENSITY_SHIFT"] == 18.0
+    assert MIN_EVENT_GAP_PER_TYPE["KICK_DENSITY_SHIFT"] == 60.0
     # Plan 17-03 paired-detector cooldowns — UNCHANGED by Plan 40-04
     assert MIN_EVENT_GAP_PER_TYPE["BREAKDOWN_KICK_KILL"] == 20.0
     assert MIN_EVENT_GAP_PER_TYPE["REENTRY_KICK_LAND"] == 12.0

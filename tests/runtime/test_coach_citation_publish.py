@@ -13,7 +13,11 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from vibemix.runtime.coach import CITATION_PUBLISH_INTERVAL_S, coach_loop
+from vibemix.runtime.coach import (
+    CITATION_PUBLISH_INTERVAL_S,
+    CITATION_UNCHANGED_PUBLISH_INTERVAL_S,
+    coach_loop,
+)
 
 _REAL_SLEEP = asyncio.sleep
 
@@ -199,6 +203,72 @@ def test_periodic_publish_fires_at_2s_interval(
     for call in ipc_bus.emit.await_args_list:
         msg = call.args[0]
         assert msg["type"] == "ipc.session.citation"
+
+
+def test_unchanged_payload_repeats_are_suppressed_until_heartbeat(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    """The first diagnostics frame and changed frames publish immediately, but
+    identical slop payloads do not rebroadcast every 2s."""
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(9, stop_event)
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+    mocker.patch(
+        "vibemix.runtime.coach.time.time",
+        side_effect=_auto_time(start=1000.0, step=1.0),
+    )
+
+    first_payload = {
+        "slop_ratio": 1.0,
+        "stripped_rate_15s": 1.0,
+        "last_unverified_response": "same blocked line",
+        "bypass_active": True,
+    }
+    changed_payload = {
+        **first_payload,
+        "last_unverified_response": "new blocked line",
+    }
+    calls = {"n": 0}
+
+    def telemetry() -> dict:
+        calls["n"] += 1
+        return changed_payload if calls["n"] >= 3 else first_payload
+
+    ipc_bus = MagicMock()
+    ipc_bus.emit = AsyncMock(return_value=None)
+
+    manual_trigger = asyncio.Event()
+    trigger_state = {"in_flight": False}
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            manual_trigger,
+            trigger_state,
+            stop_event,
+            ipc_bus=ipc_bus,
+            citation_telemetry=telemetry,
+        )
+    )
+
+    # Sim time is well below the unchanged heartbeat; only the first payload
+    # and the changed payload should hit the bus.
+    assert 9 < CITATION_UNCHANGED_PUBLISH_INTERVAL_S
+    assert ipc_bus.emit.await_count == 2
+    payloads = [call.args[0]["payload"] for call in ipc_bus.emit.await_args_list]
+    assert payloads[0]["last_unverified_response"] == "same blocked line"
+    assert payloads[1]["last_unverified_response"] == "new blocked line"
 
 
 # ---------------------------------------------------------------------------

@@ -15,7 +15,6 @@ from tests.state.detectors.conftest import _state
 from vibemix.audio.constants import LOW_RMS
 from vibemix.state.detectors.kick_density_shift import KickDensityShiftDetector
 
-
 # ---------- Test 1: fires on jump up ----------
 
 
@@ -78,10 +77,10 @@ def test_kick_density_shift_silence_gate_low_rms():
     assert d.baseline_density is None
 
 
-# ---------- Test 5: cooldown blocks repeat fire (18s) ----------
+# ---------- Test 5: cooldown blocks repeat fire (60s) ----------
 
 
-def test_kick_density_shift_cooldown_18s():
+def test_kick_density_shift_cooldown_60s():
     d = KickDensityShiftDetector()
     ms = _state(rms=0.06, onset_density=1.0)
     d.detect(ms, audio_buf=None, now=1000.0)
@@ -90,10 +89,14 @@ def test_kick_density_shift_cooldown_18s():
     ev1 = d.detect(ms, audio_buf=None, now=1008.5)
     assert ev1 is not None
 
-    # Within cooldown window (18s) — must not refire even on another big jump.
+    # Within cooldown window — must not refire even on another big jump.
     ms.onset_density = 5.0
-    ev2 = d.detect(ms, audio_buf=None, now=1020.0)  # 11.5s after fire, < 18s cooldown
+    ev2 = d.detect(ms, audio_buf=None, now=1058.0)  # 49.5s after fire, < 60s cooldown
     assert ev2 is None
+
+    ev3 = d.detect(ms, audio_buf=None, now=1069.0)  # 60.5s after fire
+    assert ev3 is not None
+    assert ev3.type == "KICK_DENSITY_SHIFT"
 
 
 # ---------- Test 6: baseline rotation across the 8s window ----------

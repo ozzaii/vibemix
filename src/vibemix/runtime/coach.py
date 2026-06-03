@@ -42,10 +42,12 @@ Latency is now mitigated by the cache + ModelRouter alone.)
 
 Plan 20-04 wiring (additive — backward compatible):
 - ``ipc_bus`` + ``citation_telemetry`` are NEW kwargs with default None.
-  When both are non-None, the loop publishes ``ipc.session.citation`` every
-  ``CITATION_PUBLISH_INTERVAL_S`` (2.0s) seconds via ``ipc_bus.emit(dict)``
-  with payload ``{slop_ratio, stripped_rate_15s, last_unverified_response,
-  bypass_active}`` sourced from the telemetry callable.
+  When both are non-None, the loop publishes changed ``ipc.session.citation``
+  payloads at most every ``CITATION_PUBLISH_INTERVAL_S`` (2.0s), with an
+  unchanged-payload heartbeat every ``CITATION_UNCHANGED_PUBLISH_INTERVAL_S``
+  (30.0s), via ``ipc_bus.emit(dict)``. Payload is ``{slop_ratio,
+  stripped_rate_15s, last_unverified_response, bypass_active}`` sourced from
+  the telemetry callable.
 - A telemetry-callable failure prints to stderr ``[coach citation publish
   err]`` and STILL bumps the publish_at debounce so a chronically-broken
   callable cannot spam the log faster than once per interval.
@@ -100,10 +102,11 @@ if TYPE_CHECKING:
     from vibemix.runtime.ws_bus import IpcBus
     from vibemix.state.evidence_registry import EvidenceRegistry
 
-# Plan 20-04 — periodic ipc.session.citation publish cadence (0.5Hz). Lower
-# than ipc.session.snapshot's 30Hz because slop_ratio + stripped_rate_15s
-# evolve slowly (15s rolling window + cumulative ratio).
+# Plan 20-04 — ipc.session.citation publish cadence. Changed payloads can
+# update at 0.5Hz, but unchanged slop payloads are re-sent much slower so the UI
+# does not hammer the same blocked line while the co-host is already silent.
 CITATION_PUBLISH_INTERVAL_S = 2.0
+CITATION_UNCHANGED_PUBLISH_INTERVAL_S = 30.0
 
 
 def _safe_print(*args: object, **kwargs: object) -> None:
@@ -452,6 +455,8 @@ async def coach_loop(
 
     last_ai_voice_at = 0.0
     last_citation_publish_at = 0.0
+    last_citation_payload: dict[str, object] | None = None
+    last_citation_payload_publish_at = 0.0
     mic_active_frames = 0
     mic_silence_since = 0.0
 
@@ -476,21 +481,34 @@ async def coach_loop(
         await asyncio.sleep(0.1)
         now = time.time()
 
-        # Plan 20-04 — periodic ipc.session.citation publish (0.5Hz). Runs
-        # before the in_flight skip so anti-slop telemetry keeps flowing
-        # even while a reaction is generating. The whole gate is wrapped in
-        # try/except + always bumps last_citation_publish_at so a broken
-        # telemetry callable cannot spam stderr faster than the interval.
+        # Plan 20-04 — ipc.session.citation publish. Runs before the in_flight
+        # skip so anti-slop telemetry keeps flowing even while a reaction is
+        # generating. Changed payloads publish at the normal 0.5Hz gate; exact
+        # duplicates publish only as a slow heartbeat so a stuck slop line does
+        # not flood the webview/log.
         if citation_wired and (now - last_citation_publish_at) >= CITATION_PUBLISH_INTERVAL_S:
             try:
                 tel = citation_telemetry()  # type: ignore[misc]
-                msg = SessionCitation.make(
-                    slop_ratio=float(tel.get("slop_ratio", 0.0)),
-                    stripped_rate_15s=float(tel.get("stripped_rate_15s", 0.0)),
-                    last_unverified_response=tel.get("last_unverified_response"),
-                    bypass_active=bool(tel.get("bypass_active", False)),
-                )
-                await ipc_bus.emit(json.loads(msg.to_json()))  # type: ignore[union-attr]
+                payload = {
+                    "slop_ratio": float(tel.get("slop_ratio", 0.0)),
+                    "stripped_rate_15s": float(tel.get("stripped_rate_15s", 0.0)),
+                    "last_unverified_response": tel.get("last_unverified_response"),
+                    "bypass_active": bool(tel.get("bypass_active", False)),
+                }
+                payload_changed = payload != last_citation_payload
+                stale_heartbeat = (
+                    now - last_citation_payload_publish_at
+                ) >= CITATION_UNCHANGED_PUBLISH_INTERVAL_S
+                if payload_changed or stale_heartbeat:
+                    msg = SessionCitation.make(
+                        slop_ratio=payload["slop_ratio"],
+                        stripped_rate_15s=payload["stripped_rate_15s"],
+                        last_unverified_response=payload["last_unverified_response"],
+                        bypass_active=payload["bypass_active"],
+                    )
+                    await ipc_bus.emit(json.loads(msg.to_json()))  # type: ignore[union-attr]
+                    last_citation_payload = payload
+                    last_citation_payload_publish_at = now
             except Exception as e:
                 _safe_print(f"\n[coach citation publish err] {e}", file=sys.stderr)
             finally:

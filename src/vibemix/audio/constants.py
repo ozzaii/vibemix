@@ -94,11 +94,13 @@ MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 +
     # locked rule "matches G-followup-1"). Tuned on the v4 coexistence matrix:
     # KICK_SWAP slightly faster than LAYER_ARRIVAL since kick character changes
     # are the main "moment" worth catching; SUB_LAYER_ARRIVAL mirrors
-    # LAYER_ARRIVAL (its bass-side analog); KICK_DENSITY_SHIFT mirrors PHASE
-    # (it's a structural shift, not a layer arrival).
+    # LAYER_ARRIVAL (its bass-side analog). KICK_DENSITY_SHIFT is deliberately
+    # slower after the 2026-06-03 live run: hard-tek onset density can wobble
+    # across the threshold while the same groove is still playing, and the old
+    # 18s gap let that one detector dominate the co-host.
     "KICK_SWAP": 14.0,
     "SUB_LAYER_ARRIVAL": 16.0,
-    "KICK_DENSITY_SHIFT": 18.0,
+    "KICK_DENSITY_SHIFT": 60.0,
     # Plan 17-03 — paired breakdown / re-entry detectors. KILL gets the same
     # 20s cooldown as MIX_MOVE (it's a structural moment, not a fast tap).
     # REENTRY uses 12s — shorter because the kill→reentry pair is bounded

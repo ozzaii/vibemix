@@ -15,7 +15,6 @@ import numpy as np
 from tests.state.detectors.conftest import _audio_sine
 from vibemix.state.detectors._dsp import kick_band_centroid, sub_share
 
-
 # ---------- kick_band_centroid ----------
 
 
@@ -100,7 +99,7 @@ def test_min_event_gap_per_type_extended_with_three_kick_side_entries():
 
     assert MIN_EVENT_GAP_PER_TYPE["KICK_SWAP"] == 14.0
     assert MIN_EVENT_GAP_PER_TYPE["SUB_LAYER_ARRIVAL"] == 16.0
-    assert MIN_EVENT_GAP_PER_TYPE["KICK_DENSITY_SHIFT"] == 18.0
+    assert MIN_EVENT_GAP_PER_TYPE["KICK_DENSITY_SHIFT"] == 60.0
     # v4 entries — Plan 40-04 re-tuned to v4 chat-tested 2026-05-11 baseline.
     # TRACK_CHANGE was 6.0 → now 5.0; LAYER_ARRIVAL was 16.0 → now 10.0.
     assert MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"] == 5.0  # Plan 40-04 — was 6.0
