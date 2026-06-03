@@ -960,6 +960,17 @@ async def coach_loop(
                     type=tag,
                     latency_ms=round((time.time() - _call_started) * 1000, 1),
                 )
+                try:
+                    handle.interrupt(force=True)
+                    _tr("ai_resp", "playout_timeout_interrupt", type=tag)
+                except Exception as e:
+                    _tr("error", "playout_timeout_interrupt", type=tag, err=str(e))
+                if playback is not None:
+                    try:
+                        playback.clear()
+                        _tr("ai_resp", "playout_timeout_playback_clear", type=tag)
+                    except Exception as e:
+                        _tr("error", "playout_timeout_playback_clear", type=tag, err=str(e))
                 _safe_print("[coach] generate_reply timed out", file=sys.stderr)
             finally:
                 trigger_state["in_flight"] = False

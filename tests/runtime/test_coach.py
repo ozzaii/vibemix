@@ -866,12 +866,14 @@ def test_coach_10_manual_trigger(
 def test_coach_11_timeout_doesnt_crash_loop(
     mocker,
     fake_session,
+    fake_handle,
     fake_agent,
     fake_levels,
     fake_recorder,
     fake_event_detector,
     music_state,
     fake_event,
+    fake_playback,
 ):
     """COACH-11: asyncio.wait_for raises TimeoutError on first event fire →
     loop catches, clears in_flight, continues. Next tick proceeds normally."""
@@ -912,10 +914,13 @@ def test_coach_11_timeout_doesnt_crash_loop(
             manual_trigger,
             trigger_state,
             stop_event,
+            playback=fake_playback,
         )
     )
 
     assert fake_session.generate_reply.call_count == 2
+    fake_handle.interrupt.assert_called_once_with(force=True)
+    fake_playback.clear.assert_called_once()
     assert trigger_state["in_flight"] is False
 
 
