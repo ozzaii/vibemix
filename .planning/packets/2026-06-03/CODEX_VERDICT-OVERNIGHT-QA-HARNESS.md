@@ -45,3 +45,25 @@
 - Remaining packet work:
   - The env-gated live `VIBEMIX_REPLAY_SESSION` capture-source substitute is not implemented yet.
   - Parallel scenario launcher and Respan quality layer remain to be wired on top of the now-available port fan-out + findings JSON.
+
+## Increment 3 — process-parallel replay runner
+
+- Item: `CODEX_READY-OVERNIGHT-QA-HARNESS.md` step 3 partial (`parallel scenario runner` for replay sessions).
+- SHA: `d81dabf3` (`feat(eval): parallelize replay harness sessions`).
+- User value: the replay harness no longer pretends `asyncio.gather` is parallel for synchronous replay work; overnight QA can pass `--jobs N` and fan out sessions in isolated worker processes.
+- By-eye artifact:
+  - Prepared a two-session temp corpus by copying `tests/eval/fixtures/synthetic_session` to `one` and `two`.
+  - Ran `uv run python -m scripts.eval.replay_harness --corpus /tmp/vibemix-overnight-jobs.sNjEDj/corpus --judges noop --output /tmp/vibemix-overnight-jobs.sNjEDj/out --jobs 2`.
+  - Command exited `0`.
+  - `eval_report.json` contained both `"session": "one"` and `"session": "two"` with `"threshold_pass": true`.
+  - `scorecard.md` rendered `Sessions: 2` and per-session rows for `one` and `two`.
+- Safety notes:
+  - `--jobs` defaults to `1`, preserving old behavior.
+  - Worker isolation uses `ProcessPoolExecutor`, not threads, so detector-mode synthetic clock patches cannot share globals across sessions.
+- Checks:
+  - `uv run pytest -q tests/eval/test_replay_harness.py tests/eval/test_replay_harness_cooldowns.py tests/eval/test_replay_harness_phase_41.py` -> `40 passed`.
+  - `uv run ruff check scripts/eval/replay_harness.py tests/eval/test_replay_harness.py` -> pass.
+  - `git diff --check` -> pass.
+- Remaining packet work:
+  - `VIBEMIX_REPLAY_SESSION` live capture-source substitute remains open.
+  - Respan/Sven blind-judge layer remains gated on provider credentials.
