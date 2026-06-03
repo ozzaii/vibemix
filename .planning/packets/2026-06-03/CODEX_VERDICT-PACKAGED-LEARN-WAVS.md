@@ -207,3 +207,55 @@
 
 - No live app, TTS, sounddevice stream, or co-host speech was run. The only sidecar execution was `--version` from the extracted updater app.
 - Full signed `latest.json` still requires the release workflow's remaining platform artifacts (`darwin-x86_64` updater archive and Windows Tauri NSIS updater installer). Those were not produced on this arm64 macOS loop.
+
+---
+
+## Increment 7 — Developer ID Seal Artifact Gate
+
+- Item: make macOS first-install and updater artifact readiness fail unless the
+  extracted/copied `.app` has a strict Developer ID Application signature and
+  resource seal.
+- SHA: `d8d143d8` (`fix(release): require developer id seal in macos artifact checks`).
+- User value: a package can no longer pass the release artifact gate merely
+  because the sidecar launches; the checker now catches the exact bad-seal
+  class exposed by the first notarization run.
+
+## By-Eye / Artifact Evidence
+
+- `scripts/dist/check_macos_app_bundle_ready.py` now supports
+  `--require-developer-id` and records `developer_id` in JSON output.
+- The new gate runs `codesign --verify --strict --verbose=4`, requires
+  `Authority=Developer ID Application:`, requires a non-empty/expected
+  `TeamIdentifier`, and requires `Contents/_CodeSignature/CodeResources` plus
+  sealed resources.
+- `scripts/dist/check_macos_dmg_artifact_ready.py` and
+  `scripts/dist/check_macos_updater_artifact_ready.py` thread the same gate to
+  the drag-installed/extracted `.app`.
+- The signed-release workflow now passes `--require-developer-id` on the
+  post-sign DMG and updater artifact checks.
+- Current artifact proof:
+  - `dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1.dmg` -> `ok=true`,
+    `developer_id="Developer ID signature ready: TeamIdentifier=UK7DYFK6F8"`,
+    `moss_source=bundled MOSS model ready`, `smoke_stdout="vibemix 0.1.0-dev0"`.
+  - `dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1-arm64.app.tar.gz` ->
+    `ok=true`,
+    `developer_id="Developer ID signature ready: TeamIdentifier=UK7DYFK6F8"`,
+    `moss_source=bundled MOSS model ready`, `smoke_stdout="vibemix 0.1.0-dev0"`.
+
+## Gates
+
+- `uv run pytest -q tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_updater_artifact_ready.py tests/install/test_macos_dmg_artifact_ready.py tests/security/test_release_yml_signing_skips.py` -> `39 passed`.
+- `uv run ruff check scripts/dist/check_macos_app_bundle_ready.py scripts/dist/check_macos_updater_artifact_ready.py scripts/dist/check_macos_dmg_artifact_ready.py tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_updater_artifact_ready.py tests/install/test_macos_dmg_artifact_ready.py tests/security/test_release_yml_signing_skips.py` -> pass.
+- `git diff --check -- .github/workflows/release.yml scripts/dist/check_macos_app_bundle_ready.py scripts/dist/check_macos_updater_artifact_ready.py scripts/dist/check_macos_dmg_artifact_ready.py tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_updater_artifact_ready.py tests/install/test_macos_dmg_artifact_ready.py tests/security/test_release_yml_signing_skips.py` -> pass.
+- `python3 scripts/dist/check_macos_dmg_artifact_ready.py dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1.dmg --triple aarch64-apple-darwin --require-moss-source --require-developer-id --smoke version --json` -> `ok=true`.
+- `python3 scripts/dist/check_macos_updater_artifact_ready.py dist/fresh-20260604-wav-signed-v2/vibemix-0.0.1-arm64.app.tar.gz --triple aarch64-apple-darwin --require-moss-source --require-developer-id --smoke version --json` -> `ok=true`.
+- `uv run python scripts/check_dirty_package_plan.py --summary` -> pass
+  (`Package 48 - Release Artifact MOSS Source Gate: 9 dirty paths`).
+
+## Notes
+
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+  still fails on unrelated unassigned `2026-06-03` packet docs in the shared
+  dirty tree; the new release paths are covered by Package 48.
+- No live app, TTS, sounddevice stream, or co-host speech was run. The only
+  sidecar execution was `--version` from the copied/extracted release artifacts.
