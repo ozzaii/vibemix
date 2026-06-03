@@ -28,9 +28,12 @@ import asyncio
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import numpy as np
 import pytest
 from livekit.agents import NOT_GIVEN
 
@@ -38,6 +41,141 @@ from vibemix import __version__
 from vibemix.agent.local_tts import LocalTTSUnavailable
 
 _REAL_SLEEP = asyncio.sleep
+
+
+def test_input_callback_uses_background_audio_processor(monkeypatch):
+    """Live input resampling must not run on the CoreAudio callback thread."""
+    import vibemix.__main__ as main_mod
+
+    resample_threads: list[str] = []
+    resampled = threading.Event()
+
+    def fake_resample(samples, *, source_sr, target_sr):
+        resample_threads.append(threading.current_thread().name)
+        resampled.set()
+        return np.zeros(max(1, len(samples) // 3), dtype=np.float32)
+
+    class BufferSpy:
+        def __init__(self) -> None:
+            self.items: list[object] = []
+
+        def push(self, item) -> None:
+            self.items.append(item)
+
+    class RecorderSpy:
+        def __init__(self) -> None:
+            self.items: list[bytes] = []
+
+        def push_input(self, item: bytes) -> None:
+            self.items.append(item)
+
+    class LevelsSpy:
+        def __init__(self) -> None:
+            self.updated = False
+
+        def update_music(self, _pcm) -> None:
+            self.updated = True
+
+    class MicSpy:
+        def pull(self, _frames):
+            return b""
+
+    monkeypatch.setattr(main_mod, "resample_audio", fake_resample)
+    audio_buf = BufferSpy()
+    clean_audio_buf = BufferSpy()
+    recorder = RecorderSpy()
+    processor = main_mod._InputAudioProcessor(
+        audio_buf=audio_buf,
+        clean_audio_buf=clean_audio_buf,
+        recorder=recorder,
+        source_sr=48000,
+    )
+    levels = LevelsSpy()
+    try:
+        callback = main_mod._input_callback_factory(
+            levels,
+            BufferSpy(),
+            MicSpy(),
+            audio_buf,
+            clean_audio_buf,
+            recorder,
+            source_sr=48000,
+            input_audio_processor=processor,
+        )
+        callback(np.ones((480, 2), dtype=np.float32) * 0.1, 480, None, None)
+
+        assert resampled.wait(timeout=1.0)
+    finally:
+        processor.close()
+
+    assert levels.updated is True
+    assert resample_threads == ["vibemix-input-audio-worker"]
+    assert audio_buf.items
+    assert clean_audio_buf.items
+    assert recorder.items
+
+
+def test_input_callback_throttles_deck_audio_context_updates():
+    """Full deck-audio evidence context is too heavy to rebuild every 10ms."""
+    import vibemix.__main__ as main_mod
+
+    class BufferSpy:
+        def push(self, _item) -> None:
+            pass
+
+    class LevelsSpy:
+        def update_music(self, _pcm) -> None:
+            pass
+
+    class MicSpy:
+        def pull(self, _frames):
+            return b""
+
+    class ProcessorSpy:
+        def __init__(self) -> None:
+            self.blocks = 0
+
+        def push(self, _music48) -> None:
+            self.blocks += 1
+
+    class DeckCaptureSpy:
+        def __init__(self) -> None:
+            self._clock_s = 0.0
+            self.context_calls = 0
+
+        def process(self, indata, *, source_sr, **_kwargs):
+            self._clock_s += indata.shape[0] / float(source_sr)
+            mono = indata.mean(axis=1).astype(np.float32)
+            stereo = np.repeat(mono[:, None], 2, axis=1).astype(np.float32)
+            return SimpleNamespace(master_mono=mono, passthrough_stereo=stereo)
+
+        def context(self):
+            self.context_calls += 1
+            return {"deck_audio_rms": {"A": 0.1, "B": 0.0}}
+
+    deck_capture = DeckCaptureSpy()
+    audio_context: dict[str, object] = {}
+    processor = ProcessorSpy()
+    callback = main_mod._input_callback_factory(
+        LevelsSpy(),
+        BufferSpy(),
+        MicSpy(),
+        BufferSpy(),
+        BufferSpy(),
+        SimpleNamespace(push_input=lambda _pcm: None),
+        deck_audio_capture=deck_capture,
+        audio_capture_context=audio_context,
+        source_sr=48000,
+        input_audio_processor=processor,
+    )
+
+    block = np.ones((480, 4), dtype=np.float32) * 0.1
+    for _ in range(30):
+        callback(block, 480, None, None)
+
+    assert processor.blocks == 30
+    assert deck_capture.context_calls == 2
+    assert audio_context["deck_audio_rms"] == {"A": 0.1, "B": 0.0}
 
 
 def _assert_tts_chain_boot_call(build_tts_chain: MagicMock) -> object:
@@ -706,7 +844,7 @@ def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
     monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
 
-    _build_audio_mocks(mocker)
+    audio_mocks = _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
     _build_state_refresh_noop(mocker)
     livekit_mocks = _build_livekit_mocks(mocker)
@@ -733,6 +871,7 @@ def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
     assert livekit_mocks["AgentSession"].call_args.kwargs["tts"] is NOT_GIVEN
     assert livekit_mocks["DJCoHostAgent"].call_args.kwargs["tts_inst"] is NOT_GIVEN
     livekit_mocks["session"].output.set_audio_enabled.assert_called_once_with(False)
+    assert audio_mocks["open_voice_output"].call_count == 0
     assert livekit_mocks["PlaybackQueueAudioOutput"].call_count == 0
     assert livekit_mocks["session"].output.audio is None
     assert livekit_mocks["session"].start.await_count == 1

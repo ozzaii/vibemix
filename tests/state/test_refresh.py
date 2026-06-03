@@ -214,6 +214,47 @@ def test_tick_writes_audio_features():
     assert last_low == 0.0
 
 
+def test_tick_idle_silence_skips_heavy_audio_dsp(mocker):
+    """Idle silence must not run the expensive 10Hz audio-only analyzers."""
+
+    for name in (
+        "energy_curve",
+        "short_term_lufs",
+        "crest_factor",
+        "estimate_bpm",
+        "compute_downbeat_phase",
+        "long_arc_curve",
+    ):
+        mocker.patch(
+            f"vibemix.state.refresh.{name}",
+            side_effect=AssertionError(f"{name} should not run on idle silence"),
+        )
+
+    state = MusicState()
+    out = _tick_once(
+        state,
+        _silent_buf(),
+        _silent_ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+    )
+
+    last_high, last_low, bpm_cache, last_bpm_at = out
+    assert last_high == 0.0
+    assert last_low == 1000.0
+    assert bpm_cache == 0.0
+    assert last_bpm_at == 0.0
+    assert state.audible is False
+    assert state.rms == 0.0
+    assert state.energy_curve == []
+    assert state.long_arc == []
+    assert state.bpm_confidence == 0.0
+
+
 def test_tick_sets_course3_session_active_only_with_audible_deck() -> None:
     state = MusicState()
     buf = _audible_buf()

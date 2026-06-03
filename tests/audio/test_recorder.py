@@ -9,6 +9,7 @@ RESEARCH.md Security V8.
 from __future__ import annotations
 
 import json
+import threading
 import wave
 from pathlib import Path
 
@@ -55,6 +56,63 @@ def test_voice_recorder_writes_input_wav_with_correct_header(tmp_path: Path) -> 
         assert w.getsampwidth() == 2
         assert w.getframerate() == INPUT_SR_TARGET
         assert w.getframerate() == 16000  # belt + braces
+
+
+def test_push_input_does_not_write_wav_on_caller_thread(tmp_path: Path, mocker) -> None:
+    """Audio callbacks enqueue PCM; the recorder thread owns WAV writes."""
+    rec = VoiceRecorder(root=tmp_path)
+    pcm = np.full(1600, 1234, dtype=np.int16).tobytes()
+    entered_write = threading.Event()
+    release_write = threading.Event()
+    returned = threading.Event()
+    original_write = rec.input_wav.writeframesraw
+
+    def blocking_write(data: bytes) -> None:
+        entered_write.set()
+        release_write.wait(timeout=1.0)
+        original_write(data)
+
+    mocker.patch.object(rec.input_wav, "writeframesraw", side_effect=blocking_write)
+
+    def push() -> None:
+        rec.push_input(pcm)
+        returned.set()
+
+    t = threading.Thread(target=push)
+    try:
+        t.start()
+        assert returned.wait(timeout=0.2), "push_input blocked on wave.writeframes"
+        assert entered_write.wait(timeout=1.0), "writer thread never consumed queued PCM"
+    finally:
+        release_write.set()
+        t.join(timeout=1.0)
+        rec.close()
+
+
+def test_recorder_batches_short_input_writes(tmp_path: Path, mocker, monkeypatch) -> None:
+    """Short callback bursts coalesce into fewer disk writes."""
+    import vibemix.audio.recorder as rec_mod
+
+    monkeypatch.setattr(rec_mod, "_WAV_BATCH_WAIT_S", 0.2)
+    rec = VoiceRecorder(root=tmp_path)
+    pcm = np.full(160, 1234, dtype=np.int16).tobytes()
+    writes: list[int] = []
+    original_write = rec.input_wav.writeframesraw
+
+    def record_write(data: bytes) -> None:
+        writes.append(len(data))
+        original_write(data)
+
+    mocker.patch.object(rec.input_wav, "writeframesraw", side_effect=record_write)
+
+    try:
+        rec.push_input(pcm)
+        rec.push_input(pcm)
+        rec.push_input(pcm)
+    finally:
+        rec.close()
+
+    assert writes == [len(pcm) * 3]
 
 
 # ===== REC-03: voice.wav 24kHz =====
@@ -167,8 +225,9 @@ def test_two_recorders_in_same_second_get_distinct_dirs(tmp_path, monkeypatch):
     boot (caught live 2026-05-30 on the frozen sidecar). Each session must keep
     its OWN dir (exist_ok=True would let them clobber each other's recordings).
     """
-    import vibemix.audio.recorder as rec_mod
     from datetime import datetime as _dt
+
+    import vibemix.audio.recorder as rec_mod
 
     fixed = _dt(2026, 5, 30, 20, 24, 21)
 

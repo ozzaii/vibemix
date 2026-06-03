@@ -154,10 +154,9 @@ class DeckAudioCapture:
                 if delta:
                     deck_deltas[side] = delta
                 try:
-                    deck16f = resample_audio(
+                    deck16f = _resample_deck_ring_audio(
                         deck_mono,
                         source_sr=source_sr,
-                        target_sr=INPUT_SR_TARGET,
                     )
                     deck_pcm = np.clip(deck16f * 32767.0, -32768, 32767).astype(np.int16)
                     self.buffers[side].push(deck_pcm)
@@ -336,6 +335,20 @@ def _deck_frame_features(deck_mono: np.ndarray, rms: float) -> dict[str, object]
         "flux": round(min(max(flux, 0.0), 9.999), 6),
         "crest": round(min(max(crest, 0.0), 99.9), 2),
     }
+
+
+def _resample_deck_ring_audio(deck_mono: np.ndarray, *, source_sr: int) -> np.ndarray:
+    """Cheap live-ring resample for per-deck evidence.
+
+    The product-quality master feed still uses the low-pass resampler. These
+    per-deck rings feed band/evidence context, so the common 48k -> 16k live
+    path can decimate without putting FIR convolution on the CoreAudio thread.
+    """
+    if source_sr == INPUT_SR_TARGET:
+        return deck_mono.astype(np.float32, copy=False)
+    if source_sr == 48000 and INPUT_SR_TARGET == 16000:
+        return deck_mono[::3].astype(np.float32, copy=False)
+    return resample_audio(deck_mono, source_sr=source_sr, target_sr=INPUT_SR_TARGET)
 
 
 def _opened_stereo_pair_rms(indata: np.ndarray) -> dict[str, float]:

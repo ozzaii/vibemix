@@ -959,7 +959,8 @@ def _tick_once(
     active_profile = get_active_profile()
     profile_name = active_profile.name if active_profile is not None else "unknown"
 
-    # Audio features (cheap — ~5-10ms)
+    # Audio features (cheap when silent; the deeper DSP below is not).
+    was_audible = bool(getattr(state, "audible", False))
     feats = snapshot_features(audio_buf, seconds=4.0)
     raw_rms = feats.get("rms", 0.0)
     voice_level = _levels_voice(levels)
@@ -969,23 +970,30 @@ def _tick_once(
     )
     if voice_dominant_capture:
         feats = _silence_trusted_features(feats)
-    curve = energy_curve(audio_buf, seconds=12.0, hop=1.0)
-    try:
-        if voice_dominant_capture:
-            master_lufs = None
-        else:
-            master_lufs = short_term_lufs(
-                audio_buf.snapshot(int(audio_buf._sr * SHORT_TERM_WINDOW_S)),
-                audio_buf._sr,
-            )
-    except Exception:
-        master_lufs = None
     rms = feats.get("rms", 0.0)
     currently_loud = rms > SILENT_RMS
+    needs_audio_dsp = currently_loud or was_audible
+    if needs_audio_dsp:
+        curve = energy_curve(audio_buf, seconds=12.0, hop=1.0)
+        try:
+            if voice_dominant_capture:
+                master_lufs = None
+            else:
+                master_lufs = short_term_lufs(
+                    audio_buf.snapshot(int(audio_buf._sr * SHORT_TERM_WINDOW_S)),
+                    audio_buf._sr,
+                )
+        except Exception:
+            master_lufs = None
+        # Phase 6: crest factor over the same 4s window.
+        pcm_for_crest = audio_buf.snapshot(int(audio_buf._sr * 4.0))
+        raw_crest = crest_factor(pcm_for_crest)
+    else:
+        curve = []
+        master_lufs = None
+        pcm_for_crest = None
+        raw_crest = 0.0
 
-    # Phase 6: crest factor over the same 4s window.
-    pcm_for_crest = audio_buf.snapshot(int(audio_buf._sr * 4.0))
-    raw_crest = crest_factor(pcm_for_crest)
     # Don't smooth on silence — keep last-known value to prevent EMA decay
     # during track gaps.
     if raw_crest > 0:
@@ -1158,12 +1166,15 @@ def _tick_once(
         # yields (0.0, 0.0) so the renderer (Plan 13-04) falls back to
         # immediate switch — never beat-locks against fabricated phase.
         # mood is owned by SettingsApplier, never touched here.
-        new_phase_frac, new_bpm_conf = compute_downbeat_phase(
-            pcm_for_crest,
-            bpm_cache,
-            audio_buf._sr,
-            prior_phase=state.downbeat_phase,
-        )
+        if pcm_for_crest is None:
+            new_phase_frac, new_bpm_conf = state.downbeat_phase, 0.0
+        else:
+            new_phase_frac, new_bpm_conf = compute_downbeat_phase(
+                pcm_for_crest,
+                bpm_cache,
+                audio_buf._sr,
+                prior_phase=state.downbeat_phase,
+            )
         state.downbeat_phase = new_phase_frac
         state.bpm_confidence = new_bpm_conf
 
@@ -1469,9 +1480,12 @@ def _tick_once(
             evidence_dedupe=evidence_dedupe,
         )
 
-        # Long arc — recompute every cycle is fine (cheap reduction over the
-        # 16k ring buffer, ~1ms)
-        state.long_arc = long_arc_curve(audio_buf, seconds=120.0, hop=10.0)
+        # Long arc is only useful with trusted music. On an idle/zero capture,
+        # scanning the 120s ring at 10Hz is pure CPU churn and can make the app
+        # stutter while the UI correctly shows silence.
+        state.long_arc = (
+            long_arc_curve(audio_buf, seconds=120.0, hop=10.0) if state.audible else []
+        )
 
         # Phase 78 (PERCEIVE-02) — multi-scale trajectory narrative. Composed
         # HERE (after phase_history / recent_moves / long_arc are written this

@@ -758,3 +758,22 @@ def test_deck_audio_capture_context_includes_pre_current_windows(monkeypatch) ->
     assert windows["B"]["pre"]["rms"] == pytest.approx(0.6)
     assert windows["B"]["current"]["rms"] == pytest.approx(0.3)
     assert "rms_fell_50pct_strong" in windows["B"]["delta"]
+
+
+def test_deck_audio_capture_uses_fast_48k_decimator_for_live_ring(monkeypatch) -> None:
+    import vibemix.audio.deck_capture as deck_capture_mod
+
+    def fail_resample(*_args, **_kwargs):
+        pytest.fail("48k deck-ring capture should not use FIR resample on the audio thread")
+
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "A=0,1;B=2,3")
+    monkeypatch.setattr(deck_capture_mod, "resample_audio", fail_resample)
+    routing = deck_audio_routing_from_env(input_channels=4)
+    capture = DeckAudioCapture(routing, seconds=1.0)
+    indata = np.zeros((480, 4), dtype=np.float32)
+    indata[:, 0] = 0.2
+    indata[:, 1] = 0.2
+
+    capture.process(indata, source_sr=48000)
+
+    assert capture.buffers["A"].snapshot(160).shape == (160,)

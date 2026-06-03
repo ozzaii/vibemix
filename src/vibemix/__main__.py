@@ -33,6 +33,7 @@ import argparse
 import asyncio
 import inspect
 import os
+import queue
 import re
 import signal
 import sys
@@ -661,13 +662,17 @@ def _input_callback_factory(
     audio_capture_context: dict[str, object] | None = None,
     controller_state: Any | None = None,
     source_sr: int = INPUT_SR_NATIVE,
+    input_audio_processor: _InputAudioProcessor | None = None,
 ):
     """Verbatim port of cohost_v4.py:912-945 input stream callback.
 
     ``source_sr`` is the capture device's native rate (44.1k/48k/...) so the
     resample to 16k stays correct regardless of the user's loopback rate."""
 
+    last_audio_context_at_s = -999.0
+
     def callback(indata, frames, time_info, status):
+        nonlocal last_audio_context_at_s
         if status:
             print(f"[input status] {status}", file=sys.stderr)
         if deck_audio_capture is not None:
@@ -693,7 +698,10 @@ def _input_callback_factory(
             passthrough_audio = captured.passthrough_stereo
             music48 = captured.master_mono
             if audio_capture_context is not None:
-                audio_capture_context.update(deck_audio_capture.context())
+                now_s = float(getattr(deck_audio_capture, "_clock_s", 0.0) or 0.0)
+                if now_s - last_audio_context_at_s >= 0.25:
+                    audio_capture_context.update(deck_audio_capture.context())
+                    last_audio_context_at_s = now_s
         else:
             passthrough_audio = indata[:, :2]
             if passthrough_audio.shape[1] == 1:
@@ -710,25 +718,133 @@ def _input_callback_factory(
         # otherwise Gemini hears Kaan's voice as "vocals" in the track.
         mic.pull(len(music48))  # keep cadence aligned, discard samples
 
-        state48 = music48 * MUSIC_GAIN_TO_GEMINI
-        state_pcm_48k = np.clip(state48 * 32767.0, -32768, 32767).astype(np.int16)
-        clean48 = music48
-
-        try:
-            state16f = resample_audio(state48, source_sr=source_sr, target_sr=INPUT_SR_TARGET)
-            state_pcm_16k = np.clip(state16f * 32767.0, -32768, 32767).astype(np.int16)
-            audio_buf.push(state_pcm_16k)
-            recorder.push_input(state_pcm_16k.tobytes())
-
-            clean16f = resample_audio(clean48, source_sr=source_sr, target_sr=INPUT_SR_TARGET)
-            clean_pcm_16k = np.clip(clean16f * 32767.0, -32768, 32767).astype(np.int16)
-            clean_audio_buf.push(clean_pcm_16k)
-        except Exception as e:
-            print(f"[buf push err] {e}", file=sys.stderr)
+        state_pcm_48k = np.clip(music48 * MUSIC_GAIN_TO_GEMINI * 32767.0, -32768, 32767).astype(
+            np.int16
+        )
+        if input_audio_processor is not None:
+            input_audio_processor.push(music48)
+        else:
+            _push_input_audio_buffers(
+                music48,
+                audio_buf=audio_buf,
+                clean_audio_buf=clean_audio_buf,
+                recorder=recorder,
+                source_sr=source_sr,
+            )
 
         levels.update_music(state_pcm_48k)
 
     return callback
+
+
+def _push_input_audio_buffers(
+    music48: np.ndarray,
+    *,
+    audio_buf: AudioBuffer,
+    clean_audio_buf: AudioBuffer,
+    recorder: VoiceRecorder,
+    source_sr: int,
+) -> None:
+    """Resample and fan out one music block outside the CoreAudio callback."""
+    state48 = music48 * MUSIC_GAIN_TO_GEMINI
+    try:
+        state16f = resample_audio(state48, source_sr=source_sr, target_sr=INPUT_SR_TARGET)
+        state_pcm_16k = np.clip(state16f * 32767.0, -32768, 32767).astype(np.int16)
+        audio_buf.push(state_pcm_16k)
+        recorder.push_input(state_pcm_16k.tobytes())
+
+        if MUSIC_GAIN_TO_GEMINI == 1.0:
+            clean_audio_buf.push(state_pcm_16k)
+            return
+        clean16f = resample_audio(music48, source_sr=source_sr, target_sr=INPUT_SR_TARGET)
+        clean_pcm_16k = np.clip(clean16f * 32767.0, -32768, 32767).astype(np.int16)
+        clean_audio_buf.push(clean_pcm_16k)
+    except Exception as e:
+        print(f"[buf push err] {e}", file=sys.stderr)
+
+
+class _InputAudioProcessor:
+    """Bounded background resampler for the live input callback."""
+
+    def __init__(
+        self,
+        *,
+        audio_buf: AudioBuffer,
+        clean_audio_buf: AudioBuffer,
+        recorder: VoiceRecorder,
+        source_sr: int,
+        max_pending: int = 32,
+        batch_blocks: int = 5,
+    ) -> None:
+        self._audio_buf = audio_buf
+        self._clean_audio_buf = clean_audio_buf
+        self._recorder = recorder
+        self._source_sr = source_sr
+        self._batch_blocks = max(1, batch_blocks)
+        self._closed = threading.Event()
+        self._queue: queue.Queue[np.ndarray | None] = queue.Queue(maxsize=max(1, max_pending))
+        self._thread = threading.Thread(
+            target=self._run,
+            name="vibemix-input-audio-worker",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def push(self, music48: np.ndarray) -> None:
+        if self._closed.is_set():
+            return
+        block = np.asarray(music48, dtype=np.float32).copy()
+        try:
+            self._queue.put_nowait(block)
+            return
+        except queue.Full:
+            pass
+        try:
+            self._queue.get_nowait()
+        except queue.Empty:
+            pass
+        try:
+            self._queue.put_nowait(block)
+        except queue.Full:
+            pass
+
+    def close(self) -> None:
+        self._closed.set()
+        try:
+            self._queue.put_nowait(None)
+        except queue.Full:
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                self._queue.put_nowait(None)
+            except queue.Full:
+                pass
+        self._thread.join(timeout=2.0)
+
+    def _run(self) -> None:
+        while True:
+            block = self._queue.get()
+            if block is None or self._closed.is_set():
+                return
+            blocks = [block]
+            while len(blocks) < self._batch_blocks:
+                try:
+                    next_block = self._queue.get(timeout=0.01)
+                except queue.Empty:
+                    break
+                if next_block is None or self._closed.is_set():
+                    return
+                blocks.append(next_block)
+            music48 = blocks[0] if len(blocks) == 1 else np.concatenate(blocks)
+            _push_input_audio_buffers(
+                music48,
+                audio_buf=self._audio_buf,
+                clean_audio_buf=self._clean_audio_buf,
+                recorder=self._recorder,
+                source_sr=self._source_sr,
+            )
 
 
 def _input_device_env_is_explicit() -> bool:
@@ -1402,13 +1518,7 @@ async def main() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, handle_sigint)
 
-    voice_stream = audio_backend.open_voice_output(
-        output_idx,
-        sample_rate=OUTPUT_SR,
-        block_size=VOICE_BLOCKSIZE,
-        callback=_voice_callback_factory(playback),
-    )
-    print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz")
+    voice_stream = None
 
     pass_stream = audio_backend.open_passthrough_output(
         output_idx,
@@ -1915,9 +2025,17 @@ async def main() -> None:
     voice_muted = tts_inst is _livekit_not_given()
     if voice_muted:
         session.output.set_audio_enabled(False)
+        print("-> AI voice output muted (no local TTS); stream not opened")
         print("-> AgentSession headless (no Room); audio out muted (no local TTS)")
     else:
         session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
+        voice_stream = audio_backend.open_voice_output(
+            output_idx,
+            sample_rate=OUTPUT_SR,
+            block_size=VOICE_BLOCKSIZE,
+            callback=_voice_callback_factory(playback),
+        )
+        print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz")
         print(f"-> AgentSession headless (no Room); audio out → PlaybackQueue @ {OUTPUT_SR}Hz")
 
     await session.start(agent)
@@ -3017,6 +3135,12 @@ async def main() -> None:
     # block the websocket and make the product look dead before it can explain
     # the audio state. If it opens, the callback starts filling the buffers.
     capture_native_sr = _resolve_capture_native_sr(audio_capture_context)
+    input_audio_processor = _InputAudioProcessor(
+        audio_buf=audio_buf,
+        clean_audio_buf=clean_audio_buf,
+        recorder=recorder,
+        source_sr=capture_native_sr,
+    )
     input_stream = None
 
     def _set_input_stream(stream: Any) -> None:
@@ -3059,6 +3183,7 @@ async def main() -> None:
                     audio_capture_context,
                     midi_macos.controller_state,
                     source_sr=capture_native_sr,
+                    input_audio_processor=input_audio_processor,
                 ),
             )
         except Exception as exc:
@@ -3159,6 +3284,10 @@ async def main() -> None:
                 mic_stream.close()
             except Exception as e:
                 print(f"[close mic err] {e}", file=sys.stderr)
+        try:
+            input_audio_processor.close()
+        except Exception as e:
+            print(f"[close input audio processor err] {e}", file=sys.stderr)
         try:
             tracer.close()
         except Exception as e:

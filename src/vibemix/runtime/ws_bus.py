@@ -91,8 +91,9 @@ class _MidiMirrorProtocol(Protocol):
 #
 # Fix: ``ws_broadcast`` now ALSO emits a schema-valid ``ipc.session.snapshot``
 # to the same connected clients (downsampled — see SNAPSHOT_EVERY_N). The
-# mascot frame keeps its EXACT shape + 30Hz cadence (mascot.html + the WS
-# tests pin both); the snapshot is an ADDITIONAL frame on the same socket.
+# mascot frame keeps its 30Hz cadence for the animation/readout fields; heavier
+# live-context proof fields ride at MASCOT_RICH_EVERY_N. The snapshot is an
+# ADDITIONAL frame on the same socket.
 #
 # Snapshot SHAPE + field mapping mirror SessionLoop._build_snapshot (the
 # reference stub). Every snapshot is validated before send; on validation /
@@ -104,6 +105,13 @@ class _MidiMirrorProtocol(Protocol):
 # plenty for the UI panels, half the wire volume of the mascot stream. The
 # mascot sleep stays 1/30 (pinned by test_ws_07); only the snapshot is gated.
 SNAPSHOT_EVERY_N: int = 2
+
+# Emit the heavier Viber/Gemini/learn context fields every Nth mascot tick.
+# The flat mascot/pill frame still rides the socket at 30Hz for meters, BPM,
+# mood, reactions, and deck chips; the big context strings/maps are proof
+# packets, not animation data. At 30Hz / 15 ~= 2Hz, Viber still sees fresh
+# live context without rebuilding the whole prompt packet on every meter tick.
+MASCOT_RICH_EVERY_N: int = 15
 
 # Cap the AI transcript drained per snapshot so a burst can't blow the frame.
 _TRANSCRIPT_DRAIN_CAP: int = 8
@@ -915,14 +923,16 @@ async def ws_broadcast(
     panels light up under the real cohost. ``transcript_buf`` (an AI-text
     deque, drained per snapshot) and ``controller_state`` (for the MIDI
     ribbon) are OPTIONAL with ``None`` defaults — existing 4-arg callers and
-    the WS tests are unaffected. The mascot frame's shape + 30Hz cadence are
-    untouched; the snapshot is strictly additive and its failure is isolated.
+    the WS tests are unaffected. The mascot frame keeps 30Hz for its fast
+    meter/readout fields; heavier live-context proof fields are downsampled.
+    The snapshot is strictly additive and its failure is isolated.
     """
     clients: set = set()
     # Snapshot downsample counter + MIDI high-water mark (boxed in a list so
     # the builder can advance it across ticks).
     tick = 0
     last_move_ts: list[float] = [time.time()]
+    sent_rich_to_client = False
 
     def _tr(event: str, **detail: Any) -> None:
         # Fail-soft WS trace shim. WS frames at 30Hz are NOT traced (too noisy);
@@ -954,7 +964,9 @@ async def ws_broadcast(
         ipc_router.bind_emit(_send_all)
 
     async def handler(ws):
+        nonlocal sent_rich_to_client
         clients.add(ws)
+        sent_rich_to_client = False
         _tr("client_connect", clients=len(clients))
         if ipc_router is not None:
             try:
@@ -1021,7 +1033,7 @@ async def ws_broadcast(
             clients.discard(ws)
             _tr("client_disconnect", clients=len(clients))
 
-    server = await websockets.serve(handler, WS_HOST, WS_PORT)
+    server = await websockets.serve(handler, WS_HOST, WS_PORT, compression=None)
     _safe_print(
         f"-> mascot bus on ws://{WS_HOST}:{WS_PORT} (send {{action: trigger}} for manual fire)"
     )
@@ -1056,46 +1068,26 @@ async def ws_broadcast(
             # parser and consumed by the mascot. The seq lets the 30Hz
             # frontend subscriber fire each intent once while still allowing
             # the same intent to re-fire on a later co-host turn.
-            # Build the mascot frame as a dict FIRST so we can gate the send
-            # at the emit boundary (BRINGUP-04). The key set / ordering / 30Hz
-            # cadence are unchanged — the guard below only decides whether to
-            # PUT this tick on the wire, it never reshapes a valid frame.
-            audio_delta = _serialize_audio_delta(state)
-            recent_moves = _serialize_recent_moves(state)
-            force_audio_window = _deck_pair_capture_configured(audio_capture_context)
-            audio_window_context = _serialize_audio_window_context(
-                state,
-                recent_moves,
-                force=force_audio_window,
-            )
-            audio_window_map = _serialize_audio_window_map(
-                state,
-                recent_moves,
-                force=force_audio_window,
-            )
-            audio_part_context = render_audio_part_context(
-                audio_seconds=6.0,
-                surface="live_context",
-                p1_model_heard=False,
-            )
-            deck_lanes_context = render_deck_lane_context(state)
-            deck_reference_context = render_deck_reference_context(state)
-            deck_source_context = render_deck_source_context(state)
-            deck_audio_context = render_deck_audio_context(state)
-            deck_audio_separation_context = render_deck_audio_separation_context(
-                audio_capture_context
-            )
-            deck_audio_features_context = render_deck_audio_features_context(audio_capture_context)
-            deck_audio_delta_context = render_deck_audio_delta_context(audio_capture_context)
-            deck_audio_window_context = render_deck_audio_window_context(audio_capture_context)
-            band_env_context = render_band_env_context(state)
-            deck_source_status = _serialize_deck_source_status(state)
+            # No clients means no user can see/hear this socket. Avoid building
+            # the rich context packet in that state; inbound handlers still run
+            # because the server stays open above.
+            if not clients:
+                tick += 1
+                await asyncio.sleep(1 / 30)
+                continue
+
             level_snap = levels.snapshot()
             level_voice_rms = max(0.0, min(1.0, float(level_snap.get("voice", 0.0))))
             # The flat mascot/pill frame is a compact UI readout, so hold BPM
             # against the debounced MusicState audible flag. The richer
             # ipc.session.snapshot still carries the stricter grounded flag.
             level_grounded = bool(getattr(state, "audible", False))
+            rich_frame = not sent_rich_to_client or tick % MASCOT_RICH_EVERY_N == 0
+            # Build the fast mascot frame as a dict FIRST so we can gate the
+            # send at the emit boundary (BRINGUP-04). This 30Hz path carries
+            # animation/readout fields only; expensive Viber/Gemini context is
+            # appended below on the first frame for a client and then at the
+            # lower rich-frame cadence.
             mascot_frame = {
                 **level_snap,
                 "live_context_schema_version": LIVE_CONTEXT_SCHEMA_VERSION,
@@ -1136,92 +1128,114 @@ async def ws_broadcast(
                 # PURE READ at the serialize edge; the single writer
                 # (``_tick_once``) is upstream and untouched.
                 "deck_state": _serialize_deck_state(state),
-                # Per-deck mixer posture — additive, read-only. This is the
-                # cheap controller context Viber/Gemini need to distinguish
-                # "deck A low was cut" from "a musical transition happened":
-                # deck faders/EQ/filter/play, crossfader, and attribution
-                # confidence. It is evidence only, not a quality verdict.
-                "deck_mixer": _serialize_deck_mixer(state),
+            }
+            if rich_frame:
+                audio_delta = _serialize_audio_delta(state)
+                recent_moves = _serialize_recent_moves(state)
+                force_audio_window = _deck_pair_capture_configured(audio_capture_context)
+                audio_window_context = _serialize_audio_window_context(
+                    state,
+                    recent_moves,
+                    force=force_audio_window,
+                )
+                audio_window_map = _serialize_audio_window_map(
+                    state,
+                    recent_moves,
+                    force=force_audio_window,
+                )
+                audio_part_context = render_audio_part_context(
+                    audio_seconds=6.0,
+                    surface="live_context",
+                    p1_model_heard=False,
+                )
+                deck_lanes_context = render_deck_lane_context(state)
+                deck_reference_context = render_deck_reference_context(state)
+                deck_source_context = render_deck_source_context(state)
+                deck_audio_context = render_deck_audio_context(state)
+                deck_audio_separation_context = render_deck_audio_separation_context(
+                    audio_capture_context
+                )
+                deck_audio_features_context = render_deck_audio_features_context(
+                    audio_capture_context
+                )
+                deck_audio_delta_context = render_deck_audio_delta_context(audio_capture_context)
+                deck_audio_window_context = render_deck_audio_window_context(
+                    audio_capture_context
+                )
+                band_env_context = render_band_env_context(state)
+                deck_source_status = _serialize_deck_source_status(state)
+                mascot_frame.update(
+                    {
+                        # Per-deck mixer posture — additive, read-only. This is
+                        # the controller context Viber/Gemini need to
+                        # distinguish "deck A low was cut" from "a musical
+                        # transition happened": deck faders/EQ/filter/play,
+                        # crossfader, and attribution confidence.
+                        "deck_mixer": _serialize_deck_mixer(state),
+                        "deck_audio_separation_context": deck_audio_separation_context,
+                        "audio_part_context": audio_part_context,
+                        # Bounded DSP deltas from the existing perceive snapshot.
+                        "audio_delta": audio_delta,
+                        # Bounded evidence keys for Viber/Gemini. These are
+                        # citable categories, not quality verdicts.
+                        "live_evidence": _serialize_live_evidence(
+                            state,
+                            audio_delta_items=audio_delta,
+                            audio_capture_context=audio_capture_context,
+                        ),
+                        # Learn Course 3 live lens. Honest-cold defaults mean
+                        # no citable count-in exists.
+                        "course3_lens": _serialize_course3_lens(state),
+                    }
+                )
                 # Structured source/provenance diagnostics, separate from deck
                 # identity. The text prompt context below is for LLM grammar;
                 # this map is for lossless UI/Viber transport and debugging.
-                **({"deck_source_status": deck_source_status} if deck_source_status else {}),
+                if deck_source_status:
+                    mascot_frame["deck_source_status"] = deck_source_status
                 # Direct deck1/deck2 text maps for Viber/Gemini. These repeat
                 # the same state as deck_state/deck_mixer in a bounded prompt
                 # grammar so downstream agents do not have to infer that
                 # deck1=A/deck2=B from separate fields. They are context, not
                 # verdicts, and are omitted when the source state is cold.
-                **({"deck_lanes_context": deck_lanes_context} if deck_lanes_context else {}),
-                **(
-                    {"deck_reference_context": deck_reference_context}
-                    if deck_reference_context
-                    else {}
-                ),
-                **({"deck_source_context": deck_source_context} if deck_source_context else {}),
-                **({"deck_audio_context": deck_audio_context} if deck_audio_context else {}),
-                "deck_audio_separation_context": deck_audio_separation_context,
-                **(
-                    {"deck_audio_features_context": deck_audio_features_context}
-                    if deck_audio_features_context
-                    else {}
-                ),
-                **(
-                    {"deck_audio_delta_context": deck_audio_delta_context}
-                    if deck_audio_delta_context
-                    else {}
-                ),
-                **(
-                    {"deck_audio_window_context": deck_audio_window_context}
-                    if deck_audio_window_context
-                    else {}
-                ),
-                "audio_part_context": audio_part_context,
-                # Bounded DSP deltas from the existing perceive snapshot. This
-                # gives Viber/Gemini a cheap "what changed in the sound" hint
-                # around recent moves without adding another model/audio pass.
-                "audio_delta": audio_delta,
-                **({"band_env_context": band_env_context} if band_env_context else {}),
+                if deck_lanes_context:
+                    mascot_frame["deck_lanes_context"] = deck_lanes_context
+                if deck_reference_context:
+                    mascot_frame["deck_reference_context"] = deck_reference_context
+                if deck_source_context:
+                    mascot_frame["deck_source_context"] = deck_source_context
+                if deck_audio_context:
+                    mascot_frame["deck_audio_context"] = deck_audio_context
+                if deck_audio_features_context:
+                    mascot_frame["deck_audio_features_context"] = deck_audio_features_context
+                if deck_audio_delta_context:
+                    mascot_frame["deck_audio_delta_context"] = deck_audio_delta_context
+                if deck_audio_window_context:
+                    mascot_frame["deck_audio_window_context"] = deck_audio_window_context
+                if band_env_context:
+                    mascot_frame["band_env_context"] = band_env_context
                 # Time-aligned "old/action/future" context for Viber/Gemini.
                 # This is a live timing contract, not an audio stem and not a
-                # quality verdict. Recent moves annotate it when present; cold
-                # frames still carry move_anchor=none whenever live state gives
-                # us a reference (controller, audio, deck rows, or lookahead).
-                **({"recent_moves": recent_moves} if recent_moves else {}),
-                **({"audio_window_context": audio_window_context} if audio_window_context else {}),
-                **({"audio_window_map": audio_window_map} if audio_window_map else {}),
-                # Bounded evidence keys for Viber/Gemini. These are citable
-                # categories (deck route, move scope, DSP delta, MIDI move),
-                # not quality verdicts; existing consumers can ignore them.
-                "live_evidence": _serialize_live_evidence(
-                    state,
-                    audio_delta_items=audio_delta,
-                    audio_capture_context=audio_capture_context,
-                ),
-                # Learn Course 3 live lens — additive, read-only. Lets the
-                # integration pass verify live audio/course/phrase readiness
-                # over the existing socket without inspecting process memory.
-                # Honest-cold defaults mean no citable count-in exists.
-                "course3_lens": _serialize_course3_lens(state),
-            }
-            # Phase (PILL next-suggestion) — additive, read-only. The pill's
-            # "what's next" card reads ``next_suggestion`` = the latest grounded
-            # suggestion dict ({track_id, title, artist, similarity, why,
-            # camelot, bpm, transition, decision}) or ``null`` (honest silence
-            # — never a fabricated track). Full ranking is computed off-loop by
-            # the SuggestionService on TRACK_CHANGE; this serialize edge may ask
-            # the holder for a throttled live refresh so the shortlist winner,
-            # validator-checked decision, and "in N bars" follow the playhead
-            # without reranking the library at 30Hz. Guarded so a holder fault
-            # can never break the wire; absent when no holder is wired
-            # (golden-equivalent for existing subscribers).
-            if suggestion_holder is not None:
-                try:
-                    if hasattr(suggestion_holder, "current_for_state"):
-                        mascot_frame["next_suggestion"] = suggestion_holder.current_for_state(state)
-                    else:
-                        mascot_frame["next_suggestion"] = suggestion_holder.current()
-                except Exception as e:
-                    _safe_print(f"[ws] suggestion read failed: {e}", file=sys.stderr)
+                # quality verdict.
+                if recent_moves:
+                    mascot_frame["recent_moves"] = recent_moves
+                if audio_window_context:
+                    mascot_frame["audio_window_context"] = audio_window_context
+                if audio_window_map:
+                    mascot_frame["audio_window_map"] = audio_window_map
+                # Phase (PILL next-suggestion) — additive, read-only. The pill
+                # holds the last rendered value when this periodic proof field
+                # is omitted between rich frames.
+                if suggestion_holder is not None:
+                    try:
+                        if hasattr(suggestion_holder, "current_for_state"):
+                            mascot_frame["next_suggestion"] = suggestion_holder.current_for_state(
+                                state
+                            )
+                        else:
+                            mascot_frame["next_suggestion"] = suggestion_holder.current()
+                    except Exception as e:
+                        _safe_print(f"[ws] suggestion read failed: {e}", file=sys.stderr)
             # Emit-boundary guard (BRINGUP-04): never serialize an empty or
             # meter-less payload onto the wire. ``Levels.snapshot()`` always
             # returns the 3 meter keys and the static keys above are literal,
@@ -1248,6 +1262,8 @@ async def ws_broadcast(
                     dead.append(c)
             for c in dead:
                 clients.discard(c)
+            if rich_frame and clients:
+                sent_rich_to_client = True
 
             # Phase 91 (RENDER-01 + RENDER-02) — Learn surface emit.
             # Drain THEN snapshot, in that strict order: a fresh plug-in's
@@ -1413,7 +1429,9 @@ class WizardBus:
         call is a no-op if already running."""
         if self._server is not None:
             return
-        self._server = await websockets.serve(self._handler, WS_HOST, WS_PORT)
+        self._server = await websockets.serve(
+            self._handler, WS_HOST, WS_PORT, compression=None
+        )
         _safe_print(f"-> wizard bus on ws://{WS_HOST}:{WS_PORT} (handlers: {len(self._handlers)})")
 
     async def stop(self) -> None:

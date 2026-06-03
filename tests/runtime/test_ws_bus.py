@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
-from vibemix.runtime.ws_bus import ws_broadcast
+from vibemix.runtime.ws_bus import WizardBus, ws_broadcast
 from vibemix.state import MusicState
 
 _REAL_SLEEP = asyncio.sleep
@@ -61,10 +61,29 @@ def test_ws_02_server_starts_on_ws_host_port(mocker):
     # Assert serve was called with the right args
     assert serve_mock.await_count == 1
     args = serve_mock.await_args.args
+    kwargs = serve_mock.await_args.kwargs
     # args[0] is handler, args[1] is host, args[2] is port
     assert args[1] == "127.0.0.1"
     assert args[2] == 8765
+    assert kwargs["compression"] is None
     # close + wait_closed were called (cleanup branch)
+    mock_server.close.assert_called_once()
+    mock_server.wait_closed.assert_awaited_once()
+
+
+def test_wizard_bus_disables_local_ws_compression(mocker):
+    mock_server = _build_mock_server()
+    serve_mock = AsyncMock(return_value=mock_server)
+    mocker.patch("vibemix.runtime.ws_bus.websockets.serve", new=serve_mock)
+
+    async def run() -> None:
+        bus = WizardBus()
+        await bus.start()
+        await bus.stop()
+
+    asyncio.run(run())
+
+    assert serve_mock.await_args.kwargs["compression"] is None
     mock_server.close.assert_called_once()
     mock_server.wait_closed.assert_awaited_once()
 
@@ -365,6 +384,112 @@ def test_ws_06_broadcast_payload_shape(mocker):
     assert payload["audible"] is True
     assert payload["deck"] == "B"
     assert payload["phase"] == "groove"
+
+
+def test_mascot_rich_context_is_downsampled_after_first_client_frame(mocker):
+    """The 30Hz mascot frame stays fast after the first client proof packet."""
+    mock_server = _build_mock_server()
+    serve_mock = AsyncMock(return_value=mock_server)
+    mocker.patch("vibemix.runtime.ws_bus.websockets.serve", new=serve_mock)
+    audio_part_mock = mocker.patch(
+        "vibemix.runtime.ws_bus.render_audio_part_context",
+        return_value="audio_part_context[surface=live_context]",
+    )
+
+    fake_levels = MagicMock()
+    fake_levels.snapshot = MagicMock(return_value={"music": 0.05, "voice": 0.02, "mic": 0.01})
+    state = MusicState()
+    state.audible = True
+    manual_trigger = asyncio.Event()
+    stop_event = asyncio.Event()
+
+    class Holder:
+        def __init__(self):
+            self.calls = 0
+
+        def current_for_state(self, _state):
+            self.calls += 1
+            return {"track_id": "next-1", "title": "Next One"}
+
+    holder = Holder()
+    mascot_payloads: list[dict] = []
+    release_handler = asyncio.Event()
+
+    class LongLivedClient:
+        async def send(self, payload):
+            parsed = json.loads(payload)
+            if "type" not in parsed:
+                mascot_payloads.append(parsed)
+                if len(mascot_payloads) >= 2:
+                    stop_event.set()
+                    release_handler.set()
+
+        def __aiter__(self):
+            client = self
+
+            async def gen():
+                await release_handler.wait()
+                if False:  # pragma: no cover
+                    yield client
+
+            return gen()
+
+    sleep_counter = {"n": 0}
+
+    async def fast_sleep(_s):
+        sleep_counter["n"] += 1
+        if sleep_counter["n"] >= 80:  # safety net
+            stop_event.set()
+            release_handler.set()
+        await _REAL_SLEEP(0)
+
+    mocker.patch("vibemix.runtime.ws_bus.asyncio.sleep", side_effect=fast_sleep)
+
+    async def driver():
+        bg = asyncio.create_task(
+            ws_broadcast(
+                fake_levels,
+                state,
+                manual_trigger,
+                stop_event,
+                suggestion_holder=holder,
+            )
+        )
+        await _REAL_SLEEP(0)
+        await _REAL_SLEEP(0)
+        handler = serve_mock.await_args.args[0]
+
+        client = LongLivedClient()
+        handler_task = asyncio.create_task(handler(client))
+
+        await bg
+        try:
+            await asyncio.wait_for(handler_task, timeout=0.5)
+        except Exception:
+            handler_task.cancel()
+
+    asyncio.run(driver())
+
+    assert len(mascot_payloads) >= 2
+    rich, fast = mascot_payloads[:2]
+    assert rich["next_suggestion"] == {"track_id": "next-1", "title": "Next One"}
+    assert rich["audio_part_context"] == "audio_part_context[surface=live_context]"
+    assert "live_evidence" in rich
+    assert "course3_lens" in rich
+
+    for key in ("music", "voice", "mic", "audible", "deck", "phase", "deck_state"):
+        assert key in fast
+    for rich_key in (
+        "next_suggestion",
+        "audio_part_context",
+        "audio_delta",
+        "live_evidence",
+        "course3_lens",
+        "deck_mixer",
+    ):
+        assert rich_key not in fast
+    audio_part_mock.assert_called_once()
+    assert holder.calls == 1
 
 
 def test_ws_07_broadcast_cadence_is_30hz(mocker):

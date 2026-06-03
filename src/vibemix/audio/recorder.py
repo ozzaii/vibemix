@@ -30,10 +30,12 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import queue
 import sys
 import threading
 import time
 import wave
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -44,6 +46,9 @@ from vibemix.audio.constants import INPUT_SR_TARGET, OUTPUT_SR
 # new optional fields can land without a bump. Surfaced to the UI via the
 # `session_json_version` field on every session.json write.
 SESSION_JSON_VERSION = "1.0"
+_WAV_BATCH_MAX_ITEMS = 24
+_WAV_BATCH_WAIT_S = 0.05
+_WAV_BATCH_MAX_BYTES = 256 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -173,10 +178,9 @@ class VoiceRecorder:
             ├── events.jsonl         # JSONL timeline, timestamped from session start
             └── session.json         # Phase 15 — meta (started/ended/voice/mode/genre/...)
 
-    Thread-safe — single `threading.Lock` guards all four writers. Audio-thread
-    callbacks (`push_input` / `push_voice`) and asyncio writers (`log_event`)
-    share the lock; the WAV/JSONL module-internal buffering is the rate-limiter,
-    not us.
+    Thread-safe — single `threading.Lock` guards file handles. Audio-thread
+    callbacks (`push_input` / `push_voice`) only enqueue PCM for a writer thread;
+    they never call wave.writeframes directly.
 
     Phase 15 constructor kwargs ``voice_id`` / ``mode`` / ``genre`` /
     ``user_level`` are ALL optional — `cohost_v4.py` still constructs
@@ -251,6 +255,15 @@ class VoiceRecorder:
         self.events_path = self.session_dir / "events.jsonl"
         self.events_f = open(self.events_path, "a", encoding="utf-8")
         self._lock = threading.Lock()
+        self._wav_queue = queue.SimpleQueue()
+        self._wav_accepting = True
+        self._wav_writer_stopped = False
+        self._wav_writer = threading.Thread(
+            target=self._wav_writer_loop,
+            name="vibemix-recorder-wav",
+            daemon=True,
+        )
+        self._wav_writer.start()
 
         wall_start = datetime.now().astimezone()
         self._write_event_locked(
@@ -295,25 +308,82 @@ class VoiceRecorder:
             f"(voice.wav + input.wav + events.jsonl + session.json)"
         )
 
-    def push_voice(self, pcm_bytes: bytes) -> None:
-        """Append AI voice PCM (24kHz mono int16) to voice.wav. Best-effort. v4:805-812."""
-        if not pcm_bytes:
-            return
-        with self._lock:
+    def _write_wav_batch_locked(self, pending: dict[str, bytearray]) -> None:
+        for kind, data in pending.items():
+            if not data:
+                continue
             try:
-                self.voice_wav.writeframes(pcm_bytes)
+                if kind == "voice":
+                    self.voice_wav.writeframesraw(data)
+                elif kind == "input":
+                    self.input_wav.writeframesraw(data)
             except Exception:
                 pass
+            finally:
+                data.clear()
+
+    def _wav_writer_loop(self) -> None:
+        pending: dict[str, bytearray] = defaultdict(bytearray)
+        while True:
+            item = self._wav_queue.get()
+            if item is None:
+                with self._lock:
+                    self._write_wav_batch_locked(pending)
+                return
+            batch_items = 0
+            while True:
+                try:
+                    kind, pcm_bytes = item
+                except (TypeError, ValueError):
+                    pass
+                else:
+                    pending[kind].extend(pcm_bytes)
+                    batch_items += 1
+                total_bytes = sum(len(data) for data in pending.values())
+                if batch_items >= _WAV_BATCH_MAX_ITEMS or total_bytes >= _WAV_BATCH_MAX_BYTES:
+                    break
+                try:
+                    item = self._wav_queue.get(timeout=_WAV_BATCH_WAIT_S)
+                except queue.Empty:
+                    break
+                if item is None:
+                    with self._lock:
+                        self._write_wav_batch_locked(pending)
+                    return
+            with self._lock:
+                self._write_wav_batch_locked(pending)
+
+    def _enqueue_wav(self, kind: str, pcm_bytes: bytes) -> None:
+        if not pcm_bytes:
+            return
+        if not self._wav_accepting:
+            return
+        try:
+            self._wav_queue.put((kind, pcm_bytes))
+        except Exception:
+            pass
+
+    def push_voice(self, pcm_bytes: bytes) -> None:
+        """Append AI voice PCM (24kHz mono int16) to voice.wav. Best-effort."""
+        self._enqueue_wav("voice", pcm_bytes)
 
     def push_input(self, pcm_bytes: bytes) -> None:
-        """Append captured input PCM (16kHz mono int16) to input.wav. Best-effort. v4:814-821."""
-        if not pcm_bytes:
+        """Append captured input PCM (16kHz mono int16) to input.wav. Best-effort."""
+        self._enqueue_wav("input", pcm_bytes)
+
+    def _stop_wav_writer(self) -> None:
+        if self._wav_writer_stopped:
             return
-        with self._lock:
-            try:
-                self.input_wav.writeframes(pcm_bytes)
-            except Exception:
-                pass
+        self._wav_accepting = False
+        try:
+            self._wav_queue.put(None)
+        except Exception:
+            pass
+        try:
+            self._wav_writer.join(timeout=2.0)
+        except Exception:
+            pass
+        self._wav_writer_stopped = True
 
     def _write_event_locked(self, rec: dict) -> None:
         """Caller MUST hold self._lock. Writes one JSONL line + flush. v4:823-829."""
@@ -469,6 +539,7 @@ class VoiceRecorder:
     def close(self) -> None:
         """Close all four handles. Best-effort — never raises. v4:838-850 +
         Phase 15 session.json finalize + Phase 29-00 evidence_registry.json."""
+        self._stop_wav_writer()
         # Phase 29-00 — serialize EvidenceRegistry snapshot BEFORE WAV/JSONL
         # close. We deliberately write OUTSIDE the recorder's threading.Lock:
         # the registry has its own lock around snapshot(), and atomic
