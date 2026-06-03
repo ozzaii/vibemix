@@ -716,6 +716,10 @@
   font-size: 11px;
 }
 
+.surface[data-surface="learn"].surface--mounted .learn-booth-earned {
+  display: none;
+}
+
 .surface[data-surface="learn"].surface--mounted .learn-booth-primary,
 .surface[data-surface="learn"].surface--mounted .learn-booth-secondary {
   align-self: center;

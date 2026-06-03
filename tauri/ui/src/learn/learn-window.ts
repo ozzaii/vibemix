@@ -74,6 +74,7 @@ import {
   firstRecommendedLessonId,
   type LearnProgressProjection,
 } from "./lesson/curriculum-meta.js";
+import type { SkillWallRow } from "./SkillWall.js";
 import {
   normalizeOperatorAction,
   type LearnOperatorAction,
@@ -204,6 +205,7 @@ interface ProgressStatePayload {
     }>;
     course_2_unlocked?: boolean;
     course_3_unlocked?: boolean;
+    skill_wall?: SkillWallRow[];
   };
 }
 
@@ -277,6 +279,27 @@ const CONTROL_FEEDBACK_LABELS: Readonly<Record<string, string>> = {
   xfader: "blend move",
 };
 
+const EARNED_PATH_LABELS: Readonly<Record<string, string>> = {
+  deck_control: "Deck",
+  beatmatching: "Beat",
+  eq_mixing: "EQ",
+  harmonic_mixing: "Key",
+  transitions: "Blend",
+  phrasing_performance: "Phrase",
+};
+
+const EARNED_PATH_STAGE_LABELS: Readonly<Record<SkillWallRow["stage"], string>> = {
+  locked: "Locked",
+  competent: "Competent",
+  mastered: "Mastered",
+};
+
+const EARNED_PATH_GLYPHS: Readonly<Record<SkillWallRow["stage"], string>> = {
+  locked: "○",
+  competent: "◑",
+  mastered: "★",
+};
+
 /**
  * Module-level latest-frame holder (RESEARCH §Pitfall 6). Set on every
  * midi_position event; drained by the rAF callback. When the user
@@ -340,6 +363,15 @@ function mountLearnWindow(root: HTMLElement): {
           <dd id="learn-booth-payoff">next skill receipt</dd>
         </div>
       </dl>
+      <div id="learn-booth-earned" class="learn-booth-earned" data-state="pending" aria-label="earned path">
+        <div class="learn-booth-earned__head">
+          <span>earned path</span>
+          <strong id="learn-booth-earned-summary">waiting for progress</strong>
+        </div>
+        <ol id="learn-booth-earned-list" class="learn-booth-earned__list">
+          <li class="learn-booth-earned__empty">progress snapshot not received yet</li>
+        </ol>
+      </div>
       <button id="learn-start-recommended" class="learn-booth-primary" type="button">start practice</button>
       <button id="learn-open-map" class="learn-booth-secondary" type="button">choose lesson</button>
     </section>
@@ -415,6 +447,13 @@ function mountLearnWindow(root: HTMLElement): {
   const boothTarget = root.querySelector("#learn-booth-target") as HTMLElement;
   const boothBriefProof = root.querySelector("#learn-booth-brief-proof") as HTMLElement;
   const boothPayoff = root.querySelector("#learn-booth-payoff") as HTMLElement;
+  const boothEarned = root.querySelector("#learn-booth-earned") as HTMLElement;
+  const boothEarnedSummary = root.querySelector(
+    "#learn-booth-earned-summary",
+  ) as HTMLElement;
+  const boothEarnedList = root.querySelector(
+    "#learn-booth-earned-list",
+  ) as HTMLOListElement;
   const screenAction = root.querySelector("#learn-screen-action") as HTMLButtonElement;
   const openMapButton = root.querySelector("#learn-open-map") as HTMLButtonElement;
   const closeMapButton = root.querySelector("#learn-close-map") as HTMLButtonElement;
@@ -428,6 +467,7 @@ function mountLearnWindow(root: HTMLElement): {
   const exemplarTrack = root.querySelector("#learn-exemplar-track") as HTMLElement;
   const exemplarMeta = root.querySelector("#learn-exemplar-meta") as HTMLElement;
   let latestProgress: LearnProgressProjection | null = null;
+  let latestSkillWall: SkillWallRow[] | null = null;
   let recommendedLessonId = firstRecommendedLessonId(latestProgress);
   let recommendedLessonLevel: "fresh" | "replay" = "fresh";
   let exemplarHideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -509,6 +549,52 @@ function mountLearnWindow(root: HTMLElement): {
     exemplarHideTimer = setTimeout(() => {
       hideExemplarChip();
     }, 1400);
+  };
+  const renderEarnedPath = (rows: SkillWallRow[] | null): void => {
+    boothEarnedList.textContent = "";
+    if (!rows || rows.length === 0) {
+      boothEarned.dataset.state = "pending";
+      boothEarnedSummary.textContent = "waiting for progress";
+      const empty = document.createElement("li");
+      empty.className = "learn-booth-earned__empty";
+      empty.textContent = "progress snapshot not received yet";
+      boothEarnedList.appendChild(empty);
+      return;
+    }
+    boothEarned.dataset.state = "ready";
+    boothEarnedSummary.textContent = earnedPathSummary(rows);
+    rows.slice(0, 6).forEach((row) => {
+      const item = document.createElement("li");
+      item.className = "learn-booth-earned__cell";
+      item.dataset.stage = row.stage;
+      item.tabIndex = 0;
+      item.setAttribute(
+        "aria-label",
+        earnedPathAriaLabel(row),
+      );
+
+      const glyph = document.createElement("span");
+      glyph.className = "learn-booth-earned__glyph";
+      glyph.setAttribute("aria-hidden", "true");
+      glyph.textContent = EARNED_PATH_GLYPHS[row.stage];
+
+      const name = document.createElement("span");
+      name.className = "learn-booth-earned__name";
+      name.textContent = earnedPathName(row.skill_id);
+
+      const stageLabel = document.createElement("span");
+      stageLabel.className = "learn-booth-earned__stage";
+      stageLabel.textContent = EARNED_PATH_STAGE_LABELS[row.stage];
+
+      const fill = document.createElement("span");
+      fill.className = "learn-booth-earned__fill";
+      const fillBar = document.createElement("i");
+      fillBar.style.width = `${earnedPathFillPercent(row)}%`;
+      fill.appendChild(fillBar);
+
+      item.append(glyph, name, stageLabel, fill);
+      boothEarnedList.appendChild(item);
+    });
   };
   let ws: LearnWsClient | null = null;
   const emitLearnIpc = async (
@@ -632,6 +718,7 @@ function mountLearnWindow(root: HTMLElement): {
     });
   };
   renderLessonChooser();
+  renderEarnedPath(latestSkillWall);
 
   const updateScreenActionForHighlight = (payload: HighlightPayload): void => {
     const expectedControlId = controlIdFromExpectedAction(payload.expected_action);
@@ -1076,7 +1163,11 @@ function mountLearnWindow(root: HTMLElement): {
       payload.progress
     ) {
       latestProgress = payload.progress;
+      latestSkillWall = Array.isArray(payload.progress.skill_wall)
+        ? payload.progress.skill_wall
+        : null;
       renderLessonChooser();
+      renderEarnedPath(latestSkillWall);
     }
   });
 
@@ -1660,6 +1751,37 @@ function recommendationBoothCue(
     ariaLabel:
       "practice deck ready. Connect a controller or use the highlighted on-screen control.",
   };
+}
+
+function earnedPathName(skillId: string): string {
+  return EARNED_PATH_LABELS[skillId] ?? skillId.replace(/[_-]+/g, " ");
+}
+
+function earnedPathSummary(rows: SkillWallRow[]): string {
+  const mastered = rows.filter((row) => row.stage === "mastered").length;
+  const competent = rows.filter((row) => row.stage === "competent").length;
+  if (mastered > 0) {
+    return `${mastered} mastered · ${competent} competent`;
+  }
+  if (competent > 0) return `${competent} competent`;
+  return "skills waiting";
+}
+
+function earnedPathFillPercent(row: SkillWallRow): number {
+  const raw = Number(row.learn_fill);
+  if (!Number.isFinite(raw)) return 0;
+  return Math.round(Math.max(0, Math.min(1, raw)) * 100);
+}
+
+function earnedPathAriaLabel(row: SkillWallRow): string {
+  const stage = EARNED_PATH_STAGE_LABELS[row.stage];
+  const fill = earnedPathFillPercent(row);
+  const remains = row.mastered
+    ? `${row.live_proof_count} cited live demos`
+    : row.what_remains;
+  return `${earnedPathName(row.skill_id)}, ${stage}, ${fill}% lesson fill${
+    remains ? `. ${remains}` : ""
+  }`;
 }
 
 function compactControllerName(raw: string | null): string | null {

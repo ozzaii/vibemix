@@ -284,6 +284,7 @@
     "next next"
     "command command"
     "brief brief"
+    "earned earned"
     "pulse pulse"
     "primary secondary";
   gap: var(--sp-2);
@@ -456,6 +457,171 @@
   color: var(--text-primary);
 }
 
+.learn-booth-earned {
+  grid-area: earned;
+  display: grid;
+  gap: 6px;
+  width: min(560px, calc(100vw - var(--sp-8)));
+  padding: var(--sp-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent),
+    rgba(0, 0, 0, 0.14);
+}
+
+.learn-booth-earned__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-width: 0;
+  color: var(--silk-40);
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.learn-booth-earned__head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--silk-65);
+  font-weight: 500;
+}
+
+.learn-booth-earned__list {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.learn-booth-earned__cell,
+.learn-booth-earned__empty {
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--rad-sm);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.learn-booth-earned__cell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "glyph name"
+    "glyph stage"
+    "fill fill";
+  align-items: center;
+  gap: 2px 5px;
+  padding: 6px;
+}
+
+.learn-booth-earned__cell:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.learn-booth-earned__glyph {
+  grid-area: glyph;
+  color: var(--silk-40);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.learn-booth-earned__name,
+.learn-booth-earned__stage {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.learn-booth-earned__name {
+  grid-area: name;
+  color: var(--text-secondary);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.learn-booth-earned__stage {
+  grid-area: stage;
+  color: var(--silk-40);
+  font-family: var(--type-mono);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.learn-booth-earned__fill {
+  grid-area: fill;
+  height: 3px;
+  margin-top: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--void-12);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.52);
+}
+
+.learn-booth-earned__fill > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--border-strong);
+  transition: width 180ms var(--ease-brand);
+}
+
+.learn-booth-earned__cell[data-stage="competent"] {
+  border-color: var(--brand-22);
+  background:
+    linear-gradient(180deg, var(--brand-04), transparent 65%),
+    rgba(0, 0, 0, 0.16);
+}
+
+.learn-booth-earned__cell[data-stage="competent"] .learn-booth-earned__glyph,
+.learn-booth-earned__cell[data-stage="competent"] .learn-booth-earned__stage {
+  color: var(--brand);
+}
+
+.learn-booth-earned__cell[data-stage="competent"] .learn-booth-earned__fill > i {
+  background: var(--brand-50);
+}
+
+.learn-booth-earned__cell[data-stage="mastered"] {
+  border-color: var(--gold-soft);
+  background:
+    linear-gradient(180deg, var(--gold-glow), transparent 62%),
+    rgba(0, 0, 0, 0.18);
+}
+
+.learn-booth-earned__cell[data-stage="mastered"] .learn-booth-earned__glyph,
+.learn-booth-earned__cell[data-stage="mastered"] .learn-booth-earned__stage {
+  color: var(--gold);
+}
+
+.learn-booth-earned__cell[data-stage="mastered"] .learn-booth-earned__fill > i {
+  background: var(--gold);
+}
+
+.learn-booth-earned__empty {
+  grid-column: 1 / -1;
+  padding: 6px 8px;
+  color: var(--silk-40);
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 .learn-booth-pulse[data-state="success"] {
   color: var(--amber-pale);
 }
@@ -513,6 +679,23 @@
   .learn-booth-brief {
     width: 100%;
     grid-template-columns: 1fr;
+  }
+
+  .learn-booth-earned {
+    width: 100%;
+  }
+
+  .learn-booth-earned__list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .learn-booth-earned__name {
+    font-size: 9px;
+  }
+
+  .learn-booth-earned__stage {
+    font-size: 7px;
+    letter-spacing: 0.08em;
   }
 
   .learn-booth-command {

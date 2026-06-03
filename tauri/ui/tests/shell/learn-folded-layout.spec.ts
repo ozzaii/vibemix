@@ -79,5 +79,8 @@ describe("folded Learn shell layout", () => {
     expect(css).toContain("display: none");
     expect(css).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(css).toContain(".learn-earned-wall .skill-wall__remains");
+    expect(css).toContain(
+      '.surface[data-surface="learn"].surface--mounted .learn-booth-earned',
+    );
   });
 });
