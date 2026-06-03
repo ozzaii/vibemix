@@ -1770,7 +1770,7 @@ _LIVE_TRUSTED_DECK_SOURCES: frozenset[str] = _SHARED_DECK_CONTEXT_TRUSTED_SOURCE
 _LIVE_DECK_SOURCES: frozenset[str] = _LIVE_TRUSTED_DECK_SOURCES | frozenset(
     {"last_known", "live_context", "unknown"}
 )
-_LIVE_CONTEXT_CAP = 16
+_LIVE_CONTEXT_CAP = 24
 _LIVE_CONTEXT_SCHEMA_VERSION = 2
 _LIVE_CONTEXT_REQUIRED_CAPABILITIES: frozenset[str] = frozenset(
     {

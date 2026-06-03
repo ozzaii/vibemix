@@ -34,6 +34,7 @@ from vibemix.library.codex_curate import (
     chat_with_codex,
     curate_with_codex,
     find_codex,
+    normalize_live_context_for_viber,
     verify_live_reply_for_viber,
 )
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
@@ -69,6 +70,45 @@ def _fresh_live_transport() -> dict:
             "live_evidence",
         ],
     }
+
+
+def test_normalize_live_context_preserves_current_bus_capabilities() -> None:
+    current_bus_capabilities = [
+        "deck_state",
+        "deck_mixer",
+        "deck_lanes_context",
+        "deck_reference_context",
+        "deck_source_context",
+        "deck_source_status",
+        "deck_audio_context",
+        "deck_audio_separation_context",
+        "deck_audio_features_context",
+        "deck_audio_delta_context",
+        "deck_audio_window_context",
+        "audio_part_context",
+        "audio_window_context",
+        "audio_window_map",
+        "band_env_context",
+        "audio_delta",
+        "live_evidence",
+    ]
+
+    normalized = normalize_live_context_for_viber(
+        {
+            "deck": "none",
+            "live_context_schema_version": 2,
+            "live_context_capabilities": current_bus_capabilities,
+            "deck_state": {},
+            "live_evidence": {
+                "mix": ["transition_block=no_resolved_decks"],
+                "refs": ["mix:transition_block=no_resolved_decks"],
+            },
+        }
+    )
+
+    assert normalized is not None
+    assert normalized["live_context_capabilities"] == current_bus_capabilities
+    assert normalized["live_evidence"]["mix"] == ["transition_block=no_resolved_decks"]
 
 
 def _deck_pair_audio_separation_context() -> str:
