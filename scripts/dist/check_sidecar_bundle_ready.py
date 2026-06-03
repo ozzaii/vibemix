@@ -29,6 +29,12 @@ MOSS_MANIFEST = "browser_poc_manifest.json"
 MOSS_ARCHIVE_URL_ENV = "VIBEMIX_MOSS_TTS_ARCHIVE_URL"
 MOSS_ARCHIVE_SHA_ENV = "VIBEMIX_MOSS_TTS_ARCHIVE_SHA256"
 MOSS_ARCHIVE_SIZE_ENV = "VIBEMIX_MOSS_TTS_ARCHIVE_SIZE"
+LEARN_EXEMPLAR_WAVS: tuple[Path, ...] = (
+    Path("vibemix/learn/assets/band_exemplars/high/vibemix_internal_high_hat_air.wav"),
+    Path("vibemix/learn/assets/band_exemplars/low/vibemix_internal_low_bass_gate.wav"),
+    Path("vibemix/learn/assets/band_exemplars/mid/vibemix_internal_mid_chord_body.wav"),
+    Path("vibemix/learn/assets/band_exemplars/sub/vibemix_internal_sub_pulse.wav"),
+)
 
 
 @dataclass(frozen=True)
@@ -99,6 +105,17 @@ def _bundled_test_fixture_paths(bundle_dir: Path) -> list[Path]:
         for path in bundle_dir.rglob("*")
         if _is_test_fixture_path(path.relative_to(bundle_dir))
     )
+
+
+def learn_exemplar_audio_ready(bundle_dir: Path) -> tuple[bool, str]:
+    """Return whether the frozen sidecar carries the packaged Learn audio bank."""
+    internal = bundle_dir / "_internal"
+    missing = [rel for rel in LEARN_EXEMPLAR_WAVS if not (internal / rel).is_file()]
+    if missing:
+        preview = ", ".join(str(path) for path in missing[:4])
+        extra = "" if len(missing) <= 4 else f" (+{len(missing) - 4} more)"
+        return (False, f"Learn exemplar WAV bank missing from sidecar: {preview}{extra}")
+    return (True, f"Learn exemplar WAV bank ready: {len(LEARN_EXEMPLAR_WAVS)} file(s)")
 
 
 def _moss_archive_pin_errors() -> list[str]:
@@ -248,6 +265,10 @@ def check_sidecar_bundle_ready(
             f"test fixture payloads bundled in sidecar: {preview}{extra}. Run `{build_cmd}`.",
             binary,
         )
+
+    exemplar_ok, exemplar_message = learn_exemplar_audio_ready(bundle_dir)
+    if not exemplar_ok:
+        return SidecarBundleStatus(False, f"{exemplar_message}. Run `{build_cmd}`.", binary)
 
     source_schema = _source_ipc_schema(root)
     if source_schema.is_file():

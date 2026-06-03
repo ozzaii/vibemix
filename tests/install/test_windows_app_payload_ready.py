@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 from scripts.dist import check_windows_app_payload_ready as gate
+from scripts.dist.check_sidecar_bundle_ready import LEARN_EXEMPLAR_WAVS
 
 WIN_TRIPLE = "x86_64-pc-windows-msvc"
 
@@ -16,7 +17,20 @@ def _write_pe(path: Path, *, size: int = 8192) -> None:
     path.write_bytes(b"MZ" + (b"x" * (size - 2)))
 
 
-def _fake_payload(tmp_path: Path, *, internal: bool = True, placeholder_only: bool = False) -> Path:
+def _write_learn_exemplar_wavs(sidecar_dir: Path) -> None:
+    for rel in LEARN_EXEMPLAR_WAVS:
+        path = sidecar_dir / "_internal" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"wav")
+
+
+def _fake_payload(
+    tmp_path: Path,
+    *,
+    internal: bool = True,
+    placeholder_only: bool = False,
+    learn_wavs: bool = True,
+) -> Path:
     payload = tmp_path / "windows-app"
     if placeholder_only:
         sidecar_dir = payload / "binaries" / f"vibemix-core-{WIN_TRIPLE}"
@@ -30,6 +44,8 @@ def _fake_payload(tmp_path: Path, *, internal: bool = True, placeholder_only: bo
     _write_pe(sidecar_dir / f"vibemix-core-{WIN_TRIPLE}.exe")
     if internal:
         (sidecar_dir / "_internal").mkdir(parents=True)
+        if learn_wavs:
+            _write_learn_exemplar_wavs(sidecar_dir)
     return payload
 
 
@@ -79,6 +95,15 @@ def test_missing_internal_dir_fails(tmp_path: Path) -> None:
 
     assert status.ok is False
     assert "_internal" in status.errors[0]
+
+
+def test_missing_learn_exemplar_wavs_fail(tmp_path: Path) -> None:
+    payload = _fake_payload(tmp_path, learn_wavs=False)
+
+    status = gate.check_windows_app_payload_ready(payload, triple=WIN_TRIPLE)
+
+    assert status.ok is False
+    assert any("Learn exemplar WAV bank missing" in error for error in status.errors)
 
 
 def test_smoke_runs_sidecar_command(tmp_path: Path, monkeypatch) -> None:

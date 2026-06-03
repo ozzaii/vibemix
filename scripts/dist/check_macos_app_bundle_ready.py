@@ -19,6 +19,7 @@ from scripts.dist.check_sidecar_bundle_ready import (  # noqa: E402
     DEFAULT_MIN_BYTES,
     detect_host_triple,
     exe_suffix_for_triple,
+    learn_exemplar_audio_ready,
     moss_release_source_ready,
 )
 from scripts.dist.repair_macos_app_sidecar_symlinks import DYLIB_DIRS  # noqa: E402
@@ -161,6 +162,9 @@ def check_macos_app_bundle_ready(
 
     _check_no_test_fixtures(app, status)
     _check_repaired_dylib_links(internal, status)
+    exemplar_ok, exemplar_message = learn_exemplar_audio_ready(bundle_dir)
+    if not exemplar_ok:
+        status.fail(exemplar_message)
     if require_moss_source:
         moss_ok, moss_message = moss_release_source_ready(bundle_dir)
         status.moss_source = moss_message

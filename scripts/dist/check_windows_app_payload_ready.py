@@ -16,6 +16,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from scripts.dist.check_sidecar_bundle_ready import (  # noqa: E402
     DEFAULT_MIN_BYTES,
+    learn_exemplar_audio_ready,
     moss_release_source_ready,
 )
 
@@ -128,6 +129,10 @@ def check_windows_app_payload_ready(
     if not internal.is_dir():
         status.fail(f"Windows sidecar _internal directory missing: {internal}")
         return status
+
+    exemplar_ok, exemplar_message = learn_exemplar_audio_ready(sidecar_dir)
+    if not exemplar_ok:
+        status.fail(exemplar_message)
 
     if require_moss_source:
         moss_ok, moss_message = moss_release_source_ready(sidecar_dir)

@@ -8,11 +8,24 @@ import stat
 from pathlib import Path
 
 from scripts.dist import check_macos_app_bundle_ready as gate
+from scripts.dist.check_sidecar_bundle_ready import LEARN_EXEMPLAR_WAVS
 
 MAC_TRIPLE = "aarch64-apple-darwin"
 
 
-def _fake_app(tmp_path: Path, *, repaired_links: bool = True) -> Path:
+def _write_learn_exemplar_wavs(sidecar_dir: Path) -> None:
+    for rel in LEARN_EXEMPLAR_WAVS:
+        path = sidecar_dir / "_internal" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"wav")
+
+
+def _fake_app(
+    tmp_path: Path,
+    *,
+    repaired_links: bool = True,
+    learn_wavs: bool = True,
+) -> Path:
     app = tmp_path / "vibemix.app"
     macos = app / "Contents" / "MacOS"
     internal = (
@@ -37,6 +50,8 @@ def _fake_app(tmp_path: Path, *, repaired_links: bool = True) -> Path:
     sidecar = sidecar_dir / f"vibemix-core-{MAC_TRIPLE}"
     sidecar.write_text("#!/usr/bin/env sh\necho vibemix-core 0.0.1\n", encoding="utf-8")
     sidecar.chmod(sidecar.stat().st_mode | stat.S_IXUSR)
+    if learn_wavs:
+        _write_learn_exemplar_wavs(sidecar_dir)
 
     target = av_dylibs / "libavcodec.62.dylib"
     target.write_bytes(b"av")
@@ -128,6 +143,20 @@ def test_bundled_test_fixture_payloads_fail(tmp_path: Path) -> None:
     assert status.ok is False
     assert any("test fixture payloads bundled" in error for error in status.errors)
     assert any("synthetic_collection.xml" in error for error in status.errors)
+
+
+def test_missing_learn_exemplar_wavs_fail(tmp_path: Path) -> None:
+    app = _fake_app(tmp_path, learn_wavs=False)
+
+    status = gate.check_macos_app_bundle_ready(
+        app,
+        triple=MAC_TRIPLE,
+        min_bytes=1,
+        smoke="none",
+    )
+
+    assert status.ok is False
+    assert any("Learn exemplar WAV bank missing" in error for error in status.errors)
 
 
 def test_require_moss_source_fails_without_bundle_or_archive(

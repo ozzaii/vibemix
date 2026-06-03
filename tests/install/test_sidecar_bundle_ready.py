@@ -17,6 +17,13 @@ def _bundle_dir(root: Path, triple: str) -> Path:
     return root / gate.BINARIES_REL / f"vibemix-core-{triple}"
 
 
+def _write_learn_exemplar_wavs(bundle: Path) -> None:
+    for rel in gate.LEARN_EXEMPLAR_WAVS:
+        path = bundle / "_internal" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"wav")
+
+
 def _write_bundle(
     root: Path,
     triple: str,
@@ -24,10 +31,13 @@ def _write_bundle(
     size: int = 8192,
     executable: bool = True,
     bundled_schema: str | None = None,
+    learn_wavs: bool = True,
 ) -> Path:
     bundle = _bundle_dir(root, triple)
     bundle.mkdir(parents=True)
     (bundle / "_internal").mkdir()
+    if learn_wavs:
+        _write_learn_exemplar_wavs(bundle)
     if bundled_schema is not None:
         schema = bundle / "_internal" / gate.IPC_SCHEMA_REL
         schema.parent.mkdir(parents=True, exist_ok=True)
@@ -194,13 +204,23 @@ def test_windows_bundle_does_not_require_posix_execute_bit(tmp_path: Path) -> No
 
 
 def test_missing_pyinstaller_internal_dir_fails(tmp_path: Path) -> None:
-    binary = _write_bundle(tmp_path, MAC_TRIPLE)
+    binary = _write_bundle(tmp_path, MAC_TRIPLE, learn_wavs=False)
     (binary.parent / "_internal").rmdir()
 
     status = gate.check_sidecar_bundle_ready(root=tmp_path, triple=MAC_TRIPLE)
 
     assert status.ok is False
     assert "_internal" in status.message
+
+
+def test_missing_learn_exemplar_wavs_fail_with_rebuild_action(tmp_path: Path) -> None:
+    _write_bundle(tmp_path, MAC_TRIPLE, learn_wavs=False)
+
+    status = gate.check_sidecar_bundle_ready(root=tmp_path, triple=MAC_TRIPLE)
+
+    assert status.ok is False
+    assert "Learn exemplar WAV bank missing" in status.message
+    assert "scripts/build_sidecar.py" in status.message
 
 
 def test_bundled_test_fixture_payloads_fail(tmp_path: Path) -> None:
