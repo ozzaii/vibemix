@@ -69,6 +69,8 @@ def check_macos_updater_artifact_ready(
     triple: str | None = None,
     install_dir: Path | None = None,
     require_moss_source: bool = False,
+    require_developer_id: bool = False,
+    developer_team_id: str | None = None,
     smoke: str = "version",
     smoke_timeout_s: float = 20.0,
 ) -> MacOSUpdaterArtifactStatus:
@@ -99,6 +101,8 @@ def check_macos_updater_artifact_ready(
             app,
             triple=triple,
             require_moss_source=require_moss_source,
+            require_developer_id=require_developer_id,
+            developer_team_id=developer_team_id,
             smoke=smoke,
             smoke_timeout_s=smoke_timeout_s,
         )
@@ -140,6 +144,19 @@ def main(argv: list[str] | None = None) -> int:
             "verified VIBEMIX_MOSS_TTS_ARCHIVE_* pins"
         ),
     )
+    parser.add_argument(
+        "--require-developer-id",
+        action="store_true",
+        help=(
+            "release gate: require a strict Developer ID Application signature "
+            "inside the updater archive"
+        ),
+    )
+    parser.add_argument(
+        "--developer-team-id",
+        default=None,
+        help="optional Apple team id expected in the Developer ID signature",
+    )
     parser.add_argument("--smoke-timeout-s", type=float, default=20.0)
     parser.add_argument("--json", action="store_true", help="print machine-readable status")
     parser.add_argument("--quiet", action="store_true", help="print only failures")
@@ -150,6 +167,8 @@ def main(argv: list[str] | None = None) -> int:
         triple=args.triple,
         install_dir=args.install_dir,
         require_moss_source=args.require_moss_source,
+        require_developer_id=args.require_developer_id,
+        developer_team_id=args.developer_team_id,
         smoke=args.smoke,
         smoke_timeout_s=args.smoke_timeout_s,
     )

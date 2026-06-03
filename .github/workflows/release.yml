@@ -396,6 +396,7 @@ jobs:
             "$DMG" \
             --triple ${{ matrix.target_triple }} \
             --require-moss-source \
+            --require-developer-id \
             --smoke version
 
       - name: PACKAGE — Create Tauri macOS updater artifact (.app.tar.gz)
@@ -421,6 +422,7 @@ jobs:
             "$UPDATER" \
             --triple ${{ matrix.target_triple }} \
             --require-moss-source \
+            --require-developer-id \
             --smoke version
 
       # ---- Stage 4 — VERIFY (ALWAYS runs, even in mock-signing) ------------

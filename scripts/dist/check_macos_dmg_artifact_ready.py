@@ -88,6 +88,8 @@ def check_macos_dmg_artifact_ready(
     install_dir: Path | None = None,
     app_name: str | None = "vibemix.app",
     require_moss_source: bool = False,
+    require_developer_id: bool = False,
+    developer_team_id: str | None = None,
     smoke: str = "version",
     smoke_timeout_s: float = 20.0,
 ) -> MacOSDmgArtifactStatus:
@@ -128,6 +130,8 @@ def check_macos_dmg_artifact_ready(
             Path(status.installed_app),
             triple=triple,
             require_moss_source=require_moss_source,
+            require_developer_id=require_developer_id,
+            developer_team_id=developer_team_id,
             smoke=smoke,
             smoke_timeout_s=smoke_timeout_s,
         )
@@ -163,6 +167,19 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--require-developer-id",
+        action="store_true",
+        help=(
+            "release gate: require a strict Developer ID Application signature "
+            "after drag-install"
+        ),
+    )
+    parser.add_argument(
+        "--developer-team-id",
+        default=None,
+        help="optional Apple team id expected in the Developer ID signature",
+    )
+    parser.add_argument(
         "--smoke",
         choices=("version", "library-stats", "none"),
         default="version",
@@ -179,6 +196,8 @@ def main(argv: list[str] | None = None) -> int:
         install_dir=args.install_dir,
         app_name=args.app_name,
         require_moss_source=args.require_moss_source,
+        require_developer_id=args.require_developer_id,
+        developer_team_id=args.developer_team_id,
         smoke=args.smoke,
         smoke_timeout_s=args.smoke_timeout_s,
     )

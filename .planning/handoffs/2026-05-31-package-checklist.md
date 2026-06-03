@@ -9241,7 +9241,9 @@ Include:
 - `.github/workflows/release.yml`
 - `tests/install/test_sidecar_bundle_ready.py`
 - `tests/install/test_macos_app_bundle_ready.py`
+- `tests/install/test_macos_dmg_artifact_ready.py`
 - `tests/install/test_macos_local_dmg_build.py`
+- `tests/install/test_macos_updater_artifact_ready.py`
 - `tests/install/test_windows_app_payload_ready.py`
 - `tests/install/test_windows_packaging_paths.py`
 - `tests/security/test_release_yml_signing_skips.py`
@@ -9264,9 +9266,9 @@ Reason:
 
 Proof before staging:
 
-- `uv run pytest -q tests/install/test_sidecar_bundle_ready.py tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_local_dmg_build.py tests/install/test_windows_app_payload_ready.py tests/install/test_windows_packaging_paths.py tests/security/test_release_yml_signing_skips.py`
+- `uv run pytest -q tests/install/test_sidecar_bundle_ready.py tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_dmg_artifact_ready.py tests/install/test_macos_local_dmg_build.py tests/install/test_macos_updater_artifact_ready.py tests/install/test_windows_app_payload_ready.py tests/install/test_windows_packaging_paths.py tests/security/test_release_yml_signing_skips.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
-- `git diff --check -- scripts/dist/check_sidecar_bundle_ready.py scripts/dist/check_macos_app_bundle_ready.py scripts/dist/check_macos_dmg_artifact_ready.py scripts/dist/check_macos_updater_artifact_ready.py scripts/dist/build_macos_local_dmg.sh scripts/win/build_local.ps1 .github/workflows/release.yml tests/install/test_sidecar_bundle_ready.py tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_local_dmg_build.py tests/install/test_windows_app_payload_ready.py tests/install/test_windows_packaging_paths.py tests/security/test_release_yml_signing_skips.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `git diff --check -- scripts/dist/check_sidecar_bundle_ready.py scripts/dist/check_macos_app_bundle_ready.py scripts/dist/check_macos_dmg_artifact_ready.py scripts/dist/check_macos_updater_artifact_ready.py scripts/dist/build_macos_local_dmg.sh scripts/win/build_local.ps1 .github/workflows/release.yml tests/install/test_sidecar_bundle_ready.py tests/install/test_macos_app_bundle_ready.py tests/install/test_macos_dmg_artifact_ready.py tests/install/test_macos_local_dmg_build.py tests/install/test_macos_updater_artifact_ready.py tests/install/test_windows_app_payload_ready.py tests/install/test_windows_packaging_paths.py tests/security/test_release_yml_signing_skips.py .planning/handoffs/2026-05-31-package-checklist.md`
 
 ## Package 49 - Honest Connected Controller Status
 

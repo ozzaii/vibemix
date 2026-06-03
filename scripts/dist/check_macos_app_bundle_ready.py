@@ -32,6 +32,7 @@ class MacOSAppBundleStatus:
     ok: bool = True
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    developer_id: str = ""
     sidecar_binary: str = ""
     moss_source: str = ""
     smoke_stdout: str = ""
@@ -117,12 +118,74 @@ def _run_smoke(binary: Path, smoke: str, timeout_s: float, status: MacOSAppBundl
         )
 
 
+def _run_codesign(args: list[str]) -> tuple[bool, str]:
+    try:
+        result = subprocess.run(
+            ["codesign", *args],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        return False, str(exc)
+    output = "\n".join(
+        part.strip() for part in (result.stdout, result.stderr) if part.strip()
+    )
+    return result.returncode == 0, output
+
+
+def _developer_id_signature_ready(
+    app: Path,
+    *,
+    team_id: str | None = None,
+) -> tuple[bool, str]:
+    """Return whether ``app`` has a Developer ID signature with a resource seal."""
+    seal = app / "Contents" / "_CodeSignature" / "CodeResources"
+    if not seal.is_file():
+        return False, f"Developer ID resource seal missing: {seal}"
+
+    verify_ok, verify_output = _run_codesign(
+        ["--verify", "--strict", "--verbose=4", str(app)]
+    )
+    if not verify_ok:
+        return False, f"codesign verification failed: {verify_output}"
+
+    details_ok, details = _run_codesign(["-dv", "--verbose=4", str(app)])
+    if not details_ok:
+        return False, f"codesign details failed: {details}"
+
+    if "Authority=Developer ID Application:" not in details:
+        return False, "signature is not a Developer ID Application signature"
+
+    if "Sealed Resources version=" not in details:
+        return False, "Developer ID signature has no sealed resources"
+
+    actual_team_id = ""
+    for line in details.splitlines():
+        if line.startswith("TeamIdentifier="):
+            actual_team_id = line.split("=", 1)[1].strip()
+            break
+
+    if team_id:
+        if actual_team_id != team_id:
+            return False, (
+                f"Developer ID TeamIdentifier mismatch: got {actual_team_id!r}, "
+                f"expected {team_id!r}"
+            )
+    elif not actual_team_id or actual_team_id.lower() == "not set":
+        return False, "Developer ID TeamIdentifier is missing"
+
+    return True, f"Developer ID signature ready: TeamIdentifier={actual_team_id}"
+
+
 def check_macos_app_bundle_ready(
     app: Path,
     *,
     triple: str | None = None,
     min_bytes: int = DEFAULT_MIN_BYTES,
     require_moss_source: bool = False,
+    require_developer_id: bool = False,
+    developer_team_id: str | None = None,
     smoke: str = "version",
     smoke_timeout_s: float = 20.0,
 ) -> MacOSAppBundleStatus:
@@ -145,6 +208,15 @@ def check_macos_app_bundle_ready(
     main_binary = app / "Contents" / "MacOS" / "vibemix"
     if not _is_executable_file(main_binary, min_bytes=min_bytes):
         status.fail(f"main app binary missing, tiny, or not executable: {main_binary}")
+
+    if require_developer_id:
+        signature_ok, signature_message = _developer_id_signature_ready(
+            app,
+            team_id=developer_team_id or os.environ.get("APPLE_TEAM_ID"),
+        )
+        status.developer_id = signature_message
+        if not signature_ok:
+            status.fail(signature_message)
 
     bundle_dir = (
         app / "Contents" / "Resources" / "binaries" / f"vibemix-core-{target_triple}"
@@ -201,6 +273,19 @@ def main(argv: list[str] | None = None) -> int:
             "verified VIBEMIX_MOSS_TTS_ARCHIVE_* pins"
         ),
     )
+    parser.add_argument(
+        "--require-developer-id",
+        action="store_true",
+        help=(
+            "release gate: require a strict Developer ID Application signature "
+            "with a sealed resource manifest"
+        ),
+    )
+    parser.add_argument(
+        "--developer-team-id",
+        default=None,
+        help="optional Apple team id expected in the Developer ID signature",
+    )
     parser.add_argument("--smoke-timeout-s", type=float, default=20.0)
     parser.add_argument("--json", action="store_true", help="print machine-readable status")
     parser.add_argument("--quiet", action="store_true", help="print only failures")
@@ -212,6 +297,8 @@ def main(argv: list[str] | None = None) -> int:
             triple=args.triple,
             min_bytes=args.min_bytes,
             require_moss_source=args.require_moss_source,
+            require_developer_id=args.require_developer_id,
+            developer_team_id=args.developer_team_id,
             smoke=args.smoke,
             smoke_timeout_s=args.smoke_timeout_s,
         )

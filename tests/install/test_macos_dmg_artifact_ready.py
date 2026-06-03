@@ -11,9 +11,17 @@ from pathlib import Path
 
 import pytest
 from scripts.dist import check_macos_dmg_artifact_ready as gate
+from scripts.dist.check_sidecar_bundle_ready import LEARN_EXEMPLAR_WAVS
 
 MAC_TRIPLE = "aarch64-apple-darwin"
 HDIUTIL = shutil.which("hdiutil")
+
+
+def _write_learn_exemplar_wavs(sidecar_dir: Path) -> None:
+    for rel in LEARN_EXEMPLAR_WAVS:
+        path = sidecar_dir / "_internal" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"wav")
 
 
 def _fake_app(root: Path) -> Path:
@@ -44,6 +52,7 @@ def _fake_app(root: Path) -> Path:
         encoding="utf-8",
     )
     sidecar.chmod(sidecar.stat().st_mode | stat.S_IXUSR)
+    _write_learn_exemplar_wavs(sidecar_dir)
 
     target = av_dylibs / "libavcodec.62.dylib"
     target.write_bytes(b"av")
@@ -136,3 +145,33 @@ def test_non_dmg_artifact_fails(tmp_path: Path) -> None:
 
     assert status.ok is False
     assert ".dmg" in status.errors[0]
+
+
+@pytest.mark.skipif(HDIUTIL is None, reason="hdiutil is macOS-only")
+def test_require_developer_id_is_passed_to_drag_installed_app_checker(
+    tmp_path: Path, monkeypatch
+) -> None:
+    artifact = _create_dmg(tmp_path, _fake_app(tmp_path / "app-src"))
+    seen = {}
+
+    def fake_app_check(app_path, **kwargs):
+        seen.update(kwargs)
+        return gate.MacOSAppBundleStatus(
+            app=str(app_path),
+            triple=kwargs["triple"],
+            developer_id="Developer ID signature ready: TeamIdentifier=TEAM123",
+        )
+
+    monkeypatch.setattr(gate, "check_macos_app_bundle_ready", fake_app_check)
+
+    status = gate.check_macos_dmg_artifact_ready(
+        artifact,
+        triple=MAC_TRIPLE,
+        require_developer_id=True,
+        developer_team_id="TEAM123",
+        smoke="none",
+    )
+
+    assert status.ok is True
+    assert seen["require_developer_id"] is True
+    assert seen["developer_team_id"] == "TEAM123"

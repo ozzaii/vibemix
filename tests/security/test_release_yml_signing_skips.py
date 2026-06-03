@@ -183,9 +183,11 @@ def test_release_yml_repairs_macos_sidecar_symlinks_before_signing(workflow_yaml
     assert "check_macos_dmg_artifact_ready.py" in steps[dmg_verify_index]["run"]
     assert "-name 'vibemix-*.dmg'" in steps[dmg_verify_index]["run"]
     assert "--require-moss-source" in steps[dmg_verify_index]["run"]
+    assert "--require-developer-id" in steps[dmg_verify_index]["run"]
     assert "check_macos_updater_artifact_ready.py" in steps[updater_verify_index]["run"]
     assert "-name '*.app.tar.gz'" in steps[updater_verify_index]["run"]
     assert "--require-moss-source" in steps[updater_verify_index]["run"]
+    assert "--require-developer-id" in steps[updater_verify_index]["run"]
 
 
 # ---------------------------------------------------------------------------
