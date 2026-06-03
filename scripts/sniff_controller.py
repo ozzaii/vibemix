@@ -10,6 +10,7 @@ Output schema (per T-23-02 mitigation, audited by test_sniff_controller.py):
 
 On Ctrl-C / timeout, prints a final summary line:
   {"summary": true, "duration_s": float, "frames": int,
+   "raw_messages": int, "unsupported_types": {...},
    "unique_cc": [...], "unique_notes": [...]}
 
 License: Apache-2.0 (matches repo).
@@ -104,7 +105,12 @@ def format_frame(msg: Any, ts: float) -> dict:
     }
 
 
-def summarize(frames: list[dict], duration_s: float) -> dict:
+def summarize(
+    frames: list[dict],
+    duration_s: float,
+    *,
+    unsupported_types: dict[str, int] | None = None,
+) -> dict:
     """Aggregate captured frames into a final summary line.
 
     unique_cc and unique_notes are returned as sorted ascending lists so
@@ -117,10 +123,13 @@ def summarize(frames: list[dict], duration_s: float) -> dict:
             cc_set.add(int(f["data1"]))
         elif f["type"] in ("note_on", "note_off"):
             note_set.add(int(f["data1"]))
+    unsupported = dict(sorted((unsupported_types or {}).items()))
     return {
         "summary": True,
         "duration_s": float(duration_s),
         "frames": len(frames),
+        "raw_messages": len(frames) + sum(unsupported.values()),
+        "unsupported_types": unsupported,
         "unique_cc": sorted(cc_set),
         "unique_notes": sorted(note_set),
     }
@@ -134,10 +143,20 @@ def diagnose_summary(summary: dict) -> dict:
     frames, but make the final summary actionable enough to archive as proof.
     """
     frames = int(summary.get("frames") or 0)
+    raw_messages = int(summary.get("raw_messages") or frames)
     out = dict(summary)
     if frames > 0:
         out["diagnosis"] = "midi_frames_observed"
         out["next_action"] = "Use the emitted CC/note rows to map or verify the controller."
+        return out
+
+    if raw_messages > 0:
+        out["diagnosis"] = "unsupported_midi_messages_observed"
+        out["next_action"] = (
+            "MIDI traffic arrived, but not as CC/note messages. Capture the unsupported "
+            "types from this summary, then extend the controller mapper or choose an "
+            "EQ/fader/pad control that emits CC/note data."
+        )
         return out
 
     out["diagnosis"] = "port_visible_no_supported_midi_frames"
@@ -155,13 +174,19 @@ def _emit(frame: dict) -> None:
     sys.stdout.flush()
 
 
-def _record_supported_msg(msg: Any, frames: list[dict], start: float) -> bool:
+def _record_supported_msg(
+    msg: Any,
+    frames: list[dict],
+    unsupported_types: dict[str, int],
+    start: float,
+) -> bool:
     """Emit a supported MIDI message and append it to ``frames``.
 
     Returns True when a frame was captured. Unsupported MIDI traffic is ignored
     so the public JSONL schema stays minimal and threat-modelled.
     """
     if msg.type not in SUPPORTED_TYPES:
+        unsupported_types[str(msg.type)] = unsupported_types.get(str(msg.type), 0) + 1
         return False
     ts = time.monotonic() - start
     frame = format_frame(msg, ts)
@@ -172,6 +197,7 @@ def _record_supported_msg(msg: Any, frames: list[dict], start: float) -> bool:
 
 def _run_poll_capture(mido: Any, port_name: str, seconds: int) -> int:
     frames: list[dict] = []
+    unsupported_types: dict[str, int] = {}
     start = time.monotonic()
     deadline = start + seconds
     try:
@@ -187,21 +213,22 @@ def _run_poll_capture(mido: Any, port_name: str, seconds: int) -> int:
                     # Avoid busy-loop; 1ms idle keeps us under <1% CPU.
                     time.sleep(0.001)
                     continue
-                _record_supported_msg(msg, frames, start)
+                _record_supported_msg(msg, frames, unsupported_types, start)
     except KeyboardInterrupt:
         pass
     duration = time.monotonic() - start
-    _emit(diagnose_summary(summarize(frames, duration)))
+    _emit(diagnose_summary(summarize(frames, duration, unsupported_types=unsupported_types)))
     return 0
 
 
 def _run_callback_capture(mido: Any, port_name: str, seconds: int) -> int:
     frames: list[dict] = []
+    unsupported_types: dict[str, int] = {}
     start = time.monotonic()
     deadline = start + seconds
 
     def _callback(msg: Any) -> None:
-        _record_supported_msg(msg, frames, start)
+        _record_supported_msg(msg, frames, unsupported_types, start)
 
     try:
         with mido.open_input(port_name, callback=_callback):
@@ -215,7 +242,7 @@ def _run_callback_capture(mido: Any, port_name: str, seconds: int) -> int:
     except KeyboardInterrupt:
         pass
     duration = time.monotonic() - start
-    _emit(diagnose_summary(summarize(frames, duration)))
+    _emit(diagnose_summary(summarize(frames, duration, unsupported_types=unsupported_types)))
     return 0
 
 

@@ -195,6 +195,8 @@ def test_summarize_aggregates_unique_cc_and_notes_sorted():
     summary = mod.summarize(frames, duration_s=1.0)
     assert summary["summary"] is True
     assert summary["frames"] == 6
+    assert summary["raw_messages"] == 6
+    assert summary["unsupported_types"] == {}
     assert summary["duration_s"] == 1.0
     assert summary["unique_cc"] == [7, 11]  # sorted ascending
     assert summary["unique_notes"] == [0x58, 0x60]  # sorted ascending
@@ -205,8 +207,23 @@ def test_summarize_empty_frames():
     summary = mod.summarize([], duration_s=0.0)
     assert summary["summary"] is True
     assert summary["frames"] == 0
+    assert summary["raw_messages"] == 0
+    assert summary["unsupported_types"] == {}
     assert summary["unique_cc"] == []
     assert summary["unique_notes"] == []
+
+
+def test_summarize_counts_unsupported_message_types():
+    mod = _fresh_module()
+    summary = mod.summarize(
+        [],
+        duration_s=1.0,
+        unsupported_types={"pitchwheel": 2, "clock": 4},
+    )
+
+    assert summary["frames"] == 0
+    assert summary["raw_messages"] == 6
+    assert summary["unsupported_types"] == {"clock": 4, "pitchwheel": 2}
 
 
 def test_diagnose_summary_marks_visible_port_with_no_supported_frames():
@@ -217,6 +234,18 @@ def test_diagnose_summary_marks_visible_port_with_no_supported_frames():
     assert summary["diagnosis"] == "port_visible_no_supported_midi_frames"
     assert "enable controller MIDI output" in summary["next_action"]
     assert "exclusive access" in summary["next_action"]
+
+
+def test_diagnose_summary_marks_unsupported_midi_traffic():
+    mod = _fresh_module()
+    summary = mod.diagnose_summary(
+        mod.summarize([], duration_s=1.0, unsupported_types={"pitchwheel": 1})
+    )
+
+    assert summary["frames"] == 0
+    assert summary["raw_messages"] == 1
+    assert summary["diagnosis"] == "unsupported_midi_messages_observed"
+    assert "controller mapper" in summary["next_action"]
 
 
 def test_diagnose_summary_marks_observed_frames():

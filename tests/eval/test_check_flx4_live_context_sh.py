@@ -48,9 +48,9 @@ fi
 if [ "${{1:-}}" = "scripts/sniff_controller.py" ]; then
   if [ "{str(direct_midi_frames).lower()}" = "true" ]; then
     echo '{{"ts": 0.1, "type": "cc", "channel": 0, "data1": 7, "data1_hex": "0x07", "data2": 90}}'
-    echo '{{"summary": true, "duration_s": 1.0, "frames": 1, "unique_cc": [7], "unique_notes": []}}'
+    echo '{{"summary": true, "duration_s": 1.0, "frames": 1, "raw_messages": 1, "unsupported_types": {{}}, "diagnosis": "midi_frames_observed", "next_action": "Use the emitted CC/note rows to map or verify the controller.", "unique_cc": [7], "unique_notes": []}}'
   else
-    echo '{{"summary": true, "duration_s": 1.0, "frames": 0, "unique_cc": [], "unique_notes": []}}'
+    echo '{{"summary": true, "duration_s": 1.0, "frames": 0, "raw_messages": 0, "unsupported_types": {{}}, "diagnosis": "port_visible_no_supported_midi_frames", "next_action": "Move an EQ knob, fader, jog, or pad while sniffing. If this still shows zero frames, enable controller MIDI output in DJ software or close any app that has exclusive access to the controller port.", "unique_cc": [], "unique_notes": []}}'
   fi
   exit 0
 fi
@@ -395,6 +395,9 @@ def test_check_flx4_live_context_splits_direct_midi_from_live_ingest_gap(
     assert summary["direct_midi_probe"]["sampling"] == "concurrent_with_live_context"
     assert summary["direct_midi_probe"]["motion_observed"] is True
     assert summary["direct_midi_probe"]["frames"] == 1
+    assert summary["direct_midi_probe"]["raw_messages"] == 1
+    assert summary["direct_midi_probe"]["unsupported_types"] == {}
+    assert summary["direct_midi_probe"]["diagnosis"] == "midi_frames_observed"
     assert summary["direct_midi_probe"]["unique_cc"] == [7]
     assert summary["top_blockers"][0] == (
         "live context did not ingest controller moves even though the direct OS MIDI "
@@ -424,6 +427,10 @@ def test_check_flx4_live_context_records_direct_midi_probe_no_motion(
     assert summary["direct_midi_probe"]["sampling"] == "concurrent_with_live_context"
     assert summary["direct_midi_probe"]["motion_observed"] is False
     assert summary["direct_midi_probe"]["frames"] == 0
+    assert summary["direct_midi_probe"]["raw_messages"] == 0
+    assert summary["direct_midi_probe"]["unsupported_types"] == {}
+    assert summary["direct_midi_probe"]["diagnosis"] == "port_visible_no_supported_midi_frames"
+    assert "exclusive access" in summary["direct_midi_probe"]["next_action"]
     assert summary["top_blockers"][0] == (
         "direct OS MIDI probe saw no controller frames during the probe window"
     )
