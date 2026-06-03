@@ -339,6 +339,46 @@ def test_live_claim_guard_emits_salvaged_audio_read_before_harmonic_advice(
     playback.push.assert_not_called()
 
 
+def test_live_claim_guard_blocks_mixer_claim_surviving_harmonic_salvage(
+    mocker, tmp_path
+) -> None:
+    """A stripped harmonic clause must not let a fake mixer claim reach the mouth."""
+    registry = EvidenceRegistry()
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.controller_connected = True
+    state.audible_deck = "mix"
+    state.deck_a = {"vol": 0, "eq_low": 81, "eq_mid": 73, "eq_hi": 73, "filter": 64}
+    state.deck_b = {"vol": 127, "eq_low": 78, "eq_mid": 83, "eq_hi": 89, "filter": 60}
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                "You just killed the lows on deck B and brought it under the incoming track. ",
+                "Keep the next blend strictly in key so the breakdown lands clean.",
+            ]
+        )
+    )
+
+    agent.set_next_event(Event(type="HEARTBEAT", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert chunks == []
+    kinds = [kind for kind, _ in recorder.events]
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "strip"
+    assert guard_log["policy"] == "mixer_contradiction"
+    assert "killed the lows" in guard_log["raw_text"].lower()
+    assert "killed the lows" not in guard_log["corrected_text"].lower()
+    assert "strictly in key" not in guard_log["corrected_text"].lower()
+    assert "ai_text" not in kinds
+    assert "citation_strip" not in kinds
+    assert tracker.rate() == 1.0
+    playback.push.assert_not_called()
+
+
 def test_live_claim_guard_defers_watch_only_stream_before_correction(mocker, tmp_path) -> None:
     """Watch-only crossfader evidence should not leak the raw streamed head."""
     registry = EvidenceRegistry()

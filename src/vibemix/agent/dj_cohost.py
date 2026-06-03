@@ -116,6 +116,7 @@ from vibemix.state.deck_context import (
     render_move_effect_context,
     render_set_window_context,
     should_defer_live_claim_stream,
+    should_defer_live_claim_text,
 )
 from vibemix.ui_bus import SessionCohostReaction, SessionOverlayHighlight
 
@@ -2799,7 +2800,17 @@ class DJCoHostAgent(Agent):
                     advice_risky = not live_claim_moves and has_unsupported_no_move_coaching_advice(
                         full_text
                     )
-                    if source_detail_risky or advice_risky:
+                    claim_guard_risky = should_defer_live_claim_text(
+                        full_text,
+                        live_claim_state,
+                        live_claim_moves,
+                        audio_capture_context=prompt_audio_capture_context,
+                        audio_delta_items=live_claim_audio_delta,
+                        deck_audio_parts_attached=deck_audio_parts_attached,
+                        judge_evidence_line=judge_evidence_line,
+                        event_type=ev_tag,
+                    )
+                    if source_detail_risky or advice_risky or claim_guard_risky:
                         live_claim_defer_stream = True
                     spoken_so_far, _ = strip_emote_tags(full_text, normalize=False)
                     language_matches = english_only_violation_matches(spoken_so_far)

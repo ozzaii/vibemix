@@ -2755,6 +2755,43 @@ def test_live_claim_guard_salvages_audio_read_before_unsupported_harmonic_advice
     assert "clashing" not in result.text.lower()
 
 
+def test_live_claim_guard_harmonic_salvage_falls_through_mixer_low_guard() -> None:
+    state = MusicState(audible=True, controller_connected=True, audible_deck="mix")
+    state.deck_a = {"vol": 0, "eq_low": 81, "eq_mid": 73, "eq_hi": 73, "filter": 64}
+    state.deck_b = {"vol": 127, "eq_low": 78, "eq_mid": 83, "eq_hi": 89, "filter": 60}
+    reply = (
+        "You just killed the lows on deck B and brought it under the incoming track. "
+        "Keep the next blend strictly in key so the breakdown lands clean."
+    )
+
+    result = apply_live_claim_guard(reply, state, [], event_type="HEARTBEAT")
+
+    assert result.corrected is True
+    assert result.emit_corrected is False
+    assert result.policy == "mixer_contradiction"
+    assert result.reason == "low_kill_not_in_mixer_state"
+    assert "killed the lows" not in result.text.lower()
+    assert "strictly in key" not in result.text.lower()
+    assert "mixer_lows=A:boost+B:boost" in result.summary
+
+
+def test_live_claim_guard_harmonic_salvage_falls_through_no_move_control_guard() -> None:
+    state = MusicState(audible=True, controller_connected=True, audible_deck="none")
+    reply = (
+        "You brought the faders up into that hollow drum phrase. "
+        "Keep the next blend strictly in key so the low end does not clash."
+    )
+
+    result = apply_live_claim_guard(reply, state, [], event_type="HEARTBEAT")
+
+    assert result.corrected is True
+    assert result.emit_corrected is False
+    assert result.policy == "single_deck_control_not_grounded"
+    assert result.reason == "control_causality_without_moves"
+    assert "faders" not in result.text.lower()
+    assert "strictly in key" not in result.text.lower()
+
+
 def test_live_claim_guard_allows_key_clash_event_claim() -> None:
     state = MusicState(audible=True, controller_connected=True, audible_deck="mix")
     state.deck_state = DeckState(

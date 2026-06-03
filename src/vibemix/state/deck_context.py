@@ -2906,6 +2906,47 @@ def should_defer_live_claim_stream(
     )
 
 
+def should_defer_live_claim_text(
+    text: str,
+    state: MusicState,
+    moves: list[str] | tuple[str, ...] = (),
+    *,
+    audio_capture_context: dict[str, object] | None = None,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    deck_audio_parts_attached: bool | None = None,
+    judge_evidence_line: str | None = None,
+    event_type: str | None = None,
+) -> bool:
+    """Return True once streamed text matches a claim guard that may strip."""
+    if not str(text or "").strip():
+        return False
+    policy, _reason = live_claim_policy(
+        state,
+        moves,
+        audio_capture_context=audio_capture_context,
+        audio_delta_items=audio_delta_items,
+        deck_audio_parts_attached=deck_audio_parts_attached,
+    )
+    event = str(event_type or "").strip().upper()
+    return (
+        _has_unsupported_harmonic_deck_claim(
+            text,
+            state,
+            moves,
+            policy=policy,
+            event_type=event_type,
+            judge_evidence_line=judge_evidence_line,
+        )
+        or _has_unsupported_mixer_low_kill_claim(text, state)
+        or (not moves and _has_unsupported_no_move_control_claim(text))
+        or (not moves and event == "PHASE" and _has_unsupported_no_move_coaching_advice(text))
+        or (
+            policy in {"blocked", "watch_not_claim", "candidate_not_verdict", "requires_more_evidence"}
+            and _has_unsupported_transition_coaching_advice(text)
+        )
+    )
+
+
 def apply_live_claim_guard(
     text: str,
     state: MusicState,
@@ -2932,16 +2973,49 @@ def apply_live_claim_guard(
         audio_delta_items=audio_delta_items,
         deck_audio_parts_attached=deck_audio_parts_attached,
     )
-    outcome_claim = has_multi_deck_outcome_claim(text)
-    public_diagnostic = bool(_LIVE_PUBLIC_DIAGNOSTIC_RE.search(text))
     effect_deltas = _move_effect_audio_delta_items(state, moves, audio_delta_items)
     capture_effect_deltas = _deck_audio_delta_text_items(audio_capture_context)
     effect_signals = [*effect_deltas, *capture_effect_deltas]
-    source_detail_reason = _unsupported_audio_source_detail_reason(
-        text,
-        state,
-        event_type=event_type,
-    )
+
+    def _text_claim_flags(raw: str) -> tuple[bool, bool, str | None]:
+        return (
+            has_multi_deck_outcome_claim(raw),
+            bool(_LIVE_PUBLIC_DIAGNOSTIC_RE.search(raw)),
+            _unsupported_audio_source_detail_reason(
+                raw,
+                state,
+                event_type=event_type,
+            ),
+        )
+
+    outcome_claim, public_diagnostic, source_detail_reason = _text_claim_flags(text)
+    pending_corrected_policy: str | None = None
+    pending_corrected_reason: str | None = None
+    pending_corrected_summary = ""
+
+    def _mark_emit_correction(*, policy: str, reason: str | None, summary: str) -> None:
+        nonlocal pending_corrected_policy, pending_corrected_reason, pending_corrected_summary
+        pending_corrected_policy = policy
+        pending_corrected_reason = reason
+        pending_corrected_summary = summary
+
+    def _pass_result(
+        *,
+        policy: str = policy,
+        reason: str | None = reason,
+        summary: str = "",
+    ) -> LiveClaimGuardResult:
+        if pending_corrected_policy is not None:
+            return LiveClaimGuardResult(
+                text=text,
+                corrected=True,
+                emit_corrected=True,
+                policy=pending_corrected_policy,
+                reason=pending_corrected_reason,
+                summary=pending_corrected_summary,
+            )
+        return LiveClaimGuardResult(text=text, policy=policy, reason=reason, summary=summary)
+
     if _has_unsupported_harmonic_deck_claim(
         text,
         state,
@@ -2953,21 +3027,21 @@ def apply_live_claim_guard(
         summary = _live_guard_summary(state, moves)
         stripped = _strip_unsupported_harmonic_clause(text)
         if stripped:
-            return LiveClaimGuardResult(
-                text=stripped,
-                corrected=True,
-                emit_corrected=True,
+            text = stripped
+            outcome_claim, public_diagnostic, source_detail_reason = _text_claim_flags(text)
+            _mark_emit_correction(
                 policy="harmonic_claim_not_grounded",
                 reason="no_citable_key_clash_evidence",
                 summary=summary,
             )
-        return LiveClaimGuardResult(
-            text=LIVE_TRANSITION_HELD_REPLY,
-            corrected=True,
-            policy="harmonic_claim_not_grounded",
-            reason="no_citable_key_clash_evidence",
-            summary=summary,
-        )
+        else:
+            return LiveClaimGuardResult(
+                text=LIVE_TRANSITION_HELD_REPLY,
+                corrected=True,
+                policy="harmonic_claim_not_grounded",
+                reason="no_citable_key_clash_evidence",
+                summary=summary,
+            )
     if _has_unsupported_mixer_low_kill_claim(text, state):
         summary = _live_guard_summary(state, moves)
         mixer_summary = _mixer_low_summary(state)
@@ -2981,13 +3055,22 @@ def apply_live_claim_guard(
     if not moves and _has_unsupported_no_move_control_claim(text):
         summary = _live_guard_summary(state, moves)
         stripped = _strip_unsupported_no_move_control_clause(text)
-        return LiveClaimGuardResult(
-            text=stripped or LIVE_MOVE_EFFECT_HELD_REPLY,
-            corrected=True,
-            policy="single_deck_control_not_grounded",
-            reason="control_causality_without_moves",
-            summary=summary,
-        )
+        if stripped:
+            text = stripped
+            outcome_claim, public_diagnostic, source_detail_reason = _text_claim_flags(text)
+            _mark_emit_correction(
+                policy="single_deck_control_not_grounded",
+                reason="control_causality_without_moves",
+                summary=summary,
+            )
+        else:
+            return LiveClaimGuardResult(
+                text=LIVE_MOVE_EFFECT_HELD_REPLY,
+                corrected=True,
+                policy="single_deck_control_not_grounded",
+                reason="control_causality_without_moves",
+                summary=summary,
+            )
     event = str(event_type or "").strip().upper()
     if (
         not moves
@@ -3045,9 +3128,7 @@ def apply_live_claim_guard(
         if license_ is not None and (
             texture_direction is None or license_.measured_direction == texture_direction
         ):
-            return LiveClaimGuardResult(
-                text=text,
-                corrected=False,
+            return _pass_result(
                 policy="move_effect_supported",
                 reason="prediction_and_measured_delta_agree",
                 summary=f"{license_.context_token}; evidence={_evidence_key(license_.evidence_key)}",
@@ -3070,9 +3151,7 @@ def apply_live_claim_guard(
             and move_read_supported
             and (not causal_control_claim or texture_direction is None)
         ):
-            return LiveClaimGuardResult(
-                text=text,
-                corrected=False,
+            return _pass_result(
                 policy="move_effect_ai_coaching_allowed",
                 reason="recent_move_ear_read",
                 summary=log_summary,
@@ -3130,7 +3209,7 @@ def apply_live_claim_guard(
                 reason=reason,
                 summary=summary,
             )
-        return LiveClaimGuardResult(text=text, policy=policy, reason=reason)
+        return _pass_result()
     if policy == "candidate_not_verdict" and outcome_claim and _MULTI_DECK_VERDICT_RE.search(text):
         summary = _live_guard_summary(state, moves)
         return LiveClaimGuardResult(
@@ -3162,18 +3241,16 @@ def apply_live_claim_guard(
         and _has_current_observed_eq_move(state, moves)
         and not _has_unsupported_transition_coaching_advice(text)
     ):
-        return LiveClaimGuardResult(
-            text=text,
-            corrected=False,
+        return _pass_result(
             policy="observed_move_ai_coaching_allowed",
             reason="midi_move_proves_control",
             summary=_live_guard_summary(state, moves),
         )
 
     if policy not in {"blocked", "watch_not_claim"}:
-        return LiveClaimGuardResult(text=text, policy=policy, reason=reason)
+        return _pass_result()
     if not text.strip() or not outcome_claim:
-        return LiveClaimGuardResult(text=text, policy=policy, reason=reason)
+        return _pass_result()
 
     summary = _live_guard_summary(state, moves)
     return LiveClaimGuardResult(
