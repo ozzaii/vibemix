@@ -271,6 +271,7 @@ const LAYOUT_CSS = `
   }
   .vmx-persona {
     appearance: none; -webkit-appearance: none;
+    position: relative; overflow: hidden;
     display: flex; align-items: center; gap: var(--sp-3);
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-sm);
@@ -284,11 +285,32 @@ const LAYOUT_CSS = `
     box-shadow:
       inset 0 1px 0 rgba(255, 251, 244, 0.028),
       inset 0 -2px 0 rgba(0, 0, 0, 0.64);
-    transition: opacity 150ms ease-out, border-color 150ms ease-out, box-shadow 150ms ease-out;
+    transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
   }
+  /* DELIGHT (impeccable, 2026-06-03): the persona is the co-host's character
+   * dial — the control a DJ taps mid-set to swing hype → coach → teach. When you
+   * reach for it, a rose key-light pools up from the lower-left (mirroring the
+   * voice slab's own pool) and the mood word brightens: the co-host leaning
+   * toward your hand. One-Rose (a hover state, not a second ambient breath),
+   * eased, rose-only, frozen by the rail's reduced-motion handling. */
+  .vmx-persona::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(120% 120% at 16% 118%, var(--amber-22), transparent 58%);
+    opacity: 0;
+    transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .vmx-persona:hover::before,
+  .vmx-persona:focus-visible::before { opacity: 1; }
   .vmx-persona:hover {
-    opacity: 0.92;
-    border-color: var(--glass-edge-up);
+    border-color: var(--amber-40);
+  }
+  .vmx-persona:hover .vmx-persona__v,
+  .vmx-persona:focus-visible .vmx-persona__v {
+    color: var(--amber);
+    text-shadow: 0 0 9px var(--amber-40);
   }
   .vmx-persona:active {
     transform: translateY(1px);
