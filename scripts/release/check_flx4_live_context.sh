@@ -1035,6 +1035,7 @@ print(
     "diagnosis={diagnosis} frames={frames} controller_connected={controller} "
     "recent_moves={moves} audio_observed={audio} blockers={blockers} "
     "direct_midi={direct_midi} direct_midi_frames={direct_midi_frames} "
+    "direct_midi_raw={direct_midi_raw} direct_midi_unsupported={direct_midi_unsupported} "
     "midi_motion_diag={midi_motion_diag} "
     "listener_read_canary={listener_read_canary} "
     "audio_causality_rejected={audio_causality_rejected} "
@@ -1052,6 +1053,8 @@ print(
         blockers=len(blockers),
         direct_midi=direct_midi_probe.get("motion_observed"),
         direct_midi_frames=direct_midi_probe.get("frames"),
+        direct_midi_raw=direct_midi_probe.get("raw_messages"),
+        direct_midi_unsupported=direct_midi_probe.get("unsupported_types"),
         midi_motion_diag=midi_motion_diagnosis,
         listener_read_canary=listener_read_canary,
         audio_causality_rejected=audio_causality_rejected,

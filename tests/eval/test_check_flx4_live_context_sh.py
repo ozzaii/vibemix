@@ -387,6 +387,9 @@ def test_check_flx4_live_context_splits_direct_midi_from_live_ingest_gap(
     assert "ACTION check_flx4_live_context: for the next 1s" in proc.stdout
     assert "sampling together" in proc.stdout
     assert "direct_midi=True" in proc.stderr
+    assert "direct_midi_frames=1" in proc.stderr
+    assert "direct_midi_raw=1" in proc.stderr
+    assert "direct_midi_unsupported={}" in proc.stderr
     assert "midi_motion_diag=live_midi_ingest_missing" in proc.stderr
     summary = json.loads((tmp_path / "out" / "flx4_live_context_summary.json").read_text())
     assert summary["action_hint"] == "restart_live_midi_listener"
@@ -419,6 +422,9 @@ def test_check_flx4_live_context_records_direct_midi_probe_no_motion(
 
     assert proc.returncode == 1
     assert "direct_midi=False" in proc.stderr
+    assert "direct_midi_frames=0" in proc.stderr
+    assert "direct_midi_raw=0" in proc.stderr
+    assert "direct_midi_unsupported={}" in proc.stderr
     assert "midi_motion_diag=no_direct_midi_motion_observed" in proc.stderr
     assert "action_hint=prove_os_midi_motion" in proc.stderr
     summary = json.loads((tmp_path / "out" / "flx4_live_context_summary.json").read_text())
