@@ -276,6 +276,8 @@ def test_release_yml_manifest_signer_uses_tauri_updater_artifacts(workflow_text:
     assert "-maxdepth 1 -type f -name '*.app.tar.gz'" not in workflow_text
     assert "PUBLISH — Verify signed updater manifest shape" in workflow_text
     assert "check_updater_manifest_ready.py release-artifacts/latest.json" in workflow_text
+    assert "check_release_upload_dir_ready.py" in workflow_text
+    assert '--tag "${{ github.ref_name }}"' in workflow_text
 
 
 def test_sign_manifest_script_rejects_first_install_artifacts():

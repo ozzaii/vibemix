@@ -851,6 +851,9 @@ jobs:
             release-artifacts/windows-artifacts -name 'verify-report-windows.json'
           cp release-artifacts/latest.json "$UPLOAD_DIR/latest.json"
           ls -la "$UPLOAD_DIR"
+          python3 scripts/dist/check_release_upload_dir_ready.py \
+            "$UPLOAD_DIR" \
+            --tag "${{ github.ref_name }}"
 
       - name: PUBLISH — POST signed manifest to api.altidus.world
         env:
