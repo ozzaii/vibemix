@@ -69,8 +69,20 @@ def test_structural_events_keep_existing_speech_path() -> None:
     assert decision.reason == "event_priority"
 
 
-def test_track_change_keeps_existing_speech_path() -> None:
+def test_plain_track_change_stays_silent_by_default() -> None:
     decision = decide_speak_gate(_event("TRACK_CHANGE", {"new_track": "B"}))
 
+    assert decision.verdict == "silent"
+    assert decision.reason == "describe_bank_only"
+
+
+def test_grounded_track_change_payload_reaches_sven() -> None:
+    decision = decide_speak_gate(
+        _event(
+            "TRACK_CHANGE",
+            {"next_suggestion_voice_line": "[track:track-42] [mix:next_suggestion=track-42]"},
+        ),
+    )
+
     assert decision.verdict == "speak"
-    assert decision.reason == "event_priority"
+    assert decision.reason == "grounded_voice_payload"

@@ -26,7 +26,9 @@ _GROUNDED_VOICE_EXTRA_KEYS = frozenset(
     }
 )
 
-_DESCRIBE_BANK_EVENT_TYPES = frozenset({"HEARTBEAT", "PHASE", "LAYER_ARRIVAL"})
+_DESCRIBE_BANK_EVENT_TYPES = frozenset(
+    {"HEARTBEAT", "PHASE", "LAYER_ARRIVAL", "TRACK_CHANGE"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,11 +55,11 @@ def decide_speak_gate(
 ) -> SpeakGateDecision:
     """Return whether the runtime should ask Sven to generate a line.
 
-    Manual/user speech paths always pass. MIX_MOVE, TRACK_CHANGE, DROP, and
-    genre-specific structural events keep the event priority ladder. The
-    describe-bank-prone automatic events (plain HEARTBEAT / PHASE /
-    LAYER_ARRIVAL) only reach Sven when code has already attached a grounded
-    deterministic voice payload.
+    Manual/user speech paths always pass. MIX_MOVE, DROP, and genre-specific
+    structural events keep the event priority ladder. The describe-bank-prone
+    automatic events (plain HEARTBEAT / PHASE / LAYER_ARRIVAL / TRACK_CHANGE)
+    only reach Sven when code has already attached a grounded deterministic
+    voice payload.
     """
 
     if manual or kaan_just_spoke or ev.type in {"MANUAL", "KAAN_SPOKE"}:

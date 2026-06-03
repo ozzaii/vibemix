@@ -56,7 +56,7 @@ def build_next_suggestion_voice_line(
     artist = _clean_text(suggestion.get("artist"), fallback="")
     artist_clause = f" by {artist}" if artist else ""
     why = _clean_text(suggestion.get("why"), fallback="")
-    why_clause = f"Reason: {why}. " if why else ""
+    why_clause = f" - {why}" if why else ""
 
     cite_tail = f"[track:{track_id}] [mix:{mix_key}]"
     if risk_cite is not None:
@@ -65,11 +65,10 @@ def build_next_suggestion_voice_line(
         cite_tail = f"{cite_tail} {section_cite}"
 
     return (
-        "Next-suggestion receipt: the live suggestion engine selected "
-        f"{title}{artist_clause}. {why_clause}{section_clause}If you recommend it, "
-        f"keep it optional, copy these citations exactly: {cite_tail}. Do not say "
-        "it is loaded or playing. This is not a proven transition unless deck/live "
-        "evidence says so; stay silent if the moment is not right."
+        f"Forward read: {title}{artist_clause} pairs next{why_clause}. "
+        f"{section_clause}Hand it as one nudge if it fits the live sound. "
+        f"Copy these citations exactly: {cite_tail}. Do not say it is loaded "
+        "or playing; it is not a proven transition unless deck/live evidence says so."
     )
 
 

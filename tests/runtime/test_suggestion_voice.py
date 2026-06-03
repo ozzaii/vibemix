@@ -22,7 +22,9 @@ def test_next_suggestion_voice_line_registers_track_and_mix_citations() -> None:
     )
 
     assert line is not None
+    assert line.startswith("Forward read: Ananta (live) / cut by Crew pairs next")
     assert "Ananta (live) / cut by Crew" in line
+    assert "similar vibe" in line
     assert "[track:track-42]" in line
     assert "[mix:next_suggestion=track-42]" in line
     assert "[mix:next_suggestion_risk=source_loop_recent]" in line
@@ -49,6 +51,7 @@ def test_next_suggestion_voice_line_registers_section_pairing() -> None:
     )
 
     assert line is not None
+    assert line.startswith("Forward read: Ananta pairs next")
     assert "Section pairing: mix out of this breakdown into that intro." in line
     assert "[mix:next_suggestion_section=breakdown_to_intro]" in line
     assert "not a proven transition" in line
