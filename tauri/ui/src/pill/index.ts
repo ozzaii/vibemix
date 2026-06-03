@@ -908,7 +908,7 @@ export function pillDemoShortcutTargetCanHandle(target: EventTarget | null): boo
 // the liquid-glass drawer can unfold below the lozenge in the real overlay.
 const PILL_COLLAPSED_H = 44;
 const PILL_EXPAND_CAP = 248; // matches .pill[data-state="expand"] .pill__expand max-height
-const PILL_PEEK_CAP = 130; // matches .pill[data-peek="true"] .pill__peek max-height
+const PILL_PEEK_CAP = 150; // matches .pill[data-peek="true"] .pill__peek max-height
 
 export interface PillGradeProgressState extends MoveGradeProgressView {
   key: string;

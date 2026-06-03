@@ -323,6 +323,23 @@ const CSS = `
     padding: 1px 4px;
     background: color-mix(in srgb, var(--silk) 4%, transparent);
   }
+  .vmx-next-card__cue-confidence {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 1px solid color-mix(in srgb, var(--brand) 16%, transparent);
+    border-radius: 4px;
+    padding: 1px 4px;
+    background: color-mix(in srgb, var(--brand) 5%, transparent);
+    color: var(--silk-65);
+    font-family: var(--type-mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+  }
   .vmx-next-card__cue-rail {
     position: relative;
     display: block;
@@ -641,6 +658,54 @@ export function nextReasonItems(
     .slice(0, 2);
 }
 
+function cueSourceLabel(source: string): string {
+  const normalized = source.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (normalized === "dj" || normalized === "user" || normalized === "hotcue") {
+    return "DJ cue";
+  }
+  if (normalized === "rekordbox" || normalized === "rb") return "Rekordbox cue";
+  if (normalized === "auto") return "auto cue";
+  if (normalized === "fallback") return "fallback entry";
+  if (normalized === "anlz") return "analysis cue";
+  return "cue";
+}
+
+function cueConfidencePhrase(
+  source: string,
+  confidence: number | null | undefined,
+): string {
+  const normalized = source.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (typeof confidence !== "number" || !Number.isFinite(confidence)) {
+    if (
+      normalized === "dj"
+      || normalized === "user"
+      || normalized === "rekordbox"
+      || normalized === "rb"
+    ) {
+      return "locked";
+    }
+    return "confidence unknown";
+  }
+  const value = Math.max(0, Math.min(1, confidence));
+  if (value >= 0.85) return "locked";
+  if (value >= 0.65) return "usable";
+  if (value >= 0.45) return "needs review";
+  return "low confidence";
+}
+
+export function nextCueConfidenceReceipt(
+  t: NextSuggestionTransitionWire | null | undefined,
+): string {
+  if (!t) return "";
+  const source = cleanDecisionText(t.cue_source);
+  const cue = typeof t.cue_slot === "string" ? t.cue_slot.trim() : "";
+  const hasConfidence = typeof t.cue_confidence === "number" && Number.isFinite(t.cue_confidence);
+  if (!source && !hasConfidence) return "";
+  const label = cueSourceLabel(source || "cue");
+  const cueLabel = cue ? ` ${cue.toUpperCase()}` : "";
+  return `${label}${cueLabel} ${cueConfidencePhrase(source, t.cue_confidence)}`;
+}
+
 export function nextDecisionText(
   d: NextSuggestionDecisionWire | null | undefined,
   t?: NextSuggestionTransitionWire | null,
@@ -725,6 +790,8 @@ export function nextSuggestionAriaLabel(
     if (meta) parts.push(meta);
   }
   if (actionText) parts.push(`action: ${actionText}`);
+  const cueReceipt = nextCueConfidenceReceipt(s.transition);
+  if (cueReceipt) parts.push(`cue: ${cueReceipt}`);
   if (reasonReceipt) parts.push(`why: ${reasonReceipt}`);
   if (fullActionText && fullActionText !== actionText) parts.push(`detail: ${fullActionText}`);
   if (grade) {
@@ -976,6 +1043,8 @@ export function nextSuggestionRenderKey(
     t?.source_anchor_s ?? "",
     t?.source_selection ?? "",
     t?.cue_slot ?? "",
+    t?.cue_source ?? "",
+    t?.cue_confidence ?? "",
     t?.start_in_bars ?? "",
     t?.move_grade?.slug ?? "",
     t?.move_grade?.label ?? "",
@@ -996,6 +1065,7 @@ export function nextSuggestionRenderKey(
     p?.level_up ?? p?.levelUp ?? "",
     p?.levels_gained ?? p?.levelsGained ?? "",
     ...(t?.risk_flags ?? []),
+    ...(t?.reasons ?? []),
     d?.emitted ?? "",
     d?.validation_status ?? "",
     d?.action ?? "",
@@ -1185,6 +1255,7 @@ export function renderNextSuggestion(
 
   const reasonItems = nextReasonItems(s.transition);
   const reasonReceipt = reasonItems.join(" · ");
+  const cueReceipt = nextCueConfidenceReceipt(s.transition);
   const actionText = isPeek
     ? nextPeekActionText(s.decision, s.transition)
     : nextDecisionText(s.decision, s.transition) || nextTransitionText(s.transition);
@@ -1218,11 +1289,21 @@ export function renderNextSuggestion(
     }
   }
 
-  if (reasonReceipt) {
+  if (reasonReceipt || cueReceipt) {
     const why = document.createElement("div");
     why.className = "vmx-next-card__why";
-    why.dataset.nextWhy = "true";
-    why.setAttribute("title", reasonReceipt);
+    if (reasonReceipt) {
+      why.dataset.nextWhy = "true";
+      why.setAttribute("title", reasonReceipt);
+    }
+    if (cueReceipt) {
+      const cue = document.createElement("span");
+      cue.className = "vmx-next-card__cue-confidence";
+      cue.dataset.nextCueConfidence = "true";
+      cue.textContent = cueReceipt;
+      cue.setAttribute("title", cueReceipt);
+      why.append(cue);
+    }
     for (const item of reasonItems) {
       const chip = document.createElement("span");
       chip.className = "vmx-next-card__why-chip";

@@ -2960,6 +2960,14 @@
   border-color: color-mix(in srgb, var(--silk) 12%, transparent);
   background: color-mix(in srgb, var(--silk) 4%, transparent);
 }
+.pill__peek .vmx-next-card__cue-confidence {
+  flex: 0 0 auto;
+  max-width: 100%;
+  border-color: color-mix(in srgb, var(--brand) 18%, transparent);
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+  color: var(--silk);
+  opacity: 0.86;
+}
 .pill__peek .vmx-next-card__cue-rail {
   height: 2px;
   margin-top: 2px;
@@ -3061,7 +3069,7 @@
  * is the CSS belt to index.ts's honest-silence (an empty mount stays invisible —
  * no empty box ever flashes on hover when there's no grounded suggestion). */
 .pill[data-peek="true"] .pill__peek:not(:empty) {
-  max-height: 130px;
+  max-height: 150px;
   padding-bottom: 10px;
   border-top-width: 1px;
   opacity: 1;

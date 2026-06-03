@@ -35,6 +35,7 @@ import {
   nextSuggestionRenderKey,
   nextMetaText,
   nextTransitionText,
+  nextCueConfidenceReceipt,
   nextReasonItems,
   nextReasonReceipt,
   renderNextSuggestion,
@@ -204,6 +205,39 @@ describe("nextReasonReceipt — grounded engine reasons", () => {
     expect(input).toContain(receipt.split(" · ")[0]);
     expect(input).toContain(receipt.split(" · ")[1]);
     expect(receipt).not.toMatch(/\d/);
+  });
+});
+
+describe("nextCueConfidenceReceipt — curated cue trust phrase", () => {
+  test("renders trusted DJ and Rekordbox cues without numeric dumping", () => {
+    expect(
+      nextCueConfidenceReceipt({
+        cue_slot: "A",
+        cue_source: "dj",
+        cue_confidence: 1,
+      }),
+    ).toBe("DJ cue A locked");
+    expect(
+      nextCueConfidenceReceipt({
+        cue_slot: "B",
+        cue_source: "rekordbox",
+        cue_confidence: 0.92,
+      }),
+    ).toBe("Rekordbox cue B locked");
+  });
+
+  test("calls out auto cues that need review as a phrase, not a score", () => {
+    const receipt = nextCueConfidenceReceipt({
+      cue_slot: "C",
+      cue_source: "auto",
+      cue_confidence: 0.52,
+    });
+    expect(receipt).toBe("auto cue C needs review");
+    expect(receipt).not.toMatch(/\d/);
+  });
+
+  test("does not render cue confidence from a cue slot alone", () => {
+    expect(nextCueConfidenceReceipt({ cue_slot: "A" })).toBe("");
   });
 });
 
@@ -554,6 +588,52 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     expect(card.getAttribute("aria-label")).toContain(
       "why: Camelot relationship is clean · tempo delta is workable",
     );
+  });
+
+  test("cue confidence renders as a curated trust receipt", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          cue_slot: "A",
+          cue_source: "auto",
+          cue_confidence: 0.52,
+          start_in_bars: 8,
+        },
+      }),
+    )!;
+    const receipt = card.querySelector<HTMLElement>("[data-next-cue-confidence]");
+    expect(receipt?.textContent).toBe("auto cue A needs review");
+    expect(receipt?.getAttribute("title")).toBe("auto cue A needs review");
+    expect(receipt?.textContent).not.toMatch(/\d/);
+  });
+
+  test("cue confidence joins the peek receipt row without hiding reasons", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          cue_slot: "A",
+          cue_source: "dj",
+          cue_confidence: 1,
+          start_in_bars: 8,
+          reasons: [
+            "Camelot relationship is clean",
+            "tempo delta is workable",
+          ],
+        },
+      }),
+      { density: "peek" },
+    )!;
+    expect(card.querySelector<HTMLElement>("[data-next-cue-confidence]")?.textContent).toBe(
+      "DJ cue A locked",
+    );
+    expect(
+      Array.from(card.querySelectorAll(".vmx-next-card__why-chip")).map((chip) => chip.textContent),
+    ).toEqual(["Camelot relationship is clean", "tempo delta is workable"]);
+    expect(card.getAttribute("aria-label")).toContain("cue: DJ cue A locked");
   });
 
   test("move grade renders as earned data, not markup", () => {
@@ -1249,6 +1329,42 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
   test("render key changes when the live transition countdown changes", () => {
     const a = _sugg({ transition: { cue_slot: "A", start_in_bars: 13 } });
     const b = _sugg({ transition: { cue_slot: "A", start_in_bars: 12 } });
+    expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
+  });
+
+  test("render key changes when rendered receipt reasons change", () => {
+    const a = _sugg({
+      transition: {
+        candidate_id: "tr_001",
+        reasons: ["Camelot relationship is clean"],
+      },
+    });
+    const b = _sugg({
+      transition: {
+        candidate_id: "tr_001",
+        reasons: ["tempo delta is workable"],
+      },
+    });
+    expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
+  });
+
+  test("render key changes when cue confidence receipt changes", () => {
+    const a = _sugg({
+      transition: {
+        candidate_id: "tr_001",
+        cue_slot: "A",
+        cue_source: "auto",
+        cue_confidence: 0.52,
+      },
+    });
+    const b = _sugg({
+      transition: {
+        candidate_id: "tr_001",
+        cue_slot: "A",
+        cue_source: "dj",
+        cue_confidence: 1,
+      },
+    });
     expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
   });
 
