@@ -1578,9 +1578,10 @@ body {
   font-family: var(--type-mono);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  color: var(--gold);
+  /* Position ordinal, NOT a key/heat/energy numeric — gold is quarantined to
+   * those. Quiet tertiary ink so the mission text leads (impeccable layout). */
+  color: var(--text-tertiary);
   text-align: right;
-  text-shadow: 0 0 6px var(--gold-glow);
 }
 .vmx-lib-idle-mission__row div {
   display: grid;
@@ -1748,14 +1749,15 @@ body {
 .vmx-lib-chat-card .setrow:last-child {
   border-bottom: 0;
 }
-/* The slot index is a numeric — gold, the one quarantined heat hue. */
+/* The slot index is a position ORDINAL, not a key/heat/energy numeric — gold is
+ * quarantined to those. The rank reads in quiet tertiary ink so the track title
+ * leads (Gold-Is-Quarantined, impeccable layout). */
 .vmx-lib-chat-card .setrow .rank {
   font-family: var(--type-mono);
   font-size: 10px;
   letter-spacing: 0.04em;
-  color: var(--gold);
+  color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 6px var(--gold-glow);
   text-align: right;
 }
 .vmx-lib-chat-card .setrow .t {
