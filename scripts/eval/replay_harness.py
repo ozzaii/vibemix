@@ -43,6 +43,7 @@ import statistics
 import sys
 import wave
 from collections import defaultdict, deque
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -780,6 +781,20 @@ async def replay_one_session(
     }
 
 
+def _replay_one_session_worker(
+    session_dir: str,
+    judges_arg: str,
+    use_detector_predictions: bool,
+) -> dict[str, Any]:
+    return asyncio.run(
+        replay_one_session(
+            Path(session_dir),
+            judges_arg,
+            use_detector_predictions=use_detector_predictions,
+        )
+    )
+
+
 def _build_overnight_findings(results: list[dict[str, Any]]) -> dict[str, Any]:
     """Build the keyless overnight QA findings report.
 
@@ -964,16 +979,31 @@ async def _run(args: argparse.Namespace) -> int:
     if args.vcr_mode:
         os.environ["VCR_RECORD_MODE"] = args.vcr_mode
 
-    results = await asyncio.gather(
-        *(
-            replay_one_session(
-                s,
+    jobs = max(1, int(args.jobs))
+    if jobs == 1 or len(sessions) <= 1:
+        results = [
+            await replay_one_session(
+                session,
                 args.judges,
                 use_detector_predictions=args.use_detector_predictions,
             )
-            for s in sessions
-        )
-    )
+            for session in sessions
+        ]
+    else:
+        loop = asyncio.get_running_loop()
+        with ProcessPoolExecutor(max_workers=min(jobs, len(sessions))) as pool:
+            results = await asyncio.gather(
+                *(
+                    loop.run_in_executor(
+                        pool,
+                        _replay_one_session_worker,
+                        str(session),
+                        args.judges,
+                        bool(args.use_detector_predictions),
+                    )
+                    for session in sessions
+                )
+            )
 
     # Plan 40-04 — cooldown-report accumulator. Off by default (zero
     # overhead on the standard scorecard path); gated by --print-cooldowns.
@@ -1143,6 +1173,16 @@ def main(argv: list[str] | None = None) -> int:
             "Write a keyless overnight QA findings JSON report at this path. "
             "Combines detector silence, mute/slop/latency flags, and evidence "
             "pointers for the auto-fix loop."
+        ),
+    )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help=(
+            "Run session replays in up to N worker processes. Use >1 for "
+            "overnight fan-out; process isolation keeps detector-mode synthetic "
+            "clock patches from sharing globals."
         ),
     )
     args = parser.parse_args(argv)

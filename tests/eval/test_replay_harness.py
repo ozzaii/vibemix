@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -199,6 +200,32 @@ def test_cli_detector_mode_writes_overnight_findings(tmp_path: Path) -> None:
     assert scenario["checklist"]["detector_events"] == 0
     assert "no_detector_events" in scenario["flags"]
     assert "mute" in scenario["flags"]
+
+
+def test_cli_jobs_two_runs_sessions_in_process_pool(tmp_path: Path) -> None:
+    """--jobs >1 uses the parallel session-runner path and keeps artifacts stable."""
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    shutil.copytree(FIXTURES / "synthetic_session", corpus / "one")
+    shutil.copytree(FIXTURES / "synthetic_session", corpus / "two")
+    out = tmp_path / "out"
+
+    rc = main(
+        [
+            "--corpus",
+            str(corpus),
+            "--judges",
+            "noop",
+            "--output",
+            str(out),
+            "--jobs",
+            "2",
+        ]
+    )
+
+    assert rc == 0
+    data = json.loads((out / "eval_report.json").read_text())
+    assert [row["session"] for row in data["sessions"]] == ["one", "two"]
 
 
 def test_empty_corpus_returns_0_with_artifacts(tmp_path: Path) -> None:
