@@ -788,6 +788,10 @@ jobs:
               --notes "Release ${{ github.ref_name }}" \
               --output release-artifacts/latest.json
 
+      - name: PUBLISH — Verify signed updater manifest shape
+        run: |
+          python3 scripts/dist/check_updater_manifest_ready.py release-artifacts/latest.json
+
       - name: PUBLISH — Stage flat GitHub Release assets
         run: |
           set -euo pipefail
