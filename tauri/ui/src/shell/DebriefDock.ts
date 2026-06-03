@@ -432,12 +432,12 @@ export function mountDebriefDock(host: HTMLElement): DebriefDockHandle {
   mast.className = "debrief-dock__mast";
   mast.innerHTML =
     '<div><div class="debrief-dock__kicker">review dock</div>' +
-    '<h2 class="debrief-dock__title">Make the last set pay you back.</h2>' +
-    '<p class="debrief-dock__sub">Open a cited review, replay the moment, then leave with one drill or one crate move.</p></div>' +
+    '<h2 class="debrief-dock__title">Look back at your last set.</h2>' +
+    '<p class="debrief-dock__sub">I replay the real moments, show you the why behind each call, then hand you one thing to drill.</p></div>' +
     '<dl class="debrief-dock__proof">' +
     '<div class="debrief-dock__proof-row"><dt>Timeline</dt><dd>drops, recoveries, energy shape</dd></div>' +
-    '<div class="debrief-dock__proof-row"><dt>Receipts</dt><dd>each praise or critique tied to evidence</dd></div>' +
-    '<div class="debrief-dock__proof-row"><dt>Next</dt><dd>practice drill or Viber crate follow-up</dd></div>' +
+    '<div class="debrief-dock__proof-row"><dt>The why</dt><dd>every call tied to what I actually heard</dd></div>' +
+    '<div class="debrief-dock__proof-row"><dt>Next</dt><dd>one drill or one crate move</dd></div>' +
     "</dl>";
 
   const sessions = document.createElement("section");
@@ -452,7 +452,7 @@ export function mountDebriefDock(host: HTMLElement): DebriefDockHandle {
     '<h3 class="debrief-dock__readiness-title">checking recorder</h3>' +
     '<p class="debrief-dock__readiness-sub">Waiting for local session evidence.</p></div>' +
     '<div class="debrief-dock__payback" aria-label="fastest payback path">' +
-    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">target</span><strong class="debrief-dock__payback-value" data-payback="target">pending</strong></div>' +
+    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">last set</span><strong class="debrief-dock__payback-value" data-payback="target">pending</strong></div>' +
     '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">blocker</span><strong class="debrief-dock__payback-value" data-payback="blocker">checking</strong></div>' +
     '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">action</span><strong class="debrief-dock__payback-value" data-payback="action">wait</strong></div>' +
     '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">unlocks</span><strong class="debrief-dock__payback-value" data-payback="unlocks">review</strong></div>' +
@@ -460,7 +460,7 @@ export function mountDebriefDock(host: HTMLElement): DebriefDockHandle {
     '<dl class="debrief-dock__readiness-metrics">' +
     '<div class="debrief-dock__readiness-metric"><dt>length</dt><dd>pending</dd></div>' +
     '<div class="debrief-dock__readiness-metric"><dt>events</dt><dd>pending</dd></div>' +
-    '<div class="debrief-dock__readiness-metric"><dt>gate</dt><dd>warming</dd></div>' +
+    '<div class="debrief-dock__readiness-metric"><dt>ready</dt><dd>warming</dd></div>' +
     "</dl>" +
     "</section>" +
     '<div class="debrief-dock__list"></div>';
@@ -575,7 +575,7 @@ function renderSessionRow(summary: RecordingSummary): HTMLElement {
   const copy = document.createElement("div");
   copy.className = "debrief-dock__copy";
   const reason = eligibility.ready
-    ? "ready for cited review"
+    ? "ready to review"
     : eligibility.reason;
 
   const date = document.createElement("h3");
@@ -683,7 +683,7 @@ function renderReadiness(
   readiness.dataset.state = eligibility.ready ? "ready" : "warming";
   if (eligibility.ready) {
     title.textContent = "review is armed";
-    sub.textContent = `${formatTimestamp(summary.started_at_iso)} can open with cited moments.`;
+    sub.textContent = `${formatTimestamp(summary.started_at_iso)} is ready, with the why behind every call.`;
   } else if (summary.crashed) {
     title.textContent = "this set stopped early";
     sub.textContent = "It ended before the recording sealed, so I can't review it fairly. Run one full set and I'll have it.";
@@ -732,8 +732,8 @@ function paybackPath(
     return {
       target,
       blocker: "none",
-      action: "open cited review",
-      unlocks: "drill, Viber follow-up",
+      action: "open your review",
+      unlocks: "one drill or crate move",
     };
   }
   if (summary.crashed) {
@@ -746,9 +746,9 @@ function paybackPath(
   }
   return {
     target,
-    blocker: `needs ${progress.remainingLabel}`,
+    blocker: `${progress.remainingLabel} short`,
     action: "keep Deck running",
-    unlocks: "cited review",
+    unlocks: "your review",
   };
 }
 
@@ -759,7 +759,7 @@ function rowPayoffLine(
 ): string {
   if (ready) return "Payback: open review to leave with one drill or crate move.";
   if (summary.crashed) return "Record one full set start to finish and I can review it.";
-  return `Payback path: ${readiness.remainingLabel} more unlocks the cited review.`;
+  return `${readiness.remainingLabel} more and I can review this set.`;
 }
 
 function bestReviewCandidate(sessions: RecordingSummary[]): RecordingSummary | null {
@@ -795,14 +795,14 @@ function reviewReadiness(summary: RecordingSummary): {
     return {
       percent,
       remainingLabel: formatDurationCeil(remainingSeconds),
-      gateLabel: "length",
+      gateLabel: "too short",
     };
   }
   if (remainingEvents > 0) {
     return {
       percent,
       remainingLabel: `${remainingEvents} events`,
-      gateLabel: "events",
+      gateLabel: "more moves",
     };
   }
   return { percent: 100, remainingLabel: "0m", gateLabel: "open" };
@@ -816,7 +816,7 @@ function debriefEligibility(summary: RecordingSummary): { ready: boolean; reason
   if (summary.event_count < MIN_DEBRIEF_EVENTS) {
     return { ready: false, reason: "needs more evidence events" };
   }
-  return { ready: true, reason: "ready for cited review" };
+  return { ready: true, reason: "ready to review" };
 }
 
 function renderEmpty(text: string): HTMLElement {

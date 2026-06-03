@@ -77,15 +77,15 @@ describe("DebriefDock", () => {
     expect(host.textContent).toContain("2 sessions");
     expect(host.textContent).toContain("next review");
     expect(host.textContent).toContain("review is armed");
-    expect(host.textContent).toContain("can open with cited moments");
-    expect(host.textContent).toContain("target");
+    expect(host.textContent).toContain("is ready, with the why behind every call");
+    expect(host.textContent).toContain("last set");
     expect(host.textContent).toContain("blocker");
-    expect(host.textContent).toContain("open cited review");
-    expect(host.textContent).toContain("drill, Viber follow-up");
+    expect(host.textContent).toContain("open your review");
+    expect(host.textContent).toContain("one drill or crate move");
     expect(host.textContent).toContain("2026-06-03 00:15");
     expect(host.textContent).toContain("42m");
     expect(host.textContent).toContain("19 events");
-    expect(host.textContent).toContain("ready for cited review");
+    expect(host.textContent).toContain("ready to review");
     expect(host.textContent).toContain("Payback: open review to leave with one drill or crate move.");
 
     const openButtons = Array.from(
@@ -112,7 +112,7 @@ describe("DebriefDock", () => {
     expect(openButtons[1]?.disabled).toBe(true);
     expect(openButtons[1]?.title).toBe("needs at least 5 minutes");
     expect(host.textContent).toContain("capture more");
-    expect(host.textContent).toContain("Payback path: 4m more unlocks the cited review.");
+    expect(host.textContent).toContain("4m more and I can review this set.");
     openButtons[1]?.click();
 
     expect(mocks.invokeTauri).not.toHaveBeenCalled();
@@ -159,11 +159,11 @@ describe("DebriefDock", () => {
 
     expect(host.textContent).toContain("capture 1m more");
     expect(host.textContent).toContain("2026-06-03 00:30");
-    expect(host.textContent).toContain("needs 1m");
+    expect(host.textContent).toContain("1m short");
     expect(host.textContent).toContain("keep Deck running");
-    expect(host.textContent).toContain("cited review");
+    expect(host.textContent).toContain("your review");
     expect(host.querySelector('[data-payback="target"]')?.textContent).toBe("2026-06-03 00:30");
-    expect(host.querySelector('[data-payback="blocker"]')?.textContent).toBe("needs 1m");
+    expect(host.querySelector('[data-payback="blocker"]')?.textContent).toBe("1m short");
   });
 
   it("explains the empty recording state without pretending a review exists", async () => {
