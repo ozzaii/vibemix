@@ -210,6 +210,9 @@ _LIVE_AUDIO_KICK_EVENT_TYPES: frozenset[str] = frozenset(
         "REENTRY_KICK_LAND",
     }
 )
+_LIVE_CLAIM_DEFER_AUTO_EVENTS: frozenset[str] = _LIVE_AUDIO_KICK_EVENT_TYPES | frozenset(
+    {"PHRASE_BOUNDARY", "SUB_LAYER_ARRIVAL"}
+)
 _LIVE_AUDIO_VOCAL_NOUNS: frozenset[str] = frozenset(
     {"vocal", "vocals", "voice", "lyric", "lyrics", "acapella"}
 )
@@ -2898,6 +2901,12 @@ def should_defer_live_claim_stream(
     ):
         return True
     if not moves and str(event_type or "").upper() == "PHASE":
+        return True
+    if (
+        not moves
+        and policy == "requires_more_evidence"
+        and str(event_type or "").upper() in _LIVE_CLAIM_DEFER_AUTO_EVENTS
+    ):
         return True
     if moves and getattr(state, "audible", False):
         return True

@@ -2666,6 +2666,14 @@ def test_live_claim_guard_strips_no_move_coaching_advice() -> None:
     assert "next time" not in result.text.lower()
 
 
+def test_live_claim_stream_defers_no_move_auto_audio_events_only() -> None:
+    state = MusicState(audible=True, controller_connected=True, audible_deck="A")
+
+    assert should_defer_live_claim_stream(state, [], event_type="KICK_SWAP") is True
+    assert should_defer_live_claim_stream(state, [], event_type="PHRASE_BOUNDARY") is True
+    assert should_defer_live_claim_stream(state, [], event_type="HEARTBEAT") is False
+
+
 def test_live_claim_guard_strips_sync_advice_when_decks_unresolved_even_with_moves() -> None:
     state = MusicState(audible=True, controller_connected=True, audible_deck="mix")
     moves = ["A_vol up (medium)", "B_vol up (medium)", "B_jog nudge forward"]

@@ -459,6 +459,45 @@ def test_live_claim_guard_strips_sync_advice_when_move_scope_is_unresolved(
     playback.push.assert_not_called()
 
 
+def test_live_claim_guard_defers_no_move_kick_swap_before_tts(mocker, tmp_path) -> None:
+    """No-move auto events must not leak raw advice before the post-stream guard."""
+    registry = EvidenceRegistry()
+    registry.write("ev", "KICK_SWAP", 148.0)
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "A"
+    state.deck_state = DeckState(decks={})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                "That kick tone just took a sharp step up [ev:KICK_SWAP@148.0], ",
+                "so keep the low end of your next track killed for 16 bars.",
+            ]
+        )
+    )
+
+    agent.set_next_event(Event(type="KICK_SWAP", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert chunks == []
+    kinds = [kind for kind, _ in recorder.events]
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "strip"
+    assert guard_log["policy"] == "transition_coaching_not_grounded"
+    assert "low end of your next track" in guard_log["raw_text"]
+    assert "ai_text" not in kinds
+    assert "streaming_cancel" not in kinds
+    assert tracker.rate() == 1.0
+    playback.push.assert_not_called()
+    ai_message = next(fields for kind, fields in recorder.events if kind == "ai_message")
+    assert ai_message["extra"]["head_yielded"] is False
+    assert ai_message["extra"]["live_claim_defer_stream"] is True
+
+
 def test_licensed_move_effect_still_requires_citation(mocker, tmp_path) -> None:
     """A physics-licensed move effect is still silent without a citation."""
     registry = EvidenceRegistry()
