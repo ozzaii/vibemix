@@ -263,22 +263,15 @@ const LAYOUT_CSS = `
     justify-content: space-between;
     gap: var(--sp-4);
     margin: 0 clamp(0px, 1.2vw, 18px);
-    padding: 10px 12px;
-    min-height: 64px;
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.036), transparent 46%, rgba(0, 0, 0, 0.18)),
-      rgba(255, 251, 244, 0.020);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.034),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.58),
-      0 1px 0 rgba(0, 0, 0, 0.48);
+    /* Borderless control strip, NOT a bordered card. Only the voice slab is a
+     * lit surface (the 20/80 the docstring describes) — the rail holds chrome
+     * controls, so it reads as a thin strip above the hero, not a third slab. */
+    padding: 2px 2px 0;
     min-width: 0;
   }
   .vmx-persona {
     appearance: none; -webkit-appearance: none;
-    display: flex; align-items: baseline; gap: var(--sp-3);
+    display: flex; align-items: center; gap: var(--sp-3);
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-sm);
     background:
@@ -304,12 +297,10 @@ const LAYOUT_CSS = `
       inset 0 1px 0 rgba(255, 251, 244, 0.016);
   }
   .vmx-persona:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: var(--rad-sm); }
-  .vmx-persona__k {
-    font-family: var(--type-display);
-    font-variation-settings: 'wdth' 85, 'wght' 600;
-    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
-    color: var(--silk-22);
-  }
+  /* The "PERSONA" key micro-label was redundant chrome — the lit mood word plus
+   * the button's full aria-label ("co-host mood: hype. tap to cycle…") already
+   * name the control. Cut so the rose mood word reads in one beat, no key/value
+   * spec-sheet tic (impeccable layout pass, 2026-06-03). */
   .vmx-persona__v {
     font-family: var(--type-display);
     font-variation-settings: 'wdth' 85, 'wght' 700;
@@ -424,7 +415,9 @@ const LAYOUT_CSS = `
     min-width: 0;
     width: auto;
     min-height: 0;
-    padding: clamp(24px, 4vw, 48px);
+    /* The hero gets the generous air; the rail + foot are thin chrome strips, so
+     * the vertical rhythm steps >1.25 from strip to slab (impeccable layout). */
+    padding: clamp(28px, 4.5vw, 52px);
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-md);
     /* The deck display — a lit machined slab, not an empty dark box (2026-05-30
@@ -461,25 +454,10 @@ const LAYOUT_CSS = `
     box-shadow: inset 0 0.5px 0 rgba(255, 210, 240, 0.07);
     pointer-events: none;
   }
-  /* The readout dot-matrix (a speaker-grille / VFD-grille detail) top-right —
-   * boosted + de-blued (the old rgba(72,152,255) was an off-palette v5 leftover;
-   * tozpembe is rose + gold only). Now a faint warm-white matrix catching the
-   * room's rose light, masked so it fades into the slab. */
-  .vmx-voice::after {
-    content: "";
-    position: absolute;
-    top: 26px;
-    right: 28px;
-    bottom: 26px;
-    width: min(34%, 280px);
-    background:
-      radial-gradient(circle, rgba(255, 222, 242, 0.10) 0 1px, transparent 1px 12px),
-      linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.020));
-    opacity: 0.32;
-    -webkit-mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.9) 30%, rgba(0, 0, 0, 0.4));
-    mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.9) 30%, rgba(0, 0, 0, 0.4));
-    pointer-events: none;
-  }
+  /* (One-Rose) The hero slab carries a single decorative texture — the ::before
+   * faceplate. The old ::after dot-matrix grille was a SECOND non-load-bearing
+   * texture competing for the slab's one-rose budget; cut so the spoken line and
+   * its receipt own the surface (impeccable layout pass, 2026-06-03). */
   .vmx-voice > * {
     position: relative;
     z-index: 1;
@@ -656,29 +634,27 @@ const LAYOUT_CSS = `
     display: grid; grid-template-columns: auto auto 1fr; align-items: center;
     gap: clamp(20px, 3vw, 48px);
     margin: 0 clamp(0px, 1.2vw, 18px);
-    padding: 12px 14px;
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.030), transparent 42%),
-      linear-gradient(90deg, rgba(255, 165, 223, 0.024), transparent 38%, transparent 62%, rgba(255, 251, 244, 0.012)),
-      rgba(255, 251, 244, 0.018);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.032),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.58),
-      0 1px 0 rgba(0, 0, 0, 0.46);
+    /* One steady master readout engraved into the void behind a SINGLE hairline,
+     * the docstring's "single master strip" — not a third bordered+shadowed slab.
+     * De-carded so only the voice slab is a lit surface (impeccable layout). */
+    padding: 12px 2px 2px;
+    border-top: 1px solid var(--glass-edge);
   }
   .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); }
   .vmx-read__lab {
     font-family: var(--type-display); font-variation-settings: 'wdth' 85, 'wght' 600;
     font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--silk-22);
   }
+  /* BPM and key read at ONE mono scale (was 22 vs 18, near-equal-weight mush);
+   * the numerics carry the read, the 9px labels stay dim. Key keeps amber — the
+   * one quarantined heat hue — so it still reads as the second value, by HUE not
+   * size (impeccable layout pass, hierarchy fix). */
   .vmx-read__num {
-    font-family: var(--type-mono); font-weight: 500; font-size: 22px; letter-spacing: 0.02em;
+    font-family: var(--type-mono); font-weight: 500; font-size: 20px; letter-spacing: 0.02em;
     color: var(--silk); transition: color 700ms ease-out;
   }
   .vmx-read__key {
-    font-family: var(--type-mono); font-weight: 500; font-size: 18px; letter-spacing: 0.04em;
+    font-family: var(--type-mono); font-weight: 500; font-size: 20px; letter-spacing: 0.04em;
     color: var(--amber-pale); transition: color 700ms ease-out;
   }
   .vmx-fmeter {
@@ -1011,12 +987,11 @@ export function mountSessionLayout(
   const persona = document.createElement("button");
   persona.type = "button";
   persona.className = "vmx-persona";
-  const personaK = document.createElement("span");
-  personaK.className = "vmx-persona__k";
-  personaK.textContent = "persona";
+  // Mood value only — the "persona" key label was redundant with the aria-label
+  // ("co-host mood: …. tap to cycle …") set on every mood change below.
   const personaValue = document.createElement("span");
   personaValue.className = "vmx-persona__v";
-  persona.append(personaK, personaValue);
+  persona.append(personaValue);
   persona.addEventListener("click", () => mountedHandle?.current.persona.onCycleMood?.());
 
   const controls = document.createElement("div");
