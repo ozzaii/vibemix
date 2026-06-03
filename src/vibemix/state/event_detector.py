@@ -503,10 +503,14 @@ class EventDetector:
                 # (and bump cooldown bookkeeping) exactly like every baseline
                 # event does. Before this the chain returned the Event WITHOUT
                 # _fire, so the deepest perception in the system produced no
-                # [ev:<TYPE>] observation. The detectors self-gate via their own
-                # last_event_at, so _fire here only records timestamps + a
-                # best-effort registry write — it does not re-arm their internal
-                # cooldowns.
+                # [ev:<TYPE>] observation.
+                #
+                # Detectors self-gate per type, but the shared EventDetector
+                # gate owns the cross-event floor. Keep that floor here too so
+                # a KICK_* event cannot be followed by a PHRASE_BOUNDARY turn a
+                # few seconds later and make Sven feel like a metronome.
+                if not self._cooldown_ok(ev.type, now):
+                    return None
                 self._fire(ev.type, now, state)
                 return ev
 

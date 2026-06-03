@@ -140,8 +140,9 @@ def test_event_gap_dict_shape_and_values() -> None:
     # Plan 17-03 paired-detector cooldowns — UNCHANGED by Plan 40-04
     assert MIN_EVENT_GAP_PER_TYPE["BREAKDOWN_KICK_KILL"] == 20.0
     assert MIN_EVENT_GAP_PER_TYPE["REENTRY_KICK_LAND"] == 12.0
-    # Plan 17-04 phrase-boundary cooldown — UNCHANGED by Plan 40-04
-    assert MIN_EVENT_GAP_PER_TYPE["PHRASE_BOUNDARY"] == 24.0
+    # 2026-06-03 live preflight — phrase boundaries stay speakable, but no longer every
+    # 16 bars on fast tracks.
+    assert MIN_EVENT_GAP_PER_TYPE["PHRASE_BOUNDARY"] == 48.0
     # Phase 30 SENSE-17/18 — UNCHANGED by Plan 40-04
     assert MIN_EVENT_GAP_PER_TYPE["DISTORTION_CLIMB"] == 6.0
     assert MIN_EVENT_GAP_PER_TYPE["ACID_LINE_ENTRY"] == 8.0

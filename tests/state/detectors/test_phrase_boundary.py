@@ -231,11 +231,11 @@ def test_phrase_boundary_silence_gate():
     assert d.detect(ms_phase_silent, buf, now=1000.0) is None
 
 
-# ---------- Test 7: cooldown blocks repeat fire (24s) ----------
+# ---------- Test 7: cooldown blocks repeat fire (48s) ----------
 
 
 def test_phrase_boundary_cooldown_prevents_double_fire():
-    """Repeat call within MIN_EVENT_GAP_PER_TYPE['PHRASE_BOUNDARY']=24s blocked.
+    """Repeat call within MIN_EVENT_GAP_PER_TYPE['PHRASE_BOUNDARY']=48s blocked.
     """
     d = PhraseBoundaryDetector()
     ms = _state_phrase_ready(bpm=130.0, beat_phase=0.0, bpm_confidence=0.8)
@@ -249,20 +249,22 @@ def test_phrase_boundary_cooldown_prevents_double_fire():
 
     # Within cooldown — should NOT fire even at the next 16-bar boundary.
     cooldown = MIN_EVENT_GAP_PER_TYPE["PHRASE_BOUNDARY"]
-    assert cooldown == 24.0
-    next_boundary = 1000.0 + sixteen_bars_s + sixteen_bars_s
-    # next_boundary is ~29.5s after first fire — past 24s cooldown but...
-    # we want to test BLOCK within cooldown so use a closer offset:
+    assert cooldown == 48.0
     inside_cooldown_t = 1000.0 + sixteen_bars_s + 5.0
     ev2 = d.detect(ms, buf, now=inside_cooldown_t)
     assert ev2 is None  # blocked by cooldown
+
+    next_boundary = 1000.0 + sixteen_bars_s + sixteen_bars_s
+    # next_boundary is ~29.5s after first fire — the new 48s live-preflight
+    # cadence blocks it too, so Sven does not narrate every 16-bar turn.
+    assert d.detect(ms, buf, now=next_boundary) is None
 
 
 # ---------- Test 8: min-bars-between-fires gate ----------
 
 
 def test_phrase_boundary_min_bars_between_fires():
-    """Even outside the 24s cooldown, two fires must be at least
+    """Even outside the 48s cooldown, two fires must be at least
     PHRASE_BOUNDARY_MIN_BARS_BETWEEN_FIRES=8 bars apart (computed from
     bar_index, not seconds — protects against fast-BPM double-fire)."""
     d = PhraseBoundaryDetector()

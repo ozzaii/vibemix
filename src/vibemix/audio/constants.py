@@ -86,9 +86,9 @@ MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 +
     "MIC": 3.0,
     "MANUAL": 1.5,
     # DROP-call signal is opt-in and speech remains separately gated, but once
-    # armed it needs its own phrase-level throttle. 24s matches the structural
-    # phrase-boundary wall: it blocks repeated approaches to the same drop while
-    # still allowing the next real phrase-level drop in fast music.
+    # armed it needs its own phrase-level throttle. 24s blocks repeated approaches
+    # to the same drop while still allowing the next real phrase-level drop in
+    # fast music.
     "DROP": 24.0,
     # Phase 17 SENSE-12 — kick-side cross-genre detectors (per CONTEXT D-cooldown
     # locked rule "matches G-followup-1"). Tuned on the v4 coexistence matrix:
@@ -108,12 +108,11 @@ MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 +
     # re-entry past the natural pair window and silently swallow the moment.
     "BREAKDOWN_KICK_KILL": 20.0,
     "REENTRY_KICK_LAND": 12.0,
-    # Plan 17-04 — phrase-boundary structural detector (SENSE-14). 24s gap
-    # prevents same-phrase double-fire while still allowing every-other-phrase
-    # reactivity at typical BPM × 16 bars (≈12-15s per phrase). Bar-count is
-    # the meaningful unit (PHRASE_BOUNDARY_MIN_BARS_BETWEEN_FIRES below); the
-    # 24s wall-clock floor is a redundant guard.
-    "PHRASE_BOUNDARY": 24.0,
+    # Plan 17-04 — phrase-boundary structural detector (SENSE-14). The 2026-06-03
+    # live preflight showed 16-bar boundaries at ~154 BPM landing every ~25s;
+    # if every boundary gets an LLM turn, Sven feels stuttery. Keep phrase reads
+    # alive, but make them every-other-major-phrase at most.
+    "PHRASE_BOUNDARY": 48.0,
     # Phase 30 SENSE-17/18 — Hard Tek genre-specific detector cooldowns.
     # Tight relative to PHASE/MIX_MOVE because Hard Tek climbs evolve fast
     # (every 6-8s a fresh distortion stack arrives in a 4-minute peak-time

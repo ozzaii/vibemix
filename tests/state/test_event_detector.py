@@ -20,6 +20,7 @@ with Plan 40-04 / AUDIO-03 re-tune to the v4 chat-tested 2026-05-11 ear-test):
 
 from __future__ import annotations
 
+from vibemix.audio.constants import EVENT_GLOBAL_MIN_GAP
 from vibemix.state import Event, EventDetector, MusicState
 
 
@@ -684,6 +685,38 @@ def test_genre_chain_fire_does_not_break_detector_self_cooldown(mocker):
     t.return_value = 1031.0
     second = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert second is None or second.type != "SUB_LAYER_ARRIVAL"
+
+
+def test_genre_chain_event_respects_global_event_floor(mocker):
+    """A genre-chain detector can self-detect a moment inside the shared floor,
+    but EventDetector must not route that moment to Sven yet."""
+    registry = EvidenceRegistry()
+    d = EventDetector(evidence_registry=registry)
+    ms = _state()
+    ms.active_genre = "techno"
+
+    class AlwaysPhraseBoundary:
+        def detect(self, state, audio_buf, now):
+            return Event("PHRASE_BOUNDARY", state)
+
+    d.router._chain = [AlwaysPhraseBoundary()]
+    d.router.current_genre = "techno"
+    d.router._initialized = True
+    t = _prime_music_playing(d, ms, mocker, t0=1000.0)
+
+    d.last_event_at = 1000.0
+    d.last_per_type_at["KICK_DENSITY_SHIFT"] = 1000.0
+    t.return_value = 1000.0 + EVENT_GLOBAL_MIN_GAP - 1.0
+    blocked = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert blocked is None
+    assert "PHRASE_BOUNDARY" not in registry.snapshot().get("ev", {})
+    assert "PHRASE_BOUNDARY" not in d.last_per_type_at
+
+    t.return_value = 1000.0 + EVENT_GLOBAL_MIN_GAP + 1.0
+    allowed = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert allowed is not None
+    assert allowed.type == "PHRASE_BOUNDARY"
+    assert "PHRASE_BOUNDARY" in registry.snapshot().get("ev", {})
 
 
 def test_event_detector_baseline_priority_wins_when_both_fire(mocker):
