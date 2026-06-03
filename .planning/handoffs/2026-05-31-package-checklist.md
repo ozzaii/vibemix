@@ -10158,6 +10158,42 @@ Proof before staging:
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/DebriefDock.ts tauri/ui/tests/shell/debrief-dock.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 
+## Package 79 - Settings Sven Contract
+
+Suggested commit: `feat(settings-ui): add sven operating contract`
+
+Include:
+
+- `tauri/ui/src/settings/SettingsDrawer.ts`
+- `tauri/ui/src/mock-transfer/contract.ts`
+- `tauri/ui/tests/settings/drawer.spec.ts`
+- `tauri/ui/tests/mock-transfer-contract.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Settings IPC schema/codegen, backend settings persistence, audio restart
+  behavior, Deck/Crate/Learn/Debrief surfaces, Sven speech, Viber tooling,
+  packaging scripts, and new dependencies. This package only upgrades the
+  Settings drawer's first screen using already-rendered settings, recording,
+  and proof state.
+
+Reason:
+
+- The exact signed app at `a40a24cf` showed Settings as the next weakest
+  commercial-value module: it exposes the right local voice, output, recording,
+  and proof facts, but still reads like a control drawer rather than a live DJ
+  operating contract. Add a compact Sven contract inside the existing trust
+  rail so the DJ sees the active persona, route, and proof state before
+  adjusting controls.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/settings/drawer.spec.ts tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/settings/SettingsDrawer.ts tauri/ui/src/mock-transfer/contract.ts tauri/ui/tests/settings/drawer.spec.ts tauri/ui/tests/mock-transfer-contract.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
 ## Package 75 - Deck Live Proof Readiness Rail
 
 Suggested commit: `feat(deck-ui): add live proof readiness rail`

@@ -543,6 +543,70 @@ const CSS = `
       inset 0 1px 0 var(--glass-top),
       inset 0 -1px 0 rgba(0, 0, 0, 0.42);
   }
+  .vmx-settings-trust__contract {
+    grid-column: 1 / -1;
+    min-width: 0;
+    padding: 12px 13px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 222, 242, 0.026), transparent 56%),
+      rgba(0, 0, 0, 0.22);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.035),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.50);
+  }
+  .vmx-settings-trust__contract[data-status="ok"] {
+    border-color: var(--brand-22);
+    background:
+      linear-gradient(180deg, var(--brand-06), transparent 58%),
+      rgba(0, 0, 0, 0.22);
+  }
+  .vmx-settings-trust__contract[data-status="warn"] {
+    border-color: rgba(244, 197, 66, 0.28);
+  }
+  .vmx-settings-trust__contract-label {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--brand);
+    font-family: var(--type-mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .vmx-settings-trust__contract-label::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--brand);
+    box-shadow: 0 0 6px var(--brand-22);
+  }
+  .vmx-settings-trust__contract-value {
+    margin-top: var(--sp-2);
+    max-width: 100%;
+    color: var(--text-primary);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 84, "wght" 650;
+    font-size: 15px;
+    line-height: 1.18;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .vmx-settings-trust__contract-sub {
+    margin-top: var(--sp-1);
+    max-width: 100%;
+    color: var(--text-muted);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .vmx-settings-trust__cell {
     min-width: 0;
     padding: 10px 11px;
@@ -1049,6 +1113,7 @@ function renderSettingsTrustRail(
   root.className = "vmx-settings-trust";
   root.dataset.wire = "settings.trust";
   root.setAttribute("aria-label", "settings trust status");
+  root.append(renderSettingsContract(settings, state));
 
   const cells: TrustCell[] = [
     {
@@ -1087,6 +1152,35 @@ function renderSettingsTrustRail(
     root.append(renderTrustCell(cell));
   }
   return root;
+}
+
+function renderSettingsContract(
+  settings: SettingsView,
+  state: ReturnType<typeof getSessionState>,
+): HTMLElement {
+  const proofValue = state.grounded
+    ? "grounded"
+    : state.claimPolicy?.label ?? "proof pending";
+  const contract = document.createElement("div");
+  contract.className = "vmx-settings-trust__contract";
+  contract.dataset.wire = "settings.trust.contract";
+  contract.dataset.status = state.grounded ? "ok" : "warn";
+
+  const label = document.createElement("div");
+  label.className = "vmx-settings-trust__contract-label";
+  label.textContent = "Sven contract";
+
+  const value = document.createElement("div");
+  value.className = "vmx-settings-trust__contract-value";
+  value.textContent =
+    `${settings.voice} · ${MODE_LABELS[settings.mode]} · ${SKILL_LABELS[settings.skill]}`;
+
+  const sub = document.createElement("div");
+  sub.className = "vmx-settings-trust__contract-sub";
+  sub.textContent = `${LENS_LABELS[settings.lens]} lens · ${formatOutputRoute(settings)} · ${proofValue}`;
+
+  contract.append(label, value, sub);
+  return contract;
 }
 
 function renderTrustCell(cell: TrustCell): HTMLElement {

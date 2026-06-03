@@ -343,6 +343,9 @@ describe("group rendering", () => {
       settings: {
         ...state.settings,
         voice: "Bella",
+        mode: "coach",
+        lens: "critique",
+        skill: "intermediate",
         output_device_id: "5",
         output_profile: "spk",
       },
@@ -355,6 +358,9 @@ describe("group rendering", () => {
     setSettingsUIState({ open: true });
 
     const trust = document.querySelector<HTMLElement>('[data-wire="settings.trust"]');
+    expect(trust?.textContent).toContain("Sven contract");
+    expect(trust?.textContent).toContain("Bella · Coach · Intermediate");
+    expect(trust?.textContent).toContain("Critique lens · Speakers · Device 5 · grounded");
     expect(trust?.textContent).toContain("Local voice");
     expect(trust?.textContent).toContain("Bella · MOSS");
     expect(trust?.textContent).toContain("Sven speaks from the bundled voice stack");

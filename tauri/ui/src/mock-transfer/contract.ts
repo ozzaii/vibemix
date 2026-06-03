@@ -87,6 +87,10 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "library.stats", purpose: "corpus/model/backend stats" },
       { wire: "library.model-setup", purpose: "local model readiness and install" },
       { wire: "library.agent-setup", purpose: "Codex/Viber setup hint" },
+      {
+        wire: "library.operator-brief",
+        purpose: "folded Crate/Viber first-screen operator brief",
+      },
       { wire: "library.results-panel", purpose: "main result/rationale panel" },
       { wire: "library.command-field", purpose: "command echo and active-mode label" },
       { wire: "library.rationale", purpose: "curate/build set notes" },
@@ -317,6 +321,8 @@ export const SESSION_RUNTIME_WIRES = [
   "session.citation",
   "session.drop",
   "session.claim-policy",
+  "session.idle-proof",
+  "session.idle-proof.next",
   "session.meter",
   "session.status",
 ] as const;
@@ -329,6 +335,7 @@ export const SETTINGS_RUNTIME_WIRES = [
   "settings.body",
   "settings.modal-slot",
   "settings.trust",
+  "settings.trust.contract",
   "settings.trust.voice",
   "settings.trust.output",
   "settings.trust.recordings",
@@ -386,6 +393,9 @@ const SESSION_RUNTIME_WIRE_PURPOSES: Record<
   "session.citation": "grounded evidence chip",
   "session.drop": "runtime drop-countdown chip",
   "session.claim-policy": "live claim-proof policy chip",
+  "session.idle-proof":
+    "idle first-move proof rail for audio, Sven, controller, and screen evidence",
+  "session.idle-proof.next": "idle first-move next action copy tied to proof readiness",
   "session.meter": "audio health meter",
   "session.status": "runtime status footer",
 };
@@ -401,6 +411,7 @@ const SETTINGS_RUNTIME_WIRE_PURPOSES: Record<
   "settings.body": "settings group mount",
   "settings.modal-slot": "confirmation dialog portal",
   "settings.trust": "top trust/readiness rail for local voice, output, recordings, and proof",
+  "settings.trust.contract": "summary of Sven persona, route, and proof state before controls",
   "settings.trust.voice": "local MOSS voice readiness summary",
   "settings.trust.output": "current co-host output route summary",
   "settings.trust.recordings": "local recording vault usage summary",
