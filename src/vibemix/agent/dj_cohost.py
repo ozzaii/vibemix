@@ -138,11 +138,11 @@ SILENCE_TOKEN = "<silence/>"
 # UI/source details.
 SCREEN_SKIP_EVENTS: frozenset[str] = frozenset({"MIX_MOVE", "HEARTBEAT"})
 
-# Runtime diet audio window. Keep the short payload for low-value chatter and
-# user-voice acknowledgement; controller/arrangement events use the full
-# INVOKE_AUDIO_SECONDS window so Sven hears the musical before/after.
+# Runtime diet audio window. Keep the short payload only for low-value chatter;
+# user-directed speech uses the full INVOKE_AUDIO_SECONDS window so Sven hears
+# the musical before/after while the separate mic Part carries what Kaan said.
 DIET_AUDIO_SECONDS: float = 6.0
-RUNTIME_DIET_EVENTS: frozenset[str] = frozenset({"HEARTBEAT", "KAAN_SPOKE"})
+RUNTIME_DIET_EVENTS: frozenset[str] = frozenset({"HEARTBEAT"})
 DECK_AUDIO_PART_SECONDS_DEFAULT: float = 3.0
 DECK_AUDIO_PART_MIN_RMS: float = 0.003
 DECK_AUDIO_PART_AUTO_EVENTS: frozenset[str] = frozenset(

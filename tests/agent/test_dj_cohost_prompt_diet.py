@@ -3,7 +3,7 @@
 
 Pins:
 - Audio Part window: 6.0s only on runtime diet events, INVOKE_AUDIO_SECONDS
-  on musical/live-control events.
+  on musical/live-control and user-directed speech events.
 - Screen Part: SKIPPED on MIX_MOVE + HEARTBEAT (SCREEN_SKIP_EVENTS).
 - AICoach.build_prompt called with diet=True on ack events, diet=False on full.
 - recorder.log_event llm_invoke payload exposes diet bool + audio_seconds int
@@ -27,7 +27,7 @@ from vibemix.agent.dj_cohost import RUNTIME_DIET_EVENTS, SCREEN_SKIP_EVENTS
 from vibemix.audio import INVOKE_AUDIO_SECONDS
 from vibemix.state import AICoach, Event, MusicState
 
-# 6s window from Plan 19-02 — diet path payload.
+# 6s window from Plan 19-02 — heartbeat diet path payload.
 DIET_AUDIO_SECONDS = 6.0
 
 
@@ -155,10 +155,10 @@ def test_layer_arrival_uses_full_window_no_diet(mocker, tmp_path):
     assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
 
 
-def test_kaan_spoke_uses_6s_window_diet(mocker, tmp_path):
+def test_kaan_spoke_uses_full_window_no_diet(mocker, tmp_path):
     snapshot_wav_mock, _, _ = _drive_with_event(mocker, tmp_path, "KAAN_SPOKE")
-    assert snapshot_wav_mock.call_args.args[1] == DIET_AUDIO_SECONDS
-    assert AICoach.build_prompt.call_args.kwargs.get("diet") is True
+    assert snapshot_wav_mock.call_args.args[1] == INVOKE_AUDIO_SECONDS
+    assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
 
 
 def test_pending_none_falls_back_to_manual_full_window(mocker, tmp_path):
@@ -184,10 +184,11 @@ def test_screen_skip_set_contains_only_mix_move_and_heartbeat():
 
 
 def test_runtime_diet_set_keeps_musical_events_full_window():
-    """MIX_MOVE and LAYER_ARRIVAL are Sven's musical ear, not tiny acks."""
-    assert RUNTIME_DIET_EVENTS == frozenset({"HEARTBEAT", "KAAN_SPOKE"})
+    """Musical and user-directed turns are Sven's ear, not tiny acks."""
+    assert RUNTIME_DIET_EVENTS == frozenset({"HEARTBEAT"})
     assert "MIX_MOVE" not in RUNTIME_DIET_EVENTS
     assert "LAYER_ARRIVAL" not in RUNTIME_DIET_EVENTS
+    assert "KAAN_SPOKE" not in RUNTIME_DIET_EVENTS
 
 
 # ---------- recorder log_event payload ----------
