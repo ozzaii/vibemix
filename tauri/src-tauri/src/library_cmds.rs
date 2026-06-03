@@ -809,6 +809,52 @@ pub async fn library_build_set(
     Ok(map_curate_result(&raw))
 }
 
+/// `library_auto_crate` — keyless deterministic set builder front-door.
+///
+/// Mirrors `library_build_set` (one-shot CLI subprocess -> JSON -> mapped UI
+/// shape), running `library auto-crate [<query>] --curve <curve> --n-slots <n>
+/// --export rekordbox --json`. It deliberately passes no `--backend`: the
+/// engine is deterministic Python, not Codex, so this path has no Codex login
+/// or shell gate.
+#[tauri::command]
+pub async fn library_auto_crate(
+    app: AppHandle,
+    query: Option<String>,
+    curve: String,
+    n_slots: Option<u32>,
+) -> Result<Value, String> {
+    const CURVES: [&str; 4] = ["opener", "peak_time", "after_hours", "festival"];
+    if !CURVES.contains(&curve.as_str()) {
+        return Err(format!(
+            "invalid curve {curve:?} (expected opener | peak_time | after_hours | festival)"
+        ));
+    }
+
+    let clean_query = query
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    let slots = n_slots.unwrap_or(6).clamp(2, 24).to_string();
+    let mut args = vec!["library".to_string(), "auto-crate".to_string()];
+    if let Some(q) = clean_query {
+        args.push(q);
+    }
+    args.extend([
+        "--curve".to_string(),
+        curve,
+        "--n-slots".to_string(),
+        slots,
+        "--export".to_string(),
+        "rekordbox".to_string(),
+        "--json".to_string(),
+    ]);
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    let (stdout, stderr, code) = run_library_to_completion(&app, &arg_refs).await?;
+    let raw = parse_cli_json(&stdout, &stderr, code)?;
+    Ok(map_curate_result(&raw))
+}
+
 /// `library_cue_folder` — folder → auto-cued Rekordbox XML / M3U8 handoff.
 ///
 /// This is the GUI-safe subset of `vibemix library cue`: it exports portable
@@ -1565,6 +1611,34 @@ mod tests {
         assert_eq!(m["stop_reason"], "exported");
         assert_eq!(m["export_path"], "/Users/x/Music/vibemix-set.xml");
         assert_eq!(m["count"], 2);
+    }
+
+    #[test]
+    fn maps_auto_crate_result_shape() {
+        // AutoCrateResult.to_dict carries top-level track_ids plus
+        // playlist.name; the existing curate mapper should surface both.
+        let raw = json!({
+            "name": "Warehouse Opener",
+            "stop_reason": "exported",
+            "curve": "peak_time",
+            "n_slots": 6,
+            "query": "warehouse opener",
+            "track_ids": ["t1", "t2"],
+            "rationale": "Eased in at 122, climbed to 126.",
+            "playlist": {
+                "name": "Warehouse Opener",
+                "track_ids": ["t1", "t2"]
+            },
+            "export_path": "/Users/x/Music/vibemix-set.xml",
+            "transition_receipts": []
+        });
+        let m = map_curate_result(&raw);
+        assert_eq!(m["name"], "Warehouse Opener");
+        assert_eq!(m["stop_reason"], "exported");
+        assert_eq!(m["export_path"], "/Users/x/Music/vibemix-set.xml");
+        assert_eq!(m["count"], 2);
+        assert_eq!(m["tracks"][0]["track_id"], "t1");
+        assert_eq!(m["tracks"][1]["track_id"], "t2");
     }
 
     #[test]

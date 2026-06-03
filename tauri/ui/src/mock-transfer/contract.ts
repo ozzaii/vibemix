@@ -158,6 +158,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       "library_similar",
       "library_curate",
       "library_build_set",
+      "library_auto_crate",
       "library_chat",
       "library_cue_folder",
     ],
