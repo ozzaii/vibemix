@@ -10192,3 +10192,40 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/session/SessionLayout.ts tauri/ui/tests/session/render-loop.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 76 - Crate Operator Brief
+
+Suggested commit: `feat(crate-ui): add viber operator brief`
+
+Include:
+
+- `tauri/ui/library.html`
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/library.css`
+- `tauri/ui/src/library/chat.test.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Viber tool implementations, library search/ranking semantics, backend
+  commands, IPC schema/codegen, Deck, Learn, Debrief, Settings, Sven speech,
+  packaging scripts, and new dependencies. This package only upgrades the
+  folded Crate first screen using already-rendered library stats and live proof
+  status.
+
+Reason:
+
+- The exact signed app at `5bd9fa8b` showed Crate as the next commercial-value
+  target after Deck: it has the real Viber chat path and grounded proof rack,
+  but the first screen still reads like a prompt console. Add a compact
+  operator brief that states what Viber can do now: build from the indexed
+  crate, mix only when proof is armed, and rediscover through local search. The
+  rail must stay tied to existing stats/live context and must not imply a live
+  transition proof until the existing gate says `armed`.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts src/library/folded-mount.test.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/library.html tauri/ui/src/library/index.ts tauri/ui/src/library/library.css tauri/ui/src/library/chat.test.ts .planning/handoffs/2026-05-31-package-checklist.md`

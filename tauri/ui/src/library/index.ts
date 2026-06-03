@@ -723,6 +723,7 @@ function renderStats(stats: LibraryStats): void {
   $("vmx-lib-stat-failed").textContent = String(stats.failed);
   const engineLabelEl = $maybe("vmx-lib-engine-label");
   if (engineLabelEl) engineLabelEl.textContent = embeddingLabel(stats);
+  renderOperatorBrief();
   renderAgentSetup(stats);
   if (latestModels) renderModelSetup(latestModels);
 }
@@ -735,6 +736,7 @@ function renderStatsError(err: unknown): void {
   $("vmx-lib-stat-failed").textContent = "·";
   const engineLabelEl = $maybe("vmx-lib-engine-label");
   if (engineLabelEl) engineLabelEl.textContent = "library stats unavailable";
+  renderOperatorBrief();
   renderAgentSetup(null);
   // eslint-disable-next-line no-console
   console.error("[vmx-lib] stats refresh failed:", err);
@@ -1263,6 +1265,68 @@ function liveProofStatus(context: LibraryLiveContext | null): {
   };
 }
 
+function operatorState(
+  stats: LibraryStats | null,
+  proof: ReturnType<typeof liveProofStatus>,
+): string {
+  if (stats?.agent_ready === false) return "Viber setup needed";
+  if (proof.ok) return "live transition armed";
+  if ((stats?.indexed ?? 0) > 0) return "set prep ready";
+  if (stats) return "index a crate first";
+  return "set prep checking";
+}
+
+function operatorBuildLabel(stats: LibraryStats | null): string {
+  if (!stats) return "crate checking";
+  if (stats.indexed > 0) return `${stats.indexed} tracks`;
+  return "crate empty";
+}
+
+function operatorSearchLabel(stats: LibraryStats | null): string {
+  if (!stats) return "search checking";
+  return libraryBackendLabel(stats.backend);
+}
+
+function operatorCellState(
+  stats: LibraryStats | null,
+  proof: ReturnType<typeof liveProofStatus>,
+  axis: "build" | "mix" | "rediscover",
+): "ok" | "warn" | "fault" {
+  if (axis === "mix") return proof.ok ? "ok" : "warn";
+  if (!stats) return "warn";
+  if (stats.agent_ready === false) return "fault";
+  if (axis === "build") return stats.indexed > 0 ? "ok" : "warn";
+  return stats.backend === "unavailable" ? "fault" : "ok";
+}
+
+function setOperatorText(id: string, text: string): void {
+  const el = $maybe(id);
+  if (el && el.textContent !== text) el.textContent = text;
+}
+
+function setOperatorCell(
+  axis: "build" | "mix" | "rediscover",
+  state: string,
+): void {
+  const el = $maybe("vmx-lib-operator")?.querySelector<HTMLElement>(
+    `[data-operator="${axis}"]`,
+  );
+  if (el && el.dataset.state !== state) el.dataset.state = state;
+}
+
+function renderOperatorBrief(): void {
+  if (!$maybe("vmx-lib-operator")) return;
+  const proof = liveProofStatus(latestLiveContext);
+  setOperatorText("vmx-lib-operator-state", operatorState(latestStats, proof));
+  setOperatorText("vmx-lib-operator-build", operatorBuildLabel(latestStats));
+  setOperatorText("vmx-lib-operator-mix", proof.state);
+  setOperatorText("vmx-lib-operator-proof", proof.detail);
+  setOperatorText("vmx-lib-operator-search", operatorSearchLabel(latestStats));
+  setOperatorCell("build", operatorCellState(latestStats, proof, "build"));
+  setOperatorCell("mix", operatorCellState(latestStats, proof, "mix"));
+  setOperatorCell("rediscover", operatorCellState(latestStats, proof, "rediscover"));
+}
+
 function appendLiveProofStatusToolRow(
   tools: HTMLElement,
   context: LibraryLiveContext | null,
@@ -1299,6 +1363,7 @@ function renderChatIdleSide(): void {
   $("vmx-lib-scope-state").textContent = liveProofStatus(latestLiveContext).ok
     ? "live read armed"
     : "ready";
+  renderOperatorBrief();
 }
 
 /** Append one live tool-tape row as Viber fires it (the agentic work made

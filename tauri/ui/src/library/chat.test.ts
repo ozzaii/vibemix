@@ -491,6 +491,24 @@ function mountSkeleton(): void {
         <div class="who">viber</div>
         <div class="body">I can build a set, solve a transition, or find deep cuts. I will show receipts before you trust it.</div>
       </div>
+      <div id="vmx-lib-operator" data-wire="library.operator-brief">
+        <div data-operator="build">
+          <span>Build</span>
+          <b id="vmx-lib-operator-build"></b>
+          <small>sequence, key, export</small>
+        </div>
+        <div data-operator="mix">
+          <span>Mix</span>
+          <b id="vmx-lib-operator-mix"></b>
+          <small id="vmx-lib-operator-proof"></small>
+        </div>
+        <div data-operator="rediscover">
+          <span>Rediscover</span>
+          <b id="vmx-lib-operator-search"></b>
+          <small>deep cuts, no repeats</small>
+        </div>
+        <b id="vmx-lib-operator-state"></b>
+      </div>
       <div id="vmx-lib-chat-starters" data-wire="library.chat-starters">
         <button type="button" data-chat="build a 45-minute psytrance set from my indexed tracks, clean energy arc, no fake genres">
           <span>Build a set</span>
@@ -561,6 +579,46 @@ describe("chat - real runChat path", () => {
     expect(
       document.querySelector('[data-wire="library.chat-starters"]'),
     ).toBeTruthy();
+    expect(
+      document.querySelector('[data-wire="library.operator-brief"]'),
+    ).toBeTruthy();
+    expect(document.getElementById("vmx-lib-operator-state")?.textContent).toBe(
+      "set prep ready",
+    );
+    expect(document.getElementById("vmx-lib-operator-build")?.textContent).toBe(
+      "12 tracks",
+    );
+    expect(document.getElementById("vmx-lib-operator-search")?.textContent).toBe(
+      "local",
+    );
+    expect(document.getElementById("vmx-lib-operator-mix")?.textContent).toBe(
+      "waiting",
+    );
+    expect(document.getElementById("vmx-lib-operator-proof")?.textContent).toBe(
+      "ask Viber for receipts",
+    );
+  });
+
+  it("updates the operator brief when live transition proof arms", async () => {
+    await mountChat();
+
+    liveContextCallback?.(readyDeckPairLiveContext());
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    expect(document.getElementById("vmx-lib-operator-state")?.textContent).toBe(
+      "live transition armed",
+    );
+    expect(document.getElementById("vmx-lib-operator-mix")?.textContent).toBe(
+      "armed",
+    );
+    expect(document.getElementById("vmx-lib-operator-proof")?.textContent).toBe(
+      "deck1 A=known:dominant / deck2 B=known:present",
+    );
+    expect(
+      document
+        .querySelector<HTMLElement>('[data-operator="mix"]')
+        ?.dataset.state,
+    ).toBe("ok");
   });
 
   it("runs a starter mission through the same Viber path and hides the starter rail", async () => {
