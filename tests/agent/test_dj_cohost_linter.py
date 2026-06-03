@@ -530,6 +530,51 @@ def test_live_claim_guard_strips_hidden_source_detail_before_tts(mocker, tmp_pat
     playback.push.assert_not_called()
 
 
+def test_live_claim_guard_emits_cleaned_audio_read_before_hidden_source_detail(
+    mocker,
+    tmp_path,
+) -> None:
+    """The guard should cherish a usable AI read instead of muting the whole turn."""
+    registry = EvidenceRegistry()
+    registry.write("ev", "BAND_SHIFT_HIGH", 5.12)
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "A"
+    state.deck_state = DeckState(decks={"A": _deck("OutA", camelot="8A")})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                (
+                    "The high end got super thin [ev:BAND_SHIFT_HIGH@5.12] and then "
+                    "those vocals and synth layers flooded the mid range."
+                )
+            ]
+        )
+    )
+
+    agent.set_next_event(Event(type="TRACK_CHANGE", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert chunks == ["The high end got super thin."]
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "emit_corrected"
+    assert guard_log["policy"] == "audio_source_detail_not_proof"
+    assert "vocals" in guard_log["raw_text"]
+    assert "vocals" not in guard_log["corrected_text"].lower()
+    assert "synth" not in guard_log["corrected_text"].lower()
+    assert next(f for kind, f in recorder.events if kind == "ai_text")["text"] == (
+        "The high end got super thin."
+    )
+    ai_row = next(f for kind, f in recorder.events if kind == "ai_message")
+    assert ai_row["message"] == "The high end got super thin."
+    assert tracker.rate() == 0.0
+    playback.push.assert_not_called()
+
+
 def test_live_claim_guard_allows_broad_audio_listener_read_before_tts(mocker, tmp_path) -> None:
     """Broad listener texture is the allowed audio-vibe lane when cited."""
     registry = EvidenceRegistry()

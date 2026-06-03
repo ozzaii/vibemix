@@ -2846,6 +2846,27 @@ def test_live_claim_guard_suppresses_hidden_source_detail_without_detector() -> 
     assert should_defer_live_claim_stream(state, ["A_low: flat→killed"]) is True
 
 
+def test_live_claim_guard_salvages_broad_audio_read_before_source_detail() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+
+    result = apply_live_claim_guard(
+        (
+            "The high end got super thin and then those vocals and synth layers "
+            "flooded the mid range. Let the low end breathe."
+        ),
+        state,
+        [],
+    )
+
+    assert result.corrected is True
+    assert result.emit_corrected is True
+    assert result.policy == "audio_source_detail_not_proof"
+    assert result.reason == "source_detail_without_grounded_detector"
+    assert result.text == "The high end got super thin. Let the low end breathe."
+    assert "vocal" not in result.text.lower()
+    assert "synth" not in result.text.lower()
+
+
 def test_live_claim_guard_allows_vocal_detail_when_vocal_detector_active() -> None:
     state = MusicState(audible=True, audible_deck="A")
     state.vocal_active = True

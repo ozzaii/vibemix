@@ -190,7 +190,7 @@ _LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE = re.compile(
     r"hear|heard|hearing|sounds?|feels?|opened(?:\s+up)?|opening|"
     r"tight(?:ened|er|ening)?|clean(?:ed|er)?|clear(?:ed|er)?|brighter|"
     r"darker|wider|punch(?:y|ier)|muddy|muddier|landed|came in|sits?|"
-    r"cut(?:s|ting)? through|present|up front"
+    r"cut(?:s|ting)? through|present|up front|flood(?:ed|ing)?"
     r")\b",
     re.IGNORECASE,
 )
@@ -3165,13 +3165,27 @@ def apply_live_claim_guard(
         )
     if source_detail_reason is not None:
         summary = _live_guard_summary(state, moves)
-        return LiveClaimGuardResult(
-            text=LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY,
-            corrected=True,
-            policy="audio_source_detail_not_proof",
-            reason=source_detail_reason,
-            summary=summary,
+        stripped = _strip_unsupported_audio_source_detail_clause(
+            text,
+            state,
+            event_type=event_type,
         )
+        if stripped:
+            text = stripped
+            outcome_claim, public_diagnostic, source_detail_reason = _text_claim_flags(text)
+            _mark_emit_correction(
+                policy="audio_source_detail_not_proof",
+                reason=source_detail_reason or "source_detail_without_grounded_detector",
+                summary=summary,
+            )
+        else:
+            return LiveClaimGuardResult(
+                text=LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY,
+                corrected=True,
+                policy="audio_source_detail_not_proof",
+                reason=source_detail_reason,
+                summary=summary,
+            )
     if public_diagnostic:
         summary = _live_guard_summary(state, moves)
         if policy == "candidate_not_verdict":
@@ -3372,6 +3386,79 @@ def _unsupported_audio_source_detail_reason(
     if not unsupported:
         return None
     return "source_detail_without_grounded_detector"
+
+
+def _strip_unsupported_audio_source_detail_clause(
+    text: str,
+    state: MusicState,
+    *,
+    event_type: str | None = None,
+) -> str:
+    """Keep broad listener clauses while removing ungrounded source-part claims."""
+
+    sentences = re.split(r"(?<=[.?!])\s+", str(text or ""))
+    kept: list[str] = []
+    for raw_sentence in sentences:
+        sentence = raw_sentence.strip()
+        if not sentence:
+            continue
+        if _unsupported_audio_source_detail_reason(
+            sentence,
+            state,
+            event_type=event_type,
+        ) is None:
+            kept.append(sentence)
+            continue
+
+        clauses = re.split(
+            r"\s+(?:and then|then|but|however|and)\s+|,\s+",
+            sentence,
+            flags=re.IGNORECASE,
+        )
+        for clause in clauses:
+            candidate = clause.strip(" \t\r\n,;:")
+            if not candidate:
+                continue
+            if _has_unsupported_audio_source_detail_noun(
+                candidate,
+                state,
+                event_type=event_type,
+            ):
+                continue
+            if _unsupported_audio_source_detail_reason(
+                candidate,
+                state,
+                event_type=event_type,
+            ) is None:
+                kept.append(candidate)
+
+    return _normalize_salvaged_public_text(kept)
+
+
+def _normalize_salvaged_public_text(parts: list[str]) -> str:
+    cleaned: list[str] = []
+    for part in parts:
+        text = re.sub(r"\s+", " ", part).strip()
+        text = re.sub(r"\s+([,.?!])", r"\1", text)
+        text = text.strip(" ,;:")
+        if not text:
+            continue
+        if text[-1] not in ".?!":
+            text += "."
+        cleaned.append(text)
+    return " ".join(cleaned)
+
+
+def _has_unsupported_audio_source_detail_noun(
+    text: str,
+    state: MusicState,
+    *,
+    event_type: str | None = None,
+) -> bool:
+    return any(
+        not _source_detail_noun_supported(match.group(1), state, event_type=event_type)
+        for match in _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.finditer(str(text or ""))
+    )
 
 
 def has_unsupported_audio_source_detail_claim(
