@@ -165,12 +165,12 @@
   max-width: 100%;
   max-height: 100%;
   /* The default stroke + fill color the SVG inherits via currentColor.
-   * Lifted from silk-22 (a barely-there ghost) to silk-40: at silk-22 the
-   * booth line-art vanished into the void and read as unfinished. silk-40 +
-   * the drop-shadow below makes it a crisp lit schematic — a real DJ-booth
-   * diagram, not a faint grey trace. P92's highlight pattern still flips
-   * this to var(--learn-highlight) on the highlighted <g> group. */
-  color: var(--silk-40);
+   * Lifted to silk-65: at silk-40 the booth line-art still read as a thin,
+   * low-confidence trace. silk-65 plus the drop-shadow below makes it a crisp
+   * lit schematic, a real DJ-booth diagram, not a faint grey one. P92's
+   * highlight pattern still flips this to var(--learn-highlight) on the
+   * highlighted <g> group. */
+  color: var(--silk-65);
   /* A precision-schematic depth: a tight contact shadow that lifts the
    * strokes off the void floor + a faint rose rim from the key-light. */
   filter:
@@ -236,14 +236,14 @@
   align-items: center;
   justify-content: center;
   gap: var(--sp-4);
-  color: var(--silk-40);
+  color: var(--silk-65);
   text-align: center;
 }
 
-/* The plug glyph reads as a lit instrument outline, not a dead grey trace —
- * lifted to silk-40 + a faint rose key-light so it sits ON the lit void. */
+/* The plug glyph reads as a lit instrument outline, not a dead grey trace,
+ * lifted to silk-65 + a faint rose key-light so it sits ON the lit void. */
 .learn-empty-state-glyph {
-  color: var(--silk-40);
+  color: var(--silk-65);
   filter: drop-shadow(0 0 16px var(--brand-06));
 }
 
@@ -373,7 +373,7 @@
 }
 
 .learn-booth-command__label {
-  color: var(--silk-40);
+  color: var(--silk-65);
   font-family: var(--type-mono);
   font-size: 9px;
   letter-spacing: 0.16em;
@@ -445,7 +445,7 @@
 }
 
 .learn-booth-brief dt {
-  color: var(--silk-40);
+  color: var(--silk-65);
   font-family: var(--type-mono);
   font-size: 9px;
   letter-spacing: 0.16em;
