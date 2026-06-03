@@ -1108,7 +1108,7 @@ class SessionLoop:
                 cohost_status = "LISTENING"
             else:
                 cohost_status = "IDLE"
-            raw_bpm = float(getattr(self.music_state, "bpm", 0.0) or 0.0)
+            raw_bpm = float(getattr(self.music_state, "bpm", 0.0) or 0.0) if grounded else 0.0
             bpm = raw_bpm if raw_bpm > 0.0 else None
             drop_bars = predicted_drop_bars(
                 getattr(self.music_state, "predicted_drop_in_sec", None),
@@ -1116,7 +1116,7 @@ class SessionLoop:
             )
             audible_track = getattr(self.music_state, "audible_track", None)
             audible_deck = getattr(self.music_state, "audible_deck", None)
-            if audible_track:
+            if grounded and audible_track:
                 track = TrackInfo(
                     title=str(audible_track),
                     artist=None,

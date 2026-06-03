@@ -124,13 +124,20 @@ def test_cohost_status_talking_when_voice_active():
 def test_cohost_status_idle_and_grounded_false_when_silent():
     msg = _build_session_snapshot(
         _FakeLevels(0.0, 0.0, 0.0),
-        _fake_state(audible=False, bpm=0.0, audible_track=None),
+        _fake_state(
+            audible=False,
+            bpm=111.1,
+            audible_track="Stale Cached Track",
+            audible_deck="A",
+            predicted_drop_in_sec=15.0,
+        ),
     )
     validate_message(msg)
     p = msg["payload"]
     assert p["cohost_status"] == "IDLE"
     assert p["grounded"] is False
     assert p["bpm"] is None
+    assert p["drop_pred_bars"] is None
     assert p["track"] is None
 
 

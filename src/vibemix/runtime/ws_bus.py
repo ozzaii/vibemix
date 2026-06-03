@@ -679,13 +679,13 @@ def _build_session_snapshot(
     else:
         cohost_status = "IDLE"
 
-    raw_bpm = float(getattr(state, "bpm", 0.0) or 0.0)
+    raw_bpm = float(getattr(state, "bpm", 0.0) or 0.0) if grounded else 0.0
     bpm = raw_bpm if raw_bpm > 0.0 else None
     drop_bars = predicted_drop_bars(getattr(state, "predicted_drop_in_sec", None), raw_bpm)
 
     audible_track = getattr(state, "audible_track", None)
     audible_deck = getattr(state, "audible_deck", None)
-    if audible_track:
+    if grounded and audible_track:
         track = TrackInfo(
             title=str(audible_track),
             artist=None,
