@@ -139,12 +139,12 @@ describe("practice booth shell", () => {
       expect(root.textContent).toContain("on-screen deck");
       expect(root.querySelector(".learn-booth-brief")).toBeTruthy();
       expect(root.querySelector(".learn-booth-command")).toBeTruthy();
-      expect(root.textContent).toContain("mission");
-      expect(root.textContent).toContain("Use the on-screen control");
-      expect(root.textContent).toContain("target");
-      expect(root.textContent).toContain("proof");
-      expect(root.textContent).toContain("payoff");
-      expect(root.textContent).toContain("next skill receipt");
+      expect(root.textContent).toContain("your move");
+      expect(root.textContent).toContain("use the on-screen controls");
+      expect(root.textContent).toContain("do this");
+      expect(root.textContent).toContain("how i check");
+      expect(root.textContent).toContain("unlocks");
+      expect(root.textContent).toContain("next lesson");
     } finally {
       ws.close();
     }
@@ -829,7 +829,7 @@ describe("practice booth shell", () => {
         "ipc.learn.start_lesson",
         expect.objectContaining({ lesson_id: "L2.01" }),
       );
-      expect(pulse.textContent).toBe("pass the course 1 recital to unlock transitions");
+      expect(pulse.textContent).toBe("finish the course 1 check to unlock transitions");
       expect(pulse.dataset.state).toBe("idle");
     } finally {
       ws.close();
@@ -1317,7 +1317,7 @@ describe("practice booth shell", () => {
       );
       await waitForMountedControl(root, "eq_hi:A");
       expect(root.textContent).toContain(
-        "FLX4 proof must land before the receipt unlocks",
+        "do the move on your FLX4 and I'll confirm it",
       );
 
       window.dispatchEvent(
@@ -1340,7 +1340,7 @@ describe("practice booth shell", () => {
       expect(map.getAttribute("aria-hidden")).toBe("true");
       expect(status.textContent).toBe("on-screen deck");
       expect(root.textContent).toContain(
-        "MIDI is visible; bind the lesson move to earn the receipt",
+        "your controller's connected, do the move and I'll confirm it",
       );
       expect(root.querySelector('[data-control-id="eq_hi:A"]')).not.toBeNull();
       expect(

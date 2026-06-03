@@ -428,9 +428,20 @@
 .learn-booth-brief dt,
 .learn-booth-brief dd {
   min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.learn-booth-brief dt {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: nowrap; /* labels stay one line, they are short */
+}
+
+.learn-booth-brief dd {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden; /* values wrap to two lines, then clamp */
 }
 
 .learn-booth-brief dt {

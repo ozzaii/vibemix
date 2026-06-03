@@ -350,24 +350,24 @@ function mountLearnWindow(root: HTMLElement): {
         <span id="learn-booth-proof" class="learn-booth-proof">screen deck available</span>
       </div>
       <div class="learn-booth-command" aria-label="practice mission">
-        <span class="learn-booth-command__label">mission</span>
+        <span class="learn-booth-command__label">your move</span>
         <strong id="learn-booth-command-text" class="learn-booth-command__text">
-          practice one clean move. Learn waits for proof.
+          do one clean move and I'll confirm it.
         </strong>
       </div>
       <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">practice deck ready</div>
       <dl class="learn-booth-brief" aria-label="practice brief">
         <div>
-          <dt>target</dt>
+          <dt>do this</dt>
           <dd id="learn-booth-target">first clean move</dd>
         </div>
         <div>
-          <dt>proof</dt>
-          <dd id="learn-booth-brief-proof">on-screen controls emit moves</dd>
+          <dt>how i check</dt>
+          <dd id="learn-booth-brief-proof">I watch your on-screen controls</dd>
         </div>
         <div>
-          <dt>payoff</dt>
-          <dd id="learn-booth-payoff">next skill receipt</dd>
+          <dt>unlocks</dt>
+          <dd id="learn-booth-payoff">the next lesson</dd>
         </div>
       </dl>
       <div id="learn-booth-earned" class="learn-booth-earned" data-state="pending" aria-label="earned path">
@@ -1693,13 +1693,13 @@ function missionProofPhrase(
   if (readiness === "hardware") {
     const compactName = compactControllerName(controllerName);
     return compactName
-      ? `${compactName} proof must land before the receipt unlocks.`
-      : "Hardware proof must land before the receipt unlocks.";
+      ? `do the move on your ${compactName} and I'll confirm it.`
+      : "do the move on your controller and I'll confirm it.";
   }
   if (readiness === "midi") {
-    return "MIDI is visible; bind the lesson move to earn the receipt.";
+    return "your controller's connected, do the move and I'll confirm it.";
   }
-  return "Use the on-screen control; proof must land before the receipt unlocks.";
+  return "use the on-screen controls and I'll confirm the move.";
 }
 
 function readinessBriefLine(
@@ -1710,15 +1710,15 @@ function readinessBriefLine(
     const compactName = compactControllerName(controllerName);
     return compactName ? `${compactName} mapped` : "hardware mapped";
   }
-  if (readiness === "midi") return "MIDI visible";
-  return "screen controls emit";
+  if (readiness === "midi") return "controller connected";
+  return "on-screen controls";
 }
 
 function practicePayoffLine(recommended: ProgressListEntry | undefined): string {
   if (!recommended) return "practice map";
-  if (recommended.status === "completed") return "receipt stays warm";
+  if (recommended.status === "completed") return "stays unlocked";
   if (recommended.status === "in-progress") return "fewer hints";
-  return "next skill receipt";
+  return "next lesson";
 }
 
 function recommendationBoothCue(
