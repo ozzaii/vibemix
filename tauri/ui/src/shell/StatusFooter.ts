@@ -8,7 +8,7 @@
 // Activation is read-only here. The live session bridge owns activation and
 // connection; the footer must never simulate a live state.
 
-import type { ActivationState, ShellStore } from "./shell-store.js";
+import type { ActivationState, ConnectionState, ShellStore } from "./shell-store.js";
 
 // Terse instrument-readout states. Kept distinct from the deck hero copy
 // ("listening for the mix…") so the footer reads as a status line, not an echo.
@@ -17,6 +17,19 @@ const ACTIVATION_LABEL: Record<ActivationState, string> = {
   listening: "listening",
   live: "live",
 };
+
+const CONNECTION_LABEL: Record<ConnectionState, string> = {
+  connected: "",
+  reconnecting: "Sven pipe reconnecting",
+  disconnected: "Sven pipe offline",
+};
+
+function footerLabel(
+  activation: ActivationState,
+  connection: ConnectionState,
+): string {
+  return CONNECTION_LABEL[connection] || ACTIVATION_LABEL[activation];
+}
 
 export function createStatusFooter(store: ShellStore): HTMLElement {
   const footer = document.createElement("div");
@@ -38,7 +51,21 @@ export function createStatusFooter(store: ShellStore): HTMLElement {
   footer.append(dot, label);
 
   const render = (): void => {
-    label.textContent = ACTIVATION_LABEL[store.getState().activation];
+    const model = store.getState();
+    const nextLabel = footerLabel(model.activation, model.connection);
+    label.textContent = nextLabel;
+    footer.dataset.conn = model.connection;
+    footer.setAttribute("aria-label", `Session status: ${nextLabel}`);
+    if (model.connection === "connected") {
+      footer.removeAttribute("title");
+    } else {
+      footer.setAttribute(
+        "title",
+        model.connection === "reconnecting"
+          ? "Sven is reconnecting to the sidecar socket."
+          : "Sven cannot speak until the sidecar socket reconnects.",
+      );
+    }
   };
   store.subscribe(render);
   render();

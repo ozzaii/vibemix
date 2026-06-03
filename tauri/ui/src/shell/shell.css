@@ -895,11 +895,13 @@
 /* ── Footer — quiet floating session status. ─────────────────────────────── */
 .shell-footer {
   position: absolute;
+  left: calc(var(--sidebar-w) + var(--sp-3));
   right: var(--sp-3);
   bottom: var(--sp-2);
   z-index: var(--z-footer);
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   min-height: 24px; /* WCAG 2.5.8 hit target; the dot+label center within it */
   gap: 6px; /* deliberately tight (sub --sp-1): dot hugs its label */
   font-family: var(--type-mono);
@@ -988,6 +990,20 @@
   animation: shell-pulse 1.5s var(--ease-brand) infinite;
 }
 #shell-root[data-conn="disconnected"] .conn-dot { background: var(--text-disabled); opacity: 0.7; }
+.shell-footer[data-conn="reconnecting"] {
+  color: var(--led-warn);
+}
+.shell-footer[data-conn="disconnected"] {
+  color: var(--led-fault);
+}
+.shell-footer[data-conn="reconnecting"] .conn-dot,
+.shell-footer[data-conn="disconnected"] .conn-dot {
+  box-shadow: 0 0 8px currentColor;
+}
+.shell-footer[data-conn="disconnected"] .conn-dot {
+  background: var(--led-fault);
+  opacity: 1;
+}
 
 /* ── Command palette ─────────────────────────────────────────────────────── */
 .shell-palette {
@@ -1219,6 +1235,52 @@
 }
 
 @media (max-width: 620px) {
+  #shell-root {
+    --sidebar-w: var(--sidebar-collapsed);
+  }
+  #shell-root .sb-label,
+  #shell-root .sb-kbd,
+  #shell-root .sb-wordmark,
+  #shell-root .sb-brand .sb-ear,
+  #shell-root .sb-cohost-label {
+    display: none;
+  }
+  #shell-root .sb-monogram {
+    display: block;
+  }
+  #shell-root:not([data-state="live"]) .sb-monogram {
+    animation: shell-breathe 2.4s var(--ease-brand) infinite;
+  }
+  #shell-root[data-conn="reconnecting"] .sb-monogram {
+    animation: none;
+  }
+  #shell-root .sb-nav-item {
+    justify-content: center;
+    padding: 0;
+  }
+  #shell-root .sb-brand {
+    justify-content: center;
+    padding: 0;
+  }
+  #shell-root .sb-cohost {
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border-color: transparent;
+  }
+  .surface--deck {
+    padding: var(--sp-4);
+  }
+  .shell-footer {
+    left: calc(var(--sidebar-collapsed) + var(--sp-2));
+    flex-wrap: wrap;
+    row-gap: 3px;
+  }
+  .shell-footer .footer-separator,
+  .shell-footer .library-freshness-label,
+  .shell-footer .voice-readiness-label {
+    display: none;
+  }
   .shell-palette {
     padding-top: 8vh;
   }

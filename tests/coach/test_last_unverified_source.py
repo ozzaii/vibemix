@@ -5,9 +5,10 @@ source for SessionCitationPayload.last_unverified_response.
 The holder is fed by an optional keyword-only kwarg on record():
 ``record(stripped, *, unverified_text=None)``. When unverified_text is
 provided (on a STRIP or a BYPASS — both surface text the user did/did-not
-hear), it overwrites self._last_unverified ("most-recent" semantics). A clean
-emit (record(False) with no text) leaves it untouched. The default None keeps
-every existing record(bool) call site byte-identical — the rolling-rate +
+hear), it overwrites self._last_unverified ("most-recent" semantics). A plain
+record(False) with no text leaves it untouched, while the cohost explicitly
+clears it after a verified spoken recovery. The default None keeps every
+existing record(bool) call site byte-identical — the rolling-rate +
 cumulative-slop counters work whether or not text is passed.
 
 This REPLACES the hardcoded ``last_unverified_response = None`` in
@@ -17,7 +18,6 @@ __main__.py's _citation_telemetry() (closed in Task 4).
 from __future__ import annotations
 
 from vibemix.coach import StrippedRateTracker
-
 
 # ---------------------------------------------------------------------------
 # Cold-start + clean emit — None
@@ -69,15 +69,23 @@ def test_last_unverified_most_recent_overwrites() -> None:
     assert tracker.last_unverified() == "newer"
 
 
-def test_clean_emit_between_strips_does_not_clear() -> None:
-    """A clean record(False) after a strip leaves the last unverified text intact.
+def test_plain_clean_record_between_strips_does_not_clear() -> None:
+    """A plain record(False) after a strip leaves the last unverified text intact.
 
-    The holder is "most recent UNVERIFIED" — a clean turn does not erase it.
+    Counter-only callers still must not mutate the diagnostics holder.
     """
     tracker = StrippedRateTracker()
     tracker.record(True, unverified_text="ghost")
     tracker.record(False)  # clean, no text — must not clear
     assert tracker.last_unverified() == "ghost"
+
+
+def test_verified_spoken_recovery_clears_last_unverified() -> None:
+    """A safe spoken emit clears stale blocked text from live telemetry."""
+    tracker = StrippedRateTracker()
+    tracker.record(True, unverified_text="ghost")
+    tracker.clear_last_unverified()
+    assert tracker.last_unverified() is None
 
 
 # ---------------------------------------------------------------------------

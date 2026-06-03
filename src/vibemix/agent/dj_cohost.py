@@ -3169,6 +3169,8 @@ class DJCoHostAgent(Agent):
                             self._stripped_tracker.record(False)
                         if audience_stripped:
                             print(f"[ai_text] {audience_stripped!r}", flush=True)
+                            if self._stripped_tracker is not None:
+                                self._stripped_tracker.clear_last_unverified()
                             self._recorder.log_event(
                                 "ai_text",
                                 text=audience_text,
@@ -3268,6 +3270,8 @@ class DJCoHostAgent(Agent):
                                 yield tts_txt
                     if audience_stripped:
                         print(f"[ai_text] {audience_stripped!r}", flush=True)
+                        if self._stripped_tracker is not None:
+                            self._stripped_tracker.clear_last_unverified()
                         self._recorder.log_event(
                             "ai_text", text=audience_text, latency_s=round(elapsed, 2)
                         )

@@ -75,7 +75,9 @@ class StrippedRateTracker:
         # Plan 55-03 — most-recent unverified-response holder. Fed by the
         # optional record(..., unverified_text=...) kwarg on a strip OR a
         # bypass (both surface text the user did / did-not hear). None until
-        # the first unverified emission; a clean record(False) never sets it.
+        # the first unverified emission; safe spoken emits explicitly clear it
+        # so live telemetry does not keep showing a stale blocked line after
+        # Sven has recovered.
         self._last_unverified: str | None = None
 
     # ------------------------------------------------------------------
@@ -122,6 +124,10 @@ class StrippedRateTracker:
         if self._bypass_consumed and self._rate_unlocked() <= self._threshold:
             self._bypass_consumed = False
 
+    def clear_last_unverified(self) -> None:
+        """Clear stale unverified text after a verified spoken recovery."""
+        self._last_unverified = None
+
     # ------------------------------------------------------------------
     # Reads
     # ------------------------------------------------------------------
@@ -156,9 +162,9 @@ class StrippedRateTracker:
         """Return the most-recent unverified-response text (Plan 55-03).
 
         ``None`` until the first ``record(..., unverified_text=...)`` on a
-        strip or bypass; thereafter the latest such text. A clean
-        ``record(False)`` (no kwarg) never sets or clears it — this is the
-        source for ``SessionCitationPayload.last_unverified_response``.
+        strip or bypass; thereafter the latest such text until a verified
+        spoken recovery clears it. A plain ``record(False)`` (no kwarg) still
+        never mutates it, preserving the historical counter contract.
         """
         return self._last_unverified
 

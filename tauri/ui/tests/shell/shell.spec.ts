@@ -175,6 +175,25 @@ describe("DesktopShell", () => {
     expect(host.dataset.conn).toBe("connected");
   });
 
+  it("names a dead Sven pipe instead of hiding it behind the idle footer", () => {
+    shell = mountDesktopShell(host);
+    const footer = host.querySelector<HTMLElement>(".shell-footer")!;
+    const label = footer.querySelector<HTMLElement>(".status-label")!;
+
+    expect(footer.dataset.conn).toBe("disconnected");
+    expect(label.textContent).toBe("Sven pipe offline");
+    expect(footer.getAttribute("title")).toContain("Sven cannot speak");
+
+    shell.store.setConnection("reconnecting");
+    expect(footer.dataset.conn).toBe("reconnecting");
+    expect(label.textContent).toBe("Sven pipe reconnecting");
+
+    shell.store.setConnection("connected");
+    expect(footer.dataset.conn).toBe("connected");
+    expect(label.textContent).toBe("idle");
+    expect(footer.getAttribute("title")).toBeNull();
+  });
+
   it("keeps the footer read-only so it cannot fake a live session", () => {
     shell = mountDesktopShell(host);
     const footer = host.querySelector<HTMLElement>(".shell-footer")!;
