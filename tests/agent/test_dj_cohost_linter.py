@@ -614,6 +614,48 @@ def test_live_claim_guard_emits_cleaned_audio_read_before_hidden_source_detail(
     playback.push.assert_not_called()
 
 
+def test_live_claim_guard_emits_cited_sub_read_before_hidden_vocal_tail(
+    mocker,
+    tmp_path,
+) -> None:
+    """A good cited bass read should survive an unsupported source-detail tail."""
+    registry = EvidenceRegistry()
+    registry.write("ev", "SUB_LAYER_ARRIVAL", 33.0)
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "A"
+    state.deck_state = DeckState(decks={"A": _deck("OutA", camelot="8A")})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                (
+                    "The sub-bass just dropped in heavy "
+                    "[ev:SUB_LAYER_ARRIVAL@33.0] under that high-pitched vocal line."
+                )
+            ]
+        )
+    )
+
+    agent.set_next_event(Event(type="SUB_LAYER_ARRIVAL", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert chunks == ["The sub-bass just dropped in heavy."]
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "emit_corrected"
+    assert guard_log["policy"] == "audio_source_detail_not_proof"
+    assert "vocal" in guard_log["raw_text"].lower()
+    assert "vocal" not in guard_log["corrected_text"].lower()
+    assert next(f for kind, f in recorder.events if kind == "ai_text")["text"] == (
+        "The sub-bass just dropped in heavy."
+    )
+    assert tracker.rate() == 0.0
+    playback.push.assert_not_called()
+
+
 def test_live_claim_guard_allows_broad_audio_listener_read_before_tts(mocker, tmp_path) -> None:
     """Broad listener texture is the allowed audio-vibe lane when cited."""
     registry = EvidenceRegistry()

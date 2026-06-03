@@ -2893,6 +2893,43 @@ def test_live_claim_guard_salvages_broad_audio_read_before_source_detail() -> No
     assert "synth" not in result.text.lower()
 
 
+def test_live_claim_guard_salvages_source_detail_tail_after_cited_audio_read() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    state.deck_state = DeckState(decks={"A": _deck("OutA")})
+
+    result = apply_live_claim_guard(
+        (
+            "The sub-bass just dropped in heavy [ev:SUB_LAYER_ARRIVAL@33.0] "
+            "under that high-pitched vocal line."
+        ),
+        state,
+        event_type="SUB_LAYER_ARRIVAL",
+    )
+
+    assert result.corrected is True
+    assert result.emit_corrected is True
+    assert result.policy == "audio_source_detail_not_proof"
+    assert result.reason == "source_detail_without_grounded_detector"
+    assert result.text == "The sub-bass just dropped in heavy [ev:SUB_LAYER_ARRIVAL@33.0]."
+    assert "vocal" not in result.text.lower()
+
+
+def test_live_claim_guard_still_blocks_transition_claim_on_sub_layer_event() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    state.deck_state = DeckState(decks={"A": _deck("OutA")})
+
+    result = apply_live_claim_guard(
+        "That transition dropped in clean [ev:SUB_LAYER_ARRIVAL@33.0].",
+        state,
+        event_type="SUB_LAYER_ARRIVAL",
+    )
+
+    assert result.corrected is True
+    assert result.emit_corrected is False
+    assert result.policy == "blocked"
+    assert result.text != "That transition dropped in clean [ev:SUB_LAYER_ARRIVAL@33.0]."
+
+
 def test_live_claim_guard_allows_vocal_detail_when_vocal_detector_active() -> None:
     state = MusicState(audible=True, audible_deck="A")
     state.vocal_active = True

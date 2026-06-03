@@ -66,6 +66,17 @@ _MULTI_DECK_PHRASE_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_SINGLE_EVENT_TRANSITION_OUTCOME_RE = re.compile(
+    r"\b("
+    r"transition(?:ed|ing)?|blend(?:ed|ing)?|mix(?:ed|ing)?|crossfade(?:d|s|ing)?|"
+    r"swap(?:ped|ping)?|switch(?:ed|ing)?|segue(?:d|ing)?|handoff|bridge(?:d|ing)?"
+    r")\b",
+    re.IGNORECASE,
+)
+_SUB_LAYER_AUDIO_OBSERVATION_RE = re.compile(
+    r"\b(sub(?:[- ]?bass)?|low[- ]end|bottom[- ]end|bass|weight|bottom)\b",
+    re.IGNORECASE,
+)
 _MULTI_DECK_DISCLAIMER_RE = re.compile(
     r"\b("
     r"not a transition|no transition|single[- ]deck|one[- ]deck|only one deck|"
@@ -200,6 +211,14 @@ _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE = re.compile(
     r"don't have proof|do not have proof|won't claim|will not claim|"
     r"not source[- ]level proof|not stem proof|not isolated"
     r")\b",
+    re.IGNORECASE,
+)
+_LIVE_AUDIO_SOURCE_DETAIL_TAIL_RE = re.compile(
+    r"\s+\b(?:under|over|behind|around|through|from|against)\b\s+"
+    r"[^\[.?!;]*\b("
+    r"vocal|vocals|voice|lyric|lyrics|snare|clap|hi[- ]?hat|hat|hats|"
+    r"drum|drums|bassline|lead|synth|pad|stem|stems|acapella|instrumental"
+    r")\b[^\[.?!;]*",
     re.IGNORECASE,
 )
 _LIVE_AUDIO_KICK_EVENT_TYPES: frozenset[str] = frozenset(
@@ -2773,6 +2792,18 @@ def has_multi_deck_outcome_claim(text: str) -> bool:
     return bool(_MULTI_DECK_OUTCOME_RE.search(text) or _MULTI_DECK_PHRASE_RE.search(text))
 
 
+def _is_grounded_single_event_audio_observation(text: str, event_type: str | None) -> bool:
+    """Return True for broad detector-event audio reads that are not transition grades."""
+    raw = str(text or "").strip()
+    event = str(event_type or "").strip().upper()
+    if event == "SUB_LAYER_ARRIVAL":
+        return bool(_SUB_LAYER_AUDIO_OBSERVATION_RE.search(raw)) and not (
+            _MULTI_DECK_PHRASE_RE.search(raw)
+            or _SINGLE_EVENT_TRANSITION_OUTCOME_RE.search(raw)
+        )
+    return False
+
+
 def has_multi_deck_outcome_disclaimer(text: str) -> bool:
     """Return True when text explicitly withdraws a multi-deck outcome claim."""
     return bool(_MULTI_DECK_DISCLAIMER_RE.search(text))
@@ -3272,6 +3303,12 @@ def apply_live_claim_guard(
 
     if policy not in {"blocked", "watch_not_claim"}:
         return _pass_result()
+    if _is_grounded_single_event_audio_observation(text, event_type):
+        return _pass_result(
+            policy="single_event_audio_observation",
+            reason=f"{event.lower()}_detector",
+            summary=_live_guard_summary(state, moves),
+        )
     if not text.strip() or not outcome_claim:
         return _pass_result()
 
@@ -3381,10 +3418,12 @@ def _unsupported_audio_source_detail_reason(
     """Return a guard reason for hidden song-part claims audio did not prove."""
     if not text.strip() or _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(text):
         return None
-    if not (
+    has_source_claim = bool(
         _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.search(text)
         and _LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE.search(text)
-    ):
+    )
+    has_source_tail = bool(_LIVE_AUDIO_SOURCE_DETAIL_TAIL_RE.search(text))
+    if not (has_source_claim or has_source_tail):
         return None
 
     unsupported = [
@@ -3433,7 +3472,17 @@ def _strip_unsupported_audio_source_detail_clause(
                 state,
                 event_type=event_type,
             ):
-                continue
+                candidate = _strip_unsupported_audio_source_detail_phrase(
+                    candidate,
+                    state,
+                    event_type=event_type,
+                )
+                if not candidate or _has_unsupported_audio_source_detail_noun(
+                    candidate,
+                    state,
+                    event_type=event_type,
+                ):
+                    continue
             if _unsupported_audio_source_detail_reason(
                 candidate,
                 state,
@@ -3442,6 +3491,24 @@ def _strip_unsupported_audio_source_detail_clause(
                 kept.append(candidate)
 
     return _normalize_salvaged_public_text(kept)
+
+
+def _strip_unsupported_audio_source_detail_phrase(
+    text: str,
+    state: MusicState,
+    *,
+    event_type: str | None = None,
+) -> str:
+    """Remove a source-detail tail while preserving the grounded broad read."""
+
+    def _replace(match: re.Match[str]) -> str:
+        noun = match.group(1)
+        if _source_detail_noun_supported(noun, state, event_type=event_type):
+            return match.group(0)
+        return ""
+
+    cleaned = _LIVE_AUDIO_SOURCE_DETAIL_TAIL_RE.sub(_replace, str(text or ""))
+    return re.sub(r"\s+", " ", cleaned).strip(" ,;:")
 
 
 def _normalize_salvaged_public_text(parts: list[str]) -> str:
