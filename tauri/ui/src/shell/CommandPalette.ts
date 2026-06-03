@@ -127,7 +127,8 @@ export function createCommandPalette(
   const input = document.createElement("input");
   input.className = "palette-input";
   input.type = "text";
-  input.placeholder = "Search surfaces, Viber, proof, settings…";
+  // Verb-led, not a four-noun feature list ("proof" was engine jargon, too).
+  input.placeholder = "Jump to a surface or run a control…";
   input.setAttribute("aria-label", "Command palette query");
   input.setAttribute("role", "combobox");
   input.setAttribute("aria-controls", LISTBOX_ID);
