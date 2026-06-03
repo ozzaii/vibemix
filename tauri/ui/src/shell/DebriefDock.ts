@@ -78,13 +78,19 @@ const CSS = `
   .debrief-dock__payback-label,
   .debrief-dock__readiness-metric dt,
   .debrief-dock__meta,
-  .debrief-dock__row-state,
-  .debrief-dock__reason,
-  .debrief-dock__payoff {
+  .debrief-dock__row-state {
     font-family: var(--type-mono);
     font-size: 10px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
+  }
+  .debrief-dock__reason,
+  .debrief-dock__payoff {
+    font-family: var(--type-mono);
+    font-size: 11px;
+    letter-spacing: 0; /* sentences read as sentences; lowercase carries 0em per DESIGN tracking-by-case */
+    text-transform: none;
+    line-height: 1.4;
   }
   .debrief-dock__kicker {
     color: var(--brand);
@@ -543,6 +549,17 @@ function renderSessions(
     return;
   }
 
+  // All recent sets are stopped-early / ineligible (none ready, none even
+  // recoverable): show one calm "nothing to review yet" instead of a per-row
+  // wall of warming gates. A stopped set is not a fault, just not reviewable.
+  const anyReady = visible.some((session) => debriefEligibility(session).ready);
+  const anyRecoverable = visible.some((session) => !session.crashed);
+  if (!anyReady && !anyRecoverable) {
+    renderReadiness(readiness, null, true);
+    list.replaceChildren(...visible.map(renderSessionRow));
+    return;
+  }
+
   renderReadiness(readiness, bestReviewCandidate(visible));
   list.replaceChildren(...visible.map(renderSessionRow));
 }
@@ -616,7 +633,11 @@ function renderSessionRow(summary: RecordingSummary): HTMLElement {
   return row;
 }
 
-function renderReadiness(readiness: HTMLElement, summary: RecordingSummary | null): void {
+function renderReadiness(
+  readiness: HTMLElement,
+  summary: RecordingSummary | null,
+  allStoppedEarly = false,
+): void {
   const title = readiness.querySelector<HTMLElement>(".debrief-dock__readiness-title")!;
   const sub = readiness.querySelector<HTMLElement>(".debrief-dock__readiness-sub")!;
   const metrics = Array.from(
@@ -625,6 +646,22 @@ function renderReadiness(readiness: HTMLElement, summary: RecordingSummary | nul
   const payback = paybackTargets(readiness);
 
   if (!summary) {
+    if (allStoppedEarly) {
+      readiness.dataset.state = "empty";
+      title.textContent = "nothing to review yet";
+      sub.textContent =
+        "Every recent set stopped before it sealed. Run one start to finish and your review opens here.";
+      setPayback(payback, {
+        target: "your next set",
+        blocker: "none saved yet",
+        action: "record start to finish",
+        unlocks: "your first review",
+      });
+      setMetric(metrics[0], "0m");
+      setMetric(metrics[1], "0 events");
+      setMetric(metrics[2], "waiting");
+      return;
+    }
     readiness.dataset.state = "empty";
     title.textContent = "record a real set";
     sub.textContent = "Debrief arms after five minutes and enough evidence events.";
@@ -632,7 +669,7 @@ function renderReadiness(readiness: HTMLElement, summary: RecordingSummary | nul
       target: "no recording yet",
       blocker: "needs a set",
       action: "record from Deck",
-      unlocks: "timeline, receipts, drill",
+      unlocks: "timeline, the why, drill",
     });
     setMetric(metrics[0], "0m");
     setMetric(metrics[1], "0 events");
@@ -648,8 +685,8 @@ function renderReadiness(readiness: HTMLElement, summary: RecordingSummary | nul
     title.textContent = "review is armed";
     sub.textContent = `${formatTimestamp(summary.started_at_iso)} can open with cited moments.`;
   } else if (summary.crashed) {
-    title.textContent = "partial session held";
-    sub.textContent = "The recording is visible, but the review stays locked until evidence is reliable.";
+    title.textContent = "this set stopped early";
+    sub.textContent = "It ended before the recording sealed, so I can't review it fairly. Run one full set and I'll have it.";
   } else {
     title.textContent = `capture ${progress.remainingLabel} more`;
     sub.textContent = "Keep Deck running until the recorder has enough context to judge fairly.";
@@ -702,9 +739,9 @@ function paybackPath(
   if (summary.crashed) {
     return {
       target,
-      blocker: "partial evidence",
-      action: "record a clean pass",
-      unlocks: "reliable review",
+      blocker: "stopped early",
+      action: "record a full set",
+      unlocks: "your review",
     };
   }
   return {
@@ -721,7 +758,7 @@ function rowPayoffLine(
   readiness: ReturnType<typeof reviewReadiness>,
 ): string {
   if (ready) return "Payback: open review to leave with one drill or crate move.";
-  if (summary.crashed) return "Payback path: record a clean pass before judging this set.";
+  if (summary.crashed) return "Record one full set start to finish and I can review it.";
   return `Payback path: ${readiness.remainingLabel} more unlocks the cited review.`;
 }
 
@@ -772,7 +809,7 @@ function reviewReadiness(summary: RecordingSummary): {
 }
 
 function debriefEligibility(summary: RecordingSummary): { ready: boolean; reason: string } {
-  if (summary.crashed) return { ready: false, reason: "session crashed, partial evidence only" };
+  if (summary.crashed) return { ready: false, reason: "stopped before it was saved" };
   if (summary.duration_s < MIN_DEBRIEF_SECONDS) {
     return { ready: false, reason: "needs at least 5 minutes" };
   }

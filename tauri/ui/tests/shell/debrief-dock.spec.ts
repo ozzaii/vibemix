@@ -183,4 +183,44 @@ describe("DebriefDock", () => {
     expect(host.textContent).toContain("Run a real set from Deck");
     expect(host.querySelector(".debrief-dock__open")).toBeNull();
   });
+
+  it("shows one calm summary when every recent set stopped early", async () => {
+    mocks.sendIpcRequest.mockResolvedValueOnce({
+      type: "ipc.recordings.list_result",
+      ts: "2026-06-03T00:00:00Z",
+      payload: {
+        bytes_total: 5 * 1024 * 1024,
+        sessions: [
+          {
+            session_dir: "20260603-010000",
+            started_at_iso: "2026-06-03T01:00:00Z",
+            duration_s: 0,
+            event_count: 0,
+            bytes_total: 3 * 1024 * 1024,
+            crashed: true,
+          },
+          {
+            session_dir: "20260603-005000",
+            started_at_iso: "2026-06-03T00:50:00Z",
+            duration_s: 0,
+            event_count: 0,
+            bytes_total: 2 * 1024 * 1024,
+            crashed: true,
+          },
+        ],
+      },
+    });
+    const host = document.createElement("div");
+
+    mountDebriefDock(host);
+    await flush();
+
+    expect(host.textContent).toContain("nothing to review yet");
+    expect(host.textContent).toContain("Run one start to finish");
+    const openButtons = Array.from(
+      host.querySelectorAll<HTMLButtonElement>(".debrief-dock__open"),
+    );
+    expect(openButtons.length).toBe(2);
+    expect(openButtons.every((button) => button.disabled)).toBe(true);
+  });
 });
