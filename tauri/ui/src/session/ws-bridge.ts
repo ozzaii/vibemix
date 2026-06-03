@@ -115,6 +115,7 @@ interface WireStatusTickPayload {
   gemini: "ok" | "down";
   midi: number | null;
   screen: "ok" | "denied" | "unavailable";
+  voice?: "ok" | "muted" | null;
 }
 
 interface WireIpcErrorPayload {
@@ -432,6 +433,7 @@ export function applyStatusTick(p: WireStatusTickPayload): void {
       gemini: p.gemini,
       midi: p.midi,
       screen: p.screen,
+      voice: p.voice ?? null,
     },
   });
 }

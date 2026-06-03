@@ -118,6 +118,7 @@ class StatusTickPayload:
     # backend is unavailable (e.g. mido import failed). minimum: 0 in schema.
     midi: int | None
     screen: Literal["ok", "denied", "unavailable"]
+    voice: Literal["ok", "muted"] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -458,11 +459,18 @@ class StatusTick:
         gemini: Literal["ok", "down"],
         midi: int | None,
         screen: Literal["ok", "denied", "unavailable"],
+        voice: Literal["ok", "muted"] | None = None,
     ) -> StatusTick:
         return cls(
             type="ipc.status.tick",
             ts=_now_iso(),
-            payload=StatusTickPayload(livekit=livekit, gemini=gemini, midi=midi, screen=screen),
+            payload=StatusTickPayload(
+                livekit=livekit,
+                gemini=gemini,
+                midi=midi,
+                screen=screen,
+                voice=voice,
+            ),
         )
 
     def to_json(self) -> str:

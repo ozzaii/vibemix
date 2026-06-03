@@ -1912,7 +1912,8 @@ async def main() -> None:
             },
         },
     )
-    if tts_inst is _livekit_not_given():
+    voice_muted = tts_inst is _livekit_not_given()
+    if voice_muted:
         session.output.set_audio_enabled(False)
         print("-> AgentSession headless (no Room); audio out muted (no local TTS)")
     else:
@@ -2902,6 +2903,7 @@ async def main() -> None:
             screen_available=screen_available,
             midi_mirror=midi_mirror,
             audio_capture_context=audio_capture_context,
+            voice_muted=voice_muted,
         )
 
     ws_task = asyncio.create_task(

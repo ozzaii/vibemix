@@ -441,6 +441,33 @@ describe("renderStatusBar", () => {
     );
   });
 
+  it("adds a voice-muted badge only when the voice engine is muted", () => {
+    const ok = renderStatusBar({
+      livekit: "ok",
+      gemini: "ok",
+      midi: 1,
+      screen: "ok",
+      voice: "ok",
+      muted: false,
+      hotkey: "⌘⇧M",
+    });
+    expect(ok.querySelector('.vmx-statusbar__badge[data-key="voice"]')).toBeNull();
+
+    const muted = renderStatusBar({
+      livekit: "ok",
+      gemini: "ok",
+      midi: 1,
+      screen: "ok",
+      voice: "muted",
+      muted: false,
+      hotkey: "⌘⇧M",
+    });
+    const voice = muted.querySelector<HTMLElement>('.vmx-statusbar__badge[data-key="voice"]');
+    expect(voice?.textContent).toContain("VOICE MUTED");
+    expect(voice?.dataset.clickable).toBe("false");
+    expect(voice?.getAttribute("title")).toBe("Local voice · muted");
+  });
+
   it("muted indicator shows when muted=true", () => {
     const sb = renderStatusBar({
       livekit: "ok",
@@ -766,6 +793,40 @@ describe("SessionLayout", () => {
       "screen proof unavailable · Start playback, I will not guess.",
     );
     expect(root.textContent).not.toContain("listening for the mix");
+  });
+
+  it("shows a passive voice status only when the local voice engine is muted", () => {
+    const root = host();
+    const mounted = mountSessionLayout(root, defaultState());
+    const voice = root.querySelector<HTMLButtonElement>('.vmx-statusrow__i[data-input="voice"]');
+    expect(voice).toBeTruthy();
+    expect(voice?.hidden).toBe(true);
+
+    renderSessionFrame(mounted, {
+      ...defaultState(),
+      status: {
+        ...defaultState().status,
+        livekit: "ok",
+        gemini: "ok",
+        midi: 1,
+        screen: "ok",
+        voice: "muted",
+      },
+    });
+
+    expect(voice?.hidden).toBe(false);
+    expect(voice?.disabled).toBe(true);
+    expect(voice?.dataset.down).toBe("true");
+    expect(voice?.dataset.actionable).toBe("false");
+    expect(voice?.getAttribute("aria-label")).toBe("voice status muted");
+    expect(root.textContent).toContain("audio armed · Sven voice muted · controller seen");
+
+    renderSessionFrame(mounted, {
+      ...defaultState(),
+      status: { ...defaultState().status, voice: "ok" },
+    });
+
+    expect(voice?.hidden).toBe(true);
   });
 
   it("rail controls call the latest rendered handlers", () => {

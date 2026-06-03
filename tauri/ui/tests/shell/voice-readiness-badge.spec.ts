@@ -53,6 +53,13 @@ describe("voice readiness badge", () => {
     });
   });
 
+  it("lets the live runtime muted state override installed model readiness", () => {
+    expect(voiceReadinessBadgeModel(payload(), undefined, "muted")).toMatchObject({
+      state: "warn",
+      label: "voice muted",
+    });
+  });
+
   it("keeps missing installable MOSS visible without claiming readiness", () => {
     expect(
       voiceReadinessBadgeModel(
@@ -101,6 +108,7 @@ describe("voice readiness badge", () => {
     const handle = mountVoiceReadinessBadge(footer, {
       autoload: false,
       pollMs: null,
+      subscribeStatusTick: false,
       onOpenCrate,
       getModels: async () =>
         payload({
@@ -124,6 +132,12 @@ describe("voice readiness badge", () => {
     expect(handle.element.dataset.state).toBe("warn");
     expect(handle.element.textContent).toBe("voice missing");
     expect(onOpenCrate).toHaveBeenCalledOnce();
+    handle.setVoiceStatus("muted");
+    expect(handle.element.dataset.state).toBe("warn");
+    expect(handle.element.textContent).toBe("voice muted");
+    handle.setVoiceStatus("ok");
+    expect(handle.element.dataset.state).toBe("warn");
+    expect(handle.element.textContent).toBe("voice missing");
     handle.teardown();
     expect(footer.querySelector(".voice-readiness-badge")).toBeNull();
   });
@@ -133,6 +147,7 @@ describe("voice readiness badge", () => {
     const handle = mountVoiceReadinessBadge(footer, {
       autoload: false,
       pollMs: null,
+      subscribeStatusTick: false,
       getModels: async () => {
         throw new Error("models offline");
       },

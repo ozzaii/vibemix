@@ -97,6 +97,7 @@ export interface SessionState {
     gemini: "ok" | "down" | null;
     midi: number | null;
     screen: "ok" | "denied" | "unavailable" | null;
+    voice?: "ok" | "muted" | null;
     muted: boolean;
     hotkey: string;
     /** Recheck a down status input via ipc.status.recheck. */
@@ -166,6 +167,8 @@ export interface Mounted {
   statusInputs: {
     audio: HTMLButtonElement;
     ai: HTMLButtonElement;
+    voice: HTMLButtonElement;
+    voiceSep: HTMLElement;
     screen: HTMLButtonElement;
     midi: HTMLButtonElement;
   };
@@ -1116,9 +1119,11 @@ export function mountSessionLayout(
   inputsEl.className = "vmx-statusrow__inputs";
   const inAudio = makeInput("audio", "livekit", () => mountedHandle);
   const inAi = makeInput("ai", "gemini", () => mountedHandle);
+  const inVoice = makeInput("voice", "gemini", () => mountedHandle);
+  const voiceSep = sep();
   const inScreen = makeInput("screen", "screen", () => mountedHandle);
   const inMidi = makeInput("midi", "midi", () => mountedHandle);
-  inputsEl.append(inAudio, sep(), inAi, sep(), inScreen, sep(), inMidi);
+  inputsEl.append(inAudio, sep(), inAi, voiceSep, inVoice, sep(), inScreen, sep(), inMidi);
   const statusRight = document.createElement("div");
   statusRight.className = "vmx-statusrow__right";
   const claimPolicy = document.createElement("span");
@@ -1159,7 +1164,14 @@ export function mountSessionLayout(
     key,
     meterFill,
     meterPeak,
-    statusInputs: { audio: inAudio, ai: inAi, screen: inScreen, midi: inMidi },
+    statusInputs: {
+      audio: inAudio,
+      ai: inAi,
+      voice: inVoice,
+      voiceSep,
+      screen: inScreen,
+      midi: inMidi,
+    },
     statusRight,
     claimPolicy,
     current: state,
@@ -1405,6 +1417,9 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     mounted.statusInputs.ai,
     next.status.gemini === "down" || downInput === "gemini",
   );
+  setPassiveInputDown(mounted.statusInputs.voice, next.status.voice === "muted");
+  mounted.statusInputs.voice.hidden = next.status.voice !== "muted";
+  mounted.statusInputs.voiceSep.hidden = next.status.voice !== "muted";
   setInputDown(mounted.statusInputs.screen, next.status.screen === "denied");
   setInputDown(mounted.statusInputs.midi, next.status.midi === 0);
   const rightText = `${outputLabel(next.output)} · ${next.persona.voice} · ${next.persona.genre}`;
@@ -1438,11 +1453,13 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
     : state.status.livekit === "connecting"
       ? "audio connecting"
       : "audio checking";
-  const ai = state.status.gemini === "ok"
-    ? "Sven ready"
-    : state.status.gemini === "down"
-      ? "Sven down"
-      : "Sven checking";
+  const ai = state.status.voice === "muted"
+    ? "Sven voice muted"
+    : state.status.gemini === "ok"
+      ? "Sven ready"
+      : state.status.gemini === "down"
+        ? "Sven down"
+        : "Sven checking";
   const controller = state.status.midi != null && state.status.midi > 0
     ? "controller seen"
     : state.status.midi === 0
@@ -1466,7 +1483,7 @@ type IdleProofState = "ok" | "warn" | "fault";
 function setIdleProof(mounted: Mounted, state: SessionState): void {
   mounted.idleProof.hidden = false;
   const audio = livekitProof(state.status.livekit);
-  const sven = svenProof(state.status.gemini);
+  const sven = svenProof(state.status.gemini, state.status.voice);
   const controller = controllerProof(state.status.midi);
   const screen = screenProof(state.status.screen);
   setIdleCell(mounted.idleProofCells.audio, audio);
@@ -1498,10 +1515,14 @@ function livekitProof(status: SessionState["status"]["livekit"]): {
   return { label: "checking", state: "warn" };
 }
 
-function svenProof(status: SessionState["status"]["gemini"]): {
+function svenProof(
+  status: SessionState["status"]["gemini"],
+  voice: SessionState["status"]["voice"],
+): {
   label: string;
   state: IdleProofState;
 } {
+  if (voice === "muted") return { label: "voice muted", state: "warn" };
   if (status === "ok") return { label: "ready", state: "ok" };
   if (status === "down") return { label: "offline", state: "fault" };
   return { label: "checking", state: "warn" };
@@ -1571,6 +1592,14 @@ function setInputDown(el: HTMLButtonElement, down: boolean): void {
   );
 }
 
+function setPassiveInputDown(el: HTMLButtonElement, down: boolean): void {
+  const v = down ? "true" : "false";
+  if (el.dataset.down !== v) el.dataset.down = v;
+  el.disabled = true;
+  el.dataset.actionable = "false";
+  el.setAttribute("aria-label", down ? "voice status muted" : "voice status ok");
+}
+
 /** Format a citation timestamp (seconds) as mm:ss (or h:mm:ss past an hour). */
 function formatTs(s: number): string {
   const total = Math.max(0, Math.floor(s));
@@ -1638,6 +1667,7 @@ export function defaultState(): SessionState {
       gemini: null,
       midi: null,
       screen: null,
+      voice: null,
       muted: false,
       hotkey: "⌘⇧M",
       errors: {},

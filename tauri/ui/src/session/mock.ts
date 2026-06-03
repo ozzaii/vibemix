@@ -138,6 +138,7 @@ function tick(): void {
       gemini: "ok",
       midi: 1,
       screen: "ok",
+      voice: "ok",
     },
     track: {
       title: "Strobe (Deadmau5 Remix)",

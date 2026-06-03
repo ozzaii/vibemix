@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Focused tests for the ``ipc.status.tick`` shape.
 
-UX-11 + D-Area-4.3 lock the four-field payload exactly. The plan asserts:
+UX-11 + D-Area-4.3 lock four required health fields plus optional voice status. The plan asserts:
 
   * ``midi=null`` valid (no MIDI backend available).
   * ``midi=-1`` invalid (``minimum: 0`` in schema).
@@ -46,6 +46,30 @@ def test_midi_zero_is_valid() -> None:
     """``midi=0`` valid — controller registry empty (zero ports)."""
     msg = StatusTick.make(livekit="ok", gemini="ok", midi=0, screen="ok")
     jsonschema.validate(json.loads(msg.to_json()), _SCHEMA)
+
+
+def test_voice_default_is_back_compat_null() -> None:
+    """Existing four-kwarg status ticks stay valid while voice is optional."""
+    msg = StatusTick.make(livekit="ok", gemini="ok", midi=1, screen="ok")
+    d = json.loads(msg.to_json())
+    assert d["payload"].get("voice") is None
+    jsonschema.validate(d, _SCHEMA)
+    assert parse_message(d)["payload"]["voice"] is None
+
+
+def test_voice_muted_is_valid() -> None:
+    """The live session can report a muted local MOSS voice path."""
+    msg = StatusTick.make(livekit="ok", gemini="ok", midi=1, screen="ok", voice="muted")
+    d = json.loads(msg.to_json())
+    assert d["payload"]["voice"] == "muted"
+    jsonschema.validate(d, _SCHEMA)
+
+
+def test_unknown_voice_value_rejected() -> None:
+    """Unknown voice status values are rejected by the closed schema."""
+    d = _wrap({"livekit": "ok", "gemini": "ok", "midi": 1, "screen": "ok", "voice": "loud"})
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(d, _SCHEMA)
 
 
 def test_midi_negative_is_invalid() -> None:

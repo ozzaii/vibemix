@@ -23,6 +23,7 @@ export interface StatusBarProps {
   gemini: "ok" | "down" | null;
   midi: number | null;
   screen: "ok" | "denied" | "unavailable" | null;
+  voice?: "ok" | "muted" | null;
   muted: boolean;
   hotkey: string;
   /** Called when the user clicks Recheck inside a down-badge tooltip. */
@@ -31,7 +32,8 @@ export interface StatusBarProps {
   errors?: Partial<Record<"livekit" | "gemini" | "midi" | "screen", string>>;
 }
 
-type BadgeKey = "livekit" | "gemini" | "midi" | "screen";
+type RecoveryBadgeKey = "livekit" | "gemini" | "midi" | "screen";
+type BadgeKey = RecoveryBadgeKey | "voice";
 
 const CSS = `
   /* v5 status strip — translucent dark glass shelf matching the
@@ -280,7 +282,7 @@ function buildBadgeSpecs(props: StatusBarProps): BadgeSpec[] {
   // dropped from the user-facing labels. LIVEKIT → LINK, GEMINI → AI,
   // MIDI → CONTROLLER. Internal keys + IPC payloads keep their
   // technical names; only the displayed label shifts to DJ-register.
-  return [
+  const specs: BadgeSpec[] = [
     {
       key: "livekit",
       state: props.livekit ?? "off",
@@ -306,6 +308,15 @@ function buildBadgeSpecs(props: StatusBarProps): BadgeSpec[] {
       clickable: props.screen === "denied",
     },
   ];
+  if (props.voice === "muted") {
+    specs.push({
+      key: "voice",
+      state: "down",
+      label: "● VOICE MUTED",
+      clickable: false,
+    });
+  }
+  return specs;
 }
 
 function badgeLabel(base: string, state: BadgeState | "denied" | null): string {
@@ -385,7 +396,7 @@ function buildBadge(spec: BadgeSpec, props: StatusBarProps): HTMLElement {
   btn.append(led, lbl);
 
   if (spec.clickable) {
-    const tooltip = buildTooltip(spec.key, props);
+    const tooltip = buildTooltip(spec.key as RecoveryBadgeKey, props);
     btn.append(tooltip);
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -409,7 +420,7 @@ function buildBadge(spec: BadgeSpec, props: StatusBarProps): HTMLElement {
   return btn;
 }
 
-function buildTooltip(key: BadgeKey, props: StatusBarProps): HTMLElement {
+function buildTooltip(key: RecoveryBadgeKey, props: StatusBarProps): HTMLElement {
   const tip = document.createElement("div");
   tip.className = "vmx-statusbar__tooltip";
   tip.dataset.for = key;
@@ -434,7 +445,7 @@ function buildTooltip(key: BadgeKey, props: StatusBarProps): HTMLElement {
   return tip;
 }
 
-function defaultErrorMsg(key: BadgeKey): string {
+function defaultErrorMsg(key: RecoveryBadgeKey): string {
   switch (key) {
     case "livekit": return "vibemix link to the realtime channel dropped. click to reconnect";
     case "gemini": return "AI service unreachable. recheck network + key";
@@ -457,8 +468,10 @@ function titleForBadge(key: BadgeKey, state: string): string {
       case "gemini": return "AI";
       case "midi": return "Controller";
       case "screen": return "Screen capture";
+      case "voice": return "Local voice";
     }
   })();
+  if (key === "voice" && state === "down") return `${label} · muted`;
   if (state === "ok") return `${label} · connected`;
   if (state === "connecting") return `${label} · connecting…`;
   if (state === "denied") return `${label} · permission denied`;

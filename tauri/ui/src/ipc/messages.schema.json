@@ -257,7 +257,7 @@
       }
     },
     "StatusTick": {
-      "$comment": "Sidecar \u2192 shell @ ~1Hz. Status-bar badges for the live UI surface. D-Area-4.3 locks the four-field payload \u2014 no extra fields tolerated; tests assert additionalProperties: false blocks any drift. UX-11 requirement.",
+      "$comment": "Sidecar \u2192 shell @ ~1Hz. Status-bar badges for the live UI surface. D-Area-4.3 locks four required health fields plus optional voice status \u2014 no extra fields tolerated; tests assert additionalProperties: false blocks any drift. UX-11 requirement.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -311,6 +311,17 @@
                 "ok",
                 "denied",
                 "unavailable"
+              ]
+            },
+            "voice": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "ok",
+                "muted",
+                null
               ]
             }
           }

@@ -50,6 +50,7 @@ export interface StatusFlags {
   gemini: "ok" | "down" | null;
   midi: number | null;
   screen: "ok" | "denied" | "unavailable" | null;
+  voice?: "ok" | "muted" | null;
 }
 
 export type ClaimPolicyLevel = "green" | "yellow" | "red";
@@ -211,6 +212,7 @@ function makeDefault(): SessionState {
       gemini: null,
       midi: null,
       screen: null,
+      voice: null,
     },
     settings: {
       voice: "Adam",

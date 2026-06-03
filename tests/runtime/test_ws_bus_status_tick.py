@@ -138,6 +138,7 @@ def test_status_tick_built_from_probes_is_schema_valid(monkeypatch):
         "gemini": "ok",
         "midi": 1,
         "screen": "ok",
+        "voice": None,
     }
 
 

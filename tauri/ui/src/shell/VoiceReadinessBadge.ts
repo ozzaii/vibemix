@@ -9,8 +9,11 @@ import {
   type LibraryModelAsset,
   type LibraryModelsResult,
 } from "../library/api.js";
+import { subscribeIpc } from "../ipc/client.js";
+import type { StatusTick } from "../ipc/messages.js";
 
 export type VoiceReadinessBadgeState = "ok" | "warn" | "fault" | "unknown";
+export type RuntimeVoiceStatus = "ok" | "muted" | null;
 
 export interface VoiceReadinessBadgeModel {
   readonly state: VoiceReadinessBadgeState;
@@ -21,6 +24,7 @@ export interface VoiceReadinessBadgeModel {
 export interface VoiceReadinessBadgeHandle {
   readonly element: HTMLElement;
   refresh(): Promise<void>;
+  setVoiceStatus(status: RuntimeVoiceStatus): void;
   teardown(): void;
 }
 
@@ -28,6 +32,7 @@ export interface VoiceReadinessBadgeOptions {
   getModels?: () => Promise<LibraryModelsResult>;
   autoload?: boolean;
   pollMs?: number | null;
+  subscribeStatusTick?: boolean;
   onOpenCrate?: () => void;
 }
 
@@ -40,7 +45,16 @@ function mossModel(models: LibraryModelsResult | null): LibraryModelAsset | null
 export function voiceReadinessBadgeModel(
   models: LibraryModelsResult | null,
   error?: unknown,
+  runtimeVoice: RuntimeVoiceStatus = null,
 ): VoiceReadinessBadgeModel {
+  if (runtimeVoice === "muted") {
+    return {
+      state: "warn",
+      label: "voice muted",
+      title: "Local MOSS voice is muted for this session.",
+    };
+  }
+
   if (error) {
     return {
       state: "unknown",
@@ -103,6 +117,7 @@ export function mountVoiceReadinessBadge(
   const getModels = options.getModels ?? (() => libraryModels());
   const autoload = options.autoload ?? true;
   const pollMs = options.pollMs === undefined ? DEFAULT_POLL_MS : options.pollMs;
+  const subscribeStatusTick = options.subscribeStatusTick ?? true;
   const onOpenCrate = options.onOpenCrate;
 
   const separator = document.createElement("span");
@@ -126,13 +141,36 @@ export function mountVoiceReadinessBadge(
   footer.append(separator, badge);
 
   let disposed = false;
+  let latestModels: LibraryModelsResult | null = null;
+  let latestError: unknown;
+  let latestRuntimeVoice: RuntimeVoiceStatus = null;
+
+  const renderCurrent = (): void => {
+    if (!disposed) {
+      renderBadge(
+        badge,
+        voiceReadinessBadgeModel(latestModels, latestError, latestRuntimeVoice),
+      );
+    }
+  };
+
   const refresh = async (): Promise<void> => {
     try {
       const models = await getModels();
-      if (!disposed) renderBadge(badge, voiceReadinessBadgeModel(models));
+      latestModels = models;
+      latestError = undefined;
+      renderCurrent();
     } catch (err) {
-      if (!disposed) renderBadge(badge, voiceReadinessBadgeModel(null, err));
+      latestModels = null;
+      latestError = err;
+      renderCurrent();
     }
+  };
+
+  const setVoiceStatus = (status: RuntimeVoiceStatus): void => {
+    if (status === latestRuntimeVoice) return;
+    latestRuntimeVoice = status;
+    renderCurrent();
   };
 
   let timer: ReturnType<typeof globalThis.setInterval> | null = null;
@@ -141,12 +179,20 @@ export function mountVoiceReadinessBadge(
   }
   if (autoload) void refresh();
 
+  const unlistenStatusPromise = subscribeStatusTick
+    ? subscribeIpc<StatusTick>("ipc.status.tick", (msg) => {
+        setVoiceStatus(msg.payload.voice ?? null);
+      })
+    : Promise.resolve(() => {});
+
   return {
     element: badge,
     refresh,
+    setVoiceStatus,
     teardown(): void {
       disposed = true;
       if (timer !== null) globalThis.clearInterval(timer);
+      void unlistenStatusPromise.then((unlisten) => unlisten?.()).catch(() => {});
       separator.remove();
       badge.remove();
     },

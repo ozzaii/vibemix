@@ -900,6 +900,7 @@ async def ws_broadcast(
     screen_available: bool | None = None,
     midi_mirror: _MidiMirrorProtocol | None = None,
     audio_capture_context: dict[str, object] | None = None,
+    voice_muted: bool = False,
 ) -> None:
     """30Hz outbound mascot broadcast + inbound manual-trigger handler.
 
@@ -1329,6 +1330,7 @@ async def ws_broadcast(
                         gemini="ok",
                         midi=_probe_midi_count(controller_state, state),
                         screen=_probe_screen_status(screen_available),
+                        voice="muted" if voice_muted else "ok",
                     )
                     status_payload = status_msg.to_json()
                     status_dead = []

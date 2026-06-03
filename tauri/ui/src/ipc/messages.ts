@@ -93,6 +93,7 @@ export interface StatusTick {
     gemini: "ok" | "down";
     midi: number | null;
     screen: "ok" | "denied" | "unavailable";
+    voice?: "ok" | "muted" | null;
   };
 }
 export interface PermissionCheck {

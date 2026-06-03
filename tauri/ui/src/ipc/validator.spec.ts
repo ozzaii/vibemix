@@ -26,6 +26,28 @@ describe("parseIpcMessage — ipc.status.tick", () => {
     expect(() => parseIpcMessage(msg)).not.toThrow();
   });
 
+  it("accepts voice=muted", () => {
+    const msg = statusTick({
+      livekit: "ok",
+      gemini: "ok",
+      midi: 1,
+      screen: "ok",
+      voice: "muted",
+    });
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+
+  it("rejects unknown voice enum value", () => {
+    const msg = statusTick({
+      livekit: "ok",
+      gemini: "ok",
+      midi: 1,
+      screen: "ok",
+      voice: "loud",
+    });
+    expect(() => parseIpcMessage(msg)).toThrow(/IPC schema violation/);
+  });
+
   it("rejects missing payload field", () => {
     const msg = { type: "ipc.status.tick", ts: TS };
     expect(() => parseIpcMessage(msg)).toThrow(/IPC schema violation/);
