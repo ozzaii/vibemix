@@ -1248,7 +1248,7 @@ describe("pillReceiptRenderKey — reaction receipt replay key", () => {
 describe("pillWindowHeightForContent — overlay resize boundary", () => {
   it("clamps expand and peek content heights to the native window caps", () => {
     expect(pillWindowHeightForContent("expand", false, 999, 999)).toBe(292);
-    expect(pillWindowHeightForContent("listening", true, 999, 999)).toBe(156);
+    expect(pillWindowHeightForContent("listening", true, 999, 999)).toBe(174);
     expect(pillWindowHeightForContent("idle", false, 999, 999)).toBe(44);
   });
 

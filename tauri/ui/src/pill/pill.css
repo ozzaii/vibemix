@@ -2944,6 +2944,22 @@
   white-space: nowrap;
   opacity: 0.74;
 }
+.pill__peek .vmx-next-card__why {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 100%;
+  color: var(--silk);
+  opacity: 0.7;
+  overflow: hidden;
+  white-space: normal;
+}
+.pill__peek .vmx-next-card__why-chip {
+  flex: 0 0 auto;
+  max-width: 100%;
+  border-color: color-mix(in srgb, var(--silk) 12%, transparent);
+  background: color-mix(in srgb, var(--silk) 4%, transparent);
+}
 .pill__peek .vmx-next-card__cue-rail {
   height: 2px;
   margin-top: 2px;
@@ -2966,6 +2982,7 @@
   animation: pill-peek-title-settle 280ms cubic-bezier(0.16, 1, 0.3, 1) 112ms both;
 }
 .pill[data-peek="true"] .pill__peek .vmx-next-card__transition,
+.pill[data-peek="true"] .pill__peek .vmx-next-card__why,
 .pill[data-peek="true"] .pill__peek .vmx-next-card__grade-reason {
   animation: pill-peek-detail-settle 240ms cubic-bezier(0.16, 1, 0.3, 1) 148ms both;
 }
@@ -3044,7 +3061,7 @@
  * is the CSS belt to index.ts's honest-silence (an empty mount stays invisible —
  * no empty box ever flashes on hover when there's no grounded suggestion). */
 .pill[data-peek="true"] .pill__peek:not(:empty) {
-  max-height: 112px;
+  max-height: 130px;
   padding-bottom: 10px;
   border-top-width: 1px;
   opacity: 1;
@@ -4069,6 +4086,7 @@
   .pill[data-peek="true"] .pill__peek .vmx-next-card__peek-action,
   .pill[data-peek="true"] .pill__peek .vmx-next-card__title,
   .pill[data-peek="true"] .pill__peek .vmx-next-card__transition,
+  .pill[data-peek="true"] .pill__peek .vmx-next-card__why,
   .pill[data-peek="true"] .pill__peek .vmx-next-card__grade-reason {
     animation: none !important;
     transform: none !important;

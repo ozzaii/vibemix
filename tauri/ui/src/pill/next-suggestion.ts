@@ -299,6 +299,30 @@ const CSS = `
   .vmx-next-card__transition-bit {
     white-space: nowrap;
   }
+  .vmx-next-card__why {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    overflow: hidden;
+    color: var(--silk-40);
+    font-family: var(--type-mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+  }
+  .vmx-next-card__why-chip {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 1px solid color-mix(in srgb, var(--silk) 13%, transparent);
+    border-radius: 4px;
+    padding: 1px 4px;
+    background: color-mix(in srgb, var(--silk) 4%, transparent);
+  }
   .vmx-next-card__cue-rail {
     position: relative;
     display: block;
@@ -601,6 +625,22 @@ export function nextTransitionText(
   return bits.join(" · ");
 }
 
+export function nextReasonReceipt(
+  t: NextSuggestionTransitionWire | null | undefined,
+): string {
+  return nextReasonItems(t).join(" · ");
+}
+
+export function nextReasonItems(
+  t: NextSuggestionTransitionWire | null | undefined,
+): string[] {
+  if (!Array.isArray(t?.reasons)) return [];
+  return t.reasons
+    .map((reason) => cleanDecisionText(reason))
+    .filter(Boolean)
+    .slice(0, 2);
+}
+
 export function nextDecisionText(
   d: NextSuggestionDecisionWire | null | undefined,
   t?: NextSuggestionTransitionWire | null,
@@ -672,6 +712,8 @@ export function nextSuggestionAriaLabel(
   const actionText = isPeek
     ? nextPeekActionText(s.decision, s.transition)
     : nextDecisionText(s.decision, s.transition) || nextTransitionText(s.transition);
+  const reasonItems = nextReasonItems(s.transition);
+  const reasonReceipt = reasonItems.join(" · ");
   const fullActionText = isPeek
     ? nextFullActionText(s.decision, s.transition)
     : "";
@@ -683,6 +725,7 @@ export function nextSuggestionAriaLabel(
     if (meta) parts.push(meta);
   }
   if (actionText) parts.push(`action: ${actionText}`);
+  if (reasonReceipt) parts.push(`why: ${reasonReceipt}`);
   if (fullActionText && fullActionText !== actionText) parts.push(`detail: ${fullActionText}`);
   if (grade) {
     parts.push(
@@ -1140,6 +1183,8 @@ export function renderNextSuggestion(
     root.append(meta);
   }
 
+  const reasonItems = nextReasonItems(s.transition);
+  const reasonReceipt = reasonItems.join(" · ");
   const actionText = isPeek
     ? nextPeekActionText(s.decision, s.transition)
     : nextDecisionText(s.decision, s.transition) || nextTransitionText(s.transition);
@@ -1171,6 +1216,20 @@ export function renderNextSuggestion(
         root.append(rail);
       }
     }
+  }
+
+  if (reasonReceipt) {
+    const why = document.createElement("div");
+    why.className = "vmx-next-card__why";
+    why.dataset.nextWhy = "true";
+    why.setAttribute("title", reasonReceipt);
+    for (const item of reasonItems) {
+      const chip = document.createElement("span");
+      chip.className = "vmx-next-card__why-chip";
+      chip.textContent = item;
+      why.append(chip);
+    }
+    root.append(why);
   }
 
   if (moveGrade) {

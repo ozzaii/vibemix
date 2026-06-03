@@ -35,6 +35,8 @@ import {
   nextSuggestionRenderKey,
   nextMetaText,
   nextTransitionText,
+  nextReasonItems,
+  nextReasonReceipt,
   renderNextSuggestion,
   _CSS_FOR_TEST,
   type MoveGradeView,
@@ -156,6 +158,52 @@ describe("nextTransitionText — cue + grounded timing", () => {
   test("no grounded transition evidence → empty string", () => {
     expect(nextTransitionText(null)).toBe("");
     expect(nextTransitionText({})).toBe("");
+  });
+});
+
+describe("nextReasonReceipt — grounded engine reasons", () => {
+  test("returns the top grounded reason items without fabrication", () => {
+    expect(
+      nextReasonItems({
+        reasons: [
+          "Camelot relationship is clean",
+          "tempo delta is workable",
+          "entry lands on a phrase boundary",
+        ],
+      }),
+    ).toEqual(["Camelot relationship is clean", "tempo delta is workable"]);
+  });
+
+  test("returns the top grounded reason clauses joined", () => {
+    expect(
+      nextReasonReceipt({
+        reasons: [
+          "Camelot relationship is clean",
+          "tempo delta is workable",
+          "entry lands on a phrase boundary",
+        ],
+      }),
+    ).toBe("Camelot relationship is clean · tempo delta is workable");
+  });
+
+  test("returns empty string when reasons are missing or empty", () => {
+    expect(nextReasonReceipt(undefined)).toBe("");
+    expect(nextReasonReceipt({})).toBe("");
+    expect(nextReasonReceipt({ reasons: [] })).toBe("");
+  });
+
+  test("does not fabricate or numericize the receipt", () => {
+    const input = [
+      "Camelot relationship is clean",
+      "entry lands on a phrase boundary",
+    ];
+    const receipt = nextReasonReceipt({
+      reasons: input,
+      scores: { harmonic: 0.91, timing: 0.88 },
+    });
+    expect(input).toContain(receipt.split(" · ")[0]);
+    expect(input).toContain(receipt.split(" · ")[1]);
+    expect(receipt).not.toMatch(/\d/);
   });
 });
 
@@ -439,6 +487,73 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
       " · outro→intro",
       " · in 8 bars",
     ]);
+  });
+
+  test("set-aware reasons render as a grounded why receipt", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          cue_slot: "A",
+          start_in_bars: 8,
+          reasons: [
+            "Camelot relationship is clean",
+            "tempo delta is workable",
+            "entry lands on a phrase boundary",
+          ],
+        },
+      }),
+    )!;
+    const receipt = card.querySelector<HTMLElement>("[data-next-why]");
+    const chips = Array.from(receipt?.querySelectorAll(".vmx-next-card__why-chip") ?? []);
+    expect(chips.map((chip) => chip.textContent)).toEqual([
+      "Camelot relationship is clean",
+      "tempo delta is workable",
+    ]);
+    expect(receipt?.getAttribute("title")).toBe(
+      "Camelot relationship is clean · tempo delta is workable",
+    );
+  });
+
+  test("empty reasons render no why receipt", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          cue_slot: "A",
+          start_in_bars: 8,
+          reasons: [],
+        },
+      }),
+    )!;
+    expect(card.querySelector("[data-next-why]")).toBeNull();
+  });
+
+  test("peek density still shows the grounded why receipt", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          start_in_bars: 8,
+          reasons: [
+            "Camelot relationship is clean",
+            "tempo delta is workable",
+          ],
+        },
+      }),
+      { density: "peek" },
+    )!;
+    const chips = Array.from(card.querySelectorAll(".vmx-next-card__why-chip"));
+    expect(chips.map((chip) => chip.textContent)).toEqual([
+      "Camelot relationship is clean",
+      "tempo delta is workable",
+    ]);
+    expect(card.getAttribute("aria-label")).toContain(
+      "why: Camelot relationship is clean · tempo delta is workable",
+    );
   });
 
   test("move grade renders as earned data, not markup", () => {
