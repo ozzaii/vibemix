@@ -10,6 +10,7 @@ honestly through ``learn.cue_practice``.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from vibemix.audio.grid import BeatGrid
@@ -37,6 +38,20 @@ def _control_from_midi(midi: dict[str, Any]) -> str:
     return control
 
 
+def _float_field(midi: dict[str, Any], *names: str) -> float | None:
+    for name in names:
+        raw = midi.get(name)
+        if raw is None:
+            continue
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(value):
+            return value
+    return None
+
+
 class CuePlacementPracticeDriver:
     """Convert the authored hot-cue lesson action into a graded cue snapshot."""
 
@@ -54,7 +69,23 @@ class CuePlacementPracticeDriver:
             return False
         if _control_from_midi(midi) != "hotcue":
             return False
-        self._cue_frame = self._target_frame
+        cue_frame = _float_field(midi, "cue_frame", "press_frame", "frame")
+        if cue_frame is None:
+            cue_beat = _float_field(midi, "cue_beat", "press_beat", "beat")
+            if cue_beat is not None:
+                cue_frame = self._grid.beat_at(cue_beat)
+        if cue_frame is None:
+            cue_offset = _float_field(midi, "cue_offset_beats", "press_offset_beats")
+            if cue_offset is not None:
+                cue_frame = self._target_frame + cue_offset * self._grid.beat_len_frames
+        if cue_frame is None:
+            elapsed_s = _float_field(midi, "action_elapsed_s", "elapsed_s", "press_elapsed_s")
+            if elapsed_s is not None:
+                cue_frame = max(0.0, elapsed_s) * _SAMPLE_RATE
+        if cue_frame is None:
+            self._cue_frame = None
+            return False
+        self._cue_frame = cue_frame
         return True
 
     def snapshot(self) -> CuePlacementPracticeSnapshot | None:

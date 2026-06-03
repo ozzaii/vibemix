@@ -995,10 +995,12 @@ class LessonRuntime(StateMachine):
 
         if self._cue_placement_practice_action_recorder is None:
             return
+        timed_midi = dict(midi)
+        timed_midi.setdefault("action_elapsed_s", self._lesson_elapsed_s())
         try:
             should_grade = self._cue_placement_practice_action_recorder(
                 self._learn.current_lesson_id,
-                midi,
+                timed_midi,
             )
         except Exception as exc:  # pragma: no cover - defensive
             import sys
@@ -1540,6 +1542,10 @@ class LessonRuntime(StateMachine):
                     f"[learn.runtime] evidence clock failed: {exc!r}",
                     file=sys.stderr,
                 )
+        return max(0.0, time.monotonic() - self._learn.lesson_started_at)
+
+    def _lesson_elapsed_s(self) -> float:
+        """Return wall-clock lesson elapsed time for owned practice timing."""
         return max(0.0, time.monotonic() - self._learn.lesson_started_at)
 
     def _record_evidence(

@@ -708,7 +708,12 @@ def test_matched_cue_action_records_and_grades_immediately(monkeypatch) -> None:
     runtime.send("begin")
     runtime.send("ack_action", midi=midi)
 
-    assert recorded == [("L2.10", midi)]
+    assert len(recorded) == 1
+    lesson_id, recorded_midi = recorded[0]
+    assert lesson_id == "L2.10"
+    for key, value in midi.items():
+        assert recorded_midi[key] == value
+    assert recorded_midi["action_elapsed_s"] >= 0.0
     assert registry.has("ev", "CUE_PLACEMENT_GRADED", 73.5, tol=1.0)
     assert progress.skills["phrasing_performance"]["live_proof_count"] == 1
     assert progress in saved
