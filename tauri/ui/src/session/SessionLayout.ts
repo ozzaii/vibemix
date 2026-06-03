@@ -1438,7 +1438,11 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   mounted.statusInputs.voiceSep.hidden = next.status.voice !== "muted";
   setInputDown(mounted.statusInputs.screen, next.status.screen === "denied");
   setInputDown(mounted.statusInputs.midi, next.status.midi === 0);
-  const rightText = `${outputLabel(next.output)} · ${next.persona.voice} · ${next.persona.genre}`;
+  // Just the live output route — the one fact here that can change mid-set and
+  // matters at a glance (where the co-host's voice lands). Voice name + genre are
+  // set-once Settings config, not live status; printing them in always-on chrome
+  // was extra text a DJ never reads mid-set (impeccable: status-row text cut).
+  const rightText = outputLabel(next.output);
   if (mounted.statusRight.textContent !== rightText) mounted.statusRight.textContent = rightText;
   const claim = next.claimPolicy ?? null;
   mounted.claimPolicy.hidden = !claim;
@@ -1449,7 +1453,7 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
       ? `${claim.policy}: ${claim.reason}`
       : claim.policy;
     mounted.claimPolicy.setAttribute("title", title);
-    mounted.claimPolicy.setAttribute("aria-label", `live claim proof: ${claim.label}`);
+    mounted.claimPolicy.setAttribute("aria-label", `live claim status: ${claim.label}`);
   }
 }
 
