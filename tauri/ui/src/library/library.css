@@ -501,6 +501,22 @@ body {
   transform: translateY(1px);
 }
 
+/* Segmented choice: two options that read as ONE control, not two loose
+   chips. The ingest "how vibemix listens" strategy pick. One shared track,
+   a 1px hairline between segments (a structural divider, not an accent). */
+.vmx-lib-seg {
+  gap: 0; margin-top: 8px; width: fit-content;
+  border-radius: var(--rad-sm); overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--glass-edge), 0 1px 0 rgba(0, 0, 0, 0.62);
+}
+.vmx-lib-seg .vmx-lib-chip { border: none; border-radius: 0; background: var(--void-3); box-shadow: none; }
+.vmx-lib-seg .vmx-lib-chip + .vmx-lib-chip { border-left: 1px solid var(--glass-edge); }
+.vmx-lib-seg .vmx-lib-chip[aria-pressed="true"] {
+  color: var(--amber-pale); background: rgba(255, 165, 223, 0.055);
+  box-shadow: inset 0 -2px 0 var(--amber-22), inset 0 0 12px rgba(255, 165, 223, 0.10);
+}
+.vmx-lib-seg-note { margin-top: 8px; max-width: 52ch; font-size: 11px; line-height: 1.45; color: var(--silk); opacity: 0.66; }
+
 /* The primary action — the one lit button. Full specular treatment: a top
    highlight line, a rose-graded fill, an embossed label. The hero control. */
 .vmx-lib-run {

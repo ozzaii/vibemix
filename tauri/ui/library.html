@@ -86,10 +86,12 @@
                   </svg>
                   <input id="vmx-lib-folder" value="~/Music" />
                 </div>
-                <div class="vmx-lib-chips">
-                  <span class="vmx-lib-chip" data-strategy="mean" aria-pressed="false">strategy · mean</span>
-                  <span class="vmx-lib-chip" data-strategy="cue-anchored" aria-pressed="true">strategy · cue-anchored</span>
+                <span class="vmx-lib-label">How vibemix listens to each track</span>
+                <div class="vmx-lib-chips vmx-lib-seg" role="radiogroup" aria-label="How vibemix listens to each track">
+                  <span class="vmx-lib-chip" data-strategy="cue-anchored" role="radio" aria-pressed="true">Around the cue points</span>
+                  <span class="vmx-lib-chip" data-strategy="mean" role="radio" aria-pressed="false">Whole track</span>
                 </div>
+                <p class="vmx-lib-seg-note">Around the cue points is faster and focuses on the part you actually mix. Whole track listens start to finish.</p>
               </div>
 
               <!-- cue export field — local auto-cue engine → portable files.
