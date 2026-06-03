@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import json
 import os
 import stat
@@ -320,6 +321,26 @@ def test_require_moss_source_accepts_complete_bundled_model(
     assert status.binary == binary
     assert os.environ.get("VIBEMIX_MOSS_TTS_DIR") is None
     assert str(model_dir) in gate._bundled_moss_model_status(binary.parent)[1]
+
+
+def test_bundled_moss_model_check_does_not_import_tts_runtime(
+    tmp_path: Path, monkeypatch
+) -> None:
+    binary = _write_bundle(tmp_path, MAC_TRIPLE)
+    _write_bundled_moss_model(tmp_path, MAC_TRIPLE)
+    real_import = builtins.__import__
+
+    def guard_import(name, *args, **kwargs):
+        if name == "vibemix.agent.local_tts" or name.startswith("livekit"):
+            raise AssertionError(f"release verifier imported runtime-only module: {name}")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guard_import)
+
+    ok, detail = gate._bundled_moss_model_status(binary.parent)
+
+    assert ok is True
+    assert "bundled MOSS model ready" in detail
 
 
 def test_main_returns_zero_for_ready_explicit_triple(tmp_path: Path, capsys) -> None:

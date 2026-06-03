@@ -10,6 +10,7 @@ without a launchable Python sidecar.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -107,6 +108,119 @@ def _bundled_test_fixture_paths(bundle_dir: Path) -> list[Path]:
     )
 
 
+def _resolve_manifest_path(base: Path, rel_path: str) -> Path:
+    path = Path(rel_path)
+    return path if path.is_absolute() else (base / path).resolve(strict=False)
+
+
+def _display_model_path(path: Path, model_dir: Path) -> str:
+    for root in (model_dir, model_dir.parent):
+        try:
+            return str(path.relative_to(root))
+        except ValueError:
+            continue
+    return str(path)
+
+
+def _read_moss_json_file(
+    path: Path,
+    *,
+    mismatched: list[str],
+    model_dir: Path,
+) -> dict[str, object] | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        mismatched.append(_display_model_path(path, model_dir))
+        return None
+
+
+def _add_moss_meta_files(
+    *,
+    meta_path: Path,
+    required: set[Path],
+    missing: list[str],
+    mismatched: list[str],
+    model_dir: Path,
+) -> None:
+    """Add ONNX/data files referenced by a MOSS meta file to ``required``."""
+    if not meta_path.is_file():
+        missing.append(_display_model_path(meta_path, model_dir))
+        return
+    meta = _read_moss_json_file(meta_path, mismatched=mismatched, model_dir=model_dir)
+    if not meta:
+        return
+    base = meta_path.parent
+    files = meta.get("files")
+    if isinstance(files, dict):
+        for rel_path in files.values():
+            if isinstance(rel_path, str):
+                required.add(_resolve_manifest_path(base, rel_path))
+    external = meta.get("external_data_files")
+    if isinstance(external, dict):
+        for rel_paths in external.values():
+            if isinstance(rel_paths, list):
+                for rel_path in rel_paths:
+                    if isinstance(rel_path, str):
+                        required.add(_resolve_manifest_path(base, rel_path))
+
+
+def _moss_model_tree_status(model_dir: Path) -> tuple[bool, str]:
+    """Return whether ``model_dir`` has the MOSS files needed before ORT load.
+
+    Keep this release verifier stdlib-only. Importing ``vibemix.agent.local_tts``
+    would also import LiveKit, so a machine that can inspect a DMG could fail the
+    artifact gate before it even checks the packaged files.
+    """
+    manifest_path = model_dir / MOSS_MANIFEST
+    missing: list[str] = []
+    mismatched: list[str] = []
+    required: set[Path] = {manifest_path}
+
+    if not manifest_path.is_file():
+        missing.append(MOSS_MANIFEST)
+    else:
+        manifest = _read_moss_json_file(
+            manifest_path,
+            mismatched=mismatched,
+            model_dir=model_dir,
+        )
+        if manifest:
+            model_files = manifest.get("model_files")
+            if isinstance(model_files, dict):
+                for key, rel_path in model_files.items():
+                    if not isinstance(rel_path, str):
+                        continue
+                    path = _resolve_manifest_path(model_dir, rel_path)
+                    required.add(path)
+                    if key in {"tts_meta", "codec_meta"}:
+                        _add_moss_meta_files(
+                            meta_path=path,
+                            required=required,
+                            missing=missing,
+                            mismatched=mismatched,
+                            model_dir=model_dir,
+                        )
+
+    for path in sorted(required, key=lambda item: str(item)):
+        if not path.is_file():
+            display = _display_model_path(path, model_dir)
+            if display not in missing:
+                missing.append(display)
+
+    if not missing and not mismatched:
+        return (True, f"bundled MOSS model ready: {model_dir}")
+    detail = "; ".join(
+        part
+        for part in (
+            "missing " + ", ".join(missing) if missing else "",
+            "mismatched " + ", ".join(mismatched) if mismatched else "",
+        )
+        if part
+    )
+    return (False, f"{model_dir}: {detail or 'not usable'}")
+
+
 def learn_exemplar_audio_ready(bundle_dir: Path) -> tuple[bool, str]:
     """Return whether the frozen sidecar carries the packaged Learn audio bank."""
     internal = bundle_dir / "_internal"
@@ -148,34 +262,19 @@ def _bundled_moss_model_status(bundle_dir: Path) -> tuple[bool, str]:
 
     The PyInstaller layout may choose a different destination for future bundled
     data, so search for the canonical model dir name instead of hardcoding one
-    path under ``_internal``. Validation reuses the runtime's cheap manifest
-    checker, keeping the release gate aligned with what MOSS actually loads.
+    path under ``_internal``.
     """
     manifests = sorted(bundle_dir.rglob(f"{MOSS_MODEL_DIRNAME}/{MOSS_MANIFEST}"))
     if not manifests:
         return (False, f"no bundled {MOSS_MODEL_DIRNAME}/{MOSS_MANIFEST}")
 
-    from vibemix.agent.local_tts import MOSS_MODEL_DIR_ENV, model_status
-
-    old = os.environ.get(MOSS_MODEL_DIR_ENV)
-    had_old = MOSS_MODEL_DIR_ENV in os.environ
     details: list[str] = []
-    try:
-        for manifest in manifests:
-            model_dir = manifest.parent
-            os.environ[MOSS_MODEL_DIR_ENV] = str(model_dir)
-            status = model_status()
-            if bool(status["installed"]):
-                return (True, f"bundled MOSS model ready: {model_dir}")
-            missing = ", ".join(str(item) for item in status.get("missing", []))
-            mismatched = ", ".join(str(item) for item in status.get("mismatched", []))
-            detail = "; ".join(part for part in (missing, mismatched) if part)
-            details.append(f"{model_dir}: {detail or 'not usable'}")
-    finally:
-        if had_old and old is not None:
-            os.environ[MOSS_MODEL_DIR_ENV] = old
-        else:
-            os.environ.pop(MOSS_MODEL_DIR_ENV, None)
+    for manifest in manifests:
+        model_dir = manifest.parent
+        ok, detail = _moss_model_tree_status(model_dir)
+        if ok:
+            return (True, detail)
+        details.append(detail)
 
     return (False, "bundled MOSS model incomplete: " + " | ".join(details))
 
