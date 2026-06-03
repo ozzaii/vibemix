@@ -3032,6 +3032,7 @@ class DJCoHostAgent(Agent):
                     full_text = live_claim_guard.text
                     stripped = full_text.strip()
                     buffered_chunks = [full_text] if full_text else []
+                    guard_action = "emit_corrected" if live_claim_guard.emit_corrected else "strip"
                     try:
                         self._recorder.log_event(
                             "live_claim_guard",
@@ -3041,12 +3042,12 @@ class DJCoHostAgent(Agent):
                             summary=live_claim_guard.summary,
                             raw_text=raw_live_claim_text,
                             corrected_text=full_text,
-                            action="strip",
+                            action=guard_action,
                             latency_s=round(elapsed, 2),
                         )
                     except Exception:
                         pass
-                    if head_yielded:
+                    if head_yielded and not live_claim_guard.emit_corrected:
                         _push_silence_pad_and_cancel("live_claim_guard")
 
             spoken_text, emote_intents = strip_emote_tags(full_text)
@@ -3058,7 +3059,9 @@ class DJCoHostAgent(Agent):
                 # so bracketed control/citation tags never leak to audio.
                 buffered_chunks = [audience_text] if audience_text else []
             if suppression is None and not (
-                live_claim_guard is not None and live_claim_guard.corrected
+                live_claim_guard is not None
+                and live_claim_guard.corrected
+                and not live_claim_guard.emit_corrected
             ):
                 language_matches = english_only_violation_matches(audience_text)
                 if language_matches:
@@ -3103,7 +3106,11 @@ class DJCoHostAgent(Agent):
                 spoken_text = ""
                 audience_text = ""
                 audience_stripped = ""
-            elif live_claim_guard is not None and live_claim_guard.corrected:
+            elif (
+                live_claim_guard is not None
+                and live_claim_guard.corrected
+                and not live_claim_guard.emit_corrected
+            ):
                 # A live-claim guard hit means the model tried to say something
                 # we cannot ground. Do not convert that failure into a spoken
                 # canned line; leave the correction in artifacts/repair queues

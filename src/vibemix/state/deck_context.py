@@ -461,6 +461,7 @@ class LiveClaimGuardResult:
 
     text: str
     corrected: bool = False
+    emit_corrected: bool = False
     policy: str = "requires_more_evidence"
     reason: str | None = None
     summary: str = ""
@@ -2950,6 +2951,16 @@ def apply_live_claim_guard(
         judge_evidence_line=judge_evidence_line,
     ):
         summary = _live_guard_summary(state, moves)
+        stripped = _strip_unsupported_harmonic_clause(text)
+        if stripped:
+            return LiveClaimGuardResult(
+                text=stripped,
+                corrected=True,
+                emit_corrected=True,
+                policy="harmonic_claim_not_grounded",
+                reason="no_citable_key_clash_evidence",
+                summary=summary,
+            )
         return LiveClaimGuardResult(
             text=LIVE_TRANSITION_HELD_REPLY,
             corrected=True,
@@ -3434,7 +3445,7 @@ def _strip_unsupported_no_move_control_clause(text: str) -> str:
         kept = stripped[: match.start()].strip(" ,;:")
         if kept:
             return kept if kept.endswith((".", "!", "?")) else f"{kept}."
-    sentences = re.findall(r"[^.!?]+[.!?]?", stripped)
+    sentences = _split_live_sentences(stripped)
     kept_sentences = [
         sentence.strip()
         for sentence in sentences
@@ -3444,6 +3455,31 @@ def _strip_unsupported_no_move_control_clause(text: str) -> str:
         out = " ".join(kept_sentences).strip()
         return out if out.endswith((".", "!", "?")) else f"{out}."
     return ""
+
+
+def _strip_unsupported_harmonic_clause(text: str) -> str:
+    """Keep grounded audio-read sentences when a trailing key claim is unsupported."""
+    stripped = text.strip()
+    if not stripped:
+        return ""
+    sentences = _split_live_sentences(stripped)
+    kept_sentences = [
+        sentence.strip()
+        for sentence in sentences
+        if sentence.strip() and not _HARMONIC_DECK_CLAIM_RE.search(sentence)
+    ]
+    if kept_sentences and len(kept_sentences) < len(sentences):
+        out = " ".join(kept_sentences).strip()
+        return out if out.endswith((".", "!", "?")) else f"{out}."
+    return ""
+
+
+def _split_live_sentences(text: str) -> list[str]:
+    """Split live prose without cutting inside decimal citation atoms."""
+    stripped = text.strip()
+    if not stripped:
+        return []
+    return [part for part in re.split(r"(?<=[.!?])\s+(?=[A-Z])", stripped) if part]
 
 
 def _resolved_decks(decks: dict[str, DeckTrack]) -> dict[str, DeckTrack]:

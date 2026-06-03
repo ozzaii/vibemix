@@ -291,6 +291,54 @@ def test_live_claim_guard_strips_cited_phase_advice_without_move_proof(mocker, t
     playback.push.assert_not_called()
 
 
+def test_live_claim_guard_emits_salvaged_audio_read_before_harmonic_advice(
+    mocker, tmp_path
+) -> None:
+    """Unsupported key advice should not erase the grounded AI audio read before it."""
+    registry = EvidenceRegistry()
+    registry.write("ev", "PHRASE", 176.5)
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "A"
+    state.audible_track = None
+    state.audible_track_confidence = 0.0
+    state.recent_moves = []
+    state.deck_state = DeckState(decks={"A": _deck("OutA", camelot="8A")})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                "The kick fell right back into that hollow [ev:PHRASE@176.5] rhythm. ",
+                "Since the sub is holding so much weight, keep the next blend strictly ",
+                "in key to prevent the low end from clashing.",
+            ]
+        )
+    )
+
+    agent.set_next_event(
+        Event(type="PHASE", state=state, extra={"prev_phase": "drop", "new_phase": "groove"})
+    )
+    chunks = _drive(agent)
+
+    assert chunks == ["The kick fell right back into that hollow rhythm."]
+    kinds = [kind for kind, _ in recorder.events]
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "emit_corrected"
+    assert guard_log["policy"] == "harmonic_claim_not_grounded"
+    assert "strictly in key" in guard_log["raw_text"]
+    assert "strictly in key" not in guard_log["corrected_text"].lower()
+    assert "ai_text" in kinds
+    assert next(fields for kind, fields in recorder.events if kind == "ai_text")["text"] == (
+        "The kick fell right back into that hollow rhythm."
+    )
+    assert "citation_strip" not in kinds
+    assert tracker.rate() == 0.0
+    playback.push.assert_not_called()
+
+
 def test_live_claim_guard_defers_watch_only_stream_before_correction(mocker, tmp_path) -> None:
     """Watch-only crossfader evidence should not leak the raw streamed head."""
     registry = EvidenceRegistry()

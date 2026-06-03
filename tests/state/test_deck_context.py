@@ -2735,6 +2735,26 @@ def test_live_claim_guard_blocks_harmonic_claim_without_key_event() -> None:
     assert "harmonic clash" not in result.text.lower()
 
 
+def test_live_claim_guard_salvages_audio_read_before_unsupported_harmonic_advice() -> None:
+    state = MusicState(audible=True, controller_connected=True, audible_deck="A")
+    state.deck_state = DeckState(decks={"A": _deck("OutA", camelot="8A")})
+    reply = (
+        "The kick fell right back into that hollow [aud:rms@176.0] rhythm. "
+        "Since the sub is holding so much weight, keep the next blend strictly in key "
+        "to prevent the low end from clashing [ev:PHRASE@176.5]."
+    )
+
+    result = apply_live_claim_guard(reply, state, [], event_type="PHRASE")
+
+    assert result.corrected is True
+    assert result.emit_corrected is True
+    assert result.policy == "harmonic_claim_not_grounded"
+    assert result.reason == "no_citable_key_clash_evidence"
+    assert result.text == "The kick fell right back into that hollow [aud:rms@176.0] rhythm."
+    assert "strictly in key" not in result.text.lower()
+    assert "clashing" not in result.text.lower()
+
+
 def test_live_claim_guard_allows_key_clash_event_claim() -> None:
     state = MusicState(audible=True, controller_connected=True, audible_deck="mix")
     state.deck_state = DeckState(
