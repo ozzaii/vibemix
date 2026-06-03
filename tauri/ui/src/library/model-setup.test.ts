@@ -355,7 +355,7 @@ describe("modelProgressStateText", () => {
         downloaded: 104_857_600,
         size: 501_513_769,
       }),
-    ).toBe("CLAP downloading 2/6 · text_model.onnx · 100 MB/478 MB");
+    ).toBe("Sound match downloading 2/6 · 100 MB/478 MB");
   });
 
   it("renders verified and error terminal frames without pretending success", () => {
@@ -370,7 +370,7 @@ describe("modelProgressStateText", () => {
         downloaded: 281_749_092,
         size: 281_749_092,
       }),
-    ).toBe("CLAP verified 1/6 · audio_model.onnx");
+    ).toBe("Sound match verified 1/6");
 
     expect(
       modelProgressStateText({
@@ -383,7 +383,7 @@ describe("modelProgressStateText", () => {
         downloaded: 10_485_760,
         size: 104_857_600,
       }),
-    ).toBe("MOSS downloading 1/3 · encoder_model.onnx · 10 MB/100 MB");
+    ).toBe("Voice downloading 1/3 · 10 MB/100 MB");
 
     expect(
       modelProgressStateText({
@@ -396,6 +396,6 @@ describe("modelProgressStateText", () => {
         downloaded: 0,
         size: 0,
       }),
-    ).toBe("CUE setup failed 1/1 · cuedetr.fp32.onnx");
+    ).toBe("Cue finder setup failed 1/1");
   });
 });

@@ -799,7 +799,6 @@ function errorMessage(err: unknown): string {
 
 function embeddingLabel(stats: LibraryStats): string {
   const backend = (stats.embedding_backend ?? "clap").toLowerCase();
-  const dim = stats.embedding_dim ?? 512;
   const model =
     backend === "clap"
       ? stats.clap_model_installed === false
@@ -812,7 +811,7 @@ function embeddingLabel(stats: LibraryStats): string {
   const freshness = stats.library_freshness_status
     ? `library ${stats.library_freshness_status.replace(/_/g, " ")}`
     : "library unknown";
-  return `${agentLabel} / ${model} / ${dim}d / ${freshness}`;
+  return `${agentLabel} / ${model} / ${freshness}`;
 }
 
 function libraryBackendLabel(backend: string): string {
@@ -896,24 +895,23 @@ function formatModelBytes(bytes: number): string {
 export function modelProgressStateText(progress: LibraryModelProgress): string {
   const model =
     progress.id === "cue-detr"
-      ? "CUE"
+      ? "Cue finder"
       : progress.id === "moss-tts"
-        ? "MOSS"
-        : "CLAP";
-  const rel = progress.rel_path.split(/[\\/]/).pop() ?? progress.rel_path;
+        ? "Voice"
+        : "Sound match";
   const count = `${progress.n}/${progress.total}`;
   if (progress.status === "verified") {
-    return `${model} verified ${count} · ${rel}`;
+    return `${model} verified ${count}`;
   }
   if (progress.status === "downloaded") {
-    return `${model} downloaded ${count} · ${rel}`;
+    return `${model} downloaded ${count}`;
   }
   if (progress.status === "error") {
-    return `${model} setup failed ${count} · ${rel}`;
+    return `${model} setup failed ${count}`;
   }
   const loaded = formatModelBytes(progress.downloaded);
   const total = formatModelBytes(progress.size);
-  return `${model} downloading ${count} · ${rel} · ${loaded}/${total}`;
+  return `${model} downloading ${count} · ${loaded}/${total}`;
 }
 
 export interface ModelSetupView {
