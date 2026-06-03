@@ -397,6 +397,10 @@ def test_check_flx4_live_context_records_direct_midi_probe_no_motion(
         "direct OS MIDI probe saw no controller frames during the probe window"
     )
     assert summary["operator_actions"][0]["code"] == "prove_os_midi_motion"
+    assert summary["operator_actions"][0]["diagnostic_commands"] == [
+        "uv run python scripts/sniff_controller.py --port DDJ-FLX4 --seconds 20 --mode callback",
+        "uv run python scripts/sniff_controller.py --port DDJ-FLX4 --seconds 20 --mode poll",
+    ]
 
 
 def test_check_flx4_live_context_writes_summary_when_midi_port_missing(

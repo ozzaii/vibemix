@@ -371,12 +371,14 @@ SUMMARY_LINE=$(
   BAD_SOURCE_VERIFY_JSON="${BAD_SOURCE_VERIFY_JSON}" \
   DIRECT_MIDI_PROBE_S="${DIRECT_MIDI_PROBE_S}" \
   DIRECT_MIDI_PROBE_MODE="${DIRECT_MIDI_PROBE_MODE}" \
+  PORT_RE="${PORT_RE}" \
   DIRECT_MIDI_JSONL="${DIRECT_MIDI_JSONL}" \
   DIRECT_MIDI_ERR="${DIRECT_MIDI_ERR}" \
   DIRECT_MIDI_RC="${DIRECT_MIDI_RC}" \
     "${PY_CMD[@]}" - "${PROOF_JSON}" "${MIDI_STDOUT}" "${SUMMARY_JSON}" <<'PY'
 import json
 import os
+import shlex
 import sys
 from pathlib import Path
 
@@ -462,10 +464,23 @@ if live_rc == 0:
     audio_source_detail_rejected = os.environ["BAD_SOURCE_REJECTED"] == "true"
 
 
-def add_action(actions: list[dict], code: str, detail: str) -> None:
-    if any(action.get("code") == code for action in actions):
-        return
-    actions.append({"code": code, "detail": detail})
+def add_action(actions: list[dict], code: str, detail: str, **extra: object) -> dict:
+    for action in actions:
+        if action.get("code") == code:
+            action.update(extra)
+            return action
+    action = {"code": code, "detail": detail}
+    action.update(extra)
+    actions.append(action)
+    return action
+
+
+port_re = os.environ.get("PORT_RE") or "DDJ-FLX4"
+port_arg = shlex.quote(port_re)
+direct_midi_diagnostic_commands = [
+    f"uv run python scripts/sniff_controller.py --port {port_arg} --seconds 20 --mode callback",
+    f"uv run python scripts/sniff_controller.py --port {port_arg} --seconds 20 --mode poll",
+]
 
 
 def copy_proof_actions(
@@ -532,6 +547,7 @@ elif (
         operator_actions,
         "prove_os_midi_motion",
         "The direct OS MIDI probe saw no FLX4 frames; move a fader/knob during the probe window or fix USB/MIDI input before trusting live moves.",
+        diagnostic_commands=direct_midi_diagnostic_commands,
     )
 copy_proof_actions(
     operator_actions,
@@ -605,6 +621,7 @@ if needs_operator_action and physical_diagnosis and not checks.get("recent_moves
             operator_actions,
             "prove_os_midi_motion",
             "The direct OS MIDI probe saw no FLX4 frames; move a fader/knob during the probe window or fix USB/MIDI input before trusting live moves.",
+            diagnostic_commands=direct_midi_diagnostic_commands,
         )
     else:
         add_action(
