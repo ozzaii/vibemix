@@ -17,6 +17,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { DJ_VOCAB } from "../src/shell/dj-vocab.js";
+
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
 
 // The canonical brand fonts (tokens.css @font-face + the --type-* tokens).
@@ -135,5 +137,49 @@ describe("design-slop gate — @font-face brand lock", () => {
     for (const fam of faces) {
       expect(ALLOWED_FONTS).toContain(fam);
     }
+  });
+});
+
+// Engine vocabulary that must never reach user-visible copy. The list is TIGHT
+// (separators / multi-word) so a phrase cannot match a legitimate code comment
+// or identifier; each was a real leak removed in the UX-redesign pass. One DJ
+// phrase per concept lives in shell/dj-vocab.ts; printing the raw engine word
+// here is the same class of slop as a generic brand font, so it fails the build.
+const JARGON_PHRASES = [
+  "grounded · ",
+  "strategy · ",
+  "CLAP 512D",
+  "mean centered",
+  "Sven pipe",
+  "sidecar socket",
+  "· cue-anchored",
+  "must land before the receipt",
+  "bind the lesson move",
+  "cited review",
+  "open cited",
+];
+
+describe("design-slop gate — no engine jargon in user copy", () => {
+  it("prints no raw engine vocabulary anywhere in src", () => {
+    const offenders: string[] = [];
+    for (const f of FILES) {
+      const text = readFileSync(f, "utf-8");
+      for (const phrase of JARGON_PHRASES) {
+        if (text.includes(phrase)) offenders.push(`${f.replace(SRC, "src")}: "${phrase}"`);
+      }
+    }
+    expect(
+      offenders,
+      `engine jargon leaked into source — translate it (shell/dj-vocab.ts):\n${offenders.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  it("keeps every DJ_VOCAB value itself jargon-free (no laundering through the helper)", () => {
+    const JARGON_WORD = /\b(grounded|proof|receipt|cited|sidecar|cosine|recital|CLAP|512D)\b/i;
+    const dirty = Object.entries(DJ_VOCAB).filter(([, value]) => JARGON_WORD.test(value));
+    expect(
+      dirty,
+      `DJ_VOCAB values must stay DJ-plain:\n${dirty.map(([k, v]) => `  ${k}: "${v}"`).join("\n")}`,
+    ).toEqual([]);
   });
 });

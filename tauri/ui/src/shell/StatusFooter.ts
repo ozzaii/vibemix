@@ -20,8 +20,8 @@ const ACTIVATION_LABEL: Record<ActivationState, string> = {
 
 const CONNECTION_LABEL: Record<ConnectionState, string> = {
   connected: "",
-  reconnecting: "Sven pipe reconnecting",
-  disconnected: "Sven pipe offline",
+  reconnecting: "Sven reconnecting",
+  disconnected: "Sven offline",
 };
 
 function footerLabel(
@@ -62,8 +62,8 @@ export function createStatusFooter(store: ShellStore): HTMLElement {
       footer.setAttribute(
         "title",
         model.connection === "reconnecting"
-          ? "Sven is reconnecting to the sidecar socket."
-          : "Sven cannot speak until the sidecar socket reconnects.",
+          ? "Sven is reconnecting to the audio engine."
+          : "Sven cannot speak until the connection comes back.",
       );
     }
   };
