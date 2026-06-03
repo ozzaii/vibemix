@@ -1831,6 +1831,144 @@ def test_tick_keeps_predicted_drop_in_sec_none_by_default():
         last_bpm_at=1000.0,
     )
     assert state.predicted_drop_in_sec is None
+    assert state.predicted_drop_cue_id is None
+
+
+def test_tick_registers_predicted_drop_cue_once() -> None:
+    state = MusicState()
+    state.set_start_at = 900.0
+    entry = _section_entry(
+        cues=(
+            CuePoint(name="intro", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="drop", type="cue", start_s=64.0, end_s=None, number=3),
+        )
+    )
+    section_source = SimpleNamespace(lookup_by_id=lambda track_id: entry)
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        "A": DeckTrack(
+            title=entry.title,
+            track_id=entry.track_id,
+            bpm=entry.bpm,
+            key=entry.key,
+            confidence=0.95,
+            source="rekordbox_xml",
+        )
+    }
+    registry = EvidenceRegistry()
+    kwargs = dict(
+        audio_buf=_audible_buf(),
+        controller_state=_ctrl_mock(),
+        track_info=_track_position_mock(title=entry.title, position_s=56.0),
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=120.0,
+        last_bpm_at=999.0,
+        deck_source=deck_source,
+        section_source=section_source,
+        evidence_registry=registry,
+    )
+
+    _tick_once(state, now=1000.0, **kwargs)
+    _tick_once(state, now=1000.1, **kwargs)
+
+    assert state.predicted_drop_in_sec == 8.0
+    assert state.predicted_drop_cue_id == "track-1:drop@64.0"
+    assert registry.snapshot()["cue"]["track-1:drop@64.0"] == (108.0,)
+
+
+def test_tick_dedupes_predicted_drop_cue_against_course3_phrase_anchor() -> None:
+    state = MusicState()
+    state.set_start_at = 900.0
+    entry = _section_entry(
+        cues=(
+            CuePoint(name="intro", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="drop", type="cue", start_s=64.0, end_s=None, number=3),
+        )
+    )
+    section_source = SimpleNamespace(lookup_by_id=lambda track_id: entry)
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        "A": DeckTrack(
+            title=entry.title,
+            track_id=entry.track_id,
+            bpm=entry.bpm,
+            key=entry.key,
+            confidence=0.95,
+            source="rekordbox_xml",
+        )
+    }
+    registry = EvidenceRegistry()
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _ctrl_mock(),
+        _track_position_mock(title=entry.title, position_s=56.0),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=120.0,
+        last_bpm_at=999.0,
+        learn_state=SimpleNamespace(current_course_id="course_3_play_mode"),
+        deck_source=deck_source,
+        section_source=section_source,
+        evidence_registry=registry,
+    )
+
+    assert state.predicted_drop_cue_id == "track-1:drop@64.0"
+    assert state.next_phrase_cue_id == "track-1:drop@64.0"
+    assert registry.snapshot()["cue"]["track-1:drop@64.0"] == (108.0,)
+
+
+def test_tick_skips_low_confidence_predicted_drop_cue() -> None:
+    state = MusicState()
+    state.set_start_at = 900.0
+    entry = _section_entry(
+        cues=(
+            CuePoint(
+                name="drop",
+                type="cue",
+                start_s=64.0,
+                end_s=None,
+                number=3,
+                source="auto",
+                confidence=0.2,
+            ),
+        )
+    )
+    section_source = SimpleNamespace(lookup_by_id=lambda track_id: entry)
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        "A": DeckTrack(
+            title=entry.title,
+            track_id=entry.track_id,
+            bpm=entry.bpm,
+            key=entry.key,
+            confidence=0.95,
+            source="rekordbox_xml",
+        )
+    }
+    registry = EvidenceRegistry()
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _ctrl_mock(),
+        _track_position_mock(title=entry.title, position_s=56.0),
+        now=1000.0,
+        last_audible_high=990.0,
+        last_audible_low=0.0,
+        bpm_cache=120.0,
+        last_bpm_at=999.0,
+        deck_source=deck_source,
+        section_source=section_source,
+        evidence_registry=registry,
+    )
+
+    assert state.predicted_drop_in_sec is None
+    assert state.predicted_drop_cue_id is None
+    assert "cue" not in registry.snapshot()
 
 
 def test_tick_with_invalid_bpm_yields_unknown_genre():

@@ -17,7 +17,7 @@ def test_state_imports_from_package():
     from vibemix.state import MusicState as MS  # noqa: F401
 
 
-def test_default_construction_exposes_26_fields():
+def test_default_construction_exposes_expected_defaults():
     state = MusicState()
 
     # Audio block (6 fields)
@@ -60,9 +60,10 @@ def test_default_construction_exposes_26_fields():
     assert state.last_kaan_spoke_at == 0.0
 
     # Phase 17 — Hard Tek detectors v1 (SENSE-13). Backward-compat defaults
-    # so Phase 3 golden-equivalence holds (4 fields).
+    # so Phase 3 golden-equivalence holds.
     assert state.buildup_score == 0.0
     assert state.predicted_drop_in_sec is None
+    assert state.predicted_drop_cue_id is None
     assert state.beat_phase == 0.0
     assert state.active_genre == "unknown"
 
@@ -73,18 +74,19 @@ def test_phase_17_fields_have_backward_compat_defaults():
     """Phase 3 golden-equivalence guard — DO NOT relax these defaults.
 
     The four Phase 17 fields (`buildup_score`, `predicted_drop_in_sec`,
-    `beat_phase`, `active_genre`) MUST default to v4-compatible inert values
-    so consumers built before Phase 17 see no behavioral change. Predictive
-    drop firing is OFF-by-default in v2.0 — `predicted_drop_in_sec is None`
-    is the documented sentinel that downstream code (Phase 19 ack bank,
-    detector consumers) uses to skip predictive paths. Locks T-17-01-04 from
-    the threat register: silent default-drift would break Phase 3 / Phase 6
-    regression coverage at the source-of-truth dataclass."""
+    `predicted_drop_cue_id`, `beat_phase`, `active_genre`) MUST default to
+    v4-compatible inert values so consumers built before Phase 17 see no
+    behavioral change. Predictive drop firing is OFF-by-default in v2.0 —
+    `predicted_drop_in_sec is None` is the documented sentinel that downstream
+    code (Phase 19 ack bank, detector consumers) uses to skip predictive paths.
+    Locks T-17-01-04 from the threat register: silent default-drift would break
+    Phase 3 / Phase 6 regression coverage at the source-of-truth dataclass."""
     state = MusicState()
     assert state.buildup_score == 0.0, "buildup_score default must be 0.0 (silence-equivalent)"
     assert state.predicted_drop_in_sec is None, (
         "predicted_drop_in_sec default must be None — predictive firing OFF by default per CONTEXT"
     )
+    assert state.predicted_drop_cue_id is None, "predicted_drop_cue_id default must be None"
     assert state.beat_phase == 0.0, "beat_phase default must be 0.0 (mirrors downbeat_phase default)"
     assert state.active_genre == "unknown", (
         "active_genre default must be 'unknown' — never fabricate a genre during BPM lock-up"
@@ -135,6 +137,7 @@ def test_phase_17_field_types_via_dataclass_fields():
     by_name = {f.name: f for f in dataclasses.fields(MusicState)}
     assert by_name["buildup_score"].type == "float"
     assert by_name["predicted_drop_in_sec"].type == "float | None"
+    assert by_name["predicted_drop_cue_id"].type == "str | None"
     assert by_name["beat_phase"].type == "float"
     assert by_name["active_genre"].type == "str"
 

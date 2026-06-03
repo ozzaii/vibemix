@@ -65,6 +65,7 @@ def test_lens_off_with_high_confidence_still_emits_no_marker() -> None:
     )
     line = AICoach.evidence_line(s)
     assert "lens=" not in line
+    assert "drop_incoming" not in line
 
 
 def test_downgrade_when_bpm_confidence_below_floor() -> None:
@@ -132,6 +133,42 @@ def test_count_in_marker_includes_cue_anchor_when_registered() -> None:
     line = AICoach.evidence_line(s)
     assert "lens=count_in_eligible[next@42.5]" in line
     assert "cue_anchor=phrase_boundary@42.5" in line
+
+
+def test_drop_incoming_hidden_when_session_inactive() -> None:
+    s = dataclasses.replace(
+        MusicState(),
+        session_active=False,
+        predicted_drop_in_sec=12.0,
+        predicted_drop_cue_id="track-1:drop@64.0",
+    )
+    line = AICoach.evidence_line(s)
+    assert "drop_incoming" not in line
+    assert "drop_cue_anchor" not in line
+
+
+def test_drop_incoming_hidden_when_eta_unknown() -> None:
+    s = dataclasses.replace(
+        MusicState(),
+        session_active=True,
+        predicted_drop_in_sec=None,
+        predicted_drop_cue_id="track-1:drop@64.0",
+    )
+    line = AICoach.evidence_line(s)
+    assert "drop_incoming" not in line
+    assert "drop_cue_anchor" not in line
+
+
+def test_drop_incoming_marker_uses_rounded_eta_and_registered_anchor() -> None:
+    s = dataclasses.replace(
+        MusicState(),
+        session_active=True,
+        predicted_drop_in_sec=6.4,
+        predicted_drop_cue_id="track-1:drop@64.0",
+    )
+    line = AICoach.evidence_line(s)
+    assert "drop_incoming[eta@6s]" in line
+    assert "drop_cue_anchor=track-1:drop@64.0" in line
 
 
 def test_count_in_at_exact_floor_passes() -> None:

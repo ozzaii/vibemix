@@ -73,7 +73,7 @@ from vibemix.state.deck_context import (
 )
 from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
 from vibemix.state.deltas import DELTA_FLOOR, render_delta
-from vibemix.state.drop_predict import predict_drop_in_sec
+from vibemix.state.drop_predict import next_drop_section, predict_drop_in_sec
 from vibemix.state.emotion_router import derive_emotion
 from vibemix.state.evidence_registry import EvidenceRegistry
 from vibemix.state.genre import (
@@ -1398,7 +1398,9 @@ def _tick_once(
         # v2.1 telemetry-guarded flip. NO reaction fires on it: predictive drop
         # FIRING stays gated (v2.0 CONTEXT D) until that accuracy is validated.
         _prev_drop = state.predicted_drop_in_sec
+        _prev_drop_cue_id = state.predicted_drop_cue_id
         state.predicted_drop_in_sec = None
+        state.predicted_drop_cue_id = None
         if (
             section_source is not None
             and deck_snap is not None
@@ -1411,12 +1413,29 @@ def _tick_once(
                 _drop_entry = _lookup_section_entry(section_source, _drop_track_id)
                 if _drop_entry is not None:
                     try:
+                        _drop_sections = sections_for_entry(_drop_entry)
                         state.predicted_drop_in_sec = predict_drop_in_sec(
-                            sections_for_entry(_drop_entry),
+                            _drop_sections,
                             state.audible_track_position_s,
                             min_confidence=_DROP_CUE_CONF_FLOOR,
                             max_horizon_s=_DROP_HORIZON_S,
                         )
+                        if state.predicted_drop_in_sec is not None:
+                            _drop_section = next_drop_section(
+                                _drop_sections,
+                                state.audible_track_position_s,
+                                min_confidence=_DROP_CUE_CONF_FLOOR,
+                                max_horizon_s=_DROP_HORIZON_S,
+                            )
+                            if _drop_section is not None and evidence_registry is not None:
+                                _drop_cue_id = _cue_anchor_id(_drop_section)
+                                state.predicted_drop_cue_id = _drop_cue_id
+                                if _drop_cue_id != _prev_drop_cue_id:
+                                    _drop_at = (
+                                        max(0.0, now - state.set_start_at)
+                                        + state.predicted_drop_in_sec
+                                    )
+                                    evidence_registry.write("cue", _drop_cue_id, _drop_at)
                     except Exception:
                         pass  # detection hiccup → honest None, never wedge the tick
         # Live-bench observability (DROP_DEBUG). The signal stays dormant (no reaction
@@ -1449,7 +1468,11 @@ def _tick_once(
                 state.phrase_position_confidence = anchor.confidence
                 state.next_phrase_at = anchor.next_phrase_at
                 state.next_phrase_cue_id = anchor.cue_id
-                if evidence_registry is not None and anchor.cue_id != prev_phrase_cue_id:
+                if (
+                    evidence_registry is not None
+                    and anchor.cue_id != prev_phrase_cue_id
+                    and anchor.cue_id != state.predicted_drop_cue_id
+                ):
                     try:
                         evidence_registry.write("cue", anchor.cue_id, anchor.next_phrase_at)
                     except Exception:

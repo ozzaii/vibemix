@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from vibemix.state.drop_predict import (
     DROP_ARM_WINDOW_S,
     drop_call_cue,
+    next_drop_section,
     predict_drop_in_sec,
     should_arm_drop_call,
 )
@@ -63,6 +64,19 @@ def test_low_confidence_drop_is_skipped() -> None:
     secs = [_Sec("build", 16.0), _Sec("drop", 32.0, confidence=0.2), _Sec("drop", 80.0, confidence=0.9)]
     # the 32s drop is below the floor → fall through to the trusted 80s drop.
     assert predict_drop_in_sec(secs, 10.0, min_confidence=0.5) == 70.0
+
+
+def test_next_drop_section_matches_eta_selection() -> None:
+    secs = [_Sec("drop", 80.0), _Sec("drop", 32.0), _Sec("build", 16.0)]
+    section = next_drop_section(secs, 10.0)
+    assert section is secs[1]
+    assert predict_drop_in_sec(secs, 10.0) == 22.0
+
+
+def test_next_drop_section_respects_confidence_and_horizon() -> None:
+    secs = [_Sec("drop", 32.0, confidence=0.2), _Sec("drop", 80.0, confidence=0.9)]
+    assert next_drop_section(secs, 10.0, min_confidence=0.5) is secs[1]
+    assert next_drop_section(secs, 10.0, min_confidence=0.5, max_horizon_s=30.0) is None
 
 
 def test_drop_beyond_horizon_is_not_predicted() -> None:

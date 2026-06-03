@@ -689,6 +689,11 @@ class AICoach:
                     e.append(f"cue_anchor={state.next_phrase_cue_id}")
             else:
                 e.append("lens=retrospective_only")
+            drop_eta = getattr(state, "predicted_drop_in_sec", None)
+            if drop_eta is not None:
+                e.append(f"drop_incoming[eta@{float(drop_eta):.0f}s]")
+                if getattr(state, "predicted_drop_cue_id", None):
+                    e.append(f"drop_cue_anchor={state.predicted_drop_cue_id}")
 
         return " | ".join(e)
 

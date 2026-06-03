@@ -58,6 +58,37 @@ def predict_drop_in_sec(
     return max(0.0, best)
 
 
+def next_drop_section(
+    sections: Sequence[Any],
+    position_s: float | None,
+    *,
+    min_confidence: float = 0.0,
+    max_horizon_s: float | None = None,
+) -> Any | None:
+    """Return the next qualifying drop section, matching ``predict_drop_in_sec``."""
+    if position_s is None:
+        return None
+    best_section = None
+    best_eta: float | None = None
+    for section in sections:
+        if getattr(section, "role", None) != _DROP_ROLE:
+            continue
+        start = float(getattr(section, "start_s", 0.0))
+        if start <= position_s:
+            continue
+        if float(getattr(section, "confidence", 0.0)) < min_confidence:
+            continue
+        eta = start - position_s
+        if best_eta is None or eta < best_eta:
+            best_eta = eta
+            best_section = section
+    if best_eta is None:
+        return None
+    if max_horizon_s is not None and best_eta > max_horizon_s:
+        return None
+    return best_section
+
+
 #: Seconds before the drop to fire the call. Sized so the spoken line + TTS
 #: latency lands the punchline ON the drop, not after it.
 DROP_ARM_WINDOW_S = 2.0

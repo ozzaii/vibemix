@@ -121,10 +121,12 @@ class MusicState:
     # GenreRouter; they are WRITTEN only inside the existing single-writer
     # block in state_refresh_loop._tick_once.
     #
-    # `predicted_drop_in_sec` stays None unless a Phase 17 v2.1 telemetry
-    # guard flips it on — predictive drop firing is OFF-by-default in v2.0
-    # per CONTEXT D. Downstream consumers MUST treat it as Optional[float]
-    # and honor None as "predictive firing OFF" (T-17-01-04 mitigation).
+    # `predicted_drop_in_sec` stays None when no trusted upcoming drop exists;
+    # predictive drop firing itself remains OFF-by-default in v2.0 per CONTEXT D.
+    # Downstream firing consumers MUST treat it as Optional[float] and honor
+    # None as "do not fire" (T-17-01-04 mitigation). `predicted_drop_cue_id`
+    # is the cue anchor last written to EvidenceRegistry for that same incoming
+    # drop; None means the ETA has no citable cue receipt.
     #
     # `active_genre` is one of the registered event-chain genres, or "unknown".
     # Invalid BPM or an unregistered detected profile yields "unknown" / coarse
@@ -136,6 +138,7 @@ class MusicState:
     # carry the bar-fraction in [0, 1).
     buildup_score: float = 0.0  # 0..1 — trailing 8s monotonic energy climb
     predicted_drop_in_sec: float | None = None  # OFF by default in v2.0
+    predicted_drop_cue_id: str | None = None  # EvidenceRegistry cue key last written
     beat_phase: float = 0.0  # 0..1 — Phase 17 alias of downbeat_phase
     active_genre: str = "unknown"
 
