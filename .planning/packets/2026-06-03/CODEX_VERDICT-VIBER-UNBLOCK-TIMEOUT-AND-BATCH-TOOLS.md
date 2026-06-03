@@ -207,3 +207,16 @@ Live app safety check during proof: `ws://127.0.0.1:8765` status ticks showed `g
 
 - The watchdog only applies to real `codex exec` runs in Viber chat/build-set. Once any MCP tool event appears, Codex keeps the normal 180s wall-clock.
 - Plain non-library chat still returns an honest timeout if Codex stalls; fallback is only for set-prep/candidate-discovery requests that can be grounded by existing library tools.
+
+## Current-HEAD Re-Verification — 2026-06-04 (`6c8c4b87`)
+
+- Re-pinned source after the overnight QA harness slice and found this packet already implemented and committed. No code change was needed.
+- Source facts:
+  - `CHAT_TIMEOUT_S = BUILD_SET_TIMEOUT_S` and the default `chat_with_codex(... timeout_s=...)` is 180s.
+  - Codex MCP tool timeout is 120s.
+  - `inspect_candidates` is registered in `LibraryToolset`, `mcp_server.build_server`, tool-event summaries, direct-mode fallback, and both curate/chat prompt rules.
+  - The `seen` anti-hallucination guard is preserved per candidate row; unseen ids return `{error: ...}` instead of fabricating features/sections/energy.
+- Checks:
+  - `uv run pytest -q tests/library/test_codex_curate.py::test_chat_timeout_is_interactive tests/library/test_codex_curate.py::test_codex_mcp_tool_timeout_allows_batched_candidate_inspection tests/library/test_codex_curate.py::test_chat_candidate_timeout_fallback_inspects_once tests/library/test_setprep_tools.py::test_inspect_candidates_batches_features_sections_and_energy tests/library/test_setprep_tools.py::test_inspect_candidates_parallelizes_rows tests/library/test_setprep_tools.py::test_inspect_candidates_rejects_unseen_ids_per_row tests/library/test_setprep_tools.py::test_inspect_candidates_caps_large_batches tests/library/test_setprep_tools.py::test_dispatch_gives_batched_candidate_inspection_a_larger_timeout tests/library/test_mcp_server_clarification.py::test_inspect_candidates_delegates_with_dict_packed_args` -> `9 passed`.
+  - `uv run ruff check src/vibemix/library/codex_curate.py src/vibemix/library/toolset.py src/vibemix/library/mcp_server.py tests/library/test_codex_curate.py tests/library/test_setprep_tools.py tests/library/test_mcp_server_clarification.py` -> pass.
+- No live app/audio launch was performed in this re-verification; the prior live/CLI artifacts above remain the by-eye proof for the shipped change.
