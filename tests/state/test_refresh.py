@@ -876,6 +876,89 @@ def test_tick_dedupes_same_title_in_track_history():
     assert state.track_history == [(900.0, "X")]
 
 
+def test_tick_clears_stale_bpm_lock_on_confirmed_track_change():
+    state = MusicState()
+    state.audible = True
+    state.track_history = [(900.0, "Old Tune")]
+    state.bpm = 128.0
+    state.downbeat_phase = 0.5
+    state.bpm_confidence = 0.9
+    state.beat_phase = 0.5
+    buf = _audible_buf()
+    bpm_ring = [128.0, 128.0, 128.0]
+
+    _last_high, _last_low, bpm_cache, last_bpm_at = _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(title="New Tune"),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=128.0,
+        last_bpm_at=999.5,
+        bpm_ring=bpm_ring,
+    )
+
+    assert state.track_history == [(900.0, "Old Tune"), (1000.0, "New Tune")]
+    assert bpm_ring == []
+    assert bpm_cache == 0.0
+    assert last_bpm_at == 0.0
+    assert state.bpm == 0.0
+    assert state.downbeat_phase == 0.0
+    assert state.bpm_confidence == 0.0
+    assert state.beat_phase == 0.0
+
+
+def test_tick_clears_pre_title_bpm_lock_on_initial_track_identification():
+    state = MusicState()
+    state.audible = True
+    buf = _audible_buf()
+    bpm_ring = [128.0, 128.0, 128.0]
+
+    _last_high, _last_low, bpm_cache, last_bpm_at = _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(title="First Tune"),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=128.0,
+        last_bpm_at=999.5,
+        bpm_ring=bpm_ring,
+    )
+
+    assert state.track_history == [(1000.0, "First Tune")]
+    assert bpm_ring == []
+    assert bpm_cache == 0.0
+    assert last_bpm_at == 0.0
+    assert state.bpm == 0.0
+
+
+def test_tick_preserves_direct_test_bpm_lock_without_live_ring():
+    state = MusicState()
+    state.audible = True
+    buf = _audible_buf()
+
+    _last_high, _last_low, bpm_cache, last_bpm_at = _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(title="First Tune"),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=128.0,
+        last_bpm_at=999.5,
+    )
+
+    assert state.track_history == [(1000.0, "First Tune")]
+    assert bpm_cache == 128.0
+    assert last_bpm_at == 999.5
+    assert state.bpm == 128.0
+
+
 def test_tick_does_not_append_track_history_when_title_none():
     state = MusicState()
     state.audible = True

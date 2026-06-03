@@ -1253,9 +1253,11 @@ def _tick_once(
         tt, tc = derive_audible_track(
             tsnap.get("title") or None, aud_deck, deck_conf, state.audible
         )
+        track_changed = False
         if tt and tc >= 0.5:
             last_title = state.track_history[-1][1] if state.track_history else None
             if tt != last_title:
+                track_changed = True
                 state.track_history.append((now, tt))
                 if len(state.track_history) > 6:
                     state.track_history.pop(0)
@@ -1269,6 +1271,14 @@ def _tick_once(
                 # tick or the in_flight gate (T-78-04-04).
                 if genre_source is not None:
                     _dispatch_genre_lookup(genre_source, tt)
+        if track_changed and bpm_ring is not None:
+            bpm_ring.clear()
+            bpm_cache = 0.0
+            last_bpm_at = 0.0
+            state.bpm = 0.0
+            state.downbeat_phase = 0.0
+            state.bpm_confidence = 0.0
+            state.beat_phase = 0.0
         state.audible_track = tt
         state.audible_track_confidence = tc
         position_s = _optional_float(tsnap.get("position_sec"))
