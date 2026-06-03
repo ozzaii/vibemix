@@ -103,6 +103,7 @@ from vibemix.library.prepared_pool import (
 )
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
+from vibemix.platform._audio_replay import maybe_wrap_replay_audio_backend
 from vibemix.profile import load_consent, load_profile, render_profile_for_cache
 from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
 from vibemix.runtime.cancel import CancelGate
@@ -1435,7 +1436,9 @@ async def main() -> None:
     event_detector = EventDetector(audio_buf=audio_buf)
 
     # --- Audio I/O via AudioMacOS firewall ---
-    audio_backend = AudioMacOS(registry, recorder)
+    audio_backend = maybe_wrap_replay_audio_backend(AudioMacOS(registry, recorder))
+    if hasattr(audio_backend, "session_dir"):
+        print(f"-> replay capture: {audio_backend.session_dir}")
     # Master-capture INPUT: BlackHole 2ch. The common real-world fail is that
     # it isn't installed — exit 3 is the sidecar's "audio-device-missing"
     # sentinel so the Tauri shell shows the BlackHole setup banner with the
