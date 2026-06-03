@@ -1388,6 +1388,18 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   if (mounted.bpm.textContent !== bpmText) mounted.bpm.textContent = bpmText;
   const keyText = next.timecode.key ?? "—";
   if (mounted.key.textContent !== keyText) mounted.key.textContent = keyText;
+  // A null key shows the dash glyph; name it so the dim slot reads as
+  // "not detected yet", not "broken". The value itself stays dark until
+  // the backend reports a key (not a frontend bug to fabricate around).
+  if (next.timecode.key == null) {
+    if (mounted.key.getAttribute("aria-label") !== "Key not detected yet.") {
+      mounted.key.setAttribute("title", "Key not detected yet.");
+      mounted.key.setAttribute("aria-label", "Key not detected yet.");
+    }
+  } else if (mounted.key.hasAttribute("aria-label")) {
+    mounted.key.removeAttribute("title");
+    mounted.key.removeAttribute("aria-label");
+  }
 
   // --- master meter (smoothed; live only — held/recolored by CSS in silent/fault) ---
   if (mode === "") {
