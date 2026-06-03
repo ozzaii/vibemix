@@ -117,6 +117,33 @@ def _lesson_unlocked(
     )
 
 
+def _zpd_course_lesson_id(
+    progress: LearnProgress,
+    *,
+    course_id: str,
+    fallback_lesson_id: str,
+) -> str:
+    """Return the course lesson that matches the current ZPD aim, if any."""
+    try:
+        from vibemix.learn.coaching_aim import resolve_coaching_aim
+        from vibemix.learn.skill_tree import SKILL_MANIFEST
+
+        aim = resolve_coaching_aim(progress)
+        if aim is None:
+            return fallback_lesson_id
+        spec = SKILL_MANIFEST.get(aim.skill_id)
+        if spec is None:
+            return fallback_lesson_id
+        course_lessons = set(course_lesson_ids(course_id))
+        aim_lessons = tuple(lid for lid in spec.lesson_ids if lid in course_lessons)
+        for lesson_id in aim_lessons:
+            if not _lesson_completed(progress, lesson_id):
+                return lesson_id
+        return aim_lessons[0] if aim_lessons else fallback_lesson_id
+    except Exception:
+        return fallback_lesson_id
+
+
 def _ack_event_type(control: str, direction: Any) -> str:
     if control in {"jog_touch", "jog_touched"}:
         return "cc"
@@ -287,6 +314,11 @@ def register_learn_handlers(
                 file=sys.stderr,
             )
             return
+        lesson_id = _zpd_course_lesson_id(
+            progress,
+            course_id=course_id,
+            fallback_lesson_id=first_lesson_id,
+        )
         controller_id = _DEFAULT_PRACTICE_CONTROLLER_ID
         try:
             profile = midi_mirror.current_profile()
@@ -296,7 +328,7 @@ def register_learn_handlers(
             pass
         lesson_runtime.send(
             "load",
-            lesson_id=first_lesson_id,
+            lesson_id=lesson_id,
             course_id=course_id,
             controller_id=controller_id,
         )

@@ -25,6 +25,7 @@ import pytest
 from vibemix.learn.ipc_handlers import register_learn_handlers
 from vibemix.learn.progress import LearnProgress
 from vibemix.learn.runtime import LessonRuntime
+from vibemix.learn.skill_tree import SKILL_MANIFEST
 from vibemix.learn.state import LearnState
 from vibemix.runtime.ws_bus import IpcRouterBus
 
@@ -75,6 +76,17 @@ def _hint_payloads(runtime_emit_sink: MagicMock) -> list[dict]:
         and call.args[0].get("type") == "ipc.learn.tutor_speak"
         and call.args[0].get("payload", {}).get("data_state") == "hint"
     ]
+
+
+def _make_competent(progress: LearnProgress, skill_id: str) -> None:
+    spec = SKILL_MANIFEST[skill_id]
+    for lesson_id in spec.lesson_ids:
+        progress.lessons[lesson_id] = {
+            "completed": True,
+            "completed_at": "2026-06-03T00:00:00Z",
+            "strikes_used": 0,
+        }
+    setattr(progress, spec.gate, True)
 
 
 def test_start_lesson_dispatch_advances_fsm() -> None:
@@ -185,6 +197,38 @@ def test_start_course_dispatch_advances_fsm() -> None:
     handled = asyncio.run(go())
     assert handled is True
     assert runtime.current_state.id == "awaiting_action"
+
+
+def test_start_course_uses_zpd_frontier_when_course_contains_aim() -> None:
+    """Course starts replay the current Competent-not-Mastered skill drill."""
+    runtime, progress, _ = _make_runtime()
+    progress.course_2_unlocked = True
+    _make_competent(progress, "eq_mixing")
+    router = IpcRouterBus()
+    midi_mirror = MagicMock(name="midi_mirror_inbound")
+    midi_mirror.current_profile.return_value = None
+    register_learn_handlers(
+        ipc_router=router,
+        lesson_runtime=runtime,
+        midi_mirror=midi_mirror,
+        progress=progress,
+    )
+
+    async def go() -> bool:
+        return await router.dispatch(
+            {
+                "type": "ipc.learn.start_course",
+                "payload": {
+                    "course_id": "course_2",
+                    "controller_id": "pioneer_ddj_flx4",
+                },
+            }
+        )
+
+    handled = asyncio.run(go())
+    assert handled is True
+    assert runtime.current_state.id == "awaiting_action"
+    assert runtime._learn.current_lesson_id == "L2.04"
 
 
 def test_start_lesson_unknown_id_silent_noop() -> None:
