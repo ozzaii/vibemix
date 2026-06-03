@@ -586,6 +586,40 @@ def test_anlz_index_drives_windows_and_has_separate_cache(isolated_cache, tmp_pa
     assert resumed_embedder.byte_calls == []
 
 
+def test_rekordbox_ingest_persists_anlz_cues_in_loadable_library_cache(
+    isolated_cache, tmp_path, monkeypatch
+):
+    """A real Rekordbox ingest cache keeps ANLZ cues loadable after restart."""
+    from vibemix.library import ingest as ingest_mod
+    from vibemix.library.ingest import ingest_source
+    from vibemix.library.sources.rekordbox import RekordboxSource
+
+    xml_path = _make_collection_xml(tmp_path, n=1)
+    audio_path = (tmp_path / "audio" / "track-1.mp3").resolve()
+    track = _track_entry("1", str(audio_path), cues=(), duration_s=200.0)
+    anlz_index = _anlz_index_for_track(track)
+
+    def _fake_slicer(path, start_s, length_s):
+        return f"RB-ANLZ-WIN-{start_s:.0f}-{length_s:.0f}".encode()
+
+    monkeypatch.setattr(ingest_mod, "_default_slicer", _fake_slicer)
+
+    report = ingest_source(
+        RekordboxSource(xml_path=str(xml_path)),
+        embedder=FakeClapEmbedder(),
+        store=_DimAgnosticStore(),
+        cache=_open_cache(tmp_path),
+        anlz_index=anlz_index,
+    )
+
+    assert report.embedded == 1
+    loaded = RekordboxLibrary()
+    assert loaded.try_load_cache() is True
+    cached_track = loaded.tracks["1"]
+    assert any(cue.source == "anlz" for cue in cached_track.cues)
+    assert [cue.name for cue in cached_track.cues] == ["INTRO", "DROP"]
+
+
 def test_auto_cues_materialize_to_cached_library_and_sections(
     isolated_cache, tmp_path, monkeypatch
 ):
