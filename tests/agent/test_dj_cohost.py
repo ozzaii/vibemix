@@ -26,6 +26,7 @@ from vibemix.agent.dj_cohost import (
 )
 from vibemix.audio import INPUT_SR_TARGET, AudioBuffer
 from vibemix.prompts.matrix import AUDIO_VIBE_CONTRACT_BLOCK, TTS_TAGS
+from vibemix.runtime.speak_gate import event_speak_fingerprint
 from vibemix.state import AICoach, Event, MusicState
 from vibemix.state.deck_state import DeckState, DeckTrack
 
@@ -188,6 +189,9 @@ def test_agent_03_initial_state(mocker, tmp_path) -> None:
     assert isinstance(agent._ai_text_history, collections.deque)
     assert len(agent._ai_text_history) == 0
     assert agent._ai_text_history.maxlen == 10
+    assert isinstance(agent._recent_speak_fingerprints, collections.deque)
+    assert len(agent._recent_speak_fingerprints) == 0
+    assert agent._recent_speak_fingerprints.maxlen == 4
 
     assert isinstance(agent._gen_cfg, types.GenerateContentConfig)
     # GenerateContentConfig is a pydantic model — direct field access works
@@ -2168,6 +2172,26 @@ def test_record_said_legacy_fallback_uses_live_state_set_seconds(mocker, tmp_pat
         f"expected legacy live-state stamp [0:12] for explicit-None; got "
         f"{agent._ai_text_history[1]!r}"
     )
+
+
+def test_record_said_records_event_speak_fingerprint(mocker, tmp_path) -> None:
+    agent, _, _, state = _build_agent(mocker, tmp_path)
+    ev = Event(type="PHASE", state=state, extra={"new_phase": "build"})
+
+    agent._record_said("clean reply text", set_s_at_event=10.0, event=ev)
+
+    assert list(agent._recent_speak_fingerprints) == [event_speak_fingerprint(ev)]
+
+
+def test_track_change_record_said_resets_event_speak_fingerprints(mocker, tmp_path) -> None:
+    agent, _, _, state = _build_agent(mocker, tmp_path)
+    old = Event(type="PHASE", state=state, extra={"new_phase": "build"})
+    new = Event(type="TRACK_CHANGE", state=state, extra={"new_track": "Next"})
+    agent._record_said("old read", event=old)
+
+    agent._record_said("new read", event=new)
+
+    assert list(agent._recent_speak_fingerprints) == [event_speak_fingerprint(new)]
 
 
 def test_llm_node_threads_event_fired_set_seconds_to_record_said(mocker, tmp_path) -> None:

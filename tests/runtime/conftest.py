@@ -86,10 +86,10 @@ def music_state():
 
 @pytest.fixture
 def fake_event(music_state):
-    """A canonical TRACK_CHANGE Event referencing the real music_state."""
+    """A canonical speakable Event referencing the real music_state."""
     from vibemix.state import Event
 
-    return Event(type="TRACK_CHANGE", state=music_state, extra={})
+    return Event(type="MIX_MOVE", state=music_state, extra={"moves": ["eq_low:A"]})
 
 
 # ---------------------------------------------------------------------------

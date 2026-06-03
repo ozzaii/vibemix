@@ -58,6 +58,7 @@ Plan 20-04 wiring (additive — backward compatible):
 from __future__ import annotations
 
 import asyncio
+import collections
 import json
 import sys
 import time
@@ -115,6 +116,24 @@ def _safe_print(*args: object, **kwargs: object) -> None:
     try:
         print(*args, **kwargs)
     except (BrokenPipeError, OSError):
+        pass
+
+
+def _agent_recent_speak_fingerprints(agent: object) -> tuple[str, ...]:
+    raw = getattr(agent, "_recent_speak_fingerprints", ())
+    if not isinstance(raw, (collections.deque, list, tuple, set, frozenset)):
+        return ()
+    return tuple(fp for fp in raw if isinstance(fp, str))
+
+
+def _clear_agent_speak_fingerprints(agent: object) -> None:
+    raw = getattr(agent, "_recent_speak_fingerprints", None)
+    clear = getattr(raw, "clear", None)
+    if not callable(clear):
+        return
+    try:
+        clear()
+    except Exception:
         pass
 
 
@@ -791,10 +810,14 @@ async def coach_loop(
                     trigger_state["in_flight_handle"] = None
                     trigger_state["in_flight_ev"] = None
 
+        if ev.type == "TRACK_CHANGE":
+            _clear_agent_speak_fingerprints(agent)
+        recent_fps = _agent_recent_speak_fingerprints(agent)
         speak_gate = decide_speak_gate(
             ev,
             manual=manual,
             kaan_just_spoke=kaan_just_spoke,
+            recent_fingerprints=recent_fps,
         )
         if not speak_gate.should_speak:
             try:

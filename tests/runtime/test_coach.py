@@ -14,6 +14,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 from vibemix.runtime.coach import coach_loop
+from vibemix.runtime.speak_gate import event_speak_fingerprint
 from vibemix.state import Event, EvidenceRegistry
 
 # ---------------------------------------------------------------------------
@@ -204,7 +205,7 @@ def test_coach_03_event_fire_path(
     assert trigger_state["in_flight"] is False
     event_payload = fake_recorder.log_event.call_args.kwargs
     assert fake_recorder.log_event.call_args.args == ("event",)
-    assert event_payload["type"] == "TRACK_CHANGE"
+    assert event_payload["type"] == "MIX_MOVE"
     assert event_payload["audible"] is True
     assert event_payload["deck"] == "A"
     assert event_payload["track"] == "Some Track"
@@ -1121,6 +1122,55 @@ def test_coach_14_plain_phase_stays_silent(
         type="PHASE",
         verdict="silent",
         reason="describe_bank_only",
+        tier="runtime_value_gate",
+        schema_version="1",
+    )
+
+
+def test_coach_14_repeat_phase_stays_silent(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    """A repeated event fingerprint is a silence signal, not a rephrase prompt."""
+    ev = Event(
+        "PHASE",
+        music_state,
+        extra={"new_phase": "build", "judge_evidence_line": "[judge:transition=clean]"},
+    )
+    fake_agent._recent_speak_fingerprints = (event_speak_fingerprint(ev),)
+    fake_event_detector.detect.return_value = ev
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            asyncio.Event(),
+            {"in_flight": False},
+            stop_event,
+        )
+    )
+
+    assert fake_agent.set_next_event.call_count == 0
+    assert fake_session.generate_reply.call_count == 0
+    fake_recorder.log_event.assert_called_once_with(
+        "speak_gate",
+        type="PHASE",
+        verdict="silent",
+        reason="repeat_of_recent",
         tier="runtime_value_gate",
         schema_version="1",
     )

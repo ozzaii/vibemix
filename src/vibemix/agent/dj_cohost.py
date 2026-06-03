@@ -85,6 +85,7 @@ from vibemix.runtime.ai_observability import (
 )
 from vibemix.runtime.debug_flags import debug_log_enabled
 from vibemix.runtime.llm_to_tts_delta_meter import LLMToTTSDeltaMeter
+from vibemix.runtime.speak_gate import event_speak_fingerprint
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 from vibemix.state.deck_context import (
@@ -1310,6 +1311,7 @@ class DJCoHostAgent(Agent):
         self._recall_task: asyncio.Task | None = None
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
+        self._recent_speak_fingerprints: collections.deque = collections.deque(maxlen=4)
         # ipc.session.snapshot transcript sink (see __init__ kwarg docstring).
         self._transcript_sink: collections.deque | None = transcript_sink
 
@@ -1589,7 +1591,20 @@ class DJCoHostAgent(Agent):
         if ok:
             self._maybe_emit_proxy_recovery()
 
-    def _record_said(self, text: str, set_s_at_event: float | None = None) -> None:
+    def _record_speak_fingerprint(self, ev: Event | None) -> None:
+        if ev is None:
+            return
+        if ev.type == "TRACK_CHANGE":
+            self._recent_speak_fingerprints.clear()
+        self._recent_speak_fingerprints.append(event_speak_fingerprint(ev))
+
+    def _record_said(
+        self,
+        text: str,
+        set_s_at_event: float | None = None,
+        *,
+        event: Event | None = None,
+    ) -> None:
         """Append a spoken line to the no-repeat memory, prefixed with the
         set-time it was said at ([M:SS]). Lets the model see WHEN it last
         spoke so it doesn't re-react to a moment it already covered or
@@ -1614,6 +1629,7 @@ class DJCoHostAgent(Agent):
             set_s = getattr(self._state, "set_seconds", 0.0) or 0.0
         stamp = f"{int(set_s // 60)}:{int(set_s % 60):02d}"
         self._ai_text_history.append(f"[{stamp}] {text}")
+        self._record_speak_fingerprint(event)
 
     def attach_grounding(self, grounding: Grounding | None) -> None:
         """Post-construction wiring for the WIRE-01 Grounding engine.
@@ -3189,7 +3205,11 @@ class DJCoHostAgent(Agent):
                             )
                             # WR-04 — stamp from event-fired set_seconds, not the
                             # post-stream/lint/bus set_seconds (multi-second drift).
-                            self._record_said(audience_stripped[:140], set_s_at_event=ev_set_seconds)
+                            self._record_said(
+                                audience_stripped[:140],
+                                set_s_at_event=ev_set_seconds,
+                                event=ev,
+                            )
                             self._push_transcript(audience_stripped[:140])
                         else:
                             print("[ai_text] <empty> (skip TTS)", flush=True)
@@ -3231,7 +3251,9 @@ class DJCoHostAgent(Agent):
                             if audience_stripped:
                                 # WR-04 — stamp from event-fired set_seconds.
                                 self._record_said(
-                                    audience_stripped[:140], set_s_at_event=ev_set_seconds
+                                    audience_stripped[:140],
+                                    set_s_at_event=ev_set_seconds,
+                                    event=ev,
                                 )
                                 self._push_transcript(audience_stripped[:140])
                         else:
@@ -3287,7 +3309,11 @@ class DJCoHostAgent(Agent):
                             "ai_text", text=audience_text, latency_s=round(elapsed, 2)
                         )
                         # WR-04 — stamp from event-fired set_seconds.
-                        self._record_said(audience_stripped[:140], set_s_at_event=ev_set_seconds)
+                        self._record_said(
+                            audience_stripped[:140],
+                            set_s_at_event=ev_set_seconds,
+                            event=ev,
+                        )
                         self._push_transcript(audience_stripped[:140])
                     else:
                         print("[ai_text] <empty> (skip TTS)", flush=True)
