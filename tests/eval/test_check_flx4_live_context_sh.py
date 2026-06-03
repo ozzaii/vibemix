@@ -8,6 +8,11 @@ import sys
 from pathlib import Path
 
 SCRIPT = Path("scripts/release/check_flx4_live_context.sh").resolve()
+RECOMMENDED_FLX4_GATE_COMMAND = (
+    "COHOST_VIBER_FLX4_WAIT_READY_S=20 "
+    "COHOST_VIBER_FLX4_DIRECT_MIDI_PROBE_S=20 "
+    "bash scripts/release/check_flx4_live_context.sh"
+)
 
 
 def _fake_bin(
@@ -274,6 +279,20 @@ def test_check_flx4_live_context_passes_when_hardware_and_live_proof_ready(
     assert summary["operator_action_runbook_sh"] == str(
         tmp_path / "out" / "operator_action_runbook.sh"
     )
+    assert summary["operator_actions_json"] == str(tmp_path / "out" / "operator_actions.json")
+    operator_actions = json.loads((tmp_path / "out" / "operator_actions.json").read_text())
+    assert operator_actions == {
+        "source": "flx4",
+        "dry_run_default": True,
+        "runbook_sh": str(tmp_path / "out" / "operator_action_runbook.sh"),
+        "recommended_command": RECOMMENDED_FLX4_GATE_COMMAND,
+        "actions": [],
+        "next_operator_action": {
+            "code": "ready",
+            "source": "flx4",
+            "detail": "FLX4 live-context proof is ready.",
+        },
+    }
     runbook = (tmp_path / "out" / "operator_action_runbook.sh").read_text()
     assert "FLX4 live-context operator action runbook" in runbook
     assert "No operator action required; FLX4 proof is ready." in runbook
@@ -416,12 +435,26 @@ def test_check_flx4_live_context_records_direct_midi_probe_no_motion(
     assert summary["operator_action_queue"][0]["source"] == "flx4"
     assert summary["next_operator_action"]["code"] == "prove_os_midi_motion"
     assert summary["next_operator_action"]["source"] == "flx4"
+    assert summary["next_operator_action"]["recommended_command"] == RECOMMENDED_FLX4_GATE_COMMAND
     assert summary["next_operator_action"]["diagnostic_commands"] == [
         "uv run python scripts/sniff_controller.py --port DDJ-FLX4 --seconds 20 --mode callback",
         "uv run python scripts/sniff_controller.py --port DDJ-FLX4 --seconds 20 --mode poll",
     ]
     assert summary["operator_action_runbook_sh"] == str(
         tmp_path / "out" / "operator_action_runbook.sh"
+    )
+    assert summary["operator_actions_json"] == str(tmp_path / "out" / "operator_actions.json")
+    operator_actions = json.loads((tmp_path / "out" / "operator_actions.json").read_text())
+    assert operator_actions["source"] == "flx4"
+    assert operator_actions["dry_run_default"] is True
+    assert operator_actions["runbook_sh"] == str(tmp_path / "out" / "operator_action_runbook.sh")
+    assert operator_actions["recommended_command"] == RECOMMENDED_FLX4_GATE_COMMAND
+    assert operator_actions["actions"][0]["code"] == "prove_os_midi_motion"
+    assert operator_actions["actions"][0]["source"] == "flx4"
+    assert operator_actions["next_operator_action"]["code"] == "prove_os_midi_motion"
+    assert (
+        operator_actions["next_operator_action"]["recommended_command"]
+        == RECOMMENDED_FLX4_GATE_COMMAND
     )
     runbook = (tmp_path / "out" / "operator_action_runbook.sh").read_text()
     assert "Set RUN_OPERATOR_COMMANDS=1 to execute diagnostic commands" in runbook
@@ -441,6 +474,14 @@ def test_check_flx4_live_context_writes_summary_when_midi_port_missing(
     assert summary["action_hint"] == "connect_ddj_flx4_and_start_live_session"
     assert summary["checks"]["controller_connected"] is False
     assert summary["operator_actions"][0]["code"] == "connect_flx4"
+    assert summary["operator_action_queue"][0]["source"] == "flx4"
+    assert summary["next_operator_action"]["code"] == "connect_flx4"
+    assert summary["next_operator_action"]["recommended_command"] == RECOMMENDED_FLX4_GATE_COMMAND
+    operator_actions = json.loads((tmp_path / "out" / "operator_actions.json").read_text())
+    assert operator_actions["actions"][0]["code"] == "connect_flx4"
+    assert operator_actions["next_operator_action"]["recommended_command"] == (
+        RECOMMENDED_FLX4_GATE_COMMAND
+    )
     assert summary["canaries"]["listener_read"] == "skipped"
 
 
@@ -458,6 +499,11 @@ def test_check_flx4_live_context_writes_summary_when_audio_device_missing(
     assert summary["checks"]["controller_connected"] is True
     assert summary["audio_device_found"] is False
     assert summary["operator_actions"][0]["code"] == "connect_flx4_audio"
+    assert summary["operator_action_queue"][0]["source"] == "flx4"
+    assert summary["next_operator_action"]["code"] == "connect_flx4_audio"
+    assert summary["next_operator_action"]["recommended_command"] == RECOMMENDED_FLX4_GATE_COMMAND
+    operator_actions = json.loads((tmp_path / "out" / "operator_actions.json").read_text())
+    assert operator_actions["actions"][0]["code"] == "connect_flx4_audio"
 
 
 def test_check_flx4_live_context_fails_when_audio_causality_canary_is_accepted(

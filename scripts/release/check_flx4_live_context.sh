@@ -142,6 +142,55 @@ def first_line(path_raw: str) -> str | None:
 operator_actions = []
 if operator_code:
     operator_actions.append({"code": operator_code, "detail": operator_detail})
+operator_runbook_path = out_path.parent / "operator_action_runbook.sh"
+operator_actions_json_path = out_path.parent / "operator_actions.json"
+recommended_command = (
+    "COHOST_VIBER_FLX4_WAIT_READY_S=20 "
+    "COHOST_VIBER_FLX4_DIRECT_MIDI_PROBE_S=20 "
+    "bash scripts/release/check_flx4_live_context.sh"
+)
+operator_action_queue = [dict(action, source="flx4") for action in operator_actions]
+next_operator_action = (
+    dict(operator_action_queue[0])
+    if operator_action_queue
+    else {
+        "code": "ready",
+        "source": "flx4",
+        "detail": "FLX4 live-context proof is ready.",
+    }
+)
+if operator_action_queue:
+    next_operator_action.setdefault("recommended_command", recommended_command)
+runbook_lines = [
+    "#!/usr/bin/env bash",
+    "# SPDX-License-Identifier: Apache-2.0",
+    "# FLX4 live-context operator action runbook.",
+    "# Dry-run by default. Set RUN_OPERATOR_COMMANDS=1 to execute diagnostic commands.",
+    "set -euo pipefail",
+    'echo "FLX4 live-context operator action runbook"',
+]
+for index, action in enumerate(operator_action_queue, start=1):
+    runbook_lines.append(f'echo "action {index}: {action.get("code", "unknown")}"')
+    detail = str(action.get("detail") or "")
+    if detail:
+        runbook_lines.append(f"echo {json.dumps('detail: ' + detail)}")
+operator_runbook_path.write_text("\n".join(runbook_lines) + "\n", encoding="utf-8")
+operator_runbook_path.chmod(0o755)
+operator_actions_json_path.write_text(
+    json.dumps(
+        {
+            "source": "flx4",
+            "dry_run_default": True,
+            "runbook_sh": str(operator_runbook_path),
+            "recommended_command": recommended_command,
+            "actions": operator_action_queue,
+            "next_operator_action": next_operator_action,
+        },
+        indent=2,
+    )
+    + "\n",
+    encoding="utf-8",
+)
 proof_legs = [
     {
         "id": "controller_midi",
@@ -169,6 +218,10 @@ summary = {
     "diagnosis": diagnosis,
     "action_hint": action_hint,
     "operator_actions": operator_actions,
+    "operator_action_queue": operator_action_queue,
+    "next_operator_action": next_operator_action,
+    "operator_action_runbook_sh": str(operator_runbook_path),
+    "operator_actions_json": str(operator_actions_json_path),
     "first_blocker": first_blocker,
     "top_blockers": [first_blocker],
     "blocker_count": 1,
@@ -846,6 +899,12 @@ elif direct_midi_ran and direct_midi_motion:
     midi_motion_diagnosis = "direct_midi_motion_observed"
 
 operator_runbook_path = summary_path.parent / "operator_action_runbook.sh"
+operator_actions_json_path = summary_path.parent / "operator_actions.json"
+recommended_command = (
+    "COHOST_VIBER_FLX4_WAIT_READY_S=20 "
+    "COHOST_VIBER_FLX4_DIRECT_MIDI_PROBE_S=20 "
+    "bash scripts/release/check_flx4_live_context.sh"
+)
 
 
 def _with_source(action: dict, source: str = "flx4") -> dict:
@@ -896,16 +955,28 @@ def _write_operator_runbook(path: Path, actions: list[dict]) -> None:
 
 
 operator_action_queue = [_with_source(action) for action in operator_actions]
-next_operator_action = (
-    operator_action_queue[0]
-    if operator_action_queue
-    else {
+if operator_action_queue:
+    next_operator_action = dict(operator_action_queue[0])
+    next_operator_action.setdefault("recommended_command", recommended_command)
+else:
+    next_operator_action = {
         "code": "ready",
         "source": "flx4",
         "detail": "FLX4 live-context proof is ready.",
     }
-)
 _write_operator_runbook(operator_runbook_path, operator_action_queue)
+operator_actions_payload = {
+    "source": "flx4",
+    "dry_run_default": True,
+    "runbook_sh": str(operator_runbook_path),
+    "recommended_command": recommended_command,
+    "actions": operator_action_queue,
+    "next_operator_action": next_operator_action,
+}
+operator_actions_json_path.write_text(
+    json.dumps(operator_actions_payload, indent=2) + "\n",
+    encoding="utf-8",
+)
 
 summary = {
     "schema": "flx4_live_context_summary_v1",
@@ -920,6 +991,7 @@ summary = {
     "operator_action_queue": operator_action_queue,
     "next_operator_action": next_operator_action,
     "operator_action_runbook_sh": str(operator_runbook_path),
+    "operator_actions_json": str(operator_actions_json_path),
     "first_blocker": first_blocker,
     "top_blockers": top_blockers,
     "blocker_count": len(blockers),
