@@ -271,6 +271,64 @@ def test_unchanged_payload_repeats_are_suppressed_until_heartbeat(
     assert payloads[1]["last_unverified_response"] == "new blocked line"
 
 
+def test_numeric_only_citation_changes_do_not_rebroadcast_fast(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    """Changing slop counters alone must not hammer the same blocked line."""
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(9, stop_event)
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+    mocker.patch(
+        "vibemix.runtime.coach.time.time",
+        side_effect=_auto_time(start=1000.0, step=1.0),
+    )
+
+    calls = {"n": 0}
+
+    def telemetry() -> dict:
+        calls["n"] += 1
+        return {
+            "slop_ratio": min(1.0, 0.2 + calls["n"] * 0.1),
+            "stripped_rate_15s": max(0.0, 1.0 - calls["n"] * 0.1),
+            "last_unverified_response": "same blocked line",
+            "bypass_active": True,
+        }
+
+    ipc_bus = MagicMock()
+    ipc_bus.emit = AsyncMock(return_value=None)
+
+    manual_trigger = asyncio.Event()
+    trigger_state = {"in_flight": False}
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            manual_trigger,
+            trigger_state,
+            stop_event,
+            ipc_bus=ipc_bus,
+            citation_telemetry=telemetry,
+        )
+    )
+
+    assert 9 < CITATION_UNCHANGED_PUBLISH_INTERVAL_S
+    assert ipc_bus.emit.await_count == 1
+    payload = ipc_bus.emit.await_args_list[0].args[0]["payload"]
+    assert payload["last_unverified_response"] == "same blocked line"
+    assert payload["bypass_active"] is True
+
+
 # ---------------------------------------------------------------------------
 # CITATION-04 — publish payload top-level + payload key shape
 # ---------------------------------------------------------------------------

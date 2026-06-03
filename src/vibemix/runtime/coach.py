@@ -102,9 +102,10 @@ if TYPE_CHECKING:
     from vibemix.runtime.ws_bus import IpcBus
     from vibemix.state.evidence_registry import EvidenceRegistry
 
-# Plan 20-04 — ipc.session.citation publish cadence. Changed payloads can
-# update at 0.5Hz, but unchanged slop payloads are re-sent much slower so the UI
-# does not hammer the same blocked line while the co-host is already silent.
+# Plan 20-04 — ipc.session.citation publish cadence. User-visible signal changes
+# (bypass state or blocked-line text) can update at 0.5Hz, but numeric-only slop
+# telemetry is re-sent much slower so the UI does not hammer the same blocked
+# line while the co-host is already silent.
 CITATION_PUBLISH_INTERVAL_S = 2.0
 CITATION_UNCHANGED_PUBLISH_INTERVAL_S = 30.0
 
@@ -455,7 +456,7 @@ async def coach_loop(
 
     last_ai_voice_at = 0.0
     last_citation_publish_at = 0.0
-    last_citation_payload: dict[str, object] | None = None
+    last_citation_signal: dict[str, object] | None = None
     last_citation_payload_publish_at = 0.0
     mic_active_frames = 0
     mic_silence_since = 0.0
@@ -495,11 +496,15 @@ async def coach_loop(
                     "last_unverified_response": tel.get("last_unverified_response"),
                     "bypass_active": bool(tel.get("bypass_active", False)),
                 }
-                payload_changed = payload != last_citation_payload
+                signal = {
+                    "last_unverified_response": payload["last_unverified_response"],
+                    "bypass_active": payload["bypass_active"],
+                }
+                signal_changed = signal != last_citation_signal
                 stale_heartbeat = (
                     now - last_citation_payload_publish_at
                 ) >= CITATION_UNCHANGED_PUBLISH_INTERVAL_S
-                if payload_changed or stale_heartbeat:
+                if signal_changed or stale_heartbeat:
                     msg = SessionCitation.make(
                         slop_ratio=payload["slop_ratio"],
                         stripped_rate_15s=payload["stripped_rate_15s"],
@@ -507,7 +512,7 @@ async def coach_loop(
                         bypass_active=payload["bypass_active"],
                     )
                     await ipc_bus.emit(json.loads(msg.to_json()))  # type: ignore[union-attr]
-                    last_citation_payload = payload
+                    last_citation_signal = signal
                     last_citation_payload_publish_at = now
             except Exception as e:
                 _safe_print(f"\n[coach citation publish err] {e}", file=sys.stderr)
