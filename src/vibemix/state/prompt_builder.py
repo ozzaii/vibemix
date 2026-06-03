@@ -64,10 +64,9 @@ if TYPE_CHECKING:  # pragma: no cover — typing-only, keeps prompt_builder.py i
 # the runtime invariant for diet=False is v4 byte-identity, NOT a cap check.
 PROMPT_TOKEN_CAP_ACK = 800
 PROMPT_TOKEN_CAP_FULL = 1500
-# Events that are eligible for the diet path. The other event classes
-# (PHASE / TRACK_CHANGE / MANUAL / DROP) keep the full payload — Gemini
-# truly needs the 18s audio window + corpus footer + history fields to
-# ground a substantive reaction on those classes.
+# Events the compact prompt builder can safely represent. Runtime dispatch is
+# allowed to choose a stricter subset for the short audio window; Sven's live
+# product path keeps MIX_MOVE/LAYER_ARRIVAL on the full master-output ear.
 ACK_ELIGIBLE_EVENTS: frozenset[str] = frozenset(
     {"HEARTBEAT", "MIX_MOVE", "LAYER_ARRIVAL", "KAAN_SPOKE"}
 )

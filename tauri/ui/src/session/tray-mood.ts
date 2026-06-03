@@ -17,9 +17,8 @@
  * of truth (mirrors mascot-group.ts applyMoodChange).
  */
 
-import { listen } from "@tauri-apps/api/event";
-
 import { emitIpc } from "../ipc/client.js";
+import { listenTauri } from "../tauri-runtime.js";
 import type { MascotMood } from "./state.js";
 
 const VALID_MOODS: readonly MascotMood[] = ["hype-man", "teacher", "coach"];
@@ -37,7 +36,7 @@ function isMood(value: unknown): value is MascotMood {
  *  failure is logged and an inert unsubscribe is returned. */
 export async function installTrayMoodListener(): Promise<() => void> {
   try {
-    const unlisten = await listen<string>("tray-set-mood", (event) => {
+    const unlisten = await listenTauri<string>("tray-set-mood", (event) => {
       const mood = event.payload;
       if (!isMood(mood)) {
         // Defensive: a future/out-of-sync tray build could emit an unknown

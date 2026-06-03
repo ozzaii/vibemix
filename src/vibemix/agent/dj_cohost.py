@@ -117,7 +117,6 @@ from vibemix.state.deck_context import (
     render_set_window_context,
     should_defer_live_claim_stream,
 )
-from vibemix.state.prompt_builder import ACK_ELIGIBLE_EVENTS
 from vibemix.ui_bus import SessionCohostReaction, SessionOverlayHighlight
 
 if TYPE_CHECKING:  # pragma: no cover — typing-only
@@ -132,18 +131,17 @@ if TYPE_CHECKING:  # pragma: no cover — typing-only
 # instruction.
 SILENCE_TOKEN = "<silence/>"
 
-# Plan 19-02 — events where the screen Part is ALWAYS skipped, even if a
-# screen frame is available. CONTEXT D-08 rule: MIX_MOVE + HEARTBEAT keep the
-# diet payload tight (text + 6s audio only). Pre-wires the v2.x re-enable
-# path with the diet rule already enforced — for v2.0 the screen Part is
-# always None (v4 anti-hallucination invariant), so this guard is a no-op
-# today; it becomes load-bearing the day the screen Part comes back.
+# Events where the screen Part is ALWAYS skipped, even if a screen frame is
+# available. This is independent from the audio window size: MIX_MOVE needs
+# the full master-output ear, but screen pixels still over-prime it to invent
+# UI/source details.
 SCREEN_SKIP_EVENTS: frozenset[str] = frozenset({"MIX_MOVE", "HEARTBEAT"})
 
-# Plan 19-02 — diet audio window for ack-eligible events. Trims from the
-# default 18s INVOKE_AUDIO_SECONDS to 6s — saves ≥500ms TTFT (CONTEXT D-08
-# Pitfall 9) by reducing the multimodal payload size.
+# Runtime diet audio window. Keep the short payload for low-value chatter and
+# user-voice acknowledgement; controller/arrangement events use the full
+# INVOKE_AUDIO_SECONDS window so Sven hears the musical before/after.
 DIET_AUDIO_SECONDS: float = 6.0
+RUNTIME_DIET_EVENTS: frozenset[str] = frozenset({"HEARTBEAT", "KAAN_SPOKE"})
 DECK_AUDIO_PART_SECONDS_DEFAULT: float = 3.0
 DECK_AUDIO_PART_MIN_RMS: float = 0.003
 DECK_AUDIO_PART_AUTO_EVENTS: frozenset[str] = frozenset(
@@ -2158,14 +2156,12 @@ class DJCoHostAgent(Agent):
             # strip a legitimate turn.
             snapshot = self._registry.snapshot() if self._registry is not None else None
 
-            # Plan 19-02 — diet dispatch. Ack-eligible events (HEARTBEAT,
-            # MIX_MOVE, LAYER_ARRIVAL, KAAN_SPOKE) shrink to a 6s audio window
-            # + the compact 5-field evidence_line; non-ack events keep the full
-            # 18s window + full evidence_line + corpus footer. An unknown
-            # ev.type defaults safely to diet=False (full payload) — erring
-            # toward correctness over latency (T-19-02-02 mitigation).
+            # Diet dispatch. Only low-value chatter keeps the 6s audio window.
+            # Musically substantive turns (especially MIX_MOVE and LAYER_ARRIVAL)
+            # get the full master-output minute so Sven can hear before/after
+            # context instead of reacting to an underfed instant.
             ev_type_for_diet = ev.type if ev is not None else "MANUAL"
-            diet = ev_type_for_diet in ACK_ELIGIBLE_EVENTS
+            diet = ev_type_for_diet in RUNTIME_DIET_EVENTS
             audio_seconds = DIET_AUDIO_SECONDS if diet else INVOKE_AUDIO_SECONDS
             skip_screen = ev_type_for_diet in SCREEN_SKIP_EVENTS
             ev_extra = ev.extra if ev is not None and isinstance(ev.extra, dict) else {}

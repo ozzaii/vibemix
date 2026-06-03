@@ -2,8 +2,8 @@
 """Plan 19-02 Task 2 — DJCoHostAgent.llm_node diet wiring.
 
 Pins:
-- Audio Part window: 6.0s on ack-eligible events, 30.0s (INVOKE_AUDIO_SECONDS)
-  on full events.
+- Audio Part window: 6.0s only on runtime diet events, INVOKE_AUDIO_SECONDS
+  on musical/live-control events.
 - Screen Part: SKIPPED on MIX_MOVE + HEARTBEAT (SCREEN_SKIP_EVENTS).
 - AICoach.build_prompt called with diet=True on ack events, diet=False on full.
 - recorder.log_event llm_invoke payload exposes diet bool + audio_seconds int
@@ -23,10 +23,9 @@ from typing import Any
 from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
-from vibemix.agent.dj_cohost import SCREEN_SKIP_EVENTS
+from vibemix.agent.dj_cohost import RUNTIME_DIET_EVENTS, SCREEN_SKIP_EVENTS
 from vibemix.audio import INVOKE_AUDIO_SECONDS
 from vibemix.state import AICoach, Event, MusicState
-from vibemix.state.prompt_builder import ACK_ELIGIBLE_EVENTS
 
 # 6s window from Plan 19-02 — diet path payload.
 DIET_AUDIO_SECONDS = 6.0
@@ -144,16 +143,16 @@ def test_heartbeat_uses_6s_window_diet(mocker, tmp_path):
     assert AICoach.build_prompt.call_args.kwargs.get("diet") is True
 
 
-def test_mix_move_uses_6s_window_diet(mocker, tmp_path):
+def test_mix_move_uses_full_window_no_diet(mocker, tmp_path):
     snapshot_wav_mock, _, _ = _drive_with_event(mocker, tmp_path, "MIX_MOVE")
-    assert snapshot_wav_mock.call_args.args[1] == DIET_AUDIO_SECONDS
-    assert AICoach.build_prompt.call_args.kwargs.get("diet") is True
+    assert snapshot_wav_mock.call_args.args[1] == INVOKE_AUDIO_SECONDS
+    assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
 
 
-def test_layer_arrival_uses_6s_window_diet(mocker, tmp_path):
+def test_layer_arrival_uses_full_window_no_diet(mocker, tmp_path):
     snapshot_wav_mock, _, _ = _drive_with_event(mocker, tmp_path, "LAYER_ARRIVAL")
-    assert snapshot_wav_mock.call_args.args[1] == DIET_AUDIO_SECONDS
-    assert AICoach.build_prompt.call_args.kwargs.get("diet") is True
+    assert snapshot_wav_mock.call_args.args[1] == INVOKE_AUDIO_SECONDS
+    assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
 
 
 def test_kaan_spoke_uses_6s_window_diet(mocker, tmp_path):
@@ -184,10 +183,11 @@ def test_screen_skip_set_contains_only_mix_move_and_heartbeat():
     assert SCREEN_SKIP_EVENTS == frozenset({"MIX_MOVE", "HEARTBEAT"})
 
 
-def test_screen_skip_set_is_subset_of_ack_eligible_events():
-    """Sanity — every screen-skip event is also ack-eligible (the diet
-    path is a superset of the screen-skip path)."""
-    assert SCREEN_SKIP_EVENTS.issubset(ACK_ELIGIBLE_EVENTS)
+def test_runtime_diet_set_keeps_musical_events_full_window():
+    """MIX_MOVE and LAYER_ARRIVAL are Sven's musical ear, not tiny acks."""
+    assert RUNTIME_DIET_EVENTS == frozenset({"HEARTBEAT", "KAAN_SPOKE"})
+    assert "MIX_MOVE" not in RUNTIME_DIET_EVENTS
+    assert "LAYER_ARRIVAL" not in RUNTIME_DIET_EVENTS
 
 
 # ---------- recorder log_event payload ----------
@@ -197,13 +197,22 @@ def test_log_event_payload_contains_diet_and_audio_seconds(mocker, tmp_path):
     """llm_invoke payload exposes diet (bool) + audio_seconds (int) for
     Phase 16 ear-test telemetry — events.jsonl correlates Gemini reaction
     quality to the diet dispatch (T-19-02-04 mitigation)."""
-    _, recorder, _ = _drive_with_event(mocker, tmp_path, "MIX_MOVE")
+    _, recorder, _ = _drive_with_event(mocker, tmp_path, "HEARTBEAT")
     invoke_events = [e for e in recorder.events if e[0] == "llm_invoke"]
     assert len(invoke_events) == 1
     fields = invoke_events[0][1]
     assert fields["diet"] is True
     assert fields["audio_seconds"] == 6
     assert isinstance(fields["audio_seconds"], int)
+
+
+def test_log_event_payload_mix_move_has_full_audio_window(mocker, tmp_path):
+    _, recorder, _ = _drive_with_event(mocker, tmp_path, "MIX_MOVE")
+    invoke_events = [e for e in recorder.events if e[0] == "llm_invoke"]
+    assert len(invoke_events) == 1
+    fields = invoke_events[0][1]
+    assert fields["diet"] is False
+    assert fields["audio_seconds"] == INVOKE_AUDIO_SECONDS
 
 
 def test_log_event_payload_diet_false_on_phase(mocker, tmp_path):

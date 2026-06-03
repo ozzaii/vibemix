@@ -8,7 +8,11 @@
  */
 
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
-import { listen as tauriListen, type UnlistenFn } from "@tauri-apps/api/event";
+import {
+  emit as tauriEmit,
+  listen as tauriListen,
+  type UnlistenFn,
+} from "@tauri-apps/api/event";
 
 export type { UnlistenFn };
 
@@ -26,7 +30,25 @@ export function listenTauri<T>(
   event: string,
   handler: Parameters<typeof tauriListen<T>>[1],
 ): Promise<UnlistenFn> {
-  return tauriListen<T>(event, handler).catch(() => () => {});
+  if (!hasTauriInternals()) {
+    return Promise.resolve(() => {});
+  }
+  try {
+    return tauriListen<T>(event, handler).catch(() => () => {});
+  } catch {
+    return Promise.resolve(() => {});
+  }
+}
+
+export function emitTauri<T = unknown>(event: string, payload?: T): Promise<void> {
+  if (!hasTauriInternals()) {
+    return Promise.resolve();
+  }
+  try {
+    return tauriEmit(event, payload).catch(() => {});
+  } catch {
+    return Promise.resolve();
+  }
 }
 
 function hasTauriInternals(): boolean {

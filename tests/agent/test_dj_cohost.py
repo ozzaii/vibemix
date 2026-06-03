@@ -1465,8 +1465,8 @@ def test_v_llm_node_calls_build_prompt_with_snapshot_when_registry_wired(mocker,
     assert snap["ev"]["TRACK_CHANGE@30.0"] == (30.0,)
 
 
-def test_llm_node_passes_recall_moments_to_diet_mix_move(mocker, tmp_path) -> None:
-    """MIX_MOVE can use hot historical move memory without leaving diet mode."""
+def test_llm_node_passes_recall_moments_to_full_ear_mix_move(mocker, tmp_path) -> None:
+    """MIX_MOVE keeps hot historical move memory while using the full audio ear."""
     from vibemix.state import EvidenceRegistry
 
     class _StubRecord:
@@ -1533,7 +1533,7 @@ def test_llm_node_passes_recall_moments_to_diet_mix_move(mocker, tmp_path) -> No
     _drive_llm_node(agent)
 
     kwargs = AICoach.build_prompt.call_args.kwargs
-    assert kwargs["diet"] is True
+    assert kwargs["diet"] is False
     assert kwargs["recall_moments"][0].record_id == "20260520-2200:7"
 
 

@@ -28,9 +28,8 @@
  * a dedicated recording-consent/recorder-active bit, so the guard protects
  * the running session without claiming more than the state can prove. */
 
-import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
-
 import { renderConfirmDialog } from "../settings/components/confirm-dialog.js";
+import { emitTauri, listenTauri, type UnlistenFn } from "../tauri-runtime.js";
 import { getSessionState } from "./state.js";
 
 /** Returns true when the cohost has an active live session. Exported for tests. */
@@ -106,20 +105,20 @@ export function installQuitGuard(): () => void {
  *  an unregister function. */
 export async function installTrayQuitListener(): Promise<() => void> {
   let dialogOpen = false;
-  const unlisten: UnlistenFn = await listen("tray-quit-requested", () => {
+  const unlisten: UnlistenFn = await listenTauri("tray-quit-requested", () => {
     if (dialogOpen) return;
     if (!isLiveSessionActive()) {
-      void emit("confirmed-quit");
+      void emitTauri("confirmed-quit");
       return;
     }
     dialogOpen = true;
     void confirmQuitDuringRecording().then((confirmed) => {
       dialogOpen = false;
       if (confirmed) {
-        void emit("confirmed-quit");
+        void emitTauri("confirmed-quit");
       } else {
         // Cancel the Rust-side fallback timer — Stay must be honored.
-        void emit("quit-cancelled");
+        void emitTauri("quit-cancelled");
       }
     });
   });

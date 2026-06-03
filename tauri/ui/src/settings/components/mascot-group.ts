@@ -45,8 +45,7 @@
  *     shape per Plan 13-03 frontend_enforcement_constraints.
  */
 
-import { invoke } from "@tauri-apps/api/core";
-
+import { invokeTauri } from "../../tauri-runtime.js";
 import { registerStyle } from "../../session/components/_style-registry.js";
 import { renderRocker } from "../../session/components/rocker.js";
 import {
@@ -152,6 +151,10 @@ interface MascotWindowStateWire {
   visible: boolean;
 }
 
+function isTauriRuntimeUnavailable(err: unknown): boolean {
+  return err instanceof Error && err.message === "Tauri runtime unavailable";
+}
+
 function isMascotWindowStateWire(value: unknown): value is MascotWindowStateWire {
   return (
     value != null &&
@@ -206,7 +209,7 @@ function buildMascotGroup(): MascotGroupHandle {
   // enabled the mascot, flip the rocker to ON without rebuilding.
   void (async () => {
     try {
-      const state = await invoke<unknown>(
+      const state = await invokeTauri<unknown>(
         "read_mascot_window_state",
       );
       if (isMascotWindowStateWire(state) && state.visible) {
@@ -219,11 +222,13 @@ function buildMascotGroup(): MascotGroupHandle {
           });
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[mascot-group] read_mascot_window_state invoke failed:",
-        err,
-      );
+      if (!isTauriRuntimeUnavailable(err)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[mascot-group] read_mascot_window_state invoke failed:",
+          err,
+        );
+      }
     }
   })();
 
@@ -336,7 +341,7 @@ async function applyVisibleChange(visible: boolean): Promise<void> {
   // creates the overlay window on first enable so no app restart is
   // needed (config.rs::set_mascot_visible).
   try {
-    await invoke("set_mascot_visible", { visible });
+    await invokeTauri("set_mascot_visible", { visible });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("[mascot-group] set_mascot_visible invoke failed:", err);
@@ -348,7 +353,7 @@ async function applyClickThroughChange(enabled: boolean): Promise<void> {
   // emitIpc lets the sidecar persist the setting (and re-broadcast on
   // ipc.settings.state which the ws-bridge applies back to SessionState).
   try {
-    await invoke("set_mascot_click_through", { enabled });
+    await invokeTauri("set_mascot_click_through", { enabled });
   } catch (err) {
     // Tauri command may not exist yet during Plan 13-03 (Plan 13-02 wires
     // it). The IPC settings store still receives the value so the sidecar

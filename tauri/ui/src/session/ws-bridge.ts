@@ -64,6 +64,10 @@ import type { PhaseChunk } from "./components/phase-tape.js";
 import type { MidiEvent } from "./components/event-ribbon.js";
 import type { CitationChip } from "./components/citation-strip.js";
 
+function isTauriRuntimeUnavailable(err: unknown): boolean {
+  return err instanceof Error && err.message === "Tauri runtime unavailable";
+}
+
 /** Wire payload shape mirrors src/ipc/messages.ts SessionSnapshot. We
  *  re-declare narrow shapes here so the bridge can be unit-tested against
  *  fake messages without round-tripping through the validator. */
@@ -291,8 +295,10 @@ export async function initSessionBridge(): Promise<{
   try {
     await emitIpc("ipc.settings.get", {});
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn("[ws-bridge] ipc.settings.get failed:", err);
+    if (!isTauriRuntimeUnavailable(err)) {
+      // eslint-disable-next-line no-console
+      console.warn("[ws-bridge] ipc.settings.get failed:", err);
+    }
   }
 
   return {
