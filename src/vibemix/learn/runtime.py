@@ -444,6 +444,7 @@ class LessonRuntime(StateMachine):
         cue_placement_practice_action_recorder: Callable[[str | None, dict[str, Any]], bool | None]
         | None = None,
         session_event_logger: Callable[[str, dict[str, Any]], None] | None = None,
+        tutor_speak_audio: Callable[[str, str], None] | None = None,
     ) -> None:
         """Build a LessonRuntime bound to its 5 collaborators.
 
@@ -505,6 +506,10 @@ class LessonRuntime(StateMachine):
                 wiring passes ``VoiceRecorder.log_event`` through a fail-soft
                 adapter so Learn milestones land in ``events.jsonl`` for later
                 debrief/profile tooling.
+            tutor_speak_audio: Optional local-audio hook. When wired at boot,
+                every emitted ``LearnTutorSpeak`` line is also synthesized by
+                the product MOSS voice. None preserves silent-subtitle behavior
+                for tests and installs without a local voice.
         """
         self._learn = learn_state
         self._mirror = midi_mirror
@@ -521,6 +526,7 @@ class LessonRuntime(StateMachine):
         self._cue_placement_practice_loader = cue_placement_practice_loader
         self._cue_placement_practice_action_recorder = cue_placement_practice_action_recorder
         self._session_event_logger = session_event_logger
+        self._tutor_speak_audio = tutor_speak_audio
         # The wall-clock anchor for the 30 s strike escalation timer.
         # Reset on every ``on_enter_<state>`` callback for the states
         # that the tick_loop watches (awaiting_action, hint_strike_*).
@@ -1491,6 +1497,31 @@ class LessonRuntime(StateMachine):
                 file=sys.stderr,
             )
 
+    def _emit_tutor_speak(self, speak: dict[str, Any]) -> None:
+        """Emit a Learn tutor line and, when wired, voice it through MOSS."""
+        self._ipc.emit(speak)
+        self._log_tutor_speak_event(speak)
+        if self._tutor_speak_audio is None:
+            return
+        payload = speak.get("payload")
+        if not isinstance(payload, dict):
+            return
+        text = payload.get("text")
+        tts_marker = payload.get("tts_marker")
+        if not isinstance(text, str) or not text.strip():
+            return
+        if not isinstance(tts_marker, str) or not tts_marker.strip():
+            return
+        try:
+            self._tutor_speak_audio(text, tts_marker)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] tutor audio callback failed: {exc!r}",
+                file=sys.stderr,
+            )
+
     def _evidence_time(self) -> float:
         """Return session-relative time for lesson evidence writes."""
         if self._evidence_clock is not None:
@@ -1650,8 +1681,7 @@ class LessonRuntime(StateMachine):
                 citations=citations,
                 data_state="hint",
             ).to_dict()
-            self._ipc.emit(speak)
-            self._log_tutor_speak_event(speak)
+            self._emit_tutor_speak(speak)
         except Exception as exc:  # pragma: no cover - defensive
             import sys
 
@@ -1896,8 +1926,7 @@ class LessonRuntime(StateMachine):
                 data_state="active",
                 teaching_loop=self._teaching_loop_payload(turn),
             ).to_dict()
-            self._ipc.emit(speak)
-            self._log_tutor_speak_event(speak)
+            self._emit_tutor_speak(speak)
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 
@@ -1930,8 +1959,7 @@ class LessonRuntime(StateMachine):
                 citations=citations,
                 data_state="active",
             ).to_dict()
-            self._ipc.emit(speak)
-            self._log_tutor_speak_event(speak)
+            self._emit_tutor_speak(speak)
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 
@@ -1966,8 +1994,7 @@ class LessonRuntime(StateMachine):
                 citations=harmonic_practice_citations(pair, self._evidence_registry),
                 data_state="active",
             ).to_dict()
-            self._ipc.emit(speak)
-            self._log_tutor_speak_event(speak)
+            self._emit_tutor_speak(speak)
         except Exception as exc:  # pragma: no cover - defensive
             import sys
 
@@ -2022,8 +2049,7 @@ class LessonRuntime(StateMachine):
                 ),
                 data_state="active",
             ).to_dict()
-            self._ipc.emit(speak)
-            self._log_tutor_speak_event(speak)
+            self._emit_tutor_speak(speak)
         except Exception as exc:  # pragma: no cover - defensive
             import sys
 
@@ -2084,8 +2110,7 @@ class LessonRuntime(StateMachine):
                 if turn is not None
                 else None,
             ).to_dict()
-            self._ipc.emit(speak)
-            self._log_tutor_speak_event(speak)
+            self._emit_tutor_speak(speak)
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 
@@ -2126,8 +2151,7 @@ class LessonRuntime(StateMachine):
                 if turn is not None
                 else None,
             ).to_dict()
-            self._ipc.emit(speak)
-            self._log_tutor_speak_event(speak)
+            self._emit_tutor_speak(speak)
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 
@@ -2170,8 +2194,7 @@ class LessonRuntime(StateMachine):
                 if turn is not None
                 else None,
             ).to_dict()
-            self._ipc.emit(speak)
-            self._log_tutor_speak_event(speak)
+            self._emit_tutor_speak(speak)
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 

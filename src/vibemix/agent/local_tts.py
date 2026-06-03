@@ -40,7 +40,11 @@ from livekit.agents._exceptions import APIError
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 from livekit.agents.utils import shortuuid
 
-from vibemix.voice_presets import DEFAULT_MOSS_VOICE, select_moss_voice_row
+from vibemix.voice_presets import (
+    DEFAULT_MOSS_VOICE,
+    normalize_stored_voice,
+    select_moss_voice_row,
+)
 
 if TYPE_CHECKING:
     import numpy as np
@@ -394,10 +398,11 @@ class MossLocalTTS(agents_tts.TTS):
         engine: MossEngine | None = None,
     ) -> None:
         self._model_dir = model_dir or resolve_model_dir()
-        self._voice = voice
+        self._voice = normalize_stored_voice(voice)
         self._thread_count = thread_count
         self._engine: MossEngine | None = engine
         self._engine_lock = threading.Lock()
+        self._synth_lock = threading.Lock()
 
         if sample_rate is None:
             sample_rate = (
@@ -430,6 +435,16 @@ class MossLocalTTS(agents_tts.TTS):
                 self._engine = _OrtCpuEngine.load(self._model_dir, self._voice, self._thread_count)
         return self._engine
 
+    def set_voice(self, voice: str) -> None:
+        """Switch the live MOSS voice; the next synthesis rebuilds the engine."""
+        normalized = normalize_stored_voice(voice)
+        with self._synth_lock:
+            with self._engine_lock:
+                if self._voice == normalized:
+                    return
+                self._voice = normalized
+                self._engine = None
+
     def prewarm(self) -> None:
         """Kick the (~728 MB) engine load in the background so reaction #1 is warm."""
         if self._engine is not None:
@@ -445,17 +460,24 @@ class MossLocalTTS(agents_tts.TTS):
 
         threading.Thread(target=_bg, name="moss-tts-prewarm", daemon=True).start()
 
+    def synthesize_pcm(self, text: str, on_pcm: Callable[[bytes], None]) -> None:
+        """Synthesize mono PCM bytes for non-LiveKit sinks such as Learn tutor audio."""
+        with self._synth_lock:
+            self._get_engine().synthesize(text, on_pcm)
+
     def synthesize(
         self, text: str, *, conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS
     ) -> agents_tts.ChunkedStream:
         return _MossChunkedStream(tts=self, input_text=text, conn_options=conn_options)
 
 
-def build_local_tts_adapter() -> agents_tts.FallbackAdapter:
+def build_local_tts_adapter(
+    *, voice: str | None = None, moss: MossLocalTTS | None = None
+) -> agents_tts.FallbackAdapter:
     """Build the single allowed live voice chain: one local MOSS provider."""
     if not local_tts_enabled():
         raise LocalTTSUnavailable(local_tts_unavailable_reason())
-    moss = MossLocalTTS()
+    moss = moss or MossLocalTTS(voice=voice or _DEFAULT_VOICE)
     moss.prewarm()
     return agents_tts.FallbackAdapter(tts=[moss], max_retry_per_tts=1)
 
@@ -484,8 +506,7 @@ class _MossChunkedStream(agents_tts.ChunkedStream):
 
         def _produce() -> None:
             try:
-                engine = tts._get_engine()  # may lazy-load here (off the loop)
-                engine.synthesize(self._input_text, _on_pcm)
+                tts.synthesize_pcm(self._input_text, _on_pcm)
             except BaseException as exc:
                 loop.call_soon_threadsafe(queue.put_nowait, exc)
             finally:

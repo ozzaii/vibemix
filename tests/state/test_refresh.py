@@ -594,6 +594,35 @@ def test_tick_bpm_gate_skips_when_silent():
     assert last_bpm_at == 0.0
 
 
+def test_tick_bpm_and_audible_gate_skip_voice_dominant_capture(mocker):
+    """Sven-only loopback must not become music, audible state, or BPM."""
+    state = MusicState()
+    buf = _audible_buf()
+    estimate = mocker.patch("vibemix.state.refresh.estimate_bpm", return_value=150.0)
+
+    out = _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=42.0,
+        last_bpm_at=0.0,
+        levels=SimpleNamespace(voice=0.5),
+    )
+
+    last_high, last_low, bpm_cache, last_bpm_at = out
+    estimate.assert_not_called()
+    assert state.rms == 0.0
+    assert state.audible is False
+    assert last_high == 0.0
+    assert last_low == 1000.0
+    assert bpm_cache == 42.0
+    assert last_bpm_at == 0.0
+
+
 def test_tick_bpm_gate_skips_when_within_3s_window():
     """last_bpm_at within 3.0s of now → skip estimate_bpm even if currently_loud."""
     state = MusicState()

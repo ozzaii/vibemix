@@ -38,6 +38,7 @@ import signal
 import sys
 import threading
 from collections import deque
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -226,6 +227,60 @@ def _build_tts_chain_or_mute(**kwargs: Any) -> Any:
         )
         print(f"-> tts:   {reason}", file=sys.stderr, flush=True)
         return _livekit_not_given()
+
+
+def _resample_pcm16_mono_bytes(pcm: bytes, *, source_sr: int, target_sr: int) -> bytes:
+    """Convert mono int16 PCM bytes between sample rates."""
+    if not pcm:
+        return b""
+    if source_sr == target_sr:
+        return pcm
+    samples = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32767.0
+    resampled = resample_audio(samples, source_sr=source_sr, target_sr=target_sr)
+    return np.clip(resampled * 32767.0, -32767.0, 32767.0).astype("<i2").tobytes()
+
+
+def _build_learn_tutor_speak_audio(
+    *,
+    moss: Any,
+    playback: PlaybackQueue,
+    muted: Callable[[], bool],
+) -> Callable[[str, str], None]:
+    """Build a mute-aware Learn tutor voice sink using the product MOSS voice."""
+
+    def speak(text: str, tts_marker: str) -> None:
+        if muted():
+            return
+
+        def _run() -> None:
+            try:
+                source_sr = int(getattr(moss, "sample_rate", OUTPUT_SR) or OUTPUT_SR)
+
+                def _on_pcm(pcm: bytes) -> None:
+                    if muted():
+                        return
+                    playback.push(
+                        _resample_pcm16_mono_bytes(
+                            pcm,
+                            source_sr=source_sr,
+                            target_sr=OUTPUT_SR,
+                        )
+                    )
+
+                moss.synthesize_pcm(text, _on_pcm)
+            except Exception as exc:  # pragma: no cover - defensive boot/runtime path
+                print(
+                    f"[learn boot] tutor MOSS synthesis failed for {tts_marker}: {exc!r}",
+                    file=sys.stderr,
+                )
+
+        threading.Thread(
+            target=_run,
+            name=f"learn-tutor-moss-{tts_marker}",
+            daemon=True,
+        ).start()
+
+    return speak
 
 
 async def _close_tts_chain(tts_inst: Any) -> None:
@@ -1207,6 +1262,18 @@ async def main() -> None:
     _boot_settings_config = load_config()
     _persona_seed = apply_persona_config_to_env(_boot_settings_config)
     _deck_audio_env_seed = _apply_deck_audio_config_to_env(_boot_settings_config)
+    live_moss_tts: Any | None = None
+    try:
+        from vibemix.agent.local_tts import MossLocalTTS, local_tts_enabled
+
+        if local_tts_enabled():
+            live_moss_tts = MossLocalTTS(voice=_boot_settings_config.voice)
+            print(f"-> tts voice: {_boot_settings_config.voice} (from settings)")
+    except Exception as _moss_boot_exc:  # pragma: no cover - defensive boot path
+        print(
+            f"-> tts voice hook unavailable: {_moss_boot_exc!r}",
+            file=sys.stderr,
+        )
     if _persona_seed:
         print(
             "-> persona settings: "
@@ -1385,17 +1452,29 @@ async def main() -> None:
         print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
         genai_client = genai.Client(api_key=api_key)
         llm_inst = build_llm(api_key, mode="direct")
-        tts_inst = _build_tts_chain_or_mute(mode="direct")
+        tts_inst = _build_tts_chain_or_mute(
+            mode="direct",
+            voice=_boot_settings_config.voice,
+            moss=live_moss_tts,
+        )
         if tts_inst is not _livekit_not_given():
             print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
+        else:
+            live_moss_tts = None
     else:  # mode == "proxy"
         print(f"-> brain: {LLM_MODEL} via proxy at {proxy_base_url}")
         _ensure_proxy_client_dep()
         genai_client = build_proxy_genai_client(jwt, proxy_base_url)
         llm_inst = build_llm(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
-        tts_inst = _build_tts_chain_or_mute(mode="proxy")
+        tts_inst = _build_tts_chain_or_mute(
+            mode="proxy",
+            voice=_boot_settings_config.voice,
+            moss=live_moss_tts,
+        )
         if tts_inst is not _livekit_not_given():
             print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
+        else:
+            live_moss_tts = None
 
     # ---- Phase 19 latency-stack wiring (ack_bank retired) ----
     # Pre-recorded ack/filler clips ("yeah/oh/nice") were removed —
@@ -1953,6 +2032,7 @@ async def main() -> None:
         _settings_config = _boot_settings_config
         _live_settings_applier = SettingsApplier(
             config_store=_settings_config,
+            cascade_agent=live_moss_tts,
             music_state=state,  # mood applies live + emits mascot.mood_change
             ws_bus=ipc_router,  # mood-change + acks reach every connected client
             recordings_root=recordings_root,
@@ -2587,6 +2667,16 @@ async def main() -> None:
         )
         cue_placement_practice_driver = None
 
+    learn_tutor_speak_audio = (
+        _build_learn_tutor_speak_audio(
+            moss=live_moss_tts,
+            playback=playback,
+            muted=lambda: bool(_session_ipc is not None and _session_ipc.muted),
+        )
+        if live_moss_tts is not None
+        else None
+    )
+
     lesson_runtime = LessonRuntime(
         learn_state=_learn_state,
         midi_mirror=midi_mirror,
@@ -2618,6 +2708,7 @@ async def main() -> None:
             else None
         ),
         session_event_logger=_learn_session_event,
+        tutor_speak_audio=learn_tutor_speak_audio,
     )
     print("-> lesson_runtime wired", file=sys.stderr)
 
@@ -2855,6 +2946,7 @@ async def main() -> None:
             prepared_pool_loader=_load_latest_prepared_pool,
             learn_state=_learn_state,
             audio_capture_context=audio_capture_context,
+            levels=levels,
         )
     )
     coach_task = asyncio.create_task(

@@ -645,8 +645,8 @@ def _build_session_snapshot(
     fake refs without binding a socket. Mirrors the field mapping in
     ``SessionLoop._build_snapshot``: meters (music/voice/mic), bpm, track
     (title from ``state.audible_track``, deck from ``state.audible_deck``),
-    cohost_status (TALKING when voice rms > 0.05, LISTENING when audible,
-    else IDLE), grounded (= ``state.audible``), MIDI ribbon, transcript.
+    cohost_status (TALKING when voice rms > 0.05, LISTENING when audible music
+    is still visible on the live meters, else IDLE), MIDI ribbon, transcript.
     """
     from vibemix.ui_bus.messages import (
         LevelPair,
@@ -671,7 +671,7 @@ def _build_session_snapshot(
         mic=LevelPair(rms=mic_rms, peak=mic_peak),
     )
 
-    grounded = bool(getattr(state, "audible", False))
+    grounded = bool(getattr(state, "audible", False)) and music_rms > SILENT_RMS
     if voice_rms > 0.05:
         cohost_status = "TALKING"
     elif grounded:
@@ -764,6 +764,19 @@ def _build_session_snapshot(
         claim_policy=claim_policy,
     )
     return json.loads(msg.to_json())
+
+
+def _trusted_flat_bpm(state: MusicState) -> float:
+    """Return a legacy numeric BPM only when the music state is grounded."""
+    if not bool(getattr(state, "audible", False)):
+        return 0.0
+    try:
+        bpm = float(getattr(state, "bpm", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    if not (bpm > 0.0):
+        return 0.0
+    return bpm
 
 
 class IpcRouterBus:
@@ -1051,7 +1064,7 @@ async def ws_broadcast(
                 "audible": state.audible,
                 "deck": state.audible_deck,
                 "phase": state.phase,
-                "bpm": state.bpm,
+                "bpm": _trusted_flat_bpm(state),
                 "mood": state.mood,
                 "bpm_confidence": state.bpm_confidence,
                 "downbeat_phase": state.downbeat_phase,

@@ -806,6 +806,19 @@ def test_empty_deck_state_is_golden_equivalent(mocker):
     assert baseline_payload["audible"] is True
 
 
+def test_flat_bpm_requires_audible_music(mocker):
+    state = MusicState()
+    state.audible = False
+    state.audible_deck = "none"
+    state.phase = "silent"
+    state.bpm = 101.7
+
+    payload = _capture_payload(state, mocker)
+
+    assert payload["audible"] is False
+    assert payload["bpm"] == 0.0
+
+
 def test_deck_state_does_not_trip_empty_frame_guard(mocker):
     """The additive deck_state field is strictly additive — the captured frame
     still carries the meter keys (music/voice/mic) so the Phase-51 emit-boundary

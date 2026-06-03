@@ -141,6 +141,26 @@ def test_cohost_status_idle_and_grounded_false_when_silent():
     assert p["track"] is None
 
 
+def test_snapshot_does_not_ground_stale_audible_state_on_silent_meters():
+    msg = _build_session_snapshot(
+        _FakeLevels(0.0, 0.0, 0.0),
+        _fake_state(
+            audible=True,
+            bpm=101.7,
+            audible_track="Stale Cached Track",
+            audible_deck="none",
+            predicted_drop_in_sec=15.0,
+        ),
+    )
+    validate_message(msg)
+    p = msg["payload"]
+    assert p["cohost_status"] == "IDLE"
+    assert p["grounded"] is False
+    assert p["bpm"] is None
+    assert p["drop_pred_bars"] is None
+    assert p["track"] is None
+
+
 def test_levels_clamped_to_unit_interval():
     # EMA drift above 1.0 must clamp so the validator's [0,1] bound holds.
     msg = _build_session_snapshot(_FakeLevels(2.5, -0.3, 1.7), _fake_state())

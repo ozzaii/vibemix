@@ -318,6 +318,55 @@ def test_synthesize_surfaces_engine_error():
     asyncio.run(_run())
 
 
+def test_synthesize_pcm_uses_engine_directly():
+    fake = _FakeEngine(sample_rate=24000, chunks=2, samples_per_chunk=10)
+    tts = MossLocalTTS(engine=fake, sample_rate=24000)
+    chunks: list[bytes] = []
+
+    tts.synthesize_pcm("coach this line", chunks.append)
+
+    assert len(chunks) == 2
+
+
+def test_set_voice_rebuilds_engine_on_next_synthesis(monkeypatch, tmp_path):
+    first = _FakeEngine(sample_rate=24000, chunks=1, samples_per_chunk=10)
+    loaded: list[str] = []
+
+    def load(_model_dir, voice, _thread_count):
+        loaded.append(voice)
+        return _FakeEngine(sample_rate=24000, chunks=1, samples_per_chunk=10)
+
+    monkeypatch.setattr("vibemix.agent.local_tts._OrtCpuEngine.load", load)
+    tts = MossLocalTTS(model_dir=tmp_path, voice="Adam", engine=first, sample_rate=24000)
+
+    tts.synthesize_pcm("first", lambda _pcm: None)
+    tts.set_voice("Bella")
+    tts.synthesize_pcm("second", lambda _pcm: None)
+
+    assert loaded == ["Bella"]
+
+
+def test_set_voice_normalizes_retired_cloud_voice_ids(monkeypatch, tmp_path):
+    loaded: list[str] = []
+
+    def load(_model_dir, voice, _thread_count):
+        loaded.append(voice)
+        return _FakeEngine(sample_rate=24000, chunks=1, samples_per_chunk=10)
+
+    monkeypatch.setattr("vibemix.agent.local_tts._OrtCpuEngine.load", load)
+    tts = MossLocalTTS(
+        model_dir=tmp_path,
+        voice="Bella",
+        engine=_FakeEngine(sample_rate=24000, chunks=1, samples_per_chunk=10),
+        sample_rate=24000,
+    )
+
+    tts.set_voice("kore")
+    tts.synthesize_pcm("legacy", lambda _pcm: None)
+
+    assert loaded == ["Adam"]
+
+
 # ---------------- guarded real-model integration ----------------
 
 @pytest.mark.slow

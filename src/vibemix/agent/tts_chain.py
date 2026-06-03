@@ -14,16 +14,20 @@ from typing import Literal
 from livekit.agents import tts as agents_tts
 
 
-def _build_moss_chain() -> agents_tts.FallbackAdapter:
+def _build_moss_chain(*, voice: str | None = None, moss: object | None = None) -> agents_tts.FallbackAdapter:
     """Build the only supported live TTS chain: local MOSS, one provider."""
-    from vibemix.agent.local_tts import build_local_tts_adapter
+    from vibemix.agent.local_tts import MossLocalTTS, build_local_tts_adapter
 
-    return build_local_tts_adapter()
+    if moss is not None and not isinstance(moss, MossLocalTTS):
+        raise TypeError("moss must be a MossLocalTTS instance")
+    return build_local_tts_adapter(voice=voice, moss=moss)
 
 
 def build_tts_chain(
     *,
     mode: Literal["direct", "proxy"] = "direct",
+    voice: str | None = None,
+    moss: object | None = None,
 ) -> agents_tts.FallbackAdapter:
     """Build the live voice chain.
 
@@ -35,4 +39,4 @@ def build_tts_chain(
     """
     if mode not in {"direct", "proxy"}:
         raise ValueError(f"unknown mode: {mode}")
-    return _build_moss_chain()
+    return _build_moss_chain(voice=voice, moss=moss)

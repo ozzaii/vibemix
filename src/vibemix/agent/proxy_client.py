@@ -50,10 +50,10 @@ def build_proxy_tts_chain(
     jwt: str, proxy_base_url: str, voice: str | None = None
 ) -> agents_tts.FallbackAdapter:
     """Compatibility shim: proxy mode also uses local MOSS as the only TTS."""
-    _ = (jwt, proxy_base_url, voice)
+    _ = (jwt, proxy_base_url)
     from vibemix.agent.local_tts import build_local_tts_adapter
 
-    return build_local_tts_adapter()
+    return build_local_tts_adapter(voice=voice)
 
 
 # ---------------------------------------------------------------------------

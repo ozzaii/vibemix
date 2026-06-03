@@ -40,6 +40,18 @@ from vibemix.agent.local_tts import LocalTTSUnavailable
 _REAL_SLEEP = asyncio.sleep
 
 
+def _assert_tts_chain_boot_call(build_tts_chain: MagicMock) -> object:
+    build_tts_chain.assert_called_once()
+    kwargs = build_tts_chain.call_args.kwargs
+    assert kwargs["mode"] == "direct"
+    assert kwargs["voice"] == "Adam"
+    assert set(kwargs) == {"mode", "voice", "moss"}
+    moss = kwargs["moss"]
+    assert hasattr(moss, "set_voice")
+    assert hasattr(moss, "synthesize_pcm")
+    return moss
+
+
 # ---------------------------------------------------------------------------
 # SMOKE-01 — --version exits zero without devices / keys
 # ---------------------------------------------------------------------------
@@ -557,8 +569,9 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     # (c) build_llm called with the dummy key in direct mode (Phase 5 explicit mode kwarg)
     livekit_mocks["build_llm"].assert_called_once_with("dummy-key", mode="direct")
 
-    # (d) build_tts_chain called in direct mode; cloud keys stay out of voice.
-    livekit_mocks["build_tts_chain"].assert_called_once_with(mode="direct")
+    # (d) build_tts_chain gets the persisted MOSS voice + shared MOSS hook;
+    # cloud keys stay out of voice.
+    _assert_tts_chain_boot_call(livekit_mocks["build_tts_chain"])
 
     # (e) DJCoHostAgent constructed with non-None kwargs
     agent_call = livekit_mocks["DJCoHostAgent"].call_args
@@ -675,7 +688,7 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
 
     asyncio.run(driver())
 
-    livekit_mocks["build_tts_chain"].assert_called_once_with(mode="direct")
+    _assert_tts_chain_boot_call(livekit_mocks["build_tts_chain"])
 
 
 def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
@@ -716,7 +729,7 @@ def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
 
     asyncio.run(driver())
 
-    livekit_mocks["build_tts_chain"].assert_called_once_with(mode="direct")
+    _assert_tts_chain_boot_call(livekit_mocks["build_tts_chain"])
     assert livekit_mocks["AgentSession"].call_args.kwargs["tts"] is NOT_GIVEN
     assert livekit_mocks["DJCoHostAgent"].call_args.kwargs["tts_inst"] is NOT_GIVEN
     livekit_mocks["session"].output.set_audio_enabled.assert_called_once_with(False)

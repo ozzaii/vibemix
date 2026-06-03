@@ -58,6 +58,7 @@ from vibemix.audio import (
     snapshot_features,
 )
 from vibemix.audio.constants import (
+    AI_TALK_THRESHOLD,
     BUILDUP_SLOPE_WINDOW_S,
     GENRE_BPM_BANDS,
     GENRE_CENTROID_HARD_TEK_MIN,
@@ -125,6 +126,7 @@ _DECK_AUDIO_MIX_CONFIDENCE = 0.55
 _BAND_ENV_TREND_FLOOR = 0.04
 _BAND_ENV_LEVEL_LOW = 0.14
 _BAND_ENV_LEVEL_HIGH = 0.32
+_VOICE_CAPTURE_DOMINANCE_RATIO = 1.25
 
 
 # Phase 52 (GENRE-01): cache the loaded GenreProfile library once — the profile
@@ -163,6 +165,37 @@ def _float_field(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _levels_voice(levels: object | None) -> float:
+    if levels is None:
+        return 0.0
+    try:
+        return max(0.0, float(getattr(levels, "voice", 0.0)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _voice_dominates_capture(*, rms: float, voice_level: float) -> bool:
+    return (
+        voice_level > AI_TALK_THRESHOLD
+        and rms <= max(SILENT_RMS, voice_level * _VOICE_CAPTURE_DOMINANCE_RATIO)
+    )
+
+
+def _silence_trusted_features(feats: dict) -> dict:
+    trusted = dict(feats)
+    trusted.update(
+        {
+            "rms": 0.0,
+            "sub_share": 0.0,
+            "low_share": 0.0,
+            "mid_share": 0.0,
+            "high_share": 0.0,
+            "onsets_per_sec": 0.0,
+        }
+    )
+    return trusted
 
 
 def _current_perceive_snapshot(state: MusicState) -> dict[str, float | None]:
@@ -844,6 +877,7 @@ def _tick_once(
     evidence_dedupe: set[str] | None = None,
     audio_capture_context: dict[str, object] | None = None,
     move_audio_baselines: dict[str, dict[str, object]] | None = None,
+    levels: object | None = None,
 ) -> tuple[float, float, float, float]:
     """One iteration of the state_refresh_loop body. Extracted so tests can
     drive single ticks deterministically with fake time and fake snapshots.
@@ -892,12 +926,23 @@ def _tick_once(
 
     # Audio features (cheap — ~5-10ms)
     feats = snapshot_features(audio_buf, seconds=4.0)
+    raw_rms = feats.get("rms", 0.0)
+    voice_level = _levels_voice(levels)
+    voice_dominant_capture = _voice_dominates_capture(
+        rms=raw_rms,
+        voice_level=voice_level,
+    )
+    if voice_dominant_capture:
+        feats = _silence_trusted_features(feats)
     curve = energy_curve(audio_buf, seconds=12.0, hop=1.0)
     try:
-        master_lufs = short_term_lufs(
-            audio_buf.snapshot(int(audio_buf._sr * SHORT_TERM_WINDOW_S)),
-            audio_buf._sr,
-        )
+        if voice_dominant_capture:
+            master_lufs = None
+        else:
+            master_lufs = short_term_lufs(
+                audio_buf.snapshot(int(audio_buf._sr * SHORT_TERM_WINDOW_S)),
+                audio_buf._sr,
+            )
     except Exception:
         master_lufs = None
     rms = feats.get("rms", 0.0)
@@ -1442,6 +1487,7 @@ async def state_refresh_loop(
     section_source=None,
     prepared_pool_loader=None,
     audio_capture_context: dict[str, object] | None = None,
+    levels: object | None = None,
 ) -> None:
     """Updates MusicState every 100ms from all sources. The ONLY writer to state.
     Audible flag is debounced — sustained samples required to flip in either
@@ -1529,6 +1575,7 @@ async def state_refresh_loop(
                 evidence_dedupe=evidence_dedupe,
                 audio_capture_context=audio_capture_context,
                 move_audio_baselines=move_audio_baselines,
+                levels=levels,
             )
         except Exception as e:
             print(f"[state refresh err] {e}", file=sys.stderr)
