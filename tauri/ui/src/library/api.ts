@@ -2496,7 +2496,7 @@ const DEV_CUE: LibraryCueResult = {
 
 const DEV_CHAT: LibraryChatResult = {
   reply:
-    "For the presentation, keep it tight: open with the pill listening, ask for a darker peak-time bridge, then show the grounded tool trace.",
+    "For the presentation, keep it tight: open with the pill listening, ask for a darker peak-time bridge, then show the live read.",
   tool_trace: [{ name: "search_vibe", arg: "dark peak-time bridge", ok: true }],
   playlist: null,
   export_path: null,

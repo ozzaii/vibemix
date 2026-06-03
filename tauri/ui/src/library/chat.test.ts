@@ -489,7 +489,7 @@ function mountSkeleton(): void {
     <div id="vmx-lib-chat-thread">
       <div class="vmx-lib-chat-turn" data-role="viber">
         <div class="who">viber</div>
-        <div class="body">I can build a set, solve a transition, or find deep cuts. I will show receipts before you trust it.</div>
+        <div class="body">I can build a set, solve a transition, or find deep cuts.</div>
       </div>
       <div id="vmx-lib-operator" data-wire="library.operator-brief">
         <div data-operator="build">
@@ -589,7 +589,7 @@ describe("chat - real runChat path", () => {
     expect(idleMission?.textContent).toContain("Viber runbook");
     expect(idleMission?.textContent).toContain("12 indexed tracks");
     expect(idleMission?.textContent).toContain(
-      "No fake tracks. No uncited transition advice.",
+      "No fake tracks. No guessing transitions.",
     );
     expect(document.getElementById("vmx-lib-operator-state")?.textContent).toBe(
       "set prep ready",
@@ -604,7 +604,7 @@ describe("chat - real runChat path", () => {
       "waiting",
     );
     expect(document.getElementById("vmx-lib-operator-proof")?.textContent).toBe(
-      "ask Viber for receipts",
+      "waiting for decks",
     );
   });
 
@@ -626,7 +626,7 @@ describe("chat - real runChat path", () => {
     expect(
       document.querySelector<HTMLElement>('[data-wire="library.idle-mission"]')
         ?.textContent,
-    ).toContain("Live mix receipt armed");
+    ).toContain("Live mix armed");
     expect(
       document
         .querySelector<HTMLElement>('[data-operator="mix"]')
@@ -666,7 +666,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("proof gate");
+    expect(toolText).toContain("live read");
     expect(toolText).toContain("waiting");
 
     const proofRow = document.querySelector<HTMLElement>(
@@ -745,7 +745,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("proof gate");
+    expect(toolText).toContain("live read");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("deck audio");
     expect(toolText).not.toContain("armed");
@@ -759,7 +759,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("proof gate");
+    expect(toolText).toContain("live read");
     expect(toolText).toContain("armed");
     expect(toolText).toContain("deck1 A=known:dominant");
     expect(toolText).toContain("deck2 B=known:present");
@@ -777,7 +777,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("proof gate");
+    expect(toolText).toContain("live read");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("deck identities");
     expect(toolText).not.toContain("armed");
@@ -826,7 +826,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("proof gate");
+    expect(toolText).toContain("live read");
     expect(toolText).toContain("partial");
     expect(toolText).toContain("both decks active");
     expect(toolText).not.toContain("armed");
@@ -884,7 +884,7 @@ describe("chat - real runChat path", () => {
     );
   });
 
-  it("keeps live read partial when deck-pair receipts are missing", async () => {
+  it("keeps live read partial when deck-pair evidence is missing", async () => {
     await mountChat();
 
     const context = readyDeckPairLiveContext();
@@ -909,9 +909,9 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("proof gate");
+    expect(toolText).toContain("live read");
     expect(toolText).toContain("partial");
-    expect(toolText).toContain("feature receipt");
+    expect(toolText).toContain("deck audio features");
     expect(toolText).not.toContain("armed");
   });
 
@@ -983,7 +983,7 @@ describe("chat - real runChat path", () => {
     expect(toolText).toContain("live read");
     expect(toolText).toContain("fresh");
     expect(toolText).toContain("live move checked");
-    expect(toolText).toContain("grounded");
+    expect(toolText).toContain("backed");
     expect(toolText).not.toContain("live_reply_verify");
     expect(toolText).not.toContain("guard");
     expect(toolText).not.toContain("unsupported_live_outcome_claim");
@@ -1044,14 +1044,14 @@ describe("chat - real runChat path", () => {
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
     expect(toolText).toContain("live read");
     expect(toolText).toContain("fresh");
-    expect(toolText).toContain("scoring grounded");
+    expect(toolText).toContain("scoring backed");
     expect(toolText).not.toContain("supported_verdict");
 
     const artifactText =
       document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
     expect(artifactText).toContain("live read");
-    expect(artifactText).toContain("scoring grounded");
-    expect(artifactText).toContain("move scoring grounded by live read");
+    expect(artifactText).toContain("scoring backed");
+    expect(artifactText).toContain("move scoring backed by live read");
     expect(artifactText).not.toContain("claim_policy");
     expect(artifactText).not.toContain("supported_verdict");
   });
@@ -1113,7 +1113,7 @@ describe("chat - real runChat path", () => {
     expect(artifactText).not.toContain("requires_more_evidence");
   });
 
-  it("keeps the library setup action visible when proof gate is still waiting", async () => {
+  it("keeps the library setup action visible while the live read is waiting", async () => {
     statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
     chatMock.mockResolvedValueOnce({
       ...CHAT_WITH_PLAYLIST,

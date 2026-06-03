@@ -1121,7 +1121,7 @@ function ensureChatIntro(thread: HTMLElement): void {
   appendChatTurn(
     thread,
     "viber",
-    "I can build a set, score a transition, or rediscover deep cuts. I will show the tool trace and export receipt before you trust it.",
+    "I can build a set, score a transition, or rediscover deep cuts.",
   );
 }
 
@@ -1140,7 +1140,7 @@ function renderChatBusy(): void {
   name.textContent = "thinking";
   const arg = document.createElement("div");
   arg.className = "arg";
-  arg.textContent = "grounding turn";
+  arg.textContent = "reading the crate";
   text.append(name, arg);
   row.append(text);
   tools.append(row);
@@ -1293,7 +1293,7 @@ function liveProofStatus(context: LibraryLiveContext | null): {
   detail: string;
 } {
   if (!context) {
-    return { ok: false, state: "waiting", detail: "ask Viber for receipts" };
+    return { ok: false, state: "waiting", detail: "waiting for decks" };
   }
   const capabilities = new Set(context.live_context_capabilities ?? []);
   const transportOk =
@@ -1347,17 +1347,17 @@ function liveProofStatus(context: LibraryLiveContext | null): {
   } else if (!context.deck_audio_window_context) {
     missing.push("deck audio window");
   } else if (liveDeckAudioCaptureTokens(context).length === 0) {
-    missing.push("deck audio receipt");
+    missing.push("deck audio activity");
   } else if (!liveDeckAudioCaptureActive(context)) {
     missing.push("deck audio idle");
   } else if (!liveDeckAudioCaptureBothActive(context)) {
     missing.push("both decks active");
   } else if (liveEvidenceTokens(context, "deck_audio_features=").length === 0) {
-    missing.push("deck audio feature receipt");
+    missing.push("deck audio features");
   } else if (liveEvidenceTokens(context, "deck_audio_delta=").length === 0) {
-    missing.push("deck audio delta receipt");
+    missing.push("deck movement");
   } else if (liveEvidenceTokens(context, "deck_audio_window=").length === 0) {
-    missing.push("deck audio window receipt");
+    missing.push("deck timing window");
   }
   if (missing.length > 0) {
     return {
@@ -1450,7 +1450,7 @@ function appendLiveProofStatusToolRow(
   const text = document.createElement("div");
   const name = document.createElement("div");
   name.className = "name";
-  name.textContent = "proof gate";
+  name.textContent = "live read";
   const arg = document.createElement("div");
   arg.className = "arg";
   arg.textContent = `${status.state} · ${status.detail}`;
@@ -1473,7 +1473,7 @@ function idleMissionArtifact(
   const kicker = document.createElement("span");
   kicker.textContent = "Viber runbook";
   const title = document.createElement("b");
-  title.textContent = proof.ok ? "Live mix receipt armed" : "Set prep console armed";
+  title.textContent = proof.ok ? "Live mix armed" : "Set prep armed";
   titleWrap.append(kicker, title);
   const state = document.createElement("em");
   state.textContent = proof.ok ? "armed" : operatorState(stats, proof);
@@ -1489,7 +1489,7 @@ function idleMissionArtifact(
   const steps: Array<[string, string, string]> = [
     ["01", "Build set", buildValue],
     ["02", "Score transition", `${proof.state} · ${proof.detail}`],
-    ["03", "Export receipt", `${searchValue} · Rekordbox / M3U after grounded set`],
+    ["03", "Export set", `${searchValue} · Rekordbox / M3U after set prep`],
   ];
   steps.forEach(([step, label, value]) => {
     const row = document.createElement("div");
@@ -1509,7 +1509,7 @@ function idleMissionArtifact(
 
   const foot = document.createElement("div");
   foot.className = "vmx-lib-idle-mission__foot";
-  foot.textContent = "No fake tracks. No uncited transition advice.";
+  foot.textContent = "No fake tracks. No guessing transitions.";
   card.append(foot);
   return card;
 }
@@ -1572,9 +1572,9 @@ function liveVerificationStateText(v: LibraryLiveVerification): string {
         : v.claim_policy === "candidate_not_verdict"
           ? "setup noted"
           : v.claim_policy === "supported_verdict"
-            ? "scoring grounded"
-          : "ready";
-  const result = v.ok ? (v.guard_applied ? "grounded" : "checked") : "waiting";
+            ? "scoring backed"
+            : "ready";
+  const result = v.ok ? (v.guard_applied ? "backed" : "checked") : "waiting";
   return `${transport} · ${policy} · ${result}`;
 }
 
@@ -1764,7 +1764,7 @@ function appendChatLiveVerificationLines(
     appendChatCardLine(card, "move scoring waits for a stronger live read");
   }
   if (verification.move_grades_seen > 0 && verification.move_grades_allowed) {
-    appendChatCardLine(card, "move scoring grounded by live read");
+    appendChatCardLine(card, "move scoring backed by live read");
   }
 }
 

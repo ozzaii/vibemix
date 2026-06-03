@@ -358,16 +358,18 @@ describe("group rendering", () => {
     setSettingsUIState({ open: true });
 
     const trust = document.querySelector<HTMLElement>('[data-wire="settings.trust"]');
-    expect(trust?.textContent).toContain("Sven contract");
+    expect(trust?.textContent).toContain("How Sven listens");
     expect(trust?.textContent).toContain("Bella · Coach · Intermediate");
-    expect(trust?.textContent).toContain("Critique lens · Speakers · Device 5 · grounded");
+    expect(trust?.textContent).toContain(
+      "Critique lens · Speakers · Device 5 · reading the room",
+    );
     expect(trust?.textContent).toContain("Local voice");
     expect(trust?.textContent).toContain("Bella · MOSS");
     expect(trust?.textContent).toContain("Sven speaks from the bundled voice stack");
     expect(trust?.textContent).toContain("Speakers · Device 5");
     expect(trust?.textContent).toContain("12 sessions");
     expect(trust?.textContent).toContain("3.4 GB stored locally");
-    expect(trust?.textContent).toContain("grounded");
+    expect(trust?.textContent).toContain("reading the room");
     expect(
       document.querySelector<HTMLElement>('[data-wire="settings.trust.proof"]')
         ?.dataset.status,
@@ -398,8 +400,8 @@ describe("group rendering", () => {
     expect(recordings?.textContent).toContain("unavailable");
     expect(recordings?.textContent).toContain("local session list did not answer");
     expect(recordings?.dataset.status).toBe("warn");
-    expect(proof?.textContent).toContain("proof pending");
-    expect(proof?.textContent).toContain("screen proof unavailable");
+    expect(proof?.textContent).toContain("listening");
+    expect(proof?.textContent).toContain("screen context unavailable");
     expect(proof?.dataset.status).toBe("warn");
   });
 

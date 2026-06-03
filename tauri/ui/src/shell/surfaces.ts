@@ -68,10 +68,10 @@ export const SURFACES: readonly SurfaceDef[] = [
     wire: "shell.surface.crate",
     empty: {
       title: "Viber is waiting for your crate.",
-      sub: "Open Rekordbox or add a music folder. I can build sets, solve transitions, and show receipts.",
+      sub: "Open Rekordbox or add a music folder. I can build sets and solve transitions.",
       proof: [
         { label: "Build", value: "set arcs from indexed tracks" },
-        { label: "Mix", value: "grounded transitions only" },
+        { label: "Mix", value: "deck-backed transitions only" },
         { label: "Find", value: "deep cuts without repeats" },
       ],
     },
@@ -97,10 +97,10 @@ export const SURFACES: readonly SurfaceDef[] = [
     wire: "shell.surface.debrief",
     empty: {
       title: "Your set review lands here.",
-      sub: "After a real set, I turn cited moments into a timeline, skill receipts, and the next move.",
+      sub: "After a real set, I turn key moments into a timeline, skill notes, and the next move.",
       proof: [
         { label: "Timeline", value: "drops, recoveries, energy shape" },
-        { label: "Receipts", value: "why a praise or critique was grounded" },
+        { label: "Why", value: "what made a praise or critique real" },
         { label: "Next move", value: "practice drill or crate follow-up" },
       ],
     },

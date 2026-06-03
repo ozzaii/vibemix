@@ -1110,10 +1110,10 @@ body {
   color: var(--silk-22);
 }
 .vmx-lib-chat-tools:empty::before {
-  content: "tool trace ready";
+  content: "live read ready";
 }
 .vmx-lib-chat-artifact:empty::before {
-  content: "receipts land here";
+  content: "runs land here";
   border-top: 1px solid var(--border-subtle);
 }
 /* A console transcript, NOT a chatbot. Turns carry no per-turn box by default:

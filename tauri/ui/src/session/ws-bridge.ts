@@ -414,15 +414,15 @@ function normalizeClaimPolicy(
 function claimPolicyLabel(policy: string): string {
   switch (policy) {
     case "supported_verdict":
-      return "verdict proof";
+      return "ready to call it";
     case "candidate_not_verdict":
-      return "candidate only";
+      return "checking the call";
     case "watch_not_claim":
-      return "watch only";
+      return "watching only";
     case "blocked":
-      return "claims held";
+      return "calls held";
     default:
-      return "proof pending";
+      return "listening";
   }
 }
 

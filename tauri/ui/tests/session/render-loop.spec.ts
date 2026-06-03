@@ -246,13 +246,14 @@ describe("renderSessionFrame — CSS variable hot path", () => {
       policy: "supported_verdict",
       level: "green",
       reason: "two_deck_audio_window_delta_proof",
-      label: "verdict proof",
+      label: "ready to call it",
     };
     const m = mountSessionLayout(root, state);
     const chip = root.querySelector<HTMLElement>(".vmx-claim-policy");
     expect(chip?.hidden).toBe(false);
-    expect(chip?.textContent).toBe("verdict proof");
+    expect(chip?.textContent).toBe("ready to call it");
     expect(chip?.dataset.level).toBe("green");
+    expect(chip?.getAttribute("aria-label")).toBe("live claim status: ready to call it");
     expect(chip?.getAttribute("title")).toBe(
       "supported_verdict: two_deck_audio_window_delta_proof",
     );

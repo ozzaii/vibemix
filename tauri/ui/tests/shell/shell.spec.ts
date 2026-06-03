@@ -80,11 +80,11 @@ describe("DesktopShell", () => {
     const debrief = host.querySelector<HTMLElement>('.surface[data-surface="debrief"]')!;
 
     expect(debrief.querySelector(".se-title")?.textContent).toBe("Your set review lands here.");
-    expect(debrief.textContent).toContain("timeline, skill receipts, and the next move");
+    expect(debrief.textContent).toContain("timeline, skill notes, and the next move");
     expect(debrief.textContent).toContain("Timeline");
     expect(debrief.textContent).toContain("drops, recoveries, energy shape");
-    expect(debrief.textContent).toContain("Receipts");
-    expect(debrief.textContent).toContain("why a praise or critique was grounded");
+    expect(debrief.textContent).toContain("Why");
+    expect(debrief.textContent).toContain("what made a praise or critique real");
     expect(debrief.textContent).toContain("Next move");
     expect(debrief.textContent).toContain("practice drill or crate follow-up");
     expect(debrief.textContent).not.toContain("No set to review.");
@@ -97,11 +97,11 @@ describe("DesktopShell", () => {
     expect(crate.querySelector(".se-title")?.textContent).toBe(
       "Viber is waiting for your crate.",
     );
-    expect(crate.textContent).toContain("build sets, solve transitions, and show receipts");
+    expect(crate.textContent).toContain("build sets and solve transitions");
     expect(crate.textContent).toContain("Build");
     expect(crate.textContent).toContain("set arcs from indexed tracks");
     expect(crate.textContent).toContain("Mix");
-    expect(crate.textContent).toContain("grounded transitions only");
+    expect(crate.textContent).toContain("deck-backed transitions only");
     expect(crate.textContent).toContain("Find");
     expect(crate.textContent).toContain("deep cuts without repeats");
     expect(crate.textContent).not.toContain("Nothing loaded yet.");

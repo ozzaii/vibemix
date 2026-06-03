@@ -84,6 +84,7 @@ import { HelpGroup } from "./components/help-group.js";
 import { LearnGroup } from "./components/learn-group.js";
 import { MascotGroup } from "./components/mascot-group.js";
 import { PerformanceGroup } from "./components/performance-group.js";
+import { djLabel } from "../shell/dj-vocab.js";
 import {
   closeSettingsState,
   getSettingsUIState,
@@ -1139,11 +1140,9 @@ function renderSettingsTrustRail(
     },
     {
       wire: "settings.trust.proof",
-      label: "Proof gate",
-      value: state.grounded ? "grounded" : state.claimPolicy?.label ?? "proof pending",
-      sub: state.grounded
-        ? "citations can attach to Sven"
-        : state.claimPolicy?.reason ?? "Sven waits for evidence",
+      label: "Calls backed",
+      value: claimStatusLabel(state),
+      sub: claimStatusSub(state),
       status: state.grounded ? "ok" : "warn",
     },
   ];
@@ -1158,9 +1157,7 @@ function renderSettingsContract(
   settings: SettingsView,
   state: ReturnType<typeof getSessionState>,
 ): HTMLElement {
-  const proofValue = state.grounded
-    ? "grounded"
-    : state.claimPolicy?.label ?? "proof pending";
+  const proofValue = claimStatusLabel(state);
   const contract = document.createElement("div");
   contract.className = "vmx-settings-trust__contract";
   contract.dataset.wire = "settings.trust.contract";
@@ -1168,7 +1165,7 @@ function renderSettingsContract(
 
   const label = document.createElement("div");
   label.className = "vmx-settings-trust__contract-label";
-  label.textContent = "Sven contract";
+  label.textContent = "How Sven listens";
 
   const value = document.createElement("div");
   value.className = "vmx-settings-trust__contract-value";
@@ -1181,6 +1178,19 @@ function renderSettingsContract(
 
   contract.append(label, value, sub);
   return contract;
+}
+
+function claimStatusLabel(state: ReturnType<typeof getSessionState>): string {
+  return state.grounded ? djLabel("grounded") : "listening";
+}
+
+function claimStatusSub(state: ReturnType<typeof getSessionState>): string {
+  if (state.grounded) return "Sven can back up every call he makes";
+  const reason = state.claimPolicy?.reason?.trim();
+  if (!reason) return "Sven waits until he hears it";
+  return reason
+    .replace(/\bproof\b/gi, "context")
+    .replace(/\bevidence\b/gi, "what he hears");
 }
 
 function renderTrustCell(cell: TrustCell): HTMLElement {
