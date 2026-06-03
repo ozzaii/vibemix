@@ -13,6 +13,8 @@ from pathlib import Path
 import pytest
 from scripts.eval.replay_harness import (
     DEFAULT_THRESHOLDS,
+    _aggregate_sven_quality,
+    _build_overnight_findings,
     call_judges_stub,
     main,
     replay_one_session,
@@ -200,6 +202,84 @@ def test_cli_detector_mode_writes_overnight_findings(tmp_path: Path) -> None:
     assert scenario["checklist"]["detector_events"] == 0
     assert "no_detector_events" in scenario["flags"]
     assert "mute" in scenario["flags"]
+
+
+def test_sven_quality_aggregation_scores_real_judge_rows() -> None:
+    """Overnight Layer B compacts Respan Sven rows into stable quality fields."""
+    quality = _aggregate_sven_quality(
+        [
+            {
+                "scores": {
+                    "friend_not_narrator": 3,
+                    "grounded_not_fabricated": 2,
+                    "earned_not_constant": 2,
+                    "move_specific_not_spectrum": 1,
+                    "voice_no_slop": 3,
+                    "should_speak": True,
+                }
+            },
+            {
+                "scores": {
+                    "friend_not_narrator": 1,
+                    "grounded_not_fabricated": 3,
+                    "earned_not_constant": 2,
+                    "move_specific_not_spectrum": 3,
+                    "voice_no_slop": 1,
+                    "should_speak": False,
+                }
+            },
+            {"error": "non-200"},
+        ]
+    )
+
+    assert quality == {
+        "source": "respan_sven_heartbeat_judge",
+        "n_lines": 2,
+        "errors": 1,
+        "friend": 2.0,
+        "grounded": 2.5,
+        "earned": 2.0,
+        "move": 2.0,
+        "voice": 2.0,
+        "should_speak_agree": 0.5,
+    }
+
+
+def test_findings_include_sven_quality_flags(tmp_path: Path) -> None:
+    """Low Layer-B scores become explicit fix-routing flags."""
+    session = tmp_path / "recording"
+    session.mkdir()
+    (session / "events.jsonl").write_text("", encoding="utf-8")
+
+    data = _build_overnight_findings(
+        [
+            {
+                "session": "recording",
+                "session_dir": str(session),
+                "predicted_events": [],
+                "ground_truth": [],
+                "prediction_source": "ground_truth_noop",
+                "quality": {
+                    "source": "respan_sven_heartbeat_judge",
+                    "n_lines": 3,
+                    "errors": 0,
+                    "friend": 1.667,
+                    "grounded": 1.333,
+                    "earned": 2.333,
+                    "move": 1.0,
+                    "voice": 1.667,
+                    "should_speak_agree": 0.333,
+                },
+            }
+        ]
+    )
+
+    scenario = data["scenarios"][0]
+    assert scenario["quality"]["n_lines"] == 3
+    assert scenario["verdict"] == "fail"
+    assert "hallucinated" in scenario["flags"]
+    assert "slop" in scenario["flags"]
+    assert "over_speaking" in scenario["flags"]
 
 
 def test_cli_jobs_two_runs_sessions_in_process_pool(tmp_path: Path) -> None:

@@ -730,6 +730,42 @@ Proof before staging:
 - `git diff --check -- tests/scripts/test_cli_library_search.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 0AQ - Overnight QA Sven Quality Layer
+
+Suggested commit: `feat(eval): attach Sven quality to overnight findings`
+
+Include:
+
+- `scripts/eval/replay_harness.py`
+- `scripts/eval/respan_sven_heartbeat_judge.py`
+- `tests/eval/test_replay_harness.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Hold:
+
+- `scripts/eval/respan_sven_sim.py`
+
+Keep out:
+
+- Live runtime, co-host say/when code, UI surfaces, package/release scripts,
+  unrelated Respan simulation experiments, and any app-launch proof artifacts.
+
+Reason:
+
+- The overnight replay harness already emits keyless findings. This package wires
+  the existing Respan Sven real-line judge as an optional Layer-B quality payload
+  behind `--quality-respan`, keeping `quality: null` when credentials or
+  invocation rows are absent.
+
+Proof before staging:
+
+- `uv run pytest -q tests/eval/test_replay_harness.py`
+- `uv run pytest -q tests/eval/test_replay_harness.py tests/eval/test_replay_harness_cooldowns.py tests/eval/test_replay_harness_phase_41.py`
+- `uv run ruff check scripts/eval/replay_harness.py scripts/eval/respan_sven_heartbeat_judge.py tests/eval/test_replay_harness.py`
+- `RESPAN_API_KEY= uv run python -m scripts.eval.replay_harness --corpus tests/eval/fixtures --judges noop --output "$tmpdir/out" --use-detector-predictions --findings-json "$tmpdir/findings.json" --quality-respan`
+- `git diff --cached --check`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Package 0AA - Replay Linter Test Ruff Hygiene
 
 Suggested commit: `test(scripts): clean replay linter test lint`

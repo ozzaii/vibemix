@@ -43,7 +43,7 @@ import statistics
 import sys
 import wave
 from collections import defaultdict, deque
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -81,6 +81,22 @@ def _load_thresholds(lock_path: Path | None) -> dict[str, float]:
 MAX_SESSION_WAV_BYTES = 300 * 1024 * 1024
 _REPLAY_TICK_SECONDS: float = 0.1
 _LATE_LLM_TO_TTS_BUDGET_MS: float = 6000.0
+_QUALITY_LOW_DIM_THRESHOLD: float = 2.0
+_QUALITY_SHOULD_SPEAK_MIN: float = 0.80
+_QUALITY_DIMS: tuple[str, ...] = (
+    "friend_not_narrator",
+    "grounded_not_fabricated",
+    "earned_not_constant",
+    "move_specific_not_spectrum",
+    "voice_no_slop",
+)
+_QUALITY_DIM_KEYS: dict[str, str] = {
+    "friend_not_narrator": "friend",
+    "grounded_not_fabricated": "grounded",
+    "earned_not_constant": "earned",
+    "move_specific_not_spectrum": "move",
+    "voice_no_slop": "voice",
+}
 
 
 @dataclass
@@ -795,11 +811,151 @@ def _replay_one_session_worker(
     )
 
 
+def _aggregate_sven_quality(judge_rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Summarize Respan Sven judge rows into the overnight findings shape.
+
+    The judge grades only real spoken lines. Empty input therefore means
+    "nothing to score", not a failure. Callers keep ``quality`` null in that
+    case so the findings JSON stays honest instead of fabricating a score.
+    """
+    scored: list[dict[str, Any]] = []
+    errors = 0
+    for row in judge_rows:
+        scores = row.get("scores")
+        if not isinstance(scores, dict):
+            errors += 1
+            continue
+        if not any(isinstance(scores.get(dim), (int, float)) for dim in _QUALITY_DIMS):
+            errors += 1
+            continue
+        scored.append(scores)
+
+    if not scored:
+        return None
+
+    quality: dict[str, Any] = {
+        "source": "respan_sven_heartbeat_judge",
+        "n_lines": len(scored),
+        "errors": errors,
+    }
+    for dim, key in _QUALITY_DIM_KEYS.items():
+        vals = [
+            float(scores[dim])
+            for scores in scored
+            if isinstance(scores.get(dim), (int, float))
+        ]
+        quality[key] = round(sum(vals) / len(vals), 3) if vals else None
+
+    should_values = [
+        scores.get("should_speak")
+        for scores in scored
+        if isinstance(scores.get("should_speak"), bool)
+    ]
+    if should_values:
+        quality["should_speak_agree"] = round(
+            sum(1 for value in should_values if value is True) / len(should_values),
+            3,
+        )
+    else:
+        quality["should_speak_agree"] = None
+    return quality
+
+
+def _quality_flags(quality: dict[str, Any] | None) -> list[str]:
+    """Map Sven quality scores to findings flags without blocking by default."""
+    if not quality:
+        return []
+    flags: list[str] = []
+    grounded = _numeric(quality.get("grounded"))
+    if grounded is not None and grounded < _QUALITY_LOW_DIM_THRESHOLD:
+        flags.append("hallucinated")
+    other_dims = [
+        _numeric(quality.get(key))
+        for key in ("friend", "earned", "move", "voice")
+    ]
+    if any(value is not None and value < _QUALITY_LOW_DIM_THRESHOLD for value in other_dims):
+        flags.append("slop")
+    should_speak = _numeric(quality.get("should_speak_agree"))
+    if should_speak is not None and should_speak < _QUALITY_SHOULD_SPEAK_MIN:
+        flags.append("over_speaking")
+    return flags
+
+
+def _run_respan_quality_for_session(
+    session_dir: Path,
+    *,
+    events: set[str],
+    limit: int | None,
+    concurrency: int,
+    dataset_tag: str,
+    log_requests: bool,
+) -> dict[str, Any] | None:
+    """Run the Respan Sven judge for a replay session when credentials exist.
+
+    Returns ``None`` for honest-null cases: no key, no invocation rows, or no
+    scored spoken lines. The replay harness is still fully useful keyless; this
+    layer only lights up when the operator deliberately enables it.
+    """
+    key = os.environ.get("RESPAN_API_KEY", "")
+    if not key:
+        return None
+    if not (session_dir / "invocations").is_dir():
+        return None
+
+    from scripts.eval.respan_sven_heartbeat_judge import judge_one, load_rows
+
+    rows = load_rows(session_dir, events, limit)
+    if not rows:
+        return None
+    workers = max(1, int(concurrency))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        judged = list(
+            pool.map(
+                lambda row: judge_one(row, key, dataset_tag, log_requests),
+                rows,
+            )
+        )
+    return _aggregate_sven_quality(judged)
+
+
+def _attach_respan_quality(
+    results: list[dict[str, Any]],
+    *,
+    events: set[str],
+    limit: int | None,
+    concurrency: int,
+    dataset_tag: str,
+    log_requests: bool,
+) -> None:
+    """Mutate replay results with optional Sven quality payloads."""
+    if not os.environ.get("RESPAN_API_KEY"):
+        print(
+            "[overnight-quality] RESPAN_API_KEY not set — quality stays null",
+            file=sys.stderr,
+        )
+        return
+    for result in results:
+        session_dir_raw = result.get("session_dir")
+        if not session_dir_raw:
+            continue
+        quality = _run_respan_quality_for_session(
+            Path(str(session_dir_raw)),
+            events=events,
+            limit=limit,
+            concurrency=concurrency,
+            dataset_tag=dataset_tag,
+            log_requests=log_requests,
+        )
+        if quality is not None:
+            result["quality"] = quality
+
+
 def _build_overnight_findings(results: list[dict[str, Any]]) -> dict[str, Any]:
     """Build the keyless overnight QA findings report.
 
-    Layer A/B/C names mirror the packet, but only keyless checks are populated
-    here. The Respan quality judge remains a later opt-in layer.
+    Layer A/C are keyless. Layer B (Sven line quality) is an optional
+    Respan-backed payload attached to each result by ``--quality-respan``;
+    without that flag or without credentials it remains honestly null.
     """
     rows: list[dict[str, Any]] = []
     for result in results:
@@ -864,6 +1020,14 @@ def _build_overnight_findings(results: list[dict[str, Any]]) -> dict[str, Any]:
             flags.append("late")
         if result.get("skipped"):
             flags.append("broken")
+        quality = (
+            result.get("quality")
+            if isinstance(result.get("quality"), dict)
+            else None
+        )
+        for flag in _quality_flags(quality):
+            if flag not in flags:
+                flags.append(flag)
 
         evidence: list[str] = []
         if events_path.exists():
@@ -888,7 +1052,7 @@ def _build_overnight_findings(results: list[dict[str, Any]]) -> dict[str, Any]:
                     "detector_events": detector_events,
                     "prediction_source": result.get("prediction_source"),
                 },
-                "quality": None,
+                "quality": quality,
                 "broken": {
                     "dead_controls": [],
                     "muted_after_trigger": bool(event_rows and not invokes),
@@ -1053,6 +1217,25 @@ async def _run(args: argparse.Namespace) -> int:
         src_root = Path(__file__).resolve().parents[2] / "src" / "vibemix"
         _emit_router_resolves_report(src_root)
 
+    if args.quality_respan:
+        events_filter = (
+            set()
+            if str(args.quality_events).upper() == "ALL"
+            else {
+                event.strip()
+                for event in str(args.quality_events).split(",")
+                if event.strip()
+            }
+        )
+        _attach_respan_quality(
+            list(results),
+            events=events_filter,
+            limit=args.quality_limit,
+            concurrency=args.quality_concurrency,
+            dataset_tag=args.quality_dataset_tag,
+            log_requests=not args.quality_no_log,
+        )
+
     from scripts.eval.scorecard import render_scorecard
 
     thresholds = _load_thresholds(args.threshold_lock)
@@ -1174,6 +1357,50 @@ def main(argv: list[str] | None = None) -> int:
             "Combines detector silence, mute/slop/latency flags, and evidence "
             "pointers for the auto-fix loop."
         ),
+    )
+    parser.add_argument(
+        "--quality-respan",
+        action="store_true",
+        default=False,
+        help=(
+            "Optional overnight QA Layer B — score actual spoken Sven lines "
+            "from session invocations/ via scripts/eval/respan_sven_heartbeat_judge.py "
+            "and attach aggregate quality to findings JSON. Requires RESPAN_API_KEY; "
+            "without it quality remains null."
+        ),
+    )
+    parser.add_argument(
+        "--quality-events",
+        type=str,
+        default="ALL",
+        help=(
+            "Comma-separated event filter for --quality-respan, or ALL. "
+            "Default ALL judges every spoken invocation in the session."
+        ),
+    )
+    parser.add_argument(
+        "--quality-limit",
+        type=int,
+        default=None,
+        help="Maximum spoken invocation rows per session for --quality-respan.",
+    )
+    parser.add_argument(
+        "--quality-concurrency",
+        type=int,
+        default=4,
+        help="Worker threads for --quality-respan judge calls.",
+    )
+    parser.add_argument(
+        "--quality-dataset-tag",
+        type=str,
+        default="vibemix-overnight-qa",
+        help="Respan dataset tag used when --quality-respan request logging is enabled.",
+    )
+    parser.add_argument(
+        "--quality-no-log",
+        action="store_true",
+        default=False,
+        help="Run --quality-respan without creating Respan request-log rows.",
     )
     parser.add_argument(
         "--jobs",
