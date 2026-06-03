@@ -56,6 +56,21 @@ describe("wizard intro hero (impeccable Wave 1.2)", () => {
     expect(called).toBe(1);
   });
 
+  it("states the live contract before asking the user to begin", () => {
+    const rendered = renderStep0Intro({ onBegin: () => {} });
+    host().append(rendered);
+
+    const contract = rendered.querySelector<HTMLElement>(
+      '[data-wire="wizard.intro-contract"]',
+    );
+    expect(contract).not.toBeNull();
+    expect(contract?.getAttribute("aria-label")).toBe("Sven live contract");
+    expect(contract?.textContent).toContain("local MOSS");
+    expect(contract?.textContent).toContain("master audio");
+    expect(contract?.textContent).toContain("screen proof");
+    expect(contract?.textContent).toContain("controller MIDI");
+  });
+
   it("has NO border-anim sweep, NO glass-tile shell (full-void brand surface)", () => {
     const rendered = renderStep0Intro({ onBegin: () => {} });
     host().append(rendered);

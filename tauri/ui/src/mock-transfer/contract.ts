@@ -52,6 +52,13 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "wizard.step-strip", purpose: "first-run calibration step strip" },
       { wire: "wizard.cta", purpose: "first-run calibration command row" },
     ],
+    dynamicWires: [
+      {
+        wire: "wizard.intro-contract",
+        purpose: "first-run Sven proof contract",
+        producerFile: "src/wizard/step0-intro.ts",
+      },
+    ],
     inbound: [
       "ipc.session.snapshot",
       "ipc.status.tick",

@@ -284,7 +284,59 @@ const CSS = `
   .wizard-intro__cta {
     position: relative;
     z-index: 2;
-    margin-top: var(--sp-3);
+    margin-top: var(--sp-2);
+  }
+  .wizard-intro__contract {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    width: min(560px, 86vw);
+    margin-top: var(--sp-2);
+    border: 1px solid rgba(255, 220, 240, 0.12);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.024), transparent 48%, rgba(0, 0, 0, 0.22)),
+      rgba(0, 0, 0, 0.24);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.032),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.68),
+      0 16px 34px rgba(0, 0, 0, 0.26);
+    overflow: hidden;
+  }
+  .wizard-intro__contract-cell {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    padding: 10px 11px 11px;
+    background: rgba(255, 251, 244, 0.014);
+  }
+  .wizard-intro__contract-cell span,
+  .wizard-intro__contract-cell b {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wizard-intro__contract-cell span {
+    font-family: var(--type-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--silk-40);
+  }
+  .wizard-intro__contract-cell b {
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 650;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--silk);
+  }
+  .wizard-intro__contract-cell:first-child b {
+    color: var(--amber);
+    text-shadow: 0 0 9px var(--amber-22);
   }
   .wizard-intro__cta .cmp-btn {
     min-width: 184px;
@@ -325,6 +377,7 @@ const CSS = `
    * same beat lands cleaner than three frames apart. */
   @media (prefers-reduced-motion: no-preference) {
     .wizard-intro__hero,
+    .wizard-intro__contract,
     .wizard-intro__cta,
     .wizard-intro__field {
       animation: vmx-intro-rise var(--motion-step) ease-out both;
@@ -356,6 +409,10 @@ const CSS = `
     .wizard-intro__wordmark { font-size: 52px; }
     .wizard-intro__phrase { font-size: 30px; }
     .wizard-intro__slogan { font-size: 11px; }
+    .wizard-intro__contract {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: min(420px, 86vw);
+    }
   }
   @media (max-width: 420px) {
     .wizard-intro__telemetry span:nth-child(n + 3) { display: none; }
@@ -369,6 +426,19 @@ const CSS = `
     .wizard-intro__cta .cmp-btn {
       min-width: 164px;
       padding-inline: 22px;
+    }
+    .wizard-intro__contract {
+      width: min(320px, 86vw);
+    }
+    .wizard-intro__contract-cell {
+      padding: 9px 10px 10px;
+    }
+    .wizard-intro__contract-cell span {
+      font-size: 8px;
+      letter-spacing: 0.15em;
+    }
+    .wizard-intro__contract-cell b {
+      font-size: 11px;
     }
   }
 `;
@@ -443,6 +513,28 @@ export function renderStep0Intro(cb: Step0IntroCallbacks): HTMLElement {
 
   hero.append(wordmark, phrase, slogan);
   root.append(hero);
+
+  const contract = document.createElement("div");
+  contract.className = "wizard-intro__contract";
+  contract.dataset.wire = "wizard.intro-contract";
+  contract.setAttribute("aria-label", "Sven live contract");
+  const contractItems: Array<[string, string]> = [
+    ["Voice", "local MOSS"],
+    ["Hear", "master audio"],
+    ["Read", "screen proof"],
+    ["Moves", "controller MIDI"],
+  ];
+  contractItems.forEach(([label, value]) => {
+    const cell = document.createElement("div");
+    cell.className = "wizard-intro__contract-cell";
+    const k = document.createElement("span");
+    k.textContent = label;
+    const v = document.createElement("b");
+    v.textContent = value;
+    cell.append(k, v);
+    contract.append(cell);
+  });
+  root.append(contract);
 
   const ctaWrap = document.createElement("div");
   ctaWrap.className = "wizard-intro__cta";

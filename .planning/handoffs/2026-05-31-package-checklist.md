@@ -10373,3 +10373,38 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/library.html tauri/ui/src/library/index.ts tauri/ui/src/library/library.css tauri/ui/src/library/chat.test.ts tauri/ui/src/mock-transfer/contract.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 81 - Wizard Live Contract Intro
+
+Suggested commit: `feat(wizard-ui): add first-run live contract`
+
+Include:
+
+- `tauri/ui/src/wizard/step0-intro.ts`
+- `tauri/ui/tests/wizard/step0-intro.spec.ts`
+- `tauri/ui/src/mock-transfer/contract.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Wizard step order, wizard IPC schema/codegen, sidecar onboarding commands,
+  driver install behavior, Deck/Crate/Learn/Debrief/Settings interiors, Sven
+  speech, Viber tooling, packaging scripts, and new dependencies. This package
+  only upgrades the first-run visual contract before the existing CTA advances
+  to permissions.
+
+Reason:
+
+- The exact signed app at `570a663e` showed the first-run intro as the next
+  weakest commercial-value surface: it has a strong brand hero, but the first
+  screen still asks a new DJ to infer what makes the app real. Add a compact
+  live contract strip that names the local MOSS voice, master-audio input,
+  screen proof, and controller MIDI chain before the first click, without
+  adding a tour, a second CTA, or fake readiness claims.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/wizard/step0-intro.spec.ts tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/wizard/step0-intro.ts tauri/ui/tests/wizard/step0-intro.spec.ts tauri/ui/src/mock-transfer/contract.ts .planning/handoffs/2026-05-31-package-checklist.md`
