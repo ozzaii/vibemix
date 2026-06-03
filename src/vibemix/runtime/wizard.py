@@ -51,6 +51,7 @@ import time
 import wave
 from pathlib import Path
 
+from vibemix.audio import WS_HOST, WS_PORT
 from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.ws_bus import WizardBus
 from vibemix.ui_bus.messages import (
@@ -592,14 +593,14 @@ class WizardLoop:
         try:
             await self.bus.start()
         except OSError as e:
-            # Port 8765 already bound (another vibemix instance, zombie
+            # Configured live bus port already bound (another vibemix instance, zombie
             # process, or a colliding process). Without this guard the
             # exception propagates uncaught and the sidecar exits with a
             # generic non-zero code → watchdog retries forever. Print a
             # stable marker the shell parses (sidecar.rs reads the last
             # log line on crash) and exit 2 (sentinel: fatal-bind-fail).
             print(
-                f"[FATAL] ws_bus port bind failed on 127.0.0.1:8765 — {e}",
+                f"[FATAL] ws_bus port bind failed on {WS_HOST}:{WS_PORT} — {e}",
                 file=sys.stderr,
                 flush=True,
             )

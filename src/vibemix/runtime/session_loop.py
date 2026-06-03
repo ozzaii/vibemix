@@ -54,6 +54,7 @@ from typing import Protocol
 
 import jsonschema
 
+from vibemix.audio import WS_HOST, WS_PORT
 from vibemix.runtime.config_store import ConfigStore, load_config, save_config
 from vibemix.runtime.drop_display import predicted_drop_bars
 from vibemix.runtime.parent_watchdog import watch_parent
@@ -1378,7 +1379,7 @@ class SessionLoop:
             await self.bus.start()
         except OSError as e:
             print(
-                f"[FATAL] ws_bus port bind failed on 127.0.0.1:8765 — {e}",
+                f"[FATAL] ws_bus port bind failed on {WS_HOST}:{WS_PORT} — {e}",
                 file=sys.stderr,
                 flush=True,
             )

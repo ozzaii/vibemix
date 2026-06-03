@@ -552,8 +552,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="SESSION_DIR",
         help=(
             "Run as post-session DEBRIEF sidecar — binds the DEBRIEF ws bus on "
-            "127.0.0.1:8766, emits the 3 reserved DEBRIEF schemas only, never "
-            "engages audio I/O or LiveKit. SESSION_DIR is the path to a "
+            f"127.0.0.1:{DEBRIEF_PORT}, emits the 3 reserved DEBRIEF schemas only, "
+            "never engages audio I/O or LiveKit. SESSION_DIR is the path to a "
             "closed recordings/* session; omit for a no-op smoke."
         ),
     )
@@ -583,7 +583,20 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 # mascot bus on 8765 (CONTEXT D-Area-1.1 / D-Area-1.3). v2.0 does NOT bind
 # this port — the constant is a forward-compatibility reservation only. v2.1
 # wires the real listener + 3-message emit path behind ``--debrief``.
-DEBRIEF_PORT: int = 8766
+def _env_port(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        port = int(raw)
+    except ValueError:
+        return default
+    if not (1 <= port <= 65535):
+        return default
+    return port
+
+
+DEBRIEF_PORT: int = _env_port("VIBEMIX_DEBRIEF_PORT", 8766)
 
 
 def _run_debrief_sidecar(session_dir: str) -> None:
@@ -596,7 +609,7 @@ def _run_debrief_sidecar(session_dir: str) -> None:
       * non-empty path: invoke :func:`vibemix.debrief.main.run` which
         canonicalizes the path, validates it lives under recordings
         root, runs the cache-hit fast path / first-time generation, and
-        starts the WS server on 127.0.0.1:DEBRIEF_PORT (8766).
+        starts the WS server on 127.0.0.1:DEBRIEF_PORT (8766 by default).
 
     Errors from the orchestrator surface as ``ipc.debrief.error`` frames
     over the WS bus, then the process exits cleanly. See plan 29-02
@@ -5409,6 +5422,9 @@ def _viber_local_source_status() -> dict[str, Any]:
 
 
 def _viber_live_context_hint(error: str | None, source_status: dict[str, Any]) -> str:
+    from vibemix.audio import WS_HOST, WS_PORT
+
+    socket_label = f"{WS_HOST}:{WS_PORT}"
     listener = source_status.get("ws_port_listener")
     if isinstance(listener, dict) and listener.get("listening"):
         if not listener.get("looks_like_vibemix"):
@@ -5420,13 +5436,13 @@ def _viber_live_context_hint(error: str | None, source_status: dict[str, Any]) -
             pid = listener.get("pid")
             pid_hint = f" pid={pid}" if pid is not None else ""
             return (
-                f"Port 8765 is occupied by {label}{pid_hint}, not the Vibemix live socket. "
+                f"Port {WS_PORT} is occupied by {label}{pid_hint}, not the Vibemix live socket. "
                 "Stop that process or free the port, then start the Vibemix live session "
                 "and rerun `vibemix library live-context`."
             )
         if error:
             return (
-                "A Vibemix-like process is listening on 8765, but the proof client could not "
+                f"A Vibemix-like process is listening on {socket_label}, but the proof client could not "
                 "read frames. Keep the live session open and rerun with --require-proof."
             )
     return "Start the vibemix live session, then rerun `vibemix library live-context`."
@@ -6208,9 +6224,11 @@ def _viber_live_context_operator_actions(
         actions.append(action)
 
     if diagnosis == "live_socket_missing":
+        from vibemix.audio import WS_HOST, WS_PORT
+
         add(
             "start_live_session",
-            "Start the Vibemix live session and keep ws://127.0.0.1:8765 open.",
+            f"Start the Vibemix live session and keep ws://{WS_HOST}:{WS_PORT} open.",
         )
         return actions
 
@@ -6301,9 +6319,11 @@ def _viber_live_context_operator_actions(
     if physical_diagnosis and (
         not checks.get("frames_seen") or not checks.get("flat_deck_frame_seen")
     ):
+        from vibemix.audio import WS_HOST, WS_PORT
+
         add(
             "start_live_session",
-            "Start the Vibemix live session and keep ws://127.0.0.1:8765 open.",
+            f"Start the Vibemix live session and keep ws://{WS_HOST}:{WS_PORT} open.",
         )
 
     if physical_diagnosis and not checks.get("controller_connected"):

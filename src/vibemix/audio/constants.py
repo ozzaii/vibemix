@@ -16,6 +16,22 @@ them OUT to module scope so Phase 3 can import without dragging EventDetector al
 
 from __future__ import annotations
 
+import os
+
+
+def _env_port(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        port = int(raw)
+    except ValueError:
+        return default
+    if not (1 <= port <= 65535):
+        return default
+    return port
+
+
 # ---- Audio I/O ----
 INVOKE_AUDIO_SECONDS = 60.0  # 2026-05-21 (Kaan): 18→30→60 — "a minute of past" for fuller context per turn. v4:100 — rolling audio snapshot length to LLM (Phase 4 consumer). clean_audio_buf auto-sizes to this+5s (__main__:470); audio_buf is 140s. Diet path (quick acks) still 6s — see DIET_AUDIO_SECONDS in dj_cohost.
 INPUT_SR_NATIVE = 48000  # v4:106 — BlackHole capture rate
@@ -47,7 +63,7 @@ MIC_AUDIO_PART_PRESENCE_RMS: float = 0.005  # int16-domain RMS floor; skip Part 
 
 # ---- WS bus (mascot + Phase 12 Live UI) ----
 WS_HOST: str = "127.0.0.1"  # v4:123
-WS_PORT: int = 8765  # v4:124
+WS_PORT: int = _env_port("VIBEMIX_WS_PORT", 8765)  # v4:124
 
 # ---- Engine tuning — French Touch / Daft Punk / Digitalism profile (125-128 BPM) ----
 SILENT_RMS = 0.012  # v4:127 — real silence between tracks (v4 raised from 0.008)
