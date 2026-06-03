@@ -460,6 +460,29 @@ def test_pyinstaller_specs_collect_sqlite_vec_extension(spec_name: str) -> None:
     "spec_name",
     ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
 )
+def test_pyinstaller_specs_collect_learn_exemplar_wavs(spec_name: str) -> None:
+    """Fresh installs need the packaged Learn EQ exemplar audio bank."""
+    text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
+    assert '"**/*.wav"' in text, f"{spec_name} must collect Learn WAV assets"
+
+    exemplar_root = PROJECT_ROOT / "src/vibemix/learn/assets/band_exemplars"
+    expected = {
+        "high/vibemix_internal_high_hat_air.wav",
+        "low/vibemix_internal_low_bass_gate.wav",
+        "mid/vibemix_internal_mid_chord_body.wav",
+        "sub/vibemix_internal_sub_pulse.wav",
+    }
+    present = {
+        path.relative_to(exemplar_root).as_posix()
+        for path in exemplar_root.rglob("*.wav")
+    }
+    assert expected <= present
+
+
+@pytest.mark.parametrize(
+    "spec_name",
+    ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
+)
 def test_pyinstaller_specs_filter_test_submodules(spec_name: str) -> None:
     """Frozen bundles must not force-include package test/demo trees."""
     text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")

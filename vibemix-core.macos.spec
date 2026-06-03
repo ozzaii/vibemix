@@ -259,7 +259,7 @@ for _fw in _PYOBJC_FRAMEWORKS:
 
 datas += collect_data_files(
     "vibemix",
-    includes=["**/*.json", "**/*.txt"],
+    includes=["**/*.json", "**/*.txt", "**/*.wav"],
     excludes=["*.env", ".env*", "*credentials*", "*.key", "*.pem"],
 )
 

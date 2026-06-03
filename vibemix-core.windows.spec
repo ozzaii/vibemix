@@ -237,7 +237,7 @@ if sys.platform == "darwin":
 
 datas += collect_data_files(
     "vibemix",
-    includes=["**/*.json", "**/*.txt"],
+    includes=["**/*.json", "**/*.txt", "**/*.wav"],
     excludes=["*.env", ".env*", "*credentials*", "*.key", "*.pem"],
 )
 
