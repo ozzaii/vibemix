@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import numpy as np
+
 from vibemix.learn.beatmatch_practice_driver import BeatmatchPracticeDriver
 from vibemix.learn.practice_loop import grade_owned_beatmatch_state
 
@@ -50,6 +52,35 @@ def test_driver_exposes_the_same_minideck_that_snapshots_grade() -> None:
     assert after is not None
     assert after.deck_state.a_frame == 128.0
     assert after.deck_state.b_frame == 128.0
+
+
+def test_driver_practice_deck_renders_audible_audio() -> None:
+    driver = BeatmatchPracticeDriver()
+
+    out = driver.deck.render_block(512)
+
+    assert out.shape == (512, 2)
+    assert out.dtype == np.float32
+    assert float(np.sqrt(np.mean(np.square(out)))) > 0.01
+
+
+def test_eq_swap_action_filters_audio_without_arming_beatmatch_grade() -> None:
+    neutral = BeatmatchPracticeDriver()
+    cut = BeatmatchPracticeDriver()
+    neutral.deck.xfader = 0.0
+    cut.deck.xfader = 0.0
+
+    assert cut.record_action("L2.04", {"control": "eq_low", "deck": "A", "value": 0}) is False
+    assert cut.snapshot() is None
+    neutral.deck.render_block(1024)
+    cut.deck.render_block(1024)  # coefficient-change crossfade block
+
+    neutral_out = neutral.deck.render_block(1024)
+    cut_out = cut.deck.render_block(1024)
+
+    neutral_rms = float(np.sqrt(np.mean(np.square(neutral_out[:, 0]))))
+    cut_rms = float(np.sqrt(np.mean(np.square(cut_out[:, 0]))))
+    assert cut_rms < neutral_rms * 0.75
 
 
 def test_ear_practice_large_pitch_move_does_not_credit_as_locked() -> None:

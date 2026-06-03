@@ -25,6 +25,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from vibemix.audio.three_band_eq import ThreeBandEQ
+
 
 def _do_scale_block(
     src: np.ndarray,
@@ -118,6 +120,7 @@ class MiniDeck:
         rate_a: float = 1.0,
         rate_b: float = 1.0,
         xfader: float = 0.5,
+        sample_rate: int = 44_100,
     ) -> None:
         self._src_a = np.asarray(src_a, dtype=np.float32)
         self._src_b = np.asarray(src_b, dtype=np.float32)
@@ -126,13 +129,30 @@ class MiniDeck:
         self.xfader = float(xfader)
         self._frame_a = 0.0
         self._frame_b = 0.0
+        self._eq_a = ThreeBandEQ(sample_rate=sample_rate)
+        self._eq_b = ThreeBandEQ(sample_rate=sample_rate)
 
     def render_block(self, n: int) -> np.ndarray:
         """Render ``n`` mixed output frames, advancing both deck cursors."""
         out_a, self._frame_a = _do_scale_block(self._src_a, self._frame_a, self.rate_a, n)
         out_b, self._frame_b = _do_scale_block(self._src_b, self._frame_b, self.rate_b, n)
+        out_a = self._eq_a.process(out_a)
+        out_b = self._eq_b.process(out_b)
         gain_a, gain_b = _equal_power_gains(self.xfader)
         return (gain_a * out_a + gain_b * out_b).astype(np.float32)
+
+    def set_eq(
+        self,
+        deck: str,
+        *,
+        low: float | int | None = None,
+        mid: float | int | None = None,
+        high: float | int | None = None,
+    ) -> None:
+        """Set one deck's EQ from controller CC values (0..127)."""
+
+        target = self._eq_a if deck.upper() == "A" else self._eq_b
+        target.set_cc(low=low, mid=mid, high=high)
 
     def state(self) -> DeckState:
         """Snapshot the two decks for the asyncio loop / Judge to read."""

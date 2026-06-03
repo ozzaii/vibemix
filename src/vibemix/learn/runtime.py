@@ -147,7 +147,7 @@ from vibemix.ui_bus.learn_messages import (
 # ``min_delta``, this default applies.
 _CC_DEFAULT_MIN_DELTA = 38
 _MISMATCH_HINT_THROTTLE_S = 1.5
-_BEATMATCH_PRACTICE_AUDIO_LESSONS = frozenset({"L2.01", "L2.02"})
+_BEATMATCH_PRACTICE_AUDIO_LESSONS = frozenset({"L2.01", "L2.02", "L2.04", "L2.05"})
 _BEATMATCH_PRACTICE_GRADE_STATES = frozenset(
     {"awaiting_action", "hint_strike_1", "hint_strike_2", "hint_strike_3", "advancing"}
 )

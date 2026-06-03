@@ -135,3 +135,22 @@ def test_minideck_full_a_outputs_deck_a_only_and_advances_both_cursors() -> None
     assert st.rate_a == 1.0
     assert st.rate_b == 2.0
     assert st.xfader == 0.0
+
+
+def test_minideck_low_eq_cut_filters_audible_deck() -> None:
+    t = np.arange(4096, dtype=np.float32) / 44_100.0
+    bass = np.sin(2.0 * np.pi * 80.0 * t).astype(np.float32)
+    src = np.column_stack([bass, bass])
+    neutral = MiniDeck(src, src, rate_a=1.0, rate_b=1.0, xfader=0.0)
+    cut = MiniDeck(src, src, rate_a=1.0, rate_b=1.0, xfader=0.0)
+
+    neutral.render_block(1024)
+    cut.set_eq("A", low=0)
+    cut.render_block(1024)  # coefficient-change crossfade block
+
+    neutral_out = neutral.render_block(1024)
+    cut_out = cut.render_block(1024)
+
+    neutral_rms = float(np.sqrt(np.mean(np.square(neutral_out[:, 0]))))
+    cut_rms = float(np.sqrt(np.mean(np.square(cut_out[:, 0]))))
+    assert cut_rms < neutral_rms * 0.55

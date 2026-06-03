@@ -75,6 +75,16 @@ def test_non_beatmatch_lesson_does_not_start_practice_player() -> None:
     assert player.starts == 0
 
 
+def test_eq_swap_lesson_starts_practice_player() -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L2.04")
+
+    assert player.starts == 1
+
+
 def test_loading_another_lesson_stops_active_practice_player() -> None:
     runtime = _runtime()
     player = _FakePracticePlayer()

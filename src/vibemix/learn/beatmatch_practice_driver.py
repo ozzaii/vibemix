@@ -24,6 +24,7 @@ _PRACTICE_BPM = 128.0
 _CENTER_CC = 64.0
 _TEMPO_CC_RATE_SPAN = 640.0
 _PRACTICE_LESSONS = frozenset({"L2.01", "L2.02"})
+_EQ_PRACTICE_LESSONS = frozenset({"L2.04", "L2.05"})
 
 
 def _deck_from_midi(midi: dict[str, Any]) -> str:
@@ -58,12 +59,37 @@ def _tempo_rate_from_cc(value: Any) -> float:
     return 1.0 + (cc - _CENTER_CC) / _TEMPO_CC_RATE_SPAN
 
 
+def _practice_loop(*, bass_hz: float, hat_hz: float = 6_500.0) -> np.ndarray:
+    """Build a small self-authored practice loop with kick, bass, and hats."""
+
+    beat_s = 60.0 / _PRACTICE_BPM
+    n_beats = 64
+    n_frames = round(_SAMPLE_RATE * beat_s * n_beats)
+    t = np.arange(n_frames, dtype=np.float32) / float(_SAMPLE_RATE)
+    beat_phase = np.mod(t, beat_s)
+
+    kick_env = np.exp(-beat_phase * 28.0)
+    kick = kick_env * np.sin(2.0 * np.pi * (55.0 + 40.0 * kick_env) * beat_phase)
+    bass = 0.36 * np.sin(2.0 * np.pi * bass_hz * t)
+    hat = 0.08 * np.sin(2.0 * np.pi * hat_hz * t) * (beat_phase < 0.045)
+    body = 0.11 * np.sin(2.0 * np.pi * 440.0 * t) * (beat_phase < beat_s * 0.55)
+    mono = (0.58 * kick + bass + hat + body).astype(np.float32)
+    mono *= 0.7 / max(0.7, float(np.max(np.abs(mono))))
+    return np.column_stack([mono, mono]).astype(np.float32)
+
+
 class BeatmatchPracticeDriver:
     """Convert authored Learn beatmatch actions into owned-deck snapshots."""
 
     def __init__(self) -> None:
-        silent = np.zeros((2, 2), dtype=np.float32)
-        self._deck = MiniDeck(silent, silent, rate_a=1.0, rate_b=0.97, xfader=0.5)
+        self._deck = MiniDeck(
+            _practice_loop(bass_hz=82.0),
+            _practice_loop(bass_hz=98.0),
+            rate_a=1.0,
+            rate_b=0.97,
+            xfader=0.5,
+            sample_rate=_SAMPLE_RATE,
+        )
         self._grid_a = BeatGrid(
             anchor_frame=0.0,
             bpm=_PRACTICE_BPM,
@@ -91,13 +117,20 @@ class BeatmatchPracticeDriver:
         actions that ``LessonRuntime`` has already matched.
         """
 
-        if lesson_id not in _PRACTICE_LESSONS:
+        if lesson_id not in _PRACTICE_LESSONS | _EQ_PRACTICE_LESSONS:
             self._armed = False
             return False
-        if _deck_from_midi(midi).upper() != "B":
+
+        deck = _deck_from_midi(midi).upper()
+        control = _control_from_midi(midi)
+        if lesson_id in _EQ_PRACTICE_LESSONS:
+            self._armed = False
+            if control == "eq_low" and deck in {"A", "B"}:
+                self._deck.set_eq(deck, low=midi.get("value"))
             return False
 
-        control = _control_from_midi(midi)
+        if deck != "B":
+            return False
         if lesson_id == "L2.01" and control == "tempo":
             self._deck.rate_a = 1.0
             self._deck.rate_b = _tempo_rate_from_cc(midi.get("value"))
