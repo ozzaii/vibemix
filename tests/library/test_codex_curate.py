@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from vibemix.library import codex_curate as codex_mod
+from vibemix.library.auto_crate import AutoCrateResult
 from vibemix.library.codex_curate import (
     BUILD_SET_TIMEOUT_S,
     CHAT_TIMEOUT_S,
@@ -27,6 +28,7 @@ from vibemix.library.codex_curate import (
     build_argv,
     build_prompt,
     build_set_prompt,
+    build_set_with_codex,
     build_subprocess_env,
     chat_prompt,
     chat_with_codex,
@@ -2968,6 +2970,181 @@ def test_timeout(library):
         "theme", library, codex_path=sys.executable, allow_shell=True, timeout_s=5, _runner=runner
     )
     assert res.stop_reason == "timeout"
+
+
+def test_build_set_timeout_before_tools_uses_auto_crate_fallback(library, monkeypatch):
+    def runner(argv, **kw):
+        raise subprocess.TimeoutExpired(argv, kw.get("timeout", 1))
+
+    def fake_auto_crate(**kwargs):
+        assert kwargs["query"].startswith("peak-time")
+        assert kwargs["curve"] == "peak_time"
+        assert kwargs["n_slots"] == 3
+        assert kwargs["bpm_min"] == 128.0
+        assert kwargs["bpm_max"] == 138.0
+        return AutoCrateResult(
+            name="Fallback Set",
+            stop_reason="created",
+            curve=kwargs["curve"],
+            n_slots=kwargs["n_slots"],
+            track_ids=["t000", "t001", "t002"],
+            rationale="3 tracks selected from 12 discovered candidates on curve peak_time.",
+            playlist={
+                "name": "Fallback Set",
+                "track_ids": ["t000", "t001", "t002"],
+                "m3u_path": "/tmp/fallback.m3u8",
+                "json_path": "/tmp/fallback.json",
+                "dropped_ids": [],
+            },
+            tool_trace=[
+                {"name": "discover_pool", "ok": True, "summary": "12 candidates"},
+                {"name": "sequence_set", "ok": True, "summary": "4 sequences"},
+                {"name": "create_playlist", "ok": True, "summary": "/tmp/fallback.m3u8"},
+            ],
+        )
+
+    monkeypatch.setattr("vibemix.library.auto_crate.build_auto_crate", fake_auto_crate)
+
+    res = build_set_with_codex(
+        "peak-time 3 tracks 128-138 bpm",
+        library,
+        codex_path=sys.executable,
+        allow_shell=True,
+        timeout_s=5,
+        _runner=runner,
+    )
+
+    assert res.stop_reason == "created"
+    assert res.track_ids == ["t000", "t001", "t002"]
+    assert res.playlist_name == "Fallback Set"
+    assert "auto-crate engine" in res.rationale
+
+
+def test_chat_set_timeout_before_tools_uses_auto_crate_fallback(library, monkeypatch):
+    def runner(argv, **kw):
+        raise subprocess.TimeoutExpired(argv, kw.get("timeout", 1))
+
+    def fake_auto_crate(**kwargs):
+        assert kwargs["curve"] == "peak_time"
+        assert kwargs["n_slots"] == 3
+        return AutoCrateResult(
+            name="Viber Draft",
+            stop_reason="created",
+            curve=kwargs["curve"],
+            n_slots=kwargs["n_slots"],
+            track_ids=["t000", "t001", "t002"],
+            rationale="3 tracks selected from 9 discovered candidates on curve peak_time.",
+            playlist={
+                "name": "Viber Draft",
+                "track_ids": ["t000", "t001", "t002"],
+                "m3u_path": "/tmp/viber.m3u8",
+                "json_path": "/tmp/viber.json",
+                "dropped_ids": [],
+            },
+            tool_trace=[
+                {"name": "discover_pool", "ok": True, "summary": "9 candidates"},
+                {"name": "sequence_set", "ok": True, "summary": "3 sequences"},
+            ],
+        )
+
+    monkeypatch.setattr("vibemix.library.auto_crate.build_auto_crate", fake_auto_crate)
+
+    res = chat_with_codex(
+        "build me a 3 track peak-time set",
+        library,
+        codex_path=sys.executable,
+        allow_shell=True,
+        timeout_s=5,
+        _runner=runner,
+    )
+
+    assert res.stop_reason == "created"
+    assert res.track_ids == ["t000", "t001", "t002"]
+    assert res.playlist is not None
+    assert res.tool_trace[0]["name"] == "codex_exec"
+    assert res.tool_trace[0]["ok"] is False
+    assert "grounded auto-crate engine" in res.reply
+
+
+def test_chat_candidate_timeout_fallback_inspects_once(library, monkeypatch):
+    calls: list[tuple[str, dict]] = []
+
+    class FakeToolset:
+        def dispatch(self, name, args):
+            calls.append((name, args))
+            if name == "discover_pool":
+                return {
+                    "pool": [
+                        {"track_id": "t000", "title": "One", "artist": "A"},
+                        {"track_id": "t001", "title": "Two", "artist": "B"},
+                    ]
+                }
+            if name == "inspect_candidates":
+                return {
+                    "candidates": [
+                        {
+                            "track_id": "t000",
+                            "features": {
+                                "track_id": "t000",
+                                "title": "One",
+                                "artist": "A",
+                                "bpm": 130.0,
+                                "key": "8A",
+                            },
+                        },
+                        {
+                            "track_id": "t001",
+                            "features": {
+                                "track_id": "t001",
+                                "title": "Two",
+                                "artist": "B",
+                                "bpm": None,
+                                "key": None,
+                            },
+                        },
+                    ]
+                }
+            return {"error": "unexpected"}
+
+    def runner(argv, **kw):
+        raise subprocess.TimeoutExpired(argv, kw.get("timeout", 1))
+
+    monkeypatch.setattr(
+        "vibemix.library.auto_crate.build_default_toolset",
+        lambda with_embedder=True: FakeToolset(),
+    )
+
+    res = chat_with_codex(
+        "find fast hardgroove candidates and inspect their BPM and key",
+        library,
+        codex_path=sys.executable,
+        allow_shell=True,
+        timeout_s=5,
+        _runner=runner,
+    )
+
+    assert [name for name, _args in calls] == ["discover_pool", "inspect_candidates"]
+    assert calls[1][1]["track_ids"] == ["t000", "t001"]
+    assert res.stop_reason == "model_done"
+    assert res.track_ids == ["t000", "t001"]
+    assert "one batch" in res.reply
+
+
+def test_plain_chat_timeout_stays_timeout(library):
+    def runner(argv, **kw):
+        raise subprocess.TimeoutExpired(argv, kw.get("timeout", 1))
+
+    res = chat_with_codex(
+        "yo",
+        library,
+        codex_path=sys.executable,
+        allow_shell=True,
+        timeout_s=5,
+        _runner=runner,
+    )
+
+    assert res.stop_reason == "timeout"
+    assert res.tool_trace == []
 
 
 def test_auth_required(library):

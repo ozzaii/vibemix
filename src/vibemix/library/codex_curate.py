@@ -176,6 +176,25 @@ BUILD_SET_TIMEOUT_S = 180.0
 # enforcement; we only set the values).
 _MCP_STARTUP_TIMEOUT_S = 15
 _MCP_TOOL_TIMEOUT_S = 120
+_CODEX_PRE_TOOL_TIMEOUT_S = 45.0
+
+_FALLBACK_CURVES: frozenset[str] = frozenset(
+    {"opener", "peak_time", "after_hours", "festival"}
+)
+_SET_PREP_FALLBACK_RE = re.compile(
+    r"\b(build|make|create|curate|prep|prepare|export)\b.*\b(set|playlist|crate)\b|"
+    r"\b(set|playlist|crate)\b.*\b(build|make|create|curate|prep|prepare|export)\b",
+    re.IGNORECASE,
+)
+_CANDIDATE_FALLBACK_RE = re.compile(
+    r"\b(find|search|discover|dig|recommend|suggest)\b.*\b(candidates?|tracks?|songs?)\b",
+    re.IGNORECASE,
+)
+_TRACK_COUNT_RE = re.compile(r"\b(\d{1,2})\s*[- ]?\s*(?:tracks?|songs?|slots?)\b", re.I)
+_BPM_RANGE_RE = re.compile(
+    r"\b(\d{2,3}(?:\.\d+)?)\s*(?:-|to)\s*(\d{2,3}(?:\.\d+)?)\s*bpm\b",
+    re.I,
+)
 
 # Substrings in Codex stderr that mean "not authenticated" rather than a
 # genuine runtime error — used to surface the actionable `codex login` hint.
@@ -675,6 +694,80 @@ def _start_tool_tape(events_path: str) -> Callable[[], None]:
     return _stop
 
 
+def _run_codex_with_pretool_watchdog(
+    argv: list[str],
+    *,
+    timeout_s: float,
+    env: dict[str, str],
+    tool_events_path: str,
+    pretool_timeout_s: float = _CODEX_PRE_TOOL_TIMEOUT_S,
+) -> subprocess.CompletedProcess:
+    """Run real ``codex exec`` but fail fast if it never reaches a library tool."""
+    proc = subprocess.Popen(
+        argv,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+        stdin=subprocess.DEVNULL,
+    )
+    started = time.monotonic()
+    deadline = started + max(0.1, float(timeout_s))
+    pretool_deadline = started + max(0.1, float(pretool_timeout_s))
+    saw_tool = False
+    try:
+        while True:
+            if proc.poll() is not None:
+                stdout, stderr = proc.communicate()
+                return subprocess.CompletedProcess(
+                    argv, proc.returncode or 0, stdout=stdout, stderr=stderr
+                )
+            if not saw_tool and _read_tool_event_trace(tool_events_path):
+                saw_tool = True
+            now = time.monotonic()
+            if not saw_tool and now >= pretool_deadline:
+                proc.kill()
+                stdout, stderr = proc.communicate()
+                raise subprocess.TimeoutExpired(
+                    argv, pretool_timeout_s, output=stdout, stderr=stderr
+                )
+            if now >= deadline:
+                proc.kill()
+                stdout, stderr = proc.communicate()
+                raise subprocess.TimeoutExpired(argv, timeout_s, output=stdout, stderr=stderr)
+            time.sleep(0.2)
+    except BaseException:
+        if proc.poll() is None:
+            proc.kill()
+            proc.communicate()
+        raise
+
+
+def _run_codex_exec(
+    argv: list[str],
+    *,
+    timeout_s: float,
+    env: dict[str, str],
+    tool_events_path: str,
+    _runner: Callable[..., subprocess.CompletedProcess],
+) -> subprocess.CompletedProcess:
+    if _runner is not subprocess.run:
+        return _runner(
+            argv,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            env=env,
+            stdin=subprocess.DEVNULL,
+        )
+    return _run_codex_with_pretool_watchdog(
+        argv,
+        timeout_s=timeout_s,
+        env=env,
+        tool_events_path=tool_events_path,
+    )
+
+
 def curate_with_codex(
     theme: str,
     library: RekordboxLibrary,
@@ -1088,6 +1181,112 @@ def build_set_prompt(
     return f"{persona} {_BUILD_SET_RULES}\n\nSet brief: {brief_line}"
 
 
+def _infer_curve(text: str, explicit: str | None = None) -> str:
+    if explicit in _FALLBACK_CURVES:
+        return explicit
+    low = text.lower()
+    if "peak" in low:
+        return "peak_time"
+    if "after hour" in low or "after-hour" in low or "after_hours" in low:
+        return "after_hours"
+    if "festival" in low:
+        return "festival"
+    return "opener"
+
+
+def _infer_slots(text: str, explicit: int | None = None, *, default: int = 6) -> int:
+    if explicit is not None:
+        try:
+            return max(1, min(24, int(explicit)))
+        except (TypeError, ValueError):
+            pass
+    match = _TRACK_COUNT_RE.search(text)
+    if match:
+        try:
+            return max(1, min(24, int(match.group(1))))
+        except (TypeError, ValueError):
+            pass
+    return default
+
+
+def _infer_bpm_range(text: str) -> tuple[float | None, float | None]:
+    match = _BPM_RANGE_RE.search(text)
+    if not match:
+        return None, None
+    try:
+        lo = float(match.group(1))
+        hi = float(match.group(2))
+    except (TypeError, ValueError):
+        return None, None
+    return (min(lo, hi), max(lo, hi))
+
+
+def _auto_crate_tool_trace(tool_trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = [
+        {
+            "name": "codex_exec",
+            "arg": "timed out before library tools; using auto_crate",
+            "ok": False,
+        }
+    ]
+    for rec in tool_trace:
+        if not isinstance(rec, dict):
+            continue
+        name = str(rec.get("name") or "auto_crate")
+        summary = str(rec.get("summary") or "").strip()
+        ok = rec.get("ok")
+        rows.append({"name": name, "arg": summary[:220], "ok": ok if isinstance(ok, bool) else True})
+    return rows
+
+
+def _build_set_auto_crate_timeout_fallback(
+    brief: str,
+    *,
+    curve: str | None,
+    name: str | None,
+    n_slots: int | None,
+    export: bool,
+) -> CodexCurateResult:
+    from vibemix.library.auto_crate import build_auto_crate
+
+    bpm_min, bpm_max = _infer_bpm_range(brief)
+    result = build_auto_crate(
+        query=brief,
+        curve=_infer_curve(brief, curve),
+        n_slots=_infer_slots(brief, n_slots),
+        k=max(24, _infer_slots(brief, n_slots) * 4),
+        name=name,
+        export="rekordbox" if export else None,
+        bpm_min=bpm_min,
+        bpm_max=bpm_max,
+    )
+    if result.stop_reason not in {"created", "exported"}:
+        return CodexCurateResult(
+            theme=brief,
+            stop_reason="timeout",
+            error=(
+                "Codex did not finish before using tools, and auto-crate fallback "
+                f"could not build a set: {result.error or result.stop_reason}"
+            ),
+        )
+
+    playlist = result.playlist or {}
+    rationale = (
+        "Codex did not reach the library tools in time, so Viber used the grounded "
+        f"auto-crate engine instead. {result.rationale}"
+    )
+    return CodexCurateResult(
+        theme=brief,
+        stop_reason="exported" if result.export_path else "created",
+        playlist_name=str(playlist.get("name") or result.name or name or brief),
+        track_ids=list(result.track_ids),
+        m3u_path=str(playlist.get("m3u_path")) if playlist.get("m3u_path") else None,
+        json_path=str(playlist.get("json_path")) if playlist.get("json_path") else None,
+        rationale=rationale,
+        export_path=result.export_path,
+    )
+
+
 def build_set_with_codex(
     brief: str,
     library: RekordboxLibrary,
@@ -1205,13 +1404,12 @@ def build_set_with_codex(
         _tape_stop = _start_tool_tape(tool_events_path)
 
         try:
-            proc = _runner(
+            proc = _run_codex_exec(
                 argv,
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
+                timeout_s=timeout_s,
                 env=env,
-                stdin=subprocess.DEVNULL,
+                tool_events_path=tool_events_path,
+                _runner=_runner,
             )
         except FileNotFoundError:
             return _finish(
@@ -1222,6 +1420,17 @@ def build_set_with_codex(
                 )
             )
         except subprocess.TimeoutExpired:
+            _tape_stop()
+            if not _read_tool_event_trace(tool_events_path):
+                return _finish(
+                    _build_set_auto_crate_timeout_fallback(
+                        brief,
+                        curve=curve,
+                        name=name,
+                        n_slots=n_slots,
+                        export=export,
+                    )
+                )
             return _finish(
                 CodexCurateResult(
                     theme=brief,
@@ -3838,6 +4047,167 @@ class CodexChatResult:
         return out
 
 
+def _chat_set_prep_timeout_fallback(message: str) -> CodexChatResult | None:
+    if not _SET_PREP_FALLBACK_RE.search(message):
+        return None
+
+    from vibemix.library.auto_crate import build_auto_crate
+
+    bpm_min, bpm_max = _infer_bpm_range(message)
+    result = build_auto_crate(
+        query=message,
+        curve=_infer_curve(message),
+        n_slots=_infer_slots(message),
+        k=max(24, _infer_slots(message) * 4),
+        name=None,
+        export=None,
+        bpm_min=bpm_min,
+        bpm_max=bpm_max,
+    )
+    if result.stop_reason not in {"created", "exported"}:
+        return None
+
+    reply = (
+        "Codex did not reach the library tools in time, so I used the grounded "
+        f"auto-crate engine and made a draft instead. {result.rationale}"
+    )
+    return CodexChatResult(
+        reply=reply,
+        tools_used=["auto_crate"],
+        tool_trace=_auto_crate_tool_trace(result.tool_trace),
+        track_ids=list(result.track_ids),
+        playlist=result.playlist,
+        export_path=result.export_path,
+        stop_reason="exported" if result.export_path else "created",
+    )
+
+
+def _chat_candidate_timeout_fallback(
+    message: str, library: RekordboxLibrary
+) -> CodexChatResult | None:
+    if not _CANDIDATE_FALLBACK_RE.search(message):
+        return None
+
+    try:
+        from vibemix.library.auto_crate import build_default_toolset
+
+        toolset = build_default_toolset(with_embedder=True)
+    except Exception:
+        return None
+
+    try:
+        bpm_min, bpm_max = _infer_bpm_range(message)
+        k = max(6, min(12, _infer_slots(message, default=6)))
+        discover_args: dict[str, Any] = {"query": message, "k": k}
+        if bpm_min is not None:
+            discover_args["bpm_min"] = bpm_min
+        if bpm_max is not None:
+            discover_args["bpm_max"] = bpm_max
+
+        discovered = toolset.dispatch("discover_pool", discover_args)
+        trace = [
+            {
+                "name": "codex_exec",
+                "arg": "timed out before library tools; using direct discovery",
+                "ok": False,
+            },
+            _direct_tool_trace_row("discover_pool", discovered),
+        ]
+        if not isinstance(discovered, dict) or discovered.get("error"):
+            return None
+        pool = discovered.get("pool")
+        if not isinstance(pool, list) or not pool:
+            return None
+        track_ids = [row.get("track_id") for row in pool if isinstance(row, dict)]
+        track_ids = [tid for tid in track_ids if isinstance(tid, str)][:k]
+        if not track_ids:
+            return None
+
+        inspected = toolset.dispatch("inspect_candidates", {"track_ids": track_ids})
+        trace.append(_direct_tool_trace_row("inspect_candidates", inspected))
+        if not isinstance(inspected, dict) or inspected.get("error"):
+            return None
+
+        rows = inspected.get("candidates")
+        candidates = rows if isinstance(rows, list) else []
+        reply = _candidate_fallback_reply(candidates)
+        grounded_ids = _validate_against_library(track_ids, library)
+        return CodexChatResult(
+            reply=reply,
+            tools_used=["discover_pool", "inspect_candidates"],
+            tool_trace=trace,
+            track_ids=grounded_ids,
+            stop_reason="model_done",
+        )
+    finally:
+        close = getattr(getattr(toolset, "_store", None), "close", None)
+        if callable(close):
+            close()
+
+
+def _direct_tool_trace_row(name: str, result: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(result, dict):
+        return {"name": name, "arg": f"returned {type(result).__name__}", "ok": False}
+    if error := result.get("error"):
+        return {"name": name, "arg": str(error)[:220], "ok": False}
+    if name == "discover_pool":
+        pool = result.get("pool")
+        warnings = result.get("metadata_warnings")
+        detail = f"{len(pool) if isinstance(pool, list) else 0} candidates"
+        if isinstance(warnings, list):
+            for warning in warnings:
+                if isinstance(warning, dict) and warning.get("field") == "bpm":
+                    detail += (
+                        f"; bpm_unknown={warning.get('unknown_count')}/"
+                        f"{warning.get('total_count')}"
+                    )
+                    break
+        return {"name": name, "arg": detail[:220], "ok": True}
+    if name == "inspect_candidates":
+        rows = result.get("candidates")
+        return {
+            "name": name,
+            "arg": f"{len(rows) if isinstance(rows, list) else 0} candidate inspections",
+            "ok": True,
+        }
+    return {"name": name, "arg": "ok", "ok": True}
+
+
+def _candidate_fallback_reply(candidates: list[Any]) -> str:
+    names: list[str] = []
+    for row in candidates[:6]:
+        if not isinstance(row, dict) or row.get("error"):
+            continue
+        features = row.get("features")
+        if not isinstance(features, dict):
+            continue
+        title = str(features.get("title") or features.get("track_id") or "unknown").strip()
+        artist = str(features.get("artist") or "").strip()
+        bpm = features.get("bpm")
+        key = features.get("key")
+        meta = []
+        meta.append(f"{float(bpm):.1f} BPM" if isinstance(bpm, (int, float)) else "BPM unknown")
+        meta.append(str(key) if key else "key unknown")
+        label = f"{artist} - {title}" if artist else title
+        names.append(f"{label} ({', '.join(meta)})")
+    if not names:
+        return (
+            "Codex did not reach the library tools in time, so I searched the "
+            "grounded library directly, but the candidate facts came back empty."
+        )
+    return (
+        "Codex did not reach the library tools in time, so I searched the "
+        "grounded library directly and inspected the candidates in one batch: "
+        + "; ".join(names)
+    )
+
+
+def _chat_timeout_fallback(message: str, library: RekordboxLibrary) -> CodexChatResult | None:
+    return _chat_set_prep_timeout_fallback(message) or _chat_candidate_timeout_fallback(
+        message, library
+    )
+
+
 def _chat_clarification_reply(question: str | None, choices: list[str] | None) -> str:
     lines = [question or "I need one more detail before I can answer that."]
     for i, choice in enumerate(choices or [], start=1):
@@ -3974,13 +4344,12 @@ def chat_with_codex(
         _tape_stop = _start_tool_tape(tool_events_path)
 
         try:
-            proc = _runner(
+            proc = _run_codex_exec(
                 argv,
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
+                timeout_s=timeout_s,
                 env=env,
-                stdin=subprocess.DEVNULL,
+                tool_events_path=tool_events_path,
+                _runner=_runner,
             )
         except FileNotFoundError:
             return _finish(
@@ -3990,6 +4359,11 @@ def chat_with_codex(
                 )
             )
         except subprocess.TimeoutExpired:
+            _tape_stop()
+            if not _read_tool_event_trace(tool_events_path):
+                fallback = _chat_timeout_fallback(message, library)
+                if fallback is not None:
+                    return _finish(fallback)
             return _finish(
                 CodexChatResult(
                     stop_reason="timeout",
