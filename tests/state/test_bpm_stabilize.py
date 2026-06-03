@@ -51,10 +51,11 @@ def test_previous_bpm_holds_on_in_range_alternate_lock():
     # must not replace an already visible BPM without a small agreeing cluster.
     assert _stabilize_bpm([166.7, 171.4, 150.0], previous=171.4) == 171.4
     assert _stabilize_bpm([166.7, 171.4, 150.0, 125.0, 150.0], previous=171.4) == 171.4
+    assert _stabilize_bpm([162.2, 125.0, 111.1, 111.1, 111.1], previous=162.2) == 162.2
 
 
 def test_previous_bpm_switches_after_cluster_forms():
-    assert _stabilize_bpm([171.4, 150.0, 150.0, 125.0, 150.0], previous=171.4) == 150.0
+    assert _stabilize_bpm([150.0, 150.0, 125.0, 150.0, 150.0], previous=171.4) == 150.0
 
 
 def test_previous_bpm_allows_small_drift():

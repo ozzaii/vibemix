@@ -107,7 +107,7 @@ from vibemix.state.track_resolver import derive_audible_deck, derive_audible_tra
 # phase classification fall back to the no-hysteresis path → live phase flicker.
 _BPM_RING_MAXLEN = 5  # ~15 s at the 3 s estimate cadence
 _BPM_SWITCH_TOLERANCE = 0.02
-_BPM_SWITCH_MIN_CLUSTER = 3
+_BPM_SWITCH_MIN_CLUSTER = 4
 _COURSE3_CUE_CONF_FLOOR = 0.7
 
 # Dormant drop-anticipation signal (SYSTEM-AUDIT C9). Only anticipate a drop the
