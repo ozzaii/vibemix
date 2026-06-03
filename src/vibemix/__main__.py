@@ -3411,6 +3411,65 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_build_set.add_argument("--json", action="store_true")
     sp_build_set.set_defaults(func=_cmd_library_build_set)
 
+    # Keyless deterministic set-prep path — explicit refs/query/curve, no Codex.
+    sp_auto_crate = sub.add_parser(
+        "auto-crate",
+        help="Build a grounded set directly from refs/query/curve (no Codex)",
+        description=(
+            "Keyless deterministic gig-prep: discover a grounded pool, sequence "
+            "it on an explicit energy curve, persist a neutral playlist, and "
+            "optionally export Rekordbox XML. Use build-set for fuzzy natural "
+            "language briefs; auto-crate is the fast direct path."
+        ),
+    )
+    sp_auto_crate.add_argument(
+        "query",
+        nargs="?",
+        default=None,
+        help="optional bounded vibe query; omit when using only --ref-track-id",
+    )
+    sp_auto_crate.add_argument(
+        "--ref-track-id",
+        action="append",
+        dest="ref_track_ids",
+        default=[],
+        help="reference track_id; repeat for multiple seeds",
+    )
+    sp_auto_crate.add_argument(
+        "--ref-track-ids",
+        dest="ref_track_ids_csv",
+        default=None,
+        help="comma-separated reference track_ids",
+    )
+    sp_auto_crate.add_argument(
+        "--curve",
+        choices=("opener", "peak_time", "after_hours", "festival"),
+        default="opener",
+        help="energy curve preset (default: opener)",
+    )
+    sp_auto_crate.add_argument("--n-slots", type=int, default=6, help="target set length")
+    sp_auto_crate.add_argument("--k", type=int, default=40, help="candidate pool size")
+    sp_auto_crate.add_argument("--name", default=None, help="set name")
+    sp_auto_crate.add_argument(
+        "--export",
+        choices=("rekordbox",),
+        default=None,
+        help="also export a Rekordbox XML",
+    )
+    sp_auto_crate.add_argument("--out", dest="out_path", default=None, help="export path")
+    sp_auto_crate.add_argument("--bpm-min", type=float, default=None)
+    sp_auto_crate.add_argument("--bpm-max", type=float, default=None)
+    sp_auto_crate.add_argument("--min-duration-s", type=float, default=None)
+    sp_auto_crate.add_argument("--max-duration-s", type=float, default=None)
+    sp_auto_crate.add_argument(
+        "--novelty",
+        type=float,
+        default=None,
+        help="0..1 nudge toward lower-similarity deep cuts from the discovered pool",
+    )
+    sp_auto_crate.add_argument("--json", action="store_true")
+    sp_auto_crate.set_defaults(func=_cmd_library_auto_crate)
+
     # Viber chat — the conversational library agent (one turn per invocation; the
     # caller threads prior turns via --history so the CLI stays stateless and
     # the Tauri bridge can drive a live conversation).
@@ -6947,6 +7006,56 @@ def _cmd_library_build_set(args: argparse.Namespace) -> int:
     # Codex talks to the MCP server (which holds embedder/store); no local
     # genai client needed. Mirrors `_cmd_library_curate_codex`.
     return _cmd_library_build_set_codex(args, lib)
+
+
+def _cmd_library_auto_crate(args: argparse.Namespace) -> int:
+    """Keyless set-prep: explicit refs/query → grounded playlist/export."""
+    import json as _json
+
+    from vibemix.library.auto_crate import build_auto_crate
+
+    refs: list[str] = []
+    for raw in getattr(args, "ref_track_ids", []) or []:
+        if isinstance(raw, str) and raw.strip():
+            refs.append(raw.strip())
+    raw_refs = getattr(args, "ref_track_ids_csv", None)
+    if isinstance(raw_refs, str) and raw_refs.strip():
+        refs.extend(part.strip() for part in raw_refs.split(",") if part.strip())
+
+    result = build_auto_crate(
+        query=getattr(args, "query", None),
+        ref_track_ids=refs,
+        curve=getattr(args, "curve", "opener"),
+        n_slots=getattr(args, "n_slots", 6),
+        k=getattr(args, "k", 40),
+        name=getattr(args, "name", None),
+        export=getattr(args, "export", None),
+        out_path=getattr(args, "out_path", None),
+        bpm_min=getattr(args, "bpm_min", None),
+        bpm_max=getattr(args, "bpm_max", None),
+        min_duration_s=getattr(args, "min_duration_s", None),
+        max_duration_s=getattr(args, "max_duration_s", None),
+        novelty=getattr(args, "novelty", None),
+    )
+    out = result.to_dict()
+
+    if result.stop_reason not in ("created", "exported"):
+        _json.dump(out, sys.stderr, indent=2)
+        sys.stderr.write("\n")
+        print(
+            f"[viber/auto-crate] {result.stop_reason}: {result.error or 'no set created'}",
+            file=sys.stderr,
+        )
+        return 1
+
+    _json.dump(out, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    print(
+        f"-> auto-crate '{result.name}' ({len(result.track_ids)} tracks)"
+        + (f"; exported: {result.export_path}" if result.export_path else ""),
+        file=sys.stderr,
+    )
+    return 0
 
 
 def _validate_export_tracks_against_library(tracks: list, library) -> tuple[list, list[dict]]:
