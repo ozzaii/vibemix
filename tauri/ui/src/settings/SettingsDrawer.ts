@@ -528,6 +528,91 @@ const CSS = `
     box-shadow: 0 0 6px var(--brand-22);
     opacity: 0.72;
   }
+  .vmx-settings-trust {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-2);
+    padding: var(--sp-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 222, 242, 0.018), transparent 46%),
+      rgba(0, 0, 0, 0.18);
+    box-shadow:
+      inset 0 1px 0 var(--glass-top),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.42);
+  }
+  .vmx-settings-trust__cell {
+    min-width: 0;
+    padding: 10px 11px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 222, 242, 0.014), transparent 48%),
+      rgba(0, 0, 0, 0.18);
+  }
+  .vmx-settings-trust__cell[data-status="ok"] {
+    border-color: var(--brand-22);
+    background:
+      linear-gradient(180deg, var(--brand-06), transparent 58%),
+      rgba(0, 0, 0, 0.18);
+  }
+  .vmx-settings-trust__cell[data-status="warn"] {
+    border-color: rgba(244, 197, 66, 0.28);
+  }
+  .vmx-settings-trust__label,
+  .vmx-settings-trust__value,
+  .vmx-settings-trust__sub {
+    overflow-wrap: anywhere;
+  }
+  .vmx-settings-trust__label {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+    font-family: var(--type-mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .vmx-settings-trust__label::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--text-disabled);
+  }
+  .vmx-settings-trust__cell[data-status="ok"] .vmx-settings-trust__label::before {
+    background: var(--brand);
+    box-shadow: 0 0 6px var(--brand-22);
+  }
+  .vmx-settings-trust__cell[data-status="warn"] .vmx-settings-trust__label::before {
+    background: var(--led-warn);
+  }
+  .vmx-settings-trust__value {
+    color: var(--text-primary);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 88, "wght" 600;
+    font-size: 13px;
+    line-height: 1.15;
+  }
+  .vmx-settings-trust__sub {
+    margin-top: var(--sp-1);
+    color: var(--text-muted);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    line-height: 1.3;
+  }
+  @media (max-width: 520px) {
+    .vmx-settings-trust {
+      grid-template-columns: 1fr;
+    }
+  }
 `;
 
 registerStyle("vmx-settings-drawer", CSS);
@@ -947,6 +1032,111 @@ function renderTruthNote(text: string, wire: string): HTMLElement {
   return note;
 }
 
+interface TrustCell {
+  wire: string;
+  label: string;
+  value: string;
+  sub: string;
+  status: "ok" | "warn" | "neutral";
+}
+
+function renderSettingsTrustRail(
+  settings: SettingsView,
+  ui: ReturnType<typeof getSettingsUIState>,
+): HTMLElement {
+  const state = getSessionState();
+  const root = document.createElement("section");
+  root.className = "vmx-settings-trust";
+  root.dataset.wire = "settings.trust";
+  root.setAttribute("aria-label", "settings trust status");
+
+  const cells: TrustCell[] = [
+    {
+      wire: "settings.trust.voice",
+      label: "Local voice",
+      value: `${settings.voice} · MOSS`,
+      sub: "Sven speaks from the bundled voice stack",
+      status: "ok",
+    },
+    {
+      wire: "settings.trust.output",
+      label: "Output route",
+      value: formatOutputRoute(settings),
+      sub: "changes apply when audio restarts",
+      status: settings.output_device_id ? "ok" : "neutral",
+    },
+    {
+      wire: "settings.trust.recordings",
+      label: "Recording vault",
+      value: formatRecordingVaultValue(ui.recordings),
+      sub: formatRecordingVaultSub(ui.recordings),
+      status: ui.recordings.error ? "warn" : "ok",
+    },
+    {
+      wire: "settings.trust.proof",
+      label: "Proof gate",
+      value: state.grounded ? "grounded" : state.claimPolicy?.label ?? "proof pending",
+      sub: state.grounded
+        ? "citations can attach to Sven"
+        : state.claimPolicy?.reason ?? "Sven waits for evidence",
+      status: state.grounded ? "ok" : "warn",
+    },
+  ];
+
+  for (const cell of cells) {
+    root.append(renderTrustCell(cell));
+  }
+  return root;
+}
+
+function renderTrustCell(cell: TrustCell): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "vmx-settings-trust__cell";
+  el.dataset.wire = cell.wire;
+  el.dataset.status = cell.status;
+
+  const label = document.createElement("div");
+  label.className = "vmx-settings-trust__label";
+  label.textContent = cell.label;
+
+  const value = document.createElement("div");
+  value.className = "vmx-settings-trust__value";
+  value.textContent = cell.value;
+
+  const sub = document.createElement("div");
+  sub.className = "vmx-settings-trust__sub";
+  sub.textContent = cell.sub;
+
+  el.append(label, value, sub);
+  return el;
+}
+
+function formatOutputRoute(settings: SettingsView): string {
+  const profile = OUTPUT_PROFILE_LABELS[settings.output_profile];
+  return settings.output_device_id
+    ? `${profile} · ${formatOutputDeviceLabel(settings.output_device_id)}`
+    : `${profile} · auto`;
+}
+
+function formatRecordingVaultValue(recordings: ReturnType<typeof getSettingsUIState>["recordings"]): string {
+  if (recordings.loading) return "loading";
+  if (recordings.error) return "unavailable";
+  return `${recordings.usage.sessions} sessions`;
+}
+
+function formatRecordingVaultSub(recordings: ReturnType<typeof getSettingsUIState>["recordings"]): string {
+  if (recordings.loading) return "checking local session store";
+  if (recordings.error) return "local session list did not answer";
+  return `${formatBytes(recordings.usage.bytes_total)} stored locally`;
+}
+
+function formatBytes(bytes: number): string {
+  const safeBytes = Math.max(0, bytes);
+  const mb = safeBytes / (1024 * 1024);
+  if (mb < 1024) return `${Math.round(mb)} MB`;
+  return `${(mb / 1024).toFixed(1)} GB`;
+}
+
 function disposeDrawerBodyResources(): void {
   for (const dispose of bodyDisposers.splice(0)) {
     try {
@@ -989,6 +1179,8 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
 
   const settings = getSessionState().settings;
   const ui = getSettingsUIState();
+
+  body.append(renderSettingsTrustRail(settings, ui));
 
   // --- PERSONA --------------------------------------------------------------
   const personaBody = document.createElement("div");

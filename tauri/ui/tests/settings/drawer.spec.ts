@@ -335,6 +335,68 @@ describe("group rendering", () => {
     expect(drawer?.textContent).not.toContain("CFG");
   });
 
+  it("surfaces local trust facts before the settings groups", () => {
+    const state = getSessionState();
+    setSessionState({
+      ...state,
+      grounded: true,
+      settings: {
+        ...state.settings,
+        voice: "Bella",
+        output_device_id: "5",
+        output_profile: "spk",
+      },
+    });
+    setRecordingsSlice({
+      usage: { sessions: 12, bytes_total: 3_656_838_349 },
+    });
+
+    mountSettingsDrawer(document.body);
+    setSettingsUIState({ open: true });
+
+    const trust = document.querySelector<HTMLElement>('[data-wire="settings.trust"]');
+    expect(trust?.textContent).toContain("Local voice");
+    expect(trust?.textContent).toContain("Bella · MOSS");
+    expect(trust?.textContent).toContain("Sven speaks from the bundled voice stack");
+    expect(trust?.textContent).toContain("Speakers · Device 5");
+    expect(trust?.textContent).toContain("12 sessions");
+    expect(trust?.textContent).toContain("3.4 GB stored locally");
+    expect(trust?.textContent).toContain("grounded");
+    expect(
+      document.querySelector<HTMLElement>('[data-wire="settings.trust.proof"]')
+        ?.dataset.status,
+    ).toBe("ok");
+  });
+
+  it("keeps recording and proof trust cells honest when evidence is missing", () => {
+    const state = getSessionState();
+    setSessionState({
+      ...state,
+      grounded: false,
+      claimPolicy: {
+        policy: "require-move-context",
+        level: "yellow",
+        reason: "screen proof unavailable",
+        label: "proof pending",
+      },
+    });
+    setRecordingsSlice({ error: "ipc timeout" });
+
+    mountSettingsDrawer(document.body);
+    setSettingsUIState({ open: true });
+
+    const recordings = document.querySelector<HTMLElement>(
+      '[data-wire="settings.trust.recordings"]',
+    );
+    const proof = document.querySelector<HTMLElement>('[data-wire="settings.trust.proof"]');
+    expect(recordings?.textContent).toContain("unavailable");
+    expect(recordings?.textContent).toContain("local session list did not answer");
+    expect(recordings?.dataset.status).toBe("warn");
+    expect(proof?.textContent).toContain("proof pending");
+    expect(proof?.textContent).toContain("screen proof unavailable");
+    expect(proof?.dataset.status).toBe("warn");
+  });
+
   it("RECORDING group shows the retention slider with 6 knobs", () => {
     mountSettingsDrawer(document.body);
     openSettings();

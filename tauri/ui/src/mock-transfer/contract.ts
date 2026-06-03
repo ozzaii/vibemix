@@ -328,6 +328,11 @@ export const SETTINGS_RUNTIME_WIRES = [
   "settings.close",
   "settings.body",
   "settings.modal-slot",
+  "settings.trust",
+  "settings.trust.voice",
+  "settings.trust.output",
+  "settings.trust.recordings",
+  "settings.trust.proof",
   "settings.persona.voice.deferred-note",
   "settings.output.deferred-note",
 ] as const;
@@ -395,6 +400,11 @@ const SETTINGS_RUNTIME_WIRE_PURPOSES: Record<
   "settings.close": "drawer close affordance",
   "settings.body": "settings group mount",
   "settings.modal-slot": "confirmation dialog portal",
+  "settings.trust": "top trust/readiness rail for local voice, output, recordings, and proof",
+  "settings.trust.voice": "local MOSS voice readiness summary",
+  "settings.trust.output": "current co-host output route summary",
+  "settings.trust.recordings": "local recording vault usage summary",
+  "settings.trust.proof": "current grounded proof-gate summary",
   "settings.persona.voice.deferred-note": "voice changes apply on next start",
   "settings.output.deferred-note": "output changes apply on next start",
 };

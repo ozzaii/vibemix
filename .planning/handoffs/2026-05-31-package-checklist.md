@@ -10012,3 +10012,39 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/shell/DebriefDock.ts tauri/ui/src/shell/app.ts tauri/ui/src/shell/surface-mounts.ts tauri/ui/src/mock-transfer/contract.ts tauri/ui/tests/shell/debrief-dock.spec.ts tauri/ui/tests/shell/surface-mounts.spec.ts tauri/ui/tests/mock-transfer-contract.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 71 - Settings Trust Rail
+
+Suggested commit: `feat(settings-ui): surface local trust status`
+
+Include:
+
+- `tauri/ui/src/settings/SettingsDrawer.ts`
+- `tauri/ui/src/mock-transfer/contract.ts`
+- `tauri/ui/tests/settings/drawer.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Settings IPC/schema changes, new settings persistence fields, recording
+  browser behavior, profile/library import semantics, Deck, Crate, Learn,
+  Debrief, Sven speech, Viber tooling, packaging scripts, and broad shell
+  layout. This package only adds a compact top-of-drawer trust/readiness rail
+  using existing settings, recording usage, and proof-gate state.
+
+Reason:
+
+- The exact signed app at `58420967` showed Settings as a polished control
+  drawer, but it buried the product's trust facts across separate groups. A
+  paying DJ should see immediately that Sven is local MOSS, output routing is
+  known, recordings are local, and proof-gated commentary will not guess. Add a
+  restrained four-cell rail above Persona, contract its `data-wire` anchors, and
+  keep missing evidence visibly honest instead of converting it into marketing
+  reassurance.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/settings/drawer.spec.ts tests/mock-transfer-contract.spec.ts tests/settings.tokens.test.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/settings/SettingsDrawer.ts tauri/ui/src/mock-transfer/contract.ts tauri/ui/tests/settings/drawer.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
