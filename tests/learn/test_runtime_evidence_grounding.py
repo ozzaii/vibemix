@@ -72,6 +72,36 @@ def _drifting_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
     )
 
 
+def _sliding_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
+    grid = _beat_grid()
+    return BeatmatchPracticeSnapshot(
+        grid_a=grid,
+        grid_b=grid,
+        deck_state=DeckState(
+            a_frame=0.0,
+            b_frame=grid.beat_len_frames * -0.05,
+            rate_a=1.0,
+            rate_b=1.0,
+            xfader=0.5,
+        ),
+    )
+
+
+def _stopped_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
+    grid = _beat_grid()
+    return BeatmatchPracticeSnapshot(
+        grid_a=grid,
+        grid_b=grid,
+        deck_state=DeckState(
+            a_frame=0.0,
+            b_frame=0.0,
+            rate_a=1.0,
+            rate_b=0.0,
+            xfader=0.5,
+        ),
+    )
+
+
 def _make_beatmatching_competent(progress: LearnProgress) -> None:
     spec = SKILL_MANIFEST["beatmatching"]
     for lesson_id in spec.lesson_ids:
@@ -104,6 +134,14 @@ def _hint_payloads(ipc: MagicMock) -> list[dict]:
     ]
 
 
+def _tutor_speak_payloads(ipc: MagicMock) -> list[dict]:
+    return [
+        call.args[0]["payload"]
+        for call in ipc.emit.call_args_list
+        if call.args and call.args[0].get("type") == "ipc.learn.tutor_speak"
+    ]
+
+
 def test_adaptive_midi_hint_writes_registry_and_time_keyed_citation() -> None:
     """MIDI adaptive coaching cites the exact registry-backed action."""
     runtime, registry, ipc = _runtime_with_evidence(clock_value=12.7)
@@ -118,7 +156,7 @@ def test_adaptive_midi_hint_writes_registry_and_time_keyed_citation() -> None:
     handled = runtime.handle_mismatch_ack(
         {
             "type": "cc",
-            "control": "eq_hi",
+            "control": "eq_mid",
             "deck": "A",
             "value": 45,
             "prev_value": 20,
@@ -129,10 +167,10 @@ def test_adaptive_midi_hint_writes_registry_and_time_keyed_citation() -> None:
 
     assert handled is True
     hints = _hint_payloads(ipc)
-    assert hints[-1]["citations"] == ["[midi:eq_hi:A@12.7]", "[screen:eq_hi:A]"]
+    assert hints[-1]["citations"] == ["[midi:eq_mid:A@12.7]", "[screen:eq_hi:A]"]
 
     snapshot = registry.snapshot()
-    assert 12.7 in snapshot["midi"]["eq_hi:A"]
+    assert 12.7 in snapshot["midi"]["eq_mid:A"]
     assert 12.7 in snapshot["screen"]["eq_hi:A"]
 
     result = CitationLinter().check(
@@ -306,6 +344,99 @@ def test_beatmatch_practice_tick_writes_receipt_and_credits_once(monkeypatch) ->
     assert progress.skills["beatmatching"]["live_proof_count"] == 1
 
 
+def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch) -> None:
+    """Q3: a credited locked grade becomes an authored cited tutor line."""
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 42.4,
+        beatmatch_practice_loader=_locked_beatmatch_snapshot,
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.01",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    payload = _tutor_speak_payloads(ipc)[-1]
+    assert payload["text"] == "nice — that's matched."
+    assert payload["tts_marker"] == "L2.01.grade"
+    assert payload["data_state"] == "hint"
+    assert payload["citations"] == ["[ev:BEATMATCH_GRADED@42.400]"]
+    result = CitationLinter().check(" ".join(payload["citations"]), registry.snapshot())
+    assert result.valid is True
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    assert len(_tutor_speak_payloads(ipc)) == 1
+
+
+def test_live_beatmatch_grade_voices_drift_without_fabricated_citation() -> None:
+    """Measured non-locked coaching is authored, but no ev atom is invented."""
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=LearnProgress(),
+        evidence_registry=registry,
+        evidence_clock=lambda: 13.0,
+        beatmatch_practice_loader=_sliding_beatmatch_snapshot,
+    )
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    payload = _tutor_speak_payloads(ipc)[-1]
+    assert payload["text"] == "close, you're sliding behind — nudge the jog."
+    assert payload["citations"] == []
+    assert "ev" not in registry.snapshot()
+
+
+def test_live_beatmatch_grade_abstain_emits_nothing() -> None:
+    """Stopped decks keep the calibrated abstain silence."""
+    runtime, _registry, ipc = _runtime_with_evidence(clock_value=7.0)
+    runtime._beatmatch_practice_loader = _stopped_beatmatch_snapshot
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    assert _tutor_speak_payloads(ipc) == []
+
+
+def test_live_beatmatch_grade_dedupes_sustained_same_verdict() -> None:
+    """The 1 Hz grade loop must not turn one drift into repeated Sven chatter."""
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=LearnProgress(),
+        evidence_registry=registry,
+        evidence_clock=lambda: 13.0,
+        beatmatch_practice_loader=_sliding_beatmatch_snapshot,
+    )
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    assert len(_tutor_speak_payloads(ipc)) == 1
+
+
 def test_matched_beatmatch_action_records_and_grades_immediately(monkeypatch) -> None:
     """A live matched lesson action can arm the owned-deck beatmatch grader."""
     saved: list[LearnProgress] = []
@@ -375,6 +506,9 @@ def test_matched_beatmatch_action_records_and_grades_immediately(monkeypatch) ->
     assert progress.skills["beatmatching"]["live_proof_count"] == 1
     assert progress in saved
     assert any(kind == "learn_beatmatch_practice_graded" for kind, _fields in events)
+    tutor_payload = _tutor_speak_payloads(runtime._ipc)[-1]
+    assert tutor_payload["text"] == "nice — that's matched."
+    assert tutor_payload["citations"] == ["[ev:BEATMATCH_GRADED@91.200]"]
 
 
 def test_beatmatch_practice_rearms_after_unlocked_grade(monkeypatch) -> None:

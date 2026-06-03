@@ -104,6 +104,8 @@ from vibemix.learn.harmonic_practice import (
 from vibemix.learn.lesson_flow import LessonFlow, LessonStep, build_lesson_flow
 from vibemix.learn.observability import learn_tutor_speak_observability_events
 from vibemix.learn.practice_loop import (
+    BEATMATCH_EVIDENCE_SOURCE,
+    BEATMATCH_GRADED_EVENT,
     BeatmatchPracticeResult,
     grade_owned_beatmatch_attempt,
     grade_owned_beatmatch_state,
@@ -547,6 +549,7 @@ class LessonRuntime(StateMachine):
         self._active_step_index: int = 0
         self._last_mismatch_hint_at: float = 0.0
         self._beatmatch_practice_lock_active = False
+        self._last_beatmatch_live_grade_verdict: str | None = None
         self._cue_placement_practice_lock_active = False
         super().__init__()
 
@@ -921,7 +924,7 @@ class LessonRuntime(StateMachine):
         if not should_grade:
             return
         self._beatmatch_practice_lock_active = False
-        self._grade_beatmatch_practice_tick()
+        self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
 
     def _record_cue_placement_practice_action(self, midi: dict[str, Any]) -> None:
         """Arm and grade an owned-deck cue placement practice attempt, if wired."""
@@ -1475,6 +1478,7 @@ class LessonRuntime(StateMachine):
         creditable.
         """
         if self._beatmatch_practice_loader is None or self._evidence_registry is None:
+            self._last_beatmatch_live_grade_verdict = None
             return None
         try:
             snapshot = self._beatmatch_practice_loader()
@@ -1488,6 +1492,7 @@ class LessonRuntime(StateMachine):
             return None
         if snapshot is None:
             self._beatmatch_practice_lock_active = False
+            self._last_beatmatch_live_grade_verdict = None
             return None
 
         t_session = self._evidence_time()
@@ -1546,6 +1551,57 @@ class LessonRuntime(StateMachine):
             credited=list(result.credited),
         )
         return result
+
+    def _emit_live_beatmatch_grade(self, result: BeatmatchPracticeResult | None) -> None:
+        """Voice the owned-deck beatmatch grade through the tutor speak channel.
+
+        The grade engine is deterministic and already writes the
+        ``BEATMATCH_GRADED`` evidence atom only for the credited locked edge.
+        Drift / tempo / trainwreck coaching is authored from measured state but
+        intentionally uncited, so this method never fabricates an ``ev`` atom.
+        """
+        if result is None or result.grade.abstain:
+            self._last_beatmatch_live_grade_verdict = None
+            return
+
+        verdict = result.grade.verdict
+        text_by_verdict = {
+            "locked": "nice — that's matched.",
+            "drifting": "close, you're sliding behind — nudge the jog.",
+            "tempo_off": "tempos are off — ease the pitch back.",
+            "trainwreck": "that's drifted off — pull it back and re-find the 1.",
+        }
+        text = text_by_verdict.get(verdict)
+        if text is None:
+            return
+
+        if verdict == self._last_beatmatch_live_grade_verdict:
+            return
+        self._last_beatmatch_live_grade_verdict = verdict
+
+        citations: tuple[str, ...] = ()
+        if result.credited:
+            citations = (
+                f"[{BEATMATCH_EVIDENCE_SOURCE}:{BEATMATCH_GRADED_EVENT}@{result.t_session:.3f}]",
+            )
+
+        lesson_id = self._learn.current_lesson_id or "learn"
+        try:
+            speak = LearnTutorSpeak.make(
+                text=text,
+                tts_marker=f"{lesson_id}.grade",
+                citations=citations,
+                data_state="hint",
+            ).to_dict()
+            self._ipc.emit(speak)
+            self._log_tutor_speak_event(speak)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] beatmatch live grade emit failed: {exc!r}",
+                file=sys.stderr,
+            )
 
     def _grade_cue_placement_practice_tick(self) -> CuePlacementPracticeResult | None:
         """Grade the optional owned-deck cue-placement lane on a lock edge.
@@ -2085,7 +2141,7 @@ class LessonRuntime(StateMachine):
         """
         while not stop_event.is_set():
             await asyncio.sleep(1.0)
-            self._grade_beatmatch_practice_tick()
+            self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
             self._grade_cue_placement_practice_tick()
             cur = self.current_state.id
             if cur in ("awaiting_action", "hint_strike_1", "hint_strike_2"):
