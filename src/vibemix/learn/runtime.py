@@ -148,6 +148,9 @@ from vibemix.ui_bus.learn_messages import (
 _CC_DEFAULT_MIN_DELTA = 38
 _MISMATCH_HINT_THROTTLE_S = 1.5
 _BEATMATCH_PRACTICE_AUDIO_LESSONS = frozenset({"L2.01", "L2.02"})
+_BEATMATCH_PRACTICE_GRADE_STATES = frozenset(
+    {"awaiting_action", "hint_strike_1", "hint_strike_2", "hint_strike_3", "advancing"}
+)
 _CONTROL_LABELS = {
     "cue": "cue",
     "eq_hi": "high EQ",
@@ -1710,6 +1713,17 @@ class LessonRuntime(StateMachine):
                 file=sys.stderr,
             )
 
+    def _emit_live_beatmatch_grade_tick(self) -> None:
+        """Emit the Learn-owned beatmatch HUD tick only while the lesson is active."""
+        if (
+            not self._is_beatmatch_practice_audio_lesson()
+            or self.current_state.id not in _BEATMATCH_PRACTICE_GRADE_STATES
+        ):
+            self._beatmatch_practice_lock_active = False
+            self._last_beatmatch_live_grade_verdict = None
+            return
+        self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
+
     def _grade_cue_placement_practice_tick(self) -> CuePlacementPracticeResult | None:
         """Grade the optional owned-deck cue-placement lane on a lock edge.
 
@@ -2241,7 +2255,7 @@ class LessonRuntime(StateMachine):
         """
         while not stop_event.is_set():
             await asyncio.sleep(1.0)
-            self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
+            self._emit_live_beatmatch_grade_tick()
             self._grade_cue_placement_practice_tick()
             cur = self.current_state.id
             if cur in ("awaiting_action", "hint_strike_1", "hint_strike_2"):

@@ -460,6 +460,40 @@ def test_live_beatmatch_grade_dedupes_sustained_same_verdict() -> None:
     assert len(_live_grade_payloads(ipc)) == 2
 
 
+def test_live_beatmatch_grade_tick_stops_after_completion(monkeypatch) -> None:
+    """Completed Learn lessons must not keep pulsing stale live-grade HUD frames."""
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=LearnProgress(),
+        evidence_registry=registry,
+        evidence_clock=lambda: 13.0,
+        beatmatch_practice_loader=_sliding_beatmatch_snapshot,
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.01",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+    runtime._emit_live_beatmatch_grade_tick()
+
+    assert len(_live_grade_payloads(ipc)) == 1
+
+    runtime.send("observer_complete", completed=True)
+    runtime._emit_live_beatmatch_grade_tick()
+
+    assert runtime.current_state.id == "completed"
+    assert len(_live_grade_payloads(ipc)) == 1
+
+
 def test_matched_beatmatch_action_records_and_grades_immediately(monkeypatch) -> None:
     """A live matched lesson action can arm the owned-deck beatmatch grader."""
     saved: list[LearnProgress] = []
