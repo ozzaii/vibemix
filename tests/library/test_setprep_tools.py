@@ -207,6 +207,25 @@ def test_discover_pool_adds_ids_to_seen(toolset):
     assert "t000" not in pool_ids
 
 
+def test_discover_pool_marks_unverified_bpm_filter(toolset, library):
+    for tid in ("t001", "t002", "t003", "t004"):
+        library.tracks[tid] = _track(tid, bpm=0.0)
+
+    out = toolset.discover_pool(
+        {"ref_track_ids": ["t000"], "k": 10, "bpm_min": 128.0, "bpm_max": 138.0}
+    )
+
+    warning = out["metadata_warnings"][0]
+    assert warning["field"] == "bpm"
+    assert warning["reason"] == "missing_library_metadata"
+    assert warning["unknown_count"] == len(out["pool"])
+    assert warning["total_count"] == len(out["pool"])
+    assert "do not treat the range as verified" in warning["message"]
+
+    summary = LibraryToolset._tool_event_summary("discover_pool", out)
+    assert f"bpm_unknown={len(out['pool'])}/{len(out['pool'])}" in summary
+
+
 def test_dispatch_blocks_set_prep_when_library_freshness_is_stale(store, library):
     guarded = LibraryToolset(
         embedder=None,

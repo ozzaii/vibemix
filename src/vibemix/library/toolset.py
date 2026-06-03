@@ -777,7 +777,30 @@ class LibraryToolset:
             score = _unit_float_or_none(item.similarity)
             if score is not None:
                 self.seen_similarity[item.track_id] = score
-        return {
+
+        bpm_min = _opt_float("bpm_min")
+        bpm_max = _opt_float("bpm_max")
+        metadata_warnings: list[dict[str, Any]] = []
+        if (bpm_min is not None or bpm_max is not None) and pool:
+            unknown_bpm = sum(1 for item in pool if item.bpm is None)
+            if unknown_bpm:
+                metadata_warnings.append(
+                    {
+                        "field": "bpm",
+                        "reason": "missing_library_metadata",
+                        "requested_min": bpm_min,
+                        "requested_max": bpm_max,
+                        "unknown_count": unknown_bpm,
+                        "total_count": len(pool),
+                        "message": (
+                            "BPM filter requested, but some returned tracks have "
+                            "unknown BPM in the library cache; do not treat the "
+                            "range as verified for those rows."
+                        ),
+                    }
+                )
+
+        out: dict[str, Any] = {
             "pool": [
                 {
                     "track_id": item.track_id,
@@ -790,6 +813,9 @@ class LibraryToolset:
                 for item in pool
             ]
         }
+        if metadata_warnings:
+            out["metadata_warnings"] = metadata_warnings
+        return out
 
     def sequence_set(self, args: dict[str, Any]) -> dict[str, Any]:
         """Order grounded track_ids into an energy-curve-following set.
@@ -1508,7 +1534,18 @@ class LibraryToolset:
             if items is None:
                 items = result.get("pool") or result.get("track_ids") or []
             n = len(items) if isinstance(items, (list, tuple)) else 0
-            return f"{n} track{'' if n == 1 else 's'}"
+            parts = [f"{n} track{'' if n == 1 else 's'}"]
+            warnings = result.get("metadata_warnings")
+            if isinstance(warnings, list):
+                for warning in warnings:
+                    if not isinstance(warning, dict) or warning.get("field") != "bpm":
+                        continue
+                    unknown = warning.get("unknown_count")
+                    total = warning.get("total_count")
+                    if unknown is not None and total is not None:
+                        parts.append(f"bpm_unknown={unknown}/{total}")
+                    break
+            return "; ".join(parts)[:160]
         if name == "sequence_set":
             # sequence_set returns ranked {"candidates": [{track_ids, …}]}.
             cands = result.get("candidates")

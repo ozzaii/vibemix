@@ -255,6 +255,8 @@ def test_build_set_prompt_has_set_prep_workflow():
     assert "sequence_set" in p
     assert "Do NOT inspect every candidate one by one" in p
     assert "inspect_candidates ONCE" in p
+    assert "metadata_warnings" in p
+    assert "do not treat that BPM/key range as verified" in p
     assert "sequence_set already resolves BPM, key, stored vectors" in p
     assert "get_track_sections" in p
     assert "transition_slate" in p
@@ -283,6 +285,8 @@ def test_chat_prompt_threads_history_and_rules():
     assert "Viber: keep it tight" in p
     assert "DJ: what bridges from this?" in p
     assert "Never invent a track" in p
+    assert "metadata_warnings" in p
+    assert "do not treat that BPM/key range as verified" in p
     assert "transition_slate" in p
     assert "compile_musical_context" in p
     assert "smart_hot_cues" in p
