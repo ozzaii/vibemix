@@ -1096,6 +1096,32 @@ def test_deck_source_context_renders_source_status_without_deck_rows() -> None:
     assert "deck_source=deck1_A_unknown_src_none+deck2_B_unknown_src_none" in packet["mix"]
 
 
+def test_deck_source_context_renders_nowplaying_playback_provenance() -> None:
+    state = MusicState(audible=True, audible_deck="none")
+    state.deck_state.source_status = {
+        "controller": "present",
+        "controller_connection": "connected",
+        "nowplaying": "deck_candidate",
+        "nowplaying_title": "seen",
+        "audible_deck": "A",
+        "audible_deck_source": "nowplaying_playback",
+        "nowplaying_playback": "playing",
+        "resolution": "nowplaying_playback_library_match",
+        "resolved_side": "A",
+        "resolved_side_rule": "nominal_nowplaying_seed_not_physical_deck_proof",
+    }
+
+    out = render_deck_source_context(state)
+
+    assert out is not None
+    assert "source_audible_deck=A" in out
+    assert "source_audible_deck_source=nowplaying_playback" in out
+    assert "nowplaying_playback=playing" in out
+    assert "resolution=nowplaying_playback_library_match" in out
+    assert "resolved_side_rule=nominal_nowplaying_seed_not_physical_deck_proof" in out
+    assert "source_status_rule=diagnostic_not_deck_identity" in out
+
+
 def test_deck_source_context_renders_source_resolution_diagnostics() -> None:
     state = MusicState(audible=False, audible_deck="A")
     state.deck_state.source_status = {

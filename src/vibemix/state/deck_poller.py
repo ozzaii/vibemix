@@ -40,6 +40,7 @@ swallows its own exception and returns last-known state — no exception escapes
 from __future__ import annotations
 
 import asyncio
+import math
 import re
 import sys
 import threading
@@ -74,6 +75,10 @@ NUMPY_CONF_FLOOR: float = 0.5  # consumed when the deferred KS estimator lands
 # (RESEARCH Spike 3, A4 — mirrors the audible_track_confidence 0.5 gate, set a
 # touch higher so only confident keys are ever citable).
 DECK_CITE_MIN_CONF: float = 0.6
+# A global OS now-playing playback row can seed receipts, but it is not
+# physical per-deck proof on a 2-channel master feed. Keep it below the cite
+# floor so EvidenceRegistry will not write [deck:] / [track:] claims from it.
+NOWPLAYING_PLAYBACK_CONF: float = 0.5
 # Last-known deck rows are contextual memory only, not current deck identity
 # proof. Keep this below deck_context.DECK_CONTEXT_MIN_CONF (0.3) so shared
 # claim policy never treats a carried-over lane as resolved/citable.
@@ -349,6 +354,7 @@ class DeckPoller:
                     connected=controller_connected,
                 )
             )
+        tsnap: dict | None = None
         title = None
         if self._track_info is not None:
             tsnap = self._track_info.snapshot()
@@ -369,6 +375,17 @@ class DeckPoller:
         audible_deck, deck_conf = derive_audible_deck(
             cs.get("A", {}), cs.get("B", {}), cs.get("xfader", 64), cs.get("connected", False)
         )
+        attribution_source = "controller"
+        if audible_deck not in ("A", "B"):
+            fallback = _nowplaying_playback_attribution(tsnap, cs)
+            if fallback is not None:
+                audible_deck, deck_conf = fallback
+                attribution_source = "nowplaying_playback"
+                source_status["audible_deck_source"] = attribution_source
+                source_status["nowplaying_playback"] = "playing"
+                source_status["resolved_side_rule"] = (
+                    "nominal_nowplaying_seed_not_physical_deck_proof"
+                )
         source_status["audible_deck"] = str(audible_deck)
 
         # Step 2: resolve ONLY the independently-confirmed (audible) single deck.
@@ -386,12 +403,23 @@ class DeckPoller:
                 # trust. (Floor, not min-cap; pinned by test_deck_poller.py:145,221
                 # `confidence >= XML_CONF_FLOOR`. Do NOT "fix" toward min() — that
                 # breaks the cite gate.)
-                conf = max(XML_CONF_FLOOR, min(1.0, deck_conf))
+                if attribution_source == "nowplaying_playback":
+                    conf = min(NOWPLAYING_PLAYBACK_CONF, max(0.0, deck_conf))
+                else:
+                    conf = max(XML_CONF_FLOOR, min(1.0, deck_conf))
                 decks[audible_deck] = self._xml_decktrack(entry, confidence=conf, now=now)
-                source_status["resolution"] = "library_match"
+                source_status["resolution"] = (
+                    "nowplaying_playback_library_match"
+                    if attribution_source == "nowplaying_playback"
+                    else "library_match"
+                )
                 source_status["resolved_side"] = str(audible_deck)
             elif title:
-                source_status["resolution"] = "library_miss"
+                source_status["resolution"] = (
+                    "nowplaying_playback_library_miss"
+                    if attribution_source == "nowplaying_playback"
+                    else "library_miss"
+                )
             elif source_status.get("nowplaying") == "blocked_non_deck_owner":
                 source_status["resolution"] = "blocked_non_deck_nowplaying"
                 source_status["library_match"] = "not_attempted_non_deck_nowplaying"
@@ -647,6 +675,45 @@ def nowplaying_source_is_deck_candidate(snapshot: object) -> bool:
     if bundle in _NON_DECK_NOWPLAYING_BUNDLE_EXACT:
         return False
     return not any(bundle.startswith(prefix) for prefix in _NON_DECK_NOWPLAYING_BUNDLE_PREFIXES)
+
+
+def _nowplaying_playback_attribution(
+    snapshot: object, controller_snapshot: object
+) -> tuple[str, float] | None:
+    """Return a nominal side for an actively-playing DJ-app nowplaying title.
+
+    This is deliberately below the citation floor: macOS can prove a title is
+    playing, but not which physical deck emitted it on a 2-channel master feed.
+    """
+    if not isinstance(snapshot, dict) or not isinstance(controller_snapshot, dict):
+        return None
+    if not nowplaying_source_is_deck_candidate(snapshot):
+        return None
+    title = str(snapshot.get("title") or "").strip()
+    if not title:
+        return None
+    position = _finite_float(snapshot.get("position_sec"))
+    rate = _finite_float(snapshot.get("playback_rate"))
+    if position is None or position < 0:
+        return None
+    if rate is None or rate <= 0.05:
+        return None
+    return _nominal_nowplaying_side(controller_snapshot), NOWPLAYING_PLAYBACK_CONF
+
+
+def _nominal_nowplaying_side(controller_snapshot: dict) -> str:
+    xfader = _finite_float(controller_snapshot.get("xfader"))
+    if xfader is not None and xfader >= 96:
+        return "B"
+    return "A"
+
+
+def _finite_float(value: object) -> float | None:
+    try:
+        out = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return out if math.isfinite(out) else None
 
 
 def _entry_nowplaying_keys(entry) -> set[str]:

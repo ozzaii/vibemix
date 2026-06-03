@@ -98,9 +98,18 @@ class _FakeActivityController(_FakeController):
 
 
 class _FakeTrackInfo:
-    def __init__(self, title: str = "", *, client_bundle_id: str | None = None):
+    def __init__(
+        self,
+        title: str = "",
+        *,
+        client_bundle_id: str | None = None,
+        position_sec: float | None = None,
+        playback_rate: float = 1.0,
+    ):
         self._title = title
         self._client_bundle_id = client_bundle_id
+        self._position_sec = position_sec
+        self._playback_rate = playback_rate
 
     def snapshot(self) -> dict:
         return {
@@ -108,6 +117,8 @@ class _FakeTrackInfo:
             "prev_title": "",
             "title_changed_at": 0.0,
             "client_bundle_id": self._client_bundle_id,
+            "position_sec": self._position_sec,
+            "playback_rate": self._playback_rate,
         }
 
 
@@ -363,6 +374,60 @@ def test_source_status_distinguishes_visible_controller_with_no_midi_traffic():
     assert status["controller_midi_messages"] == "0"
     assert status["controller_midi_events"] == "0"
     assert status["controller_midi_moves"] == "0"
+
+
+def test_nowplaying_playback_seeds_deck_when_controller_has_no_midi_motion():
+    """A DJ-app nowplaying title can seed receipts without becoming citable deck proof."""
+    p = DeckPoller(
+        library=_lib(_entry("1", "Strobe", artist="Deadmau5", key="Am")),
+        controller=_FakeActivityController(
+            _ctrl_snap(vol_a=0, vol_b=0, xfader=64, connected=True),
+            {
+                "connected": True,
+                "messages_seen_total": 0,
+                "events_seen_total": 0,
+                "moves_seen_total": 0,
+            },
+        ),
+        track_info=_FakeTrackInfo(
+            "Deadmau5 - Strobe",
+            client_bundle_id="com.pioneerdj.rekordbox",
+            position_sec=42.0,
+            playback_rate=1.0,
+        ),
+    )
+
+    p.poll_once()
+
+    snap = p.snapshot()
+    assert snap["A"].track_id == "1"
+    assert snap["A"].confidence == pytest.approx(0.5)
+    assert snap["A"].confidence < DECK_CITE_MIN_CONF
+    status = p.source_snapshot()
+    assert status["audible_deck"] == "A"
+    assert status["audible_deck_source"] == "nowplaying_playback"
+    assert status["nowplaying_playback"] == "playing"
+    assert status["resolution"] == "nowplaying_playback_library_match"
+    assert status["resolved_side_rule"] == "nominal_nowplaying_seed_not_physical_deck_proof"
+    assert status["controller_midi_activity"] == "connected_no_midi_traffic"
+
+
+def test_nowplaying_playback_fallback_requires_active_position():
+    p = DeckPoller(
+        library=_lib(_entry("1", "Strobe", artist="Deadmau5", key="Am")),
+        controller=_FakeController(_ctrl_snap(vol_a=0, vol_b=0, xfader=64, connected=True)),
+        track_info=_FakeTrackInfo(
+            "Deadmau5 - Strobe",
+            client_bundle_id="com.pioneerdj.rekordbox",
+            position_sec=None,
+            playback_rate=1.0,
+        ),
+    )
+
+    p.poll_once()
+
+    assert p.snapshot() == {}
+    assert p.source_snapshot()["resolution"] == "no_single_attributable_deck"
 
 
 def test_dj_nowplaying_source_can_resolve_deck_identity():
