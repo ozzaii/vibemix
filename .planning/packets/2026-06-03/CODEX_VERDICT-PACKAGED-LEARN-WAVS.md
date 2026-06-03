@@ -259,3 +259,46 @@
   dirty tree; the new release paths are covered by Package 48.
 - No live app, TTS, sounddevice stream, or co-host speech was run. The only
   sidecar execution was `--version` from the copied/extracted release artifacts.
+
+---
+
+## Increment 8 — Signed Updater Manifest Shape Gate
+
+- Item: verify the generated Tauri updater `latest.json` before publish.
+- SHA: `90a715be` (`fix(release): verify updater manifest before publish`).
+- User value: a tagged release can no longer publish a malformed updater
+  manifest with a missing platform, empty signature, macOS DMG URL, Windows
+  Inno installer URL, or MSI URL.
+
+## By-Eye / Source Evidence
+
+- Added `scripts/dist/check_updater_manifest_ready.py`.
+- The checker requires exactly:
+  - `darwin-aarch64`
+  - `darwin-x86_64`
+  - `windows-x86_64`
+- Each platform must have an HTTPS URL and a non-empty signature.
+- macOS URLs must end in `.app.tar.gz`, not `.dmg`.
+- Windows URL must be a Tauri NSIS `*setup*.exe`, not
+  `vibemix-installer.exe` and not `.msi`.
+- `.github/workflows/release.yml` now runs the checker immediately after
+  `scripts/dist/sign_manifest.sh` writes `release-artifacts/latest.json`, before
+  release assets are staged or uploaded.
+
+## Gates
+
+- `uv run pytest -q tests/install/test_updater_manifest_ready.py tests/security/test_release_yml_signing_skips.py` -> `24 passed`.
+- `uv run ruff check scripts/dist/check_updater_manifest_ready.py tests/install/test_updater_manifest_ready.py tests/security/test_release_yml_signing_skips.py` -> pass.
+- `git diff --check -- .github/workflows/release.yml scripts/dist/check_updater_manifest_ready.py tests/install/test_updater_manifest_ready.py tests/security/test_release_yml_signing_skips.py .planning/handoffs/2026-05-31-package-checklist.md` -> pass.
+- `python3 scripts/dist/check_updater_manifest_ready.py <temp latest.json> --json` -> `ok=true`, platforms `darwin-aarch64`, `darwin-x86_64`, `windows-x86_64`.
+- `uv run python scripts/check_dirty_package_plan.py --summary` -> pass
+  (`Package 48 - Release Artifact MOSS Source Gate: 5 dirty paths` during the
+  slice).
+
+## Notes
+
+- No real release `latest.json` exists in the local artifact tree yet, because
+  full manifest signing still requires the remaining `darwin-x86_64` and
+  Windows updater artifacts. This increment hardens the publish gate that will
+  run once those artifacts exist.
+- No live app, TTS, sounddevice stream, or co-host speech was run.
