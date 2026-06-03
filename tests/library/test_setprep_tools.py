@@ -18,6 +18,7 @@ fake store + in-memory library; energy is monkeypatched.
 
 from __future__ import annotations
 
+import time
 import xml.etree.ElementTree as ET
 from types import SimpleNamespace
 
@@ -411,6 +412,41 @@ def test_inspect_candidates_batches_features_sections_and_energy(toolset, monkey
     assert first["sections"][0]["section_id"].startswith("t000#")
     assert first["energy"] == {"energy": 71.6, "breakdown": {"loudness": 0.6}}
     assert any(section_id.startswith("t000#") for section_id in toolset.seen_sections)
+
+
+def test_inspect_candidates_parallelizes_rows(toolset, monkeypatch):
+    ids = ["t000", "t001", "t002", "t003", "t004", "t000", "t001", "t002"]
+    toolset.seen.update(ids)
+
+    def slow_features(args):
+        time.sleep(0.05)
+        return {
+            "track_id": args["track_id"],
+            "bpm": 124.0,
+            "camelot": "8A",
+            "duration_s": 300.0,
+            "genre": None,
+        }
+
+    def slow_sections(args):
+        time.sleep(0.05)
+        return {"track_id": args["track_id"], "sections": []}
+
+    def slow_energy(args):
+        time.sleep(0.05)
+        return {"track_id": args["track_id"], "energy": 64.0, "breakdown": {}}
+
+    monkeypatch.setattr(toolset, "get_track_features", slow_features)
+    monkeypatch.setattr(toolset, "get_track_sections", slow_sections)
+    monkeypatch.setattr(toolset, "get_track_energy", slow_energy)
+
+    started = time.perf_counter()
+    out = toolset.inspect_candidates({"track_ids": ids})
+    elapsed = time.perf_counter() - started
+
+    assert out["track_ids"] == ids
+    assert [row["track_id"] for row in out["candidates"]] == ids
+    assert elapsed < 0.65
 
 
 def test_inspect_candidates_rejects_unseen_ids_per_row(toolset, monkeypatch):

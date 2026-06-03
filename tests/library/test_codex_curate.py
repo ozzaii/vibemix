@@ -253,6 +253,8 @@ def test_build_set_prompt_has_set_prep_workflow():
     assert "export requested" in p
     assert "discover_pool" in p
     assert "sequence_set" in p
+    assert "expected tool tape is discover_pool" in p
+    assert "choose the first/best sequence_set candidate" in p
     assert "Do NOT inspect every candidate one by one" in p
     assert "inspect_candidates ONCE" in p
     assert "metadata_warnings" in p

@@ -35,6 +35,7 @@ import json
 import logging
 import math
 import os
+import threading
 from collections.abc import Callable
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, Literal, Protocol
@@ -75,6 +76,7 @@ TOOL_CALL_TIMEOUT_S = 30.0
 # Wiring (counter increment + threshold trip) lands in Plan 99-02 / 99-03.
 TOOL_STARVATION_THRESHOLD: int = 3
 MAX_INSPECT_CANDIDATES: int = 24
+INSPECT_CANDIDATES_WORKERS: int = 8
 
 FRESHNESS_GUARDED_TOOLS: frozenset[str] = frozenset(
     {
@@ -140,6 +142,7 @@ class LibraryToolset:
         # INTEL grounding holders. Track ids are discovered first, then section
         # and transition/context aliases are issued from deterministic code.
         self.seen_sections: dict[str, SectionRecord] = {}
+        self._seen_sections_lock = threading.Lock()
         self.issued_transition_candidates: dict[str, TransitionCandidate] = {}
         self.issued_cue_proposals: dict[str, SmartCueProposal] = {}
         self.issued_context_packets: dict[str, AgentContextEnvelope] = {}
@@ -168,6 +171,7 @@ class LibraryToolset:
         # genre_prototypes import here) and repeated feature lookups in one run
         # reuse the built prototype table.
         self._genre_lookup: Any | None = None
+        self._genre_lookup_lock = threading.Lock()
 
     def _freshness_payload(self) -> dict[str, Any]:
         """Return a dict freshness snapshot from the optional product provider."""
@@ -300,8 +304,9 @@ class LibraryToolset:
         if entry is None:
             return {"error": f"unknown track_id {track_id!r}"}
         sections = sections_for_entry(entry)
-        for section in sections:
-            self.seen_sections[section.section_id] = section
+        with self._seen_sections_lock:
+            for section in sections:
+                self.seen_sections[section.section_id] = section
         return {
             "track_id": track_id,
             "sections": [section_to_dict(section) for section in sections],
@@ -329,19 +334,14 @@ class LibraryToolset:
             return {"error": "inspect_candidates: 'track_ids' must be a non-empty list"}
 
         truncated = len(raw_track_ids) > MAX_INSPECT_CANDIDATES
-        rows: list[dict[str, Any]] = []
-        for raw_track_id in raw_track_ids[:MAX_INSPECT_CANDIDATES]:
+        def inspect_one(raw_track_id: Any) -> dict[str, Any]:
             if not isinstance(raw_track_id, str) or not raw_track_id:
-                rows.append(
-                    {
-                        "track_id": raw_track_id,
-                        "error": "inspect_candidates: each track_id must be a non-empty string",
-                    }
-                )
-                continue
+                return {
+                    "track_id": raw_track_id,
+                    "error": "inspect_candidates: each track_id must be a non-empty string",
+                }
             if raw_track_id not in self.seen:
-                rows.append({"track_id": raw_track_id, **self._invented_track_id_error(raw_track_id)})
-                continue
+                return {"track_id": raw_track_id, **self._invented_track_id_error(raw_track_id)}
 
             features = self.get_track_features({"track_id": raw_track_id})
             sections = self.get_track_sections({"track_id": raw_track_id})
@@ -364,7 +364,15 @@ class LibraryToolset:
                     for key, value in energy.items()
                     if key in {"energy", "breakdown"}
                 }
-            rows.append(row)
+            return row
+
+        candidate_ids = raw_track_ids[:MAX_INSPECT_CANDIDATES]
+        max_workers = min(INSPECT_CANDIDATES_WORKERS, len(candidate_ids))
+        if max_workers <= 1:
+            rows = [inspect_one(raw_track_id) for raw_track_id in candidate_ids]
+        else:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+                rows = list(ex.map(inspect_one, candidate_ids))
 
         out: dict[str, Any] = {
             "candidates": rows,
@@ -584,19 +592,12 @@ class LibraryToolset:
         honest-null so a feature lookup never raises.
         """
         try:
-            # WR-03: this lazy-init is an unguarded check-then-set, which is safe
-            # ONLY because dispatch serializes tool calls within a run — `dispatch`
-            # runs each handler on a fresh single-worker ThreadPoolExecutor and the
-            # agent loop dispatches calls one at a time, so two `get_track_features`
-            # never race this line. If a future caller ever dispatches tool calls
-            # concurrently against the same toolset, guard this with a per-instance
-            # lock. (The inner GenrePrototypeLookup is itself thread-safe via
-            # double-checked locks, so the worst case today is wasted work, never
-            # corruption.)
             if self._genre_lookup is None:
-                from vibemix.library.genre_prototypes import GenrePrototypeLookup
+                with self._genre_lookup_lock:
+                    if self._genre_lookup is None:
+                        from vibemix.library.genre_prototypes import GenrePrototypeLookup
 
-                self._genre_lookup = GenrePrototypeLookup(self._store)
+                        self._genre_lookup = GenrePrototypeLookup(self._store)
             label, _conf = self._genre_lookup.classify_playing(track_id)
             return label if label and label != "unknown" else None
         except Exception:
@@ -1863,6 +1864,7 @@ def _unit_float_or_none(raw: Any) -> float | None:
 
 
 __all__ = [
+    "INSPECT_CANDIDATES_WORKERS",
     "MAX_CHOICES",
     "MAX_INSPECT_CANDIDATES",
     "MIN_CHOICES",
