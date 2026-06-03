@@ -1685,8 +1685,21 @@ def test_viber_live_context_operator_actions_name_silent_blackhole_route():
         "macos.audio_midi_setup",
         "settings.audio.input",
     ]
+    assert actions[0]["diagnostic_commands"] == [
+        (
+            "system_profiler SPAudioDataType | "
+            "rg -i -C 4 'DDJ-FLX4|BlackHole|Aggregate|Multi-Output|rekordbox'"
+        ),
+        "uv run python -m vibemix library live-context --timeout 2 --frames 160 --json",
+        (
+            "COHOST_VIBER_FLX4_WAIT_READY_S=20 "
+            "COHOST_VIBER_FLX4_DIRECT_MIDI_PROBE_S=20 "
+            "bash scripts/release/check_flx4_live_context.sh"
+        ),
+    ]
     assert "no active deck lane" in actions[1]["detail"]
     assert "only one active deck lane" not in actions[1]["detail"]
+    assert actions[1]["diagnostic_commands"] == actions[0]["diagnostic_commands"]
 
 
 def test_viber_live_context_operator_actions_include_library_index_setup():

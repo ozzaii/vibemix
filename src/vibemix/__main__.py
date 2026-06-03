@@ -6215,6 +6215,18 @@ def _viber_live_context_operator_actions(
     physical_diagnosis = diagnosis not in {"live_socket_missing", "stale_live_runtime"}
 
     actions: list[dict[str, Any]] = []
+    audio_route_diagnostic_commands = [
+        (
+            "system_profiler SPAudioDataType | "
+            "rg -i -C 4 'DDJ-FLX4|BlackHole|Aggregate|Multi-Output|rekordbox'"
+        ),
+        "uv run python -m vibemix library live-context --timeout 2 --frames 160 --json",
+        (
+            "COHOST_VIBER_FLX4_WAIT_READY_S=20 "
+            "COHOST_VIBER_FLX4_DIRECT_MIDI_PROBE_S=20 "
+            "bash scripts/release/check_flx4_live_context.sh"
+        ),
+    ]
 
     def add(code: str, detail: str, **extra: Any) -> None:
         if any(action.get("code") == code for action in actions):
@@ -6363,6 +6375,7 @@ def _viber_live_context_operator_actions(
                     "macos.audio_midi_setup",
                     "settings.audio.input",
                 ],
+                diagnostic_commands=audio_route_diagnostic_commands,
             )
         else:
             add(
@@ -6434,6 +6447,7 @@ def _viber_live_context_operator_actions(
             detail,
             **({"route_diagnosis": route_diagnosis} if route_diagnosis else {}),
             **({"recommended_env": recommended_env} if recommended_env else {}),
+            diagnostic_commands=audio_route_diagnostic_commands,
         )
 
     if not actions and blockers:
