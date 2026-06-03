@@ -132,13 +132,15 @@ class BeatmatchPracticeDriver:
         if deck != "B":
             return False
         if lesson_id == "L2.01" and control == "tempo":
-            self._deck.rate_a = 1.0
-            self._deck.rate_b = _tempo_rate_from_cc(midi.get("value"))
+            self._deck.set_rates(
+                rate_a=1.0,
+                rate_b=_tempo_rate_from_cc(midi.get("value")),
+                smooth=False,
+            )
             self._armed = True
             return True
         if lesson_id == "L2.02" and control == "sync":
-            self._deck.rate_a = 1.0
-            self._deck.rate_b = 1.0
+            self._deck.set_rates(rate_a=1.0, rate_b=1.0, smooth=False)
             self._armed = True
             return True
         return False

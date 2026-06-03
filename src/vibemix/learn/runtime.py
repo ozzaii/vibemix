@@ -148,6 +148,7 @@ from vibemix.ui_bus.learn_messages import (
 _CC_DEFAULT_MIN_DELTA = 38
 _MISMATCH_HINT_THROTTLE_S = 1.5
 _BEATMATCH_PRACTICE_AUDIO_LESSONS = frozenset({"L2.01", "L2.02", "L2.04", "L2.05"})
+_BEATMATCH_PRACTICE_LOCK_REQUIRED_LESSONS = frozenset({"L2.01", "L2.02"})
 _BEATMATCH_PRACTICE_GRADE_STATES = frozenset(
     {"awaiting_action", "hint_strike_1", "hint_strike_2", "hint_strike_3", "advancing"}
 )
@@ -565,6 +566,7 @@ class LessonRuntime(StateMachine):
         self._last_beatmatch_live_grade_signature: tuple[str, float, float, str | None] | None = (
             None
         )
+        self._beatmatch_practice_ack_prehandled = False
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
         self._cue_placement_practice_lock_active = False
@@ -692,6 +694,20 @@ class LessonRuntime(StateMachine):
     def _is_beatmatch_practice_audio_lesson(self) -> bool:
         return self._learn.current_lesson_id in _BEATMATCH_PRACTICE_AUDIO_LESSONS
 
+    def _is_beatmatch_practice_lock_action(self, expected: dict[str, Any] | None) -> bool:
+        """Return True for L2 beatmatch actions that must prove a locked grade."""
+
+        if self._learn.current_lesson_id not in _BEATMATCH_PRACTICE_LOCK_REQUIRED_LESSONS:
+            return False
+        if not isinstance(expected, dict):
+            return False
+        control, deck = _control_and_deck(expected)
+        if self._learn.current_lesson_id == "L2.01":
+            return expected.get("type") == "cc" and control == "tempo" and deck == "B"
+        if self._learn.current_lesson_id == "L2.02":
+            return expected.get("type") == "button" and control == "sync" and deck == "B"
+        return False
+
     def _start_beatmatch_practice_player(self) -> None:
         if (
             self._beatmatch_practice_player is None
@@ -770,6 +786,50 @@ class LessonRuntime(StateMachine):
         self._emit_advance(reason="action_matched")
         self._emit_highlight(next_step.expected_action)
         self._emit_step_tutor(next_step)
+        return True
+
+    def handle_beatmatch_practice_ack(self, midi: dict[str, Any]) -> bool:
+        """Consume L2 beatmatch acks until the measured grade is actually locked.
+
+        Before the owned-deck judge existed, a matched L2.01/L2.02 control move
+        was enough to finish the lesson. Now those lessons have real phase/tempo
+        ground truth, so a matched but uncredited grade must keep the lesson open:
+        Sven can coach the measured miss, the audio keeps playing, and the learner
+        can keep correcting until the cited ``BEATMATCH_GRADED`` lock lands.
+        """
+
+        if self.current_state.id not in (
+            "awaiting_action",
+            "hint_strike_1",
+            "hint_strike_2",
+            "hint_strike_3",
+        ):
+            return False
+        if self._active_observer() is not None:
+            return False
+        expected = self._current_expected_action()
+        if not self._is_beatmatch_practice_lock_action(expected):
+            return False
+        if (
+            self._beatmatch_practice_action_recorder is None
+            or self._beatmatch_practice_loader is None
+            or self._evidence_registry is None
+        ):
+            return False
+        if not self.action_matches(midi=midi, expected=expected):
+            return False
+
+        self._record_action_evidence(expected=expected, midi=midi, matched=True)
+        self._mark_progress_practice_source(midi)
+        result = self._record_beatmatch_practice_action(midi)
+        if result is not None and result.event is None:
+            self._state_entered_at = time.monotonic()
+            return True
+
+        # Locked (or fail-soft ungradeable) goes through the normal advance
+        # transition, but ``on_ack_action`` must not re-record/re-grade it.
+        self._beatmatch_practice_ack_prehandled = True
+        self.send("ack_action", midi=midi)
         return True
 
     def handle_mismatch_ack(self, midi: dict[str, Any]) -> bool:
@@ -940,7 +1000,9 @@ class LessonRuntime(StateMachine):
     def on_ack_action(self, **kwargs: Any) -> None:
         self._last_was_match = True
         midi = kwargs.get("midi")
-        if isinstance(midi, dict):
+        prehandled_beatmatch_ack = self._beatmatch_practice_ack_prehandled
+        self._beatmatch_practice_ack_prehandled = False
+        if isinstance(midi, dict) and not prehandled_beatmatch_ack:
             self._record_action_evidence(
                 expected=self._current_expected_action(),
                 midi=midi,
@@ -970,11 +1032,14 @@ class LessonRuntime(StateMachine):
                     file=sys.stderr,
                 )
 
-    def _record_beatmatch_practice_action(self, midi: dict[str, Any]) -> None:
+    def _record_beatmatch_practice_action(
+        self,
+        midi: dict[str, Any],
+    ) -> BeatmatchPracticeResult | None:
         """Arm and grade an owned-deck beatmatch practice attempt, if wired."""
 
         if self._beatmatch_practice_action_recorder is None:
-            return
+            return None
         try:
             should_grade = self._beatmatch_practice_action_recorder(
                 self._learn.current_lesson_id,
@@ -987,11 +1052,13 @@ class LessonRuntime(StateMachine):
                 f"[learn.runtime] beatmatch practice recorder failed: {exc!r}",
                 file=sys.stderr,
             )
-            return
+            return None
         if not should_grade:
-            return
+            return None
         self._beatmatch_practice_lock_active = False
-        self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
+        result = self._grade_beatmatch_practice_tick()
+        self._emit_live_beatmatch_grade(result)
+        return result
 
     def _record_cue_placement_practice_action(self, midi: dict[str, Any]) -> None:
         """Arm and grade an owned-deck cue placement practice attempt, if wired."""
@@ -1682,7 +1749,7 @@ class LessonRuntime(StateMachine):
             return
 
         citations: tuple[str, ...] = ()
-        if result.credited:
+        if result.event is not None:
             citations = (
                 f"[{BEATMATCH_EVIDENCE_SOURCE}:{BEATMATCH_GRADED_EVENT}@{result.t_session:.3f}]",
             )

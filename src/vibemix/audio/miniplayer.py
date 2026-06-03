@@ -181,6 +181,24 @@ class MiniDeck:
         self._prev_gain_b = gain_b
         return mixed.astype(np.float32)
 
+    def set_rates(
+        self,
+        *,
+        rate_a: float | None = None,
+        rate_b: float | None = None,
+        smooth: bool = True,
+    ) -> None:
+        """Set deck rates, optionally latching the ramp state immediately."""
+
+        if rate_a is not None:
+            self.rate_a = float(rate_a)
+            if not smooth:
+                self._prev_rate_a = self.rate_a
+        if rate_b is not None:
+            self.rate_b = float(rate_b)
+            if not smooth:
+                self._prev_rate_b = self.rate_b
+
     def set_eq(
         self,
         deck: str,

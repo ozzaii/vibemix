@@ -428,6 +428,8 @@ def register_learn_handlers(
             return
         if lesson_runtime.handle_step_ack(midi):
             return
+        if lesson_runtime.handle_beatmatch_practice_ack(midi):
+            return
         if lesson_runtime.handle_mismatch_ack(midi):
             return
         lesson_runtime.send("ack_action", midi=midi)

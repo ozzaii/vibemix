@@ -400,6 +400,39 @@ def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch)
     assert _live_grade_payloads(ipc)[-1]["citation"] is None
 
 
+def test_live_beatmatch_grade_cites_locked_event_before_mastery_credit() -> None:
+    """A measured locked grade cites its event even before skill credit unlocks."""
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    progress = LearnProgress()
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 43.2,
+        beatmatch_practice_loader=_locked_beatmatch_snapshot,
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.01",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    payload = _tutor_speak_payloads(ipc)[-1]
+    live_grade = _live_grade_payloads(ipc)[-1]
+    assert payload["text"] == "nice — that's matched."
+    assert payload["citations"] == ["[ev:BEATMATCH_GRADED@43.200]"]
+    assert live_grade["citation"] == "[ev:BEATMATCH_GRADED@43.200]"
+    assert registry.has("ev", "BEATMATCH_GRADED", 43.2, tol=1.0)
+    assert progress.skills.get("beatmatching", {}).get("live_proof_count", 0) == 0
+
+
 def test_live_beatmatch_grade_voices_drift_without_fabricated_citation() -> None:
     """Measured non-locked coaching is authored, but no ev atom is invented."""
     registry = EvidenceRegistry()
@@ -617,6 +650,121 @@ def test_matched_beatmatch_action_records_and_grades_immediately(monkeypatch) ->
     tutor_payload = _tutor_speak_payloads(runtime._ipc)[-1]
     assert tutor_payload["text"] == "nice — that's matched."
     assert tutor_payload["citations"] == ["[ev:BEATMATCH_GRADED@91.200]"]
+
+
+def test_uncredited_beatmatch_practice_ack_stays_active_for_recovery() -> None:
+    """A measured bad beatmatch grade coaches without completing the lesson."""
+    progress = LearnProgress()
+    registry = EvidenceRegistry()
+    events: list[tuple[str, dict]] = []
+    recorded: list[tuple[str | None, dict]] = []
+
+    def record_action(lesson_id: str | None, midi: dict) -> bool:
+        recorded.append((lesson_id, dict(midi)))
+        return True
+
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 92.4,
+        beatmatch_practice_loader=_sliding_beatmatch_snapshot,
+        beatmatch_practice_action_recorder=record_action,
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.01",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+    handled = runtime.handle_beatmatch_practice_ack(
+        {
+            "type": "cc",
+            "control": "tempo",
+            "deck": "B",
+            "direction": "up",
+            "value": 100,
+            "prev_value": 64,
+            "source": "click",
+        }
+    )
+
+    assert handled is True
+    assert runtime.current_state.id == "awaiting_action"
+    assert recorded == [
+        (
+            "L2.01",
+            {
+                "type": "cc",
+                "control": "tempo",
+                "deck": "B",
+                "direction": "up",
+                "value": 100,
+                "prev_value": 64,
+                "source": "click",
+            },
+        )
+    ]
+    assert _live_grade_payloads(runtime._ipc)[-1]["verdict"] == "drifting"
+    tutor_payload = _tutor_speak_payloads(runtime._ipc)[-1]
+    assert tutor_payload["text"] == "close, you're sliding behind — nudge the jog."
+    assert tutor_payload["citations"] == []
+    assert not registry.has("ev", "BEATMATCH_GRADED", 92.4, tol=1.0)
+    assert progress.lessons["L2.01"]["completed"] is False
+    assert not any(kind == "learn_lesson_completed" for kind, _fields in events)
+
+
+def test_locked_beatmatch_practice_ack_advances_after_cited_grade() -> None:
+    """The same beatmatch ack path completes only once the grade is locked."""
+    progress = LearnProgress()
+    registry = EvidenceRegistry()
+
+    def record_action(_lesson_id: str | None, _midi: dict) -> bool:
+        return True
+
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 93.1,
+        beatmatch_practice_loader=_locked_beatmatch_snapshot,
+        beatmatch_practice_action_recorder=record_action,
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.01",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+    handled = runtime.handle_beatmatch_practice_ack(
+        {
+            "type": "cc",
+            "control": "tempo",
+            "deck": "B",
+            "direction": "down",
+            "value": 64,
+            "prev_value": 20,
+            "source": "click",
+        }
+    )
+
+    assert handled is True
+    assert runtime.current_state.id in {"advancing", "completed"}
+    live_grade = _live_grade_payloads(runtime._ipc)[-1]
+    assert live_grade["verdict"] == "locked"
+    assert live_grade["citation"] == "[ev:BEATMATCH_GRADED@93.100]"
+    assert registry.has("ev", "BEATMATCH_GRADED", 93.1, tol=1.0)
 
 
 def test_beatmatch_practice_rearms_after_unlocked_grade(monkeypatch) -> None:
