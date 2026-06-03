@@ -86,6 +86,22 @@ def test_grade_octave_apart_but_aligned_counts_as_matched() -> None:
     assert grade.verdict == "locked"
 
 
+def test_grade_octave_apart_stays_locked_at_non_anchor_frame() -> None:
+    # The phase comparison must fold B's beat domain too, not only the tempo
+    # ratio. At 70<->140, the same playhead time is a half-beat in the slow grid
+    # for every fast-grid beat; comparing raw beat_distance would report -0.5.
+    grid_a = BeatGrid(anchor_frame=0.0, bpm=140.0, sample_rate=SR)
+    grid_b = BeatGrid(anchor_frame=0.0, bpm=70.0, sample_rate=SR)
+    frame = grid_a.beat_len_frames * 5.25
+
+    grade = grade_beatmatch(grid_a, grid_b, _state(frame, frame))
+
+    assert grade.tempo_matched is True
+    assert grade.phase_error_beats == pytest.approx(0.0)
+    assert grade.phase_locked is True
+    assert grade.verdict == "locked"
+
+
 def test_grade_tempo_off_is_not_matched() -> None:
     grid_a = BeatGrid(anchor_frame=0.0, bpm=120.0, sample_rate=SR)
     grid_b = BeatGrid(anchor_frame=0.0, bpm=128.0, sample_rate=SR)

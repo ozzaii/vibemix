@@ -111,7 +111,12 @@ def grade_beatmatch(grid_a: BeatGrid, grid_b: BeatGrid, state: DeckState) -> Bea
     tempo_matched = tempo_error <= _TEMPO_MATCH_TOL
 
     # --- phase alignment, modular on the beat circle (B1) ---
-    phase = _phase_error(grid_b.beat_distance(state.b_frame), grid_a.beat_distance(state.a_frame))
+    #
+    # Compare B after applying the same octave fold used for tempo. Without
+    # this, a true 70<->140 lock away from the anchor lands at B's half-beat
+    # and looks like a trainwreck even though the folded beat domains align.
+    folded_b_distance = (grid_b.beat_index(state.b_frame) / _octave_fold_multiplier(ratio)) % 1.0
+    phase = _phase_error(folded_b_distance, grid_a.beat_distance(state.a_frame))
     phase_locked = abs(phase) <= _PHASE_LOCK_TOL
     recoverable_late = 0.0 < phase <= _PAST_BEAT_FORGIVE
 
