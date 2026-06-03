@@ -6,7 +6,7 @@ the native ``codex exec`` runtime is the bounded reasoning harness; this STDIO
 MCP server exposes the grounded tool core, backed by the shared
 :class:`~vibemix.library.toolset.LibraryToolset`. The core discovery/write
 tools are ``search_vibe`` / ``discover_pool`` / ``create_playlist`` /
-``export_set``; additional tools add energy, sequencing, web, quote,
+``export_set``; additional tools add batch inspection, energy, sequencing, web, quote,
 knowledge, and cue-export capabilities. Codex plans the curation and calls
 these tools; the seen-set grounding gate (Cardinal Invariant #2) and the
 write/export re-validation are enforced here at the tool boundary — NOT in the
@@ -180,6 +180,16 @@ def build_server(toolset: Any) -> Any:
         come from search_vibe/discover_pool this run. Returns section_ids the
         agent may later use in transition_slate."""
         return toolset.get_track_sections({"track_id": track_id})
+
+    @mcp.tool()
+    def inspect_candidates(track_ids: list[str]) -> dict[str, Any]:
+        """Batch inspect discovered candidates in one call: deterministic
+        features, grounded sections, and perceived energy for each track_id.
+        Every track_id must have come from search_vibe/discover_pool this run;
+        unseen ids return per-row errors. Use this ONCE for a candidate pool
+        instead of looping get_track_features / get_track_sections /
+        get_track_energy per track."""
+        return toolset.inspect_candidates({"track_ids": track_ids})
 
     @mcp.tool()
     def transition_slate(

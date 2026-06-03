@@ -33,7 +33,7 @@ from vibemix.library.rekordbox import (
     TrackEntry,
 )
 from vibemix.library.staleness import LibraryFreshness
-from vibemix.library.toolset import LibraryToolset
+from vibemix.library.toolset import MAX_INSPECT_CANDIDATES, LibraryToolset
 
 # --------------------------------------------------------------------------- #
 # Fixtures — mirror test_discovery.py / test_next_suggestion.py fakes.
@@ -368,6 +368,57 @@ def test_get_track_sections_issues_cue_derived_sections(toolset):
     assert out["sections"][1]["role"] == "drop"
     assert out["sections"][2]["role"] == "outro"
     assert set(toolset.seen_sections) >= {"t000#s000", "t000#s001", "t000#s002"}
+
+
+def test_inspect_candidates_batches_features_sections_and_energy(toolset, monkeypatch):
+    from vibemix.library.energy import EnergyScore
+
+    monkeypatch.setattr(
+        energy_mod,
+        "score_energy_cached",
+        lambda *a, **k: EnergyScore(score=71.6, breakdown={"loudness": 0.6}),
+    )
+    toolset.seen.update({"t000", "t001"})
+
+    out = toolset.inspect_candidates({"track_ids": ["t000", "t001"]})
+
+    assert out["track_ids"] == ["t000", "t001"]
+    assert out["truncated"] is False
+    assert len(out["candidates"]) == 2
+    first = out["candidates"][0]
+    assert first["features"]["track_id"] == "t000"
+    assert first["features"]["bpm"] == 124.0
+    assert first["sections"]
+    assert first["sections"][0]["section_id"].startswith("t000#")
+    assert first["energy"] == {"energy": 71.6, "breakdown": {"loudness": 0.6}}
+    assert any(section_id.startswith("t000#") for section_id in toolset.seen_sections)
+
+
+def test_inspect_candidates_rejects_unseen_ids_per_row(toolset, monkeypatch):
+    monkeypatch.setattr(energy_mod, "score_energy_cached", lambda *a, **k: None)
+    toolset.seen.add("t000")
+
+    out = toolset.inspect_candidates({"track_ids": ["t000", "GHOST"]})
+
+    assert out["track_ids"] == ["t000"]
+    assert "features" in out["candidates"][0]
+    rejected = out["candidates"][1]
+    assert rejected["track_id"] == "GHOST"
+    assert "invented" in rejected["error"]
+    assert "features" not in rejected
+    assert "sections" not in rejected
+    assert "energy" not in rejected
+
+
+def test_inspect_candidates_caps_large_batches(toolset, monkeypatch):
+    monkeypatch.setattr(energy_mod, "score_energy_cached", lambda *a, **k: None)
+    toolset.seen.add("t000")
+
+    out = toolset.inspect_candidates({"track_ids": ["t000"] * (MAX_INSPECT_CANDIDATES + 1)})
+
+    assert out["truncated"] is True
+    assert len(out["candidates"]) == MAX_INSPECT_CANDIDATES
+    assert "truncated" in out["note"]
 
 
 def test_get_track_sections_preserves_materialized_auto_hot_cue_slots(toolset):
@@ -742,6 +793,7 @@ def test_export_set_revalidates_against_library(toolset, tmp_path):
 def test_dispatch_registers_setprep_tools(toolset):
     assert "error" in toolset.dispatch("get_track_energy", {"track_id": "NOPE"})
     assert "error" in toolset.dispatch("get_track_sections", {"track_id": "NOPE"})
+    assert "error" in toolset.dispatch("inspect_candidates", {"track_ids": []})
     assert "error" in toolset.dispatch("transition_slate", {})
     assert "error" in toolset.dispatch("compile_musical_context", {})
     assert "error" in toolset.dispatch("discover_pool", {})

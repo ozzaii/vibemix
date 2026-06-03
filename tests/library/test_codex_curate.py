@@ -253,6 +253,7 @@ def test_build_set_prompt_has_set_prep_workflow():
     assert "discover_pool" in p
     assert "sequence_set" in p
     assert "Do NOT inspect every candidate one by one" in p
+    assert "inspect_candidates ONCE" in p
     assert "sequence_set already resolves BPM, key, stored vectors" in p
     assert "get_track_sections" in p
     assert "transition_slate" in p

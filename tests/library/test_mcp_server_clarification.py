@@ -12,7 +12,8 @@ thin FastMCP wrapper. These tests pin five behaviors:
     object (has a ``run`` method) without raising. No Codex spawn, no STDIO
     transport — purely a ``build_server()`` unit check.
 2.  **Tool count regression-pin** — the registered tool count is the grounded
-    base surface (16) + 1 = **17**. If a future refactor accidentally drops a
+    base surface (16) + inspect_candidates + request_clarification = **18**.
+    If a future refactor accidentally drops a
     tool, this count flips and the regression is caught.
 3.  **Tool delegation correctness** — invoking the registered
     ``request_clarification`` function delegates to
@@ -33,7 +34,7 @@ thin FastMCP wrapper. These tests pin five behaviors:
     substring contract is the runtime gate.
 
 Plus an existing-exposures byte-equivalence check (no accidental drop of the
-16 grounded base tools).
+16 grounded base tools or inspect_candidates).
 
 No Codex spawn. No STDIO transport. The fake toolset is a plain class with
 stub methods returning ``{}`` for each registered tool — enough for FastMCP's
@@ -66,6 +67,7 @@ class _FakeToolset:
 
     def __init__(self) -> None:
         self.recorded_clarification_args: dict[str, Any] | None = None
+        self.recorded_inspect_args: dict[str, Any] | None = None
 
     # -- core discovery + playlist write ---------------------------------- #
     def search_vibe(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -76,6 +78,10 @@ class _FakeToolset:
 
     def get_track_sections(self, args: dict[str, Any]) -> dict[str, Any]:
         return {}
+
+    def inspect_candidates(self, args: dict[str, Any]) -> dict[str, Any]:
+        self.recorded_inspect_args = args
+        return {"candidates": [{"track_id": tid} for tid in args.get("track_ids", [])]}
 
     def transition_slate(self, args: dict[str, Any]) -> dict[str, Any]:
         return {}
@@ -159,14 +165,15 @@ def test_build_server_smoke(server: Any) -> None:
     assert hasattr(server, "run"), "FastMCP server must expose a run() method"
 
 
-def test_registered_tool_count_is_seventeen(server: Any) -> None:
-    """The grounded base surface is 16; request_clarification brings it to 17.
+def test_registered_tool_count_is_eighteen(server: Any) -> None:
+    """The grounded base surface is 16; two newer surfaces bring it to 18.
 
     Regression-pin: if a future refactor drops a tool, this flips.
     """
     tools = server._tool_manager.list_tools()
-    assert len(tools) == 17, (
-        f"Expected 17 registered tools (16 base + 1 request_clarification), "
+    assert len(tools) == 18, (
+        f"Expected 18 registered tools (16 base + inspect_candidates + "
+        f"request_clarification), "
         f"got {len(tools)}: {[t.name for t in tools]}"
     )
 
@@ -179,8 +186,8 @@ def test_request_clarification_is_registered(server: Any) -> None:
     )
 
 
-def test_existing_sixteen_grounded_tools_still_registered(server: Any) -> None:
-    """The 16 grounded base tools are registered; raw cue export stays absent.
+def test_existing_grounded_tools_still_registered(server: Any) -> None:
+    """The grounded tools are registered; raw cue export stays absent.
 
     Raw ``export_cues`` accepted arbitrary track paths/cue payloads and is no
     longer part of the agent-facing MCP surface; ``export_smart_cues`` is the
@@ -190,6 +197,7 @@ def test_existing_sixteen_grounded_tools_still_registered(server: Any) -> None:
         "search_vibe",
         "get_track_features",
         "get_track_sections",
+        "inspect_candidates",
         "transition_slate",
         "compile_musical_context",
         "smart_hot_cues",
@@ -208,6 +216,18 @@ def test_existing_sixteen_grounded_tools_still_registered(server: Any) -> None:
     missing = expected_base - names
     assert not missing, f"Plan 100-02 accidentally dropped: {sorted(missing)}"
     assert "export_cues" not in names
+
+
+def test_inspect_candidates_delegates_with_dict_packed_args(
+    fake_toolset: _FakeToolset, server: Any
+) -> None:
+    tool = server._tool_manager.get_tool("inspect_candidates")
+    assert tool is not None
+
+    result = tool.fn(track_ids=["t001", "t002"])
+
+    assert fake_toolset.recorded_inspect_args == {"track_ids": ["t001", "t002"]}
+    assert result == {"candidates": [{"track_id": "t001"}, {"track_id": "t002"}]}
 
 
 def test_request_clarification_delegates_with_dict_packed_args(
@@ -304,9 +324,9 @@ def test_request_clarification_docstring_teaches_codex(server: Any) -> None:
     )
 
 
-def test_grep_gate_seventeen_mcp_tool_decorators() -> None:
+def test_grep_gate_eighteen_mcp_tool_decorators() -> None:
     """Subprocess grep gate — independent confirmation that the source file
-    has exactly 17 ``@mcp.tool()`` decorators.
+    has exactly 18 ``@mcp.tool()`` decorators.
 
     Belt-and-braces for the registered-tool-count check; this also catches
     "tool was added but build_server didn't re-bind it" drift since the
@@ -321,8 +341,8 @@ def test_grep_gate_seventeen_mcp_tool_decorators() -> None:
         check=False,
     )
     count = int(out.stdout.strip())
-    assert count == 17, (
-        f"Expected exactly 17 @mcp.tool() decorators in mcp_server.py, "
+    assert count == 18, (
+        f"Expected exactly 18 @mcp.tool() decorators in mcp_server.py, "
         f"got {count}. Either request_clarification is missing, the raw "
         f"export_cues tool came back, or a sibling grounded tool was dropped."
     )

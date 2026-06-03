@@ -74,12 +74,14 @@ TOOL_CALL_TIMEOUT_S = 30.0
 # false-firing on a single missed search. Tunable in tests via monkeypatch.
 # Wiring (counter increment + threshold trip) lands in Plan 99-02 / 99-03.
 TOOL_STARVATION_THRESHOLD: int = 3
+MAX_INSPECT_CANDIDATES: int = 24
 
 FRESHNESS_GUARDED_TOOLS: frozenset[str] = frozenset(
     {
         "search_vibe",
         "get_track_features",
         "get_track_sections",
+        "inspect_candidates",
         "transition_slate",
         "compile_musical_context",
         "smart_hot_cues",
@@ -293,12 +295,7 @@ class LibraryToolset:
         if not isinstance(track_id, str) or not track_id:
             return {"error": "get_track_sections: 'track_id' must be a string"}
         if track_id not in self.seen:
-            return {
-                "error": (
-                    "rejected: track_id was never returned by search_vibe/"
-                    f"discover_pool this run (invented): {track_id!r}"
-                )
-            }
+            return self._invented_track_id_error(track_id)
         entry = self._library.lookup_by_id(track_id)
         if entry is None:
             return {"error": f"unknown track_id {track_id!r}"}
@@ -309,6 +306,79 @@ class LibraryToolset:
             "track_id": track_id,
             "sections": [section_to_dict(section) for section in sections],
         }
+
+    @staticmethod
+    def _invented_track_id_error(track_id: str) -> dict[str, str]:
+        return {
+            "error": (
+                "rejected: track_id was never returned by search_vibe/"
+                f"discover_pool this run (invented): {track_id!r}"
+            )
+        }
+
+    def inspect_candidates(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Batch deterministic candidate facts for already-discovered tracks.
+
+        This is a speed tool, not a new authority surface: each id must already
+        be in ``seen`` from search_vibe/discover_pool. It collapses the common
+        get_track_features + get_track_sections + get_track_energy loop into
+        one tool call while preserving honest-null/error behavior per row.
+        """
+        raw_track_ids = args.get("track_ids")
+        if not isinstance(raw_track_ids, list) or not raw_track_ids:
+            return {"error": "inspect_candidates: 'track_ids' must be a non-empty list"}
+
+        truncated = len(raw_track_ids) > MAX_INSPECT_CANDIDATES
+        rows: list[dict[str, Any]] = []
+        for raw_track_id in raw_track_ids[:MAX_INSPECT_CANDIDATES]:
+            if not isinstance(raw_track_id, str) or not raw_track_id:
+                rows.append(
+                    {
+                        "track_id": raw_track_id,
+                        "error": "inspect_candidates: each track_id must be a non-empty string",
+                    }
+                )
+                continue
+            if raw_track_id not in self.seen:
+                rows.append({"track_id": raw_track_id, **self._invented_track_id_error(raw_track_id)})
+                continue
+
+            features = self.get_track_features({"track_id": raw_track_id})
+            sections = self.get_track_sections({"track_id": raw_track_id})
+            energy = self.get_track_energy({"track_id": raw_track_id})
+
+            row: dict[str, Any] = {"track_id": raw_track_id}
+            if "error" in features:
+                row["features_error"] = features["error"]
+            else:
+                row["features"] = features
+            if "error" in sections:
+                row["sections_error"] = sections["error"]
+            else:
+                row["sections"] = sections.get("sections", [])
+            if "error" in energy:
+                row["energy_error"] = energy["error"]
+            else:
+                row["energy"] = {
+                    key: value
+                    for key, value in energy.items()
+                    if key in {"energy", "breakdown"}
+                }
+            rows.append(row)
+
+        out: dict[str, Any] = {
+            "candidates": rows,
+            "track_ids": [
+                row["track_id"]
+                for row in rows
+                if isinstance(row.get("track_id"), str) and "error" not in row
+            ],
+            "limit": MAX_INSPECT_CANDIDATES,
+            "truncated": truncated,
+        }
+        if truncated:
+            out["note"] = f"truncated to first {MAX_INSPECT_CANDIDATES} track_ids"
+        return out
 
     def transition_slate(self, args: dict[str, Any]) -> dict[str, Any]:
         """Issue deterministic section-to-section transition candidates.
@@ -1370,6 +1440,9 @@ class LibraryToolset:
             return "; ".join(p for p in parts if p)[:160]
         if name in ("get_track_features", "get_track_energy", "get_track_sections"):
             return text("track_id", limit=120)
+        if name == "inspect_candidates":
+            n = count("track_ids")
+            return f"{n} tracks" if n is not None else ""
         if name == "sequence_set":
             n = count("track_ids")
             parts = [text("curve", limit=40), f"{n} tracks" if n is not None else ""]
@@ -1442,6 +1515,11 @@ class LibraryToolset:
             if isinstance(cands, (list, tuple)):
                 n = len(cands)
                 return f"{n} candidate{'' if n == 1 else 's'}"
+        if name == "inspect_candidates":
+            rows = result.get("candidates")
+            if isinstance(rows, (list, tuple)):
+                n = len(rows)
+                return f"{n} candidate inspection{'' if n == 1 else 's'}"
         if name in ("create_playlist", "export_set"):
             ids = result.get("track_ids")
             if ids is None:
@@ -1519,6 +1597,7 @@ class LibraryToolset:
             "search_vibe": self.search_vibe,
             "get_track_features": self.get_track_features,
             "get_track_sections": self.get_track_sections,
+            "inspect_candidates": self.inspect_candidates,
             "transition_slate": self.transition_slate,
             "compile_musical_context": self.compile_musical_context,
             "smart_hot_cues": self.smart_hot_cues,
@@ -1748,6 +1827,7 @@ def _unit_float_or_none(raw: Any) -> float | None:
 
 __all__ = [
     "MAX_CHOICES",
+    "MAX_INSPECT_CANDIDATES",
     "MIN_CHOICES",
     "TOOL_CALL_TIMEOUT_S",
     "TOOL_STARVATION_THRESHOLD",
