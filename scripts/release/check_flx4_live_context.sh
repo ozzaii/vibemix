@@ -441,6 +441,8 @@ elif not checks.get("controller_connected"):
     action_hint = "connect_ddj_flx4_and_start_live_session"
 elif direct_midi_ran and direct_midi_motion and not checks.get("recent_moves_seen"):
     action_hint = "restart_live_midi_listener"
+elif direct_midi_ran and not direct_midi_motion and not checks.get("recent_moves_seen"):
+    action_hint = "prove_os_midi_motion"
 elif not checks.get("recent_moves_seen") and not checks.get("audio_observed"):
     action_hint = "play_audible_deck_audio_and_move_a_fader_or_knob_within_the_proof_window"
 elif not checks.get("recent_moves_seen"):
@@ -518,6 +520,18 @@ if (
         operator_actions,
         "restart_live_midi_listener",
         "The direct OS MIDI probe saw FLX4 frames, but live-context did not; restart the live session and inspect MIDI listener binding if it repeats.",
+    )
+elif (
+    needs_operator_action
+    and physical_diagnosis
+    and direct_midi_ran
+    and not direct_midi_motion
+    and not checks.get("recent_moves_seen")
+):
+    add_action(
+        operator_actions,
+        "prove_os_midi_motion",
+        "The direct OS MIDI probe saw no FLX4 frames; move a fader/knob during the probe window or fix USB/MIDI input before trusting live moves.",
     )
 copy_proof_actions(
     operator_actions,

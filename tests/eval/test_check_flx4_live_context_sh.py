@@ -386,7 +386,9 @@ def test_check_flx4_live_context_records_direct_midi_probe_no_motion(
     assert proc.returncode == 1
     assert "direct_midi=False" in proc.stderr
     assert "midi_motion_diag=no_direct_midi_motion_observed" in proc.stderr
+    assert "action_hint=prove_os_midi_motion" in proc.stderr
     summary = json.loads((tmp_path / "out" / "flx4_live_context_summary.json").read_text())
+    assert summary["action_hint"] == "prove_os_midi_motion"
     assert summary["midi_motion_diagnosis"] == "no_direct_midi_motion_observed"
     assert summary["direct_midi_probe"]["sampling"] == "concurrent_with_live_context"
     assert summary["direct_midi_probe"]["motion_observed"] is False
@@ -394,7 +396,7 @@ def test_check_flx4_live_context_records_direct_midi_probe_no_motion(
     assert summary["top_blockers"][0] == (
         "direct OS MIDI probe saw no controller frames during the probe window"
     )
-    assert summary["operator_actions"][1]["code"] == "prove_os_midi_motion"
+    assert summary["operator_actions"][0]["code"] == "prove_os_midi_motion"
 
 
 def test_check_flx4_live_context_writes_summary_when_midi_port_missing(
