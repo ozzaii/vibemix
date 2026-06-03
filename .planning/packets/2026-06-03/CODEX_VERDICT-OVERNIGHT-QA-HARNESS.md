@@ -67,3 +67,28 @@
 - Remaining packet work:
   - `VIBEMIX_REPLAY_SESSION` live capture-source substitute remains open.
   - Respan/Sven blind-judge layer remains gated on provider credentials.
+
+## Increment 4 — optional Respan/Sven quality layer
+
+- Item: `CODEX_READY-OVERNIGHT-QA-HARNESS.md` step 2c / Layer B (`Sven blind-judge for line quality`) wired into replay findings.
+- SHA: `62c250f6` (`feat(eval): attach Sven quality to overnight findings`).
+- User value: the overnight QA artifact can now carry a real "is Sven actually good?" score over actual spoken `invocations/` lines, not just detector/mute/slop plumbing. Low groundedness, low DJ-friend quality, and "should have stayed silent" now route into explicit findings flags (`hallucinated`, `slop`, `over_speaking`) for the auto-fix loop.
+- By-eye artifact:
+  - Ran `RESPAN_API_KEY= uv run python -m scripts.eval.replay_harness --corpus tests/eval/fixtures --judges noop --output /tmp/vibemix-overnight-quality.*/out --use-detector-predictions --findings-json /tmp/vibemix-overnight-quality.*/findings.json --quality-respan`.
+  - Command printed `[overnight-quality] RESPAN_API_KEY not set — quality stays null` and exited `1` for the expected detector-mode fixture failure: `FAIL synthetic_session: ['f1=0.00 < 0.80']`.
+  - `findings.json` still wrote schema `vibemix_overnight_qa_findings_v1`, `verdict: fail`, scenario `quality: null`, and flags `no_detector_events,mute`.
+  - Unit proof pins the scored path: two Respan-style rows aggregate to `friend=2.0`, `grounded=2.5`, `should_speak_agree=0.5`; a low-quality payload produces `hallucinated`, `slop`, and `over_speaking`.
+- Safety notes:
+  - No app launch, sounddevice stream, Tauri, MOSS, LiveKit, or websocket server was opened for this increment.
+  - `--quality-respan` is default-off and performs no network call unless `RESPAN_API_KEY` is present.
+  - The commit includes `scripts/eval/respan_sven_heartbeat_judge.py`, so the new replay flag does not import a missing helper on a clean checkout. The unrelated `scripts/eval/respan_sven_sim.py` stays held/uncommitted.
+  - No grounding review required: this changes eval/judge tooling and findings JSON only, not what Sven says or when he speaks.
+- Checks:
+  - `uv run pytest -q tests/eval/test_replay_harness.py` -> `16 passed`.
+  - `uv run pytest -q tests/eval/test_replay_harness.py tests/eval/test_replay_harness_cooldowns.py tests/eval/test_replay_harness_phase_41.py` -> `42 passed`.
+  - `uv run ruff check scripts/eval/replay_harness.py scripts/eval/respan_sven_heartbeat_judge.py tests/eval/test_replay_harness.py` -> pass.
+  - `git diff --cached --check` -> pass before commit.
+  - `uv run python scripts/check_dirty_package_plan.py --summary` -> pass: all dirty paths covered by the package checklist; strict mode remains blocked by pre-existing unassigned `.planning/packets/2026-06-03/**` packet drift outside this eval slice.
+- Remaining packet work:
+  - `VIBEMIX_REPLAY_SESSION` live capture-source substitute remains open.
+  - The paid Respan judge path still needs a real `RESPAN_API_KEY` run over recorded sessions to populate non-null quality in an artifact.
