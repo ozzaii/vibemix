@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from vibemix.library.telegram_bridge import (
+    CURATE_TIMEOUT_S,
     TelegramBridge,
     TelegramDependencyError,
     build_bridge_from_env,
@@ -242,6 +243,12 @@ def test_telegram_transport_dependency_is_optional() -> None:
 
     assert not any("python-telegram-bot" in dep for dep in deps)
     assert extras["telegram"] == ["python-telegram-bot>=21"]
+
+
+def test_telegram_default_timeout_matches_viber_set_prep_budget() -> None:
+    assert CURATE_TIMEOUT_S >= 180.0
+    bridge = TelegramBridge("t", {42}, lambda theme: {"ok": True})
+    assert bridge._timeout_s == CURATE_TIMEOUT_S
 
 
 def test_telegram_dependency_error_is_actionable(monkeypatch):

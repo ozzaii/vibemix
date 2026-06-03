@@ -42,9 +42,10 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Hard wall-clock per curation request (the agent is itself bounded; this is the
-# belt-and-braces so one request can never park the poll loop).
-CURATE_TIMEOUT_S = 90.0
+# Hard wall-clock per curation request. Match the Viber set-prep/chat budget:
+# the live tool tape shows progress while Codex works, so the mobile transport
+# should not kill a healthy batched run earlier than the engine would.
+CURATE_TIMEOUT_S = 180.0
 
 # A curate_fn returns this normalized shape (the CLI adapts current Codex and
 # historical harness results to it), so format_reply stays backend-agnostic:
