@@ -143,6 +143,21 @@ def test_mark_completed_updates_lesson() -> None:
     assert entry.get("completed") is True, (
         f"completed flag not set; entry={entry!r}"
     )
+    assert entry.get("demonstrated") is True
+
+
+def test_mark_completed_can_record_skip_without_demonstration() -> None:
+    """A timeout/user-skip may finish the row without awarding demo credit."""
+    progress = LearnProgress()
+    progress.mark_completed(
+        "course_0",
+        "L0.00-press-play",
+        demonstrated=False,
+    )
+
+    entry = progress.lessons["L0.00-press-play"]
+    assert entry["completed"] is True
+    assert entry["demonstrated"] is False
 
 
 def test_mark_started_creates_incomplete_schema_row() -> None:
@@ -214,6 +229,7 @@ def test_mark_started_does_not_erase_completed_replay() -> None:
         "completed": True,
         "completed_at": completed_at,
         "strikes_used": 1,
+        "demonstrated": True,
     }
 
 
@@ -380,6 +396,45 @@ def test_runtime_completion_persists_across_load(
     assert entry.get("completed") is True, (
         f"completion flag not persisted; entry={entry!r}"
     )
+    assert entry.get("demonstrated") is True
+
+
+def test_runtime_user_skip_persists_without_demonstration(
+    progress_path_in_tmp: Path,
+) -> None:
+    """The 45s skip escape completes the row without full demo credit."""
+    import time
+    from unittest.mock import MagicMock
+
+    from vibemix.learn.runtime import LessonRuntime
+    from vibemix.learn.state import LearnState
+
+    progress = LearnProgress()
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+    )
+
+    runtime.send(
+        "load",
+        lesson_id="L0.00-press-play",
+        course_id="course_0",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    runtime._learn.lesson_started_at = time.monotonic() - 46.0
+    runtime.send("skip")
+    if runtime.current_state.id == "advancing":
+        runtime.send("finish")
+
+    reloaded, was_corrupt = load_progress()
+    assert was_corrupt is False
+    entry = reloaded.lessons["L0.00-press-play"]
+    assert entry["completed"] is True
+    assert entry["demonstrated"] is False
 
 
 def test_runtime_start_persists_in_progress_across_load(
@@ -462,6 +517,7 @@ def test_runtime_completion_persists_strikes_used(
     reloaded, was_corrupt = load_progress()
     assert was_corrupt is False
     assert reloaded.lessons["L0.00-press-play"]["strikes_used"] == 2
+    assert reloaded.lessons["L0.00-press-play"]["demonstrated"] is True
 
 
 # ---------------------------------------------------------------------------

@@ -915,6 +915,7 @@ export interface LearnProgressState {
           completed?: boolean;
           completed_at?: string | null;
           strikes_used?: number;
+          demonstrated?: boolean;
           practice_sources?: {
             hardware?: number;
             screen?: number;

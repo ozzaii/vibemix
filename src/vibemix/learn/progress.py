@@ -226,6 +226,7 @@ class LearnProgress:
         course_id: str,
         lesson_id: str,
         strikes_used: int = 0,
+        demonstrated: bool = True,
     ) -> None:
         """Record a lesson completion.
 
@@ -236,6 +237,8 @@ class LearnProgress:
             lesson_id: The lesson identifier (e.g. ``"L0.00-press-play"``).
             strikes_used: Number of hint strikes the user took to
                 complete the lesson (0 = first try, 3 = max hints).
+            demonstrated: True only when the learner completed the lesson by
+                performing the expected action, not by timing out and skipping.
         """
         # ISO-8601 UTC timestamp with seconds precision (``Z`` suffix
         # marker = UTC; matches the timestamp shape elsewhere in the
@@ -246,6 +249,7 @@ class LearnProgress:
             "completed": True,
             "completed_at": iso,
             "strikes_used": int(strikes_used),
+            "demonstrated": bool(demonstrated),
         }
         _carry_practice_source_fields(
             row,

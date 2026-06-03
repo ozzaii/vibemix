@@ -186,6 +186,11 @@ def test_progress_state_accepts_current_progress_schema() -> None:
     progress = LearnProgress()
     progress.mark_practice_source("course_1_anatomy", "L1.03", "midi")
     progress.mark_practice_source("course_1_anatomy", "L1.03", "click")
+    progress.mark_completed(
+        "course_1_anatomy",
+        "L1.03",
+        demonstrated=False,
+    )
     env = LearnProgressState.make(
         action="snapshot",
         progress=progress.to_dict(),
@@ -195,6 +200,7 @@ def test_progress_state_accepts_current_progress_schema() -> None:
     assert wire["payload"]["progress"]["schema_version"] == 2
     assert "skills" in wire["payload"]["progress"]
     lesson = wire["payload"]["progress"]["lessons"]["L1.03"]
+    assert lesson["demonstrated"] is False
     assert lesson["practice_sources"] == {"hardware": 1, "screen": 1}
     assert lesson["last_practice_source"] == "screen"
     _VALIDATOR.validate(wire)

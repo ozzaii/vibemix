@@ -3122,6 +3122,7 @@
                       "completed": {"type": "boolean"},
                       "completed_at": {"type": ["string", "null"]},
                       "strikes_used": {"type": "integer", "minimum": 0, "maximum": 3},
+                      "demonstrated": {"type": "boolean"},
                       "practice_sources": {
                         "type": "object",
                         "additionalProperties": false,

@@ -1296,6 +1296,7 @@ class LessonRuntime(StateMachine):
                 self._learn.current_course_id,
                 self._learn.current_lesson_id,
                 strikes_used=self._learn.strike_count,
+                demonstrated=self._last_was_match,
             )
             # CR-02: persist to disk via atomic save (tmp + os.replace).
             # Skip save when progress_store isn't a real LearnProgress

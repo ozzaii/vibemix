@@ -255,6 +255,7 @@ def _weight_for(row: dict[str, Any] | None) -> float:
     """Quality weight of a single lesson row's contribution to fill.
 
     * absent / ``None`` / not a dict → ``WEIGHT_FLOOR`` (never reached).
+    * ``completed=True`` but ``demonstrated=False`` → ``WEIGHT_FLOOR``.
     * ``completed=True`` with 0 strikes → ``WEIGHT_FIRST_TRY``.
     * ``completed=True`` with >= 1 strikes → ``WEIGHT_WITH_STRIKES``.
     * present but not completed (in-progress) → ``WEIGHT_FLOOR``.
@@ -266,6 +267,8 @@ def _weight_for(row: dict[str, Any] | None) -> float:
     if not isinstance(row, dict):
         return WEIGHT_FLOOR
     if row.get("completed") is not True:
+        return WEIGHT_FLOOR
+    if row.get("demonstrated", True) is not True:
         return WEIGHT_FLOOR
     try:
         strikes = int(row.get("strikes_used", 0))

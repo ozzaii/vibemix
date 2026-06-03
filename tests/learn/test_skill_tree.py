@@ -189,6 +189,37 @@ def test_quality_weighted_fill_ordering() -> None:
     assert fill_click == WEIGHT_FLOOR
 
 
+def test_completed_without_demonstration_gets_floor_weight() -> None:
+    """A 45s timeout/skip completion must not look like a flawless demo."""
+    spec = SKILL_MANIFEST["deck_control"]
+    progress = LearnProgress()
+    progress.lessons[spec.lesson_ids[0]] = {
+        "completed": True,
+        "completed_at": "2026-05-29T00:00:00Z",
+        "strikes_used": 0,
+        "demonstrated": False,
+    }
+
+    fill = SkillTree().compute(progress)["deck_control"].learn_fill
+
+    assert fill == WEIGHT_FLOOR
+
+
+def test_legacy_completed_rows_without_demonstrated_keep_weight() -> None:
+    """Pre-Q4 progress rows had no flag; preserve their historical credit."""
+    spec = SKILL_MANIFEST["deck_control"]
+    progress = LearnProgress()
+    progress.lessons[spec.lesson_ids[0]] = {
+        "completed": True,
+        "completed_at": "2026-05-29T00:00:00Z",
+        "strikes_used": 0,
+    }
+
+    fill = SkillTree().compute(progress)["deck_control"].learn_fill
+
+    assert fill == WEIGHT_FIRST_TRY / len(spec.lesson_ids)
+
+
 def test_partial_completion_fill_is_fractional() -> None:
     """Completing half a skill's lessons first-try yields fill in (0, 1)."""
     spec = SKILL_MANIFEST["transitions"]  # 5 lessons
