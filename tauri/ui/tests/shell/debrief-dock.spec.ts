@@ -75,6 +75,9 @@ describe("DebriefDock", () => {
       "ipc.recordings.list_result",
     );
     expect(host.textContent).toContain("2 sessions");
+    expect(host.textContent).toContain("next review");
+    expect(host.textContent).toContain("review is armed");
+    expect(host.textContent).toContain("can open with cited moments");
     expect(host.textContent).toContain("2026-06-03 00:15");
     expect(host.textContent).toContain("42m");
     expect(host.textContent).toContain("19 events");
@@ -103,6 +106,7 @@ describe("DebriefDock", () => {
     );
     expect(openButtons[1]?.disabled).toBe(true);
     expect(openButtons[1]?.title).toBe("needs at least 5 minutes");
+    expect(host.textContent).toContain("capture more");
     openButtons[1]?.click();
 
     expect(mocks.invokeTauri).not.toHaveBeenCalled();
@@ -120,6 +124,8 @@ describe("DebriefDock", () => {
     await flush();
 
     expect(host.textContent).toContain("no sessions recorded");
+    expect(host.textContent).toContain("record a real set");
+    expect(host.textContent).toContain("Debrief arms after five minutes");
     expect(host.textContent).toContain("Run a real set from Deck");
     expect(host.querySelector(".debrief-dock__open")).toBeNull();
   });

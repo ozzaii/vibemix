@@ -10123,3 +10123,37 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/src/shell/shell.css tauri/ui/tests/learn/test_practice_booth_shell.spec.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 74 - Debrief Readiness Console
+
+Suggested commit: `feat(debrief-ui): add review readiness console`
+
+Include:
+
+- `tauri/ui/src/shell/DebriefDock.ts`
+- `tauri/ui/tests/shell/debrief-dock.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Dedicated debrief window internals, recordings backend, sidecar/debrief port
+  8766 behavior, recording IPC schema, Deck/Crate/Learn/Settings surfaces,
+  Sven speech, Viber tooling, packaging scripts, and new dependencies. This
+  package only upgrades the folded shell Debrief dock using existing recording
+  summaries and the current honest eligibility gate.
+
+Reason:
+
+- The exact signed app at `722f76af` showed Debrief as the next weakest
+  commercial-value module: it has real recording summaries and honest not-ready
+  gates, but reads like a quiet archive. Add a next-review readiness console
+  and row-level evidence meters so a DJ immediately sees whether a cited review
+  is armed, what is blocking the nearest recording, and why weak sessions cannot
+  open yet.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/debrief-dock.spec.ts tests/debrief/no-legacy-amber.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/DebriefDock.ts tauri/ui/tests/shell/debrief-dock.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
