@@ -580,6 +580,12 @@ const LAYOUT_CSS = `
       0 2px 1px rgba(20, 16, 18, 0.5),
       0 18px 46px rgba(0, 0, 0, 0.55);
     transition: color 700ms ease-out;
+    /* The hero is the one unbounded text object: a long live line ran off the
+       slab and clipped mid-word. Hold it to three lines, then ellipsis. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
   }
   /* Emphasis ignites rose — the co-host leaning on the word that matters. The
    * one charisma beat in the hero line (mirrors the mock's cohost-line em). */
@@ -906,6 +912,7 @@ const LAYOUT_CSS = `
     .vmx-now {
       font-size: clamp(28px, 9vw, 42px);
       max-width: 12ch;
+      -webkit-line-clamp: 2; /* the narrow voice slab holds two lines, not three */
     }
     .vmx-receipt {
       width: min(30ch, 100%);
