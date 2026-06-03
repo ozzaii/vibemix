@@ -37,6 +37,7 @@ import {
   renderCitationStrip,
   type CitationChip,
 } from "./citation-strip.js";
+import { DJ_VOCAB } from "../../shell/dj-vocab.js";
 
 export type CohostStatus = "LISTENING" | "TALKING" | "IDLE";
 
@@ -660,7 +661,7 @@ function buildTopStrip(): HTMLElement {
   tag.textContent = "AI COHOST";
   const meta = document.createElement("span");
   meta.className = "vmx-cohost__topstrip-meta";
-  meta.textContent = "grounded · audio + screen";
+  meta.textContent = `${DJ_VOCAB.grounded} · audio + screen`;
   strip.append(tag, meta);
   return strip;
 }
@@ -865,9 +866,11 @@ function buildFoot(
 // semantic ("I have your master + djay window + I'm paying attention")
 // in a phrase a DJ would use about another DJ.
 function footLabelFor(grounded: boolean, failed: boolean): string {
-  if (grounded) return "READING THE ROOM";
-  if (failed) return "AI SERVICE OFFLINE";
-  return "TUNING IN";
+  // The booth label is the uppercased form of the same DJ phrases the deck
+  // top-strip prints, so the two reads can never disagree (DJ_VOCAB is canon).
+  if (grounded) return DJ_VOCAB.grounded.toUpperCase();
+  if (failed) return DJ_VOCAB.serviceOffline.toUpperCase();
+  return DJ_VOCAB.tuningIn.toUpperCase();
 }
 
 function footTooltipFor(grounded: boolean, failed: boolean): string {
