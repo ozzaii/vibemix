@@ -1064,8 +1064,10 @@ function setProgress(
   ($("vmx-lib-progress-fill") as HTMLElement).style.transform =
     `scaleX(${Math.max(0, Math.min(1, pct / 100)).toFixed(3)})`;
   $("vmx-lib-prog-n").innerHTML =
-    `${n}<small> / ${total}${note ? ` · ${esc(note)}` : ""}</small>`;
-  $("vmx-lib-prog-cost").textContent = `~€${costEur.toFixed(2)}`;
+    total > 0
+      ? `${n}<small> / ${total}${note ? ` · ${esc(note)}` : ""}</small>`
+      : `<small>Ready to embed</small>`;
+  $("vmx-lib-prog-cost").textContent = total > 0 ? `~€${costEur.toFixed(2)}` : "";
 }
 
 function appendLog(
@@ -2273,7 +2275,7 @@ export function mountLibrary(root: ParentNode = document): void {
   async function runIngest(runId: number): Promise<void> {
     state = setFolder(state, folderInput.value.trim() || state.folder);
     $("vmx-lib-loglist").innerHTML = "";
-    setProgress(0, DEV_FALLBACK.embedLog.length, 0, "");
+    setProgress(0, 0, 0, "");
 
     const accepted = await libraryEmbedFolder(state.folder, state.strategy);
     if (!isCurrentRun(runId, "ingest")) return;
@@ -2409,9 +2411,9 @@ export function mountLibrary(root: ParentNode = document): void {
       }
       if (mode === "build") syncCurvePicker();
       if (mode === "ingest") {
-        // show last-known progress shape, don't auto-run
+        // idle ingest view: show the ready state, don't auto-run
         $("vmx-lib-loglist").innerHTML = "";
-        setProgress(0, DEV_FALLBACK.embedLog.length, 0, "");
+        setProgress(0, 0, 0, "");
       } else if (mode === "chat") {
         ensureChatIntro(chatThread);
       } else if (mode === "search" || mode === "similar") {

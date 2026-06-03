@@ -2121,6 +2121,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: fit-content;
   font-size: 12.5px;
   color: var(--silk);
 }
@@ -2186,6 +2187,12 @@ body {
   font-size: 11px;
   line-height: 1.9;
   color: var(--silk-65);
+}
+.vmx-lib-loglist:empty::before {
+  content: "tracks land here as vibemix reads them";
+  color: var(--silk-22);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
 }
 .vmx-lib-loglist .ll {
   display: flex;
