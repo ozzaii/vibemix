@@ -36,6 +36,22 @@ def test_ear_practice_centered_pitch_fader_produces_locked_owned_deck_state() ->
     assert grade.phase_locked is True
 
 
+def test_driver_exposes_the_same_minideck_that_snapshots_grade() -> None:
+    driver = BeatmatchPracticeDriver()
+    assert driver.record_action("L2.01", {"control": "tempo", "deck": "B", "value": 64}) is True
+
+    before = driver.snapshot()
+    assert before is not None
+    assert before.deck_state.a_frame == 0.0
+
+    driver.deck.render_block(128)
+
+    after = driver.snapshot()
+    assert after is not None
+    assert after.deck_state.a_frame == 128.0
+    assert after.deck_state.b_frame == 128.0
+
+
 def test_ear_practice_large_pitch_move_does_not_credit_as_locked() -> None:
     driver = BeatmatchPracticeDriver()
 

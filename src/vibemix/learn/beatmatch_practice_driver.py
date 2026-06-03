@@ -76,6 +76,12 @@ class BeatmatchPracticeDriver:
         )
         self._armed = False
 
+    @property
+    def deck(self) -> MiniDeck:
+        """Return the exact owned deck that snapshots grade."""
+
+        return self._deck
+
     def record_action(self, lesson_id: str | None, midi: dict[str, Any]) -> bool:
         """Record one matched Learn action.
 
