@@ -854,3 +854,21 @@ def test_dispatch_registers_setprep_tools(toolset):
     assert "error" in toolset.dispatch("discover_pool", {})
     assert "error" in toolset.dispatch("sequence_set", {"track_ids": [], "curve": "x"})
     assert "error" in toolset.dispatch("export_set", {"name": "", "track_ids": []})
+
+
+def test_dispatch_gives_batched_candidate_inspection_a_larger_timeout(toolset, monkeypatch):
+    seen_timeouts: list[float | None] = []
+    original_result = tool_mod.concurrent.futures.Future.result
+
+    def spy_result(self, timeout=None):
+        seen_timeouts.append(timeout)
+        return original_result(self, timeout=timeout)
+
+    monkeypatch.setattr(tool_mod.concurrent.futures.Future, "result", spy_result)
+
+    toolset.dispatch("inspect_candidates", {"track_ids": []})
+    toolset.dispatch("get_track_features", {"track_id": "NOPE"})
+
+    assert tool_mod.BATCH_TOOL_CALL_TIMEOUT_S > tool_mod.TOOL_CALL_TIMEOUT_S
+    assert tool_mod.BATCH_TOOL_CALL_TIMEOUT_S in seen_timeouts
+    assert tool_mod.TOOL_CALL_TIMEOUT_S in seen_timeouts

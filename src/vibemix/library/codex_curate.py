@@ -175,7 +175,7 @@ BUILD_SET_TIMEOUT_S = 180.0
 # MCP tool/startup timeouts handed to Codex via -c overrides (its harness owns
 # enforcement; we only set the values).
 _MCP_STARTUP_TIMEOUT_S = 15
-_MCP_TOOL_TIMEOUT_S = 60
+_MCP_TOOL_TIMEOUT_S = 120
 
 # Substrings in Codex stderr that mean "not authenticated" rather than a
 # genuine runtime error — used to surface the actionable `codex login` hint.

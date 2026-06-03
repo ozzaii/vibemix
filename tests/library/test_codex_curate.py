@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from vibemix.library import codex_curate as codex_mod
 from vibemix.library.codex_curate import (
     BUILD_SET_TIMEOUT_S,
     CHAT_TIMEOUT_S,
@@ -271,6 +272,20 @@ def test_chat_timeout_is_interactive():
     assert CHAT_TIMEOUT_S == BUILD_SET_TIMEOUT_S
     assert inspect.signature(chat_with_codex).parameters["timeout_s"].default == BUILD_SET_TIMEOUT_S
     assert BUILD_SET_TIMEOUT_S >= 180.0
+
+
+def test_codex_mcp_tool_timeout_allows_batched_candidate_inspection(tmp_path):
+    argv = build_argv(
+        "/bin/echo",
+        mcp_command="python",
+        mcp_args=["-m", "vibemix.library.mcp_server"],
+        schema_path=str(tmp_path / "schema.json"),
+        out_path=str(tmp_path / "out.json"),
+        prompt="curate",
+    )
+
+    assert codex_mod._MCP_TOOL_TIMEOUT_S >= 120
+    assert any(arg == "mcp_servers.vibemix_library.tool_timeout_sec=120" for arg in argv)
 
 
 def test_chat_prompt_threads_history_and_rules():
@@ -2899,7 +2914,7 @@ def test_build_argv_injects_mcp_config_and_schema(tmp_path):
     assert "--output-schema" in argv and "--sandbox" in argv
     joined = " ".join(argv)
     assert "mcp_servers.vibemix_library.command=" in joined
-    assert "mcp_servers.vibemix_library.tool_timeout_sec=60" in joined
+    assert f"mcp_servers.vibemix_library.tool_timeout_sec={codex_mod._MCP_TOOL_TIMEOUT_S}" in joined
     assert '"-m", "vibemix.library.mcp_server"' in joined.replace("'", '"') or any(
         "vibemix.library.mcp_server" in a for a in argv
     )

@@ -67,6 +67,9 @@ logger = logging.getLogger(__name__)
 # Hard wall-clock per tool call. A pathological handler (or a wedged search)
 # can never park a caller's loop past this.
 TOOL_CALL_TIMEOUT_S = 30.0
+# Candidate inspection intentionally batches many deterministic local reads into
+# one MCP round trip, so it needs more room than the tiny one-track tools.
+BATCH_TOOL_CALL_TIMEOUT_S = 120.0
 
 # Phase 99 HARDEN-RETRY (Decision 3, locked): after N consecutive empty
 # ``search_vibe`` returns or ``{"error": ...}`` tool responses, the next
@@ -1659,10 +1662,13 @@ class LibraryToolset:
             self._emit_tool_event(name, freshness_block, args)
             return freshness_block
         # Hard per-tool timeout — a pathological handler can never park the loop.
+        timeout_s = (
+            BATCH_TOOL_CALL_TIMEOUT_S if name == "inspect_candidates" else TOOL_CALL_TIMEOUT_S
+        )
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
             fut = ex.submit(handler, args)
             try:
-                result = fut.result(timeout=TOOL_CALL_TIMEOUT_S)
+                result = fut.result(timeout=timeout_s)
             except concurrent.futures.TimeoutError:
                 result = {"error": f"tool {name!r} timed out"}
             except Exception as e:
@@ -1864,6 +1870,7 @@ def _unit_float_or_none(raw: Any) -> float | None:
 
 
 __all__ = [
+    "BATCH_TOOL_CALL_TIMEOUT_S",
     "INSPECT_CANDIDATES_WORKERS",
     "MAX_CHOICES",
     "MAX_INSPECT_CANDIDATES",
