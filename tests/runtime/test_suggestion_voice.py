@@ -33,6 +33,53 @@ def test_next_suggestion_voice_line_registers_track_and_mix_citations() -> None:
     assert result.reason == "valid"
 
 
+def test_next_suggestion_voice_line_registers_section_pairing() -> None:
+    registry = EvidenceRegistry()
+    suggestion = {
+        "track_id": "track-42",
+        "title": "Ananta",
+        "why": "similar vibe",
+        "transition": {"from_role": "breakdown", "to_role": "intro"},
+    }
+
+    line = build_next_suggestion_voice_line(
+        suggestion,
+        event_type="TRANSITION_OPPORTUNITY",
+        evidence_registry=registry,
+    )
+
+    assert line is not None
+    assert "Section pairing: mix out of this breakdown into that intro." in line
+    assert "[mix:next_suggestion_section=breakdown_to_intro]" in line
+    assert "not a proven transition" in line
+
+    result = CitationLinter().check(line, registry.snapshot(), mode="live")
+    assert result.valid is True
+    assert result.reason == "valid"
+
+
+def test_next_suggestion_voice_line_abstains_on_unknown_section_pairing() -> None:
+    for transition in (
+        {"from_role": "unknown", "to_role": "intro"},
+        {"to_role": "intro"},
+    ):
+        registry = EvidenceRegistry()
+
+        line = build_next_suggestion_voice_line(
+            {"track_id": "track-42", "title": "Ananta", "transition": transition},
+            event_type="TRACK_CHANGE",
+            evidence_registry=registry,
+        )
+
+        assert line is not None
+        assert "Section pairing" not in line
+        assert "next_suggestion_section=" not in line
+        assert "next_suggestion_section=unknown_to_intro" not in registry.snapshot().get(
+            "mix",
+            {},
+        )
+
+
 def test_next_suggestion_voice_line_abstains_on_uncitable_track_id() -> None:
     registry = EvidenceRegistry()
 

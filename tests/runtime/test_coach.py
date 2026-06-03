@@ -427,6 +427,8 @@ def test_coach_hands_grounded_next_suggestion_to_agent(
     assert "[track:track-42]" in line
     assert "[mix:next_suggestion=track-42]" in line
     assert "[mix:next_suggestion_risk=timing_low_confidence]" in line
+    assert "mix out of this outro into that intro" in line
+    assert "[mix:next_suggestion_section=outro_to_intro]" in line
     transition_line = sent_ev.extra["transition_verdict_voice_line"]
     assert "10-signal transition scorer" in transition_line
     assert "deck A to deck B" in transition_line

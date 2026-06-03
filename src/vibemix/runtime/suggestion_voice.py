@@ -49,6 +49,9 @@ def build_next_suggestion_voice_line(
     evidence_registry.write("mix", mix_key, 0.0)
 
     risk_cite = _register_risk_citation(suggestion, evidence_registry)
+    section = _register_section_pairing(suggestion, evidence_registry)
+    section_clause = section[0] if section is not None else ""
+    section_cite = section[1] if section is not None else None
     title = _clean_text(suggestion.get("title"), fallback="candidate")
     artist = _clean_text(suggestion.get("artist"), fallback="")
     artist_clause = f" by {artist}" if artist else ""
@@ -58,13 +61,15 @@ def build_next_suggestion_voice_line(
     cite_tail = f"[track:{track_id}] [mix:{mix_key}]"
     if risk_cite is not None:
         cite_tail = f"{cite_tail} {risk_cite}"
+    if section_cite is not None:
+        cite_tail = f"{cite_tail} {section_cite}"
 
     return (
         "Next-suggestion receipt: the live suggestion engine selected "
-        f"{title}{artist_clause}. {why_clause}If you recommend it, keep it optional, "
-        f"copy these citations exactly: {cite_tail}. Do not say it is loaded or "
-        "playing. This is not a proven transition unless deck/live evidence says so; "
-        "stay silent if the moment is not right."
+        f"{title}{artist_clause}. {why_clause}{section_clause}If you recommend it, "
+        f"keep it optional, copy these citations exactly: {cite_tail}. Do not say "
+        "it is loaded or playing. This is not a proven transition unless deck/live "
+        "evidence says so; stay silent if the moment is not right."
     )
 
 
@@ -86,6 +91,26 @@ def _register_risk_citation(
         evidence_registry.write("mix", key, 0.0)
         return f"[mix:{key}]"
     return None
+
+
+def _register_section_pairing(
+    suggestion: Mapping[str, Any],
+    evidence_registry: EvidenceRegistry,
+) -> tuple[str, str] | None:
+    """Return citable section-pairing copy for a grounded transition."""
+    transition = suggestion.get("transition")
+    if not isinstance(transition, Mapping):
+        return None
+    from_role = _clean_citation_body(transition.get("from_role"))
+    to_role = _clean_citation_body(transition.get("to_role"))
+    if from_role is None or to_role is None:
+        return None
+    if from_role == "unknown" or to_role == "unknown":
+        return None
+    key = f"next_suggestion_section={from_role}_to_{to_role}"
+    evidence_registry.write("mix", key, 0.0)
+    clause = f"Section pairing: mix out of this {from_role} into that {to_role}. "
+    return clause, f"[mix:{key}]"
 
 
 def _clean_citation_body(value: object) -> str | None:
