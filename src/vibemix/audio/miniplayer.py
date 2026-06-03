@@ -33,6 +33,8 @@ def _do_scale_block(
     next_frame: float,
     rate: float,
     n: int,
+    *,
+    prev_rate: float | None = None,
 ) -> tuple[np.ndarray, float]:
     """Resample ``n`` output frames from ``src`` at playback ``rate``.
 
@@ -43,13 +45,24 @@ def _do_scale_block(
         down an octave), ``2.0`` = double. Pitch moves with tempo — keylock-off
         vinyl/CDJ behaviour, which is what beatmatching teaches.
     :param n: number of output frames to produce this block.
+    :param prev_rate: optional rate from the previous block. When provided and
+        different from ``rate``, the rate is linearly ramped across this block
+        and integrated into the carried cursor.
     :returns: ``(out, next_frame_after)`` — ``out`` is ``(n, 2)`` float32 and
         ``next_frame_after`` is the carried cursor (the persistent accumulator).
     """
     # Output frames in SOURCE-frame coordinates — the vectorized form of the
     # C++ per-frame ``m_dNextFrame += rate_add`` accumulator loop.
     m = src.shape[0]
-    pos = next_frame + rate * np.arange(n, dtype=np.float64)
+    rate = float(rate)
+    prev_rate = rate if prev_rate is None else float(prev_rate)
+    if prev_rate == rate:
+        pos = next_frame + rate * np.arange(n, dtype=np.float64)
+        next_frame_after = next_frame + rate * n
+    else:
+        rate_ramp = np.linspace(prev_rate, rate, n, dtype=np.float64)
+        pos = next_frame + np.cumsum(rate_ramp) - rate_ramp
+        next_frame_after = next_frame + float(np.sum(rate_ramp))
     floor = np.floor(pos).astype(np.int64)
     frac = (pos - floor).astype(np.float32)[:, None]  # (n, 1), broadcast over channels
 
@@ -65,7 +78,7 @@ def _do_scale_block(
     out = src[lo] + frac * (src[hi] - src[lo])
     out[(pos > m - 1) | (pos < 0.0)] = 0.0
 
-    return out.astype(np.float32, copy=False), next_frame + rate * n
+    return out.astype(np.float32, copy=False), next_frame_after
 
 
 def _equal_power_gains(xfader: float) -> tuple[float, float]:
@@ -131,15 +144,42 @@ class MiniDeck:
         self._frame_b = 0.0
         self._eq_a = ThreeBandEQ(sample_rate=sample_rate)
         self._eq_b = ThreeBandEQ(sample_rate=sample_rate)
+        self._prev_rate_a = self.rate_a
+        self._prev_rate_b = self.rate_b
+        self._prev_gain_a, self._prev_gain_b = _equal_power_gains(self.xfader)
 
     def render_block(self, n: int) -> np.ndarray:
         """Render ``n`` mixed output frames, advancing both deck cursors."""
-        out_a, self._frame_a = _do_scale_block(self._src_a, self._frame_a, self.rate_a, n)
-        out_b, self._frame_b = _do_scale_block(self._src_b, self._frame_b, self.rate_b, n)
+        rate_a = float(self.rate_a)
+        rate_b = float(self.rate_b)
+        out_a, self._frame_a = _do_scale_block(
+            self._src_a,
+            self._frame_a,
+            rate_a,
+            n,
+            prev_rate=self._prev_rate_a,
+        )
+        out_b, self._frame_b = _do_scale_block(
+            self._src_b,
+            self._frame_b,
+            rate_b,
+            n,
+            prev_rate=self._prev_rate_b,
+        )
         out_a = self._eq_a.process(out_a)
         out_b = self._eq_b.process(out_b)
         gain_a, gain_b = _equal_power_gains(self.xfader)
-        return (gain_a * out_a + gain_b * out_b).astype(np.float32)
+        if self._prev_gain_a == gain_a and self._prev_gain_b == gain_b:
+            mixed = gain_a * out_a + gain_b * out_b
+        else:
+            gain_a_ramp = np.linspace(self._prev_gain_a, gain_a, n, dtype=np.float32)[:, None]
+            gain_b_ramp = np.linspace(self._prev_gain_b, gain_b, n, dtype=np.float32)[:, None]
+            mixed = gain_a_ramp * out_a + gain_b_ramp * out_b
+        self._prev_rate_a = rate_a
+        self._prev_rate_b = rate_b
+        self._prev_gain_a = gain_a
+        self._prev_gain_b = gain_b
+        return mixed.astype(np.float32)
 
     def set_eq(
         self,

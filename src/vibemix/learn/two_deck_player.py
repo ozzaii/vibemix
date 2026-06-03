@@ -95,6 +95,7 @@ def _copy_block(outdata: np.ndarray, block: np.ndarray) -> None:
         return
     n = min(outdata.shape[0], block.shape[0])
     outdata[:n, :2] = block[:n, :2]
+    np.clip(outdata, -1.0, 1.0, out=outdata)
 
 
 __all__ = ["TwoDeckPlayer"]

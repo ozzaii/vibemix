@@ -104,6 +104,28 @@ def test_two_deck_callback_degrades_to_silence_on_render_error(
     assert np.all(out == 0.0)
 
 
+def test_two_deck_callback_clamps_once_at_output_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streams: list[_FakeStream] = []
+    monkeypatch.setattr(
+        "sounddevice.OutputStream",
+        lambda **kwargs: streams.append(_FakeStream(**kwargs)) or streams[-1],
+    )
+    deck = MagicMock(name="MiniDeck")
+    deck.render_block.return_value = np.array([[1.4, -1.6], [0.25, -0.25]], dtype=np.float32)
+    player = TwoDeckPlayer(0, deck, state=_cold_state())
+    player.start()
+
+    out = np.empty((2, 2), dtype=np.float32)
+    streams[0].kwargs["callback"](out, 2, None, None)
+
+    np.testing.assert_array_equal(
+        out,
+        np.array([[1.0, -1.0], [0.25, -0.25]], dtype=np.float32),
+    )
+
+
 def test_two_deck_player_refuses_playback_during_audible_live_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
