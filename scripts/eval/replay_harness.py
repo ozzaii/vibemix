@@ -41,10 +41,13 @@ import os
 import re
 import statistics
 import sys
-from collections import defaultdict
-from datetime import datetime, timezone
+import wave
+from collections import defaultdict, deque
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 # CONTEXT EVAL-06 default thresholds — kept inline for Plan 27-01 ergonomics;
 # Plan 27-04's --threshold-lock arg overrides via eval/THRESHOLD-LOCK.md.
@@ -75,6 +78,23 @@ def _load_thresholds(lock_path: Path | None) -> dict[str, float]:
 # Hard cap per session WAV — 300 MB. Defensive against an over-sized corpus
 # entry triggering a process-OOM during fill_from_wav (T-27-01-04).
 MAX_SESSION_WAV_BYTES = 300 * 1024 * 1024
+_REPLAY_TICK_SECONDS: float = 0.1
+_LATE_LLM_TO_TTS_BUDGET_MS: float = 6000.0
+
+
+@dataclass
+class _ReplayControllerStub:
+    def deck_snapshot(self) -> dict[str, Any]:
+        return {"A": {}, "B": {}, "xfader": 64, "connected": False}
+
+    def moves_since(self, _t: float) -> list[tuple[float, str]]:
+        return []
+
+
+@dataclass
+class _ReplayTrackStub:
+    def snapshot(self) -> dict[str, Any]:
+        return {"title": None, "prev_title": None, "title_changed_at": 0.0}
 
 
 def _read_text_or(default: str, path: Path) -> str:
@@ -94,6 +114,157 @@ def _load_events_jsonl(path: Path) -> list[dict[str, Any]]:
             continue
         out.append(json.loads(line))
     return out
+
+
+def _event_row_kind(row: dict[str, Any]) -> str:
+    kind = row.get("kind")
+    if isinstance(kind, str) and kind:
+        return kind
+    typ = row.get("type")
+    return typ if isinstance(typ, str) else ""
+
+
+def _numeric(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _read_wav_to_int16_16k(path: Path) -> Any:
+    """Read WAV as mono int16 at the runtime analysis sample rate."""
+    import numpy as np
+
+    from vibemix.audio.constants import INPUT_SR_TARGET
+    from vibemix.audio.resample import resample_audio
+
+    with wave.open(str(path), "rb") as wf:
+        source_sr = wf.getframerate()
+        channels = wf.getnchannels()
+        sample_width = wf.getsampwidth()
+        raw = wf.readframes(wf.getnframes())
+
+    if sample_width == 2:
+        samples = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    elif sample_width == 4:
+        samples = np.frombuffer(raw, dtype=np.int32).astype(np.float32) / 2147483648.0
+    elif sample_width == 1:
+        samples = (np.frombuffer(raw, dtype=np.uint8).astype(np.float32) - 128.0) / 128.0
+    else:
+        raise ValueError(f"unsupported WAV sample width {sample_width} in {path}")
+
+    if channels > 1:
+        samples = samples.reshape(-1, channels).mean(axis=1)
+    if source_sr != INPUT_SR_TARGET:
+        samples = resample_audio(
+            samples,
+            source_sr=source_sr,
+            target_sr=INPUT_SR_TARGET,
+        ).astype(np.float32, copy=False)
+    return (np.clip(samples, -1.0, 1.0) * 32767.0).astype(np.int16)
+
+
+def _event_to_result_dict(
+    *,
+    event: Any,
+    session_id: str,
+    index: int,
+    t_session: float,
+) -> dict[str, Any]:
+    state = event.state
+    out: dict[str, Any] = {
+        "id": f"detected_{index:04d}",
+        "type": str(event.type),
+        "t_session": round(float(t_session), 3),
+        "session": session_id,
+        "payload": dict(event.extra or {}),
+        "phase": getattr(state, "phase", None),
+        "deck": getattr(state, "audible_deck", None),
+    }
+    bpm = getattr(state, "bpm", None)
+    if isinstance(bpm, (int, float)) and bpm > 0:
+        out["bpm"] = round(float(bpm), 3)
+    return out
+
+
+def _detect_events_for_session(
+    *,
+    session_id: str,
+    wav_path: Path,
+    registry: Any,
+) -> list[dict[str, Any]]:
+    """Time-warp a WAV through the real refresh tick + EventDetector.
+
+    This is the honest detector lane for overnight QA: no sounddevice, no
+    sleep, no model call. It feeds the analysis ring in 100ms hops, lets
+    `_tick_once` write `MusicState`, and asks `EventDetector.detect` what the
+    live detector stack would have emitted.
+    """
+    import numpy as np
+
+    from vibemix.audio.buffers import AudioBuffer
+    from vibemix.audio.constants import INPUT_SR_TARGET
+    from vibemix.state import EventDetector, MusicState
+    from vibemix.state.refresh import _tick_once
+
+    if not wav_path.exists():
+        return []
+    samples = _read_wav_to_int16_16k(wav_path)
+    if samples.size == 0:
+        return []
+
+    state = MusicState()
+    audio_buf = AudioBuffer(seconds=140.0, sr=INPUT_SR_TARGET)
+    detector = EventDetector(audio_buf=audio_buf, evidence_registry=registry)
+    controller_stub = _ReplayControllerStub()
+    track_stub = _ReplayTrackStub()
+
+    current_t = [0.0]
+
+    def _clock() -> float:
+        return current_t[0]
+
+    last_audible_high = 0.0
+    last_audible_low = 0.0
+    bpm_cache = 0.0
+    last_bpm_at = 0.0
+    feature_history: deque[dict] = deque(maxlen=5)
+    predicted: list[dict[str, Any]] = []
+    hop_samples = max(1, int(_REPLAY_TICK_SECONDS * INPUT_SR_TARGET))
+
+    with patch("vibemix.state.event_detector.time.time", _clock):
+        for start in range(0, int(samples.size), hop_samples):
+            hop = samples[start : start + hop_samples]
+            if hop.size <= 0:
+                continue
+            audio_buf.push(np.asarray(hop, dtype=np.int16))
+            current_t[0] = min(
+                float(samples.size) / float(INPUT_SR_TARGET),
+                float(start + hop.size) / float(INPUT_SR_TARGET),
+            )
+            last_audible_high, last_audible_low, bpm_cache, last_bpm_at = _tick_once(
+                state,
+                audio_buf,
+                controller_stub,
+                track_stub,
+                now=current_t[0],
+                last_audible_high=last_audible_high,
+                last_audible_low=last_audible_low,
+                bpm_cache=bpm_cache,
+                last_bpm_at=last_bpm_at,
+                feature_history=feature_history,
+                evidence_registry=registry,
+            )
+            event = detector.detect(state, kaan_just_spoke=False, manual=False)
+            if event is not None:
+                predicted.append(
+                    _event_to_result_dict(
+                        event=event,
+                        session_id=session_id,
+                        index=len(predicted) + 1,
+                        t_session=current_t[0],
+                    )
+                )
+    return predicted
 
 
 # ----------------------------------------------------------------------
@@ -476,6 +647,8 @@ def _build_judge_callable(judges_arg: str):
 async def replay_one_session(
     session_dir: Path,
     judges_arg: str,
+    *,
+    use_detector_predictions: bool = False,
 ) -> dict[str, Any]:
     """Replay one session end-to-end against the real live-runtime stack.
 
@@ -490,8 +663,8 @@ async def replay_one_session(
     # session-replay time (rather than at module import).
     from vibemix.audio.buffers import AudioBuffer
     from vibemix.coach.citation_linter import CitationLinter
-    from vibemix.state.evidence_registry import EvidenceRegistry
     from vibemix.state.event_detector import EventDetector
+    from vibemix.state.evidence_registry import EvidenceRegistry
 
     session_id = session_dir.name
     wav_path = session_dir / "input.wav"
@@ -528,8 +701,8 @@ async def replay_one_session(
     if wav_path.exists():
         audio_buf.fill_from_wav(wav_path)
 
-    detector = EventDetector(audio_buf=audio_buf, evidence_registry=registry)
-    linter = CitationLinter()  # noqa: F841 — instantiated to prove import + ctor parity
+    EventDetector(audio_buf=audio_buf, evidence_registry=registry)
+    CitationLinter()
 
     # 1Hz manual tick — drives the detector across the session's wall-clock.
     # NOTE: For the noop / synthetic happy path the real detector's output is
@@ -537,13 +710,22 @@ async def replay_one_session(
     # scorecard happy-path uses ground_truth as the predicted set so F1=1.0;
     # Plan 02 swaps this for the real detector emission stream once the
     # 2-judge cross-check makes detection accuracy meaningful.
-    if judges_arg == "noop":
+    if use_detector_predictions:
+        predicted_events = _detect_events_for_session(
+            session_id=session_id,
+            wav_path=wav_path,
+            registry=registry,
+        )
+        prediction_source = "detector"
+    elif judges_arg == "noop":
         predicted_events = list(ground_truth)
+        prediction_source = "ground_truth_noop"
     else:
         # Plan 02 hand-off: drive the real state_refresh_loop tick by tick
         # and collect EventDetector.detect() emissions. Out of scope for
         # Plan 27-01 (only the noop path ships this plan).
         predicted_events = []
+        prediction_source = "legacy_empty_non_noop"
 
     # Per-event judge calls.
     judge_callable = _build_judge_callable(judges_arg)
@@ -588,11 +770,126 @@ async def replay_one_session(
         "skipped": False,
         "predicted_events": predicted_events,
         "ground_truth": ground_truth,
+        "prediction_source": prediction_source,
         "f1": f1_session,
         "verdicts": verdicts,
         "useful_response_ratio": round(useful_response_ratio, 4),
         "bypass_rate": round(bypass_rate, 4),
         "per_event_substance": per_event_substance,
+        "session_dir": str(session_dir),
+    }
+
+
+def _build_overnight_findings(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build the keyless overnight QA findings report.
+
+    Layer A/B/C names mirror the packet, but only keyless checks are populated
+    here. The Respan quality judge remains a later opt-in layer.
+    """
+    rows: list[dict[str, Any]] = []
+    for result in results:
+        session_id = str(result.get("session") or "")
+        session_dir = Path(str(result.get("session_dir") or ""))
+        events_path = session_dir / "events.jsonl"
+        events = _load_events_jsonl(events_path)
+        event_rows = [
+            row
+            for row in events
+            if _event_row_kind(row) == "event"
+            or (
+                "kind" not in row
+                and _event_row_kind(row)
+                not in {
+                    "citation_count",
+                    "llm_invoke",
+                    "llm_to_tts_delta_ms",
+                    "cache_hit",
+                    "ai_message",
+                    "ai_text",
+                }
+            )
+        ]
+        invokes = [row for row in events if _event_row_kind(row) == "llm_invoke"]
+        citation_counts = [
+            row for row in events if _event_row_kind(row) == "citation_count"
+        ]
+        deltas = [
+            value
+            for row in events
+            if _event_row_kind(row) == _LLM_TO_TTS_DELTA_EVENT_TYPE
+            for value in [_numeric(row.get("delta_ms"))]
+            if value is not None
+        ]
+        max_latency_ms = max(deltas) if deltas else 0.0
+        detector_events = len(result.get("predicted_events") or [])
+        ground_truth_events = len(result.get("ground_truth") or [])
+        cited_emits = sum(
+            1
+            for row in citation_counts
+            if isinstance(row.get("count"), (int, float)) and int(row["count"]) >= 1
+        )
+        citation_zero = sum(
+            1
+            for row in citation_counts
+            if isinstance(row.get("count"), (int, float)) and int(row["count"]) == 0
+        )
+
+        flags: list[str] = []
+        if (
+            result.get("prediction_source") == "detector"
+            and ground_truth_events
+            and not detector_events
+        ):
+            flags.append("no_detector_events")
+        if event_rows and not invokes:
+            flags.append("mute")
+        if citation_zero:
+            flags.append("slop")
+        if max_latency_ms > _LATE_LLM_TO_TTS_BUDGET_MS:
+            flags.append("late")
+        if result.get("skipped"):
+            flags.append("broken")
+
+        evidence: list[str] = []
+        if events_path.exists():
+            evidence.append(f"{events_path}:events_jsonl")
+        rows.append(
+            {
+                "scenario": session_id,
+                "lane": "replay-capture",
+                "instance_port": None,
+                "session_dir": str(session_dir),
+                "verdict": "fail" if flags else "pass",
+                "checklist": {
+                    "events": len(event_rows),
+                    "llm_invokes": len(invokes),
+                    "cited_emits": cited_emits,
+                    "citation_zero_non_ack": citation_zero,
+                    "slop_suppressed": sum(
+                        1 for row in events if _event_row_kind(row) == "slop_suppressed"
+                    ),
+                    "idle_not_faulted": True,
+                    "ground_truth_events": ground_truth_events,
+                    "detector_events": detector_events,
+                    "prediction_source": result.get("prediction_source"),
+                },
+                "quality": None,
+                "broken": {
+                    "dead_controls": [],
+                    "muted_after_trigger": bool(event_rows and not invokes),
+                    "max_latency_ms": round(max_latency_ms),
+                    "over_latency_budget": max_latency_ms > _LATE_LLM_TO_TTS_BUDGET_MS,
+                },
+                "flags": flags,
+                "evidence": evidence,
+            }
+        )
+
+    return {
+        "schema": "vibemix_overnight_qa_findings_v1",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "verdict": "fail" if any(row["flags"] for row in rows) else "pass",
+        "scenarios": rows,
     }
 
 
@@ -655,13 +952,27 @@ async def _run(args: argparse.Namespace) -> int:
             json.dumps(data, indent=2), encoding="utf-8"
         )
         (output / "scorecard.md").write_text(md, encoding="utf-8")
+        if args.findings_json is not None:
+            findings_path = Path(args.findings_json).resolve()
+            findings_path.parent.mkdir(parents=True, exist_ok=True)
+            findings_path.write_text(
+                json.dumps(_build_overnight_findings([]), indent=2),
+                encoding="utf-8",
+            )
         return 0
 
     if args.vcr_mode:
         os.environ["VCR_RECORD_MODE"] = args.vcr_mode
 
     results = await asyncio.gather(
-        *(replay_one_session(s, args.judges) for s in sessions)
+        *(
+            replay_one_session(
+                s,
+                args.judges,
+                use_detector_predictions=args.use_detector_predictions,
+            )
+            for s in sessions
+        )
     )
 
     # Plan 40-04 — cooldown-report accumulator. Off by default (zero
@@ -720,6 +1031,11 @@ async def _run(args: argparse.Namespace) -> int:
         json.dumps(data, indent=2), encoding="utf-8"
     )
     (output / "scorecard.md").write_text(md, encoding="utf-8")
+    if args.findings_json is not None:
+        findings = _build_overnight_findings(list(results))
+        findings_path = Path(args.findings_json).resolve()
+        findings_path.parent.mkdir(parents=True, exist_ok=True)
+        findings_path.write_text(json.dumps(findings, indent=2), encoding="utf-8")
 
     # Exit 1 if any session falls below thresholds.
     for sess in data["sessions"]:
@@ -807,6 +1123,26 @@ def main(argv: list[str] | None = None) -> int:
             "Plan 41-07 / LAT-01 — scan src/vibemix/ for resolve(...) "
             "call sites and emit per-router-path counts. Audits that no "
             "new SDK call site bypasses ModelRouter."
+        ),
+    )
+    parser.add_argument(
+        "--use-detector-predictions",
+        action="store_true",
+        default=False,
+        help=(
+            "Overnight QA lane — drive input.wav through the real refresh tick "
+            "+ EventDetector and score predicted_events from detector emissions. "
+            "Default off preserves the legacy noop scorecard behavior."
+        ),
+    )
+    parser.add_argument(
+        "--findings-json",
+        type=Path,
+        default=None,
+        help=(
+            "Write a keyless overnight QA findings JSON report at this path. "
+            "Combines detector silence, mute/slop/latency flags, and evidence "
+            "pointers for the auto-fix loop."
         ),
     )
     args = parser.parse_args(argv)

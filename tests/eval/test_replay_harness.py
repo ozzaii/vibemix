@@ -10,7 +10,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from scripts.eval.replay_harness import (
     DEFAULT_THRESHOLDS,
     call_judges_stub,
@@ -68,6 +67,27 @@ def test_replay_one_session_constructs_real_primitives(synthetic_session: Path) 
     assert "bypass_rate" in result
     # noop happy path: predicted = ground_truth, F1 == 1.0
     assert result["f1"]["f1"] == 1.0
+
+
+def test_replay_one_session_detector_mode_does_not_fake_predictions(
+    synthetic_session: Path,
+) -> None:
+    """Overnight detector mode uses the real detector output, not ground truth.
+
+    The fixture is a 440Hz sine tone, not a DJ transition, so the honest
+    detector result is empty. This pins the anti-greenwash path: no fake F1.
+    """
+    result = asyncio.run(
+        replay_one_session(
+            synthetic_session,
+            "noop",
+            use_detector_predictions=True,
+        )
+    )
+
+    assert result["prediction_source"] == "detector"
+    assert result["predicted_events"] == []
+    assert result["f1"]["f1"] == 0.0
 
 
 def test_scorecard_threshold_block_present(tmp_path: Path) -> None:
@@ -149,6 +169,36 @@ def test_cli_subprocess_invocation_exits_0_on_synth_happy_path(tmp_path: Path) -
     assert proc.returncode == 0, f"stdout={proc.stdout}\nstderr={proc.stderr}"
     assert (out / "eval_report.json").exists()
     assert (out / "scorecard.md").exists()
+
+
+def test_cli_detector_mode_writes_overnight_findings(tmp_path: Path) -> None:
+    """Detector-mode scorecard can fail while still writing findings JSON."""
+    out = tmp_path / "out"
+    findings_path = out / "findings.json"
+    rc = main(
+        [
+            "--corpus",
+            str(FIXTURES),
+            "--judges",
+            "noop",
+            "--output",
+            str(out),
+            "--use-detector-predictions",
+            "--findings-json",
+            str(findings_path),
+        ]
+    )
+
+    assert rc == 1
+    data = json.loads(findings_path.read_text())
+    assert data["schema"] == "vibemix_overnight_qa_findings_v1"
+    assert data["verdict"] == "fail"
+    scenario = data["scenarios"][0]
+    assert scenario["checklist"]["prediction_source"] == "detector"
+    assert scenario["checklist"]["ground_truth_events"] == 3
+    assert scenario["checklist"]["detector_events"] == 0
+    assert "no_detector_events" in scenario["flags"]
+    assert "mute" in scenario["flags"]
 
 
 def test_empty_corpus_returns_0_with_artifacts(tmp_path: Path) -> None:
