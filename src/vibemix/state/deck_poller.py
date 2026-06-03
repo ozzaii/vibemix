@@ -49,7 +49,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from vibemix.midi.state import classify_controller_midi_activity
+from vibemix.midi.activity import classify_controller_midi_activity
 from vibemix.state.deck_state import DeckTrack
 from vibemix.state.track_resolver import derive_audible_deck
 

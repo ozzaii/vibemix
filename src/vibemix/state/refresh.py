@@ -65,7 +65,7 @@ from vibemix.audio.constants import (
 )
 from vibemix.audio.lufs import SHORT_TERM_WINDOW_S, short_term_lufs
 from vibemix.library.section_builder import next_section_after_position, sections_for_entry
-from vibemix.midi.state import classify_controller_midi_activity
+from vibemix.midi.activity import classify_controller_midi_activity
 from vibemix.state.deck_context import (
     live_mix_evidence_keys,
     midi_evidence_key,
