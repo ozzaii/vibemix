@@ -1,7 +1,7 @@
 # CODEX VERDICT - B3
 
 Item: B3 - Grade-carrying IPC + lock-meter HUD
-Code SHA: fd9a92ee
+Code SHA: f064657c
 
 ## User Value
 
@@ -23,6 +23,9 @@ computes, while Sven keeps the rare spoken grade path deduped instead of stutter
   `tail_ui_log` confirmed the frontend received the same frames.
 - Session `20260603-141106` recorded one deduped authored tutor grade:
   `tempos are off - ease the pitch back.` with `tts_marker=L2.01.grade`.
+- Follow-up proof inspection found the HUD tick was still replaying after lesson
+  completion. `f064657c` gates the 1 Hz grade tick to active beatmatch lesson
+  states only and adds a regression test for completed lessons.
 - BPM guard held during speech: session snapshots reported `bpm:null` and pill frames
   stayed at `bpm:0` while voice/meter activity was present, so Sven audio did not fake
   a deck BPM count.
@@ -39,6 +42,9 @@ computes, while Sven keeps the rare spoken grade path deduped instead of stutter
 - `npm --prefix tauri/ui test`
 - `uv run pytest -q tests/learn/test_runtime_invariants.py tests/learn/test_no_new_ws_port.py tests/runtime/test_ws_bus.py tests/learn/test_no_speculative_phrase.py tests/prompts/test_negative_dict.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py`
 - `uv run pytest -q tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py`
+- `uv run pytest -q tests/learn/test_runtime_evidence_grounding.py`
+- `uv run pytest -q tests/learn/test_runtime_invariants.py tests/learn/test_runtime_evidence_grounding.py`
+- `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py`
 - `git diff --check`
 
 ## Assumptions / Gaps
