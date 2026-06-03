@@ -6,6 +6,7 @@ them with ``LessonRuntime``. These tests intentionally inspect the startup
 source because ``vibemix.__main__.main`` owns a large hardware/audio boot graph
 that is not practical to instantiate in a unit test.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -32,9 +33,9 @@ def test_observer_complete_envelopes_return_to_lesson_runtime() -> None:
     src = _main_source()
 
     assert "def _learn_observer_emit(msg: dict) -> None:" in src
-    assert "msg.get(\"type\") != \"ipc.learn.complete_lesson\"" in src
+    assert 'msg.get("type") != "ipc.learn.complete_lesson"' in src
     assert "lesson_runtime.complete_observer_lesson(" in src
-    assert "completed=reason == \"completed\"" in src
+    assert 'completed=reason == "completed"' in src
 
 
 def test_observer_tutor_speak_is_logged_as_ai_message() -> None:
@@ -53,6 +54,16 @@ def test_exemplar_observer_has_safe_noop_player_fallback() -> None:
     assert "read_learn_headphone_device_index" in src
     assert "from vibemix.learn.audio_cue import ExemplarPlayer" in src
     assert "exemplar_player = ExemplarPlayer(" in src
+
+
+def test_beatmatch_practice_audio_uses_shared_learn_output_device() -> None:
+    src = _main_source()
+
+    assert "from vibemix.learn.two_deck_player import TwoDeckPlayer" in src
+    assert "beatmatch_practice_player = TwoDeckPlayer(" in src
+    assert "beatmatch_practice_driver.deck" in src
+    assert "lesson_runtime.set_beatmatch_practice_player(beatmatch_practice_player)" in src
+    assert "lesson_runtime.set_beatmatch_practice_player(None)" in src
 
 
 def test_lesson_runtime_uses_shared_evidence_registry_in_main() -> None:

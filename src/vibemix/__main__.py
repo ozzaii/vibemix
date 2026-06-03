@@ -1317,6 +1317,13 @@ async def main() -> None:
         )
         print(f"[FATAL] {e}", file=sys.stderr, flush=True)
         sys.exit(3)
+    try:
+        import sounddevice as sd
+
+        _output_info = sd.query_devices(output_idx)
+        output_device_label = str(_output_info.get("name") or OUTPUT_DEVICE)
+    except Exception:
+        output_device_label = OUTPUT_DEVICE
 
     stop_event = asyncio.Event()
 
@@ -1334,7 +1341,7 @@ async def main() -> None:
         block_size=VOICE_BLOCKSIZE,
         callback=_voice_callback_factory(playback),
     )
-    print(f"-> AI voice -> {OUTPUT_DEVICE} @ {OUTPUT_SR}Hz")
+    print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz")
 
     pass_stream = audio_backend.open_passthrough_output(
         output_idx,
@@ -1343,7 +1350,7 @@ async def main() -> None:
         block_size=OUTPUT_BLOCKSIZE,
         callback=_passthrough_callback_factory(passthrough),
     )
-    print(f"-> djay passthrough -> {OUTPUT_DEVICE} @ {INPUT_SR_NATIVE}Hz")
+    print(f"-> djay passthrough -> {output_device_label} @ {INPUT_SR_NATIVE}Hz")
 
     # Mic stream is optional. Keep it opt-in at boot: CoreAudio can hang inside
     # PortAudio when opening a mic device, and that previously blocked the
@@ -2681,6 +2688,7 @@ async def main() -> None:
 
         output_device = _learn_output_device_index()
         exemplar_player: Any = _NoopLearnExemplarPlayer()
+        beatmatch_practice_player: Any | None = None
         if output_device is not None:
             try:
                 from vibemix.learn.audio_cue import ExemplarPlayer
@@ -2691,6 +2699,21 @@ async def main() -> None:
                     f"-> learn exemplar audio using no-op player: {_player_exc!r}",
                     file=sys.stderr,
                 )
+            if beatmatch_practice_driver is not None:
+                try:
+                    from vibemix.learn.two_deck_player import TwoDeckPlayer
+
+                    beatmatch_practice_player = TwoDeckPlayer(
+                        output_device,
+                        beatmatch_practice_driver.deck,
+                        state=state,
+                    )
+                except Exception as _deck_player_exc:  # pragma: no cover — defensive boot path
+                    print(
+                        f"-> learn beatmatch practice audio disabled: {_deck_player_exc!r}",
+                        file=sys.stderr,
+                    )
+        lesson_runtime.set_beatmatch_practice_player(beatmatch_practice_player)
 
         lesson_runtime.register_lesson_observer(
             "L1.14",
@@ -2996,6 +3019,10 @@ async def main() -> None:
             await _close_tts_chain(tts_inst)
         except Exception as e:
             print(f"[close tts err] {e}", file=sys.stderr)
+        try:
+            lesson_runtime.set_beatmatch_practice_player(None)
+        except Exception as e:
+            print(f"[close learn beatmatch practice player err] {e}", file=sys.stderr)
         # Phase 77 review WR-01 — cancel the agent's off-loop pre-dispatch
         # tasks (grounding + recall) so an event firing just before SIGINT
         # doesn't leak an orphaned executor embed / a "Task was destroyed but

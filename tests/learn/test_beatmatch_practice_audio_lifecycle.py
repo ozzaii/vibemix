@@ -1,0 +1,119 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Audible beatmatch-practice player lifecycle regression tests."""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+from vibemix.learn.progress import LearnProgress
+from vibemix.learn.runtime import LessonRuntime
+from vibemix.learn.state import LearnState
+
+
+class _FakePracticePlayer:
+    def __init__(self, *, fail_start: bool = False) -> None:
+        self.fail_start = fail_start
+        self.starts = 0
+        self.stops = 0
+
+    def start(self) -> None:
+        self.starts += 1
+        if self.fail_start:
+            raise RuntimeError("boom")
+
+    def stop(self) -> None:
+        self.stops += 1
+
+
+def _runtime() -> LessonRuntime:
+    return LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=LearnProgress(),
+    )
+
+
+def _load_begin(
+    runtime: LessonRuntime,
+    *,
+    lesson_id: str,
+    course_id: str = "course_2_transitions",
+) -> None:
+    runtime.send(
+        "load",
+        lesson_id=lesson_id,
+        course_id=course_id,
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+
+def test_beatmatch_lesson_starts_and_stops_practice_player(monkeypatch) -> None:
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L2.01")
+
+    assert player.starts == 1
+
+    runtime.send("observer_complete", completed=True)
+
+    assert player.stops == 1
+
+
+def test_non_beatmatch_lesson_does_not_start_practice_player() -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L0.00-press-play", course_id="course_0")
+
+    assert player.starts == 0
+
+
+def test_loading_another_lesson_stops_active_practice_player() -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L2.01")
+    runtime.send("observer_complete", completed=True)
+    runtime.send(
+        "load",
+        lesson_id="L2.02",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+
+    assert player.starts == 1
+    assert player.stops >= 1
+
+
+def test_replacing_practice_player_stops_old_player() -> None:
+    runtime = _runtime()
+    old_player = _FakePracticePlayer()
+    new_player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(old_player)
+    _load_begin(runtime, lesson_id="L2.01")
+    runtime.set_beatmatch_practice_player(new_player)
+
+    assert old_player.starts == 1
+    assert old_player.stops == 1
+    assert new_player.starts == 1
+
+
+def test_practice_player_start_failure_does_not_wedge_lesson(capsys) -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer(fail_start=True)
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L2.01")
+
+    assert runtime.current_state.id == "awaiting_action"
+    assert player.starts == 1
+    assert "beatmatch practice player start failed" in capsys.readouterr().err

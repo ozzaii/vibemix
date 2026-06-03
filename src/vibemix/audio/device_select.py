@@ -116,6 +116,11 @@ def is_unstable_output_device(name: str) -> bool:
     return _BLACKHOLE_PREFIX in low or any(tok in low for tok in _UNSTABLE_OUTPUT_TOKENS)
 
 
+def is_explicit_multi_output_device(name: str) -> bool:
+    """True for macOS' deliberate fan-out output, not a capture aggregate."""
+    return "multi-output" in name.lower()
+
+
 class MasterCaptureNotFoundError(RuntimeError):
     """Raised when no BlackHole master-capture input can be selected.
 
@@ -257,7 +262,7 @@ def select_output_device(
         from a missing BlackHole input.
     """
 
-    def _resolvable(idx: int | None) -> bool:
+    def _resolvable(idx: int | None, *, allow_multi_output: bool = False) -> bool:
         # output_device_id is a POSITIONAL query_devices() index, which reorders
         # on plug/unplug/reboot. A stale index that lands on a BlackHole output
         # variant would route the AI voice INTO the master-capture device — the
@@ -270,10 +275,13 @@ def select_output_device(
         # route the voice to a controller's headphone out.
         if not (isinstance(idx, int) and 0 <= idx < len(devices) and _is_output(devices[idx])):
             return False
-        return not is_unstable_output_device(_name_of(devices[idx]))
+        name = _name_of(devices[idx])
+        if allow_multi_output and is_explicit_multi_output_device(name):
+            return True
+        return not is_unstable_output_device(name)
 
     # 1. Explicit wizard-persisted choice.
-    if _resolvable(preferred_index):
+    if _resolvable(preferred_index, allow_multi_output=True):
         return preferred_index  # type: ignore[return-value]
     # 2. Legacy substring name (happy-path parity).
     if fallback_name:

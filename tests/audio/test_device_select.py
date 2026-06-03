@@ -211,7 +211,9 @@ def test_output_stale_persisted_index_onto_blackhole_is_rejected() -> None:
         _in("BlackHole 2ch", ich=2, och=2),  # loopback, output-capable
         _in("MacBook Pro Speakers", ich=0, och=2),
     ]
-    assert select_output_device(devices, preferred_index=0, fallback_name="MacBook Pro Speakers") == 1
+    assert (
+        select_output_device(devices, preferred_index=0, fallback_name="MacBook Pro Speakers") == 1
+    )
 
 
 def test_output_stale_persisted_index_onto_aggregate_is_rejected() -> None:
@@ -223,7 +225,21 @@ def test_output_stale_persisted_index_onto_aggregate_is_rejected() -> None:
         _in("MacBook Pro Speakers", ich=0, och=2),
         _in("rekordbox Aggregate Device", ich=2, och=6),
     ]
-    assert select_output_device(devices, preferred_index=2, fallback_name="MacBook Pro Speakers") == 1
+    assert (
+        select_output_device(devices, preferred_index=2, fallback_name="MacBook Pro Speakers") == 1
+    )
+
+
+def test_output_explicit_multi_output_index_is_honored() -> None:
+    # Multi-Output Device is a deliberate user-selected fan-out endpoint. It
+    # is aggregate-like, but not the BlackHole/master-capture feedback path.
+    devices = [
+        _in("MacBook Pro Speakers", ich=0, och=2),
+        _in("Multi-Output Device", ich=0, och=2),
+    ]
+    assert (
+        select_output_device(devices, preferred_index=1, fallback_name="MacBook Pro Speakers") == 1
+    )
 
 
 def test_output_os_default_onto_blackhole_is_rejected() -> None:
@@ -252,4 +268,6 @@ def test_output_persisted_controller_index_is_still_honored() -> None:
         _in("MacBook Pro Speakers", ich=0, och=2),
         _in("DDJ-FLX4", ich=4, och=4),  # controller output
     ]
-    assert select_output_device(devices, preferred_index=1, fallback_name="MacBook Pro Speakers") == 1
+    assert (
+        select_output_device(devices, preferred_index=1, fallback_name="MacBook Pro Speakers") == 1
+    )

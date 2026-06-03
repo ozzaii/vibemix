@@ -145,6 +145,7 @@ from vibemix.ui_bus.learn_messages import (
 # ``min_delta``, this default applies.
 _CC_DEFAULT_MIN_DELTA = 38
 _MISMATCH_HINT_THROTTLE_S = 1.5
+_BEATMATCH_PRACTICE_AUDIO_LESSONS = frozenset({"L2.01", "L2.02"})
 _CONTROL_LABELS = {
     "cue": "cue",
     "eq_hi": "high EQ",
@@ -550,6 +551,8 @@ class LessonRuntime(StateMachine):
         self._last_mismatch_hint_at: float = 0.0
         self._beatmatch_practice_lock_active = False
         self._last_beatmatch_live_grade_verdict: str | None = None
+        self._beatmatch_practice_player: Any | None = None
+        self._beatmatch_practice_player_active = False
         self._cue_placement_practice_lock_active = False
         super().__init__()
 
@@ -657,6 +660,56 @@ class LessonRuntime(StateMachine):
         to the completed state.
         """
         self.send("observer_complete", completed=completed)
+
+    def set_beatmatch_practice_player(self, player: Any | None) -> None:
+        """Install or clear the optional L2.01/L2.02 audible practice player."""
+        if player is self._beatmatch_practice_player:
+            return
+        self._stop_beatmatch_practice_player()
+        self._beatmatch_practice_player = player
+        if self._is_beatmatch_practice_audio_lesson() and self.current_state.id in (
+            "awaiting_action",
+            "hint_strike_1",
+            "hint_strike_2",
+            "hint_strike_3",
+        ):
+            self._start_beatmatch_practice_player()
+
+    def _is_beatmatch_practice_audio_lesson(self) -> bool:
+        return self._learn.current_lesson_id in _BEATMATCH_PRACTICE_AUDIO_LESSONS
+
+    def _start_beatmatch_practice_player(self) -> None:
+        if (
+            self._beatmatch_practice_player is None
+            or not self._is_beatmatch_practice_audio_lesson()
+            or self._beatmatch_practice_player_active
+        ):
+            return
+        try:
+            self._beatmatch_practice_player.start()
+            self._beatmatch_practice_player_active = True
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] beatmatch practice player start failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _stop_beatmatch_practice_player(self) -> None:
+        if self._beatmatch_practice_player is None or not self._beatmatch_practice_player_active:
+            return
+        try:
+            self._beatmatch_practice_player.stop()
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] beatmatch practice player stop failed: {exc!r}",
+                file=sys.stderr,
+            )
+        finally:
+            self._beatmatch_practice_player_active = False
 
     def handle_step_ack(self, midi: dict[str, Any]) -> bool:
         """Advance an authored lesson beat without completing the lesson.
@@ -983,6 +1036,7 @@ class LessonRuntime(StateMachine):
         if self._finish_task is not None and not self._finish_task.done():
             self._finish_task.cancel()
             self._finish_task = None
+        self._stop_beatmatch_practice_player()
         # Update LearnState — Invariant #1 binding (sole writer).
         if lesson_id is not None:
             self._learn.current_lesson_id = lesson_id
@@ -1107,6 +1161,7 @@ class LessonRuntime(StateMachine):
         self._emit_highlight(expected)
 
         self._emit_opening_tutor_beats(expected)
+        self._start_beatmatch_practice_player()
         # Reset the strike timer's state-entry anchor.
         self._state_entered_at = time.monotonic()
 
@@ -1158,6 +1213,7 @@ class LessonRuntime(StateMachine):
         ``advancing``, which is one of the two acceptable terminal
         observations per the test contract.
         """
+        self._stop_beatmatch_practice_player()
         reason = "action_matched" if self._last_was_match else "user_skip"
         self._emit_advance(reason=reason)
 
@@ -1223,6 +1279,7 @@ class LessonRuntime(StateMachine):
         to tmp anyway. The bracket-tagged stderr line surfaces save
         failures without wedging the FSM.
         """
+        self._stop_beatmatch_practice_player()
         try:
             self._progress.mark_completed(
                 self._learn.current_course_id,
