@@ -64,6 +64,7 @@ from vibemix.ui_bus import (
     LearnExemplarStop,
     LearnHighlight,
     LearnLessonLoaded,
+    LearnLiveGrade,
     LearnMidiPosition,
     LearnProgressDot,
     LearnProgressState,
@@ -516,6 +517,15 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 tts_marker="L000.beat0",
                 citations=(),
                 data_state="active",
+            ),
+        ),
+        (
+            "LearnLiveGrade",
+            LearnLiveGrade.make(
+                verdict="locked",
+                phase_error_beats=0.0,
+                score=1.0,
+                citation="[ev:BEATMATCH_GRADED@12.345]",
             ),
         ),
         (

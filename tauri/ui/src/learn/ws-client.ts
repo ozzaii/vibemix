@@ -76,6 +76,7 @@ const LEARN_INBOUND_TYPES = [
   "ipc.learn.advance",
   "ipc.learn.complete_lesson",
   "ipc.learn.tutor_speak",
+  "ipc.learn.live_grade",
   "ipc.learn.exemplar_play",
   "ipc.learn.exemplar_stop",
   "ipc.learn.progress_state",
@@ -332,8 +333,6 @@ export class LearnWsClient extends EventTarget {
     if (envelope.type !== STATUS_TICK_TYPE) return;
     const ok = validate(envelope);
     if (!ok) {
-      // eslint-disable-next-line no-console
-      console.warn("[learn:ws] validate failed for ipc.status.tick; dropping");
       return;
     }
     window.dispatchEvent(new CustomEvent(STATUS_TICK_TYPE, { detail: envelope.payload }));

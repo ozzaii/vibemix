@@ -150,6 +150,49 @@ describe("practice booth shell", () => {
     }
   });
 
+  it("mounts the live grade meter and updates it from the learn bus", async () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      await waitForMountedControl(root, "eq_hi:A");
+      dispatchLessonLoaded("L2.01", "course_2_transitions");
+
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.live_grade", {
+          detail: {
+            verdict: "drifting",
+            phase_error_beats: 0.25,
+            score: 0.5,
+            citation: null,
+          },
+        }),
+      );
+
+      const meter = root.querySelector<HTMLElement>("#learn-live-meter");
+      expect(meter).not.toBeNull();
+      expect(meter?.dataset.state).toBe("active");
+      expect(meter?.dataset.verdict).toBe("drifting");
+      expect(Number(meter?.dataset.needlePct)).toBeGreaterThan(50);
+
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.live_grade", {
+          detail: {
+            verdict: "locked",
+            phase_error_beats: 0,
+            score: 1,
+            citation: "[ev:BEATMATCH_GRADED@12.345]",
+          },
+        }),
+      );
+
+      expect(meter?.dataset.verdict).toBe("locked");
+      expect(Number(meter?.dataset.needlePct)).toBe(50);
+      expect(meter?.dataset.citation).toBe("[ev:BEATMATCH_GRADED@12.345]");
+    } finally {
+      ws.close();
+    }
+  });
+
   it("surfaces Course 3 live cue evidence as one quiet status phrase", () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);

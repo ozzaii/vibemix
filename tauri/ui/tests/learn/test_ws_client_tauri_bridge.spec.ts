@@ -107,10 +107,14 @@ describe("LearnWsClient Tauri bridge selection", () => {
     const client = new LearnWsClient();
     const openSpy = vi.fn();
     const heard: CustomEvent[] = [];
+    const heardGrade: CustomEvent[] = [];
     const heardCourse3: CustomEvent[] = [];
     const heardOperatorAction: CustomEvent[] = [];
     const onTutor = (event: Event): void => {
       heard.push(event as CustomEvent);
+    };
+    const onGrade = (event: Event): void => {
+      heardGrade.push(event as CustomEvent);
     };
     const onCourse3 = (event: Event): void => {
       heardCourse3.push(event as CustomEvent);
@@ -119,6 +123,7 @@ describe("LearnWsClient Tauri bridge selection", () => {
       heardOperatorAction.push(event as CustomEvent);
     };
     window.addEventListener("ipc.learn.tutor_speak", onTutor);
+    window.addEventListener("ipc.learn.live_grade", onGrade);
     window.addEventListener("learn.course3_lens", onCourse3);
     window.addEventListener("learn.operator_action", onOperatorAction);
     client.addEventListener("open", openSpy);
@@ -126,7 +131,7 @@ describe("LearnWsClient Tauri bridge selection", () => {
     try {
       client.connect();
       await vi.waitFor(() => {
-        expect(mocks.subscribeIpc).toHaveBeenCalledTimes(10);
+        expect(mocks.subscribeIpc).toHaveBeenCalledTimes(12);
       });
       await vi.waitFor(() => {
         expect(openSpy).toHaveBeenCalledTimes(1);
@@ -150,6 +155,16 @@ describe("LearnWsClient Tauri bridge selection", () => {
           tts_marker: "L1.02.step1",
           citations: ["lesson:L1.02"],
           data_state: "active",
+        },
+      });
+      callbacks.get("ipc.learn.live_grade")?.({
+        type: "ipc.learn.live_grade",
+        ts: "2026-05-28T00:00:00.000Z",
+        payload: {
+          verdict: "drifting",
+          phase_error_beats: 0.125,
+          score: 0.5,
+          citation: null,
         },
       });
       const emitCourse3Lens = rawCallbacks.get("learn-course3-lens");
@@ -185,6 +200,12 @@ describe("LearnWsClient Tauri bridge selection", () => {
         text: "trim the highs",
         data_state: "active",
       });
+      expect(heardGrade).toHaveLength(1);
+      expect(heardGrade[0]?.detail).toMatchObject({
+        verdict: "drifting",
+        phase_error_beats: 0.125,
+        citation: null,
+      });
       expect(heardCourse3).toHaveLength(1);
       expect(heardCourse3[0]?.detail).toMatchObject({
         session_active: true,
@@ -202,10 +223,12 @@ describe("LearnWsClient Tauri bridge selection", () => {
 
       client.close();
       expect(unlisteners.get("ipc.learn.tutor_speak")).toHaveBeenCalledTimes(1);
+      expect(unlisteners.get("ipc.learn.live_grade")).toHaveBeenCalledTimes(1);
       expect(course3LensUnlisten).toHaveBeenCalledTimes(1);
       expect(operatorActionUnlisten).toHaveBeenCalledTimes(1);
     } finally {
       window.removeEventListener("ipc.learn.tutor_speak", onTutor);
+      window.removeEventListener("ipc.learn.live_grade", onGrade);
       window.removeEventListener("learn.course3_lens", onCourse3);
       window.removeEventListener("learn.operator_action", onOperatorAction);
       client.close();

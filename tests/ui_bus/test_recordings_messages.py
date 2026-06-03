@@ -284,8 +284,8 @@ def test_count_parity_at_72() -> None:
     LearnStartLesson / LearnCompleteLesson / LearnLessonLoaded /
     LearnHighlight / LearnAdvance / LearnAck / LearnTutorSpeak /
     LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 70.
-    Phase 97 adds SessionSetMode → 71. Quick 260529-ifq adds WizardSetSkill
-    (onboarding skill-level step) → 72.
+    B3 adds LearnLiveGrade → 71. Phase 97 adds SessionSetMode → 72.
+    Quick 260529-ifq adds WizardSetSkill (onboarding skill-level step) → 73.
     Both sides — schema oneOf and Python wrapper dataclasses — must match
     exactly.
 
@@ -322,10 +322,10 @@ def test_count_parity_at_72() -> None:
                 seen.add(obj)
                 wrapper_count += 1
 
-    assert len(_SCHEMA["oneOf"]) == 72, (
-        "schema oneOf count should be 72 after pruning stale library/debrief IPC"
+    assert len(_SCHEMA["oneOf"]) == 73, (
+        "schema oneOf count should be 73 after adding LearnLiveGrade"
     )
-    assert wrapper_count == 72, f"wrapper count {wrapper_count} != 72"
+    assert wrapper_count == 73, f"wrapper count {wrapper_count} != 73"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

@@ -80,6 +80,9 @@ export default defineConfig({
       // registerStyle() (touches document.head) and inspects DOM
       // structure via querySelectorAll. Needs jsdom.
       ["src/session/components/*.test.ts", "jsdom"],
+      // Model setup derives copy from library/index.ts, whose module-level
+      // wiring keeps a DOM root handle. Keep this one spec under jsdom.
+      ["src/library/model-setup.test.ts", "jsdom"],
     ],
   },
 });

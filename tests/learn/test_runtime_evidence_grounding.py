@@ -142,6 +142,14 @@ def _tutor_speak_payloads(ipc: MagicMock) -> list[dict]:
     ]
 
 
+def _live_grade_payloads(ipc: MagicMock) -> list[dict]:
+    return [
+        call.args[0]["payload"]
+        for call in ipc.emit.call_args_list
+        if call.args and call.args[0].get("type") == "ipc.learn.live_grade"
+    ]
+
+
 def test_adaptive_midi_hint_writes_registry_and_time_keyed_citation() -> None:
     """MIDI adaptive coaching cites the exact registry-backed action."""
     runtime, registry, ipc = _runtime_with_evidence(clock_value=12.7)
@@ -371,16 +379,25 @@ def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch)
     runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
 
     payload = _tutor_speak_payloads(ipc)[-1]
+    live_grade = _live_grade_payloads(ipc)[-1]
     assert payload["text"] == "nice — that's matched."
     assert payload["tts_marker"] == "L2.01.grade"
     assert payload["data_state"] == "hint"
     assert payload["citations"] == ["[ev:BEATMATCH_GRADED@42.400]"]
+    assert live_grade == {
+        "verdict": "locked",
+        "phase_error_beats": 0.0,
+        "score": 1.0,
+        "citation": "[ev:BEATMATCH_GRADED@42.400]",
+    }
     result = CitationLinter().check(" ".join(payload["citations"]), registry.snapshot())
     assert result.valid is True
 
     runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
 
     assert len(_tutor_speak_payloads(ipc)) == 1
+    assert len(_live_grade_payloads(ipc)) == 2
+    assert _live_grade_payloads(ipc)[-1]["citation"] is None
 
 
 def test_live_beatmatch_grade_voices_drift_without_fabricated_citation() -> None:
@@ -401,8 +418,12 @@ def test_live_beatmatch_grade_voices_drift_without_fabricated_citation() -> None
     runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
 
     payload = _tutor_speak_payloads(ipc)[-1]
+    live_grade = _live_grade_payloads(ipc)[-1]
     assert payload["text"] == "close, you're sliding behind — nudge the jog."
     assert payload["citations"] == []
+    assert live_grade["verdict"] == "drifting"
+    assert live_grade["citation"] is None
+    assert live_grade["phase_error_beats"] > 0
     assert "ev" not in registry.snapshot()
 
 
@@ -414,6 +435,7 @@ def test_live_beatmatch_grade_abstain_emits_nothing() -> None:
     runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
 
     assert _tutor_speak_payloads(ipc) == []
+    assert _live_grade_payloads(ipc) == []
 
 
 def test_live_beatmatch_grade_dedupes_sustained_same_verdict() -> None:
@@ -435,6 +457,7 @@ def test_live_beatmatch_grade_dedupes_sustained_same_verdict() -> None:
     runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
 
     assert len(_tutor_speak_payloads(ipc)) == 1
+    assert len(_live_grade_payloads(ipc)) == 2
 
 
 def test_matched_beatmatch_action_records_and_grades_immediately(monkeypatch) -> None:

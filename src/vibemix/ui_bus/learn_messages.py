@@ -14,6 +14,7 @@ Phase 92 (11 envelopes — lesson runtime + AI highlight contract):
   - LearnAdvance            (bidirectional)
   - LearnAck                (shell→sidecar)
   - LearnTutorSpeak         (sidecar→shell — narration; text from fixture)
+  - LearnLiveGrade          (sidecar→shell — beatmatch grade HUD signal)
   - LearnExemplarPlay       (sidecar→shell — shape only; engine in P93)
   - LearnExemplarStop       (sidecar→shell — shape only)
   - LearnProgressState      (bidirectional — snapshot/reset/reset_ack)
@@ -674,6 +675,54 @@ class LearnTutorSpeak:
             d["payload"].pop("teaching_loop", None)
         _validate(d)
         return json.dumps(d, separators=(",", ":"))
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.live_grade ---------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnLiveGradePayload:
+    """Payload of ``ipc.learn.live_grade``. Deterministic beatmatch HUD tick."""
+
+    verdict: Literal["locked", "drifting", "tempo_off", "trainwreck", "abstain"]
+    phase_error_beats: float
+    score: float
+    citation: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class LearnLiveGrade:
+    """``ipc.learn.live_grade`` envelope wrapper (sidecar → shell)."""
+
+    type: Literal["ipc.learn.live_grade"]
+    ts: str
+    payload: LearnLiveGradePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        verdict: str,
+        phase_error_beats: float,
+        score: float,
+        citation: str | None = None,
+    ) -> LearnLiveGrade:
+        return cls(
+            type="ipc.learn.live_grade",
+            ts=_now_iso(),
+            payload=LearnLiveGradePayload(
+                verdict=verdict,  # type: ignore[arg-type]
+                phase_error_beats=float(phase_error_beats),
+                score=float(score),
+                citation=citation,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
 
     def to_dict(self) -> dict:
         return json.loads(self.to_json())

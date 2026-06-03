@@ -73,6 +73,7 @@ export type VibemixIPCMessages =
   | LearnAdvance
   | LearnAck
   | LearnTutorSpeak
+  | LearnLiveGrade
   | LearnExemplarPlay
   | LearnExemplarStop
   | LearnProgressState;
@@ -866,6 +867,16 @@ export interface LearnTeachingLoop {
     input_surfaces: ["hardware" | "screen"] | ["hardware" | "screen", "hardware" | "screen"];
     direction: "" | "up" | "down";
     min_delta: number;
+  };
+}
+export interface LearnLiveGrade {
+  type: "ipc.learn.live_grade";
+  ts: string;
+  payload: {
+    verdict: "locked" | "drifting" | "tempo_off" | "trainwreck" | "abstain";
+    phase_error_beats: number;
+    score: number;
+    citation: string | null;
   };
 }
 export interface LearnExemplarPlay {

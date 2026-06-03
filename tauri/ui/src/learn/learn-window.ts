@@ -63,6 +63,11 @@ import {
   type LessonSkipHandle,
 } from "./lesson/skip-button.js";
 import {
+  LiveGradeMeter,
+  type LiveGradeMeterHandle,
+  type LiveGradePayload,
+} from "./live-meter.js";
+import {
   renderProgressList,
   type LessonStatus,
   type ProgressListEntry,
@@ -179,6 +184,8 @@ interface TutorSpeakWirePayload {
   citations: ReadonlyArray<string>;
   data_state: "active" | "hint";
 }
+
+interface LiveGradeWirePayload extends LiveGradePayload {}
 
 interface AdvancePayload {
   lesson_id: string;
@@ -382,6 +389,7 @@ function mountLearnWindow(root: HTMLElement): {
       <strong id="learn-exemplar-track" class="learn-exemplar-chip__track"></strong>
       <span id="learn-exemplar-meta" class="learn-exemplar-chip__meta"></span>
     </div>
+    <div id="learn-live-meter-host" class="learn-live-meter-host"></div>
     <aside id="learn-progress-list-host" class="learn-progress-list-host" data-visible="false" aria-hidden="true">
       <div class="learn-progress-list-shell">
         <div class="learn-progress-list-head">
@@ -466,6 +474,7 @@ function mountLearnWindow(root: HTMLElement): {
   const exemplarLabel = root.querySelector("#learn-exemplar-label") as HTMLElement;
   const exemplarTrack = root.querySelector("#learn-exemplar-track") as HTMLElement;
   const exemplarMeta = root.querySelector("#learn-exemplar-meta") as HTMLElement;
+  const liveMeterHost = root.querySelector("#learn-live-meter-host") as HTMLElement;
   let latestProgress: LearnProgressProjection | null = null;
   let latestSkillWall: SkillWallRow[] | null = null;
   let recommendedLessonId = firstRecommendedLessonId(latestProgress);
@@ -939,6 +948,7 @@ function mountLearnWindow(root: HTMLElement): {
   let lessonHud: LessonHudHandle | null = null;
   let tutorDock: TutorSpeakHandle | null = null;
   let skipButton: LessonSkipHandle | null = null;
+  let liveMeter: LiveGradeMeterHandle | null = null;
   // Per-controlled-position last-known values (for delta detection in
   // the ack-emit listener). Cleared on lesson_loaded so a fresh lesson
   // doesn't inherit stale deltas.
@@ -973,6 +983,11 @@ function mountLearnWindow(root: HTMLElement): {
     lessonActionCount = 0;
     lessonMatchedSourceCounts = freshLessonSourceCounts();
     lessonUsedHint = false;
+    if (!liveMeter) {
+      liveMeter = LiveGradeMeter(liveMeterHost);
+    } else {
+      liveMeter.reset();
+    }
 
     // Flip the lesson-mode class so the grid extends to host the HUD + dock.
     root.classList.add("lesson-mode");
@@ -1100,6 +1115,7 @@ function mountLearnWindow(root: HTMLElement): {
     lastHighlightPayload = null;
     screenAction.hidden = true;
     if (tutorDock) tutorDock.hide();
+    if (liveMeter) liveMeter.reset();
     hideExemplarChip();
     clearHighlight(stageEl);
     lastPositions = {};
@@ -1180,6 +1196,14 @@ function mountLearnWindow(root: HTMLElement): {
     const payload = (ev as CustomEvent<ExemplarStopPayload>).detail;
     if (!payload) return;
     showExemplarStop(payload);
+  });
+  addWindowListener("ipc.learn.live_grade", (ev: Event) => {
+    const payload = (ev as CustomEvent<LiveGradeWirePayload>).detail;
+    if (!payload) return;
+    if (!liveMeter) {
+      liveMeter = LiveGradeMeter(liveMeterHost);
+    }
+    liveMeter.update(payload);
   });
 
   const emitLearnAction = (
@@ -1343,6 +1367,11 @@ function mountLearnWindow(root: HTMLElement): {
     }
     try {
       status.dispose();
+    } catch {
+      /* swallow */
+    }
+    try {
+      liveMeter?.dispose();
     } catch {
       /* swallow */
     }

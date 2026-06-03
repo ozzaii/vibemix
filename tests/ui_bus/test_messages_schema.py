@@ -62,6 +62,7 @@ from vibemix.ui_bus import (
     LearnExemplarStop,
     LearnHighlight,
     LearnLessonLoaded,
+    LearnLiveGrade,
     LearnMidiPosition,
     LearnProgressDot,
     LearnProgressState,
@@ -538,6 +539,15 @@ def _make_examples() -> list[tuple[str, object]]:
             ),
         ),
         (
+            "LearnLiveGrade",
+            LearnLiveGrade.make(
+                verdict="locked",
+                phase_error_beats=0.0,
+                score=1.0,
+                citation="[ev:BEATMATCH_GRADED@12.345]",
+            ),
+        ),
+        (
             "LearnExemplarPlay",
             LearnExemplarPlay.make(
                 track_id="track_0001",
@@ -595,10 +605,11 @@ def test_example_count_matches_schema_oneof() -> None:
     LearnStartCourse / LearnStartLesson / LearnCompleteLesson /
     LearnLessonLoaded / LearnHighlight / LearnAdvance / LearnAck /
     LearnTutorSpeak / LearnExemplarPlay / LearnExemplarStop /
-    LearnProgressState) → 70. Phase 97 adds SessionSetMode → 71.
-    Quick 260529-ifq adds WizardSetSkill (onboarding skill-level step) → 72.
+    LearnProgressState) → 70. B3 adds LearnLiveGrade → 71.
+    Phase 97 adds SessionSetMode → 72. Quick 260529-ifq adds
+    WizardSetSkill (onboarding skill-level step) → 73.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 72
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 73
 
 
 @pytest.mark.parametrize(
@@ -687,8 +698,8 @@ def test_schema_oneof_count_is_72() -> None:
     LearnStartLesson / LearnCompleteLesson / LearnLessonLoaded /
     LearnHighlight / LearnAdvance / LearnAck / LearnTutorSpeak /
     LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 70.
-    Phase 97 adds SessionSetMode → 71. Quick 260529-ifq adds WizardSetSkill
-    (onboarding skill-level step) → 72.
+    B3 adds LearnLiveGrade → 71. Phase 97 adds SessionSetMode → 72.
+    Quick 260529-ifq adds WizardSetSkill (onboarding skill-level step) → 73.
 
     ``definitions`` count grows alongside oneOf since every new wrapper
     adds one entry to both. ``LevelPair`` is a shared helper ref'd from
@@ -699,8 +710,8 @@ def test_schema_oneof_count_is_72() -> None:
     (``WizardSetSkill``'s payload is inlined, not a separate definition,
     so it adds 1 to both counts and the skew stays 2).
     """
-    assert len(_SCHEMA["oneOf"]) == 72
-    assert len(_SCHEMA["definitions"]) == 74
+    assert len(_SCHEMA["oneOf"]) == 73
+    assert len(_SCHEMA["definitions"]) == 75
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

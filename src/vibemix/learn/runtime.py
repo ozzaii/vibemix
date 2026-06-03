@@ -73,6 +73,7 @@ this class; we rely on:
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -128,6 +129,7 @@ from vibemix.ui_bus.learn_messages import (
     LearnCompleteLesson,
     LearnHighlight,
     LearnLessonLoaded,
+    LearnLiveGrade,
     LearnProgressState,
     LearnTeachingLoopPayload,
     LearnTeachingObservationPayload,
@@ -1663,18 +1665,36 @@ class LessonRuntime(StateMachine):
         if text is None:
             return
 
-        if verdict == self._last_beatmatch_live_grade_verdict:
-            return
-        self._last_beatmatch_live_grade_verdict = verdict
-
         citations: tuple[str, ...] = ()
         if result.credited:
             citations = (
                 f"[{BEATMATCH_EVIDENCE_SOURCE}:{BEATMATCH_GRADED_EVENT}@{result.t_session:.3f}]",
             )
+        citation = citations[0] if citations else None
+
+        phase_error = float(result.grade.phase_error_beats)
+        if not math.isfinite(phase_error):
+            phase_error = 0.0
+        phase_error = max(-0.5, min(0.5, phase_error))
+        score = float(result.grade.score)
+        if not math.isfinite(score):
+            score = 0.0
+        score = max(0.0, min(1.0, score))
 
         lesson_id = self._learn.current_lesson_id or "learn"
         try:
+            live_grade = LearnLiveGrade.make(
+                verdict=verdict,
+                phase_error_beats=phase_error,
+                score=score,
+                citation=citation,
+            ).to_dict()
+            self._ipc.emit(live_grade)
+
+            if verdict == self._last_beatmatch_live_grade_verdict:
+                return
+            self._last_beatmatch_live_grade_verdict = verdict
+
             speak = LearnTutorSpeak.make(
                 text=text,
                 tts_marker=f"{lesson_id}.grade",

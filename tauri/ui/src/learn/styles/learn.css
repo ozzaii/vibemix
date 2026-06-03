@@ -911,6 +911,110 @@
   }
 }
 
+/* --- Live beatmatch lock meter --- */
+.learn-live-meter-host {
+  position: fixed;
+  right: var(--sp-5);
+  top: calc(var(--titlebar-h) + var(--sp-4));
+  z-index: 22;
+  width: min(260px, calc(100vw - var(--sp-8)));
+  min-height: 0;
+  pointer-events: none;
+}
+
+#learn-root.lesson-mode .learn-live-meter-host {
+  top: calc(var(--titlebar-h) + 56px + var(--sp-4));
+}
+
+.learn-live-meter {
+  display: grid;
+  grid-template-rows: 26px 96px 24px;
+  width: 100%;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(180deg, rgba(18, 20, 28, 0.92), rgba(4, 5, 9, 0.88)),
+    rgba(0, 0, 0, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.64);
+  color: var(--silk);
+  opacity: 0.74;
+  transform: translateZ(0);
+  transition: opacity var(--motion-snap) ease-out,
+              border-color var(--motion-snap) ease-out;
+}
+
+.learn-live-meter[data-state="active"] {
+  opacity: 1;
+  border-color: var(--amber-22);
+}
+
+.learn-live-meter[data-verdict="locked"] {
+  border-color: var(--silk-40);
+}
+
+.learn-live-meter__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3);
+  border-bottom: 1px solid var(--glass-edge);
+}
+
+.learn-live-meter__label,
+.learn-live-meter__verdict,
+.learn-live-meter__phase {
+  font-family: var(--type-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.learn-live-meter__label {
+  color: var(--silk-40);
+  font-size: 10px;
+}
+
+.learn-live-meter__verdict {
+  color: var(--amber-pale);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.learn-live-meter[data-verdict="locked"] .learn-live-meter__verdict {
+  color: var(--silk);
+}
+
+.learn-live-meter__canvas {
+  display: block;
+  width: 100%;
+  height: 96px;
+}
+
+.learn-live-meter__phase {
+  padding: 0 var(--sp-3);
+  color: var(--silk-65);
+  font-size: 10px;
+  line-height: 24px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 760px) {
+  .learn-live-meter-host {
+    right: var(--sp-3);
+    bottom: calc(var(--statusbar-h) + var(--sp-3));
+    top: auto;
+    width: min(240px, calc(100vw - var(--sp-6)));
+  }
+
+  #learn-root.lesson-mode .learn-live-meter-host {
+    top: auto;
+  }
+}
+
 /* --- Status bar (40px bottom rail) --- */
 .learn-status-bar {
   display: flex;

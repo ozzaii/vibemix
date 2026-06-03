@@ -42,6 +42,7 @@ from vibemix.ui_bus.learn_messages import (
     LearnExemplarStop,
     LearnHighlight,
     LearnLessonLoaded,
+    LearnLiveGrade,
     LearnProgressState,
     LearnStartCourse,
     LearnStartLesson,
@@ -128,6 +129,16 @@ from vibemix.ui_bus.messages import _VALIDATOR
             "ipc.learn.tutor_speak",
         ),
         (
+            LearnLiveGrade.make,
+            {
+                "verdict": "drifting",
+                "phase_error_beats": 0.125,
+                "score": 0.375,
+                "citation": None,
+            },
+            "ipc.learn.live_grade",
+        ),
+        (
             LearnExemplarPlay.make,
             {"track_id": "track_0001", "duration_s": 30.0, "gain_db": -12.0},
             "ipc.learn.exemplar_play",
@@ -209,9 +220,9 @@ def _load_schema() -> dict:
 
 
 def test_oneof_count_parity_matches_dataclass_count() -> None:
-    """13 Learn-prefixed $refs in the schema's oneOf list (2 P91 + 11 P92).
+    """14 Learn-prefixed $refs in the schema's oneOf list (2 P91 + 12 P92+).
 
-    Mirrors the overall count-parity gate, now 78 wrappers against 78
+    Mirrors the overall count-parity gate, now 73 wrappers against 73
     oneOf entries; this test slices that gate down to the Learn-only
     subset so a future Learn envelope cannot silently mask a Learn-side
     regression.
@@ -222,8 +233,8 @@ def test_oneof_count_parity_matches_dataclass_count() -> None:
         for entry in schema.get("oneOf", [])
         if "$ref" in entry and "Learn" in entry["$ref"]
     ]
-    assert len(learn_refs) == 13, (
-        f"expected 13 Learn $refs in schema oneOf (2 P91 + 11 P92), got "
+    assert len(learn_refs) == 14, (
+        f"expected 14 Learn $refs in schema oneOf (2 P91 + 12 P92+), got "
         f"{len(learn_refs)}: {[r.get('$ref') for r in learn_refs]!r}. "
         "If you added a P93+ envelope, update the expected count here."
     )
@@ -243,6 +254,7 @@ _P92_DEFINITION_NAMES: tuple[str, ...] = (
     "LearnAdvance",
     "LearnAck",
     "LearnTutorSpeak",
+    "LearnLiveGrade",
     "LearnExemplarPlay",
     "LearnExemplarStop",
     "LearnProgressState",

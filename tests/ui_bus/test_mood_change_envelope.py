@@ -126,9 +126,9 @@ def test_count_parity_holds_after_addition():
     runtime envelopes — LearnStartCourse / LearnStartLesson /
     LearnCompleteLesson / LearnLessonLoaded / LearnHighlight /
     LearnAdvance / LearnAck / LearnTutorSpeak / LearnExemplarPlay /
-    LearnExemplarStop / LearnProgressState). Phase 97 adds SessionSetMode
-    to 71. Quick 260529-ifq adds WizardSetSkill (onboarding skill-level
-    step) → 72. The check_ipc_schema.py
+    LearnExemplarStop / LearnProgressState). B3 adds LearnLiveGrade → 71.
+    Phase 97 adds SessionSetMode to 72. Quick 260529-ifq adds WizardSetSkill
+    (onboarding skill-level step) → 73. The check_ipc_schema.py
     invariant is what fails the CI build if either side regresses, so we
     assert it here directly. Introspection must filter on the ``type``
     field annotation starting with ``Literal["ipc.`` so nested
@@ -169,9 +169,9 @@ def test_count_parity_holds_after_addition():
     schema = json.loads(schema_path.read_text())
     oneof_count = len(schema["oneOf"])
 
-    assert wrapper_count == oneof_count == 72, (
+    assert wrapper_count == oneof_count == 73, (
         f"count parity violated: wrappers={wrapper_count} vs oneOf={oneof_count}; "
-        "expected both 72 after pruning stale library search IPC and debrief ghosts"
+        "expected both 73 after adding LearnLiveGrade"
     )
 
 

@@ -212,6 +212,9 @@
       "$ref": "#/definitions/LearnTutorSpeak"
     },
     {
+      "$ref": "#/definitions/LearnLiveGrade"
+    },
+    {
       "$ref": "#/definitions/LearnExemplarPlay"
     },
     {
@@ -2946,6 +2949,32 @@
             },
             "data_state": {"type": "string", "enum": ["active", "hint"]},
             "teaching_loop": {"$ref": "#/definitions/LearnTeachingLoop"}
+          }
+        }
+      }
+    },
+    "LearnLiveGrade": {
+      "$comment": "Sidecar → shell. Deterministic beatmatch grade tick for the Learn lock-meter HUD.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.live_grade"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verdict", "phase_error_beats", "score", "citation"],
+          "properties": {
+            "verdict": {"type": "string", "enum": ["locked", "drifting", "tempo_off", "trainwreck", "abstain"]},
+            "phase_error_beats": {"type": "number", "minimum": -0.5, "maximum": 0.5},
+            "score": {"type": "number", "minimum": 0, "maximum": 1},
+            "citation": {
+              "anyOf": [
+                {"type": "string", "pattern": "^\\[(track|exemplar|cue|ev|aud|midi|screen|mix|key|recall):.+\\]$"},
+                {"type": "null"}
+              ]
+            }
           }
         }
       }
