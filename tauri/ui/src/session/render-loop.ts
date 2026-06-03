@@ -374,7 +374,11 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       // ipc.settings.state, so the deck reflects the persisted value
       // instead of the prior hardcoded "INT".
       skill: skillFromSettings(s.settings.skill),
-      interaction: s.settings.mode === "coach" ? "COACH" : "HYPE",
+      // Persona is one axis, and `lens` is the field the live brain actually
+      // reads (hype -> hype mode, critique/tutor -> coach mode). Derive the
+      // deck readout from lens, not the now writer-less `mode`, so the deck
+      // never shows a persona the co-host is not running.
+      interaction: s.settings.lens === "hype" ? "HYPE" : "COACH",
       mood: moodFromSettings(s.settings.mood),
       voice: s.settings.voice,
       genre: s.settings.genre,

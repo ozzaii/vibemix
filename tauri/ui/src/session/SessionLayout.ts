@@ -1291,7 +1291,7 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     mounted.persona.dataset.mood = next.persona.mood;
     mounted.persona.setAttribute(
       "aria-label",
-      `co-host mood: ${next.persona.mood.toLowerCase()}. tap to cycle hype, teach, coach.`,
+      `co-host mood: ${next.persona.mood.toLowerCase()}. tap to cycle hype, coach, teach.`,
     );
   }
 
