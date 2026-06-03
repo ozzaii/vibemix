@@ -783,6 +783,7 @@ class AICoach:
                 "next_suggestion_voice_line",
                 "set_progress_voice_line",
                 "transition_verdict_voice_line",
+                "judge_evidence_line",
             ):
                 line = ev_extra.get(key)
                 if isinstance(line, str) and line.strip():
@@ -885,13 +886,14 @@ class AICoach:
                 "mix or output a single space to stay silent."
             )
         if t == "HEARTBEAT":
-            return (
-                "Steady stretch. ONE sharp observation about the SOUND right "
-                "now — groove, texture, what the track is doing musically. "
-                "No coaching advice unless recent_moves[8s] names a real move. "
+            return _with_grounded_receipts(
+                "Steady stretch. Turn what you hear into where the set should "
+                "go next — one forward read Kaan can act on: a move to set up, "
+                "a layer to bring in, or an energy to hold or lift. "
+                "Ground it in the audio you just heard. "
                 "If you cite, copy an exact bracket from grounding_refs; never "
                 "invent a timestamp from BPM/RMS values. "
-                "If there is no grounded sound read worth saying, output a single "
+                "If there is no grounded forward read worth interrupting for, output a single "
                 "space to stay silent."
             )
         # Phase 60-04 (HARMONIC-01) — CITED, NARRATE-ONLY clash fragment. The

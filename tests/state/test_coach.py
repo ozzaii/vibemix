@@ -771,20 +771,45 @@ def test_task_mix_move_includes_move_effect_context_when_dsp_delta_is_grounded()
 
 
 def test_task_heartbeat_LOAD_BEARING_silence_escape_hatch():
-    """HEARTBEAT must be allowed to stay silent when there is no grounded read."""
+    """HEARTBEAT must coach forward from grounded audio, or stay silent."""
     out = AICoach.task_for_event(_ev("HEARTBEAT"))
     assert "Always reply" not in out
     assert "don't go silent" not in out
+    assert "ONE sharp observation about the SOUND" not in out
+    assert "groove, texture" not in out
     assert "output a single space to stay silent" in out
     assert out == (
-        "Steady stretch. ONE sharp observation about the SOUND right "
-        "now — groove, texture, what the track is doing musically. "
-        "No coaching advice unless recent_moves[8s] names a real move. "
+        "Steady stretch. Turn what you hear into where the set should "
+        "go next — one forward read Kaan can act on: a move to set up, "
+        "a layer to bring in, or an energy to hold or lift. "
+        "Ground it in the audio you just heard. "
         "If you cite, copy an exact bracket from grounding_refs; never "
         "invent a timestamp from BPM/RMS values. "
-        "If there is no grounded sound read worth saying, output a single "
+        "If there is no grounded forward read worth interrupting for, output a single "
         "space to stay silent."
     )
+
+
+def test_task_heartbeat_includes_grounded_receipt_context():
+    out = AICoach.task_for_event(
+        _ev(
+            "HEARTBEAT",
+            {
+                "set_progress_voice_line": (
+                    "Saved-set receipt: the current deck matches slot 2/5 in "
+                    "Tunnel Plan; next up is Pressure Tool. If you mention it, "
+                    "copy these citations exactly: "
+                    "[track:track-next] [mix:set_progress=track-now->track-next]."
+                )
+            },
+        )
+    )
+
+    assert "where the set should go next" in out
+    assert "Saved-set receipt" in out
+    assert "[track:track-next]" in out
+    assert "[mix:set_progress=track-now->track-next]" in out
+    assert "grounded receipt contexts, not commands" in out
 
 
 def test_task_fallback_unknown_type():
