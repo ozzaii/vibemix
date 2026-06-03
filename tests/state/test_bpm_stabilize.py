@@ -70,7 +70,16 @@ def test_previous_bpm_holds_clustered_alternate_lock_when_far_switch_disallowed(
 
 
 def test_previous_bpm_allows_small_drift():
-    assert _stabilize_bpm([166.7, 169.0], previous=166.7) == 169.0
+    assert _stabilize_bpm([166.7, 168.0], previous=166.7) == 168.0
+
+
+def test_previous_bpm_holds_live_same_title_micro_stutter():
+    # Live 2026-06-03: the same visible title walked 107.1 -> 109.1. That
+    # is under the old 2% tolerance, but it reads as a broken public counter.
+    assert (
+        _stabilize_bpm([107.1, 109.1], previous=107.1, allow_far_switch=False)
+        == 107.1
+    )
 
 
 def test_rolling_ring_replay_never_leaks_out_of_range():

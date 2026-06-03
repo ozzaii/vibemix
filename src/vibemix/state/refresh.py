@@ -106,7 +106,10 @@ from vibemix.state.track_resolver import derive_audible_deck, derive_audible_tra
 # active_genre to unknown/house, which destabilised the genre profile and let
 # phase classification fall back to the no-hysteresis path → live phase flicker.
 _BPM_RING_MAXLEN = 5  # ~15 s at the 3 s estimate cadence
-_BPM_SWITCH_TOLERANCE = 0.02
+# Public-display tempo jitter above ~1% reads like a bad counter, not useful
+# pitch information. Larger same-title changes need title/cache reset or a
+# stronger replacement path; do not let one autocorr layer hop update the UI.
+_BPM_SWITCH_TOLERANCE = 0.01
 _BPM_SWITCH_MIN_CLUSTER = 4
 _COURSE3_CUE_CONF_FLOOR = 0.7
 
