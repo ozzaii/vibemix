@@ -9937,3 +9937,38 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/src/shell/shell.css tauri/ui/tests/learn/test_controller_detected_mounts_svg.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 69 - Settings Drawer Active Chrome
+
+Suggested commit: `fix(shell): mark settings active while open`
+
+Include:
+
+- `tauri/ui/src/shell/shell-store.ts`
+- `tauri/ui/src/shell/Sidebar.ts`
+- `tauri/ui/src/shell/DesktopShell.ts`
+- `tauri/ui/src/shell/app.ts`
+- `tauri/ui/tests/shell/settings-nav.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Settings control semantics, settings IPC/schema, Deck, Crate, Learn, Debrief,
+  packaging scripts, and broad shell layout. This package only makes the shell
+  chrome tell the truth when the Settings drawer is visible.
+
+Reason:
+
+- The exact signed app at `8da49374` opened Settings as a right drawer while
+  the sidebar still highlighted Debrief. The drawer model is useful because it
+  preserves the user's task surface behind settings, but the visible app chrome
+  contradicted the open module. Keep the stage on the last real surface, carry
+  a separate `settingsOpen` store bit, and let the sidebar use Settings as the
+  effective active row while the drawer is open.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/settings-nav.spec.ts tests/shell/shell.spec.ts tests/shell/command-palette.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- tauri/ui/src/shell/shell-store.ts tauri/ui/src/shell/Sidebar.ts tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/app.ts tauri/ui/tests/shell/settings-nav.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

@@ -72,7 +72,8 @@ export function createSidebar(store: ShellStore): HTMLElement {
   sidebar.append(collapse, brand, nav, foot);
 
   const render = (): void => {
-    const active = store.getState().activeSurface;
+    const state = store.getState();
+    const active = state.settingsOpen ? "settings" : state.activeSurface;
     for (const item of items) {
       item.el.setAttribute("aria-current", item.id === active ? "true" : "false");
     }

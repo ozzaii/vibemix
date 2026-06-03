@@ -97,10 +97,29 @@ describe("wireSettingsNav", () => {
 
     expect(settings.openSettings).toHaveBeenCalledTimes(1);
     expect(shell!.store.getState().activeSurface).toBe("crate");
+    expect(shell!.store.getState().settingsOpen).toBe(true);
+    expect(host.dataset.settings).toBe("open");
+    expect(
+      host.querySelector<HTMLElement>('.sb-nav-item[data-surface="settings"]')?.getAttribute(
+        "aria-current",
+      ),
+    ).toBe("true");
+    expect(
+      host.querySelector<HTMLElement>('.sb-nav-item[data-surface="crate"]')?.getAttribute(
+        "aria-current",
+      ),
+    ).toBe("false");
 
     settings.setOpen(false);
 
     expect(shell!.store.getState().activeSurface).toBe("crate");
+    expect(shell!.store.getState().settingsOpen).toBe(false);
+    expect(host.dataset.settings).toBe("closed");
+    expect(
+      host.querySelector<HTMLElement>('.sb-nav-item[data-surface="crate"]')?.getAttribute(
+        "aria-current",
+      ),
+    ).toBe("true");
 
     shell!.store.setActiveSurface("settings");
 
@@ -112,10 +131,17 @@ describe("wireSettingsNav", () => {
     shell!.store.setActiveSurface("settings");
     expect(settings.openSettings).toHaveBeenCalledTimes(1);
     expect(shell!.store.getState().activeSurface).toBe("deck");
+    expect(shell!.store.getState().settingsOpen).toBe(true);
 
     shell!.store.setActiveSurface("learn");
 
     expect(settings.closeSettings).toHaveBeenCalledTimes(1);
     expect(shell!.store.getState().activeSurface).toBe("learn");
+    expect(shell!.store.getState().settingsOpen).toBe(false);
+    expect(
+      host.querySelector<HTMLElement>('.sb-nav-item[data-surface="learn"]')?.getAttribute(
+        "aria-current",
+      ),
+    ).toBe("true");
   });
 });

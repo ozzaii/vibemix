@@ -100,6 +100,7 @@ export function wireSettingsNav(shell: MountedShell): () => void {
 
   if (prev === "settings") {
     openSettings();
+    shell.store.setSettingsOpen(true);
     restoringSettingsSurface = true;
     shell.store.setActiveSurface(lastNonSettings);
     restoringSettingsSurface = false;
@@ -107,13 +108,15 @@ export function wireSettingsNav(shell: MountedShell): () => void {
   }
 
   const unstore = shell.store.subscribe((model) => {
+    if (restoringSettingsSurface) return;
     if (model.activeSurface !== "settings") {
       lastNonSettings = model.activeSurface;
     }
     if (model.activeSurface === prev) return;
     if (model.activeSurface === "settings") {
-      openSettings();
       restoringSettingsSurface = true;
+      openSettings();
+      shell.store.setSettingsOpen(true);
       shell.store.setActiveSurface(lastNonSettings);
       restoringSettingsSurface = false;
       prev = lastNonSettings;
@@ -125,10 +128,12 @@ export function wireSettingsNav(shell: MountedShell): () => void {
   });
 
   const unsettings = subscribeSettingsUI((ui) => {
+    shell.store.setSettingsOpen(ui.open);
     if (!ui.open && shell.store.getState().activeSurface === "settings") {
       shell.store.setActiveSurface(lastNonSettings);
     }
   });
+  shell.store.setSettingsOpen(getSettingsUIState().open);
 
   return () => {
     unstore();

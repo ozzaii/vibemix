@@ -23,6 +23,7 @@ export type ConnectionState = "connected" | "reconnecting" | "disconnected";
 export interface ShellModel {
   collapsed: boolean;
   activeSurface: SurfaceId;
+  settingsOpen: boolean;
   activation: ActivationState;
   panelOpen: boolean;
   connection: ConnectionState;
@@ -77,6 +78,7 @@ export class ShellStore {
     this.model = {
       collapsed: persisted.collapsed ?? false,
       activeSurface: persisted.activeSurface ?? "deck",
+      settingsOpen: false,
       activation: "idle",
       panelOpen: false,
       connection: "disconnected",
@@ -119,6 +121,10 @@ export class ShellStore {
 
   setActiveSurface(activeSurface: SurfaceId): void {
     this.set({ activeSurface }, true);
+  }
+
+  setSettingsOpen(settingsOpen: boolean): void {
+    this.set({ settingsOpen });
   }
 
   setPanelOpen(panelOpen: boolean): void {

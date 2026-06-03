@@ -160,6 +160,7 @@ export function mountDesktopShell(host: HTMLElement, store: ShellStore = new She
     const model = store.getState();
     host.dataset.collapsed = String(model.collapsed);
     host.dataset.panel = model.panelOpen ? "open" : "closed";
+    host.dataset.settings = model.settingsOpen ? "open" : "closed";
     host.dataset.state = model.activation;
     host.dataset.conn = model.connection;
     host.dataset.surface = model.activeSurface;
