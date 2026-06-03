@@ -147,3 +147,63 @@ Real app proof:
 - Current source chat/build-set wall-clock is 180s, not 90s.
 - This follow-up raises the Codex MCP tool timeout from 60s to 120s and gives `inspect_candidates` a matching `BATCH_TOOL_CALL_TIMEOUT_S=120.0`; tiny tools keep the 30s dispatch budget.
 - No signed/package rebuild was performed in this loop; package status remains a separate release lane.
+
+## Follow-Up — Pre-Tool Stall Rescue (`0e39127d`)
+
+- Item: Viber could still spend the whole wall-clock before Codex reached the MCP tools.
+- SHA: `0e39127d fix(viber): rescue pre-tool codex stalls`
+- User value: a Pro/Studio user no longer waits through dead air when Codex stalls before the library engine; if no tool fires within 45s, structured set prep falls back to `auto_crate`, and candidate-search chat falls back to `discover_pool -> inspect_candidates` once.
+
+### By-Eye Artifact
+
+Real current-source chat run:
+
+```bash
+VIBEMIX_CODEX_ALLOW_SHELL=1 VIBEMIX_LOCAL_TTS=0 \
+VIBEMIX_OUTPUT_DEVICE='Multi-Output Device' \
+uv run python -m vibemix library chat \
+  "Find a handful of fast hardgroove candidates from my library and inspect their BPM, key, sections, and energy before you answer. Use one candidate inspection batch, keep it concise." \
+  --backend codex --json
+```
+
+Observed tool tape:
+
+```text
+[viber-tool] search_vibe ok fast hardgroove techno driving percussive 128 138; k=8; 5 tracks
+[viber-tool] inspect_candidates ok 5 tracks; 5 candidate inspections
+```
+
+Result: `stop_reason="model_done"`, `iterations=2`, five grounded `seen_track_ids`, no serial `get_track_features` / `get_track_sections` / `get_track_energy` loop, and no timeout.
+
+Real current-source set-prep run:
+
+```bash
+VIBEMIX_CODEX_ALLOW_SHELL=1 VIBEMIX_LOCAL_TTS=0 \
+VIBEMIX_OUTPUT_DEVICE='Multi-Output Device' \
+uv run python -m vibemix library build-set \
+  "peak-time 3 tracks 128-138 bpm" \
+  --curve peak_time --n-slots 3 --json
+```
+
+Observed tool tape:
+
+```text
+[viber-tool] discover_pool ok peak-time 128-138 bpm; bpm=128.0-138.0; k=15; 15 tracks; bpm_unknown=15/15
+[viber-tool] sequence_set ok peak_time; 15 tracks; slots=3; 4 candidates
+```
+
+Result: `stop_reason="created"`, playlist artifact `/Users/ozai/.cache/vibemix/playlists/peak-time-128-138-three-track-set-1780502414.m3u8`, no timeout.
+
+Live app safety check during proof: `ws://127.0.0.1:8765` status ticks showed `gemini=ok`, `livekit=ok`, `midi=1`, `voice=muted`; UI voice meter stayed `0`.
+
+### Gates
+
+- `uv run pytest -q tests/library/test_codex_curate.py` -> 94 passed.
+- `uv run pytest -q tests/library/test_codex_curate.py tests/library/test_setprep_tools.py tests/library/test_auto_crate.py` -> 134 passed.
+- `uv run ruff check src/vibemix/library/codex_curate.py tests/library/test_codex_curate.py tests/library/test_auto_crate.py` -> pass.
+- `git diff --check` -> pass.
+
+### Notes
+
+- The watchdog only applies to real `codex exec` runs in Viber chat/build-set. Once any MCP tool event appears, Codex keeps the normal 180s wall-clock.
+- Plain non-library chat still returns an honest timeout if Codex stalls; fallback is only for set-prep/candidate-discovery requests that can be grounded by existing library tools.
