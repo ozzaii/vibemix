@@ -28,6 +28,8 @@ from vibemix.prompts.matrix import (
     HYPE_BEGINNER,
     HYPE_INTERMEDIATE,
     HYPE_PRO,
+    SVEN_COACH_INTERMEDIATE,
+    SVEN_COACH_IDENTITY,
     build_parts_description,
     build_system_instruction,
 )
@@ -43,6 +45,8 @@ __all__ = [
     "HYPE_BEGINNER",
     "HYPE_INTERMEDIATE",
     "HYPE_PRO",
+    "SVEN_COACH_INTERMEDIATE",
+    "SVEN_COACH_IDENTITY",
     "NEGATIVE_PHRASES",
     "NEGATIVE_REGEX",
     "TurnHistory",

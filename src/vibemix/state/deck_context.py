@@ -2977,7 +2977,12 @@ def apply_live_claim_guard(
             reason="control_causality_without_moves",
             summary=summary,
         )
-    if not moves and _has_unsupported_no_move_coaching_advice(text):
+    event = str(event_type or "").strip().upper()
+    if (
+        not moves
+        and event == "PHASE"
+        and _has_unsupported_no_move_coaching_advice(text)
+    ):
         summary = _live_guard_summary(state, moves)
         return LiveClaimGuardResult(
             text=LIVE_COACHING_ADVICE_HELD_REPLY,
@@ -3041,6 +3046,26 @@ def apply_live_claim_guard(
         log_summary = summary + (
             f"; DSP deltas around the move: {delta_hint}" if delta_hint else ""
         )
+        names_observed_control = bool(_MOVE_EFFECT_CONTROL_RE.search(text))
+        move_read_supported = _move_read_supported_for_ai_coaching(
+            state,
+            moves,
+            effect_signals,
+            audio_capture_context=audio_capture_context,
+        )
+        if (
+            source_detail_reason is None
+            and names_observed_control
+            and move_read_supported
+            and (not causal_control_claim or texture_direction is None)
+        ):
+            return LiveClaimGuardResult(
+                text=text,
+                corrected=False,
+                policy="move_effect_ai_coaching_allowed",
+                reason="recent_move_ear_read",
+                summary=log_summary,
+            )
         return LiveClaimGuardResult(
             text=LIVE_MOVE_EFFECT_HELD_REPLY,
             corrected=True,
@@ -3119,6 +3144,21 @@ def apply_live_claim_guard(
                 summary=summary,
             )
 
+    if (
+        policy == "blocked"
+        and moves
+        and _MOVE_EFFECT_CONTROL_RE.search(text)
+        and _has_current_observed_eq_move(state, moves)
+        and not _has_unsupported_transition_coaching_advice(text)
+    ):
+        return LiveClaimGuardResult(
+            text=text,
+            corrected=False,
+            policy="observed_move_ai_coaching_allowed",
+            reason="midi_move_proves_control",
+            summary=_live_guard_summary(state, moves),
+        )
+
     if policy not in {"blocked", "watch_not_claim"}:
         return LiveClaimGuardResult(text=text, policy=policy, reason=reason)
     if not text.strip() or not outcome_claim:
@@ -3141,6 +3181,57 @@ def _move_effect_texture_claim_direction(text: str) -> str | None:
     if _MOVE_EFFECT_TEXTURE_ROSE_RE.search(text):
         return "rose"
     return None
+
+
+def _move_read_supported_for_ai_coaching(
+    state: MusicState,
+    moves: list[str] | tuple[str, ...],
+    effect_signals: list[str] | tuple[str, ...],
+    *,
+    audio_capture_context: dict[str, object] | None = None,
+) -> bool:
+    """Return True when a real EQ move has same-band audio evidence.
+
+    This is weaker than a causal verdict: direction does not have to match the
+    model's prediction. It is only permission for Sven to make an AI ear-read
+    about an observed control move, not permission to invent a transition,
+    source, deck, or hidden stem claim.
+    """
+    measured = _measured_band_directions(effect_signals)
+    if not measured:
+        return False
+    sample_rate = _move_effect_sample_rate(state, audio_capture_context)
+    labels = [_move_label(item) for item in moves]
+    labels = [label for label in labels if label]
+    for label in reversed(labels[-3:]):
+        canonical = canonical_eq_move(label)
+        if canonical is None:
+            continue
+        if not _eq_move_current_state_supports(state, label, canonical):
+            continue
+        predicted = predicted_band_gains(canonical, sample_rate)
+        for band, predicted_db in predicted.items():
+            if abs(float(predicted_db or 0.0)) < _MOVE_EFFECT_MIN_PREDICTED_DB:
+                continue
+            if band in measured:
+                return True
+    return False
+
+
+def _has_current_observed_eq_move(
+    state: MusicState,
+    moves: list[str] | tuple[str, ...],
+) -> bool:
+    for raw in moves:
+        label = _move_label(raw)
+        if not label:
+            continue
+        canonical = canonical_eq_move(label)
+        if canonical is None:
+            continue
+        if _eq_move_current_state_supports(state, label, canonical):
+            return True
+    return False
 
 
 def _judge_score_from_evidence_line(judge_evidence_line: str | None) -> float | None:

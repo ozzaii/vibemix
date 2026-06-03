@@ -8,10 +8,9 @@ Each cell must contain:
 - The <silence/> instruction.
 - ≥8 anchor phrases hand-crafted for that (skill, mode) register.
 
-Backward-compat invariant: build_system_instruction("intermediate", "hype")
-returns byte-identical to the existing vibemix.agent.persona.SYSTEM_INSTRUCTION
-(which is the v4 port from Phase 4). This keeps existing dj_cohost / persona
-tests green.
+Live default invariant: build_system_instruction("intermediate", "hype")
+starts with the bench-decided Sven identity and then appends the shared grammar
+and delivery contracts.
 """
 
 from __future__ import annotations
@@ -29,6 +28,7 @@ from vibemix.prompts.matrix import (
     HYPE_INTERMEDIATE,
     HYPE_PRO,
     MOOD_PERSONAS,
+    SVEN_COACH_INTERMEDIATE,
     TTS_TAGS,
     build_system_instruction,
 )
@@ -48,17 +48,14 @@ ANCHOR_PHRASES = {
         "this is the moment",
     ],
     ("intermediate", "hype"): [
-        # The intermediate-hype cell IS the v4 prompt. Its anchors are the
-        # phrasings v4 already shipped — pulled from the v4 vocabulary
-        # (drum/kick character, vibe words, scene-reference rules).
-        "STANDOUT ELEMENT",
-        "raw tunnel",
-        "303",
-        "warehouse-4am",
-        "scene references",
-        "Never assume a genre",
-        "kicks stepped on each other",
-        "that cut felt half-bar off",
+        "You're Sven",
+        "Kaan's DJ friend",
+        "YOUR EARS COME FIRST",
+        "COACH THE FORWARD",
+        "EARN YOUR SPECIFICS",
+        "recent_moves[8s]",
+        "ONE THING, TEASED",
+        "STAY IN CHARACTER",
     ],
     ("pro", "hype"): [
         "that EQ swap landed",
@@ -87,14 +84,14 @@ ANCHOR_PHRASES = {
         "tighten it next time",
     ],
     ("intermediate", "coach"): [
-        "kicks stepped on each other for a half-bar",
-        "EQ killed the lows too aggressively",
-        "build release missed the one",
-        "unsupported blend verdict — stay on sound",
-        "for a half-bar",
-        "killed the lows",
-        "missed the one",
-        "unsupported phrase verdict",
+        "you twisted that filter",
+        "ride it back",
+        "give it 8 bars",
+        "kill them a touch",
+        "the mids got crowded",
+        "bring the high EQ up",
+        "the low end opened up",
+        "next time",
     ],
     ("pro", "coach"): [
         "phrase ended on the 3",
@@ -191,18 +188,12 @@ def test_prompt_01_hype_intermediate_byte_identical_to_persona() -> None:
 
 
 def test_prompt_01_default_dispatch_is_intermediate_hype() -> None:
-    """build_system_instruction() with no args defaults to intermediate/hype
-    (preserves v4 persona body for existing callers — the citation-grammar
-    block is appended on top, but the v4 body stays byte-identical at the
-    HYPE_INTERMEDIATE constant level)."""
+    """build_system_instruction() with no args defaults to the decided Sven identity."""
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     out = build_system_instruction()
-    # Plan 18-03 — default appends grammar block; assert v4 body is the prefix
-    # AND the grammar block's signature substring (`[ev:`) is in the appended
-    # tail. Locks "v4 byte-identity preserved at the constant level + grammar
-    # block appended after."
     assert out.startswith(SYSTEM_INSTRUCTION)
+    assert "You're Sven" in out
     assert "[ev:" in out
 
 
@@ -221,8 +212,6 @@ def test_hype_prompt_does_not_reference_removed_phase_field() -> None:
     )
 
     assert not re.search(r"\bphase=", out)
-    assert "phase_age" in out
-    assert "phase_history" in out
 
 
 def test_hype_prompt_keeps_latency_safe_variety_rule() -> None:
@@ -236,12 +225,12 @@ def test_hype_prompt_keeps_latency_safe_variety_rule() -> None:
     )
 
     assert "Don't make every reaction past-tense" not in out
-    assert "present-tense claims" in out
-    assert "past-tense or timeless fragments" in out
+    assert "COACH THE FORWARD, NOT THE NOW" in out
+    assert "Past tense for what just happened" in out
 
 
-def test_hype_prompt_blocks_no_move_coaching_advice() -> None:
-    """No-move live proof can still describe sound, but must not prescribe fixes."""
+def test_hype_prompt_blocks_invented_no_move_hand_claims() -> None:
+    """No-move live proof can coach the music's direction, but must not invent a move."""
     out = build_system_instruction(
         "intermediate",
         "hype",
@@ -250,8 +239,9 @@ def test_hype_prompt_blocks_no_move_coaching_advice() -> None:
         include_tag_dsl=False,
     )
 
-    assert "do not give \"try next time\" coaching advice" in out
-    assert "Sound-only listener read or silence" in out
+    assert "When recent_moves[8s] is NONE" in out
+    assert "there was no move" in out
+    assert "never an imagined hand on the mixer" in out
 
 
 def test_hype_prompt_does_not_assume_kaans_genre() -> None:
@@ -266,7 +256,7 @@ def test_hype_prompt_does_not_assume_kaans_genre() -> None:
 
     assert "Kaan plays Hard Tek" not in out
     assert "Kaan plays" not in out
-    assert "Never assume a genre" in out
+    assert "A track / genre — only when track='X' (no unsure tag) or genre= is in the packet" in out
 
 
 def test_hype_prompt_requires_grounded_genre_for_scene_tags() -> None:
@@ -285,9 +275,8 @@ def test_hype_prompt_requires_grounded_genre_for_scene_tags() -> None:
         include_tag_dsl=False,
     )
 
-    assert "Genre/scene talk is allowed ONLY when the evidence packet shows `genre=<label>`" in out
-    assert "never infer a scene from mood words alone" in out
-    assert "If absent, do not guess a genre from mood/tempo alone" in out
+    assert "A track / genre — only when track='X' (no unsure tag) or genre= is in the packet" in out
+    assert "reaching for a specific you can't back makes you a liar" in out
     assert "the genre/style is fair game even without a track name" not in out.lower()
 
 
@@ -313,7 +302,7 @@ def test_new_prompt_cells_share_grounded_genre_rule(skill: str, mode: str) -> No
         ("intermediate", "hype", "HYPE_INTERMEDIATE"),
         ("pro", "hype", "HYPE_PRO"),
         ("beginner", "coach", "COACH_BEGINNER"),
-        ("intermediate", "coach", "COACH_INTERMEDIATE"),
+        ("intermediate", "coach", "SVEN_COACH_INTERMEDIATE"),
         ("pro", "coach", "COACH_PRO"),
     ],
 )
@@ -425,7 +414,7 @@ def test_prompt_01_each_new_cell_has_describe_before_infer(skill: str, mode: str
 def test_prompt_01_each_cell_has_past_tense_rule(skill: str, mode: str) -> None:
     """Every cell carries the past-tense framing rule (already in v4)."""
     body = build_system_instruction(skill, mode)
-    assert "past tense" in body, f"({skill},{mode}) missing past-tense rule"
+    assert "past tense" in body.lower(), f"({skill},{mode}) missing past-tense rule"
 
 
 @pytest.mark.parametrize("skill,mode", ALL_CELLS)
@@ -433,8 +422,11 @@ def test_prompt_01_each_cell_mentions_kaan_spoke_exception(skill: str, mode: str
     """Every cell carries the KAAN_SPOKE / MANUAL always-reply exception
     (already in v4 → backward compatible)."""
     body = build_system_instruction(skill, mode)
-    assert "KAAN_SPOKE" in body
-    assert "MANUAL" in body
+    if (skill, mode) == ("intermediate", "hype"):
+        assert "pressed his trigger or spoke to you" in body
+    else:
+        assert "KAAN_SPOKE" in body
+        assert "MANUAL" in body
 
 
 @pytest.mark.parametrize("skill,mode", NEW_CELLS)
@@ -468,17 +460,11 @@ def test_prompt_01_each_new_cell_includes_negative_dict_ban_list(skill: str, mod
 
 
 def test_prompt_01_hype_intermediate_carries_equivalent_substrate() -> None:
-    """HYPE_INTERMEDIATE (=v4 verbatim) carries the substrate semantically:
-    past-tense rule + KAAN_SPOKE exception are in v4. The literal `<silence/>`
-    token + literal 'describe what you HEAR' phrase + inline ban list live in
-    the NEW 5 cells; v4's protections fire via the post-hoc filter."""
-    assert "past tense" in HYPE_INTERMEDIATE
-    assert "KAAN_SPOKE" in HYPE_INTERMEDIATE
-    assert "MANUAL" in HYPE_INTERMEDIATE
-    # v4 equivalent of describe-before-infer
-    assert "React to what you HEAR" in HYPE_INTERMEDIATE
-    # v4 equivalent of <silence/> instruction
-    assert "reply with silence" in HYPE_INTERMEDIATE
+    """HYPE_INTERMEDIATE is the decided Sven identity and keeps the live substrate semantically."""
+    assert "past tense" in HYPE_INTERMEDIATE.lower()
+    assert "pressed his trigger or spoke to you" in HYPE_INTERMEDIATE
+    assert "YOUR EARS COME FIRST" in HYPE_INTERMEDIATE
+    assert "EARN YOUR SPECIFICS" in HYPE_INTERMEDIATE
 
 
 # ---------------------------------------------------------------------------
@@ -557,19 +543,12 @@ def test_p_grammar_block_appended_to_every_cell(skill: str, mode: str) -> None:
     assert CITATION_GRAMMAR_BLOCK in out, f"({skill},{mode}) missing CITATION_GRAMMAR_BLOCK"
 
 
-def test_q_v4_byte_identity_preserved_at_constant_level() -> None:
-    """Test Q — HYPE_INTERMEDIATE constant string is byte-identical to the v4
-    SYSTEM_INSTRUCTION (Phase 4 invariant + load-bearing IP per CLAUDE.md).
-    The grammar block + the Plan 20-02 fail-soft fragment + the Plan 41-04
-    TTS tag DSL block are appended via the dispatcher; the underlying
-    constant body is untouched. Triple opt-out
-    (include_citation_grammar=False + include_listening_fallback=False +
-    include_tag_dsl=False) returns byte-identical to the constant."""
+def test_q_default_identity_preserved_at_constant_level() -> None:
+    """Test Q — persona.SYSTEM_INSTRUCTION and HYPE_INTERMEDIATE share the decided identity."""
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
-    # Constant unchanged
+    assert "You're Sven" in HYPE_INTERMEDIATE
     assert HYPE_INTERMEDIATE == SYSTEM_INSTRUCTION
-    # Triple opt-out returns the constant byte-for-byte
     assert (
         build_system_instruction(
             "intermediate",
@@ -580,7 +559,6 @@ def test_q_v4_byte_identity_preserved_at_constant_level() -> None:
         )
         == HYPE_INTERMEDIATE
     )
-    # Default path is a strict superset (constant + grammar + fragment + tag DSL)
     default_out = build_system_instruction("intermediate", "hype")
     assert default_out.startswith(HYPE_INTERMEDIATE)
     assert len(default_out) > len(HYPE_INTERMEDIATE)
@@ -754,12 +732,7 @@ def test_invalid_skill_still_raises() -> None:
 
 
 def test_persona_system_instruction_still_byte_equal_to_hype_intermediate() -> None:
-    """persona.SYSTEM_INSTRUCTION === HYPE_INTERMEDIATE — byte-identity invariant.
-
-    Pins the v4-port contract through the Plan 20-02 dispatcher change. If the
-    persona opt-out drifts, the import-time assert in persona.py fires AND
-    this test fails — double safety net.
-    """
+    """persona.SYSTEM_INSTRUCTION === HYPE_INTERMEDIATE — decided identity invariant."""
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     assert SYSTEM_INSTRUCTION == HYPE_INTERMEDIATE
@@ -867,7 +840,7 @@ def test_prompt_62_psy_tripper_overlay_is_not_default(monkeypatch: pytest.Monkey
     monkeypatch.delenv("VIBEMIX_PROMPT_OVERLAY", raising=False)
     body = build_system_instruction("intermediate", "hype")
     assert "SADECE TÜRKÇE KONUŞ" not in body
-    assert "Respond in English." in body
+    assert "You're Sven" in body
 
 
 def test_prompt_63_psy_tripper_overlay_is_explicit_opt_in(

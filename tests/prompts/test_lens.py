@@ -42,10 +42,10 @@ from vibemix.state.evidence_registry import EvidenceRegistry, parse_citations
 _COACH_FRAGMENT = "post-mortem-anchored"
 _TEACHER_FRAGMENT = "framework-anchored"
 
-# The v4 hype default's stable opening — the byte-identity golden body. This is
+# The hype default's stable opening — the decided Sven identity body. This is
 # the HYPE_INTERMEDIATE cell (no {mood_persona} slot), so we grep its own text,
 # not a MOOD_PERSONAS fragment.
-_HYPE_DEFAULT_FRAGMENT = "Kaan's friend in his studio"
+_HYPE_DEFAULT_FRAGMENT = "You're Sven"
 
 # LENS-01 (Plan 02) + LENS-02 (Plan 03) have landed — all lens scaffolds are now
 # real-green; no remaining xfail-strict gates in this file.
@@ -57,7 +57,7 @@ _HYPE_DEFAULT_FRAGMENT = "Kaan's friend in his studio"
 
 
 def test_v4_golden_anchor_present() -> None:
-    """The default co-host cell exists today and carries the hype-man persona.
+    """The default co-host cell exists today and carries the decided Sven identity.
 
     This is the byte-identity anchor: ``build_lens_instruction("hype",
     "intermediate")`` (Plan 02) must resolve to THIS exact prompt. Documenting
@@ -66,7 +66,7 @@ def test_v4_golden_anchor_present() -> None:
     """
     out = build_system_instruction("intermediate", "hype")
     assert isinstance(out, str) and out.strip()
-    # The v4 hype default carries its own opening, not a MOOD_PERSONAS slot.
+    # The hype default carries its own opening, not a MOOD_PERSONAS slot.
     assert _HYPE_DEFAULT_FRAGMENT in out
     # Sanity: the coach-mode persona fragments really are the ones we grep for
     # in the critique/tutor lens-shape test below.
@@ -106,7 +106,7 @@ def test_lens_prompt_shape_per_lens() -> None:
     critique = build_lens_instruction("critique")
     tutor = build_lens_instruction("tutor")
 
-    # hype = the v4 HYPE_INTERMEDIATE cell (its own opening, no persona slot);
+    # hype = the HYPE_INTERMEDIATE cell (its own opening, no persona slot);
     # critique = coach cell w/ coach persona; tutor = coach cell w/ teacher persona.
     assert _HYPE_DEFAULT_FRAGMENT in hype
     assert _COACH_FRAGMENT in critique

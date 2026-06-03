@@ -14,11 +14,14 @@ from vibemix.audio import Levels
 
 
 def test_initial_state_zero() -> None:
-    """Fresh Levels has all three fields at 0.0."""
+    """Fresh Levels has all RMS and peak fields at 0.0."""
     lv = Levels()
     assert lv.music == 0.0
     assert lv.voice == 0.0
     assert lv.mic == 0.0
+    assert lv.music_peak == 0.0
+    assert lv.voice_peak == 0.0
+    assert lv.mic_peak == 0.0
 
 
 def test_update_music_int16_full_scale_yields_nonzero() -> None:
@@ -31,6 +34,7 @@ def test_update_music_int16_full_scale_yields_nonzero() -> None:
     lv.update_music(np.full(1024, 32767, dtype=np.int16))
     assert lv.music > 0.3, f"expected EMA > 0.3, got {lv.music}"
     assert lv.music < 0.5
+    assert lv.music_peak > 0.99
 
 
 def test_update_voice_bytes_path() -> None:
@@ -40,6 +44,7 @@ def test_update_voice_bytes_path() -> None:
     lv.update_voice(pcm)
     # rms_normalized = 16384/32768 = 0.5 → EMA: 0.5 * 0.5 = 0.25
     assert 0.2 < lv.voice < 0.3, f"expected 0.2-0.3, got {lv.voice}"
+    assert 0.49 < lv.voice_peak < 0.51
 
 
 def test_update_voice_empty_bytes_no_op() -> None:
@@ -59,6 +64,7 @@ def test_update_mic_float32_no_32768_divide() -> None:
     lv = Levels()
     lv.update_mic(np.full(480, 0.5, dtype=np.float32))
     assert 0.2 < lv.mic < 0.3, f"expected 0.2-0.3 (NOT ~7.6e-6), got {lv.mic}"
+    assert 0.49 < lv.mic_peak < 0.51
 
 
 def test_decay_voice_multiplies_by_0_7() -> None:
@@ -67,10 +73,12 @@ def test_decay_voice_multiplies_by_0_7() -> None:
     pcm = np.full(2048, 32767, dtype=np.int16).tobytes()
     lv.update_voice(pcm)  # set voice to a known nonzero value
     v0 = lv.voice
+    p0 = lv.voice_peak
     for _ in range(5):
         lv.decay_voice()
     expected = v0 * (0.7**5)
     assert abs(lv.voice - expected) < 0.01, f"expected ~{expected}, got {lv.voice}"
+    assert lv.voice_peak < p0
 
 
 def test_snapshot_returns_fresh_dict_not_view() -> None:
@@ -79,8 +87,11 @@ def test_snapshot_returns_fresh_dict_not_view() -> None:
     lv.update_music(np.full(1024, 32767, dtype=np.int16))
     snap = lv.snapshot()
     music_before = lv.music
+    music_peak_before = lv.music_peak
     snap["music"] = -999.0
+    snap["music_peak"] = -999.0
     assert lv.music == music_before
+    assert lv.music_peak == music_peak_before
 
 
 def test_update_music_int16_sine_known_rms() -> None:

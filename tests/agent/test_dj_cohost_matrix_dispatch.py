@@ -23,6 +23,7 @@ from vibemix.prompts.matrix import (
     HYPE_INTERMEDIATE,
     HYPE_PRO,
     MOOD_PERSONAS,
+    SVEN_COACH_INTERMEDIATE,
 )
 
 
@@ -132,7 +133,7 @@ def test_dispatch_02_default_equals_persona_system_instruction(
         # COACH_* templates carry a {mood_persona} placeholder (Phase 13-05).
         # The default mood ('hype-man') is substituted at dispatch time.
         ("beginner", "coach", _coach_rendered(COACH_BEGINNER)),
-        ("intermediate", "coach", _coach_rendered(COACH_INTERMEDIATE)),
+        ("intermediate", "coach", _coach_rendered(SVEN_COACH_INTERMEDIATE)),
         ("pro", "coach", _coach_rendered(COACH_PRO)),
     ],
 )

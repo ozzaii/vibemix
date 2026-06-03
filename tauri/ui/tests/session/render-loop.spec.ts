@@ -23,6 +23,7 @@ import {
 } from "../../src/session/state.js";
 import {
   defaultState,
+  meterLevelPct,
   mountSessionLayout,
   renderSessionFrame,
 } from "../../src/session/SessionLayout.js";
@@ -130,12 +131,19 @@ describe("renderSessionFrame — CSS variable hot path", () => {
     });
     renderSessionFrame(m, layout);
 
-    // "The Deck Speaks": the single master meter is smoothed (0.16 attack
+    // "The Deck Speaks": the single master meter is perceptually scaled then smoothed
     // from 0) and the foot readouts mirror the snapshot. LISTENING + grounded
     // + all inputs ok → live mode ("").
-    expect(m.meterFill.style.width).toBe("6.7%"); // 0.42*100*0.16
+    expect(m.meterFill.style.width).toBe("15.2%");
     expect(m.bpm.textContent).toBe("120.0");
     expect(m.root.dataset.mode).toBe("");
+  });
+
+  it("maps live RMS to a dB-style meter percentage", () => {
+    expect(meterLevelPct(0)).toBe(0);
+    expect(meterLevelPct(0.02)).toBeCloseTo(6.7, 1);
+    expect(meterLevelPct(0.18)).toBeCloseTo(70.4, 1);
+    expect(meterLevelPct(1.5)).toBe(100);
   });
 
   it("clamps out-of-range values to [0, 1]", () => {

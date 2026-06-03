@@ -1071,20 +1071,25 @@ class SessionLoop:
             music_rms = float(snap.get("music", 0.0))
             voice_rms = float(snap.get("voice", 0.0))
             mic_rms = float(snap.get("mic", 0.0))
+            music_peak = float(snap.get("music_peak", music_rms))
+            voice_peak = float(snap.get("voice_peak", voice_rms))
+            mic_peak = float(snap.get("mic_peak", mic_rms))
         else:
             music_rms = voice_rms = mic_rms = 0.0
+            music_peak = voice_peak = mic_peak = 0.0
         # Clamp to [0, 1] — schema constraint. EMA-smoothed RMS rarely
         # exceeds 1.0 but guard anyway so a numeric drift doesn't crash
         # the validator and bring the snapshot loop down.
         music_rms = max(0.0, min(1.0, music_rms))
         voice_rms = max(0.0, min(1.0, voice_rms))
         mic_rms = max(0.0, min(1.0, mic_rms))
-        # Peak is approximated as RMS for the structural ship — the
-        # real peak readers land in 12-04 alongside the cascade graph.
+        music_peak = max(0.0, min(1.0, music_peak))
+        voice_peak = max(0.0, min(1.0, voice_peak))
+        mic_peak = max(0.0, min(1.0, mic_peak))
         meters = MetersTriple(
-            music=LevelPair(rms=music_rms, peak=music_rms),
-            voice=LevelPair(rms=voice_rms, peak=voice_rms),
-            mic=LevelPair(rms=mic_rms, peak=mic_rms),
+            music=LevelPair(rms=music_rms, peak=music_peak),
+            voice=LevelPair(rms=voice_rms, peak=voice_peak),
+            mic=LevelPair(rms=mic_rms, peak=mic_peak),
         )
 
         # Cohost status — TALKING when AI voice meter is non-trivial,

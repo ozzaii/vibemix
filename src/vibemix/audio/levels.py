@@ -34,13 +34,19 @@ class Levels:
         self.music: float = 0.0
         self.voice: float = 0.0
         self.mic: float = 0.0
+        self.music_peak: float = 0.0
+        self.voice_peak: float = 0.0
+        self.mic_peak: float = 0.0
         self._lock = threading.Lock()
 
     def update_music(self, mono_int16: np.ndarray) -> None:
         """Update music EMA from int16 mono PCM. v4:264-267."""
-        rms = float(np.sqrt(np.mean(mono_int16.astype(np.float32) ** 2))) / 32768.0
+        arr = mono_int16.astype(np.float32)
+        rms = float(np.sqrt(np.mean(arr**2))) / 32768.0
+        peak = float(np.max(np.abs(arr))) / 32768.0 if arr.size else 0.0
         with self._lock:
             self.music = self.music * 0.6 + rms * 0.4
+            self.music_peak = max(self.music_peak * 0.82, peak)
 
     def update_voice(self, pcm_int16: bytes) -> None:
         """Update AI voice EMA from int16 mono PCM bytes. v4:269-275."""
@@ -48,21 +54,33 @@ class Levels:
             return
         arr = np.frombuffer(pcm_int16, dtype=np.int16).astype(np.float32)
         rms = float(np.sqrt(np.mean(arr**2))) / 32768.0
+        peak = float(np.max(np.abs(arr))) / 32768.0 if arr.size else 0.0
         with self._lock:
             self.voice = self.voice * 0.5 + rms * 0.5
+            self.voice_peak = max(self.voice_peak * 0.82, peak)
 
     def update_mic(self, samples_float: np.ndarray) -> None:
         """Update mic EMA from float32 samples (already in -1..1, no /32768 needed). v4:277-280."""
         rms = float(np.sqrt(np.mean(samples_float**2)))
+        peak = float(np.max(np.abs(samples_float))) if samples_float.size else 0.0
         with self._lock:
             self.mic = self.mic * 0.5 + rms * 0.5
+            self.mic_peak = max(self.mic_peak * 0.82, peak)
 
     def decay_voice(self) -> None:
         """Decay voice level by 0.7. Called from PlaybackQueue.pull on empty buffer. v4:282-284."""
         with self._lock:
             self.voice *= 0.7
+            self.voice_peak *= 0.82
 
     def snapshot(self) -> dict[str, float]:
         """Return a fresh dict of the current levels (safe to read concurrent with updates). v4:286-288."""
         with self._lock:
-            return {"music": self.music, "voice": self.voice, "mic": self.mic}
+            return {
+                "music": self.music,
+                "voice": self.voice,
+                "mic": self.mic,
+                "music_peak": self.music_peak,
+                "voice_peak": self.voice_peak,
+                "mic_peak": self.mic_peak,
+            }

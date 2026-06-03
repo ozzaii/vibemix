@@ -22,8 +22,24 @@ from vibemix.ui_bus.validator import validate_message
 
 
 class _FakeLevels:
-    def __init__(self, music: float, voice: float, mic: float) -> None:
-        self._snap = {"music": music, "voice": voice, "mic": mic}
+    def __init__(
+        self,
+        music: float,
+        voice: float,
+        mic: float,
+        *,
+        music_peak: float | None = None,
+        voice_peak: float | None = None,
+        mic_peak: float | None = None,
+    ) -> None:
+        self._snap = {
+            "music": music,
+            "voice": voice,
+            "mic": mic,
+            "music_peak": music if music_peak is None else music_peak,
+            "voice_peak": voice if voice_peak is None else voice_peak,
+            "mic_peak": mic if mic_peak is None else mic_peak,
+        }
 
     def snapshot(self) -> dict[str, float]:
         return dict(self._snap)
@@ -52,6 +68,7 @@ def test_snapshot_is_schema_valid_and_carries_fields():
     p = msg["payload"]
     # Meters
     assert p["meters"]["music"]["rms"] == 0.42
+    assert p["meters"]["music"]["peak"] == 0.42
     assert p["meters"]["voice"]["rms"] == 0.0
     assert p["meters"]["mic"]["rms"] == 0.01
     # BPM + track
@@ -66,6 +83,18 @@ def test_snapshot_is_schema_valid_and_carries_fields():
         "level": "yellow",
         "reason": None,
     }
+
+
+def test_snapshot_carries_real_level_peaks():
+    msg = _build_session_snapshot(
+        _FakeLevels(0.18, 0.04, 0.02, music_peak=0.61, voice_peak=0.12, mic_peak=0.09),
+        _fake_state(),
+    )
+    validate_message(msg)
+    p = msg["payload"]
+    assert p["meters"]["music"] == {"rms": 0.18, "peak": 0.61}
+    assert p["meters"]["voice"] == {"rms": 0.04, "peak": 0.12}
+    assert p["meters"]["mic"] == {"rms": 0.02, "peak": 0.09}
 
 
 def test_snapshot_carries_drop_prediction_as_bars():

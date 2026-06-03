@@ -122,13 +122,32 @@ class FakeMusicState:
 class FakeLevels:
     """Duck-typed Levels — only ``snapshot()`` is read."""
 
-    def __init__(self, *, music=0.2, voice=0.0, mic=0.0) -> None:
+    def __init__(
+        self,
+        *,
+        music=0.2,
+        voice=0.0,
+        mic=0.0,
+        music_peak=None,
+        voice_peak=None,
+        mic_peak=None,
+    ) -> None:
         self.music = music
         self.voice = voice
         self.mic = mic
+        self.music_peak = music if music_peak is None else music_peak
+        self.voice_peak = voice if voice_peak is None else voice_peak
+        self.mic_peak = mic if mic_peak is None else mic_peak
 
     def snapshot(self) -> dict[str, float]:
-        return {"music": self.music, "voice": self.voice, "mic": self.mic}
+        return {
+            "music": self.music,
+            "voice": self.voice,
+            "mic": self.mic,
+            "music_peak": self.music_peak,
+            "voice_peak": self.voice_peak,
+            "mic_peak": self.mic_peak,
+        }
 
 
 class FakeControllerState:
@@ -505,12 +524,13 @@ def test_snapshot_fallback_when_music_state_missing(fake_bus: FakeBus) -> None:
 def test_snapshot_with_music_state_audible(fake_bus: FakeBus) -> None:
     """Audible music + non-trivial voice → LISTENING/TALKING, grounded=true."""
     ms = FakeMusicState(audible=True, bpm=124.0, audible_track="Foo - Bar")
-    levels = FakeLevels(music=0.3, voice=0.0, mic=0.0)
+    levels = FakeLevels(music=0.3, voice=0.0, mic=0.0, music_peak=0.74)
     loop = SessionLoop(fake_bus, music_state=ms, levels=levels)
     payload_json = loop._build_snapshot().to_json()
     payload = json.loads(payload_json)["payload"]
     assert payload["cohost_status"] == "LISTENING"
     assert payload["grounded"] is True
+    assert payload["meters"]["music"] == {"rms": 0.3, "peak": 0.74}
     assert payload["bpm"] == 124.0
     assert payload["track"] == {"title": "Foo - Bar", "artist": None, "deck": "A"}
 

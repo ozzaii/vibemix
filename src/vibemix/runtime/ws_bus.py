@@ -662,10 +662,13 @@ def _build_session_snapshot(
     music_rms = max(0.0, min(1.0, float(snap.get("music", 0.0))))
     voice_rms = max(0.0, min(1.0, float(snap.get("voice", 0.0))))
     mic_rms = max(0.0, min(1.0, float(snap.get("mic", 0.0))))
+    music_peak = max(0.0, min(1.0, float(snap.get("music_peak", music_rms))))
+    voice_peak = max(0.0, min(1.0, float(snap.get("voice_peak", voice_rms))))
+    mic_peak = max(0.0, min(1.0, float(snap.get("mic_peak", mic_rms))))
     meters = MetersTriple(
-        music=LevelPair(rms=music_rms, peak=music_rms),
-        voice=LevelPair(rms=voice_rms, peak=voice_rms),
-        mic=LevelPair(rms=mic_rms, peak=mic_rms),
+        music=LevelPair(rms=music_rms, peak=music_peak),
+        voice=LevelPair(rms=voice_rms, peak=voice_peak),
+        mic=LevelPair(rms=mic_rms, peak=mic_peak),
     )
 
     grounded = bool(getattr(state, "audible", False))

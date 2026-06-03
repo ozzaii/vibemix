@@ -200,6 +200,8 @@ const IDLE_HERO_LINE = "Ready for the first move.";
 const METER_ATTACK = 0.16;
 const METER_PEAK_DECAY = 0.04;
 const METER_CEIL = 86;
+const METER_DB_FLOOR = -36;
+const METER_DB_CEIL = -6;
 
 const LAYOUT_CSS = `
   .vmx-session {
@@ -1377,9 +1379,10 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
 
   // --- master meter (smoothed; live only — held/recolored by CSS in silent/fault) ---
   if (mode === "") {
-    const target = clamp01(next.meters.music.rms) * 100;
+    const target = meterLevelPct(next.meters.music.rms);
     mounted.meterCur += (target - mounted.meterCur) * METER_ATTACK;
-    const lead = mounted.meterCur + 4;
+    const peakTarget = meterLevelPct(next.meters.music.peak ?? next.meters.music.rms);
+    const lead = Math.max(mounted.meterCur + 4, peakTarget);
     if (lead > mounted.meterPk) mounted.meterPk = lead;
     else mounted.meterPk += (lead - mounted.meterPk) * METER_PEAK_DECAY;
     const w = Math.min(mounted.meterCur, 100);
@@ -1601,6 +1604,13 @@ function clamp01(n: number): number {
   if (n < 0) return 0;
   if (n > 1) return 1;
   return n;
+}
+
+export function meterLevelPct(level: number): number {
+  const value = clamp01(level);
+  if (value <= 0) return 0;
+  const db = 20 * Math.log10(value);
+  return clamp01((db - METER_DB_FLOOR) / (METER_DB_CEIL - METER_DB_FLOOR)) * 100;
 }
 
 /** Mock-friendly default state for `?dev=session-mock` and tests. */
