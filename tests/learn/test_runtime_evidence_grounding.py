@@ -171,8 +171,17 @@ def test_runtime_grade_feedback_avoids_empty_compliments() -> None:
     source = (
         inspect.getsource(LessonRuntime._emit_live_beatmatch_grade)
         + inspect.getsource(LessonRuntime._emit_live_cue_placement_grade)
+        + inspect.getsource(LessonRuntime._recovery_drill_success_text)
     ).lower()
-    for token in ("nice", "great job", "awesome", "amazing", "congrats", "you got this"):
+    for token in (
+        "nice",
+        "good -",
+        "great job",
+        "awesome",
+        "amazing",
+        "congrats",
+        "you got this",
+    ):
         assert token not in source
 
 
@@ -768,7 +777,7 @@ def test_recovery_drill_bailout_actions_give_meaningful_credit(monkeypatch) -> N
     assert progress.skills["transitions"]["live_proof_count"] == 1
     tutor_texts = [payload["text"] for payload in _tutor_speak_payloads(runtime._ipc)]
     assert (
-        "Good - that filter sweep pulls deck B out, so deck A reads clean."
+        "that filter sweep pulls deck B out, so deck A reads clean."
         in tutor_texts
     )
     recovery_events = [

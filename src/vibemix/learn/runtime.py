@@ -1629,18 +1629,18 @@ class LessonRuntime(StateMachine):
         clean_deck = "A" if problem_deck == "B" else "B"
         if "filter" in bailout_label:
             return (
-                f"Good - that filter sweep pulls deck {problem_deck} out, so "
+                f"that filter sweep pulls deck {problem_deck} out, so "
                 f"deck {clean_deck} reads clean."
             )
         if "volume" in bailout_label:
             return (
-                f"Good - pulling deck {problem_deck} down removes the bad layer, "
+                f"pulling deck {problem_deck} down removes the bad layer, "
                 f"so deck {clean_deck} stays clean."
             )
         if "crossfader" in bailout_label:
-            return f"Good - that crossfader cut gets deck {problem_deck} out fast."
+            return f"that crossfader cut gets deck {problem_deck} out fast."
         return (
-            f"Good - echo-out gives deck {problem_deck} a clean exit instead of "
+            f"echo-out gives deck {problem_deck} a clean exit instead of "
             "letting it fight the mix."
         )
 
