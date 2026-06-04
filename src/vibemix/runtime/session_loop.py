@@ -55,7 +55,14 @@ from typing import Protocol
 import jsonschema
 
 from vibemix.audio import WS_HOST, WS_PORT
-from vibemix.runtime.config_store import ConfigStore, load_config, save_config
+from vibemix.runtime.config_store import (
+    ConfigStore,
+    brain_env_path,
+    brain_key_persisted,
+    load_config,
+    persist_brain_settings,
+    save_config,
+)
 from vibemix.runtime.drop_display import predicted_drop_bars
 from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.recordings_index import RecordingsIndex, run_retention_sweep
@@ -76,6 +83,7 @@ from vibemix.ui_bus.messages import (
     RecordingsUsage,
     SessionMute,
     SessionSnapshot,
+    SettingsBrainAck,
     SettingsState,
     StatusTick,
     TrackInfo,
@@ -268,6 +276,7 @@ class SessionLoop:
         # semantic layer (top-level surface vs persona attribute).
         self.bus.register_handler("ipc.session.set_mode", self._on_session_set_mode)
         self.bus.register_handler("ipc.settings.set", self._on_settings_set)
+        self.bus.register_handler("ipc.settings.set_brain", self._on_settings_set_brain)
         self.bus.register_handler("ipc.settings.get", self._on_settings_get)
         self.bus.register_handler("ipc.status.recheck", self._on_status_recheck)
         # Phase 15 Plan 03 — recording browser handlers. 3 inbound types
@@ -410,6 +419,66 @@ class SessionLoop:
     async def _on_settings_get(self, _msg: dict) -> None:
         """Reply to ``ipc.settings.get`` with the full ``ipc.settings.state``."""
         await self._emit_settings_state()
+
+    async def _on_settings_set_brain(self, msg: dict) -> None:
+        """Persist the live brain path and ack without echoing secrets."""
+        payload = msg.get("payload", {})
+        mode = payload.get("mode")
+        if mode not in ("direct", "proxy"):
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason="settings.set_brain rejected: mode must be 'direct' or 'proxy'",
+                        original_type="ipc.settings.set_brain",
+                    ).to_json()
+                )
+            )
+            return
+        raw_key = payload.get("gemini_api_key")
+        if raw_key is not None and not isinstance(raw_key, str):
+            await self.bus.emit(
+                json.loads(
+                    SettingsBrainAck.make(
+                        ok=False,
+                        mode=mode,
+                        key_set=brain_key_persisted(brain_env_path()),
+                        error="gemini_api_key must be a string when provided",
+                    ).to_json()
+                )
+            )
+            return
+
+        try:
+            key_set = persist_brain_settings(
+                self.config_store,
+                mode=mode,
+                gemini_api_key=raw_key.strip() if isinstance(raw_key, str) else None,
+                env_path=brain_env_path(),
+            )
+        except Exception as exc:
+            log.exception("settings.set_brain persist failed for mode=%r", mode)
+            await self.bus.emit(
+                json.loads(
+                    SettingsBrainAck.make(
+                        ok=False,
+                        mode=mode,
+                        key_set=brain_key_persisted(brain_env_path()),
+                        error=f"persist failed: {type(exc).__name__}",
+                    ).to_json()
+                )
+            )
+            return
+
+        await self.bus.emit(
+            json.loads(
+                SettingsBrainAck.make(
+                    ok=True,
+                    mode=mode,
+                    key_set=key_set,
+                    restart_required=True,
+                ).to_json()
+            )
+        )
 
     # ------------------------------------------------------------------
     # Phase 15 Plan 03 — recording browser handlers + retention sweep

@@ -26,8 +26,10 @@ from vibemix.runtime import config_store as cs_mod
 from vibemix.runtime.config_store import (
     ConfigStore,
     _default_hotkey,
+    brain_key_persisted,
     config_path,
     load_config,
+    persist_brain_settings,
     save_config,
 )
 
@@ -106,6 +108,32 @@ def test_round_trip_preserves_phase11_fields(tmp_path: Path) -> None:
     assert loaded.target_dj_app_hint == "djay"
     assert loaded.target_window_id == "win-12345"
     assert loaded.blackhole_install_seen is True
+
+
+def test_persist_brain_settings_writes_direct_key_without_clobbering_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "config.json"
+    env_path = tmp_path / ".env"
+    env_path.write_text("OTHER=1\nGEMINI_API_KEY=old-key\n", encoding="utf-8")
+    monkeypatch.setattr(cs_mod, "config_path", lambda: target)
+    cfg = ConfigStore()
+
+    key_set = persist_brain_settings(
+        cfg,
+        mode="direct",
+        gemini_api_key="AIza-test-new-key",
+        env_path=env_path,
+    )
+
+    assert key_set is True
+    assert brain_key_persisted(env_path) is True
+    assert cfg.llm_mode == "direct"
+    assert load_config(target).llm_mode == "direct"
+    lines = env_path.read_text(encoding="utf-8").splitlines()
+    assert "OTHER=1" in lines
+    assert lines.count("GEMINI_API_KEY=AIza-test-new-key") == 1
+    assert "GEMINI_API_KEY=old-key" not in lines
 
 
 def test_round_trip_preserves_unknown_keys(tmp_path: Path) -> None:

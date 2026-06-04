@@ -174,6 +174,7 @@ def test_register_handlers_covers_all_session_types(fake_bus: FakeBus) -> None:
     expected = {
         "ipc.session.mute",
         "ipc.settings.set",
+        "ipc.settings.set_brain",
         "ipc.settings.get",
         "ipc.status.recheck",
     }
@@ -382,6 +383,78 @@ def test_settings_set_failure_emits_ipc_error(fake_bus: FakeBus) -> None:
     assert len(errors) == 1
     assert errors[0]["payload"]["original_type"] == "ipc.settings.set"
     assert "mode" in errors[0]["payload"]["reason"]
+
+
+def test_settings_set_brain_direct_persists_key_and_acks_without_secret(
+    fake_bus: FakeBus,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    _redirect_config_path: Path,
+) -> None:
+    import vibemix.runtime.session_loop as session_loop_mod
+
+    env_path = tmp_path / ".env"
+    monkeypatch.setattr(session_loop_mod, "brain_env_path", lambda: env_path)
+    cfg = ConfigStore()
+    loop = SessionLoop(fake_bus, config_store=cfg)
+    loop.register_handlers()
+
+    _drive(
+        fake_bus,
+        {
+            "type": "ipc.settings.set_brain",
+            "ts": "2026-06-04T08:00:00+00:00",
+            "payload": {
+                "mode": "direct",
+                "gemini_api_key": "AIza-test-secret-value",
+            },
+        },
+    )
+
+    assert cfg.llm_mode == "direct"
+    assert json.loads(_redirect_config_path.read_text())["llm_mode"] == "direct"
+    assert "GEMINI_API_KEY=AIza-test-secret-value" in env_path.read_text()
+    acks = fake_bus.emitted_by_type("ipc.settings.brain_ack")
+    assert len(acks) == 1
+    assert acks[0]["payload"] == {
+        "ok": True,
+        "mode": "direct",
+        "key_set": True,
+        "restart_required": True,
+        "error": None,
+    }
+    assert "AIza-test-secret-value" not in json.dumps(fake_bus.emitted)
+
+
+def test_settings_set_brain_proxy_persists_mode_without_key_write(
+    fake_bus: FakeBus,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import vibemix.runtime.session_loop as session_loop_mod
+
+    env_path = tmp_path / ".env"
+    monkeypatch.setattr(session_loop_mod, "brain_env_path", lambda: env_path)
+    cfg = ConfigStore(llm_mode="direct")
+    loop = SessionLoop(fake_bus, config_store=cfg)
+    loop.register_handlers()
+
+    _drive(
+        fake_bus,
+        {
+            "type": "ipc.settings.set_brain",
+            "ts": "2026-06-04T08:00:00+00:00",
+            "payload": {"mode": "proxy", "gemini_api_key": "AIza-ignored"},
+        },
+    )
+
+    assert cfg.llm_mode == "proxy"
+    assert not env_path.exists()
+    ack = fake_bus.emitted_by_type("ipc.settings.brain_ack")[0]["payload"]
+    assert ack["ok"] is True
+    assert ack["mode"] == "proxy"
+    assert ack["key_set"] is False
+    assert "AIza-ignored" not in json.dumps(fake_bus.emitted)
 
 
 # ---------------------------------------------------------------------------

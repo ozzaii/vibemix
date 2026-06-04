@@ -152,6 +152,69 @@ def app_data_dir() -> Path:
     return _app_data_dir()
 
 
+def brain_env_path() -> Path:
+    """Return the per-user dotenv path used for direct-mode brain credentials."""
+    return _app_data_dir() / ".env"
+
+
+def _dotenv_key_present(path: Path, key: str) -> bool:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    prefix = f"{key}="
+    return any(line.startswith(prefix) and bool(line[len(prefix) :].strip()) for line in lines)
+
+
+def brain_key_persisted(path: Path | None = None) -> bool:
+    """True when the app dotenv has a persisted Gemini key value."""
+    return _dotenv_key_present(path or brain_env_path(), "GEMINI_API_KEY")
+
+
+def _write_dotenv_key(path: Path, key: str, value: str) -> None:
+    cleaned = value.strip()
+    if not cleaned:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        existing = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        existing = []
+    prefix = f"{key}="
+    lines = [line for line in existing if not line.startswith(prefix)]
+    lines.append(f"{key}={cleaned}")
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
+    os.replace(tmp, path)
+
+
+def persist_brain_settings(
+    store: ConfigStore,
+    *,
+    mode: str,
+    gemini_api_key: str | None = None,
+    env_path: Path | None = None,
+) -> bool:
+    """Persist the live brain mode and optional direct-mode Gemini key.
+
+    Returns whether a direct-mode key is persisted after the write. The key value
+    is never returned or logged by this module.
+    """
+    normalized_mode = mode.strip().lower()
+    if normalized_mode not in {"direct", "proxy"}:
+        raise ValueError("mode must be 'direct' or 'proxy'")
+    target_env = env_path or brain_env_path()
+    if normalized_mode == "direct" and gemini_api_key:
+        _write_dotenv_key(target_env, "GEMINI_API_KEY", gemini_api_key)
+    store.llm_mode = normalized_mode
+    save_config(store)
+    return brain_key_persisted(target_env)
+
+
 # ---------------------------------------------------------------------------
 # Config dataclass
 # ---------------------------------------------------------------------------
@@ -341,4 +404,13 @@ def save_config(store: ConfigStore, path: Path | None = None) -> Path:
     return store.save(path)
 
 
-__all__ = ["ConfigStore", "config_path", "load_config", "save_config"]
+__all__ = [
+    "ConfigStore",
+    "app_data_dir",
+    "brain_env_path",
+    "brain_key_persisted",
+    "config_path",
+    "load_config",
+    "persist_brain_settings",
+    "save_config",
+]
