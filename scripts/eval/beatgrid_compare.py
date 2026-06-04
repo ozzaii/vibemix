@@ -55,7 +55,6 @@ TORCH_FREE_CONTRACT = {
     "lazy_only_sites": [
         "src/vibemix/library/clap_engine.py:286 import torch",
         "src/vibemix/library/clap_engine.py:329 import torchaudio",
-        "src/vibemix/agent/moss_tts/__init__.py:8 import torch",
     ],
     "do_not_add": ["torch", "torchaudio", "onnxruntime", "beat-this", "rten", "ort"],
 }

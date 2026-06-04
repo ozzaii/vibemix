@@ -328,7 +328,7 @@ def _judge(evidence: str, line: str, key: str) -> dict:
 
 
 def _spoken_line_for_judge(model_line: str) -> str:
-    """Mirror the audience-facing text shape used by the live MOSS path."""
+    """Mirror the audience-facing text shape used by the live Chatterbox path."""
 
     if not model_line:
         return ""

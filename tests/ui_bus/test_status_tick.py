@@ -61,7 +61,7 @@ def test_voice_default_is_back_compat_null() -> None:
 
 
 def test_voice_muted_is_valid() -> None:
-    """The live session can report a muted local MOSS voice path."""
+    """The live session can report a muted local Chatterbox voice path."""
     msg = StatusTick.make(livekit="ok", gemini="ok", midi=1, screen="ok", voice="muted")
     d = json.loads(msg.to_json())
     assert d["payload"]["voice"] == "muted"

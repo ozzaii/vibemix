@@ -1,18 +1,18 @@
-# Retired Gemini TTS Tags — MOSS Live Voice Policy
+# Retired Gemini TTS Tags — Chatterbox Live Voice Policy
 
-vibemix's live co-host voice is **local MOSS-only**. The live product does not
+vibemix's live co-host voice is **local Chatterbox-only**. The live product does not
 route speech through Gemini TTS, OpenAI TTS, Cartesia, or any other cloud voice
 provider, and the old cloud-TTS router aliases are intentionally invalid.
 
 This page documents the retired Gemini TTS tag DSL so future work does not
 accidentally re-enable it. The constants still exist for compatibility tests and
-old prompt builders, but the live Sven/MOSS path opts out of the DSL.
+old prompt builders, but the live Sven/Chatterbox path opts out of the DSL.
 
 ## Current Live Contract
 
 | Surface | Contract |
 | --- | --- |
-| Voice source | `vibemix.agent.tts_chain.build_tts_chain(mode=...)` builds the single local `MossLocalTTS` provider. |
+| Voice source | `vibemix.agent.tts_chain.build_tts_chain(mode=...)` builds the single local `ChatterboxLocalTTS` provider. |
 | Live prompt | `DJCoHostAgent` calls `build_system_instruction(..., include_tag_dsl=False, include_audio_vibe_contract=True, include_coach_closing=True)`. |
 | Legacy tag cleanup | `vibemix.agent.emote_parser.strip_emote_tags` strips known voice tags before speech/transcript output. |
 | Router contract | `vibemix.llm.model_router.resolve(...)` has no product cloud-TTS route. |
@@ -57,19 +57,19 @@ when they need audio-grounding instructions.
 ## Do Not Re-Introduce
 
 Do not add a new provider fallback or router alias to make the old DSL "work"
-again. If MOSS is unavailable, the app should surface that voice is unavailable
+again. If Chatterbox is unavailable, the app should surface that voice is unavailable
 or start muted by design; it must not silently route speech to paid/cloud TTS.
 
 Do not use tags as a style-control substitute for better prompting. For live
 Sven, the correct path is grounded, English-only, citation-checked text flowing
-through the MOSS sanitizer, not bracket controls in the model output.
+through the Chatterbox voice path, not bracket controls in the model output.
 
 ## Source Of Truth
 
 | Layer | Path |
 | --- | --- |
-| MOSS-only TTS factory | `src/vibemix/agent/tts_chain.py` |
-| Proxy-mode MOSS shim | `src/vibemix/agent/proxy_client.py` |
+| Chatterbox-only TTS factory | `src/vibemix/agent/tts_chain.py` |
+| Proxy-mode Chatterbox shim | `src/vibemix/agent/proxy_client.py` |
 | Legacy tag parser/sanitizer | `src/vibemix/agent/emote_parser.py` |
 | Prompt matrix compatibility constants | `src/vibemix/prompts/matrix.py` |
 | Live prompt opt-out | `src/vibemix/agent/dj_cohost.py` |

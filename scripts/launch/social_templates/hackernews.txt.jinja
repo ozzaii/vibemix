@@ -10,7 +10,7 @@ It listens to your master output (BlackHole on mac; WASAPI loopback on Windows w
 
 **Anti-slop is the product:** reactions are tied to real events (BPM jumps, track changes, MIDI moves) via a Gemini-grounded evidence registry. The model has to cite what just happened before it speaks. If reactions feel scripted, late, or hallucinated, the product fails — that's the hard quality bar.
 
-**Stack:** Tauri (rust shell) + Python sidecar + FastAPI proxy. Gemini 3 Flash reasoning + local MOSS TTS. WaveSurfer for the live UI. No telemetry by default. Recordings and speech synthesis stay local.
+**Stack:** Tauri (rust shell) + Python sidecar + FastAPI proxy. Gemini 3 Flash reasoning + local Chatterbox TTS. WaveSurfer for the live UI. No telemetry by default. Recordings and speech synthesis stay local.
 
 **Open source:** Apache 2.0. The Bravoh-managed proxy is closed (rate-limits Gemini per install so we don't ship raw API keys — solved the "API key in distributed binary" problem).
 

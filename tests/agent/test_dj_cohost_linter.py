@@ -1232,7 +1232,7 @@ def test_bypass_emits_with_unverified_marker(mocker, tmp_path, capsys) -> None:
     chunks = _drive(agent)
 
     # Chunks ARE yielded under bypass, but citation atoms are still TTS-only
-    # stripped so MOSS does not read bracket receipts aloud.
+    # stripped so the voice path does not read bracket receipts aloud.
     assert chunks == ["unverified reply"]
     kinds = [k for k, _ in recorder.events]
     assert "citation_bypass" in kinds

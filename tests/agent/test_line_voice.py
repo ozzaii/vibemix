@@ -2,7 +2,7 @@
 """One-shot synth seam — drive the existing live TTS chain for a single line.
 
 The live co-host voice is a LiveKit ``tts.FallbackAdapter`` backed by the single
-MOSS provider. The viral auto-mix demo has no room: it knows every reaction line
+Chatterbox provider. The viral auto-mix demo has no room: it knows every reaction line
 ahead of time and needs each one as a finished PCM buffer to mix over the deck.
 ``synthesize_line`` drives that exact adapter's ``.synthesize(text)`` once and
 assembles the int16 frames into stereo float32 — reusing the live voice, not

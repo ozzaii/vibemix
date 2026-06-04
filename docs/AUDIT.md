@@ -26,7 +26,7 @@
 | `av` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `bidict` | 0.23.1 | see uv.lock | pyrekordbox transitive (declared explicitly per --no-deps recipe). Pure-Python. | 🟢 Green |  |
 | `construct` | 2.10.70 | see uv.lock | pyrekordbox transitive — ANLZ binary parser. Pure-Python. | 🟢 Green |  |
-| `google-genai` | 2.0.1 | see uv.lock | Gemini Live co-host brain/listening client. Product speech is local MOSS-only; library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build. | 🟢 Green |  |
+| `google-genai` | 2.0.1 | see uv.lock | Gemini Live co-host brain/listening client. Product speech is local Chatterbox-only; library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build. | 🟢 Green |  |
 | `httpx` | 0.28.1 | see uv.lock | HTTP client used by google-genai + livekit-agents transitives. | 🟢 Green |  |
 | `jsonschema` | 4.26.0 | see uv.lock | JSON-schema validation (IPC schema gate, dep_ratings_schema). Pure-Python. | 🟢 Green |  |
 | `keyring` | 25.7.0 | see uv.lock | Native macOS Keychain / Windows Credential Locker integration via pure-Python ctypes; no compile step. | 🟡 Yellow |  |
@@ -126,9 +126,9 @@ populates the dep-cull entries; future re-justifications append.
 
 **Action:** removed
 
-Removed from pyproject.toml and uv.lock after the MOSS-only TTS chain
+Removed from pyproject.toml and uv.lock after the Chatterbox-only TTS chain
 made the LiveKit OpenAI voice plugin unreachable. src/vibemix/agent/
-tts_chain.py builds only local MOSS, tests/agent/test_proxy_client.py
+tts_chain.py builds only local Chatterbox, tests/agent/test_proxy_client.py
 plus tests/agent/test_tts_chain.py assert it does not patch, import, or
 instantiate the OpenAI LiveKit TTS plugin, and direct OpenRouter brain
 streaming uses the first-party `openai` SDK rather than this LiveKit TTS

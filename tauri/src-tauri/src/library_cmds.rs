@@ -1265,7 +1265,7 @@ pub async fn library_stats(app: AppHandle) -> Result<Value, String> {
 /// `library_models` — local AI model status/install seam for setup UX.
 ///
 /// Status is offline (`library models --json`). Installing required assets may
-/// network (`library models --install required --json`) for CLAP + MOSS. CUE is
+/// network (`library models --install clap --json`) for CLAP. CUE is
 /// optional and installable only when an operator-hosted ONNX URL plus verified
 /// pins are configured. Returns the CLI's JSON payload even if the install
 /// failed, so the UI can show per-file errors instead of a generic invoke

@@ -63,13 +63,14 @@ Rust dependencies (see tauri/src-tauri/Cargo.toml)
 Vendored source and optional local model references
 ----------------------------------------------------------------------
 
-- OpenMOSS / MOSS-TTS-Nano — Apache 2.0  https://github.com/OpenMOSS/MOSS-TTS-Nano
-  vibemix vendors the torch-free ONNX CPU runtime wrapper in
-  src/vibemix/agent/moss_tts/ort_cpu_runtime.py.
-  The optional MOSS-TTS-Nano-100M-ONNX and MOSS-Audio-Tokenizer-Nano-ONNX
-  model trees are not bundled in the source tree or wheel by default; release
-  builds that host or bundle them must preserve Apache-2.0 attribution and
-  verify the archive URL, SHA-256, and byte size pins before shipping.
+- MLX-Audio — MIT  https://github.com/Blaizzy/mlx-audio
+  vibemix uses mlx-audio on Apple Silicon for local Chatterbox voice inference.
+- mlx-community/chatterbox-turbo-8bit — Apache 2.0
+  https://huggingface.co/mlx-community/chatterbox-turbo-8bit
+  vibemix may download/cache this Chatterbox Turbo 8-bit model for local voice
+  inference. Release bundles must preserve the upstream Apache-2.0 model
+  attribution and include the approved project-owned cohost_voice_ref.wav
+  reference clip only after rights review.
 
 ----------------------------------------------------------------------
 Clean-room algorithm references (no Mixxx source or binaries bundled)

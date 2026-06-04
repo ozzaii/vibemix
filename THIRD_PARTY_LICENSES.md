@@ -30,18 +30,19 @@ Repository: https://github.com/mixxxdj/mixxx
 The following third-party source or model references are used by local
 inference paths. Runtime dependency attributions still live in `NOTICE`.
 
-Upstream: OpenMOSS / MOSS-TTS-Nano
-License: Apache-2.0, as stated by the OpenMOSS source repository and the
-MOSS-TTS-Nano ONNX model cards.
-Source repository: https://github.com/OpenMOSS/MOSS-TTS-Nano
-ONNX model repository: https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Nano-100M-ONNX
-Companion codec repository:
-https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano-ONNX
+Upstream runtime: MLX-Audio
+License: MIT, as stated by the project repository.
+Source repository: https://github.com/Blaizzy/mlx-audio
+
+Upstream model: mlx-community/chatterbox-turbo-8bit
+License: Apache-2.0, as stated by the Hugging Face model card.
+Model repository: https://huggingface.co/mlx-community/chatterbox-turbo-8bit
 
 | vibemix file or asset | Treatment |
 | --- | --- |
-| `src/vibemix/agent/moss_tts/ort_cpu_runtime.py` | Vendored torch-free ONNX CPU runtime wrapper copied from OpenMOSS / MOSS-TTS-Nano under Apache-2.0. |
-| `MOSS-TTS-Nano-100M-ONNX` and `MOSS-Audio-Tokenizer-Nano-ONNX` model trees | Optional local model cache or release-hosted archive for local MOSS speech. They are not bundled in the source tree or wheel by default; any bundled or hosted release archive must preserve Apache-2.0 attribution and the archive URL/SHA/size release pins. |
+| `mlx-audio` Python package | Runtime dependency for Apple Silicon local Chatterbox voice inference. No source is vendored in this repository. |
+| `mlx-community/chatterbox-turbo-8bit` model cache | Optional local Hugging Face model cache for Chatterbox Turbo 8-bit inference. Release bundles must preserve Apache-2.0 attribution. |
+| `models/chatterbox/cohost_voice_ref.wav` | Project-owned/approved production reference voice clip bundled only by release tooling after rights review. |
 
 ## Maintenance Rule
 

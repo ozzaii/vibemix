@@ -45,7 +45,7 @@ _MODES = {m.name.lower(): m for m in TransitionMode}
 def _prerender_voice(texts: list[str], *, target_sr: int) -> dict[str, np.ndarray]:
     """Synthesize each unique reaction line in the LIVE co-host voice, once, up front.
 
-    Drives the exact local MOSS-only line voice via ``agent.line_voice`` and
+    Drives the exact local Chatterbox-only line voice via ``agent.line_voice`` and
     resamples each line to the deck rate so the audio
     callback can mix it sample-accurately. The reel is deterministic, so every line
     is known before audio starts — no mid-playback provider stall. Missing local
@@ -162,7 +162,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Load the repo-root .env for local runtime knobs. The voice chain is still
-    # MOSS-only; cloud TTS keys in .env must not become demo voice fallbacks.
+    # Chatterbox-only; cloud TTS keys in .env must not become demo voice fallbacks.
     try:
         from dotenv import load_dotenv
 

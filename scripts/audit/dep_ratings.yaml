@@ -18,7 +18,7 @@
 python:
   google-genai:
     rating: green
-    rationale: "Gemini Live co-host brain/listening client. Product speech is local MOSS-only; library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build."
+    rationale: "Gemini Live co-host brain/listening client. Product speech is local Chatterbox-only; library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build."
   httpx:
     rating: green
     rationale: "HTTP client used by google-genai + livekit-agents transitives."
@@ -240,9 +240,9 @@ decisions:
     target: livekit-plugins-openai
     action: removed
     rationale: |
-      Removed from pyproject.toml and uv.lock after the MOSS-only TTS chain
+      Removed from pyproject.toml and uv.lock after the Chatterbox-only TTS chain
       made the LiveKit OpenAI voice plugin unreachable. src/vibemix/agent/
-      tts_chain.py builds only local MOSS, tests/agent/test_proxy_client.py
+      tts_chain.py builds only local Chatterbox, tests/agent/test_proxy_client.py
       plus tests/agent/test_tts_chain.py assert it does not patch, import, or
       instantiate the OpenAI LiveKit TTS plugin, and direct OpenRouter brain
       streaming uses the first-party `openai` SDK rather than this LiveKit TTS

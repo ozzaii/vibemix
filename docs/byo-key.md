@@ -3,7 +3,7 @@
 
 vibemix's live co-host mode (`direct`) runs against your own Gemini key when
 `GEMINI_API_KEY` is set in the environment. This is only for the live Gemini
-reaction-planning path; speech remains local MOSS-only, library
+reaction-planning path; speech remains local Chatterbox-only, library
 embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex, so
 they do not need this key. This doc walks the BYO path end-to-end on macOS /
 Windows: where to get a key, where to put it, how to verify the client builds,

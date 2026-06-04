@@ -17,7 +17,7 @@ REQ-ID coverage:
   * LAT-01 — ModelRouter migration            : test_router_resolves_all_paths
   * LAT-02 — Caching cleanup + mutation hook  : test_cache_does_not_spawn_refresh_loop_task
                                                 + test_evidence_registry_triggers_cache_refresh
-  * LAT-03 — TTS routing retired              : product voice is local MOSS-only
+  * LAT-03 — TTS routing retired              : product voice is local Chatterbox-only
   * LAT-04 — LLM→TTS streaming pipe           : test_full_turn_streams_first_sentence_before_completion
   * LAT-05 — Embedding 2 GA migration         : test_embedding_probe_runs_at_boot_and_logs
   * LAT-06 — MRL 768-dim parity (probe)       : test_embedding_probe_runs_at_boot_and_logs

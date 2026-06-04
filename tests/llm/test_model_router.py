@@ -12,7 +12,7 @@ These tests pin the router contract:
   router path.
 - The OpenRouter brain path returns a namespaced ``google/gemini-*`` id and a
   ``None`` tier sentinel (they are not Gemini-API calls).
-- Product speech is local MOSS-only; retired Gemini/OpenRouter TTS aliases are
+- Product speech is local Chatterbox-only; retired Gemini/OpenRouter TTS aliases are
   not valid router paths.
 - Unknown paths raise ``RouterPathError`` and the message lists every valid
   path so the caller can self-diagnose.
@@ -64,7 +64,7 @@ def test_resolve_openrouter_live_coach_returns_namespaced_id_and_none_tier() -> 
     ["live_coach_tts", "live_coach_tts_fallback", "live_coach_tts_openrouter"],
 )
 def test_cloud_tts_router_paths_are_retired(path: str) -> None:
-    """MOSS is the product voice; cloud TTS survives only as explicit cost what-ifs."""
+    """Chatterbox is the product voice; cloud TTS survives only as explicit cost what-ifs."""
     with pytest.raises(RouterPathError):
         resolve(path)
 

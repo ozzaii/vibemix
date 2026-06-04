@@ -119,7 +119,7 @@ def run_live_replay_session(
         {
             "HOME": str(home_dir),
             "VIBEMIX_DEV_SIDECAR": "1",
-            "VIBEMIX_LOCAL_TTS": "0",
+            "VIBEMIX_TTS_ENGINE": "off",
             "VIBEMIX_REPLAY_SESSION": str(session_dir.resolve()),
             "VIBEMIX_WS_PORT": str(ws_port),
             "VIBEMIX_DEBRIEF_PORT": str(debrief_port),

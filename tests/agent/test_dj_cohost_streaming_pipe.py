@@ -184,7 +184,7 @@ def test_no_boundary_in_short_response_yields_after_stream(mocker, tmp_path) -> 
 
 
 def test_grounded_cue_payload_replaces_incomplete_stream_tail(mocker, tmp_path) -> None:
-    """An unfinished model sentence must not reach MOSS when a citable cue receipt exists."""
+    """An unfinished model sentence must not reach speech when a citable cue receipt exists."""
 
     agent, gen, recorder, state = _build_agent_legacy(mocker, tmp_path)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")

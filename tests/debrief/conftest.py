@@ -79,7 +79,7 @@ def sample_session_dir(
                 "started_at_iso": "2026-05-15T11:21:39.656+03:00",
                 "ended_at_iso": "2026-05-15T11:51:39.656+03:00",
                 "duration_s": 1800.0,
-                "voice": "MOSS",
+                "voice": "Chatterbox",
                 "mode": "live",
                 "genre": "house",
                 "user_level": "intermediate",

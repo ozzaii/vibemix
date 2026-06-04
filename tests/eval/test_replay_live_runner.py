@@ -111,7 +111,7 @@ def test_run_live_replay_session_sets_env_and_reports_pass(tmp_path: Path) -> No
     assert env["VIBEMIX_REPLAY_SESSION"] == str(session.resolve())
     assert env["VIBEMIX_WS_PORT"] == "19000"
     assert env["VIBEMIX_DEBRIEF_PORT"] == "19100"
-    assert env["VIBEMIX_LOCAL_TTS"] == "0"
+    assert env["VIBEMIX_TTS_ENGINE"] == "off"
     assert env["VIBEMIX_OUTPUT_DEVICE"] == "BlackHole 2ch"
     assert result.max_music == 0.249
     assert result.audible_seen is True

@@ -236,7 +236,7 @@ def test_load_non_dict_returns_defaults(tmp_path: Path) -> None:
 
 
 def test_load_legacy_cloud_voice_returns_moss_default(tmp_path: Path) -> None:
-    """Retired Gemini voice ids must not keep the MOSS picker in a no-op state."""
+    """Retired Gemini voice ids must not keep the stored voice in a no-op state."""
     target = tmp_path / "config.json"
     target.write_text(json.dumps({"voice": "kore"}))
 

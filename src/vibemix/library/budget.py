@@ -174,7 +174,7 @@ def project_monthly_cost(
 #   - cache-eligible paths carry a "cached_input" rate (90% discount on
 #     live_coach: 0.15 vs 1.50);
 #   - embedding paths have no cache → cached_input == input (the split
-#     degenerates to "all fresh", savings 0). Production TTS is local MOSS and
+#     degenerates to "all fresh", savings 0). Production TTS is local Chatterbox and
 #     no longer records a paid router path here.
 ROUTE_PRICING: dict[str, dict[str, float]] = {
     # path:            input,  output, cached_input  (USD per 1M tokens)

@@ -38,7 +38,7 @@ git clone https://github.com/ozzaii/vibemix.git
 cd vibemix
 
 # uv sync picks up Windows-only deps automatically via sys_platform markers.
-# --extra ai-local adds the local CLAP/CUE/MOSS ONNX runtime deps used by the
+# --extra ai-local adds the local CLAP/CUE runtime deps used by the
 # product path.
 uv sync --extra ai-local
 
@@ -53,11 +53,13 @@ Set-Content .env "GEMINI_API_KEY=your_key_here"
 
 If `uv run python` complains about a missing `pyaudiowpatch` wheel, run `uv pip install pyaudiowpatch` manually.
 
-## 4. Local MOSS voice model
+## 4. Local Chatterbox voice
 
-Sven's product voice is local MOSS only. There is no Cartesia, Gemini, OpenAI,
-or other cloud TTS fallback in the runtime. If the MOSS model is absent, the app
-must degrade as muted/unready rather than silently choosing a paid voice.
+Sven's product voice is local Chatterbox only. There is no Cartesia, Gemini,
+OpenAI, or other cloud TTS fallback in the runtime. Chatterbox currently renders
+through `mlx-audio` on Apple Silicon, so Windows source runs are expected to be
+voiceless until the Windows GPU backend follow-up lands. The app must degrade as
+muted/unready rather than silently choosing a paid voice.
 
 Check the local model state:
 
@@ -65,28 +67,23 @@ Check the local model state:
 uv run python -m vibemix library models --json
 ```
 
-Install required local models when your release/test environment provides the
-pinned MOSS archive metadata:
+The `chatterbox-voice` row reports the production reference clip and local
+engine availability. There is no Windows install target for the voice in this
+lane. Required setup from source installs CLAP only:
 
 ```powershell
-$env:VIBEMIX_MOSS_TTS_ARCHIVE_URL = "https://example.invalid/MOSS-TTS-Nano-100M-ONNX.zip"
-$env:VIBEMIX_MOSS_TTS_ARCHIVE_SHA256 = "<64-character lowercase sha256>"
-$env:VIBEMIX_MOSS_TTS_ARCHIVE_SIZE = "<archive byte count>"
-uv run python -m vibemix library models --install required --json
+uv run python -m vibemix library models --install clap --json
 ```
 
-Without those archive pins, the CLI reports the exact manual setup needed. The
-manual path is to place a complete `MOSS-TTS-Nano-100M-ONNX` directory in the
-vibemix cache, or point vibemix at it:
+On macOS Apple Silicon, release/dev builds place the approved reference clip at
+`~/.cache/vibemix/cohost_voice_ref.wav` or set:
 
 ```powershell
-$env:VIBEMIX_MOSS_TTS_DIR = "C:\path\to\MOSS-TTS-Nano-100M-ONNX"
-uv run python -m vibemix library models --json
+$env:VIBEMIX_CHATTERBOX_REF = "C:\path\to\cohost_voice_ref.wav"
 ```
 
-The required directory is the one containing `browser_poc_manifest.json`.
-Source installs need `onnxruntime` and `sentencepiece`; `uv sync --extra
-ai-local` installs both.
+That reference is still not enough for Windows speech until the Windows backend
+exists; it only makes the configuration state explicit.
 
 ## 5. Sample-rate calibration
 
@@ -120,7 +117,7 @@ Phase 9 expands this to a 10-controller library (DDJ-200, DDJ-400, DDJ-FLX6, Her
 
 ## 8. Troubleshooting
 
-- **Sven is silent / voice is unavailable** — run `uv run python -m vibemix library models --json` and inspect the `moss-tts` row. If `installed` is `false`, complete Section 4. This app does not fall back to cloud TTS.
+- **Sven is silent / voice is unavailable** — run `uv run python -m vibemix library models --json` and inspect the `chatterbox-voice` row. On Windows this is currently expected; the app does not fall back to cloud TTS.
 - **`WASAPI loopback device not found`** — confirm default playback device is set and not muted. Reboot may help after a driver install. Check via `uv run python -c "import pyaudiowpatch as pya; p = pya.PyAudio(); print(p.get_default_wasapi_loopback())"`.
 - **`SampleRateMismatchError`** — repeat Section 5 and set Default Format = 48000 Hz, 16-bit, Stereo.
 - **`pywin32 ImportError`** — re-run the `pywin32_postinstall.py -install` step from Section 3.

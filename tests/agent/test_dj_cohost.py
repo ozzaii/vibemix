@@ -2303,7 +2303,7 @@ def test_resolve_prompt_cell_cold_path_byte_identical(tmp_path, monkeypatch) -> 
     """With NO shared lens + default env, the live cell stays deterministic.
 
     REAL-GREEN co-host cold-path guard: when extra['lens'] is unset and no env
-    overrides, _resolve_prompt_cell must equal the MOSS-only live prompt shape:
+    overrides, _resolve_prompt_cell must equal the Chatterbox-only live prompt shape:
     default hype cell + grounding/audio contract, but no legacy Gemini-TTS tags.
     """
     import vibemix.runtime.config_store as cs_mod
