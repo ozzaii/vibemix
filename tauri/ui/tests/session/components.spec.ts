@@ -822,7 +822,7 @@ describe("SessionLayout", () => {
     });
 
     expect(root.querySelector(".vmx-now")?.textContent).toBe("Ready for the first move.");
-    expect(root.textContent).toContain("audio waiting · Sven ready · controller seen");
+    expect(root.textContent).toContain("audio waiting · co-host ready · controller seen");
     expect(root.textContent).toContain(
       "capture silent · Route DJ output into capture.",
     );
@@ -935,7 +935,7 @@ describe("SessionLayout", () => {
     mountSessionLayout(root, state);
 
     const rail = root.querySelector<HTMLElement>('[data-wire="session.idle-proof"]');
-    expect(root.textContent).toContain("audio hearing · Sven ready · controller seen");
+    expect(root.textContent).toContain("audio hearing · co-host ready · controller seen");
     expect(rail?.textContent).toContain("audiohearing");
     expect(
       rail
@@ -957,9 +957,9 @@ describe("SessionLayout", () => {
 
     const rail = root.querySelector<HTMLElement>('[data-wire="session.idle-proof"]');
     const controller = rail?.querySelector<HTMLElement>('[data-axis="controller"]');
-    expect(root.textContent).toContain("audio hearing · Sven ready · controller not proven");
+    expect(root.textContent).toContain("audio hearing · co-host ready · controller not proven");
     expect(root.textContent).toContain("screen proof ready · Move a control once, I will not guess.");
-    expect(root.textContent).toContain("Move the controller once. Sven waits for proof.");
+    expect(root.textContent).toContain("Move the controller once. The co-host waits for proof.");
     expect(controller?.textContent).toContain("controllerno motion");
     expect(controller?.dataset.state).toBe("warn");
   });
@@ -977,7 +977,7 @@ describe("SessionLayout", () => {
 
     mountSessionLayout(root, state);
 
-    expect(root.textContent).toContain("audio hearing · Sven ready · DDJ-FLX4 waiting");
+    expect(root.textContent).toContain("audio hearing · co-host ready · DDJ-FLX4 waiting");
     expect(root.textContent).toContain(
       "screen proof ready · DDJ-FLX4 waiting · Move mixer/deck control.",
     );
@@ -1010,7 +1010,7 @@ describe("SessionLayout", () => {
     expect(voice?.dataset.down).toBe("true");
     expect(voice?.dataset.actionable).toBe("false");
     expect(voice?.getAttribute("aria-label")).toBe("voice status muted");
-    expect(root.textContent).toContain("audio waiting · Sven voice muted · controller seen");
+    expect(root.textContent).toContain("audio waiting · voice muted · controller seen");
 
     renderSessionFrame(mounted, {
       ...defaultState(),

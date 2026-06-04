@@ -1502,12 +1502,12 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
       ? "audio connecting"
       : "audio checking";
   const ai = state.status.voice === "muted"
-    ? "Sven voice muted"
+    ? "voice muted"
     : state.status.gemini === "ok"
-      ? "Sven ready"
+      ? "co-host ready"
       : state.status.gemini === "down"
-        ? "Sven down"
-        : "Sven checking";
+        ? "co-host offline"
+        : "co-host checking";
   const controller = state.status.midi != null && state.status.midi > 0
     ? "controller seen"
     : state.status.midi === 0 && state.status.midiActivity === "connected_no_midi_traffic"
@@ -1583,8 +1583,8 @@ function idleProofNext(
     return midiProofNext(midiActivity, midiDevice);
   }
   return screen.state === "ok"
-    ? "Start playback. Sven will cite what lands."
-    : "Start playback. Sven waits for proof.";
+    ? "Start playback. The co-host cites what lands."
+    : "Start playback. The co-host waits for proof.";
 }
 
 function musicSignalActive(music: SessionState["meters"]["music"]): boolean {
@@ -1674,7 +1674,7 @@ function midiProofNext(
   if (midiActivity === "midi_events_no_moves") {
     return `${device} is visible. Move a deck control for proof.`;
   }
-  return "Move the controller once. Sven waits for proof.";
+  return "Move the controller once. The co-host waits for proof.";
 }
 
 function audioProof(
