@@ -98,7 +98,8 @@ def test_readme_has_faq_question(readme_text: str, question: str) -> None:
 
 
 def test_readme_has_bravoh_footer_with_utm(readme_text: str) -> None:
-    assert "altidus.world/vibemix?utm_source=github" in readme_text
+    assert "bravoh.ai/vibemix?utm_source=github" in readme_text
+    assert "https://altidus.world/vibemix" not in readme_text
 
 
 def test_readme_has_install_section(readme_text: str) -> None:

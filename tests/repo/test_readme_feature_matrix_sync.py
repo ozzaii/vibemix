@@ -98,8 +98,10 @@ def test_feature_matrix_excludes_v0_and_v2_0_phases():
 def test_bravoh_footer_link_present_and_active():
     """Bravoh funnel link (with utm_*) must be present in README footer."""
     body = README.read_text(encoding="utf-8")
-    # Must contain the altidus.world link with utm campaign attribution.
-    assert "altidus.world" in body, "Bravoh footer link missing"
+    # Public README traffic now lands on the Bravoh funnel. The internal
+    # api.altidus.world proxy references may remain in privacy/FAQ copy, so this
+    # gate pins the exact marketing URL instead of a broad domain substring.
+    assert "bravoh.ai/vibemix?utm_source=github" in body, "Bravoh footer link missing"
     assert "utm_source=github" in body, (
         "Bravoh footer link missing utm_source=github attribution"
     )
@@ -112,7 +114,7 @@ def test_bravoh_footer_appears_after_feature_matrix():
     """Sanity: the footer link comes after the feature matrix block."""
     body = README.read_text(encoding="utf-8")
     matrix_end = body.find("<!-- AUTO-GEN: feature-matrix END -->")
-    footer_idx = body.find("altidus.world/vibemix?utm_source=github")
+    footer_idx = body.find("bravoh.ai/vibemix?utm_source=github")
     assert matrix_end != -1 and footer_idx != -1
     assert footer_idx > matrix_end, (
         "Bravoh footer must appear after the feature-matrix block"
