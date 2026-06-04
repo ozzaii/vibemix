@@ -270,7 +270,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
 
     const rail = root.querySelector<HTMLElement>('[data-wire="session.idle-proof"]');
     expect(rail?.hidden).toBe(false);
-    expect(rail?.textContent).toContain("audioarmed");
+    expect(rail?.textContent).toContain("audiowaiting");
     expect(rail?.textContent).toContain("svenready");
     expect(rail?.textContent).toContain("controllerseen");
     expect(rail?.textContent).toContain("proofunavailable");

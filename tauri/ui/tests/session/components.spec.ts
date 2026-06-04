@@ -788,11 +788,32 @@ describe("SessionLayout", () => {
     });
 
     expect(root.querySelector(".vmx-now")?.textContent).toBe("Ready for the first move.");
-    expect(root.textContent).toContain("audio armed · Sven ready · controller seen");
+    expect(root.textContent).toContain("audio waiting · Sven ready · controller seen");
     expect(root.textContent).toContain(
       "screen proof unavailable · Start playback, I will not guess.",
     );
     expect(root.textContent).not.toContain("listening for the mix");
+  });
+
+  it("renders audible capture as hearing, not merely armed", () => {
+    const root = host();
+    const state = defaultState();
+    state.meters.music = { rms: 0.08, peak: 0.14 };
+    state.status.livekit = "ok";
+    state.status.gemini = "ok";
+    state.status.midi = 1;
+    state.status.screen = "ok";
+
+    mountSessionLayout(root, state);
+
+    const rail = root.querySelector<HTMLElement>('[data-wire="session.idle-proof"]');
+    expect(root.textContent).toContain("audio hearing · Sven ready · controller seen");
+    expect(rail?.textContent).toContain("audiohearing");
+    expect(
+      rail
+        ?.querySelector<HTMLElement>('[data-axis="audio"]')
+        ?.dataset.state,
+    ).toBe("ok");
   });
 
   it("shows a passive voice status only when the local voice engine is muted", () => {
@@ -819,7 +840,7 @@ describe("SessionLayout", () => {
     expect(voice?.dataset.down).toBe("true");
     expect(voice?.dataset.actionable).toBe("false");
     expect(voice?.getAttribute("aria-label")).toBe("voice status muted");
-    expect(root.textContent).toContain("audio armed · Sven voice muted · controller seen");
+    expect(root.textContent).toContain("audio waiting · Sven voice muted · controller seen");
 
     renderSessionFrame(mounted, {
       ...defaultState(),

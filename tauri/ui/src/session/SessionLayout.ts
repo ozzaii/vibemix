@@ -1469,7 +1469,9 @@ function setGhostText(el: HTMLElement, text: string): void {
 
 function idleReadinessLines(state: SessionState): { inputs: string; action: string } {
   const audio = state.status.livekit === "ok"
-    ? "audio armed"
+    ? musicSignalActive(state.meters.music)
+      ? "audio hearing"
+      : "audio waiting"
     : state.status.livekit === "connecting"
       ? "audio connecting"
       : "audio checking";
@@ -1502,7 +1504,7 @@ type IdleProofState = "ok" | "warn" | "fault";
 
 function setIdleProof(mounted: Mounted, state: SessionState): void {
   mounted.idleProof.hidden = false;
-  const audio = livekitProof(state.status.livekit);
+  const audio = audioProof(state.status.livekit, state.meters.music);
   const sven = svenProof(state.status.gemini, state.status.voice);
   const controller = controllerProof(state.status.midi);
   const screen = screenProof(state.status.screen);
@@ -1525,11 +1527,22 @@ function setIdleCell(
   if (cell && cell.dataset.state !== proof.state) cell.dataset.state = proof.state;
 }
 
-function livekitProof(status: SessionState["status"]["livekit"]): {
+function musicSignalActive(music: SessionState["meters"]["music"]): boolean {
+  return Math.max(music.rms || 0, music.peak || 0) > 0.015;
+}
+
+function audioProof(
+  status: SessionState["status"]["livekit"],
+  music: SessionState["meters"]["music"],
+): {
   label: string;
   state: IdleProofState;
 } {
-  if (status === "ok") return { label: "armed", state: "ok" };
+  if (status === "ok") {
+    return musicSignalActive(music)
+      ? { label: "hearing", state: "ok" }
+      : { label: "waiting", state: "warn" };
+  }
   if (status === "down") return { label: "dropped", state: "fault" };
   if (status === "connecting") return { label: "connecting", state: "warn" };
   return { label: "checking", state: "warn" };
