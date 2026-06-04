@@ -103,7 +103,11 @@ from vibemix.library.prepared_pool import (
 )
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
-from vibemix.platform._audio_replay import maybe_wrap_replay_audio_backend
+from vibemix.platform._audio_replay import (
+    maybe_wrap_replay_audio_backend,
+    maybe_wrap_replay_midi_backend,
+    maybe_wrap_replay_track_backend,
+)
 from vibemix.profile import load_consent, load_profile, render_profile_for_cache
 from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
 from vibemix.runtime.cancel import CancelGate
@@ -1366,7 +1370,9 @@ async def main() -> None:
     screen_macos = ScreenMacOS()
     deck_vision_capture_enabled = _deck_vision_capture_enabled()
     screen_available = deck_vision_capture_enabled and screen_macos.is_available()
-    midi_macos = MidiMacOS()
+    midi_macos = maybe_wrap_replay_midi_backend(MidiMacOS())
+    if hasattr(midi_macos, "midi_jsonl"):
+        print(f"-> replay MIDI tape: {midi_macos.midi_jsonl}")
     # MIDI trace hook — every de-duplicated controller move (button/fader/knob)
     # is forwarded to the tracer. Set on the shared controller_state so the
     # single-state hot-plug rebuild path (which mutates this object in place)
@@ -1383,7 +1389,9 @@ async def main() -> None:
 
     midi_mirror = MidiMirror(controller_state=midi_macos.controller_state)
     print("-> midi_mirror wired", file=sys.stderr)
-    track_macos = TrackMacOS()
+    track_macos = maybe_wrap_replay_track_backend(TrackMacOS())
+    if hasattr(track_macos, "track_info") and hasattr(track_macos.track_info, "nowplaying_jsonl"):
+        print(f"-> replay nowplaying: {track_macos.track_info.nowplaying_jsonl}")
     # Seed persona env BEFORE MusicState mood, context-cache construction, and
     # DJCoHostAgent instantiation. The Settings drawer persists these values in
     # ConfigStore; the prompt resolver reads the env at build time.
