@@ -96,8 +96,8 @@ describe("test_controller_detected_mounts_svg.test.ts (RENDER-01)", () => {
     try {
       const next = root.querySelector("#learn-booth-next") as HTMLElement;
       expect(next).not.toBeNull();
-      expect(root.querySelector("#learn-booth-course")?.textContent).toContain(
-        "Course 1 Anatomy",
+      expect(root.querySelector("#learn-booth-course")?.textContent).toBe(
+        "Course 1 · Anatomy",
       );
       expect(root.querySelector("#learn-booth-title")?.textContent).toBe(
         "opening dialog",

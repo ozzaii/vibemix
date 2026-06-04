@@ -194,24 +194,6 @@ describe("progress-list — rendering", () => {
     expect(retry?.querySelector(".vmx-progress-list__tag")).toBeNull();
   });
 
-  it("the lesson_id-head is rendered as the right-aligned mono label", () => {
-    const root = renderProgressList({
-      lessons: SAMPLE_LESSONS,
-      onPickLesson: () => {},
-    });
-    document.body.append(root);
-    const idLabels = Array.from(
-      root.querySelectorAll<HTMLElement>(".vmx-progress-list__lesson-id"),
-    ).map((el) => el.textContent);
-    expect(idLabels).toEqual([
-      "L1.01",
-      "L1.02",
-      "L1.03",
-      "L1.04",
-      "L2.01",
-      "L2.02",
-    ]);
-  });
 });
 
 describe("progress-list — pick + level", () => {

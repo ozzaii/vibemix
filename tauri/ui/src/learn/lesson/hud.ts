@@ -9,7 +9,8 @@
 //             — Saira wdth 85 wght 600 14px UPPERCASE 0.12em silk-65
 //             + progress dots row (6 px circles; pending=silk-22 outline,
 //               current=amber+glow-faint, completed=silk-65 solid)
-//   - RIGHT:  progress index (e.g. `L0.00 OF 1`)
+//   - RIGHT:  progress index (e.g. `2 OF 3`) — the lesson's position in
+//             the course, not the raw curriculum key
 //             — JetBrains Mono 11px UPPERCASE 0.18em silk-22
 //
 // Border-bottom 1px var(--glass-edge); NO panel fill — the cinematic
@@ -135,12 +136,12 @@ function courseDisplayFor(courseId: string): string {
 }
 
 /**
- * Format the right-region progress index.
+ * Format the right-region progress index as a plain `N OF M` position so
+ * the raw curriculum key (e.g. `L1.02`) never reaches user-facing copy —
+ * the title + course chip already carry the semantic name.
  *
- * - The lesson_id convention from the curriculum is `L<N>.<NN>-<slug>`
- *   (e.g. `L0.00-press-play`). We strip the `-<slug>` suffix to keep
- *   the index compact (the title + course chip already carry the
- *   semantic name).
+ * - The numerator is the 1-based position of the active lesson within the
+ *   dots row (the dot whose lesson_id matches, else the `current` dot).
  * - The denominator is the count of dots — for the P92 hello-world
  *   1-lesson course, this is `OF 1`; for the future 16-lesson Course 1
  *   it becomes `OF 16`.
@@ -150,7 +151,12 @@ function formatProgressIndex(
   dots: ReadonlyArray<LessonHudProgressDot>,
 ): string {
   const head = lessonId.split("-")[0] ?? lessonId;
-  return `${head.toUpperCase()} OF ${dots.length}`;
+  let position = dots.findIndex((dot) => dot.lesson_id === head);
+  if (position < 0) {
+    position = dots.findIndex((dot) => dot.status === "current");
+  }
+  const oneBased = position >= 0 ? position + 1 : Math.max(1, dots.length);
+  return `${oneBased} OF ${dots.length}`;
 }
 
 /**

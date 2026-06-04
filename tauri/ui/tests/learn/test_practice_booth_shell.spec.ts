@@ -137,14 +137,9 @@ describe("practice booth shell", () => {
       );
       expect(root.querySelector('[data-control-id="eq_hi:A"]')).not.toBeNull();
       expect(root.textContent).toContain("on-screen deck");
-      expect(root.querySelector(".learn-booth-brief")).toBeTruthy();
       expect(root.querySelector(".learn-booth-command")).toBeTruthy();
       expect(root.textContent).toContain("your move");
       expect(root.textContent).toContain("use the on-screen controls");
-      expect(root.textContent).toContain("do this");
-      expect(root.textContent).toContain("how i check");
-      expect(root.textContent).toContain("unlocks");
-      expect(root.textContent).toContain("next lesson");
     } finally {
       ws.close();
     }
@@ -676,121 +671,6 @@ describe("practice booth shell", () => {
         lesson_id: "L1.02",
         level: "fresh",
       });
-    } finally {
-      ws.close();
-    }
-  });
-
-  it("paints the booth earned path from skill wall progress only", () => {
-    const root = document.getElementById("learn-root") as HTMLElement;
-    const { ws } = mountLearnWindow(root);
-    try {
-      const earned = root.querySelector<HTMLElement>("#learn-booth-earned")!;
-      expect(earned.dataset.state).toBe("pending");
-      expect(
-        root.querySelector<HTMLElement>("#learn-booth-earned-summary")!.textContent,
-      ).toBe("waiting for progress");
-
-      window.dispatchEvent(
-        new CustomEvent("ipc.learn.progress_state", {
-          detail: {
-            action: "snapshot",
-            progress: {
-              schema_version: 1,
-              courses: {},
-              lessons: {},
-              skill_wall: [
-                {
-                  skill_id: "deck_control",
-                  stage: "locked",
-                  learn_fill: 0,
-                  competent: false,
-                  live_proof_count: 0,
-                  mastered: false,
-                  first_mastered_at: null,
-                  what_remains: "finish deck basics",
-                },
-                {
-                  skill_id: "beatmatching",
-                  stage: "locked",
-                  learn_fill: 0.25,
-                  competent: false,
-                  live_proof_count: 0,
-                  mastered: false,
-                  first_mastered_at: null,
-                  what_remains: "hold tempo for 16 bars",
-                },
-                {
-                  skill_id: "eq_mixing",
-                  stage: "locked",
-                  learn_fill: 0,
-                  competent: false,
-                  live_proof_count: 0,
-                  mastered: false,
-                  first_mastered_at: null,
-                  what_remains: "complete EQ lessons",
-                },
-                {
-                  skill_id: "harmonic_mixing",
-                  stage: "competent",
-                  learn_fill: 0.8,
-                  competent: true,
-                  live_proof_count: 0,
-                  mastered: false,
-                  first_mastered_at: null,
-                  what_remains: "prove it in a live set",
-                },
-                {
-                  skill_id: "transitions",
-                  stage: "locked",
-                  learn_fill: 0,
-                  competent: false,
-                  live_proof_count: 0,
-                  mastered: false,
-                  first_mastered_at: null,
-                  what_remains: "unlock course 2",
-                },
-                {
-                  skill_id: "phrasing_performance",
-                  stage: "locked",
-                  learn_fill: 0,
-                  competent: false,
-                  live_proof_count: 0,
-                  mastered: false,
-                  first_mastered_at: null,
-                  what_remains: "unlock course 3",
-                },
-              ],
-            },
-          },
-        }),
-      );
-
-      expect(earned.dataset.state).toBe("ready");
-      expect(
-        root.querySelector<HTMLElement>("#learn-booth-earned-summary")!.textContent,
-      ).toBe("1 competent");
-
-      const cells = Array.from(
-        root.querySelectorAll<HTMLElement>(".learn-booth-earned__cell"),
-      );
-      expect(cells).toHaveLength(6);
-      expect(cells.map((cell) => cell.dataset.stage)).toEqual([
-        "locked",
-        "locked",
-        "locked",
-        "competent",
-        "locked",
-        "locked",
-      ]);
-      expect(cells[3]?.textContent).toContain("Key");
-      expect(cells[3]?.getAttribute("aria-label")).toContain(
-        "prove it in a live set",
-      );
-      expect(
-        cells[3]?.querySelector<HTMLElement>(".learn-booth-earned__fill > i")
-          ?.style.width,
-      ).toBe("80%");
     } finally {
       ws.close();
     }

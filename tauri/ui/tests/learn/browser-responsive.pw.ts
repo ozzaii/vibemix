@@ -51,7 +51,6 @@ test.describe("Learn browser responsive shell", () => {
         "#learn-titlebar",
         "#learn-stage",
         "#learn-status-bar",
-        "#learn-footer",
       ];
       return shellSelectors
         .map((selector) => {

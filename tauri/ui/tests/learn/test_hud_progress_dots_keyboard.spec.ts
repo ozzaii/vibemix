@@ -100,7 +100,7 @@ describe("test_hud_progress_dots_keyboard.spec.ts (LESSON-02 a11y)", () => {
         "COURSE 1 · ANATOMY",
       );
       expect(root.querySelector(".learn-hud .progress-index")?.textContent).toBe(
-        "L1.02 OF 3",
+        "2 OF 3",
       );
     } finally {
       ws.close();

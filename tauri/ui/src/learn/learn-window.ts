@@ -35,7 +35,7 @@
 //
 //   window.addEventListener("ipc.learn.midi_position", ...)
 //      → pendingPositions = e.detail.positions (LWW under flood)
-//      → rAF drainer: stage.applyPositionFrame + status.pushLatency
+//      → rAF drainer: stage.applyPositionFrame
 
 import "./styles/learn.css";
 import { LearnWsClient } from "./ws-client.js";
@@ -96,25 +96,23 @@ import {
 } from "./lesson/operator-action.js";
 import { emitIpc } from "../ipc/client.js";
 
+// Trademark attribution (nominative fair use). The controller schematics this
+// window draws are likenesses of third-party hardware; the canonical notice is
+// kept in source for the legal posture but is no longer rendered as UI chrome
+// (it sat as a footer on every practice state, which is slop). The shipped copy
+// lives as an HTML comment in learn.html; the README carries the public version.
+//
+//   Visual representation for instructional use. DDJ-FLX4, XDJ-RX3, etc. are
+//   trademarks of AlphaTheta / Pioneer DJ. Inpulse is a trademark of Hercules.
+//   Numark is a trademark of inMusic Brands.
+//   vibemix is not affiliated with or endorsed by these manufacturers.
+
 interface ControllerDetectedPayload {
   connected: boolean;
   controller_id: string;
   display_name: string;
   port_name: string;
 }
-
-/**
- * Phase 97 / ONBOARD-07 + RENDER-08 — Trademark disclaimer copy (verbatim).
- *
- * Required to be present in two surfaces: the app's Learn-window footer
- * (this constant) AND the repo README's Trademarks section. The
- * `tests/learn/test_disclaimer_present.py` source-scan asserts both.
- * Do not paraphrase — the wording is the legal posture for nominative
- * fair use of the controller names + Pioneer / Hercules / Numark
- * trademarks the rendered SVGs reference.
- */
-export const TRADEMARK_DISCLAIMER =
-  "Visual representation for instructional use. DDJ-FLX4, XDJ-RX3, etc. are trademarks of AlphaTheta / Pioneer DJ. Inpulse is a trademark of Hercules. Numark is a trademark of inMusic Brands. vibemix is not affiliated with or endorsed by these manufacturers.";
 
 interface MidiPositionPayload {
   controller_id: string;
@@ -128,10 +126,6 @@ interface StatusTickPayload {
   payload?: {
     midi?: number;
   };
-}
-
-interface IpcEnvelopeMeta {
-  ts?: string;
 }
 
 interface Course3LensPayload {
@@ -296,27 +290,6 @@ const CONTROL_FEEDBACK_LABELS: Readonly<Record<string, string>> = {
   xfader: "blend move",
 };
 
-const EARNED_PATH_LABELS: Readonly<Record<string, string>> = {
-  deck_control: "Deck",
-  beatmatching: "Beat",
-  eq_mixing: "EQ",
-  harmonic_mixing: "Key",
-  transitions: "Blend",
-  phrasing_performance: "Phrase",
-};
-
-const EARNED_PATH_STAGE_LABELS: Readonly<Record<SkillWallRow["stage"], string>> = {
-  locked: "Locked",
-  competent: "Competent",
-  mastered: "Mastered",
-};
-
-const EARNED_PATH_GLYPHS: Readonly<Record<SkillWallRow["stage"], string>> = {
-  locked: "○",
-  competent: "◑",
-  mastered: "★",
-};
-
 /**
  * Module-level latest-frame holder (RESEARCH §Pitfall 6). Set on every
  * midi_position event; drained by the rAF callback. When the user
@@ -325,7 +298,6 @@ const EARNED_PATH_GLYPHS: Readonly<Record<SkillWallRow["stage"], string>> = {
  * paints exactly one frame per repaint slot.
  */
 let pendingPositions: Record<string, number> | null = null;
-let pendingEmitTs: number | null = null;
 
 /**
  * Frame-tracking guard (T-91-05-03 + §Pitfall 6): we also remember the
@@ -366,29 +338,6 @@ function mountLearnWindow(root: HTMLElement): {
         </strong>
       </div>
       <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">practice deck ready</div>
-      <dl class="learn-booth-brief" aria-label="practice brief">
-        <div>
-          <dt>do this</dt>
-          <dd id="learn-booth-target">first clean move</dd>
-        </div>
-        <div>
-          <dt>how i check</dt>
-          <dd id="learn-booth-brief-proof">I watch your on-screen controls</dd>
-        </div>
-        <div>
-          <dt>unlocks</dt>
-          <dd id="learn-booth-payoff">the next lesson</dd>
-        </div>
-      </dl>
-      <div id="learn-booth-earned" class="learn-booth-earned" data-state="pending" aria-label="earned path">
-        <div class="learn-booth-earned__head">
-          <span>earned path</span>
-          <strong id="learn-booth-earned-summary">waiting for progress</strong>
-        </div>
-        <ol id="learn-booth-earned-list" class="learn-booth-earned__list">
-          <li class="learn-booth-earned__empty">progress snapshot not received yet</li>
-        </ol>
-      </div>
       <button id="learn-start-recommended" class="learn-booth-primary" type="button">start practice</button>
       <button id="learn-open-map" class="learn-booth-secondary" type="button">choose lesson</button>
     </section>
@@ -412,7 +361,6 @@ function mountLearnWindow(root: HTMLElement): {
     </aside>
     <div id="learn-status-bar"></div>
     <div id="learn-sr-announcement" class="learn-sr-announcement" data-sr-region="tutor" aria-live="polite" aria-atomic="true"></div>
-    <footer id="learn-footer" class="learn-footer"></footer>
   `;
 
   const titlebar = new LearnTitlebar(
@@ -463,16 +411,6 @@ function mountLearnWindow(root: HTMLElement): {
   const boothProof = root.querySelector("#learn-booth-proof") as HTMLElement;
   const boothCommandText = root.querySelector("#learn-booth-command-text") as HTMLElement;
   const boothPulse = root.querySelector("#learn-booth-pulse") as HTMLElement;
-  const boothTarget = root.querySelector("#learn-booth-target") as HTMLElement;
-  const boothBriefProof = root.querySelector("#learn-booth-brief-proof") as HTMLElement;
-  const boothPayoff = root.querySelector("#learn-booth-payoff") as HTMLElement;
-  const boothEarned = root.querySelector("#learn-booth-earned") as HTMLElement;
-  const boothEarnedSummary = root.querySelector(
-    "#learn-booth-earned-summary",
-  ) as HTMLElement;
-  const boothEarnedList = root.querySelector(
-    "#learn-booth-earned-list",
-  ) as HTMLOListElement;
   const screenAction = root.querySelector("#learn-screen-action") as HTMLButtonElement;
   const openMapButton = root.querySelector("#learn-open-map") as HTMLButtonElement;
   const closeMapButton = root.querySelector("#learn-close-map") as HTMLButtonElement;
@@ -489,7 +427,6 @@ function mountLearnWindow(root: HTMLElement): {
   const liveMeterHost = root.querySelector("#learn-live-meter-host") as HTMLElement;
   const waveforms = WaveformDisplay(waveformHost);
   let latestProgress: LearnProgressProjection | null = null;
-  let latestSkillWall: SkillWallRow[] | null = null;
   let recommendedLessonId = firstRecommendedLessonId(latestProgress);
   let recommendedLessonLevel: "fresh" | "replay" = "fresh";
   let exemplarHideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -541,18 +478,15 @@ function mountLearnWindow(root: HTMLElement): {
     clearExemplarTimer();
     const track = shortTrackId(payload.track_id);
     const duration = Math.max(0, Math.round(payload.duration_s));
-    const gain = Number.isFinite(payload.gain_db)
-      ? payload.gain_db.toFixed(1)
-      : "0.0";
     exemplarChip.hidden = false;
     exemplarChip.dataset.active = "true";
     exemplarChip.removeAttribute("data-reason");
     exemplarLabel.textContent = "example playing";
     exemplarTrack.textContent = track;
-    exemplarMeta.textContent = `${duration}s at ${gain} dB`;
+    exemplarMeta.textContent = `${duration}s`;
     exemplarChip.setAttribute(
       "aria-label",
-      `example playing, ${track}, ${duration}s at ${gain} dB`,
+      `example playing, ${track}, ${duration}s`,
     );
   };
   const showExemplarStop = (payload: ExemplarStopPayload): void => {
@@ -571,52 +505,6 @@ function mountLearnWindow(root: HTMLElement): {
     exemplarHideTimer = setTimeout(() => {
       hideExemplarChip();
     }, 1400);
-  };
-  const renderEarnedPath = (rows: SkillWallRow[] | null): void => {
-    boothEarnedList.textContent = "";
-    if (!rows || rows.length === 0) {
-      boothEarned.dataset.state = "pending";
-      boothEarnedSummary.textContent = "waiting for progress";
-      const empty = document.createElement("li");
-      empty.className = "learn-booth-earned__empty";
-      empty.textContent = "progress snapshot not received yet";
-      boothEarnedList.appendChild(empty);
-      return;
-    }
-    boothEarned.dataset.state = "ready";
-    boothEarnedSummary.textContent = earnedPathSummary(rows);
-    rows.slice(0, 6).forEach((row) => {
-      const item = document.createElement("li");
-      item.className = "learn-booth-earned__cell";
-      item.dataset.stage = row.stage;
-      item.tabIndex = 0;
-      item.setAttribute(
-        "aria-label",
-        earnedPathAriaLabel(row),
-      );
-
-      const glyph = document.createElement("span");
-      glyph.className = "learn-booth-earned__glyph";
-      glyph.setAttribute("aria-hidden", "true");
-      glyph.textContent = EARNED_PATH_GLYPHS[row.stage];
-
-      const name = document.createElement("span");
-      name.className = "learn-booth-earned__name";
-      name.textContent = earnedPathName(row.skill_id);
-
-      const stageLabel = document.createElement("span");
-      stageLabel.className = "learn-booth-earned__stage";
-      stageLabel.textContent = EARNED_PATH_STAGE_LABELS[row.stage];
-
-      const fill = document.createElement("span");
-      fill.className = "learn-booth-earned__fill";
-      const fillBar = document.createElement("i");
-      fillBar.style.width = `${earnedPathFillPercent(row)}%`;
-      fill.appendChild(fillBar);
-
-      item.append(glyph, name, stageLabel, fill);
-      boothEarnedList.appendChild(item);
-    });
   };
   let ws: LearnWsClient | null = null;
   const emitLearnIpc = async (
@@ -717,7 +605,7 @@ function mountLearnWindow(root: HTMLElement): {
         : "screen";
     boothPanel.dataset.readiness = readiness;
     boothCourse.textContent = recommended
-      ? compactCourseLabel(recommended.course_label, recommended.lesson_id)
+      ? recommended.course_label
       : "Next lesson";
     boothTitle.textContent = recommended?.title ?? "pick a first lesson";
     boothProof.textContent = readinessProofLine(readiness, controllerDisplayName);
@@ -726,9 +614,6 @@ function mountLearnWindow(root: HTMLElement): {
       readiness,
       controllerDisplayName,
     );
-    boothTarget.textContent = practiceTargetLine(recommended);
-    boothBriefProof.textContent = readinessBriefLine(readiness, controllerDisplayName);
-    boothPayoff.textContent = practicePayoffLine(recommended);
     const cue = recommendationBoothCue(
       recommended,
       readiness,
@@ -740,7 +625,6 @@ function mountLearnWindow(root: HTMLElement): {
     });
   };
   renderLessonChooser();
-  renderEarnedPath(latestSkillWall);
 
   const updateScreenActionForHighlight = (payload: HighlightPayload): void => {
     const expectedControlId = controlIdFromExpectedAction(payload.expected_action);
@@ -818,14 +702,6 @@ function mountLearnWindow(root: HTMLElement): {
     );
   });
 
-  // Phase 97 / ONBOARD-07 + RENDER-08 — disclaimer footer.
-  // The verbatim copy lives in a module-level constant so the
-  // tests/learn/test_disclaimer_present.py source-scanner finds it
-  // deterministically (the test asserts the fragment appears in some
-  // .ts file under tauri/ui/src/learn/).
-  const footer = root.querySelector("#learn-footer") as HTMLElement;
-  footer.textContent = TRADEMARK_DISCLAIMER;
-
   // Phase 97 / ONBOARD-02 — first-launch tutor announce-by-name. On the
   // FIRST controller-connect event of this app run, the aria-live region
   // speaks the verbatim greeting "I see your <controller name>. Let's
@@ -891,17 +767,6 @@ function mountLearnWindow(root: HTMLElement): {
     if (!detail) return;
     pendingPositions = detail.positions;
     pendingControllerId = detail.controller_id;
-    // Parse envelope ts → emit timestamp (ms since epoch). The envelope
-    // ts is on the custom-event's parent envelope, not the payload, so
-    // we conservatively use the now() time when the event fires.
-    pendingEmitTs = performance.now();
-    // ts on the envelope wrapper itself — we'd need to thread it through
-    // the ws-client; for P91 we use the event-arrival timestamp which
-    // overstates real latency by the ws → DOM hop (a few ms). Good
-    // enough for the dev-visible status pip; the canonical synthetic
-    // measurement lives in `tests/learn/highlight-latency.test.ts`.
-    const envelopeMeta = (ev as CustomEvent<MidiPositionPayload> & { detail: { __envelope__?: IpcEnvelopeMeta } });
-    void envelopeMeta;
   });
 
   // The main runtime can see a MIDI port before the Learn-specific controller
@@ -1192,11 +1057,7 @@ function mountLearnWindow(root: HTMLElement): {
       payload.progress
     ) {
       latestProgress = payload.progress;
-      latestSkillWall = Array.isArray(payload.progress.skill_wall)
-        ? payload.progress.skill_wall
-        : null;
       renderLessonChooser();
-      renderEarnedPath(latestSkillWall);
     }
   });
 
@@ -1392,17 +1253,11 @@ function mountLearnWindow(root: HTMLElement): {
       pendingControllerId !== null &&
       stage.currentControllerId === pendingControllerId
     ) {
-      const positions = pendingPositions;
-      const emitTs = pendingEmitTs;
-      stage.applyPositionFrame(positions);
-      if (emitTs !== null) {
-        status.pushLatency(performance.now() - emitTs);
-      }
+      stage.applyPositionFrame(pendingPositions);
     }
     // Always clear after a drain attempt — stale pending frames don't
     // accumulate; the next midi_position event repopulates.
     pendingPositions = null;
-    pendingEmitTs = null;
     requestAnimationFrame(drainFrame);
   }
   requestAnimationFrame(drainFrame);
@@ -1718,10 +1573,6 @@ function recommendedActionVerb(status: LessonStatus | undefined): string {
   return "start";
 }
 
-function compactCourseLabel(courseLabel: string, lessonId: string): string {
-  const course = courseLabel.replace(/\s*·\s*/g, " ").trim();
-  return `${course} ${lessonId}`;
-}
 
 function readinessProofLine(
   readiness: "hardware" | "midi" | "screen",
@@ -1775,25 +1626,6 @@ function missionProofPhrase(
     return "your controller's connected, do the move and I'll confirm it.";
   }
   return "use the on-screen controls and I'll confirm the move.";
-}
-
-function readinessBriefLine(
-  readiness: "hardware" | "midi" | "screen",
-  controllerName: string | null,
-): string {
-  if (readiness === "hardware") {
-    const compactName = compactControllerName(controllerName);
-    return compactName ? `${compactName} mapped` : "hardware mapped";
-  }
-  if (readiness === "midi") return "controller connected";
-  return "on-screen controls";
-}
-
-function practicePayoffLine(recommended: ProgressListEntry | undefined): string {
-  if (!recommended) return "practice map";
-  if (recommended.status === "completed") return "stays unlocked";
-  if (recommended.status === "in-progress") return "fewer hints";
-  return "next lesson";
 }
 
 function recommendationBoothCue(
@@ -1855,37 +1687,6 @@ function recommendationBoothCue(
     ariaLabel:
       "practice deck ready. Connect a controller or use the highlighted on-screen control.",
   };
-}
-
-function earnedPathName(skillId: string): string {
-  return EARNED_PATH_LABELS[skillId] ?? skillId.replace(/[_-]+/g, " ");
-}
-
-function earnedPathSummary(rows: SkillWallRow[]): string {
-  const mastered = rows.filter((row) => row.stage === "mastered").length;
-  const competent = rows.filter((row) => row.stage === "competent").length;
-  if (mastered > 0) {
-    return `${mastered} mastered · ${competent} competent`;
-  }
-  if (competent > 0) return `${competent} competent`;
-  return "skills waiting";
-}
-
-function earnedPathFillPercent(row: SkillWallRow): number {
-  const raw = Number(row.learn_fill);
-  if (!Number.isFinite(raw)) return 0;
-  return Math.round(Math.max(0, Math.min(1, raw)) * 100);
-}
-
-function earnedPathAriaLabel(row: SkillWallRow): string {
-  const stage = EARNED_PATH_STAGE_LABELS[row.stage];
-  const fill = earnedPathFillPercent(row);
-  const remains = row.mastered
-    ? `${row.live_proof_count} cited live demos`
-    : row.what_remains;
-  return `${earnedPathName(row.skill_id)}, ${stage}, ${fill}% lesson fill${
-    remains ? `. ${remains}` : ""
-  }`;
 }
 
 function compactControllerName(raw: string | null): string | null {

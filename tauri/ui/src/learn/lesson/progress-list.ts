@@ -187,10 +187,6 @@ export function renderProgressList(
       title.className = "vmx-progress-list__title";
       title.textContent = lesson.title;
 
-      const lessonId = document.createElement("span");
-      lessonId.className = "vmx-progress-list__lesson-id";
-      lessonId.textContent = lesson.lesson_id;
-
       btn.append(dot, title);
       if (lesson.locked || lesson.is_recommended) {
         const tag = document.createElement("span");
@@ -198,7 +194,6 @@ export function renderProgressList(
         tag.textContent = lesson.locked ? "locked" : "next";
         btn.append(tag);
       }
-      btn.append(lessonId);
 
       btn.addEventListener("click", () => {
         if (btn.dataset.locked === "true") {
