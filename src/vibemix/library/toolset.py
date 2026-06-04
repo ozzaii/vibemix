@@ -1104,6 +1104,10 @@ class LibraryToolset:
             "path": primary_path,
             "outputs": outputs,
             "tag_receipts": tag_receipts,
+            "import_instructions": _export_import_instructions(
+                outputs=outputs,
+                tag_receipts=tag_receipts,
+            ),
             "written": written,
             "referenced": referenced,
             "dropped": dropped,
@@ -1971,6 +1975,62 @@ def _markers2_carrier_for_target(
     if target == "all":
         return "markers2_tags"
     return "serato_tags"
+
+
+def _export_import_instructions(
+    outputs: dict[str, str],
+    tag_receipts: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Human import/reload receipt for each carrier written by export_set."""
+    instructions: list[dict[str, Any]] = []
+    if path := outputs.get("rekordbox"):
+        instructions.append(
+            {
+                "app": "Rekordbox",
+                "carrier": "rekordbox_xml",
+                "path": path,
+                "writes_audio_tags": False,
+                "instruction": (
+                    "Preferences -> Bridge -> Imported Library, choose this XML, "
+                    "then drag the exported playlist into your collection."
+                ),
+            }
+        )
+    if path := outputs.get("m3u8"):
+        instructions.append(
+            {
+                "app": "Any DJ app",
+                "carrier": "m3u8",
+                "path": path,
+                "writes_audio_tags": False,
+                "instruction": (
+                    "Import this M3U8 as an additive playlist/crate. It carries order; "
+                    "cues ride through Rekordbox XML or Markers2 tags."
+                ),
+            }
+        )
+    for receipt in tag_receipts:
+        if not isinstance(receipt, dict):
+            continue
+        files = [str(path) for path in receipt.get("files", []) if isinstance(path, str)]
+        if not files:
+            continue
+        apps = receipt.get("compatible_apps")
+        app_names = ", ".join(str(app) for app in apps if isinstance(app, str)) or "Serato/Mixxx"
+        instructions.append(
+            {
+                "app": app_names,
+                "carrier": str(receipt.get("carrier") or "markers2_tags"),
+                "files": files,
+                "writes_audio_tags": True,
+                "instruction": (
+                    "Reload or rescan these tagged audio files in the DJ app. "
+                    "VM cues are written as Markers2 tags with explicit permission; "
+                    "existing cues on other pads are merged, not clobbered."
+                ),
+            }
+        )
+    return instructions
 
 
 def _write_export_set_markers2_tags(

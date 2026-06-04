@@ -1003,6 +1003,19 @@ def test_export_set_all_writes_xml_m3u8_and_markers2_tags(toolset, tmp_path, mon
     assert out["tag_receipts"][0]["carrier"] == "markers2_tags"
     assert out["tag_receipts"][0]["compatible_apps"] == ["Serato", "Mixxx"]
     assert out["tag_receipts"][0]["tagged"] == 1
+    instructions = out["import_instructions"]
+    assert [row["carrier"] for row in instructions] == [
+        "rekordbox_xml",
+        "m3u8",
+        "markers2_tags",
+    ]
+    assert instructions[0]["app"] == "Rekordbox"
+    assert instructions[0]["path"] == str(out_xml)
+    assert "Imported Library" in instructions[0]["instruction"]
+    assert instructions[1]["path"] == str(tmp_path / "all.m3u8")
+    assert instructions[2]["writes_audio_tags"] is True
+    assert instructions[2]["files"] == [str(dst)]
+    assert "rescan" in instructions[2]["instruction"]
     assert out["auto_cues"]["cues_added"] == 2
     assert out_xml.exists()
     assert (tmp_path / "all.m3u8").exists()

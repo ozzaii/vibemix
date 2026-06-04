@@ -146,6 +146,22 @@ def test_auto_crate_preserves_all_carrier_export_receipt(toolset, tmp_path, monk
                     "skipped_tracks": [],
                 }
             ],
+            "import_instructions": [
+                {
+                    "app": "Rekordbox",
+                    "carrier": "rekordbox_xml",
+                    "path": str(out_xml),
+                    "writes_audio_tags": False,
+                    "instruction": "Import XML",
+                },
+                {
+                    "app": "Serato, Mixxx",
+                    "carrier": "markers2_tags",
+                    "files": ["/tmp/a.mp3", "/tmp/b.mp3"],
+                    "writes_audio_tags": True,
+                    "instruction": "Reload files",
+                },
+            ],
             "auto_cues": {"enabled": True, "tracks_cued": 2, "cues_added": 6},
         }
 
@@ -170,6 +186,12 @@ def test_auto_crate_preserves_all_carrier_export_receipt(toolset, tmp_path, monk
     }
     assert result.export_tag_receipts[0]["carrier"] == "markers2_tags"
     assert result.export_tag_receipts[0]["compatible_apps"] == ["Serato", "Mixxx"]
+    assert result.export_import_instructions[0]["carrier"] == "rekordbox_xml"
+    assert result.export_import_instructions[1]["carrier"] == "markers2_tags"
+    assert result.to_dict()["export_import_instructions"][1]["files"] == [
+        "/tmp/a.mp3",
+        "/tmp/b.mp3",
+    ]
     assert result.export_auto_cues == {"enabled": True, "tracks_cued": 2, "cues_added": 6}
 
 

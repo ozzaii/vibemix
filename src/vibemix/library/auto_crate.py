@@ -40,6 +40,7 @@ class AutoCrateResult:
     export_outputs: dict[str, str] = field(default_factory=dict)
     export_tag_receipts: list[dict[str, Any]] = field(default_factory=list)
     export_auto_cues: dict[str, Any] | None = None
+    export_import_instructions: list[dict[str, Any]] = field(default_factory=list)
     sequence: dict[str, Any] | None = None
     transition_receipts: list[dict[str, Any]] = field(default_factory=list)
     metadata_warnings: list[dict[str, Any]] = field(default_factory=list)
@@ -217,6 +218,7 @@ def build_auto_crate(
         export_outputs: dict[str, str] = {}
         export_tag_receipts: list[dict[str, Any]] = []
         export_auto_cues: dict[str, Any] | None = None
+        export_import_instructions: list[dict[str, Any]] = []
         stop_reason = "created"
         if export in {"rekordbox", "m3u8", "both", "serato_tags", "mixxx_tags", "all"}:
             export_args: dict[str, Any] = {
@@ -246,6 +248,11 @@ def build_auto_crate(
             raw_auto_cues = exported.get("auto_cues")
             if isinstance(raw_auto_cues, dict):
                 export_auto_cues = dict(raw_auto_cues)
+            raw_import_instructions = exported.get("import_instructions")
+            if isinstance(raw_import_instructions, list):
+                export_import_instructions = [
+                    row for row in raw_import_instructions if isinstance(row, dict)
+                ]
             stop_reason = "exported" if export_path else "created"
 
         warnings = discovered.get("metadata_warnings")
@@ -270,6 +277,7 @@ def build_auto_crate(
             export_outputs=export_outputs,
             export_tag_receipts=export_tag_receipts,
             export_auto_cues=export_auto_cues,
+            export_import_instructions=export_import_instructions,
             sequence=candidate,
             transition_receipts=receipts,
             metadata_warnings=metadata_warnings,

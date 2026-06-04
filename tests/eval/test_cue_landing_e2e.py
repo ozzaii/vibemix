@@ -29,6 +29,11 @@ def test_cue_landing_e2e_probe_proves_carriers_and_pill(tmp_path: Path) -> None:
     assert proof["export_result"]["target"] == "all"
     assert proof["export_result"]["auto_cues"]["cues_added"] == 2
     assert proof["export_result"]["pill_cues_materialized"] == {"tracks": 1, "cues": 2}
+    assert [row["carrier"] for row in proof["export_result"]["import_instructions"]] == [
+        "rekordbox_xml",
+        "m3u8",
+        "markers2_tags",
+    ]
     assert proof["outputs_exist"] == {
         "rekordbox": True,
         "m3u8": True,
