@@ -272,7 +272,8 @@ def test_smoke_02_missing_gemini_key_defaults_to_proxy(monkeypatch, mocker, tmp_
     _build_state_refresh_noop(mocker)
     livekit_mocks = _build_livekit_mocks(mocker)
     _patch_voice_recorder(mocker, tmp_path)
-    _patch_runtime_for_fast_smoke(mocker, [])
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
     proxy_mocks = _build_proxy_mocks(mocker)
 
     from vibemix.__main__ import main
@@ -290,6 +291,7 @@ def test_smoke_02_missing_gemini_key_defaults_to_proxy(monkeypatch, mocker, tmp_
 
     assert os.environ["VIBEMIX_LLM_MODE"] == "proxy"
     assert os.environ["VIBEMIX_PROXY_BASE_URL"] == "https://api.altidus.world"
+    assert "session_started" in tasks_seen
     proxy_mocks["get_or_refresh_jwt"].assert_called_once()
     livekit_mocks["build_llm"].assert_called_once_with(
         mode="proxy",
@@ -629,7 +631,12 @@ def _build_livekit_mocks(mocker):
     }
 
 
-def _patch_runtime_for_fast_smoke(mocker, tasks_seen: list):
+def _patch_runtime_for_fast_smoke(
+    mocker,
+    tasks_seen: list,
+    *,
+    start_session: bool = False,
+):
     """Patch coach_loop / diag_loop / ws_broadcast to no-op coroutines that
     just exit on stop_event. Also patch the actual asyncio.create_task usage
     to record which coroutines are spawned (for assertion)."""
@@ -647,9 +654,24 @@ def _patch_runtime_for_fast_smoke(mocker, tasks_seen: list):
         if stop_event is not None:
             await stop_event.wait()
 
+    start_sent = False
+
     async def ws_noop(*a, **kw):
+        nonlocal start_sent
         tasks_seen.append("ws")
-        stop_event = a[-1] if a else kw.get("stop_event")
+        if start_session and not start_sent:
+            start_sent = True
+            ipc_router = kw.get("ipc_router")
+            if ipc_router is not None:
+                await ipc_router.dispatch(
+                    {
+                        "type": "ipc.session.start",
+                        "ts": "2026-06-04T00:00:00Z",
+                        "payload": {},
+                    }
+                )
+                tasks_seen.append("session_started")
+        stop_event = a[3] if len(a) > 3 else kw.get("stop_event")
         if stop_event is not None:
             await stop_event.wait()
 
@@ -677,12 +699,14 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     Gemini surfaces and verifies the orchestration."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
     monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
     # Importing vibemix.__main__ can load the developer .env before the patch
     # above takes effect; re-assert the dummy keys after that import side effect.
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
     monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
     # Chatterbox is the only voice; legacy cloud voice env must not affect boot.
     monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
@@ -700,7 +724,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     _patch_voice_recorder(mocker, tmp_path)
 
     tasks_seen: list = []
-    _patch_runtime_for_fast_smoke(mocker, tasks_seen)
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
 
     from vibemix.__main__ import main
 
@@ -765,11 +789,10 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     # (h) session.start was awaited (with agent)
     assert livekit_mocks["session"].start.await_count == 1
 
-    # (j) all 3 runtime loops were spawned (we can't easily test all 6 here;
-    # the 3 we patched are confirmation enough for the wiring path)
+    # (j) Start-gated runtime work spawned through the live-session path.
     assert "coach" in tasks_seen
-    assert "diag" in tasks_seen
     assert "ws" in tasks_seen
+    assert "session_started" in tasks_seen
     sensor_mocks["screen_capture"].assert_not_called()
     sensor_mocks["track_poll"].assert_called_once()
 
@@ -778,6 +801,7 @@ def test_screen_vision_capture_opt_in_spawns_capture_task(monkeypatch, mocker, t
     """Screen capture is a dormant live leg unless the explicit eval flag is set."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
     monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
@@ -793,7 +817,7 @@ def test_screen_vision_capture_opt_in_spawns_capture_task(monkeypatch, mocker, t
     _patch_voice_recorder(mocker, tmp_path)
 
     tasks_seen: list = []
-    _patch_runtime_for_fast_smoke(mocker, tasks_seen)
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
 
     from vibemix.__main__ import main
 
@@ -820,6 +844,7 @@ def test_screen_vision_capture_opt_in_spawns_capture_task(monkeypatch, mocker, t
 def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
     """SMOKE-04: no OPENROUTER_API_KEY still boots Chatterbox-only voice."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
@@ -836,7 +861,7 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
     _patch_voice_recorder(mocker, tmp_path)
 
     tasks_seen: list = []
-    _patch_runtime_for_fast_smoke(mocker, tasks_seen)
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
 
     from vibemix.__main__ import main
 
@@ -862,6 +887,7 @@ def test_smoke_04b_missing_chatterbox_boots_muted_not_cloud_fallback(
 ):
     """Missing Chatterbox must not crash boot or create a cloud-TTS fallback."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
@@ -877,7 +903,7 @@ def test_smoke_04b_missing_chatterbox_boots_muted_not_cloud_fallback(
     _patch_voice_recorder(mocker, tmp_path)
 
     tasks_seen: list = []
-    _patch_runtime_for_fast_smoke(mocker, tasks_seen)
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
 
     from vibemix.__main__ import main
 
@@ -913,6 +939,7 @@ def test_smoke_05_cleanup_closes_all_streams(monkeypatch, mocker, tmp_path):
     AND close() called."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
     monkeypatch.setenv("VIBEMIX_ENABLE_MIC", "1")
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
 
@@ -923,7 +950,7 @@ def test_smoke_05_cleanup_closes_all_streams(monkeypatch, mocker, tmp_path):
     _patch_voice_recorder(mocker, tmp_path)
 
     tasks_seen: list = []
-    _patch_runtime_for_fast_smoke(mocker, tasks_seen)
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
 
     from vibemix.__main__ import main
 
@@ -1025,7 +1052,8 @@ def test_main_03_proxy_register_401_boots_brainless(monkeypatch, mocker, tmp_pat
     _build_state_refresh_noop(mocker)
     livekit_mocks = _build_livekit_mocks(mocker)
     _patch_voice_recorder(mocker, tmp_path)
-    _patch_runtime_for_fast_smoke(mocker, [])
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
 
     from vibemix.__main__ import main
 
@@ -1041,8 +1069,9 @@ def test_main_03_proxy_register_401_boots_brainless(monkeypatch, mocker, tmp_pat
     asyncio.run(driver())
 
     livekit_mocks["build_llm"].assert_not_called()
-    assert livekit_mocks["AgentSession"].call_args.kwargs["llm"] is NOT_GIVEN
-    assert livekit_mocks["DJCoHostAgent"].call_args.kwargs["genai_client"] is None
+    livekit_mocks["AgentSession"].assert_not_called()
+    livekit_mocks["DJCoHostAgent"].assert_not_called()
+    assert "session_started" in tasks_seen
     assert "add your Gemini key in Settings" in capsys.readouterr().err
 
 
@@ -1066,7 +1095,8 @@ def test_main_04_proxy_network_error_boots_brainless(monkeypatch, mocker, tmp_pa
     _build_state_refresh_noop(mocker)
     livekit_mocks = _build_livekit_mocks(mocker)
     _patch_voice_recorder(mocker, tmp_path)
-    _patch_runtime_for_fast_smoke(mocker, [])
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
 
     from vibemix.__main__ import main
 
@@ -1082,8 +1112,9 @@ def test_main_04_proxy_network_error_boots_brainless(monkeypatch, mocker, tmp_pa
     asyncio.run(driver())
 
     livekit_mocks["build_llm"].assert_not_called()
-    assert livekit_mocks["AgentSession"].call_args.kwargs["llm"] is NOT_GIVEN
-    assert livekit_mocks["DJCoHostAgent"].call_args.kwargs["genai_client"] is None
+    livekit_mocks["AgentSession"].assert_not_called()
+    livekit_mocks["DJCoHostAgent"].assert_not_called()
+    assert "session_started" in tasks_seen
     assert "proxy network error" in capsys.readouterr().err
 
 
@@ -1137,7 +1168,8 @@ def test_main_05b_direct_mode_without_key_falls_to_proxy(monkeypatch, mocker, tm
     _build_state_refresh_noop(mocker)
     livekit_mocks = _build_livekit_mocks(mocker)
     _patch_voice_recorder(mocker, tmp_path)
-    _patch_runtime_for_fast_smoke(mocker, [])
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
     proxy_mocks = _build_proxy_mocks(mocker)
 
     from vibemix.__main__ import main
@@ -1154,6 +1186,7 @@ def test_main_05b_direct_mode_without_key_falls_to_proxy(monkeypatch, mocker, tm
     asyncio.run(driver())
 
     assert os.environ["VIBEMIX_LLM_MODE"] == "proxy"
+    assert "session_started" in tasks_seen
     proxy_mocks["get_or_refresh_jwt"].assert_called_once()
     livekit_mocks["build_llm"].assert_called_once_with(
         mode="proxy",
@@ -1437,8 +1470,8 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
 # ---------------------------------------------------------------------------
 
 
-def test_apply_packaged_defaults_leaves_tts_engine_to_config_seed(monkeypatch):
-    """Packaged defaults leave the voice engine to the config.json boot seed.
+def test_apply_packaged_defaults_seeds_chatterbox_tts_engine(monkeypatch):
+    """Packaged defaults seed the voice engine from config.json.
 
     It does not turn the drop-call oracle on; spoken drop calls stay explicitly
     opted in until the mix-timing lane has live grounding proof.
@@ -1450,7 +1483,7 @@ def test_apply_packaged_defaults_leaves_tts_engine_to_config_seed(monkeypatch):
 
     _apply_packaged_defaults()
 
-    assert "VIBEMIX_TTS_ENGINE" not in os.environ
+    assert os.environ["VIBEMIX_TTS_ENGINE"] == "chatterbox"
     assert "VIBEMIX_DROP_CALL" not in os.environ
 
 
