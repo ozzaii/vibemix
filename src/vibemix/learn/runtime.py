@@ -945,6 +945,8 @@ class LessonRuntime(StateMachine):
 
         # Locked (or fail-soft ungradeable) goes through the normal advance
         # transition, but ``on_ack_action`` must not re-record/re-grade it.
+        if result is not None and result.event is not None:
+            self._last_completion_can_advance = True
         self._beatmatch_practice_ack_prehandled = True
         self.send("ack_action", midi=midi)
         return True
@@ -1034,14 +1036,11 @@ class LessonRuntime(StateMachine):
 
           * ``midi["type"] == "cc"``,
           * ``midi["control"] == expected["control"]``, AND
-          * for hardware ``source="midi"`` a changed value is enough. The
-            webview only emits an ack after it has observed a position
-            change while the lesson is active; requiring that single sampled
-            frame to clear a large ``min_delta`` wedged real FLX4 practice
-            when the user moved the right knob in smaller/sparser steps.
-          * otherwise, ``abs(midi["value"] - midi["prev_value"])`` >=
+          * ``abs(midi["value"] - midi["prev_value"])`` >=
             ``expected.get("min_delta", 38)`` (30% of the 127 CC range by
-            default).
+            default). Small but correct moves are still observed evidence;
+            they route through adaptive coaching as "move farther" instead
+            of completing the lesson.
 
         Button branch: matches when
 
@@ -1077,8 +1076,6 @@ class LessonRuntime(StateMachine):
                     return False
             cur = int(midi.get("value", 0))
             prev = int(midi.get("prev_value", cur))
-            if midi.get("source") == "midi" and cur != prev:
-                return True
             min_delta = int(expected.get("min_delta", _CC_DEFAULT_MIN_DELTA))
             return abs(cur - prev) >= min_delta
 
@@ -1129,7 +1126,6 @@ class LessonRuntime(StateMachine):
     # ------------------------------------------------------------------
     def on_ack_action(self, **kwargs: Any) -> None:
         self._last_was_match = True
-        self._last_completion_can_advance = True
         midi = kwargs.get("midi")
         prehandled_beatmatch_ack = self._beatmatch_practice_ack_prehandled
         self._beatmatch_practice_ack_prehandled = False

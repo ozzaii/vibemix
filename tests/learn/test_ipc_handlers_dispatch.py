@@ -501,15 +501,8 @@ def test_ack_dispatch_uses_real_prev_value_for_cc_actions() -> None:
     assert runtime.current_state.id in {"advancing", "completed"}
 
 
-def test_hardware_cc_ack_advances_even_when_sample_delta_is_small() -> None:
-    """Real hardware acks should not require an 80-point single-frame jump.
-
-    The Learn webview only emits ``ipc.learn.ack`` for MIDI after observing a
-    position change while a lesson is active. On a live FLX4 the sampled frames
-    can arrive as smaller deltas even when the user is doing the right knob
-    motion, so the sidecar must trust the exact-control hardware ack instead
-    of wedging L1.03 until one frame clears the fixture's large min_delta.
-    """
+def test_hardware_cc_ack_keeps_small_sample_delta_as_near_miss() -> None:
+    """Small real hardware deltas cite practice but do not complete the lesson."""
     runtime, progress, _ = _make_runtime()
     router = IpcRouterBus()
     midi_mirror = MagicMock(name="midi_mirror_inbound")
@@ -546,7 +539,7 @@ def test_hardware_cc_ack_advances_even_when_sample_delta_is_small() -> None:
 
     handled = asyncio.run(go())
     assert handled is True
-    assert runtime.current_state.id in {"advancing", "completed"}
+    assert runtime.current_state.id == "awaiting_action"
     assert progress.lessons["L1.03"]["practice_sources"] == {
         "hardware": 1,
         "screen": 0,
