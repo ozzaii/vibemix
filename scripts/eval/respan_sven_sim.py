@@ -79,6 +79,16 @@ DIMS = [
     "friend_not_narrator", "grounded_not_fabricated", "earned_not_constant",
     "move_specific_not_spectrum", "voice_no_slop",
 ]
+QUALITY_TARGET_SCENARIOS = ("phase_with_cue_lookahead", "track_change_with_cue_lookahead")
+QUALITY_MEAN_THRESHOLDS = {
+    "friend_not_narrator": 2.0,
+    "grounded_not_fabricated": 2.4,
+    "voice_no_slop": 2.0,
+}
+QUALITY_TARGET_THRESHOLDS = {
+    "friend_not_narrator": 2.0,
+    "voice_no_slop": 2.0,
+}
 
 # Controlled scenarios — authored faithful to the real evidence-bundle format.
 # `expect` = the gate verdict we expect from today's build.
@@ -257,11 +267,127 @@ def _spoken_line_for_judge(model_line: str) -> str:
     return model_text_for_tts(clipped, normalize=True)
 
 
+def _score_value(scores: dict, dim: str) -> float | None:
+    value = scores.get(dim)
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed:
+        return None
+    return parsed
+
+
+def _scored_rows(results: list[dict]) -> list[dict]:
+    return [
+        row
+        for row in results
+        if isinstance(row.get("scores"), dict)
+        and _score_value(row["scores"], "friend_not_narrator") is not None
+    ]
+
+
+def _dim_means(results: list[dict]) -> dict[str, float]:
+    scored = _scored_rows(results)
+    if not scored:
+        return {}
+    return {
+        dim: round(
+            sum(_score_value(row["scores"], dim) or 0.0 for row in scored) / len(scored),
+            2,
+        )
+        for dim in DIMS
+    }
+
+
+def _quality_summary(results: list[dict]) -> dict:
+    gate_ok = sum(1 for row in results if row.get("gate_ok") is True)
+    target_rows = {
+        name: next((row for row in results if row.get("name") == name), None)
+        for name in QUALITY_TARGET_SCENARIOS
+    }
+    means = _dim_means(results)
+    failures = _quality_failures(results, means=means, target_rows=target_rows)
+    return {
+        "gate_ok": gate_ok,
+        "gate_total": len(results),
+        "means": means,
+        "target_scenarios": {
+            name: {
+                "gate": row.get("gate") if row else None,
+                "scores": row.get("scores") if row else None,
+                "line": row.get("line") if row else None,
+            }
+            for name, row in target_rows.items()
+        },
+        "failures": failures,
+    }
+
+
+def _quality_failures(
+    results: list[dict],
+    *,
+    means: dict[str, float] | None = None,
+    target_rows: dict[str, dict | None] | None = None,
+) -> list[str]:
+    failures: list[str] = []
+    if not results:
+        return ["no scenario rows were produced"]
+    if len(results) != len(SCENARIOS):
+        failures.append(f"expected {len(SCENARIOS)} scenarios, got {len(results)}")
+
+    gate_misses = [
+        f"{row.get('name', '<unknown>')} expected {row.get('expect')} got {row.get('gate')}"
+        for row in results
+        if row.get("gate_ok") is not True
+    ]
+    if gate_misses:
+        failures.append("gate routing mismatch: " + "; ".join(gate_misses))
+
+    means = means if means is not None else _dim_means(results)
+    if not means:
+        failures.append("no judged lines were scored")
+    else:
+        for dim, threshold in QUALITY_MEAN_THRESHOLDS.items():
+            value = means.get(dim)
+            if value is None or value < threshold:
+                failures.append(f"mean {dim} {value!r} below {threshold:g}")
+
+    if target_rows is None:
+        target_rows = {
+            name: next((row for row in results if row.get("name") == name), None)
+            for name in QUALITY_TARGET_SCENARIOS
+        }
+    for name, row in target_rows.items():
+        if row is None:
+            failures.append(f"missing target scenario {name}")
+            continue
+        scores = row.get("scores")
+        if not isinstance(scores, dict):
+            failures.append(f"{name} has no judged scores")
+            continue
+        for dim, threshold in QUALITY_TARGET_THRESHOLDS.items():
+            value = _score_value(scores, dim)
+            if value is None or value < threshold:
+                failures.append(f"{name} {dim} {value!r} below {threshold:g}")
+    return failures
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--gate-only", action="store_true", help="deterministic gate routing, no model")
     ap.add_argument("--no-log", action="store_true")
     ap.add_argument("--out", default=None)
+    ap.add_argument(
+        "--require-quality",
+        action="store_true",
+        help=(
+            "exit nonzero unless gate routing is perfect, generated means stay above "
+            "the Sven floor, and both cue-lookahead scenarios score friend/voice >= 2"
+        ),
+    )
     ap.add_argument(
         "--match-live-persona",
         action="store_true",
@@ -344,11 +470,12 @@ def main() -> int:
             }, key)
         results.append(row)
 
-    scored = [r for r in results if isinstance(r.get("scores"), dict) and "friend_not_narrator" in r["scores"]]
+    scored = _scored_rows(results)
+    means = _dim_means(results)
     if scored:
-        means = {d: round(sum(float(r["scores"].get(d, 0) or 0) for r in scored) / len(scored), 2) for d in DIMS}
         print(f"\nGENERATED-line dim means (n={len(scored)}):", json.dumps(means))
-    gate_ok = sum(1 for r in results if r["gate_ok"])
+    quality = _quality_summary(results)
+    gate_ok = int(quality["gate_ok"])
     print(f"gate routing: {gate_ok}/{len(results)} matched expectation")
     if args.out:
         with open(args.out, "w") as f:
@@ -360,12 +487,21 @@ def main() -> int:
                         "include_citation_grammar": include_citation_grammar,
                     },
                     "results": results,
+                    "quality": quality,
                 },
                 f,
                 indent=2,
                 ensure_ascii=False,
             )
         print(f"-> wrote {args.out}", file=sys.stderr)
+    if args.require_quality:
+        failures = list(quality.get("failures") or [])
+        if failures:
+            print("quality gate: FAIL", file=sys.stderr)
+            for failure in failures:
+                print(f"  - {failure}", file=sys.stderr)
+            return 1
+        print("quality gate: PASS")
     if args.heartbeat_session:
         return _run_heartbeat_judge(
             session=args.heartbeat_session,
