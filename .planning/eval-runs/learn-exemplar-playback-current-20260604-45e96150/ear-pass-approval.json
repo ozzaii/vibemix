@@ -1,0 +1,41 @@
+{
+  "approved": true,
+  "approved_at": "2026-06-04T14:56:48.021888+00:00",
+  "approved_by": "Kaan \u00d6zkan",
+  "bank_dir": "/Users/ozai/projects/dj-set-ai/src/vibemix/learn/assets/band_exemplars",
+  "bank_fingerprint": {
+    "algorithm": "sha256-canonical-json-v1",
+    "digest": "34e7aafe568b2e8badecb75fd28e0a8bd710f4fd1b1f2d84e7ff4a78584096e9",
+    "manifest_sha256": "8d8ae0dd1e418babb900dc70c3335829eae27629e9f8b5e6591721c435decd58",
+    "track_count": 4
+  },
+  "notes": "",
+  "proof": "learn_exemplar_ear_pass",
+  "schema_version": 1,
+  "tracks": [
+    {
+      "band": "high",
+      "rel": "high/vibemix_internal_high_hat_air.wav",
+      "sha256": "7dcec4764229732452c409e7bcf218fa7ff806652ae169250a663cc988fb1beb",
+      "title": "High Hat Air Practice Loop"
+    },
+    {
+      "band": "low",
+      "rel": "low/vibemix_internal_low_bass_gate.wav",
+      "sha256": "c8aa0d1c75996f986792620315045497ddccbee2211ecdf0757bea066055879d",
+      "title": "Low Bass Gate Practice Loop"
+    },
+    {
+      "band": "mid",
+      "rel": "mid/vibemix_internal_mid_chord_body.wav",
+      "sha256": "035366690293506dc06bcd00b7661037613ed4be1a5adfa84a3e190c272bbbfe",
+      "title": "Mid Chord Body Practice Loop"
+    },
+    {
+      "band": "sub",
+      "rel": "sub/vibemix_internal_sub_pulse.wav",
+      "sha256": "fef218a73244062893143e2ceb00e332c4c8e08d99e49e66de558407c08e73c5",
+      "title": "Sub Pulse Practice Loop"
+    }
+  ]
+}
