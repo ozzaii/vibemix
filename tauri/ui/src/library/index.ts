@@ -858,11 +858,8 @@ function renderStats(stats: LibraryStats): void {
   latestStats = stats;
   $("vmx-lib-stat-indexed").textContent = String(stats.indexed);
   $("vmx-lib-stat-backend").textContent = libraryBackendLabel(stats.backend);
-  $("vmx-lib-stat-spent").textContent = `€${stats.spent_eur.toFixed(2)}`;
-  $("vmx-lib-stat-failed").textContent = String(stats.failed);
   const engineLabelEl = $maybe("vmx-lib-engine-label");
   if (engineLabelEl) engineLabelEl.textContent = embeddingLabel(stats);
-  renderOperatorBrief();
   renderAgentSetup(stats);
   if (latestModels) renderModelSetup(latestModels);
 }
@@ -871,11 +868,8 @@ function renderStatsError(err: unknown): void {
   latestStats = null;
   $("vmx-lib-stat-indexed").textContent = "·";
   $("vmx-lib-stat-backend").textContent = "unavailable";
-  $("vmx-lib-stat-spent").textContent = "·";
-  $("vmx-lib-stat-failed").textContent = "·";
   const engineLabelEl = $maybe("vmx-lib-engine-label");
   if (engineLabelEl) engineLabelEl.textContent = "library stats unavailable";
-  renderOperatorBrief();
   renderAgentSetup(null);
   // eslint-disable-next-line no-console
   console.error("[vmx-lib] stats refresh failed:", err);
@@ -1137,6 +1131,81 @@ function appendChatTurn(
   return turn;
 }
 
+let activeInlineToolLog: HTMLElement | null = null;
+
+function createInlineToolLog(turn: HTMLElement): HTMLElement {
+  const existing = turn.querySelector<HTMLElement>(".vmx-lib-agent-log");
+  if (existing) return existing;
+
+  const log = document.createElement("div");
+  log.className = "vmx-lib-agent-log";
+  log.dataset.wire = "library.chat-agent-log";
+  log.dataset.toolCount = "0";
+
+  const head = document.createElement("div");
+  head.className = "vmx-lib-agent-log__head";
+  const title = document.createElement("span");
+  title.textContent = "Live agent log";
+  const state = document.createElement("b");
+  state.textContent = "thinking";
+  head.append(title, state);
+
+  const rows = document.createElement("div");
+  rows.className = "vmx-lib-agent-log__rows";
+  rows.dataset.role = "rows";
+
+  log.append(head, rows);
+  turn.append(log);
+  return log;
+}
+
+function appendInlineToolRow(log: HTMLElement, e: LibraryViberToolEvent): void {
+  const rows = log.querySelector<HTMLElement>('[data-role="rows"]');
+  if (!rows) return;
+  const row = document.createElement("div");
+  row.className = "vmx-lib-agent-log__row";
+  row.dataset.ok = String(e.ok);
+  row.dataset.state = "running";
+
+  const status = document.createElement("span");
+  status.className = "vmx-lib-agent-log__status";
+  status.setAttribute("aria-hidden", "true");
+
+  const text = document.createElement("div");
+  const name = document.createElement("b");
+  name.textContent = chatToolDisplayName(e.tool);
+  const arg = document.createElement("span");
+  arg.textContent = chatToolDisplayArg(e.tool, e.summary, e.ok);
+  text.append(name, arg);
+  row.append(status, text);
+  rows.append(row);
+
+  const count = Number(log.dataset.toolCount ?? "0") + 1;
+  log.dataset.toolCount = String(count);
+  log.querySelector<HTMLElement>(".vmx-lib-agent-log__head b")!.textContent =
+    `${count} tool${count === 1 ? "" : "s"}`;
+  window.setTimeout(() => {
+    row.dataset.state = e.ok ? "done" : "failed";
+  }, 180);
+}
+
+function finalizeInlineToolLog(
+  log: HTMLElement | null,
+  result: Pick<LibraryChatResult, "iterations" | "stop_reason">,
+): void {
+  if (!log) return;
+  const count = Number(log.dataset.toolCount ?? "0");
+  const headState = log.querySelector<HTMLElement>(".vmx-lib-agent-log__head b");
+  if (count > 0) {
+    log.dataset.collapsed = "true";
+    if (headState) {
+      headState.textContent = `${count} real tool${count === 1 ? "" : "s"} · ${result.stop_reason}`;
+    }
+    return;
+  }
+  log.remove();
+}
+
 function setChatTurnText(
   turn: HTMLElement,
   text: string,
@@ -1158,26 +1227,10 @@ function ensureChatIntro(thread: HTMLElement): void {
 }
 
 function renderChatBusy(): void {
-  const tools = $("vmx-lib-chat-tools");
-  tools.replaceChildren();
-  appendLiveProofStatusToolRow(tools, latestLiveContext);
-  const row = document.createElement("div");
-  row.className = "vmx-lib-chat-tool";
-  row.dataset.ok = "true";
-  row.append(document.createElement("span"));
-  row.firstElementChild?.classList.add("gem");
-  const text = document.createElement("div");
-  const name = document.createElement("div");
-  name.className = "name";
-  name.textContent = "thinking";
-  const arg = document.createElement("div");
-  arg.className = "arg";
-  arg.textContent = "reading the crate";
-  text.append(name, arg);
-  row.append(text);
-  tools.append(row);
-  $("vmx-lib-chat-artifact").replaceChildren();
-  $("vmx-lib-scope-state").textContent = "working";
+  $maybe("vmx-lib-chat-tools")?.replaceChildren();
+  $maybe("vmx-lib-chat-artifact")?.replaceChildren();
+  const scopeState = $maybe("vmx-lib-scope-state");
+  if (scopeState) scopeState.textContent = "working";
 }
 
 function proofDeckResolved(deck?: LibraryLiveDeck): boolean {
@@ -1405,68 +1458,6 @@ function liveProofStatus(context: LibraryLiveContext | null): {
   };
 }
 
-function operatorState(
-  stats: LibraryStats | null,
-  proof: ReturnType<typeof liveProofStatus>,
-): string {
-  if (stats?.agent_ready === false) return "Viber setup needed";
-  if (proof.ok) return "live transition armed";
-  if ((stats?.indexed ?? 0) > 0) return "set prep ready";
-  if (stats) return "index a crate first";
-  return "set prep checking";
-}
-
-function operatorBuildLabel(stats: LibraryStats | null): string {
-  if (!stats) return "crate checking";
-  if (stats.indexed > 0) return `${stats.indexed} tracks`;
-  return "crate empty";
-}
-
-function operatorSearchLabel(stats: LibraryStats | null): string {
-  if (!stats) return "search checking";
-  return libraryBackendLabel(stats.backend);
-}
-
-function operatorCellState(
-  stats: LibraryStats | null,
-  proof: ReturnType<typeof liveProofStatus>,
-  axis: "build" | "mix" | "rediscover",
-): "ok" | "warn" | "fault" {
-  if (axis === "mix") return proof.ok ? "ok" : "warn";
-  if (!stats) return "warn";
-  if (stats.agent_ready === false) return "fault";
-  if (axis === "build") return stats.indexed > 0 ? "ok" : "warn";
-  return stats.backend === "unavailable" ? "fault" : "ok";
-}
-
-function setOperatorText(id: string, text: string): void {
-  const el = $maybe(id);
-  if (el && el.textContent !== text) el.textContent = text;
-}
-
-function setOperatorCell(
-  axis: "build" | "mix" | "rediscover",
-  state: string,
-): void {
-  const el = $maybe("vmx-lib-operator")?.querySelector<HTMLElement>(
-    `[data-operator="${axis}"]`,
-  );
-  if (el && el.dataset.state !== state) el.dataset.state = state;
-}
-
-function renderOperatorBrief(): void {
-  if (!$maybe("vmx-lib-operator")) return;
-  const proof = liveProofStatus(latestLiveContext);
-  setOperatorText("vmx-lib-operator-state", operatorState(latestStats, proof));
-  setOperatorText("vmx-lib-operator-build", operatorBuildLabel(latestStats));
-  setOperatorText("vmx-lib-operator-mix", proof.state);
-  setOperatorText("vmx-lib-operator-proof", proof.detail);
-  setOperatorText("vmx-lib-operator-search", operatorSearchLabel(latestStats));
-  setOperatorCell("build", operatorCellState(latestStats, proof, "build"));
-  setOperatorCell("mix", operatorCellState(latestStats, proof, "mix"));
-  setOperatorCell("rediscover", operatorCellState(latestStats, proof, "rediscover"));
-}
-
 function appendLiveProofStatusToolRow(
   tools: HTMLElement,
   context: LibraryLiveContext | null,
@@ -1491,79 +1482,39 @@ function appendLiveProofStatusToolRow(
   tools.append(row);
 }
 
-function idleMissionArtifact(
-  stats: LibraryStats | null,
-  proof: ReturnType<typeof liveProofStatus>,
-): HTMLElement {
-  const card = document.createElement("div");
-  card.className = "vmx-lib-idle-mission";
-  card.dataset.wire = "library.idle-mission";
-
-  const head = document.createElement("div");
-  head.className = "vmx-lib-idle-mission__head";
-  const titleWrap = document.createElement("div");
-  const kicker = document.createElement("span");
-  kicker.textContent = "Viber runbook";
-  const title = document.createElement("b");
-  title.textContent = proof.ok ? "Live mix armed" : "Set prep armed";
-  titleWrap.append(kicker, title);
-  const state = document.createElement("em");
-  state.textContent = proof.ok ? "armed" : operatorState(stats, proof);
-  head.append(titleWrap, state);
-  card.append(head);
-
-  const rows = document.createElement("div");
-  rows.className = "vmx-lib-idle-mission__rows";
-  const trackCount = stats?.indexed ?? 0;
-  const buildValue =
-    trackCount > 0 ? `${trackCount} indexed tracks` : "index crate first";
-  const searchValue = stats ? operatorSearchLabel(stats) : "search checking";
-  const steps: Array<[string, string, string]> = [
-    ["01", "Build set", buildValue],
-    ["02", "Score transition", `${proof.state} · ${proof.detail}`],
-    ["03", "Export set", `${searchValue} · Rekordbox / M3U after set prep`],
-  ];
-  steps.forEach(([step, label, value]) => {
-    const row = document.createElement("div");
-    row.className = "vmx-lib-idle-mission__row";
-    const idx = document.createElement("span");
-    idx.textContent = step;
-    const copy = document.createElement("div");
-    const name = document.createElement("b");
-    name.textContent = label;
-    const detail = document.createElement("small");
-    detail.textContent = value;
-    copy.append(name, detail);
-    row.append(idx, copy);
-    rows.append(row);
-  });
-  card.append(rows);
-
-  const foot = document.createElement("div");
-  foot.className = "vmx-lib-idle-mission__foot";
-  foot.textContent = "No fake tracks. No guessing transitions.";
-  card.append(foot);
-  return card;
+function renderInlineSetupCard(stats: LibraryStats | null): void {
+  const thread = $maybe("vmx-lib-chat-thread");
+  if (!thread) return;
+  thread
+    .querySelectorAll<HTMLElement>('[data-wire="library.setup-candidate"]')
+    .forEach((card) => card.remove());
+  if (thread.querySelector('[data-role="you"]')) return;
+  const setupCard = chatLibrarySetupCard(stats);
+  if (setupCard) {
+    thread.append(setupCard);
+    thread.scrollTop = thread.scrollHeight;
+  }
 }
 
 function renderChatIdleSide(): void {
-  const tools = $("vmx-lib-chat-tools");
-  if (tools.dataset.live === "true") return;
-  tools.replaceChildren();
-  const proof = liveProofStatus(latestLiveContext);
-  appendLiveProofStatusToolRow(tools, latestLiveContext);
-  const artifact = $("vmx-lib-chat-artifact");
-  artifact.replaceChildren();
-  const setupCard = chatLibrarySetupCard(latestStats);
-  artifact.append(setupCard ?? idleMissionArtifact(latestStats, proof));
-  $("vmx-lib-scope-state").textContent = proof.ok ? "live read armed" : "ready";
-  renderOperatorBrief();
+  const tools = $maybe("vmx-lib-chat-tools");
+  if (tools?.dataset.live === "true") return;
+  tools?.replaceChildren();
+  const artifact = $maybe("vmx-lib-chat-artifact");
+  artifact?.replaceChildren();
+  const scopeState = $maybe("vmx-lib-scope-state");
+  if (scopeState) scopeState.textContent = "ready";
+  renderInlineSetupCard(latestStats);
 }
 
 /** Append one live tool-tape row as Viber fires it (the agentic work made
  *  visible). XSS-safe: textContent only, no innerHTML. The first event of a run
  *  clears any placeholder ("thinking" / "no tools this turn"). */
 function appendLiveToolRow(e: LibraryViberToolEvent): void {
+  if (activeInlineToolLog) {
+    appendInlineToolRow(activeInlineToolLog, e);
+    return;
+  }
   const tools = $("vmx-lib-chat-tools");
   if (tools.dataset.live !== "true") {
     tools.replaceChildren();
@@ -1654,20 +1605,33 @@ function chatScopeStateText(result: LibraryChatResult): string {
 }
 
 function renderChatSide(result: LibraryChatResult): void {
-  const tools = $("vmx-lib-chat-tools");
-  tools.replaceChildren();
-  if (result.live_verification) {
-    appendLiveVerificationToolRow(tools, result.live_verification);
-  } else {
-    appendLiveProofStatusToolRow(tools, latestLiveContext);
+  const tools = $maybe("vmx-lib-chat-tools");
+  tools?.replaceChildren();
+  if (activeInlineToolLog && Number(activeInlineToolLog.dataset.toolCount ?? "0") === 0) {
+    result.tool_trace
+      .filter(
+        (tool) => !(result.live_verification && isInternalLiveProofTool(tool)),
+      )
+      .forEach((tool) => {
+        appendInlineToolRow(activeInlineToolLog as HTMLElement, {
+          tool: tool.name,
+          ok: tool.ok,
+          summary: tool.arg,
+        });
+      });
   }
-  if (result.tool_trace.length === 0 && !result.live_verification) {
+  if (result.live_verification) {
+    if (tools) appendLiveVerificationToolRow(tools, result.live_verification);
+  } else {
+    if (tools) appendLiveProofStatusToolRow(tools, latestLiveContext);
+  }
+  if (tools && result.tool_trace.length === 0 && !result.live_verification) {
     const empty = document.createElement("div");
     empty.className = "vmx-lib-chat-empty";
-    empty.textContent = "no tools this turn";
+    empty.textContent = "";
     tools.append(empty);
   }
-  if (result.tool_trace.length > 0) {
+  if (tools && result.tool_trace.length > 0) {
     result.tool_trace
       .filter(
         (tool) => !(result.live_verification && isInternalLiveProofTool(tool)),
@@ -1691,13 +1655,28 @@ function renderChatSide(result: LibraryChatResult): void {
       });
   }
 
-  const artifact = $("vmx-lib-chat-artifact");
-  artifact.replaceChildren();
+  const artifact = $maybe("vmx-lib-chat-artifact");
+  artifact?.replaceChildren();
   const card = chatArtifactCard(result);
-  if (card) artifact.append(card);
+  if (card) {
+    const inlineTarget = activeInlineToolLog?.closest<HTMLElement>(
+      ".vmx-lib-chat-turn",
+    );
+    if (inlineTarget) inlineTarget.append(card);
+    else artifact?.append(card);
+  }
   const setupCard = chatLibrarySetupCard(latestStats);
-  if (setupCard) artifact.append(setupCard);
-  $("vmx-lib-scope-state").textContent = chatScopeStateText(result);
+  if (setupCard) {
+    const inlineTarget = activeInlineToolLog?.closest<HTMLElement>(
+      ".vmx-lib-chat-turn",
+    );
+    if (inlineTarget) inlineTarget.append(setupCard);
+    else artifact?.append(setupCard);
+  }
+  const scopeState = $maybe("vmx-lib-scope-state");
+  if (scopeState) scopeState.textContent = chatScopeStateText(result);
+  finalizeInlineToolLog(activeInlineToolLog, result);
+  activeInlineToolLog = null;
 }
 
 function isChatSetupStop(stopReason: string): boolean {
@@ -2039,8 +2018,8 @@ function renderChatError(err: unknown): void {
       : typeof err === "string"
         ? err
         : String(err);
-  const artifact = $("vmx-lib-chat-artifact");
-  artifact.replaceChildren();
+  const artifact = $maybe("vmx-lib-chat-artifact");
+  artifact?.replaceChildren();
   const card = document.createElement("div");
   card.className = "vmx-lib-chat-card";
   const cap = document.createElement("div");
@@ -2052,9 +2031,11 @@ function renderChatError(err: unknown): void {
   cap.append(led, label);
   card.append(cap);
   appendChatCardLine(card, msg);
-  artifact.append(card);
-  $("vmx-lib-chat-tools").replaceChildren();
-  $("vmx-lib-scope-state").textContent = "error";
+  artifact?.append(card);
+  $maybe("vmx-lib-chat-tools")?.replaceChildren();
+  const scopeState = $maybe("vmx-lib-scope-state");
+  if (scopeState) scopeState.textContent = "error";
+  activeInlineToolLog = null;
 }
 
 // ── Bootstrap ───────────────────────────────────────────────────────────────
@@ -2116,7 +2097,7 @@ export function mountLibrary(root: ParentNode = document): void {
               ? "Embed"
               : "Pulled";
     $("vmx-lib-side-label").textContent =
-      state.mode === "chat" ? "Grounding" : "Vibe scope";
+      state.mode === "chat" ? "Receipts" : "Vibe scope";
     runBtn.textContent = runLabel(state.mode);
     echoEl.textContent = echoText(state);
     if (state.mode === "chat") {
@@ -2248,6 +2229,9 @@ export function mountLibrary(root: ParentNode = document): void {
     const message = state.chatMessage;
     const priorHistory = chatHistory.slice();
 
+    chatThread
+      .querySelectorAll<HTMLElement>('[data-wire="library.setup-candidate"]')
+      .forEach((card) => card.remove());
     appendChatTurn(chatThread, "you", message);
     chatHistory.push({ role: "you", text: message });
     chatInput.value = "";
@@ -2255,8 +2239,10 @@ export function mountLibrary(root: ParentNode = document): void {
     echoEl.textContent = "conversation";
 
     const pending = appendChatTurn(chatThread, "viber", "", true);
+    activeInlineToolLog = createInlineToolLog(pending);
     cancelActiveRun = () => {
       pending.remove();
+      activeInlineToolLog = null;
       const lastTurn = chatHistory[chatHistory.length - 1];
       if (lastTurn?.role === "you" && lastTurn.text === message) {
         chatHistory.pop();
@@ -2352,6 +2338,7 @@ export function mountLibrary(root: ParentNode = document): void {
       const liveTools = $("vmx-lib-chat-tools");
       liveTools.replaceChildren();
       delete liveTools.dataset.live;
+      activeInlineToolLog = null;
     }
     try {
       if (modeAtStart === "search") await runSearch(runId);

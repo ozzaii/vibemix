@@ -18,6 +18,7 @@ html, body { height: 100%; }
 
 body {
   font-family: var(--type-body);
+  font-size: var(--type-step-2);
   color: var(--silk);
   background: var(--void);
   -webkit-font-smoothing: antialiased;
@@ -26,9 +27,9 @@ body {
      multiple fine grids here; that made the whole surface shimmer before
      the user had even made a decision. */
   background:
-    linear-gradient(90deg, rgba(255, 165, 223, 0.026), transparent 28%, transparent 78%, rgba(72, 152, 255, 0.016)),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.026), transparent 28%, transparent 78%, rgba(255, 165, 223, 0.012)),
     radial-gradient(100% 82% at 8% -12%, rgba(255, 165, 223, 0.042), transparent 48%),
-    radial-gradient(78% 70% at 100% 110%, rgba(72, 152, 255, 0.020), transparent 58%),
+    radial-gradient(78% 70% at 100% 110%, rgba(232, 196, 122, 0.014), transparent 58%),
     var(--void-1);
 }
 
@@ -146,7 +147,7 @@ body {
     radial-gradient(circle at 14px calc(100% - 14px), rgba(255, 251, 244, 0.045) 0 1px, rgba(0, 0, 0, 0.34) 1px 3px, transparent 4px),
     radial-gradient(circle at calc(100% - 14px) calc(100% - 14px), rgba(255, 251, 244, 0.045) 0 1px, rgba(0, 0, 0, 0.34) 1px 3px, transparent 4px),
     linear-gradient(180deg, rgba(255, 251, 244, 0.024), transparent 21%),
-    linear-gradient(90deg, rgba(255, 165, 223, 0.018), transparent 30%, transparent 72%, rgba(72, 152, 255, 0.012)),
+    linear-gradient(90deg, rgba(255, 165, 223, 0.018), transparent 30%, transparent 72%, rgba(232, 196, 122, 0.010)),
     var(--glass-2);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.050),
@@ -930,100 +931,79 @@ body {
   font-weight: 650;
 }
 
-/* Center well: a composed idle field so chat mode never reads as an empty app. */
-.vmx-lib-command-field {
-  display: none;
-}
-:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-command-field {
-  position: absolute;
-  inset: clamp(18px, 3vw, 42px);
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  opacity: 0.28;
-  z-index: 0;
-}
-.vmx-lib-field-orbit {
-  position: relative;
-  width: min(360px, 62%);
-  aspect-ratio: 1;
-  border: 1px solid rgba(214, 207, 199, 0.052);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255, 165, 223, 0.032), transparent 13%),
-    radial-gradient(circle at 50% 50%, rgba(72, 152, 255, 0.018), transparent 48%),
-    radial-gradient(circle at 50% 50%, transparent 0 62%, rgba(0, 0, 0, 0.32) 78%);
-  box-shadow:
-    inset 0 0 32px rgba(0, 0, 0, 0.62),
-    inset 0 1px 0 rgba(255, 251, 244, 0.018),
-    0 0 34px rgba(255, 165, 223, 0.030);
-}
-.vmx-lib-field-orbit::before,
-.vmx-lib-field-orbit::after {
-  content: "";
-  position: absolute;
-  inset: 14%;
-  border: 1px solid rgba(255, 165, 223, 0.038);
-  border-radius: 50%;
-}
-.vmx-lib-field-orbit::after {
-  inset: 31%;
-  border-color: rgba(214, 207, 199, 0.040);
-  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.56);
-}
-.vmx-lib-field-orbit span {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255, 251, 244, 0.72), transparent 18%),
-    radial-gradient(circle at 50% 58%, var(--amber), rgba(255, 165, 223, 0.35) 54%, rgba(0, 0, 0, 0.72) 80%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.20),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.72),
-    var(--glow-faint);
-}
-.vmx-lib-field-orbit span:nth-child(1) { left: 17%; top: 34%; }
-.vmx-lib-field-orbit span:nth-child(2) { right: 20%; top: 22%; opacity: 0.66; }
-.vmx-lib-field-orbit span:nth-child(3) { right: 28%; bottom: 19%; opacity: 0.42; }
-.vmx-lib-field-readout {
-  position: absolute;
-  display: grid;
-  gap: 6px;
-  place-items: center;
-  padding: 14px 18px;
-  border: 1px solid rgba(214, 207, 199, 0.060);
-  border-radius: var(--rad-sm);
-  background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.020), transparent 48%, rgba(0, 0, 0, 0.26)),
-    rgba(0, 0, 0, 0.42);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.030),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.64),
-    0 8px 30px rgba(0, 0, 0, 0.36);
-}
-.vmx-lib-field-readout span,
-.vmx-lib-field-readout b {
-  font-family: var(--type-mono);
-  text-transform: uppercase;
-}
-.vmx-lib-field-readout span {
-  font-size: 9px;
-  letter-spacing: 0.24em;
-  color: var(--silk-22);
-}
-.vmx-lib-field-readout b {
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  color: var(--amber-pale);
-  font-weight: 500;
-  text-shadow: 0 0 8px var(--amber-22);
-}
-
 /* ── chat mode: conversational Viber ────────────────────── */
 .vmx-lib-chat-thread,
 .vmx-lib-chat-side {
+  display: none;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-frame {
+  grid-template-columns: minmax(0, 1fr);
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child {
+  position: absolute;
+  left: clamp(18px, 4vw, 72px);
+  right: clamp(18px, 4vw, 72px);
+  bottom: clamp(18px, 3vw, 34px);
+  z-index: 8;
+  min-height: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--rad-md);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.026), transparent 48%, rgba(0, 0, 0, 0.32)),
+    rgba(26, 22, 24, 0.94);
+  box-shadow:
+    var(--bevel-raised),
+    0 16px 46px rgba(0, 0, 0, 0.54),
+    0 0 32px -20px var(--brand-40);
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child .vmx-lib-panel-hd,
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child .vmx-lib-field:not([data-for~="chat"]),
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child .vmx-lib-corpus,
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child .vmx-lib-model-setup,
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child .vmx-lib-agent-setup {
+  display: none !important;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child .vmx-lib-panel-bd {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding: 12px;
+  overflow: visible;
+  background: transparent;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-modeswitch {
+  align-self: center;
+  width: auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-field[data-for="chat"] {
+  display: block !important;
+  margin: 0;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chatbox {
+  min-height: 54px;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chatbox textarea {
+  min-height: 52px;
+  max-height: 112px;
+  font-size: var(--type-step-2);
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-run {
+  width: auto;
+  min-width: 96px;
+  margin: 0;
+  align-self: stretch;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:nth-child(2) {
+  grid-column: 1;
+  border-left: 0;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:nth-child(3) {
+  display: none;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:nth-child(2) .vmx-lib-panel-hd {
   display: none;
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-results,
@@ -1044,7 +1024,7 @@ body {
   flex: 1;
   min-height: 0;
   justify-content: flex-end;
-  padding: clamp(20px, 3vw, 46px) clamp(20px, 3vw, 48px) clamp(22px, 3.4vw, 50px);
+  padding: clamp(26px, 4vw, 64px) clamp(22px, 5vw, 82px) clamp(142px, 18vh, 190px);
   /* A lit recessed display slab (the deck's .vmx-voice material), NOT a flat
      dark box. A soft rose key-light pools at the bottom where Viber's newest
      line sits, so the console reads as currently speaking. */
@@ -1085,36 +1065,9 @@ body {
   background:
     linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 36%, rgba(0, 0, 0, 0.18));
 }
-:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-side:empty::before {
-  content: "side rack idle";
-  display: block;
-  padding: 11px 12px;
-  font-family: var(--type-mono);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.6;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--silk-22);
-}
 .vmx-lib-chat-tools:empty::before,
 .vmx-lib-chat-artifact:empty::before {
-  display: block;
-  padding: 11px 12px;
-  font-family: var(--type-mono);
-  font-size: 9.5px;
-  font-weight: 600;
-  line-height: 1.6;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--silk-22);
-}
-.vmx-lib-chat-tools:empty::before {
-  content: "live read ready";
-}
-.vmx-lib-chat-artifact:empty::before {
-  content: "runs land here";
-  border-top: 1px solid var(--border-subtle);
+  display: none;
 }
 /* A console transcript, NOT a chatbot. Turns carry no per-turn box by default:
    Viber's voice flows as a lit stream, the user's line reads as a recessed
@@ -1206,13 +1159,13 @@ body {
 /* Viber answers warmer + larger — it is the agent's read line. */
 .vmx-lib-chat-turn[data-role="viber"] .body {
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: var(--type-step-3);
   line-height: 1.62;
   letter-spacing: -0.002em;
 }
 .vmx-lib-chat-turn[data-role="user"] .body {
   font-family: var(--type-mono);
-  font-size: 13px;
+  font-size: var(--type-step-1);
   line-height: 1.5;
   letter-spacing: 0.01em;
   color: var(--silk-65);
@@ -1236,98 +1189,128 @@ body {
   box-shadow: var(--glow-soft);
   animation: vmx-lib-breathe 1s ease-in-out infinite;
 }
-.vmx-lib-operator {
-  display: grid;
-  gap: 1px;
-  width: min(500px, 100%);
+.vmx-lib-agent-log {
+  margin-top: 12px;
+  max-width: min(620px, 100%);
   border: 1px solid var(--border-default);
-  border-radius: var(--rad-sm);
+  border-radius: var(--rad-md);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 46%, rgba(0, 0, 0, 0.22)),
-    rgba(0, 0, 0, 0.28);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 42%, rgba(0, 0, 0, 0.24)),
+    var(--void-5);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.024),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.64);
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.58);
   overflow: hidden;
 }
-.vmx-lib-operator[hidden] {
-  display: none;
-}
-.vmx-lib-operator__head {
+.vmx-lib-agent-log__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 10px 12px;
+  padding: 9px 11px;
   border-bottom: 1px solid var(--border-subtle);
-  background:
-    linear-gradient(90deg, var(--brand-04), transparent 48%),
-    rgba(0, 0, 0, 0.20);
+  font-family: var(--type-mono);
+  font-size: var(--type-step-0);
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
 }
-.vmx-lib-operator__head b {
+.vmx-lib-agent-log__head b {
+  color: var(--brand-glow);
+  font-weight: 500;
+}
+.vmx-lib-agent-log__head b::after {
+  content: "";
+  display: inline-block;
+  width: 30px;
+  height: 1px;
+  margin-left: 10px;
+  vertical-align: middle;
+  background: linear-gradient(90deg, var(--brand-40), transparent);
+  animation: vmx-lib-agent-think 1.1s var(--ease-brand) infinite;
+}
+.vmx-lib-agent-log[data-collapsed="true"] .vmx-lib-agent-log__head {
+  border-bottom: 0;
+}
+.vmx-lib-agent-log[data-collapsed="true"] .vmx-lib-agent-log__head b::after {
+  content: "✓";
+  width: auto;
+  height: auto;
+  margin-left: 8px;
+  background: none;
+  animation: none;
+}
+.vmx-lib-agent-log[data-collapsed="true"] .vmx-lib-agent-log__rows {
+  display: none;
+}
+.vmx-lib-agent-log__rows {
+  display: grid;
+}
+.vmx-lib-agent-log__row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  padding: 9px 11px;
+  border-top: 1px solid var(--border-subtle);
+}
+.vmx-lib-agent-log__row:first-child {
+  border-top: 0;
+}
+.vmx-lib-agent-log__status {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--brand-40);
+  border-radius: 50%;
+}
+.vmx-lib-agent-log__row[data-state="running"] .vmx-lib-agent-log__status {
+  border-top-color: transparent;
+  animation: vmx-lib-agent-spin 0.72s linear infinite;
+}
+.vmx-lib-agent-log__row[data-state="done"] .vmx-lib-agent-log__status,
+.vmx-lib-agent-log__row[data-state="failed"] .vmx-lib-agent-log__status {
+  display: grid;
+  place-items: center;
+  border-color: transparent;
+  animation: none;
+}
+.vmx-lib-agent-log__row[data-state="done"] .vmx-lib-agent-log__status::before {
+  content: "✓";
+  color: var(--led-ok);
+  font-family: var(--type-mono);
+  font-size: var(--type-step-0);
+}
+.vmx-lib-agent-log__row[data-state="failed"] .vmx-lib-agent-log__status::before {
+  content: "!";
+  color: var(--led-fault);
+  font-family: var(--type-mono);
+  font-size: var(--type-step-0);
+}
+.vmx-lib-agent-log__row b,
+.vmx-lib-agent-log__row span {
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.vmx-lib-agent-log__row b {
   font-family: var(--type-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--silk-65);
-}
-.vmx-lib-operator__grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-}
-.vmx-lib-operator__cell {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-  padding: 11px 12px 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 56%),
-    rgba(255, 251, 244, 0.014);
-}
-.vmx-lib-operator__cell span,
-.vmx-lib-operator__cell b {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.vmx-lib-operator__cell span {
-  font-family: var(--type-mono);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.20em;
-  text-transform: uppercase;
-  color: var(--silk-22);
-}
-.vmx-lib-operator__cell b {
-  font-family: var(--type-mono);
-  font-size: 11px;
+  font-size: var(--type-step-0);
   font-weight: 600;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--silk-40);
+  color: var(--text-secondary);
 }
-.vmx-lib-operator__cell small {
-  min-width: 0;
-  font-family: var(--type-body);
-  font-size: 12px;
-  line-height: 1.2;
-  color: var(--silk-40);
-  overflow-wrap: anywhere;
+.vmx-lib-agent-log__row span {
+  margin-top: 2px;
+  font-size: var(--type-step-0);
+  color: var(--text-muted);
 }
-.vmx-lib-operator__cell[data-state="ok"] b {
-  color: var(--brand);
-  text-shadow: 0 0 8px var(--brand-22);
+@keyframes vmx-lib-agent-spin {
+  to { transform: rotate(360deg); }
 }
-.vmx-lib-operator__cell[data-state="fault"] b {
-  color: var(--led-fault);
-  text-shadow: 0 0 8px rgba(212, 65, 58, 0.34);
+@keyframes vmx-lib-agent-think {
+  0%, 100% { opacity: 0.32; transform: scaleX(0.48); }
+  50% { opacity: 1; transform: scaleX(1); }
 }
 .vmx-lib-chat-starters {
   display: grid;
@@ -1508,115 +1491,6 @@ body {
 .vmx-lib-chat-artifact {
   border-top: 1px solid var(--glass-edge);
   padding-top: 14px;
-}
-.vmx-lib-idle-mission {
-  border: 1px solid var(--border-default);
-  border-radius: var(--rad-md);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 22%, rgba(0, 0, 0, 0.28)),
-    var(--glass-1);
-  box-shadow:
-    inset 0 1px 0 var(--glass-top),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.62),
-    var(--shadow-raised);
-  overflow: hidden;
-}
-.vmx-lib-idle-mission__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 13px;
-  border-bottom: 1px solid var(--border-default);
-  background:
-    linear-gradient(90deg, var(--brand-08), transparent 68%),
-    rgba(0, 0, 0, 0.20);
-}
-.vmx-lib-idle-mission__head div {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-.vmx-lib-idle-mission__head span,
-.vmx-lib-idle-mission__head em {
-  font-family: var(--type-mono);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--silk-40);
-}
-.vmx-lib-idle-mission__head b {
-  min-width: 0;
-  font-family: var(--type-display);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.18;
-  color: var(--text-primary);
-}
-.vmx-lib-idle-mission__head em {
-  flex: 0 0 auto;
-  max-width: 44%;
-  color: var(--brand);
-  font-style: normal;
-  text-align: right;
-  overflow-wrap: anywhere;
-  text-shadow: var(--text-emboss);
-}
-.vmx-lib-idle-mission__rows {
-  display: grid;
-}
-.vmx-lib-idle-mission__row {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  gap: 11px;
-  padding: 10px 13px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: rgba(255, 251, 244, 0.010);
-}
-.vmx-lib-idle-mission__row > span {
-  font-family: var(--type-mono);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  /* Position ordinal, NOT a key/heat/energy numeric — gold is quarantined to
-   * those. Quiet tertiary ink so the mission text leads (impeccable layout). */
-  color: var(--text-tertiary);
-  text-align: right;
-}
-.vmx-lib-idle-mission__row div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-.vmx-lib-idle-mission__row b {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--type-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--silk);
-}
-.vmx-lib-idle-mission__row small {
-  min-width: 0;
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--silk-55);
-  overflow-wrap: anywhere;
-}
-.vmx-lib-idle-mission__foot {
-  padding: 10px 13px 11px;
-  font-family: var(--type-mono);
-  font-size: 9.5px;
-  font-weight: 600;
-  line-height: 1.45;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--brand);
-  background: linear-gradient(90deg, var(--brand-06), transparent 72%);
 }
 /* The artifact = a premium lit readout card (a built set / playlist receipt).
    Crisp machined edges, a lit caption header, real labels. Gold reserved for
@@ -2296,14 +2170,28 @@ body {
     max-width: 360px;
     align-self: center;
   }
-  :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-command-field {
-    inset: 18px;
-    opacity: 0.26;
+  :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child {
+    left: 18px;
+    right: 18px;
+    bottom: 18px;
   }
-  .vmx-lib-field-orbit {
-    width: min(280px, 84%);
+  :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-thread {
+    padding: 30px 22px 230px;
   }
-  .vmx-lib-field-readout {
-    display: none;
+  :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child .vmx-lib-panel-bd {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+  }
+  :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-modeswitch {
+    align-self: stretch;
+  }
+  :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-field[data-for="chat"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-run {
+    grid-column: 2;
+    min-width: 96px;
+    min-height: 62px;
   }
 }

@@ -342,6 +342,11 @@
   --type-body:    'Saira', system-ui, sans-serif;
   --type-mono:    'JetBrains Mono', ui-monospace, monospace;
   --type-serif:   'Instrument Serif', Georgia, serif;  /* cohost hero + lead track names */
+  --type-step-0: 11px;
+  --type-step-1: 13px;
+  --type-step-2: 15px;
+  --type-step-3: 18px;
+  --type-step-4: 22px;
 
   /* --- Radius (v5) --- */
   --rad-sm: 2px;

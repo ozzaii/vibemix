@@ -106,12 +106,12 @@ export function runLabel(mode: LibraryMode): string {
     case "curate":
       return "▸ Curate playlist";
     case "build":
-      return "▸ Build a Set";
+      return "Build set";
     case "chat":
-      return "▸ Ask Viber";
+      return "Send";
     case "search":
     default:
-      return "▸ Run search";
+      return "Run search";
   }
 }
 

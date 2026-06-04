@@ -44,11 +44,11 @@ describe("mode switch + labels", () => {
   });
 
   it("maps each mode to its run-button label", () => {
-    expect(runLabel("search")).toBe("▸ Run search");
+    expect(runLabel("search")).toBe("Run search");
     expect(runLabel("similar")).toBe("▸ Find similar");
     expect(runLabel("ingest")).toBe("▸ Embed folder");
     expect(runLabel("cue")).toBe("▸ Export cues");
-    expect(runLabel("chat")).toBe("▸ Ask Viber");
+    expect(runLabel("chat")).toBe("Send");
   });
 
   it("echoes conversation in chat, query in search, seed in similar, and folder in cue", () => {

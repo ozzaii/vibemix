@@ -477,8 +477,6 @@ function mountSkeleton(): void {
     <span id="vmx-lib-echo"></span>
     <div id="vmx-lib-stat-indexed"></div>
     <div id="vmx-lib-stat-backend"></div>
-    <div id="vmx-lib-stat-spent"></div>
-    <div id="vmx-lib-stat-failed"></div>
     <div id="vmx-lib-model-state"></div>
     <button id="vmx-lib-install-models"></button>
     <div id="vmx-lib-agent-setup" hidden><div id="vmx-lib-agent-state"></div></div>
@@ -491,32 +489,14 @@ function mountSkeleton(): void {
         <div class="who">viber</div>
         <div class="body">I can build a set, solve a transition, or find deep cuts.</div>
       </div>
-      <div id="vmx-lib-operator" data-wire="library.operator-brief">
-        <div data-operator="build">
-          <span>Build</span>
-          <b id="vmx-lib-operator-build"></b>
-          <small>sequence, key, export</small>
-        </div>
-        <div data-operator="mix">
-          <span>Mix</span>
-          <b id="vmx-lib-operator-mix"></b>
-          <small id="vmx-lib-operator-proof"></small>
-        </div>
-        <div data-operator="rediscover">
-          <span>Rediscover</span>
-          <b id="vmx-lib-operator-search"></b>
-          <small>deep cuts, no repeats</small>
-        </div>
-        <b id="vmx-lib-operator-state"></b>
-      </div>
       <div id="vmx-lib-chat-starters" data-wire="library.chat-starters">
-        <button type="button" data-chat="build a 45-minute psytrance set from my indexed tracks, clean energy arc, no fake genres">
+        <button type="button" data-chat="build a 45-minute psytrance set from my library, clean energy arc, nothing invented">
           <span>Build a set</span>
-          <b>Build 45 min psytrance</b>
+          <b>45 min psytrance</b>
         </button>
-        <button type="button" data-chat="what mixes cleanly out of the currently playing track? use only grounded live and library evidence">
+        <button type="button" data-chat="what mixes cleanly out of the currently playing track? just my library, nothing invented">
           <span>What mixes next</span>
-          <b>Find grounded transition</b>
+          <b>Current track out</b>
         </button>
         <button type="button" data-chat="find deep cuts in my crate that fit this set but avoid the obvious repeats">
           <span>Rediscover</span>
@@ -581,57 +561,29 @@ describe("chat - real runChat path", () => {
     ).toBeTruthy();
     expect(
       document.querySelector('[data-wire="library.operator-brief"]'),
-    ).toBeTruthy();
-    const idleMission = document.querySelector<HTMLElement>(
-      '[data-wire="library.idle-mission"]',
-    );
-    expect(idleMission).not.toBeNull();
-    expect(idleMission?.textContent).toContain("Viber runbook");
-    expect(idleMission?.textContent).toContain("12 indexed tracks");
-    expect(idleMission?.textContent).toContain(
-      "No fake tracks. No guessing transitions.",
-    );
-    expect(document.getElementById("vmx-lib-operator-state")?.textContent).toBe(
-      "set prep ready",
-    );
-    expect(document.getElementById("vmx-lib-operator-build")?.textContent).toBe(
-      "12 tracks",
-    );
-    expect(document.getElementById("vmx-lib-operator-search")?.textContent).toBe(
-      "local",
-    );
-    expect(document.getElementById("vmx-lib-operator-mix")?.textContent).toBe(
-      "waiting",
-    );
-    expect(document.getElementById("vmx-lib-operator-proof")?.textContent).toBe(
-      "waiting for decks",
+    ).toBeNull();
+    expect(threadText).not.toContain("Operator brief");
+    expect(threadText).not.toContain("Viber runbook");
+    expect(threadText).not.toContain("No fake tracks. No guessing transitions.");
+    expect(document.getElementById("vmx-lib-chat-tools")?.textContent ?? "").toBe(
+      "",
     );
   });
 
-  it("updates the operator brief when live transition proof arms", async () => {
+  it("does not turn live deck readiness into a permanent chat cockpit", async () => {
     await mountChat();
 
     liveContextCallback?.(readyDeckPairLiveContext());
     for (let i = 0; i < 4; i++) await Promise.resolve();
 
-    expect(document.getElementById("vmx-lib-operator-state")?.textContent).toBe(
+    expect(document.querySelector('[data-wire="library.operator-brief"]')).toBeNull();
+    expect(document.querySelector('[data-wire="library.idle-mission"]')).toBeNull();
+    expect(document.getElementById("vmx-lib-chat-tools")?.textContent ?? "").toBe(
+      "",
+    );
+    expect(document.getElementById("vmx-lib-chat-thread")?.textContent).not.toContain(
       "live transition armed",
     );
-    expect(document.getElementById("vmx-lib-operator-mix")?.textContent).toBe(
-      "armed",
-    );
-    expect(document.getElementById("vmx-lib-operator-proof")?.textContent).toBe(
-      "deck1 A=known:dominant / deck2 B=known:present",
-    );
-    expect(
-      document.querySelector<HTMLElement>('[data-wire="library.idle-mission"]')
-        ?.textContent,
-    ).toContain("Live mix armed");
-    expect(
-      document
-        .querySelector<HTMLElement>('[data-operator="mix"]')
-        ?.dataset.state,
-    ).toBe("ok");
   });
 
   it("runs a starter mission through the same Viber path and hides the starter rail", async () => {
@@ -643,7 +595,7 @@ describe("chat - real runChat path", () => {
     for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(chatMock).toHaveBeenCalledWith(
-      "what mixes cleanly out of the currently playing track? use only grounded live and library evidence",
+      "what mixes cleanly out of the currently playing track? just my library, nothing invented",
       [],
     );
     expect(
@@ -661,27 +613,12 @@ describe("chat - real runChat path", () => {
     document.body.innerHTML = "";
   });
 
-  it("shows live read status before the user asks Viber", async () => {
-    await mountChat();
-
-    const toolText =
-      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
-    expect(toolText).toContain("waiting");
-
-    const proofRow = document.querySelector<HTMLElement>(
-      '.vmx-lib-chat-tool[data-proof="true"]',
-    );
-    expect(proofRow?.dataset.proofState).toBe("waiting");
-  });
-
   it("surfaces a user-approved library setup action when Viber finds a source", async () => {
     statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
 
     await mountChat();
 
-    const artifact = document.getElementById("vmx-lib-chat-artifact");
-    const setupCard = artifact?.querySelector<HTMLElement>(
+    const setupCard = document.querySelector<HTMLElement>(
       '[data-wire="library.setup-candidate"]',
     );
     expect(setupCard).not.toBeNull();
@@ -730,106 +667,11 @@ describe("chat - real runChat path", () => {
     });
     expect(button?.disabled).toBe(true);
     expect(
-      document.getElementById("vmx-lib-chat-artifact")?.textContent,
+      document.querySelector('[data-wire="library.setup-candidate"]')?.textContent,
     ).toContain("indexing started");
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
       "indexing library",
     );
-  });
-
-  it("keeps the live read partial until deck-pair audio is active", async () => {
-    await mountChat();
-
-    liveContextCallback?.(readyIdentifiedDeckPairLiveContext());
-    for (let i = 0; i < 4; i++) await Promise.resolve();
-
-    const toolText =
-      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
-    expect(toolText).toContain("partial");
-    expect(toolText).toContain("deck audio");
-    expect(toolText).not.toContain("armed");
-  });
-
-  it("arms the live read only after deck-pair audio activity arrives", async () => {
-    await mountChat();
-
-    liveContextCallback?.(readyDeckPairLiveContext());
-    for (let i = 0; i < 4; i++) await Promise.resolve();
-
-    const toolText =
-      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
-    expect(toolText).toContain("armed");
-    expect(toolText).toContain("deck1 A=known:dominant");
-    expect(toolText).toContain("deck2 B=known:present");
-  });
-
-  it("keeps the live read partial when deck audio is active but Deck B is unresolved", async () => {
-    await mountChat();
-
-    const context = readyDeckPairLiveContext();
-    liveContextCallback?.({
-      ...context,
-      deck_state: context.deck_state?.A ? { A: context.deck_state.A } : {},
-    });
-    for (let i = 0; i < 4; i++) await Promise.resolve();
-
-    const toolText =
-      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
-    expect(toolText).toContain("partial");
-    expect(toolText).toContain("deck identities");
-    expect(toolText).not.toContain("armed");
-  });
-
-  it("keeps the live read partial when only one captured deck lane is active", async () => {
-    await mountChat();
-
-    const oneLane = readyDeckPairLiveContext();
-    liveContextCallback?.({
-      ...oneLane,
-      live_evidence: {
-        mix: (oneLane.live_evidence?.mix ?? []).map((token) =>
-          token
-            .replace(
-              "deck_audio_capture=A_active+B_active",
-              "deck_audio_capture=A_active+B_silent",
-            )
-            .replace(
-              "deck_audio_features=A_active_rms_0.020+B_active_rms_0.030",
-              "deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000",
-            )
-            .replace(
-              "deck_audio_window=A_active_pre_0.020_current_0.040+B_active_pre_0.030_current_0.020",
-              "deck_audio_window=A_active_pre_0.020_current_0.040+B_silent_pre_0.030_current_0.000",
-            ),
-        ),
-        refs: (oneLane.live_evidence?.refs ?? []).map((token) =>
-          token
-            .replace(
-              "mix:deck_audio_capture=A_active+B_active",
-              "mix:deck_audio_capture=A_active+B_silent",
-            )
-            .replace(
-              "mix:deck_audio_features=A_active_rms_0.020+B_active_rms_0.030",
-              "mix:deck_audio_features=A_active_rms_0.020+B_silent_rms_0.000",
-            )
-            .replace(
-              "mix:deck_audio_window=A_active_pre_0.020_current_0.040+B_active_pre_0.030_current_0.020",
-              "mix:deck_audio_window=A_active_pre_0.020_current_0.040+B_silent_pre_0.030_current_0.000",
-            ),
-        ),
-      },
-    });
-    for (let i = 0; i < 4; i++) await Promise.resolve();
-
-    const toolText =
-      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
-    expect(toolText).toContain("partial");
-    expect(toolText).toContain("both decks active");
-    expect(toolText).not.toContain("armed");
   });
 
   it("passes Deck A/B audio-window part labels into Viber chat", async () => {
@@ -884,37 +726,6 @@ describe("chat - real runChat path", () => {
     );
   });
 
-  it("keeps live read partial when deck-pair evidence is missing", async () => {
-    await mountChat();
-
-    const context = readyDeckPairLiveContext();
-    liveContextCallback?.({
-      ...context,
-      live_evidence: {
-        mix: (context.live_evidence?.mix ?? []).filter(
-          (token) =>
-            !token.includes("deck_audio_features=") &&
-            !token.includes("deck_audio_delta=") &&
-            !token.includes("deck_audio_window="),
-        ),
-        refs: (context.live_evidence?.refs ?? []).filter(
-          (token) =>
-            !token.includes("deck_audio_features=") &&
-            !token.includes("deck_audio_delta=") &&
-            !token.includes("deck_audio_window="),
-        ),
-      },
-    });
-    for (let i = 0; i < 4; i++) await Promise.resolve();
-
-    const toolText =
-      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
-    expect(toolText).toContain("partial");
-    expect(toolText).toContain("deck audio features");
-    expect(toolText).not.toContain("armed");
-  });
-
   it("renders a grounded tool trace and playlist artifact from one Viber turn", async () => {
     await mountChat();
     await sendChat("find two dark peak techno tracks");
@@ -933,13 +744,13 @@ describe("chat - real runChat path", () => {
     ).toBe("");
 
     const toolText =
-      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
+      document.querySelector(".vmx-lib-agent-log")?.textContent ?? "";
     expect(toolText).toContain("search_vibe");
     expect(toolText).toContain("dark peak techno");
     expect(toolText).toContain("create_playlist");
 
     const artifactText =
-      document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
+      document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
     expect(artifactText).toContain("playlist");
     expect(artifactText).toContain("Dark Fuse");
     expect(artifactText).toContain("2 tracks");
@@ -994,7 +805,7 @@ describe("chat - real runChat path", () => {
     expect(proofRow?.dataset.ok).toBe("true");
 
     const artifactText =
-      document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
+      document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
     expect(artifactText).toContain("live read");
     expect(artifactText).toContain("live move checked");
     expect(artifactText).not.toContain("guard");
@@ -1048,7 +859,7 @@ describe("chat - real runChat path", () => {
     expect(toolText).not.toContain("supported_verdict");
 
     const artifactText =
-      document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
+      document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
     expect(artifactText).toContain("live read");
     expect(artifactText).toContain("scoring backed");
     expect(artifactText).toContain("move scoring backed by live read");
@@ -1106,7 +917,7 @@ describe("chat - real runChat path", () => {
     );
 
     const artifactText =
-      document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
+      document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
     expect(artifactText).toContain("live read");
     expect(artifactText).toContain("listening");
     expect(artifactText).not.toContain("live_context_required");
@@ -1148,7 +959,7 @@ describe("chat - real runChat path", () => {
     await mountChat();
     await sendChat("why can't you read the decks?");
 
-    const artifact = document.getElementById("vmx-lib-chat-artifact");
+    const artifact = document.getElementById("vmx-lib-chat-thread");
     const cards = artifact?.querySelectorAll<HTMLElement>(".vmx-lib-chat-card");
     expect(cards).toHaveLength(2);
     const firstCard = cards?.item(0);
@@ -1185,7 +996,7 @@ describe("chat - real runChat path", () => {
     for (let i = 0; i < 4; i++) await Promise.resolve();
 
     const liveText =
-      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
+      document.querySelector(".vmx-lib-agent-log")?.textContent ?? "";
     expect(liveText).toContain("search_vibe");
     expect(liveText).toContain("dark rolling bridge");
     expect(liveText).toContain("8 tracks");
@@ -1254,7 +1065,7 @@ describe("chat - real runChat path", () => {
     expect(breakdownText).toContain("t003");
     // dropped tracks are surfaced, not silently swallowed
     const artifactText =
-      document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
+      document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
     expect(artifactText).toContain("1 dropped");
   });
 
@@ -1653,7 +1464,7 @@ describe("chat - real runChat path", () => {
     await sendChat("what bridge clicks?");
 
     const artifact = document.getElementById(
-      "vmx-lib-chat-artifact",
+      "vmx-lib-chat-thread",
     ) as HTMLElement;
     const grade = artifact.querySelector<HTMLElement>(
       '[data-wire="library.chat-move-grade"]',
@@ -1770,7 +1581,7 @@ describe("chat - real runChat path", () => {
     expect(threadText).toContain("1. headphones");
 
     const artifact = document.getElementById(
-      "vmx-lib-chat-artifact",
+      "vmx-lib-chat-thread",
     ) as HTMLElement;
     const card = artifact.querySelector(
       '[data-wire="library.chat-clarification"]',

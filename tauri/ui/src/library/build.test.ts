@@ -46,7 +46,7 @@ describe("build — state machine", () => {
 
   it("maps the build mode to its field + run labels", () => {
     expect(fieldLabel("build")).toBe("Build a Set");
-    expect(runLabel("build")).toBe("▸ Build a Set");
+    expect(runLabel("build")).toBe("Build set");
   });
 
   it("echoes the brief in build mode (not the query/seed/theme)", () => {
@@ -745,7 +745,7 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     const threadText = document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
     expect(threadText).toContain("Codex CLI not found");
     const artifactText =
-      document.getElementById("vmx-lib-chat-artifact")?.textContent ?? "";
+      document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
     expect(artifactText).toContain("Codex CLI missing");
     expect(artifactText).toContain("codex login");
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(

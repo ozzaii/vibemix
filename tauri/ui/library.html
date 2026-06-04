@@ -159,11 +159,10 @@
                 </div>
               </div>
 
-              <!-- Viber operator field, backed by library_chat. The home surface:
+              <!-- Viber composer, backed by library_chat. The home surface:
                    one prompt that searches, finds similar, curates and builds
                    (the tool tabs above are the same actions). -->
               <div class="vmx-lib-field" data-for="chat" data-wire="library.chat-field">
-                <span class="vmx-lib-label">Ask Viber</span>
                 <div class="vmx-lib-qbox vmx-lib-chatbox">
                   <textarea id="vmx-lib-chat"
                             rows="3"
@@ -171,7 +170,7 @@
                 </div>
               </div>
 
-              <button class="vmx-lib-run" id="vmx-lib-runbtn" data-wire="library.run">▸ Run Viber</button>
+              <button class="vmx-lib-run" id="vmx-lib-runbtn" data-wire="library.run">Send</button>
 
               <!-- corpus readout -->
               <div class="vmx-lib-corpus" data-wire="library.stats">
@@ -182,14 +181,6 @@
                 <div class="vmx-lib-stat">
                   <div class="k">Search</div>
                   <div class="v backend" id="vmx-lib-stat-backend">·</div>
-                </div>
-                <div class="vmx-lib-stat">
-                  <div class="k">Spend</div>
-                  <div class="v amber" id="vmx-lib-stat-spent">·</div>
-                </div>
-                <div class="vmx-lib-stat">
-                  <div class="k">Failed</div>
-                  <div class="v" id="vmx-lib-stat-failed">·</div>
                 </div>
               </div>
               <div class="vmx-lib-model-setup" id="vmx-lib-model-setup" data-wire="library.model-setup">
@@ -215,18 +206,6 @@
               <span class="vmx-lib-count" id="vmx-lib-rcount">·</span>
             </div>
             <div class="vmx-lib-panel-bd">
-              <div class="vmx-lib-command-field" data-wire="library.command-field" aria-hidden="true">
-                <div class="vmx-lib-field-orbit">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <div class="vmx-lib-field-readout">
-                  <span>local index</span>
-                  <b>vibe field armed</b>
-                </div>
-              </div>
-
               <!-- curate rationale — the agent's plain-language read on the set
                    it built; shown only in curate mode, above the numbered set. -->
               <div class="vmx-lib-rationale" id="vmx-lib-rationale" data-wire="library.rationale">
@@ -252,41 +231,18 @@
                   <div class="who">viber</div>
                   <div class="body">I can build a set, score a transition, or rediscover deep cuts.</div>
                 </div>
-                <div class="vmx-lib-operator" id="vmx-lib-operator" data-wire="library.operator-brief" aria-label="Viber operator brief">
-                  <div class="vmx-lib-operator__head">
-                    <span class="vmx-lib-label">Operator brief</span>
-                    <b id="vmx-lib-operator-state">set prep checking</b>
-                  </div>
-                  <div class="vmx-lib-operator__grid">
-                    <div class="vmx-lib-operator__cell" data-operator="build">
-                      <span>Build</span>
-                      <b id="vmx-lib-operator-build">crate checking</b>
-                      <small>key arc export</small>
-                    </div>
-                    <div class="vmx-lib-operator__cell" data-operator="mix">
-                      <span>Mix</span>
-                      <b id="vmx-lib-operator-mix">live read waiting</b>
-                      <small id="vmx-lib-operator-proof">waiting for decks</small>
-                    </div>
-                    <div class="vmx-lib-operator__cell" data-operator="rediscover">
-                      <span>Rediscover</span>
-                      <b id="vmx-lib-operator-search">search checking</b>
-                      <small>deep cuts, no repeats</small>
-                    </div>
-                  </div>
-                </div>
                 <div class="vmx-lib-chat-starters" id="vmx-lib-chat-starters" data-wire="library.chat-starters" aria-label="Viber starter prompts">
-                  <button type="button" data-chat="build a 45-minute psytrance set from my indexed tracks, clean energy arc, no fake genres">
+                  <button type="button" data-chat="build a 45-minute psytrance set from my library, clean energy arc, nothing invented">
                     <span>Build a set</span>
-                    <b>Build 45 min psytrance</b>
+                    <b>45 min psytrance</b>
                   </button>
-                  <button type="button" data-chat="what mixes cleanly out of the currently playing track? use only grounded live and library evidence">
+                  <button type="button" data-chat="what mixes cleanly out of the currently playing track? just my library, nothing invented">
                     <span>What mixes next</span>
-                    <b>Find grounded transition</b>
+                    <b>Current track out</b>
                   </button>
                   <button type="button" data-chat="find deep cuts in my crate that fit this set but avoid the obvious repeats">
                     <span>Rediscover</span>
-                    <b>Find deep cuts, no repeats</b>
+                    <b>Deep cuts</b>
                   </button>
                 </div>
               </div>
@@ -308,7 +264,7 @@
           <!-- RIGHT — vibe scope -->
           <aside class="vmx-lib-panel" data-wire="library.grounding-panel">
             <div class="vmx-lib-panel-hd">
-              <span class="vmx-lib-label" id="vmx-lib-side-label">Grounding</span>
+              <span class="vmx-lib-label" id="vmx-lib-side-label">Scope</span>
               <span class="spacer" style="flex: 1"></span>
               <span class="vmx-lib-count vmx-lib-mono" id="vmx-lib-scope-state"
                     style="font-size: 10px">·</span>

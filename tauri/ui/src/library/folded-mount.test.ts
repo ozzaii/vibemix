@@ -113,7 +113,7 @@ describe("folded library mount", () => {
 
     const app = mount.querySelector<HTMLElement>(".vmx-lib-app");
     expect(app?.dataset.mode).toBe("chat");
-    expect(mount.querySelector("#vmx-lib-runbtn")?.textContent).toBe("▸ Ask Viber");
+    expect(mount.querySelector("#vmx-lib-runbtn")?.textContent).toBe("Send");
     expect(shellOnly.style.display).toBe("");
     expect(shellOnly.dataset.for).toBe("status-tip");
   });

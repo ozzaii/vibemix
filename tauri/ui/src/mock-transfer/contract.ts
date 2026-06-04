@@ -94,12 +94,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "library.stats", purpose: "corpus/model/backend stats" },
       { wire: "library.model-setup", purpose: "local model readiness and install" },
       { wire: "library.agent-setup", purpose: "Codex/Viber setup hint" },
-      {
-        wire: "library.operator-brief",
-        purpose: "folded Crate/Viber first-screen operator brief",
-      },
       { wire: "library.results-panel", purpose: "main result/rationale panel" },
-      { wire: "library.command-field", purpose: "command echo and active-mode label" },
       { wire: "library.rationale", purpose: "curate/build set notes" },
       { wire: "library.export", purpose: "Rekordbox export result line" },
       { wire: "library.results", purpose: "search/set/build rows" },
@@ -130,8 +125,8 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
         producerFile: "src/library/index.ts",
       },
       {
-        wire: "library.idle-mission",
-        purpose: "Viber at-rest runbook derived from library stats and live proof gate",
+        wire: "library.chat-agent-log",
+        purpose: "inline live Viber tool log attached to the chat turn",
         producerFile: "src/library/index.ts",
       },
     ],
