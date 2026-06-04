@@ -28,7 +28,14 @@ _GROUNDED_VOICE_EXTRA_KEYS = frozenset(
 )
 
 _DESCRIBE_BANK_EVENT_TYPES = frozenset(
-    {"HEARTBEAT", "PHASE", "LAYER_ARRIVAL", "TRACK_CHANGE"}
+    {
+        "HEARTBEAT",
+        "PHASE",
+        "LAYER_ARRIVAL",
+        "PHRASE_BOUNDARY",
+        "SUB_LAYER_ARRIVAL",
+        "TRACK_CHANGE",
+    }
 )
 
 
@@ -89,8 +96,11 @@ def event_speak_fingerprint(ev: Event) -> str:
     if ev.type == "PHASE":
         phase = extra.get("new_phase") or getattr(ev.state, "phase", "")
         parts.append(f"phase={_text_atom(phase)}")
-    elif ev.type == "LAYER_ARRIVAL":
+    elif ev.type in {"LAYER_ARRIVAL", "SUB_LAYER_ARRIVAL"}:
         parts.append(f"layer={_text_atom(extra.get('band'))}")
+    elif ev.type == "PHRASE_BOUNDARY":
+        phase = extra.get("new_phase") or getattr(ev.state, "phase", "")
+        parts.append(f"phase={_text_atom(phase)}")
     elif ev.type == "TRACK_CHANGE":
         track = extra.get("new_track") or getattr(ev.state, "audible_track", "")
         parts.append(f"track={_text_atom(track)}")
@@ -117,9 +127,9 @@ def decide_speak_gate(
 
     Manual/user speech paths always pass. MIX_MOVE, DROP, and genre-specific
     structural events keep the event priority ladder. The describe-bank-prone
-    automatic events (plain HEARTBEAT / PHASE / LAYER_ARRIVAL / TRACK_CHANGE)
-    only reach Sven when code has already attached a grounded deterministic
-    voice payload.
+    automatic events (plain HEARTBEAT / PHASE / layer-arrivals / phrase
+    boundaries / TRACK_CHANGE) only reach Sven when code has already attached a
+    grounded deterministic voice payload.
     """
 
     if manual or kaan_just_spoke or ev.type in {"MANUAL", "KAAN_SPOKE"}:
