@@ -365,7 +365,7 @@ def _what_remains(sp: SkillProgress, spec: SkillSpec) -> str:
     uncreditable branch states the current limit without hinting at a hidden path:
 
       * ``mastered``  → ``""`` (the cited-proof line carries it; nothing remains).
-      * ``competent`` + creditable → ``"{N-count} more cited live demo(s) to Master"``.
+      * ``competent`` + creditable → ``"{N-count} more cited proof(s) to Master"``.
       * ``competent`` + uncreditable → states the limit, NO false "soon"/"coming".
       * ``locked`` + lessons done (fill ≥ threshold) → the recital is the gate (COMP-02).
       * ``locked`` + lessons unfinished → finish the lessons first.
@@ -378,8 +378,8 @@ def _what_remains(sp: SkillProgress, spec: SkillSpec) -> str:
             # without promising a path that does not exist (anti-slop).
             return "Mastered isn't live-graded for this skill"
         remaining = max(1, spec.mastered_threshold - sp.live_proof_count)
-        unit = "demo" if remaining == 1 else "demos"
-        return f"{remaining} more cited live {unit} to Master"
+        unit = "proof" if remaining == 1 else "proofs"
+        return f"{remaining} more cited {unit} to Master"
     # locked: distinguish "needs the recital" (lessons done) from "needs lessons".
     if sp.learn_fill >= COMPETENT_THRESHOLD:
         return "Pass the recital to reach Competent"

@@ -52,8 +52,8 @@ def test_locked_lessons_done_recital_pending_says_pass_the_recital():
 
 
 def test_competent_creditable_counts_down_remaining_demos():
-    # eq_mixing IS live-creditable (MIX_MOVE EQ-band). At Competent with 1 of 3 demos,
-    # exactly 2 remain — plural phrasing.
+    # eq_mixing has citable practice/live producers. At Competent with 1 of 3
+    # proofs, exactly 2 remain - plural phrasing.
     progress = LearnProgress()
     _compete(progress, "eq_mixing")
     progress.skills["eq_mixing"] = {
@@ -61,7 +61,7 @@ def test_competent_creditable_counts_down_remaining_demos():
     }
     row = _row(progress, "eq_mixing")
     assert row["stage"] == "competent"
-    assert row["what_remains"] == "2 more cited live demos to Master"
+    assert row["what_remains"] == "2 more cited proofs to Master"
 
 
 def test_competent_creditable_singular_when_one_demo_left():
@@ -71,7 +71,7 @@ def test_competent_creditable_singular_when_one_demo_left():
         "live_proof_count": 2, "mastered": False, "first_mastered_at": None,
     }
     row = _row(progress, "eq_mixing")
-    assert row["what_remains"] == "1 more cited live demo to Master"
+    assert row["what_remains"] == "1 more cited proof to Master"
 
 
 def test_competent_beatmatching_counts_down_after_producer_lands():
@@ -81,7 +81,7 @@ def test_competent_beatmatching_counts_down_after_producer_lands():
     _compete(progress, "beatmatching")
     row = _row(progress, "beatmatching")
     assert row["stage"] == "competent"
-    assert row["what_remains"] == "3 more cited live demos to Master"
+    assert row["what_remains"] == "3 more cited proofs to Master"
 
 
 def test_stored_beatmatch_mastery_displays_after_producer_lands():

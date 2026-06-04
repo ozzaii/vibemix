@@ -14,7 +14,17 @@ from typing import Any
 
 from vibemix.learn.curriculum import CURRICULUM
 from vibemix.learn.progress import LearnProgress
+from vibemix.learn.skill_tree import SkillTree
 from vibemix.state.evidence_registry import EVIDENCE_CITATION_RE
+
+_SKILL_LABELS: dict[str, str] = {
+    "deck_control": "deck control",
+    "beatmatching": "beatmatching",
+    "eq_mixing": "EQ mixing",
+    "harmonic_mixing": "harmonic mixing",
+    "transitions": "transitions",
+    "phrasing_performance": "phrasing",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +46,8 @@ class GraduationSummary:
     hardware_practice_actions: int = 0
     screen_practice_actions: int = 0
     last_practice_source: str | None = None
+    cited_skill_proofs: int = 0
+    mastered_skill_labels: tuple[str, ...] = ()
 
 
 def build_graduation_summary(
@@ -55,6 +67,7 @@ def build_graduation_summary(
     hardware_actions, screen_actions, last_practice_source = _practice_source_summary(
         progress
     )
+    cited_skill_proofs, mastered_skill_labels = _skill_proof_summary(progress)
 
     return GraduationSummary(
         completed_lessons=completed,
@@ -72,6 +85,8 @@ def build_graduation_summary(
         hardware_practice_actions=hardware_actions,
         screen_practice_actions=screen_actions,
         last_practice_source=last_practice_source,
+        cited_skill_proofs=cited_skill_proofs,
+        mastered_skill_labels=mastered_skill_labels,
     )
 
 
@@ -91,11 +106,14 @@ def build_graduation_tutor_line(summary: GraduationSummary) -> str:
         profile = "profile still empty"
     else:
         profile = "profile consent off"
-    practice = _practice_surface_phrase(summary)
-    if practice:
-        base = f"{progress}. {debrief}. {profile}. {practice}"
-    else:
-        base = f"{progress}. {debrief}. {profile}"
+    parts = [progress, debrief, profile]
+    for optional in (
+        _practice_surface_phrase(summary),
+        _skill_proof_surface_phrase(summary),
+    ):
+        if optional:
+            parts.append(optional)
+    base = ". ".join(parts)
     recommended = _recommended_lesson_phrase(summary)
     if recommended:
         return f"{base}. {recommended}."
@@ -172,6 +190,41 @@ def _practice_surface_phrase(summary: GraduationSummary) -> str | None:
     if screen > hardware:
         return "practice: mostly screen deck"
     return "practice: hardware + screen"
+
+
+def _skill_proof_summary(progress: LearnProgress) -> tuple[int, tuple[str, ...]]:
+    try:
+        rows = SkillTree().compute(progress)
+    except Exception:
+        return 0, ()
+
+    cited = 0
+    mastered: list[str] = []
+    for skill_id, row in rows.items():
+        cited += max(0, int(row.live_proof_count))
+        if row.mastered:
+            mastered.append(_SKILL_LABELS.get(skill_id, skill_id.replace("_", " ")))
+    return cited, tuple(mastered)
+
+
+def _skill_proof_surface_phrase(summary: GraduationSummary) -> str | None:
+    try:
+        cited = max(0, int(summary.cited_skill_proofs))
+    except (TypeError, ValueError):
+        cited = 0
+    mastered = tuple(
+        str(label).strip()
+        for label in summary.mastered_skill_labels
+        if str(label).strip()
+    )
+    if cited <= 0 and not mastered:
+        return None
+    if not mastered:
+        return f"proofs: {cited} cited"
+    mastered_text = " + ".join(mastered)
+    if cited <= 0:
+        return f"proofs: mastered {mastered_text}"
+    return f"proofs: {cited} cited; mastered {mastered_text}"
 
 
 def _load_profile_consent(loader: Callable[[], bool] | None) -> bool:

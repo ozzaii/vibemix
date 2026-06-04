@@ -205,6 +205,34 @@ def test_graduation_line_names_mixed_practice_surface() -> None:
     )
 
 
+def test_graduation_line_names_cited_skill_proofs_and_mastered_skills() -> None:
+    progress = _completed_progress(2)
+    progress.skills["deck_control"] = {
+        "live_proof_count": 3,
+        "mastered": True,
+        "first_mastered_at": "2026-06-04T10:00:00Z",
+    }
+    progress.skills["eq_mixing"] = {
+        "live_proof_count": 1,
+        "mastered": False,
+        "first_mastered_at": None,
+    }
+
+    summary = build_graduation_summary(
+        progress,
+        profile_loader=lambda: None,
+        consent_loader=lambda: False,
+        recordings_root_loader=lambda: Path("/definitely/not/there"),
+    )
+
+    assert summary.cited_skill_proofs == 4
+    assert summary.mastered_skill_labels == ("deck control",)
+    assert build_graduation_tutor_line(summary) == (
+        "saved: 2/36 lessons. no debrief saved yet. profile consent off. "
+        "proofs: 4 cited; mastered deck control."
+    )
+
+
 def test_l3_06_runtime_emits_registry_grounded_graduation_status() -> None:
     summary = GraduationSummary(
         completed_lessons=36,

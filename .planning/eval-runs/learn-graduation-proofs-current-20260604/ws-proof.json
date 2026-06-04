@@ -1,0 +1,371 @@
+{
+  "captured_at": "2026-06-04T13:15:20.962559+00:00",
+  "graduation_status_payloads": [
+    {
+      "citations": [
+        "[screen:learn-progress]",
+        "[screen:learn-profile]"
+      ],
+      "data_state": "active",
+      "text": "saved: 2/36 lessons. no debrief saved yet. profile: unknown, 128-138. proofs: 4 cited; mastered deck control.",
+      "tts_marker": "L306.graduation_status"
+    }
+  ],
+  "learn_frame_count": 8,
+  "learn_frames": [
+    {
+      "payload": {
+        "controller_id": "pioneer_ddj_flx4",
+        "course_id": "course_3_play_mode",
+        "lesson_id": "L3.06",
+        "progress_dots": [
+          {
+            "lesson_id": "L3.01",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L3.02",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L3.03",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L3.04",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L3.05",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L3.06",
+            "status": "current"
+          }
+        ],
+        "title": "dj profile graduation"
+      },
+      "ts": "2026-06-04T13:15:12.955777+00:00",
+      "type": "ipc.learn.lesson_loaded"
+    },
+    {
+      "payload": {
+        "action": "snapshot",
+        "progress": {
+          "course_2_unlocked": true,
+          "course_3_unlocked": true,
+          "courses": {
+            "course_3_play_mode": {}
+          },
+          "lessons": {
+            "L1.01": {
+              "completed": true,
+              "completed_at": "2026-06-04T10:00:00Z",
+              "demonstrated": true,
+              "strikes_used": 0
+            },
+            "L1.02": {
+              "completed": true,
+              "completed_at": "2026-06-04T10:00:00Z",
+              "demonstrated": true,
+              "strikes_used": 0
+            },
+            "L3.06": {
+              "completed": false,
+              "completed_at": null,
+              "last_practice_source": "hardware",
+              "strikes_used": 0
+            }
+          },
+          "schema_version": 2,
+          "skill_wall": [
+            {
+              "competent": false,
+              "first_mastered_at": "2026-06-04T10:00:00Z",
+              "learn_fill": 0.125,
+              "live_proof_count": 3,
+              "mastered": true,
+              "skill_id": "deck_control",
+              "stage": "mastered",
+              "what_remains": ""
+            },
+            {
+              "competent": false,
+              "first_mastered_at": null,
+              "learn_fill": 0.0,
+              "live_proof_count": 0,
+              "mastered": false,
+              "skill_id": "beatmatching",
+              "stage": "locked",
+              "what_remains": "Finish the lessons to reach Competent"
+            },
+            {
+              "competent": false,
+              "first_mastered_at": null,
+              "learn_fill": 0.0,
+              "live_proof_count": 1,
+              "mastered": false,
+              "skill_id": "eq_mixing",
+              "stage": "locked",
+              "what_remains": "Finish the lessons to reach Competent"
+            },
+            {
+              "competent": false,
+              "first_mastered_at": null,
+              "learn_fill": 0.0,
+              "live_proof_count": 0,
+              "mastered": false,
+              "skill_id": "harmonic_mixing",
+              "stage": "locked",
+              "what_remains": "Finish the lessons to reach Competent"
+            },
+            {
+              "competent": false,
+              "first_mastered_at": null,
+              "learn_fill": 0.0,
+              "live_proof_count": 0,
+              "mastered": false,
+              "skill_id": "transitions",
+              "stage": "locked",
+              "what_remains": "Finish the lessons to reach Competent"
+            },
+            {
+              "competent": false,
+              "first_mastered_at": null,
+              "learn_fill": 0.0,
+              "live_proof_count": 0,
+              "mastered": false,
+              "skill_id": "phrasing_performance",
+              "stage": "locked",
+              "what_remains": "Finish the lessons to reach Competent"
+            }
+          ],
+          "skills": {
+            "beatmatching": {
+              "first_mastered_at": null,
+              "live_proof_count": 0,
+              "mastered": false
+            },
+            "deck_control": {
+              "first_mastered_at": "2026-06-04T10:00:00Z",
+              "live_proof_count": 3,
+              "mastered": true
+            },
+            "eq_mixing": {
+              "first_mastered_at": null,
+              "live_proof_count": 1,
+              "mastered": false
+            },
+            "harmonic_mixing": {
+              "first_mastered_at": null,
+              "live_proof_count": 0,
+              "mastered": false
+            },
+            "phrasing_performance": {
+              "first_mastered_at": null,
+              "live_proof_count": 0,
+              "mastered": false
+            },
+            "transitions": {
+              "first_mastered_at": null,
+              "live_proof_count": 0,
+              "mastered": false
+            }
+          }
+        },
+        "was_recovered": false
+      },
+      "ts": "2026-06-04T13:15:12.958898+00:00",
+      "type": "ipc.learn.progress_state"
+    },
+    {
+      "payload": {
+        "annotation": "",
+        "control_id": "lesson_continue",
+        "cue_color": "amber",
+        "cue_shape": "pulse-ring",
+        "deck": "",
+        "expected_action": {
+          "control": "lesson_continue",
+          "deck": "",
+          "direction": "down",
+          "min_delta": 0,
+          "type": "button"
+        }
+      },
+      "ts": "2026-06-04T13:15:12.961781+00:00",
+      "type": "ipc.learn.highlight"
+    },
+    {
+      "payload": {
+        "band": null,
+        "control_id": "lesson_continue",
+        "deck": "",
+        "phase": "focus"
+      },
+      "ts": "2026-06-04T13:15:13.012126+00:00",
+      "type": "ipc.learn.teaching_focus"
+    },
+    {
+      "payload": {
+        "citations": [
+          "[screen:lesson_continue]"
+        ],
+        "data_state": "active",
+        "teaching_loop": {
+          "observation": {
+            "backstage_lenses": [
+              "evidence_registry",
+              "debrief",
+              "dj_profile"
+            ],
+            "control_id": "lesson_continue",
+            "input_surfaces": [
+              "screen"
+            ],
+            "kind": "practice",
+            "lesson_id": "L3.06",
+            "step_id": "L3.06.beat.0",
+            "strikes_used": 0
+          },
+          "route_path": "learn_tutor",
+          "stages": [
+            "observe",
+            "decide",
+            "teach",
+            "verify",
+            "adapt"
+          ],
+          "turn_kind": "teach",
+          "verification": {
+            "control": "lesson_continue",
+            "deck": "",
+            "direction": "down",
+            "input_surfaces": [
+              "screen"
+            ],
+            "kind": "button_press",
+            "min_delta": 0,
+            "observable_control_ids": [
+              "lesson_continue"
+            ]
+          }
+        },
+        "text": "this is the handoff: progress, debrief, and dj profile. i will only name what is actually saved.",
+        "tts_marker": "L306.beat0"
+      },
+      "ts": "2026-06-04T13:15:13.015635+00:00",
+      "type": "ipc.learn.tutor_speak"
+    },
+    {
+      "payload": {
+        "citations": [
+          "[screen:learn-progress]",
+          "[screen:learn-profile]"
+        ],
+        "data_state": "active",
+        "text": "saved: 2/36 lessons. no debrief saved yet. profile: unknown, 128-138. proofs: 4 cited; mastered deck control.",
+        "tts_marker": "L306.graduation_status"
+      },
+      "ts": "2026-06-04T13:15:13.143418+00:00",
+      "type": "ipc.learn.tutor_speak"
+    },
+    {
+      "payload": {
+        "connected": true,
+        "controller_id": "pioneer_ddj_flx4",
+        "display_name": "Pioneer DDJ-FLX4",
+        "port_name": "DDJ-FLX4"
+      },
+      "ts": "2026-06-04T13:14:34.811319+00:00",
+      "type": "ipc.learn.controller_detected"
+    },
+    {
+      "payload": {
+        "controller_id": "pioneer_ddj_flx4",
+        "positions": {
+          "cue:A": 0,
+          "cue:B": 0,
+          "eq_hi:A": 64,
+          "eq_hi:B": 64,
+          "eq_low:A": 64,
+          "eq_low:B": 64,
+          "eq_mid:A": 64,
+          "eq_mid:B": 64,
+          "filter:A": 64,
+          "filter:B": 64,
+          "jog:A": 0,
+          "jog:B": 0,
+          "jog_touched:A": 0,
+          "jog_touched:B": 0,
+          "play:A": 0,
+          "play:B": 0,
+          "tempo:A": 64,
+          "tempo:B": 64,
+          "vol:A": 0,
+          "vol:B": 0,
+          "xfader": 64
+        }
+      },
+      "ts": "2026-06-04T13:15:13.147927+00:00",
+      "type": "ipc.learn.midi_position"
+    }
+  ],
+  "lesson_loaded": {
+    "controller_id": "pioneer_ddj_flx4",
+    "course_id": "course_3_play_mode",
+    "lesson_id": "L3.06",
+    "progress_dots": [
+      {
+        "lesson_id": "L3.01",
+        "status": "pending"
+      },
+      {
+        "lesson_id": "L3.02",
+        "status": "pending"
+      },
+      {
+        "lesson_id": "L3.03",
+        "status": "pending"
+      },
+      {
+        "lesson_id": "L3.04",
+        "status": "pending"
+      },
+      {
+        "lesson_id": "L3.05",
+        "status": "pending"
+      },
+      {
+        "lesson_id": "L3.06",
+        "status": "current"
+      }
+    ],
+    "title": "dj profile graduation"
+  },
+  "progress_state_count": 1,
+  "start_envelope": {
+    "payload": {
+      "lesson_id": "L3.06",
+      "level": "fresh"
+    },
+    "ts": "2026-06-04T13:15:12.928739+00:00",
+    "type": "ipc.learn.start_lesson"
+  },
+  "summary": {
+    "lesson_loaded_l306": true,
+    "saw_proof_summary": true,
+    "status_citations": [
+      [
+        "[screen:learn-progress]",
+        "[screen:learn-profile]"
+      ]
+    ],
+    "status_texts": [
+      "saved: 2/36 lessons. no debrief saved yet. profile: unknown, 128-138. proofs: 4 cited; mastered deck control."
+    ]
+  },
+  "temp_progress_path": "/tmp/vibemix-learn-graduation-proof-progress.json",
+  "url": "ws://127.0.0.1:8765"
+}
