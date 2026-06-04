@@ -25,8 +25,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from vibemix.audio.three_band_eq import ThreeBandEQ
-
 
 def _do_scale_block(
     src: np.ndarray,
@@ -35,6 +33,7 @@ def _do_scale_block(
     n: int,
     *,
     prev_rate: float | None = None,
+    loop: bool = False,
 ) -> tuple[np.ndarray, float]:
     """Resample ``n`` output frames from ``src`` at playback ``rate``.
 
@@ -63,6 +62,15 @@ def _do_scale_block(
         rate_ramp = np.linspace(prev_rate, rate, n, dtype=np.float64)
         pos = next_frame + np.cumsum(rate_ramp) - rate_ramp
         next_frame_after = next_frame + float(np.sum(rate_ramp))
+    if loop:
+        wrapped_pos = np.mod(pos, m)
+        floor = np.floor(wrapped_pos).astype(np.int64)
+        frac = (wrapped_pos - floor).astype(np.float32)[:, None]
+        lo = floor
+        hi = (floor + 1) % m
+        out = src[lo] + frac * (src[hi] - src[lo])
+        return out.astype(np.float32, copy=False), next_frame_after
+
     floor = np.floor(pos).astype(np.int64)
     frac = (pos - floor).astype(np.float32)[:, None]  # (n, 1), broadcast over channels
 
@@ -94,6 +102,36 @@ def _equal_power_gains(xfader: float) -> tuple[float, float]:
     return float(np.cos(theta)), float(np.sin(theta))
 
 
+def _gain_to_unit(value: float | int | None, *, default: float = 1.0) -> float:
+    try:
+        raw = float(value)
+    except (TypeError, ValueError):
+        return min(1.0, max(0.0, default))
+    if raw <= 1.0:
+        return min(1.0, max(0.0, raw))
+    return min(1.0, max(0.0, raw / 127.0))
+
+
+def _filter_cutoff_from_cc(value: float | int | None, sample_rate: int) -> tuple[str, float]:
+    """Map centered DJ filter CC to high-pass/low-pass mode and cutoff."""
+
+    try:
+        cc = float(value)
+    except (TypeError, ValueError):
+        cc = 64.0
+    cc = min(127.0, max(0.0, cc))
+    nyquist = float(sample_rate) / 2.0
+    if abs(cc - 64.0) <= 1.0:
+        return "lowpass", nyquist * 0.94
+    if cc < 64.0:
+        # Left sweep: high-pass from barely audible to roughly 1 kHz.
+        amount = (64.0 - cc) / 64.0
+        return "highpass", 24.0 * ((1_000.0 / 24.0) ** amount)
+    amount = (cc - 64.0) / 63.0
+    # Right sweep: low-pass down from open air to roughly 650 Hz.
+    return "lowpass", (nyquist * 0.94) * ((650.0 / (nyquist * 0.94)) ** amount)
+
+
 @dataclass(frozen=True)
 class DeckState:
     """Immutable snapshot of both decks for the asyncio loop / Beatmatch Judge.
@@ -109,6 +147,8 @@ class DeckState:
     rate_a: float
     rate_b: float
     xfader: float
+    vol_a: float = 1.0
+    vol_b: float = 1.0
 
 
 class MiniDeck:
@@ -133,20 +173,35 @@ class MiniDeck:
         rate_a: float = 1.0,
         rate_b: float = 1.0,
         xfader: float = 0.5,
+        vol_a: float = 1.0,
+        vol_b: float = 1.0,
         sample_rate: int = 44_100,
+        loop: bool = False,
     ) -> None:
+        from vibemix.learn.dj_eq import ResonantFilter, ThreeBandEQ
+
         self._src_a = np.asarray(src_a, dtype=np.float32)
         self._src_b = np.asarray(src_b, dtype=np.float32)
         self.rate_a = float(rate_a)
         self.rate_b = float(rate_b)
         self.xfader = float(xfader)
+        self.vol_a = _gain_to_unit(vol_a, default=float(vol_a))
+        self.vol_b = _gain_to_unit(vol_b, default=float(vol_b))
+        self._sample_rate = int(sample_rate)
+        self._loop = bool(loop)
         self._frame_a = 0.0
         self._frame_b = 0.0
         self._eq_a = ThreeBandEQ(sample_rate=sample_rate)
         self._eq_b = ThreeBandEQ(sample_rate=sample_rate)
+        self._filter_a = ResonantFilter(sample_rate=sample_rate, mode="lowpass")
+        self._filter_b = ResonantFilter(sample_rate=sample_rate, mode="lowpass")
+        self._filter_a_active = False
+        self._filter_b_active = False
         self._prev_rate_a = self.rate_a
         self._prev_rate_b = self.rate_b
-        self._prev_gain_a, self._prev_gain_b = _equal_power_gains(self.xfader)
+        xfader_gain_a, xfader_gain_b = _equal_power_gains(self.xfader)
+        self._prev_gain_a = xfader_gain_a * self.vol_a
+        self._prev_gain_b = xfader_gain_b * self.vol_b
 
     def render_block(self, n: int) -> np.ndarray:
         """Render ``n`` mixed output frames, advancing both deck cursors."""
@@ -158,6 +213,7 @@ class MiniDeck:
             rate_a,
             n,
             prev_rate=self._prev_rate_a,
+            loop=self._loop,
         )
         out_b, self._frame_b = _do_scale_block(
             self._src_b,
@@ -165,10 +221,17 @@ class MiniDeck:
             rate_b,
             n,
             prev_rate=self._prev_rate_b,
+            loop=self._loop,
         )
         out_a = self._eq_a.process(out_a)
         out_b = self._eq_b.process(out_b)
-        gain_a, gain_b = _equal_power_gains(self.xfader)
+        if self._filter_a_active:
+            out_a = self._filter_a.process(out_a)
+        if self._filter_b_active:
+            out_b = self._filter_b.process(out_b)
+        xfader_gain_a, xfader_gain_b = _equal_power_gains(self.xfader)
+        gain_a = xfader_gain_a * min(1.0, max(0.0, float(self.vol_a)))
+        gain_b = xfader_gain_b * min(1.0, max(0.0, float(self.vol_b)))
         if self._prev_gain_a == gain_a and self._prev_gain_b == gain_b:
             mixed = gain_a * out_a + gain_b * out_b
         else:
@@ -212,6 +275,32 @@ class MiniDeck:
         target = self._eq_a if deck.upper() == "A" else self._eq_b
         target.set_cc(low=low, mid=mid, high=high)
 
+    def set_volume(self, deck: str, value: float | int | None) -> None:
+        """Set one channel fader from controller CC values (0..127)."""
+
+        if deck.upper() == "A":
+            self.vol_a = _gain_to_unit(value, default=self.vol_a)
+        else:
+            self.vol_b = _gain_to_unit(value, default=self.vol_b)
+
+    def set_filter(self, deck: str, value: float | int | None) -> None:
+        """Set one deck's centered color filter from controller CC values."""
+
+        mode, cutoff = _filter_cutoff_from_cc(value, self._sample_rate)
+        deck_id = deck.upper()
+        target = self._filter_a if deck_id == "A" else self._filter_b
+        target.set_mode(mode)
+        target.set_cutoff_hz(cutoff)
+        try:
+            cc = float(value)
+        except (TypeError, ValueError):
+            cc = 64.0
+        active = abs(min(127.0, max(0.0, cc)) - 64.0) > 1.0
+        if deck_id == "A":
+            self._filter_a_active = active
+        else:
+            self._filter_b_active = active
+
     def state(self) -> DeckState:
         """Snapshot the two decks for the asyncio loop / Judge to read."""
         return DeckState(
@@ -220,4 +309,6 @@ class MiniDeck:
             rate_a=self.rate_a,
             rate_b=self.rate_b,
             xfader=self.xfader,
+            vol_a=self.vol_a,
+            vol_b=self.vol_b,
         )

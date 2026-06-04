@@ -77,6 +77,8 @@ const LEARN_INBOUND_TYPES = [
   "ipc.learn.complete_lesson",
   "ipc.learn.tutor_speak",
   "ipc.learn.live_grade",
+  "ipc.learn.waveform_ready",
+  "ipc.learn.playhead_tick",
   "ipc.learn.exemplar_play",
   "ipc.learn.exemplar_stop",
   "ipc.learn.progress_state",

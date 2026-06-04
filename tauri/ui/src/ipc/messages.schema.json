@@ -215,6 +215,12 @@
       "$ref": "#/definitions/LearnLiveGrade"
     },
     {
+      "$ref": "#/definitions/LearnWaveformReady"
+    },
+    {
+      "$ref": "#/definitions/LearnPlayheadTick"
+    },
+    {
       "$ref": "#/definitions/LearnExemplarPlay"
     },
     {
@@ -3014,6 +3020,94 @@
                 {"type": "string", "pattern": "^\\[(track|exemplar|cue|ev|aud|midi|screen|mix|key|recall):.+\\]$"},
                 {"type": "null"}
               ]
+            }
+          }
+        }
+      }
+    },
+    "LearnWaveformReady": {
+      "$comment": "Sidecar → shell. Compact two-deck Learn practice waveform peaks.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.waveform_ready"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sample_rate", "beat_interval_s", "decks"],
+          "properties": {
+            "sample_rate": {"type": "integer", "minimum": 1000},
+            "beat_interval_s": {"type": "number", "minimum": 0},
+            "decks": {
+              "type": "object",
+              "additionalProperties": {"$ref": "#/definitions/LearnWaveformDeck"}
+            }
+          }
+        }
+      }
+    },
+    "LearnWaveformDeck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bpm", "duration_s", "peaks", "cues"],
+      "properties": {
+        "bpm": {"type": "number", "minimum": 0},
+        "duration_s": {"type": "number", "minimum": 0},
+        "peaks": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {"type": "integer", "minimum": 0, "maximum": 255},
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "minItems": 1,
+          "maxItems": 4096
+        },
+        "cues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "start_s", "end_s"],
+            "properties": {
+              "label": {"type": "string", "minLength": 1, "maxLength": 32},
+              "start_s": {"type": "number", "minimum": 0},
+              "end_s": {"type": "number", "minimum": 0}
+            }
+          },
+          "maxItems": 16
+        }
+      }
+    },
+    "LearnPlayheadTick": {
+      "$comment": "Sidecar → shell. Owned-deck playhead and current BPM tick for Learn practice.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.playhead_tick"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sample_rate", "decks"],
+          "properties": {
+            "sample_rate": {"type": "integer", "minimum": 1000},
+            "decks": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["frame", "position_s", "bpm"],
+                "properties": {
+                  "frame": {"type": "number", "minimum": 0},
+                  "position_s": {"type": "number", "minimum": 0},
+                  "bpm": {"type": "number", "minimum": 0}
+                }
+              }
             }
           }
         }

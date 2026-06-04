@@ -130,11 +130,13 @@ from vibemix.ui_bus.learn_messages import (
     LearnHighlight,
     LearnLessonLoaded,
     LearnLiveGrade,
+    LearnPlayheadTick,
     LearnProgressState,
     LearnTeachingLoopPayload,
     LearnTeachingObservationPayload,
     LearnTeachingVerificationPayload,
     LearnTutorSpeak,
+    LearnWaveformReady,
 )
 
 # ---------------------------------------------------------------------------
@@ -147,10 +149,12 @@ from vibemix.ui_bus.learn_messages import (
 # ``min_delta``, this default applies.
 _CC_DEFAULT_MIN_DELTA = 38
 _MISMATCH_HINT_THROTTLE_S = 1.5
-_BEATMATCH_PRACTICE_AUDIO_LESSONS = frozenset({"L2.01", "L2.02", "L2.04", "L2.05"})
 _BEATMATCH_PRACTICE_LOCK_REQUIRED_LESSONS = frozenset({"L2.01", "L2.02"})
 _BEATMATCH_PRACTICE_GRADE_STATES = frozenset(
     {"awaiting_action", "hint_strike_1", "hint_strike_2", "hint_strike_3", "advancing"}
+)
+_PRACTICE_AUDIO_CONTROLS = frozenset(
+    {"eq_hi", "eq_low", "eq_mid", "filter", "jog", "play", "sync", "tempo", "vol", "xfader"}
 )
 _CONTROL_LABELS = {
     "cue": "cue",
@@ -446,6 +450,8 @@ class LessonRuntime(StateMachine):
         beatmatch_practice_loader: Callable[[], BeatmatchPracticeSnapshot | None] | None = None,
         beatmatch_practice_action_recorder: Callable[[str | None, dict[str, Any]], bool | None]
         | None = None,
+        waveform_payload_loader: Callable[[], dict[str, Any] | None] | None = None,
+        playhead_payload_loader: Callable[[], dict[str, Any] | None] | None = None,
         cue_placement_practice_loader: Callable[[], CuePlacementPracticeSnapshot | None] | None = None,
         cue_placement_practice_action_recorder: Callable[[str | None, dict[str, Any]], bool | None]
         | None = None,
@@ -529,6 +535,8 @@ class LessonRuntime(StateMachine):
         self._graduation_summary_loader = graduation_summary_loader
         self._beatmatch_practice_loader = beatmatch_practice_loader
         self._beatmatch_practice_action_recorder = beatmatch_practice_action_recorder
+        self._waveform_payload_loader = waveform_payload_loader
+        self._playhead_payload_loader = playhead_payload_loader
         self._cue_placement_practice_loader = cue_placement_practice_loader
         self._cue_placement_practice_action_recorder = cue_placement_practice_action_recorder
         self._session_event_logger = session_event_logger
@@ -569,6 +577,7 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_ack_prehandled = False
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
+        self._waveform_ready_lesson_id: str | None = None
         self._cue_placement_practice_lock_active = False
         super().__init__()
 
@@ -692,7 +701,31 @@ class LessonRuntime(StateMachine):
             self._start_beatmatch_practice_player()
 
     def _is_beatmatch_practice_audio_lesson(self) -> bool:
-        return self._learn.current_lesson_id in _BEATMATCH_PRACTICE_AUDIO_LESSONS
+        lesson_id = self._learn.current_lesson_id
+        if lesson_id is None:
+            return False
+        lesson_meta = CURRICULUM.get(lesson_id)
+        if lesson_meta is not None and lesson_meta.course_id == "course_0":
+            return False
+        try:
+            flow = build_lesson_flow(lesson_id)
+        except Exception:
+            flow = None
+        actions: list[dict[str, Any]] = []
+        if flow is not None:
+            actions.extend(step.expected_action for step in flow.steps)
+            actions.append(flow.primary_expected_action)
+        elif lesson_id in CURRICULUM:
+            expected = CURRICULUM[lesson_id].script.get("expected_action")
+            if isinstance(expected, dict):
+                actions.append(expected)
+        for action in actions:
+            control, deck = _control_and_deck(action)
+            if control not in _PRACTICE_AUDIO_CONTROLS:
+                continue
+            if deck or control == "xfader":
+                return True
+        return False
 
     def _is_beatmatch_practice_lock_action(self, expected: dict[str, Any] | None) -> bool:
         """Return True for L2 beatmatch actions that must prove a locked grade."""
@@ -716,6 +749,7 @@ class LessonRuntime(StateMachine):
         ):
             return
         try:
+            self._emit_waveform_ready()
             self._beatmatch_practice_player.start()
             self._beatmatch_practice_player_active = True
         except Exception as exc:  # pragma: no cover - defensive
@@ -740,6 +774,58 @@ class LessonRuntime(StateMachine):
             )
         finally:
             self._beatmatch_practice_player_active = False
+
+    def _emit_waveform_ready(self) -> None:
+        lesson_id = self._learn.current_lesson_id
+        if (
+            lesson_id is None
+            or self._waveform_ready_lesson_id == lesson_id
+            or self._waveform_payload_loader is None
+        ):
+            return
+        try:
+            payload = self._waveform_payload_loader()
+            if not isinstance(payload, dict):
+                return
+            envelope = LearnWaveformReady.make(
+                sample_rate=int(payload.get("sample_rate", 44_100)),
+                beat_interval_s=float(payload.get("beat_interval_s", 60.0 / 128.0)),
+                decks=payload.get("decks", {}),
+            ).to_dict()
+            self._ipc.emit(envelope)
+            self._waveform_ready_lesson_id = lesson_id
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] waveform_ready emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _emit_playhead_tick(self) -> None:
+        if (
+            not self._is_beatmatch_practice_audio_lesson()
+            or self.current_state.id not in _BEATMATCH_PRACTICE_GRADE_STATES
+            or self._playhead_payload_loader is None
+        ):
+            return
+        try:
+            payload = self._playhead_payload_loader()
+            if not isinstance(payload, dict):
+                return
+            self._ipc.emit(
+                LearnPlayheadTick.make(
+                    sample_rate=int(payload.get("sample_rate", 44_100)),
+                    decks=payload.get("decks", {}),
+                ).to_dict()
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] playhead_tick emit failed: {exc!r}",
+                file=sys.stderr,
+            )
 
     def handle_step_ack(self, midi: dict[str, Any]) -> bool:
         """Advance an authored lesson beat without completing the lesson.
@@ -831,6 +917,19 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_ack_prehandled = True
         self.send("ack_action", midi=midi)
         return True
+
+    def handle_practice_audio_ack(self, midi: dict[str, Any]) -> None:
+        """Apply practice-audio controls to the owned deck before lesson gating.
+
+        The normal step-ack path may consume a matching action for dwell /
+        advancement reasons. Audio cannot wait for that: a learner dragging a
+        pitch fader, EQ, filter, channel fader, or xfader should hear the deck
+        change on the first ack frame.
+        """
+
+        if not self._is_beatmatch_practice_audio_lesson():
+            return
+        self._apply_beatmatch_practice_action(midi)
 
     def handle_mismatch_ack(self, midi: dict[str, Any]) -> bool:
         """Emit one deterministic adaptive hint for a wrong user action.
@@ -1038,10 +1137,21 @@ class LessonRuntime(StateMachine):
     ) -> BeatmatchPracticeResult | None:
         """Arm and grade an owned-deck beatmatch practice attempt, if wired."""
 
+        should_grade = self._apply_beatmatch_practice_action(midi)
+        if not should_grade:
+            return None
+        self._beatmatch_practice_lock_active = False
+        result = self._grade_beatmatch_practice_tick()
+        self._emit_live_beatmatch_grade(result)
+        return result
+
+    def _apply_beatmatch_practice_action(self, midi: dict[str, Any]) -> bool | None:
+        """Apply one practice action to the owned deck without grading it."""
+
         if self._beatmatch_practice_action_recorder is None:
             return None
         try:
-            should_grade = self._beatmatch_practice_action_recorder(
+            return self._beatmatch_practice_action_recorder(
                 self._learn.current_lesson_id,
                 midi,
             )
@@ -1053,12 +1163,6 @@ class LessonRuntime(StateMachine):
                 file=sys.stderr,
             )
             return None
-        if not should_grade:
-            return None
-        self._beatmatch_practice_lock_active = False
-        result = self._grade_beatmatch_practice_tick()
-        self._emit_live_beatmatch_grade(result)
-        return result
 
     def _record_cue_placement_practice_action(self, midi: dict[str, Any]) -> None:
         """Arm and grade an owned-deck cue placement practice attempt, if wired."""
@@ -1120,6 +1224,7 @@ class LessonRuntime(StateMachine):
             self._finish_task.cancel()
             self._finish_task = None
         self._stop_beatmatch_practice_player()
+        self._waveform_ready_lesson_id = None
         # Update LearnState — Invariant #1 binding (sole writer).
         if lesson_id is not None:
             self._learn.current_lesson_id = lesson_id
@@ -2322,8 +2427,16 @@ class LessonRuntime(StateMachine):
             )
 
     # ------------------------------------------------------------------
-    # 1 Hz tick loop — strike escalation timer
+    # Fast grade loop + 1 Hz strike escalation timer
     # ------------------------------------------------------------------
+    async def live_grade_loop(self, stop_event: asyncio.Event) -> None:
+        """Drive Learn-owned beatmatch feedback at a practice-control cadence."""
+
+        while not stop_event.is_set():
+            await asyncio.sleep(0.15)
+            self._emit_playhead_tick()
+            self._emit_live_beatmatch_grade_tick()
+
     async def tick_loop(self, stop_event: asyncio.Event) -> None:
         """Drive the 30 s strike escalation timer.
 
@@ -2339,7 +2452,6 @@ class LessonRuntime(StateMachine):
         """
         while not stop_event.is_set():
             await asyncio.sleep(1.0)
-            self._emit_live_beatmatch_grade_tick()
             self._grade_cue_placement_practice_tick()
             cur = self.current_state.id
             if cur in ("awaiting_action", "hint_strike_1", "hint_strike_2"):

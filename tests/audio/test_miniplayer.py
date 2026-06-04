@@ -60,6 +60,16 @@ def test_reading_past_end_degrades_to_silence_not_indexerror() -> None:
     assert out[-1, 0] == 0.0  # frame 11 past end -> silence
 
 
+def test_loop_mode_wraps_past_end_for_learn_practice() -> None:
+    src = np.arange(8, dtype=np.float32)
+    stereo = np.stack([src, src], axis=1)
+
+    out, next_frame = _do_scale_block(stereo, 6.0, 1.0, 6, loop=True)
+
+    np.testing.assert_array_equal(out[:, 0], np.array([6, 7, 0, 1, 2, 3], dtype=np.float32))
+    assert next_frame == 12.0
+
+
 def test_cursor_carries_across_blocks_without_drift() -> None:
     # THE scar: the fractional cursor persists across audio blocks, so two
     # back-to-back blocks are bit-identical to one double-length block. If the
@@ -154,3 +164,35 @@ def test_minideck_low_eq_cut_filters_audible_deck() -> None:
     neutral_rms = float(np.sqrt(np.mean(np.square(neutral_out[:, 0]))))
     cut_rms = float(np.sqrt(np.mean(np.square(cut_out[:, 0]))))
     assert cut_rms < neutral_rms * 0.55
+
+
+def test_minideck_channel_volume_changes_audible_mix() -> None:
+    a = np.full((256, 2), 0.5, dtype=np.float32)
+    b = np.full((256, 2), 0.5, dtype=np.float32)
+    deck = MiniDeck(a, b, rate_a=1.0, rate_b=1.0, xfader=0.0)
+
+    open_out = deck.render_block(64)
+    deck.set_volume("A", 0)
+    deck.render_block(64)
+    muted_out = deck.render_block(64)
+
+    assert float(np.sqrt(np.mean(np.square(open_out)))) > 0.1
+    assert float(np.sqrt(np.mean(np.square(muted_out)))) < 0.01
+
+
+def test_minideck_filter_sweep_changes_audible_deck() -> None:
+    t = np.arange(8192, dtype=np.float32) / 44_100.0
+    high = np.sin(2.0 * np.pi * 8_000.0 * t).astype(np.float32)
+    src = np.column_stack([high, high])
+    neutral = MiniDeck(src, src, rate_a=1.0, rate_b=1.0, xfader=0.0)
+    swept = MiniDeck(src, src, rate_a=1.0, rate_b=1.0, xfader=0.0)
+
+    swept.set_filter("A", 127)
+    neutral.render_block(2048)
+    swept.render_block(2048)
+    neutral_out = neutral.render_block(2048)
+    swept_out = swept.render_block(2048)
+
+    neutral_rms = float(np.sqrt(np.mean(np.square(neutral_out[:, 0]))))
+    swept_rms = float(np.sqrt(np.mean(np.square(swept_out[:, 0]))))
+    assert swept_rms < neutral_rms * 0.35

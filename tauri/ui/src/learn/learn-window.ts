@@ -68,6 +68,16 @@ import {
   type LiveGradePayload,
 } from "./live-meter.js";
 import {
+  isAnalogControl,
+  startAnalogControlDrag,
+  type AnalogDragFrame,
+} from "./drag-control.js";
+import {
+  WaveformDisplay,
+  type PlayheadTickPayload,
+  type WaveformReadyPayload,
+} from "./waveform-display.js";
+import {
   renderProgressList,
   type LessonStatus,
   type ProgressListEntry,
@@ -389,6 +399,7 @@ function mountLearnWindow(root: HTMLElement): {
       <strong id="learn-exemplar-track" class="learn-exemplar-chip__track"></strong>
       <span id="learn-exemplar-meta" class="learn-exemplar-chip__meta"></span>
     </div>
+    <div id="learn-waveform-host" class="learn-waveform-host"></div>
     <div id="learn-live-meter-host" class="learn-live-meter-host"></div>
     <aside id="learn-progress-list-host" class="learn-progress-list-host" data-visible="false" aria-hidden="true">
       <div class="learn-progress-list-shell">
@@ -474,7 +485,9 @@ function mountLearnWindow(root: HTMLElement): {
   const exemplarLabel = root.querySelector("#learn-exemplar-label") as HTMLElement;
   const exemplarTrack = root.querySelector("#learn-exemplar-track") as HTMLElement;
   const exemplarMeta = root.querySelector("#learn-exemplar-meta") as HTMLElement;
+  const waveformHost = root.querySelector("#learn-waveform-host") as HTMLElement;
   const liveMeterHost = root.querySelector("#learn-live-meter-host") as HTMLElement;
+  const waveforms = WaveformDisplay(waveformHost);
   let latestProgress: LearnProgressProjection | null = null;
   let latestSkillWall: SkillWallRow[] | null = null;
   let recommendedLessonId = firstRecommendedLessonId(latestProgress);
@@ -1205,6 +1218,16 @@ function mountLearnWindow(root: HTMLElement): {
     }
     liveMeter.update(payload);
   });
+  addWindowListener("ipc.learn.waveform_ready", (ev: Event) => {
+    const payload = (ev as CustomEvent<WaveformReadyPayload>).detail;
+    if (!payload) return;
+    waveforms.updateWaveforms(payload);
+  });
+  addWindowListener("ipc.learn.playhead_tick", (ev: Event) => {
+    const payload = (ev as CustomEvent<PlayheadTickPayload>).detail;
+    if (!payload) return;
+    waveforms.updatePlayhead(payload);
+  });
 
   const emitLearnAction = (
     controlId: string,
@@ -1243,6 +1266,23 @@ function mountLearnWindow(root: HTMLElement): {
     emitLearnAction(ackControlId, "click", next, prev, direction);
   };
 
+  const initialAnalogValue = (controlId: string): number => {
+    const head = controlId.split(":")[0] ?? controlId;
+    if (head === "vol") return 127;
+    if (
+      head === "eq_hi" ||
+      head === "eq_mid" ||
+      head === "eq_low" ||
+      head === "filter" ||
+      head === "tempo" ||
+      head === "xfader" ||
+      head === "jog"
+    ) {
+      return 64;
+    }
+    return 0;
+  };
+
   screenAction.addEventListener("click", () => {
     if (!currentExpectedAction) return;
     triggerScreenControl(controlIdFromExpectedAction(currentExpectedAction));
@@ -1251,8 +1291,38 @@ function mountLearnWindow(root: HTMLElement): {
   const handleStageControlActivation = (ev: Event): void => {
     const group = controlGroupFromStageEvent(ev, stageEl);
     const controlId = group?.getAttribute("data-control-id");
-    if (!controlId) return;
+    if (!group || !controlId) return;
     ev.preventDefault();
+    const ackControlId = ackControlIdFor(controlId, currentExpectedAction);
+    if (
+      typeof PointerEvent !== "undefined" &&
+      ev instanceof PointerEvent &&
+      isAnalogControl(ackControlId)
+    ) {
+      const visualControlId = visualControlIdFor(controlId);
+      const initialValue = lastPositions[ackControlId] ?? initialAnalogValue(ackControlId);
+      lastPositions[ackControlId] = initialValue;
+      const didStart = startAnalogControlDrag({
+        event: ev,
+        group,
+        controlId,
+        ackControlId,
+        visualControlId,
+        initialValue,
+        apply: (positions) => stage.applyPositionFrame(positions),
+        emit: (frame: AnalogDragFrame) => {
+          lastPositions[frame.controlId] = frame.value;
+          emitLearnAction(
+            frame.controlId,
+            "click",
+            frame.value,
+            frame.prevValue,
+            frame.direction,
+          );
+        },
+      });
+      if (didStart) return;
+    }
     triggerScreenControl(controlId);
   };
 
@@ -1372,6 +1442,11 @@ function mountLearnWindow(root: HTMLElement): {
     }
     try {
       liveMeter?.dispose();
+    } catch {
+      /* swallow */
+    }
+    try {
+      waveforms.dispose();
     } catch {
       /* swallow */
     }

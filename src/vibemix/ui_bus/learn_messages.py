@@ -15,6 +15,8 @@ Phase 92 (11 envelopes — lesson runtime + AI highlight contract):
   - LearnAck                (shell→sidecar)
   - LearnTutorSpeak         (sidecar→shell — narration; text from fixture)
   - LearnLiveGrade          (sidecar→shell — beatmatch grade HUD signal)
+  - LearnWaveformReady      (sidecar→shell — compact practice waveform peaks)
+  - LearnPlayheadTick       (sidecar→shell — owned-deck playhead/BPM tick)
   - LearnExemplarPlay       (sidecar→shell — shape only; engine in P93)
   - LearnExemplarStop       (sidecar→shell — shape only)
   - LearnProgressState      (bidirectional — snapshot/reset/reset_ack)
@@ -718,6 +720,131 @@ class LearnLiveGrade:
                 phase_error_beats=float(phase_error_beats),
                 score=float(score),
                 citation=citation,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.waveform_ready / ipc.learn.playhead_tick -----------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnWaveformDeckCue:
+    label: str
+    start_s: float
+    end_s: float
+
+
+@dataclass(frozen=True, slots=True)
+class LearnWaveformDeck:
+    bpm: float
+    duration_s: float
+    peaks: tuple[tuple[int, int, int], ...]
+    cues: tuple[LearnWaveformDeckCue, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnWaveformReadyPayload:
+    sample_rate: int
+    beat_interval_s: float
+    decks: dict[str, LearnWaveformDeck]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnWaveformReady:
+    """``ipc.learn.waveform_ready`` envelope wrapper (sidecar → shell)."""
+
+    type: Literal["ipc.learn.waveform_ready"]
+    ts: str
+    payload: LearnWaveformReadyPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        sample_rate: int,
+        beat_interval_s: float,
+        decks: dict[str, dict],
+    ) -> LearnWaveformReady:
+        return cls(
+            type="ipc.learn.waveform_ready",
+            ts=_now_iso(),
+            payload=LearnWaveformReadyPayload(
+                sample_rate=int(sample_rate),
+                beat_interval_s=float(beat_interval_s),
+                decks={
+                    side: LearnWaveformDeck(
+                        bpm=float(row.get("bpm", 0.0)),
+                        duration_s=float(row.get("duration_s", 0.0)),
+                        peaks=tuple(
+                            tuple(int(v) for v in peak[:3])  # type: ignore[index]
+                            for peak in row.get("peaks", ())
+                        ),
+                        cues=tuple(
+                            LearnWaveformDeckCue(
+                                label=str(cue.get("label", "")),
+                                start_s=float(cue.get("start_s", 0.0)),
+                                end_s=float(cue.get("end_s", 0.0)),
+                            )
+                            for cue in row.get("cues", ())
+                            if isinstance(cue, dict)
+                        ),
+                    )
+                    for side, row in decks.items()
+                    if isinstance(row, dict)
+                },
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+@dataclass(frozen=True, slots=True)
+class LearnPlayheadDeck:
+    frame: float
+    position_s: float
+    bpm: float
+
+
+@dataclass(frozen=True, slots=True)
+class LearnPlayheadTickPayload:
+    sample_rate: int
+    decks: dict[str, LearnPlayheadDeck]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnPlayheadTick:
+    """``ipc.learn.playhead_tick`` envelope wrapper (sidecar → shell)."""
+
+    type: Literal["ipc.learn.playhead_tick"]
+    ts: str
+    payload: LearnPlayheadTickPayload
+
+    @classmethod
+    def make(cls, *, sample_rate: int, decks: dict[str, dict]) -> LearnPlayheadTick:
+        return cls(
+            type="ipc.learn.playhead_tick",
+            ts=_now_iso(),
+            payload=LearnPlayheadTickPayload(
+                sample_rate=int(sample_rate),
+                decks={
+                    side: LearnPlayheadDeck(
+                        frame=float(row.get("frame", 0.0)),
+                        position_s=float(row.get("position_s", 0.0)),
+                        bpm=float(row.get("bpm", 0.0)),
+                    )
+                    for side, row in decks.items()
+                    if isinstance(row, dict)
+                },
             ),
         )
 

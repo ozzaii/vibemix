@@ -41,6 +41,9 @@ from vibemix.ui_bus.learn_messages import (
     LearnLiveGradePayload,
     LearnMidiPosition,
     LearnMidiPositionPayload,
+    LearnPlayheadDeck,
+    LearnPlayheadTick,
+    LearnPlayheadTickPayload,
     LearnProgressDot,
     LearnProgressState,
     LearnProgressStatePayload,
@@ -53,6 +56,10 @@ from vibemix.ui_bus.learn_messages import (
     LearnTeachingVerificationPayload,
     LearnTutorSpeak,
     LearnTutorSpeakPayload,
+    LearnWaveformDeck,
+    LearnWaveformDeckCue,
+    LearnWaveformReady,
+    LearnWaveformReadyPayload,
 )
 from vibemix.ui_bus.messages import (
     # Wrapper dataclasses — one per schema oneOf entry (19 total)
@@ -333,6 +340,9 @@ __all__ = [
     "LearnLessonLoadedPayload",
     "LearnLiveGrade",
     "LearnLiveGradePayload",
+    "LearnPlayheadDeck",
+    "LearnPlayheadTick",
+    "LearnPlayheadTickPayload",
     "LearnProgressDot",
     "LearnProgressState",
     "LearnProgressStatePayload",
@@ -345,6 +355,10 @@ __all__ = [
     "LearnTeachingVerificationPayload",
     "LearnTutorSpeak",
     "LearnTutorSpeakPayload",
+    "LearnWaveformDeck",
+    "LearnWaveformDeckCue",
+    "LearnWaveformReady",
+    "LearnWaveformReadyPayload",
     # Phase 32 — long-term DJ profile (PROFILE-04/05/07)
     "ProfileConsentState",
     "ProfileConsentStatePayload",

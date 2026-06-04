@@ -310,18 +310,14 @@ export function applyPositionFrame(
     if (typeof valueRaw !== "number") continue;
     const value = valueRaw;
     // Resolve key: try literal, then strip `_touched` -> `_touch` for jog.
-    let resolvedKey = rawKey;
+    let resolvedKey = rawKey.startsWith("jog:")
+      ? rawKey.replace("jog:", "jog_touch:")
+      : rawKey;
     let group = stage.querySelector(
-      `[data-control-id="${rawKey}"]`,
+      `[data-control-id="${resolvedKey}"]`,
     ) as SVGGElement | null;
     if (!group && rawKey.startsWith("jog_touched:")) {
       resolvedKey = rawKey.replace("jog_touched:", "jog_touch:");
-      group = stage.querySelector(
-        `[data-control-id="${resolvedKey}"]`,
-      ) as SVGGElement | null;
-    }
-    if (!group && rawKey.startsWith("jog:")) {
-      resolvedKey = rawKey.replace("jog:", "jog_touch:");
       group = stage.querySelector(
         `[data-control-id="${resolvedKey}"]`,
       ) as SVGGElement | null;

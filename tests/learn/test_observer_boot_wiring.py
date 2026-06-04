@@ -59,6 +59,8 @@ def test_exemplar_observer_has_safe_noop_player_fallback() -> None:
 def test_beatmatch_practice_audio_uses_shared_learn_output_device() -> None:
     src = _main_source()
 
+    assert "learn headphone device" in src
+    assert "max_output_channels" in src
     assert "from vibemix.learn.two_deck_player import TwoDeckPlayer" in src
     assert "beatmatch_practice_player = TwoDeckPlayer(" in src
     assert "beatmatch_practice_driver.deck" in src

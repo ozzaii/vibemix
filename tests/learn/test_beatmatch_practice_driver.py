@@ -83,6 +83,20 @@ def test_eq_swap_action_filters_audio_without_arming_beatmatch_grade() -> None:
     assert cut_rms < neutral_rms * 0.75
 
 
+def test_mixer_actions_route_to_owned_deck_without_arming_grade() -> None:
+    driver = BeatmatchPracticeDriver()
+
+    assert driver.record_action("L1.04", {"control": "xfader", "value": 0}) is False
+    assert driver.record_action("L1.03", {"control": "vol", "deck": "A", "value": 0}) is False
+    assert driver.record_action("L2.06", {"control": "filter", "deck": "B", "value": 127}) is False
+
+    state = driver.deck.state()
+    assert state.xfader == 0.0
+    assert state.vol_a == 0.0
+    assert state.vol_b == 1.0
+    assert driver.snapshot() is None
+
+
 def test_ear_practice_large_pitch_move_does_not_credit_as_locked() -> None:
     driver = BeatmatchPracticeDriver()
 

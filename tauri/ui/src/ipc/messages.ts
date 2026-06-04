@@ -74,6 +74,8 @@ export type VibemixIPCMessages =
   | LearnAck
   | LearnTutorSpeak
   | LearnLiveGrade
+  | LearnWaveformReady
+  | LearnPlayheadTick
   | LearnExemplarPlay
   | LearnExemplarStop
   | LearnProgressState;
@@ -888,6 +890,757 @@ export interface LearnLiveGrade {
     phase_error_beats: number;
     score: number;
     citation: string | null;
+  };
+}
+export interface LearnWaveformReady {
+  type: "ipc.learn.waveform_ready";
+  ts: string;
+  payload: {
+    sample_rate: number;
+    beat_interval_s: number;
+    decks: {
+      [k: string]: LearnWaveformDeck;
+    };
+  };
+}
+export interface LearnWaveformDeck {
+  bpm: number;
+  duration_s: number;
+  /**
+   * @minItems 1
+   * @maxItems 4096
+   */
+  peaks: [[number, number, number], ...[number, number, number][]];
+  /**
+   * @maxItems 16
+   */
+  cues:
+    | []
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ]
+    | [
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        },
+        {
+          label: string;
+          start_s: number;
+          end_s: number;
+        }
+      ];
+}
+export interface LearnPlayheadTick {
+  type: "ipc.learn.playhead_tick";
+  ts: string;
+  payload: {
+    sample_rate: number;
+    decks: {
+      [k: string]: {
+        frame: number;
+        position_s: number;
+        bpm: number;
+      };
+    };
   };
 }
 export interface LearnExemplarPlay {

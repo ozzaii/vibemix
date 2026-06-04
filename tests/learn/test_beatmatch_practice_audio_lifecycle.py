@@ -35,6 +35,17 @@ def _runtime() -> LessonRuntime:
     )
 
 
+def _runtime_with_recorder(recorder) -> LessonRuntime:
+    return LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=LearnProgress(),
+        beatmatch_practice_action_recorder=recorder,
+    )
+
+
 def _load_begin(
     runtime: LessonRuntime,
     *,
@@ -83,6 +94,38 @@ def test_eq_swap_lesson_starts_practice_player() -> None:
     _load_begin(runtime, lesson_id="L2.04")
 
     assert player.starts == 1
+
+
+def test_course_one_deck_control_lesson_starts_practice_player() -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L1.03", course_id="course_1_anatomy")
+
+    assert player.starts == 1
+
+
+def test_practice_audio_ack_applies_before_lesson_gate() -> None:
+    calls: list[tuple[str | None, dict]] = []
+
+    def recorder(lesson_id: str | None, midi: dict) -> bool:
+        calls.append((lesson_id, dict(midi)))
+        return False
+
+    runtime = _runtime_with_recorder(recorder)
+    _load_begin(runtime, lesson_id="L2.01")
+
+    runtime.handle_practice_audio_ack(
+        {"type": "cc", "control": "tempo", "deck": "B", "value": 64, "prev_value": 63}
+    )
+
+    assert calls == [
+        (
+            "L2.01",
+            {"type": "cc", "control": "tempo", "deck": "B", "value": 64, "prev_value": 63},
+        )
+    ]
 
 
 def test_loading_another_lesson_stops_active_practice_player() -> None:

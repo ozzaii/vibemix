@@ -66,11 +66,13 @@ from vibemix.ui_bus import (
     LearnLessonLoaded,
     LearnLiveGrade,
     LearnMidiPosition,
+    LearnPlayheadTick,
     LearnProgressDot,
     LearnProgressState,
     LearnStartCourse,
     LearnStartLesson,
     LearnTutorSpeak,
+    LearnWaveformReady,
     LevelPair,
     LibraryImport,
     LibraryImportCancel,
@@ -526,6 +528,41 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 phase_error_beats=0.0,
                 score=1.0,
                 citation="[ev:BEATMATCH_GRADED@12.345]",
+            ),
+        ),
+        (
+            "LearnWaveformReady",
+            LearnWaveformReady.make(
+                sample_rate=44_100,
+                beat_interval_s=0.46875,
+                decks={
+                    "A": {
+                        "bpm": 128.0,
+                        "duration_s": 30.0,
+                        "peaks": ((16, 32, 64), (24, 48, 96)),
+                        "cues": (
+                            {"label": "intro", "start_s": 0.0, "end_s": 8.0},
+                        ),
+                    },
+                    "B": {
+                        "bpm": 128.0,
+                        "duration_s": 30.0,
+                        "peaks": ((12, 36, 72), (20, 40, 88)),
+                        "cues": (
+                            {"label": "drop", "start_s": 8.0, "end_s": 16.0},
+                        ),
+                    },
+                },
+            ),
+        ),
+        (
+            "LearnPlayheadTick",
+            LearnPlayheadTick.make(
+                sample_rate=44_100,
+                decks={
+                    "A": {"frame": 1024.0, "position_s": 0.023, "bpm": 128.0},
+                    "B": {"frame": 2048.0, "position_s": 0.046, "bpm": 127.2},
+                },
             ),
         ),
         (

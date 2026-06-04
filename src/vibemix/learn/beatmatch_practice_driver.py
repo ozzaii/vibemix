@@ -17,6 +17,7 @@ import numpy as np
 
 from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import MiniDeck
+from vibemix.audio.waveform_peaks import compute_three_band_peaks
 from vibemix.learn.runtime import BeatmatchPracticeSnapshot
 
 _SAMPLE_RATE = 44_100
@@ -25,6 +26,7 @@ _CENTER_CC = 64.0
 _TEMPO_CC_RATE_SPAN = 640.0
 _PRACTICE_LESSONS = frozenset({"L2.01", "L2.02"})
 _EQ_PRACTICE_LESSONS = frozenset({"L2.04", "L2.05"})
+_MIXER_CONTROLS = frozenset({"eq_hi", "eq_mid", "eq_low", "filter", "vol"})
 
 
 def _deck_from_midi(midi: dict[str, Any]) -> str:
@@ -82,14 +84,39 @@ class BeatmatchPracticeDriver:
     """Convert authored Learn beatmatch actions into owned-deck snapshots."""
 
     def __init__(self) -> None:
+        src_a = _practice_loop(bass_hz=82.0)
+        src_b = _practice_loop(bass_hz=98.0)
         self._deck = MiniDeck(
-            _practice_loop(bass_hz=82.0),
-            _practice_loop(bass_hz=98.0),
+            src_a,
+            src_b,
             rate_a=1.0,
             rate_b=0.97,
             xfader=0.5,
             sample_rate=_SAMPLE_RATE,
+            loop=True,
         )
+        self._waveform_decks = {
+            "A": {
+                "bpm": _PRACTICE_BPM,
+                "duration_s": float(src_a.shape[0]) / float(_SAMPLE_RATE),
+                "peaks": compute_three_band_peaks(src_a, sample_rate=_SAMPLE_RATE),
+                "cues": [
+                    {"label": "intro", "start_s": 0.0, "end_s": 7.5},
+                    {"label": "drop", "start_s": 7.5, "end_s": 15.0},
+                    {"label": "outro", "start_s": 22.5, "end_s": 30.0},
+                ],
+            },
+            "B": {
+                "bpm": _PRACTICE_BPM,
+                "duration_s": float(src_b.shape[0]) / float(_SAMPLE_RATE),
+                "peaks": compute_three_band_peaks(src_b, sample_rate=_SAMPLE_RATE),
+                "cues": [
+                    {"label": "intro", "start_s": 0.0, "end_s": 7.5},
+                    {"label": "drop", "start_s": 7.5, "end_s": 15.0},
+                    {"label": "outro", "start_s": 22.5, "end_s": 30.0},
+                ],
+            },
+        }
         self._grid_a = BeatGrid(
             anchor_frame=0.0,
             bpm=_PRACTICE_BPM,
@@ -117,16 +144,33 @@ class BeatmatchPracticeDriver:
         actions that ``LessonRuntime`` has already matched.
         """
 
-        if lesson_id not in _PRACTICE_LESSONS | _EQ_PRACTICE_LESSONS:
-            self._armed = False
-            return False
-
         deck = _deck_from_midi(midi).upper()
         control = _control_from_midi(midi)
-        if lesson_id in _EQ_PRACTICE_LESSONS:
+        value = midi.get("value")
+        if control == "xfader":
+            try:
+                cc = float(value)
+            except (TypeError, ValueError):
+                cc = _CENTER_CC
+            self._deck.xfader = min(1.0, max(0.0, cc / 127.0))
+            return False
+        if control in _MIXER_CONTROLS and deck in {"A", "B"}:
+            if control == "vol":
+                self._deck.set_volume(deck, value)
+            elif control == "filter":
+                self._deck.set_filter(deck, value)
+            else:
+                band = control.removeprefix("eq_")
+                self._deck.set_eq(
+                    deck,
+                    low=value if band == "low" else None,
+                    mid=value if band == "mid" else None,
+                    high=value if band == "hi" else None,
+                )
+            return False
+
+        if lesson_id not in _PRACTICE_LESSONS:
             self._armed = False
-            if control == "eq_low" and deck in {"A", "B"}:
-                self._deck.set_eq(deck, low=midi.get("value"))
             return False
 
         if deck != "B":
@@ -155,6 +199,39 @@ class BeatmatchPracticeDriver:
             grid_b=self._grid_b,
             deck_state=self._deck.state(),
         )
+
+    def waveform_payload(self) -> dict[str, Any]:
+        """Return compact two-deck waveform payload for Learn Canvas rendering."""
+
+        return {
+            "sample_rate": _SAMPLE_RATE,
+            "beat_interval_s": 60.0 / _PRACTICE_BPM,
+            "decks": self._waveform_decks,
+        }
+
+    def playhead_payload(self) -> dict[str, Any]:
+        """Return current owned-deck playheads and BPMs for the Learn UI."""
+
+        state = self._deck.state()
+        duration_a = float(self._waveform_decks["A"]["duration_s"])
+        duration_b = float(self._waveform_decks["B"]["duration_s"])
+        frame_a = float(state.a_frame % max(1.0, duration_a * _SAMPLE_RATE))
+        frame_b = float(state.b_frame % max(1.0, duration_b * _SAMPLE_RATE))
+        return {
+            "sample_rate": _SAMPLE_RATE,
+            "decks": {
+                "A": {
+                    "frame": frame_a,
+                    "position_s": frame_a / float(_SAMPLE_RATE),
+                    "bpm": _PRACTICE_BPM * state.rate_a,
+                },
+                "B": {
+                    "frame": frame_b,
+                    "position_s": frame_b / float(_SAMPLE_RATE),
+                    "bpm": _PRACTICE_BPM * state.rate_b,
+                },
+            },
+        }
 
 
 __all__ = ["BeatmatchPracticeDriver"]

@@ -2858,6 +2858,16 @@ async def main() -> None:
             if beatmatch_practice_driver is not None
             else None
         ),
+        waveform_payload_loader=(
+            beatmatch_practice_driver.waveform_payload
+            if beatmatch_practice_driver is not None
+            else None
+        ),
+        playhead_payload_loader=(
+            beatmatch_practice_driver.playhead_payload
+            if beatmatch_practice_driver is not None
+            else None
+        ),
         cue_placement_practice_loader=(
             cue_placement_practice_driver.snapshot
             if cue_placement_practice_driver is not None
@@ -2883,28 +2893,64 @@ async def main() -> None:
             return
 
     def _learn_output_device_index() -> int | None:
+        def _valid_output_index(sd: Any, idx: int | None) -> int | None:
+            if idx is None or idx < 0:
+                return None
+            try:
+                info = sd.query_devices(idx)
+            except Exception:
+                return None
+            try:
+                output_channels = int(info.get("max_output_channels", 0))
+            except Exception:
+                output_channels = 0
+            return idx if output_channels > 0 else None
+
+        try:
+            import sounddevice as sd
+        except Exception:
+            return None
+
         try:
             from vibemix.learn.settings import read_learn_headphone_device_index
 
             configured = read_learn_headphone_device_index()
+            valid_configured = _valid_output_index(sd, configured)
+            if valid_configured is not None:
+                return valid_configured
             if configured is not None:
-                return configured
+                print(
+                    f"-> learn headphone device {configured} unavailable; falling back",
+                    file=sys.stderr,
+                )
         except Exception:
             pass
         try:
-            import sounddevice as sd
-
             default_device = getattr(sd.default, "device", None)
             if isinstance(default_device, (list, tuple)) and len(default_device) >= 2:
                 output_idx = default_device[1]
             else:
                 output_idx = default_device
             if output_idx is None:
-                return None
+                raise ValueError("no default output")
             idx = int(output_idx)
-            return idx if idx >= 0 else None
+            valid_default = _valid_output_index(sd, idx)
+            if valid_default is not None:
+                return valid_default
         except Exception:
-            return None
+            pass
+        try:
+            devices = sd.query_devices()
+            for idx, info in enumerate(devices):
+                try:
+                    output_channels = int(info.get("max_output_channels", 0))
+                except Exception:
+                    output_channels = 0
+                if output_channels > 0:
+                    return idx
+        except Exception:
+            pass
+        return None
 
     from vibemix.learn.observability import (
         learn_tutor_speak_observability_events as _learn_tutor_speak_observability_events,
@@ -3075,6 +3121,7 @@ async def main() -> None:
     # escalation timer (Pitfall 6 mitigation pinned by
     # tests/runtime/test_ws_broadcast_30hz_under_lesson_load.py).
     lesson_tick_task = asyncio.create_task(lesson_runtime.tick_loop(stop_event))
+    lesson_live_grade_task = asyncio.create_task(lesson_runtime.live_grade_loop(stop_event))
     diag_task = asyncio.create_task(diag_loop(levels, state, stop_event, tracer=tracer))
     screen_task: asyncio.Task | None = None
     if deck_vision_capture_enabled:
@@ -3169,6 +3216,7 @@ async def main() -> None:
             ("track_poll", track_task),
             ("deck_poll", deck_poll_task),
             ("lesson_tick", lesson_tick_task),
+            ("lesson_live_grade", lesson_live_grade_task),
         ),
     )
 
@@ -3263,6 +3311,7 @@ async def main() -> None:
             # but it is pending" warning. Include it here so the shutdown
             # is clean.
             lesson_tick_task,
+            lesson_live_grade_task,
         ]
         if screen_task is not None:
             cleanup_tasks.append(screen_task)
