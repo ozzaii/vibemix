@@ -18,6 +18,7 @@ fake store + in-memory library; energy is monkeypatched.
 
 from __future__ import annotations
 
+import json
 import pathlib
 import shutil
 import time
@@ -983,15 +984,18 @@ def test_export_set_all_writes_xml_m3u8_and_markers2_tags(toolset, tmp_path, mon
         ),
     )
     out_xml = tmp_path / "all.xml"
+    events = tmp_path / "tool_events.jsonl"
+    monkeypatch.setenv("VIBEMIX_TOOL_EVENTS_FILE", str(events))
 
-    out = toolset.export_set(
+    out = toolset.dispatch(
+        "export_set",
         {
             "name": "All DJ",
             "track_ids": ["t000"],
             "out_path": str(out_xml),
             "target": "all",
             "tag_write_granted": True,
-        }
+        },
     )
 
     assert out.get("exported") is True
@@ -1024,6 +1028,17 @@ def test_export_set_all_writes_xml_m3u8_and_markers2_tags(toolset, tmp_path, mon
     cues = {cue.name: cue for cue in read_serato_cues(dst)}
     assert cues["VM A IN"].position_ms == 10000
     assert cues["VM D DROP"].position_ms == 64500
+    rec = json.loads(events.read_text(encoding="utf-8").splitlines()[0])
+    assert rec["tool"] == "export_set"
+    assert rec["receipt"]["target"] == "all"
+    assert rec["receipt"]["outputs"] == out["outputs"]
+    assert rec["receipt"]["tag_receipts"][0]["carrier"] == "markers2_tags"
+    assert [row["carrier"] for row in rec["receipt"]["import_instructions"]] == [
+        "rekordbox_xml",
+        "m3u8",
+        "markers2_tags",
+    ]
+    assert rec["receipt"]["auto_cues"]["cues_added"] == 2
 
 
 def test_export_set_forwards_rekordbox_cues_and_beatgrid(toolset, tmp_path):

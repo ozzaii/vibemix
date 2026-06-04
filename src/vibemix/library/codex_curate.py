@@ -353,6 +353,10 @@ class CodexCurateResult:
     # Set-prep only: the Rekordbox XML path written by the export_set MCP tool
     # during a `build_set_with_codex` run. None for plain curation.
     export_path: str | None = None
+    export_outputs: dict[str, str] = field(default_factory=dict)
+    export_tag_receipts: list[dict[str, Any]] = field(default_factory=list)
+    export_auto_cues: dict[str, Any] | None = None
+    export_import_instructions: list[dict[str, Any]] = field(default_factory=list)
     # Phase 100 HARDEN-CLARIFY-03: populated when the MCP-side toolset's
     # request_clarification handler trips (stop_reason="clarification_needed").
     # Defaults preserve the cold path — every non-clarification result keeps
@@ -603,6 +607,42 @@ def _read_tool_event_trace(events_path: str) -> list[dict[str, Any]]:
     return rows
 
 
+def _read_export_receipt_from_tool_events(events_path: str) -> dict[str, Any]:
+    """Return the last structured export_set receipt from the MCP tool tape."""
+    try:
+        lines = Path(events_path).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+    receipt: dict[str, Any] = {}
+    for line in lines:
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(rec, dict) or rec.get("tool") != "export_set":
+            continue
+        raw = rec.get("receipt")
+        if isinstance(raw, dict):
+            receipt = dict(raw)
+    return receipt
+
+
+def _receipt_str_dict(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(key): str(value)
+        for key, value in raw.items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+
+
+def _receipt_dict_rows(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    return [dict(row) for row in raw if isinstance(row, dict)]
+
+
 def _record_codex_ai_message(
     *,
     surface: str,
@@ -624,6 +664,10 @@ def _record_codex_ai_message(
         stop_reason = getattr(result, "stop_reason", None)
         playlist = getattr(result, "playlist", None)
         export_path = getattr(result, "export_path", None)
+        export_outputs = getattr(result, "export_outputs", None)
+        export_tag_receipts = getattr(result, "export_tag_receipts", None)
+        export_auto_cues = getattr(result, "export_auto_cues", None)
+        export_import_instructions = getattr(result, "export_import_instructions", None)
         if playlist is None:
             playlist_name = getattr(result, "playlist_name", None)
             m3u_path = getattr(result, "m3u_path", None)
@@ -657,6 +701,16 @@ def _record_codex_ai_message(
                 "track_ids": track_ids if isinstance(track_ids, list) else [],
                 "playlist": playlist,
                 "export_path": export_path,
+                "export_outputs": export_outputs if isinstance(export_outputs, dict) else {},
+                "export_tag_receipts": (
+                    export_tag_receipts if isinstance(export_tag_receipts, list) else []
+                ),
+                "export_auto_cues": export_auto_cues if isinstance(export_auto_cues, dict) else None,
+                "export_import_instructions": (
+                    export_import_instructions
+                    if isinstance(export_import_instructions, list)
+                    else []
+                ),
                 "error": str(error) if error else None,
                 "question": getattr(result, "question", None),
                 "choices": getattr(result, "choices", None),
@@ -1344,6 +1398,12 @@ def _build_set_auto_crate_timeout_fallback(
         json_path=str(playlist.get("json_path")) if playlist.get("json_path") else None,
         rationale=rationale,
         export_path=result.export_path,
+        export_outputs=dict(result.export_outputs),
+        export_tag_receipts=[dict(row) for row in result.export_tag_receipts],
+        export_auto_cues=dict(result.export_auto_cues) if result.export_auto_cues else None,
+        export_import_instructions=[
+            dict(row) for row in result.export_import_instructions
+        ],
     )
 
 
@@ -1614,10 +1674,19 @@ def build_set_with_codex(
             )
         )
 
-    # export_path comes from the export_set tool (grounded writer). Trust only a
-    # path that actually exists on disk — an empty/missing path means "no export".
-    raw_export = str(payload.get("export_path") or "").strip()
+    # export_path comes from the export_set tool (grounded writer). The strict
+    # model output schema only carries the primary path, so recover the richer
+    # all-carrier receipt from the MCP tool tape when export_set ran.
+    export_receipt = _read_export_receipt_from_tool_events(tool_events_path)
+    raw_export = str(payload.get("export_path") or export_receipt.get("path") or "").strip()
     export_path: str | None = raw_export if raw_export and Path(raw_export).exists() else None
+    export_outputs = _receipt_str_dict(export_receipt.get("outputs"))
+    export_tag_receipts = _receipt_dict_rows(export_receipt.get("tag_receipts"))
+    raw_auto_cues = export_receipt.get("auto_cues")
+    export_auto_cues = dict(raw_auto_cues) if isinstance(raw_auto_cues, dict) else None
+    export_import_instructions = _receipt_dict_rows(
+        export_receipt.get("import_instructions")
+    )
 
     # Persist a neutral M3U/JSON too (mirror curate: the wrapper is the validated
     # writer), so the set has a playlist artifact alongside the Rekordbox XML.
@@ -1644,6 +1713,10 @@ def build_set_with_codex(
             json_path=json_path,
             rationale=str(payload.get("rationale", "")),
             export_path=export_path,
+            export_outputs=export_outputs,
+            export_tag_receipts=export_tag_receipts,
+            export_auto_cues=export_auto_cues,
+            export_import_instructions=export_import_instructions,
         )
     )
 

@@ -3137,11 +3137,42 @@ def test_build_set_timeout_before_tools_uses_auto_crate_fallback(library, monkey
         assert kwargs["bpm_max"] == 138.0
         return AutoCrateResult(
             name="Fallback Set",
-            stop_reason="created",
+            stop_reason="exported",
             curve=kwargs["curve"],
             n_slots=kwargs["n_slots"],
             track_ids=["t000", "t001", "t002"],
             rationale="3 tracks selected from 12 discovered candidates on curve peak_time.",
+            export_path="/tmp/viber-all.xml",
+            export_outputs={
+                "rekordbox": "/tmp/viber-all.xml",
+                "m3u8": "/tmp/viber-all.m3u8",
+            },
+            export_tag_receipts=[
+                {
+                    "carrier": "markers2_tags",
+                    "compatible_apps": ["Serato", "Mixxx"],
+                    "tagged": 3,
+                    "cues_total": 9,
+                    "files": ["/tmp/a.mp3", "/tmp/b.mp3", "/tmp/c.mp3"],
+                }
+            ],
+            export_auto_cues={"enabled": True, "tracks_cued": 3, "cues_added": 9},
+            export_import_instructions=[
+                {
+                    "app": "Rekordbox",
+                    "carrier": "rekordbox_xml",
+                    "path": "/tmp/viber-all.xml",
+                    "writes_audio_tags": False,
+                    "instruction": "Import XML",
+                },
+                {
+                    "app": "Serato, Mixxx",
+                    "carrier": "markers2_tags",
+                    "files": ["/tmp/a.mp3", "/tmp/b.mp3", "/tmp/c.mp3"],
+                    "writes_audio_tags": True,
+                    "instruction": "Reload files",
+                },
+            ],
             playlist={
                 "name": "Fallback Set",
                 "track_ids": ["t000", "t001", "t002"],
@@ -3170,9 +3201,18 @@ def test_build_set_timeout_before_tools_uses_auto_crate_fallback(library, monkey
         _runner=runner,
     )
 
-    assert res.stop_reason == "created"
+    assert res.stop_reason == "exported"
     assert res.track_ids == ["t000", "t001", "t002"]
     assert res.playlist_name == "Fallback Set"
+    assert res.export_path == "/tmp/viber-all.xml"
+    assert res.export_outputs["m3u8"] == "/tmp/viber-all.m3u8"
+    assert res.export_tag_receipts[0]["carrier"] == "markers2_tags"
+    assert res.export_auto_cues == {"enabled": True, "tracks_cued": 3, "cues_added": 9}
+    assert res.export_import_instructions[1]["files"] == [
+        "/tmp/a.mp3",
+        "/tmp/b.mp3",
+        "/tmp/c.mp3",
+    ]
     assert "auto-crate engine" in res.rationale
 
 
@@ -3558,7 +3598,42 @@ def test_build_set_codex_exported_with_export_and_grounding(library, monkeypatch
     monkeypatch.setattr(cp_mod, "PLAYLISTS_DIR", tmp_path)
     # The export_set tool would have written this XML during the run.
     export_xml = tmp_path / "set.xml"
+    export_m3u8 = tmp_path / "set.m3u8"
     export_xml.write_text("<DJ_PLAYLISTS/>", encoding="utf-8")
+    export_m3u8.write_text("#EXTM3U\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "vibemix.library.codex_curate._read_export_receipt_from_tool_events",
+        lambda _path: {
+            "target": "all",
+            "path": str(export_xml),
+            "outputs": {"rekordbox": str(export_xml), "m3u8": str(export_m3u8)},
+            "tag_receipts": [
+                {
+                    "carrier": "markers2_tags",
+                    "compatible_apps": ["Serato", "Mixxx"],
+                    "tagged": 2,
+                    "files": ["/tmp/a.mp3", "/tmp/b.mp3"],
+                }
+            ],
+            "auto_cues": {"enabled": True, "tracks_cued": 2, "cues_added": 6},
+            "import_instructions": [
+                {
+                    "app": "Rekordbox",
+                    "carrier": "rekordbox_xml",
+                    "path": str(export_xml),
+                    "writes_audio_tags": False,
+                    "instruction": "Import XML",
+                },
+                {
+                    "app": "Serato, Mixxx",
+                    "carrier": "markers2_tags",
+                    "files": ["/tmp/a.mp3", "/tmp/b.mp3"],
+                    "writes_audio_tags": True,
+                    "instruction": "Reload files",
+                },
+            ],
+        },
+    )
     runner = _runner_writing(
         {
             "name": "Peak Set",
@@ -3579,6 +3654,10 @@ def test_build_set_codex_exported_with_export_and_grounding(library, monkeypatch
     assert res.track_ids == ["t002", "t003"]  # GHOST dropped (grounding)
     assert res.playlist_name == "Peak Set"
     assert res.export_path == str(export_xml)  # surfaced (file exists)
+    assert res.export_outputs == {"rekordbox": str(export_xml), "m3u8": str(export_m3u8)}
+    assert res.export_tag_receipts[0]["carrier"] == "markers2_tags"
+    assert res.export_auto_cues == {"enabled": True, "tracks_cued": 2, "cues_added": 6}
+    assert res.export_import_instructions[1]["files"] == ["/tmp/a.mp3", "/tmp/b.mp3"]
     assert res.m3u_path is not None and Path(res.m3u_path).exists()
 
 

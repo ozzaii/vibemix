@@ -1692,6 +1692,41 @@ class LibraryToolset:
         # Unknown shape: the tool NAME + ok/err is the signal; no noisy "ok".
         return ""
 
+    @staticmethod
+    def _tool_event_receipt(name: str, result: dict[str, Any]) -> dict[str, Any] | None:
+        """Structured, redacted receipt for tool events that write artifacts.
+
+        The live tape's human summary stays tiny, but parent processes also need
+        enough machine-readable data to render "where did my DJ-software handoff
+        land?" after Codex exits. Keep this limited to artifact paths/counts and
+        export receipts; never include raw candidate vectors or broad metadata.
+        """
+        if name != "export_set" or not isinstance(result, dict) or result.get("error"):
+            return None
+        receipt: dict[str, Any] = {}
+        for key in ("target", "path"):
+            value = result.get(key)
+            if isinstance(value, str) and value:
+                receipt[key] = value
+        outputs = result.get("outputs")
+        if isinstance(outputs, dict):
+            receipt["outputs"] = {
+                str(key): str(value)
+                for key, value in outputs.items()
+                if isinstance(key, str) and isinstance(value, str)
+            }
+        for key in ("tag_receipts", "import_instructions"):
+            rows = result.get(key)
+            if isinstance(rows, list):
+                receipt[key] = [dict(row) for row in rows if isinstance(row, dict)]
+        auto_cues = result.get("auto_cues")
+        if isinstance(auto_cues, dict):
+            receipt["auto_cues"] = dict(auto_cues)
+        pill = result.get("pill_cues_materialized")
+        if isinstance(pill, dict):
+            receipt["pill_cues_materialized"] = dict(pill)
+        return receipt or None
+
     def _emit_tool_event(
         self, name: str, result: dict[str, Any], args: dict[str, Any] | None = None
     ) -> None:
@@ -1716,6 +1751,9 @@ class LibraryToolset:
             "summary": self._tool_event_summary(name, result),
             "ts": time.time(),
         }
+        receipt = self._tool_event_receipt(name, result)
+        if receipt is not None:
+            record["receipt"] = receipt
         try:
             with open(path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record) + "\n")
