@@ -1,0 +1,133 @@
+# SPDX-License-Identifier: Apache-2.0
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import numpy as np
+from scripts.eval import library_auto_tags as lat
+
+from vibemix.library.auto_tags import AutoTagDecision
+
+
+def test_load_hand_labels_accepts_nested_tags_and_reports_unknown(tmp_path: Path) -> None:
+    path = tmp_path / "labels.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "track_id": "t1",
+                "split": "holdout",
+                "tags": {
+                    "mood": ["Dark"],
+                    "texture": ["raw"],
+                    "instrument": ["laser-harp"],
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    loaded = lat.load_hand_labels(path)
+    row = loaded["rows"][0]
+
+    assert loaded["status"] == "ok"
+    assert row.track_id == "t1"
+    assert row.split == "holdout"
+    assert row.labels["mood"] == {"dark"}
+    assert row.labels["texture"] == {"raw"}
+    assert row.labels["instrument"] == set()
+    assert loaded["unknown_tags"] == {"instrument": ["laser_harp"]}
+
+
+def test_evaluate_labeled_predictions_measures_precision_recall_and_abstain() -> None:
+    rows = [
+        lat.HandLabelRow("t1", "eval", {"mood": {"dark"}, "texture": {"raw"}}),
+        lat.HandLabelRow("t2", "eval", {"mood": {"euphoric"}, "texture": {"airy"}}),
+    ]
+    predictions = {
+        "t1": (
+            AutoTagDecision("mood", "dark", 0.8, None, -1.0, 1.8, 0.2, True, "accepted"),
+            AutoTagDecision("texture", None, 0.1, "raw", 0.09, 0.01, 0.2, False, "below_threshold"),
+        ),
+        "t2": (
+            AutoTagDecision("mood", "dark", 0.7, None, -1.0, 1.7, 0.2, True, "accepted"),
+            AutoTagDecision("texture", "airy", 0.7, None, -1.0, 1.7, 0.2, True, "accepted"),
+        ),
+    }
+
+    metrics = lat.evaluate_labeled_predictions(rows, predictions)
+
+    assert metrics["micro"]["tp"] == 2
+    assert metrics["micro"]["fp"] == 1
+    assert metrics["micro"]["fn"] == 2
+    assert metrics["micro"]["precision"] == 0.666667
+    assert metrics["micro"]["recall"] == 0.5
+    assert metrics["micro"]["abstentions"] == 1
+
+
+class _FakeEngine:
+    def embed_query(self, text: str) -> np.ndarray:
+        text = text.lower()
+        if "dark" in text or "raw" in text or "vocal" in text:
+            return np.asarray([1.0, 0.0, 0.0], dtype=np.float32)
+        if "euphoric" in text or "airy" in text:
+            return np.asarray([0.0, 1.0, 0.0], dtype=np.float32)
+        return np.asarray([0.0, 0.0, 1.0], dtype=np.float32)
+
+
+def test_build_report_missing_labels_is_honest_null(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        lat,
+        "_load_store",
+        lambda: (
+            ["t1"],
+            np.asarray([[1.0, 0.0, 0.0]], dtype=np.float32),
+            "FakeStore",
+            "snap",
+        ),
+    )
+    monkeypatch.setattr(lat, "ClapEngine", lambda: _FakeEngine())
+
+    report = lat.build_report(labels_path=tmp_path / "missing.jsonl", max_examples=2)
+
+    assert report["status"] == "unproven_no_hand_labels"
+    assert report["label_set"]["usable_rows"] == 0
+    assert report["comparison"] is None
+    assert report["modes"]["template"]["metrics"] is None
+    assert report["modes"]["template"]["prediction_summary"]["track_count"] == 1
+
+
+def test_build_report_with_labels_scores_template_and_bare(tmp_path: Path, monkeypatch) -> None:
+    labels = tmp_path / "labels.jsonl"
+    labels.write_text(
+        json.dumps(
+            {
+                "track_id": "t1",
+                "split": "holdout",
+                "mood": ["dark"],
+                "texture": ["raw"],
+                "instrument": ["vocal"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        lat,
+        "_load_store",
+        lambda: (
+            ["t1"],
+            np.asarray([[1.0, 0.0, 0.0]], dtype=np.float32),
+            "FakeStore",
+            "snap",
+        ),
+    )
+    monkeypatch.setattr(lat, "ClapEngine", lambda: _FakeEngine())
+
+    report = lat.build_report(labels_path=labels, max_examples=2)
+
+    assert report["status"] == "measured_small_hand_label_subset"
+    assert report["label_set"]["usable_rows"] == 1
+    assert report["modes"]["template"]["metrics"]["micro"]["precision"] >= 0.0
+    assert report["comparison"]["primary_metric"] == "micro_f1"

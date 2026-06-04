@@ -20,8 +20,8 @@ const ACTIVATION_LABEL: Record<ActivationState, string> = {
 
 const CONNECTION_LABEL: Record<ConnectionState, string> = {
   connected: "",
-  reconnecting: "Sven reconnecting",
-  disconnected: "Sven offline",
+  reconnecting: "co-host reconnecting",
+  disconnected: "co-host offline",
 };
 
 function footerLabel(
@@ -62,8 +62,8 @@ export function createStatusFooter(store: ShellStore): HTMLElement {
       footer.setAttribute(
         "title",
         model.connection === "reconnecting"
-          ? "Sven is reconnecting to the audio engine."
-          : "Sven cannot speak until the connection comes back.",
+          ? "The co-host is reconnecting to the audio engine."
+          : "The co-host cannot speak until the connection comes back.",
       );
     }
   };

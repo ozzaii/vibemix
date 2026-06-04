@@ -181,12 +181,12 @@ describe("DesktopShell", () => {
     const label = footer.querySelector<HTMLElement>(".status-label")!;
 
     expect(footer.dataset.conn).toBe("disconnected");
-    expect(label.textContent).toBe("Sven offline");
-    expect(footer.getAttribute("title")).toContain("Sven cannot speak");
+    expect(label.textContent).toBe("co-host offline");
+    expect(footer.getAttribute("title")).toContain("co-host cannot speak");
 
     shell.store.setConnection("reconnecting");
     expect(footer.dataset.conn).toBe("reconnecting");
-    expect(label.textContent).toBe("Sven reconnecting");
+    expect(label.textContent).toBe("co-host reconnecting");
 
     shell.store.setConnection("connected");
     expect(footer.dataset.conn).toBe("connected");

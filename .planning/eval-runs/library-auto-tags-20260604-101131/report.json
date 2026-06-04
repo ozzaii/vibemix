@@ -1,0 +1,738 @@
+{
+  "comparison": null,
+  "generated_at": "2026-06-04T10:11:31+00:00",
+  "git_head": "c9462365cf32468e8a26b61bfd7ebcf1dbc5724a",
+  "label_set": {
+    "calibration_rows": 0,
+    "calibration_strategy": null,
+    "evaluation_rows": 0,
+    "hook": "create eval/private/library/auto_tag_labels.jsonl with track_id + mood/texture/instrument tags",
+    "path": "/Users/ozai/projects/dj-set-ai/eval/private/library/auto_tag_labels.jsonl",
+    "status": "missing",
+    "unknown_tags": {},
+    "usable_rows": 0
+  },
+  "margin": 0.015,
+  "modes": {
+    "bare": {
+      "example_predictions": [
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:000e62e62ec60bdd"
+        },
+        {
+          "abstained": [
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "dark"
+            ]
+          },
+          "track_id": "folder:021ab63321fbeb33"
+        },
+        {
+          "abstained": [
+            "mood"
+          ],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:036f1f0cce812abf"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:039030678757825e"
+        },
+        {
+          "abstained": [
+            "instrument",
+            "texture"
+          ],
+          "tags": {
+            "mood": [
+              "aggressive"
+            ]
+          },
+          "track_id": "folder:05b7cebb505a50e9"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "hypnotic"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:069af44d4b4060ea"
+        },
+        {
+          "abstained": [
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "aggressive"
+            ]
+          },
+          "track_id": "folder:06e217cb5b4d49a9"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "distorted"
+            ]
+          },
+          "track_id": "folder:080e7b38f74eeade"
+        },
+        {
+          "abstained": [
+            "mood"
+          ],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "texture": [
+              "raw"
+            ]
+          },
+          "track_id": "folder:09ce370fe33d2145"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "dreamy"
+            ],
+            "texture": [
+              "airy"
+            ]
+          },
+          "track_id": "folder:0a264e38914844c0"
+        },
+        {
+          "abstained": [
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "aggressive"
+            ]
+          },
+          "track_id": "folder:0a9b8a90864b9227"
+        },
+        {
+          "abstained": [
+            "mood"
+          ],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:0b3f8426dce43071"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "drums"
+            ],
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "distorted"
+            ]
+          },
+          "track_id": "folder:0b6720458d4f47f9"
+        },
+        {
+          "abstained": [
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "aggressive"
+            ]
+          },
+          "track_id": "folder:0bec2166640da6e7"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "dreamy"
+            ],
+            "texture": [
+              "airy"
+            ]
+          },
+          "track_id": "folder:0c12e4e1fd6bb83f"
+        },
+        {
+          "abstained": [
+            "instrument"
+          ],
+          "tags": {
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:0cde010c05663d3f"
+        }
+      ],
+      "metrics": null,
+      "prediction_summary": {
+        "categories": {
+          "instrument": {
+            "abstained": 36,
+            "abstention_rate": 0.131868,
+            "accepted": 237,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 141,
+                "tag": "vocal"
+              },
+              {
+                "count": 60,
+                "tag": "acid_synth"
+              },
+              {
+                "count": 26,
+                "tag": "drums"
+              },
+              {
+                "count": 5,
+                "tag": "bassline"
+              },
+              {
+                "count": 3,
+                "tag": "piano"
+              },
+              {
+                "count": 2,
+                "tag": "pads"
+              }
+            ]
+          },
+          "mood": {
+            "abstained": 75,
+            "abstention_rate": 0.274725,
+            "accepted": 198,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 111,
+                "tag": "aggressive"
+              },
+              {
+                "count": 30,
+                "tag": "hypnotic"
+              },
+              {
+                "count": 22,
+                "tag": "dark"
+              },
+              {
+                "count": 17,
+                "tag": "tense"
+              },
+              {
+                "count": 14,
+                "tag": "dreamy"
+              },
+              {
+                "count": 4,
+                "tag": "euphoric"
+              }
+            ]
+          },
+          "texture": {
+            "abstained": 109,
+            "abstention_rate": 0.399267,
+            "accepted": 164,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 64,
+                "tag": "warm"
+              },
+              {
+                "count": 35,
+                "tag": "airy"
+              },
+              {
+                "count": 27,
+                "tag": "distorted"
+              },
+              {
+                "count": 21,
+                "tag": "polished"
+              },
+              {
+                "count": 11,
+                "tag": "raw"
+              },
+              {
+                "count": 4,
+                "tag": "atmospheric"
+              },
+              {
+                "count": 2,
+                "tag": "percussive"
+              }
+            ]
+          }
+        },
+        "track_count": 273
+      },
+      "thresholds": {
+        "instrument": 0.18,
+        "mood": 0.18,
+        "texture": 0.18
+      }
+    },
+    "template": {
+      "example_predictions": [
+        {
+          "abstained": [
+            "instrument",
+            "texture"
+          ],
+          "tags": {
+            "mood": [
+              "euphoric"
+            ]
+          },
+          "track_id": "folder:000e62e62ec60bdd"
+        },
+        {
+          "abstained": [
+            "mood",
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "bassline"
+            ]
+          },
+          "track_id": "folder:021ab63321fbeb33"
+        },
+        {
+          "abstained": [
+            "mood"
+          ],
+          "tags": {
+            "instrument": [
+              "pads"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:036f1f0cce812abf"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:039030678757825e"
+        },
+        {
+          "abstained": [
+            "instrument"
+          ],
+          "tags": {
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:05b7cebb505a50e9"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "pads"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "percussive"
+            ]
+          },
+          "track_id": "folder:069af44d4b4060ea"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:06e217cb5b4d49a9"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "distorted"
+            ]
+          },
+          "track_id": "folder:080e7b38f74eeade"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:09ce370fe33d2145"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:0a264e38914844c0"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:0a9b8a90864b9227"
+        },
+        {
+          "abstained": [
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "piano"
+            ],
+            "mood": [
+              "euphoric"
+            ]
+          },
+          "track_id": "folder:0b3f8426dce43071"
+        },
+        {
+          "abstained": [
+            "mood"
+          ],
+          "tags": {
+            "instrument": [
+              "drums"
+            ],
+            "texture": [
+              "distorted"
+            ]
+          },
+          "track_id": "folder:0b6720458d4f47f9"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:0bec2166640da6e7"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:0c12e4e1fd6bb83f"
+        },
+        {
+          "abstained": [
+            "instrument",
+            "texture"
+          ],
+          "tags": {
+            "mood": [
+              "euphoric"
+            ]
+          },
+          "track_id": "folder:0cde010c05663d3f"
+        }
+      ],
+      "metrics": null,
+      "prediction_summary": {
+        "categories": {
+          "instrument": {
+            "abstained": 68,
+            "abstention_rate": 0.249084,
+            "accepted": 205,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 125,
+                "tag": "acid_synth"
+              },
+              {
+                "count": 32,
+                "tag": "pads"
+              },
+              {
+                "count": 21,
+                "tag": "piano"
+              },
+              {
+                "count": 10,
+                "tag": "vocal"
+              },
+              {
+                "count": 7,
+                "tag": "bassline"
+              },
+              {
+                "count": 5,
+                "tag": "drums"
+              },
+              {
+                "count": 5,
+                "tag": "guitar"
+              }
+            ]
+          },
+          "mood": {
+            "abstained": 59,
+            "abstention_rate": 0.216117,
+            "accepted": 214,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 173,
+                "tag": "euphoric"
+              },
+              {
+                "count": 15,
+                "tag": "aggressive"
+              },
+              {
+                "count": 12,
+                "tag": "dark"
+              },
+              {
+                "count": 10,
+                "tag": "hypnotic"
+              },
+              {
+                "count": 2,
+                "tag": "tense"
+              },
+              {
+                "count": 2,
+                "tag": "dreamy"
+              }
+            ]
+          },
+          "texture": {
+            "abstained": 76,
+            "abstention_rate": 0.278388,
+            "accepted": 197,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 122,
+                "tag": "polished"
+              },
+              {
+                "count": 30,
+                "tag": "distorted"
+              },
+              {
+                "count": 29,
+                "tag": "percussive"
+              },
+              {
+                "count": 8,
+                "tag": "raw"
+              },
+              {
+                "count": 4,
+                "tag": "airy"
+              },
+              {
+                "count": 2,
+                "tag": "atmospheric"
+              },
+              {
+                "count": 1,
+                "tag": "metallic"
+              },
+              {
+                "count": 1,
+                "tag": "warm"
+              }
+            ]
+          }
+        },
+        "track_count": 273
+      },
+      "thresholds": {
+        "instrument": 0.18,
+        "mood": 0.18,
+        "texture": 0.18
+      }
+    }
+  },
+  "notes": {
+    "cached_audio_vectors_only": true,
+    "honest_caveat": "precision/recall and template-vs-bare claims require the private hand-labeled auto_tag_labels.jsonl set",
+    "no_accuracy_claim_without_labels": true,
+    "no_audio_decode": true,
+    "no_torch_or_librosa": true
+  },
+  "prompt_bank": {
+    "categories": [
+      "mood",
+      "texture",
+      "instrument"
+    ],
+    "modes": [
+      "bare",
+      "template"
+    ],
+    "prompt_count": 22
+  },
+  "schema": "library_auto_tags_bench_v1",
+  "status": "unproven_no_hand_labels",
+  "store": {
+    "backend": "SqliteVecStore",
+    "embedded_tracks": 273,
+    "snapshot_hash": "361bbfa12fab41de2743fca9cfbdb2148aad6db31b9e012e8374e2aa75f37e90"
+  }
+}
