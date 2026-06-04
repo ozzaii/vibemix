@@ -81,7 +81,9 @@ REQUIRED_FAQ_QUESTIONS = [
     "Is my audio sent to the cloud?",
     "Is this free?",
     "Why no Linux?",
-    "Why Gemini",
+    # Re-pinned 2026-06-04: the FAQ heading dropped the model name per the
+    # partner-copy policy (no model names in public copy). Was "Why Gemini".
+    "Which AI runs the co-host",
     "Is the AI actually listening",
     "Can it hallucinate?",
     "What's open-source",
@@ -105,11 +107,11 @@ def test_readme_has_bravoh_footer_with_utm(readme_text: str) -> None:
 def test_readme_has_install_section(readme_text: str) -> None:
     assert "## Install" in readme_text
     assert "vibemix.dmg" in readme_text
-    # v0.1.0-rc1 ships macOS only. The Windows row carries a forward-looking
-    # placeholder ("ships with v0.1.0 stable") instead of an installer URL
-    # until SignPath OSS-program approval lands. v0.1.0 stable swaps the
-    # placeholder for the real vibemix-installer.exe link.
-    assert "v0.1.0 stable" in readme_text
+    # Re-pinned 2026-06-04: v1 ships macOS Apple Silicon; Windows is the v1.1
+    # fast-follow (the co-host voice is Apple-Silicon-only, so Windows needs its
+    # own GPU voice backend + signing path). The Windows row carries the honest
+    # "v1.1 fast-follow" framing instead of the old "v0.1.0 stable" promise.
+    assert "v1.1" in readme_text
 
 
 def test_readme_has_feature_matrix(readme_text: str) -> None:
