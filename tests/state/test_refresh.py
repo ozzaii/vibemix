@@ -1218,6 +1218,54 @@ def test_tick_refuses_unverified_deck_audio_fallback_when_controller_silent():
     assert state.audible_track_confidence == 0.3
 
 
+def test_tick_uses_nowplaying_playback_deck_status_when_controller_silent():
+    """FLX4/no-MIDI rigs can lift track confidence without minting deck proof."""
+    state = MusicState()
+    state.set_start_at = 900.0
+    registry = EvidenceRegistry()
+    deck_source = MagicMock()
+    deck_source.snapshot.return_value = {
+        "A": DeckTrack(
+            title="Nominal Tune",
+            track_id="track-nominal",
+            key="Am",
+            bpm=128.0,
+            confidence=0.5,
+            source="rekordbox_xml",
+        )
+    }
+    deck_source.source_snapshot.return_value = {
+        "audible_deck": "A",
+        "audible_deck_source": "nowplaying_playback",
+        "nowplaying_playback": "playing",
+        "resolved_side_rule": "nominal_nowplaying_seed_not_physical_deck_proof",
+        "resolution": "nowplaying_playback_library_match",
+    }
+
+    _tick_once(
+        state,
+        _audible_buf(),
+        _silent_ctrl_mock(),
+        _track_mock(title="Nominal Tune"),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.0,
+        deck_source=deck_source,
+        evidence_registry=registry,
+    )
+
+    assert state.audible_deck == "A"
+    assert state.deck_confidence == 0.5
+    assert state.audible_track == "Nominal Tune"
+    assert state.audible_track_confidence == 0.5
+    snapshot = registry.snapshot()
+    assert snapshot["mix"]["audible_deck=A"] == (100.0,)
+    assert "track" not in snapshot
+    assert "key" not in snapshot
+
+
 def test_tick_writes_recent_moves():
     state = MusicState()
     buf = _audible_buf()
@@ -2254,8 +2302,7 @@ def test_tick_registers_citable_deck_audio_window_evidence() -> None:
     assert "deck_audio_features=A_active_rms_0.040+B_active_rms_0.020" in mix
     assert "deck_audio_delta=A_rms_rose_100pct_strong+B_rms_fell_33pct_clear" in mix
     assert (
-        "deck_audio_window=A_active_pre_0.020_current_0.040+"
-        "B_active_pre_0.030_current_0.020"
+        "deck_audio_window=A_active_pre_0.020_current_0.040+B_active_pre_0.030_current_0.020"
     ) in mix
 
 

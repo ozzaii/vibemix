@@ -71,7 +71,7 @@ from vibemix.state.deck_context import (
     midi_evidence_key,
     render_audio_delta_items,
 )
-from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
+from vibemix.state.deck_poller import DECK_CITE_MIN_CONF, NOWPLAYING_PLAYBACK_CONF
 from vibemix.state.deltas import DELTA_FLOOR, render_delta
 from vibemix.state.drop_predict import next_drop_section, predict_drop_in_sec
 from vibemix.state.emotion_router import derive_emotion
@@ -186,9 +186,7 @@ def _stabilize_bpm(
     if abs(candidate - prev) / prev <= _BPM_SWITCH_TOLERANCE:
         return candidate
     cluster = sum(
-        1
-        for bpm in valid
-        if abs(float(bpm) - candidate) / candidate <= _BPM_SWITCH_TOLERANCE
+        1 for bpm in valid if abs(float(bpm) - candidate) / candidate <= _BPM_SWITCH_TOLERANCE
     )
     if allow_far_switch and cluster >= _BPM_SWITCH_MIN_CLUSTER:
         return candidate
@@ -212,9 +210,8 @@ def _levels_voice(levels: object | None) -> float:
 
 
 def _voice_dominates_capture(*, rms: float, voice_level: float) -> bool:
-    return (
-        voice_level > AI_TALK_THRESHOLD
-        and rms <= max(SILENT_RMS, voice_level * _VOICE_CAPTURE_DOMINANCE_RATIO)
+    return voice_level > AI_TALK_THRESHOLD and rms <= max(
+        SILENT_RMS, voice_level * _VOICE_CAPTURE_DOMINANCE_RATIO
     )
 
 
@@ -345,8 +342,7 @@ def _update_move_audio_delta(
                 not isinstance(rec, dict)
                 or _float_field(rec.get("move_at")) is None
                 or move_at
-                > (_float_field(rec.get("move_at")) or float("-inf"))
-                + _MOVE_AUDIO_BASELINE_RESET_S
+                > (_float_field(rec.get("move_at")) or float("-inf")) + _MOVE_AUDIO_BASELINE_RESET_S
             )
         ):
             move_audio_baselines[key] = {
@@ -555,6 +551,38 @@ def _verified_deck_audio_audible_deck(
     if max(a_rms, b_rms) / quieter >= _DECK_AUDIO_DOMINANCE_RATIO:
         return ("A" if a_rms > b_rms else "B"), _DECK_AUDIO_SINGLE_CONFIDENCE
     return "mix", _DECK_AUDIO_MIX_CONFIDENCE
+
+
+def _deck_source_status_snapshot(deck_source: object | None) -> dict[str, object]:
+    if deck_source is None or not hasattr(deck_source, "source_snapshot"):
+        return {}
+    try:
+        raw = deck_source.source_snapshot()  # type: ignore[attr-defined]
+    except Exception:
+        return {}
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _nowplaying_playback_audible_deck_from_status(
+    source_status: dict[str, object],
+) -> tuple[str, float] | None:
+    """Lift the poller's nominal DJ-app nowplaying side into live state.
+
+    The poller only sets this status when macOS Now Playing is an actively
+    playing DJ-app title. It is deliberately below the citation floor: this can
+    unblock TRACK_CHANGE on FLX4/no-MIDI master-feed rigs, but it cannot become
+    key:/track: proof of a physical deck.
+    """
+    if source_status.get("audible_deck_source") != "nowplaying_playback":
+        return None
+    if source_status.get("nowplaying_playback") != "playing":
+        return None
+    if source_status.get("resolved_side_rule") != "nominal_nowplaying_seed_not_physical_deck_proof":
+        return None
+    side = str(source_status.get("audible_deck") or "").upper()
+    if side not in {"A", "B"}:
+        return None
+    return side, NOWPLAYING_PLAYBACK_CONF
 
 
 def _write_live_grounding_evidence(
@@ -1251,11 +1279,18 @@ def _tick_once(
         # we can detect a deck flip and write a change-only "mix" observation
         # to the EvidenceRegistry (Phase 18 Plan 02).
         prev_deck = state.audible_deck
+        deck_source_status = _deck_source_status_snapshot(deck_source)
         aud_deck, deck_conf = derive_audible_deck(cs["A"], cs["B"], cs["xfader"], cs["connected"])
         if aud_deck == "none":
             deck_audio_fallback = _verified_deck_audio_audible_deck(audio_capture_context)
             if deck_audio_fallback is not None:
                 aud_deck, deck_conf = deck_audio_fallback
+        if aud_deck == "none":
+            nowplaying_playback_fallback = _nowplaying_playback_audible_deck_from_status(
+                deck_source_status
+            )
+            if nowplaying_playback_fallback is not None:
+                aud_deck, deck_conf = nowplaying_playback_fallback
         state.audible_deck = aud_deck
         state.deck_confidence = deck_conf
         course3_live = _course3_session_lens_active(learn_state)
@@ -1350,17 +1385,7 @@ def _tick_once(
                 dt.camelot = to_camelot(dt.key)
             state.deck_state.decks = deck_snap
             state.deck_state.updated_at = now
-            try:
-                source_status = (
-                    deck_source.source_snapshot()
-                    if hasattr(deck_source, "source_snapshot")
-                    else {}
-                )
-            except Exception:
-                source_status = {}
-            state.deck_state.source_status = (
-                dict(source_status) if isinstance(source_status, dict) else {}
-            )
+            state.deck_state.source_status = dict(deck_source_status)
 
             # Change-only, confidence-gated key:/track: registry writes. Bounded
             # registry growth (Pitfall T-59-04-04): only write when a deck's
@@ -1506,9 +1531,7 @@ def _tick_once(
         # Long arc is only useful with trusted music. On an idle/zero capture,
         # scanning the 120s ring at 10Hz is pure CPU churn and can make the app
         # stutter while the UI correctly shows silence.
-        state.long_arc = (
-            long_arc_curve(audio_buf, seconds=120.0, hop=10.0) if state.audible else []
-        )
+        state.long_arc = long_arc_curve(audio_buf, seconds=120.0, hop=10.0) if state.audible else []
 
         # Phase 78 (PERCEIVE-02) — multi-scale trajectory narrative. Composed
         # HERE (after phase_history / recent_moves / long_arc are written this
