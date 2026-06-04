@@ -117,6 +117,15 @@ interface WireStatusTickPayload {
   screen: "ok" | "denied" | "unavailable";
   voice?: "ok" | "muted" | null;
   capture_device?: string | null;
+  midi_activity?:
+    | "disconnected"
+    | "connected_no_midi_traffic"
+    | "midi_traffic_unmapped"
+    | "midi_events_no_moves"
+    | "active"
+    | "unknown"
+    | null;
+  midi_device?: string | null;
 }
 
 interface WireIpcErrorPayload {
@@ -436,11 +445,33 @@ export function applyStatusTick(p: WireStatusTickPayload): void {
       screen: p.screen,
       voice: p.voice ?? null,
       captureDevice: normalizeCaptureDevice(p.capture_device),
+      midiActivity: normalizeMidiActivity(p.midi_activity),
+      midiDevice: normalizeMidiDevice(p.midi_device),
     },
   });
 }
 
 function normalizeCaptureDevice(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim().replace(/\s+/g, " ");
+  return text ? text.slice(0, 96) : null;
+}
+
+function normalizeMidiActivity(value: unknown): WireStatusTickPayload["midi_activity"] {
+  switch (value) {
+    case "disconnected":
+    case "connected_no_midi_traffic":
+    case "midi_traffic_unmapped":
+    case "midi_events_no_moves":
+    case "active":
+    case "unknown":
+      return value;
+    default:
+      return null;
+  }
+}
+
+function normalizeMidiDevice(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const text = value.trim().replace(/\s+/g, " ");
   return text ? text.slice(0, 96) : null;

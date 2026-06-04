@@ -114,7 +114,7 @@ class IpcBootPayload:
 class StatusTickPayload:
     livekit: Literal["ok", "connecting", "down"]
     gemini: Literal["ok", "down"]
-    # ``midi`` is the count of connected MIDI inputs; null when the platform
+    # ``midi`` is the trusted controller-motion count; null when the platform
     # backend is unavailable (e.g. mido import failed). minimum: 0 in schema.
     midi: int | None
     screen: Literal["ok", "denied", "unavailable"]
@@ -122,6 +122,20 @@ class StatusTickPayload:
     # Optional live capture device label for idle proof copy. Bounded in the
     # schema and diagnostic-only: it is not audio evidence by itself.
     capture_device: str | None = None
+    # Optional controller traffic diagnosis. Diagnostic-only: ``midi`` remains
+    # the trust gate for whether controller motion is actually usable.
+    midi_activity: (
+        Literal[
+            "disconnected",
+            "connected_no_midi_traffic",
+            "midi_traffic_unmapped",
+            "midi_events_no_moves",
+            "active",
+            "unknown",
+        ]
+        | None
+    ) = None
+    midi_device: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -464,6 +478,18 @@ class StatusTick:
         screen: Literal["ok", "denied", "unavailable"],
         voice: Literal["ok", "muted"] | None = None,
         capture_device: str | None = None,
+        midi_activity: (
+            Literal[
+                "disconnected",
+                "connected_no_midi_traffic",
+                "midi_traffic_unmapped",
+                "midi_events_no_moves",
+                "active",
+                "unknown",
+            ]
+            | None
+        ) = None,
+        midi_device: str | None = None,
     ) -> StatusTick:
         return cls(
             type="ipc.status.tick",
@@ -475,6 +501,8 @@ class StatusTick:
                 screen=screen,
                 voice=voice,
                 capture_device=capture_device,
+                midi_activity=midi_activity,
+                midi_device=midi_device,
             ),
         )
 

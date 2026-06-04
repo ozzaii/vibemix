@@ -125,14 +125,26 @@ _MIDI_EVENT_CAP: int = 64
 # neutral. HONEST + NEVER-FAULTS by construction: livekit/gemini are emitted
 # "ok" (the real gemini-down signal is the SessionLayout grounding-failure
 # timer, not this tick; we have no honest audio-drop signal so livekit never
-# goes "down"), midi is the real connected-controller count, and screen is a
-# live non-prompting probe used only to light the badge — screen-denied is NOT
+# goes "down"), midi is the real trusted controller-motion count, and screen is
+# a live non-prompting probe used only to light the badge — screen-denied is NOT
 # a deck fault (audio-only is a valid mode; see faultInput in SessionLayout.ts).
+# Optional capture/controller fields are diagnostics only: they explain the
+# route/traffic state without promoting setup presence into trusted evidence.
 # A missing capture backend reports "unavailable" instead of a false green "ok".
 STATUS_EVERY_N: int = 30
 _COURSE3_CUE_CONFIDENCE_FLOOR: float = 0.7
 _COURSE3_DECK_CITE_MIN_CONF: float = 0.6
 _COURSE3_ATTRIBUTED_DECKS = frozenset({"A", "B", "mix"})
+_STATUS_MIDI_ACTIVITY_VALUES = frozenset(
+    {
+        "disconnected",
+        "connected_no_midi_traffic",
+        "midi_traffic_unmapped",
+        "midi_events_no_moves",
+        "active",
+        "unknown",
+    }
+)
 
 
 def _safe_print(*args: object, **kwargs: object) -> None:
@@ -192,6 +204,41 @@ def _probe_midi_count(
         return 1 if getattr(controller_state, "port_name", "") else 0
     except Exception:
         return None
+
+
+def _status_midi_activity(music_state: MusicState | None = None) -> str | None:
+    """Return the bounded controller-traffic diagnosis for status diagnostics."""
+    if music_state is None:
+        return None
+    try:
+        activity = str(getattr(music_state, "controller_midi_activity", "") or "").strip()
+    except Exception:
+        return "unknown"
+    if not activity:
+        return None
+    return activity if activity in _STATUS_MIDI_ACTIVITY_VALUES else "unknown"
+
+
+def _status_midi_device(controller_state: Any | None) -> str | None:
+    """Return the bounded controller port label for status diagnostics."""
+    if controller_state is None:
+        return None
+    raw: object = None
+    try:
+        snap_fn = getattr(controller_state, "activity_snapshot", None)
+        if callable(snap_fn):
+            snap = snap_fn()
+            if isinstance(snap, dict):
+                raw = snap.get("port_name")
+    except Exception:
+        raw = None
+    if raw is None:
+        try:
+            raw = getattr(controller_state, "port_name", None)
+        except Exception:
+            raw = None
+    text = " ".join(str(raw or "").split()).strip()
+    return text[:96] or None
 
 
 def _now_iso() -> str:
@@ -1364,6 +1411,8 @@ async def ws_broadcast(
                         screen=_probe_screen_status(screen_available),
                         voice="muted" if voice_muted else "ok",
                         capture_device=_status_capture_device(audio_capture_context),
+                        midi_activity=_status_midi_activity(state),
+                        midi_device=_status_midi_device(controller_state),
                     )
                     status_payload = status_msg.to_json()
                     status_dead = []

@@ -363,6 +363,8 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       screen: s.status.screen,
       voice: s.status.voice ?? null,
       captureDevice: s.status.captureDevice ?? null,
+      midiActivity: s.status.midiActivity ?? null,
+      midiDevice: s.status.midiDevice ?? null,
       muted: s.muted,
       hotkey: formatHotkey(s.settings.push_to_mute_hotkey),
       onRecheck: statusRecheckHandler,

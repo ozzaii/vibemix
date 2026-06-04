@@ -22,6 +22,15 @@ export interface StatusBarProps {
   livekit: BadgeState;
   gemini: "ok" | "down" | null;
   midi: number | null;
+  midiActivity?:
+    | "disconnected"
+    | "connected_no_midi_traffic"
+    | "midi_traffic_unmapped"
+    | "midi_events_no_moves"
+    | "active"
+    | "unknown"
+    | null;
+  midiDevice?: string | null;
   screen: "ok" | "denied" | "unavailable" | null;
   voice?: "ok" | "muted" | null;
   muted: boolean;
@@ -34,6 +43,7 @@ export interface StatusBarProps {
 
 type RecoveryBadgeKey = "livekit" | "gemini" | "midi" | "screen";
 type BadgeKey = RecoveryBadgeKey | "voice";
+const defaultMidiErrorMsg = "no controller motion is reaching vibemix. plug in the controller, enable MIDI output, then move a fader";
 
 const CSS = `
   /* v5 status strip — translucent dark glass shelf matching the
@@ -275,6 +285,8 @@ interface BadgeSpec {
   state: string;
   label: string;
   clickable: boolean;
+  title?: string;
+  tooltip?: string;
 }
 
 function buildBadgeSpecs(props: StatusBarProps): BadgeSpec[] {
@@ -295,12 +307,7 @@ function buildBadgeSpecs(props: StatusBarProps): BadgeSpec[] {
       label: badgeLabel("AI", props.gemini),
       clickable: props.gemini === "down",
     },
-    {
-      key: "midi",
-      state: props.midi == null || props.midi === 0 ? "down" : "ok",
-      label: `● CONTROLLER · ${props.midi ?? 0}`,
-      clickable: props.midi == null || props.midi === 0,
-    },
+    midiBadgeSpec(props),
     {
       key: "screen",
       state: screenBadgeState(props.screen),
@@ -317,6 +324,73 @@ function buildBadgeSpecs(props: StatusBarProps): BadgeSpec[] {
     });
   }
   return specs;
+}
+
+function midiBadgeSpec(props: StatusBarProps): BadgeSpec {
+  const device = midiDeviceLabel(props.midiDevice);
+  const activity = props.midiActivity ?? null;
+  if (props.midi != null && props.midi > 0) {
+    return {
+      key: "midi",
+      state: "ok",
+      label: `● ${device} · ACTIVE`,
+      clickable: false,
+      title: `Controller · ${device} motion proven`,
+    };
+  }
+  if (props.midi == null) {
+    return {
+      key: "midi",
+      state: "down",
+      label: "● CONTROLLER · CHECK",
+      clickable: true,
+      title: "Controller · checking · click for recovery",
+      tooltip: "controller status is not available yet. recheck MIDI, then move a fader",
+    };
+  }
+  if (activity === "connected_no_midi_traffic") {
+    return {
+      key: "midi",
+      state: "down",
+      label: `● ${device} · WAITING`,
+      clickable: true,
+      title: `${device} · connected, waiting for motion`,
+      tooltip: `${device} is connected, but no MIDI frames have landed. move an EQ knob or fader once`,
+    };
+  }
+  if (activity === "midi_traffic_unmapped") {
+    return {
+      key: "midi",
+      state: "down",
+      label: `● ${device} · UNMAPPED`,
+      clickable: true,
+      title: `${device} · MIDI frames are not mapped`,
+      tooltip: `${device} is sending MIDI, but the active profile is not decoding it. run controller mapping`,
+    };
+  }
+  if (activity === "midi_events_no_moves") {
+    return {
+      key: "midi",
+      state: "down",
+      label: `● ${device} · NO MOVES`,
+      clickable: true,
+      title: `${device} · waiting for a deck control move`,
+      tooltip: `${device} is visible. move a deck control once so vibemix can cite it`,
+    };
+  }
+  return {
+    key: "midi",
+    state: "down",
+    label: `● CONTROLLER · ${props.midi ?? 0}`,
+    clickable: true,
+    title: "Controller · motion not proven · click for recovery",
+    tooltip: defaultMidiErrorMsg,
+  };
+}
+
+function midiDeviceLabel(device?: string | null): string {
+  const text = (device ?? "").trim().replace(/\s+/g, " ");
+  return text || "CONTROLLER";
 }
 
 function badgeLabel(base: string, state: BadgeState | "denied" | null): string {
@@ -383,8 +457,9 @@ function buildBadge(spec: BadgeSpec, props: StatusBarProps): HTMLElement {
   // Click-tooltip (existing) is still the recovery path for "down"; this
   // surfaces "ok" too so the user can read "LiveKit · connected" without
   // having to click into a dead badge.
-  btn.setAttribute("title", titleForBadge(spec.key, spec.state));
-  btn.setAttribute("aria-label", titleForBadge(spec.key, spec.state));
+  const title = spec.title ?? titleForBadge(spec.key, spec.state);
+  btn.setAttribute("title", title);
+  btn.setAttribute("aria-label", title);
   if (!spec.clickable) btn.disabled = true;
 
   const led = document.createElement("span");
@@ -396,7 +471,7 @@ function buildBadge(spec: BadgeSpec, props: StatusBarProps): HTMLElement {
   btn.append(led, lbl);
 
   if (spec.clickable) {
-    const tooltip = buildTooltip(spec.key as RecoveryBadgeKey, props);
+    const tooltip = buildTooltip(spec as BadgeSpec & { key: RecoveryBadgeKey }, props);
     btn.append(tooltip);
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -420,15 +495,18 @@ function buildBadge(spec: BadgeSpec, props: StatusBarProps): HTMLElement {
   return btn;
 }
 
-function buildTooltip(key: RecoveryBadgeKey, props: StatusBarProps): HTMLElement {
+function buildTooltip(
+  spec: BadgeSpec & { key: RecoveryBadgeKey },
+  props: StatusBarProps,
+): HTMLElement {
   const tip = document.createElement("div");
   tip.className = "vmx-statusbar__tooltip";
-  tip.dataset.for = key;
+  tip.dataset.for = spec.key;
   tip.setAttribute("role", "tooltip");
 
   const msg = document.createElement("div");
   msg.className = "vmx-statusbar__tooltip-msg";
-  msg.textContent = props.errors?.[key] ?? defaultErrorMsg(key);
+  msg.textContent = props.errors?.[spec.key] ?? spec.tooltip ?? defaultErrorMsg(spec.key);
   tip.append(msg);
 
   const btn = document.createElement("button");
@@ -438,7 +516,7 @@ function buildTooltip(key: RecoveryBadgeKey, props: StatusBarProps): HTMLElement
   btn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    props.onRecheck?.(key);
+    props.onRecheck?.(spec.key);
   });
   tip.append(btn);
 
@@ -449,7 +527,7 @@ function defaultErrorMsg(key: RecoveryBadgeKey): string {
   switch (key) {
     case "livekit": return "vibemix link to the realtime channel dropped. click to reconnect";
     case "gemini": return "AI service unreachable. recheck network + key";
-    case "midi": return "no controller motion is reaching vibemix. plug in the controller, enable MIDI output, then move a fader";
+    case "midi": return defaultMidiErrorMsg;
     case "screen": return "screen-capture permission denied. open system settings";
   }
 }

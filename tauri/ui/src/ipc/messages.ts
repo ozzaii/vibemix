@@ -95,6 +95,15 @@ export interface StatusTick {
     screen: "ok" | "denied" | "unavailable";
     voice?: "ok" | "muted" | null;
     capture_device?: string | null;
+    midi_activity?:
+      | "disconnected"
+      | "connected_no_midi_traffic"
+      | "midi_traffic_unmapped"
+      | "midi_events_no_moves"
+      | "active"
+      | "unknown"
+      | null;
+    midi_device?: string | null;
   };
 }
 export interface PermissionCheck {

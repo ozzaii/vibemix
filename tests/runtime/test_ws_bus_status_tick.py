@@ -21,7 +21,12 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from vibemix.runtime import ws_bus
-from vibemix.runtime.ws_bus import _probe_midi_count, _probe_screen_status
+from vibemix.runtime.ws_bus import (
+    _probe_midi_count,
+    _probe_screen_status,
+    _status_midi_activity,
+    _status_midi_device,
+)
 from vibemix.ui_bus.messages import StatusTick
 from vibemix.ui_bus.validator import validate_message
 
@@ -151,11 +156,30 @@ def test_status_tick_built_from_probes_is_schema_valid(monkeypatch):
         "screen": "ok",
         "voice": None,
         "capture_device": None,
+        "midi_activity": None,
+        "midi_device": None,
     }
 
 
 def test_status_capture_device_prefers_opened_device_name():
     assert ws_bus._status_capture_device({"device_name": " eqMac   Export "}) == "eqMac Export"
+
+
+def test_status_midi_activity_is_bounded():
+    assert (
+        _status_midi_activity(SimpleNamespace(controller_midi_activity="connected_no_midi_traffic"))
+        == "connected_no_midi_traffic"
+    )
+    assert _status_midi_activity(SimpleNamespace(controller_midi_activity="surprised")) == "unknown"
+    assert _status_midi_activity(SimpleNamespace(controller_midi_activity="")) is None
+
+
+def test_status_midi_device_prefers_activity_snapshot_port_name():
+    controller = SimpleNamespace(
+        port_name="fallback",
+        activity_snapshot=lambda: {"port_name": " DDJ-FLX4  "},
+    )
+    assert _status_midi_device(controller) == "DDJ-FLX4"
 
 
 def test_status_tick_accepts_screen_unavailable():

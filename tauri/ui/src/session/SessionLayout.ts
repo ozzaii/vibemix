@@ -99,6 +99,15 @@ export interface SessionState {
     screen: "ok" | "denied" | "unavailable" | null;
     voice?: "ok" | "muted" | null;
     captureDevice?: string | null;
+    midiActivity?:
+      | "disconnected"
+      | "connected_no_midi_traffic"
+      | "midi_traffic_unmapped"
+      | "midi_events_no_moves"
+      | "active"
+      | "unknown"
+      | null;
+    midiDevice?: string | null;
     muted: boolean;
     hotkey: string;
     /** Recheck a down status input via ipc.status.recheck. */
@@ -1488,6 +1497,10 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
         : "Sven checking";
   const controller = state.status.midi != null && state.status.midi > 0
     ? "controller seen"
+    : state.status.midi === 0 && state.status.midiActivity === "connected_no_midi_traffic"
+      ? `${midiDeviceLabel(state.status.midiDevice)} waiting`
+    : state.status.midi === 0 && state.status.midiActivity === "midi_traffic_unmapped"
+      ? `${midiDeviceLabel(state.status.midiDevice)} unmapped`
     : state.status.midi === 0
       ? "controller not proven"
       : "controller checking";
@@ -1501,7 +1514,7 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
   const action = audioWaiting
     ? `${captureDeviceLabel(state.status.captureDevice)} silent · Route DJ output there.`
     : controllerWaiting
-      ? `${screen} · Move a control once, I will not guess.`
+      ? `${screen} · ${midiProofAction(state.status.midiActivity, state.status.midiDevice)}`
       : `${screen} · Start playback, I will not guess.`;
   return {
     inputs: `${audio} · ${ai} · ${controller}`,
@@ -1521,7 +1534,14 @@ function setIdleProof(mounted: Mounted, state: SessionState): void {
   setIdleCell(mounted.idleProofCells.sven, sven);
   setIdleCell(mounted.idleProofCells.controller, controller);
   setIdleCell(mounted.idleProofCells.screen, screen);
-  const next = idleProofNext(audio, controller, screen, state.status.captureDevice);
+  const next = idleProofNext(
+    audio,
+    controller,
+    screen,
+    state.status.captureDevice,
+    state.status.midiActivity,
+    state.status.midiDevice,
+  );
   if (mounted.idleProofNext.textContent !== next) mounted.idleProofNext.textContent = next;
 }
 
@@ -1539,13 +1559,15 @@ function idleProofNext(
   controller: { label: string; state: IdleProofState },
   screen: { label: string; state: IdleProofState },
   captureDevice?: string | null,
+  midiActivity?: SessionState["status"]["midiActivity"],
+  midiDevice?: string | null,
 ): string {
   if (audio.label === "waiting") {
     const device = captureDeviceLabel(captureDevice);
     return `${device} is silent. Route DJ output there.`;
   }
   if (controller.label === "no motion") {
-    return "Move the controller once. Sven waits for proof.";
+    return midiProofNext(midiActivity, midiDevice);
   }
   return screen.state === "ok"
     ? "Start playback. Sven will cite what lands."
@@ -1559,6 +1581,45 @@ function musicSignalActive(music: SessionState["meters"]["music"]): boolean {
 function captureDeviceLabel(captureDevice?: string | null): string {
   const text = (captureDevice ?? "").trim().replace(/\s+/g, " ");
   return text || "capture";
+}
+
+function midiDeviceLabel(midiDevice?: string | null): string {
+  const text = (midiDevice ?? "").trim().replace(/\s+/g, " ");
+  return text || "controller";
+}
+
+function midiProofAction(
+  midiActivity?: SessionState["status"]["midiActivity"],
+  midiDevice?: string | null,
+): string {
+  const device = midiDeviceLabel(midiDevice);
+  if (midiActivity === "connected_no_midi_traffic") {
+    return `${device} waiting · Move one control.`;
+  }
+  if (midiActivity === "midi_traffic_unmapped") {
+    return `${device} unmapped · Run controller mapping.`;
+  }
+  if (midiActivity === "midi_events_no_moves") {
+    return `${device} seen · Move a deck control.`;
+  }
+  return "Move a control once, I will not guess.";
+}
+
+function midiProofNext(
+  midiActivity?: SessionState["status"]["midiActivity"],
+  midiDevice?: string | null,
+): string {
+  const device = midiDeviceLabel(midiDevice);
+  if (midiActivity === "connected_no_midi_traffic") {
+    return `${device} is connected. Move one control for proof.`;
+  }
+  if (midiActivity === "midi_traffic_unmapped") {
+    return `${device} sends MIDI, but the profile is not mapping it.`;
+  }
+  if (midiActivity === "midi_events_no_moves") {
+    return `${device} is visible. Move a deck control for proof.`;
+  }
+  return "Move the controller once. Sven waits for proof.";
 }
 
 function audioProof(
@@ -1732,6 +1793,8 @@ export function defaultState(): SessionState {
       screen: null,
       voice: null,
       captureDevice: null,
+      midiActivity: null,
+      midiDevice: null,
       muted: false,
       hotkey: "⌘⇧M",
       errors: {},

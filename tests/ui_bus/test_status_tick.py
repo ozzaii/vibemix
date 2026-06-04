@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Focused tests for the ``ipc.status.tick`` shape.
 
-UX-11 + D-Area-4.3 lock four required health fields plus optional voice/capture status. The plan asserts:
+UX-11 + D-Area-4.3 lock four required health fields plus optional voice/capture/controller status. The plan asserts:
 
   * ``midi=null`` valid (no MIDI backend available).
   * ``midi=-1`` invalid (``minimum: 0`` in schema).
@@ -54,6 +54,8 @@ def test_voice_default_is_back_compat_null() -> None:
     d = json.loads(msg.to_json())
     assert d["payload"].get("voice") is None
     assert d["payload"].get("capture_device") is None
+    assert d["payload"].get("midi_activity") is None
+    assert d["payload"].get("midi_device") is None
     jsonschema.validate(d, _SCHEMA)
     assert parse_message(d)["payload"]["voice"] is None
 
@@ -79,6 +81,41 @@ def test_capture_device_is_valid() -> None:
     assert d["payload"]["capture_device"] == "eqMac Export"
     jsonschema.validate(d, _SCHEMA)
     assert parse_message(d)["payload"]["capture_device"] == "eqMac Export"
+
+
+def test_midi_diagnostics_are_valid() -> None:
+    """The live session can explain why midi=0 without promoting it to proof."""
+    msg = StatusTick.make(
+        livekit="ok",
+        gemini="ok",
+        midi=0,
+        screen="unavailable",
+        midi_activity="connected_no_midi_traffic",
+        midi_device="DDJ-FLX4",
+    )
+    d = json.loads(msg.to_json())
+    assert d["payload"]["midi"] == 0
+    assert d["payload"]["midi_activity"] == "connected_no_midi_traffic"
+    assert d["payload"]["midi_device"] == "DDJ-FLX4"
+    jsonschema.validate(d, _SCHEMA)
+    parsed = parse_message(d)["payload"]
+    assert parsed["midi_activity"] == "connected_no_midi_traffic"
+    assert parsed["midi_device"] == "DDJ-FLX4"
+
+
+def test_unknown_midi_activity_value_rejected() -> None:
+    """Unknown controller activity values are rejected by the closed schema."""
+    d = _wrap(
+        {
+            "livekit": "ok",
+            "gemini": "ok",
+            "midi": 0,
+            "screen": "ok",
+            "midi_activity": "vibes_only",
+        }
+    )
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(d, _SCHEMA)
 
 
 def test_unknown_voice_value_rejected() -> None:

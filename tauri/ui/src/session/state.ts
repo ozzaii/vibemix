@@ -52,6 +52,15 @@ export interface StatusFlags {
   screen: "ok" | "denied" | "unavailable" | null;
   voice?: "ok" | "muted" | null;
   captureDevice?: string | null;
+  midiActivity?:
+    | "disconnected"
+    | "connected_no_midi_traffic"
+    | "midi_traffic_unmapped"
+    | "midi_events_no_moves"
+    | "active"
+    | "unknown"
+    | null;
+  midiDevice?: string | null;
 }
 
 export type ClaimPolicyLevel = "green" | "yellow" | "red";
@@ -215,6 +224,8 @@ function makeDefault(): SessionState {
       screen: null,
       voice: null,
       captureDevice: null,
+      midiActivity: null,
+      midiDevice: null,
     },
     settings: {
       voice: "Adam",

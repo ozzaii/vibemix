@@ -555,6 +555,30 @@ describe("renderStatusBar", () => {
       midiBadge?.querySelector(".vmx-statusbar__tooltip-msg")?.textContent,
     ).toContain("enable MIDI output");
   });
+
+  it("names a connected controller that has not sent motion yet", () => {
+    const sb = renderStatusBar({
+      livekit: "ok",
+      gemini: "ok",
+      midi: 0,
+      midiActivity: "connected_no_midi_traffic",
+      midiDevice: "DDJ-FLX4",
+      screen: "ok",
+      muted: false,
+      hotkey: "⌘⇧M",
+    });
+    host().append(sb);
+
+    const midiBadge = sb.querySelector<HTMLButtonElement>(
+      '.vmx-statusbar__badge[data-key="midi"]',
+    );
+    expect(midiBadge?.dataset.state).toBe("down");
+    expect(midiBadge?.textContent).toContain("DDJ-FLX4 · WAITING");
+    expect(midiBadge?.getAttribute("title")).toBe("DDJ-FLX4 · connected, waiting for motion");
+    expect(
+      midiBadge?.querySelector(".vmx-statusbar__tooltip-msg")?.textContent,
+    ).toContain("DDJ-FLX4 is connected, but no MIDI frames have landed");
+  });
 });
 
 // === Titlebar / rocker / picker smoke =======================================
@@ -864,6 +888,26 @@ describe("SessionLayout", () => {
     expect(root.textContent).toContain("Move the controller once. Sven waits for proof.");
     expect(controller?.textContent).toContain("controllerno motion");
     expect(controller?.dataset.state).toBe("warn");
+  });
+
+  it("names the connected controller in idle proof when motion is not proven", () => {
+    const root = host();
+    const state = defaultState();
+    state.meters.music = { rms: 0.08, peak: 0.14 };
+    state.status.livekit = "ok";
+    state.status.gemini = "ok";
+    state.status.midi = 0;
+    state.status.midiActivity = "connected_no_midi_traffic";
+    state.status.midiDevice = "DDJ-FLX4";
+    state.status.screen = "ok";
+
+    mountSessionLayout(root, state);
+
+    expect(root.textContent).toContain("audio hearing · Sven ready · DDJ-FLX4 waiting");
+    expect(root.textContent).toContain(
+      "screen proof ready · DDJ-FLX4 waiting · Move one control.",
+    );
+    expect(root.textContent).toContain("DDJ-FLX4 is connected. Move one control for proof.");
   });
 
   it("shows a passive voice status only when the local voice engine is muted", () => {
