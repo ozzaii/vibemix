@@ -45,6 +45,9 @@ Bounded piece:
     first set); offline -> voiceless banner, then pre-warm once on disk.
 (4) Env-seed os.environ.setdefault("VIBEMIX_TTS_ENGINE", cfg.tts_engine) at __main__.py:~1420 +
     in the packaged-defaults path (launchd/Dock strip VIBEMIX_*; this is the "always silent" root cause).
+    ⚠ DE-CONFLICT: if the START-GATE lane is running CONCURRENTLY (it restructures main()), SKIP this
+    step here and hand the env-seed to the START-GATE lane — `__main__.py` is single-owner, never edit it
+    from two loops. This VOICE goal then lives entirely on its own island (no __main__.py) = parallel-safe.
 (5) Swap the release gate --require-moss-source -> --require-chatterbox-source across
     scripts/dist/pretag_check.sh + .github/workflows/release.yml (every site) — verify the chatterbox HF
     repo + pinned revision (no self-hosted archive; simpler than MOSS).
@@ -65,6 +68,9 @@ heavy models sit resident at idle. Bounded piece:
 (2) Split main() into a light idle boot + an _activate_session() that starts capture + reactions; idle =
     cold, Start activates, Stop/idle releases the heavy models. v1 scope = Start + Stop-releases + the
     silent background pre-warm hook, NOT a full eager->lazy refactor.
+(3) ⚠ YOU OWN __main__.py — also add the VOICE lane's env-seed here in the same edit:
+    os.environ.setdefault("VIBEMIX_TTS_ENGINE", cfg.tts_engine) at the boot/packaged-defaults path
+    (the VOICE lane is skipping it to avoid a two-loop race on this single-owner file).
 PROOF (by-eye/by-bus): app idle = no Start = no reactions/no resident model; Start flips to active;
 Stop releases. ISLAND: __main__.py + runtime/session_loop.py. Do NOT edit the IPC schema (frontend owns
 it; the types already exist). STOP PROTOCOL applies. SHARED LAW as above.
