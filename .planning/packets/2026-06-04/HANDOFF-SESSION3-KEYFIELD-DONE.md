@@ -1,8 +1,31 @@
 # Session-3 Handoff — KEYFIELD shipped; MASKLEARN + CUETRAY cross-session-blocked (2026-06-04)
 
 Branch: `ux-redesign-impeccable` (ONE shared tree, 3+ concurrent sessions — VERY hot;
-HEAD moved 4× during this lane). Continues `HANDOFF-SESSION2-FONTS-NEXTLANES.md` +
+HEAD moved 6× during this session). Continues `HANDOFF-SESSION2-FONTS-NEXTLANES.md` +
 `NEXT-LANE-BLUEPRINTS.md`. Read those for the lane specs.
+
+## ⏩ DO THIS FIRST when you wake (post-compact)
+KEYFIELD is DONE + committed (`8c6a7b6e`) — do NOT redo it. The other two lanes were
+blocked on concurrent sessions. **Re-test both blockers before doing anything** (HEAD
+moves every few min):
+
+```bash
+git rev-parse --short HEAD
+# MASKLEARN unblocks when this is CLEAN (sibling committed the ws-client test):
+git status --short tauri/ui/tests/learn/test_ws_client_tauri_bridge.spec.ts
+# CUETRAY unblocks when this is >= 1 (Lane B registered the Rust command):
+grep -c "library_land_cues" tauri/src-tauri/src/main.rs
+```
+
+- **ws-client test CLEAN** → do **MASKLEARN** (lowest risk, self-contained, no schema/
+  contract/handshake). Spec: `NEXT-LANE-BLUEPRINT-masklearn.md`. Add `teaching_focus` to
+  BOTH `LEARN_INBOUND_TYPES` (ws-client.ts) and the now-committed `EXPECTED_TAURI_SUBSCRIPTIONS`,
+  then build `organism-stage.ts` + mount + CSS + 4 TDD tests. Mask stays VISUALLY AS-IS.
+- **`library_land_cues` registered AND `cue_landing.CueSet` now carries summary/policy/
+  detected_target** → do **CUETRAY**. Spec: `NEXT-LANE-BLUEPRINT-cuetray.md`.
+- **both still blocked** → don't force them (clobber / test-passing-but-dark both violate
+  Kaan's rules). Either poll, or pick up other WIRE-THE-GOLD backlog. Lane-B handshake for
+  KEYFIELD (`_on_settings_set_brain` persist) is also open but is Lane B's island, not mine.
 
 ## ✅ DONE — KEYFIELD (DEMOCRATIZATION #1) — `8c6a7b6e`
 In-GUI Gemini-key field + DIRECT/PROXY brain toggle. Kaan's named #1 deliverable.
