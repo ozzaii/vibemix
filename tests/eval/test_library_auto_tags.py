@@ -343,6 +343,48 @@ def test_audit_labels_cli_exits_nonzero_until_enough_complete_rows(
     assert "complete_eval=0/1" in capsys.readouterr().out
 
 
+def test_audit_labels_cli_writes_json_artifact_even_when_incomplete(
+    tmp_path: Path,
+) -> None:
+    labels = tmp_path / "labels.jsonl"
+    out = tmp_path / "audit" / "report.json"
+    labels.write_text(
+        json.dumps(
+            {
+                "track_id": "complete",
+                "split": "holdout",
+                "mood": ["dark"],
+                "texture": ["raw"],
+                "instrument": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    rc = lat.main(
+        [
+            "--audit-labels",
+            "--labels",
+            str(labels),
+            "--out",
+            str(out),
+            "--min-hand-labels",
+            "2",
+        ]
+    )
+
+    assert rc == 2
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["schema"] == "library_auto_tags_bench_v1_label_audit_v1"
+    assert payload["evaluation_complete_rows"] == 1
+    assert payload["enough_complete_eval_rows"] is False
+    assert payload["next_action"] == (
+        "complete eval/private/library/auto_tag_labels.jsonl rows for "
+        "mood, texture, and instrument"
+    )
+
+
 def test_build_label_template_rows_balances_buckets_and_excludes_labeled_ids() -> None:
     predictions = {
         "a1": (

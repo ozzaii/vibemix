@@ -751,6 +751,12 @@ def main(argv: list[str] | None = None) -> int:
             labels_path=args.labels,
             min_hand_labels=args.min_hand_labels,
         )
+        if args.out is not None:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(
+                json.dumps(audit, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
         if args.json:
             print(json.dumps(audit, indent=2, sort_keys=True))
         else:
