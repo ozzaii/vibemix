@@ -4,7 +4,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from scripts.eval.key_estimator_bench import (
+    DEFAULT_DATASET_ROOT,
+    FROZEN_REGRESSION20_MIREX_FLOOR,
+    FROZEN_REGRESSION20_SUBSET,
     KeyLabel,
     evaluate_dataset,
     main,
@@ -121,3 +125,51 @@ def test_cli_no_audio_is_nonzero_unless_allowed(tmp_path: Path, capsys) -> None:
         )
         == 0
     )
+
+
+def _giantsteps_dirs() -> tuple[Path, Path]:
+    root = DEFAULT_DATASET_ROOT.expanduser()
+    annotations = root / "annotations" / "giantsteps"
+    audio = root / "audio"
+    if not annotations.exists() or not audio.exists():
+        pytest.fail(
+            "GiantSteps regression guard needs the local GiantSteps key dataset "
+            f"at {root}. Set VIBEMIX_GIANTSTEPS_KEY_ROOT or run the dataset setup."
+        )
+    return annotations, audio
+
+
+def test_giantsteps_regression20_mirex_floor_real_audio() -> None:
+    annotations, audio = _giantsteps_dirs()
+
+    result = evaluate_dataset(
+        annotations_dir=annotations,
+        audio_dir=audio,
+        track_ids=FROZEN_REGRESSION20_SUBSET,
+    )
+
+    assert result["status"] == "ok"
+    assert result["attempted"] == len(FROZEN_REGRESSION20_SUBSET)
+    assert result["audio_missing"] == 0
+    assert result["mirex_weighted"] >= FROZEN_REGRESSION20_MIREX_FLOOR
+
+
+def test_giantsteps_regression20_guard_goes_red_when_cqt_is_perturbed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from vibemix.library import key_estimator as estimator_mod
+
+    annotations, audio = _giantsteps_dirs()
+    monkeypatch.setattr(estimator_mod, "CQT_BINS_PER_OCTAVE", 12)
+    estimator_mod._cqt_bands.cache_clear()
+    try:
+        result = evaluate_dataset(
+            annotations_dir=annotations,
+            audio_dir=audio,
+            track_ids=FROZEN_REGRESSION20_SUBSET,
+            estimator=estimator_mod.estimate_key,
+        )
+    finally:
+        estimator_mod._cqt_bands.cache_clear()
+
+    assert result["mirex_weighted"] < FROZEN_REGRESSION20_MIREX_FLOOR

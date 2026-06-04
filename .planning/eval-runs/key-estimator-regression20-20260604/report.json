@@ -1,0 +1,226 @@
+{
+  "abstained": 0,
+  "annotations_total": 20,
+  "attempted": 20,
+  "audio_found": 20,
+  "audio_missing": 0,
+  "counts": {
+    "abstained": 0,
+    "exact": 11,
+    "fifth": 1,
+    "other": 4,
+    "parallel": 2,
+    "relative": 2
+  },
+  "coverage": 1.0,
+  "dataset": "GiantSteps-604",
+  "emission_rate": 1.0,
+  "emitted": 20,
+  "exact_accuracy": 0.55,
+  "exact_accuracy_emitted": 0.55,
+  "mirex_weighted": 0.625,
+  "mirex_weighted_emitted": 0.625,
+  "notes": {
+    "missing_audio_not_scored": true,
+    "parallel_credit": 0.2,
+    "source_path_redacted": true
+  },
+  "schema": "key_estimator_bench_v1",
+  "status": "ok",
+  "subset": {
+    "mirex_floor": 0.5,
+    "name": "regression20",
+    "track_ids": [
+      "1004923.LOFI",
+      "1234668.LOFI",
+      "1669939.LOFI",
+      "1850984.LOFI",
+      "2026524.LOFI",
+      "2666528.LOFI",
+      "3133794.LOFI",
+      "3302298.LOFI",
+      "3383171.LOFI",
+      "3519499.LOFI",
+      "3641166.LOFI",
+      "3813682.LOFI",
+      "398124.LOFI",
+      "4173942.LOFI",
+      "4366506.LOFI",
+      "4735775.LOFI",
+      "4934196.LOFI",
+      "5013063.LOFI",
+      "5431709.LOFI",
+      "877345.LOFI"
+    ]
+  },
+  "tracks": [
+    {
+      "confidence": 0.0368,
+      "predicted": "C",
+      "relation": "parallel",
+      "score": 0.2,
+      "track_id": "1004923.LOFI",
+      "truth": "Cm"
+    },
+    {
+      "confidence": 0.0733,
+      "predicted": "Dm",
+      "relation": "fifth",
+      "score": 0.5,
+      "track_id": "1234668.LOFI",
+      "truth": "Gm"
+    },
+    {
+      "confidence": 0.0319,
+      "predicted": "Bm",
+      "relation": "other",
+      "score": 0.0,
+      "track_id": "1669939.LOFI",
+      "truth": "E"
+    },
+    {
+      "confidence": 0.0849,
+      "predicted": "Am",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "1850984.LOFI",
+      "truth": "Am"
+    },
+    {
+      "confidence": 0.0762,
+      "predicted": "F#",
+      "relation": "relative",
+      "score": 0.3,
+      "track_id": "2026524.LOFI",
+      "truth": "Ebm"
+    },
+    {
+      "confidence": 0.0793,
+      "predicted": "C#m",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "2666528.LOFI",
+      "truth": "C#m"
+    },
+    {
+      "confidence": 0.0283,
+      "predicted": "Am",
+      "relation": "other",
+      "score": 0.0,
+      "track_id": "3133794.LOFI",
+      "truth": "Abm"
+    },
+    {
+      "confidence": 0.1025,
+      "predicted": "Bb",
+      "relation": "other",
+      "score": 0.0,
+      "track_id": "3302298.LOFI",
+      "truth": "Cm"
+    },
+    {
+      "confidence": 0.0345,
+      "predicted": "A",
+      "relation": "parallel",
+      "score": 0.2,
+      "track_id": "3383171.LOFI",
+      "truth": "Am"
+    },
+    {
+      "confidence": 0.0043,
+      "predicted": "Ebm",
+      "relation": "other",
+      "score": 0.0,
+      "track_id": "3519499.LOFI",
+      "truth": "Gm"
+    },
+    {
+      "confidence": 0.0665,
+      "predicted": "Em",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "3641166.LOFI",
+      "truth": "Em"
+    },
+    {
+      "confidence": 0.0982,
+      "predicted": "Gm",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "3813682.LOFI",
+      "truth": "Gm"
+    },
+    {
+      "confidence": 0.0102,
+      "predicted": "Bm",
+      "relation": "relative",
+      "score": 0.3,
+      "track_id": "398124.LOFI",
+      "truth": "D"
+    },
+    {
+      "confidence": 0.0035,
+      "predicted": "C",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "4173942.LOFI",
+      "truth": "C"
+    },
+    {
+      "confidence": 0.0719,
+      "predicted": "Ebm",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "4366506.LOFI",
+      "truth": "Ebm"
+    },
+    {
+      "confidence": 0.0815,
+      "predicted": "Ebm",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "4735775.LOFI",
+      "truth": "Ebm"
+    },
+    {
+      "confidence": 0.0133,
+      "predicted": "Am",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "4934196.LOFI",
+      "truth": "Am"
+    },
+    {
+      "confidence": 0.0371,
+      "predicted": "Em",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "5013063.LOFI",
+      "truth": "Em"
+    },
+    {
+      "confidence": 0.0376,
+      "predicted": "Cm",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "5431709.LOFI",
+      "truth": "Cm"
+    },
+    {
+      "confidence": 0.0324,
+      "predicted": "Eb",
+      "relation": "exact",
+      "score": 1.0,
+      "track_id": "877345.LOFI",
+      "truth": "Eb"
+    }
+  ],
+  "weights": {
+    "abstained": 0.0,
+    "exact": 1.0,
+    "fifth": 0.5,
+    "other": 0.0,
+    "parallel": 0.2,
+    "relative": 0.3
+  }
+}

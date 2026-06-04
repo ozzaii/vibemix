@@ -30,6 +30,32 @@ if str(ROOT) not in sys.path:
 from vibemix.library.key_estimator import KeyEstimate, estimate_key  # noqa: E402
 
 SCHEMA = "key_estimator_bench_v1"
+FROZEN_REGRESSION20_SUBSET: tuple[str, ...] = (
+    "1004923.LOFI",
+    "1234668.LOFI",
+    "1669939.LOFI",
+    "1850984.LOFI",
+    "2026524.LOFI",
+    "2666528.LOFI",
+    "3133794.LOFI",
+    "3302298.LOFI",
+    "3383171.LOFI",
+    "3519499.LOFI",
+    "3641166.LOFI",
+    "3813682.LOFI",
+    "398124.LOFI",
+    "4173942.LOFI",
+    "4366506.LOFI",
+    "4735775.LOFI",
+    "4934196.LOFI",
+    "5013063.LOFI",
+    "5431709.LOFI",
+    "877345.LOFI",
+)
+FROZEN_REGRESSION20_MIREX_FLOOR = 0.50
+FROZEN_SUBSETS: dict[str, tuple[str, ...]] = {
+    "regression20": FROZEN_REGRESSION20_SUBSET,
+}
 DEFAULT_DATASET_ROOT = (
     Path(os.environ.get("VIBEMIX_GIANTSTEPS_KEY_ROOT", ""))
     if os.environ.get("VIBEMIX_GIANTSTEPS_KEY_ROOT")
@@ -169,8 +195,22 @@ def _first_key_line(path: Path) -> str:
     raise ValueError(f"{path}: no key annotation line")
 
 
-def load_annotations(annotations_dir: Path, *, limit: int | None = None) -> list[Annotation]:
-    paths = sorted(annotations_dir.glob("*.key"))
+def load_annotations(
+    annotations_dir: Path,
+    *,
+    limit: int | None = None,
+    track_ids: Iterable[str] | None = None,
+) -> list[Annotation]:
+    if track_ids is None:
+        paths = sorted(annotations_dir.glob("*.key"))
+    else:
+        by_id = {path.stem: path for path in annotations_dir.glob("*.key")}
+        missing = [track_id for track_id in track_ids if track_id not in by_id]
+        if missing:
+            raise FileNotFoundError(
+                f"{annotations_dir}: missing GiantSteps annotations for {missing}"
+            )
+        paths = [by_id[track_id] for track_id in track_ids]
     if limit is not None:
         paths = paths[: max(0, int(limit))]
     annotations: list[Annotation] = []
@@ -211,10 +251,16 @@ def evaluate_dataset(
     annotations_dir: Path,
     audio_dir: Path,
     limit: int | None = None,
+    track_ids: Iterable[str] | None = None,
     estimator: Estimator = estimate_key,
     include_tracks: bool = False,
 ) -> dict[str, Any]:
-    annotations = load_annotations(annotations_dir, limit=limit)
+    requested_track_ids = tuple(track_ids) if track_ids is not None else None
+    annotations = load_annotations(
+        annotations_dir,
+        limit=limit,
+        track_ids=requested_track_ids,
+    )
     audio_index = build_audio_index(audio_dir)
     counts = {name: 0 for name in MIREX_WEIGHTS}
     missing_audio = 0
@@ -286,6 +332,12 @@ def evaluate_dataset(
             "source_path_redacted": True,
         },
     }
+    if requested_track_ids is not None:
+        result["subset"] = {
+            "name": None,
+            "track_ids": list(requested_track_ids),
+            "mirex_floor": FROZEN_REGRESSION20_MIREX_FLOOR,
+        }
     if include_tracks:
         result["tracks"] = track_rows
     return result
@@ -316,6 +368,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--annotations-dir", type=Path)
     parser.add_argument("--annotation-set", choices=("giantsteps", "key"), default="giantsteps")
     parser.add_argument("--limit", type=int)
+    parser.add_argument(
+        "--subset",
+        choices=tuple(FROZEN_SUBSETS),
+        help="score a frozen GiantSteps subset instead of the full annotation set",
+    )
     parser.add_argument("--json", action="store_true", help="print JSON instead of one-line text")
     parser.add_argument("--tracks", action="store_true", help="include per-track redacted rows")
     parser.add_argument("--output", type=Path, help="write the JSON report to this path")
@@ -341,8 +398,11 @@ def main(argv: Iterable[str] | None = None) -> int:
         annotations_dir=annotations_dir,
         audio_dir=audio_dir,
         limit=args.limit,
+        track_ids=FROZEN_SUBSETS.get(args.subset) if args.subset else None,
         include_tracks=bool(args.tracks),
     )
+    if args.subset and "subset" in result:
+        result["subset"]["name"] = args.subset
     payload = json.dumps(result, indent=2, sort_keys=True)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
