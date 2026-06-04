@@ -26,13 +26,13 @@
  * wrong (magenta at clip). The peak needle stays amber — the single
  * visceral CDJ Whisper signal.
  *
- * Layout-thrash-free update path: the caller writes a single CSS custom
- * property to the meter root — `--meter-rms` (0..1) and `--meter-peak`
- * (0..1). Each segment is positioned bottom-up at index N (1..16) and
- * lit when `--meter-rms * 16 >= N`. We can't do `>` in pure CSS, so the
- * segments are pre-positioned and JS sets a `data-lit-count` attribute
- * on the root (0..16) — a single attribute write per frame, the browser
- * repaints the LEDs.
+ * Layout-thrash-free update path: the caller sends RMS + peak (0..1).
+ * The LED fill is peak-forward, because DJs read capture confidence from
+ * the same transient-heavy signal their hardware meters show. RMS alone made
+ * near-red capture look like "barely hearing" while the peak needle was just a
+ * thin marker. Segments are pre-positioned and JS sets a `data-lit-count`
+ * attribute on the root (0..16) — a single attribute write per frame, the
+ * browser repaints the LEDs.
  *
  * Peak-hold is rendered as a 17th "needle" segment that absolutely-
  * positions itself via the inline `--meter-peak-pct` style — set by the
@@ -50,6 +50,7 @@ export interface MeterProps {
 }
 
 const SEGMENT_COUNT = 16;
+const PEAK_DISPLAY_WEIGHT = 0.9;
 
 const CSS = `
   .vmx-meter {
@@ -229,7 +230,9 @@ export interface MeterLevels {
  *  Returns the number of segments lit (for tests). */
 export function setMeterLevels(el: HTMLElement, levels: MeterLevels): number {
   const rms = Math.max(0, Math.min(1, levels.rms));
-  const litCount = Math.round(rms * SEGMENT_COUNT);
+  const peak = levels.peak == null ? null : Math.max(0, Math.min(1, levels.peak));
+  const displayLevel = Math.max(rms, (peak ?? 0) * PEAK_DISPLAY_WEIGHT);
+  const litCount = Math.round(displayLevel * SEGMENT_COUNT);
   if (el.dataset.litCount !== String(litCount)) {
     el.dataset.litCount = String(litCount);
     const segs = el.querySelectorAll<HTMLElement>(".vmx-meter__seg");
@@ -241,10 +244,9 @@ export function setMeterLevels(el: HTMLElement, levels: MeterLevels): number {
 
   const peakEl = el.querySelector<HTMLElement>(".vmx-meter__peak");
   if (peakEl) {
-    if (levels.peak == null) {
+    if (peak == null) {
       peakEl.style.setProperty("--meter-peak-shown", "0");
     } else {
-      const peak = Math.max(0, Math.min(1, levels.peak));
       peakEl.style.setProperty("--meter-peak-pct", String(peak));
       peakEl.style.setProperty("--meter-peak-shown", peak > 0.02 ? "1" : "0");
     }

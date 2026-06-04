@@ -131,11 +131,11 @@ describe("meter — VIS-03 contract", () => {
     expect(_CSS_FOR_TEST).not.toMatch(/rgba?\(/);
   });
 
-  test("7 — setMeterLevels({rms:0.5, peak:0.8}) lights 8 segments + sets peak pct", () => {
+  test("7 — setMeterLevels({rms:0.5, peak:0.8}) fills peak-forward + sets peak pct", () => {
     const root = mount();
     const lit = setMeterLevels(root, { rms: 0.5, peak: 0.8 });
-    expect(lit).toBe(8);
-    expect(root.dataset.litCount).toBe("8");
+    expect(lit).toBe(12);
+    expect(root.dataset.litCount).toBe("12");
     // 16 segments still present
     expect(root.querySelectorAll(".vmx-meter__seg").length).toBe(16);
     // Peak element carries the inline custom property.
@@ -155,8 +155,8 @@ describe("meter — VIS-03 contract", () => {
     const peakElBefore = root.querySelector<HTMLElement>(".vmx-meter__peak")!;
     const peakBefore = peakElBefore.style.getPropertyValue("--meter-peak-pct");
 
-    // Wire a MutationObserver before the second call; expect ZERO
-    // mutations on the seg attributes (rms unchanged ⇒ no DOM writes).
+    // Wire a MutationObserver before the second call; expect ZERO mutations
+    // on the seg attributes (display level unchanged => no DOM writes).
     let mutationCount = 0;
     const observer = new MutationObserver((records) => {
       mutationCount += records.length;

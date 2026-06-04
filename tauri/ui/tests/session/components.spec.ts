@@ -62,6 +62,17 @@ describe("renderMeter / setMeterLevels", () => {
     expect(litCount).toBe(8);
   });
 
+  it("fills from peak too so near-red capture does not look tiny", () => {
+    const m = renderMeter({ label: "music" });
+    host().append(m);
+    const lit = setMeterLevels(m, { rms: 0.12, peak: 0.95 });
+    expect(lit).toBe(14);
+    expect(m.dataset.litCount).toBe("14");
+    const peak = m.querySelector<HTMLElement>(".vmx-meter__peak");
+    expect(peak?.style.getPropertyValue("--meter-peak-shown")).toBe("1");
+    expect(peak?.style.getPropertyValue("--meter-peak-pct")).toBe("0.95");
+  });
+
   it("lights all 16 segments + shows peak needle at rms=1.0", () => {
     const m = renderMeter({ label: "music" });
     host().append(m);
