@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Plan 41-01 / MOSS-only update — debrief/tldr.py routing contracts.
+"""Plan 41-01 / Chatterbox-only update — debrief/tldr.py routing contracts.
 
 Pins the contract that debrief text generation still comes from
 ``vibemix.llm.model_router.resolve`` while debrief narration audio does not
-resolve a Gemini TTS route. MOSS is the single product voice source.
+resolve a Gemini TTS route. Chatterbox is the single product voice source.
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ def test_debrief_tldr_model_matches_router() -> None:
     assert DEBRIEF_TLDR_MODEL == resolve("debrief")[0]
 
 
-def test_debrief_tts_provider_is_moss_local() -> None:
-    """Debrief audio uses the local MOSS provider, not a Gemini TTS route."""
-    assert DEBRIEF_TTS_PROVIDER == "moss-local"
+def test_debrief_tts_provider_is_chatterbox_local() -> None:
+    """Debrief audio uses the local Chatterbox provider, not a Gemini TTS route."""
+    assert DEBRIEF_TTS_PROVIDER == "chatterbox-local"
 
 
 def test_debrief_tldr_model_is_3_5_flash() -> None:

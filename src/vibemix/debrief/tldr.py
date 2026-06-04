@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""DEBRIEF-04 — cited TLDR narration → MOSS MP3 (60–90 seconds).
+"""DEBRIEF-04 — cited TLDR narration → Chatterbox MP3 (60–90 seconds).
 
 Two-stage pipeline:
 
 1. :func:`generate_tldr_text` — single Gemini debrief-route call to compose
    60–90 second (150–220 word) narration. Output is then run through the
    :mod:`stripper` so every sentence carries a citation.
-2. :func:`synthesize_moss_mp3` — local MOSS-only TTS line synthesis →
+2. :func:`synthesize_chatterbox_mp3` — local Chatterbox TTS line synthesis →
    raw PCM s16le → PyAV libmp3lame encode → MP3 bytes.
 
 Both stages are guarded by typed exceptions so the orchestrator (Plan
@@ -15,7 +15,7 @@ without crashing the sidecar.
 
 The text model id is resolved via :func:`vibemix.llm.model_router.resolve`
 under the ``"debrief"`` path so SKU changes stay in one router file. TTS is
-not routed through Gemini: MOSS is the single product voice source.
+not routed through Gemini: Chatterbox is the single product voice source.
 Wave 0 A3 verdict: PyAV libmp3lame is in-process available; no system
 ffmpeg fallback required.
 """
@@ -29,8 +29,8 @@ from typing import Any, Protocol
 
 import numpy as np
 
+from vibemix.agent.chatterbox_tts import ChatterboxUnavailable, configured_model
 from vibemix.agent.line_voice import build_default_line_adapter, synthesize_line
-from vibemix.agent.local_tts import LocalTTSUnavailable
 from vibemix.debrief.stripper import strip_uncited_sentences
 from vibemix.llm.model_router import resolve
 from vibemix.runtime.ai_observability import append_global_ai_message
@@ -44,7 +44,7 @@ __all__ = [
     "GeminiClientProtocol",
     "generate_tldr_mp3",
     "generate_tldr_text",
-    "synthesize_moss_mp3",
+    "synthesize_chatterbox_mp3",
 ]
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 # Plan 41-01 routes both through vibemix.llm.model_router so a future SKU bump
 # is a one-file edit.
 DEBRIEF_TLDR_MODEL = resolve("debrief")[0]
-DEBRIEF_TTS_PROVIDER = "moss-local"
+DEBRIEF_TTS_PROVIDER = "chatterbox-local"
 
 # 150 wpm × (60-90s) bounds → 150-225 words target.
 MIN_TLDR_WORDS = 150
@@ -91,7 +91,7 @@ def _build_tldr_prompt(
     return (
         "You are the post-session debrief narrator for vibemix, an AI DJ "
         "co-host. Write a 150-220 word narration (about 60-90 seconds "
-        "spoken at the local MOSS voice's natural ~150 WPM) summarizing the "
+        "spoken at the local co-host voice's natural ~150 WPM) summarizing the "
         "DJ's set.\n\n"
         "HARD RULE: every sentence MUST contain at least one citation in "
         "the form `[ev:<id>@<t>]`, `[track:<id>]`, `[mix:<id>]`, "
@@ -219,13 +219,13 @@ def generate_tldr_text(
     return out
 
 
-def synthesize_moss_mp3(
+def synthesize_chatterbox_mp3(
     text: str,
     *,
     adapter_factory=None,
     line_synthesizer=None,
 ) -> bytes:
-    """Synthesize ``text`` via local MOSS TTS → MP3 bytes.
+    """Synthesize ``text`` via local Chatterbox TTS → MP3 bytes.
 
     Returns the encoded MP3 bytes ready for :func:`persistence.write_debrief`.
     Raises :class:`DebriefGenerationError(reason="tldr_generation_failed")`
@@ -235,9 +235,10 @@ def synthesize_moss_mp3(
         adapter_factory = build_default_line_adapter
     if line_synthesizer is None:
         line_synthesizer = synthesize_line
+    tts_model = configured_model()
     try:
         audio, sample_rate = asyncio.run(
-            _synthesize_moss_line(
+            _synthesize_chatterbox_line(
                 text,
                 adapter_factory=adapter_factory,
                 line_synthesizer=line_synthesizer,
@@ -247,18 +248,18 @@ def synthesize_moss_mp3(
         _record_tldr_ai_message(
             surface="debrief_tts",
             text=text,
-            model="moss-tts-nano-100m-onnx",
+            model=tts_model,
             stop_reason=f"error:{type(e).__name__}",
             prompt=text,
             response=f"<error {type(e).__name__}: {e}>",
             extra={"provider": DEBRIEF_TTS_PROVIDER, "error": f"{type(e).__name__}: {e}"},
-            engine="moss_tts",
+            engine="chatterbox_tts",
             provider=DEBRIEF_TTS_PROVIDER,
         )
         reason = (
-            "MOSS TTS unavailable"
-            if isinstance(e, LocalTTSUnavailable)
-            else f"MOSS TTS failed: {type(e).__name__}: {e}"
+            "Chatterbox TTS unavailable"
+            if isinstance(e, ChatterboxUnavailable)
+            else f"Chatterbox TTS failed: {type(e).__name__}: {e}"
         )
         raise DebriefGenerationError(
             reason="tldr_generation_failed",
@@ -270,22 +271,22 @@ def synthesize_moss_mp3(
         _record_tldr_ai_message(
             surface="debrief_tts",
             text=text,
-            model="moss-tts-nano-100m-onnx",
+            model=tts_model,
             stop_reason="empty_audio",
             prompt=text,
             response="<pcm bytes=0>",
             extra={"provider": DEBRIEF_TTS_PROVIDER, "pcm_bytes": 0},
-            engine="moss_tts",
+            engine="chatterbox_tts",
             provider=DEBRIEF_TTS_PROVIDER,
         )
         raise DebriefGenerationError(
             reason="tldr_generation_failed",
-            message="MOSS TTS returned empty PCM",
+            message="Chatterbox TTS returned empty PCM",
         )
     _record_tldr_ai_message(
         surface="debrief_tts",
         text=text,
-        model="moss-tts-nano-100m-onnx",
+        model=tts_model,
         stop_reason="model_done",
         prompt=text,
         response=f"<pcm bytes={len(pcm)}>",
@@ -294,7 +295,7 @@ def synthesize_moss_mp3(
             "pcm_bytes": len(pcm),
             "sample_rate": int(sample_rate),
         },
-        engine="moss_tts",
+        engine="chatterbox_tts",
         provider=DEBRIEF_TTS_PROVIDER,
     )
     return _encode_pcm_to_mp3(pcm, sample_rate=int(sample_rate))
@@ -307,7 +308,7 @@ def generate_tldr_mp3(
 ) -> bytes:
     """Compose narration text + synthesize MP3 in one call."""
     text = generate_tldr_text(client, chapter_summaries, cited_critique)
-    return synthesize_moss_mp3(text)
+    return synthesize_chatterbox_mp3(text)
 
 
 # ---------------------------------------------------------------------------
@@ -330,7 +331,7 @@ def _extract_text(response: Any) -> str:
         return ""
 
 
-async def _synthesize_moss_line(
+async def _synthesize_chatterbox_line(
     text: str,
     *,
     adapter_factory,

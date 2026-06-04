@@ -4,7 +4,7 @@
 Pure-Python backend that converts a recorded session_dir into:
 
 - a list of :class:`ChapterRegion` from events.jsonl
-- a voiced TL;DR MP3 (60-90s, local MOSS voice)
+- a voiced TL;DR MP3 (60-90s, local Chatterbox voice)
 - exactly 3 SBI/STAR-AR :class:`Drill` objects with cited evidence
 - cited-critique-stripped text everywhere (DEBRIEF-07 hard gate)
 

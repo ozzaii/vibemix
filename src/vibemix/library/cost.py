@@ -4,7 +4,7 @@ per-turn / per-session / per-DJ-month / fleet bill for `budget --stack live`.
 
 The cache-blend (``_effective_input_rate``) is the load-bearing insight: with a
 high implicit cache-hit rate the input leg collapses. Production speech is local
-MOSS, so the default TTS leg is explicit zero-cost rather than a hidden paid
+Chatterbox, so the default TTS leg is explicit zero-cost rather than a hidden paid
 provider. Paid voice rows remain only as what-if sensitivity rows. All money is
 USD here; the EUR conversion happens at the CLI boundary.
 """
@@ -89,7 +89,7 @@ def tts_reaction_usd(
 ) -> float:
     """USD cost of speaking one reaction, across both TTS billing shapes.
 
-    - local MOSS: verified zero per-provider cost.
+    - local Chatterbox: verified zero per-provider cost.
     - per-character vendors (ElevenLabs/Hume/OpenAI tts-1): spoken chars × rate.
     - audio-token models (Gemini/gpt-4o-mini-tts): spoken audio tokens × rate,
       plus the small text-input charge for the words spoken.
@@ -134,12 +134,12 @@ def listen_reaction_usd(
 @dataclass(frozen=True, slots=True)
 class LiveStackSpec:
     """Which model fills each leg. Defaults = the CURRENT production routes (the
-    live brain plus local MOSS voice) so `budget --stack live` shows today's
+    live brain plus local Chatterbox voice) so `budget --stack live` shows today's
     bill; flags swap in paid voice vendors or cheaper brain candidates to reveal
     the lever."""
 
     live_brain_path: str = "live_coach"
-    tts_path: str = "moss-local"  # a local/provider model id, or a router what-if
+    tts_path: str = "chatterbox-local"  # a local/provider model id, or a router what-if
     stt: str = "gemini_part"  # "gemini_part" (mic→Gemini) OR a dedicated STT model id
     viber_model: str = "deepseek-v4-pro"
     # LiveKit runs LOCALLY in direct mode (no Cloud room) ⇒ 0 marginal cost. Set
@@ -289,7 +289,7 @@ class SensitivityRow:
 # The candidate set per axis (deliverable #4). Labels avoid the grep-gated model
 # literals — descriptive names only; the model ids are resolved via the table.
 _TTS_OPTIONS = (
-    ("moss-local", "Local MOSS (production)"),
+    ("chatterbox-local", "Local Chatterbox (production)"),
     ("live_coach_tts_fallback", "Gemini value TTS"),
     ("live_coach_tts", "Gemini premium TTS"),
     ("eleven_flash_v2_5", "ElevenLabs Flash v2.5"),

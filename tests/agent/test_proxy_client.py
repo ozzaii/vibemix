@@ -27,36 +27,36 @@ def test_proxy_02_trailing_slash_stripped():
     assert ho.base_url == "https://api.altidus.world"
 
 
-def test_proxy_03_tts_chain_is_moss_only(mocker):
-    """PROXY-03: proxy TTS is local MOSS, never proxy/OpenAI speech."""
-    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
-    fake_moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
+def test_proxy_03_tts_chain_is_chatterbox_only(mocker):
+    """PROXY-03: proxy TTS is local Chatterbox, never proxy/OpenAI speech."""
+    mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=True)
+    fake_chatterbox_cls = mocker.patch("vibemix.agent.chatterbox_tts.ChatterboxLocalTTS")
     mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
 
     build_proxy_tts_chain(jwt="jwt-x", proxy_base_url="https://api.altidus.world")
 
     fa_kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    assert fa_kwargs["tts"] == [fake_moss_cls.return_value]
+    assert fa_kwargs["tts"] == [fake_chatterbox_cls.return_value]
     assert fa_kwargs["max_retry_per_tts"] == 1
-    fake_moss_cls.return_value.prewarm.assert_called_once()
+    fake_chatterbox_cls.return_value.prewarm.assert_called_once()
 
 
-def test_proxy_03b_tts_chain_uses_local_moss_when_enabled(mocker):
-    """Proxy mode should not route voice to paid/proxy TTS when local MOSS is ready."""
-    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
-    fake_moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
+def test_proxy_03b_tts_chain_uses_local_chatterbox_when_enabled(mocker):
+    """Proxy mode should not route voice to paid/proxy TTS when Chatterbox is ready."""
+    mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=True)
+    fake_chatterbox_cls = mocker.patch("vibemix.agent.chatterbox_tts.ChatterboxLocalTTS")
     mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
 
     build_proxy_tts_chain(jwt="jwt-x", proxy_base_url="https://api.altidus.world")
 
     fa_kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    assert fa_kwargs["tts"] == [fake_moss_cls.return_value]
+    assert fa_kwargs["tts"] == [fake_chatterbox_cls.return_value]
     assert fa_kwargs["max_retry_per_tts"] == 1
-    fake_moss_cls.return_value.prewarm.assert_called_once()
+    fake_chatterbox_cls.return_value.prewarm.assert_called_once()
 
 
 def test_proxy_04_tts_chain_does_not_import_openai_tts_plugin() -> None:
-    """PROXY-04: MOSS-only voice does not patch or import OpenAI TTS."""
+    """PROXY-04: Chatterbox-only voice does not patch or import OpenAI TTS."""
     proc = subprocess.run(
         [
             sys.executable,

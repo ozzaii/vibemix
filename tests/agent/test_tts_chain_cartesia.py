@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Cartesia residue must not re-enter the MOSS-only voice policy."""
+"""Cartesia residue must not re-enter the Chatterbox-only voice policy."""
 
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ def test_cartesia_plugin_is_not_a_runtime_dependency() -> None:
 
 
 def test_cartesia_key_is_not_a_supported_tts_argument(mocker) -> None:
-    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
-    moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
+    mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=True)
+    chatterbox_cls = mocker.patch("vibemix.agent.chatterbox_tts.ChatterboxLocalTTS")
     mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
 
     from vibemix.agent.tts_chain import build_tts_chain
@@ -27,14 +27,14 @@ def test_cartesia_key_is_not_a_supported_tts_argument(mocker) -> None:
     with pytest.raises(TypeError):
         build_tts_chain(cartesia_api_key="c", mode="direct")  # type: ignore[call-arg]
 
-    moss_cls.assert_not_called()
+    chatterbox_cls.assert_not_called()
     assert "livekit.plugins.cartesia" not in sys.modules
 
 
 def test_cartesia_env_is_ignored_by_tts_chain(mocker, monkeypatch) -> None:
     monkeypatch.setenv("CARTESIA_API_KEY", "env-cartesia-key")
-    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
-    fake_moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
+    mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=True)
+    fake_chatterbox_cls = mocker.patch("vibemix.agent.chatterbox_tts.ChatterboxLocalTTS")
     mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
 
     from vibemix.agent.tts_chain import build_tts_chain
@@ -42,7 +42,7 @@ def test_cartesia_env_is_ignored_by_tts_chain(mocker, monkeypatch) -> None:
     build_tts_chain(mode="direct")
 
     kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    assert kwargs["tts"] == [fake_moss_cls.return_value]
+    assert kwargs["tts"] == [fake_chatterbox_cls.return_value]
     assert "livekit.plugins.cartesia" not in sys.modules
 
 

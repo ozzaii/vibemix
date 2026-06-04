@@ -38,7 +38,7 @@ import pytest
 from livekit.agents import NOT_GIVEN
 
 from vibemix import __version__
-from vibemix.agent.local_tts import LocalTTSUnavailable
+from vibemix.agent.chatterbox_tts import ChatterboxUnavailable
 
 _REAL_SLEEP = asyncio.sleep
 
@@ -194,12 +194,8 @@ def _assert_tts_chain_boot_call(build_tts_chain: MagicMock, *, mode: str = "dire
     build_tts_chain.assert_called_once()
     kwargs = build_tts_chain.call_args.kwargs
     assert kwargs["mode"] == mode
-    assert kwargs["voice"] == "Adam"
-    assert set(kwargs) == {"mode", "voice", "moss"}
-    moss = kwargs["moss"]
-    assert hasattr(moss, "set_voice")
-    assert hasattr(moss, "synthesize_pcm")
-    return moss
+    assert set(kwargs) == {"mode", "chatterbox"}
+    return kwargs["chatterbox"]
 
 
 # ---------------------------------------------------------------------------
@@ -688,7 +684,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
     monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
-    # MOSS is the only voice; legacy cloud voice env must not affect boot.
+    # Chatterbox is the only voice; legacy cloud voice env must not affect boot.
     monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     monkeypatch.delenv("VIBEMIX_DECK_VISION", raising=False)
     # Pin per-deck OFF so the device-upgrade path is deterministic regardless of
@@ -736,7 +732,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     # (c) build_llm called with the dummy key in direct mode (Phase 5 explicit mode kwarg)
     livekit_mocks["build_llm"].assert_called_once_with("dummy-key", mode="direct")
 
-    # (d) build_tts_chain gets the persisted MOSS voice + shared MOSS hook;
+    # (d) build_tts_chain gets the local Chatterbox hook when available;
     # cloud keys stay out of voice.
     _assert_tts_chain_boot_call(livekit_mocks["build_tts_chain"])
 
@@ -822,13 +818,13 @@ def test_screen_vision_capture_opt_in_spawns_capture_task(monkeypatch, mocker, t
 
 
 def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
-    """SMOKE-04: no OPENROUTER_API_KEY still boots MOSS-only voice."""
+    """SMOKE-04: no OPENROUTER_API_KEY still boots Chatterbox-only voice."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    # MOSS is the only voice; legacy cloud voice env must not affect boot.
+    # Chatterbox is the only voice; legacy cloud voice env must not affect boot.
     monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     # Per-deck OFF — deterministic boot regardless of host rekordbox config.
     monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
@@ -858,13 +854,13 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
     _assert_tts_chain_boot_call(livekit_mocks["build_tts_chain"])
 
 
-def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
+def test_smoke_04b_missing_chatterbox_boots_muted_not_cloud_fallback(
     monkeypatch,
     mocker,
     tmp_path,
     capsys,
 ):
-    """Missing MOSS must not crash boot or create a cloud-TTS fallback."""
+    """Missing Chatterbox must not crash boot or create a cloud-TTS fallback."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
@@ -877,7 +873,7 @@ def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
     _build_sensor_mocks(mocker)
     _build_state_refresh_noop(mocker)
     livekit_mocks = _build_livekit_mocks(mocker)
-    livekit_mocks["build_tts_chain"].side_effect = LocalTTSUnavailable("MOSS model missing")
+    livekit_mocks["build_tts_chain"].side_effect = ChatterboxUnavailable("mlx-audio missing")
     _patch_voice_recorder(mocker, tmp_path)
 
     tasks_seen: list = []
@@ -904,7 +900,7 @@ def test_smoke_04b_missing_moss_model_boots_muted_not_cloud_fallback(
     assert livekit_mocks["PlaybackQueueAudioOutput"].call_count == 0
     assert livekit_mocks["session"].output.audio is None
     assert livekit_mocks["session"].start.await_count == 1
-    assert "voice muted, no cloud fallback" in capsys.readouterr().err
+    assert "voice muted, no fallback" in capsys.readouterr().err
 
 
 # ---------------------------------------------------------------------------
@@ -1441,31 +1437,31 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
 # ---------------------------------------------------------------------------
 
 
-def test_apply_packaged_defaults_opts_moss_in_when_absent(monkeypatch):
-    """With no operator override, the packaged app turns the free MOSS voice ON.
+def test_apply_packaged_defaults_leaves_tts_engine_to_config_seed(monkeypatch):
+    """Packaged defaults leave the voice engine to the config.json boot seed.
 
     It does not turn the drop-call oracle on; spoken drop calls stay explicitly
     opted in until the mix-timing lane has live grounding proof.
     """
     from vibemix.__main__ import _apply_packaged_defaults
 
-    monkeypatch.delenv("VIBEMIX_LOCAL_TTS", raising=False)
+    monkeypatch.delenv("VIBEMIX_TTS_ENGINE", raising=False)
     monkeypatch.delenv("VIBEMIX_DROP_CALL", raising=False)
 
     _apply_packaged_defaults()
 
-    assert os.environ["VIBEMIX_LOCAL_TTS"] == "1"
+    assert "VIBEMIX_TTS_ENGINE" not in os.environ
     assert "VIBEMIX_DROP_CALL" not in os.environ
 
 
-def test_apply_packaged_defaults_respects_explicit_off(monkeypatch):
+def test_apply_packaged_defaults_respects_explicit_env(monkeypatch):
     """An explicit ``VIBEMIX_*=0`` is never clobbered — setdefault, not assign."""
     from vibemix.__main__ import _apply_packaged_defaults
 
-    monkeypatch.setenv("VIBEMIX_LOCAL_TTS", "0")
+    monkeypatch.setenv("VIBEMIX_TTS_ENGINE", "custom")
     monkeypatch.setenv("VIBEMIX_DROP_CALL", "0")
 
     _apply_packaged_defaults()
 
-    assert os.environ["VIBEMIX_LOCAL_TTS"] == "0"
+    assert os.environ["VIBEMIX_TTS_ENGINE"] == "custom"
     assert os.environ["VIBEMIX_DROP_CALL"] == "0"

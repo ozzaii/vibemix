@@ -48,7 +48,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from vibemix.voice_presets import DEFAULT_MOSS_VOICE, normalize_stored_voice
+from vibemix.voice_presets import DEFAULT_VOICE, normalize_stored_voice
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -62,6 +62,16 @@ def _default_hotkey() -> str:
     return "cmd+shift+m"
 
 
+DEFAULT_TTS_ENGINE = "chatterbox"
+_SUPPORTED_TTS_ENGINES = frozenset({DEFAULT_TTS_ENGINE})
+
+
+def normalize_tts_engine(value: object) -> str:
+    """Normalize persisted voice-engine values; unsupported engines fall to Chatterbox."""
+    candidate = value.strip().lower() if isinstance(value, str) else ""
+    return candidate if candidate in _SUPPORTED_TTS_ENGINES else DEFAULT_TTS_ENGINE
+
+
 # Phase 11 + 12 fields the store ALWAYS materializes on save (other
 # top-level keys — e.g. tauri-plugin-store's ``first_run_state`` wrapper
 # — are preserved verbatim via the merge in ``save_config``).
@@ -73,6 +83,9 @@ _PHASE12_FIELDS: tuple[str, ...] = (
     "output_profile",
     "retention_days",
     "push_to_mute_hotkey",
+    # Product co-host voice engine. Launchd/Dock launches strip shell env, so
+    # main() re-seeds VIBEMIX_TTS_ENGINE from this persisted value at boot.
+    "tts_engine",
     # Phase 14-04 — perf-blur preference. Persisted alongside the other
     # Phase 12 settings; default False (full v5 visual contract on fresh
     # installs). Read at boot by main.ts to set html[data-blur-perf].
@@ -231,7 +244,8 @@ class ConfigStore:
     """
 
     # Phase 12 fields
-    voice: str = DEFAULT_MOSS_VOICE
+    voice: str = DEFAULT_VOICE
+    tts_engine: str = DEFAULT_TTS_ENGINE
     mode: str = "coach"
     genre: str = "tech-house"
     output_device_id: str | None = None
@@ -302,6 +316,8 @@ class ConfigStore:
                 kwargs.pop("retention_days", None)
         if "voice" in kwargs:
             kwargs["voice"] = normalize_stored_voice(kwargs["voice"])
+        if "tts_engine" in kwargs:
+            kwargs["tts_engine"] = normalize_tts_engine(kwargs["tts_engine"])
         # IN-02 in 14-REVIEW.md — coerce/drop non-bool lighter_blur from
         # disk. A corrupted config.json with `"lighter_blur": "yes"` or
         # `1` would otherwise populate the dataclass verbatim and break
@@ -405,12 +421,14 @@ def save_config(store: ConfigStore, path: Path | None = None) -> Path:
 
 
 __all__ = [
+    "DEFAULT_TTS_ENGINE",
     "ConfigStore",
     "app_data_dir",
     "brain_env_path",
     "brain_key_persisted",
     "config_path",
     "load_config",
+    "normalize_tts_engine",
     "persist_brain_settings",
     "save_config",
 ]

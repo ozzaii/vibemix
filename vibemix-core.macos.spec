@@ -17,7 +17,7 @@
 #
 # Run via: ``uv run pyinstaller vibemix-core.macos.spec --clean --noconfirm``.
 
-# ruff: noqa: F821  # PyInstaller injects Analysis / PYZ / EXE / COLLECT at
+# ruff: noqa: E402, F821  # PyInstaller injects Analysis / PYZ / EXE / COLLECT at
 # spec-file exec time; the linter doesn't know about them.
 
 import sys
@@ -33,7 +33,7 @@ from PyInstaller.utils.hooks import (
     collect_dynamic_libs,
     collect_submodules,
 )
-from scripts.dist.moss_bundle import collect_moss_model_datas
+from scripts.dist.chatterbox_bundle import collect_chatterbox_ref_datas
 
 block_cipher = None
 
@@ -124,7 +124,7 @@ for _pkg in _DYNAMIC_PKGS:
     except Exception as exc:  # pragma: no cover — defensive
         print(f"[spec] collect_submodules({_pkg!r}) skipped: {exc}", file=sys.stderr)
 
-# VibeMix uses LiveKit's Gemini LLM leaf only. Product speech is local MOSS; the
+# VibeMix uses LiveKit's Gemini LLM leaf only. Product speech is local Chatterbox; the
 # package initializer eagerly imports Google Cloud STT/TTS; keep the frozen
 # hiddenimports to the exact leaves used by vibemix.agent._livekit_google_slim.
 hiddenimports.extend(
@@ -139,7 +139,7 @@ hiddenimports.extend(
     ]
 )
 
-# Local AI + watcher runtime deps. These are lazy-imported by CLAP/CUE/MOSS and
+# Local AI + watcher runtime deps. These are lazy-imported by CLAP/CUE/voice and
 # freshness-watcher paths, so PyInstaller can miss native libs/submodules.
 # The build script runs `uv run --extra ai-local ...`; this block makes sure the
 # installed runtime actually lands in the frozen sidecar without bundling
@@ -286,7 +286,7 @@ if not _GENRE_PROFILES.is_dir():
     raise RuntimeError(f"vibemix-core.macos.spec: missing {_GENRE_PROFILES}")
 
 datas = [item for item in datas if _runtime_data_file(item)]
-datas.extend(collect_moss_model_datas())
+datas.extend(collect_chatterbox_ref_datas())
 
 _ANALYSIS_EXCLUDES = [
     "tkinter",

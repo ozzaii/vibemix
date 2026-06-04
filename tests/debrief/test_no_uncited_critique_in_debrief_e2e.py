@@ -23,7 +23,7 @@ from vibemix.debrief.drills import Drill, Drills
 from vibemix.debrief.stripper import assert_all_cited
 
 
-def _patch_moss_tldr_audio(monkeypatch) -> None:
+def _patch_chatterbox_tldr_audio(monkeypatch) -> None:
     async def fake_line_synthesizer(_adapter, _text):
         return np.zeros((24000, 2), dtype=np.float32), 24000
 
@@ -117,7 +117,7 @@ def test_no_uncited_critique_in_persisted_debrief(tmp_path: Path, monkeypatch):
     """
     root, sess = _build_full_session(tmp_path)
     client = _make_mock_client_with_uncited_sentences_in_tldr()
-    _patch_moss_tldr_audio(monkeypatch)
+    _patch_chatterbox_tldr_audio(monkeypatch)
 
     state = run(sess, client=client, recordings_root=root, serve=False)
     assert state["cache_hit"] is False

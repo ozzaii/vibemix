@@ -3,7 +3,7 @@
 
 Real Gemini calls are out of scope for offline tests — we verify the
 deterministic word-budget enforcement and the stripper integration via
-mocks. The local MOSS MP3 duration smoke is verified in the manual smoke
+mocks. The local Chatterbox MP3 duration smoke is verified in the manual smoke
 checklist (Plan 29-08).
 """
 

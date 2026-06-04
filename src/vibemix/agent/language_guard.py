@@ -3,7 +3,7 @@
 
 The live prompt asks for English, but prompt text is not a safety boundary.
 This module is intentionally conservative: it catches obvious Turkish prose
-that should never reach MOSS/TTS, while allowing track and artist names with
+that should never reach TTS, while allowing track and artist names with
 Turkish characters to pass when the surrounding sentence is English.
 """
 

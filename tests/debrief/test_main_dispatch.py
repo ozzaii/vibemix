@@ -53,7 +53,7 @@ def _build_session(root: Path, name: str = "20260515-aaaaaa", duration_s: float 
     return sess
 
 
-def _patch_moss_tldr_audio(monkeypatch) -> None:
+def _patch_chatterbox_tldr_audio(monkeypatch) -> None:
     async def fake_line_synthesizer(_adapter, _text):
         return np.zeros((24000, 2), dtype=np.float32), 24000
 
@@ -138,11 +138,11 @@ def test_run_with_cached_debrief_still_updates_profile(tmp_path: Path, monkeypat
 
 
 def test_run_first_time_generation_calls_gemini(tmp_path: Path, monkeypatch):
-    """First-time run with no cache calls Gemini text paths + MOSS audio."""
+    """First-time run with no cache calls Gemini text paths + Chatterbox audio."""
     root = tmp_path / "recordings"
     root.mkdir()
     sess = _build_session(root)
-    _patch_moss_tldr_audio(monkeypatch)
+    _patch_chatterbox_tldr_audio(monkeypatch)
     profile_updates: list[tuple[list[dict], dict]] = []
     monkeypatch.setattr(
         "vibemix.debrief.main._write_back_profile_best_effort",
@@ -180,7 +180,7 @@ def test_run_first_time_generation_calls_gemini(tmp_path: Path, monkeypatch):
     assert state["cache_hit"] is False
     assert (sess / "debrief_tldr.mp3").exists()
     assert (sess / "session_debrief.json").exists()
-    # Only the Gemini text calls happened; narration audio is local MOSS.
+    # Only the Gemini text calls happened; narration audio is local Chatterbox.
     assert client.models.generate_content.call_count == 2
     assert len(profile_updates) == 1
     events, evidence = profile_updates[0]

@@ -3,7 +3,7 @@
 
 The cache-blend is the load-bearing insight (Kaan, 2026-05-30): with ~90%
 implicit cache hits across a continuous set, the input leg collapses ~5-9x. The
-production voice is now local MOSS, so paid TTS appears only as an explicit
+production voice is now local Chatterbox, so paid TTS appears only as an explicit
 what-if sensitivity row.
 """
 
@@ -55,12 +55,12 @@ def test_tts_reaction_cost_gemini_is_audio_token_billed() -> None:
     assert usd == pytest.approx(0.00302, rel=1e-9)
 
 
-def test_tts_reaction_cost_moss_local_is_zero_provider_bill() -> None:
-    """MOSS is local/on-device, so provider TTS cost is explicitly zero."""
+def test_tts_reaction_cost_chatterbox_local_is_zero_provider_bill() -> None:
+    """Chatterbox is local/on-device, so provider TTS cost is explicitly zero."""
     from vibemix.library.cost import tts_reaction_usd
     from vibemix.library.pricing import price_for_model
 
-    row = price_for_model("moss-local")
+    row = price_for_model("chatterbox-local")
     assert tts_reaction_usd(row, speech_seconds=12.0, text_tokens=40) == 0.0
 
 
@@ -114,13 +114,13 @@ def test_listen_cost_falls_back_to_input_rate_when_no_separate_audio_rate() -> N
 
 
 def _default_inputs():
-    """The cost-sane default live stack: cheap Gemini brain + local MOSS voice +
+    """The cost-sane default live stack: cheap Gemini brain + local Chatterbox voice +
     mic→Gemini Part STT + DeepSeek Viber, at the bench-measured turn profile."""
     from vibemix.library.cost import LiveStackSpec, TurnProfile, UsageProfile
 
     spec = LiveStackSpec(
         live_brain_path="live_coach_cand_25flash",
-        tts_path="moss-local",
+        tts_path="chatterbox-local",
         stt="gemini_part",
         viber_model="deepseek-v4-pro",
     )
@@ -174,8 +174,8 @@ def test_livekit_cloud_rate_adds_a_real_leg_scaling_with_set_minutes() -> None:
     assert lk.per_session_eur > 0
 
 
-def test_listen_is_the_dominant_leg_for_the_default_moss_stack() -> None:
-    """With MOSS local, listening/audio-in becomes the dominant paid leg."""
+def test_listen_is_the_dominant_leg_for_the_default_chatterbox_stack() -> None:
+    """With local Chatterbox, listening/audio-in becomes the dominant paid leg."""
     from vibemix.library.cost import compute_live_cost
 
     spec, turn, usage = _default_inputs()
@@ -194,8 +194,8 @@ def test_fleet_scales_linearly_with_dau() -> None:
     )
 
 
-def test_fleet_at_10k_reflects_moss_removing_paid_tts() -> None:
-    """The MOSS default should be far below the old paid-Gemini-TTS anchor."""
+def test_fleet_at_10k_reflects_chatterbox_removing_paid_tts() -> None:
+    """The Chatterbox default should be far below the old paid-Gemini-TTS anchor."""
     from vibemix.library.cost import compute_live_cost
 
     spec, turn, usage = _default_inputs()
@@ -205,7 +205,7 @@ def test_fleet_at_10k_reflects_moss_removing_paid_tts() -> None:
 
 def test_premium_tts_swap_moves_the_fleet_more_than_a_premium_brain_swap() -> None:
     """Decision-grade: adding paid TTS changes the fleet bill far more than
-    switching the brain tier — because MOSS removes the default voice bill."""
+    switching the brain tier — because Chatterbox removes the default voice bill."""
     from dataclasses import replace
 
     from vibemix.library.cost import compute_live_cost
@@ -267,8 +267,8 @@ def test_live_budget_report_is_a_complete_serializable_dict() -> None:
 
 
 @pytest.mark.cli
-def test_live_budget_cli_defaults_to_moss_local_voice() -> None:
-    """The real CLI default must match the product voice policy: MOSS-only."""
+def test_live_budget_cli_defaults_to_chatterbox_local_voice() -> None:
+    """The real CLI default must match the product voice policy: Chatterbox-only."""
     proc = subprocess.run(
         [
             sys.executable,
@@ -290,6 +290,6 @@ def test_live_budget_cli_defaults_to_moss_local_voice() -> None:
 
     assert proc.returncode == 0, proc.stderr
     payload = json.loads(proc.stdout)
-    assert payload["stack"]["tts"] == "moss-local"
+    assert payload["stack"]["tts"] == "chatterbox-local"
     tts_leg = next(leg for leg in payload["legs"] if leg["name"] == "tts")
     assert tts_leg["per_session_eur"] == 0.0

@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Proxy-mode genai client builder plus MOSS-only TTS compatibility shim.
+"""Proxy-mode genai client builder plus local Chatterbox TTS compatibility shim.
 
 Per RESEARCH Q1 verified: genai.Client(http_options=HttpOptions(base_url=...,
 headers={Authorization: Bearer JWT})) is the canonical pattern. The SDK's
 generate_content_stream(...) works unchanged once base_url + headers are set.
 
 TTS is intentionally not proxied anymore: ``build_proxy_tts_chain`` keeps the old
-call signature but returns the same local MOSS-only adapter as direct mode.
+call signature but returns the same local Chatterbox adapter as direct mode.
 
 Phase 69 Plan 69-03 (OSS-02) — Client-side proxy fallback contract:
 when the proxy returns 5xx, times out, refuses the connection, or returns a
@@ -49,11 +49,11 @@ def build_proxy_genai_client(jwt: str, proxy_base_url: str) -> genai.Client:
 def build_proxy_tts_chain(
     jwt: str, proxy_base_url: str, voice: str | None = None
 ) -> agents_tts.FallbackAdapter:
-    """Compatibility shim: proxy mode also uses local MOSS as the only TTS."""
-    _ = (jwt, proxy_base_url)
-    from vibemix.agent.local_tts import build_local_tts_adapter
+    """Compatibility shim: proxy mode also uses the local Chatterbox voice."""
+    _ = (jwt, proxy_base_url, voice)
+    from vibemix.agent.tts_chain import build_tts_chain
 
-    return build_local_tts_adapter(voice=voice)
+    return build_tts_chain(mode="proxy")
 
 
 # ---------------------------------------------------------------------------

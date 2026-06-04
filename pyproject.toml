@@ -155,19 +155,16 @@ clap = [
 cue = [
     "onnxruntime>=1.20",
 ]
-# Local on-device TTS (the free co-host voice) — vendored MOSS-TTS-Nano ONNX.
-# sentencepiece is the text tokenizer (standalone C++, torch-free); onnxruntime
-# runs the engine. Verified torch-free: the vendored runtime imports only stdlib
-# + numpy + onnxruntime (see vibemix/agent/moss_tts/). Weights are cached at
-# runtime under ~/.cache/vibemix/moss-tts-onnx/, not shipped in the wheel.
+# Local on-device TTS (the co-host voice) — Chatterbox-Turbo via mlx-audio on
+# Apple Silicon. The model id stays configurable at runtime; the production
+# reference clip is bundled separately by scripts/dist/chatterbox_bundle.py.
 tts-local = [
-    "onnxruntime>=1.20",
-    "sentencepiece>=0.2",
+    "mlx-audio>=0.3; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
 ai-local = [
     "onnxruntime>=1.20",
     "tokenizers>=0.22",
-    "sentencepiece>=0.2",
+    "mlx-audio>=0.3; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
 telegram = [
     "python-telegram-bot>=21",

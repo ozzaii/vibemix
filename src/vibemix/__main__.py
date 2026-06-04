@@ -111,7 +111,12 @@ from vibemix.platform._audio_replay import (
 from vibemix.profile import load_consent, load_profile, render_profile_for_cache
 from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
 from vibemix.runtime.cancel import CancelGate
-from vibemix.runtime.config_store import app_data_dir, load_config, save_config
+from vibemix.runtime.config_store import (
+    DEFAULT_TTS_ENGINE,
+    app_data_dir,
+    load_config,
+    save_config,
+)
 from vibemix.runtime.recordings_index import run_retention_sweep
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import (
@@ -235,17 +240,17 @@ def _livekit_not_given() -> Any:
 
 
 def _build_tts_chain_or_mute(**kwargs: Any) -> Any:
-    """Build MOSS-only TTS for app boot, or start muted without cloud fallback."""
+    """Build local Chatterbox TTS for app boot, or start muted without fallback."""
     try:
         return build_tts_chain(**kwargs)
     except Exception as exc:
-        from vibemix.agent.local_tts import LocalTTSUnavailable
+        from vibemix.agent.chatterbox_tts import ChatterboxUnavailable
 
-        if not isinstance(exc, LocalTTSUnavailable):
+        if not isinstance(exc, ChatterboxUnavailable):
             raise
-        reason = str(exc) or "local MOSS unavailable"
+        reason = str(exc) or "local Chatterbox unavailable"
         print(
-            "-> tts:   unavailable (MOSS local only; voice muted, no cloud fallback)",
+            "-> tts:   unavailable (Chatterbox local only; voice muted, no fallback)",
             file=sys.stderr,
             flush=True,
         )
@@ -275,11 +280,11 @@ def _resample_pcm16_mono_bytes(pcm: bytes, *, source_sr: int, target_sr: int) ->
 
 def _build_learn_tutor_speak_audio(
     *,
-    moss: Any,
+    voice_tts: Any,
     playback: PlaybackQueue,
     muted: Callable[[], bool],
 ) -> Callable[[str, str], None]:
-    """Build a mute-aware Learn tutor voice sink using the product MOSS voice."""
+    """Build a mute-aware Learn tutor voice sink using the product voice."""
 
     def speak(text: str, tts_marker: str) -> None:
         if muted():
@@ -287,7 +292,7 @@ def _build_learn_tutor_speak_audio(
 
         def _run() -> None:
             try:
-                source_sr = int(getattr(moss, "sample_rate", OUTPUT_SR) or OUTPUT_SR)
+                source_sr = int(getattr(voice_tts, "sample_rate", OUTPUT_SR) or OUTPUT_SR)
 
                 def _on_pcm(pcm: bytes) -> None:
                     if muted():
@@ -300,16 +305,16 @@ def _build_learn_tutor_speak_audio(
                         )
                     )
 
-                moss.synthesize_pcm(text, _on_pcm)
+                voice_tts.synthesize_pcm(text, _on_pcm)
             except Exception as exc:  # pragma: no cover - defensive boot/runtime path
                 print(
-                    f"[learn boot] tutor MOSS synthesis failed for {tts_marker}: {exc!r}",
+                    f"[learn boot] tutor voice synthesis failed for {tts_marker}: {exc!r}",
                     file=sys.stderr,
                 )
 
         threading.Thread(
             target=_run,
-            name=f"learn-tutor-moss-{tts_marker}",
+            name=f"learn-tutor-voice-{tts_marker}",
             daemon=True,
         ).start()
 
@@ -1041,16 +1046,17 @@ def _mic_callback_factory(mic: MicBuffer, mic_audio_buf: AudioBuffer | None = No
 
 
 def _apply_packaged_defaults() -> None:
-    """Ship the free on-device voice ON by default.
+    """Ship packaged-only runtime defaults.
 
     ``setdefault`` (not assignment) so an explicit shell/.env override still wins,
     AND so the default survives ``open -a`` / Dock / launchd launches that strip
     ``VIBEMIX_*`` from the inherited env — the process opts ITSELF in rather than
-    trusting the launcher to pass the flag. ``VIBEMIX_LOCAL_TTS=0`` still turns
-    speech off. Drop-call speech remains opt-in until the mix-timing oracle has
-    live grounding proof.
+    trusting the launcher to pass the flag. The TTS engine is seeded from
+    ``ConfigStore.tts_engine`` after config.json is loaded so packaged launches
+    use the same source of truth as Settings. Drop-call speech remains opt-in
+    until the mix-timing oracle has live grounding proof.
     """
-    os.environ.setdefault("VIBEMIX_LOCAL_TTS", "1")  # MOSS = the only voice (zero TTS cost, no key)
+    return None
 
 
 _DECK_AUDIO_CHANNELS_CONFIG_KEY = "deck_audio.channels"
@@ -1418,18 +1424,35 @@ async def main() -> None:
     from vibemix.runtime.settings import apply_persona_config_to_env
 
     _boot_settings_config = load_config()
+    _tts_engine_seed = str(getattr(_boot_settings_config, "tts_engine", DEFAULT_TTS_ENGINE) or DEFAULT_TTS_ENGINE)
+    os.environ.setdefault("VIBEMIX_TTS_ENGINE", _tts_engine_seed)
     _persona_seed = apply_persona_config_to_env(_boot_settings_config)
     _deck_audio_env_seed = _apply_deck_audio_config_to_env(_boot_settings_config)
-    live_moss_tts: Any | None = None
+    live_voice_tts: Any | None = None
     try:
-        from vibemix.agent.local_tts import MossLocalTTS, local_tts_enabled
+        from vibemix.agent.chatterbox_tts import (
+            ChatterboxLocalTTS,
+            chatterbox_available,
+            chatterbox_unavailable_reason,
+            engine_selected,
+        )
 
-        if local_tts_enabled():
-            live_moss_tts = MossLocalTTS(voice=_boot_settings_config.voice)
-            print(f"-> tts voice: {_boot_settings_config.voice} (from settings)")
-    except Exception as _moss_boot_exc:  # pragma: no cover - defensive boot path
+        if engine_selected() and chatterbox_available():
+            live_voice_tts = ChatterboxLocalTTS()
+            print(f"-> tts engine: chatterbox (from settings/env; ref={live_voice_tts._ref_path})")
+        elif engine_selected():
+            print(
+                f"-> tts engine: chatterbox unavailable ({chatterbox_unavailable_reason()})",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "-> tts engine: unsupported; Chatterbox is the only co-host voice",
+                file=sys.stderr,
+            )
+    except Exception as _voice_boot_exc:  # pragma: no cover - defensive boot path
         print(
-            f"-> tts voice hook unavailable: {_moss_boot_exc!r}",
+            f"-> tts voice hook unavailable: {_voice_boot_exc!r}",
             file=sys.stderr,
         )
     if _persona_seed:
@@ -1608,13 +1631,12 @@ async def main() -> None:
         llm_inst = build_llm(api_key, mode="direct")
         tts_inst = _build_tts_chain_or_mute(
             mode="direct",
-            voice=_boot_settings_config.voice,
-            moss=live_moss_tts,
+            chatterbox=live_voice_tts,
         )
         if tts_inst is not _livekit_not_given():
-            print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
+            print("-> tts:   Chatterbox local only (provider=chatterbox-mlx)")
         else:
-            live_moss_tts = None
+            live_voice_tts = None
     elif brain_unavailable_reason is None:  # mode == "proxy"
         print(f"-> brain: {LLM_MODEL} via proxy at {proxy_base_url}")
         _ensure_proxy_client_dep()
@@ -1622,26 +1644,24 @@ async def main() -> None:
         llm_inst = build_llm(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
         tts_inst = _build_tts_chain_or_mute(
             mode="proxy",
-            voice=_boot_settings_config.voice,
-            moss=live_moss_tts,
+            chatterbox=live_voice_tts,
         )
         if tts_inst is not _livekit_not_given():
-            print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
+            print("-> tts:   Chatterbox local only (provider=chatterbox-mlx)")
         else:
-            live_moss_tts = None
+            live_voice_tts = None
     else:
         print(f"-> brain: {LLM_MODEL} unavailable ({brain_unavailable_reason})")
         genai_client = None
         llm_inst = _livekit_not_given()
         tts_inst = _build_tts_chain_or_mute(
             mode="proxy",
-            voice=_boot_settings_config.voice,
-            moss=live_moss_tts,
+            chatterbox=live_voice_tts,
         )
         if tts_inst is not _livekit_not_given():
-            print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
+            print("-> tts:   Chatterbox local only (provider=chatterbox-mlx)")
         else:
-            live_moss_tts = None
+            live_voice_tts = None
     brain_available = brain_unavailable_reason is None
 
     # ---- Phase 19 latency-stack wiring (ack_bank retired) ----
@@ -2209,7 +2229,7 @@ async def main() -> None:
         _settings_config = _boot_settings_config
         _live_settings_applier = SettingsApplier(
             config_store=_settings_config,
-            cascade_agent=live_moss_tts,
+            cascade_agent=None,
             music_state=state,  # mood applies live + emits mascot.mood_change
             ws_bus=ipc_router,  # mood-change + acks reach every connected client
             recordings_root=recordings_root,
@@ -2847,11 +2867,11 @@ async def main() -> None:
 
     learn_tutor_speak_audio = (
         _build_learn_tutor_speak_audio(
-            moss=live_moss_tts,
+            voice_tts=live_voice_tts,
             playback=playback,
             muted=lambda: bool(_session_ipc is not None and _session_ipc.muted),
         )
-        if live_moss_tts is not None
+        if live_voice_tts is not None
         else None
     )
 
@@ -4017,8 +4037,8 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_budget.add_argument(
         "--tts",
-        default="moss-local",
-        help="[--stack live] TTS provider id or paid what-if (default moss-local; e.g. live_coach_tts_fallback, eleven_flash_v2_5)",
+        default="chatterbox-local",
+        help="[--stack live] TTS provider id or paid what-if (default chatterbox-local; e.g. live_coach_tts_fallback, eleven_flash_v2_5)",
     )
     sp_budget.add_argument(
         "--stt",
@@ -4054,10 +4074,10 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
 
     sp_models = sub.add_parser(
         "models",
-        help="Show local AI model cache status for CLAP, MOSS, and CUE-DETR",
+        help="Show local AI model cache status for CLAP, Chatterbox, and CUE-DETR",
         description=(
             "Offline model asset status for one-click setup. Reports where "
-            "the CLAP embedding snapshot, required MOSS voice model, and "
+            "the CLAP embedding snapshot, required Chatterbox voice ref, and "
             "CUE-DETR cue model should live, which files are missing, and "
             "which env var overrides the path."
         ),
@@ -4065,15 +4085,12 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_models.add_argument("--json", action="store_true")
     sp_models.add_argument(
         "--install",
-        choices=("required", "clap", "moss", "cue", "all"),
+        choices=("clap", "cue"),
         default=None,
         help=(
-            "download/install supported local model assets. 'required' "
-            "installs first-run required CLAP + MOSS assets; 'clap' installs "
-            "the Hugging Face CLAP ONNX snapshot; 'moss' reports/verifies the "
-            "required MOSS voice model unless a release archive is configured; "
-            "'cue' reports/verifies the manual CUE-DETR ONNX target until "
-            "hosting exists; 'all' requires every local model target to be ready."
+            "download/install supported local model assets. 'clap' installs "
+            "the Hugging Face CLAP ONNX snapshot; 'cue' reports/verifies the "
+            "manual CUE-DETR ONNX target until hosting exists."
         ),
     )
     sp_models.add_argument(
@@ -8465,14 +8482,26 @@ def _cmd_library_models(args: argparse.Namespace) -> int:
                 progress=progress,
             )
 
-    from vibemix.agent.local_tts import MOSS_MODEL_DIR_ENV
-    from vibemix.agent.local_tts import model_status as moss_model_status
+    from vibemix.agent.chatterbox_tts import (
+        REF_ENV,
+        chatterbox_available,
+        chatterbox_unavailable_reason,
+        default_ref_path,
+        resolve_ref_path,
+    )
     from vibemix.library.clap_engine import onnx_model_status
     from vibemix.library.cue_detr import model_status as cue_model_status
-    from vibemix.library.model_assets import cue_model_installable, moss_model_installable
+    from vibemix.library.model_assets import cue_model_installable
 
     clap = onnx_model_status()
-    moss = moss_model_status()
+    ref_path = resolve_ref_path()
+    chatterbox_missing: list[str] = []
+    if ref_path is None:
+        chatterbox_missing.append("cohost_voice_ref.wav")
+    if not chatterbox_available():
+        reason = chatterbox_unavailable_reason()
+        if reason != "unknown" and reason not in chatterbox_missing:
+            chatterbox_missing.append(reason)
     cue = cue_model_status()
     models = [
         {
@@ -8488,16 +8517,16 @@ def _cmd_library_models(args: argparse.Namespace) -> int:
             "mismatched": clap.get("mismatched", []),
         },
         {
-            "id": "moss-tts",
-            "label": "MOSS TTS ONNX",
+            "id": "chatterbox-voice",
+            "label": "Chatterbox voice",
             "role": "local co-host voice",
             "required": True,
-            "env": MOSS_MODEL_DIR_ENV,
-            "installed": bool(moss["installed"]),
-            "installable": moss_model_installable(),
-            "path": moss["path"],
-            "missing": moss["missing"],
-            "mismatched": moss.get("mismatched", []),
+            "env": REF_ENV,
+            "installed": not chatterbox_missing,
+            "installable": False,
+            "path": str(ref_path or default_ref_path()),
+            "missing": chatterbox_missing,
+            "mismatched": [],
         },
         {
             "id": "cue-detr",

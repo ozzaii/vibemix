@@ -48,6 +48,7 @@ def test_defaults_phase12_fields() -> None:
     assert cfg.output_profile == "hp"
     assert cfg.retention_days == 7
     assert cfg.llm_mode == "proxy"
+    assert cfg.tts_engine == "chatterbox"
     # Hotkey is platform-aware — match whatever this process is on.
     assert cfg.push_to_mute_hotkey == _default_hotkey()
 
@@ -74,6 +75,7 @@ def test_round_trip_phase12_fields(tmp_path: Path) -> None:
         genre="dnb",
         output_device_id="dev-7",
         output_profile="spk",
+        tts_engine="chatterbox",
         retention_days=30,
         push_to_mute_hotkey="cmd+option+m",
     )
@@ -85,6 +87,7 @@ def test_round_trip_phase12_fields(tmp_path: Path) -> None:
     assert loaded.genre == "dnb"
     assert loaded.output_device_id == "dev-7"
     assert loaded.output_profile == "spk"
+    assert loaded.tts_engine == "chatterbox"
     assert loaded.retention_days == 30
     assert loaded.push_to_mute_hotkey == "cmd+option+m"
 
@@ -240,6 +243,15 @@ def test_load_legacy_cloud_voice_returns_moss_default(tmp_path: Path) -> None:
     cfg = load_config(target)
 
     assert cfg.voice == "Adam"
+
+
+def test_load_legacy_tts_engine_returns_chatterbox_default(tmp_path: Path) -> None:
+    target = tmp_path / "config.json"
+    target.write_text(json.dumps({"tts_engine": "moss"}))
+
+    cfg = load_config(target)
+
+    assert cfg.tts_engine == "chatterbox"
 
 
 def test_load_coerces_retention_days(tmp_path: Path) -> None:

@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Opt-in Chatterbox-Turbo MLX voice — engine switch + provider plumbing.
+"""Chatterbox-Turbo MLX voice — engine switch + provider plumbing.
 
 The wiring is exercised with a fake engine (no mlx-audio, no model download). The
-default engine stays MOSS; ``VIBEMIX_TTS_ENGINE=chatterbox`` opts in, and an
-unavailable Chatterbox falls back to MOSS so the voice is never muted.
+default engine is Chatterbox; unavailable Chatterbox raises a typed mute reason.
 """
 from __future__ import annotations
 
@@ -14,11 +13,11 @@ from livekit.agents import tts as agents_tts
 from vibemix.agent.chatterbox_tts import (
     ChatterboxEngine,
     ChatterboxLocalTTS,
+    ChatterboxUnavailable,
     configured_temperature,
     engine_selected,
     resolve_ref_path,
 )
-
 
 # ---------------- fake engine seam ----------------
 
@@ -37,9 +36,9 @@ class _FakeEngine(ChatterboxEngine):
 
 # ---------------- config helpers ----------------
 
-def test_engine_not_selected_by_default(monkeypatch):
+def test_engine_selected_by_default(monkeypatch):
     monkeypatch.delenv("VIBEMIX_TTS_ENGINE", raising=False)
-    assert engine_selected() is False
+    assert engine_selected() is True
 
 
 def test_engine_selected_when_env_set(monkeypatch):
@@ -95,10 +94,10 @@ def test_chunked_stream_pushes_engine_pcm():
     pushed: list[bytes] = []
 
     class _Emitter:
-        def initialize(self, **_kw):  # noqa: ANN001
+        def initialize(self, **_kw):
             pass
 
-        def push(self, b):  # noqa: ANN001
+        def push(self, b):
             pushed.append(b)
 
         def flush(self):
@@ -115,21 +114,17 @@ def test_chunked_stream_pushes_engine_pcm():
 
 # ---------------- engine switch in build_tts_chain ----------------
 
-def _patch_moss(mocker):
-    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
-    fake_moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
-    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
-    return fake_moss_cls
 
-
-def test_default_chain_is_moss(monkeypatch, mocker):
+def test_default_chain_is_chatterbox(monkeypatch, mocker):
     monkeypatch.delenv("VIBEMIX_TTS_ENGINE", raising=False)
-    fake_moss_cls = _patch_moss(mocker)
+    mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=True)
+    fake_chatterbox_cls = mocker.patch("vibemix.agent.chatterbox_tts.ChatterboxLocalTTS")
+    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
     from vibemix.agent.tts_chain import build_tts_chain
 
     build_tts_chain(mode="direct")
     kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    assert kwargs["tts"] == [fake_moss_cls.return_value]
+    assert kwargs["tts"] == [fake_chatterbox_cls.return_value]
 
 
 def test_chatterbox_selected_and_available_builds_chatterbox(monkeypatch, mocker):
@@ -140,18 +135,20 @@ def test_chatterbox_selected_and_available_builds_chatterbox(monkeypatch, mocker
     from vibemix.agent.tts_chain import build_tts_chain
 
     assert build_tts_chain(mode="direct") is sentinel
-    built.assert_called_once()
+    built.assert_called_once_with(chatterbox=None)
 
 
-def test_chatterbox_unavailable_falls_back_to_moss(monkeypatch, mocker):
+def test_chatterbox_unavailable_raises_without_fallback(monkeypatch, mocker):
     monkeypatch.setenv("VIBEMIX_TTS_ENGINE", "chatterbox")
     mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=False)
     mocker.patch(
         "vibemix.agent.chatterbox_tts.chatterbox_unavailable_reason", return_value="no mlx-audio"
     )
-    fake_moss_cls = _patch_moss(mocker)
     from vibemix.agent.tts_chain import build_tts_chain
 
-    build_tts_chain(mode="direct")
-    kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    assert kwargs["tts"] == [fake_moss_cls.return_value]
+    try:
+        build_tts_chain(mode="direct")
+    except ChatterboxUnavailable as exc:
+        assert "no mlx-audio" in str(exc)
+    else:  # pragma: no cover - assertion clarity
+        raise AssertionError("unavailable Chatterbox must not fall back")

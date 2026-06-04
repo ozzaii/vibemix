@@ -4,7 +4,7 @@
 Live Gemini brain rows are keyed by ids resolved through ``model_router`` at
 import time, so NO live Gemini model literal is ever typed in this file (the CI
 grep gate in ``scripts/release/check_no_hardcoded_model.sh`` only allowlists
-``_router_config.py``). Product speech is local MOSS-only: the old Gemini TTS
+``_router_config.py``). Product speech is local Chatterbox-only: the old Gemini TTS
 entries remain as explicit historical what-if pricing rows, not router paths.
 Non-Gemini ids (DeepSeek, the premium TTS vendors, dedicated STT) are not
 grep-gated, so they are keyed by their literal id.
@@ -22,7 +22,7 @@ The EUR conversion + the per-turn/per-session/fleet cost model live in
 Sources (rechecked 2026-05-31):
 - Gemini:   https://ai.google.dev/gemini-api/docs/pricing
 - DeepSeek: https://api-docs.deepseek.com/quick_start/pricing
-- MOSS:     local on-device TTS; no per-call provider bill
+- Chatterbox: local on-device TTS; no per-call provider bill
 - ElevenLabs: https://elevenlabs.io/pricing/api
 - Hume:     https://www.hume.ai/pricing
 - Cartesia: https://www.cartesia.ai/pricing   (UNVERIFIED — credits/minutes only)
@@ -114,31 +114,31 @@ MODEL_PRICING: dict[str, PriceRow] = dict(
             cached_input_per_mtok_usd=0.05, audio_input_per_mtok_usd=1.00,
             notes="Current-gen standard Flash (cascade); $1.00/1M audio in.",
         ),
-        # ─── TTS (production local MOSS + paid what-if vendors) ───────────────
+        # ─── TTS (production local Chatterbox + paid what-if vendors) ─────────
         (
-            "moss-local",
+            "chatterbox-local",
             PriceRow(
-                model_id="moss-local", kind="tts", verified=True,
-                source_url="local:vibemix.agent.local_tts", source_date="2026-06-01",
+                model_id="chatterbox-local", kind="tts", verified=True,
+                source_url="local:vibemix.agent.chatterbox_tts", source_date="2026-06-04",
                 tts_per_1m_char_usd=0.0,
-                notes="Production voice path: on-device MOSS-TTS-Nano. No per-call "
+                notes="Production voice path: on-device Chatterbox-Turbo. No per-call "
                 "provider bill; packaging/model distribution is tracked separately.",
             ),
         ),
         # Historical Gemini TTS rows remain as explicit what-if comparison rows.
         # They intentionally do NOT resolve through model_router: product speech
-        # is local MOSS-only, and these keys are sensitivity labels only.
+        # is local Chatterbox-only, and these keys are sensitivity labels only.
         _historical_tts_row(
             "live_coach_tts", kind="tts", verified=True,
             input_per_mtok_usd=1.00, tts_audio_out_per_mtok_usd=20.00,
             notes="Historical paid Gemini Flash TTS comparison row; production "
-            "speech is local MOSS.",
+            "speech is local Chatterbox.",
         ),
         _historical_tts_row(
             "live_coach_tts_fallback", kind="tts", verified=True,
             input_per_mtok_usd=0.50, tts_audio_out_per_mtok_usd=10.00,
             notes="Historical paid Gemini Flash TTS comparison row; production "
-            "speech is local MOSS.",
+            "speech is local Chatterbox.",
         ),
         # ─── VIBER / set-prep brain (DeepSeek, LLM — not grep-gated) ───────────
         (
@@ -196,7 +196,7 @@ MODEL_PRICING: dict[str, PriceRow] = dict(
                 "and plan prices but no exact per-character conversion; keep this row "
                 "unverified until account billing confirms the current effective rate. "
                 "Historical paid-voice sensitivity row only; production speech is local "
-                "MOSS. Router id sonic-3.",
+                "Chatterbox. Router id sonic-3.",
             ),
         ),
         (

@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-"""MOSS voice names shared by settings/config and the local TTS runtime."""
+"""Legacy voice names shared by settings/config normalization."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-DEFAULT_MOSS_VOICE = "Adam"
+DEFAULT_VOICE = "Adam"
+DEFAULT_MOSS_VOICE = DEFAULT_VOICE
 
 # Product-facing subset of the voices present in the MOSS-TTS-Nano manifest.
 # Keep this mirrored in tauri/ui/src/settings/SettingsDrawer.ts until the UI

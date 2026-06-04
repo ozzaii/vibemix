@@ -12,7 +12,7 @@ foundation Plans 41-02..06 consume — keep it stable.
 Tier dispatch follows CONTEXT.md (LAT-07). The ``embedding`` route is retained
 only for the legacy Gemini cache/migration helper in ``vibemix.library.embed``;
 the product library embedder is local CLAP ONNX via ``embed_factory``. Product
-speech is local MOSS-only, so Gemini/OpenRouter TTS aliases do not belong in
+speech is local Chatterbox-only, so Gemini/OpenRouter TTS aliases do not belong in
 the live model router; paid voice vendors remain explicit cost-model what-ifs
 under ``vibemix.library.pricing`` / ``vibemix.library.cost``.
 

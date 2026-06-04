@@ -24,7 +24,7 @@ from livekit.agents.voice import io as voice_io
 from vibemix.audio import OUTPUT_SR, PlaybackQueue, VoiceRecorder
 
 # 2026-05-21 (Kaan: "sesini yuksege al") — software gain on the AI voice
-# before it hits the speaker. Local MOSS speech can still get buried under
+# before it hits the speaker. Local co-host speech can still get buried under
 # the music passthrough, so multiply the int16 PCM with hard-clip protection.
 # Env-tunable (VIBEMIX_VOICE_GAIN); 1.0 = bypass.
 VOICE_GAIN: float = float(os.environ.get("VIBEMIX_VOICE_GAIN", "2.0"))

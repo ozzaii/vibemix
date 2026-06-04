@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""MOSS-only TTS chain contract."""
+"""Chatterbox-only TTS chain contract."""
 
 from __future__ import annotations
 
@@ -9,58 +9,58 @@ import sys
 from livekit.agents import tts as agents_tts
 
 
-def _patch_moss_chain(mocker):
-    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
-    fake_moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
+def _patch_chatterbox_chain(mocker):
+    mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=True)
+    fake_chatterbox_cls = mocker.patch("vibemix.agent.chatterbox_tts.ChatterboxLocalTTS")
     mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
-    return fake_moss_cls
+    return fake_chatterbox_cls
 
 
-def test_tts_chain_direct_is_moss_only(mocker) -> None:
-    fake_moss_cls = _patch_moss_chain(mocker)
+def test_tts_chain_direct_is_chatterbox_only(mocker) -> None:
+    fake_chatterbox_cls = _patch_chatterbox_chain(mocker)
 
     from vibemix.agent.tts_chain import build_tts_chain
 
     build_tts_chain(mode="direct")
 
     kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    assert kwargs["tts"] == [fake_moss_cls.return_value]
+    assert kwargs["tts"] == [fake_chatterbox_cls.return_value]
     assert kwargs["max_retry_per_tts"] == 1
-    fake_moss_cls.return_value.prewarm.assert_called_once()
+    fake_chatterbox_cls.return_value.prewarm.assert_called_once()
 
 
-def test_tts_chain_proxy_is_moss_only_without_proxy_args(mocker) -> None:
-    fake_moss_cls = _patch_moss_chain(mocker)
+def test_tts_chain_proxy_is_chatterbox_only_without_proxy_args(mocker) -> None:
+    fake_chatterbox_cls = _patch_chatterbox_chain(mocker)
 
     from vibemix.agent.tts_chain import build_tts_chain
 
     build_tts_chain(mode="proxy")
 
     kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
-    assert kwargs["tts"] == [fake_moss_cls.return_value]
+    assert kwargs["tts"] == [fake_chatterbox_cls.return_value]
     assert kwargs["max_retry_per_tts"] == 1
 
 
-def test_tts_chain_missing_moss_model_fails_loud(mocker) -> None:
-    from vibemix.agent.local_tts import LocalTTSUnavailable
+def test_tts_chain_missing_chatterbox_runtime_fails_loud(mocker) -> None:
+    from vibemix.agent.chatterbox_tts import ChatterboxUnavailable
     from vibemix.agent.tts_chain import build_tts_chain
 
-    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=False)
+    mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=False)
     mocker.patch(
-        "vibemix.agent.local_tts.local_tts_unavailable_reason",
-        return_value="MOSS model missing",
+        "vibemix.agent.chatterbox_tts.chatterbox_unavailable_reason",
+        return_value="mlx-audio not installed",
     )
 
     try:
         build_tts_chain()
-    except LocalTTSUnavailable as exc:
-        assert "MOSS model missing" in str(exc)
+    except ChatterboxUnavailable as exc:
+        assert "mlx-audio not installed" in str(exc)
     else:  # pragma: no cover - assertion clarity
-        raise AssertionError("build_tts_chain must fail when MOSS is unavailable")
+        raise AssertionError("build_tts_chain must fail when Chatterbox is unavailable")
 
 
 def test_tts_chain_unknown_mode_raises(mocker) -> None:
-    _patch_moss_chain(mocker)
+    _patch_chatterbox_chain(mocker)
     from vibemix.agent.tts_chain import build_tts_chain
 
     try:

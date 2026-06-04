@@ -600,7 +600,7 @@ class LessonRuntime(StateMachine):
                 debrief/profile tooling.
             tutor_speak_audio: Optional local-audio hook. When wired at boot,
                 every emitted ``LearnTutorSpeak`` line is also synthesized by
-                the product MOSS voice. None preserves silent-subtitle behavior
+                the product co-host voice. None preserves silent-subtitle behavior
                 for tests and installs without a local voice.
         """
         self._learn = learn_state
@@ -2414,7 +2414,7 @@ class LessonRuntime(StateMachine):
             )
 
     def _emit_tutor_speak(self, speak: dict[str, Any]) -> None:
-        """Emit a Learn tutor line and, when wired, voice it through MOSS."""
+        """Emit a Learn tutor line and, when wired, voice it through the co-host voice."""
         self._ipc.emit(speak)
         self._log_tutor_speak_event(speak)
         if self._tutor_speak_audio is None:

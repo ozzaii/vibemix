@@ -1,17 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
 """Local Chatterbox-Turbo voice for the live co-host — MLX / Apple-GPU zero-shot clone.
 
-Opt-in alternative to the MOSS voice, selected with ``VIBEMIX_TTS_ENGINE=chatterbox``.
-It mirrors :class:`vibemix.agent.local_tts.MossLocalTTS` exactly — a LiveKit ``TTS``
-provider with an injectable engine seam (:class:`ChatterboxEngine`) so the wiring is
+This is the product co-host voice, selected by default with
+``VIBEMIX_TTS_ENGINE=chatterbox``. It is built as a LiveKit ``TTS`` provider
+with an injectable engine seam (:class:`ChatterboxEngine`) so the wiring is
 unit-testable without the heavy ``mlx-audio`` dependency or any model download.
 
 The real engine (:class:`_MlxChatterboxEngine`) renders speech through
 ``mlx-audio``'s ``chatterbox-turbo-8bit`` on Apple GPU: zero-shot voice clone from a
 reference clip, paralinguistic tags (``[laugh]``/``[gasp]``/``[sigh]``) at temperature
 0.4, streamed chunk-by-chunk for a ~0.2s time-to-first-audio. ``mlx-audio`` is
-Apple-only and is **never** a base dependency — it is imported lazily, and when it is
-absent the chain falls back to MOSS so the voice is never muted.
+Apple-only and is **never** a base dependency — it is imported lazily. When the
+engine or reference clip is unavailable, callers start voiceless with an honest
+reason instead of falling back to another voice.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import os
+import sys
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -27,8 +29,6 @@ from livekit.agents import tts as agents_tts
 from livekit.agents._exceptions import APIError
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 from livekit.agents.utils import shortuuid
-
-from vibemix.agent.local_tts import pcm16_mono_le  # reuse the proven mono int16 downmix
 
 # Chatterbox-Turbo s3gen output rate; mono to match the live sink + FallbackAdapter.
 NATIVE_SR = 24000
@@ -43,6 +43,21 @@ _DEFAULT_STREAM_INTERVAL = 0.5  # seconds of audio per streamed chunk (low TTFT)
 # Default co-host voice ref = the Kaan-locked "pranker" voice (music-stripped clip,
 # rendered at temp 0.4). Lives in the vibemix cache next to the other model assets.
 _DEV_REF = Path.home() / ".cache" / "vibemix" / "cohost_voice_ref.wav"
+_BUNDLED_REF_REL = Path("models") / "chatterbox" / "cohost_voice_ref.wav"
+
+
+class ChatterboxUnavailable(RuntimeError):
+    """Raised when the product voice cannot be built on this machine."""
+
+
+def pcm16_mono_le(audio_2d) -> bytes:
+    """Downmix float audio in [-1, 1] to mono little-endian int16 PCM bytes."""
+    import numpy as np
+
+    a = np.asarray(audio_2d, dtype=np.float32)
+    mono = a if a.ndim == 1 else (a.mean(axis=0) if a.shape[0] > 1 else a[0])
+    pcm = np.round(np.clip(mono, -1.0, 1.0) * 32767.0).astype("<i2")
+    return pcm.tobytes()
 
 
 def configured_temperature() -> float:
@@ -59,19 +74,38 @@ def configured_model() -> str:
     return os.environ.get(MODEL_ENV, "").strip() or _DEFAULT_MODEL
 
 
+def default_ref_path() -> Path:
+    return _DEV_REF
+
+
+def bundled_ref_candidates() -> tuple[Path, ...]:
+    roots: list[Path] = []
+    frozen_root = getattr(sys, "_MEIPASS", None)
+    if frozen_root:
+        roots.append(Path(frozen_root))
+    try:
+        exe_parent = Path(sys.executable).resolve().parent
+        roots.extend([exe_parent, exe_parent / "_internal"])
+    except Exception:
+        pass
+    return tuple(root / _BUNDLED_REF_REL for root in roots)
+
+
 def resolve_ref_path() -> Path | None:
     """The reference clip to clone. ``VIBEMIX_CHATTERBOX_REF`` overrides; else the
-    dev Archie ref if it is present; else ``None`` (engine unavailable)."""
+    cache/bundled pranker ref if present; else ``None`` (engine unavailable)."""
     override = os.environ.get(REF_ENV, "").strip()
     if override:
         candidate = Path(override).expanduser()
         return candidate if candidate.is_file() else None
-    return _DEV_REF if _DEV_REF.is_file() else None
+    if _DEV_REF.is_file():
+        return _DEV_REF
+    return next((candidate for candidate in bundled_ref_candidates() if candidate.is_file()), None)
 
 
 def engine_selected() -> bool:
-    """True when the operator asked for the Chatterbox voice."""
-    return os.environ.get(ENGINE_ENV, "moss").strip().lower() == "chatterbox"
+    """True when the configured product voice engine is Chatterbox."""
+    return os.environ.get(ENGINE_ENV, "chatterbox").strip().lower() == "chatterbox"
 
 
 def chatterbox_available() -> bool:
@@ -140,7 +174,7 @@ class _MlxChatterboxEngine(ChatterboxEngine):
 class ChatterboxLocalTTS(agents_tts.TTS):
     """LiveKit ``TTS`` provider backed by the local Chatterbox-Turbo MLX engine.
 
-    Non-streaming capability (``streaming=False``) mirrors MOSS: the FallbackAdapter
+    Non-streaming capability (``streaming=False``) matches the live sink: the FallbackAdapter
     wraps it in a StreamAdapter for token-streamed text, and we stream PCM out fast
     via the ``synthesize`` ChunkedStream so first audio lands quickly.
     """
@@ -201,7 +235,7 @@ class ChatterboxLocalTTS(agents_tts.TTS):
         threading.Thread(target=_bg, name="chatterbox-tts-prewarm", daemon=True).start()
 
     def synthesize_pcm(self, text: str, on_pcm: Callable[[bytes], None]) -> None:
-        """Synthesize mono PCM bytes for non-LiveKit sinks (parity with MOSS)."""
+        """Synthesize mono PCM bytes for non-LiveKit sinks."""
         with self._synth_lock:
             self._get_engine().synthesize(text, on_pcm)
 
@@ -235,7 +269,7 @@ class _ChatterboxChunkedStream(agents_tts.ChunkedStream):
         def _produce() -> None:
             try:
                 tts.synthesize_pcm(self._input_text, _on_pcm)
-            except BaseException as exc:  # noqa: BLE001 - surfaced to the stream
+            except BaseException as exc:
                 loop.call_soon_threadsafe(queue.put_nowait, exc)
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, self._DONE)
@@ -255,8 +289,12 @@ class _ChatterboxChunkedStream(agents_tts.ChunkedStream):
         output_emitter.flush()
 
 
-def build_chatterbox_adapter(*, ref_path: str | None = None) -> agents_tts.FallbackAdapter:
-    """Build the Chatterbox-only live voice chain (parity with the MOSS-only builder)."""
-    cbt = ChatterboxLocalTTS(ref_path=ref_path)
+def build_chatterbox_adapter(
+    *, ref_path: str | None = None, chatterbox: ChatterboxLocalTTS | None = None
+) -> agents_tts.FallbackAdapter:
+    """Build the Chatterbox-only live voice chain."""
+    if chatterbox is None and not chatterbox_available():
+        raise ChatterboxUnavailable(chatterbox_unavailable_reason())
+    cbt = chatterbox or ChatterboxLocalTTS(ref_path=ref_path)
     cbt.prewarm()
     return agents_tts.FallbackAdapter(tts=[cbt], max_retry_per_tts=1)

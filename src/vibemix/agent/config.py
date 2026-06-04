@@ -12,7 +12,7 @@ Settings; v4 hard-codes them so we port the v4 defaults verbatim.
 Plan 41-01 migration: the LLM model string is resolved through
 :func:`vibemix.llm.model_router.resolve_model` so a future SKU bump is a
 one-file edit in ``vibemix/llm/_router_config.py``. Live co-host speech never
-uses cloud TTS IDs; ``agent.tts_chain`` resolves to local MOSS only.
+uses cloud TTS IDs; ``agent.tts_chain`` resolves to local Chatterbox only.
 """
 
 from __future__ import annotations
@@ -20,13 +20,13 @@ from __future__ import annotations
 import os
 
 from vibemix.llm.model_router import resolve, resolve_model
-from vibemix.voice_presets import DEFAULT_MOSS_VOICE
+from vibemix.voice_presets import DEFAULT_VOICE
 
 # ---- LLM model identifiers (router-derived per Plan 41-01) ----
 LLM_MODEL: str = resolve_model("live_coach")
 
 # OpenRouter-routed Gemini brain model id. The retired OpenRouter TTS id is not
-# exported from the agent layer; live speech resolves through local MOSS only.
+# exported from the agent layer; live speech resolves through local Chatterbox only.
 OPENROUTER_LLM_MODEL: str = resolve_model("live_coach_openrouter")
 
 # ---- ServiceTier dispatch (Plan 41-01, LAT-07) ----
@@ -35,9 +35,9 @@ OPENROUTER_LLM_MODEL: str = resolve_model("live_coach_openrouter")
 # need to round-trip back through ``resolve()``. Other call sites that
 # want both values for a different path should import ``resolve`` directly.
 # ---- Voice id ----
-# Source-facing default only. Runtime persistence and local synthesis normalize
-# through the MOSS preset list, so never pin a retired cloud-era voice here.
-VOICE: str = DEFAULT_MOSS_VOICE
+# Source-facing default only. Runtime persistence may still carry legacy voice
+# names, but live synthesis is driven by the Chatterbox reference clip.
+VOICE: str = DEFAULT_VOICE
 
 # ---- Device names (v4:101-103) ----
 # Factory defaults stay pinned for ordinary installs. The env overrides are

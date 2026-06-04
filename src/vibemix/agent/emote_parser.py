@@ -10,7 +10,7 @@ We extract the whitelisted intents and strip the tags from the
 playback text so they never get sent to TTS.
 
 Legacy Gemini-TTS voice tags such as ``[chill]`` and ``[excited]`` are
-also stripped from playback text. MOSS is the only TTS source now, so
+also stripped from playback text. Chatterbox is the only TTS source now, so
 these tags are internal control residue, not text the DJ should hear or
 see in the transcript.
 
