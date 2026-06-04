@@ -2733,6 +2733,7 @@ async def main() -> None:
     # failed) we still wire LessonRuntime so the FSM exists; emit calls
     # become no-ops via the sync-adapter's None branch. The live app
     # boots cleanly even when SessionLoop wiring degrades.
+    from vibemix.learn.graduation import build_graduation_summary
     from vibemix.learn.runtime import LessonRuntime
     from vibemix.learn.state import LearnState
     from vibemix.ui_bus.learn_messages import LearnProgressState
@@ -2880,6 +2881,7 @@ async def main() -> None:
         ),
         session_event_logger=_learn_session_event,
         tutor_speak_audio=learn_tutor_speak_audio,
+        graduation_summary_loader=build_graduation_summary,
     )
     print("-> lesson_runtime wired", file=sys.stderr)
 

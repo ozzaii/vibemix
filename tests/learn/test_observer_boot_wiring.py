@@ -89,3 +89,10 @@ def test_lesson_runtime_uses_library_harmonic_pair_loader_in_main() -> None:
     assert "def _load_learn_harmonic_pair()" in src
     assert "pick_harmonic_practice_pair(lib)" in src
     assert "harmonic_pair_loader=_load_learn_harmonic_pair" in src
+
+
+def test_lesson_runtime_uses_graduation_summary_loader_in_main() -> None:
+    src = _main_source()
+
+    assert "from vibemix.learn.graduation import build_graduation_summary" in src
+    assert "graduation_summary_loader=build_graduation_summary" in src
