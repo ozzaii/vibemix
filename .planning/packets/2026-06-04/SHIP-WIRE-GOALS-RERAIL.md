@@ -100,6 +100,15 @@ proxy (`/var/www/bravoh-clean-backend`, PM2 `bravoh-clean-api-0/1`)? Then make d
 real: a fresh app with no key reaches the brain through the proxy. Report state, propose/apply the fix.
 Plus coordinate keystone/packaging (route-doctor determinism + a fresh signed DMG at HEAD) — unowned.
 
+## W3 clarifications — RESOLVED (terminating answers, so goals can exit)
+W3 (USER-READY-WIRING-EXIT-MAP) found the dark concentrated in 5 cross-engine seams + the fresh-user path CRASHING at Step 4 (wizard done → session boots `mode=direct` at config_store.py:194 → no key → `sys.exit(4)`). The 4 open clarifications are answered here so no goal waits on an undecided fork:
+1. **Start-gate scope** → v1 = Start button + "Stop releases models" + silent pre-warm. NO full eager→lazy `main()` refactor in v1.
+2. **MOSS-nuke sequence** → ship Chatterbox-BUNDLED (not voiceless-interim, not keep-MOSS-one-release). Mac works now; Windows GPU backend is its own build lane.
+3. **Proxy default vs interim** → v1 SHIPS on the in-GUI key field (already built `8c6a7b6e`). Hosted-proxy-default = fast-follow once the organizer deploys the `/register` route to the Bravoh backend (live probe 2026-06-04: PM2 online, Gemini key present, but `/register` = HTTP 404 = route not deployed; deploy needs Kaan's OK on prod).
+4. **Streak robot voice** → full in v1, SEQUENCED (ground signal → rebind to cited executed transition → voice). Not parallel.
+
+**The #1 ship-blocker is NOT the proxy — it is the fresh-user crash.** Fix = the `set_brain` backend handler (KEYFIELD's pending Lane B half) + boot gracefully to the key field instead of `sys.exit(4)` when no key. That belongs to the keystone/backend lane (R1: `main()` is one owner). Route W3's 5 paste-ready /goal blocks (in USER-READY-WIRING-EXIT-MAP.md) under the STOP PROTOCOL above.
+
 ## What ends the confusion
 Every session now has ONE bounded target that ends at a by-ear/by-eye DoD. Sven stops prompt-tuning and
 takes the voice (the actual #1 concern). Frontend takes the ship-critical Start gate instead of idling.
