@@ -1,0 +1,53 @@
+{
+  "report": {
+    "session": "/Users/ozai/Library/Application Support/vibemix/recordings/20260603-175859",
+    "events": "ALL",
+    "judged": 1,
+    "errors": 0,
+    "judge_no_parse": 0,
+    "dim_means": {
+      "friend_not_narrator": 2.0,
+      "grounded_not_fabricated": 3.0,
+      "earned_not_constant": 2.0,
+      "move_specific_not_spectrum": 3.0,
+      "voice_no_slop": 2.0
+    },
+    "should_NOT_have_spoken": 0,
+    "should_NOT_have_spoken_pct": 0.0,
+    "worst_lines": [
+      {
+        "id": "0010_182021_KICK_DENSITY_SHIFT",
+        "line": "That rapid, stuttering kick layer [ev:KICK_DENSITY_SHIFT@1281.0] just came in. Next time you want to build tension on a shift like this, ride a high-pass filter up on the kick to clear out the sub-bass, then snap it back on the phrase change to make the bottom end hit twice as hard.",
+        "why": "Good actionable filter tip, but starts with unnecessary sound narration.",
+        "friend": 2
+      }
+    ],
+    "describe_bank_census": {
+      "input_spoken_rows": 21,
+      "kept_for_judge": 1,
+      "silenced_by_describe_bank_census": 20,
+      "silenced_by_event": {
+        "PHRASE_BOUNDARY": 17,
+        "SUB_LAYER_ARRIVAL": 3
+      },
+      "payload_caveat": "No recorded event.extra payloads are reconstructed; this is a no-payload describe-bank census, not a full live gate replay."
+    }
+  },
+  "rows": [
+    {
+      "id": "0010_182021_KICK_DENSITY_SHIFT",
+      "event": "KICK_DENSITY_SHIFT",
+      "line": "That rapid, stuttering kick layer [ev:KICK_DENSITY_SHIFT@1281.0] just came in. Next time you want to build tension on a shift like this, ride a high-pass filter up on the kick to clear out the sub-bass, then snap it back on the phrase change to make the bottom end hit twice as hard.",
+      "status": 200,
+      "scores": {
+        "friend_not_narrator": 2,
+        "grounded_not_fabricated": 3,
+        "earned_not_constant": 2,
+        "move_specific_not_spectrum": 3,
+        "voice_no_slop": 2,
+        "should_speak": true,
+        "why": "Good actionable filter tip, but starts with unnecessary sound narration."
+      }
+    }
+  ]
+}
