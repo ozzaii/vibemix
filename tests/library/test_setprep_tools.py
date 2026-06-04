@@ -968,6 +968,52 @@ def test_export_set_serato_tags_writes_vm_cues_with_permission(toolset, tmp_path
     assert cues["VM D DROP"].position_ms == 64500
 
 
+@pytest.mark.skipif(not _REAL_MP3.exists(), reason="needs the in-repo test mp3")
+def test_export_set_all_writes_xml_m3u8_and_markers2_tags(toolset, tmp_path, monkeypatch):
+    pytest.importorskip("mutagen")
+    dst = tmp_path / "track.mp3"
+    shutil.copy(_REAL_MP3, dst)
+    toolset.seen.add("t000")
+    toolset._library.tracks["t000"] = replace(_track("t000", bpm=120.0), filepath=str(dst))
+    monkeypatch.setattr(
+        tool_mod,
+        "sections_for_entry",
+        lambda entry: (
+            _section(f"{entry.track_id}#intro", "intro", 10.21, 32.0),
+            _section(f"{entry.track_id}#drop", "drop", 64.26, 128.0),
+        ),
+    )
+    out_xml = tmp_path / "all.xml"
+
+    out = toolset.export_set(
+        {
+            "name": "All DJ",
+            "track_ids": ["t000"],
+            "out_path": str(out_xml),
+            "target": "all",
+            "tag_write_granted": True,
+        }
+    )
+
+    assert out.get("exported") is True
+    assert out["target"] == "all"
+    assert out["outputs"] == {
+        "rekordbox": str(out_xml),
+        "m3u8": str(tmp_path / "all.m3u8"),
+    }
+    assert out["tag_receipts"][0]["carrier"] == "markers2_tags"
+    assert out["tag_receipts"][0]["compatible_apps"] == ["Serato", "Mixxx"]
+    assert out["tag_receipts"][0]["tagged"] == 1
+    assert out["auto_cues"]["cues_added"] == 2
+    assert out_xml.exists()
+    assert (tmp_path / "all.m3u8").exists()
+    from vibemix.library.export_serato import read_serato_cues
+
+    cues = {cue.name: cue for cue in read_serato_cues(dst)}
+    assert cues["VM A IN"].position_ms == 10000
+    assert cues["VM D DROP"].position_ms == 64500
+
+
 def test_export_set_forwards_rekordbox_cues_and_beatgrid(toolset, tmp_path):
     toolset.discover_pool({"ref_track_ids": ["t000"], "k": 10})
     toolset.seen.add("t000")

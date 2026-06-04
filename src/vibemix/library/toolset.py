@@ -1058,7 +1058,7 @@ class LibraryToolset:
             if _target_wants_tags(target):
                 tag_receipt = _write_export_set_markers2_tags(
                     items,
-                    carrier="mixxx_tags" if target == "mixxx_tags" else "serato_tags",
+                    carrier=_markers2_carrier_for_target(target),
                     granted=tag_write_granted,
                 )
                 tag_receipts.append(tag_receipt)
@@ -1956,10 +1956,20 @@ def _target_wants_tags(target: str) -> bool:
     return target in {"serato_tags", "mixxx_tags", "all"}
 
 
+def _markers2_carrier_for_target(
+    target: str,
+) -> Literal["serato_tags", "mixxx_tags", "markers2_tags"]:
+    if target == "mixxx_tags":
+        return "mixxx_tags"
+    if target == "all":
+        return "markers2_tags"
+    return "serato_tags"
+
+
 def _write_export_set_markers2_tags(
     items: list[dict[str, Any]],
     *,
-    carrier: Literal["serato_tags", "mixxx_tags"],
+    carrier: Literal["serato_tags", "mixxx_tags", "markers2_tags"],
     granted: bool,
 ) -> dict[str, Any]:
     from vibemix.library.export_serato import marks_to_serato_cues, write_serato_cues
@@ -1997,6 +2007,7 @@ def _write_export_set_markers2_tags(
             )
     return {
         "carrier": carrier,
+        "compatible_apps": ["Serato", "Mixxx"],
         "tagged": tagged,
         "cues_total": cues_total,
         "skipped": len(skipped),

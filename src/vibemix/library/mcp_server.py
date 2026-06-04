@@ -378,6 +378,7 @@ def build_server(toolset: Any) -> Any:
 
         Default target "both" writes Rekordbox XML (order + key + BPM +
         VM-stamped auto cues) plus M3U8 (order-only crate for other DJ apps).
+        Target "all" also writes Serato/Mixxx-compatible Markers2 tags.
         Serato/Mixxx tag targets require tag_write_granted=True because they
         mutate audio file tags.
         Every track_id must have come from a prior discovery result. Call once

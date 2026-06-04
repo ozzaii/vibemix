@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<DJ_PLAYLISTS Version="1.0.0">
+	<PRODUCT Name="vibemix" Version="1.0.0" Company="Bravoh" />
+	<COLLECTION Entries="1">
+		<TRACK Location="file://localhost/.planning/eval-runs/cue-land-viber-export-current-all-carrier/all-carrier-proof-track.mp3" Name="All Carrier Proof" Artist="Vibemix" AverageBpm="120.0" TotalTime="300" Tonality="Am" TrackID="1">
+			<TEMPO Inizio="0.0" Bpm="120.0" Metro="4/4" Battito="1" />
+			<POSITION_MARK Name="VM A IN" Type="0" Start="10.0" Num="0" />
+			<POSITION_MARK Name="VM D DROP" Type="0" Start="64.5" Num="3" />
+		</TRACK>
+	</COLLECTION>
+	<PLAYLISTS>
+		<NODE Name="ROOT" Type="0" Count="1">
+			<NODE Name="All Carrier Proof" Type="1" KeyType="0" Entries="1">
+				<TRACK Key="1" />
+			</NODE>
+		</NODE>
+	</PLAYLISTS>
+</DJ_PLAYLISTS>

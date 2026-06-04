@@ -1,0 +1,76 @@
+{
+  "export_result": {
+    "auto_cues": {
+      "cues_added": 2,
+      "enabled": true,
+      "proposal_export_ready_count": 2,
+      "proposal_missing_required_count": 1,
+      "proposal_review_count": 0,
+      "proposal_suppressed_count": 2,
+      "skipped_failed": 0,
+      "skipped_tracks": 0,
+      "snap_adjusted_count": 2,
+      "snap_max_adjustment_ms": 240.0,
+      "tracks_attempted": 1,
+      "tracks_cued": 1
+    },
+    "dropped": [],
+    "exported": true,
+    "outputs": {
+      "m3u8": ".planning/eval-runs/cue-land-viber-export-current-all-carrier/all-carrier-proof.m3u8",
+      "rekordbox": ".planning/eval-runs/cue-land-viber-export-current-all-carrier/all-carrier-proof.xml"
+    },
+    "path": ".planning/eval-runs/cue-land-viber-export-current-all-carrier/all-carrier-proof.xml",
+    "referenced": 1,
+    "tag_receipts": [
+      {
+        "carrier": "markers2_tags",
+        "compatible_apps": [
+          "Serato",
+          "Mixxx"
+        ],
+        "cues_total": 2,
+        "files": [
+          ".planning/eval-runs/cue-land-viber-export-current-all-carrier/all-carrier-proof-track.mp3"
+        ],
+        "skipped": 0,
+        "skipped_tracks": [],
+        "tagged": 1
+      }
+    ],
+    "target": "all",
+    "written": 1
+  },
+  "fixture_copy_removed_after_readback": true,
+  "goal": "Viber export_set target=all lands auto cues to Rekordbox XML, M3U8 order, and Serato/Mixxx-compatible Markers2 tags with explicit permission.",
+  "outputs_exist": {
+    "m3u8": true,
+    "rekordbox": true
+  },
+  "read_back_markers2_vm_cues": [
+    {
+      "color": [
+        204,
+        0,
+        0
+      ],
+      "index": 0,
+      "name": "VM A IN",
+      "position_ms": 10000
+    },
+    {
+      "color": [
+        204,
+        0,
+        0
+      ],
+      "index": 3,
+      "name": "VM D DROP",
+      "position_ms": 64500
+    }
+  ],
+  "tag_receipt_apps": [
+    "Serato",
+    "Mixxx"
+  ]
+}
