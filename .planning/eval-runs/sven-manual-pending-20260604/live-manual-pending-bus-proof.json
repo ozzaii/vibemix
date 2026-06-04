@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-04T17:20:00+03:00",
+  "purpose": "Live bus proof for Sven manual-trigger pending semantics after cooldown and prompt-meta guard.",
+  "repo": {
+    "branch": "ux-redesign-impeccable",
+    "head_observed_after_probe": "83022a90",
+    "sven_commits_under_head": [
+      {
+        "hash": "4b32a7b3",
+        "subject": "fix(sven): keep manual trigger pending through cooldown"
+      },
+      {
+        "hash": "845d2023",
+        "subject": "fix(sven): suppress prompt meta cue fragments"
+      }
+    ],
+    "sibling_commits_above_sven_observed_after_probe": [
+      "915fb9f7",
+      "83022a90"
+    ]
+  },
+  "runtime": {
+    "command_shape": "VIBEMIX_DEV_SIDECAR=1 VIBEMIX_LOCAL_TTS=1 VIBEMIX_DROP_DEBUG=1 .venv/bin/python -m vibemix",
+    "speech_source": "local MOSS TTS",
+    "session_id": "20260604-170711",
+    "session_dir": "/Users/ozai/Library/Application Support/vibemix/recordings/20260604-170711",
+    "bus": "ws://127.0.0.1:8765",
+    "bus_status_after_probe": "stopped; lsof on 127.0.0.1:8765 returned no listener",
+    "audio_stimulus": {
+      "device": "BlackHole 16ch",
+      "sample_rate_hz": 48000,
+      "duration_s": 120,
+      "grounded_snapshots": "ipc.session.snapshot showed grounded=true and bpm around 136.4 during stimulus",
+      "deck_audio_activity": "A_active+B_silent",
+      "caveat": "Nowplaying title was stale/untrusted; proof uses live deck-audio activity and event routing, not title identity."
+    }
+  },
+  "live_bus_observations": [
+    {
+      "t": 59.054,
+      "kind": "speak_gate",
+      "type": "PHASE",
+      "verdict": "silent",
+      "reason": "describe_bank_only"
+    },
+    {
+      "t": 81.113,
+      "kind": "speak_gate",
+      "type": "HEARTBEAT",
+      "verdict": "silent",
+      "reason": "describe_bank_only"
+    },
+    {
+      "t": 103.224,
+      "kind": "event",
+      "type": "MANUAL",
+      "audible": true,
+      "deck": "A",
+      "phase": "peak",
+      "proof_point": "Manual trigger was accepted as a MANUAL event after earlier cooldown-era describe-bank events were silenced."
+    },
+    {
+      "t": 103.234,
+      "kind": "deck_audio_parts_attached",
+      "event": "MANUAL",
+      "mode": "auto",
+      "seconds": 3.0,
+      "sides": "A+B",
+      "activity": "A:active+B:silent"
+    },
+    {
+      "t": 103.235,
+      "kind": "llm_invoke",
+      "event": "MANUAL",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash",
+      "deck_audio_parts": 2,
+      "audio_tokens_est": 1728
+    },
+    {
+      "t": 107.260,
+      "kind": "citation_count",
+      "event": "MANUAL",
+      "count": 2
+    },
+    {
+      "t": 107.260,
+      "kind": "live_claim_guard",
+      "event": "MANUAL",
+      "policy": "single_deck_control_not_grounded",
+      "reason": "control_causality_without_moves",
+      "action": "emit_corrected",
+      "raw_text": "That low-end pulse has been driving solo for a bit [aud:rms@90.0]. Once you cue up the next one on deck [mix:deck_reference=deck1_A_unknown_route_muted+deck2_B_unknown_route_muted], bring the mid EQ up gradually to lift the energy before the swap.",
+      "corrected_text": "That low-end pulse has been driving solo for a bit [aud:rms@90.0]."
+    },
+    {
+      "t": 107.263,
+      "kind": "ai_message",
+      "event": "MANUAL",
+      "message": "That low-end pulse has been driving solo for a bit.",
+      "citation_count": 2,
+      "spoken_response_chars": 51,
+      "latency_s": 4.02
+    },
+    {
+      "t": 173.288,
+      "kind": "speak_gate",
+      "type": "PHRASE_BOUNDARY",
+      "verdict": "silent",
+      "reason": "describe_bank_only"
+    }
+  ],
+  "respan_artifacts": {
+    "sim": {
+      "path": ".planning/eval-runs/sven-manual-pending-20260604/respan-sven-sim-manual-pending-meta-guard-live-persona-strict-quality.json",
+      "command_shape": "uv run python scripts/eval/respan_sven_sim.py --match-live-persona --require-quality --out <path>",
+      "quality_gate": "PASS",
+      "gate_routing": "9/9",
+      "means": {
+        "friend_not_narrator": 3.0,
+        "grounded_not_fabricated": 3.0,
+        "earned_not_constant": 2.57,
+        "move_specific_not_spectrum": 2.71,
+        "voice_no_slop": 3.0
+      },
+      "target_scenarios": {
+        "phase_with_cue_lookahead": {
+          "line": "Let this heavy sub roll until the phrase change at 108, then bring in some top-end energy.",
+          "scores": {
+            "friend_not_narrator": 3,
+            "grounded_not_fabricated": 3,
+            "earned_not_constant": 2,
+            "move_specific_not_spectrum": 2,
+            "voice_no_slop": 3
+          }
+        },
+        "track_change_with_cue_lookahead": {
+          "line": "Hold this for about 4 bars; make the move on the next phrase.",
+          "scores": {
+            "friend_not_narrator": 3,
+            "grounded_not_fabricated": 3,
+            "earned_not_constant": 3,
+            "move_specific_not_spectrum": 3,
+            "voice_no_slop": 3
+          }
+        }
+      }
+    },
+    "heartbeat_judge": {
+      "path": ".planning/eval-runs/sven-manual-pending-20260604/respan-sven-heartbeat-manual-pending-meta-guard-strict-quality.json",
+      "command_shape": "uv run python scripts/eval/respan_sven_heartbeat_judge.py --session ~/Library/Application Support/vibemix/recordings/20260603-175859 --events ALL --describe-bank-census --concurrency 4 --require-quality --min-judged 1 --out <path>",
+      "quality_gate": "PASS",
+      "judged": 1,
+      "errors": 0,
+      "judge_no_parse": 0,
+      "means": {
+        "friend_not_narrator": 2.0,
+        "grounded_not_fabricated": 3.0,
+        "earned_not_constant": 2.0,
+        "move_specific_not_spectrum": 3.0,
+        "voice_no_slop": 2.0
+      },
+      "should_not_have_spoken": 0,
+      "describe_bank_census": {
+        "input_spoken_rows": 21,
+        "kept_for_judge": 1,
+        "silenced_by_describe_bank_census": 20,
+        "silenced_by_event": {
+          "PHRASE_BOUNDARY": 17,
+          "SUB_LAYER_ARRIVAL": 3
+        }
+      }
+    }
+  },
+  "verdict": "Live bus accepted the pending manual trigger as MANUAL after cooldown-era silence, attached real deck audio parts, invoked the live coach, emitted with citations, and local MOSS spoke the corrected grounded line. Respan strict sim and heartbeat judge stayed above the required friend/voice/grounded thresholds."
+}
