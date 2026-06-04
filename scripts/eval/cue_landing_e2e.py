@@ -38,7 +38,12 @@ from vibemix.intel.transition_scorer import SectionRecord  # noqa: E402
 from vibemix.library import toolset as tool_mod  # noqa: E402
 from vibemix.library.export_serato import read_serato_cues  # noqa: E402
 from vibemix.library.next_suggestion import next_suggestion  # noqa: E402
-from vibemix.library.rekordbox import CuePoint, RekordboxLibrary, TrackEntry  # noqa: E402
+from vibemix.library.rekordbox import (  # noqa: E402
+    CuePoint,
+    RekordboxLibrary,
+    TempoNode,
+    TrackEntry,
+)
 from vibemix.library.toolset import LibraryToolset  # noqa: E402
 
 SCHEMA = "cue_landing_e2e_v1"
@@ -84,6 +89,7 @@ def _track(
     title: str,
     filepath: str,
     cues: tuple[CuePoint, ...] = (),
+    beatgrid: tuple[TempoNode, ...] = (),
 ) -> TrackEntry:
     return TrackEntry(
         track_id=track_id,
@@ -95,6 +101,7 @@ def _track(
         duration_s=300.0,
         cues=cues,
         filepath=filepath,
+        beatgrid=beatgrid,
     )
 
 
@@ -189,7 +196,12 @@ def run_probe(out_dir: Path = DEFAULT_OUT_DIR) -> dict[str, Any]:
             filepath=str(out_dir / "source-placeholder.mp3"),
             cues=(CuePoint("OUT", "cue", 224.0, None, 5),),
         ),
-        "dst": _track("dst", title="Destination Track", filepath=str(tag_copy)),
+        "dst": _track(
+            "dst",
+            title="Destination Track",
+            filepath=str(tag_copy),
+            beatgrid=(TempoNode(inizio_s=0.125, bpm=124.0, metro="4/4", battito=1),),
+        ),
     }
     store = _FakeStore()
     toolset = LibraryToolset(embedder=None, store=store, library=library)
@@ -258,6 +270,12 @@ def run_probe(out_dir: Path = DEFAULT_OUT_DIR) -> dict[str, Any]:
             "mutated_user_audio": False,
             "tagged_copy": str(tag_copy),
             "fixture_source": str(FIXTURE_MP3.relative_to(ROOT)),
+        },
+        "rekordbox_existing_grid_fixture": {
+            "track_id": "dst",
+            "inizio_s": 0.125,
+            "bpm": 124.0,
+            "purpose": "prove VM cues snap to a persisted Rekordbox grid, not just a BPM-only export grid",
         },
     }
     (out_dir / "proof.json").write_text(
