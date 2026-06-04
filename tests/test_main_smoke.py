@@ -797,6 +797,73 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     sensor_mocks["track_poll"].assert_called_once()
 
 
+def test_smoke_03b_idle_is_cold_until_start(monkeypatch, mocker, tmp_path):
+    """SHIP-WIRE START-gate — idle is COLD: with NO ipc.session.start the live
+    graph never activates, so no heavy model is built and no capture stream is
+    opened. This is the regression guard for the gate's core promise ("idle =
+    no resident model"); test_smoke_03 proves the Start side, this proves the
+    armed side. Same wiring as smoke_03 but start_session defaults to False, so
+    main() boots the idle shell (ws + handlers + prewarm) and waits for a Start
+    that never comes.
+    """
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
+    monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
+    monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
+    monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
+    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
+    monkeypatch.delenv("VIBEMIX_DECK_VISION", raising=False)
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
+    monkeypatch.setenv("VIBEMIX_ENABLE_MIC", "1")
+
+    audio_mocks = _build_audio_mocks(mocker)
+    sensor_mocks = _build_sensor_mocks(mocker)
+    _build_state_refresh_noop(mocker)
+    livekit_mocks = _build_livekit_mocks(mocker)
+    _patch_voice_recorder(mocker, tmp_path)
+
+    tasks_seen: list = []
+    # No start_session=True → the idle shell boots and never receives a Start.
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen)
+
+    from vibemix.__main__ import main
+
+    async def driver():
+        main_task = asyncio.create_task(main())
+        await _REAL_SLEEP(0.05)
+        main_task.cancel()
+        try:
+            await asyncio.wait_for(main_task, timeout=3.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    asyncio.run(driver())
+
+    # The idle shell IS up (ws broadcast running) but Start never fired.
+    assert "ws" in tasks_seen
+    assert "session_started" not in tasks_seen
+    assert "coach" not in tasks_seen
+
+    # No heavy model is built at idle: the LLM client and the local TTS chain
+    # (the chatterbox model load) are only constructed inside _activate_session.
+    livekit_mocks["build_llm"].assert_not_called()
+    livekit_mocks["build_tts_chain"].assert_not_called()
+    livekit_mocks["AgentSession"].assert_not_called()
+    livekit_mocks["DJCoHostAgent"].assert_not_called()
+    assert livekit_mocks["session"].start.await_count == 0
+
+    # No capture/playback streams are opened at idle — the audio graph waits
+    # for Start (the streams open in _activate_session, not the idle boot).
+    assert audio_mocks["open_capture"].call_count == 0
+    assert audio_mocks["open_voice_output"].call_count == 0
+    assert audio_mocks["open_passthrough_output"].call_count == 0
+    assert audio_mocks["open_mic_capture"].call_count == 0
+
+
 def test_screen_vision_capture_opt_in_spawns_capture_task(monkeypatch, mocker, tmp_path):
     """Screen capture is a dormant live leg unless the explicit eval flag is set."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
