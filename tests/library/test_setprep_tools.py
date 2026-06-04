@@ -28,6 +28,7 @@ import pytest
 from vibemix.intel.transition_scorer import SectionRecord
 from vibemix.library import energy as energy_mod
 from vibemix.library import toolset as tool_mod
+from vibemix.library.cue_types import CueAnchor
 from vibemix.library.rekordbox import (
     CuePoint,
     RekordboxLibrary,
@@ -929,6 +930,34 @@ def test_export_set_auto_cues_empty_slots_by_default(toolset, tmp_path, monkeypa
     marks = ET.parse(out_xml).getroot().findall(".//POSITION_MARK")
     names = {mark.attrib["Name"] for mark in marks}
     assert {"VM A IN", "VM D DROP", "VM F OUT"} <= names
+
+
+def test_export_set_auto_cues_from_producer_when_cache_sections_are_not_ready(
+    toolset, tmp_path, monkeypatch
+):
+    import vibemix.library.cue_engine as cue_engine
+
+    toolset.seen.add("t000")
+    monkeypatch.setattr(tool_mod, "sections_for_entry", lambda entry: ())
+    monkeypatch.setattr(
+        cue_engine,
+        "detect_cues_auto",
+        lambda *_args, **_kwargs: [
+            CueAnchor("intro", 0.0, 32.0, 0.93, "auto"),
+            CueAnchor("drop", 64.0, 128.0, 0.94, "auto"),
+        ],
+    )
+
+    out_xml = tmp_path / "producer-cued.xml"
+    out = toolset.export_set(
+        {"name": "Producer Cued", "track_ids": ["t000"], "out_path": str(out_xml)}
+    )
+
+    assert out.get("exported") is True
+    assert out["auto_cues"]["tracks_cued"] == 1
+    marks = {m.attrib["Name"]: m for m in ET.parse(out_xml).getroot().findall(".//POSITION_MARK")}
+    assert marks["VM A IN"].attrib["Num"] == "0"
+    assert marks["VM D DROP"].attrib["Num"] == "3"
 
 
 def test_export_set_no_cue_opt_out_skips_auto_cue(toolset, tmp_path, monkeypatch):

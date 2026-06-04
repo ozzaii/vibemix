@@ -1885,6 +1885,25 @@ def _auto_cue_marks_for_export(
         include_review=False,
         include_preserved=False,
     )
+    if not marks and getattr(entry, "filepath", None):
+        try:
+            from vibemix.library.cue_engine import detect_cues_auto
+            from vibemix.library.cue_landing import sections_from_anchors
+
+            anchors = detect_cues_auto(entry.filepath, max_cues=8)
+        except Exception:
+            anchors = []
+        if anchors:
+            proposal = propose_smart_cues(
+                entry,
+                sections_from_anchors(entry, anchors),
+                genre=genre,
+            )
+            marks = proposal_to_export_marks(
+                proposal,
+                include_review=False,
+                include_preserved=False,
+            )
     fill_empty_only = [
         mark
         for mark in marks
