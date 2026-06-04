@@ -825,9 +825,9 @@ describe("SessionLayout", () => {
     expect(root.querySelector(".vmx-now")?.textContent).toBe("Ready for the first move.");
     expect(root.textContent).toContain("audio waiting · Sven ready · controller seen");
     expect(root.textContent).toContain(
-      "capture silent · Route DJ output there.",
+      "capture silent · Route DJ output into capture.",
     );
-    expect(root.textContent).toContain("capture is silent. Route DJ output there.");
+    expect(root.textContent).toContain("capture is silent. Route DJ output into capture.");
     expect(root.textContent).not.toContain(
       "screen proof unavailable · Start playback, I will not guess.",
     );
@@ -846,10 +846,36 @@ describe("SessionLayout", () => {
     mountSessionLayout(root, state);
 
     expect(root.textContent).toContain(
-      "eqMac Export silent · Send DJ app to Multi-Output (eqMac).",
+      "eqMac Export silent · Send DJ app to Multi-Output (eqMac), not speaker only.",
     );
     expect(root.textContent).toContain(
-      "eqMac Export is silent. Send DJ app to Multi-Output (eqMac).",
+      "eqMac Export is silent. Send DJ app to Multi-Output (eqMac), not speaker only.",
+    );
+  });
+
+  it("warns that FLX4 speaker audio is not capture proof", () => {
+    const root = host();
+    const state = defaultState();
+    state.status.livekit = "ok";
+    state.status.gemini = "ok";
+    state.status.midi = 0;
+    state.status.midiActivity = "connected_no_midi_traffic";
+    state.status.midiDevice = "DDJ-FLX4";
+    state.status.screen = "unavailable";
+    state.status.captureDevice = "DDJ-FLX4";
+
+    mountSessionLayout(root, state);
+
+    expect(root.textContent).toContain(
+      "DDJ-FLX4 silent · Use BlackHole/eqMac capture, speaker audio is not proof.",
+    );
+    expect(root.textContent).toContain(
+      "DDJ-FLX4 is silent. Use BlackHole/eqMac capture, speaker audio is not proof.",
+    );
+
+    const bpm = root.querySelector<HTMLElement>(".vmx-read__num");
+    expect(bpm?.getAttribute("title")).toBe(
+      "BPM waits for master capture. DDJ-FLX4 is not hearing the master.",
     );
   });
 

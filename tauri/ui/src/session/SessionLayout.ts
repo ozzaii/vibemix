@@ -1598,10 +1598,25 @@ function captureDeviceLabel(captureDevice?: string | null): string {
 
 function captureRouteInstruction(captureDevice?: string | null): string {
   const device = captureDeviceLabel(captureDevice).toLowerCase();
-  if (device === "eqmac export") {
-    return "Send DJ app to Multi-Output (eqMac).";
+  if (isControllerCaptureDevice(device)) {
+    return "Use BlackHole/eqMac capture, speaker audio is not proof.";
   }
-  return "Route DJ output there.";
+  if (device === "eqmac export") {
+    return "Send DJ app to Multi-Output (eqMac), not speaker only.";
+  }
+  if (device.includes("blackhole")) {
+    return "Send DJ app to BlackHole or an aggregate that includes it.";
+  }
+  return "Route DJ output into capture.";
+}
+
+function isControllerCaptureDevice(device: string): boolean {
+  return (
+    device.includes("ddj")
+    || device.includes("flx")
+    || device.includes("pioneer")
+    || device.includes("rekordbox aggregate")
+  );
 }
 
 function bpmWaitingTitle(
@@ -1609,9 +1624,11 @@ function bpmWaitingTitle(
   music: SessionState["meters"]["music"],
 ): string {
   const device = captureDeviceLabel(captureDevice);
-  return musicSignalActive(music)
-    ? "BPM is not locked yet."
-    : `BPM waits for audio from ${device}.`;
+  if (musicSignalActive(music)) return "BPM is not locked yet.";
+  if (isControllerCaptureDevice(device.toLowerCase())) {
+    return `BPM waits for master capture. ${device} is not hearing the master.`;
+  }
+  return `BPM waits for audio from ${device}.`;
 }
 
 function midiDeviceLabel(midiDevice?: string | null): string {

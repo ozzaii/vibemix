@@ -274,7 +274,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
     expect(rail?.textContent).toContain("svenready");
     expect(rail?.textContent).toContain("controllerseen");
     expect(rail?.textContent).toContain("proofunavailable");
-    expect(rail?.textContent).toContain("capture is silent. Route DJ output there.");
+    expect(rail?.textContent).toContain("capture is silent. Route DJ output into capture.");
     expect(
       rail
         ?.querySelector<HTMLElement>('[data-axis="proof"]')
