@@ -80,7 +80,10 @@ if (isMockMode) {
     totalDurationS = detail.duration_s;
     // Plan 42-03 — mount the ear-test toggle once the session loads so
     // the form has a real duration_s for the submission payload.
-    if (earTestToggleEl) {
+    // The ear-test sign-off is a single-developer release-gate QA instrument
+    // ("30min minimum, >=2 genres"), not a DJ control. Gated to dev builds via
+    // import.meta.env.DEV; shipped builds skip the mount and the DJ never sees it.
+    if (earTestToggleEl && import.meta.env.DEV) {
       mountEarTestToggle(
         earTestToggleEl,
         {
