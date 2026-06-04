@@ -303,6 +303,12 @@ def test_label_audit_reports_missing_partial_and_complete_rows(tmp_path: Path) -
         "texture": 1,
         "instrument": 1,
     }
+    assert audit["known_tags"]["mood"] == sorted(audit["known_tags"]["mood"])
+    assert "dark" in audit["known_tags"]["mood"]
+    assert "raw" in audit["known_tags"]["texture"]
+    assert "vocal" in audit["known_tags"]["instrument"]
+    assert audit["label_row_example"]["split"] == "holdout"
+    assert set(audit["label_row_example"]["tags"]) == {"mood", "texture", "instrument"}
 
 
 def test_label_audit_can_pass_when_enough_complete_eval_rows(tmp_path: Path) -> None:
@@ -379,6 +385,8 @@ def test_audit_labels_cli_writes_json_artifact_even_when_incomplete(
     assert payload["schema"] == "library_auto_tags_bench_v1_label_audit_v1"
     assert payload["evaluation_complete_rows"] == 1
     assert payload["enough_complete_eval_rows"] is False
+    assert payload["known_tags"]["mood"]
+    assert payload["label_row_example"]["label_status"] == "complete"
     assert payload["next_action"] == (
         "complete eval/private/library/auto_tag_labels.jsonl rows for "
         "mood, texture, and instrument"

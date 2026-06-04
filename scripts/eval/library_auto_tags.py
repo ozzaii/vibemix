@@ -272,6 +272,25 @@ def _missing_category_counts(rows: Sequence[HandLabelRow]) -> dict[str, int]:
     return {category: counts[category] for category in CATEGORIES}
 
 
+def _known_tag_payload() -> dict[str, list[str]]:
+    known = known_tags_by_category()
+    return {category: sorted(known[category]) for category in CATEGORIES}
+
+
+def _label_row_example() -> dict[str, Any]:
+    known = _known_tag_payload()
+    return {
+        "track_id": "folder:example",
+        "split": "holdout",
+        "label_status": "complete",
+        "tags": {
+            "mood": [known["mood"][0]],
+            "texture": [known["texture"][0]],
+            "instrument": [],
+        },
+    }
+
+
 def build_label_audit(
     *,
     labels_path: Path = DEFAULT_LABELS_PATH,
@@ -302,6 +321,8 @@ def build_label_audit(
         "missing_category_counts": _missing_category_counts(rows),
         "unknown_tags": labels["unknown_tags"],
         "required_categories": list(CATEGORIES),
+        "known_tags": _known_tag_payload(),
+        "label_row_example": _label_row_example(),
         "next_action": (
             "run the full auto-tag bench with --require-labels"
             if enough
