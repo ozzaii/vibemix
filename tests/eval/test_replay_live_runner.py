@@ -116,7 +116,10 @@ def test_run_live_replay_session_sets_env_and_reports_pass(tmp_path: Path) -> No
     assert result.max_music == 0.249
     assert result.audible_seen is True
     assert result.recording_input_duration_s == 2.0
-    assert build_findings([result])["verdict"] == "pass"
+    findings = build_findings([result])
+    assert findings["verdict"] == "pass"
+    assert findings["scenarios"][0]["checklist"]["events"] == 0
+    assert findings["scenarios"][0]["checklist"]["citation_zero_non_ack"] == 0
 
 
 def test_build_findings_flags_broken_replay(tmp_path: Path) -> None:
@@ -153,3 +156,73 @@ def test_build_findings_flags_broken_replay(tmp_path: Path) -> None:
     assert "fatal_log" in row["flags"]
     assert "replay_capture_not_selected" in row["flags"]
     assert "no_music_meter" in row["flags"]
+
+
+def test_build_findings_routes_event_log_failures(tmp_path: Path) -> None:
+    session = tmp_path / "corpus" / "set-one"
+    session.mkdir(parents=True)
+    _write_wav(session / "input.wav")
+
+    class EventfulProc:
+        returncode = None
+
+        def __init__(self, command, *, cwd, env, stdout, stderr, text):
+            self.env = env
+
+        def poll(self):
+            return self.returncode
+
+        def send_signal(self, sig):
+            self.returncode = 0
+            home = Path(self.env["HOME"])
+            recording = home / "Library" / "Application Support" / "vibemix" / "recordings" / "r1"
+            recording.mkdir(parents=True)
+            _write_wav(recording / "input.wav", frames=32000)
+            (recording / "events.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"kind": "event", "type": "TRACK_CHANGE"}),
+                        json.dumps({"kind": "citation_count", "count": 0}),
+                        json.dumps({"kind": "slop_suppressed"}),
+                        json.dumps({"kind": "llm_to_tts_delta_ms", "delta_ms": 7001}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+        def communicate(self, timeout=None):
+            return (
+                "\n".join(
+                    [
+                        "-> replay capture: /tmp/session",
+                        "-> AI voice output muted (no local TTS); stream not opened",
+                        "-> mascot bus on ws://127.0.0.1:18765",
+                        "[live] music=0.249 | audible=1 deck=A phase=peak",
+                    ]
+                ),
+                "",
+            )
+
+        def kill(self):
+            self.returncode = -9
+
+    result = run_live_replay_session(
+        session,
+        index=0,
+        config=LiveReplayConfig(repo_root=tmp_path, output_dir=tmp_path / "out", duration_s=0.0),
+        popen_factory=EventfulProc,
+        sleep_fn=lambda _: None,
+    )
+
+    row = build_findings([result])["scenarios"][0]
+    assert row["verdict"] == "fail"
+    assert row["checklist"]["events"] == 1
+    assert row["checklist"]["llm_invokes"] == 0
+    assert row["checklist"]["citation_zero_non_ack"] == 1
+    assert row["checklist"]["slop_suppressed"] == 1
+    assert row["checklist"]["max_latency_ms"] == 7001
+    assert "mute" in row["flags"]
+    assert "citation_zero" in row["flags"]
+    assert "slop_suppressed" in row["flags"]
+    assert "late" in row["flags"]

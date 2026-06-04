@@ -32,6 +32,8 @@ from typing import Any
 _MUSIC_RE = re.compile(r"music=([0-9]+(?:\.[0-9]+)?)")
 _AUDIBLE_RE = re.compile(r"audible=1")
 _FATAL_RE = re.compile(r"(Traceback|\\bFATAL\\b)", re.IGNORECASE)
+_LLM_TO_TTS_DELTA_EVENT_TYPE = "llm_to_tts_delta_ms"
+_LATE_LLM_TO_TTS_BUDGET_MS = 6000.0
 
 
 @dataclass(frozen=True)
@@ -198,6 +200,7 @@ def build_findings(results: list[LiveReplayResult]) -> dict[str, Any]:
 
 
 def _scenario_row(result: LiveReplayResult) -> dict[str, Any]:
+    events_summary = _events_summary(result.events_jsonl)
     flags: list[str] = []
     if result.returncode not in {0, None}:
         flags.append("app_nonzero_exit")
@@ -221,6 +224,14 @@ def _scenario_row(result: LiveReplayResult) -> dict[str, Any]:
         flags.append("no_audible_meter")
     if result.recording_input_duration_s <= 0.1:
         flags.append("no_recorded_input")
+    if events_summary["events"] > 0 and events_summary["llm_invokes"] == 0:
+        flags.append("mute")
+    if events_summary["citation_zero_non_ack"] > 0:
+        flags.append("citation_zero")
+    if events_summary["slop_suppressed"] > 0:
+        flags.append("slop_suppressed")
+    if events_summary["max_latency_ms"] > _LATE_LLM_TO_TTS_BUDGET_MS:
+        flags.append("late")
 
     evidence = [str(result.stdout_path), str(result.stderr_path)]
     if result.events_jsonl is not None:
@@ -246,6 +257,12 @@ def _scenario_row(result: LiveReplayResult) -> dict[str, Any]:
             "music_meter_max": round(result.max_music, 4),
             "audible_seen": result.audible_seen,
             "recorded_input_duration_s": round(result.recording_input_duration_s, 3),
+            "events": events_summary["events"],
+            "llm_invokes": events_summary["llm_invokes"],
+            "cited_emits": events_summary["cited_emits"],
+            "citation_zero_non_ack": events_summary["citation_zero_non_ack"],
+            "slop_suppressed": events_summary["slop_suppressed"],
+            "max_latency_ms": round(events_summary["max_latency_ms"]),
         },
         "flags": flags,
         "evidence": evidence,
@@ -288,6 +305,67 @@ def _wav_duration(path: Path) -> float:
             return wf.getnframes() / float(sr)
     except (wave.Error, OSError):
         return 0.0
+
+
+def _events_summary(path: Path | None) -> dict[str, Any]:
+    rows = _load_jsonl(path)
+    event_rows = [row for row in rows if _row_kind(row) == "event"]
+    llm_invokes = [row for row in rows if _row_kind(row) == "llm_invoke"]
+    citation_rows = [row for row in rows if _row_kind(row) == "citation_count"]
+    deltas = [
+        value
+        for row in rows
+        if _row_kind(row) == _LLM_TO_TTS_DELTA_EVENT_TYPE
+        for value in [_numeric(row.get("delta_ms"))]
+        if value is not None
+    ]
+    return {
+        "events": len(event_rows),
+        "llm_invokes": len(llm_invokes),
+        "cited_emits": sum(
+            1
+            for row in citation_rows
+            if isinstance(row.get("count"), (int, float)) and int(row["count"]) >= 1
+        ),
+        "citation_zero_non_ack": sum(
+            1
+            for row in citation_rows
+            if isinstance(row.get("count"), (int, float)) and int(row["count"]) == 0
+        ),
+        "slop_suppressed": sum(1 for row in rows if _row_kind(row) == "slop_suppressed"),
+        "max_latency_ms": max(deltas) if deltas else 0.0,
+    }
+
+
+def _load_jsonl(path: Path | None) -> list[dict[str, Any]]:
+    if path is None or not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        raw = line.strip()
+        if not raw:
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def _row_kind(row: dict[str, Any]) -> str:
+    kind = row.get("kind")
+    if isinstance(kind, str) and kind:
+        return kind
+    typ = row.get("type")
+    return typ if isinstance(typ, str) else ""
+
+
+def _numeric(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
