@@ -1,0 +1,1 @@
+beatgrid manifest not found: tests/bench/data/bpm_truth_manifest.json (needs Kaan/Rekordbox truth BPMs)
