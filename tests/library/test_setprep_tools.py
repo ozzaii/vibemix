@@ -32,6 +32,7 @@ from vibemix.intel.transition_scorer import SectionRecord
 from vibemix.library import energy as energy_mod
 from vibemix.library import toolset as tool_mod
 from vibemix.library.cue_types import CueAnchor
+from vibemix.library.next_suggestion import next_suggestion
 from vibemix.library.rekordbox import (
     CuePoint,
     RekordboxLibrary,
@@ -921,9 +922,7 @@ def test_export_set_target_m3u8_writes_order_only_crate(toolset, tmp_path):
 def test_export_set_serato_tags_requires_explicit_permission(toolset):
     toolset.seen.add("t000")
 
-    out = toolset.export_set(
-        {"name": "Tag Write", "track_ids": ["t000"], "target": "serato_tags"}
-    )
+    out = toolset.export_set({"name": "Tag Write", "track_ids": ["t000"], "target": "serato_tags"})
 
     assert "error" in out
     assert "tag_write_granted=True" in out["error"]
@@ -1140,6 +1139,56 @@ def test_export_set_auto_cues_materialize_for_live_pill(toolset, tmp_path, monke
     assert sections["D"].role == "drop"
 
 
+def test_viber_exported_auto_cues_drive_next_suggestion_pill(
+    toolset, store, tmp_path, monkeypatch
+) -> None:
+    """A Viber-built set's landed cues feed the pill transition payload immediately."""
+    toolset.seen.add("t001")
+    toolset._library.tracks["t000"] = replace(
+        _track("t000", bpm=124.0, key="8A"),
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    toolset._library.tracks["t001"] = _track("t001", bpm=124.0, key="9A")
+    monkeypatch.setattr(
+        tool_mod,
+        "sections_for_entry",
+        lambda entry: (
+            _section(f"{entry.track_id}#intro", "intro", 0.0, 32.0),
+            _section(f"{entry.track_id}#drop", "drop", 64.0, 128.0),
+        ),
+    )
+
+    out_xml = tmp_path / "viber-to-pill.xml"
+    out = toolset.export_set(
+        {"name": "Viber To Pill", "track_ids": ["t001"], "out_path": str(out_xml)}
+    )
+
+    assert out.get("exported") is True
+    assert out["pill_cues_materialized"] == {"tracks": 1, "cues": 2}
+
+    suggestion = next_suggestion(
+        store,
+        toolset._library,
+        seed_vector=np.ones(8, dtype=np.float32),
+        seed_track_id="t000",
+        played_ids=set(),
+        source_deck="A",
+        target_deck="B",
+    )
+
+    assert suggestion is not None
+    assert suggestion.track_id == "t001"
+    assert suggestion.transition is not None
+    assert suggestion.transition["target_deck"] == "B"
+    assert suggestion.transition["cue_slot"] == "A"
+    assert suggestion.transition["cue_source"] == "anlz"
+    assert suggestion.transition["cue_confidence"] == pytest.approx(0.92)
+    assert suggestion.transition["from_role"] == "outro"
+    assert suggestion.transition["to_role"] == "intro"
+    assert "outro into intro is a strong role pair" in suggestion.transition["reasons"]
+    assert "cue vm a in @ 0:00" in suggestion.why
+
+
 def test_export_set_auto_cues_snap_to_real_grid_inizio(toolset, tmp_path, monkeypatch):
     """Machine cue snap respects a persisted Rekordbox beatgrid phase."""
     toolset.seen.add("t000")
@@ -1162,7 +1211,9 @@ def test_export_set_auto_cues_snap_to_real_grid_inizio(toolset, tmp_path, monkey
     )
 
     out_xml = tmp_path / "snap-real-grid.xml"
-    out = toolset.export_set({"name": "Snap Real Grid", "track_ids": ["t000"], "out_path": str(out_xml)})
+    out = toolset.export_set(
+        {"name": "Snap Real Grid", "track_ids": ["t000"], "out_path": str(out_xml)}
+    )
 
     assert out.get("exported") is True
     track = ET.parse(out_xml).getroot().find("COLLECTION/TRACK")
