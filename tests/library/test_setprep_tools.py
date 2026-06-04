@@ -321,6 +321,70 @@ def test_sequence_set_orders_seen_pool(toolset):
     assert set(first["track_ids"]).issubset(toolset.seen)
 
 
+def test_sequence_set_dedupes_obvious_file_copies_before_ordering(monkeypatch):
+    from vibemix.library import sequencer as sequencer_mod
+
+    lib = RekordboxLibrary()
+    lib.tracks = {
+        "a": TrackEntry(
+            track_id="a",
+            title="Mass In Orbit - Connect",
+            artist="",
+            album="A",
+            bpm=124.0,
+            key="8A",
+            duration_s=323.29,
+            cues=(),
+            filepath="/tmp/connect.mp3",
+        ),
+        "b": TrackEntry(
+            track_id="b",
+            title="Mass In Orbit - Connect (1)",
+            artist="",
+            album="A",
+            bpm=124.0,
+            key="8A",
+            duration_s=323.29,
+            cues=(),
+            filepath="/tmp/connect-copy.mp3",
+        ),
+        "c": TrackEntry(
+            track_id="c",
+            title="Other Peak Tool",
+            artist="",
+            album="A",
+            bpm=125.0,
+            key="8A",
+            duration_s=300.0,
+            cues=(),
+            filepath="/tmp/other.mp3",
+        ),
+    }
+    ids = ["a", "b", "c"]
+    vectors = np.eye(3, 8, dtype=np.float32)
+    ranked = [(tid, 0.9 - 0.05 * i) for i, tid in enumerate(ids)]
+    toolset = LibraryToolset(embedder=None, store=_FakeStore(ids, vectors, ranked), library=lib)
+    toolset.seen.update(ids)
+
+    def fake_sequence_set(pool, *, curve, n_slots, **_kwargs):
+        return [
+            SimpleNamespace(
+                track_ids=[p.track_id for p in pool],
+                energy_fit=0.0,
+                avg_coherence=1.0,
+                relaxed_transitions=[],
+            )
+        ]
+
+    monkeypatch.setattr(sequencer_mod, "sequence_set", fake_sequence_set)
+
+    out = toolset.sequence_set({"track_ids": ids, "curve": "peak_time", "n_slots": 3})
+
+    assert out["deduped_track_ids"] == ["b"]
+    assert out["candidates"][0]["track_ids"] == ["a", "c"]
+    assert LibraryToolset._tool_event_summary("sequence_set", out) == "1 candidate; deduped=1"
+
+
 def test_sequence_set_novelty_uses_discovery_similarity_as_surprise(toolset, monkeypatch):
     from vibemix.library import sequencer as sequencer_mod
 

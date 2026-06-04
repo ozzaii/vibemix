@@ -367,7 +367,11 @@ def _summary(name: str, args: dict[str, Any], out: dict[str, Any]) -> str:
         return "; ".join(parts)
     if name == "sequence_set":
         candidates = out.get("candidates")
-        return f"{len(candidates) if isinstance(candidates, list) else 0} sequences"
+        parts = [f"{len(candidates) if isinstance(candidates, list) else 0} sequences"]
+        deduped = out.get("deduped_track_ids")
+        if isinstance(deduped, list) and deduped:
+            parts.append(f"deduped={len(deduped)}")
+        return "; ".join(parts)
     if name in {"create_playlist", "export_set"}:
         return str(out.get("path") or out.get("m3u_path") or out.get("track_count") or "ok")
     if name == "transition_slate":

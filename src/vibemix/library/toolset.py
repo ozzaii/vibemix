@@ -35,6 +35,7 @@ import json
 import logging
 import math
 import os
+import re
 import threading
 from collections.abc import Callable
 from dataclasses import asdict
@@ -894,6 +895,9 @@ class LibraryToolset:
                 )
             if not pool:
                 return {"error": "sequence_set: no track had a stored vector"}
+            pool, deduped_track_ids = _dedupe_sequence_pool(pool)
+            if not pool:
+                return {"error": "sequence_set: every grounded track collapsed as a duplicate"}
             n_slots = args.get("n_slots")
             try:
                 n_slots = int(n_slots) if n_slots is not None else len(pool)
@@ -910,6 +914,7 @@ class LibraryToolset:
                 {
                     tid: 1.0 - score
                     for tid in track_ids
+                    if tid not in deduped_track_ids
                     if (score := self.seen_similarity.get(tid)) is not None
                 }
                 if novelty > 0.0
@@ -927,7 +932,7 @@ class LibraryToolset:
         except Exception as e:
             logger.warning("[viber] sequence_set failed: %s", e)
             return {"error": f"sequence_set failed: {type(e).__name__}: {e}"}
-        return {
+        out: dict[str, Any] = {
             "candidates": [
                 {
                     "track_ids": c.track_ids,
@@ -938,6 +943,9 @@ class LibraryToolset:
                 for c in candidates
             ]
         }
+        if deduped_track_ids:
+            out["deduped_track_ids"] = deduped_track_ids
+        return out
 
     def export_set(self, args: dict[str, Any]) -> dict[str, Any]:
         """Export an ordered, grounded set to a Rekordbox-importable XML.
@@ -1569,7 +1577,11 @@ class LibraryToolset:
             cands = result.get("candidates")
             if isinstance(cands, (list, tuple)):
                 n = len(cands)
-                return f"{n} candidate{'' if n == 1 else 's'}"
+                parts = [f"{n} candidate{'' if n == 1 else 's'}"]
+                deduped = result.get("deduped_track_ids")
+                if isinstance(deduped, list) and deduped:
+                    parts.append(f"deduped={len(deduped)}")
+                return "; ".join(parts)
         if name == "inspect_candidates":
             rows = result.get("candidates")
             if isinstance(rows, (list, tuple)):
@@ -1861,6 +1873,51 @@ def _float_arg(raw: Any, *, default: float) -> float:
         return float(raw)
     except (TypeError, ValueError):
         return default
+
+
+_COPY_SUFFIX_RE = re.compile(r"\s+\((?:copy\s*)?\d+\)\s*$", re.IGNORECASE)
+_SPACE_RE = re.compile(r"\s+")
+
+
+def _dedupe_sequence_pool(pool: list[Any]) -> tuple[list[Any], list[str]]:
+    """Drop obvious duplicate file copies before set sequencing.
+
+    The key is intentionally conservative: normalized title (with only trailing
+    numeric copy suffixes removed), normalized artist, and rounded duration.
+    Same title but different duration stays available, so radio/extended edits
+    are not collapsed.
+    """
+    seen: set[tuple[str, str, int]] = set()
+    out: list[Any] = []
+    dropped: list[str] = []
+    for item in pool:
+        key = _sequence_duplicate_key(item)
+        if key is None:
+            out.append(item)
+            continue
+        if key in seen:
+            dropped.append(str(getattr(item, "track_id", "")))
+            continue
+        seen.add(key)
+        out.append(item)
+    return out, dropped
+
+
+def _sequence_duplicate_key(item: Any) -> tuple[str, str, int] | None:
+    duration = _float_arg(getattr(item, "duration_s", None), default=0.0)
+    if duration <= 0:
+        return None
+    title = _normalize_duplicate_text(getattr(item, "title", ""))
+    if not title:
+        return None
+    artist = _normalize_duplicate_text(getattr(item, "artist", ""))
+    return (title, artist, round(duration))
+
+
+def _normalize_duplicate_text(raw: Any) -> str:
+    text = str(raw or "").strip().casefold()
+    text = _COPY_SUFFIX_RE.sub("", text)
+    return _SPACE_RE.sub(" ", text).strip()
 
 
 def _bounded_float_arg(raw: Any, *, minimum: float, maximum: float, default: float) -> float:
