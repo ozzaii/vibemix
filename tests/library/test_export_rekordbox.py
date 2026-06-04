@@ -264,6 +264,18 @@ def test_machine_cue_provenance_is_visible_and_dj_cues_are_preserved(tmp_path):
     assert by_name["VM BUILD"].attrib["Num"] == "2"
     assert by_name["VM BREAKDOWN"].attrib["Num"] == "3"
 
+    rbxml = pytest.importorskip("pyrekordbox.rbxml")
+    rb = rbxml.RekordboxXml(out)
+    rb_tracks = rb.get_tracks()
+    assert len(rb_tracks) == 1
+    rb_marks = rb_tracks[0].marks
+    by_num = {mark.Num: mark for mark in rb_marks}
+    assert set(by_num) == {0, 1, 2, 3}
+    assert by_num[0].Name == "DROP"
+    assert not by_num[0].Name.startswith("VM ")
+    for num in (1, 2, 3):
+        assert by_num[num].Name.startswith("VM ")
+
 
 # --------------------------------------------------------------------- #
 # Optional metadata: Colour + Rating                                    #
