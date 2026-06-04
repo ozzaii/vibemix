@@ -292,16 +292,12 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
 export const SESSION_RUNTIME_WIRES = [
   "session.runtime",
   "session.titlebar",
-  "session.mode-picker",
   "session.stage",
   "session.primary",
   "session.vibe-engine",
   "session.now-line",
   "session.citation",
   "session.drop",
-  "session.claim-policy",
-  "session.idle-proof",
-  "session.idle-proof.next",
   "session.meter",
   "session.status",
 ] as const;
@@ -364,17 +360,12 @@ const SESSION_RUNTIME_WIRE_PURPOSES: Record<
 > = {
   "session.runtime": "hydrated live shell replacing the setup wizard",
   "session.titlebar": "runtime titlebar and settings affordance",
-  "session.mode-picker": "cohost/library/build/debrief/learn mode switch",
   "session.stage": "main post-wizard stage",
   "session.primary": "primary deck and cohost mount",
   "session.vibe-engine": "Library/Viber and vibe-engine open control",
   "session.now-line": "current deck / phrase readout",
   "session.citation": "grounded evidence chip",
   "session.drop": "runtime drop-countdown chip",
-  "session.claim-policy": "live claim-proof policy chip",
-  "session.idle-proof":
-    "idle first-move proof rail for audio, Sven, controller, and screen evidence",
-  "session.idle-proof.next": "idle first-move next action copy tied to proof readiness",
   "session.meter": "audio health meter",
   "session.status": "runtime status footer",
 };

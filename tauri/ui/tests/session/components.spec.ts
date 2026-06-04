@@ -826,7 +826,6 @@ describe("SessionLayout", () => {
     expect(root.textContent).toContain(
       "capture silent · Route DJ output into capture.",
     );
-    expect(root.textContent).toContain("capture is silent. Route DJ output into capture.");
     expect(root.textContent).not.toContain(
       "screen proof unavailable · Start playback, I will not guess.",
     );
@@ -847,9 +846,6 @@ describe("SessionLayout", () => {
     expect(root.textContent).toContain(
       "eqMac Export silent · Send DJ app to Multi-Output (eqMac), not speaker only.",
     );
-    expect(root.textContent).toContain(
-      "eqMac Export is silent. Send DJ app to Multi-Output (eqMac), not speaker only.",
-    );
   });
 
   it("warns that speaker output alone is not BlackHole capture proof", () => {
@@ -867,9 +863,6 @@ describe("SessionLayout", () => {
 
     expect(root.textContent).toContain(
       "BlackHole 16ch silent · Send DJ app to a Multi-Output/Aggregate that includes BlackHole; speaker output alone is not proof.",
-    );
-    expect(root.textContent).toContain(
-      "BlackHole 16ch is silent. Send DJ app to a Multi-Output/Aggregate that includes BlackHole; speaker output alone is not proof.",
     );
 
     const bpm = root.querySelector<HTMLElement>(".vmx-read__num");
@@ -896,9 +889,6 @@ describe("SessionLayout", () => {
 
     expect(root.textContent).toContain(
       "DDJ-FLX4 silent · Use BlackHole/eqMac capture, speaker audio is not proof.",
-    );
-    expect(root.textContent).toContain(
-      "DDJ-FLX4 is silent. Use BlackHole/eqMac capture, speaker audio is not proof.",
     );
 
     const bpm = root.querySelector<HTMLElement>(".vmx-read__num");
@@ -934,14 +924,7 @@ describe("SessionLayout", () => {
 
     mountSessionLayout(root, state);
 
-    const rail = root.querySelector<HTMLElement>('[data-wire="session.idle-proof"]');
     expect(root.textContent).toContain("audio hearing · co-host ready · controller seen");
-    expect(rail?.textContent).toContain("audiohearing");
-    expect(
-      rail
-        ?.querySelector<HTMLElement>('[data-axis="audio"]')
-        ?.dataset.state,
-    ).toBe("ok");
   });
 
   it("asks for controller motion once audio is audible but MIDI is unproven", () => {
@@ -955,16 +938,11 @@ describe("SessionLayout", () => {
 
     mountSessionLayout(root, state);
 
-    const rail = root.querySelector<HTMLElement>('[data-wire="session.idle-proof"]');
-    const controller = rail?.querySelector<HTMLElement>('[data-axis="controller"]');
     expect(root.textContent).toContain("audio hearing · co-host ready · controller not proven");
     expect(root.textContent).toContain("screen proof ready · Move a control once, I will not guess.");
-    expect(root.textContent).toContain("Move the controller once. The co-host waits for proof.");
-    expect(controller?.textContent).toContain("controllerno motion");
-    expect(controller?.dataset.state).toBe("warn");
   });
 
-  it("names the connected controller in idle proof when motion is not proven", () => {
+  it("names the connected controller in the idle readiness line when motion is not proven", () => {
     const root = host();
     const state = defaultState();
     state.meters.music = { rms: 0.08, peak: 0.14 };
@@ -980,9 +958,6 @@ describe("SessionLayout", () => {
     expect(root.textContent).toContain("audio hearing · co-host ready · DDJ-FLX4 waiting");
     expect(root.textContent).toContain(
       "screen proof ready · DDJ-FLX4 waiting · Move mixer/deck control.",
-    );
-    expect(root.textContent).toContain(
-      "DDJ-FLX4 is connected. Move mixer/deck control for proof.",
     );
   });
 

@@ -31,7 +31,6 @@
  */
 
 import { registerStyle } from "./components/_style-registry.js";
-import { renderModePicker, setModePickerActive, type ModePickerMode } from "./components/mode-picker.js";
 import { renderTitlebar, setTitlebarClock, setTitlebarPill, type PillLevel } from "./components/titlebar.js";
 import { GROUNDING_FAILURE_MS, type CohostStatus, type ReactionsByTs, type TranscriptLine } from "./components/cohost.js";
 import { renderDropChip } from "./components/drop-chip.js";
@@ -41,6 +40,12 @@ import { type MidiEvent } from "./components/event-ribbon.js";
 import type { BadgeState } from "./components/status-bar.js";
 
 type StatusRecheckComponent = "livekit" | "gemini" | "midi" | "screen";
+
+/** Top-level vibemix mode persisted in the projected state. The in-deck mode
+ *  picker chrome was cut (DJs do not switch modes mid-set; the surrounding
+ *  shell owns nav), but the render-loop still projects the mode + change
+ *  handler so the field stays part of the layout prop contract. */
+type SessionTopMode = "cohost" | "learn" | "build" | "debrief";
 
 export interface SessionState {
   titlebar: {
@@ -135,21 +140,19 @@ export interface SessionState {
     device: string;
     profile: "HP" | "SPK";
   };
-  /** Phase 97 / ONBOARD-01 — top-level mode (cohost/learn/build/debrief).
-   *  Optional on the layout-side type so existing tests / mocks that omit
-   *  it still type-check. mountSessionLayout defaults to "cohost". */
-  mode?: ModePickerMode;
-  /** Phase 97 / ONBOARD-01 — click handler fired by the mode picker.
-   *  Render-loop wires it to modeChangeHandler (setSessionState +
-   *  ipc.session.set_mode). Omitted (dev mock) → click is a no-op. */
-  onModeChange?: (mode: ModePickerMode) => void;
+  /** Top-level mode (cohost/learn/build/debrief). The in-deck mode picker was
+   *  removed, but the render-loop still projects this field; it persists the
+   *  last-picked mode and feeds the surrounding shell nav. */
+  mode?: SessionTopMode;
+  /** Click handler the render-loop wires to modeChangeHandler (setSessionState
+   *  + ipc.session.set_mode). Retained on the prop contract even though the
+   *  deck no longer renders the picker that called it. */
+  onModeChange?: (mode: SessionTopMode) => void;
 }
 
 export interface Mounted {
   root: HTMLElement;
   titlebar: HTMLElement;
-  /** Phase 97 / ONBOARD-01 — 4-mode picker row between titlebar and stage. */
-  modePicker: HTMLElement;
   /** Rail persona button (tap-to-cycle mood). */
   persona: HTMLElement;
   personaValue: HTMLElement;
@@ -158,14 +161,6 @@ export interface Mounted {
   /** Cross-fade liveness labels (always mounted; opacity toggled by mode). */
   liveFault: HTMLElement;
   ghosts: [HTMLElement, HTMLElement];
-  idleProof: HTMLElement;
-  idleProofCells: {
-    audio: HTMLElement;
-    sven: HTMLElement;
-    controller: HTMLElement;
-    screen: HTMLElement;
-  };
-  idleProofNext: HTMLElement;
   now: HTMLElement;
   receipt: HTMLElement;
   dropSlot: HTMLElement;
@@ -183,7 +178,6 @@ export interface Mounted {
     midi: HTMLButtonElement;
   };
   statusRight: HTMLElement;
-  claimPolicy: HTMLElement;
   current: SessionState;
   /** Timestamp (Date.now()) of the most-recent grounded true→false transition.
    *  Null when grounded is currently true. Drives the >5s grounding-failure
@@ -219,7 +213,7 @@ const METER_DB_CEIL = -6;
 const LAYOUT_CSS = `
   .vmx-session {
     display: grid;
-    grid-template-rows: var(--titlebar-h) auto 1fr var(--statusbar-h);
+    grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
     height: 100vh;
     position: relative;
     overflow: hidden;
@@ -228,21 +222,6 @@ const LAYOUT_CSS = `
       linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 24%),
       var(--void-5);
   }
-  /* Phase 97 / ONBOARD-01 — mode picker bar between titlebar and stage.
-   * Sized by content (height: 34px from the picker itself + 12px padding
-   * either side). Sits flush against the titlebar with a faint --silk-22
-   * hairline below to separate the navigation layer from the deck stage. */
-  .vmx-modebar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--sp-2) clamp(22px, 5vw, 76px);
-    border-bottom: 1px solid var(--silk-22);
-    background-color: var(--void);
-    position: relative;
-    z-index: 1;
-  }
-  .vmx-modebar .vmx-mode-picker { max-width: 480px; }
   .vmx-drop-slot:empty { display: none; }
 
   /* === THE DECK — no card. Open void. Hero anchored low (mixer LCD). ==== */
@@ -508,72 +487,6 @@ const LAYOUT_CSS = `
   .vmx-ghost--g2 { color: var(--text-disabled); opacity: 0.7; }
   .vmx-ghost--g1 { color: var(--text-muted); }
   .vmx-claim { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); margin-top: var(--sp-2); }
-  .vmx-idle-proof {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1px;
-    width: min(760px, 100%);
-    margin: 0 auto var(--sp-2);
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.024), rgba(0, 0, 0, 0.18)),
-      rgba(0, 0, 0, 0.16);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.028),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.58);
-    overflow: hidden;
-  }
-  .vmx-idle-proof[hidden] { display: none; }
-  .vmx-idle-proof__cell {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    min-width: 0;
-    padding: 10px 12px;
-    background: rgba(255, 251, 244, 0.018);
-  }
-  .vmx-idle-proof__k {
-    font-family: var(--type-display);
-    font-variation-settings: 'wdth' 85, 'wght' 650;
-    font-size: 9px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--silk-22);
-  }
-  .vmx-idle-proof__v {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--type-mono);
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--silk-65);
-  }
-  .vmx-idle-proof__cell[data-state="ok"] .vmx-idle-proof__v {
-    color: var(--amber-pale);
-    text-shadow: 0 0 7px var(--amber-22);
-  }
-  .vmx-idle-proof__cell[data-state="warn"] .vmx-idle-proof__v {
-    color: var(--silk-40);
-  }
-  .vmx-idle-proof__cell[data-state="fault"] .vmx-idle-proof__v {
-    color: var(--led-fault);
-    text-shadow: 0 0 6px rgba(212, 65, 58, 0.42);
-  }
-  .vmx-idle-proof__next {
-    grid-column: 1 / -1;
-    padding: 8px 12px 9px;
-    border-top: 1px solid var(--border-subtle);
-    font-family: var(--type-mono);
-    font-size: 10px;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-    color: var(--silk-40);
-    background: rgba(0, 0, 0, 0.16);
-  }
   /* The co-host SPEAKING — set in the one warm human face of the system
    * (Instrument Serif, the documented hero voice per DESIGN.md §3). The impl
    * had been rendering this in condensed Saira display, which read industrial /
@@ -763,42 +676,6 @@ const LAYOUT_CSS = `
     min-width: 0;
   }
   .vmx-statusrow__right { font-family: var(--type-mono); font-size: 11px; color: var(--silk-40); letter-spacing: 0.08em; }
-  .vmx-claim-policy {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    margin-left: 14px;
-    padding: 3px 8px;
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--rad-sm);
-    font-family: var(--type-mono);
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--silk-40);
-    background: rgba(0, 0, 0, 0.18);
-    white-space: nowrap;
-  }
-  .vmx-claim-policy::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--led-warn);
-    box-shadow: 0 0 7px rgba(244, 197, 66, 0.35);
-  }
-  .vmx-claim-policy[data-level="green"]::before {
-    background: var(--led-ok);
-    box-shadow: 0 0 7px rgba(109, 212, 74, 0.32);
-  }
-  .vmx-claim-policy[data-level="red"] {
-    color: var(--silk-65);
-    border-color: rgba(212, 65, 58, 0.34);
-  }
-  .vmx-claim-policy[data-level="red"]::before {
-    background: var(--led-fault);
-    box-shadow: 0 0 7px rgba(212, 65, 58, 0.42);
-  }
 
   /* === SILENT + FAULT — the surface settles into listening / holds on a drop = */
   .vmx-session[data-mode="silent"] .vmx-now { color: var(--text-muted); }
@@ -908,17 +785,6 @@ const LAYOUT_CSS = `
       font-size: 14px;
       max-width: 100%;
     }
-    .vmx-idle-proof {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      width: 100%;
-    }
-    .vmx-idle-proof__cell {
-      padding: 9px 10px;
-    }
-    .vmx-idle-proof__v {
-      font-size: 10px;
-      letter-spacing: 0.06em;
-    }
     .vmx-now {
       font-size: clamp(28px, 9vw, 42px);
       max-width: 12ch;
@@ -955,9 +821,6 @@ const LAYOUT_CSS = `
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .vmx-claim-policy {
-    display: none;
-  }
   }
 `;
 
@@ -988,21 +851,6 @@ export function mountSessionLayout(
   });
   titlebar.dataset.wire = "session.titlebar";
   root.append(titlebar);
-
-  // Phase 97 / ONBOARD-01 — mode picker bar between titlebar and stage.
-  // Sits in its own grid row (auto-sized) so the deck stage still gets
-  // the 1fr flex remainder. Click handler reads the live mounted handle
-  // so the picker survives state diffs without re-mounting.
-  const modebar = document.createElement("div");
-  modebar.className = "vmx-modebar";
-  modebar.dataset.wire = "session.mode-picker";
-  const modePicker = renderModePicker({
-    active: state.mode ?? "cohost",
-    onChange: (m) => mountedHandle?.current.onModeChange?.(m),
-    ariaLabel: "vibemix mode",
-  });
-  modebar.append(modePicker);
-  root.append(modebar);
 
   // Stage → the single deck.
   const stage = document.createElement("main");
@@ -1043,6 +891,10 @@ export function mountSessionLayout(
   muteBtn.type = "button";
   muteBtn.dataset.action = "mute";
   muteBtn.textContent = "mute";
+  // a11y: a bare "mute" label gave screen-reader users no read on the toggle
+  // state. Name it + expose aria-pressed; applyState keeps both in sync.
+  muteBtn.setAttribute("aria-label", "mute co-host");
+  muteBtn.setAttribute("aria-pressed", "false");
   muteBtn.addEventListener("click", () => mountedHandle?.current.cohost.onMute?.());
   controls.append(vibeEngineBtn, muteBtn);
 
@@ -1070,18 +922,6 @@ export function mountSessionLayout(
   ghost2.className = "vmx-ghost vmx-ghost--g2";
   const ghost1 = document.createElement("p");
   ghost1.className = "vmx-ghost vmx-ghost--g1";
-  const idleProof = document.createElement("div");
-  idleProof.className = "vmx-idle-proof";
-  idleProof.dataset.wire = "session.idle-proof";
-  idleProof.hidden = true;
-  const idleAudio = makeIdleProofCell("audio");
-  const idleSven = makeIdleProofCell("sven");
-  const idleController = makeIdleProofCell("controller");
-  const idleScreen = makeIdleProofCell("proof");
-  const idleProofNext = document.createElement("div");
-  idleProofNext.className = "vmx-idle-proof__next";
-  idleProofNext.dataset.wire = "session.idle-proof.next";
-  idleProof.append(idleAudio.cell, idleSven.cell, idleController.cell, idleScreen.cell, idleProofNext);
   const claim = document.createElement("div");
   claim.className = "vmx-claim";
   const now = document.createElement("p");
@@ -1106,7 +946,7 @@ export function mountSessionLayout(
   dropSlot.className = "vmx-drop-slot";
   dropSlot.dataset.wire = "session.drop";
   claim.append(now, receipt, dropSlot);
-  voice.append(ghost2, ghost1, idleProof, claim);
+  voice.append(ghost2, ghost1, claim);
 
   speak.append(voice);
   deck.append(speak);
@@ -1146,13 +986,9 @@ export function mountSessionLayout(
   inputsEl.append(inAudio, sep(), inAi, voiceSep, inVoice, sep(), inScreen, sep(), inMidi);
   const statusRight = document.createElement("div");
   statusRight.className = "vmx-statusrow__right";
-  const claimPolicy = document.createElement("span");
-  claimPolicy.className = "vmx-claim-policy";
-  claimPolicy.dataset.wire = "session.claim-policy";
-  claimPolicy.hidden = true;
   const statusMeta = document.createElement("div");
   statusMeta.className = "vmx-statusrow__meta";
-  statusMeta.append(statusRight, claimPolicy);
+  statusMeta.append(statusRight);
   statusRow.append(inputsEl, statusMeta);
   root.append(statusRow);
 
@@ -1161,21 +997,12 @@ export function mountSessionLayout(
   const mounted: Mounted = {
     root,
     titlebar,
-    modePicker,
     persona,
     personaValue,
     vibeEngineButton: vibeEngineBtn,
     muteButton: muteBtn,
     liveFault,
     ghosts: [ghost1, ghost2],
-    idleProof,
-    idleProofCells: {
-      audio: idleAudio.value,
-      sven: idleSven.value,
-      controller: idleController.value,
-      screen: idleScreen.value,
-    },
-    idleProofNext,
     now,
     receipt,
     dropSlot,
@@ -1193,7 +1020,6 @@ export function mountSessionLayout(
       midi: inMidi,
     },
     statusRight,
-    claimPolicy,
     current: state,
     groundedFalseSinceMs: state.cohost.grounded ? null : Date.now(),
     meterCur: 0,
@@ -1230,20 +1056,6 @@ function makeReadout(label: string, isKey = false): { wrap: HTMLElement; value: 
   value.className = isKey ? "vmx-read__key" : "vmx-read__num";
   wrap.append(lab, value);
   return { wrap, value };
-}
-
-function makeIdleProofCell(label: string): { cell: HTMLElement; value: HTMLElement } {
-  const cell = document.createElement("div");
-  cell.className = "vmx-idle-proof__cell";
-  cell.dataset.axis = label;
-  const lab = document.createElement("span");
-  lab.className = "vmx-idle-proof__k";
-  lab.textContent = label;
-  const value = document.createElement("span");
-  value.className = "vmx-idle-proof__v";
-  value.dataset.value = label;
-  cell.append(lab, value);
-  return { cell, value };
 }
 
 function makeInput(
@@ -1287,16 +1099,6 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   if (isMount || prev.titlebar.live !== next.titlebar.live) setTitlebarPill(mounted.titlebar, "live", next.titlebar.live);
   if (isMount || prev.titlebar.rec !== next.titlebar.rec) setTitlebarPill(mounted.titlebar, "rec", next.titlebar.rec);
   if (isMount || prev.titlebar.sys !== next.titlebar.sys) setTitlebarPill(mounted.titlebar, "sys", next.titlebar.sys);
-
-  // --- mode picker (Phase 97 / ONBOARD-01) ---
-  // External sync path: cold-boot ipc.settings.state may carry a persisted
-  // mode. setModePickerActive flips data-active in place so the lit segment
-  // matches the singleton without rebuilding the picker.
-  const nextMode = next.mode ?? "cohost";
-  const prevMode = prev.mode ?? "cohost";
-  if (isMount || prevMode !== nextMode) {
-    setModePickerActive(mounted.modePicker, nextMode);
-  }
 
   // --- persona (tap-to-cycle mood headline) ---
   if (isMount || prev.persona.mood !== next.persona.mood) {
@@ -1360,11 +1162,9 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     const idle = idleReadinessLines(next);
     setGhostText(mounted.ghosts[0], idle.action);
     setGhostText(mounted.ghosts[1], idle.inputs);
-    setIdleProof(mounted, next);
   } else {
     setGhost(mounted.ghosts[0], g1Line);
     setGhost(mounted.ghosts[1], g2Line);
-    mounted.idleProof.hidden = true;
   }
 
   // --- the receipt (cite for the now-line) ---
@@ -1453,6 +1253,8 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     if (muteBtn) {
       muteBtn.dataset.on = next.status.muted ? "true" : "false";
       muteBtn.textContent = next.status.muted ? "muted" : "mute";
+      muteBtn.setAttribute("aria-pressed", next.status.muted ? "true" : "false");
+      muteBtn.setAttribute("aria-label", next.status.muted ? "unmute co-host" : "mute co-host");
     }
   }
 
@@ -1473,17 +1275,6 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   // was extra text a DJ never reads mid-set (impeccable: status-row text cut).
   const rightText = outputLabel(next.output);
   if (mounted.statusRight.textContent !== rightText) mounted.statusRight.textContent = rightText;
-  const claim = next.claimPolicy ?? null;
-  mounted.claimPolicy.hidden = !claim;
-  if (claim) {
-    if (mounted.claimPolicy.textContent !== claim.label) mounted.claimPolicy.textContent = claim.label;
-    mounted.claimPolicy.dataset.level = claim.level;
-    const title = claim.reason
-      ? `${claim.policy}: ${claim.reason}`
-      : claim.policy;
-    mounted.claimPolicy.setAttribute("title", title);
-    mounted.claimPolicy.setAttribute("aria-label", `live claim status: ${claim.label}`);
-  }
 }
 
 function setGhost(el: HTMLElement, line: TranscriptLine | null): void {
@@ -1539,58 +1330,6 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
     inputs: `${audio} · ${ai} · ${controller}`,
     action,
   };
-}
-
-type IdleProofState = "ok" | "warn" | "fault";
-
-function setIdleProof(mounted: Mounted, state: SessionState): void {
-  mounted.idleProof.hidden = false;
-  const audio = audioProof(state.status.livekit, state.meters.music);
-  const sven = svenProof(state.status.gemini, state.status.voice);
-  const controller = controllerProof(state.status.midi);
-  const screen = screenProof(state.status.screen);
-  setIdleCell(mounted.idleProofCells.audio, audio);
-  setIdleCell(mounted.idleProofCells.sven, sven);
-  setIdleCell(mounted.idleProofCells.controller, controller);
-  setIdleCell(mounted.idleProofCells.screen, screen);
-  const next = idleProofNext(
-    audio,
-    controller,
-    screen,
-    state.status.captureDevice,
-    state.status.midiActivity,
-    state.status.midiDevice,
-  );
-  if (mounted.idleProofNext.textContent !== next) mounted.idleProofNext.textContent = next;
-}
-
-function setIdleCell(
-  value: HTMLElement,
-  proof: { label: string; state: IdleProofState },
-): void {
-  if (value.textContent !== proof.label) value.textContent = proof.label;
-  const cell = value.parentElement;
-  if (cell && cell.dataset.state !== proof.state) cell.dataset.state = proof.state;
-}
-
-function idleProofNext(
-  audio: { label: string; state: IdleProofState },
-  controller: { label: string; state: IdleProofState },
-  screen: { label: string; state: IdleProofState },
-  captureDevice?: string | null,
-  midiActivity?: SessionState["status"]["midiActivity"],
-  midiDevice?: string | null,
-): string {
-  if (audio.label === "waiting") {
-    const device = captureDeviceLabel(captureDevice);
-    return `${device} is silent. ${captureRouteInstruction(captureDevice)}`;
-  }
-  if (controller.label === "no motion") {
-    return midiProofNext(midiActivity, midiDevice);
-  }
-  return screen.state === "ok"
-    ? "Start playback. The co-host cites what lands."
-    : "Start playback. The co-host waits for proof.";
 }
 
 function musicSignalActive(music: SessionState["meters"]["music"]): boolean {
@@ -1664,72 +1403,6 @@ function midiProofAction(
     return `${device} seen · Move a deck control.`;
   }
   return "Move a control once, I will not guess.";
-}
-
-function midiProofNext(
-  midiActivity?: SessionState["status"]["midiActivity"],
-  midiDevice?: string | null,
-): string {
-  const device = midiDeviceLabel(midiDevice);
-  if (midiActivity === "connected_no_midi_traffic") {
-    return `${device} is connected. Move mixer/deck control for proof.`;
-  }
-  if (midiActivity === "midi_traffic_unmapped") {
-    return `${device} sends MIDI, but the profile is not mapping it.`;
-  }
-  if (midiActivity === "midi_events_no_moves") {
-    return `${device} is visible. Move a deck control for proof.`;
-  }
-  return "Move the controller once. The co-host waits for proof.";
-}
-
-function audioProof(
-  status: SessionState["status"]["livekit"],
-  music: SessionState["meters"]["music"],
-): {
-  label: string;
-  state: IdleProofState;
-} {
-  if (status === "ok") {
-    return musicSignalActive(music)
-      ? { label: "hearing", state: "ok" }
-      : { label: "waiting", state: "warn" };
-  }
-  if (status === "down") return { label: "dropped", state: "fault" };
-  if (status === "connecting") return { label: "connecting", state: "warn" };
-  return { label: "checking", state: "warn" };
-}
-
-function svenProof(
-  status: SessionState["status"]["gemini"],
-  voice: SessionState["status"]["voice"],
-): {
-  label: string;
-  state: IdleProofState;
-} {
-  if (voice === "muted") return { label: "voice muted", state: "warn" };
-  if (status === "ok") return { label: "ready", state: "ok" };
-  if (status === "down") return { label: "offline", state: "fault" };
-  return { label: "checking", state: "warn" };
-}
-
-function controllerProof(status: SessionState["status"]["midi"]): {
-  label: string;
-  state: IdleProofState;
-} {
-  if (status != null && status > 0) return { label: "seen", state: "ok" };
-  if (status === 0) return { label: "no motion", state: "warn" };
-  return { label: "checking", state: "warn" };
-}
-
-function screenProof(status: SessionState["status"]["screen"]): {
-  label: string;
-  state: IdleProofState;
-} {
-  if (status === "ok") return { label: "screen ready", state: "ok" };
-  if (status === "denied") return { label: "denied", state: "fault" };
-  if (status === "unavailable") return { label: "unavailable", state: "warn" };
-  return { label: "checking", state: "warn" };
 }
 
 /** Re-trigger the rise + draw + ignite CSS animations on a new reaction.
