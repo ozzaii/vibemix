@@ -5,8 +5,52 @@
   "enough_complete_eval_rows": false,
   "evaluation_complete_rows": 0,
   "evaluation_rows": 0,
-  "generated_at": "2026-06-04T11:11:37+00:00",
-  "git_head": "bdc6ea489ff4dd3374242b07aa703a8dccf18f1f",
+  "generated_at": "2026-06-04T11:13:28+00:00",
+  "git_head": "4f43e7aa12fc06f7d75f42eb3de65bbf729e9076",
+  "known_tags": {
+    "instrument": [
+      "acid_synth",
+      "bassline",
+      "drums",
+      "guitar",
+      "pads",
+      "piano",
+      "strings",
+      "vocal"
+    ],
+    "mood": [
+      "aggressive",
+      "dark",
+      "dreamy",
+      "euphoric",
+      "hypnotic",
+      "tense"
+    ],
+    "texture": [
+      "airy",
+      "atmospheric",
+      "distorted",
+      "metallic",
+      "percussive",
+      "polished",
+      "raw",
+      "warm"
+    ]
+  },
+  "label_row_example": {
+    "label_status": "complete",
+    "split": "holdout",
+    "tags": {
+      "instrument": [],
+      "mood": [
+        "aggressive"
+      ],
+      "texture": [
+        "airy"
+      ]
+    },
+    "track_id": "folder:example"
+  },
   "label_status": "missing",
   "min_required_rows": 50,
   "missing_category_counts": {
