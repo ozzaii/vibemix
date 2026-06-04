@@ -82,6 +82,7 @@ def evaluate_anlz_cue_agreement(
     cache_dj_reference_tracks = 0
     sidecar_dj_reference_tracks = 0
     sidecar_dj_anchor_count = 0
+    cache_structural_cue_count = 0
 
     for track_id, track in sorted(tracks.items(), key=lambda item: item[0]):
         meta = match_track_to_anlz(track, anlz_index)
@@ -99,6 +100,7 @@ def evaluate_anlz_cue_agreement(
         dj_anchors = _dj_anchors_for_track(track, max_cues=max_cues)
         reference_source = "cache"
         if dj_anchors:
+            cache_structural_cue_count += len(dj_anchors)
             cache_dj_reference_tracks += 1
         else:
             dj_anchors = dj_cue_anchors_from_anlz(track, meta, max_cues=max_cues)
@@ -142,6 +144,18 @@ def evaluate_anlz_cue_agreement(
             )
 
     status = "ok" if scored else "honest_null_no_dj_reference_cues"
+    reference_audit = {
+        "cache_tracks_with_structural_dj_cues": cache_dj_reference_tracks,
+        "cache_structural_dj_anchor_count": cache_structural_cue_count,
+        "anlz_sidecar_tracks_with_pcob_pco2_dj_cues": sidecar_dj_reference_tracks,
+        "anlz_sidecar_pcob_pco2_dj_anchor_count": sidecar_dj_anchor_count,
+        "numeric_agreement_claimable": bool(scored),
+        "missing_reference_reason": (
+            "cache has no structural DJ cues and matched ANLZ sidecars have no PCOB/PCO2 DJ cue entries"
+            if not scored
+            else None
+        ),
+    }
     return {
         "schema": SCHEMA,
         "cache_loaded": True,
@@ -161,6 +175,7 @@ def evaluate_anlz_cue_agreement(
         "cue_agreement_mean_score": round(mean(scored), 6) if scored else None,
         "cue_agreement_mean_abs_offset_s": round(mean(offsets), 6) if offsets else None,
         "cue_agreement_weak_labels": weak_count,
+        "reference_audit": reference_audit,
         "status": status,
         "notes": {
             "agreement_score_is_not_fabricated_without_dj_refs": not scored,

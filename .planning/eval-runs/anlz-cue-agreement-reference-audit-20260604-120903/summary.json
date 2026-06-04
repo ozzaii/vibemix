@@ -1,0 +1,21 @@
+{
+  "cached_tracks": 187,
+  "anlz_index_tracks": 1039,
+  "anlz_index_metas": 1045,
+  "anlz_matched_cached_tracks": 45,
+  "tracks_with_pssi_anchors": 45,
+  "pssi_anchor_count": 360,
+  "pssi_first_fill_candidate_tracks": 45,
+  "dj_reference_tracks": 0,
+  "cue_agreement_scored_tracks": 0,
+  "cue_agreement_mean_score": null,
+  "status": "honest_null_no_dj_reference_cues",
+  "reference_audit": {
+    "anlz_sidecar_pcob_pco2_dj_anchor_count": 0,
+    "anlz_sidecar_tracks_with_pcob_pco2_dj_cues": 0,
+    "cache_structural_dj_anchor_count": 0,
+    "cache_tracks_with_structural_dj_cues": 0,
+    "missing_reference_reason": "cache has no structural DJ cues and matched ANLZ sidecars have no PCOB/PCO2 DJ cue entries",
+    "numeric_agreement_claimable": false
+  }
+}

@@ -65,6 +65,10 @@ def test_anlz_cue_agreement_scores_when_dj_reference_exists() -> None:
     assert report["cue_agreement_scored_tracks"] == 1
     assert report["cue_agreement_mean_score"] == 1.0
     assert report["cue_agreement_mean_abs_offset_s"] == 0.5
+    assert report["reference_audit"]["cache_tracks_with_structural_dj_cues"] == 1
+    assert report["reference_audit"]["cache_structural_dj_anchor_count"] == 1
+    assert report["reference_audit"]["numeric_agreement_claimable"] is True
+    assert report["reference_audit"]["missing_reference_reason"] is None
 
 
 def test_anlz_cue_agreement_scores_sidecar_dj_cues_when_cache_has_none() -> None:
@@ -91,6 +95,9 @@ def test_anlz_cue_agreement_scores_sidecar_dj_cues_when_cache_has_none() -> None
     assert report["cue_agreement_mean_score"] == 1.0
     assert report["cue_agreement_mean_abs_offset_s"] == 0.5
     assert report["sample_rows"][0]["dj_reference_source"] == "anlz_pcob_pco2"
+    assert report["reference_audit"]["anlz_sidecar_tracks_with_pcob_pco2_dj_cues"] == 1
+    assert report["reference_audit"]["anlz_sidecar_pcob_pco2_dj_anchor_count"] == 1
+    assert report["reference_audit"]["numeric_agreement_claimable"] is True
 
 
 def test_anlz_cue_agreement_honest_null_without_dj_reference() -> None:
@@ -103,4 +110,14 @@ def test_anlz_cue_agreement_honest_null_without_dj_reference() -> None:
     assert report["anlz_sidecar_dj_reference_tracks"] == 0
     assert report["anlz_sidecar_dj_anchor_count"] == 0
     assert report["cue_agreement_mean_score"] is None
+    assert report["reference_audit"] == {
+        "cache_tracks_with_structural_dj_cues": 0,
+        "cache_structural_dj_anchor_count": 0,
+        "anlz_sidecar_tracks_with_pcob_pco2_dj_cues": 0,
+        "anlz_sidecar_pcob_pco2_dj_anchor_count": 0,
+        "numeric_agreement_claimable": False,
+        "missing_reference_reason": (
+            "cache has no structural DJ cues and matched ANLZ sidecars have no PCOB/PCO2 DJ cue entries"
+        ),
+    }
     assert report["notes"]["agreement_score_is_not_fabricated_without_dj_refs"] is True
