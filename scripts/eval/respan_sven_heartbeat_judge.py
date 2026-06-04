@@ -95,6 +95,13 @@ DIMS = [
     "voice_no_slop",
 ]
 
+QUALITY_MEAN_THRESHOLDS = {
+    "friend_not_narrator": 2.0,
+    "grounded_not_fabricated": 2.4,
+    "earned_not_constant": 2.0,
+    "voice_no_slop": 2.0,
+}
+
 
 DESCRIBE_BANK_CENSUS_CAVEAT = (
     "No recorded event.extra payloads are reconstructed; this is a no-payload "
@@ -292,6 +299,100 @@ def judge_one(row: dict, key: str, dataset_tag: str, do_log: bool) -> dict:
     return out
 
 
+def _score_value(scores: dict, dim: str) -> float | None:
+    value = scores.get(dim)
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed:
+        return None
+    return parsed
+
+
+def _scored_results(results: list[dict]) -> list[dict]:
+    return [
+        row
+        for row in results
+        if isinstance(row.get("scores"), dict)
+        and _score_value(row["scores"], "friend_not_narrator") is not None
+    ]
+
+
+def _dim_means(results: list[dict]) -> dict[str, float]:
+    scored = _scored_results(results)
+    if not scored:
+        return {}
+    return {
+        dim: round(
+            sum(_score_value(row["scores"], dim) or 0.0 for row in scored) / len(scored),
+            2,
+        )
+        for dim in DIMS
+    }
+
+
+def quality_summary(
+    results: list[dict],
+    *,
+    min_judged: int,
+    errors: int | None = None,
+) -> dict:
+    scored = _scored_results(results)
+    means = _dim_means(results)
+    should_not_speak = sum(
+        1 for row in scored if row.get("scores", {}).get("should_speak") is False
+    )
+    failures = quality_failures(
+        results,
+        means=means,
+        min_judged=min_judged,
+        errors=errors,
+        should_not_speak=should_not_speak,
+    )
+    return {
+        "judged": len(scored),
+        "min_judged": min_judged,
+        "errors": errors,
+        "dim_means": means,
+        "should_NOT_have_spoken": should_not_speak,
+        "failures": failures,
+    }
+
+
+def quality_failures(
+    results: list[dict],
+    *,
+    means: dict[str, float] | None = None,
+    min_judged: int = 1,
+    errors: int | None = None,
+    should_not_speak: int | None = None,
+) -> list[str]:
+    failures: list[str] = []
+    scored = _scored_results(results)
+    if len(scored) < min_judged:
+        failures.append(f"judged rows {len(scored)} below minimum {min_judged}")
+    if errors:
+        failures.append(f"judge errors {errors} > 0")
+    means = means if means is not None else _dim_means(results)
+    if not means:
+        failures.append("no judged dim means")
+    else:
+        for dim, threshold in QUALITY_MEAN_THRESHOLDS.items():
+            value = means.get(dim)
+            if value is None or value < threshold:
+                failures.append(f"mean {dim} {value!r} below {threshold:g}")
+    if should_not_speak is None:
+        should_not_speak = sum(
+            1 for row in scored if row.get("scores", {}).get("should_speak") is False
+        )
+    if should_not_speak:
+        failures.append(f"should_NOT_have_spoken {should_not_speak} > 0")
+    return failures
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--session", required=True, type=Path)
@@ -299,6 +400,20 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--concurrency", type=int, default=4)
     ap.add_argument("--dataset-tag", default="sven-heartbeat-real-set")
+    ap.add_argument(
+        "--require-quality",
+        action="store_true",
+        help=(
+            "exit nonzero unless judged real lines clear friend/earned/voice >= 2, "
+            "grounded >= 2.4, no judge errors, and no should_speak=false rows"
+        ),
+    )
+    ap.add_argument(
+        "--min-judged",
+        type=int,
+        default=1,
+        help="minimum judged rows required when --require-quality is set",
+    )
     ap.add_argument(
         "--describe-bank-census",
         action="store_true",
@@ -341,6 +456,10 @@ def main() -> int:
                     )
                 )
                 print(f"-> wrote {args.out}", file=sys.stderr)
+            if args.require_quality and args.min_judged > 0:
+                print("quality gate: FAIL", file=sys.stderr)
+                print(f"  - judged rows 0 below minimum {args.min_judged}", file=sys.stderr)
+                return 1
             return 0
 
     if args.dry_run:
@@ -349,6 +468,9 @@ def main() -> int:
         if describe_bank_report is not None:
             print(json.dumps({"describe_bank_census": describe_bank_report}, indent=2))
         print(f"\n(dry-run) {len(rows)} rows ready; no network.", file=sys.stderr)
+        if args.require_quality:
+            print("--require-quality needs judged rows; dry-run cannot prove quality", file=sys.stderr)
+            return 1
         return 0
 
     key = os.environ.get("RESPAN_API_KEY")
@@ -388,12 +510,25 @@ def main() -> int:
         }
         if describe_bank_report is not None:
             report["describe_bank_census"] = describe_bank_report
+        report["quality"] = quality_summary(results, min_judged=args.min_judged, errors=len(errs))
         print(json.dumps(report, indent=2, ensure_ascii=False))
         if args.out:
             args.out.write_text(json.dumps({"report": report, "rows": ok}, indent=2, ensure_ascii=False))
             print(f"-> wrote {args.out}", file=sys.stderr)
+        if args.require_quality:
+            failures = list(report["quality"].get("failures") or [])
+            if failures:
+                print("quality gate: FAIL", file=sys.stderr)
+                for failure in failures:
+                    print(f"  - {failure}", file=sys.stderr)
+                return 1
+            print("quality gate: PASS")
     else:
         print(json.dumps({"judged": 0, "errors": len(errs), "sample_err": errs[:2]}, indent=2))
+        if args.require_quality:
+            print("quality gate: FAIL", file=sys.stderr)
+            print("  - no judged rows", file=sys.stderr)
+            return 1
     return 0
 
 
