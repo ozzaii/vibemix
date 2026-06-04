@@ -255,7 +255,8 @@ _META_LINE_RESIDUE_RE = re.compile(
     r"\bformulate\b|\bfinal\s+polish\b|\brefine\b|\boption\s+[ab]\b|"
     r"\bground\s+citation\b|\bgrounding\s+ref\b|\bexact\s+grounding\b|"
     r"\bdj\s+terminology\b|\bdj-to-dj\b|\bor\s+similar\b|\bdo\s+i\s+have\b|"
-    r"\bomit\s+the\s+citation\b|\bjson\b|\bshould_speak\b|\bfriend_not_narrator\b|"
+    r"\bomit\s+the\s+citation\b|\bprompt\s+mentions\b|\bjson\b|\bshould_speak\b|"
+    r"\bfriend_not_narrator\b|"
     r"\bgrounded_not_fabricated\b)",
     re.IGNORECASE,
 )
@@ -441,6 +442,8 @@ def _starts_finished_line_meta_scaffold(text: str) -> bool:
         return True
     without_tail = _strip_orphan_citation_tail(stripped)
     if without_tail != stripped:
+        return True
+    if _META_LINE_RESIDUE_RE.search(without_tail):
         return True
     return bool(_FINISHED_LINE_META_PREFIX_RE.match(stripped))
 

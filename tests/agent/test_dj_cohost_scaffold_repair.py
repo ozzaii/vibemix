@@ -112,6 +112,13 @@ def test_meta_tail_after_citation_strip_is_suppressed() -> None:
     assert repair_finished_headphone_line(raw) is None
 
 
+def test_prompt_mention_cue_anchor_fragment_is_suppressed() -> None:
+    raw = "8.0]`? The prompt mentions `cue_anchor=phrase_boundary@1"
+
+    assert _could_be_finished_line_meta_scaffold(raw) is True
+    assert repair_finished_headphone_line(raw) is None
+
+
 def test_incomplete_headphone_tail_is_suppressed() -> None:
     raw = "That filter cut took a massive bite out of"
 
