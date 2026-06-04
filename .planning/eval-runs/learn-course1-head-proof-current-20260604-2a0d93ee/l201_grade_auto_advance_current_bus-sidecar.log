@@ -1,61 +1,0 @@
--> env: loaded /Users/ozai/projects/dj-set-ai/.env
-vibemix v0.1.0-dev0 — privacy posture
-  Audio capture: local (BlackHole / Loopback) — never leaves machine
-  MIDI input: local (USB) — never leaves machine
-  Screen capture: local (macOS Quartz / Win SCK) — never leaves machine
-  Network out (always):
-    - https://api.bravoh.altidus.world  [Bravoh proxy — Gemini reaction planning]
-    - https://api.altidus.world/vibemix/latest.json  [Updater manifest (~once/day)]
-  Network out (user-click only):
-    - https://github.com/bravoh-ai/vibemix  [User click in settings (shell-out)]
-    - https://existential.audio/blackhole  [User click in wizard install hint (shell-out)]
-  Telemetry: OFF
--> genre profile: none (Phase 3 absolute-threshold fallback)
--> genre auto-detect: ON (self-correcting active profile)
--> lookahead: OFF (grounding on live master output only)
--> recording session -> 20260604-170307/  (voice.wav + input.wav + events.jsonl + session.json)
--> session trace -> 20260604-170307/trace.jsonl
--> midi_mirror wired
--> tts voice: Adam (from settings)
--> persona settings: mode=coach, mood=teacher, skill=intermediate
--> deck audio settings: VIBEMIX_DECK_AUDIO_CHANNELS=A=0,1;B=2,3
--> mood: teacher (from VIBEMIX_MOOD)
--> deck audio auto: upgraded input device 'BlackHole 2ch' -> 'BlackHole 16ch' (4ch)
--> djay passthrough -> MacBook Pro Speakers @ 48000Hz
--> mic disabled: set VIBEMIX_ENABLE_MIC=1 to enable mic capture
--> mode:  direct (GEMINI_API_KEY from .env)
--> brain: gemini-3.5-flash (thinking=minimal, temp=1.0)
--> tts:   MOSS-TTS-Nano local only (provider=moss-local)
--> profile: loaded (521 chars in cache section)
--> cache disabled: 
--> anti-slop: on
--> citation lint: off (VIBEMIX_CITATION_LINT)
--> secondary-ear: OFF (set VIBEMIX_GROUND_SECONDARY_EAR=1 to flip)
--> recall: disabled (set VIBEMIX_RECALL_ENABLED=1 to flip)
--> library: 187 tracks registered for [track:<id>] citations
--> mastered markers: dry-run; set VIBEMIX_WRITE_MASTERED_MARKERS=1 to write hot cues
--> library store: backend=SqliteVecStore reason=ok
--> grounding: armed (event-gated, threshold=0.7)
--> pill next-suggestion: armed
--> AI voice -> MacBook Pro Speakers @ 24000Hz
--> AgentSession headless (no Room); audio out → PlaybackQueue @ 24000Hz
--> agent started.
--> session IPC handlers wired onto mascot bus (12 types: settings/profile/recordings)
--> agent IPC bus bound (citation chips + overlay-highlight live)
--> library import + staleness handlers wired
--> staleness nudge emitted (0d stale)
--> library freshness watcher armed
--> MIDI controller in: 'DDJ-FLX4' (profile=pioneer_ddj_flx4, mode=callback)
--> lesson_runtime wired
--> learn headphone device 14 unavailable; falling back
--> learn lesson observers wired (L1.14/L1.16/L2.14)
--> learn IPC handlers wired (5 types: start_course/start_lesson/ack/complete_lesson/progress_state)
--> screen vision capture disabled (set VIBEMIX_DECK_VISION=1 to enable)
--> mascot bus on ws://127.0.0.1:8765 (send {action: trigger} for manual fire)
--> listening to BlackHole 16ch @ 48000Hz (4ch) -> audio_buf + clean_audio_buf
-[live] music=0.000                                | voice=0.117 #####      | audible=0 deck=none phase=silent  [live] music=0.000                                | voice=0.098 ####       | audible=0 deck=none phase=silent  [live] music=0.000                                | voice=0.053 ##         | audible=0 deck=none phase=silent  [live] music=0.000                                | voice=0.081 ####       | audible=0 deck=none phase=silent  [live] music=0.000                                | voice=0.061 ###        | audible=0 deck=none phase=silent  [live] music=0.000                                | voice=0.061 ###        | audible=0 deck=none phase=silent  [live] music=0.000                                | voice=0.061 ###        | audible=0 deck=none phase=silent  [live] music=0.000                                | voice=0.061 ###        | audible=0 deck=none phase=silent  [live] music=0.000                                | voice=0.061 ###        | audible=0 deck=none phase=silent  [live] music=0.000                                | voice=0.061 ###        | audible=0 deck=none phase=silent  
--> stopping...
-[session cost] ---------------------------------------
-  TOTAL €0.0000  |  cache-hit 0.0%  |  saved €0.0000
-------------------------------------------------------
--> bye
