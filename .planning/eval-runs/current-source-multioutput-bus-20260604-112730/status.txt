@@ -1,0 +1,2 @@
+[0001] ipc.status.tick  livekit=ok gemini=ok midi=1 screen=unavailable
+[0002] ipc.status.tick  livekit=ok gemini=ok midi=1 screen=unavailable

@@ -1,0 +1,46 @@
+{
+  "artifact": "current-source multi-output bus proof",
+  "branch": "ux-redesign-impeccable",
+  "git_head": "0357195a8771103dd27c06ec78de0094046070c4",
+  "git_head_short": "0357195a fix(session): a11y \u2014 announce the co-host line, keep the cite chip visible",
+  "input_route": "Rekordbox Multi-Output Device -> BlackHole 2ch capture (user-confirmed multi-output set)",
+  "launch_env": {
+    "VIBEMIX_DEV_SIDECAR": "1",
+    "VIBEMIX_ENABLE_MIC": "0",
+    "VIBEMIX_INPUT_DEVICE": "BlackHole 2ch",
+    "VIBEMIX_LOCAL_TTS": "0"
+  },
+  "notes": [
+    "No self-test tone was played.",
+    "No local TTS output was enabled; voice meter remained 0.0 in every captured mascot frame.",
+    "This proves current-source sidecar receives nonzero music over the multi-output/BlackHole path."
+  ],
+  "probe": {
+    "audible_false_frames": 0,
+    "audible_true_frames": 92,
+    "bpm_values": [
+      162.2
+    ],
+    "mascot_frames": 92,
+    "mic_values": [
+      0.0
+    ],
+    "music_rms_max": 0.024,
+    "music_rms_mean": 0.014674,
+    "music_rms_min": 0.002,
+    "status_ticks": 2,
+    "status_ticks_raw": [
+      "[0001] ipc.status.tick  livekit=ok gemini=ok midi=1 screen=unavailable",
+      "[0002] ipc.status.tick  livekit=ok gemini=ok midi=1 screen=unavailable"
+    ],
+    "voice_values": [
+      0.0
+    ]
+  },
+  "verdict": {
+    "engine_heard_master_audio": true,
+    "mic_was_muted": false,
+    "sidecar_status": "stopped_after_probe",
+    "voice_was_muted": false
+  }
+}
