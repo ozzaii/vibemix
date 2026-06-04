@@ -34,6 +34,12 @@ import "./chrome.css";
 import { loadMascotAssets } from "./asset-loader.js";
 import { dispatchEvent, type SnapshotSlice } from "./event-dispatcher.js";
 import {
+  FocusLayer,
+  type ControlRectPayload,
+  type FocusableOrganism,
+  type TeachingFocusPayload,
+} from "./focus-layer.js";
+import {
   MOOD_PROFILES,
   getCurrentMood,
   setCurrentMood,
@@ -122,6 +128,18 @@ async function boot(): Promise<void> {
 
   const renderer = new MascotRenderer(canvas, assets);
 
+  // ── Teaching-focus layer ───────────────────────────────────────────────
+  // Routes ipc.learn.control_rect (registry) + ipc.learn.teaching_focus
+  // (dissolve→stream→reform) into the particle organism. The organism is
+  // driven through a thin adapter over the renderer's passthrough methods so
+  // the FocusLayer stays WebGL-free + testable. Grounding: the organism
+  // animates ONLY on a real teaching_focus event.
+  const focusLayer = new FocusLayer();
+  const focusOrganism: FocusableOrganism = {
+    focusAt: (target, nowMs) => renderer.focusOrganismAt(target, nowMs),
+    reform: (nowMs) => renderer.reformOrganism(nowMs),
+  };
+
   // TEMP 2026-05-12 — write renderer debug snapshot to the diag overlay
   // so we can see camera framing + material binding without devtools.
   const diag = document.getElementById("mascot-diag");
@@ -192,6 +210,33 @@ async function boot(): Promise<void> {
 
   function handleMessage(message: unknown): void {
     const now = performance.now();
+
+    // Typed ipc.learn.* envelopes carry a `type` string; the 30Hz mascot
+    // frame carries type:"snapshot". Route the two teaching-focus envelopes
+    // BEFORE the snapshot branch — they drive the particle organism's focus
+    // mechanic (control_rect registers a screen rect; teaching_focus fires the
+    // dissolve→stream→reform). Grounding: no organism motion without one of
+    // these real events.
+    if (message && typeof message === "object") {
+      const envType = (message as { type?: unknown }).type;
+      if (envType === "ipc.learn.control_rect") {
+        const payload = (message as { payload?: ControlRectPayload }).payload;
+        if (payload) focusLayer.setControlRect(payload);
+        return;
+      }
+      if (envType === "ipc.learn.teaching_focus") {
+        const payload = (message as { payload?: TeachingFocusPayload }).payload;
+        if (payload) {
+          focusLayer.onTeachingFocus(
+            payload,
+            focusOrganism,
+            (cx, cy) => renderer.screenToWorld(cx, cy),
+            now,
+          );
+        }
+        return;
+      }
+    }
 
     // Snapshots are state-READERS — they update the dispatcher's view
     // of bpm/confidence/downbeat/mood. Snapshots do NOT trigger
@@ -279,10 +324,18 @@ async function boot(): Promise<void> {
   }
 
   // ── Bus subscription (or mock harness in DEV) ──────────────────────────
-  const mockMode =
-    import.meta.env?.DEV &&
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("dev") === "mascot-mock";
+  const devParam =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("dev")
+      : null;
+  const mockMode = import.meta.env?.DEV && devParam === "mascot-mock";
+  // ?dev=organism-probe — a runtime VISUAL RECEIPT for the particle organism.
+  // jsdom never compiles WebGL, so green vitest cannot prove the GLSL builds or
+  // that the teaching-focus dissolve actually moves pixels. This probe drives
+  // the organism through real focus/reform cycles (caused motion only, no free
+  // animation) over a dark backdrop so a Playwright pixel-variance check can
+  // assert the canvas is alive. Same grounding contract: every motion is caused.
+  const probeMode = import.meta.env?.DEV && devParam === "organism-probe";
 
   let bus: MascotBusClient | null = null;
   let mockTimer: ReturnType<typeof setInterval> | null = null;
@@ -315,6 +368,42 @@ async function boot(): Promise<void> {
       console.log(`${TAG} mock event:`, event);
       handleMessage(event);
     }, MOCK_EVENT_INTERVAL_MS);
+  } else if (probeMode) {
+    console.log(`${TAG} ?dev=organism-probe -> bus SKIPPED; organism focus/reform driver active`);
+    // Dark backdrop so the additive-blended organism reads against the page.
+    // mascot.html paints the page background on <html>, so set both.
+    document.documentElement.style.background = "#0a0708";
+    document.body.style.background = "#0a0708";
+    // Synthetic transport so beat pulse + breath have live data (the frame loop
+    // ramps downbeat_phase and oscillates voice while probeMode is on).
+    currentSnapshot.bpm = MOCK_BPM;
+    currentSnapshot.bpm_confidence = MOCK_BPM_CONFIDENCE;
+    const screenToWorld = (cx: number, cy: number) => renderer.screenToWorld(cx, cy);
+    // One caused cycle: register a control rect, dissolve+stream to it, hold,
+    // then reform. The motion only ever comes from a real teaching_focus event.
+    const driveFocusCycle = (): void => {
+      const w = window.innerWidth || 320;
+      const h = window.innerHeight || 400;
+      focusLayer.setControlRect({ control_id: "probe", deck: "a", cx: w * 0.72, cy: h * 0.34 });
+      focusLayer.onTeachingFocus(
+        { control_id: "probe", deck: "a", band: "low", phase: "focus" },
+        focusOrganism,
+        screenToWorld,
+        performance.now(),
+      );
+      console.log(`${TAG} [organism-probe] phase=focus`);
+      window.setTimeout(() => {
+        focusLayer.onTeachingFocus(
+          { control_id: "probe", deck: "a", band: "low", phase: "reform" },
+          focusOrganism,
+          screenToWorld,
+          performance.now(),
+        );
+        console.log(`${TAG} [organism-probe] phase=reform`);
+      }, 1800);
+    };
+    driveFocusCycle();
+    mockTimer = setInterval(driveFocusCycle, 3600);
   } else {
     bus = connectMascotBus("ws://127.0.0.1:8765");
     bus.addMessageListener(handleMessage);
@@ -338,10 +427,15 @@ async function boot(): Promise<void> {
 
     // 1. Update synthetic downbeat_phase in mock mode (so beat-lock scheduler
     //    has live data). Real mode: snapshots from sidecar update this.
-    if (mockMode) {
+    if (mockMode || probeMode) {
       const msPerBar = (60 / MOCK_BPM) * 4 * 1000;
       const elapsed = (now - mockPhaseStart) % msPerBar;
       currentSnapshot.downbeat_phase = elapsed / msPerBar;
+    }
+    // Probe: oscillate the voice envelope so breath displacement is visible and
+    // the pixel-variance receipt has continuous caused motion to measure.
+    if (probeMode) {
+      currentSnapshot.voice = 0.5 + 0.45 * Math.sin(now / 600);
     }
 
     // 2. Process any pending downbeat-scheduled switch.

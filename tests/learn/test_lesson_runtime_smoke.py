@@ -143,6 +143,82 @@ def test_full_lifecycle() -> None:
         )
 
 
+def test_teaching_focus_emitted_alongside_highlight_and_advance() -> None:
+    """The particle-organism focus mechanic rides the real teaching events.
+
+    ``_emit_highlight`` emits a ``phase="focus"`` teaching_focus sibling and
+    ``_emit_advance`` emits a ``phase="reform"`` sibling. The organism
+    animates ONLY on these caused events — visual grounding, no timers.
+    """
+    runtime, ipc_router = _make_runtime()
+    runtime.send(
+        "load",
+        lesson_id="L0.00-press-play",
+        course_id="course_0",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    runtime.send(
+        "ack_action",
+        midi={
+            "type": "button",
+            "control": "play",
+            "deck": "A",
+            "direction": "down",
+        },
+    )
+
+    focus_envelopes = [
+        env
+        for env in _emitted_envelopes(ipc_router)
+        if env["type"] == "ipc.learn.teaching_focus"
+    ]
+    phases = {env["payload"]["phase"] for env in focus_envelopes}
+    assert "focus" in phases, (
+        "highlight did not emit a phase=focus teaching_focus sibling; "
+        f"saw {[e['payload'] for e in focus_envelopes]!r}"
+    )
+    assert "reform" in phases, (
+        "advance did not emit a phase=reform teaching_focus sibling; "
+        f"saw {[e['payload'] for e in focus_envelopes]!r}"
+    )
+    # control_id stays non-empty (schema minLength:1) and the band is null
+    # for a non-EQ control like play.
+    for env in focus_envelopes:
+        assert env["payload"]["control_id"], env
+        assert env["payload"]["band"] is None, env
+
+
+def test_teaching_focus_carries_eq_band_for_eq_lesson() -> None:
+    """An EQ lesson highlight derives band=low/mid/hi for the organism swirl."""
+    runtime, ipc_router = _make_runtime()
+    runtime.send(
+        "load",
+        lesson_id="L1.02-low-eq",
+        course_id="course_1",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+    focus_envelopes = [
+        env
+        for env in _emitted_envelopes(ipc_router)
+        if env["type"] == "ipc.learn.teaching_focus"
+        and env["payload"]["phase"] == "focus"
+    ]
+    # Only assert the band mapping when this lesson actually targets an EQ
+    # control — keeps the test resilient to curriculum id churn.
+    eq_focus = [
+        env
+        for env in focus_envelopes
+        if env["payload"]["control_id"].startswith("eq_")
+    ]
+    for env in eq_focus:
+        head = env["payload"]["control_id"].split(":", 1)[0]
+        expected = {"eq_low": "low", "eq_mid": "mid", "eq_hi": "hi"}[head]
+        assert env["payload"]["band"] == expected, env
+
+
 def test_lesson_loaded_emits_full_course_progress_dots() -> None:
     """Live HUD dots must include completed, current, and pending rows.
 

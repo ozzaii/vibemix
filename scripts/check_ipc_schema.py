@@ -60,6 +60,7 @@ from vibemix.ui_bus import (
     LearnAdvance,
     LearnCompleteLesson,
     LearnControllerDetected,
+    LearnControlRect,
     LearnExemplarPlay,
     LearnExemplarStop,
     LearnHighlight,
@@ -71,6 +72,7 @@ from vibemix.ui_bus import (
     LearnProgressState,
     LearnStartCourse,
     LearnStartLesson,
+    LearnTeachingFocus,
     LearnTutorSpeak,
     LearnWaveformReady,
     LevelPair,
@@ -501,6 +503,25 @@ def _minimal_examples() -> list[tuple[str, object]]:
             LearnAdvance.make(
                 lesson_id="L0.00-press-play",
                 reason="action_matched",
+            ),
+        ),
+        # Organism focus mechanic — teaching_focus + control_rect relay.
+        (
+            "LearnTeachingFocus",
+            LearnTeachingFocus.make(
+                control_id="eq_low",
+                deck="A",
+                band="low",
+                phase="focus",
+            ),
+        ),
+        (
+            "LearnControlRect",
+            LearnControlRect.make(
+                control_id="eq_low",
+                deck="A",
+                cx=120.5,
+                cy=240.0,
             ),
         ),
         (

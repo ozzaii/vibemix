@@ -226,12 +226,13 @@ def _load_schema() -> dict:
 
 
 def test_oneof_count_parity_matches_dataclass_count() -> None:
-    """14 Learn-prefixed $refs in the schema's oneOf list (2 P91 + 12 P92+).
+    """18 Learn-prefixed $refs in the schema's oneOf list.
 
-    Mirrors the overall count-parity gate, now 73 wrappers against 73
-    oneOf entries; this test slices that gate down to the Learn-only
-    subset so a future Learn envelope cannot silently mask a Learn-side
-    regression.
+    2 P91 + 12 P92 + P93+ additions: LearnLiveGrade, LearnWaveformReady,
+    LearnPlayheadTick, and the organism focus mechanic's
+    LearnTeachingFocus + LearnControlRect. This test slices the overall
+    count-parity gate down to the Learn-only subset so a future Learn
+    envelope cannot silently mask a Learn-side regression.
     """
     schema = _load_schema()
     learn_refs = [
@@ -239,10 +240,10 @@ def test_oneof_count_parity_matches_dataclass_count() -> None:
         for entry in schema.get("oneOf", [])
         if "$ref" in entry and "Learn" in entry["$ref"]
     ]
-    assert len(learn_refs) == 14, (
-        f"expected 14 Learn $refs in schema oneOf (2 P91 + 12 P92+), got "
+    assert len(learn_refs) == 18, (
+        f"expected 18 Learn $refs in schema oneOf, got "
         f"{len(learn_refs)}: {[r.get('$ref') for r in learn_refs]!r}. "
-        "If you added a P93+ envelope, update the expected count here."
+        "If you added a Learn envelope, update the expected count here."
     )
 
 

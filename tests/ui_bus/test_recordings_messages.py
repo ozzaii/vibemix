@@ -322,10 +322,12 @@ def test_count_parity_at_72() -> None:
                 seen.add(obj)
                 wrapper_count += 1
 
-    assert len(_SCHEMA["oneOf"]) == 73, (
-        "schema oneOf count should be 73 after adding LearnLiveGrade"
+    assert len(_SCHEMA["oneOf"]) == 77, (
+        "schema oneOf count should be 77 after adding "
+        "LearnWaveformReady/LearnPlayheadTick and the organism "
+        "LearnTeachingFocus/LearnControlRect envelopes"
     )
-    assert wrapper_count == 73, f"wrapper count {wrapper_count} != 73"
+    assert wrapper_count == 77, f"wrapper count {wrapper_count} != 77"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

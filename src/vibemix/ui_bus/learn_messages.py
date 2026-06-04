@@ -520,6 +520,118 @@ class LearnAdvance:
         return json.loads(self.to_json())
 
 
+# -- ipc.learn.teaching_focus -----------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnTeachingFocusPayload:
+    """Payload of ``ipc.learn.teaching_focus``.
+
+    Sibling of :class:`LearnHighlight` that drives the particle-organism
+    focus mechanic — NOT an overload of the highlight (which carries a
+    16ms SVG paint budget). ``phase="focus"`` dissolves + streams the
+    organism to the named control; ``phase="reform"`` pulls it home on
+    advance. ``band`` carries the EQ band (``"low"``/``"mid"``/``"hi"``) or
+    ``None`` for non-EQ controls. The organism animates ONLY on a real
+    teaching-focus event — visual grounding, the anti-slop contract.
+    """
+
+    control_id: str
+    deck: Literal["", "A", "B", "C", "D"]
+    band: Literal["low", "mid", "hi"] | None
+    phase: Literal["focus", "reform"]
+
+
+@dataclass(frozen=True, slots=True)
+class LearnTeachingFocus:
+    """``ipc.learn.teaching_focus`` envelope wrapper (sidecar → shell)."""
+
+    type: Literal["ipc.learn.teaching_focus"]
+    ts: str
+    payload: LearnTeachingFocusPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        control_id: str,
+        deck: str,
+        band: str | None,
+        phase: str,
+    ) -> LearnTeachingFocus:
+        return cls(
+            type="ipc.learn.teaching_focus",
+            ts=_now_iso(),
+            payload=LearnTeachingFocusPayload(
+                control_id=control_id,
+                deck=deck,  # type: ignore[arg-type]
+                band=band,  # type: ignore[arg-type]
+                phase=phase,  # type: ignore[arg-type]
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
+# -- ipc.learn.control_rect -------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LearnControlRectPayload:
+    """Payload of ``ipc.learn.control_rect``.
+
+    Learn window → mascot window. Screen-space center of a highlighted
+    control's ``getBoundingClientRect``, relayed over the ws bus so the
+    separate mascot webview can convert screen→world and aim the focus
+    stream. Stored in the mascot's ``controlRectRegistry`` keyed
+    ``control_id:deck``.
+    """
+
+    control_id: str
+    deck: Literal["", "A", "B", "C", "D"]
+    cx: float
+    cy: float
+
+
+@dataclass(frozen=True, slots=True)
+class LearnControlRect:
+    """``ipc.learn.control_rect`` envelope wrapper (learn window → mascot)."""
+
+    type: Literal["ipc.learn.control_rect"]
+    ts: str
+    payload: LearnControlRectPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        control_id: str,
+        deck: str,
+        cx: float,
+        cy: float,
+    ) -> LearnControlRect:
+        return cls(
+            type="ipc.learn.control_rect",
+            ts=_now_iso(),
+            payload=LearnControlRectPayload(
+                control_id=control_id,
+                deck=deck,  # type: ignore[arg-type]
+                cx=float(cx),
+                cy=float(cy),
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        return json.loads(self.to_json())
+
+
 # -- ipc.learn.ack ----------------------------------------------------------
 
 

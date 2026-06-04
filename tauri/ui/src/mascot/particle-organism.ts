@@ -17,6 +17,9 @@ export interface OrganismSignals {
   readonly voice?: number;
   readonly beatPhase?: number;
   readonly bpmConfidence?: number;
+  /** Signed MIDI CC delta of the EQ knob being taught (-127..127). Drives
+   *  the tangential swirl near the focus target. Idle frames omit it. */
+  readonly eqKnobDelta?: number;
 }
 
 interface OrganismUniforms {
@@ -26,14 +29,22 @@ interface OrganismUniforms {
   readonly uPoseProgress: { value: number };
   readonly uFocusWeight: { value: number };
   readonly uFocusTarget: { value: Vector3 };
+  readonly uTangentialBias: { value: number };
 }
 
 const SIM_SIDE = 128;
 const PARTICLE_COUNT = SIM_SIDE * SIM_SIDE;
 const MAX_DELTA_SECONDS = 0.033;
-const FACE_PLANE_Z = 0.72;
-const MASK_CENTER_Y = 1.50;
+/** Z of the face plane; exported so the focus layer can pin screen→world
+ *  unprojections onto the same plane the mask lives on. */
+export const FACE_PLANE_Z = 0.72;
+/** Y centroid of the mask; the focus layer's self-focus fallback target. */
+export const MASK_CENTER_Y = 1.50;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+/** Per-frame decay of the EQ-knob swirl (tangential bias). A real CC delta
+ *  re-energises it; idle frames decay it to zero so there is no un-caused
+ *  swirl (grounding contract). */
+const KNOB_SWIRL_DECAY = 0.88;
 
 const VERTEX_SHADER = `
 uniform float uTime;
@@ -42,6 +53,7 @@ uniform float uBeatPulse;
 uniform float uPoseProgress;
 uniform float uFocusWeight;
 uniform vec3 uFocusTarget;
+uniform float uTangentialBias;
 uniform float uPointScale;
 
 attribute vec3 aMask;
@@ -77,7 +89,16 @@ void main() {
     cos(phase * 0.7 + uTime * 1.6) * 0.045,
     sin(phase * 1.9) * 0.018
   );
-  pos = mix(pos, uFocusTarget + focusLane, focus);
+  vec3 focused = uFocusTarget + focusLane;
+  // EQ-knob swirl: a tangential (perpendicular) velocity component around
+  // the focus target, signed by the CC delta. Caused only by a real knob
+  // move (uTangentialBias is decayed to 0 on idle frames), so the swirl
+  // never appears un-caused. Strength tracks the focus weight so it is local
+  // to the dissolved region, not the whole face.
+  vec2 toTarget = pos.xy - uFocusTarget.xy;
+  vec2 swirlDir = vec2(-toTarget.y, toTarget.x);
+  focused.xy += swirlDir * uTangentialBias * 0.12;
+  pos = mix(pos, focused, focus);
 
   vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mvPosition;
@@ -219,6 +240,9 @@ export class ParticleOrganism {
   private voice = 0;
   private beatPulse = 0;
   private previousBeatPhase: number | null = null;
+  /** Tangential swirl bias from the taught EQ knob; re-energised by a real
+   *  CC delta, decayed every frame so idle shows no swirl. */
+  private knobSwirl = 0;
   private disposed = false;
 
   constructor(private readonly scene: Scene) {
@@ -237,6 +261,7 @@ export class ParticleOrganism {
         uPoseProgress: { value: 0 },
         uFocusWeight: { value: 0 },
         uFocusTarget: { value: new Vector3(0, MASK_CENTER_Y, FACE_PLANE_Z) },
+        uTangentialBias: { value: 0 },
         uPointScale: { value: 6.2 },
         uBaseColor: { value: new Color(1.0, 0.65, 0.87) },
         uHotColor: { value: new Color(1.0, 0.86, 0.48) },
@@ -268,6 +293,25 @@ export class ParticleOrganism {
       }
       this.previousBeatPhase = phase;
     }
+    if (typeof signals.eqKnobDelta === "number" && signals.eqKnobDelta !== 0) {
+      this.setKnobSwirl(signals.eqKnobDelta);
+    }
+  }
+
+  /** Re-energise the EQ-knob swirl from a real CC delta. The sign sets the
+   *  swirl direction (knob turn direction); magnitude is normalised by the
+   *  127-tick CC range and clamped. The learn window separately rotates the
+   *  SVG `.knob-indicator` needle by `angleDeg = (value / 127) * 270 - 135`
+   *  (DDJ-FLX4 unipolar EQ knobs sweep +/-135 from noon) — that SVG needle
+   *  element is a design dependency, not added here. */
+  setKnobSwirl(knobDelta: number): void {
+    if (this.disposed) return;
+    const signed = Math.max(-1, Math.min(1, knobDelta / 127));
+    // Bias toward the strongest recent move rather than averaging, so a
+    // sharp turn reads as a sharp swirl.
+    if (Math.abs(signed) >= Math.abs(this.knobSwirl)) {
+      this.knobSwirl = signed;
+    }
   }
 
   morphToPill(nowMs: number): void {
@@ -291,6 +335,7 @@ export class ParticleOrganism {
     const dt = Math.min(MAX_DELTA_SECONDS, Math.max(0, deltaSeconds));
     this.elapsed += dt;
     this.beatPulse *= 0.85;
+    this.knobSwirl *= KNOB_SWIRL_DECAY;
     const snapshot = this.morph.update(nowMs);
     const target = snapshot.focusTarget ?? { x: 0, y: MASK_CENTER_Y, z: FACE_PLANE_Z };
     let poseProgress = snapshot.pose === "pill" ? 1 : 0;
@@ -306,6 +351,7 @@ export class ParticleOrganism {
     uniforms.uPoseProgress.value = poseProgress;
     uniforms.uFocusWeight.value = snapshot.focusWeight;
     uniforms.uFocusTarget.value.set(target.x, target.y, target.z);
+    uniforms.uTangentialBias.value = this.knobSwirl;
   }
 
   dispose(): void {

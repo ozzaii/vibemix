@@ -654,6 +654,36 @@ function mountLearnWindow(root: HTMLElement): {
     }
     if (stage.currentControllerId === null) return;
     applyHighlight(stageEl, payload);
+    emitControlRectForHighlight(payload);
+  };
+
+  // After painting a highlight, relay the matched control's screen-space
+  // center to the mascot window so its particle organism can stream the
+  // focus dissolve onto the real on-screen control position. The mascot is
+  // a separate webview with no shared DOM, so this ws-bus relay is the
+  // bridge (per VIBEMIX-ORGANISM-DIRECTION highlight-mechanic section).
+  const emitControlRectForHighlight = (payload: HighlightPayload): void => {
+    const targetId = payload.deck
+      ? `${payload.control_id}:${payload.deck}`
+      : payload.control_id;
+    const group = stageEl.querySelector<SVGGElement>(
+      `[data-control-id="${targetId}"]`,
+    );
+    if (!group) return;
+    const rect = group.getBoundingClientRect();
+    // Skip a zero-area rect (SVG not laid out yet / jsdom) — no useful center.
+    if (rect.width === 0 && rect.height === 0) return;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    void emitLearnIpc("ipc.learn.control_rect", {
+      control_id: payload.control_id,
+      deck: payload.deck,
+      cx,
+      cy,
+    }).catch((err: unknown) => {
+      // eslint-disable-next-line no-console
+      console.warn("[learn] control_rect emit failed:", err);
+    });
   };
 
   const repaintCurrentLessonHighlight = (): void => {

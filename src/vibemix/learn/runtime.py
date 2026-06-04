@@ -128,6 +128,7 @@ from vibemix.ui_bus.learn_messages import (
     LearnAdvance,
     LearnCompleteLesson,
     LearnHighlight,
+    LearnTeachingFocus,
     LearnLessonLoaded,
     LearnLiveGrade,
     LearnPlayheadTick,
@@ -246,6 +247,23 @@ def _control_and_deck(action: dict[str, Any]) -> tuple[str, str]:
 
 def _observable_control_id(control: str, deck: str) -> str:
     return f"{control}:{deck}" if deck else control
+
+
+# EQ band lookup for the organism teaching-focus swirl. A control like
+# ``eq_low``/``eq_mid``/``eq_hi`` carries a band so the mascot can localise
+# the focus glow + knob swirl to the right EQ region; everything else is
+# bandless (``None``).
+_EQ_BAND_BY_CONTROL: dict[str, str] = {
+    "eq_low": "low",
+    "eq_mid": "mid",
+    "eq_hi": "hi",
+}
+
+
+def _eq_band_for_control(control: str) -> str | None:
+    """Return the EQ band for a control, or ``None`` when it is not an EQ knob."""
+    head = control.split(":", 1)[0].strip()
+    return _EQ_BAND_BY_CONTROL.get(head)
 
 
 def _format_evidence_time(t_session: float) -> str:
@@ -1701,6 +1719,16 @@ class LessonRuntime(StateMachine):
                 key=_observable_control_id(control, deck),
                 t_session=self._evidence_time(),
             )
+            # Sibling emit: drive the particle-organism focus dissolve toward
+            # this control. Kept thin + caused-only — the organism animates
+            # ONLY on this real teaching event (visual grounding contract).
+            focus = LearnTeachingFocus.make(
+                control_id=control,
+                deck=deck,
+                band=_eq_band_for_control(control),
+                phase="focus",
+            ).to_dict()
+            self._ipc.emit(focus)
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 
@@ -2104,6 +2132,24 @@ class LessonRuntime(StateMachine):
                 reason=reason,
             ).to_dict()
             self._ipc.emit(advance)
+            # Sibling emit: reform the particle organism back into the mask.
+            # The matched action is the real cause — same grounding principle
+            # as the focus dissolve. The mascot's reform() ignores the target,
+            # but the envelope still carries the just-completed control so the
+            # control_id minLength contract holds and review tooling can pair
+            # the focus/reform legs.
+            expected = self._current_expected_action()
+            control = ""
+            deck = ""
+            if isinstance(expected, dict):
+                control, deck = _control_and_deck(expected)
+            focus = LearnTeachingFocus.make(
+                control_id=control or "lesson",
+                deck=deck,
+                band=_eq_band_for_control(control),
+                phase="reform",
+            ).to_dict()
+            self._ipc.emit(focus)
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 

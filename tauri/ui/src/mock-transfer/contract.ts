@@ -284,7 +284,13 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "mascot.hidden-label", purpose: "hidden legacy top-label compatibility node" },
       { wire: "mascot.hidden-state", purpose: "hidden legacy state-caption compatibility node" },
     ],
-    inbound: ["flat mascot frame", "ipc.mascot.mood_change", "deck_state"],
+    inbound: [
+      "flat mascot frame",
+      "ipc.mascot.mood_change",
+      "deck_state",
+      "ipc.learn.teaching_focus",
+      "ipc.learn.control_rect",
+    ],
     outbound: ["window geometry persistence"],
   },
 ] as const;

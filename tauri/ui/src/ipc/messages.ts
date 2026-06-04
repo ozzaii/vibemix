@@ -71,6 +71,8 @@ export type VibemixIPCMessages =
   | LearnLessonLoaded
   | LearnHighlight
   | LearnAdvance
+  | LearnTeachingFocus
+  | LearnControlRect
   | LearnAck
   | LearnTutorSpeak
   | LearnLiveGrade
@@ -794,6 +796,26 @@ export interface LearnAdvance {
   payload: {
     lesson_id: string;
     reason: "action_matched" | "user_skip";
+  };
+}
+export interface LearnTeachingFocus {
+  type: "ipc.learn.teaching_focus";
+  ts: string;
+  payload: {
+    control_id: string;
+    deck: "" | "A" | "B" | "C" | "D";
+    band: "low" | "mid" | "hi" | null;
+    phase: "focus" | "reform";
+  };
+}
+export interface LearnControlRect {
+  type: "ipc.learn.control_rect";
+  ts: string;
+  payload: {
+    control_id: string;
+    deck: "" | "A" | "B" | "C" | "D";
+    cx: number;
+    cy: number;
   };
 }
 export interface LearnAck {

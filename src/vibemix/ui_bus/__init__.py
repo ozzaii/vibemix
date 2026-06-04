@@ -28,6 +28,8 @@ from vibemix.ui_bus.learn_messages import (
     # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn module envelopes.
     LearnControllerDetected,
     LearnControllerDetectedPayload,
+    LearnControlRect,
+    LearnControlRectPayload,
     LearnExemplarPlay,
     LearnExemplarPlayPayload,
     LearnExemplarStop,
@@ -51,6 +53,8 @@ from vibemix.ui_bus.learn_messages import (
     LearnStartCoursePayload,
     LearnStartLesson,
     LearnStartLessonPayload,
+    LearnTeachingFocus,
+    LearnTeachingFocusPayload,
     LearnTeachingLoopPayload,
     LearnTeachingObservationPayload,
     LearnTeachingVerificationPayload,
@@ -321,6 +325,11 @@ __all__ = [
     "LearnControllerDetectedPayload",
     "LearnMidiPosition",
     "LearnMidiPositionPayload",
+    # Organism focus mechanic — teaching_focus + control_rect relay
+    "LearnTeachingFocus",
+    "LearnTeachingFocusPayload",
+    "LearnControlRect",
+    "LearnControlRectPayload",
     # Phase 92 TONE-02 / TONE-04 / LESSON-01..LESSON-06 / RENDER-04 —
     # lesson-runtime envelopes + AI highlight contract
     "LearnAck",

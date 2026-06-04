@@ -58,20 +58,24 @@ from vibemix.ui_bus import (
     LearnCompleteLesson,
     # Phase 91 RENDER-01 / RENDER-02 / RENDER-07 — Learn module envelopes.
     LearnControllerDetected,
+    LearnControlRect,
     LearnExemplarPlay,
     LearnExemplarStop,
     LearnHighlight,
     LearnLessonLoaded,
     LearnLiveGrade,
     LearnMidiPosition,
+    LearnPlayheadTick,
     LearnProgressDot,
     LearnProgressState,
     LearnStartCourse,
     LearnStartLesson,
+    LearnTeachingFocus,
     LearnTeachingLoopPayload,
     LearnTeachingObservationPayload,
     LearnTeachingVerificationPayload,
     LearnTutorSpeak,
+    LearnWaveformReady,
     LevelPair,
     LibraryImport,
     LibraryImportCancel,
@@ -520,6 +524,25 @@ def _make_examples() -> list[tuple[str, object]]:
                 reason="action_matched",
             ),
         ),
+        # Organism focus mechanic — teaching_focus + control_rect relay.
+        (
+            "LearnTeachingFocus",
+            LearnTeachingFocus.make(
+                control_id="eq_low",
+                deck="A",
+                band="low",
+                phase="focus",
+            ),
+        ),
+        (
+            "LearnControlRect",
+            LearnControlRect.make(
+                control_id="eq_low",
+                deck="A",
+                cx=120.5,
+                cy=240.0,
+            ),
+        ),
         (
             "LearnAck",
             LearnAck.make(
@@ -545,6 +568,41 @@ def _make_examples() -> list[tuple[str, object]]:
                 phase_error_beats=0.0,
                 score=1.0,
                 citation="[ev:BEATMATCH_GRADED@12.345]",
+            ),
+        ),
+        (
+            "LearnWaveformReady",
+            LearnWaveformReady.make(
+                sample_rate=44_100,
+                beat_interval_s=0.46875,
+                decks={
+                    "A": {
+                        "bpm": 128.0,
+                        "duration_s": 30.0,
+                        "peaks": ((16, 32, 64), (24, 48, 96)),
+                        "cues": (
+                            {"label": "intro", "start_s": 0.0, "end_s": 8.0},
+                        ),
+                    },
+                    "B": {
+                        "bpm": 128.0,
+                        "duration_s": 30.0,
+                        "peaks": ((12, 36, 72), (20, 40, 88)),
+                        "cues": (
+                            {"label": "drop", "start_s": 8.0, "end_s": 16.0},
+                        ),
+                    },
+                },
+            ),
+        ),
+        (
+            "LearnPlayheadTick",
+            LearnPlayheadTick.make(
+                sample_rate=44_100,
+                decks={
+                    "A": {"frame": 1024.0, "position_s": 0.023, "bpm": 128.0},
+                    "B": {"frame": 2048.0, "position_s": 0.046, "bpm": 127.2},
+                },
             ),
         ),
         (
@@ -607,9 +665,11 @@ def test_example_count_matches_schema_oneof() -> None:
     LearnTutorSpeak / LearnExemplarPlay / LearnExemplarStop /
     LearnProgressState) → 70. B3 adds LearnLiveGrade → 71.
     Phase 97 adds SessionSetMode → 72. Quick 260529-ifq adds
-    WizardSetSkill (onboarding skill-level step) → 73.
+    WizardSetSkill (onboarding skill-level step) → 73. Beatmatch practice
+    adds LearnWaveformReady + LearnPlayheadTick → 75. Organism focus
+    mechanic adds LearnTeachingFocus + LearnControlRect → 77.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 73
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 77
 
 
 @pytest.mark.parametrize(
@@ -700,18 +760,20 @@ def test_schema_oneof_count_is_72() -> None:
     LearnExemplarPlay / LearnExemplarStop / LearnProgressState) → 70.
     B3 adds LearnLiveGrade → 71. Phase 97 adds SessionSetMode → 72.
     Quick 260529-ifq adds WizardSetSkill (onboarding skill-level step) → 73.
+    Beatmatch practice adds LearnWaveformReady + LearnPlayheadTick → 75.
+    Organism focus mechanic adds LearnTeachingFocus + LearnControlRect → 77.
 
     ``definitions`` count grows alongside oneOf since every new wrapper
     adds one entry to both. ``LevelPair`` is a shared helper ref'd from
     ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message
     (so it counts in ``definitions`` but not in ``oneOf``); the skew
-    between the two counts is 2 after adding the payload-only
-    ``LearnTeachingLoop`` helper for ``LearnTutorSpeak`` metadata
-    (``WizardSetSkill``'s payload is inlined, not a separate definition,
-    so it adds 1 to both counts and the skew stays 2).
+    between the two counts is 3 — the payload-only ``LearnTeachingLoop``
+    helper for ``LearnTutorSpeak`` metadata plus the two
+    ``LearnWaveformDeck`` / ``LearnPlayheadDeck`` nested helpers contribute
+    to ``definitions`` but not to ``oneOf``.
     """
-    assert len(_SCHEMA["oneOf"]) == 73
-    assert len(_SCHEMA["definitions"]) == 75
+    assert len(_SCHEMA["oneOf"]) == 77
+    assert len(_SCHEMA["definitions"]) == 80
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

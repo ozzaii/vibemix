@@ -206,6 +206,12 @@
       "$ref": "#/definitions/LearnAdvance"
     },
     {
+      "$ref": "#/definitions/LearnTeachingFocus"
+    },
+    {
+      "$ref": "#/definitions/LearnControlRect"
+    },
+    {
       "$ref": "#/definitions/LearnAck"
     },
     {
@@ -2947,6 +2953,48 @@
           "properties": {
             "lesson_id": {"type": "string", "minLength": 1},
             "reason": {"type": "string", "enum": ["action_matched", "user_skip"]}
+          }
+        }
+      }
+    },
+    "LearnTeachingFocus": {
+      "$comment": "Sidecar → shell. Particle-organism focus trigger paired with a highlight. NOT an overload of ipc.learn.highlight (16ms SVG paint budget). phase=focus dissolves+streams the mascot organism to the control; phase=reform pulls it home on advance. band carries the EQ band (low/mid/hi) or null for non-EQ controls. Organism visual grounding — fires ONLY on a real teaching event.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.teaching_focus"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["control_id", "deck", "band", "phase"],
+          "properties": {
+            "control_id": {"type": "string", "minLength": 1},
+            "deck": {"type": "string", "enum": ["", "A", "B", "C", "D"]},
+            "band": {"type": ["string", "null"], "enum": ["low", "mid", "hi", null]},
+            "phase": {"type": "string", "enum": ["focus", "reform"]}
+          }
+        }
+      }
+    },
+    "LearnControlRect": {
+      "$comment": "Learn window → mascot window. Screen-space center of a highlighted control's getBoundingClientRect, relayed over the ws bus so the separate mascot webview can convert screen→world and aim the focus stream. Stored in the mascot's controlRectRegistry keyed control_id:deck.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.control_rect"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["control_id", "deck", "cx", "cy"],
+          "properties": {
+            "control_id": {"type": "string", "minLength": 1},
+            "deck": {"type": "string", "enum": ["", "A", "B", "C", "D"]},
+            "cx": {"type": "number"},
+            "cy": {"type": "number"}
           }
         }
       }

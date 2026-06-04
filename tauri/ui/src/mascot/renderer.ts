@@ -55,9 +55,11 @@ import {
   type ParticlePuffController,
 } from "./particle-puff.js";
 import {
+  FACE_PLANE_Z,
   ParticleOrganism,
   type OrganismSignals,
 } from "./particle-organism.js";
+import type { FocusWorldPoint } from "./focus-layer.js";
 import type { MascotState } from "./types.js";
 
 // ── Tuning constants (CONTEXT Area 2) ─────────────────────────────────────
@@ -506,6 +508,41 @@ export class MascotRenderer {
   setOrganismSignals(signals: OrganismSignals): void {
     if (this.disposed) return;
     this.organism.setSignals(signals);
+  }
+
+  /**
+   * Convert a screen-space pixel center (e.g. a control's
+   * getBoundingClientRect center relayed from the learn window) into a world
+   * point on the mask's face plane. The FocusLayer injects this so the
+   * teaching-focus dissolve aims at the real on-screen control position.
+   *
+   * NDC unproject through the live camera, then pin Z to the face plane so
+   * the glow lands on the mask depth rather than wherever the unproject ray
+   * happens to cross.
+   */
+  screenToWorld(cx: number, cy: number): FocusWorldPoint {
+    const canvas = this.renderer.domElement;
+    const clientW = canvas.clientWidth || canvas.width || 1;
+    const clientH = canvas.clientHeight || canvas.height || 1;
+    const ndcX = (cx / clientW) * 2 - 1;
+    const ndcY = -(cy / clientH) * 2 + 1;
+    const v = new Vector3(ndcX, ndcY, 0.5).unproject(this.camera);
+    v.z = FACE_PLANE_Z;
+    return { x: v.x, y: v.y, z: v.z };
+  }
+
+  /** Aim the organism's dissolve→stream at a world point. Passthrough so
+   *  index.ts can drive the organism via the FocusLayer without reaching
+   *  into the private field. */
+  focusOrganismAt(target: FocusWorldPoint, nowMs: number): void {
+    if (this.disposed) return;
+    this.organism.focusAt(target, nowMs);
+  }
+
+  /** Reform the organism back into the mask (caused by a matched action). */
+  reformOrganism(nowMs: number): void {
+    if (this.disposed) return;
+    this.organism.reform(nowMs);
   }
 
   /**
