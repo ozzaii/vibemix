@@ -72,6 +72,24 @@ ACK_ELIGIBLE_EVENTS: frozenset[str] = frozenset(
 )
 
 
+def _current_event_grounding_ref_context(
+    ev: Event,
+    registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None,
+) -> str | None:
+    """Render the current event's own exact citation when EventDetector registered it."""
+
+    if not registry_snapshot:
+        return None
+    observed = registry_snapshot.get("ev", {}).get(ev.type)
+    if not observed:
+        return None
+    try:
+        latest = max(float(t) for t in observed)
+    except (TypeError, ValueError):
+        return None
+    return f"grounding_refs[[ev:{ev.type}@{latest:.1f}]]"
+
+
 # ---- Phase 66 — Visible Copilot Move prompt fragments (COPILOT-01/02/03) ----
 #
 # Two module-scope fragment template strings + the dispatch helper
@@ -1023,15 +1041,20 @@ class AICoach:
                     f"The KICK PATTERN density shifted — the system measured it move "
                     f"from {prev} to {new} ({delta:+}); the pattern got {direction}. "
                     "Hand the DJ one forward nudge from that change: "
-                    f"{move_target}. Ground it only in the measured density shift. If "
-                    "it's not worth a call, output a single space to stay silent."
+                    f"{move_target}. Ground it only in the measured density shift. "
+                    "When the measured shift is the reason to speak, copy the current "
+                    "event bracket from grounding_refs and keep the line to one "
+                    "forward nudge. If it's not worth a call, output a single space "
+                    "to stay silent."
                 )
                 if isinstance(delta, (int, float))
                 else (
                     f"The KICK PATTERN density shifted — the system measured it move "
                     f"from {prev} to {new}. Hand the DJ one forward nudge from that "
-                    "measured shift. If it's not worth a call, output a single space "
-                    "to stay silent."
+                    "measured shift. When the measured shift is the reason to speak, "
+                    "copy the current event bracket from grounding_refs and keep the "
+                    "line to one forward nudge. If it's not worth a call, output a "
+                    "single space to stay silent."
                 )
             )
         if t == "DISTORTION_CLIMB":
@@ -1120,6 +1143,9 @@ class AICoach:
                 include_live_evidence=ev.type != "MIX_MOVE",
                 audio_capture_context=audio_capture_context,
             )
+            event_ref = _current_event_grounding_ref_context(ev, registry_snapshot)
+            if event_ref:
+                evidence = f"{evidence} | {event_ref}"
             task = AICoach.task_for_event(ev)
             recall_context = compact_recall_context_for_event(recall_moments)
             recall_frag = recall_fragment_for_event(ev, recall_moments, compact=True)
@@ -1130,6 +1156,9 @@ class AICoach:
             recall_moments=recall_moments,
             audio_capture_context=audio_capture_context,
         )
+        event_ref = _current_event_grounding_ref_context(ev, registry_snapshot)
+        if event_ref:
+            evidence = f"{evidence} | {event_ref}"
         task = AICoach.task_for_event(ev)
         # Phase 66 (COPILOT-01/02) — conditional recall fragment append.
         # ``recall_fragment_for_event`` returns ``""`` on cold/empty input

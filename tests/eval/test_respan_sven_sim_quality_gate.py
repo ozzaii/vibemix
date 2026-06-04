@@ -148,6 +148,18 @@ def test_quality_summary_fails_partial_or_misrouted_runs() -> None:
     assert "gate routing mismatch: idle_heartbeat expected silent got speak" in failures
 
 
+def test_kick_density_target_seeds_live_linter_event_ref() -> None:
+    registry = sim._registry_for_sim(sim.KICK_DENSITY_TARGET, {})
+
+    lint = sim.CitationLinter().check(
+        "Use the added space before the next layer. [ev:KICK_DENSITY_SHIFT@1281.0]",
+        registry.snapshot(),
+        mode="live",
+    )
+
+    assert lint.valid is True
+
+
 def test_line_or_grounded_fallback_uses_cue_receipt_when_model_is_empty() -> None:
     ev_extra = {
         "next_suggestion_voice_line": (
@@ -226,6 +238,76 @@ def test_line_or_grounded_fallback_replaces_incomplete_next_track_tail() -> None
     assert fallback_line is not None
     assert model_line == fallback_line
     assert line == "Line up a darker rolling 9A track next to keep this build moving."
+
+
+def test_live_linter_mode_uses_valid_grounded_receipt_fallback() -> None:
+    ev_extra = {"next_suggestion_voice_line": sim._FORWARD_READ_RECEIPT}
+    registry = sim._registry_for_sim({"evidence": ""}, ev_extra)
+
+    line, model_line, fallback_line, live_linter = sim._live_linter_checked_line(
+        "That darker 9A roller is ready next.",
+        "That darker 9A roller is ready next.",
+        None,
+        event_type="TRACK_CHANGE",
+        gate_reason="grounded_voice_payload",
+        ev_extra=ev_extra,
+        registry=registry,
+    )
+
+    assert live_linter["action"] == "fallback_emit"
+    assert live_linter["valid"] is True
+    assert "[track:track-42]" in model_line
+    assert "[mix:next_suggestion=track-42]" in model_line
+    assert line == "Line up a darker rolling 9A track next to keep this build moving."
+    assert fallback_line == model_line
+
+
+def test_live_linter_mode_strips_uncitable_model_citation_without_fallback() -> None:
+    registry = sim._registry_for_sim(
+        {"evidence": "grounding_refs[[midi:A_filter:_flat_to_cut_big_twist@612.4]]"},
+        {},
+    )
+
+    line, model_line, fallback_line, live_linter = sim._live_linter_checked_line(
+        "Let this roll [track:Raik - Trio d'Acid].",
+        "Let this roll [track:Raik - Trio d'Acid].",
+        None,
+        event_type="MIX_MOVE",
+        gate_reason="event_priority",
+        ev_extra={},
+        registry=registry,
+    )
+
+    assert line == ""
+    assert model_line == ""
+    assert fallback_line is None
+    assert live_linter["action"] == "strip"
+    assert live_linter["valid"] is False
+    assert live_linter["reason"] == "no_citations"
+
+
+def test_live_linter_mode_uses_registered_kick_event_fallback() -> None:
+    ev_extra = {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5}
+    registry = sim._registry_for_sim(sim.KICK_DENSITY_TARGET, ev_extra)
+
+    line, model_line, fallback_line, live_linter = sim._live_linter_checked_line(
+        "Bring a bright layer into the space. [",
+        "Bring a bright layer into the space. [",
+        None,
+        event_type="KICK_DENSITY_SHIFT",
+        gate_reason="event_priority",
+        ev_extra=ev_extra,
+        registry=registry,
+    )
+
+    assert live_linter["action"] == "event_fallback_emit"
+    assert live_linter["valid"] is True
+    assert model_line == (
+        "Use this added space for the next layer before the lows get busy again. "
+        "[ev:KICK_DENSITY_SHIFT@1281.0]"
+    )
+    assert line == "Use this added space for the next layer before the lows get busy again."
+    assert fallback_line == model_line
 
 
 def test_run_heartbeat_judge_propagates_required_quality_gate(monkeypatch) -> None:

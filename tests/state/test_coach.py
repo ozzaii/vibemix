@@ -15,7 +15,8 @@ from __future__ import annotations
 import inspect
 import time
 
-from vibemix.state import AICoach, Event, MusicState
+from vibemix.coach.citation_linter import CitationLinter
+from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState
 from vibemix.state.deck_context import midi_evidence_key
 from vibemix.state.deck_state import DeckState, DeckTrack
 
@@ -874,6 +875,7 @@ def test_task_kick_density_shift_grounds_on_density_delta():
     assert "0.35" in out
     assert "Hand the DJ one forward nudge" in out
     assert "hold the extra drive" in out
+    assert "copy the current event bracket from grounding_refs" in out
     assert "React to what" not in out
     assert "output a single space to stay silent" in out
 
@@ -892,6 +894,7 @@ def test_task_kick_density_shift_sparser_density_points_to_space_move():
     assert "the pattern got sparser" in out
     assert "use the added space" in out
     assert "Hand the DJ one forward nudge" in out
+    assert "copy the current event bracket from grounding_refs" in out
     assert "React to what" not in out
     assert "output a single space to stay silent" in out
 
@@ -1162,6 +1165,31 @@ def test_build_prompt_integrates_evidence_and_task():
     assert "event=KAAN_SPOKE" in out
     # Task is at the end (after `]`):
     assert out.endswith("Not a music reaction.")
+
+
+def test_build_prompt_renders_current_event_grounding_ref_that_lints():
+    ev = _ev(
+        "KICK_DENSITY_SHIFT",
+        {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5},
+    )
+
+    out = AICoach.build_prompt(
+        ev,
+        registry_snapshot={"ev": {"KICK_DENSITY_SHIFT": (1281.0,)}},
+    )
+
+    cite = "[ev:KICK_DENSITY_SHIFT@1281.0]"
+    assert f"grounding_refs[{cite}]" in out
+    assert "event=KICK_DENSITY_SHIFT" in out
+
+    registry = EvidenceRegistry()
+    registry.write("ev", "KICK_DENSITY_SHIFT", 1281.0)
+    lint = CitationLinter().check(
+        f"Use the added space before the next layer. {cite}",
+        registry.snapshot(),
+        mode="live",
+    )
+    assert lint.valid is True
 
 
 def test_build_prompt_track_change_with_prev_flows_through():

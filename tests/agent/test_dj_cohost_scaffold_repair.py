@@ -3,11 +3,14 @@ from __future__ import annotations
 
 from vibemix.agent.dj_cohost import (
     _could_be_finished_line_meta_scaffold,
+    _grounded_event_fallback_line,
     _grounded_receipt_fallback_line,
     _grounded_voice_payload_fallback_line,
     _has_unclosed_bracket_tail,
     repair_finished_headphone_line,
 )
+from vibemix.coach.citation_linter import CitationLinter
+from vibemix.state import EvidenceRegistry
 
 
 def test_final_polish_fragment_after_citation_tail_is_suppressed() -> None:
@@ -232,6 +235,34 @@ def test_grounded_voice_payload_fallback_prefers_cue_receipt() -> None:
     assert fallback == (
         "Hold this for about 4 bars; make the move on the next phrase. "
         "[cue:phrase_boundary@108.0]"
+    )
+
+
+def test_grounded_event_fallback_uses_registered_kick_density_event() -> None:
+    registry = EvidenceRegistry()
+    registry.write("ev", "KICK_DENSITY_SHIFT", 1281.0)
+
+    fallback = _grounded_event_fallback_line(
+        "KICK_DENSITY_SHIFT",
+        {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5},
+        registry.snapshot(),
+    )
+
+    assert fallback == (
+        "Use this added space for the next layer before the lows get busy again. "
+        "[ev:KICK_DENSITY_SHIFT@1281.0]"
+    )
+    assert CitationLinter().check(fallback, registry.snapshot(), mode="live").valid is True
+
+
+def test_grounded_event_fallback_abstains_without_registered_event() -> None:
+    assert (
+        _grounded_event_fallback_line(
+            "KICK_DENSITY_SHIFT",
+            {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5},
+            {},
+        )
+        is None
     )
 
 

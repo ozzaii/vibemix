@@ -26,6 +26,7 @@ Usage:
     uv run python scripts/eval/respan_sven_sim.py --gate-only # deterministic, no model
     uv run python scripts/eval/respan_sven_sim.py --no-log    # don't log to Respan
     uv run python scripts/eval/respan_sven_sim.py --include-kick-density-target
+    uv run python scripts/eval/respan_sven_sim.py --match-live-persona --match-live-linter
 """
 from __future__ import annotations
 
@@ -41,17 +42,19 @@ import httpx
 
 from vibemix.agent._streaming_pipe import last_balanced_position
 from vibemix.agent.dj_cohost import (
+    _grounded_event_fallback_line,
     _grounded_voice_payload_fallback_line,
     _has_unclosed_bracket_tail,
     repair_finished_headphone_line,
 )
 from vibemix.agent.tts_sanitizer import model_text_for_tts
 from vibemix.bench.fixtures import fixture_state_for
+from vibemix.coach.citation_linter import CitationLinter
 from vibemix.llm.model_router import resolve_model
 from vibemix.prompts.matrix import build_system_instruction
 from vibemix.runtime.speak_gate import decide_speak_gate
 from vibemix.runtime.suggestion_voice import build_next_suggestion_voice_line
-from vibemix.state import Event, EvidenceRegistry
+from vibemix.state import Event, EvidenceRegistry, parse_citations
 
 RESPAN_BASE = "https://api.respan.ai/api"
 GATEWAY = f"{RESPAN_BASE}/chat/completions"
@@ -109,6 +112,11 @@ _CUE_STATE = {
     "bpm": 120.0,
     "bpm_confidence": 0.95,
 }
+_FORWARD_READ_RECEIPT = (
+    "Forward read: a darker rolling 9A track pairs next - keeps the build. "
+    "Hand it as one nudge if it fits the live sound. "
+    "Copy these citations exactly: [track:track-42] [mix:next_suggestion=track-42]."
+)
 SCENARIOS = [
     {
         "name": "idle_heartbeat", "event": "HEARTBEAT", "extra": {}, "expect": "silent",
@@ -123,12 +131,12 @@ SCENARIOS = [
     },
     {
         "name": "heartbeat_with_grounded_payload", "event": "HEARTBEAT",
-        "extra": {"next_suggestion_voice_line": "Forward read: a darker rolling 9A track pairs next - keeps the build."},
+        "extra": {"next_suggestion_voice_line": _FORWARD_READ_RECEIPT},
         "expect": "speak",
         "evidence": (
             f"{_HEAR} | track=unknown | deck=A | recent_moves[8s]: NONE | "
-            "next_track_ready=true camelot=9A | "
-            'next_suggestion_voice_line="Forward read: a darker rolling 9A track pairs next - keeps the build."'
+            "next_track_ready=true track_id=track-42 camelot=9A | "
+            f'next_suggestion_voice_line="{_FORWARD_READ_RECEIPT}"'
         ),
         "task": "You have a grounded next-track suggestion (see payload). Hand it to Kaan as one forward nudge.",
     },
@@ -160,9 +168,14 @@ SCENARIOS = [
     },
     {
         "name": "track_change_with_next", "event": "TRACK_CHANGE",
-        "extra": {"next_suggestion_voice_line": "Forward read: a darker rolling 9A track pairs next - keeps the build."},
+        "extra": {"next_suggestion_voice_line": _FORWARD_READ_RECEIPT},
         "expect": "speak",
-        "evidence": f"{_HEAR} | track=\"Valence - Infinite\"->\"Raik - Trio d'Acid\" | deck=A | recent_moves[8s]: NONE | next_track_ready=true camelot=9A bpm=128",
+        "evidence": (
+            f"{_HEAR} | track=\"Valence - Infinite\"->\"Raik - Trio d'Acid\" | "
+            "deck=A | recent_moves[8s]: NONE | next_track_ready=true "
+            f"track_id=track-42 camelot=9A bpm=128 | next_suggestion_voice_line="
+            f'"{_FORWARD_READ_RECEIPT}"'
+        ),
         "task": "The track just changed and the packet carries a grounded next-track receipt. Hand one forward nudge.",
     },
 ]
@@ -174,11 +187,13 @@ KICK_DENSITY_TARGET = {
     "expect": "speak",
     "evidence": (
         f"{_HEAR} | track=unknown | deck=A | recent_moves[8s]: NONE | "
-        "kick_density=6.0->4.5 delta=-1.5 | onset density fell 13% (slight)"
+        "kick_density=6.0->4.5 delta=-1.5 | onset density fell 13% (slight) | "
+        "grounding_refs[[ev:KICK_DENSITY_SHIFT@1281.0]]"
     ),
     "task": (
         "The measured kick density got sparser with no controller move. Hand one forward "
-        "DJ nudge for how to use the added space, or stay silent if it is not worth a call."
+        "DJ nudge for how to use the added space, copying the current event bracket from "
+        "grounding_refs, or stay silent if it is not worth a call."
     ),
 }
 
@@ -206,6 +221,31 @@ def _extra_for_scenario(sc: dict, state: object) -> dict:
         if line:
             extra["next_suggestion_voice_line"] = line
     return extra
+
+
+def _seed_registry_from_text(text: object, registry: EvidenceRegistry) -> None:
+    if not isinstance(text, str) or not text:
+        return
+    for source, body in parse_citations(text):
+        if source in {"ev", "aud", "midi"}:
+            key, sep, t_raw = body.partition("@")
+            if not sep:
+                continue
+            try:
+                t_session = float(t_raw)
+            except ValueError:
+                continue
+            registry.write(source, key, t_session)
+        else:
+            registry.write(source, body, 0.0)
+
+
+def _registry_for_sim(sc: dict, ev_extra: dict) -> EvidenceRegistry:
+    registry = EvidenceRegistry()
+    _seed_registry_from_text(sc.get("evidence"), registry)
+    for value in ev_extra.values():
+        _seed_registry_from_text(value, registry)
+    return registry
 
 
 def _run_heartbeat_judge(
@@ -308,6 +348,64 @@ def _line_or_grounded_fallback(raw_line: str, *, gate_reason: str, ev_extra: dic
             model_line = fallback_line
             line = _spoken_line_for_judge(model_line)
     return line, model_line, fallback_line
+
+
+def _live_linter_checked_line(
+    line: str,
+    model_line: str,
+    fallback_line: str | None,
+    *,
+    event_type: str,
+    gate_reason: str,
+    ev_extra: dict,
+    registry: EvidenceRegistry,
+) -> tuple[str, str, str | None, dict]:
+    """Mirror the live response-level citation gate for sim scoring.
+
+    The live linter checks the full model text, not the TTS-stripped audience
+    text. When a grounded payload already exists and the model omitted or
+    mangled citations, the sim may use the same grounded receipt fallback only
+    if that fallback itself resolves against the seeded registry.
+    """
+
+    lint = CitationLinter().check(model_line, registry.snapshot(), mode="live")
+    if lint.valid:
+        return line, model_line, fallback_line, _lint_payload(lint, "emit")
+
+    if gate_reason == "grounded_voice_payload":
+        candidate = fallback_line or _grounded_voice_payload_fallback_line(ev_extra)
+        if candidate:
+            fallback_lint = CitationLinter().check(candidate, registry.snapshot(), mode="live")
+            if fallback_lint.valid:
+                return (
+                    _spoken_line_for_judge(candidate),
+                    candidate,
+                    candidate,
+                    _lint_payload(fallback_lint, "fallback_emit"),
+                )
+
+    candidate = _grounded_event_fallback_line(event_type, ev_extra, registry.snapshot())
+    if candidate:
+        fallback_lint = CitationLinter().check(candidate, registry.snapshot(), mode="live")
+        if fallback_lint.valid:
+            return (
+                _spoken_line_for_judge(candidate),
+                candidate,
+                candidate,
+                _lint_payload(fallback_lint, "event_fallback_emit"),
+            )
+
+    return "", "", fallback_line, _lint_payload(lint, "strip")
+
+
+def _lint_payload(lint_result, action: str) -> dict:
+    return {
+        "action": action,
+        "valid": bool(lint_result.valid),
+        "reason": lint_result.reason,
+        "citations_found": int(lint_result.citations_found),
+        "missing": [list(item) for item in lint_result.missing],
+    }
 
 
 def _score_value(scores: dict, dim: str) -> float | None:
@@ -451,6 +549,11 @@ def main() -> int:
         help="include the citation grammar block so the sim matches DJCoHostAgent's live prompt",
     )
     ap.add_argument(
+        "--match-live-linter",
+        action="store_true",
+        help="score only text that the live response-level CitationLinter would emit",
+    )
+    ap.add_argument(
         "--include-kick-density-target",
         action="store_true",
         help="append the recorded-set KICK_DENSITY_SHIFT weak spot as a quality target",
@@ -474,7 +577,8 @@ def main() -> int:
     print(
         "persona: "
         f"match_live_persona={args.match_live_persona} "
-        f"include_citation_grammar={include_citation_grammar}",
+        f"include_citation_grammar={include_citation_grammar} "
+        f"match_live_linter={args.match_live_linter}",
     )
 
     key = None
@@ -512,6 +616,18 @@ def main() -> int:
             gate_reason=gate.reason,
             ev_extra=ev_extra,
         )
+        live_linter = None
+        if args.match_live_linter:
+            registry = _registry_for_sim(sc, ev_extra)
+            line, model_line, fallback_line, live_linter = _live_linter_checked_line(
+                line,
+                model_line,
+                fallback_line,
+                event_type=sc["event"],
+                gate_reason=gate.reason,
+                ev_extra=ev_extra,
+                registry=registry,
+            )
         suppressed_model_line = bool(raw_line and not model_line and not line)
         if line:
             scores = _judge(sc["evidence"], line, key)
@@ -524,6 +640,8 @@ def main() -> int:
         else:
             scores = {}
         row.update({"line": line, "model_line": model_line, "raw_line": raw_line, "scores": scores})
+        if live_linter is not None:
+            row["live_linter"] = live_linter
         if suppressed_model_line:
             row["suppressed_model_line"] = True
         if fallback_line is not None:
@@ -542,6 +660,7 @@ def main() -> int:
                     "gate": gate.verdict,
                     "match_live_persona": args.match_live_persona,
                     "include_citation_grammar": include_citation_grammar,
+                    "match_live_linter": args.match_live_linter,
                     **{d: scores.get(d) for d in DIMS},
                 },
             }, key)
@@ -566,6 +685,7 @@ def main() -> int:
                         "model": MODEL,
                         "match_live_persona": args.match_live_persona,
                         "include_citation_grammar": include_citation_grammar,
+                        "match_live_linter": args.match_live_linter,
                         "include_kick_density_target": args.include_kick_density_target,
                         "quality_target_scenarios": list(target_scenarios),
                     },

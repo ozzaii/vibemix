@@ -363,6 +363,48 @@ def _grounded_voice_payload_fallback_line(ev_extra: dict[str, Any]) -> str | Non
     return f"{body}.{f' {citation_tail}' if citation_tail else ''}"
 
 
+def _latest_event_citation(
+    ev_tag: str,
+    registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None,
+) -> str | None:
+    if not ev_tag or not registry_snapshot:
+        return None
+    observed = registry_snapshot.get("ev", {}).get(ev_tag)
+    if not observed:
+        return None
+    latest: float | None = None
+    for value in observed:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            continue
+        if latest is None or parsed > latest:
+            latest = parsed
+    if latest is None:
+        return None
+    return f"[ev:{ev_tag}@{latest:.1f}]"
+
+
+def _grounded_event_fallback_line(
+    ev_tag: str,
+    ev_extra: dict[str, Any],
+    registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None,
+) -> str | None:
+    """Return a citable coach line for measured event-priority turns."""
+
+    if ev_tag != "KICK_DENSITY_SHIFT":
+        return None
+    cite = _latest_event_citation(ev_tag, registry_snapshot)
+    if cite is None:
+        return None
+    delta = ev_extra.get("delta")
+    if not isinstance(delta, (int, float)):
+        return None
+    if delta > 0:
+        return f"Hold that extra drive and keep the next layer clean. {cite}"
+    return f"Use this added space for the next layer before the lows get busy again. {cite}"
+
+
 def _unsupported_band_intensity_reason(
     text: str,
     state: MusicState,
@@ -3800,13 +3842,64 @@ class DJCoHostAgent(Agent):
                         else:
                             print("[ai_text] <empty> (skip TTS)", flush=True)
                     else:
+                        fallback_text = (
+                            _grounded_event_fallback_line(ev_tag, ev_extra, snapshot)
+                            if not head_yielded
+                            else None
+                        )
+                        fallback_lint_result = (
+                            self._linter.check(fallback_text, snapshot, mode="live")
+                            if fallback_text
+                            else None
+                        )
+                        if fallback_lint_result is not None and fallback_lint_result.valid:
+                            raw_fallback_text = full_text
+                            full_text = fallback_text or ""
+                            buffered_chunks = [full_text] if full_text else []
+                            lint_result = fallback_lint_result
+                            citation_action = "emit"
+                            citation_lint_valid = lint_result.valid
+                            citation_lint_reason = lint_result.reason
+                            citation_lint_missing_payload = [list(t) for t in lint_result.missing]
+                            spoken_text, emote_intents = strip_emote_tags(full_text)
+                            audience_text = model_text_for_tts(full_text)
+                            audience_stripped = audience_text.strip()
+                            for txt in buffered_chunks:
+                                tts_txt = _prepare_tts_segment(txt)
+                                if tts_txt:
+                                    yield tts_txt
+                            if self._stripped_tracker is not None:
+                                self._stripped_tracker.record(False)
+                                self._stripped_tracker.clear_last_unverified()
+                            self._recorder.log_event(
+                                "grounded_event_fallback",
+                                event=ev_tag,
+                                response_id=response_id,
+                                raw_text=raw_fallback_text,
+                                fallback_text=full_text,
+                                latency_s=round(elapsed, 2),
+                            )
+                            if audience_stripped:
+                                print(f"[ai_text] {audience_stripped!r}", flush=True)
+                                self._recorder.log_event(
+                                    "ai_text",
+                                    text=audience_text,
+                                    latency_s=round(elapsed, 2),
+                                )
+                                self._record_said(
+                                    audience_stripped[:140],
+                                    set_s_at_event=ev_set_seconds,
+                                    event=ev,
+                                )
+                                self._push_transcript(audience_stripped[:140])
+                            else:
+                                print("[ai_text] <empty> (skip TTS)", flush=True)
                         # Invalid — consult the one-shot bypass before stripping.
-                        bypass_active = (
+                        elif (
                             self._stripped_tracker.should_bypass()
                             if self._stripped_tracker is not None
                             else False
-                        )
-                        if bypass_active:
+                        ):
                             citation_action = "bypass"
                             # Plan 41-04 — same head_yielded guard as the
                             # valid path: chunks already in-flight, no
