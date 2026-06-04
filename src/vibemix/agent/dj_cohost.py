@@ -155,6 +155,8 @@ _FINISHED_LINE_META_PREFIX_RE = re.compile(
     r"^\s*(?:"
     r"check\s+constraints\b|"
     r"formulate\b|"
+    r"(?:\d+[.)]\s*)?(?:\*+\s*)?final\s+polish\b|"
+    r"(?:\d+[.)]\s*)?(?:\*+\s*)?drafting\s+the\s+final\s+response\b|"
     r"(?:[-*]\s*)?\*?\s*draft\s*\d+\b|"
     r"\d+\s*(?:and\s*)?(?:<=|<|>=|>)\s*\d+\s*words?\b|"
     r"\d+\s*,\s*(?:<=|<|>=|>)?\s*\d+\s*words?\b|"
@@ -164,10 +166,16 @@ _FINISHED_LINE_META_PREFIX_RE = re.compile(
 )
 _PARTIAL_FINISHED_LINE_META_PREFIX_RE = re.compile(
     r"^\s*(?:\d{1,2}\s*(?:$|,|and\b|words?\b|\))|check\s*(?:$|c)|formulate\s*$|"
+    r"(?:\d+[.)]\s*)?(?:\*+\s*)?final\s*(?:$|p)|"
+    r"(?:\d+[.)]\s*)?(?:\*+\s*)?drafting\s*(?:$|the\b)|"
     r"(?:[-*]\s*)?\*?\s*draft\s*(?:$|\d*))",
     re.IGNORECASE,
 )
 _QUOTED_FINISHED_LINE_RE = re.compile(r'"(?P<body>[^"\n]{8,220})(?:"|$)')
+_ORPHAN_CITATION_TAIL_PREFIX_RE = re.compile(
+    r"^\s*(?:[a-z]+:[^\s\]]+|\d+(?:\.\d+)?)\]\s*",
+    re.IGNORECASE,
+)
 _CHECK_CONSTRAINTS_PREFIX_RE = re.compile(
     r"^\s*(?:[-*]\s*)?(?:\*+\s*)?check\s+constraints\s*[:.)*-]*\s*",
     re.IGNORECASE,
@@ -178,6 +186,16 @@ _FORMULATE_PREFIX_RE = re.compile(
 )
 _DRAFT_PREFIX_RE = re.compile(
     r"^\s*(?:[-*]\s*)?(?:\*+\s*)?draft\s*\d+\s*(?:\*+\s*)?[:.)-]*\s*",
+    re.IGNORECASE,
+)
+_FINAL_POLISH_PREFIX_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\d+[.)]\s*)?(?:\*+\s*)?"
+    r"final\s+polish(?:\s*\([^)]*\))?\s*(?:\*+\s*)?[:.)*-]*\s*",
+    re.IGNORECASE,
+)
+_DRAFTING_FINAL_RESPONSE_PREFIX_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\d+[.)]\s*)?(?:\*+\s*)?"
+    r"drafting\s+the\s+final\s+response(?:\s*\([^)]*\))?\s*(?:\*+\s*)?[:.)*-]*\s*",
     re.IGNORECASE,
 )
 _WORD_COUNT_PREFIX_RE = re.compile(
@@ -191,7 +209,7 @@ _WORD_COUNT_PREFIX_RE = re.compile(
 _SPEAKER_PREFIX_RE = re.compile(r"^\s*(?:sven|you)\s*[:.)-]\s*", re.IGNORECASE)
 _META_LINE_RESIDUE_RE = re.compile(
     r"(?:<=|>=|<\s*\d+\s*words|\b\d+\s*words?\b|\bconstraints?\b|\bdraft\b|"
-    r"\bformulate\b|\bjson\b|\bshould_speak\b|\bfriend_not_narrator\b|"
+    r"\bformulate\b|\bfinal\s+polish\b|\bjson\b|\bshould_speak\b|\bfriend_not_narrator\b|"
     r"\bgrounded_not_fabricated\b)",
     re.IGNORECASE,
 )
@@ -254,7 +272,13 @@ def _repair_option_scaffold_line(text: str) -> str | None:
 
 
 def _starts_finished_line_meta_scaffold(text: str) -> bool:
-    return bool(_FINISHED_LINE_META_PREFIX_RE.match(text or ""))
+    stripped = (text or "").strip()
+    if not stripped:
+        return False
+    without_tail = _strip_orphan_citation_tail(stripped)
+    if without_tail != stripped:
+        return True
+    return bool(_FINISHED_LINE_META_PREFIX_RE.match(stripped))
 
 
 def _could_be_finished_line_meta_scaffold(text: str) -> bool:
@@ -263,11 +287,14 @@ def _could_be_finished_line_meta_scaffold(text: str) -> bool:
     stripped = (text or "").strip()
     if not stripped:
         return False
+    without_tail = _strip_orphan_citation_tail(stripped)
+    if without_tail != stripped:
+        return True
     lowered = stripped.lower()
     return (
         "check constraints".startswith(lowered)
         or "formulate".startswith(lowered)
-        or bool(_PARTIAL_FINISHED_LINE_META_PREFIX_RE.match(stripped))
+        or bool(_PARTIAL_FINISHED_LINE_META_PREFIX_RE.match(without_tail))
     )
 
 
@@ -285,6 +312,9 @@ def repair_finished_headphone_line(text: str) -> str | None:
     """Strip model-authored drafting wrappers without inventing a replacement."""
 
     stripped = (text or "").strip()
+    if not stripped:
+        return None
+    stripped = _strip_orphan_citation_tail(stripped).strip()
     if not stripped:
         return None
     if _starts_unspoken_packet_fragment(stripped):
@@ -307,9 +337,17 @@ def repair_finished_headphone_line(text: str) -> str | None:
         candidate = _FORMULATE_PREFIX_RE.sub("", candidate, count=1)
         candidate = _WORD_COUNT_PREFIX_RE.sub("", candidate, count=1)
         candidate = _DRAFT_PREFIX_RE.sub("", candidate, count=1)
+        candidate = _FINAL_POLISH_PREFIX_RE.sub("", candidate, count=1)
+        candidate = _DRAFTING_FINAL_RESPONSE_PREFIX_RE.sub("", candidate, count=1)
         if candidate == before:
             break
     return _clean_finished_line_candidate(candidate)
+
+
+def _strip_orphan_citation_tail(text: str) -> str:
+    """Remove a leading half-citation tail such as ``108.0]``."""
+
+    return _ORPHAN_CITATION_TAIL_PREFIX_RE.sub("", text or "", count=1)
 
 
 def _clean_finished_line_candidate(text: str) -> str | None:
