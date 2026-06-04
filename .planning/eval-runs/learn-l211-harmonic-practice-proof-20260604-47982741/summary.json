@@ -1,0 +1,96 @@
+{
+  "proof_id": "learn-l211-harmonic-practice-proof-20260604-47982741",
+  "commit": "47982741",
+  "ran_at_local": "2026-06-04T17:26:03+03:00",
+  "mode": "by-bus-live-sidecar",
+  "sidecar_env": {
+    "VIBEMIX_DEV_SIDECAR": "1",
+    "VIBEMIX_LEARN_PROGRESS_PATH": "/tmp/vibemix-l211-harmonic-progress.json"
+  },
+  "session_dir": "/Users/ozai/Library/Application Support/vibemix/recordings/20260604-172519",
+  "commands": [
+    "PYTHONPATH=src VIBEMIX_LEARN_PROGRESS_PATH=/tmp/vibemix-l211-harmonic-progress.json .venv/bin/python - <<'PY' ... seed LearnProgress ...",
+    "PYTHONPATH=src VIBEMIX_DEV_SIDECAR=1 VIBEMIX_LEARN_PROGRESS_PATH=/tmp/vibemix-l211-harmonic-progress.json .venv/bin/python -m vibemix",
+    "PYTHONPATH=src .venv/bin/python .claude/skills/drive-vibemix/scripts/ws_probe.py --ipc ipc.learn.start_lesson --payload-json '{\"lesson_id\":\"L2.11\",\"level\":\"beginner\"}' --watch ipc.learn --seconds 4",
+    "PYTHONPATH=src .venv/bin/python .claude/skills/drive-vibemix/scripts/ws_probe.py --ipc ipc.learn.ack --payload-json '{\"control_id\":\"lesson_continue\",\"source\":\"click\",\"value\":127,\"prev_value\":0,\"direction\":\"down\"}' --watch ipc.learn --seconds 2",
+    "PYTHONPATH=src .venv/bin/python .claude/skills/drive-vibemix/scripts/ws_probe.py --ipc ipc.learn.ack --payload-json '{\"control_id\":\"lesson_continue\",\"source\":\"click\",\"value\":127,\"prev_value\":0,\"direction\":\"down\"}' --watch ipc.learn --seconds 2",
+    "PYTHONPATH=src .venv/bin/python .claude/skills/drive-vibemix/scripts/ws_probe.py --ipc ipc.learn.ack --payload-json '{\"control_id\":\"lesson_continue\",\"source\":\"click\",\"value\":127,\"prev_value\":0,\"direction\":\"down\"}' --watch ipc.learn --seconds 5"
+  ],
+  "observed": {
+    "lesson_loaded": {
+      "type": "ipc.learn.lesson_loaded",
+      "lesson_id": "L2.11",
+      "course_id": "course_2_transitions"
+    },
+    "library_pair_prompt": {
+      "type": "ipc.learn.tutor_speak",
+      "tts_marker": "L211.library_pair",
+      "text": "your library pair: Acid Sweep into daftpunk-bass. 7B, -2 BPM. load the first, then tap continue.",
+      "citations": [
+        "[track:folder:039030678757825e]",
+        "[track:folder:5ea7b67594ea630b]"
+      ]
+    },
+    "waveform_and_audio_gate": {
+      "waveform_ready_seen": true,
+      "playhead_tick_seen": true,
+      "sample_rate": 44100,
+      "deck_a_bpm": 128.0,
+      "deck_b_bpm": 124.16
+    },
+    "first_two_continue_presses": {
+      "beat1_tutor_seen": true,
+      "beat2_tutor_seen": true,
+      "harmonic_receipt_before_final_press": false
+    },
+    "final_continue_press": {
+      "mastered_tutor_speak": {
+        "text": "Harmonic mixing is mastered from cited compatible-key practice.",
+        "tts_marker": "L2.11.mastered.harmonic_mixing",
+        "citations": [
+          "[ev:HARMONIC_PRACTICE_GRADED@43.363]"
+        ]
+      },
+      "progress_snapshot_seen": true,
+      "advance_seen": true,
+      "complete_lesson_seen": true
+    },
+    "events_jsonl": {
+      "learn_harmonic_practice_graded": {
+        "lesson_id": "L2.11",
+        "course_id": "course_2_transitions",
+        "step_id": "L2.11.beat.2",
+        "evidence_time": 43.363057136535645,
+        "source_track_id": "folder:039030678757825e",
+        "target_track_id": "folder:5ea7b67594ea630b",
+        "relation": "7B, -2 BPM",
+        "credited": [
+          "harmonic_mixing"
+        ]
+      },
+      "learn_lesson_completed": {
+        "lesson_id": "L2.11",
+        "reason": "completed",
+        "strikes_used": 0
+      }
+    },
+    "temp_progress_after_probe": {
+      "harmonic_mixing": {
+        "live_proof_count": 3,
+        "mastered": true
+      },
+      "lesson_L2_11": {
+        "completed": true,
+        "demonstrated": true,
+        "practice_sources": {
+          "hardware": 0,
+          "screen": 3
+        }
+      }
+    }
+  },
+  "notes": [
+    "This proof used a throwaway progress file so the user's real Learn progress was not mutated.",
+    "This is by-bus/live-sidecar proof. Human by-ear verification was not claimed."
+  ]
+}
