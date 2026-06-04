@@ -1,20 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
 """Phase 33 / Plan 33-09 — API-key entry surface assertion.
 
-Memory rule (project_one_click_install_hard_req): vibemix NEVER ships
-a UI surface that accepts a Gemini API key from the user. The proxy
-sits at Bravoh and rate-limits per client; there is no key entry,
-no settings field, no env-var prompt.
+Original memory rule (project_one_click_install_hard_req): vibemix shipped with
+no UI surface that accepts a Gemini API key from the user.
+
+Kaan D2 updated the product policy: direct mode may expose exactly one BYO key
+surface in the Settings BRAIN group, because democratizing Sven for users who
+bring their own Gemini key is now intentional. The field must stay masked,
+write-only, redacted by IPC logging, and scoped to settings only.
 
 This gate greps the Tauri UI source tree (and the install docs) for
-ANY indication of a key-entry surface:
+any non-approved key-entry surface:
 
   - Literal Gemini key prefixes ("AIza...") in strings.
   - Label / placeholder text mentioning "api key" / "gemini key" /
     "api_token" (case-insensitive).
   - <input> elements whose surrounding label contains those tokens.
 
-Any match fails the build with file:line for triage.
+Any non-approved match fails the build with file:line for triage.
 """
 
 from __future__ import annotations
@@ -52,6 +55,9 @@ EXCLUDED_PATHS = (
     # still fully covered by test_no_api_key_input_field_in_wizard_or_settings.
     "tauri/ui/src/crash-banner.ts",
 )
+
+ALLOWED_BYO_KEY_SURFACE = "tauri/ui/src/settings/components/brain-group.ts"
+IPC_CLIENT = REPO_ROOT / "tauri" / "ui" / "src" / "ipc" / "client.ts"
 
 # Regex catalogue.
 FORBIDDEN_PATTERNS = (
@@ -95,6 +101,10 @@ def _match_in_file(path: Path) -> list[tuple[int, str, str]]:
     return matches
 
 
+def _is_allowed_byo_key_surface(path: Path) -> bool:
+    return path.relative_to(REPO_ROOT).as_posix() == ALLOWED_BYO_KEY_SURFACE
+
+
 def test_no_api_key_input_field_in_wizard_or_settings() -> None:
     """Grep every wizard + settings TS file for API-key entry surfaces."""
     offenders: list[tuple[Path, list[tuple[int, str, str]]]] = []
@@ -104,7 +114,7 @@ def test_no_api_key_input_field_in_wizard_or_settings() -> None:
         if "wizard/" not in rel and "settings/" not in rel:
             continue
         matches = _match_in_file(path)
-        if matches:
+        if matches and not _is_allowed_byo_key_surface(path):
             offenders.append((path, matches))
     assert not offenders, _format_offenders(offenders)
 
@@ -115,9 +125,26 @@ def test_no_api_key_label_text_anywhere_in_ui() -> None:
     offenders: list[tuple[Path, list[tuple[int, str, str]]]] = []
     for path in _scan_files():
         matches = _match_in_file(path)
-        if matches:
+        if matches and not _is_allowed_byo_key_surface(path):
             offenders.append((path, matches))
     assert not offenders, _format_offenders(offenders)
+
+
+def test_byo_key_surface_is_single_masked_write_only_and_redacted() -> None:
+    """The D2 BYO exception is one scoped Settings field, not a free pass."""
+    path = REPO_ROOT / ALLOWED_BYO_KEY_SURFACE
+    body = path.read_text(encoding="utf-8")
+    ipc_client = IPC_CLIENT.read_text(encoding="utf-8")
+
+    assert not FORBIDDEN_PATTERNS[0].search(body), "brain group contains a full Gemini key"
+    assert body.count('keyWrap.dataset.wire = "settings.brain.key"') == 1
+    assert body.count('input.type = "password"') == 1
+    assert 'input.autocomplete = "off"' in body
+    assert "input.spellcheck = false" in body
+    assert 'input.setAttribute("aria-label", "Gemini API key")' in body
+    assert "{ mode: \"direct\", gemini_api_key: key }" in body
+    assert "clearInput: true" in body
+    assert '"ipc.settings.set_brain": ["gemini_api_key"]' in ipc_client
 
 
 def _format_offenders(
