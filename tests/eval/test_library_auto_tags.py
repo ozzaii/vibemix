@@ -165,6 +165,14 @@ def test_build_report_with_labels_scores_template_and_bare(tmp_path: Path, monke
     assert report["label_set"]["complete_rows"] == 1
     assert report["label_set"]["evaluation_complete_rows"] == 1
     assert report["label_set"]["min_required_rows"] == 50
+    assert report["label_set"]["enough_complete_eval_rows"] is False
+    assert report["claim_gate"] == {
+        "final_precision_recall_claim_allowed": False,
+        "evaluation_complete_rows": 1,
+        "min_required_rows": 50,
+        "reason": "needs_50_complete_holdout_rows_for_final_claim",
+    }
+    assert report["notes"]["no_final_accuracy_claim_without_min_labels"] is True
     assert report["label_set"]["calibration_strategy"] == "explicit_holdout_default_thresholds"
     assert report["modes"]["template"]["metrics"]["micro"]["precision"] >= 0.0
     assert report["comparison"]["primary_metric"] == "micro_f1"
@@ -266,6 +274,51 @@ def test_partial_label_rows_do_not_satisfy_complete_row_gate(
     assert report["label_set"]["evaluation_rows"] == 2
     assert report["label_set"]["evaluation_complete_rows"] == 1
     assert report["status"] == "measured_small_hand_label_subset"
+
+
+def test_enough_complete_rows_allow_final_claim_gate(
+    tmp_path: Path, monkeypatch
+) -> None:
+    labels = tmp_path / "labels.jsonl"
+    labels.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "track_id": f"t{i}",
+                    "split": "holdout",
+                    "mood": ["dark"],
+                    "texture": ["raw"],
+                    "instrument": [],
+                }
+            )
+            + "\n"
+            for i in range(2)
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        lat,
+        "_load_store",
+        lambda: (
+            ["t0", "t1"],
+            np.asarray([[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=np.float32),
+            "FakeStore",
+            "snap",
+        ),
+    )
+    monkeypatch.setattr(lat, "ClapEngine", lambda: _FakeEngine())
+
+    report = lat.build_report(labels_path=labels, min_hand_labels=2)
+
+    assert report["status"] == "ok"
+    assert report["label_set"]["enough_complete_eval_rows"] is True
+    assert report["claim_gate"] == {
+        "final_precision_recall_claim_allowed": True,
+        "evaluation_complete_rows": 2,
+        "min_required_rows": 2,
+        "reason": "ok_minimum_complete_holdout_met",
+    }
+    assert report["notes"]["no_final_accuracy_claim_without_min_labels"] is False
 
 
 def test_label_audit_reports_missing_partial_and_complete_rows(tmp_path: Path) -> None:

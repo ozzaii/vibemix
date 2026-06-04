@@ -618,6 +618,7 @@ def build_report(
     calibration_rows, eval_rows, calibration_strategy = _rows_by_split(rows)
     complete_rows = _complete_rows(rows)
     complete_eval_rows = _complete_rows(eval_rows)
+    enough_complete_eval_rows = len(complete_eval_rows) >= min_hand_labels
 
     mode_reports: dict[str, Any] = {}
     for mode in ("bare", "template"):
@@ -662,7 +663,7 @@ def build_report(
         }
         status = (
             "ok"
-            if len(complete_eval_rows) >= min_hand_labels
+            if enough_complete_eval_rows
             else "measured_small_hand_label_subset"
         )
 
@@ -705,8 +706,19 @@ def build_report(
             "calibration_rows": len(calibration_rows),
             "calibration_strategy": calibration_strategy if rows else None,
             "min_required_rows": min_hand_labels,
+            "enough_complete_eval_rows": enough_complete_eval_rows,
             "unknown_tags": labels["unknown_tags"],
             "hook": "create eval/private/library/auto_tag_labels.jsonl with track_id + mood/texture/instrument tags",
+        },
+        "claim_gate": {
+            "final_precision_recall_claim_allowed": enough_complete_eval_rows,
+            "evaluation_complete_rows": len(complete_eval_rows),
+            "min_required_rows": min_hand_labels,
+            "reason": (
+                "ok_minimum_complete_holdout_met"
+                if enough_complete_eval_rows
+                else "needs_50_complete_holdout_rows_for_final_claim"
+            ),
         },
         "label_template": {
             "status": "needed" if template_rows else "not_needed",
@@ -723,6 +735,7 @@ def build_report(
             "no_torch_or_librosa": True,
             "cached_audio_vectors_only": True,
             "no_accuracy_claim_without_labels": labels["status"] != "ok",
+            "no_final_accuracy_claim_without_min_labels": not enough_complete_eval_rows,
             "honest_caveat": (
                 "precision/recall and template-vs-bare claims require the private "
                 "hand-labeled auto_tag_labels.jsonl set"
