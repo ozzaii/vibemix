@@ -25,14 +25,14 @@ export function mountDrillsPanel(
     article.className = "vmx-drill";
     article.dataset.drillIndex = String(i);
 
+    // The situation IS the title (the real line); "Drill N" was template filler.
     const h3 = document.createElement("h3");
     h3.className = "vmx-drill-title";
-    h3.textContent = `Drill ${i + 1}`;
+    h3.textContent = d.situation;
 
     const dl = document.createElement("dl");
     dl.className = "vmx-drill-fields";
     for (const [label, value] of [
-      ["Situation", d.situation],
       ["Behavior", d.behavior],
       ["Impact", d.impact],
       ["Action", d.action_recommended],

@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe("drills-panel", () => {
-  it("renders 3 articles with 4 <dt>/<dd> rows each", () => {
+  it("titles each card with the situation and renders 3 SBI rows (no 'Drill N' filler)", () => {
     const div = document.createElement("div");
     document.body.append(div);
     mountDrillsPanel(div, [drill, drill, drill]);
@@ -28,10 +28,12 @@ describe("drills-panel", () => {
     );
     expect(articles.length).toBe(3);
     for (const a of articles) {
+      // The real situation line is the title, not "Drill 1/2/3".
+      expect(a.querySelector(".vmx-drill-title")?.textContent).toBe("S");
       const dts = a.querySelectorAll("dt");
       const dds = a.querySelectorAll("dd");
-      expect(dts.length).toBe(4);
-      expect(dds.length).toBe(4);
+      expect(dts.length).toBe(3);
+      expect(dds.length).toBe(3);
     }
   });
 
