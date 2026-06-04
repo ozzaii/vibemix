@@ -59,10 +59,20 @@ def test_estimates_a_minor() -> None:
     assert estimate.camelot == "8A"
 
 
-def test_equal_relative_triad_abstains_instead_of_overclaiming() -> None:
+def test_equal_relative_triad_emits_low_confidence_by_default() -> None:
     audio = _synth([(261.63, 1.0), (329.63, 1.0), (392.00, 1.0)])
 
-    assert estimate_key_from_audio(audio, sr=SR) is None
+    estimate = estimate_key_from_audio(audio, sr=SR)
+
+    assert estimate is not None
+    assert estimate.musical == "C"
+    assert estimate.confidence < 0.01
+
+
+def test_equal_relative_triad_can_still_abstain_with_positive_floor() -> None:
+    audio = _synth([(261.63, 1.0), (329.63, 1.0), (392.00, 1.0)])
+
+    assert estimate_key_from_audio(audio, sr=SR, confidence_floor=0.01) is None
 
 
 def test_white_noise_abstains() -> None:
@@ -74,4 +84,3 @@ def test_white_noise_abstains() -> None:
 
 def test_silence_abstains() -> None:
     assert estimate_key_from_audio(np.zeros(SR, dtype=np.float32), sr=SR) is None
-
