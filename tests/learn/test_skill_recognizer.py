@@ -29,7 +29,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from vibemix.learn.progress import LearnProgress
-from vibemix.learn.skill_recognizer import CONTROL_PRACTICE_GRADED_EVENT, recognize
+from vibemix.learn.skill_recognizer import (
+    CONTROL_PRACTICE_GRADED_EVENT,
+    HARMONIC_PRACTICE_GRADED_EVENT,
+    recognize,
+)
 from vibemix.learn.skill_tree import SKILL_MANIFEST, SkillTree
 
 # A fixed injected timestamp — recognize/record_live_demo never call a clock;
@@ -242,6 +246,50 @@ def test_learn_control_practice_event_credits_only_matched_allowed_skills() -> N
     assert _recognize(unmatched_event, citation_check=_cited, progress=progress, now=_NOW) == []
     assert _count(progress, "harmonic_mixing") == 0
     assert _count(progress, "deck_control") == 0
+
+
+def test_harmonic_practice_event_credits_only_compatible_real_pair() -> None:
+    """L2.11's owned practice receipt credits harmonic_mixing, but no proxy skills."""
+
+    progress = _competent_progress("harmonic_mixing", "transitions")
+    good_event = SimpleNamespace(
+        type=HARMONIC_PRACTICE_GRADED_EVENT,
+        extra={
+            "source_track_id": "source",
+            "target_track_id": "target",
+            "harmonic_score": 0.88,
+            "harmonic_compatible": True,
+        },
+        _t=43.0,
+    )
+    clash_event = SimpleNamespace(
+        type=HARMONIC_PRACTICE_GRADED_EVENT,
+        extra={
+            "source_track_id": "source",
+            "target_track_id": "target",
+            "harmonic_score": 0.12,
+            "harmonic_compatible": False,
+        },
+        _t=44.0,
+    )
+    same_track_event = SimpleNamespace(
+        type=HARMONIC_PRACTICE_GRADED_EVENT,
+        extra={
+            "source_track_id": "source",
+            "target_track_id": "source",
+            "harmonic_score": 0.88,
+            "harmonic_compatible": True,
+        },
+        _t=45.0,
+    )
+
+    assert _recognize(good_event, citation_check=_cited, progress=progress, now=_NOW) == [
+        "harmonic_mixing"
+    ]
+    assert _recognize(clash_event, citation_check=_cited, progress=progress, now=_NOW) == []
+    assert _recognize(same_track_event, citation_check=_cited, progress=progress, now=_NOW) == []
+    assert _count(progress, "harmonic_mixing") == 1
+    assert _count(progress, "transitions") == 0
 
 
 # ---------------------------------------------------------------------------

@@ -77,9 +77,13 @@ from vibemix.learn.graduation import (
     graduation_citations,
 )
 from vibemix.learn.harmonic_practice import (
+    HARMONIC_PRACTICE_EVIDENCE_SOURCE,
+    HARMONIC_PRACTICE_GRADED_EVENT,
     HarmonicPracticePair,
+    HarmonicPracticeResult,
     HarmonicPracticeTrack,
     build_harmonic_practice_prompt,
+    grade_harmonic_practice_pair,
     harmonic_practice_citations,
     pick_harmonic_practice_pair,
 )
@@ -144,6 +148,8 @@ __all__ = [
     "CUE_PLACEMENT_EVIDENCE_SOURCE",
     "CUE_PLACEMENT_GRADED_EVENT",
     "CURRICULUM",
+    "HARMONIC_PRACTICE_EVIDENCE_SOURCE",
+    "HARMONIC_PRACTICE_GRADED_EVENT",
     "LEARN_TUTOR_ROUTE",
     "SCHEMA_VERSION",
     "TEACHING_LOOP_STAGES",
@@ -163,6 +169,7 @@ __all__ = [
     "ExemplarPlayer",
     "GraduationSummary",
     "HarmonicPracticePair",
+    "HarmonicPracticeResult",
     "HarmonicPracticeTrack",
     "LearnProgress",
     "LearnState",
@@ -188,6 +195,7 @@ __all__ = [
     "compute_band_shares",
     "course_lesson_ids",
     "cue_grade_to_event_extra",
+    "grade_harmonic_practice_pair",
     "grade_minideck_beatmatch_attempt",
     "grade_owned_beatmatch_attempt",
     "grade_owned_cue_placement_attempt",

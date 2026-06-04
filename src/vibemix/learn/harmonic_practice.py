@@ -10,14 +10,17 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
+from vibemix.learn.skill_recognizer import HARMONIC_PRACTICE_GRADED_EVENT, recognize
 from vibemix.library.track_relation import TrackRelation, compute_relation
 from vibemix.state.harmonics import to_camelot
 
 _MAX_TRACKS_TO_SCAN = 200
 _MAX_DISPLAY_NAME_CHARS = 54
 _MAX_PROMPT_CHARS = 260
+HARMONIC_PRACTICE_EVIDENCE_SOURCE = "ev"
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +58,16 @@ class HarmonicPracticePair:
     def why(self) -> str:
         """Return the human harmonic/tempo relation phrase."""
         return self.relation.why()
+
+
+@dataclass(frozen=True, slots=True)
+class HarmonicPracticeResult:
+    """Outcome of one grounded L2.11 harmonic practice action."""
+
+    event: Any | None
+    credited: tuple[str, ...]
+    t_session: float
+    pair: HarmonicPracticePair | None = None
 
 
 def pick_harmonic_practice_pair(
@@ -110,6 +123,67 @@ def pick_harmonic_practice_pair(
             if best is None or _pair_sort_key(pair) < _pair_sort_key(best):
                 best = pair
     return best
+
+
+def grade_harmonic_practice_pair(
+    pair: HarmonicPracticePair,
+    *,
+    evidence_registry: Any,
+    t_session: float,
+    progress: Any,
+    now: str,
+    lesson_id: str,
+) -> HarmonicPracticeResult:
+    """Write and recognize a cited compatible-pair practice receipt.
+
+    The pair picker already filters for compatible Camelot relations. This
+    function repeats the compatibility check at the evidence boundary so a
+    direct caller cannot turn an incompatible pair into Skill Wall credit.
+    """
+
+    if not pair.relation.harmonic_compatible:
+        return HarmonicPracticeResult(
+            event=None,
+            credited=(),
+            t_session=t_session,
+            pair=pair,
+        )
+    extra = {
+        "lesson_id": lesson_id,
+        "source_track_id": pair.source.track_id,
+        "target_track_id": pair.target.track_id,
+        "source_camelot": pair.source.camelot,
+        "target_camelot": pair.target.camelot,
+        "relation": pair.why,
+        "harmonic_score": float(pair.relation.harmonic),
+        "harmonic_compatible": True,
+    }
+    event = SimpleNamespace(type=HARMONIC_PRACTICE_GRADED_EVENT, extra=extra)
+    evidence_registry.write(
+        HARMONIC_PRACTICE_EVIDENCE_SOURCE,
+        HARMONIC_PRACTICE_GRADED_EVENT,
+        t_session,
+    )
+    credited = tuple(
+        recognize(
+            event,
+            citation_check=lambda source, key, t: evidence_registry.has(
+                source,
+                key,
+                t,
+                tol=1.0,
+            ),
+            progress=progress,
+            now=now,
+            event_t=t_session,
+        )
+    )
+    return HarmonicPracticeResult(
+        event=event,
+        credited=credited,
+        t_session=t_session,
+        pair=pair,
+    )
 
 
 def build_harmonic_practice_prompt(pair: HarmonicPracticePair) -> str:
@@ -237,9 +311,13 @@ def _safe_citation_body(value: str) -> bool:
 
 
 __all__ = [
+    "HARMONIC_PRACTICE_EVIDENCE_SOURCE",
+    "HARMONIC_PRACTICE_GRADED_EVENT",
     "HarmonicPracticePair",
+    "HarmonicPracticeResult",
     "HarmonicPracticeTrack",
     "build_harmonic_practice_prompt",
+    "grade_harmonic_practice_pair",
     "harmonic_practice_citations",
     "pick_harmonic_practice_pair",
 ]

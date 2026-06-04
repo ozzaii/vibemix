@@ -106,8 +106,11 @@ from vibemix.learn.graduation import (
     graduation_citations,
 )
 from vibemix.learn.harmonic_practice import (
+    HARMONIC_PRACTICE_GRADED_EVENT,
     HarmonicPracticePair,
+    HarmonicPracticeResult,
     build_harmonic_practice_prompt,
+    grade_harmonic_practice_pair,
     harmonic_practice_citations,
 )
 from vibemix.learn.lesson_flow import LessonFlow, LessonStep, build_lesson_flow
@@ -656,6 +659,7 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
         self._waveform_ready_lesson_id: str | None = None
+        self._active_harmonic_pair: HarmonicPracticePair | None = None
         self._recovery_drill_armed_step_key: tuple[str, int] | None = None
         self._recovery_drill_armed_citation: str | None = None
         self._cue_placement_practice_lock_active = False
@@ -1253,6 +1257,11 @@ class LessonRuntime(StateMachine):
                 expected=expected,
                 evidence_time=evidence_time,
             )
+            self._record_harmonic_practice_action(
+                midi,
+                expected=expected,
+                evidence_time=evidence_time,
+            )
             self._record_beatmatch_practice_action(midi)
             self._record_cue_placement_practice_action(midi)
 
@@ -1353,6 +1362,83 @@ class LessonRuntime(StateMachine):
             control=result.control,
             deck=result.deck,
             skill_id=result.skill_id or "",
+            credited=list(result.credited),
+        )
+        return result
+
+    def _record_harmonic_practice_action(
+        self,
+        midi: dict[str, Any],
+        *,
+        expected: dict[str, Any] | None,
+        evidence_time: float,
+    ) -> HarmonicPracticeResult | None:
+        """Credit L2.11 harmonic practice only from the final grounded pair step."""
+
+        if (
+            self._learn.current_lesson_id != "L2.11"
+            or self._evidence_registry is None
+            or self._active_harmonic_pair is None
+            or expected is None
+        ):
+            return None
+        expected_control, _expected_deck = _control_and_deck(expected)
+        midi_control, _midi_deck = _control_and_deck(midi)
+        if expected_control != "lesson_continue" or midi_control != "lesson_continue":
+            return None
+        if self._flow_step(self._active_step_index + 1) is not None:
+            return None
+
+        before_mastered = self._mastered_flags()
+        try:
+            result = grade_harmonic_practice_pair(
+                self._active_harmonic_pair,
+                evidence_registry=self._evidence_registry,
+                t_session=evidence_time,
+                progress=self._progress,
+                now=datetime.now(UTC).isoformat(),
+                lesson_id=self._learn.current_lesson_id or "",
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] harmonic practice grade failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return None
+        if result.event is None:
+            return result
+        if result.credited:
+            citation = f"[ev:{HARMONIC_PRACTICE_GRADED_EVENT}@{result.t_session:.3f}]"
+            self._emit_mastered_unlocks(
+                result.credited,
+                before_mastered,
+                citations=(citation,),
+            )
+            try:
+                from vibemix.learn.progress import LearnProgress, save_progress
+
+                if isinstance(self._progress, LearnProgress):
+                    save_progress(self._progress)
+            except Exception as exc:  # pragma: no cover - defensive
+                import sys
+
+                print(
+                    f"[learn.runtime] harmonic practice progress save failed: {exc!r}",
+                    file=sys.stderr,
+                )
+            self._emit_progress_snapshot()
+        pair = result.pair
+        self._log_session_event(
+            "learn_harmonic_practice_graded",
+            lesson_id=self._learn.current_lesson_id or "",
+            course_id=self._learn.current_course_id or "",
+            step_id=self._current_step_id(),
+            evidence_time=result.t_session,
+            source_track_id=pair.source.track_id if pair is not None else "",
+            target_track_id=pair.target.track_id if pair is not None else "",
+            relation=pair.why if pair is not None else "",
             credited=list(result.credited),
         )
         return result
@@ -1787,6 +1873,7 @@ class LessonRuntime(StateMachine):
         self._state_entered_at = self._learn.lesson_started_at
         self._active_flow = None
         self._active_step_index = 0
+        self._active_harmonic_pair = None
         self._recovery_drill_armed_step_key = None
         self._recovery_drill_armed_citation = None
 
@@ -2944,6 +3031,7 @@ class LessonRuntime(StateMachine):
             return
         if pair is None:
             return
+        self._active_harmonic_pair = pair
         try:
             speak = LearnTutorSpeak.make(
                 text=build_harmonic_practice_prompt(pair),

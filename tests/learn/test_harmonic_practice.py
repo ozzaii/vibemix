@@ -5,12 +5,16 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from vibemix.learn.harmonic_practice import (
+    HARMONIC_PRACTICE_GRADED_EVENT,
     HarmonicPracticePair,
     HarmonicPracticeTrack,
     build_harmonic_practice_prompt,
+    grade_harmonic_practice_pair,
     harmonic_practice_citations,
     pick_harmonic_practice_pair,
 )
+from vibemix.learn.progress import LearnProgress
+from vibemix.learn.skill_tree import SKILL_MANIFEST
 from vibemix.library.track_relation import compute_relation
 from vibemix.state.evidence_registry import EvidenceRegistry
 
@@ -124,6 +128,31 @@ def test_citations_require_registry_resolution_and_safe_track_ids() -> None:
     assert harmonic_practice_citations(pair, None) == ()
 
 
+def test_grades_compatible_pair_through_cited_skill_spine() -> None:
+    progress = LearnProgress()
+    _make_competent(progress, "harmonic_mixing")
+    registry = EvidenceRegistry()
+    pair = _pair("t1", "t2")
+
+    result = grade_harmonic_practice_pair(
+        pair,
+        evidence_registry=registry,
+        t_session=88.5,
+        progress=progress,
+        now="2026-06-04T00:00:00Z",
+        lesson_id="L2.11",
+    )
+
+    assert result.event is not None
+    assert result.event.type == HARMONIC_PRACTICE_GRADED_EVENT
+    assert result.event.extra["source_track_id"] == "t1"
+    assert result.event.extra["target_track_id"] == "t2"
+    assert result.event.extra["harmonic_compatible"] is True
+    assert registry.has("ev", HARMONIC_PRACTICE_GRADED_EVENT, 88.5, tol=1.0)
+    assert result.credited == ("harmonic_mixing",)
+    assert progress.skills["harmonic_mixing"]["live_proof_count"] == 1
+
+
 def _pair(source_id: str, target_id: str) -> HarmonicPracticePair:
     source = HarmonicPracticeTrack(
         track_id=source_id,
@@ -154,3 +183,14 @@ def _pair(source_id: str, target_id: str) -> HarmonicPracticePair:
         relation=relation,
         score=1.0,
     )
+
+
+def _make_competent(progress: LearnProgress, skill_id: str) -> None:
+    spec = SKILL_MANIFEST[skill_id]
+    for lesson_id in spec.lesson_ids:
+        progress.lessons[lesson_id] = {
+            "completed": True,
+            "completed_at": "2026-06-04T00:00:00Z",
+            "strikes_used": 0,
+        }
+    setattr(progress, spec.gate, True)

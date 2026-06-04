@@ -81,6 +81,7 @@ EVENT_SKILL_MAP: dict[str, tuple[str, ...]] = {
     "PHRASE_BOUNDARY": ("phrasing_performance",),  # the genre-chain variant
     "RECOVERY_DRILL_RECOVERED": ("transitions",),  # owned-deck bailout recovered
 }
+HARMONIC_PRACTICE_GRADED_EVENT = "HARMONIC_PRACTICE_GRADED"
 
 # MIX_MOVE move-label substrings → the skill each significance class credits.
 # These mirror the EventDetector significance set (event_detector.py:325-334)
@@ -201,6 +202,24 @@ def _candidate_skills(event: Any) -> list[str]:
         if extra.get("verdict") in {"beat_locked", "drop_locked"}:
             return ["phrasing_performance"]
         return []
+
+    if ev_type == HARMONIC_PRACTICE_GRADED_EVENT:
+        # Learn-owned Camelot practice. The runtime emits this only after L2.11
+        # has surfaced a real compatible library pair and the learner reaches the
+        # final continue action. It is a harmonic-practice proof, not a proxy for
+        # transitions or beatmatching.
+        extra = getattr(event, "extra", None)
+        if not isinstance(extra, dict):
+            return []
+        if not bool(extra.get("harmonic_compatible")):
+            return []
+        if not _positive_numeric_component(extra.get("harmonic_score")):
+            return []
+        source_track_id = str(extra.get("source_track_id", "") or "").strip()
+        target_track_id = str(extra.get("target_track_id", "") or "").strip()
+        if not source_track_id or not target_track_id or source_track_id == target_track_id:
+            return []
+        return ["harmonic_mixing"]
 
     if ev_type == CONTROL_PRACTICE_GRADED_EVENT:
         # Learn-owned control practice. The runtime emits this only after the
