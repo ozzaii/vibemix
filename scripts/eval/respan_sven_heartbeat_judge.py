@@ -47,6 +47,8 @@ from pathlib import Path
 import httpx  # vibemix core dep; run via `uv run python …`
 
 from vibemix.llm.model_router import resolve_model
+from vibemix.runtime.speak_gate import decide_speak_gate
+from vibemix.state import Event, MusicState
 
 RESPAN_BASE = "https://api.respan.ai/api"
 GATEWAY = f"{RESPAN_BASE}/chat/completions"
@@ -88,6 +90,38 @@ DIMS = [
     "move_specific_not_spectrum",
     "voice_no_slop",
 ]
+
+
+def apply_current_gate_replay(rows: list[dict]) -> tuple[list[dict], dict]:
+    """Filter recorded spoken rows through today's deterministic speak gate.
+
+    This replays the event type from recorded invocation metadata. It does not
+    reconstruct old ``event.extra`` payloads, so it is intentionally best for
+    no-payload describe-bank burns where the event type itself was the failure.
+    """
+
+    kept: list[dict] = []
+    silenced: list[dict] = []
+    silenced_by_event: dict[str, int] = {}
+    for row in rows:
+        event_type = str(row.get("event") or "")
+        decision = decide_speak_gate(Event(event_type, MusicState(), extra={}))
+        row["current_gate"] = {
+            "verdict": decision.verdict,
+            "reason": decision.reason,
+        }
+        if decision.verdict == "speak":
+            kept.append(row)
+        else:
+            silenced.append(row)
+            silenced_by_event[event_type] = silenced_by_event.get(event_type, 0) + 1
+    summary = {
+        "input_spoken_rows": len(rows),
+        "kept_for_judge": len(kept),
+        "silenced_by_current_gate": len(silenced),
+        "silenced_by_event": dict(sorted(silenced_by_event.items())),
+    }
+    return kept, summary
 
 
 # The evidence Sven ACTUALLY had is the leading bracket bundle in prompt.txt
@@ -253,6 +287,11 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--concurrency", type=int, default=4)
     ap.add_argument("--dataset-tag", default="sven-heartbeat-real-set")
+    ap.add_argument(
+        "--apply-current-gate",
+        action="store_true",
+        help="score only rows today's speak gate would still allow from recorded metadata",
+    )
     ap.add_argument("--dry-run", action="store_true", help="assemble rows, no network")
     ap.add_argument("--no-log", action="store_true", help="judge but do not log to Respan")
     ap.add_argument("--out", type=Path, default=None)
@@ -263,10 +302,33 @@ def main() -> int:
     if not rows:
         print("no rows", file=sys.stderr)
         return 1
+    current_gate_replay = None
+    if args.apply_current_gate:
+        rows, current_gate_replay = apply_current_gate_replay(rows)
+        print(
+            "-> current gate replay: "
+            f"{current_gate_replay['silenced_by_current_gate']} silenced, "
+            f"{current_gate_replay['kept_for_judge']} kept",
+            file=sys.stderr,
+        )
+        if not rows:
+            print(json.dumps({"current_gate_replay": current_gate_replay}, indent=2))
+            if args.out:
+                args.out.write_text(
+                    json.dumps(
+                        {"report": {"current_gate_replay": current_gate_replay}, "rows": []},
+                        indent=2,
+                        ensure_ascii=False,
+                    )
+                )
+                print(f"-> wrote {args.out}", file=sys.stderr)
+            return 0
 
     if args.dry_run:
         for r in rows[:8]:
             print(f"\n[{r['id']}] ({r['event']})\n  EVIDENCE: {r['digest']}\n  LINE: {r['line']}")
+        if current_gate_replay is not None:
+            print(json.dumps({"current_gate_replay": current_gate_replay}, indent=2))
         print(f"\n(dry-run) {len(rows)} rows ready; no network.", file=sys.stderr)
         return 0
 
@@ -305,6 +367,8 @@ def main() -> int:
                 key=lambda x: (x["friend"] if isinstance(x["friend"], (int, float)) else 9),
             )[:8],
         }
+        if current_gate_replay is not None:
+            report["current_gate_replay"] = current_gate_replay
         print(json.dumps(report, indent=2, ensure_ascii=False))
         if args.out:
             args.out.write_text(json.dumps({"report": report, "rows": ok}, indent=2, ensure_ascii=False))
