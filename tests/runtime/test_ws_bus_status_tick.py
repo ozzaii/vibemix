@@ -150,7 +150,12 @@ def test_status_tick_built_from_probes_is_schema_valid(monkeypatch):
         "midi": 1,
         "screen": "ok",
         "voice": None,
+        "capture_device": None,
     }
+
+
+def test_status_capture_device_prefers_opened_device_name():
+    assert ws_bus._status_capture_device({"device_name": " eqMac   Export "}) == "eqMac Export"
 
 
 def test_status_tick_accepts_screen_unavailable():

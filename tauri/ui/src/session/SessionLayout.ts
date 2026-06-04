@@ -98,6 +98,7 @@ export interface SessionState {
     midi: number | null;
     screen: "ok" | "denied" | "unavailable" | null;
     voice?: "ok" | "muted" | null;
+    captureDevice?: string | null;
     muted: boolean;
     hotkey: string;
     /** Recheck a down status input via ipc.status.recheck. */
@@ -1498,7 +1499,7 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
         ? "screen proof unavailable"
         : "screen proof checking";
   const action = audioWaiting
-    ? "capture silent · Route DJ output into capture."
+    ? `${captureDeviceLabel(state.status.captureDevice)} silent · Route DJ output there.`
     : controllerWaiting
       ? `${screen} · Move a control once, I will not guess.`
       : `${screen} · Start playback, I will not guess.`;
@@ -1520,7 +1521,7 @@ function setIdleProof(mounted: Mounted, state: SessionState): void {
   setIdleCell(mounted.idleProofCells.sven, sven);
   setIdleCell(mounted.idleProofCells.controller, controller);
   setIdleCell(mounted.idleProofCells.screen, screen);
-  const next = idleProofNext(audio, controller, screen);
+  const next = idleProofNext(audio, controller, screen, state.status.captureDevice);
   if (mounted.idleProofNext.textContent !== next) mounted.idleProofNext.textContent = next;
 }
 
@@ -1537,9 +1538,11 @@ function idleProofNext(
   audio: { label: string; state: IdleProofState },
   controller: { label: string; state: IdleProofState },
   screen: { label: string; state: IdleProofState },
+  captureDevice?: string | null,
 ): string {
   if (audio.label === "waiting") {
-    return "Route DJ output into capture. Sven waits for sound.";
+    const device = captureDeviceLabel(captureDevice);
+    return `${device} is silent. Route DJ output there.`;
   }
   if (controller.label === "no motion") {
     return "Move the controller once. Sven waits for proof.";
@@ -1551,6 +1554,11 @@ function idleProofNext(
 
 function musicSignalActive(music: SessionState["meters"]["music"]): boolean {
   return Math.max(music.rms || 0, music.peak || 0) > 0.015;
+}
+
+function captureDeviceLabel(captureDevice?: string | null): string {
+  const text = (captureDevice ?? "").trim().replace(/\s+/g, " ");
+  return text || "capture";
 }
 
 function audioProof(
@@ -1723,6 +1731,7 @@ export function defaultState(): SessionState {
       midi: null,
       screen: null,
       voice: null,
+      captureDevice: null,
       muted: false,
       hotkey: "⌘⇧M",
       errors: {},

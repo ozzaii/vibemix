@@ -51,6 +51,7 @@ export interface StatusFlags {
   midi: number | null;
   screen: "ok" | "denied" | "unavailable" | null;
   voice?: "ok" | "muted" | null;
+  captureDevice?: string | null;
 }
 
 export type ClaimPolicyLevel = "green" | "yellow" | "red";
@@ -213,6 +214,7 @@ function makeDefault(): SessionState {
       midi: null,
       screen: null,
       voice: null,
+      captureDevice: null,
     },
     settings: {
       voice: "Adam",

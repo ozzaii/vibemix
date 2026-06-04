@@ -424,6 +424,17 @@ def _deck_pair_capture_configured(audio_capture_context: dict[str, object] | Non
     return all(side in deck_channels and deck_channels.get(side) for side in ("A", "B"))
 
 
+def _status_capture_device(audio_capture_context: dict[str, object] | None) -> str | None:
+    """Return the bounded capture-device label for status diagnostics."""
+    if not isinstance(audio_capture_context, dict):
+        return None
+    raw = audio_capture_context.get("device_name")
+    if raw is None:
+        raw = audio_capture_context.get("requested_device")
+    text = " ".join(str(raw or "").split()).strip()
+    return text[:96] or None
+
+
 def _serialize_live_evidence(
     state: MusicState,
     *,
@@ -1352,6 +1363,7 @@ async def ws_broadcast(
                         midi=_probe_midi_count(controller_state, state),
                         screen=_probe_screen_status(screen_available),
                         voice="muted" if voice_muted else "ok",
+                        capture_device=_status_capture_device(audio_capture_context),
                     )
                     status_payload = status_msg.to_json()
                     status_dead = []

@@ -116,6 +116,7 @@ interface WireStatusTickPayload {
   midi: number | null;
   screen: "ok" | "denied" | "unavailable";
   voice?: "ok" | "muted" | null;
+  capture_device?: string | null;
 }
 
 interface WireIpcErrorPayload {
@@ -434,8 +435,15 @@ export function applyStatusTick(p: WireStatusTickPayload): void {
       midi: p.midi,
       screen: p.screen,
       voice: p.voice ?? null,
+      captureDevice: normalizeCaptureDevice(p.capture_device),
     },
   });
+}
+
+function normalizeCaptureDevice(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim().replace(/\s+/g, " ");
+  return text ? text.slice(0, 96) : null;
 }
 
 /** Whitelist of valid mascot moods — anything else from the wire is

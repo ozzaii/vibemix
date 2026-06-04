@@ -801,13 +801,28 @@ describe("SessionLayout", () => {
     expect(root.querySelector(".vmx-now")?.textContent).toBe("Ready for the first move.");
     expect(root.textContent).toContain("audio waiting · Sven ready · controller seen");
     expect(root.textContent).toContain(
-      "capture silent · Route DJ output into capture.",
+      "capture silent · Route DJ output there.",
     );
-    expect(root.textContent).toContain("Route DJ output into capture. Sven waits for sound.");
+    expect(root.textContent).toContain("capture is silent. Route DJ output there.");
     expect(root.textContent).not.toContain(
       "screen proof unavailable · Start playback, I will not guess.",
     );
     expect(root.textContent).not.toContain("listening for the mix");
+  });
+
+  it("names the silent capture device when the sidecar reports it", () => {
+    const root = host();
+    const state = defaultState();
+    state.status.livekit = "ok";
+    state.status.gemini = "ok";
+    state.status.midi = 1;
+    state.status.screen = "unavailable";
+    state.status.captureDevice = "eqMac Export ";
+
+    mountSessionLayout(root, state);
+
+    expect(root.textContent).toContain("eqMac Export silent · Route DJ output there.");
+    expect(root.textContent).toContain("eqMac Export is silent. Route DJ output there.");
   });
 
   it("renders audible capture as hearing, not merely armed", () => {

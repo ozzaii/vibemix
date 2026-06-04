@@ -119,6 +119,9 @@ class StatusTickPayload:
     midi: int | None
     screen: Literal["ok", "denied", "unavailable"]
     voice: Literal["ok", "muted"] | None = None
+    # Optional live capture device label for idle proof copy. Bounded in the
+    # schema and diagnostic-only: it is not audio evidence by itself.
+    capture_device: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -460,6 +463,7 @@ class StatusTick:
         midi: int | None,
         screen: Literal["ok", "denied", "unavailable"],
         voice: Literal["ok", "muted"] | None = None,
+        capture_device: str | None = None,
     ) -> StatusTick:
         return cls(
             type="ipc.status.tick",
@@ -470,6 +474,7 @@ class StatusTick:
                 midi=midi,
                 screen=screen,
                 voice=voice,
+                capture_device=capture_device,
             ),
         )
 

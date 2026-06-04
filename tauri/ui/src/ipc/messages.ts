@@ -94,6 +94,7 @@ export interface StatusTick {
     midi: number | null;
     screen: "ok" | "denied" | "unavailable";
     voice?: "ok" | "muted" | null;
+    capture_device?: string | null;
   };
 }
 export interface PermissionCheck {
