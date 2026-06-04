@@ -572,7 +572,6 @@ export function renderCohostPanel(props: CohostPanelProps): HTMLElement {
   // The cohost reads as a quiet inner glass tile inside the breathing
   // session shell.
 
-  root.append(buildTopStrip());
   root.append(buildHeader(props.status, props.muted ?? false));
   root.append(
     buildTranscript(
@@ -651,19 +650,6 @@ function buildSeeAllLink(
   });
   wrap.append(link);
   return wrap;
-}
-
-function buildTopStrip(): HTMLElement {
-  const strip = document.createElement("div");
-  strip.className = "vmx-cohost__topstrip";
-  const tag = document.createElement("span");
-  tag.className = "vmx-cohost__topstrip-tag";
-  tag.textContent = "AI COHOST";
-  const meta = document.createElement("span");
-  meta.className = "vmx-cohost__topstrip-meta";
-  meta.textContent = `${DJ_VOCAB.grounded} · audio + screen`;
-  strip.append(tag, meta);
-  return strip;
 }
 
 function buildHeader(status: CohostStatus, muted: boolean): HTMLElement {
