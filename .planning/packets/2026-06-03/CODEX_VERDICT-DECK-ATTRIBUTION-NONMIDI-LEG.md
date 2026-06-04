@@ -52,3 +52,60 @@ By-eye / live-app:
   receipts without turning into a spoken `[deck:A]` claim.
 - This is not per-deck audio proof on a 2ch master rig. It is a grounded nowplaying playback
   seed for the one audible nowplaying title.
+
+---
+
+## 2026-06-04 Refresh Wire Follow-Up
+
+**Item:** Deck attribution non-MIDI leg, refresh writer half  
+**SHA:** `d84144e9 fix(state): lift nowplaying playback into audible deck`
+
+### What Landed
+
+- `state/refresh.py` now reads `deck_source.source_snapshot()` before assigning
+  `MusicState.audible_deck`.
+- If controller-derived attribution and verified deck-pair audio both return `none`, refresh
+  accepts the poller's `nowplaying_playback` provenance as a nominal A/B side at
+  `NOWPLAYING_PLAYBACK_CONF=0.5`.
+- The fallback requires `resolved_side_rule=nominal_nowplaying_seed_not_physical_deck_proof`.
+  It still stays below `DECK_CITE_MIN_CONF`, so it can lift `audible_track_confidence` to the
+  TRACK_CHANGE floor without minting citable `key:`/`track:` evidence.
+
+### User Value
+
+On FLX4 / no-MIDI-motion / master-only rigs, Sven and the pill can now treat an actively
+playing DJ-app nowplaying title as real live context instead of leaving the live state stuck at
+`audible_deck=none`.
+
+### Proof
+
+Code/test:
+
+- `uv run pytest -q tests/state/test_refresh.py::test_tick_uses_nowplaying_playback_deck_status_when_controller_silent tests/state/test_refresh.py::test_tick_refuses_unverified_deck_audio_fallback_when_controller_silent tests/state/test_refresh.py::test_tick_writes_audible_deck_and_track tests/state/test_deck_poller.py::test_nowplaying_playback_seeds_deck_when_controller_has_no_midi_motion`
+  - `4 passed`
+- `uv run pytest -q tests/state/test_refresh.py tests/state/test_refresh_deck.py tests/state/test_deck_poller.py tests/state/test_deck_context.py tests/runtime/test_speak_gate.py tests/runtime/test_suggestion_voice.py`
+  - `288 passed`
+- `uv run pytest -q tests/state/test_event_detector.py tests/state/test_hype_anti_slop.py tests/state/test_coach_anti_slop.py tests/coach/test_citation_linter.py tests/state/test_evidence_registry.py`
+  - `115 passed`
+- `uv run ruff check src/vibemix/state/refresh.py tests/state/test_refresh.py`
+  - passed
+- `uv run ruff format --check src/vibemix/state/refresh.py tests/state/test_refresh.py`
+  - passed
+
+Live source / by-eye:
+
+- Relaunched current source with `VIBEMIX_DEV_SIDECAR=1`, `VIBEMIX_LOCAL_TTS=0`,
+  `VIBEMIX_INPUT_DEVICE=eqMac`, and `VIBEMIX_OUTPUT_DEVICE=Multi-Output`.
+- Startup log confirmed `AI voice output muted`, `MOSS local TTS is disabled`, FLX4 MIDI input
+  selected, and output/passthrough routed to `Multi-Output Device`.
+- Websocket status showed `midi_device=DDJ-FLX4`, `midi_activity=connected_no_midi_traffic`,
+  `voice=muted`, `capture_device=eqMac Export`.
+- Session snapshots showed `music.rms=0.0`, `music.peak=0.0`, `track=null`, `bpm=null`,
+  `cohost_status=IDLE`.
+
+### Remaining Live Blocker
+
+By-ear proof did **not** fire because the current capture route is silent: `eqMac Export` is
+reading zero music. The code path is pinned by tests and loaded in a fresh muted source run, but
+the rig still needs Rekordbox/FLX4 audio routed into the capture loopback before a real
+TRACK_CHANGE / pill / Sven receipt can occur.
