@@ -142,6 +142,13 @@ def test_incomplete_new_tail_is_suppressed() -> None:
     assert repair_finished_headphone_line(raw) is None
 
 
+def test_incomplete_band_action_tail_is_suppressed() -> None:
+    raw = "Keep this sub heavy until the phrase hits at 108, then let the highs"
+
+    assert _could_be_finished_line_meta_scaffold(raw) is True
+    assert repair_finished_headphone_line(raw) is None
+
+
 def test_text_prefix_keeps_complete_headphone_line() -> None:
     raw = "text\nLet this sub roll before you start pulling the tempo down."
 

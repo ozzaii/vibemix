@@ -183,6 +183,42 @@ def test_no_boundary_in_short_response_yields_after_stream(mocker, tmp_path) -> 
     assert "".join(chunks) == "Yeah."
 
 
+def test_grounded_cue_payload_replaces_incomplete_stream_tail(mocker, tmp_path) -> None:
+    """An unfinished model sentence must not reach MOSS when a citable cue receipt exists."""
+
+    agent, gen, recorder, state = _build_agent_legacy(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: cue")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            ["Keep this sub heavy until the phrase hits at 108, then let the highs"]
+        )
+    )
+    ev = Event(
+        type="PHASE",
+        state=state,
+        extra={
+            "next_suggestion_voice_line": (
+                "Forward cue receipt: the next citable phrase boundary is about 4 bars ahead. "
+                "Use it as one forward timing nudge for what comes next if the live sound "
+                "supports it. Copy this citation exactly: [cue:phrase_boundary@108.0]."
+            )
+        },
+    )
+    agent.set_next_event(ev)
+
+    chunks = _drive(agent)
+
+    assert chunks == ["Hold this for about 4 bars; make the move on the next phrase. "]
+    fallback_events = [fields for kind, fields in recorder.events if kind == "grounded_voice_fallback"]
+    assert fallback_events
+    assert fallback_events[-1]["reason"] == "line_scaffold"
+    assert fallback_events[-1]["fallback_text"] == (
+        "Hold this for about 4 bars; make the move on the next phrase. "
+        "[cue:phrase_boundary@108.0]"
+    )
+
+
 def test_silence_token_head_suppresses_all(mocker, tmp_path) -> None:
     """LLM emits ``<silence/>`` only — head gate fails AND post-stream
     silence-suppression fires; nothing yielded."""

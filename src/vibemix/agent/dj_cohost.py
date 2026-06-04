@@ -265,7 +265,10 @@ _BROKEN_CITATION_TAIL_FRAGMENT_RE = re.compile(
     re.IGNORECASE,
 )
 _INCOMPLETE_HEADPHONE_TAIL_RE = re.compile(
-    r"\b(?:out\s+of|before\s+you\s+bring|before\s+you\s+layer|that\s+\d+|bring|start|with|into|from|to|for|and|then|the|that|new)$",
+    r"\b(?:out\s+of|before\s+you\s+bring|before\s+you\s+layer|that\s+\d+|"
+    r"(?:let|bring|lift|open|roll|pull|ride|ease)\s+(?:the\s+)?"
+    r"(?:highs?|mids?|lows?|sub|top\s+end|low\s+end|midrange|treble|bass)|"
+    r"bring|start|with|into|from|to|for|and|then|the|that|new)$",
     re.IGNORECASE,
 )
 _PACKET_FRAGMENT_PREFIX_RE = re.compile(
@@ -525,6 +528,7 @@ def _looks_like_broken_voice_fragment(text: str) -> bool:
     return bool(
         _BROKEN_VOICE_FRAGMENT_PREFIX_RE.match(stripped)
         or _BROKEN_WORD_COUNT_TAIL_RE.search(stripped)
+        or _INCOMPLETE_HEADPHONE_TAIL_RE.search(stripped)
     )
 
 
