@@ -21,21 +21,8 @@ import { describe, expect, it } from "vitest";
 import { applyFrame, initialPillState, tickCollapse } from "./state-machine.js";
 import { nextSuggestionRenderKey, type NextSuggestionWire } from "./next-suggestion.js";
 import {
-  nextSuggestionChoiceMessage,
-  nextSuggestionFeedbackMessage,
-  pillBurstProfile,
-  pillGradeFaceText,
-  pillGradeXpText,
   pillFaceLabel,
-  pillFeedbackShouldSend,
-  pillFeedbackShouldClearForSuggestion,
   pillIntelState,
-  pillLevelAriaLabel,
-  pillLevelText,
-  pillMoveGradeRenderKey,
-  nextPillGradeProgress,
-  pillFeedbackAriaText,
-  pillFeedbackEchoLabel,
   pillDebriefInvokeArgs,
   pillCitationChipsRenderKey,
   pillReceiptRenderKey,
@@ -51,7 +38,6 @@ import {
   pillDemoShortcutTargetCanHandle,
   syncPillDemoControlsActive,
   syncPillDemoControlsHover,
-  syncPillDemoStageFeedback,
   syncPillDemoPadPointer,
   syncPillDemoShortcutPadAim,
   resetPillDemoPadPointer,
@@ -92,57 +78,14 @@ import {
 
 const T0 = 2_000_000;
 
-describe("pill.css — care affordance polish", () => {
+describe("pill.css — actionable face polish", () => {
   const pillCss = readFileSync("src/pill/pill.css", "utf8");
-
-  it("keeps risky DJ KNOWS actions on a warning rail with a dedicated arm motion", () => {
-    expect(pillCss).toMatch(
-      /\.pill\[data-actionable="true"\]\[data-grade-earned="false"\] \.pill__row::after/,
-    );
-    expect(pillCss).toMatch(
-      /\.pill__peek \.vmx-next-card\[data-interactive="true"\]\[data-grade-deserved="false"\]:hover/,
-    );
-    expect(pillCss).toMatch(/@keyframes pill-peek-care-arm/);
-  });
 
   it("keeps the actionable face rail in the one-rose system", () => {
     const rowRailRule = pillCss.match(/\.pill__row::after\s*\{[^}]*\}/s)?.[0];
     expect(rowRailRule).toBeTruthy();
     expect(rowRailRule).toContain("var(--brand-65)");
     expect(rowRailRule).not.toMatch(/--gold/);
-  });
-
-  it("renders the DJ KNOWS peek action as a hardware capsule, not a tiny tag", () => {
-    const actionRule = pillCss.match(
-      /\.pill__peek \.vmx-next-card__peek-action\s*\{[^}]*\}/s,
-    )?.[0];
-    const careRule = pillCss.match(
-      /\.pill__peek \.vmx-next-card__peek-action\[data-care="true"\]\s*\{[^}]*\}/s,
-    )?.[0];
-    expect(actionRule).toBeTruthy();
-    expect(actionRule).toMatch(/min-width:\s*50px;/);
-    expect(actionRule).toMatch(/min-height:\s*17px;/);
-    expect(actionRule).toMatch(/border:\s*1px solid var\(--brand-40\);/);
-    expect(actionRule).toContain("var(--brand-16)");
-    expect(actionRule).not.toMatch(/--gold/);
-    expect(careRule).toBeTruthy();
-    expect(careRule).toContain("var(--led-warn)");
-    expect(careRule).not.toMatch(/--gold/);
-  });
-
-  it("makes risky DJ KNOWS reasons readable without adding more copy", () => {
-    const reasonRule = pillCss.match(
-      /\.pill__peek \.vmx-next-card\[data-grade-deserved="false"\] \.vmx-next-card__grade-reason\s*\{[^}]*\}/s,
-    )?.[0];
-    expect(reasonRule).toBeTruthy();
-    expect(reasonRule).toMatch(/font-size:\s*9px;/);
-    expect(reasonRule).toMatch(/min-height:\s*13px;/);
-    expect(reasonRule).toMatch(/letter-spacing:\s*0\.01em;/);
-    expect(pillCss).toMatch(
-      /\.pill__peek \.vmx-next-card__grade-reason\s*\{[^}]*text-transform:\s*none;/s,
-    );
-    expect(reasonRule).toContain("var(--led-warn)");
-    expect(reasonRule).not.toMatch(/--gold/);
   });
 
   it("keeps demo reaction controls from stealing pointer events from an open pill", () => {
@@ -336,96 +279,6 @@ describe("readNextSuggestion — tri-state (omitted / null / object)", () => {
     expect(readNextSuggestion({ type: "snapshot" })).toBeUndefined();
     expect(readNextSuggestion({})).toBeUndefined();
     expect(readNextSuggestion(null)).toBeUndefined();
-  });
-});
-
-describe("nextSuggestionChoiceMessage — backup command payload", () => {
-  it("builds the existing websocket action shape for a rendered backup", () => {
-    expect(
-      nextSuggestionChoiceMessage({
-        key: "tr_002",
-        candidateId: "tr_002",
-        trackId: "t2",
-        title: "02 · Backup Heat",
-        meta: "cue B",
-      }),
-    ).toEqual({
-      action: "next_suggestion.choose",
-      candidate_id: "tr_002",
-      track_id: "t2",
-    });
-  });
-});
-
-describe("nextSuggestionFeedbackMessage — feedback command payload", () => {
-  it("builds the websocket action shape for explicit pill labels", () => {
-    expect(nextSuggestionFeedbackMessage("wrong_timing")).toEqual({
-      action: "next_suggestion.feedback",
-      feedback: "wrong_timing",
-    });
-  });
-});
-
-describe("pillFeedbackEchoLabel — compact command echo", () => {
-  it("uses command labels without claiming backend success", () => {
-    expect(pillFeedbackEchoLabel("accept")).toBe("KEEP");
-    expect(pillFeedbackEchoLabel("not_now")).toBe("LATER");
-    expect(pillFeedbackEchoLabel("wrong_timing")).toBe("TIMING");
-  });
-
-  it("echoes care when accepting a non-deserved move grade", () => {
-    expect(
-      pillFeedbackEchoLabel("accept", {
-        slug: "negative",
-        label: "NEG",
-        xp: 0,
-        intensity: 22,
-        reason: "key clash",
-        deserved: false,
-        overdrive: false,
-      }),
-    ).toBe("CARE");
-  });
-});
-
-describe("pillFeedbackAriaText — completion receipt meaning", () => {
-  it("keeps visual labels terse while assistive text says what happened", () => {
-    expect(
-      pillFeedbackAriaText({
-        kind: "accept",
-        label: "KEEP",
-        suggestionKey: "tr_001",
-        care: false,
-        until: T0 + 900,
-      }),
-    ).toBe("suggestion kept");
-    expect(
-      pillFeedbackAriaText({
-        kind: "accept",
-        label: "CARE",
-        suggestionKey: "tr_001",
-        care: true,
-        until: T0 + 900,
-      }),
-    ).toBe("suggestion accepted with care");
-    expect(
-      pillFeedbackAriaText({
-        kind: "not_now",
-        label: "LATER",
-        suggestionKey: "tr_001",
-        care: false,
-        until: T0 + 900,
-      }),
-    ).toBe("suggestion postponed");
-    expect(
-      pillFeedbackAriaText({
-        kind: "wrong_timing",
-        label: "TIMING",
-        suggestionKey: "tr_001",
-        care: false,
-        until: T0 + 900,
-      }),
-    ).toBe("suggestion timing marked wrong");
   });
 });
 
@@ -1103,39 +956,6 @@ describe("pillDemoControlsHandleShortcutKey — real number-key trigger path", (
   });
 });
 
-describe("syncPillDemoStageFeedback — completed suggestion receipt", () => {
-  it("mirrors the feedback echo onto the dev stage and clears it after the echo", () => {
-    const stage = document.createElement("div");
-    stage.id = "pill-demo-stage";
-    document.body.append(stage);
-
-    syncPillDemoStageFeedback({
-      kind: "accept",
-      label: "KEEP",
-      suggestionKey: "tr_001",
-      care: false,
-      until: T0 + 900,
-    });
-    expect(stage.dataset.feedback).toBe("accept");
-    expect(stage.dataset.feedbackCare).toBe("false");
-
-    syncPillDemoStageFeedback({
-      kind: "accept",
-      label: "CARE",
-      suggestionKey: "tr_002",
-      care: true,
-      until: T0 + 900,
-    });
-    expect(stage.dataset.feedback).toBe("accept");
-    expect(stage.dataset.feedbackCare).toBe("true");
-
-    syncPillDemoStageFeedback(null);
-    expect(stage.dataset.feedback).toBeUndefined();
-    expect(stage.dataset.feedbackCare).toBeUndefined();
-    stage.remove();
-  });
-});
-
 describe("syncPillDemoPadPointer — hot-cue magnetic highlight", () => {
   it("maps pointer position into clamped CSS vars and clears them on leave", () => {
     const button = document.createElement("button");
@@ -1397,19 +1217,10 @@ describe("pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval — focus con
 });
 
 describe("pillRootPrimaryActionAvailable — root action affordance", () => {
-  it("is available only for an open grounded peek without a feedback receipt", () => {
-    expect(pillRootPrimaryActionAvailable(true, true, null)).toBe(true);
-    expect(pillRootPrimaryActionAvailable(true, false, null)).toBe(false);
-    expect(pillRootPrimaryActionAvailable(false, true, null)).toBe(false);
-    expect(
-      pillRootPrimaryActionAvailable(true, true, {
-        kind: "accept",
-        label: "KEEP",
-        suggestionKey: "tr_001",
-        care: false,
-        until: T0 + 900,
-      }),
-    ).toBe(false);
+  it("is available only for an open grounded peek", () => {
+    expect(pillRootPrimaryActionAvailable(true, true)).toBe(true);
+    expect(pillRootPrimaryActionAvailable(true, false)).toBe(false);
+    expect(pillRootPrimaryActionAvailable(false, true)).toBe(false);
   });
 });
 
@@ -1463,7 +1274,7 @@ describe("pillShouldSuppressNextFocusPeek — Escape/focus return guard", () => 
 });
 
 describe("pillNextCompletionKey — local completion memory", () => {
-  it("keys the handled task by stable suggestion identity, not render-only progress", () => {
+  it("keys the handled task by stable suggestion identity, not render-only churn", () => {
     const base = {
       track_id: "t1",
       title: "Strobe",
@@ -1477,14 +1288,6 @@ describe("pillNextCompletionKey — local completion memory", () => {
         target_deck: "B",
         cue_slot: "A",
         start_in_bars: 8,
-        move_grade: { slug: "bomb", label: "BOMB", xp: 72 },
-      },
-      grade_progress: {
-        streak: 1,
-        total_xp: 72,
-        last_xp: 72,
-        earned: true,
-        heat: 84,
       },
     };
 
@@ -1492,17 +1295,6 @@ describe("pillNextCompletionKey — local completion memory", () => {
       pillNextCompletionKey({
         ...base,
         why: "new wording from backend",
-        transition: {
-          ...base.transition,
-          move_grade: { slug: "lit_aff", label: "LIT AFF", xp: 100 },
-        },
-        grade_progress: {
-          streak: 2,
-          total_xp: 172,
-          last_xp: 100,
-          earned: true,
-          heat: 100,
-        },
       }),
     );
     expect(pillNextCompletionKey(base)).not.toBe(
@@ -1580,18 +1372,9 @@ describe("syncFocusableDescendants — hidden panel tab discipline", () => {
 
 describe("pillRenderLabel — honest hover copy", () => {
   it("says DJ KNOWS only when a grounded peek card is visible", () => {
-    expect(pillRenderLabel("IDLE", true, true, null)).toBe("DJ KNOWS");
-    expect(pillRenderLabel("IDLE", true, false, null)).toBe("IDLE");
-    expect(pillRenderLabel("LISTENING", false, false, null)).toBe("LISTENING");
-    expect(
-      pillRenderLabel("IDLE", true, true, {
-        kind: "accept",
-        label: "KEEP",
-        suggestionKey: "tr_001",
-        care: false,
-        until: T0 + 900,
-      }),
-    ).toBe("KEEP");
+    expect(pillRenderLabel("IDLE", true, true)).toBe("DJ KNOWS");
+    expect(pillRenderLabel("IDLE", true, false)).toBe("IDLE");
+    expect(pillRenderLabel("LISTENING", false, false)).toBe("LISTENING");
   });
 });
 
@@ -1607,135 +1390,36 @@ describe("pillRootAriaLabel — focused pill action summary", () => {
     transition: {
       target_deck: "B",
       start_in_bars: 8,
-      move_grade: {
-        slug: "sexy",
-        label: "SEXY",
-        xp: 48,
-        reason: "smooth blend",
-        deserved: true,
-      },
     },
   };
 
-  it("describes the visible KEEP action on the focused pill itself", () => {
+  it("describes the visible load action on the focused pill itself", () => {
     expect(
       pillRootAriaLabel({
         peekVisible: true,
         suggestion,
-        feedback: null,
       }),
     ).toBe(
       [
         "vibemix cohost pill",
-        "next: Velvet Pressure. action: load B · in 8 bars",
-        "grade: SEXY, 48 xp, smooth blend. activate to keep suggestion",
+        "next: Velvet Pressure. action: load B · in 8 bars. activate to load suggestion",
       ].join(". "),
     );
   });
 
-  it("falls back to the base label, with feedback receipts taking priority", () => {
+  it("falls back to the base label when no grounded peek is visible", () => {
     expect(
       pillRootAriaLabel({
         peekVisible: false,
         suggestion,
-        feedback: null,
       }),
     ).toBe("vibemix cohost pill");
     expect(
       pillRootAriaLabel({
         peekVisible: true,
         suggestion: null,
-        feedback: null,
       }),
     ).toBe("vibemix cohost pill");
-    expect(
-      pillRootAriaLabel({
-        peekVisible: true,
-        suggestion,
-        feedback: {
-          kind: "accept",
-          label: "KEEP",
-          suggestionKey: "tr_001",
-          care: false,
-          until: T0 + 900,
-        },
-      }),
-    ).toBe("vibemix cohost pill. suggestion kept.");
-  });
-});
-
-describe("pillFeedbackShouldSend — one completion per echo window", () => {
-  it("suppresses duplicate same-suggestion feedback while the face echo is active", () => {
-    const echo = {
-      kind: "accept",
-      label: "KEEP",
-      suggestionKey: "tr_001",
-      care: false,
-      until: T0 + 900,
-    } as const;
-
-    expect(pillFeedbackShouldSend(echo, "accept", "tr_001", T0 + 100)).toBe(false);
-    expect(pillFeedbackShouldSend(echo, "wrong_timing", "tr_001", T0 + 100)).toBe(true);
-    expect(pillFeedbackShouldSend(echo, "accept", "tr_002", T0 + 100)).toBe(true);
-    expect(pillFeedbackShouldSend(echo, "accept", "tr_001", T0 + 901)).toBe(true);
-    expect(pillFeedbackShouldSend(null, "accept", "tr_001", T0)).toBe(true);
-  });
-});
-
-describe("pillFeedbackShouldClearForSuggestion — fresh suggestion owns the face", () => {
-  it("keeps a completion echo for the same suggestion, but clears it for a new one", () => {
-    const base = {
-      track_id: "t1",
-      title: "Strobe",
-      artist: "Deadmau5",
-      similarity: 0.9,
-      why: "similar vibe",
-      camelot: "8A",
-      bpm: 128,
-      transition: {
-        candidate_id: "tr_001",
-        target_deck: "B",
-        cue_slot: "A",
-        start_in_bars: 8,
-        move_grade: { slug: "bomb", label: "BOMB", xp: 72 },
-      },
-    };
-    const echo = {
-      kind: "accept",
-      label: "KEEP",
-      suggestionKey: nextSuggestionRenderKey(base),
-      completionKey: pillNextCompletionKey(base),
-      care: false,
-      until: T0 + 900,
-    } as const;
-
-    expect(pillFeedbackShouldClearForSuggestion(echo, base)).toBe(false);
-    expect(
-      pillFeedbackShouldClearForSuggestion(echo, {
-        ...base,
-        why: "backend reworded the reason",
-        transition: {
-          ...base.transition,
-          move_grade: { slug: "lit_aff", label: "LIT AFF", xp: 100 },
-        },
-        grade_progress: {
-          streak: 4,
-          total_xp: 244,
-          last_xp: 100,
-          earned: true,
-          heat: 100,
-        },
-      }),
-    ).toBe(false);
-    expect(
-      pillFeedbackShouldClearForSuggestion(echo, {
-        ...base,
-        track_id: "t2",
-        title: "Risky Switch",
-        transition: { ...base.transition, candidate_id: "tr_002", start_in_bars: 4 },
-      }),
-    ).toBe(true);
-    expect(pillFeedbackShouldClearForSuggestion(echo, null)).toBe(false);
   });
 });
 
@@ -1746,542 +1430,32 @@ describe("pillShouldClearHandledNextOnNull — demo fallback completion memory",
   });
 });
 
-describe("nextPillGradeStreak — earned candy streak, grounded by suggestion key", () => {
-  it("increments once per new earned suggestion and holds on repeated frames", () => {
-    const clean = {
-      slug: "clean",
-      label: "CLEAN",
-      xp: 28,
-      intensity: 48,
-      reason: "clean fit",
-      deserved: true,
-      overdrive: false,
-    } as const;
-    const s1 = nextPillGradeProgress(
-      { key: "", slug: "", streak: 0, xp: 0, totalXp: 0, lastXp: 0, earned: false, heat: 0 },
-      "a",
-      clean,
-    );
-    expect(s1).toEqual({
-      key: "a",
-      slug: "clean",
-      streak: 1,
-      xp: 28,
-      totalXp: 28,
-      lastXp: 28,
-      earned: true,
-      heat: 48,
-      level: 1,
-      levelXp: 28,
-      nextLevelXp: 250,
-      levelProgress: 11,
-      levelUp: false,
-      levelsGained: 0,
-    });
-    expect(nextPillGradeProgress(s1, "a", clean)).toBe(s1);
-    expect(nextPillGradeProgress(s1, "b", clean)).toEqual({
-      key: "b",
-      slug: "clean",
-      streak: 2,
-      xp: 28,
-      totalXp: 56,
-      lastXp: 28,
-      earned: true,
-      heat: 48,
-      level: 1,
-      levelXp: 56,
-      nextLevelXp: 250,
-      levelProgress: 22,
-      levelUp: false,
-      levelsGained: 0,
-    });
-  });
-
-  it("marks level-up only when earned XP crosses the level threshold", () => {
-    const prev = {
-      key: "a",
-      slug: "bomb",
-      streak: 3,
-      xp: 72,
-      totalXp: 188,
-      lastXp: 72,
-      earned: true,
-      heat: 84,
-    };
-
-    expect(
-      nextPillGradeProgress(prev, "b", {
-        slug: "lit_aff",
-        label: "LIT AFF",
-        xp: 100,
-        intensity: 100,
-        reason: "everything clicks",
-        deserved: true,
-        overdrive: true,
-      }),
-    ).toMatchObject({
-      totalXp: 288,
-      level: 2,
-      levelXp: 38,
-      levelProgress: 15,
-      levelUp: true,
-      levelsGained: 1,
-    });
-  });
-
-  it("resets on mid, negative, or missing grade", () => {
-    const prev = {
-      key: "a",
-      slug: "bomb",
-      streak: 3,
-      xp: 72,
-      totalXp: 188,
-      lastXp: 72,
-      earned: true,
-      heat: 84,
-    };
-    expect(
-      nextPillGradeProgress(prev, "b", {
-        slug: "mid",
-        label: "MID",
-        xp: 8,
-        intensity: 24,
-        reason: "works with care",
-        deserved: false,
-        overdrive: false,
-      }),
-    ).toEqual({
-      key: "b",
-      slug: "mid",
-      streak: 0,
-      xp: 8,
-      totalXp: 188,
-      lastXp: 0,
-      earned: false,
-      heat: 0,
-      level: 1,
-      levelXp: 188,
-      nextLevelXp: 250,
-      levelProgress: 75,
-      levelUp: false,
-      levelsGained: 0,
-    });
-    expect(nextPillGradeProgress(prev, "", null)).toEqual({
-      key: "",
-      slug: "",
-      streak: 0,
-      xp: 0,
-      totalXp: 188,
-      lastXp: 0,
-      earned: false,
-      heat: 0,
-      level: 1,
-      levelXp: 188,
-      nextLevelXp: 250,
-      levelProgress: 75,
-      levelUp: false,
-      levelsGained: 0,
-    });
-  });
-});
-
-describe("pillMoveGradeRenderKey — visual replay key", () => {
-  it("changes on grounded suggestion key even when visible grade data matches", () => {
-    const grade = {
-      slug: "lit_aff",
-      label: "LIT AFF",
-      xp: 100,
-      intensity: 100,
-      reason: "everything clicks",
-      deserved: true,
-      overdrive: true,
-    } as const;
-    const base = {
-      key: "candidate-a",
-      slug: "lit_aff",
-      streak: 1,
-      xp: 100,
-      totalXp: 100,
-      lastXp: 100,
-      earned: true,
-      heat: 100,
-    };
-    expect(pillMoveGradeRenderKey(grade, base)).not.toBe(
-      pillMoveGradeRenderKey(grade, { ...base, key: "candidate-b" }),
-    );
-  });
-});
-
-describe("pill level bead — grounded XP readout", () => {
-  it("stays silent before XP and renders compact LV text after earned progress", () => {
-    expect(
-      pillLevelText({
-        streak: 0,
-        totalXp: 0,
-        lastXp: 0,
-        earned: false,
-        heat: 0,
-      }),
-    ).toBe("");
-    expect(
-      pillLevelText({
-        streak: 3,
-        totalXp: 300,
-        lastXp: 100,
-        earned: true,
-        heat: 100,
-        level: 2,
-        levelXp: 50,
-        nextLevelXp: 250,
-        levelProgress: 20,
-      }),
-    ).toBe("LV2");
-  });
-
-  it("announces level progress without inventing a custom XP scale", () => {
-    expect(
-      pillLevelAriaLabel({
-        streak: 3,
-        totalXp: 300,
-        lastXp: 100,
-        earned: true,
-        heat: 100,
-        level: 2,
-        levelXp: 50,
-        nextLevelXp: 250,
-        levelProgress: 20,
-      }),
-    ).toBe("level 2, 50 of 250 xp");
-    expect(
-      pillLevelAriaLabel({
-        streak: 3,
-        totalXp: 300,
-        lastXp: 100,
-        earned: true,
-        heat: 100,
-        level: 2,
-        levelXp: 50,
-        nextLevelXp: 250,
-        levelProgress: 20,
-        levelUp: true,
-        levelsGained: 1,
-      }),
-    ).toBe("level 2, 50 of 250 xp, level up");
-  });
-});
-
-describe("pillGradeXpText — explicit collapsed XP readout", () => {
-  it("keeps XP visible in the grade chip instead of implying the unit", () => {
-    expect(pillGradeXpText({
-      slug: "lit_aff",
-      label: "LIT AFF",
-      xp: 100,
-      intensity: 100,
-      reason: "everything clicks",
-      deserved: true,
-      overdrive: true,
-    })).toBe("+100xp");
-    expect(pillGradeXpText({
-      slug: "negative",
-      label: "NEG",
-      xp: 0,
-      intensity: 0,
-      reason: "risk stacked",
-      deserved: false,
-      overdrive: false,
-    })).toBe("0xp");
-    expect(pillGradeXpText(null)).toBe("");
-  });
-});
-
-describe("pillGradeFaceText — compact collapsed chip copy", () => {
-  it("keeps a real separator between move grade and XP", () => {
-    expect(pillGradeFaceText({
-      slug: "bomb",
-      label: "BOMB",
-      xp: 72,
-      intensity: 84,
-      reason: "big payoff",
-      deserved: true,
-      overdrive: false,
-    })).toBe("BOMB +72xp");
-    expect(pillGradeFaceText(null)).toBe("");
-  });
-});
-
 describe("pillIntelState — one grounded live-intelligence state", () => {
-  const progress = {
-    streak: 1,
-    totalXp: 100,
-    lastXp: 100,
-    earned: true,
-    heat: 100,
-  };
-  const litAff = {
-    slug: "lit_aff",
-    label: "LIT AFF",
-    xp: 100,
-    intensity: 100,
-    reason: "everything clicks",
-    deserved: true,
-    overdrive: true,
-  } as const;
-
-  it("prioritizes feedback, care, open knowing, overdrive, then earned grades", () => {
+  it("prioritizes reaction, then speaking, knowing, listening, then idle", () => {
     expect(
-      pillIntelState({
-        mode: "idle",
-        hasNext: false,
-        peekVisible: false,
-        feedback: null,
-        grade: null,
-        progress: null,
-      }),
+      pillIntelState({ mode: "idle", hasNext: false, peekVisible: false }),
     ).toBe("idle");
     expect(
-      pillIntelState({
-        mode: "listening",
-        hasNext: true,
-        peekVisible: false,
-        feedback: null,
-        grade: null,
-        progress: null,
-      }),
+      pillIntelState({ mode: "listening", hasNext: true, peekVisible: false }),
     ).toBe("knows");
     expect(
-      pillIntelState({
-        mode: "idle",
-        hasNext: false,
-        hovered: true,
-        peekVisible: false,
-        feedback: null,
-        grade: null,
-        progress: null,
-      }),
+      pillIntelState({ mode: "idle", hasNext: false, hovered: true, peekVisible: false }),
     ).toBe("idle");
     expect(
-      pillIntelState({
-        mode: "idle",
-        hasNext: false,
-        hovered: true,
-        peekVisible: true,
-        feedback: null,
-        grade: null,
-        progress: null,
-      }),
+      pillIntelState({ mode: "idle", hasNext: false, hovered: true, peekVisible: true }),
     ).toBe("knows");
     expect(
-      pillIntelState({
-        mode: "speaking",
-        hasNext: true,
-        hovered: true,
-        peekVisible: true,
-        feedback: null,
-        grade: null,
-        progress: null,
-      }),
+      pillIntelState({ mode: "speaking", hasNext: true, hovered: true, peekVisible: true }),
     ).toBe("speaking");
     expect(
-      pillIntelState({
-        mode: "speaking",
-        hasNext: true,
-        hovered: true,
-        peekVisible: false,
-        feedback: null,
-        grade: litAff,
-        progress,
-      }),
-    ).toBe("speaking");
-    expect(
-      pillIntelState({
-        mode: "speaking",
-        hasNext: true,
-        peekVisible: false,
-        feedback: {
-          kind: "accept",
-          label: "KEEP",
-          suggestionKey: "tr_001",
-          care: false,
-          until: T0 + 900,
-        },
-        grade: litAff,
-        progress,
-      }),
-    ).toBe("speaking");
-    expect(
-      pillIntelState({
-        mode: "listening",
-        hasNext: true,
-        peekVisible: true,
-        feedback: null,
-        grade: {
-          slug: "negative",
-          label: "NEG",
-          xp: 0,
-          intensity: 0,
-          reason: "risk stacked",
-          deserved: false,
-          overdrive: false,
-        },
-        progress: { ...progress, streak: 0, lastXp: 0, earned: false, heat: 0 },
-      }),
-    ).toBe("care");
-    expect(
-      pillIntelState({
-        mode: "listening",
-        hasNext: true,
-        peekVisible: true,
-        feedback: null,
-        grade: { ...litAff, overdrive: false },
-        progress,
-      }),
-    ).toBe("knows");
-    expect(
-      pillIntelState({
-        mode: "listening",
-        hasNext: true,
-        peekVisible: false,
-        feedback: null,
-        grade: { ...litAff, overdrive: false },
-        progress,
-      }),
-    ).toBe("earned");
-    expect(
-      pillIntelState({
-        mode: "listening",
-        hasNext: true,
-        peekVisible: false,
-        feedback: null,
-        grade: { ...litAff, overdrive: false },
-        progress: { ...progress, levelUp: true, levelsGained: 1 },
-      }),
-    ).toBe("overdrive");
-    expect(
-      pillIntelState({
-        mode: "listening",
-        hasNext: true,
-        peekVisible: false,
-        feedback: null,
-        grade: litAff,
-        progress,
-      }),
-    ).toBe("overdrive");
-    expect(
-      pillIntelState({
-        mode: "listening",
-        hasNext: true,
-        peekVisible: false,
-        feedback: {
-          kind: "accept",
-          label: "KEEP",
-          suggestionKey: "tr_001",
-          care: false,
-          until: T0 + 900,
-        },
-        grade: litAff,
-        progress,
-      }),
-    ).toBe("feedback");
-    expect(
-      pillIntelState({
-        mode: "listening",
-        hasNext: false,
-        peekVisible: false,
-        feedback: {
-          kind: "accept",
-          label: "CARE",
-          suggestionKey: "tr_risky",
-          care: true,
-          until: T0 + 900,
-        },
-        grade: null,
-        progress: null,
-      }),
-    ).toBe("care");
+      pillIntelState({ mode: "listening", hasNext: false, peekVisible: false }),
+    ).toBe("listening");
   });
 
   it("lets an open cohost reaction own the face over next-suggestion mood", () => {
     expect(
-      pillIntelState({
-        mode: "expand",
-        hasNext: true,
-        peekVisible: false,
-        feedback: null,
-        grade: {
-          slug: "negative",
-          label: "NEG",
-          xp: 0,
-          intensity: 0,
-          reason: "risk stacked",
-          deserved: false,
-          overdrive: false,
-        },
-        progress: { ...progress, streak: 0, lastXp: 0, earned: false, heat: 0 },
-      }),
+      pillIntelState({ mode: "expand", hasNext: true, peekVisible: false }),
     ).toBe("reaction");
-    expect(
-      pillIntelState({
-        mode: "expand",
-        hasNext: true,
-        peekVisible: false,
-        feedback: null,
-        grade: litAff,
-        progress,
-      }),
-    ).toBe("reaction");
-  });
-});
-
-describe("pillBurstProfile — grounded hot-moment intensity", () => {
-  const progress = {
-    streak: 5,
-    totalXp: 388,
-    lastXp: 100,
-    earned: true,
-    heat: 100,
-    level: 2,
-    levelXp: 138,
-    nextLevelXp: 250,
-    levelProgress: 55,
-    levelUp: false,
-    levelsGained: 0,
-  };
-  const litAff = {
-    slug: "lit_aff",
-    label: "LIT AFF",
-    xp: 100,
-    intensity: 100,
-    reason: "everything clicks",
-    deserved: true,
-    overdrive: true,
-  } as const;
-
-  it("reserves the strongest burst for true overdrive", () => {
-    expect(pillBurstProfile(litAff, progress)).toEqual({
-      mode: "overdrive",
-      shardCount: 10,
-      ringCount: 4,
-    });
-    expect(
-      pillBurstProfile(
-        { ...litAff, slug: "bomb", label: "BOMB", xp: 72, intensity: 84, overdrive: false },
-        { ...progress, lastXp: 72, levelUp: true, levelsGained: 1 },
-      ),
-    ).toEqual({
-      mode: "level_up",
-      shardCount: 6,
-      ringCount: 3,
-    });
-    expect(pillBurstProfile({ ...litAff, overdrive: false }, progress)).toEqual({
-      mode: "none",
-      shardCount: 0,
-      ringCount: 0,
-    });
-    expect(pillBurstProfile(litAff, { ...progress, earned: false })).toEqual({
-      mode: "none",
-      shardCount: 0,
-      ringCount: 0,
-    });
   });
 });
 

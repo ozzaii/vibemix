@@ -115,17 +115,6 @@
     var(--lg-surface-shadow),
     inset 0 0 0 1px var(--glass-edge-up);
 }
-.pill[data-feedback="accept"] {
-  animation: pill-completion-keep 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-feedback="accept"][data-grade-earned="false"],
-.pill[data-feedback-care="true"],
-.pill[data-feedback="wrong_timing"] {
-  animation: pill-completion-care 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-feedback="not_now"] {
-  animation: pill-completion-later 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
 .pill[data-reaction-echo] {
   animation: pill-echo-afterglow 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -497,48 +486,6 @@
     transform: scaleX(1);
   }
 }
-@keyframes pill-completion-keep {
-  from {
-    filter: brightness(1) saturate(1);
-    transform: translate3d(0, 0, 0) scale(0.996);
-  }
-  42% {
-    filter: brightness(1.1) saturate(1.08);
-    transform: translate3d(0, -0.5px, 0) scale(1.006);
-  }
-  to {
-    filter: none;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-@keyframes pill-completion-care {
-  from {
-    filter: brightness(1) saturate(1);
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  34% {
-    filter: brightness(1.06) saturate(1.1);
-    transform: translate3d(-0.8px, 0, 0) scale(1.002);
-  }
-  72% {
-    filter: brightness(1.02) saturate(1);
-    transform: translate3d(0.6px, 0, 0) scale(0.999);
-  }
-  to {
-    filter: none;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-@keyframes pill-completion-later {
-  from {
-    filter: brightness(1.05) saturate(1);
-    transform: translate3d(0, -0.5px, 0) scale(1.002);
-  }
-  to {
-    filter: none;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
 @keyframes pill-echo-afterglow {
   from {
     filter: brightness(1.12) saturate(1.16);
@@ -607,10 +554,6 @@
 .pill__row,
 .pill__expand,
 .pill__peek,
-.pill__burst,
-.pill__overdrive,
-.pill__level,
-.pill__streak,
 .pill__notch {
   position: relative;
   z-index: 1;
@@ -751,9 +694,6 @@
 .pill[data-actionable="true"] .pill__row::after {
   animation: pill-actionable-face-rail 1180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.pill[data-actionable="true"][data-grade-earned="false"] .pill__row::after {
-  background: linear-gradient(90deg, transparent, var(--led-warn), var(--glass-edge-up), transparent);
-}
 .pill__dot {
   position: relative;
   flex: 0 0 auto;
@@ -809,38 +749,6 @@
   opacity: 0.62;
   transform: scale(1);
 }
-.pill[data-intel="earned"] .pill__dot::after,
-.pill[data-intel="feedback"] .pill__dot::after {
-  animation: pill-dot-ring-commit 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  border-color: var(--brand-40);
-  box-shadow: 0 0 10px var(--brand-22);
-  opacity: 0.88;
-  transform: scale(1.08);
-}
-.pill[data-intel="care"] .pill__dot::after {
-  animation: pill-dot-ring-care 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  border-color: var(--led-warn);
-  box-shadow:
-    0 0 8px var(--glass-edge-up),
-    0 0 10px var(--led-warn);
-  opacity: 0.72;
-  transform: scale(1.04);
-}
-.pill[data-intel="care"][data-move-grade="negative"] .pill__dot::after {
-  border-color: var(--led-fault);
-  box-shadow:
-    0 0 8px var(--glass-edge-up),
-    0 0 10px var(--led-fault);
-}
-.pill[data-intel="overdrive"] .pill__dot::after {
-  animation: pill-dot-ring-overdrive 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  border-color: var(--brand-40);
-  box-shadow:
-    0 0 10px var(--brand-22),
-    0 0 14px var(--brand-22);
-  opacity: 1;
-  transform: scale(1.16);
-}
 .pill[data-reaction-echo] .pill__dot::after {
   animation: pill-dot-ring-echo 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
   border-color: var(--brand-40);
@@ -869,52 +777,6 @@
   to {
     opacity: 0.62;
     transform: scale(1);
-  }
-}
-@keyframes pill-dot-ring-commit {
-  from {
-    opacity: 0;
-    transform: scale(0.82);
-  }
-  44% {
-    opacity: 1;
-    transform: scale(1.22);
-  }
-  to {
-    opacity: 0.88;
-    transform: scale(1.08);
-  }
-}
-@keyframes pill-dot-ring-care {
-  from {
-    opacity: 0;
-    transform: scale(0.78);
-  }
-  52% {
-    opacity: 0.86;
-    transform: scale(1.14);
-  }
-  to {
-    opacity: 0.72;
-    transform: scale(1.04);
-  }
-}
-@keyframes pill-dot-ring-overdrive {
-  from {
-    opacity: 0;
-    transform: scale(0.84);
-  }
-  38% {
-    opacity: 1;
-    transform: scale(1.28);
-  }
-  72% {
-    opacity: 0.9;
-    transform: scale(1.1);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1.16);
   }
 }
 @keyframes pill-dot-ring-echo {
@@ -960,29 +822,6 @@
   .pill__label {
   animation: pill-live-label-speak 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.pill[data-feedback] .pill__label {
-  font-variation-settings: "wdth" 85, "wght" 650;
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  color: var(--brand);
-  text-shadow: 0 0 10px var(--brand-22);
-  animation: pill-feedback-label-pop 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-feedback="accept"] .pill__label {
-  color: var(--brand-glow);
-  text-shadow: 0 0 10px var(--brand-22);
-}
-.pill[data-feedback="accept"][data-grade-earned="false"] .pill__label {
-  color: var(--led-warn);
-  text-shadow: 0 0 10px var(--glass-edge-up);
-}
-.pill[data-feedback-care="true"] .pill__label {
-  color: var(--led-warn);
-  text-shadow: 0 0 10px var(--glass-edge-up);
-}
-.pill[data-feedback="not_now"] .pill__label {
-  color: var(--silk);
-}
 .pill[data-peek="true"] .pill__label {
   animation: pill-peek-label-arm 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -995,20 +834,6 @@
     0 0 10px var(--brand-40),
     0 0 16px var(--brand-22);
   animation: pill-reaction-echo-kick 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes pill-feedback-label-pop {
-  from {
-    opacity: 0.62;
-    transform: translateY(2px) scale(0.96);
-  }
-  46% {
-    opacity: 1;
-    transform: translateY(-1px) scale(1.035);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 @keyframes pill-peek-label-arm {
   from {
@@ -1083,52 +908,6 @@
 .pill[data-reaction-echo="negative"] .pill__dot {
   background: var(--led-fault);
 }
-.pill[data-reaction-echo] .pill__grade,
-.pill[data-reaction-echo][data-grade-earned="true"] .pill__level:not(:empty),
-.pill[data-reaction-echo] .pill__level {
-  max-width: 0;
-  min-width: 0;
-  padding-left: 0;
-  padding-right: 0;
-  border-width: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-.pill__grade {
-  flex: 0 0 auto;
-  display: none;
-  position: relative;
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-  max-width: 116px;
-  height: 18px;
-  padding: 0 6px;
-  border: 1px solid var(--glass-edge);
-  border-radius: 9px;
-  background:
-    linear-gradient(180deg, var(--brand-08), transparent),
-    var(--glass-2);
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-mid),
-    inset 0 -1px 0 var(--lg-rim-void);
-  font-family: var(--type-mono);
-  font-size: 9px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  color: var(--brand);
-  overflow: hidden;
-  white-space: nowrap;
-  isolation: isolate;
-  transition:
-    max-width 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    padding-left 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    padding-right 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-width 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
 @keyframes pill-reaction-echo-kick {
   from {
     opacity: 0;
@@ -1141,310 +920,6 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
-  }
-}
-.pill__grade::before {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  border-radius: inherit;
-  background:
-    linear-gradient(105deg, transparent, var(--lg-spec-mid), transparent);
-  opacity: 0;
-  transform: scaleX(0);
-  transform-origin: left center;
-  pointer-events: none;
-  z-index: 0;
-}
-.pill__grade::after {
-  content: "";
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  bottom: 3px;
-  height: 1px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--brand), var(--brand));
-  transform: scaleX(var(--pill-grade-heat-scale, 0));
-  transform-origin: left center;
-  opacity: 0.66;
-  transition: transform var(--motion-transition) cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 0;
-}
-.pill__grade:not(:empty) {
-  display: inline-flex;
-}
-.pill[data-state="expand"] .pill__grade,
-.pill[data-state="speaking"] .pill__grade {
-  display: none;
-}
-.pill[data-peek="true"] .pill__grade {
-  max-width: 0;
-  padding-left: 0;
-  padding-right: 0;
-  border-width: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-.pill__grade-label {
-  display: inline-block;
-  max-width: 54px;
-  font-weight: 600;
-}
-.pill__grade-label,
-.pill__grade-xp,
-.pill__grade-spacer {
-  min-width: 0;
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-  text-overflow: ellipsis;
-}
-.pill__grade-spacer {
-  display: inline-block;
-  inline-size: 1px;
-}
-.pill__grade-xp {
-  color: var(--brand);
-}
-.pill[data-move-grade="negative"] .pill__grade {
-  color: var(--led-fault);
-  border-color: var(--led-fault);
-  background: var(--glass-2);
-}
-.pill[data-move-grade="negative"] .pill__grade::after {
-  background: var(--led-fault);
-}
-.pill[data-move-grade="mid"] .pill__grade {
-  color: var(--silk-65);
-  background: var(--glass-2);
-}
-.pill[data-move-grade="bomb"] .pill__grade,
-.pill[data-move-grade="lit_aff"] .pill__grade {
-  border-color: var(--brand-40);
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-mid),
-    inset 0 -1px 0 var(--lg-rim-void),
-    0 0 12px var(--brand-22);
-}
-.pill[data-feedback] .pill__grade {
-  animation: pill-feedback-kick 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-feedback="accept"] .pill__grade {
-  border-color: var(--brand-40);
-}
-.pill[data-feedback="wrong_timing"] .pill__grade {
-  border-color: var(--led-warn);
-}
-.pill[data-grade-earned="true"] .pill__grade::before {
-  animation: pill-grade-charge 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-grade-earned="false"][data-move-grade] .pill__grade {
-  animation: pill-care-check 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-grade-earned="false"][data-move-grade] .pill__grade::before {
-  animation: pill-care-scan 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-grade-burst="overdrive"] .pill__grade {
-  border-color: var(--brand-40);
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-mid),
-    inset 0 -1px 0 var(--lg-rim-void),
-    0 0 14px var(--brand-22),
-    0 0 16px var(--brand-22);
-}
-.pill__level {
-  flex: 0 0 auto;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  min-width: 31px;
-  max-width: 42px;
-  height: 16px;
-  padding: 0 5px;
-  border: 1px solid var(--glass-edge);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, var(--brand-22), transparent 68%),
-    var(--glass-2);
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-mid),
-    inset 0 -1px 0 var(--lg-rim-void);
-  font-family: var(--type-mono);
-  font-size: 8px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  color: var(--brand);
-  overflow: hidden;
-  white-space: nowrap;
-  isolation: isolate;
-  transition:
-    max-width 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    min-width 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    padding-left 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    padding-right 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-width 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.pill__level::before,
-.pill__level::after {
-  content: "";
-  position: absolute;
-  pointer-events: none;
-}
-.pill__level::before {
-  inset: 0;
-  background: linear-gradient(105deg, transparent, var(--lg-spec-mid), transparent);
-  opacity: 0;
-  transform: scaleX(0);
-  transform-origin: left center;
-}
-.pill__level::after {
-  left: 4px;
-  right: 4px;
-  bottom: 2px;
-  height: 1px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--brand), var(--brand));
-  opacity: 0.78;
-  transform: scaleX(var(--pill-level-scale, 0));
-  transform-origin: left center;
-  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.pill[data-grade-earned="true"] .pill__level:not(:empty) {
-  display: inline-flex;
-}
-.pill[data-grade-overdrive="true"] .pill__level {
-  border-color: var(--brand-40);
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-mid),
-    inset 0 -1px 0 var(--lg-rim-void),
-    0 0 12px var(--brand-22);
-  animation: pill-level-pop 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-grade-level-up="true"] .pill__level {
-  border-color: var(--brand-40);
-  color: var(--brand);
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-mid),
-    inset 0 -1px 0 var(--lg-rim-void),
-    0 0 14px var(--brand-22),
-    0 0 18px var(--brand-22);
-  animation: pill-level-up-pop 780ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-grade-level-up="true"] .pill__level::before {
-  animation: pill-level-glint 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-state="expand"] .pill__level,
-.pill[data-state="expand"][data-grade-earned="true"] .pill__level:not(:empty),
-.pill[data-state="speaking"] .pill__level,
-.pill[data-state="speaking"][data-grade-earned="true"] .pill__level:not(:empty) {
-  display: none;
-}
-.pill[data-peek="true"] .pill__level {
-  min-width: 0;
-  max-width: 0;
-  padding-left: 0;
-  padding-right: 0;
-  border-width: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-.pill[data-grade-level-up="true"] .pill__streak {
-  box-shadow:
-    0 0 12px var(--brand-22),
-    0 0 18px var(--brand-22);
-}
-@keyframes pill-feedback-kick {
-  0% {
-    transform: translateY(0);
-  }
-  35% {
-    transform: translateY(-1px);
-  }
-  100% {
-    transform: translateY(0);
-  }
-}
-@keyframes pill-level-pop {
-  0% {
-    opacity: 0;
-    transform: translateY(3px) scale(0.9);
-  }
-  38% {
-    opacity: 1;
-    transform: translateY(-1px) scale(1.04);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-@keyframes pill-level-up-pop {
-  0% {
-    opacity: 0;
-    transform: translateY(4px) scale(0.84);
-  }
-  22% {
-    opacity: 1;
-    transform: translateY(-2px) scale(1.08);
-  }
-  54% {
-    transform: translateY(0) scale(0.98);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-@keyframes pill-level-glint {
-  0% {
-    opacity: 0;
-    transform: scaleX(0);
-  }
-  22% {
-    opacity: 0.9;
-  }
-  100% {
-    opacity: 0;
-    transform: scaleX(1);
-  }
-}
-@keyframes pill-grade-charge {
-  0% {
-    opacity: 0;
-    transform: scaleX(0);
-  }
-  28% {
-    opacity: 0.72;
-  }
-  100% {
-    opacity: 0;
-    transform: scaleX(1);
-  }
-}
-@keyframes pill-care-check {
-  0% {
-    opacity: 0.72;
-    transform: translateY(1px) scaleX(0.96);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scaleX(1);
-  }
-}
-@keyframes pill-care-scan {
-  0% {
-    opacity: 0;
-    transform: scaleX(0);
-  }
-  34% {
-    opacity: 0.58;
-  }
-  100% {
-    opacity: 0;
-    transform: scaleX(1);
   }
 }
 .pill__wave {
@@ -1498,323 +973,6 @@
     opacity: 1;
     filter: none;
     transform: translateY(0) scaleX(1);
-  }
-}
-/* When the earned grade + level bead are visible, the 14-bar voice comb yields
- * its roomy idle geometry. This preserves the real RMS signal without letting
- * the meter push the 280px hardware row wider than the overlay. */
-.pill[data-grade-earned="true"] .vmx-pill-wave {
-  gap: 1px;
-  max-width: 36px;
-}
-.pill[data-state="speaking"][data-grade-earned="true"] .vmx-pill-wave {
-  gap: 2px;
-  max-width: 140px;
-}
-.pill[data-grade-earned="true"] .vmx-pill-wave__bar {
-  min-width: 1px;
-}
-.pill[data-state="speaking"][data-grade-earned="true"] .vmx-pill-wave__bar {
-  min-width: 2px;
-}
-.pill__burst {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  opacity: 0;
-}
-.pill__burst span {
-  position: absolute;
-  left: var(--x);
-  top: 31px;
-  width: 3px;
-  height: 10px;
-  border-radius: 2px;
-  background: var(--brand);
-  box-shadow: 0 0 10px var(--brand-40);
-  transform: translateY(0) scaleY(0.4);
-}
-.pill[data-grade-burst="level_up"] .pill__burst,
-.pill[data-grade-burst="overdrive"] .pill__burst {
-  opacity: 1;
-}
-.pill[data-grade-burst="level_up"] .pill__burst span,
-.pill[data-grade-burst="overdrive"] .pill__burst span {
-  animation: pill-burst-pop 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: var(--delay);
-}
-.pill[data-grade-burst="overdrive"] .pill__burst span {
-  height: 12px;
-  box-shadow:
-    0 0 10px var(--brand-40),
-    0 0 14px var(--brand-22);
-}
-.pill[data-grade-burst="overdrive"] .pill__burst span:nth-child(3n) {
-  background: var(--brand);
-  box-shadow: 0 0 12px var(--brand-22);
-}
-.pill__overdrive {
-  position: absolute;
-  z-index: 2;
-  left: 5px;
-  right: 5px;
-  top: 5px;
-  height: 34px;
-  border-radius: calc(var(--rad-lg) - 2px);
-  pointer-events: none;
-  overflow: hidden;
-  opacity: 0;
-  mix-blend-mode: screen;
-}
-.pill__overdrive span {
-  position: absolute;
-  inset: 0;
-  border: 1px solid var(--brand-40);
-  border-radius: inherit;
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-mid),
-    inset 0 -1px 0 var(--lg-rim-void),
-    0 0 12px var(--brand-22);
-  opacity: 0;
-  transform: scaleX(0.82) scaleY(0.66);
-}
-.pill__overdrive span:nth-child(2) {
-  border-color: var(--brand-40);
-  animation-delay: 70ms;
-}
-.pill__overdrive span:nth-child(3) {
-  inset: 3px;
-  border-color: var(--lg-spec-mid);
-  animation-delay: 140ms;
-}
-.pill[data-grade-burst="level_up"] .pill__overdrive,
-.pill[data-grade-burst="overdrive"] .pill__overdrive {
-  opacity: 1;
-}
-.pill[data-grade-burst="level_up"] .pill__overdrive span,
-.pill[data-grade-burst="overdrive"] .pill__overdrive span {
-  animation: pill-overdrive-halo 920ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-grade-burst="overdrive"] .pill__overdrive span {
-  animation-duration: 1040ms;
-}
-.pill[data-grade-burst="overdrive"] .pill__overdrive span:nth-child(4) {
-  inset: -2px;
-  border-color: var(--brand-40);
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-mid),
-    inset 0 -1px 0 var(--lg-rim-void),
-    0 0 16px var(--brand-22);
-  animation-delay: 210ms;
-}
-.pill[data-grade-burst="level_up"],
-.pill[data-grade-burst="overdrive"] {
-  box-shadow:
-    var(--lg-surface-shadow),
-    0 0 16px var(--brand-12);
-}
-.pill[data-grade-burst="level_up"]:not([data-feedback]) {
-  animation: pill-grade-level-shell 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-grade-burst="overdrive"] {
-  box-shadow:
-    var(--lg-surface-shadow),
-    0 0 18px var(--brand-16);
-}
-.pill[data-grade-burst="overdrive"]:not([data-feedback]) {
-  animation: pill-grade-overdrive-shell 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-feedback="accept"][data-grade-burst] {
-  animation: pill-completion-keep 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-feedback="accept"][data-grade-earned="false"][data-grade-burst],
-.pill[data-feedback-care="true"][data-grade-burst],
-.pill[data-feedback="wrong_timing"][data-grade-burst] {
-  animation: pill-completion-care 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-feedback="not_now"][data-grade-burst] {
-  animation: pill-completion-later 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes pill-burst-pop {
-  0% {
-    opacity: 0;
-    transform: translateY(0) scaleY(0.4) rotate(0deg);
-  }
-  20% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-28px) scaleY(1) rotate(var(--rot));
-  }
-}
-@keyframes pill-overdrive-halo {
-  0% {
-    opacity: 0;
-    transform: scaleX(0.76) scaleY(0.58);
-  }
-  18% {
-    opacity: 0.84;
-  }
-  100% {
-    opacity: 0;
-    transform: scaleX(1.06) scaleY(1);
-  }
-}
-@keyframes pill-grade-level-shell {
-  from {
-    filter: brightness(1) saturate(1);
-    transform: translate3d(0, 0, 0) scale(0.997);
-  }
-  42% {
-    filter: brightness(1.08) saturate(1.08);
-    transform: translate3d(0, -0.5px, 0) scale(1.005);
-  }
-  to {
-    filter: none;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-@keyframes pill-grade-overdrive-shell {
-  from {
-    filter: brightness(1.06) saturate(1.08);
-    transform: translate3d(0, 0, 0) scale(0.996);
-  }
-  34% {
-    filter: brightness(1.14) saturate(1.18);
-    transform: translate3d(0, -0.8px, 0) scale(1.008);
-  }
-  68% {
-    filter: brightness(1.07) saturate(1.08);
-    transform: translate3d(0, 0, 0) scale(1.003);
-  }
-  to {
-    filter: none;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-/* ── Grounded combo heat rail ────────────────────────────────────────────── *
- * A textless XP read under the collapsed chrome. It is fed by backend
- * `grade_progress.heat`, not browser invention: the grade chip says the move,
- * this rail lets the mascot body show the streak charge. Hidden for MID/NEG or
- * no grounded grade, one-shot transition only, no idle breathing. */
-.pill__streak {
-  position: absolute;
-  z-index: 2;
-  left: var(--sp-3);
-  right: var(--sp-3);
-  top: 39px;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--glass-2);
-  overflow: hidden;
-  opacity: 0;
-  transform: scaleX(0.72);
-  transform-origin: center;
-  pointer-events: none;
-  transition:
-    opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.pill__streak::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--brand), var(--brand));
-  transform: scaleX(var(--pill-streak-heat-scale, 0));
-  transform-origin: left center;
-  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.pill__streak::after {
-  content: "";
-  position: absolute;
-  top: -2px;
-  left: calc((100% - 8px) * var(--pill-streak-heat-scale, 0));
-  width: 8px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--brand);
-  box-shadow: 0 0 10px var(--brand-22);
-  opacity: 0.82;
-  transition: left 260ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.pill[data-grade-earned="true"] .pill__streak {
-  opacity: 0.86;
-  transform: scaleX(1);
-}
-.pill[data-peek="true"] .pill__streak,
-.pill[data-state="speaking"] .pill__streak {
-  opacity: 0;
-  transform: scaleX(0.68);
-}
-.pill[data-grade-overdrive="true"] .pill__streak {
-  height: 3px;
-  box-shadow:
-    0 0 12px var(--brand-22),
-    0 0 18px var(--brand-22);
-  animation: pill-streak-kick 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-feedback] .pill__streak {
-  opacity: 1;
-  animation: pill-feedback-rail 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill[data-feedback] .pill__streak::before {
-  background: linear-gradient(90deg, var(--brand-22), var(--brand));
-  transform: scaleX(1);
-}
-.pill[data-feedback] .pill__streak::after {
-  left: calc(100% - 8px);
-  background: var(--brand-glow);
-  box-shadow: 0 0 10px var(--brand-22);
-}
-.pill[data-feedback="accept"] .pill__streak::after {
-  background: var(--brand-glow);
-}
-.pill[data-feedback-care="true"] .pill__streak::before {
-  background: linear-gradient(90deg, var(--led-warn), var(--glass-edge-up));
-}
-.pill[data-feedback-care="true"] .pill__streak::after {
-  background: var(--led-warn);
-  box-shadow: 0 0 10px var(--glass-edge-up);
-}
-.pill[data-feedback="not_now"] .pill__streak {
-  opacity: 0.62;
-}
-.pill[data-feedback="not_now"] .pill__streak::before {
-  background: linear-gradient(90deg, var(--silk-22), var(--glass-edge-up));
-}
-.pill[data-feedback="not_now"] .pill__streak::after {
-  background: var(--silk-40);
-  box-shadow: 0 0 8px var(--glass-edge-up);
-}
-.pill[data-feedback="wrong_timing"] .pill__streak::after {
-  background: var(--led-warn);
-}
-@keyframes pill-streak-kick {
-  0% {
-    opacity: 0;
-    transform: scaleX(0.52);
-  }
-  28% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.92;
-    transform: scaleX(1);
-  }
-}
-@keyframes pill-feedback-rail {
-  0% {
-    transform: scaleX(0.82);
-  }
-  35% {
-    transform: scaleX(1);
-  }
-  100% {
-    transform: scaleX(1);
   }
 }
 @keyframes pill-actionable-face-rail {
@@ -2691,14 +1849,6 @@
   font-size: 10px;
   line-height: 1.1;
 }
-.pill #pill-next .vmx-next-card__feedback {
-  gap: 3px;
-  margin-top: 0;
-  padding-top: var(--sp-1);
-}
-.pill #pill-next .vmx-next-card__feedback-btn {
-  height: 16px;
-}
 
 /* ── Collapsed-hover PEEK card (Phase-1b — the next-track glance) ─────────── *
  * On pointer-hover of the COLLAPSED pill, the next-track suggestion surfaces as
@@ -2783,26 +1933,6 @@
     opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
     transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-.pill__peek .vmx-next-card[data-interactive="true"][data-grade-deserved="false"]::after {
-  background: linear-gradient(90deg, var(--led-warn), transparent 78%);
-}
-.pill__peek .vmx-next-card[data-grade-deserved="false"] {
-  background:
-    radial-gradient(
-      90px 32px at 100% 0%,
-      color-mix(in srgb, var(--led-warn) 10%, transparent),
-      transparent 70%
-    );
-}
-.pill__peek .vmx-next-card[data-grade-deserved="false"]::before {
-  background:
-    linear-gradient(
-      115deg,
-      color-mix(in srgb, var(--led-warn) 10%, transparent),
-      transparent 48%
-    );
-  opacity: 0.72;
-}
 .pill__peek .vmx-next-card[data-interactive="true"]:hover {
   background:
     linear-gradient(180deg, var(--brand-08), transparent 76%);
@@ -2810,22 +1940,6 @@
   box-shadow:
     inset 0 1px 0 var(--lg-spec-lo),
     inset 0 -1px 0 var(--brand-22);
-}
-.pill__peek .vmx-next-card[data-interactive="true"][data-grade-deserved="false"]:hover {
-  background:
-    radial-gradient(
-      92px 34px at 100% 0%,
-      color-mix(in srgb, var(--led-warn) 14%, transparent),
-      transparent 72%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--led-warn) 8%, transparent),
-      transparent 76%
-    );
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-lo),
-    inset 0 -1px 0 color-mix(in srgb, var(--led-warn) 34%, transparent);
 }
 .pill__peek .vmx-next-card[data-interactive="true"]:active {
   transform: translateY(1px);
@@ -2836,25 +1950,10 @@
     inset 0 -1px 0 var(--brand-65),
     0 0 12px var(--brand-22);
 }
-.pill__peek .vmx-next-card[data-interactive="true"][data-grade-deserved="false"]:focus-visible {
-  box-shadow:
-    inset 0 -1px 0 var(--led-warn),
-    0 0 12px color-mix(in srgb, var(--led-warn) 24%, transparent);
-}
 .pill__peek .vmx-next-card[data-interactive="true"]:hover::after,
 .pill__peek .vmx-next-card[data-interactive="true"]:focus-visible::after {
   opacity: 0.86;
   transform: scaleX(1);
-}
-.pill[data-feedback="accept"] .pill__peek .vmx-next-card[data-interactive="true"]::after {
-  opacity: 1;
-  transform: scaleX(1);
-}
-.pill[data-feedback="accept"][data-grade-earned="false"] .pill__peek .vmx-next-card[data-interactive="true"]::after {
-  background: linear-gradient(90deg, var(--led-warn), transparent 78%);
-}
-.pill[data-feedback-care="true"] .pill__peek .vmx-next-card[data-interactive="true"]::after {
-  background: linear-gradient(90deg, var(--led-warn), transparent 78%);
 }
 .pill__peek .vmx-next-card__label {
   display: flex;
@@ -2862,65 +1961,6 @@
   font-size: 8px;
   letter-spacing: 0.1em;
   color: var(--silk-65);
-}
-.pill__peek .vmx-next-card__peek-action {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 50px;
-  min-height: 17px;
-  padding: 2px 10px 1px;
-  border: 1px solid var(--brand-40);
-  border-radius: 999px;
-  border-color: var(--brand-40);
-  background:
-    radial-gradient(24px 12px at 50% 0%, var(--lg-spec-hi), transparent 72%),
-    linear-gradient(180deg, var(--brand-16), var(--brand-04)),
-    var(--glass-2);
-  color: var(--brand-glow);
-  font-size: 8.5px;
-  font-weight: 720;
-  letter-spacing: 0.12em;
-  line-height: 1;
-  overflow: hidden;
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-hi),
-    inset 0 -1px 0 var(--lg-rim-void),
-    0 0 12px var(--brand-12);
-  text-shadow: 0 0 8px var(--brand-22);
-}
-.pill__peek .vmx-next-card__peek-action::before {
-  content: "";
-  position: absolute;
-  left: 5px;
-  right: 5px;
-  top: 2px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--lg-spec-hi), transparent);
-  opacity: 0.72;
-  pointer-events: none;
-}
-.pill__peek .vmx-next-card__peek-action[data-care="true"] {
-  border-color: var(--led-warn);
-  background:
-    radial-gradient(
-      24px 12px at 50% 0%,
-      color-mix(in srgb, var(--led-warn) 28%, transparent),
-      transparent 72%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--led-warn) 12%, transparent),
-      transparent 72%
-    ),
-    var(--glass-2);
-  color: var(--led-warn);
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-hi),
-    inset 0 -1px 0 var(--lg-rim-void),
-    0 0 12px color-mix(in srgb, var(--led-warn) 18%, transparent);
-  text-shadow: 0 0 8px color-mix(in srgb, var(--led-warn) 26%, transparent);
 }
 .pill__peek .vmx-next-card__title {
   font-family: var(--type-display);
@@ -2959,14 +1999,6 @@
   border-color: color-mix(in srgb, var(--silk) 12%, transparent);
   background: color-mix(in srgb, var(--silk) 4%, transparent);
 }
-.pill__peek .vmx-next-card__cue-confidence {
-  flex: 0 0 auto;
-  max-width: 100%;
-  border-color: color-mix(in srgb, var(--brand) 18%, transparent);
-  background: color-mix(in srgb, var(--brand) 6%, transparent);
-  color: var(--silk);
-  opacity: 0.86;
-}
 .pill__peek .vmx-next-card__cue-rail {
   height: 2px;
   margin-top: 2px;
@@ -2979,90 +2011,12 @@
 .pill[data-peek="true"] .pill__peek .vmx-next-card__cue-rail::after {
   animation: pill-peek-cue-commit 520ms cubic-bezier(0.16, 1, 0.3, 1) 60ms both;
 }
-.pill[data-peek="true"] .pill__peek .vmx-next-card__peek-action {
-  animation: pill-peek-action-arm 340ms cubic-bezier(0.16, 1, 0.3, 1) 84ms both;
-}
-.pill[data-peek="true"] .pill__peek .vmx-next-card[data-grade-deserved="false"] .vmx-next-card__peek-action {
-  animation: pill-peek-care-arm 380ms cubic-bezier(0.16, 1, 0.3, 1) 84ms both;
-}
 .pill[data-peek="true"] .pill__peek .vmx-next-card__title {
   animation: pill-peek-title-settle 280ms cubic-bezier(0.16, 1, 0.3, 1) 112ms both;
 }
 .pill[data-peek="true"] .pill__peek .vmx-next-card__transition,
-.pill[data-peek="true"] .pill__peek .vmx-next-card__why,
-.pill[data-peek="true"] .pill__peek .vmx-next-card__grade-reason {
+.pill[data-peek="true"] .pill__peek .vmx-next-card__why {
   animation: pill-peek-detail-settle 240ms cubic-bezier(0.16, 1, 0.3, 1) 148ms both;
-}
-.pill__peek .vmx-next-card__grade {
-  grid-template-columns: auto auto minmax(0, 1fr);
-  justify-content: start;
-  column-gap: 5px;
-  width: 100%;
-  max-width: 100%;
-  padding: 0 0 5px;
-  font-size: 8px;
-  line-height: 1;
-}
-.pill__peek .vmx-next-card__grade-label {
-  letter-spacing: 0.12em;
-}
-.pill__peek .vmx-next-card__grade-xp {
-  letter-spacing: 0.04em;
-}
-.pill__peek .vmx-next-card__grade-reason {
-  display: block;
-  max-width: 100%;
-  padding-left: 8px;
-  color: var(--silk);
-  opacity: 0.76;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: none;
-  white-space: nowrap;
-}
-.pill__peek .vmx-next-card[data-grade-deserved="false"] .vmx-next-card__grade-reason {
-  min-height: 13px;
-  padding: 2px 6px 1px 11px;
-  border: 1px solid color-mix(in srgb, var(--led-warn) 20%, transparent);
-  border-radius: 999px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--led-warn) 9%, transparent),
-      color-mix(in srgb, var(--led-warn) 3%, transparent)
-    ),
-    var(--glass-3);
-  color: var(--silk);
-  font-size: 9px;
-  font-weight: 560;
-  letter-spacing: 0.01em;
-  line-height: 1;
-  opacity: 0.94;
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec-lo),
-    0 0 8px color-mix(in srgb, var(--led-warn) 12%, transparent);
-}
-.pill__peek .vmx-next-card[data-grade-deserved="false"] .vmx-next-card__grade-reason::before {
-  content: "";
-  position: absolute;
-  left: 5px;
-  top: 50%;
-  width: 3px;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--led-warn);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--led-warn) 38%, transparent);
-  transform: translateY(-50%);
-}
-.pill__peek .vmx-next-card__feedback {
-  gap: 3px;
-  margin-top: var(--sp-1);
-  padding-top: var(--sp-1);
-}
-.pill__peek .vmx-next-card__feedback-btn {
-  height: 18px;
-  font-size: 7px;
-  letter-spacing: 0.06em;
 }
 /* Reveal: only when hovering (data-peek) AND a card is present. The :empty guard
  * is the CSS belt to index.ts's honest-silence (an empty mount stays invisible —
@@ -3088,23 +2042,6 @@
     transform: translateY(0);
   }
 }
-@keyframes pill-peek-care-arm {
-  from {
-    filter: brightness(0.78);
-    opacity: 0;
-    transform: translateY(-2px) scaleX(0.9);
-  }
-  48% {
-    filter: brightness(1.1);
-    opacity: 1;
-    transform: translateY(0) scaleX(1.06);
-  }
-  to {
-    filter: brightness(1);
-    opacity: 1;
-    transform: translateY(0) scaleX(1);
-  }
-}
 @keyframes pill-peek-cue-commit {
   from {
     opacity: 0;
@@ -3116,23 +2053,6 @@
   to {
     opacity: 0.72;
     transform: scaleX(var(--cue-rail-scale, 0));
-  }
-}
-@keyframes pill-peek-action-arm {
-  from {
-    opacity: 0.68;
-    filter: brightness(1) saturate(1);
-    transform: translate3d(2px, -1px, 0) scale(0.96);
-  }
-  46% {
-    opacity: 1;
-    filter: brightness(1.14) saturate(1.12);
-    transform: translate3d(0, 0, 0) scale(1.035);
-  }
-  to {
-    opacity: 1;
-    filter: none;
-    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 @keyframes pill-peek-title-settle {
@@ -3253,27 +2173,6 @@
   --stage-wash-a: color-mix(in srgb, var(--led-fault) 22%, transparent);
   --stage-wash-b: color-mix(in srgb, var(--led-fault) 14%, transparent);
   --stage-scan-opacity: 0.72;
-}
-.pill-demo-stage[data-feedback="accept"] {
-  --stage-grid-line: var(--brand-04);
-  --stage-scan-line: var(--brand-08);
-  --stage-wash-a: var(--brand-12);
-  --stage-wash-b: var(--brand-22);
-  animation: pill-demo-stage-receipt 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill-demo-stage[data-feedback="not_now"] {
-  --stage-grid-line: var(--glass-edge-up);
-  --stage-scan-line: var(--brand-04);
-  --stage-wash-a: var(--brand-04);
-  animation: pill-demo-stage-receipt 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.pill-demo-stage[data-feedback="wrong_timing"],
-.pill-demo-stage[data-feedback-care="true"] {
-  --stage-grid-line: color-mix(in srgb, var(--led-warn) 12%, transparent);
-  --stage-scan-line: color-mix(in srgb, var(--led-warn) 18%, transparent);
-  --stage-wash-a: color-mix(in srgb, var(--led-warn) 18%, transparent);
-  --stage-wash-b: transparent;
-  animation: pill-demo-stage-receipt 860ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .pill-demo-stage::before,
 .pill-demo-stage::after {
@@ -3885,18 +2784,6 @@
     filter: brightness(1) saturate(1);
   }
 }
-@keyframes pill-demo-stage-receipt {
-  from {
-    filter: brightness(1.12) saturate(1.18);
-  }
-  48% {
-    filter: brightness(1.22) saturate(1.28);
-  }
-  to {
-    filter: brightness(1) saturate(1);
-  }
-}
-
 @media (min-width: 621px) and (max-width: 755px) {
   .pill-demo-controls {
     right: 6px;
@@ -4028,9 +2915,7 @@
     transform: none !important;
   }
   .pill[data-reaction-pulse],
-  .pill[data-feedback],
   .pill[data-reaction-echo],
-  .pill[data-grade-burst],
   .pill__reaction-lead,
   .pill__reaction-rest,
   .pill[data-state="expand"] .pill__expand .vmx-citation-chip,
@@ -4038,24 +2923,15 @@
   .pill[data-state="listening"] .pill__label,
   .pill[data-state="speaking"] .pill__label,
   .pill[data-peek="true"] .pill__label,
-  .pill[data-feedback] .pill__label,
   .pill[data-reaction-echo] .pill__label,
   .pill[data-actionable="true"] .pill__row::after,
   .pill[data-state="expand"][data-reaction-tone][data-reaction-pulse]::before,
   .pill[data-state="expand"][data-reaction-tone][data-reaction-pulse]::after,
   .pill__dot::after,
-  .pill__grade::before,
-  .pill__level,
-  .pill__level::before,
-  .pill[data-grade-earned="false"][data-move-grade] .pill__grade,
-  .pill[data-feedback] .pill__grade,
-  .pill__burst span,
-  .pill__overdrive span,
   .pill[data-state="speaking"] .pill__wave,
   .pill[data-state="expand"][data-face-wave="visible"] .pill__wave,
   .pill[data-state="speaking"] .vmx-pill-wave__bar,
-  .pill[data-state="expand"][data-face-wave="visible"] .vmx-pill-wave__bar,
-  .pill__streak {
+  .pill[data-state="expand"][data-face-wave="visible"] .vmx-pill-wave__bar {
     animation: none !important;
     transform: none !important;
   }
@@ -4063,9 +2939,7 @@
   .pill[data-state="expand"][data-face-wave="visible"] .vmx-pill-wave__bar {
     transition: none !important;
   }
-  .pill__burst,
-  .pill__fx,
-  .pill__overdrive {
+  .pill__fx {
     display: none;
   }
   .pill[data-state="expand"][data-reaction-tone] .pill__reaction::before {
@@ -4090,11 +2964,9 @@
     animation: none !important;
     transition: none !important;
   }
-  .pill[data-peek="true"] .pill__peek .vmx-next-card__peek-action,
   .pill[data-peek="true"] .pill__peek .vmx-next-card__title,
   .pill[data-peek="true"] .pill__peek .vmx-next-card__transition,
-  .pill[data-peek="true"] .pill__peek .vmx-next-card__why,
-  .pill[data-peek="true"] .pill__peek .vmx-next-card__grade-reason {
+  .pill[data-peek="true"] .pill__peek .vmx-next-card__why {
     animation: none !important;
     transform: none !important;
   }
@@ -4109,7 +2981,6 @@
   }
   .pill-demo-controls,
   .pill-demo-stage,
-  .pill-demo-stage[data-feedback],
   .pill-demo-stage__hit,
   .pill-demo-stage::before,
   .pill-demo-controls button,

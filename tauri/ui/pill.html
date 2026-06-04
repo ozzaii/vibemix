@@ -82,7 +82,7 @@
       <div class="pill__drag" id="pill-drag" data-wire="pill.drag" aria-hidden="true">
         <div class="pill__grab"></div>
       </div>
-      <!-- Collapsed face: state dot + state label + grade + waveform mount. -->
+      <!-- Collapsed face: state dot + state label + waveform mount. -->
       <div class="pill__row" data-wire="pill.row">
         <div class="pill__dot" id="pill-dot" data-wire="pill.intelligence" aria-hidden="true"></div>
         <!-- a11y: the dot + waveform are aria-hidden decoration, so the dynamic
@@ -90,17 +90,8 @@
              SPEAKING. role=status + aria-live=polite announces the co-host
              starting/stopping without interrupting (UI-REVIEW minor a11y rec). -->
         <div class="pill__label" id="pill-label" data-wire="pill.state-label" role="status" aria-live="polite">IDLE</div>
-        <div class="pill__grade" id="pill-grade" data-wire="pill.grade" aria-live="polite"></div>
-        <span class="pill__level" id="pill-level" data-wire="pill.level" aria-live="polite"></span>
         <div class="pill__wave" id="pill-wave" data-wire="pill.wave"></div>
       </div>
-      <div class="pill__burst" id="pill-burst" data-wire="pill.burst" aria-hidden="true"></div>
-      <div class="pill__overdrive" id="pill-overdrive" data-wire="pill.overdrive" aria-hidden="true">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-      <span class="pill__streak" id="pill-streak" data-wire="pill.streak" aria-hidden="true"></span>
       <span class="pill__notch" data-wire="pill.notch" aria-hidden="true"></span>
       <!-- Expand panel: reaction text + citation strip mount (62-04);
            deck-context chips mount (62-05). -->

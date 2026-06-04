@@ -29,15 +29,8 @@ import { renderCitationStrip, type CitationChip } from "../session/components/ci
 import { renderDeckChips, type DeckStateWire } from "./deck-chips.js";
 import {
   nextSuggestionRenderKey,
-  nextMoveGrade,
-  nextMoveGradeProgress,
   nextSuggestionPrimaryActionAriaLabel,
   renderNextSuggestion,
-  pillXpLevel,
-  type MoveGradeProgressView,
-  type MoveGradeView,
-  type NextAlternativeView,
-  type NextSuggestionFeedbackKind,
   type NextSuggestionWire,
 } from "./next-suggestion.js";
 import {
@@ -66,7 +59,6 @@ import { invoke } from "@tauri-apps/api/core";
 
 const TAG = "[pill]";
 const PILL_ROOT_ARIA_LABEL = "vibemix cohost pill";
-const PILL_FEEDBACK_ECHO_MS = 1400;
 const PILL_REACTION_ECHO_MS = 1800;
 
 /**
@@ -238,11 +230,6 @@ export function reduceFrame(state: PillState, msg: unknown, now: number): PillSt
 interface PillView {
   root: HTMLElement;
   label: HTMLElement;
-  gradeMount: HTMLElement;
-  levelMount: HTMLElement;
-  burstMount: HTMLElement;
-  overdriveMount: HTMLElement;
-  streakMount: HTMLElement;
   fxCanvas: HTMLCanvasElement;
   fxAnimationFrame: number | null;
   reaction: HTMLElement;
@@ -271,11 +258,8 @@ interface PillView {
    *  edge cases while the backend/demo source still exposes the same card. */
   handledNextRenderKey: string;
   onPeekPrimaryAction: (() => void) | null;
-  gradeStreak: PillGradeProgressState;
-  feedbackEcho: PillFeedbackEcho | null;
   reactionEcho: PillReactionEcho | null;
   lastReactionEchoKey: string;
-  lastGradeKey: string;
   lastNextKey: string;
   lastNextPulseKey: string;
   nextPulseRevision: number;
@@ -464,14 +448,6 @@ const DEMO_NEXT_SUGGESTION: NextSuggestionWire = {
     start_in_bars: 8,
     from_role: "outro",
     to_role: "intro",
-    move_grade: {
-      slug: "sexy",
-      label: "SEXY",
-      xp: 48,
-      intensity: 66,
-      reason: "smooth blend, clean bass handoff",
-      deserved: PILL_MOVE_GRADE_VOCABULARY.sexy.deserved,
-    },
   },
 };
 
@@ -801,18 +777,6 @@ function clearPillDemoStageImpulses(stage: HTMLElement): void {
   stage.querySelectorAll(`.${PILL_DEMO_STAGE_HIT_CLASS}`).forEach((hit) => hit.remove());
 }
 
-export function syncPillDemoStageFeedback(feedback: PillFeedbackEcho | null): void {
-  const stage = document.getElementById(PILL_DEMO_STAGE_ID);
-  if (!stage) return;
-  if (feedback) {
-    stage.dataset.feedback = feedback.kind;
-    stage.dataset.feedbackCare = feedback.care ? "true" : "false";
-  } else {
-    delete stage.dataset.feedback;
-    delete stage.dataset.feedbackCare;
-  }
-}
-
 export function syncPillDemoPadPointer(button: HTMLElement, clientX: number, clientY: number): void {
   const rect = button.getBoundingClientRect();
   const width = Math.max(1, rect.width);
@@ -910,23 +874,6 @@ const PILL_COLLAPSED_H = 44;
 const PILL_EXPAND_CAP = 248; // matches .pill[data-state="expand"] .pill__expand max-height
 const PILL_PEEK_CAP = 150; // matches .pill[data-peek="true"] .pill__peek max-height
 
-export interface PillGradeProgressState extends MoveGradeProgressView {
-  key: string;
-  slug: string;
-  xp: number;
-}
-
-export interface PillFeedbackEcho {
-  kind: NextSuggestionFeedbackKind;
-  label: string;
-  suggestionKey: string;
-  completionKey?: string;
-  grade?: MoveGradeView | null;
-  progress?: PillGradeProgressState | null;
-  care: boolean;
-  until: number;
-}
-
 export interface PillReactionEcho {
   label: string;
   tone: PillReactionTone;
@@ -939,19 +886,7 @@ export type PillIntelState =
   | "listening"
   | "speaking"
   | "reaction"
-  | "knows"
-  | "care"
-  | "earned"
-  | "overdrive"
-  | "feedback";
-
-export type PillBurstMode = "none" | "level_up" | "overdrive";
-
-export interface PillBurstProfile {
-  mode: PillBurstMode;
-  shardCount: number;
-  ringCount: number;
-}
+  | "knows";
 
 function boundedContentHeight(value: number, cap: number): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
@@ -1074,9 +1009,8 @@ export function pillShouldExposePeekFocus(peekVisible: boolean, hasNext: boolean
 export function pillRootPrimaryActionAvailable(
   peekVisible: boolean,
   hasNext: boolean,
-  feedback: PillFeedbackEcho | null,
 ): boolean {
-  return !feedback && pillShouldExposePeekFocus(peekVisible, hasNext);
+  return pillShouldExposePeekFocus(peekVisible, hasNext);
 }
 
 export function syncPillRootActionability(root: HTMLElement, available: boolean): void {
@@ -1147,185 +1081,18 @@ export function pillSuggestionIsHandled(
   return Boolean(renderKey && renderKey === handledRenderKey);
 }
 
-export function nextPillGradeProgress(
-  prev: PillGradeProgressState,
-  suggestionKey: string,
-  grade: MoveGradeView | null,
-): PillGradeProgressState {
-  if (!grade || !suggestionKey) {
-    const level = pillXpLevel(prev.totalXp);
-    return {
-      key: "",
-      slug: "",
-      streak: 0,
-      xp: 0,
-      totalXp: prev.totalXp,
-      lastXp: 0,
-      earned: false,
-      heat: 0,
-      levelUp: false,
-      levelsGained: 0,
-      ...level,
-    };
-  }
-  if (prev.key === suggestionKey && prev.slug === grade.slug) return prev;
-  const earned = grade.deserved && grade.slug !== "mid" && grade.slug !== "negative";
-  const previousLevel = pillXpLevel(prev.totalXp).level;
-  const streak = earned ? prev.streak + 1 : 0;
-  const totalXp = earned ? prev.totalXp + grade.xp : prev.totalXp;
-  const level = pillXpLevel(totalXp);
-  const levelsGained = earned ? Math.max(0, level.level - previousLevel) : 0;
-  return {
-    key: suggestionKey,
-    slug: grade.slug,
-    streak,
-    xp: grade.xp,
-    totalXp,
-    lastXp: earned ? grade.xp : 0,
-    earned,
-    heat: earned ? Math.min(100, Math.max(grade.intensity, streak * 18)) : 0,
-    levelUp: levelsGained > 0,
-    levelsGained,
-    ...level,
-  };
-}
-
-export const nextPillGradeStreak = nextPillGradeProgress;
-
-export function pillMoveGradeRenderKey(
-  grade: MoveGradeView | null,
-  progress: PillGradeProgressState,
-): string {
-  return grade
-    ? [
-        progress.key,
-        grade.slug,
-        grade.label,
-        grade.xp,
-        grade.reason,
-        grade.deserved,
-        grade.overdrive,
-        progress.streak,
-        progress.totalXp,
-        progress.lastXp,
-        progress.earned,
-        progress.heat,
-        progress.level ?? "",
-        progress.levelXp ?? "",
-        progress.nextLevelXp ?? "",
-        progress.levelProgress ?? "",
-        progress.levelUp ?? "",
-        progress.levelsGained ?? "",
-      ].join("|")
-    : "";
-}
-
-export function pillGradeXpText(grade: MoveGradeView | null): string {
-  if (!grade) return "";
-  return grade.xp > 0 ? `+${grade.xp}xp` : "0xp";
-}
-
-export function pillGradeFaceText(grade: MoveGradeView | null): string {
-  if (!grade) return "";
-  return `${grade.label} ${pillGradeXpText(grade)}`;
-}
-
-export function pillLevelText(progress: MoveGradeProgressView): string {
-  if (progress.totalXp <= 0) return "";
-  const level = progress.level ?? pillXpLevel(progress.totalXp).level;
-  return `LV${level}`;
-}
-
-export function pillLevelAriaLabel(progress: MoveGradeProgressView): string {
-  const text = pillLevelText(progress);
-  if (!text) return "";
-  const fallback = pillXpLevel(progress.totalXp);
-  const level = progress.level ?? fallback.level;
-  const levelXp = progress.levelXp ?? fallback.levelXp;
-  const nextLevelXp = progress.nextLevelXp ?? fallback.nextLevelXp;
-  return `level ${level}, ${levelXp} of ${nextLevelXp} xp${
-    progress.levelUp ? ", level up" : ""
-  }`;
-}
-
 export function pillIntelState(input: {
   mode: PillState["mode"];
   hasNext: boolean;
   hovered?: boolean;
   peekVisible: boolean;
-  feedback: PillFeedbackEcho | null;
-  grade: MoveGradeView | null;
-  progress: MoveGradeProgressView | null;
 }): PillIntelState {
   if (input.mode === "expand") return "reaction";
   if (input.mode === "speaking") return "speaking";
-  if (input.feedback?.care) return "care";
-  if (input.feedback) return "feedback";
-  if (input.grade && input.progress && !input.progress.earned) return "care";
   if (input.peekVisible) return "knows";
-  if ((input.grade?.overdrive || input.progress?.levelUp) && input.progress?.earned) {
-    return "overdrive";
-  }
-  if (input.progress?.earned) return "earned";
   if (input.hasNext) return "knows";
   if (input.mode === "listening") return "listening";
   return "idle";
-}
-
-export function pillBurstProfile(
-  grade: MoveGradeView | null,
-  progress: MoveGradeProgressView | null,
-): PillBurstProfile {
-  if (!grade || progress?.earned !== true) {
-    return { mode: "none", shardCount: 0, ringCount: 0 };
-  }
-  if (grade.overdrive) {
-    return { mode: "overdrive", shardCount: 10, ringCount: 4 };
-  }
-  if (progress.levelUp) {
-    return { mode: "level_up", shardCount: 6, ringCount: 3 };
-  }
-  return { mode: "none", shardCount: 0, ringCount: 0 };
-}
-
-export function pillFeedbackEchoLabel(
-  kind: NextSuggestionFeedbackKind,
-  grade: MoveGradeView | null = null,
-): string {
-  if (kind === "accept") return grade && !grade.deserved ? "CARE" : "KEEP";
-  if (kind === "not_now") return "LATER";
-  return "TIMING";
-}
-
-export function pillFeedbackAriaText(feedback: PillFeedbackEcho): string {
-  if (feedback.care) return "suggestion accepted with care";
-  if (feedback.kind === "accept") return "suggestion kept";
-  if (feedback.kind === "not_now") return "suggestion postponed";
-  return "suggestion timing marked wrong";
-}
-
-export function pillFeedbackShouldSend(
-  echo: PillFeedbackEcho | null,
-  kind: NextSuggestionFeedbackKind,
-  suggestionKey: string,
-  now: number,
-): boolean {
-  return !(
-    echo &&
-    now <= echo.until &&
-    echo.kind === kind &&
-    echo.suggestionKey === suggestionKey
-  );
-}
-
-export function pillFeedbackShouldClearForSuggestion(
-  echo: PillFeedbackEcho | null,
-  suggestion: NextSuggestionWire | null | undefined,
-): boolean {
-  if (!echo || !hasRenderableSuggestion(suggestion)) return false;
-  const completionKey = pillNextCompletionKey(suggestion);
-  if (completionKey && echo.completionKey) return completionKey !== echo.completionKey;
-  return nextSuggestionRenderKey(suggestion) !== echo.suggestionKey;
 }
 
 export function pillShouldClearHandledNextOnNull(demoFallbackEnabled: boolean): boolean {
@@ -1336,23 +1103,17 @@ export function pillRenderLabel(
   baseLabel: string,
   hoverActive: boolean,
   peekVisible: boolean,
-  feedback: PillFeedbackEcho | null,
 ): string {
-  if (feedback) return feedback.label;
   return hoverActive && peekVisible ? "DJ KNOWS" : baseLabel;
 }
 
 export function pillRootAriaLabel(input: {
   peekVisible: boolean;
   suggestion: NextSuggestionWire | null | undefined;
-  feedback: PillFeedbackEcho | null;
-  gradeProgress?: MoveGradeProgressView | null;
 }): string {
-  if (input.feedback) return `${PILL_ROOT_ARIA_LABEL}. ${pillFeedbackAriaText(input.feedback)}.`;
   if (input.peekVisible && hasRenderableSuggestion(input.suggestion)) {
     const action = nextSuggestionPrimaryActionAriaLabel(input.suggestion, {
       density: "peek",
-      gradeProgress: input.gradeProgress ?? null,
     });
     return `${PILL_ROOT_ARIA_LABEL}. ${action}`;
   }
@@ -1365,28 +1126,7 @@ function render(view: PillView, state: PillState, baseLabel: string, now: number
 
   const effectiveNext = effectiveNextSuggestion(view);
   const nextKey = nextSuggestionRenderKey(effectiveNext);
-  const moveGrade = nextMoveGrade(effectiveNext);
   const exposeNextChrome = pillShouldExposeNextChrome(state.mode);
-  const localProgress = nextPillGradeProgress(view.gradeStreak, nextKey, moveGrade);
-  const wireProgress = nextMoveGradeProgress(effectiveNext, null);
-  const nextProgress = wireProgress && moveGrade
-    ? {
-        key: nextKey,
-        slug: moveGrade.slug,
-        xp: moveGrade.xp,
-        ...wireProgress,
-      }
-    : localProgress;
-  const feedbackEcho = activeFeedbackEcho(view, now);
-  const faceFeedback = state.mode === "expand" || state.mode === "speaking" ? null : feedbackEcho;
-  const faceGrade =
-    exposeNextChrome && !moveGrade && faceFeedback?.grade ? faceFeedback.grade : moveGrade;
-  const faceProgress =
-    exposeNextChrome && !moveGrade && faceFeedback?.progress
-      ? faceFeedback.progress
-      : nextProgress;
-  view.gradeStreak = faceProgress;
-  syncMoveGrade(view, exposeNextChrome ? faceGrade : null);
   const hasNext = exposeNextChrome && hasRenderableSuggestion(effectiveNext);
   const demoNext = exposeNextChrome && effectiveNext === DEMO_NEXT_SUGGESTION;
   view.root.dataset.hasNext = hasNext ? "true" : "false";
@@ -1405,15 +1145,7 @@ function render(view: PillView, state: PillState, baseLabel: string, now: number
   view.root.dataset.faceWave = pillShouldShowFaceWave(state.mode, state.cohostStatus)
     ? "visible"
     : "quiet";
-  if (faceFeedback) {
-    view.root.dataset.feedback = faceFeedback.kind;
-    view.root.dataset.feedbackCare = faceFeedback.care ? "true" : "false";
-  } else {
-    delete view.root.dataset.feedback;
-    delete view.root.dataset.feedbackCare;
-  }
-  syncPillDemoStageFeedback(faceFeedback);
-  if (reactionEcho && !faceFeedback) {
+  if (reactionEcho) {
     view.root.dataset.reactionEcho = reactionEcho.tone;
   } else {
     delete view.root.dataset.reactionEcho;
@@ -1423,21 +1155,16 @@ function render(view: PillView, state: PillState, baseLabel: string, now: number
     hasNext,
     hovered: hoverActive,
     peekVisible,
-    feedback: faceFeedback,
-    grade: exposeNextChrome ? faceGrade : null,
-    progress: view.gradeStreak,
   });
   view.label.textContent =
-    reactionEcho && !faceFeedback
+    reactionEcho
       ? reactionEcho.label
-      : pillRenderLabel(baseLabel, hoverActive, peekVisible, faceFeedback);
+      : pillRenderLabel(baseLabel, hoverActive, peekVisible);
   view.root.setAttribute(
     "aria-label",
     pillRootAriaLabel({
       peekVisible,
       suggestion: effectiveNext,
-      feedback: faceFeedback,
-      gradeProgress: nextProgress,
     }),
   );
   if (exposeNextChrome) {
@@ -1448,7 +1175,7 @@ function render(view: PillView, state: PillState, baseLabel: string, now: number
   const exposePeek = pillShouldExposePeekFocus(peekVisible, hasNext);
   syncPillRootActionability(
     view.root,
-    pillRootPrimaryActionAvailable(peekVisible, hasNext, faceFeedback),
+    pillRootPrimaryActionAvailable(peekVisible, hasNext),
   );
   syncPeekAssistiveVisibility(view, exposePeek);
   syncPeekFocus(view, exposePeek);
@@ -1868,14 +1595,6 @@ function pillClamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function activeFeedbackEcho(view: PillView, now: number): PillFeedbackEcho | null {
-  const echo = view.feedbackEcho;
-  if (echo === null) return null;
-  if (now <= echo.until) return echo;
-  view.feedbackEcho = null;
-  return null;
-}
-
 function activeReactionEcho(
   view: PillView,
   mode: PillState["mode"],
@@ -1950,108 +1669,6 @@ function syncWindowHeight(view: PillView, state: PillState): void {
   void invoke("set_pill_height", { height: target }).catch((e: unknown) =>
     vmxLog("[vmx:error]", "set_pill_height failed", { error: String(e) }),
   );
-}
-
-function syncMoveGrade(view: PillView, grade: MoveGradeView | null): void {
-  const streak = view.gradeStreak;
-  const key = pillMoveGradeRenderKey(grade, streak);
-  if (key === view.lastGradeKey) return;
-  view.lastGradeKey = key;
-
-  if (!grade) {
-    delete view.root.dataset.moveGrade;
-    delete view.root.dataset.gradeEarned;
-    delete view.root.dataset.gradeOverdrive;
-    delete view.root.dataset.gradeStreak;
-    delete view.root.dataset.gradeTotalXp;
-    delete view.root.dataset.gradeLevel;
-    delete view.root.dataset.gradeLevelUp;
-    delete view.root.dataset.gradeBurst;
-    view.gradeMount.style.removeProperty("--pill-grade-heat-scale");
-    view.levelMount.style.removeProperty("--pill-level-scale");
-    view.streakMount.style.removeProperty("--pill-streak-heat-scale");
-    view.gradeMount.replaceChildren();
-    view.gradeMount.removeAttribute("aria-label");
-    view.gradeMount.removeAttribute("title");
-    view.levelMount.replaceChildren();
-    view.levelMount.removeAttribute("aria-label");
-    view.burstMount.replaceChildren();
-    view.overdriveMount.replaceChildren();
-    return;
-  }
-
-  const level = pillXpLevel(streak.totalXp);
-  const levelProgress = streak.levelProgress ?? level.levelProgress;
-  view.root.dataset.moveGrade = grade.slug;
-  view.root.dataset.gradeEarned = streak.earned ? "true" : "false";
-  view.root.dataset.gradeOverdrive = grade.overdrive ? "true" : "false";
-  view.root.dataset.gradeStreak = String(streak.streak);
-  view.root.dataset.gradeTotalXp = String(streak.totalXp);
-  view.root.dataset.gradeLevel = String(streak.level ?? level.level);
-  view.root.dataset.gradeLevelUp = streak.levelUp ? "true" : "false";
-  view.gradeMount.style.setProperty(
-    "--pill-grade-heat-scale",
-    (grade.intensity / 100).toFixed(2),
-  );
-  view.levelMount.style.setProperty(
-    "--pill-level-scale",
-    (levelProgress / 100).toFixed(2),
-  );
-  view.streakMount.style.setProperty(
-    "--pill-streak-heat-scale",
-    (streak.heat / 100).toFixed(2),
-  );
-
-  const label = document.createElement("span");
-  label.className = "pill__grade-label";
-  label.textContent = grade.label;
-
-  const xp = document.createElement("span");
-  xp.className = "pill__grade-xp";
-  xp.textContent = pillGradeXpText(grade);
-
-  const spacer = document.createElement("span");
-  spacer.className = "pill__grade-spacer";
-  spacer.setAttribute("aria-hidden", "true");
-  spacer.textContent = " ";
-
-  view.gradeMount.replaceChildren(label, spacer, xp);
-  view.gradeMount.setAttribute("title", pillGradeFaceText(grade));
-  view.gradeMount.setAttribute(
-    "aria-label",
-    `${grade.label} move, ${grade.xp} xp, ${grade.reason}${
-      streak.streak > 1 ? `, ${streak.streak} move streak` : ""
-    }${streak.totalXp > 0 ? `, ${streak.totalXp} session xp, ${pillLevelAriaLabel(streak)}` : ""}`,
-  );
-  const levelText = streak.earned ? pillLevelText(streak) : "";
-  view.levelMount.textContent = levelText;
-  if (levelText) {
-    view.levelMount.setAttribute("aria-label", pillLevelAriaLabel(streak));
-  } else {
-    view.levelMount.removeAttribute("aria-label");
-  }
-
-  view.burstMount.replaceChildren();
-  view.overdriveMount.replaceChildren();
-  const burst = pillBurstProfile(grade, streak);
-  if (burst.mode === "none") {
-    delete view.root.dataset.gradeBurst;
-  } else {
-    view.root.dataset.gradeBurst = burst.mode;
-    const spanStep = burst.shardCount > 1 ? 72 / (burst.shardCount - 1) : 0;
-    const delayStepMs = burst.mode === "overdrive" ? 24 : 34;
-    const rotation = burst.mode === "overdrive" ? 32 : 24;
-    for (let index = 0; index < burst.shardCount; index += 1) {
-      const shard = document.createElement("span");
-      shard.style.setProperty("--x", `${14 + index * spanStep}%`);
-      shard.style.setProperty("--delay", `${index * delayStepMs}ms`);
-      shard.style.setProperty("--rot", `${index % 2 === 0 ? rotation : -rotation}deg`);
-      view.burstMount.append(shard);
-    }
-    for (let index = 0; index < burst.ringCount; index += 1) {
-      view.overdriveMount.append(document.createElement("span"));
-    }
-  }
 }
 
 function syncCitationStrip(
@@ -2171,13 +1788,7 @@ function syncNextSuggestion(view: PillView): void {
     [mount],
   );
   mount.replaceChildren();
-  const card = renderNextSuggestion(s, {
-    showAlternatives: true,
-    maxAlternatives: 2,
-    gradeProgress: view.gradeStreak,
-    onAlternativeSelect: chooseNextSuggestionAlternative,
-    onFeedback: (kind) => sendNextSuggestionFeedback(kind, view),
-  });
+  const card = renderNextSuggestion(s, {});
   if (card) {
     card.setAttribute("data-no-drag", "");
     mount.append(card);
@@ -2212,11 +1823,7 @@ function syncPeekCard(view: PillView): void {
   mount.removeAttribute("aria-label");
   const card = renderNextSuggestion(s, {
     density: "peek",
-    showAlternatives: false,
-    showFeedback: false,
-    gradeProgress: view.gradeStreak,
     onPrimaryAction: () => view.onPeekPrimaryAction?.(),
-    onFeedback: (kind) => sendNextSuggestionFeedback(kind, view),
   });
   if (card) {
     card.setAttribute("data-no-drag", "");
@@ -2328,23 +1935,6 @@ function hasRenderableSuggestion(
   return Boolean(s?.track_id && s?.title);
 }
 
-export function nextSuggestionChoiceMessage(alt: NextAlternativeView): Record<string, unknown> {
-  return {
-    action: "next_suggestion.choose",
-    candidate_id: alt.candidateId,
-    track_id: alt.trackId || null,
-  };
-}
-
-export function nextSuggestionFeedbackMessage(
-  feedback: NextSuggestionFeedbackKind,
-): Record<string, unknown> {
-  return {
-    action: "next_suggestion.feedback",
-    feedback,
-  };
-}
-
 export function pillDebriefInvokeArgs(chip: CitationChip): Record<string, unknown> {
   return {
     sessionDir: "",
@@ -2355,77 +1945,11 @@ export function pillDebriefInvokeArgs(chip: CitationChip): Record<string, unknow
   };
 }
 
-function chooseNextSuggestionAlternative(alt: NextAlternativeView): void {
-  const message = nextSuggestionChoiceMessage(alt);
-  vmxLog("[vmx:ipc>]", "choose next-suggestion backup", message);
-  void invoke("forward_ipc_to_sidecar", { message }).catch((err: unknown) => {
-    vmxLog("[vmx:error]", "next-suggestion backup choose failed", {
-      error: String(err),
-    });
-  });
-}
-
-function sendNextSuggestionFeedback(
-  feedback: NextSuggestionFeedbackKind,
-  view?: PillView,
-): void {
-  let suggestionKey = "";
-  if (view) {
-    const suggestion = effectiveNextSuggestion(view);
-    const grade = nextMoveGrade(suggestion);
-    suggestionKey = nextSuggestionRenderKey(suggestion);
-    const completionKey = pillNextCompletionKey(suggestion);
-    const progress = grade ? view.gradeStreak : null;
-    const now = performance.now();
-    if (!pillFeedbackShouldSend(view.feedbackEcho, feedback, suggestionKey, now)) return;
-    const label = pillFeedbackEchoLabel(feedback, grade);
-    view.feedbackEcho = {
-      kind: feedback,
-      label,
-      suggestionKey,
-      completionKey,
-      grade,
-      progress,
-      care: label === "CARE",
-      until: now + PILL_FEEDBACK_ECHO_MS,
-    };
-    if (suggestionKey) view.handledNextRenderKey = suggestionKey;
-    if (completionKey) {
-      view.handledNextKey = completionKey;
-    }
-    if (completionKey || suggestionKey) {
-      const restoreRootFocus = pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(
-        document.activeElement,
-        view.root,
-        [view.nextMount, view.peekMount],
-      );
-      view.nextMount.replaceChildren();
-      view.peekMount.replaceChildren();
-      view.peekMount.removeAttribute("aria-label");
-      view.lastNextKey = "";
-      view.lastPeekKey = "";
-      if (restoreRootFocus) view.root.focus({ preventScroll: true });
-    }
-  }
-  const message = nextSuggestionFeedbackMessage(feedback);
-  vmxLog("[vmx:ipc>]", "label next-suggestion", message);
-  void invoke("forward_ipc_to_sidecar", { message }).catch((err: unknown) => {
-    vmxLog("[vmx:error]", "next-suggestion feedback failed", {
-      error: String(err),
-    });
-  });
-}
-
 // ── Boot ──────────────────────────────────────────────────────────────────
 
 function boot(): void {
   const root = document.getElementById("pill");
   const label = document.getElementById("pill-label");
-  const gradeMount = document.getElementById("pill-grade");
-  const levelMount = document.getElementById("pill-level");
-  const burstMount = document.getElementById("pill-burst");
-  const overdriveMount = document.getElementById("pill-overdrive");
-  const streakMount = document.getElementById("pill-streak");
   const fxCanvas = document.getElementById("pill-fx");
   const reaction = document.getElementById("pill-reaction");
   const expand = document.getElementById("pill-expand");
@@ -2436,11 +1960,6 @@ function boot(): void {
   if (
     !root ||
     !label ||
-    !gradeMount ||
-    !levelMount ||
-    !burstMount ||
-    !overdriveMount ||
-    !streakMount ||
     !(fxCanvas instanceof HTMLCanvasElement) ||
     !reaction ||
     !expand ||
@@ -2471,11 +1990,6 @@ function boot(): void {
   const view: PillView = {
     root,
     label,
-    gradeMount,
-    levelMount,
-    burstMount,
-    overdriveMount,
-    streakMount,
     fxCanvas,
     fxAnimationFrame: null,
     reaction,
@@ -2491,20 +2005,8 @@ function boot(): void {
     handledNextKey: "",
     handledNextRenderKey: "",
     onPeekPrimaryAction: null,
-    gradeStreak: {
-      key: "",
-      slug: "",
-      streak: 0,
-      xp: 0,
-      totalXp: 0,
-      lastXp: 0,
-      earned: false,
-      heat: 0,
-    },
-    feedbackEcho: null,
     reactionEcho: null,
     lastReactionEchoKey: "",
-    lastGradeKey: "",
     lastChipsKey: "",
     lastDeckKey: "",
     lastReactionKey: "",
@@ -2538,13 +2040,30 @@ function boot(): void {
     }
   };
   view.onPeekPrimaryAction = () => {
+    // Activating the peek card dismisses it locally — mark the current
+    // suggestion handled so a stale echo of the same pick doesn't re-open the
+    // glance until a fresh suggestion arrives.
+    const suggestion = effectiveNextSuggestion(view);
+    const completionKey = pillNextCompletionKey(suggestion);
+    const renderKey = nextSuggestionRenderKey(suggestion);
+    if (renderKey) view.handledNextRenderKey = renderKey;
+    if (completionKey) view.handledNextKey = completionKey;
+    const restoreRootFocus = pillShouldReturnFocusToRootAfterSuggestionSurfaceRemoval(
+      document.activeElement,
+      view.root,
+      [view.nextMount, view.peekMount],
+    );
+    view.nextMount.replaceChildren();
+    view.peekMount.replaceChildren();
+    view.peekMount.removeAttribute("aria-label");
+    view.lastNextKey = "";
+    view.lastPeekKey = "";
+    if (restoreRootFocus) view.root.focus({ preventScroll: true });
     closePeekToRoot(true);
-    sendNextSuggestionFeedback("accept", view);
   };
   view.demoControls = installPillDemoControls((key) => {
     const now = performance.now();
     state = setPeek(state, false);
-    view.feedbackEcho = null;
     view.deckState = DEMO_DECK_STATE;
     view.nextSuggestion = DEMO_NEXT_SUGGESTION;
     view.handledNextKey = "";
@@ -2666,9 +2185,6 @@ function boot(): void {
       // bridged snapshot (which omits the field) never wipes the suggestion.
       const ns = readNextSuggestion(msg);
       if (ns !== undefined) {
-        if (pillFeedbackShouldClearForSuggestion(view.feedbackEcho, ns)) {
-          view.feedbackEcho = null;
-        }
         view.nextSuggestion = ns;
         if (ns === null && pillShouldClearHandledNextOnNull(DEMO_NEXT_ENABLED)) {
           view.handledNextKey = "";
