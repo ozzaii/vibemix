@@ -845,8 +845,12 @@ describe("SessionLayout", () => {
 
     mountSessionLayout(root, state);
 
-    expect(root.textContent).toContain("eqMac Export silent · Route DJ output there.");
-    expect(root.textContent).toContain("eqMac Export is silent. Route DJ output there.");
+    expect(root.textContent).toContain(
+      "eqMac Export silent · Send DJ app to Multi-Output (eqMac).",
+    );
+    expect(root.textContent).toContain(
+      "eqMac Export is silent. Send DJ app to Multi-Output (eqMac).",
+    );
   });
 
   it("explains the blank BPM readout when the capture device is silent", () => {
@@ -921,9 +925,11 @@ describe("SessionLayout", () => {
 
     expect(root.textContent).toContain("audio hearing · Sven ready · DDJ-FLX4 waiting");
     expect(root.textContent).toContain(
-      "screen proof ready · DDJ-FLX4 waiting · Move one control.",
+      "screen proof ready · DDJ-FLX4 waiting · Move mixer/deck control.",
     );
-    expect(root.textContent).toContain("DDJ-FLX4 is connected. Move one control for proof.");
+    expect(root.textContent).toContain(
+      "DDJ-FLX4 is connected. Move mixer/deck control for proof.",
+    );
   });
 
   it("shows a passive voice status only when the local voice engine is muted", () => {

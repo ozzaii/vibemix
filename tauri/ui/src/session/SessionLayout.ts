@@ -1525,7 +1525,7 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
         ? "screen proof unavailable"
         : "screen proof checking";
   const action = audioWaiting
-    ? `${captureDeviceLabel(state.status.captureDevice)} silent · Route DJ output there.`
+    ? `${captureDeviceLabel(state.status.captureDevice)} silent · ${captureRouteInstruction(state.status.captureDevice)}`
     : controllerWaiting
       ? `${screen} · ${midiProofAction(state.status.midiActivity, state.status.midiDevice)}`
       : `${screen} · Start playback, I will not guess.`;
@@ -1577,7 +1577,7 @@ function idleProofNext(
 ): string {
   if (audio.label === "waiting") {
     const device = captureDeviceLabel(captureDevice);
-    return `${device} is silent. Route DJ output there.`;
+    return `${device} is silent. ${captureRouteInstruction(captureDevice)}`;
   }
   if (controller.label === "no motion") {
     return midiProofNext(midiActivity, midiDevice);
@@ -1594,6 +1594,14 @@ function musicSignalActive(music: SessionState["meters"]["music"]): boolean {
 function captureDeviceLabel(captureDevice?: string | null): string {
   const text = (captureDevice ?? "").trim().replace(/\s+/g, " ");
   return text || "capture";
+}
+
+function captureRouteInstruction(captureDevice?: string | null): string {
+  const device = captureDeviceLabel(captureDevice).toLowerCase();
+  if (device === "eqmac export") {
+    return "Send DJ app to Multi-Output (eqMac).";
+  }
+  return "Route DJ output there.";
 }
 
 function bpmWaitingTitle(
@@ -1617,7 +1625,7 @@ function midiProofAction(
 ): string {
   const device = midiDeviceLabel(midiDevice);
   if (midiActivity === "connected_no_midi_traffic") {
-    return `${device} waiting · Move one control.`;
+    return `${device} waiting · Move mixer/deck control.`;
   }
   if (midiActivity === "midi_traffic_unmapped") {
     return `${device} unmapped · Run controller mapping.`;
@@ -1634,7 +1642,7 @@ function midiProofNext(
 ): string {
   const device = midiDeviceLabel(midiDevice);
   if (midiActivity === "connected_no_midi_traffic") {
-    return `${device} is connected. Move one control for proof.`;
+    return `${device} is connected. Move mixer/deck control for proof.`;
   }
   if (midiActivity === "midi_traffic_unmapped") {
     return `${device} sends MIDI, but the profile is not mapping it.`;
