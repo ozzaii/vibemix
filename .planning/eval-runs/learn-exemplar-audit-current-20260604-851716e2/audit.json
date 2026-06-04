@@ -1,0 +1,286 @@
+{
+  "bank_dir": "/Users/ozai/projects/dj-set-ai/src/vibemix/learn/assets/band_exemplars",
+  "bank_fingerprint": {
+    "algorithm": "sha256-canonical-json-v1",
+    "digest": "34e7aafe568b2e8badecb75fd28e0a8bd710f4fd1b1f2d84e7ff4a78584096e9",
+    "manifest_sha256": "8d8ae0dd1e418babb900dc70c3335829eae27629e9f8b5e6591721c435decd58",
+    "track_count": 4
+  },
+  "diagnosis": {
+    "code": "technical_audit_passed_ear_pass_pending",
+    "message": "Packaged exemplar WAV integrity passed; human ear-pass is still required.",
+    "next_action": "list output devices, play the four loops through the Learn player, then write explicit approval or replace the bank",
+    "severity": "needs_ear_pass"
+  },
+  "expected_bands": [
+    "sub",
+    "low",
+    "mid",
+    "high"
+  ],
+  "generated_at": "2026-06-04T14:52:29.683453+00:00",
+  "human_ear_pass": null,
+  "human_ear_pass_required": true,
+  "missing_bands": [],
+  "next_action": "list output devices, play the four loops through the Learn player, then write explicit approval or replace the bank",
+  "operator_action": {
+    "prompt": "Listen to the four EQ exemplar loops on MacBook Pro Speakers (eqMac), then approve them or replace the bank.",
+    "recommended_output_devices": [
+      {
+        "default_sample_rate": 48000,
+        "hostapi": "Core Audio",
+        "index": 5,
+        "is_default_output": true,
+        "max_output_channels": 2,
+        "name": "MacBook Pro Speakers (eqMac)",
+        "recommendation_reason": "audible_output_for_human_ear_pass",
+        "recommendation_score": 106
+      },
+      {
+        "default_sample_rate": 48000,
+        "hostapi": "Core Audio",
+        "index": 4,
+        "is_default_output": false,
+        "max_output_channels": 2,
+        "name": "MacBook Pro Speakers",
+        "recommendation_reason": "audible_output_for_human_ear_pass",
+        "recommendation_score": 102
+      },
+      {
+        "default_sample_rate": 48000,
+        "hostapi": "Core Audio",
+        "index": 8,
+        "is_default_output": false,
+        "max_output_channels": 4,
+        "name": "HEADPHONEMG",
+        "recommendation_reason": "audible_output_for_human_ear_pass",
+        "recommendation_score": 102
+      }
+    ],
+    "steps": [
+      "uv run python scripts/audition_learn_exemplars.py --list-devices",
+      "uv run python scripts/audition_learn_exemplars.py --play --device-index 5 --say-prompts --out /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json",
+      "uv run python scripts/audition_learn_exemplars.py --approve-ear-pass --approved-by <name> --audition /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json --approval-out /tmp/vibemix-live-learn-proof/learn-exemplar-ear-pass-current.json",
+      "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+    ]
+  },
+  "operator_commands": {
+    "approve": "uv run python scripts/audition_learn_exemplars.py --approve-ear-pass --approved-by <name> --audition /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json --approval-out /tmp/vibemix-live-learn-proof/learn-exemplar-ear-pass-current.json",
+    "list_output_devices": "uv run python scripts/audition_learn_exemplars.py --list-devices",
+    "play": "uv run python scripts/audition_learn_exemplars.py --play --device-index <output-device-index> --say-prompts --out /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json",
+    "verify": "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+  },
+  "output_devices": [
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 0,
+      "is_default_output": false,
+      "max_output_channels": 4,
+      "name": "DDJ-FLX4"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 1,
+      "is_default_output": false,
+      "max_output_channels": 16,
+      "name": "BlackHole 16ch"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 2,
+      "is_default_output": false,
+      "max_output_channels": 2,
+      "name": "BlackHole 2ch"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 4,
+      "is_default_output": false,
+      "max_output_channels": 2,
+      "name": "MacBook Pro Speakers"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 5,
+      "is_default_output": true,
+      "max_output_channels": 2,
+      "name": "MacBook Pro Speakers (eqMac)"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 7,
+      "is_default_output": false,
+      "max_output_channels": 6,
+      "name": "rekordbox Aggregate Device"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 8,
+      "is_default_output": false,
+      "max_output_channels": 4,
+      "name": "HEADPHONEMG"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 9,
+      "is_default_output": false,
+      "max_output_channels": 2,
+      "name": "Aggregate Device"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 10,
+      "is_default_output": false,
+      "max_output_channels": 2,
+      "name": "AIDJ"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 11,
+      "is_default_output": false,
+      "max_output_channels": 2,
+      "name": "AIDJ"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 12,
+      "is_default_output": false,
+      "max_output_channels": 2,
+      "name": "Multi-Output Device"
+    },
+    {
+      "default_sample_rate": 48000,
+      "hostapi": "Core Audio",
+      "index": 13,
+      "is_default_output": false,
+      "max_output_channels": 2,
+      "name": "AI Capture"
+    }
+  ],
+  "passed": true,
+  "release_ready": false,
+  "schema_version": 2,
+  "technical_failures": [],
+  "technical_passed": true,
+  "tracks": [
+    {
+      "artist": "vibemix internal sound design",
+      "band": "high",
+      "channels": 2,
+      "clip_free": true,
+      "clipped_samples": 0,
+      "duration_s": 5.0,
+      "duration_valid": true,
+      "hash_matches": true,
+      "integrity_passed": true,
+      "license": "Apache-2.0",
+      "manifest_sample_rate_hz": 22050,
+      "manifest_sha256": "7dcec4764229732452c409e7bcf218fa7ff806652ae169250a663cc988fb1beb",
+      "needs_human_ear_pass": true,
+      "non_silent": true,
+      "peak": 0.959961,
+      "peak_dbfs": -0.35,
+      "rel": "high/vibemix_internal_high_hat_air.wav",
+      "rms": 0.125756,
+      "rms_dbfs": -18.01,
+      "sample_rate_hz": 22050,
+      "sample_rate_matches": true,
+      "sha256": "7dcec4764229732452c409e7bcf218fa7ff806652ae169250a663cc988fb1beb",
+      "stereo": true,
+      "technical_passed": true,
+      "title": "High Hat Air Practice Loop"
+    },
+    {
+      "artist": "vibemix internal sound design",
+      "band": "low",
+      "channels": 2,
+      "clip_free": true,
+      "clipped_samples": 0,
+      "duration_s": 5.0,
+      "duration_valid": true,
+      "hash_matches": true,
+      "integrity_passed": true,
+      "license": "Apache-2.0",
+      "manifest_sample_rate_hz": 22050,
+      "manifest_sha256": "c8aa0d1c75996f986792620315045497ddccbee2211ecdf0757bea066055879d",
+      "needs_human_ear_pass": true,
+      "non_silent": true,
+      "peak": 0.959961,
+      "peak_dbfs": -0.35,
+      "rel": "low/vibemix_internal_low_bass_gate.wav",
+      "rms": 0.402357,
+      "rms_dbfs": -7.91,
+      "sample_rate_hz": 22050,
+      "sample_rate_matches": true,
+      "sha256": "c8aa0d1c75996f986792620315045497ddccbee2211ecdf0757bea066055879d",
+      "stereo": true,
+      "technical_passed": true,
+      "title": "Low Bass Gate Practice Loop"
+    },
+    {
+      "artist": "vibemix internal sound design",
+      "band": "mid",
+      "channels": 2,
+      "clip_free": true,
+      "clipped_samples": 0,
+      "duration_s": 5.0,
+      "duration_valid": true,
+      "hash_matches": true,
+      "integrity_passed": true,
+      "license": "Apache-2.0",
+      "manifest_sample_rate_hz": 22050,
+      "manifest_sha256": "035366690293506dc06bcd00b7661037613ed4be1a5adfa84a3e190c272bbbfe",
+      "needs_human_ear_pass": true,
+      "non_silent": true,
+      "peak": 0.752167,
+      "peak_dbfs": -2.47,
+      "rel": "mid/vibemix_internal_mid_chord_body.wav",
+      "rms": 0.174419,
+      "rms_dbfs": -15.17,
+      "sample_rate_hz": 22050,
+      "sample_rate_matches": true,
+      "sha256": "035366690293506dc06bcd00b7661037613ed4be1a5adfa84a3e190c272bbbfe",
+      "stereo": true,
+      "technical_passed": true,
+      "title": "Mid Chord Body Practice Loop"
+    },
+    {
+      "artist": "vibemix internal sound design",
+      "band": "sub",
+      "channels": 2,
+      "clip_free": true,
+      "clipped_samples": 0,
+      "duration_s": 5.0,
+      "duration_valid": true,
+      "hash_matches": true,
+      "integrity_passed": true,
+      "license": "Apache-2.0",
+      "manifest_sample_rate_hz": 22050,
+      "manifest_sha256": "fef218a73244062893143e2ceb00e332c4c8e08d99e49e66de558407c08e73c5",
+      "needs_human_ear_pass": true,
+      "non_silent": true,
+      "peak": 0.959961,
+      "peak_dbfs": -0.35,
+      "rel": "sub/vibemix_internal_sub_pulse.wav",
+      "rms": 0.257475,
+      "rms_dbfs": -11.79,
+      "sample_rate_hz": 22050,
+      "sample_rate_matches": true,
+      "sha256": "fef218a73244062893143e2ceb00e332c4c8e08d99e49e66de558407c08e73c5",
+      "stereo": true,
+      "technical_passed": true,
+      "title": "Sub Pulse Practice Loop"
+    }
+  ]
+}
