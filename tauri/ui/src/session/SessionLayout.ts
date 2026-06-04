@@ -1483,7 +1483,7 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
   const controller = state.status.midi != null && state.status.midi > 0
     ? "controller seen"
     : state.status.midi === 0
-      ? "controller missing"
+      ? "controller not proven"
       : "controller checking";
   const screen = state.status.screen === "ok"
     ? "screen proof ready"
@@ -1553,7 +1553,7 @@ function controllerProof(status: SessionState["status"]["midi"]): {
   state: IdleProofState;
 } {
   if (status != null && status > 0) return { label: "seen", state: "ok" };
-  if (status === 0) return { label: "missing", state: "warn" };
+  if (status === 0) return { label: "no motion", state: "warn" };
   return { label: "checking", state: "warn" };
 }
 
