@@ -41,10 +41,9 @@ export type { EarTestSubmission };
 const bootState = parseDebriefBootUrl(location.search);
 const { sessionDir, sessionId, isMockMode } = bootState;
 
-// Surface the session id in the titlebar.
-const titleEl = document.getElementById("vmx-debrief-session");
-if (titleEl) titleEl.textContent = sessionId;
-document.title = `Debrief · ${sessionId}`;
+// The raw session id is dev telemetry, not a DJ's review heading; keep the
+// window title clean and leave the titlebar slot empty.
+document.title = "Debrief";
 
 const errorBanner = document.getElementById("vmx-debrief-error-banner");
 const tooltip = document.getElementById("vmx-debrief-tooltip");
