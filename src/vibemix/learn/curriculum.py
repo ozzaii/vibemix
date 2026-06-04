@@ -114,7 +114,7 @@ COURSE_REGISTRY: dict[str, CourseMeta] = {
         label="Course 2 · Transitions",
         hud_label="COURSE 2 · TRANSITIONS",
         unlock_gate="course_2_unlocked",
-        lock_reason="pass the course 1 recital to unlock transitions",
+        lock_reason="finish the course 1 check to unlock transitions",
         capabilities=(
             "evidence_registry",
             "controller_state",
@@ -127,7 +127,7 @@ COURSE_REGISTRY: dict[str, CourseMeta] = {
         label="Course 3 · Play Mode",
         hud_label="COURSE 3 · PLAY-MODE",
         unlock_gate="course_3_unlocked",
-        lock_reason="pass the course 2 recital to unlock play mode",
+        lock_reason="finish the course 2 check to unlock play mode",
         frontstage_mode="live_play_mode",
         capabilities=(
             "evidence_registry",
