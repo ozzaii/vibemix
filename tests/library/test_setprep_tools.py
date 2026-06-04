@@ -25,6 +25,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from vibemix.intel.transition_scorer import SectionRecord
 from vibemix.library import energy as energy_mod
 from vibemix.library import toolset as tool_mod
 from vibemix.library.rekordbox import (
@@ -52,6 +53,27 @@ def _track(tid: str, bpm: float = 124.0, key: str = "8A") -> TrackEntry:
         duration_s=300.0,
         cues=(),
         filepath=f"/tmp/{tid}.mp3",
+    )
+
+
+def _section(track_section_id: str, role: str, start_s: float, end_s: float) -> SectionRecord:
+    track_id = track_section_id.split("#", 1)[0]
+    return SectionRecord(
+        section_id=track_section_id,
+        track_id=track_id,
+        role=role,
+        source="anlz",
+        source_detail="pssi",
+        confidence=0.92,
+        start_s=start_s,
+        end_s=end_s,
+        start_beat=round(start_s * 2),
+        end_beat=round(end_s * 2),
+        bar_count=(end_s - start_s) * 124.0 / 60.0 / 4.0,
+        bpm=124.0,
+        camelot="8A",
+        cue_source="anlz",
+        cue_confidence=0.92,
     )
 
 
@@ -869,7 +891,9 @@ def test_export_set_forwards_rekordbox_cues_and_beatgrid(toolset, tmp_path):
     )
 
     out_xml = tmp_path / "cued.xml"
-    out = toolset.export_set({"name": "Cued", "track_ids": ["t000"], "out_path": str(out_xml)})
+    out = toolset.export_set(
+        {"name": "Cued", "track_ids": ["t000"], "out_path": str(out_xml), "cue": False}
+    )
 
     assert out.get("exported") is True
     track = ET.parse(out_xml).getroot().find("COLLECTION/TRACK")
@@ -879,6 +903,84 @@ def test_export_set_forwards_rekordbox_cues_and_beatgrid(toolset, tmp_path):
     assert set(marks) == {"DROP", "LOOP"}
     assert marks["DROP"].attrib["Num"] == "0"
     assert marks["LOOP"].attrib["Type"] == "4"
+
+
+def test_export_set_auto_cues_empty_slots_by_default(toolset, tmp_path, monkeypatch):
+    toolset.seen.add("t000")
+    monkeypatch.setattr(
+        tool_mod,
+        "sections_for_entry",
+        lambda entry: (
+            _section(f"{entry.track_id}#intro", "intro", 0.0, 32.0),
+            _section(f"{entry.track_id}#drop", "drop", 64.0, 128.0),
+            _section(f"{entry.track_id}#outro", "outro", 192.0, 240.0),
+        ),
+    )
+
+    out_xml = tmp_path / "auto-cued.xml"
+    out = toolset.export_set({"name": "Auto Cued", "track_ids": ["t000"], "out_path": str(out_xml)})
+
+    assert out.get("exported") is True
+    assert out["auto_cues"]["enabled"] is True
+    assert out["auto_cues"]["tracks_attempted"] == 1
+    assert out["auto_cues"]["tracks_cued"] == 1
+    assert out["auto_cues"]["cues_added"] >= 3
+    assert out["auto_cues"]["proposal_export_ready_count"] >= out["auto_cues"]["cues_added"]
+    marks = ET.parse(out_xml).getroot().findall(".//POSITION_MARK")
+    names = {mark.attrib["Name"] for mark in marks}
+    assert {"VM A IN", "VM D DROP", "VM F OUT"} <= names
+
+
+def test_export_set_no_cue_opt_out_skips_auto_cue(toolset, tmp_path, monkeypatch):
+    toolset.seen.add("t000")
+
+    def fail_sections(_entry):
+        raise AssertionError("sections_for_entry should not run when cue=False")
+
+    monkeypatch.setattr(tool_mod, "sections_for_entry", fail_sections)
+    out_xml = tmp_path / "no-cue.xml"
+    out = toolset.export_set(
+        {"name": "No Cues", "track_ids": ["t000"], "out_path": str(out_xml), "cue": False}
+    )
+
+    assert out.get("exported") is True
+    assert out["auto_cues"]["enabled"] is False
+    assert out["auto_cues"]["tracks_attempted"] == 0
+    assert ET.parse(out_xml).getroot().find(".//POSITION_MARK") is None
+
+
+def test_export_set_auto_cues_fill_empty_slots_without_clobbering_dj(
+    toolset, tmp_path, monkeypatch
+):
+    toolset.seen.add("t000")
+    toolset._library.tracks["t000"] = TrackEntry(
+        track_id="t000",
+        title="Cued Track",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="8A",
+        duration_s=300.0,
+        cues=(CuePoint(name="MY A", type="cue", start_s=4.0, end_s=None, number=0),),
+        filepath="/tmp/t000.mp3",
+    )
+    monkeypatch.setattr(
+        tool_mod,
+        "sections_for_entry",
+        lambda entry: (
+            _section(f"{entry.track_id}#intro", "intro", 0.0, 32.0),
+            _section(f"{entry.track_id}#drop", "drop", 64.0, 128.0),
+        ),
+    )
+
+    out_xml = tmp_path / "preserve.xml"
+    out = toolset.export_set({"name": "Preserve", "track_ids": ["t000"], "out_path": str(out_xml)})
+
+    assert out.get("exported") is True
+    marks = {m.attrib["Name"]: m for m in ET.parse(out_xml).getroot().findall(".//POSITION_MARK")}
+    assert marks["MY A"].attrib["Num"] == "0"
+    assert "VM MY A" not in marks
+    assert marks["VM D DROP"].attrib["Num"] == "3"
 
 
 def test_export_set_records_exported_on_toolset(toolset, tmp_path):

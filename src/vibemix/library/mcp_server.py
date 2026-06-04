@@ -366,11 +366,18 @@ def build_server(toolset: Any) -> Any:
         )
 
     @mcp.tool()
-    def export_set(name: str, track_ids: list[str], out_path: str | None = None) -> dict[str, Any]:
+    def export_set(
+        name: str,
+        track_ids: list[str],
+        out_path: str | None = None,
+        cue: bool = True,
+    ) -> dict[str, Any]:
         """Export the chosen ordered set to a Rekordbox-importable XML (order +
-        key + BPM + cues). Every track_id must have come from a prior discovery
-        result. Call once when the DJ accepts a set."""
-        return toolset.export_set({"name": name, "track_ids": track_ids, "out_path": out_path})
+        key + BPM + VM-stamped auto cues by default). Every track_id must have
+        come from a prior discovery result. Call once when the DJ accepts a set."""
+        return toolset.export_set(
+            {"name": name, "track_ids": track_ids, "out_path": out_path, "cue": cue}
+        )
 
     # -- DJ-knowledge / source capability tools (grounding identical above) -- #
 

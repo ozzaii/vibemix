@@ -3648,6 +3648,19 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         help="auto-export the chosen set (rekordbox = Rekordbox XML)",
     )
     sp_build_set.add_argument(
+        "--cue",
+        dest="cue",
+        action="store_true",
+        default=True,
+        help="with --export rekordbox, fill empty hot-cue slots with VM-stamped auto cues",
+    )
+    sp_build_set.add_argument(
+        "--no-cue",
+        dest="cue",
+        action="store_false",
+        help="with --export rekordbox, export order/BPM/key only and do not add auto cues",
+    )
+    sp_build_set.add_argument(
         "--name", default=None, help="set name (default: derived from the brief)"
     )
     sp_build_set.add_argument(
@@ -7221,6 +7234,7 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
         name=getattr(args, "name", None),
         n_slots=getattr(args, "n_slots", None),
         export=getattr(args, "export", None) == "rekordbox",
+        cue=bool(getattr(args, "cue", True)),
     )
     out = result.to_dict()
 

@@ -350,6 +350,8 @@ def test_build_set_prompt_has_set_prep_workflow():
     assert "name the set 'Peak Set'" in p
     assert "target exactly 3 slots" in p
     assert "export requested" in p
+    assert "auto-cue export requested" in p
+    assert "cue=true" in p
     assert "discover_pool" in p
     assert "sequence_set" in p
     assert "expected tool tape is discover_pool" in p
@@ -368,6 +370,13 @@ def test_build_set_prompt_has_set_prep_workflow():
     assert "get_track_sections" in p
     assert "transition_slate" in p
     assert "smart_hot_cues" in p
+    assert "export_set fills empty hot-cue slots" in p
+
+
+def test_build_set_prompt_can_disable_auto_cue_export():
+    p = build_set_prompt("dark warehouse", export=True, cue=False)
+    assert "do not auto-cue export" in p
+    assert "cue=false" in p
     assert "export_smart_cues" in p
     assert "export_set" in p
 

@@ -968,6 +968,8 @@ class LibraryToolset:
                     f"search_vibe/discover_pool this run (invented): {invented}."
                 )
             }
+        auto_cue_enabled = bool(args.get("cue", args.get("auto_cue", True)))
+        auto_cue_report: dict[str, Any] = _auto_cue_report(enabled=auto_cue_enabled)
         try:
             from vibemix.library import export_rekordbox
 
@@ -978,6 +980,22 @@ class LibraryToolset:
                 if entry is None:
                     continue
                 camelot = harmonics.to_camelot(entry.key) if entry.key else None
+                cue_payload = _export_cues_and_grid(entry)
+                if auto_cue_enabled:
+                    auto_cue_report["tracks_attempted"] += 1
+                    try:
+                        auto_marks, proposal_summary = _auto_cue_marks_for_export(
+                            entry,
+                            genre=self._resolve_genre(tid) or entry.genre,
+                            occupied_slots=_occupied_hotcue_slots(cue_payload.get("cues", ())),
+                        )
+                    except Exception as cue_exc:
+                        logger.warning("[viber] export_set auto-cue skipped for %s: %s", tid, cue_exc)
+                        auto_cue_report["skipped_failed"] += 1
+                    else:
+                        _add_auto_cue_summary(auto_cue_report, proposal_summary, len(auto_marks))
+                        if auto_marks:
+                            cue_payload["cues"] = [*cue_payload.get("cues", []), *auto_marks]
                 items.append(
                     {
                         "track_id": tid,
@@ -987,7 +1005,7 @@ class LibraryToolset:
                         "bpm": entry.bpm if (entry.bpm and entry.bpm > 0) else None,
                         "camelot": camelot,
                         "duration_s": entry.duration_s or None,
-                        **_export_cues_and_grid(entry),
+                        **cue_payload,
                     }
                 )
             if not items:
@@ -1019,6 +1037,7 @@ class LibraryToolset:
             "written": result.written,
             "referenced": result.referenced,
             "dropped": result.dropped,
+            "auto_cues": auto_cue_report,
         }
 
     def export_smart_cues(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -1835,6 +1854,74 @@ def _export_cues_and_grid(entry: Any) -> dict[str, Any]:
         out["beatgrid"] = {"bpm": entry.bpm}
 
     return out
+
+
+def _auto_cue_report(*, enabled: bool) -> dict[str, Any]:
+    return {
+        "enabled": enabled,
+        "tracks_attempted": 0,
+        "tracks_cued": 0,
+        "cues_added": 0,
+        "skipped_tracks": 0,
+        "skipped_failed": 0,
+        "proposal_export_ready_count": 0,
+        "proposal_review_count": 0,
+        "proposal_missing_required_count": 0,
+        "proposal_suppressed_count": 0,
+    }
+
+
+def _auto_cue_marks_for_export(
+    entry: Any,
+    *,
+    genre: str | None,
+    occupied_slots: set[int],
+) -> tuple[list[dict[str, Any]], Any]:
+    from vibemix.library.smart_cues import proposal_to_export_marks, propose_smart_cues
+
+    proposal = propose_smart_cues(entry, sections_for_entry(entry), genre=genre)
+    marks = proposal_to_export_marks(
+        proposal,
+        include_review=False,
+        include_preserved=False,
+    )
+    fill_empty_only = [
+        mark
+        for mark in marks
+        if _mark_hotcue_slot(mark) is None or _mark_hotcue_slot(mark) not in occupied_slots
+    ]
+    return fill_empty_only, proposal.summary
+
+
+def _add_auto_cue_summary(report: dict[str, Any], summary: Any, cue_count: int) -> None:
+    report["proposal_export_ready_count"] += int(getattr(summary, "export_ready_count", 0) or 0)
+    report["proposal_review_count"] += int(getattr(summary, "review_count", 0) or 0)
+    report["proposal_missing_required_count"] += int(
+        getattr(summary, "missing_required_count", 0) or 0
+    )
+    report["proposal_suppressed_count"] += int(getattr(summary, "suppressed_count", 0) or 0)
+    if cue_count > 0:
+        report["tracks_cued"] += 1
+        report["cues_added"] += cue_count
+    else:
+        report["skipped_tracks"] += 1
+
+
+def _occupied_hotcue_slots(cues: Any) -> set[int]:
+    return {
+        slot
+        for cue in cues or ()
+        if (slot := _mark_hotcue_slot(cue)) is not None
+    }
+
+
+def _mark_hotcue_slot(mark: Any) -> int | None:
+    raw = mark.get("num") if isinstance(mark, dict) else getattr(mark, "num", None)
+    try:
+        slot = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return slot if 0 <= slot <= 7 else None
 
 
 def _transition_candidate_to_dict(candidate: TransitionCandidate) -> dict[str, Any]:

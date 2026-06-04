@@ -68,6 +68,7 @@ class _FakeToolset:
     def __init__(self) -> None:
         self.recorded_clarification_args: dict[str, Any] | None = None
         self.recorded_inspect_args: dict[str, Any] | None = None
+        self.recorded_export_set_args: dict[str, Any] | None = None
 
     # -- core discovery + playlist write ---------------------------------- #
     def search_vibe(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -109,7 +110,8 @@ class _FakeToolset:
         return {}
 
     def export_set(self, args: dict[str, Any]) -> dict[str, Any]:
-        return {}
+        self.recorded_export_set_args = args
+        return {"exported": True}
 
     # -- DJ-knowledge / source -------------------------------------------- #
     def web_search(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -228,6 +230,21 @@ def test_inspect_candidates_delegates_with_dict_packed_args(
 
     assert fake_toolset.recorded_inspect_args == {"track_ids": ["t001", "t002"]}
     assert result == {"candidates": [{"track_id": "t001"}, {"track_id": "t002"}]}
+
+
+def test_export_set_delegates_cue_bool(fake_toolset: _FakeToolset, server: Any) -> None:
+    tool = server._tool_manager.get_tool("export_set")
+    assert tool is not None
+
+    result = tool.fn(name="Set", track_ids=["t001", "t002"], out_path="/tmp/set.xml", cue=False)
+
+    assert fake_toolset.recorded_export_set_args == {
+        "name": "Set",
+        "track_ids": ["t001", "t002"],
+        "out_path": "/tmp/set.xml",
+        "cue": False,
+    }
+    assert result == {"exported": True}
 
 
 def test_request_clarification_delegates_with_dict_packed_args(

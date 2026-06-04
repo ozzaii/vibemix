@@ -1116,12 +1116,16 @@ _BUILD_SET_RULES = (
     "4. For set-aware mix points, use get_track_sections on the ordered tracks, "
     "then transition_slate for adjacent moves you need to explain. The tr_* "
     "candidate ids come from the tool; never invent them.\n"
-    "5. For smart hot-cue prep, call smart_hot_cues on grounded track_ids; if "
-    "the DJ asks to write cues, call export_smart_cues with issued proposal/cue "
-    "ids. Never pass raw cue payloads.\n"
+    "5. For standalone smart hot-cue prep, call smart_hot_cues on grounded "
+    "track_ids; if the DJ asks to write cues outside set export, call "
+    "export_smart_cues with issued proposal/cue ids. Never pass raw cue "
+    "payloads. For normal set export, do not call smart_hot_cues first: "
+    "export_set fills empty hot-cue slots with VM-stamped auto cues by default.\n"
     "6. If export is requested, export_set — write the final ordered set to a "
-    "Rekordbox XML and capture the returned `path`. If export is not requested, "
-    "skip export_set and return export_path as an empty string.\n"
+    "Rekordbox XML and capture the returned `path`. Pass cue=true unless the "
+    "brief explicitly says not to land auto-cues; pass cue=false for no-cue "
+    "exports. If export is not requested, skip export_set and return "
+    "export_path as an empty string.\n"
     "RULES (non-negotiable):\n"
     "1. NEVER invent a track_id, title, artist, BPM, or key. Every track_id MUST "
     "have come from a discover_pool result in THIS run.\n"
@@ -1164,6 +1168,7 @@ def build_set_prompt(
     name: str | None = None,
     n_slots: int | None = None,
     export: bool = True,
+    cue: bool = True,
 ) -> str:
     """Compose the set-prep prompt: shared persona/lens + set-prep rules + brief.
 
@@ -1177,7 +1182,15 @@ def build_set_prompt(
         hints.append(f"name the set '{name}'")
     if n_slots:
         hints.append(f"target exactly {n_slots} slots")
-    hints.append("export requested" if export else "do not export; return export_path as empty")
+    if export:
+        hints.append("export requested")
+        hints.append(
+            "auto-cue export requested; call export_set with cue=true"
+            if cue
+            else "do not auto-cue export; call export_set with cue=false"
+        )
+    else:
+        hints.append("do not export; return export_path as empty")
     brief_line = brief.strip()
     if hints:
         brief_line = f"{brief_line} ({'; '.join(hints)})"
@@ -1319,6 +1332,7 @@ def build_set_with_codex(
     name: str | None = None,
     n_slots: int | None = None,
     export: bool = True,
+    cue: bool = True,
     timeout_s: float = BUILD_SET_TIMEOUT_S,
     codex_path: str | None = None,
     mcp_command: str | None = None,
@@ -1402,6 +1416,7 @@ def build_set_with_codex(
             name=name,
             n_slots=n_slots,
             export=export,
+            cue=cue,
         )
         argv = build_argv(
             codex,
