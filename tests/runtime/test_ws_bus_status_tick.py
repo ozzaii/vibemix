@@ -8,12 +8,12 @@ helpers against fakes (no socket, no port bind) and assert the ``StatusTick``
 built from them passes the SAME outbound validator the bus uses.
 
 Honesty + never-fault contract (see STATUS_EVERY_N comment in ws_bus.py):
-livekit/gemini are "ok" (the real gemini-down signal is the SessionLayout
-grounding-failure timer, not this tick); midi is the connected-controller count
-for the compact footer LED, while detailed no-frame/no-move diagnosis stays in
-the deck_mixer.midi_activity proof channel; screen is a live non-prompting probe
-used ONLY to light the badge — denied or unavailable is NOT a deck fault
-(faultInput drops screen; audio-only is valid).
+livekit is "ok" once the sidecar bus is alive; gemini is "ok" only when boot
+constructed a usable brain, else "down" while Settings stays reachable. midi is
+the connected-controller count for the compact footer LED, while detailed
+no-frame/no-move diagnosis stays in the deck_mixer.midi_activity proof channel;
+screen is a live non-prompting probe used ONLY to light the badge — denied or
+unavailable is NOT a deck fault (faultInput drops screen; audio-only is valid).
 """
 
 from __future__ import annotations
@@ -194,6 +194,21 @@ def test_status_tick_accepts_screen_unavailable():
     payload = json.loads(msg.to_json())
     validate_message(payload)
     assert payload["payload"]["screen"] == "unavailable"
+
+
+def test_status_tick_accepts_brain_unavailable():
+    msg = StatusTick.make(
+        livekit="ok",
+        gemini="down",
+        midi=1,
+        screen="ok",
+        voice="ok",
+    )
+    import json
+
+    payload = json.loads(msg.to_json())
+    validate_message(payload)
+    assert payload["payload"]["gemini"] == "down"
 
 
 def test_status_every_n_is_roughly_one_hz():

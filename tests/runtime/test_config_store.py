@@ -45,6 +45,7 @@ def test_defaults_phase12_fields() -> None:
     assert cfg.output_device_id is None
     assert cfg.output_profile == "hp"
     assert cfg.retention_days == 7
+    assert cfg.llm_mode == "proxy"
     # Hotkey is platform-aware — match whatever this process is on.
     assert cfg.push_to_mute_hotkey == _default_hotkey()
 

@@ -190,10 +190,10 @@ def test_input_callback_throttles_deck_audio_context_updates():
     assert audio_context["deck_audio_rms"] == {"A": 0.1, "B": 0.0}
 
 
-def _assert_tts_chain_boot_call(build_tts_chain: MagicMock) -> object:
+def _assert_tts_chain_boot_call(build_tts_chain: MagicMock, *, mode: str = "direct") -> object:
     build_tts_chain.assert_called_once()
     kwargs = build_tts_chain.call_args.kwargs
-    assert kwargs["mode"] == "direct"
+    assert kwargs["mode"] == mode
     assert kwargs["voice"] == "Adam"
     assert set(kwargs) == {"mode", "voice", "moss"}
     moss = kwargs["moss"]
@@ -255,35 +255,52 @@ def test_smoke_01c_bench_cli_is_source_only_in_frozen_sidecar(mocker, capsys):
 
 
 # ---------------------------------------------------------------------------
-# SMOKE-02 — missing GEMINI_API_KEY exits non-zero
+# SMOKE-02 — missing GEMINI_API_KEY reaches proxy boot
 # ---------------------------------------------------------------------------
 
 
-def test_smoke_02_missing_gemini_key_exits_nonzero(monkeypatch):
-    """SMOKE-02: ``cli_entry([])`` with no GEMINI_API_KEY raises SystemExit.
-
-    Tricky timing: ``vibemix.__main__`` calls ``load_dotenv()`` at module
-    load. If the module hasn't been imported yet in this test process,
-    the import below triggers the load and re-populates os.environ from
-    .env. So we must delete the env vars AFTER the import (after
-    load_dotenv has run) so the in-process check inside ``main()`` sees
-    them as absent."""
-    # Trigger module load (and the module-level load_dotenv() side effect)
-    from vibemix.__main__ import cli_entry
-
-    # NOW clear the env vars — main() reads them fresh on each call
+def test_smoke_02_missing_gemini_key_defaults_to_proxy(monkeypatch, mocker, tmp_path):
+    """SMOKE-02: a fresh no-key boot uses the Bravoh proxy instead of exit(4)."""
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("VIBEMIX_LLM_MODE", raising=False)
+    monkeypatch.delenv("VIBEMIX_PROXY_BASE_URL", raising=False)
+    monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
 
-    with pytest.raises(SystemExit) as exc:
-        cli_entry([])
+    import vibemix.__main__ as main_mod
+    from vibemix.runtime.config_store import ConfigStore
 
-    # RELEASE-AUTH: the missing-key gate now exits with the no-retry sentinel
-    # code 4 (the Tauri watchdog routes it to the "set your API key" banner
-    # instead of looping). The human-readable [FATAL] explanation goes to
-    # stderr (verified by the watchdog's read_last_log_line), so the
-    # SystemExit payload is the bare exit code, not the message string.
-    assert exc.value.code == 4
+    mocker.patch.object(main_mod, "load_config", MagicMock(return_value=ConfigStore()))
+    _build_audio_mocks(mocker)
+    _build_sensor_mocks(mocker)
+    _build_state_refresh_noop(mocker)
+    livekit_mocks = _build_livekit_mocks(mocker)
+    _patch_voice_recorder(mocker, tmp_path)
+    _patch_runtime_for_fast_smoke(mocker, [])
+    proxy_mocks = _build_proxy_mocks(mocker)
+
+    from vibemix.__main__ import main
+
+    async def driver():
+        main_task = asyncio.create_task(main())
+        await _REAL_SLEEP(0.05)
+        main_task.cancel()
+        try:
+            await asyncio.wait_for(main_task, timeout=3.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    asyncio.run(driver())
+
+    assert os.environ["VIBEMIX_LLM_MODE"] == "proxy"
+    assert os.environ["VIBEMIX_PROXY_BASE_URL"] == "https://api.altidus.world"
+    proxy_mocks["get_or_refresh_jwt"].assert_called_once()
+    livekit_mocks["build_llm"].assert_called_once_with(
+        mode="proxy",
+        proxy_base_url="https://api.altidus.world",
+        jwt="test-jwt",
+    )
+    _assert_tts_chain_boot_call(livekit_mocks["build_tts_chain"], mode="proxy")
 
 
 # ---------------------------------------------------------------------------
@@ -994,8 +1011,8 @@ def _build_proxy_mocks(mocker, jwt_value="test-jwt", install_uuid_value="a" * 32
     }
 
 
-def test_main_03_proxy_register_401_exits(monkeypatch, mocker, tmp_path):
-    """MAIN-03: get_or_refresh_jwt raises RuntimeError → SystemExit, no fallback."""
+def test_main_03_proxy_register_401_boots_brainless(monkeypatch, mocker, tmp_path, capsys):
+    """MAIN-03: proxy auth failure boots the shell with Gemini down, no exit."""
     monkeypatch.setenv("VIBEMIX_LLM_MODE", "proxy")
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
 
@@ -1007,17 +1024,34 @@ def test_main_03_proxy_register_401_exits(monkeypatch, mocker, tmp_path):
         raise RuntimeError("proxy /register rejected install_uuid (status=401)")
 
     mocker.patch.object(main_mod, "get_or_refresh_jwt", MagicMock(side_effect=boom))
+    _build_audio_mocks(mocker)
+    _build_sensor_mocks(mocker)
+    _build_state_refresh_noop(mocker)
+    livekit_mocks = _build_livekit_mocks(mocker)
+    _patch_voice_recorder(mocker, tmp_path)
+    _patch_runtime_for_fast_smoke(mocker, [])
 
     from vibemix.__main__ import main
 
-    with pytest.raises(SystemExit) as exc:
-        asyncio.run(main())
-    msg = str(exc.value)
-    assert "Proxy mode setup failed" in msg
+    async def driver():
+        main_task = asyncio.create_task(main())
+        await _REAL_SLEEP(0.05)
+        main_task.cancel()
+        try:
+            await asyncio.wait_for(main_task, timeout=3.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    asyncio.run(driver())
+
+    livekit_mocks["build_llm"].assert_not_called()
+    assert livekit_mocks["AgentSession"].call_args.kwargs["llm"] is NOT_GIVEN
+    assert livekit_mocks["DJCoHostAgent"].call_args.kwargs["genai_client"] is None
+    assert "add your Gemini key in Settings" in capsys.readouterr().err
 
 
-def test_main_04_proxy_network_error_exits(monkeypatch, mocker):
-    """MAIN-04: httpx.HTTPError → SystemExit, no fallback."""
+def test_main_04_proxy_network_error_boots_brainless(monkeypatch, mocker, tmp_path, capsys):
+    """MAIN-04: httpx.HTTPError keeps the settings-capable sidecar alive."""
     import httpx
 
     monkeypatch.setenv("VIBEMIX_LLM_MODE", "proxy")
@@ -1031,12 +1065,30 @@ def test_main_04_proxy_network_error_exits(monkeypatch, mocker):
         raise httpx.ConnectError("no route")
 
     mocker.patch.object(main_mod, "get_or_refresh_jwt", MagicMock(side_effect=neterr))
+    _build_audio_mocks(mocker)
+    _build_sensor_mocks(mocker)
+    _build_state_refresh_noop(mocker)
+    livekit_mocks = _build_livekit_mocks(mocker)
+    _patch_voice_recorder(mocker, tmp_path)
+    _patch_runtime_for_fast_smoke(mocker, [])
 
     from vibemix.__main__ import main
 
-    with pytest.raises(SystemExit) as exc:
-        asyncio.run(main())
-    assert "Proxy /register network error" in str(exc.value)
+    async def driver():
+        main_task = asyncio.create_task(main())
+        await _REAL_SLEEP(0.05)
+        main_task.cancel()
+        try:
+            await asyncio.wait_for(main_task, timeout=3.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    asyncio.run(driver())
+
+    livekit_mocks["build_llm"].assert_not_called()
+    assert livekit_mocks["AgentSession"].call_args.kwargs["llm"] is NOT_GIVEN
+    assert livekit_mocks["DJCoHostAgent"].call_args.kwargs["genai_client"] is None
+    assert "proxy network error" in capsys.readouterr().err
 
 
 def test_main_05_proxy_mode_does_not_require_gemini_key(monkeypatch, mocker, tmp_path):
@@ -1075,6 +1127,43 @@ def test_main_05_proxy_mode_does_not_require_gemini_key(monkeypatch, mocker, tmp
     args = proxy_mocks["get_or_refresh_jwt"].call_args
     assert args.args[0] == "a" * 32
     assert args.args[1] == "https://test.altidus.world"
+
+
+def test_main_05b_direct_mode_without_key_falls_to_proxy(monkeypatch, mocker, tmp_path):
+    """An old direct-mode config/env with no key must not recreate exit(4)."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
+    monkeypatch.setenv("VIBEMIX_PROXY_BASE_URL", "https://test.altidus.world")
+    monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+
+    _build_audio_mocks(mocker)
+    _build_sensor_mocks(mocker)
+    _build_state_refresh_noop(mocker)
+    livekit_mocks = _build_livekit_mocks(mocker)
+    _patch_voice_recorder(mocker, tmp_path)
+    _patch_runtime_for_fast_smoke(mocker, [])
+    proxy_mocks = _build_proxy_mocks(mocker)
+
+    from vibemix.__main__ import main
+
+    async def driver():
+        main_task = asyncio.create_task(main())
+        await _REAL_SLEEP(0.05)
+        main_task.cancel()
+        try:
+            await asyncio.wait_for(main_task, timeout=3.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    asyncio.run(driver())
+
+    assert os.environ["VIBEMIX_LLM_MODE"] == "proxy"
+    proxy_mocks["get_or_refresh_jwt"].assert_called_once()
+    livekit_mocks["build_llm"].assert_called_once_with(
+        mode="proxy",
+        proxy_base_url="https://test.altidus.world",
+        jwt="test-jwt",
+    )
 
 
 def test_main_06_proxy_base_url_defaults_to_altidus(monkeypatch, mocker, tmp_path):

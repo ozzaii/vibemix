@@ -92,9 +92,9 @@ _PHASE12_FIELDS: tuple[str, ...] = (
     "bravoh_waitlist_opt_in",
     # One Mind W5 — persisted LLM mode ("direct" = BYO Gemini key, "proxy" =
     # keyless Bravoh proxy). Lets a UI mode-picker choice survive relaunch;
-    # VIBEMIX_LLM_MODE env still overrides at boot. Ships defaulting to
-    # "direct" — the packaged-default flip to "proxy" is KAAN-ACTION, gated on
-    # the Bravoh /register + /health + /v1 endpoints being live.
+    # VIBEMIX_LLM_MODE env still overrides at boot. Fresh installs default to
+    # "proxy" so a no-key user reaches the hosted Bravoh brain instead of
+    # crashing before the Settings UI can explain the direct-key path.
     "llm_mode",
     # One Mind S4 — persisted cross-session recall toggle. Default OFF;
     # explicit-opt-in only (see ConfigStore.recall_enabled docstring).
@@ -187,11 +187,11 @@ class ConfigStore:
     # the debrief settings drawer toggle. The field's existence does
     # NOT imply opt-in (mirrors telemetry_consent's dark-pattern guard).
     bravoh_waitlist_opt_in: bool = False
-    # One Mind W5 — LLM mode select. "direct" = BYO GEMINI_API_KEY (default,
-    # protects current users); "proxy" = keyless Bravoh proxy. The VIBEMIX_LLM_MODE
-    # env var overrides this at boot; otherwise main() reads this persisted value.
-    # The packaged-default flip to "proxy" is KAAN-ACTION (Bravoh endpoints live).
-    llm_mode: str = "direct"
+    # One Mind W5 — LLM mode select. "direct" = BYO GEMINI_API_KEY; "proxy" =
+    # keyless Bravoh proxy. The VIBEMIX_LLM_MODE env var overrides this at boot;
+    # otherwise main() reads this persisted value. Fresh installs default to the
+    # hosted proxy so missing local keys never hard-crash first boot.
+    llm_mode: str = "proxy"
     # One Mind S4 — cross-session memory recall. Default False (OFF). The full
     # recall loop (ingest → memory.db → grounded retrieval) is built + invariant-
     # safe, but reads past-session memory, so it stays explicit-opt-in (same

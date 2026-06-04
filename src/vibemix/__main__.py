@@ -253,6 +253,15 @@ def _build_tts_chain_or_mute(**kwargs: Any) -> Any:
         return _livekit_not_given()
 
 
+def _log_brain_unavailable(reason: str) -> None:
+    """Surface a boot-time brain outage without crashing the sidecar."""
+    print(
+        f"-> brain: unavailable ({reason}); add your Gemini key in Settings or retry proxy",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
 def _resample_pcm16_mono_bytes(pcm: bytes, *, source_sr: int, target_sr: int) -> bytes:
     """Convert mono int16 PCM bytes between sample rates."""
     if not pcm:
@@ -1078,7 +1087,7 @@ async def main() -> None:
     """Verbatim port of cohost_v4.py:1925-2080 with package-aware imports.
 
     Phase 5 adds env-driven mode dispatch:
-      VIBEMIX_LLM_MODE       = 'direct' (default) | 'proxy'
+      VIBEMIX_LLM_MODE       = 'proxy' (default) | 'direct'
       VIBEMIX_PROXY_BASE_URL = 'https://api.altidus.world' (default)
       VIBEMIX_CLIENT_VERSION = vibemix.__version__ (default)
     """
@@ -1105,66 +1114,59 @@ async def main() -> None:
     # ----- Phase 5 / One Mind W5 — mode dispatch (env > persisted config) -----
     # VIBEMIX_LLM_MODE env wins (dev/CI override). Otherwise the persisted
     # ConfigStore.llm_mode drives it so a UI mode-picker choice survives
-    # relaunch. Ships defaulting to "direct" (BYO key) — the packaged-default
-    # flip to "proxy" is KAAN-ACTION, gated on the Bravoh /register + /health
-    # + /v1 endpoints being live (a premature proxy default would exit boot
-    # below for every user without those endpoints).
+    # relaunch. Fresh installs default to "proxy" so a no-key user reaches the
+    # Bravoh brain instead of dying before Settings can offer the direct-key path.
     _env_mode = os.environ.get("VIBEMIX_LLM_MODE")
     if _env_mode is not None:
         mode = _env_mode.strip().lower()
     else:
         try:
-            mode = (load_config().llm_mode or "direct").strip().lower()
+            mode = (load_config().llm_mode or "proxy").strip().lower()
         except Exception:
-            mode = "direct"
+            mode = "proxy"
     proxy_base_url = os.environ.get("VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world")
     client_version = os.environ.get("VIBEMIX_CLIENT_VERSION", __version__)
 
     if mode not in ("direct", "proxy"):
         sys.exit(f"VIBEMIX_LLM_MODE must be 'direct' or 'proxy', got {mode!r}")
 
+    # Export the resolved mode/base URL for components constructed later
+    # (notably DJCoHostAgent's proxy-unavailable classifier). Packaged launches
+    # often arrive without these env vars because launchd strips process env.
+    os.environ["VIBEMIX_LLM_MODE"] = mode
+    os.environ.setdefault("VIBEMIX_PROXY_BASE_URL", proxy_base_url)
+
     api_key: str | None = None
     or_key: str | None = None
     jwt: str | None = None
     install_uuid: str | None = None
+    brain_unavailable_reason: str | None = None
 
     if mode == "direct":
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            # LOUD failure. A missing key is the #1 cause of the "co-host
-            # never speaks" silent dead-end (the bundled binary not finding
-            # its .env). Emit a [FATAL]-tagged line so the Tauri watchdog's
-            # read_last_log_line surfaces the real cause in the crash banner
-            # instead of a generic exit. Exit 4 = "no API key" sentinel.
             print(
-                "[FATAL] GEMINI_API_KEY not set (mode=direct) — the co-host "
-                "cannot authenticate to Gemini and will never speak.",
+                "-> mode: direct requested but GEMINI_API_KEY is unset; trying Bravoh proxy",
                 file=sys.stderr,
                 flush=True,
             )
-            print(
-                "[FATAL] Set GEMINI_API_KEY in the environment, in the "
-                "repo-root .env (dev), or in "
-                f"{app_data_dir() / '.env'} (bundled install). "
-                "Or set VIBEMIX_LLM_MODE=proxy to use the Bravoh proxy.",
-                file=sys.stderr,
-                flush=True,
-            )
-            sys.exit(4)
-        or_key = os.environ.get("OPENROUTER_API_KEY")  # optional
-    else:  # mode == "proxy"
+            mode = "proxy"
+            os.environ["VIBEMIX_LLM_MODE"] = mode
+        else:
+            or_key = os.environ.get("OPENROUTER_API_KEY")  # optional
+    if mode == "proxy":
         try:
             _ensure_proxy_auth_deps()
             install_uuid = get_or_create_install_uuid()
             jwt = await get_or_refresh_jwt(install_uuid, proxy_base_url, client_version)
         except RuntimeError as e:
-            sys.exit(f"Proxy mode setup failed: {e}. Check VIBEMIX_PROXY_BASE_URL and network.")
+            brain_unavailable_reason = f"proxy setup failed: {e}"
+            _log_brain_unavailable(brain_unavailable_reason)
         except httpx.HTTPError as e:
-            sys.exit(
-                f"Proxy /register network error: {e.__class__.__name__}: {e}. "
-                f"Check VIBEMIX_PROXY_BASE_URL and connectivity."
-            )
-        print(f"-> mode: proxy (install_uuid={install_uuid[:8]}..., jwt cached)")
+            brain_unavailable_reason = f"proxy network error: {e.__class__.__name__}: {e}"
+            _log_brain_unavailable(brain_unavailable_reason)
+        else:
+            print(f"-> mode: proxy (install_uuid={install_uuid[:8]}..., jwt cached)")
 
     # ----- Phase 6 genre profile dispatch -----
     applied_genre = apply_genre_env()
@@ -1613,7 +1615,7 @@ async def main() -> None:
             print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
         else:
             live_moss_tts = None
-    else:  # mode == "proxy"
+    elif brain_unavailable_reason is None:  # mode == "proxy"
         print(f"-> brain: {LLM_MODEL} via proxy at {proxy_base_url}")
         _ensure_proxy_client_dep()
         genai_client = build_proxy_genai_client(jwt, proxy_base_url)
@@ -1627,6 +1629,20 @@ async def main() -> None:
             print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
         else:
             live_moss_tts = None
+    else:
+        print(f"-> brain: {LLM_MODEL} unavailable ({brain_unavailable_reason})")
+        genai_client = None
+        llm_inst = _livekit_not_given()
+        tts_inst = _build_tts_chain_or_mute(
+            mode="proxy",
+            voice=_boot_settings_config.voice,
+            moss=live_moss_tts,
+        )
+        if tts_inst is not _livekit_not_given():
+            print("-> tts:   MOSS-TTS-Nano local only (provider=moss-local)")
+        else:
+            live_moss_tts = None
+    brain_available = brain_unavailable_reason is None
 
     # ---- Phase 19 latency-stack wiring (ack_bank retired) ----
     # Pre-recorded ack/filler clips ("yeah/oh/nice") were removed —
@@ -3112,6 +3128,7 @@ async def main() -> None:
             midi_mirror=midi_mirror,
             audio_capture_context=audio_capture_context,
             voice_muted=voice_muted,
+            brain_available=brain_available,
         )
 
     ws_task = asyncio.create_task(
@@ -3160,44 +3177,60 @@ async def main() -> None:
             levels=levels,
         )
     )
-    coach_task = asyncio.create_task(
-        coach_loop(
-            session,
-            agent,
-            state,
-            levels,
-            event_detector,
-            recorder,
-            manual_trigger,
-            trigger_state,
-            stop_event,
-            cancel_gate=cancel_gate,
-            ttft_meter=ttft_meter,
-            playback=playback,
-            # One Mind W2 — drain citation telemetry to the LIVE bus. Was
-            # ``citation_shim`` (a bounded deque dead-end that nothing read);
-            # ipc_router is the real ws_broadcast router, so SessionCitation
-            # envelopes now reach the Settings → Diagnostics panel. coach_loop's
-            # ``citation_wired`` gate tolerates ipc_router=None (boot-IPC-failure
-            # path) — no emit fires there, identical to the old shim-less case.
-            ipc_bus=ipc_router,
-            citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
-            suggestion_service=suggestion_service,
-            tracer=tracer,
-            audio_capture_context=audio_capture_context,
-            # §EARNED-LIVE-MASTERED-VERIFY — the live event loop credits v11.0
-            # skill mastery only on a resolvable citation. Both handles already
-            # exist in main(): the registry the EventDetector writes into, and
-            # the LearnProgress loaded at boot (also passed to the LessonRuntime).
-            evidence_registry=evidence_registry,
-            learn_progress=_learn_progress,
-            mastered_marker_writer=_write_mastered_marker,
-            # 4d — the live Vibe Judge needs the per-deck rings to assemble its
-            # typed frame; None on a 2ch/master-only-incapable rig (the Judge
-            # then abstains by construction). Constructed at __main__:1056.
-            deck_audio_capture=deck_audio_capture,
+    if brain_available:
+        coach_task = asyncio.create_task(
+            coach_loop(
+                session,
+                agent,
+                state,
+                levels,
+                event_detector,
+                recorder,
+                manual_trigger,
+                trigger_state,
+                stop_event,
+                cancel_gate=cancel_gate,
+                ttft_meter=ttft_meter,
+                playback=playback,
+                # One Mind W2 — drain citation telemetry to the LIVE bus. Was
+                # ``citation_shim`` (a bounded deque dead-end that nothing read);
+                # ipc_router is the real ws_broadcast router, so SessionCitation
+                # envelopes now reach the Settings → Diagnostics panel. coach_loop's
+                # ``citation_wired`` gate tolerates ipc_router=None (boot-IPC-failure
+                # path) — no emit fires there, identical to the old shim-less case.
+                ipc_bus=ipc_router,
+                citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
+                suggestion_service=suggestion_service,
+                tracer=tracer,
+                audio_capture_context=audio_capture_context,
+                # §EARNED-LIVE-MASTERED-VERIFY — the live event loop credits v11.0
+                # skill mastery only on a resolvable citation. Both handles already
+                # exist in main(): the registry the EventDetector writes into, and
+                # the LearnProgress loaded at boot (also passed to the LessonRuntime).
+                evidence_registry=evidence_registry,
+                learn_progress=_learn_progress,
+                mastered_marker_writer=_write_mastered_marker,
+                # 4d — the live Vibe Judge needs the per-deck rings to assemble its
+                # typed frame; None on a 2ch/master-only-incapable rig (the Judge
+                # then abstains by construction). Constructed at __main__:1056.
+                deck_audio_capture=deck_audio_capture,
+            )
         )
-    )
+    else:
+        try:
+            recorder.log_event(
+                "brain_unavailable",
+                reason=brain_unavailable_reason or "unknown",
+                path="boot",
+            )
+        except Exception:
+            pass
+        transcript_buf.append("Brain unavailable — add your Gemini key in Settings or retry proxy.")
+
+        async def _brain_unavailable_loop() -> None:
+            await stop_event.wait()
+
+        coach_task = asyncio.create_task(_brain_unavailable_loop())
 
     # Plan 41-02 — wall-clock cache refresh_loop deleted. Cache refresh is
     # now event-driven from EvidenceRegistry.write() (debounced 5s, capped
