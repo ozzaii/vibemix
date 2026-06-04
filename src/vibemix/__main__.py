@@ -41,7 +41,7 @@ import threading
 from collections import deque
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import httpx
 import numpy as np
@@ -59,7 +59,6 @@ from vibemix.agent.config import (
     INPUT_DEVICE,
     LLM_MODEL,
     MIC_DEVICE,
-    OPENROUTER_LLM_MODEL,
     OUTPUT_DEVICE,
 )
 from vibemix.agent.persona import SYSTEM_INSTRUCTION  # noqa: F401
@@ -108,8 +107,8 @@ from vibemix.platform._audio_replay import (
     maybe_wrap_replay_midi_backend,
     maybe_wrap_replay_track_backend,
 )
-from vibemix.profile import load_consent, load_profile, render_profile_for_cache
-from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
+from vibemix.profile import load_consent, load_profile
+from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast  # noqa: F401
 from vibemix.runtime.cancel import CancelGate
 from vibemix.runtime.config_store import (
     DEFAULT_TTS_ENGINE,
@@ -127,6 +126,7 @@ from vibemix.state import (
 )
 from vibemix.state.deck_context import DECK_CONTEXT_TRUSTED_SOURCES
 from vibemix.state.deck_poller import DeckPoller
+from vibemix.state.deck_state import DeckState
 
 # Cohost-only imports are resolved lazily so library/model CLI commands do not
 # load LiveKit provider plugins, Google Cloud STT/TTS, or OpenAI TTS plumbing at
@@ -1056,7 +1056,12 @@ def _apply_packaged_defaults() -> None:
     use the same source of truth as Settings. Drop-call speech remains opt-in
     until the mix-timing oracle has live grounding proof.
     """
-    return None
+    try:
+        cfg = load_config()
+        tts_engine = str(getattr(cfg, "tts_engine", DEFAULT_TTS_ENGINE) or DEFAULT_TTS_ENGINE)
+        os.environ.setdefault("VIBEMIX_TTS_ENGINE", tts_engine)
+    except Exception as exc:  # pragma: no cover - defensive boot default
+        print(f"-> tts engine seed skipped: {exc!r}", file=sys.stderr)
 
 
 _DECK_AUDIO_CHANNELS_CONFIG_KEY = "deck_audio.channels"
@@ -1106,10 +1111,12 @@ async def main() -> None:
     # Emitted to stderr BEFORE any network activity so a user reading the
     # sidecar log sees the privacy posture before the proxy /register
     # call. Telemetry state is read from the persisted ConfigStore.
+    _boot_settings_config = None
     try:
         from vibemix.runtime.sec_check import print_security_banner
 
         _cfg = load_config()
+        _boot_settings_config = _cfg
         print_security_banner(
             telemetry_on=getattr(_cfg, "telemetry_consent", False),
             version=__version__,
@@ -1143,9 +1150,6 @@ async def main() -> None:
     os.environ.setdefault("VIBEMIX_PROXY_BASE_URL", proxy_base_url)
 
     api_key: str | None = None
-    or_key: str | None = None
-    jwt: str | None = None
-    install_uuid: str | None = None
     brain_unavailable_reason: str | None = None
 
     if mode == "direct":
@@ -1159,20 +1163,9 @@ async def main() -> None:
             mode = "proxy"
             os.environ["VIBEMIX_LLM_MODE"] = mode
         else:
-            or_key = os.environ.get("OPENROUTER_API_KEY")  # optional
+            pass
     if mode == "proxy":
-        try:
-            _ensure_proxy_auth_deps()
-            install_uuid = get_or_create_install_uuid()
-            jwt = await get_or_refresh_jwt(install_uuid, proxy_base_url, client_version)
-        except RuntimeError as e:
-            brain_unavailable_reason = f"proxy setup failed: {e}"
-            _log_brain_unavailable(brain_unavailable_reason)
-        except httpx.HTTPError as e:
-            brain_unavailable_reason = f"proxy network error: {e.__class__.__name__}: {e}"
-            _log_brain_unavailable(brain_unavailable_reason)
-        else:
-            print(f"-> mode: proxy (install_uuid={install_uuid[:8]}..., jwt cached)")
+        print("-> mode: proxy (auth deferred until Start)")
 
     # ----- Phase 6 genre profile dispatch -----
     applied_genre = apply_genre_env()
@@ -1212,6 +1205,7 @@ async def main() -> None:
     # the ring has signal. Zero-filled during AI talk in the callback to
     # prevent self-triggered KAAN_SPOKE loops (Pitfall 1).
     mic_audio_buf = AudioBuffer(seconds=12.0, sr=INPUT_SR_TARGET)
+    event_detector = EventDetector(audio_buf=audio_buf)
     # Plan 40-03 (AUDIO-02 + AUDIO-04) — source-file lookahead provider.
     # Per-session lifecycle: the title→path Spotlight cache + extrapolation-
     # guard state live for the whole DJ session (RESEARCH Open Question 3
@@ -1236,36 +1230,16 @@ async def main() -> None:
         lookahead_provider = None
         print("-> lookahead: OFF (grounding on live master output only)")
 
-    # Phase 15 — boot-time crashed-session sweep. Walks recordings_root for
-    # session.json files whose ended_at_iso is None AND mtime older than
-    # 30s; marks them crashed=True. Best-effort: any IO error logs and
-    # continues (POC parity — the sweep is a nice-to-have surface for the
-    # Plan 15-04 browser UI, not a critical-path operation).
-    recordings_root = _resolve_recordings_root()
     try:
-        marked = sweep_crashed_sessions(recordings_root)
-        if marked:
-            print(f"-> recovered {len(marked)} crashed session(s): {', '.join(marked)}")
-    except Exception as e:
-        print(f"[sweep err] {e}", file=sys.stderr)
+        recordings_root = _resolve_recordings_root()
+    except Exception as exc:
+        recordings_root = Path("recordings")
+        print(f"-> recordings root fallback: {exc!r}", file=sys.stderr)
 
-    # Phase 15 Plan 03 — boot-time retention sweep. Reads retention_days from
-    # the persisted ConfigStore (Phase 12 W2) and prunes any session dir
-    # older than that. ∞ sentinel (36500) short-circuits before scandir.
-    # Best-effort: any failure logs and continues — the live session must
-    # still start.
-    try:
-        cfg_for_sweep = load_config()
-        result = run_retention_sweep(recordings_root, cfg_for_sweep.retention_days)
-        if result.deleted_names:
-            print(
-                f"-> retention sweep (boot): pruned {len(result.deleted_names)} "
-                f"session(s) ({result.bytes_pruned} bytes)"
-            )
-    except Exception as e:
-        print(f"[retention sweep boot err] {e}", file=sys.stderr)
+    evidence_registry = EvidenceRegistry()
+    event_detector.attach_evidence_registry(evidence_registry)
 
-    recorder = VoiceRecorder(root=recordings_root)
+    recorder = VoiceRecorder(root=recordings_root, evidence_registry=evidence_registry)
 
     # SessionTracer — comprehensive per-session trace.jsonl next to events.jsonl
     # (same session dir, same lock, same time origin). Default ON; gate via
@@ -1423,7 +1397,8 @@ async def main() -> None:
     # ConfigStore; the prompt resolver reads the env at build time.
     from vibemix.runtime.settings import apply_persona_config_to_env
 
-    _boot_settings_config = load_config()
+    if _boot_settings_config is None:
+        _boot_settings_config = load_config()
     _tts_engine_seed = str(getattr(_boot_settings_config, "tts_engine", DEFAULT_TTS_ENGINE) or DEFAULT_TTS_ENGINE)
     os.environ.setdefault("VIBEMIX_TTS_ENGINE", _tts_engine_seed)
     _persona_seed = apply_persona_config_to_env(_boot_settings_config)
@@ -1431,15 +1406,13 @@ async def main() -> None:
     live_voice_tts: Any | None = None
     try:
         from vibemix.agent.chatterbox_tts import (
-            ChatterboxLocalTTS,
             chatterbox_available,
             chatterbox_unavailable_reason,
             engine_selected,
         )
 
         if engine_selected() and chatterbox_available():
-            live_voice_tts = ChatterboxLocalTTS()
-            print(f"-> tts engine: chatterbox (from settings/env; ref={live_voice_tts._ref_path})")
+            print("-> tts engine: chatterbox armed (loads on Start)")
         elif engine_selected():
             print(
                 f"-> tts engine: chatterbox unavailable ({chatterbox_unavailable_reason()})",
@@ -1480,12 +1453,6 @@ async def main() -> None:
         print(f"-> mood: {_seed_mood} (from {ENV_MOOD})")
     state.set_start_at = _time.time()
     state.phase_started_at = _time.time()
-    # Phase 17 Plan 05 — pass audio_buf to EventDetector so genre-chain
-    # detectors that need raw samples (KickSwap, PhraseBoundary) can call
-    # snapshot APIs on it. Default-None signature in EventDetector.__init__
-    # keeps the no-arg form working for tests + coach.py callers.
-    event_detector = EventDetector(audio_buf=audio_buf)
-
     # --- Audio I/O via AudioMacOS firewall ---
     audio_backend = maybe_wrap_replay_audio_backend(AudioMacOS(registry, recorder))
     if hasattr(audio_backend, "session_dir"):
@@ -1585,1166 +1552,662 @@ async def main() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, handle_sigint)
 
-    voice_stream = None
+    # --- SHIP-WIRE START gate -------------------------------------------------
+    # From this point on, boot stays light: the socket/settings surface is live,
+    # but capture, AgentSession, LLM/TTS objects, and reaction tasks are created
+    # only after ipc.session.start. ipc.session.stop parks that live graph again.
+    transcript_buf: deque = deque(maxlen=200)
+    manual_trigger = asyncio.Event()
+    trigger_state: dict = {"in_flight": False}
+    suggestion_service = None
+    active_task: asyncio.Task | None = None
+    active_stop_event: asyncio.Event | None = None
+    live_session_active = False
+    live_voice_muted = True
+    _background_tasks: set[asyncio.Task] = set()
 
-    pass_stream = audio_backend.open_passthrough_output(
-        output_idx,
-        sample_rate=INPUT_SR_NATIVE,
-        channels=2,
-        block_size=OUTPUT_BLOCKSIZE,
-        callback=_passthrough_callback_factory(passthrough),
-    )
-    print(f"-> djay passthrough -> {output_device_label} @ {INPUT_SR_NATIVE}Hz")
-
-    # Mic stream is optional. Keep it opt-in at boot: CoreAudio can hang inside
-    # PortAudio when opening a mic device, and that previously blocked the
-    # websocket before the UI could explain anything.
-    mic_enabled = os.environ.get("VIBEMIX_ENABLE_MIC", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    ) or bool(str(os.environ.get("VIBEMIX_MIC_DEVICE") or "").strip())
-    if mic_enabled:
+    async def _boot_housekeeping() -> None:
         try:
-            mic_idx = audio_backend.find_device(MIC_DEVICE, "input")
-            mic_stream = audio_backend.open_mic_capture(
-                mic_idx,
-                sample_rate=INPUT_SR_NATIVE,
-                block_size=INPUT_CHUNK_FRAMES,
-                callback=_mic_callback_factory(mic, mic_audio_buf),
+            marked = await asyncio.to_thread(sweep_crashed_sessions, recordings_root)
+            if marked:
+                print(f"-> recovered {len(marked)} crashed session(s): {', '.join(marked)}")
+        except Exception as exc:
+            print(f"[sweep err] {exc}", file=sys.stderr)
+        try:
+            cfg_for_sweep = await asyncio.to_thread(load_config)
+            result = await asyncio.to_thread(
+                run_retention_sweep,
+                recordings_root,
+                cfg_for_sweep.retention_days,
             )
-            print(f"-> mic on {MIC_DEVICE} @ {INPUT_SR_NATIVE}Hz")
-        except Exception as e:
-            print(f"-> mic disabled: {e}")
-            mic_stream = None
-    else:
-        print("-> mic disabled: set VIBEMIX_ENABLE_MIC=1 to enable mic capture")
-        mic_stream = None
+            if result.deleted_names:
+                print(
+                    f"-> retention sweep (boot): pruned {len(result.deleted_names)} "
+                    f"session(s) ({result.bytes_pruned} bytes)"
+                )
+        except Exception as exc:
+            print(f"[retention sweep boot err] {exc}", file=sys.stderr)
 
-    # --- LLM + TTS chain ---
-    _ensure_live_llm_tts_deps()
-    if mode == "direct":
-        print("-> mode:  direct (GEMINI_API_KEY from .env)")
-        print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
-        genai_client = _direct_genai_client(api_key)
-        llm_inst = build_llm(api_key, mode="direct")
-        tts_inst = _build_tts_chain_or_mute(
-            mode="direct",
-            chatterbox=live_voice_tts,
-        )
-        if tts_inst is not _livekit_not_given():
-            print("-> tts:   Chatterbox local only (provider=chatterbox-mlx)")
-        else:
-            live_voice_tts = None
-    elif brain_unavailable_reason is None:  # mode == "proxy"
-        print(f"-> brain: {LLM_MODEL} via proxy at {proxy_base_url}")
-        _ensure_proxy_client_dep()
-        genai_client = build_proxy_genai_client(jwt, proxy_base_url)
-        llm_inst = build_llm(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
-        tts_inst = _build_tts_chain_or_mute(
-            mode="proxy",
-            chatterbox=live_voice_tts,
-        )
-        if tts_inst is not _livekit_not_given():
-            print("-> tts:   Chatterbox local only (provider=chatterbox-mlx)")
-        else:
-            live_voice_tts = None
-    else:
-        print(f"-> brain: {LLM_MODEL} unavailable ({brain_unavailable_reason})")
-        genai_client = None
-        llm_inst = _livekit_not_given()
-        tts_inst = _build_tts_chain_or_mute(
-            mode="proxy",
-            chatterbox=live_voice_tts,
-        )
-        if tts_inst is not _livekit_not_given():
-            print("-> tts:   Chatterbox local only (provider=chatterbox-mlx)")
-        else:
-            live_voice_tts = None
-    brain_available = brain_unavailable_reason is None
+    def _quiet_levels() -> None:
+        lock = getattr(levels, "_lock", None)
+        if lock is None:
+            return
+        try:
+            with lock:
+                levels.music = 0.0
+                levels.voice = 0.0
+                levels.mic = 0.0
+                levels.music_peak = 0.0
+                levels.voice_peak = 0.0
+                levels.mic_peak = 0.0
+        except Exception:
+            pass
 
-    # ---- Phase 19 latency-stack wiring (ack_bank retired) ----
-    # Pre-recorded ack/filler clips ("yeah/oh/nice") were removed —
-    # they injected English placeholders into Turkish sessions and the
-    # whole "premade reactions" surface fights the anti-slop thesis.
-    # Reactions now come only from Gemini; silence is the substitute on
-    # citation-stripped responses.
-    ttft_meter = TTFTMeter()
-    cancel_gate = CancelGate()
-    # X3 — Learn skill-tree AIM for the live coach prompt. Load once before
-    # cache/agent construction so the context cache and direct genai path carry
-    # the same fixed coach-mode frame. LessonRuntime below receives this SAME
-    # object, preserving the existing mutate-save contract.
-    from vibemix.learn.progress import load_progress as _load_progress
+    class _RunGatedMusicState:
+        """Read-only bus view: cold values while the Start gate is armed."""
 
-    _learn_progress, _learn_was_recovered = _load_progress()
-    # Plan 32-02 / PROFILE-03 — load long-term DJ profile into the cache body.
-    # P60: profile lives in the CACHE, never in the per-turn prompt. If the
-    # file is missing or invalid, ``profile_dict`` is None and the cache section
-    # is the empty string — byte-identical to the pre-Phase-32 cache body.
-    # CURATE-02 (Phase 82): gate on consent so a stale profile.json that
-    # outlives a consent toggle-OFF never feeds the co-host cache — mirrors
-    # session_loop.py and the curator seam (_curator_seams.taste_hint). The
-    # consent-gated taste layer is now consistent across BOTH surfaces.
-    profile_dict = load_profile() if load_consent() else None
-    profile_section = render_profile_for_cache(profile_dict)
-    if profile_dict is not None:
-        print(f"-> profile: loaded ({len(profile_section)} chars in cache section)")
-    # 2026-05-21 — the context cache MUST carry the SAME persona cell the
-    # agent resolves from VIBEMIX_SKILL_LEVEL / VIBEMIX_MODE / VIBEMIX_MOOD.
-    # Previously it baked the hardcoded SYSTEM_INSTRUCTION (= HYPE_INTERMEDIATE,
-    # Turkish hype). When the cache went warm, Gemini used the cached system
-    # instruction and SILENTLY OVERRODE the agent's COACH_PRO/English gen_cfg —
-    # so a pro+coach+English session still spoke Turkish hype. Resolve the same
-    # cell here so cache ≡ agent.
-    from vibemix.agent.dj_cohost import _resolve_prompt_cell
-
-    cache_system_instruction = _resolve_prompt_cell(learn_progress=_learn_progress)
-    _ensure_context_cache_dep()
-    cache: GeminiContextCache | None = GeminiContextCache(
-        client=genai_client,
-        system_instruction_body=cache_system_instruction,
-        model=LLM_MODEL,
-        profile_section=profile_section,
-    )
-    try:
-        # 2026-05-21 — wrap in a hard timeout. The SDK caches.create() call has
-        # no timeout of its own; on a free-tier key (explicit context caching is
-        # paid-tier on some projects) it HANGS indefinitely and blocks boot
-        # before "listening to". Fail fast → cache=None → graceful degradation.
-        await asyncio.wait_for(cache.create(), timeout=4.0)
-        print("-> cache: warm (Gemini context cache active)")
-    except Exception as e:
-        print(f"-> cache disabled: {e}", file=sys.stderr)
-        cache = None  # graceful degradation — agent's None-cache branch handles it
-
-    # ---- Plan 20-05 — Phase 20 anti-slop runtime wiring ----
-    # Env-var gate: VIBEMIX_ANTI_SLOP defaults to "on". Set to "off" / "0" /
-    # "false" to fall back to the legacy non-wired path (v4 byte-identical
-    # legacy emit path inside DJCoHostAgent.llm_node). Default-on because
-    # anti-slop IS the v2.0 product — Phase 20's central thesis.
-    #
-    # The EvidenceRegistry is constructed unconditionally so state_refresh_loop
-    # always has a target for observation writes; only the linter + tracker
-    # flip on/off via the env flag. Threading the registry into the agent
-    # gives the linter a non-empty snapshot to validate against (without
-    # this, every response strips with reason='no_citations').
-    anti_slop_flag = os.environ.get("VIBEMIX_ANTI_SLOP", "on").strip().lower()
-    anti_slop_enabled = anti_slop_flag not in ("off", "0", "false")
-    print(f"-> anti-slop: {'on' if anti_slop_enabled else 'off (VIBEMIX_ANTI_SLOP)'}")
-    # Plan 41-02 — mutation-driven cache refresh. When the cache is wired,
-    # every EvidenceRegistry.write() call schedules a debounced refresh (5s
-    # debounce + 30s min-interval guard inside the registry). When cache is
-    # None (degraded path), on_mutation stays None → registry stays a pure
-    # observation store with no callback overhead. The lambda closes over
-    # ``cache`` so refresh() resolves at fire-time, not at construction
-    # (lets the wiring tolerate post-construction cache invalidation —
-    # ``current_name()`` going None is fine, refresh() will re-create).
-    if cache is not None:
-        evidence_registry = EvidenceRegistry(on_mutation=lambda: cache.refresh())
-    else:
-        evidence_registry = EvidenceRegistry()
-    # EventDetector is constructed before the registry exists because audio and
-    # platform setup happen first. Attach the shared registry before coach_loop
-    # starts so [ev:<TYPE>@t] citations resolve like deck/audio evidence.
-    event_detector.attach_evidence_registry(evidence_registry)
-    # Citation-linter ENFORCEMENT gate — decoupled from anti-slop 2026-05-21
-    # (Kaan). The v1.0 prompt contract is "cites encouraged, not required, no
-    # penalty" (CITATION_GRAMMAR_BLOCK), but a wired linter strips EVERY
-    # uncited reply as reason='no_citations' — gemini-3.x rarely emits the
-    # [cite] grammar, so wiring it muzzles the co-host. Default OFF; opt back
-    # in with VIBEMIX_CITATION_LINT=on. The banned-phrase slop filter +
-    # <silence/> short-circuit are UNAFFECTED — they run regardless of the
-    # linter (see dj_cohost.llm_node silence/slop gate).
-    citation_lint_flag = os.environ.get("VIBEMIX_CITATION_LINT", "off").strip().lower()
-    citation_lint_enabled = anti_slop_enabled and citation_lint_flag not in (
-        "off",
-        "0",
-        "false",
-        "",
-    )
-    citation_linter = CitationLinter() if citation_lint_enabled else None
-    stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
-    print(f"-> citation lint: {'on' if citation_lint_enabled else 'off (VIBEMIX_CITATION_LINT)'}")
-
-    def _citation_telemetry() -> dict:
-        """Closure invoked by ``coach_loop``'s publish gate every
-        ``CITATION_PUBLISH_INTERVAL_S`` (2.0s). Reads fresh from the
-        StrippedRateTracker on every call so the emitted SessionCitation
-        envelope reflects the latest state.
-
-        Returns the 4 keys ``SessionCitation.make()`` expects:
-
-        - ``slop_ratio``: the REAL cumulative stripped/total ratio sourced
-          from ``stripped_rate_tracker.slop_ratio()`` (Plan 55-03 / LIVE-04).
-          This is the lifetime "what fraction of model turns got stripped"
-          metric — it MOVES when the linter strips, unlike the retired
-          ``1 / (1 + mean)`` count-derived placeholder. 0.0 when the tracker
-          is None (anti-slop disabled).
-        - ``stripped_rate_15s``: tracker 15s rolling rate fresh per call.
-          0.0 when tracker is None. Distinct from slop_ratio (windowed
-          bypass-guard vs lifetime metric — same record() decisions).
-        - ``last_unverified_response``: the REAL most-recent stripped/bypassed
-          response text sourced from ``stripped_rate_tracker.last_unverified()``
-          (Plan 55-03 / LIVE-04), fed by the agent's strip/bypass branches.
-          None when the tracker is None or nothing unverified yet this session.
-        - ``bypass_active``: non-destructive read — ``rate >
-          STRIPPED_RATE_THRESHOLD``. We deliberately do NOT call
-          ``tracker.should_bypass()`` here because that's the one-shot
-          latch consumer; using it from telemetry would race the gate
-          decision in the agent's llm_node strip path.
-
-        T-20-05-03: the callable must not raise. When the tracker is None
-        the safe defaults (slop_ratio 0.0, last_unverified None) are returned
-        and nothing is dereferenced. ``coach_loop`` also wraps it in
-        try/except, but staying clean keeps the publish path quiet.
-        """
-        slop_ratio = (
-            stripped_rate_tracker.slop_ratio() if stripped_rate_tracker is not None else 0.0
-        )
-        rate = stripped_rate_tracker.rate() if stripped_rate_tracker is not None else 0.0
-        last_unverified = (
-            stripped_rate_tracker.last_unverified() if stripped_rate_tracker is not None else None
-        )
-        bypass_active = stripped_rate_tracker is not None and rate > STRIPPED_RATE_THRESHOLD
-        return {
-            "slop_ratio": float(slop_ratio),
-            "stripped_rate_15s": float(rate),
-            "last_unverified_response": last_unverified,
-            "bypass_active": bool(bypass_active),
+        _COLD: ClassVar[dict[str, Any]] = {
+            "audible": False,
+            "rms": 0.0,
+            "bands": {"sub": 0.0, "low": 0.0, "mid": 0.0, "high": 0.0},
+            "onset_density": 0.0,
+            "bpm": 0.0,
+            "energy_curve": [],
+            "master_lufs": None,
+            "phase": "silent",
+            "phase_started_at": 0.0,
+            "detected_genre": "unknown",
+            "genre_confidence": 0.0,
+            "prev_perceive": {},
+            "audio_delta": [],
+            "move_audio_delta": [],
+            "band_env": [],
+            "trajectory_narrative": "",
+            "deck_state": DeckState(),
+            "bpm_confidence": 0.0,
+            "downbeat_phase": 0.0,
+            "buildup_score": 0.0,
+            "predicted_drop_in_sec": None,
+            "predicted_drop_cue_id": None,
+            "beat_phase": 0.0,
+            "active_genre": "unknown",
+            "audible_deck": "none",
+            "deck_confidence": 0.0,
+            "audible_track": None,
+            "audible_track_confidence": 0.0,
+            "audible_track_position_s": None,
+            "audible_track_duration_s": None,
+            "audible_track_position_confidence": 0.0,
+            "audible_track_beat_fraction": None,
+            "audible_track_seconds_to_nearest_beat": None,
+            "recent_moves": [],
+            "long_arc": [],
+            "phase_history": [],
+            "track_history": [],
+            "set_progress": None,
+            "set_start_at": 0.0,
+            "set_seconds": 0.0,
+            "last_kaan_spoke_at": 0.0,
+            "emotion": None,
+            "last_reaction_intent": None,
+            "last_reaction_intent_seq": 0,
+            "session_active": False,
+            "phrase_position_confidence": 0.0,
+            "next_phrase_at": None,
+            "next_phrase_cue_id": None,
         }
 
-    # ipc.session.snapshot transcript sink — spoken AI lines land here from
-    # the agent's cold post-stream logging tail; ws_broadcast drains it per
-    # snapshot to light up the Tauri cohost transcript panel. Bounded so a
-    # paused/dead UI client can't grow it unbounded.
-    transcript_buf: deque = deque(maxlen=200)
+        def __init__(self, inner: MusicState, active: Callable[[], bool]) -> None:
+            self._inner = inner
+            self._active = active
 
-    # 2026-05-21 — OpenRouter brain path (opt-in via VIBEMIX_LLM_VIA_OPENROUTER=1).
-    # Routes the live-coach LLM through OpenRouter (OpenAI-compat, inline-audio
-    # verified) to escape free-tier Gemini 503s. Requires OPENROUTER_API_KEY.
-    # Model id overridable via VIBEMIX_OR_LLM_MODEL; default comes from
-    # model_router through OPENROUTER_LLM_MODEL.
-    or_llm_client = None
-    or_llm_model = os.environ.get("VIBEMIX_OR_LLM_MODEL", OPENROUTER_LLM_MODEL)
-    if os.environ.get("VIBEMIX_LLM_VIA_OPENROUTER", "0").strip().lower() not in (
-        "0",
-        "off",
-        "false",
-        "",
-    ):
-        if not or_key:
-            sys.exit("VIBEMIX_LLM_VIA_OPENROUTER=1 but OPENROUTER_API_KEY missing in .env.")
-        from vibemix.agent.openrouter_llm import build_or_client
+        def __getattr__(self, name: str) -> Any:
+            if not self._active() and name in self._COLD:
+                value = self._COLD[name]
+                return value.copy() if isinstance(value, dict) else value
+            return getattr(self._inner, name)
 
-        or_llm_client = build_or_client(or_key)
-        print(f"-> brain via OpenRouter: {or_llm_model} (escapes free-tier 503)")
+    class _DynamicBool:
+        """Truth value read at use-time by ws_broadcast's status tick."""
 
-    # ── Phase 65 Plan 04 — Memory Retrieval Seam (RECALL-01..04) ──
-    # Build the MemoryRecall service lazily (best-effort) only when enabled.
-    # The recall embedder is the product CLAP factory, never the legacy Gemini
-    # embedding client; when DEFAULT-OFF, startup performs zero recall/model
-    # setup and agent behavior stays byte-identical.
-    recall_svc = None
-    # One Mind S4 — env > persisted config (mirror of the W5 llm_mode resolve).
-    # VIBEMIX_RECALL_ENABLED wins when set; otherwise the persisted
-    # ConfigStore.recall_enabled drives it so a future UI toggle survives
-    # relaunch. Default stays OFF (config default False + env unset) — flipping
-    # the shipped default ON is KAAN-ACTION (recall-feel ear-pass).
-    _recall_env = os.environ.get("VIBEMIX_RECALL_ENABLED")
-    if _recall_env is not None:
-        recall_enabled = _recall_env.strip().lower() not in ("0", "off", "false", "")
-    else:
-        try:
-            recall_enabled = bool(load_config().recall_enabled)
-        except Exception:
-            recall_enabled = False
-    # Phase 80 Plan 02 — GROUND-01: secondary-ear framing flag, default OFF.
-    # When OFF the reaction request is byte-identical to the v8.0 baseline (the
-    # Part-1 audio still feeds, no new framing). When ON the prompt names the
-    # live audio a *secondary grounding signal* with the structured evidence
-    # authoritative. Gates ONLY the prompt clause — never the Part-1 attach.
-    ground_secondary_ear = os.environ.get(
-        "VIBEMIX_GROUND_SECONDARY_EAR", "0"
-    ).strip().lower() not in ("0", "off", "false", "no", "")
-    print(
-        "-> secondary-ear: ON"
-        if ground_secondary_ear
-        else "-> secondary-ear: OFF (set VIBEMIX_GROUND_SECONDARY_EAR=1 to flip)"
-    )
-    if recall_enabled:
-        try:
-            from vibemix.library.embed_factory import (
-                build_embedder as _build_embedder_for_recall,
-            )
-            from vibemix.memory.retrieval import MemoryRecall as _MemoryRecall
-            from vibemix.memory.store import open_memory_store as _open_memory_store
+        def __init__(self, value: Callable[[], bool]) -> None:
+            self._value = value
 
-            _recall_embedder = _build_embedder_for_recall()
-            _recall_store = _open_memory_store()
-            recall_svc = _MemoryRecall(_recall_embedder, _recall_store)
-            print("-> recall: armed (CLAP, track-aware, floor=0.7, off-loop)")
-        except Exception as e:  # pragma: no cover — best-effort, never blocks boot
-            print(f"-> recall: disabled ({e})", file=sys.stderr)
-            recall_svc = None
-            recall_enabled = False
-    else:
-        print("-> recall: disabled (set VIBEMIX_RECALL_ENABLED=1 to flip)")
+        def __bool__(self) -> bool:
+            return bool(self._value())
 
-    _ensure_live_session_deps()
-    agent = DJCoHostAgent(
-        genai_client=genai_client,
-        clean_audio_buf=clean_audio_buf,
-        screen_buf=screen_macos,
-        state=state,
-        recorder=recorder,
-        llm_inst=llm_inst,
-        tts_inst=tts_inst,
-        cache=cache,
-        or_client=or_llm_client,
-        or_model=or_llm_model,
-        ttft_meter=ttft_meter,
-        evidence_registry=evidence_registry,
-        citation_linter=citation_linter,
-        stripped_rate_tracker=stripped_rate_tracker,
-        playback=playback,
-        # Plan 32-03 / PROFILE-04 — same dict already injected into the cache
-        # body via render_profile_for_cache above. Stored on the agent for
-        # Settings → Profile panel diagnostics; NEVER read inside llm_node
-        # (P60). None default keeps v2.0 4-kwarg call shape byte-identical.
-        profile=profile_dict,
-        # Plan 40-01 / AUDIO-01 — mic-as-2nd-Gemini-Part ring. Fed by
-        # _mic_callback_factory(mic, mic_audio_buf) on the audio thread;
-        # consumed by DJCoHostAgent.llm_node when KAAN_SPOKE-recent AND
-        # the ring has signal. None default preserves byte-identical
-        # 1-Part path; the wired-in instance enables the 2-Part contract.
-        mic_audio_buf=mic_audio_buf,
-        # Plan 40-03 / AUDIO-02 + AUDIO-04 — source-file lookahead provider.
-        # Per-session lifecycle: instantiated once above; the title→path
-        # cache + extrapolation guard state persist for the whole session.
-        # Consumed by DJCoHostAgent.llm_node via ``snapshot_wav()`` which
-        # returns ``(None, meta)`` on every failure path — the agent's
-        # try/except wrapper double-belts that contract (T-40-03-02).
-        lookahead=lookahead_provider,
-        # ipc.session.snapshot transcript sink (drained by ws_broadcast).
-        transcript_sink=transcript_buf,
-        # Phase 65 Plan 04 — MemoryRecall service + Kaan-ear veto flag.
-        # The service is wired regardless (so tests + telemetry see the seam);
-        # recall_enabled is the live-veto switch — default-OFF until Kaan
-        # flips it on the real corpus (KAAN-ACTION). With either None,
-        # the agent's cold path is byte-identical to v5.0.
-        recall=recall_svc,
-        recall_enabled=recall_enabled,
-        # Phase 80 Plan 02 — GROUND-01 secondary-ear framing gate (default OFF
-        # via VIBEMIX_GROUND_SECONDARY_EAR). Omitting the env var = v8.0
-        # byte-identical behavior.
-        secondary_ear=ground_secondary_ear,
-        audio_capture_context=audio_capture_context,
-        deck_audio_buffers=deck_audio_capture.buffers if deck_audio_capture is not None else None,
-        learn_progress=_learn_progress,
-    )
-
-    # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──
-    library_cache = Path.home() / ".cache" / "vibemix" / "library.pkl"
-    # Phase 59-04 (DECK-05) — retain the cache-warm RekordboxLibrary so the deck
-    # poller can reuse it READ-ONLY (no second XML import, no DB open). None when
-    # the user never imported a collection.xml → poller degrades to honest unknown.
-    deck_library = None
-    if library_cache.exists():
-        lib = RekordboxLibrary()
-        if lib.try_load_cache():
-            registered = evidence_registry.register_library(lib)
-            deck_library = lib  # share the SAME read-only object with the poller
-            print(f"-> library: {registered} tracks registered for [track:<id>] citations")
-        else:
-            print("-> library: cache present but failed to load — skipping registration")
-    else:
-        print(
-            "-> library: no cache at ~/.cache/vibemix/library.pkl — citations limited to nowplaying-cli"
+    def _is_live_session_active() -> bool:
+        return bool(
+            live_session_active
+            and active_task is not None
+            and not active_task.done()
         )
 
-    mastered_marker_allow_write = os.environ.get(
-        "VIBEMIX_WRITE_MASTERED_MARKERS", ""
-    ).strip().lower() in {"1", "on", "true", "yes"}
-    if deck_library is not None:
-        print(
-            "-> mastered markers: "
-            + (
-                "write enabled (VIBEMIX_WRITE_MASTERED_MARKERS=1)"
-                if mastered_marker_allow_write
-                else "dry-run; set VIBEMIX_WRITE_MASTERED_MARKERS=1 to write hot cues"
-            )
-        )
-
-    def _write_mastered_marker(skill_id: str, live_state: Any) -> Any | None:
-        if deck_library is None:
-            return None
+    async def _activate_session(
+        run_stop_event: asyncio.Event,
+        started_event: asyncio.Event,
+    ) -> None:
+        nonlocal live_session_active, live_voice_muted, live_voice_tts
+        session = None
+        tts_inst = None
+        agent = None
+        pass_stream = None
+        voice_stream = None
+        mic_stream = None
+        input_stream = None
+        input_audio_processor = None
+        midi_stop: threading.Event | None = None
+        midi_watcher_stop: asyncio.Event | None = None
+        cleanup_tasks: list[asyncio.Task] = []
         try:
-            from vibemix.learn.mastered_marker_writer import write_mastered_marker_from_state
-
-            result = write_mastered_marker_from_state(
-                skill_id=skill_id,
-                state=live_state,
-                library=deck_library,
-                allow_write=mastered_marker_allow_write,
-            )
-            try:
-                recorder.log_event(
-                    "mastered_marker",
-                    skill_id=skill_id,
-                    written=bool(getattr(result, "written", False)),
-                    reason=str(getattr(result, "reason", "")),
-                    index=getattr(result, "index", None),
-                    position_ms=getattr(result, "position_ms", None),
-                    name=str(getattr(result, "name", "")),
+            _ensure_live_llm_tts_deps()
+            if brain_unavailable_reason is not None:
+                print(
+                    f"-> session start: brain unavailable ({brain_unavailable_reason}); remaining idle until Stop",
+                    file=sys.stderr,
                 )
+                live_session_active = True
+                live_voice_muted = True
+                started_event.set()
+                await run_stop_event.wait()
+                return
+
+            if mode == "direct":
+                print("-> mode:  direct (GEMINI_API_KEY from .env)")
+                print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
+                genai_client = _direct_genai_client(api_key)
+                llm_inst = build_llm(api_key, mode="direct")
+            else:
+                print(f"-> brain: {LLM_MODEL} via proxy at {proxy_base_url}")
+                _ensure_proxy_client_dep()
+                try:
+                    _ensure_proxy_auth_deps()
+                    install_id = get_or_create_install_uuid()
+                    proxy_jwt = await get_or_refresh_jwt(
+                        install_id,
+                        proxy_base_url,
+                        client_version,
+                    )
+                    print(f"-> mode: proxy (install_uuid={install_id[:8]}..., jwt cached)")
+                except RuntimeError as exc:
+                    raise RuntimeError(f"proxy setup failed: {exc}") from exc
+                except httpx.HTTPError as exc:
+                    raise RuntimeError(
+                        f"proxy network error: {exc.__class__.__name__}: {exc}"
+                    ) from exc
+                genai_client = build_proxy_genai_client(proxy_jwt, proxy_base_url)
+                llm_inst = build_llm(mode="proxy", proxy_base_url=proxy_base_url, jwt=proxy_jwt)
+
+            try:
+                from vibemix.agent.chatterbox_tts import (
+                    ChatterboxLocalTTS,
+                    chatterbox_available,
+                    engine_selected,
+                )
+
+                live_voice_tts = (
+                    ChatterboxLocalTTS()
+                    if engine_selected() and chatterbox_available()
+                    else None
+                )
+            except Exception as exc:
+                live_voice_tts = None
+                print(f"-> tts voice hook unavailable on Start: {exc!r}", file=sys.stderr)
+            tts_inst = _build_tts_chain_or_mute(mode=mode, chatterbox=live_voice_tts)
+            voice_muted = tts_inst is _livekit_not_given()
+            live_voice_muted = voice_muted
+            if voice_muted:
+                live_voice_tts = None
+            else:
+                print("-> tts:   Chatterbox local only (provider=chatterbox-mlx)")
+
+            anti_slop_flag = os.environ.get("VIBEMIX_ANTI_SLOP", "on").strip().lower()
+            anti_slop_enabled = anti_slop_flag not in ("off", "0", "false")
+            citation_lint_flag = os.environ.get("VIBEMIX_CITATION_LINT", "off").strip().lower()
+            citation_linter = (
+                CitationLinter()
+                if anti_slop_enabled and citation_lint_flag not in ("off", "0", "false", "")
+                else None
+            )
+            stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
+
+            def _citation_telemetry() -> dict[str, Any]:
+                slop_ratio = stripped_rate_tracker.slop_ratio() if stripped_rate_tracker is not None else 0.0
+                rate = stripped_rate_tracker.rate() if stripped_rate_tracker is not None else 0.0
+                last_unverified = (
+                    stripped_rate_tracker.last_unverified()
+                    if stripped_rate_tracker is not None
+                    else None
+                )
+                return {
+                    "slop_ratio": float(slop_ratio),
+                    "stripped_rate_15s": float(rate),
+                    "last_unverified_response": last_unverified,
+                    "bypass_active": bool(stripped_rate_tracker is not None and rate > STRIPPED_RATE_THRESHOLD),
+                }
+
+            profile_dict = load_profile() if load_consent() else None
+            _ensure_live_session_deps()
+            agent = DJCoHostAgent(
+                genai_client=genai_client,
+                clean_audio_buf=clean_audio_buf,
+                screen_buf=screen_macos,
+                state=state,
+                recorder=recorder,
+                llm_inst=llm_inst,
+                tts_inst=tts_inst,
+                cache=None,
+                ttft_meter=TTFTMeter(),
+                evidence_registry=evidence_registry,
+                citation_linter=citation_linter,
+                stripped_rate_tracker=stripped_rate_tracker,
+                playback=playback,
+                profile=profile_dict,
+                mic_audio_buf=mic_audio_buf,
+                lookahead=lookahead_provider,
+                transcript_sink=transcript_buf,
+                recall=None,
+                recall_enabled=False,
+                secondary_ear=os.environ.get("VIBEMIX_GROUND_SECONDARY_EAR", "0").strip().lower()
+                not in ("0", "off", "false", "no", ""),
+                audio_capture_context=audio_capture_context,
+                deck_audio_buffers=deck_audio_capture.buffers if deck_audio_capture is not None else None,
+                learn_progress=_learn_progress,
+            )
+            agent.bind_ipc_bus(ipc_router)
+
+            session = AgentSession(
+                llm=llm_inst,
+                tts=tts_inst,
+                turn_handling={"interruption": {"enabled": False, "resume_false_interruption": False}},
+            )
+            if voice_muted:
+                session.output.set_audio_enabled(False)
+                print("-> AI voice output muted (no local TTS); stream not opened")
+            else:
+                session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
+                voice_stream = audio_backend.open_voice_output(
+                    output_idx,
+                    sample_rate=OUTPUT_SR,
+                    block_size=VOICE_BLOCKSIZE,
+                    callback=_voice_callback_factory(playback),
+                )
+                print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz")
+
+            await session.start(agent)
+            print("-> agent started.")
+
+            pass_stream = audio_backend.open_passthrough_output(
+                output_idx,
+                sample_rate=INPUT_SR_NATIVE,
+                channels=2,
+                block_size=OUTPUT_BLOCKSIZE,
+                callback=_passthrough_callback_factory(passthrough),
+            )
+            print(f"-> djay passthrough -> {output_device_label} @ {INPUT_SR_NATIVE}Hz")
+
+            mic_enabled = os.environ.get("VIBEMIX_ENABLE_MIC", "").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            ) or bool(str(os.environ.get("VIBEMIX_MIC_DEVICE") or "").strip())
+            if mic_enabled:
+                try:
+                    mic_idx = audio_backend.find_device(MIC_DEVICE, "input")
+                    mic_stream = audio_backend.open_mic_capture(
+                        mic_idx,
+                        sample_rate=INPUT_SR_NATIVE,
+                        block_size=INPUT_CHUNK_FRAMES,
+                        callback=_mic_callback_factory(mic, mic_audio_buf),
+                    )
+                    print(f"-> mic on {MIC_DEVICE} @ {INPUT_SR_NATIVE}Hz")
+                except Exception as exc:
+                    print(f"-> mic disabled: {exc}")
+                    mic_stream = None
+            else:
+                print("-> mic disabled: set VIBEMIX_ENABLE_MIC=1 to enable mic capture")
+
+            library_cache = Path.home() / ".cache" / "vibemix" / "library.pkl"
+            deck_library = None
+            if library_cache.exists():
+                try:
+                    deck_library = RekordboxLibrary()
+                    if deck_library.try_load_cache():
+                        registered = evidence_registry.register_library(deck_library)
+                        print(f"-> library: {registered} tracks registered for citations")
+                    else:
+                        deck_library = None
+                except Exception as exc:
+                    deck_library = None
+                    print(f"-> library registration skipped: {exc!r}", file=sys.stderr)
+
+            midi_stop = threading.Event()
+            midi_macos.start_listener_thread(midi_stop)
+            midi_watcher_stop = asyncio.Event()
+
+            def _on_midi_port_change(event: tuple) -> None:
+                kind = event[0]
+                if kind == "connected":
+                    _, port_name, profile = event
+                    midi_mirror.bind_profile(profile)
+                    midi_mirror.queue_controller_detected(True, profile, port_name)
+                elif kind == "disconnected":
+                    _, port_name = event
+                    last_profile = midi_mirror.current_profile()
+                    if last_profile is not None:
+                        midi_mirror.queue_controller_detected(False, last_profile, port_name)
+                    try:
+                        midi_macos.controller_state.mark_disconnected()
+                    except Exception as exc:
+                        print(f"[midi disconnect err] {exc}", file=sys.stderr)
+                    midi_mirror.unbind()
+
+            midi_watcher_task = None
+            if not os.environ.get("PYTEST_CURRENT_TEST"):
+                try:
+                    midi_watcher_task = midi_macos.start_port_watcher(
+                        midi_watcher_stop,
+                        on_change=_on_midi_port_change,
+                    )
+                except Exception as exc:
+                    print(f"-> MIDI hotplug watcher disabled: {exc!r}", file=sys.stderr)
+            if midi_watcher_task is not None:
+                cleanup_tasks.append(midi_watcher_task)
+
+            screen_task: asyncio.Task | None = None
+            if deck_vision_capture_enabled:
+                screen_task = asyncio.create_task(screen_macos.run_capture_loop(state, run_stop_event))
+                cleanup_tasks.append(screen_task)
+            else:
+                print("-> screen vision capture disabled (set VIBEMIX_DECK_VISION=1)")
+            track_task = asyncio.create_task(track_macos.run_poll_loop(run_stop_event))
+            cleanup_tasks.append(track_task)
+            deck_poller = DeckPoller(
+                library=deck_library,
+                controller=midi_macos.controller_state,
+                track_info=track_macos.track_info,
+            )
+            deck_poll_task = asyncio.create_task(deck_poller.run_poll_loop(run_stop_event))
+            cleanup_tasks.append(deck_poll_task)
+            refresh_task = asyncio.create_task(
+                state_refresh_loop(
+                    state,
+                    audio_buf,
+                    midi_macos.controller_state,
+                    track_macos.track_info,
+                    run_stop_event,
+                    evidence_registry=evidence_registry,
+                    deck_source=deck_poller,
+                    section_source=deck_library,
+                    prepared_pool_loader=_load_latest_prepared_pool,
+                    learn_state=_learn_state,
+                    audio_capture_context=audio_capture_context,
+                    levels=levels,
+                )
+            )
+            cleanup_tasks.append(refresh_task)
+            coach_task = asyncio.create_task(
+                coach_loop(
+                    session,
+                    agent,
+                    state,
+                    levels,
+                    event_detector,
+                    recorder,
+                    manual_trigger,
+                    trigger_state,
+                    run_stop_event,
+                    cancel_gate=CancelGate(),
+                    ttft_meter=TTFTMeter(),
+                    playback=playback,
+                    ipc_bus=ipc_router,
+                    citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
+                    suggestion_service=None,
+                    tracer=tracer,
+                    audio_capture_context=audio_capture_context,
+                    evidence_registry=evidence_registry,
+                    learn_progress=_learn_progress,
+                    mastered_marker_writer=None,
+                    deck_audio_capture=deck_audio_capture,
+                )
+            )
+            cleanup_tasks.append(coach_task)
+            _attach_task_crash_observers(
+                tracer,
+                (
+                    ("coach_loop", coach_task),
+                    ("state_refresh", refresh_task),
+                    ("track_poll", track_task),
+                    ("deck_poll", deck_poll_task),
+                ),
+            )
+
+            capture_native_sr = _resolve_capture_native_sr(audio_capture_context)
+            input_audio_processor = _InputAudioProcessor(
+                audio_buf=audio_buf,
+                clean_audio_buf=clean_audio_buf,
+                recorder=recorder,
+                source_sr=capture_native_sr,
+            )
+
+            def _set_input_stream(stream: Any) -> None:
+                nonlocal input_stream
+                if run_stop_event.is_set() or stop_event.is_set():
+                    try:
+                        stream.stop()
+                        stream.close()
+                    except Exception:
+                        pass
+                    return
+                input_stream = stream
+                print(
+                    f"-> listening to {input_device_name} @ {capture_native_sr}Hz "
+                    f"({deck_audio_routing.opened_channels}ch) -> audio_buf + clean_audio_buf"
+                )
+
+            def _set_input_stream_error(exc: BaseException) -> None:
+                try:
+                    tracer.error("input_stream_open_failed", err=repr(exc))
+                except Exception:
+                    pass
+                print(f"-> input capture disabled: {exc}", file=sys.stderr, flush=True)
+
+            def _open_input_stream_worker() -> None:
+                try:
+                    stream = audio_backend.open_capture(
+                        input_idx,
+                        sample_rate=capture_native_sr,
+                        channels=deck_audio_routing.opened_channels,
+                        block_size=INPUT_CHUNK_FRAMES,
+                        callback=_input_callback_factory(
+                            levels,
+                            passthrough,
+                            mic,
+                            audio_buf,
+                            clean_audio_buf,
+                            recorder,
+                            deck_audio_capture,
+                            audio_capture_context,
+                            midi_macos.controller_state,
+                            source_sr=capture_native_sr,
+                            input_audio_processor=input_audio_processor,
+                        ),
+                    )
+                except Exception as exc:
+                    loop.call_soon_threadsafe(_set_input_stream_error, exc)
+                    return
+                loop.call_soon_threadsafe(_set_input_stream, stream)
+
+            threading.Thread(target=_open_input_stream_worker, name="vibemix-input-open", daemon=True).start()
+            live_session_active = True
+            try:
+                recorder.log_event("session_lifecycle", state="started")
             except Exception:
                 pass
-            return result
-        except Exception as _marker_exc:  # pragma: no cover - defensive live path
-            print(f"[learn mastered marker] disabled: {_marker_exc!r}", file=sys.stderr)
-            return None
-
-    # ── Plan 28-07 / One Mind W3 — 30-day staleness nudge ──
-    # Once-per-boot check (cheap file-stat). The nudge payload is CAPTURED here
-    # and flushed onto the live ipc_router below (the router is created
-    # downstream at :1492, after this point). Was print-only — the renderer's
-    # staleness banner never lit because nothing reached the bus.
-    _pending_staleness_nudges: list[dict] = []
-    try:
-        from vibemix.library import emit_nudge_if_stale as _emit_staleness
-
-        def _staleness_capture(msg_type: str, payload: dict) -> None:
-            _pending_staleness_nudges.append(payload)
-
-        _emit_staleness(_staleness_capture, library_cache)
-    except Exception as e:
-        print(f"-> staleness check failed: {e}", file=sys.stderr)
-
-    # ── Plan 28-04 — grounding pipeline (event-gated, local CLAP) ──
-    # Build Grounding lazily when a library cache exists. Embeddings are local
-    # CLAP ONNX/512 through build_embedder(); the Gemini client is for Sven's live
-    # reaction-planning brain only, not for speech or library grounding embeddings.
-    grounding = None
-    suggestion_service = None
-    # One Mind W3 — pre-declare so the library-import handler (registered after
-    # ipc_router, downstream) can lazily build + rebind these via ``nonlocal``
-    # even when no cache exists yet. A first-time import MUST work cold: the
-    # whole point of "import library" is to create the embedding store the very
-    # first time, when ``library_cache.exists()`` is still False.
-    _library_embedder = None
-    _library_store = None
-    if library_cache.exists():
-        try:
-            from vibemix.library import (
-                Grounding as _Grounding,
-            )
-            from vibemix.library import (
-                open_store as _open_store,
-            )
-            from vibemix.library.embed_factory import build_embedder as _build_embedder
-
-            _library_embedder = _build_embedder()
-            _library_store = _open_store()
-            grounding = _Grounding(_library_embedder, _library_store)
-            print("-> grounding: armed (event-gated, threshold=0.7)")
-            # PILL next-suggestion: reuse the SAME store + cache-warm library so
-            # the pill suggests from the embedded library (Phase 1, embedding-
-            # only; needs deck_library for track-id resolution). Full ranking is
-            # recomputed on TRACK_CHANGE by coach_loop; ws_broadcast performs a
-            # throttled live refresh so the shortlist winner + countdown follow
-            # the playhead without reranking at 30Hz.
-            if deck_library is not None:
-                from vibemix.runtime.suggestion import SuggestionService
-
-                suggestion_service = SuggestionService(
-                    _library_store,
-                    deck_library,
-                    feedback_sink=_live_next_feedback_sink,
-                    session_id=recorder.session_dir.name,
-                    taste_scores=_load_live_taste_scores(),
-                    prepared_pool_loader=_load_latest_prepared_pool,
-                )
-                print("-> pill next-suggestion: armed")
-        except Exception as e:
-            print(f"-> grounding: disabled ({e})", file=sys.stderr)
-            grounding = None
-
-    # ── Phase 77 Plan 04 — WIRE-01: attach the armed Grounding engine ──
-    # The agent is built ABOVE (its construction depends on inputs available
-    # before deck_library is resolved); the Grounding engine is built HERE,
-    # after deck_library + library registration. Rather than reorder the
-    # build, the agent was constructed with grounding=None and we attach the
-    # engine now via the post-construction setter (smaller, cleaner diff —
-    # see 77-04 SUMMARY for the build-reorder-vs-setter rationale). When
-    # grounding is None (no library cache / disabled), the agent's cold path
-    # stays byte-identical: set_next_event dispatches nothing, llm_node
-    # injects nothing. The injected ``[track:<id>]`` resolves against the
-    # register_library-seeded ids above (invariant #2 — no linter change).
-    agent.attach_grounding(grounding)
-
-    # ── LiveKit 1.5.14 turn_handling: kill the false-interruption resume ──
-    # Mic VAD fires on music → LiveKit marks "interrupt" → 2s later "false alarm"
-    # → with the default resume_false_interruption=True the prior utterance
-    # replays from LiveKit's internal text buffer using stale content (the
-    # "audio from before comes back after close" bug). DJ booth: music is
-    # always above VAD threshold, so we disable barge-in interruption entirely.
-    session = AgentSession(
-        llm=llm_inst,
-        tts=tts_inst,
-        turn_handling={
-            "interruption": {
-                "enabled": False,
-                "resume_false_interruption": False,
-            },
-        },
-    )
-    voice_muted = tts_inst is _livekit_not_given()
-    if voice_muted:
-        session.output.set_audio_enabled(False)
-        print("-> AI voice output muted (no local TTS); stream not opened")
-        print("-> AgentSession headless (no Room); audio out muted (no local TTS)")
-    else:
-        session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
-        voice_stream = audio_backend.open_voice_output(
-            output_idx,
-            sample_rate=OUTPUT_SR,
-            block_size=VOICE_BLOCKSIZE,
-            callback=_voice_callback_factory(playback),
-        )
-        print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz")
-        print(f"-> AgentSession headless (no Room); audio out → PlaybackQueue @ {OUTPUT_SR}Hz")
-
-    await session.start(agent)
-    print("-> agent started.")
-
-    trigger_state: dict = {"in_flight": False}
-    manual_trigger = asyncio.Event()
-
-    # --- MIDI daemon thread (Phase 3) ---
-    midi_stop = threading.Event()
-    midi_thread = midi_macos.start_listener_thread(midi_stop)  # noqa: F841 — daemon thread
-
-    # --- MIDI hot-plug watcher (Phase 53 BRINGUP-03) ---
-    # The static listener above retries silently on disconnect; it does NOT flip
-    # is_connected() false or clear stale moves. The watcher detects mid-session
-    # unplug/replug (~poll_seconds latency) and drives the single-state callback,
-    # which mutates midi_macos.controller_state IN PLACE — the SAME object passed
-    # to ws_broadcast + state_refresh_loop below, so single-state ownership holds
-    # (no rebuild, no consumer change). Runs on its own asyncio.Event stop signal;
-    # cleaned up in the finally block alongside midi_stop.
-    midi_watcher_stop = asyncio.Event()
-    # Phase 91 (RENDER-01) — layer MidiMirror's controller_detected enqueue +
-    # bind_profile/unbind hooks on the existing hot-plug watcher. The watcher's
-    # default single-state callback (handle_port_change_single_state) would also
-    # work, BUT it spawns a fresh listener thread that opens mido.open_input on
-    # the same port as the static start_listener_thread above — every MIDI
-    # message gets handled twice (CR-01 from Phase 91 review).
-    #
-    # The fix: do NOT call handle_port_change_single_state from here. The
-    # static listener at start_listener_thread() above already:
-    #   * Calls controller_state.mark_connected(port_name) on each successful
-    #     open (see _midi_common.midi_listener_thread:125).
-    #   * Retries silently on disconnect (2s sleep + re-enumerate) — so a
-    #     replug rebinds without intervention from this callback.
-    #
-    # What the static listener does NOT do: call mark_disconnected on unplug
-    # (it just retries forever). The single-state callback handled that —
-    # mark_disconnected clears the moves/events rings so a coach reaction
-    # post-unplug can't hallucinate a move from stale ring data (state.py:193
-    # docstring). So we still call mark_disconnected() here on the disconnect
-    # event, but we do NOT spawn a second listener thread. Net effect: one
-    # listener thread, ring-clear on unplug, MidiMirror bind/unbind layered
-    # on top.
-    #
-    # Order: on connect we bind THEN enqueue (so a subsequent snapshot() sees
-    # the bound profile); on disconnect we capture the last-bound profile,
-    # enqueue, mark_disconnected on the controller_state, THEN unbind on the
-    # mirror (so the envelope payload's profile id / display_name are still
-    # well-formed before clearing).
-
-    def _on_midi_port_change(event: tuple) -> None:
-        kind = event[0]
-        if kind == "connected":
-            _, port_name, profile = event
-            # The static listener above will (or already did) call
-            # controller_state.mark_connected(port_name) on its open. Bind
-            # the mirror's profile FIRST so the next ws_broadcast 30 Hz tick
-            # emits a fresh full position frame for the freshly-rendered SVG.
-            midi_mirror.bind_profile(profile)
-            midi_mirror.queue_controller_detected(
-                connected=True, profile=profile, port_name=port_name
-            )
-        elif kind == "disconnected":
-            _, port_name = event
-            # Use the public current_profile() accessor (WR-04 fix — no
-            # reach into MidiMirror's private _profile attribute) so the
-            # disconnect envelope's controller_id / display_name reflect the
-            # LAST bound profile.
-            last_profile = midi_mirror.current_profile()
-            if last_profile is not None:
-                midi_mirror.queue_controller_detected(
-                    connected=False,
-                    profile=last_profile,
-                    port_name=port_name,
-                )
-            # Clear the moves/events rings on the live ControllerState so a
-            # post-unplug coach reaction can't hallucinate a move from stale
-            # ring data (state.py:193 — this is the load-bearing piece of the
-            # old single-state callback we preserve; the listener-restart
-            # piece is what we drop to avoid the doubled-thread bug).
+            started_event.set()
+            await run_stop_event.wait()
+        except Exception:
+            if not started_event.is_set():
+                started_event.set()
+            raise
+        finally:
+            live_session_active = False
+            live_voice_muted = True
+            if midi_stop is not None:
+                midi_stop.set()
+            if midi_watcher_stop is not None:
+                midi_watcher_stop.set()
+            for task in list(cleanup_tasks):
+                if not task.done():
+                    task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            if session is not None:
+                try:
+                    await session.aclose()
+                except Exception as exc:
+                    print(f"[close session err] {exc}", file=sys.stderr)
+            if tts_inst is not None:
+                try:
+                    await _close_tts_chain(tts_inst)
+                except Exception as exc:
+                    print(f"[close tts err] {exc}", file=sys.stderr)
+            for stream in (voice_stream, pass_stream, input_stream):
+                if stream is None:
+                    continue
+                try:
+                    stream.stop()
+                    stream.close()
+                except Exception as exc:
+                    print(f"[close stream err] {exc}", file=sys.stderr)
+            if mic_stream is not None:
+                try:
+                    mic_stream.stop()
+                    mic_stream.close()
+                except Exception as exc:
+                    print(f"[close mic err] {exc}", file=sys.stderr)
+            if input_audio_processor is not None:
+                try:
+                    input_audio_processor.close()
+                except Exception as exc:
+                    print(f"[close input audio processor err] {exc}", file=sys.stderr)
             try:
-                midi_macos.controller_state.mark_disconnected()
-            except Exception as e:  # pragma: no cover — defensive
-                print(f"[midi disconnect err] {e}", file=sys.stderr)
-            midi_mirror.unbind()
+                playback.clear()
+            except Exception:
+                pass
+            manual_trigger.clear()
+            trigger_state["in_flight"] = False
+            _quiet_levels()
+            try:
+                recorder.log_event("session_lifecycle", state="stopped")
+            except Exception:
+                pass
+            print("-> session parked; live graph released")
 
-    midi_watcher_task = midi_macos.start_port_watcher(
-        midi_watcher_stop, on_change=_on_midi_port_change
-    )
+    async def _start_live_session() -> None:
+        nonlocal active_task, active_stop_event
+        if active_task is not None and not active_task.done():
+            return
+        active_stop_event = asyncio.Event()
+        started_event = asyncio.Event()
+        active_task = asyncio.create_task(_activate_session(active_stop_event, started_event))
+        try:
+            await asyncio.wait_for(started_event.wait(), timeout=30.0)
+        except TimeoutError:
+            raise RuntimeError("session.start timed out waiting for activation") from None
+        if active_task.done():
+            active_task.result()
 
-    # 2026-05-25 — wire the GUI session-control IPC handlers onto the live
-    # ws_broadcast socket. Until now the Tauri renderer's ipc.settings.* /
-    # ipc.profile.* / ipc.recordings.* requests had NO responder in the live
-    # path (ws_broadcast only handled the manual-trigger action; SessionLoop,
-    # which owns these handlers, was never instantiated here) — so every
-    # persona/output control + settings page silently timed out. We run
-    # SessionLoop's tested handlers via the IpcRouterBus adapter routed through
-    # ws_broadcast's existing socket (no second listener — One Socket invariant).
+    async def _stop_live_session() -> None:
+        nonlocal active_task, active_stop_event
+        if active_task is None:
+            return
+        if active_stop_event is not None:
+            active_stop_event.set()
+        try:
+            await active_task
+        finally:
+            active_task = None
+            active_stop_event = None
+
+    async def _silent_prewarm_hook() -> None:
+        await asyncio.sleep(0.25)
+        if stop_event.is_set() or _is_live_session_active():
+            return
+        try:
+            _ensure_live_llm_tts_deps()
+            _ensure_live_session_deps()
+            print("-> start gate prewarm: live imports ready (models still cold)")
+        except Exception as exc:
+            print(f"-> start gate prewarm skipped: {exc!r}", file=sys.stderr)
+
     from vibemix.runtime.session_loop import SessionLoop
     from vibemix.runtime.settings import GenreProfileLoader, SettingsApplier
     from vibemix.runtime.ws_bus import IpcRouterBus
 
     ipc_router: IpcRouterBus | None = IpcRouterBus()
-    # Phase 77 Plan 04 — WIRE-05: the live SessionLoop handle. Initialized to
-    # None BEFORE the try so the name is always bound in the finally-block
-    # close-ingest call (the except path below leaves it unset otherwise).
-    _session_ipc = None
-    # Phase 77 review WR-02 — strong-ref holder for fire-and-forget tasks
-    # (the boot memory-ingest below). Bound before the try so the name is
-    # always available; tasks add a self-removing done-callback.
-    _background_tasks: set[asyncio.Task] = set()
-    try:
-        _settings_config = _boot_settings_config
-        _live_settings_applier = SettingsApplier(
-            config_store=_settings_config,
-            cascade_agent=None,
-            music_state=state,  # mood applies live + emits mascot.mood_change
-            ws_bus=ipc_router,  # mood-change + acks reach every connected client
-            recordings_root=recordings_root,
-            genre_loader=GenreProfileLoader(),
-        )
-        _session_ipc = SessionLoop(
-            ipc_router,
-            config_store=_settings_config,
-            settings_applier=_live_settings_applier,
-            music_state=state,
-            levels=levels,
-            playback_queue=playback,
+    _settings_config = _boot_settings_config
+    _live_settings_applier = SettingsApplier(
+        config_store=_settings_config,
+        cascade_agent=None,
+        music_state=state,
+        ws_bus=ipc_router,
+        recordings_root=recordings_root,
+        genre_loader=GenreProfileLoader(),
+    )
+    _session_ipc = SessionLoop(
+        ipc_router,
+        config_store=_settings_config,
+        settings_applier=_live_settings_applier,
+        music_state=state,
+        levels=levels,
+        playback_queue=playback,
+        controller_state=midi_macos.controller_state,
+        screen_available=screen_available,
+        recordings_root=recordings_root,
+        active_recorder=recorder,
+        evidence_registry=evidence_registry,
+        memory_ingest_enabled=False,
+        session_start=_start_live_session,
+        session_stop=_stop_live_session,
+        session_is_active=_is_live_session_active,
+    )
+    _session_ipc.register_handlers()
+    from vibemix.learn.progress import load_progress as _load_progress
+    from vibemix.learn.state import LearnState
+
+    _learn_progress, _learn_was_recovered = _load_progress()
+    _learn_state = LearnState()
+    print(
+        "-> session IPC handlers wired onto mascot bus "
+        f"({len(ipc_router._handlers)} types incl. start/stop)"
+    )
+
+    session_state_view = _RunGatedMusicState(state, _is_live_session_active)
+
+    async def _ws_broadcast_once() -> None:
+        await ws_broadcast(
+            levels,
+            session_state_view,  # type: ignore[arg-type]
+            manual_trigger,
+            stop_event,
+            transcript_buf=transcript_buf,
             controller_state=midi_macos.controller_state,
+            suggestion_holder=suggestion_service,
+            tracer=tracer,
+            ipc_router=ipc_router,
             screen_available=screen_available,
-            recordings_root=recordings_root,
-            active_recorder=recorder,
-            evidence_registry=evidence_registry,
+            midi_mirror=midi_mirror,
+            audio_capture_context=audio_capture_context,
+            voice_muted=_DynamicBool(lambda: live_voice_muted),  # type: ignore[arg-type]
+            brain_available=_DynamicBool(_is_live_session_active),  # type: ignore[arg-type]
         )
-        # Register handlers ONLY — never call run() (ws_broadcast owns the
-        # server + the snapshot loop; SessionLoop here is a handler bag).
-        _session_ipc.register_handlers()
-        print(
-            "-> session IPC handlers wired onto mascot bus "
-            f"({len(ipc_router._handlers)} types: settings/profile/recordings)"
-        )
-        # Phase 77 Plan 04 — WIRE-05: fire the BOOT memory-ingest sweep on the
-        # SAME _session_ipc instance. main() builds SessionLoop but only calls
-        # register_handlers() (never run()), so the boot+close ingest sweeps
-        # that SessionLoop.run() would normally fire never ran on the live
-        # path → memory.db stayed empty. We call ``_fire_ingest("boot")``
-        # DIRECTLY — NOT the combined boot-sweep method, which ALSO re-runs
-        # retention (main() already ran the boot retention sweep at :650;
-        # the combined method would DOUBLE-prune). Gated on recall_enabled
-        # (VIBEMIX_RECALL_ENABLED, default OFF) → additive no-op for the
-        # default user (memory stays opt-in; recall has no fuel until Kaan
-        # flips §RECALL-EAR). Off-loop + best-effort inside _fire_ingest.
-        #
-        # Phase 77 review WR-02 — retain a STRONG reference to the boot
-        # ingest task. The event loop holds only a WEAK reference to a task
-        # (CPython docs), so a bare ``asyncio.create_task(...)`` whose return
-        # value is discarded can be garbage-collected mid-flight and silently
-        # cancelled — leaving memory.db un-seeded even with
-        # VIBEMIX_RECALL_ENABLED=1. Stash it in a long-lived set with a
-        # self-removing done-callback so the loop keeps a strong ref until the
-        # ingest completes. (The close-path ingest in the finally already
-        # ``await``s, so only this boot path was exposed.)
-        if recall_enabled and _session_ipc is not None:
-            _boot_ingest_task = asyncio.create_task(_session_ipc._fire_ingest("boot"))
-            _background_tasks.add(_boot_ingest_task)
-            _boot_ingest_task.add_done_callback(_background_tasks.discard)
-    except Exception as _e:  # pragma: no cover — never block boot on this
-        ipc_router = None
-        _session_ipc = None
-        print(f"-> session IPC handlers NOT wired: {_e!r}", file=sys.stderr)
 
-    # One Mind W1 — wire the live UI publish bus into the agent. The agent is
-    # constructed at :1230 BEFORE ipc_router exists (:1492), so its _ipc_bus
-    # defaulted to None and the citation-chip + overlay-highlight surfaces
-    # stayed dark on the live path (the reaction still reached the audience via
-    # TTS; only the "show your receipts" chips never broadcast). Bind it now —
-    # mirror of attach_grounding. ipc_router is the live bus on success, or None
-    # on the rare boot-IPC-failure path above; bind_ipc_bus(None) is a no-op
-    # that keeps the cold path byte-identical.
-    agent.bind_ipc_bus(ipc_router)
-    if ipc_router is not None:
-        print("-> agent IPC bus bound (citation chips + overlay-highlight live)")
-
-    # ── One Mind W3 — library import + staleness producers on the live bus ──
-    # importer.py (Plan 09) + staleness.py (Plan 28) were built + unit-tested
-    # but never registered on the live router: ipc.library.import /
-    # import_cancel / staleness_action frames from the renderer had no
-    # responder, and the boot staleness nudge only printed. Wire them here — the
-    # library embedder/store + evidence_registry + _background_tasks all live in
-    # THIS scope (not SessionLoop's), so registering directly on ipc_router is
-    # the localized fix (no SessionLoop constructor churn). No schema change:
-    # these message types already exist in messages.schema.json.
-    if ipc_router is not None:
-        try:
-            import json as _json
-
-            from vibemix.library.importer import LibraryImporter
-            from vibemix.library.staleness import (
-                apply_snooze_action,
-                library_freshness_status,
-                refreshable_source,
-                watch_library_freshness,
-            )
-            from vibemix.ui_bus.messages import (
-                LibraryImportProgress,
-                LibraryStalenessNudge,
-            )
-
-            _import_state: dict[str, Any] = {"importer": None, "task": None}
-
-            async def _emit_library(envelope: dict) -> None:
-                try:
-                    await ipc_router.emit(envelope)
-                except Exception as _e:  # pragma: no cover — best-effort UI
-                    print(f"-> [library emit err] {_e!r}", file=sys.stderr)
-
-            def _progress_envelope(p: dict) -> dict:
-                return _json.loads(
-                    LibraryImportProgress.make(
-                        total=int(p.get("total", 0)),
-                        done=int(p.get("done", 0)),
-                        current_track_name=str(p.get("current_track_name", "")),
-                        cache_hits=int(p.get("cache_hits", 0)),
-                        cancelled=bool(p.get("cancelled", False)),
-                    ).to_json()
-                )
-
-            def _ensure_library_runtime(label: str) -> bool:
-                nonlocal _library_embedder, _library_store
-                try:
-                    if _library_embedder is None or _library_store is None:
-                        from vibemix.library import open_store as _open_store
-                        from vibemix.library.embed_factory import (
-                            build_embedder as _build_embedder,
-                        )
-
-                        _library_embedder = _build_embedder()
-                        _library_store = _open_store()
-                except Exception as _e:
-                    print(
-                        f"-> library {label}: embedder unavailable ({_e!r})",
-                        file=sys.stderr,
-                    )
-                    return False
-                return True
-
-            def _refresh_library_registry() -> None:
-                try:
-                    _lib = RekordboxLibrary()
-                    if _lib.try_load_cache():
-                        evidence_registry.register_library(_lib)
-                except Exception as _e:
-                    print(
-                        f"-> post-import registry refresh failed: {_e!r}",
-                        file=sys.stderr,
-                    )
-
-            async def _start_folder_import(
-                folder: Path,
-                *,
-                label: str,
-                clear_staleness: bool = False,
-            ) -> None:
-                _task = _import_state.get("task")
-                if _task is not None and not _task.done():
-                    return
-                folder = folder.expanduser()
-                if not folder.is_dir():
-                    print(
-                        f"-> library {label} rejected: folder is missing",
-                        file=sys.stderr,
-                    )
-                    return
-                if not _ensure_library_runtime(label):
-                    return
-
-                _import_state["importer"] = None
-                loop = asyncio.get_running_loop()
-                try:
-                    from vibemix.library import scan_folder as _scan_folder
-
-                    folder_total = len(_scan_folder(folder))
-                except Exception:
-                    folder_total = 0
-                progress_done = 0
-
-                def _on_folder_progress(line: str) -> None:
-                    nonlocal progress_done
-                    progress_done += 1
-
-                    def _send() -> None:
-                        _pt = loop.create_task(
-                            _emit_library(
-                                _progress_envelope(
-                                    {
-                                        "total": folder_total,
-                                        "done": progress_done,
-                                        "current_track_name": line[:200],
-                                        "cache_hits": 0,
-                                        "cancelled": False,
-                                    }
-                                )
-                            )
-                        )
-                        _background_tasks.add(_pt)
-                        _pt.add_done_callback(_background_tasks.discard)
-
-                    loop.call_soon_threadsafe(_send)
-
-                async def _run_folder_import() -> None:
-                    try:
-                        from vibemix.library import ingest_folder
-
-                        def _sync_import():
-                            return ingest_folder(
-                                folder,
-                                _library_embedder,
-                                _library_store,
-                                persist_library=True,
-                                progress=_on_folder_progress,
-                                embed_strategy=getattr(
-                                    _library_embedder,
-                                    "_embed_strategy",
-                                    "mean_excerpt",
-                                ),
-                            )
-
-                        report = await loop.run_in_executor(None, _sync_import)
-                        _refresh_library_registry()
-                        await _emit_library(
-                            _progress_envelope(
-                                {
-                                    "total": report.total,
-                                    "done": report.total,
-                                    "current_track_name": "",
-                                    "cache_hits": report.skipped_cached,
-                                    "cancelled": False,
-                                }
-                            )
-                        )
-                        if clear_staleness:
-                            ipc_router.clear_retained("ipc.library.staleness_nudge")
-                    except Exception as _e:
-                        print(f"-> library {label} failed: {_e!r}", file=sys.stderr)
-
-                _t = loop.create_task(_run_folder_import())
-                _import_state["task"] = _t
-                _background_tasks.add(_t)
-                _t.add_done_callback(_background_tasks.discard)
-
-            def _catalog_source_for_import_path(source_path: Path) -> object | None:
-                """Return a non-Rekordbox source for explicit catalog imports.
-
-                Rekordbox XML keeps using ``LibraryImporter`` below because it
-                supports cooperative cancel. Traktor/VirtualDJ candidates come
-                from setup discovery too; without this branch the visible
-                Library panel would send them to the XML importer and fail.
-                """
-                name = source_path.name.lower()
-                text = str(source_path).lower()
-                if source_path.suffix.lower() == ".nml":
-                    from vibemix.library.sources.traktor import TraktorSource
-
-                    return TraktorSource(nml_path=str(source_path))
-                if name == "database.xml" and "virtualdj" in text:
-                    from vibemix.library.sources.virtualdj import VirtualDJSource
-
-                    return VirtualDJSource(database_path=str(source_path))
-                if name == "m.db" and ("engine" in text or "database2" in text):
-                    from vibemix.library.sources.engine import EngineDJSource
-
-                    return EngineDJSource(database_path=str(source_path))
-                if name == "database v2" and "_serato_" in text:
-                    from vibemix.library.sources.serato import SeratoSource
-
-                    return SeratoSource(library_path=str(source_path))
-                return None
-
-            async def _start_catalog_source_import(source: object, *, label: str) -> None:
-                _task = _import_state.get("task")
-                if _task is not None and not _task.done():
-                    return
-                if not _ensure_library_runtime(label):
-                    return
-                detect = getattr(source, "detect", None)
-                if not callable(detect) or not bool(detect()):
-                    print(
-                        f"-> library {label} rejected: source is missing",
-                        file=sys.stderr,
-                    )
-                    return
-
-                _import_state["importer"] = None
-                loop = asyncio.get_running_loop()
-                progress_done = 0
-
-                def _on_source_progress(line: str) -> None:
-                    nonlocal progress_done
-                    progress_done += 1
-
-                    def _send() -> None:
-                        _pt = loop.create_task(
-                            _emit_library(
-                                _progress_envelope(
-                                    {
-                                        "total": 0,
-                                        "done": progress_done,
-                                        "current_track_name": line[:200],
-                                        "cache_hits": 0,
-                                        "cancelled": False,
-                                    }
-                                )
-                            )
-                        )
-                        _background_tasks.add(_pt)
-                        _pt.add_done_callback(_background_tasks.discard)
-
-                    loop.call_soon_threadsafe(_send)
-
-                async def _run_source_import() -> None:
-                    try:
-                        from vibemix.library.ingest import ingest_source
-
-                        def _sync_import():
-                            return ingest_source(
-                                source,  # type: ignore[arg-type]
-                                _library_embedder,
-                                _library_store,
-                                persist_library=True,
-                                progress=_on_source_progress,
-                            )
-
-                        report = await loop.run_in_executor(None, _sync_import)
-                        _refresh_library_registry()
-                        await _emit_library(
-                            _progress_envelope(
-                                {
-                                    "total": report.total,
-                                    "done": report.total,
-                                    "current_track_name": "",
-                                    "cache_hits": report.skipped_cached,
-                                    "cancelled": False,
-                                }
-                            )
-                        )
-                    except Exception as _e:
-                        print(f"-> library {label} failed: {_e!r}", file=sys.stderr)
-
-                _t = loop.create_task(_run_source_import())
-                _import_state["task"] = _t
-                _background_tasks.add(_t)
-                _t.add_done_callback(_background_tasks.discard)
-
-            async def _on_library_import(msg: dict) -> None:
-                _task = _import_state.get("task")
-                if _task is not None and not _task.done():
-                    return  # an import is already running — drop the duplicate
-                payload = msg.get("payload") or {}
-                raw_path = str(payload.get("path", "")).strip()
-                if not raw_path:
-                    return
-                source_path = Path(raw_path).expanduser()
-                if source_path.is_dir():
-                    await _start_folder_import(source_path, label="folder import")
-                    return
-                catalog_source = _catalog_source_for_import_path(source_path)
-                if catalog_source is not None:
-                    await _start_catalog_source_import(
-                        catalog_source,
-                        label=f"{getattr(catalog_source, 'name', 'catalog')} import",
-                    )
-                    return
-                xml_path = source_path
-                # Lazily build embedder + store — import is the one path that
-                # must run cold (first-time user has no cache yet). build_embedder
-                # loads the local CLAP ONNX model.
-                if not _ensure_library_runtime("import"):
-                    return
-
-                loop = asyncio.get_running_loop()
-
-                def _on_progress(p: dict) -> None:
-                    # Sync callback fired on the loop thread from import_library;
-                    # schedule the async bus emit. Retain a strong ref (RUF006 /
-                    # WR-02): the loop only weakly references tasks, so a bare
-                    # create_task can be GC'd mid-emit.
-                    _pt = loop.create_task(_emit_library(_progress_envelope(p)))
-                    _background_tasks.add(_pt)
-                    _pt.add_done_callback(_background_tasks.discard)
-
-                importer = LibraryImporter(
-                    _library_embedder, _library_store, on_progress=_on_progress
-                )
-                _import_state["importer"] = importer
-
-                async def _run_import() -> None:
-                    try:
-                        result = await importer.import_library(xml_path)
-                        if not result.get("cancelled"):
-                            # Refresh the EvidenceRegistry so [track:<id>]
-                            # citations resolve mid-session, no restart needed
-                            # (mirrors import_library_async).
-                            _refresh_library_registry()
-                        # Final frame doubles as the completion signal.
-                        await _emit_library(
-                            _progress_envelope(
-                                {
-                                    "total": result.get("total", 0),
-                                    "done": result.get("done", 0),
-                                    "current_track_name": "",
-                                    "cache_hits": result.get("cache_hits", 0),
-                                    "cancelled": result.get("cancelled", False),
-                                }
-                            )
-                        )
-                    except Exception as _e:
-                        print(f"-> library import failed: {_e!r}", file=sys.stderr)
-
-                _t = loop.create_task(_run_import())
-                _import_state["task"] = _t
-                _background_tasks.add(_t)
-                _t.add_done_callback(_background_tasks.discard)
-
-            async def _start_folder_reindex() -> None:
-                _task = _import_state.get("task")
-                if _task is not None and not _task.done():
-                    return
-                status = library_freshness_status(library_cache)
-                source_path, source_kind = refreshable_source(status)
-                if source_kind != "folder" or not source_path:
-                    print(
-                        "-> staleness reindex rejected: recorded source is not a folder",
-                        file=sys.stderr,
-                    )
-                    return
-                folder = Path(source_path).expanduser()
-                if not folder.is_dir():
-                    print(
-                        "-> staleness reindex rejected: recorded folder is missing",
-                        file=sys.stderr,
-                    )
-                    return
-                await _start_folder_import(
-                    folder,
-                    label="folder reindex",
-                    clear_staleness=True,
-                )
-
-            async def _on_library_import_cancel(msg: dict) -> None:
-                importer = _import_state.get("importer")
-                if importer is not None:
-                    importer.cancel_flag.set()
-
-            async def _on_library_staleness_action(msg: dict) -> None:
-                payload = msg.get("payload") or {}
-                action = str(payload.get("action", "")).strip()
-                try:
-                    if action == "reindex_folder":
-                        await _start_folder_reindex()
-                        return
-                    apply_snooze_action(action)
-                    ipc_router.clear_retained("ipc.library.staleness_nudge")
-                except ValueError as _e:
-                    print(f"-> staleness action rejected: {_e}", file=sys.stderr)
-
-            ipc_router.register_handler("ipc.library.import", _on_library_import)
-            ipc_router.register_handler("ipc.library.import_cancel", _on_library_import_cancel)
-            ipc_router.register_handler(
-                "ipc.library.staleness_action", _on_library_staleness_action
-            )
-            print("-> library import + staleness handlers wired")
-
-            # Flush the boot staleness nudge captured above onto the live bus.
-            for _p in _pending_staleness_nudges:
-                await _emit_library(
-                    _json.loads(
-                        LibraryStalenessNudge.make(
-                            age_days=int(_p.get("age_days", 0)),
-                            snoozed_until_ts=_p.get("snoozed_until_ts"),
-                            source_path=_p.get("source_path")
-                            if isinstance(_p.get("source_path"), str)
-                            else None,
-                            source_kind=_p.get("source_kind")
-                            if isinstance(_p.get("source_kind"), str)
-                            else None,
-                            reason=_p.get("reason") if isinstance(_p.get("reason"), str) else None,
-                        ).to_json()
-                    )
-                )
-            if _pending_staleness_nudges:
-                _age = _pending_staleness_nudges[0].get("age_days")
-                print(f"-> staleness nudge emitted ({_age}d stale)")
-
-            def _watcher_staleness_emit(msg_type: str, payload: dict) -> None:
-                async def _send() -> None:
-                    await _emit_library(
-                        _json.loads(
-                            LibraryStalenessNudge.make(
-                                age_days=int(payload.get("age_days", 0)),
-                                snoozed_until_ts=payload.get("snoozed_until_ts"),
-                                source_path=payload.get("source_path")
-                                if isinstance(payload.get("source_path"), str)
-                                else None,
-                                source_kind=payload.get("source_kind")
-                                if isinstance(payload.get("source_kind"), str)
-                                else None,
-                                reason=payload.get("reason")
-                                if isinstance(payload.get("reason"), str)
-                                else None,
-                            ).to_json()
-                        )
-                    )
-
-                _wt = asyncio.create_task(_send())
-                _background_tasks.add(_wt)
-                _wt.add_done_callback(_background_tasks.discard)
-
-            _freshness_watch_task = asyncio.create_task(
-                watch_library_freshness(
-                    _watcher_staleness_emit,
-                    stop_event,
-                    poll_seconds=10.0,
-                    library_pkl=library_cache,
-                )
-            )
-            _background_tasks.add(_freshness_watch_task)
-            _freshness_watch_task.add_done_callback(_background_tasks.discard)
-            print("-> library freshness watcher armed")
-        except Exception as _e:
-            print(f"-> library import/staleness NOT wired: {_e!r}", file=sys.stderr)
-
+    ws_task = asyncio.create_task(_run_ws_broadcast_supervised(_ws_broadcast_once, stop_event, tracer))
+    await asyncio.sleep(0)
     # Phase 92 (LESSON-01/03/04) — wire LessonRuntime alongside MidiMirror.
     # P91 already shipped MidiMirror (read-only 30 Hz controller-position
     # snapshotter); P92 ships the FSM that drives the lesson lifecycle on
@@ -2771,7 +2234,6 @@ async def main() -> None:
     # boots cleanly even when SessionLoop wiring degrades.
     from vibemix.learn.graduation import build_graduation_summary
     from vibemix.learn.runtime import LessonRuntime
-    from vibemix.learn.state import LearnState
     from vibemix.ui_bus.learn_messages import LearnProgressState
 
     class _LessonRuntimeIpcAdapter:
@@ -2812,7 +2274,6 @@ async def main() -> None:
                     file=sys.stderr,
                 )
 
-    _learn_state = LearnState()
     _lesson_ipc_adapter = _LessonRuntimeIpcAdapter(ipc_router)
 
     def _load_learn_harmonic_pair() -> Any | None:
@@ -2821,7 +2282,7 @@ async def main() -> None:
             from vibemix.learn.harmonic_practice import pick_harmonic_practice_pair
             from vibemix.library.rekordbox import RekordboxLibrary as _RBLibrary
 
-            lib = deck_library
+            lib = None
             if lib is None:
                 lib = _RBLibrary()
                 if not lib.try_load_cache():
@@ -3132,348 +2593,54 @@ async def main() -> None:
                 file=sys.stderr,
             )
 
-    # --- Asyncio tasks (6) ---
-    async def _ws_broadcast_once() -> None:
-        await ws_broadcast(
-            levels,
-            state,
-            manual_trigger,
-            stop_event,
-            transcript_buf=transcript_buf,
-            controller_state=midi_macos.controller_state,
-            suggestion_holder=suggestion_service,
-            tracer=tracer,
-            ipc_router=ipc_router,
-            screen_available=screen_available,
-            midi_mirror=midi_mirror,
-            audio_capture_context=audio_capture_context,
-            voice_muted=voice_muted,
-            brain_available=brain_available,
-        )
-
-    ws_task = asyncio.create_task(
-        _run_ws_broadcast_supervised(_ws_broadcast_once, stop_event, tracer)
-    )
-    # Phase 92 (LESSON-01) — drive LessonRuntime's 1 Hz tick_loop
-    # alongside ws_broadcast's 30 Hz tick. The two coroutines share the
-    # same asyncio event loop; the tick_loop coroutine is the strike-
-    # escalation timer (Pitfall 6 mitigation pinned by
-    # tests/runtime/test_ws_broadcast_30hz_under_lesson_load.py).
     lesson_tick_task = asyncio.create_task(lesson_runtime.tick_loop(stop_event))
     lesson_live_grade_task = asyncio.create_task(lesson_runtime.live_grade_loop(stop_event))
-    diag_task = asyncio.create_task(diag_loop(levels, state, stop_event, tracer=tracer))
-    screen_task: asyncio.Task | None = None
-    if deck_vision_capture_enabled:
-        screen_task = asyncio.create_task(screen_macos.run_capture_loop(state, stop_event))
-    else:
-        print("-> screen vision capture disabled (set VIBEMIX_DECK_VISION=1 to enable)")
-    track_task = asyncio.create_task(track_macos.run_poll_loop(stop_event))
-
-    # Phase 59-04 (DECK-04/05) — the THIRD external snapshot producer. Reuses the
-    # SAME read-only controller_state / track_info instances the refresh loop owns
-    # and the cache-warm RekordboxLibrary (deck_library, None when no collection.xml
-    # imported → honest unknown). Its run_poll_loop writes the poller's OWN holder;
-    # state_refresh_loop is the only thing that copies snapshot() into MusicState
-    # under state._lock (single-writer rule). deck_source threads in alongside.
-    deck_poller = DeckPoller(
-        library=deck_library,
-        controller=midi_macos.controller_state,
-        track_info=track_macos.track_info,
-    )
-    deck_poll_task = asyncio.create_task(deck_poller.run_poll_loop(stop_event))
-    refresh_task = asyncio.create_task(
-        state_refresh_loop(
-            state,
-            audio_buf,
-            midi_macos.controller_state,
-            track_macos.track_info,
-            stop_event,
-            evidence_registry=evidence_registry,
-            deck_source=deck_poller,
-            section_source=deck_library,
-            prepared_pool_loader=_load_latest_prepared_pool,
-            learn_state=_learn_state,
-            audio_capture_context=audio_capture_context,
-            levels=levels,
-        )
-    )
-    if brain_available:
-        coach_task = asyncio.create_task(
-            coach_loop(
-                session,
-                agent,
-                state,
-                levels,
-                event_detector,
-                recorder,
-                manual_trigger,
-                trigger_state,
-                stop_event,
-                cancel_gate=cancel_gate,
-                ttft_meter=ttft_meter,
-                playback=playback,
-                # One Mind W2 — drain citation telemetry to the LIVE bus. Was
-                # ``citation_shim`` (a bounded deque dead-end that nothing read);
-                # ipc_router is the real ws_broadcast router, so SessionCitation
-                # envelopes now reach the Settings → Diagnostics panel. coach_loop's
-                # ``citation_wired`` gate tolerates ipc_router=None (boot-IPC-failure
-                # path) — no emit fires there, identical to the old shim-less case.
-                ipc_bus=ipc_router,
-                citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
-                suggestion_service=suggestion_service,
-                tracer=tracer,
-                audio_capture_context=audio_capture_context,
-                # §EARNED-LIVE-MASTERED-VERIFY — the live event loop credits v11.0
-                # skill mastery only on a resolvable citation. Both handles already
-                # exist in main(): the registry the EventDetector writes into, and
-                # the LearnProgress loaded at boot (also passed to the LessonRuntime).
-                evidence_registry=evidence_registry,
-                learn_progress=_learn_progress,
-                mastered_marker_writer=_write_mastered_marker,
-                # 4d — the live Vibe Judge needs the per-deck rings to assemble its
-                # typed frame; None on a 2ch/master-only-incapable rig (the Judge
-                # then abstains by construction). Constructed at __main__:1056.
-                deck_audio_capture=deck_audio_capture,
-            )
-        )
-    else:
-        try:
-            recorder.log_event(
-                "brain_unavailable",
-                reason=brain_unavailable_reason or "unknown",
-                path="boot",
-            )
-        except Exception:
-            pass
-        transcript_buf.append("Brain unavailable — add your Gemini key in Settings or retry proxy.")
-
-        async def _brain_unavailable_loop() -> None:
-            await stop_event.wait()
-
-        coach_task = asyncio.create_task(_brain_unavailable_loop())
-
-    # Plan 41-02 — wall-clock cache refresh_loop deleted. Cache refresh is
-    # now event-driven from EvidenceRegistry.write() (debounced 5s, capped
-    # to once per 30s). No background task to spawn or clean up.
-
-    # Orphan-process self-shutdown — trips stop_event if Tauri parent
-    # dies abruptly so the live runtime closes audio streams + session
-    # cleanly instead of orphaning under launchd with port 8765 held.
     parent_watch_task = asyncio.create_task(watch_parent(stop_event))
-
-    _attach_task_crash_observers(
-        tracer,
-        (
-            ("ws_broadcast", ws_task),
-            ("coach_loop", coach_task),
-            ("state_refresh", refresh_task),
-            ("diag_loop", diag_task),
-            ("track_poll", track_task),
-            ("deck_poll", deck_poll_task),
-            ("lesson_tick", lesson_tick_task),
-            ("lesson_live_grade", lesson_live_grade_task),
-        ),
-    )
-
-    # --- Input stream — last because state must be ready ---
-    # Open on a daemon thread so a wedged CoreAudio/PortAudio device cannot
-    # block the websocket and make the product look dead before it can explain
-    # the audio state. If it opens, the callback starts filling the buffers.
-    capture_native_sr = _resolve_capture_native_sr(audio_capture_context)
-    input_audio_processor = _InputAudioProcessor(
-        audio_buf=audio_buf,
-        clean_audio_buf=clean_audio_buf,
-        recorder=recorder,
-        source_sr=capture_native_sr,
-    )
-    input_stream = None
-
-    def _set_input_stream(stream: Any) -> None:
-        nonlocal input_stream
-        if stop_event.is_set():
-            try:
-                stream.stop()
-                stream.close()
-            except Exception:
-                pass
-            return
-        input_stream = stream
-        print(
-            f"-> listening to {input_device_name} @ {capture_native_sr}Hz "
-            f"({deck_audio_routing.opened_channels}ch) -> audio_buf + clean_audio_buf"
-        )
-
-    def _set_input_stream_error(exc: BaseException) -> None:
-        try:
-            tracer.error("input_stream_open_failed", err=repr(exc))
-        except Exception:
-            pass
-        print(f"-> input capture disabled: {exc}", file=sys.stderr, flush=True)
-
-    def _open_input_stream_worker() -> None:
-        try:
-            stream = audio_backend.open_capture(
-                input_idx,
-                sample_rate=capture_native_sr,
-                channels=deck_audio_routing.opened_channels,
-                block_size=INPUT_CHUNK_FRAMES,
-                callback=_input_callback_factory(
-                    levels,
-                    passthrough,
-                    mic,
-                    audio_buf,
-                    clean_audio_buf,
-                    recorder,
-                    deck_audio_capture,
-                    audio_capture_context,
-                    midi_macos.controller_state,
-                    source_sr=capture_native_sr,
-                    input_audio_processor=input_audio_processor,
-                ),
-            )
-        except Exception as exc:
-            loop.call_soon_threadsafe(_set_input_stream_error, exc)
-            return
-        loop.call_soon_threadsafe(_set_input_stream, stream)
-
-    threading.Thread(
-        target=_open_input_stream_worker,
-        name="vibemix-input-open",
-        daemon=True,
-    ).start()
+    prewarm_task = asyncio.create_task(_silent_prewarm_hook())
+    _background_tasks.add(prewarm_task)
+    prewarm_task.add_done_callback(_background_tasks.discard)
+    housekeeping_task = asyncio.create_task(_boot_housekeeping())
+    _background_tasks.add(housekeeping_task)
+    housekeeping_task.add_done_callback(_background_tasks.discard)
+    print("-> start gate: armed (idle; capture/reactions/model load wait for Start)")
 
     try:
         await stop_event.wait()
     finally:
-        midi_stop.set()
-        # Phase 53 BRINGUP-03: signal the hot-plug watcher to exit cooperatively
-        # (within one poll) BEFORE its task is cancelled below.
-        midi_watcher_stop.set()
-        cleanup_tasks: list[asyncio.Task] = [
-            coach_task,
-            refresh_task,
-            ws_task,
-            diag_task,
-            track_task,
-            deck_poll_task,
-            parent_watch_task,
-            midi_watcher_task,
-            # WR-01 fix (P92 REVIEW): lesson_tick_task was missing from
-            # the cleanup list — tick_loop checks stop_event each second
-            # so it exits eventually, but the main coroutine never
-            # awaited it. asyncio could shut down the loop mid-
-            # `await asyncio.sleep(1.0)` and emit the "Task was destroyed
-            # but it is pending" warning. Include it here so the shutdown
-            # is clean.
-            lesson_tick_task,
-            lesson_live_grade_task,
-        ]
-        if screen_task is not None:
-            cleanup_tasks.append(screen_task)
-        for t in cleanup_tasks:
-            t.cancel()
+        await _stop_live_session()
+        for task in (ws_task, parent_watch_task, lesson_tick_task, lesson_live_grade_task):
+            task.cancel()
             try:
-                await t
+                await task
             except (asyncio.CancelledError, Exception):
                 pass
-        try:
-            await session.aclose()
-        except Exception as e:
-            print(f"[close session err] {e}", file=sys.stderr)
-        try:
-            await _close_tts_chain(tts_inst)
-        except Exception as e:
-            print(f"[close tts err] {e}", file=sys.stderr)
-        try:
-            lesson_runtime.set_beatmatch_practice_player(None)
-        except Exception as e:
-            print(f"[close learn beatmatch practice player err] {e}", file=sys.stderr)
-        # Phase 77 review WR-01 — cancel the agent's off-loop pre-dispatch
-        # tasks (grounding + recall) so an event firing just before SIGINT
-        # doesn't leak an orphaned executor embed / a "Task was destroyed but
-        # it is pending" warning. Both are cancellable best-effort: the field
-        # is None until the first track-aware event, and may be done already.
-        # WIRE-01 added _grounding_task; _recall_task is the pre-existing
-        # Phase-65 sibling — cancel both here so neither leaks.
-        for _agent_task in (
-            getattr(agent, "_grounding_task", None),
-            getattr(agent, "_recall_task", None),
-        ):
-            if _agent_task is not None and not _agent_task.done():
-                _agent_task.cancel()
+        for bg_task in list(_background_tasks):
+            if not bg_task.done():
+                bg_task.cancel()
                 try:
-                    await _agent_task
+                    await bg_task
                 except (asyncio.CancelledError, Exception):
                     pass
-        # Phase 77 review WR-02 — drain any still-running fire-and-forget
-        # background task (the boot memory-ingest) on shutdown so it doesn't
-        # leak past the loop teardown. Snapshot the set first (the done-
-        # callback mutates it on completion).
-        for _bg_task in list(_background_tasks):
-            if not _bg_task.done():
-                _bg_task.cancel()
-                try:
-                    await _bg_task
-                except (asyncio.CancelledError, Exception):
-                    pass
-        for stream in (voice_stream, pass_stream, input_stream):
-            if stream is None:
-                continue
-            try:
-                stream.stop()
-                stream.close()
-            except Exception as e:
-                print(f"[close stream err] {e}", file=sys.stderr)
-        if mic_stream is not None:
-            try:
-                mic_stream.stop()
-                mic_stream.close()
-            except Exception as e:
-                print(f"[close mic err] {e}", file=sys.stderr)
-        try:
-            input_audio_processor.close()
-        except Exception as e:
-            print(f"[close input audio processor err] {e}", file=sys.stderr)
         try:
             tracer.close()
-        except Exception as e:
-            print(f"[close tracer err] {e}", file=sys.stderr)
+        except Exception as exc:
+            print(f"[close tracer err] {exc}", file=sys.stderr)
         try:
             recorder.close()
-        except Exception as e:
-            print(f"[close recorder err] {e}", file=sys.stderr)
-        # Phase 77 Plan 04 — WIRE-05: fire the CLOSE memory-ingest for the
-        # just-finished session on the SAME _session_ipc instance. Placed
-        # AFTER recorder.close() so session.json is finalized (the layout
-        # ingest_session expects). We await ``_fire_ingest("close", ...)``
-        # directly (this finally block is inside ``async def main()`` so the
-        # await is valid) — NOT the combined session-close method, which
-        # ALSO re-runs retention (the close retention sweep runs just below
-        # at the run_retention_sweep call; the combined method would
-        # DOUBLE-prune). Gated on recall_enabled (default OFF) → additive
-        # no-op by default. _session_ipc is None on the handler-wire except
-        # path, so guard it. Best-effort + off-loop inside _fire_ingest.
-        if recall_enabled and _session_ipc is not None:
-            try:
-                await _session_ipc._fire_ingest("close", session_dir=recorder.session_dir)
-            except Exception as e:  # pragma: no cover — best-effort
-                print(f"[close ingest err] {e}", file=sys.stderr)
-        # Phase 15 Plan 03 — session-close retention sweep trigger. Fires
-        # AFTER recorder.close() so the just-finished session's session.json
-        # is finalized (matches the data layout the sweep expects). Reads
-        # retention_days fresh in case the user changed it mid-session.
+        except Exception as exc:
+            print(f"[close recorder err] {exc}", file=sys.stderr)
         try:
             cfg_for_close_sweep = load_config()
             result_close = run_retention_sweep(recordings_root, cfg_for_close_sweep.retention_days)
             if result_close.deleted_names:
                 print(
-                    f"-> retention sweep (close): pruned "
-                    f"{len(result_close.deleted_names)} session(s) "
+                    f"-> retention sweep (close): pruned {len(result_close.deleted_names)} session(s) "
                     f"({result_close.bytes_pruned} bytes)"
                 )
-        except Exception as e:
-            print(f"[retention sweep close err] {e}", file=sys.stderr)
+        except Exception as exc:
+            print(f"[retention sweep close err] {exc}", file=sys.stderr)
         print("-> bye")
+    return
 
 
 # =============================================================================
@@ -4085,7 +3252,7 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_models.add_argument("--json", action="store_true")
     sp_models.add_argument(
         "--install",
-        choices=("clap", "cue"),
+        choices=("clap", "chatterbox", "required", "cue", "all"),
         default=None,
         help=(
             "download/install supported local model assets. 'clap' installs "

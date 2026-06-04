@@ -48,6 +48,7 @@ import signal
 import sys
 import time
 from collections import deque
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
@@ -185,6 +186,9 @@ class SessionLoop:
         active_recorder: object | None = None,
         evidence_registry: object | None = None,
         memory_ingest_enabled: bool = True,
+        session_start: Callable[[], Awaitable[None]] | None = None,
+        session_stop: Callable[[], Awaitable[None]] | None = None,
+        session_is_active: Callable[[], bool] | None = None,
     ) -> None:
         self.bus = bus
         self.config_store = config_store or load_config()
@@ -216,6 +220,9 @@ class SessionLoop:
         # ``insufficient_evidence`` instead of producing an empty profile
         # from a snapshot-less registry.
         self.evidence_registry = evidence_registry
+        self._session_start = session_start
+        self._session_stop = session_stop
+        self._session_is_active = session_is_active
 
         # Transient state
         self.muted: bool = False
@@ -268,6 +275,8 @@ class SessionLoop:
         (list / delete / events). recordings.usage is push-only — no inbound
         shape, no handler.
         """
+        self.bus.register_handler("ipc.session.start", self._on_session_start)
+        self.bus.register_handler("ipc.session.stop", self._on_session_stop)
         self.bus.register_handler("ipc.session.mute", self._on_session_mute)
         # Phase 97 / ONBOARD-01 — top-level mode picker (cohost/learn/build/debrief).
         # Persists via ConfigStore.extra so the next launch boots into the
@@ -309,6 +318,60 @@ class SessionLoop:
     # ------------------------------------------------------------------
     # Handlers
     # ------------------------------------------------------------------
+
+    def _session_active(self) -> bool:
+        if self._session_is_active is None:
+            return self._live_runtime_attached()
+        try:
+            return bool(self._session_is_active())
+        except Exception:
+            log.exception("session_is_active callback failed")
+            return False
+
+    async def _on_session_start(self, _msg: dict) -> None:
+        """Handle ``ipc.session.start`` — activate the live co-host graph.
+
+        There is intentionally no ack envelope in the frontend-owned schema:
+        the shell repaints optimistically and the runtime proves activation via
+        subsequent status/snapshot traffic. Duplicate Start is idempotent.
+        """
+        if self._session_start is None:
+            log.info("session.start ignored: no lifecycle callback wired")
+            return
+        if self._session_active():
+            return
+        try:
+            await self._session_start()
+        except Exception as exc:
+            log.exception("session.start failed")
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason=f"session.start failed: {type(exc).__name__}",
+                        original_type="ipc.session.start",
+                    ).to_json()
+                )
+            )
+
+    async def _on_session_stop(self, _msg: dict) -> None:
+        """Handle ``ipc.session.stop`` — park the co-host and release models."""
+        if self._session_stop is None:
+            log.info("session.stop ignored: no lifecycle callback wired")
+            return
+        if not self._session_active():
+            return
+        try:
+            await self._session_stop()
+        except Exception as exc:
+            log.exception("session.stop failed")
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason=f"session.stop failed: {type(exc).__name__}",
+                        original_type="ipc.session.stop",
+                    ).to_json()
+                )
+            )
 
     async def _on_session_mute(self, msg: dict) -> None:
         """Handle ``ipc.session.mute {toggle: true}`` — flip ``muted``,
@@ -1119,7 +1182,12 @@ class SessionLoop:
 
     def _live_runtime_attached(self) -> bool:
         """True when SessionLoop is acting as handlers for the full live app."""
-        return any(ref is not None for ref in (self.music_state, self.levels, self.playback_queue))
+        refs_attached = any(
+            ref is not None for ref in (self.music_state, self.levels, self.playback_queue)
+        )
+        if self._session_is_active is None:
+            return refs_attached
+        return refs_attached and self._session_active()
 
     # ------------------------------------------------------------------
     # Snapshot construction
@@ -1164,7 +1232,7 @@ class SessionLoop:
 
         # Cohost status — TALKING when AI voice meter is non-trivial,
         # LISTENING when audible music + no AI voice, else IDLE.
-        if self.music_state is None:
+        if self.music_state is None or not self._session_active():
             cohost_status: str = "IDLE"
             grounded = False
             bpm: float | None = None
