@@ -56,7 +56,7 @@ Your audio doesn't leave your machine without you knowing. The vibemix client is
 
 ---
 
-**A real DJ friend in your ear — no AI slop.** vibemix listens to your master output, watches your DJ software's screen, ingests your controller, and talks back into your headphones in a way that's grounded in what you actually just did. Not generic "AI assistant" commentary. Not hallucinated track names. Not late reactions to events that already passed. Built by [Bravoh](https://altidus.world) as a commercial product with an Apache-licensed client.
+**A real DJ friend in your ear — no AI slop.** vibemix listens to your master output, watches your DJ software's screen, ingests your controller, and talks back into your headphones in a way that's grounded in what you actually just did. Not generic "AI assistant" commentary. Not hallucinated track names. Not late reactions to events that already passed. Built by [Bravoh](https://bravoh.ai) as a commercial product with an Apache-licensed client.
 
 > **Audio privacy in one line:** live audio is streamed to Bravoh's Gemini proxy for analysis; library embeddings stay local. Recordings stay on your machine. See [FAQ](#faq) for the long version.
 
@@ -300,11 +300,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Three paths: bug fixes (standard PR with
 
 ---
 
-## Built by [Bravoh](https://altidus.world)
+## Built by [Bravoh](https://bravoh.ai)
 
 vibemix is a Bravoh product with an Apache-licensed client and a managed hosted service. If you like the energy here, the AI creative team for music artists is over there:
 
-[**altidus.world →**](https://altidus.world/vibemix?utm_source=github&utm_medium=repo&utm_campaign=vibemix_launch)
+[**bravoh.ai →**](https://bravoh.ai/vibemix?utm_source=github&utm_medium=repo&utm_campaign=vibemix_launch)
 
 ---
 
