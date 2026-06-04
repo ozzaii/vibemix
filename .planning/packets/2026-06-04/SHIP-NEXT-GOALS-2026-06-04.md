@@ -17,7 +17,7 @@ The whole-system fresh-eye map landed (`SHIP-MAP-MASTER.md`, committed `d1b925db
 
 ## Owner decisions Kaan must make (gate the path)
 
-- **D1 — `mlx-audio` as a `pyproject.toml` extra.** Required by locked decision #1 (Chatterbox is the only voice). It is Apple-only and reintroduces transformers 5.x to the deliberately torch-free/transformers-free project. This is the direct consequence of the voice you already locked; confirm and the backend-boot lane executes it. WITHOUT it `chatterbox_available()=False` forever and no human hears the voice.
+- **D1 — `mlx-audio` as a `pyproject.toml` extra. ✅ RESOLVED (Kaan 2026-06-04: "1 gb is cool"):** APPROVED. Ship the **8bit** model (`mlx-community/chatterbox-turbo-8bit`, 675MB) — no need to drop to 4bit. Total footprint ~1.0–1.1GB (403MB deps incl. transformers 5.x but NO torch + 675MB model + 720KB ref). Measured: deps `mlx` 189M / `scipy` 82M / `transformers` 49M / `numpy` 24M. ONNX path rejected (5.7GB AND benched-dead live on Mac: CPU 1.3–2.5s TTFT, CoreML vocoder fails). The backend-boot lane executes immediately, no further gate.
 - **D2 — the "no API-key surface" CI gate vs the BYO key field.** `tests/security/test_no_api_key_surface.py` fails on the in-GUI Gemini key field shipped under locked decision #2. The gate (Phase-33 "never ship a key surface") and the BYO field are in head-on conflict. Retire or scope-narrow the gate (1-test policy call). Blocks `full-test-matrix` CI → blocks a tag.
 - **D3 — Windows v1 scope.** macOS-arm64 is the only platform with a real PKG path; macOS-Intel + Windows are PKG=0 (placeholders, need an NVIDIA box + GPU backend + SignPath). Ship arm64-only, +Intel, or hold for Windows?
 
@@ -27,19 +27,32 @@ The whole-system fresh-eye map landed (`SHIP-MAP-MASTER.md`, committed `d1b925db
 ```
 /goal SHIP-WIRE — make the locked Chatterbox voice REACHABLE on a packaged launch. The source-side
 MOSS-nuke + Chatterbox-only tts_chain already landed; the voice is still voiceless because mlx_audio is
-not installed and not a dependency, and the ref clip is unbundled. Bounded piece:
-(1) Add `mlx-audio` as a `pyproject.toml` extra (Apple-only; gated import, no hard dep on non-Apple).
-(2) Bundle `cohost_voice_ref.wav` as a PyInstaller `datas` asset in vibemix-core.macos.spec; point
-    agent/chatterbox_tts.py resolve_ref_path() at the bundled path (fallback to the dev-cache path).
-(3) Env-seed os.environ.setdefault("VIBEMIX_TTS_ENGINE", cfg.tts_engine) at __main__.py:~1420 +
+not installed and not a dependency, and the ref clip is unbundled. DISTRIBUTION (Kaan-decided): the
+~400MB Python deps + the 720KB ref clip ride IN the DMG (PyInstaller, unavoidable); the 675MB 8bit MODEL
+is NOT in the DMG — it is FIRST-RUN fetched from HF hub (the repo is public; mlx_audio.load_model already
+auto-downloads it at chatterbox_tts.py:154), pre-fetched via the wizard with progress, NEVER mid-set.
+Bounded piece:
+(1) Add `mlx-audio` as a `pyproject.toml` extra, 8bit model (Kaan-approved ~1GB; Apple-only; gated
+    import, no hard dep on non-Apple).
+(2) Bundle `cohost_voice_ref.wav` as a PyInstaller `datas` asset in vibemix-core.macos.spec at
+    models/chatterbox/cohost_voice_ref.wav; chatterbox_tts.py:46 already defines that bundled path —
+    make resolve_ref_path() prefer it, fall back to the dev-cache path.
+(3) Add `install_chatterbox_model()` to library/model_assets.py + register in the `library models
+    --install chatterbox|all` CLI + ModelProgress callback (mirror install_clap_model/install_moss_model)
+    so the 675MB weights pre-fetch with a progress bar + a pinned HF revision + an actionable offline
+    message — NOT a silent first-generate() stall. Trigger it once from the wizard (download before the
+    first set); offline -> voiceless banner, then pre-warm once on disk.
+(4) Env-seed os.environ.setdefault("VIBEMIX_TTS_ENGINE", cfg.tts_engine) at __main__.py:~1420 +
     in the packaged-defaults path (launchd/Dock strip VIBEMIX_*; this is the "always silent" root cause).
-(4) Swap the release gate --require-moss-source -> --require-chatterbox-source across
-    scripts/dist/pretag_check.sh + .github/workflows/release.yml (every site).
-PROOF (by-ear, not test-green): on a packaged-style launch reading config.json (NOT env),
-chatterbox_available() is True and the cohost speaks in the pranker voice; grep shows no MOSS gate left.
-ISLAND: pyproject.toml + vibemix-core.macos.spec + agent/chatterbox_tts.py + __main__.py(env-seed only)
-+ the dist scripts. STOP PROTOCOL applies. git add <exact paths> NEVER -A; socket 8765 one (pkill before
-probe); commit -s Kaan Özkan <rahipdotaci@gmail.com>.
+(5) Swap the release gate --require-moss-source -> --require-chatterbox-source across
+    scripts/dist/pretag_check.sh + .github/workflows/release.yml (every site) — verify the chatterbox HF
+    repo + pinned revision (no self-hosted archive; simpler than MOSS).
+PROOF (by-ear, not test-green): on a packaged-style launch reading config.json (NOT env), after the
+wizard fetch chatterbox_available() is True and the cohost speaks in the pranker voice; grep shows no
+MOSS gate left. ISLAND: pyproject.toml + vibemix-core.macos.spec + agent/chatterbox_tts.py +
+library/model_assets.py + the wizard install trigger + __main__.py(env-seed only) + the dist scripts.
+STOP PROTOCOL applies. git add <exact paths> NEVER -A; socket 8765 one (pkill before probe);
+commit -s Kaan Özkan <rahipdotaci@gmail.com>.
 ```
 
 ### KEYSTONE lane (owns `main()`) → START GATE backend handler (#2, sequence behind/with #1)
