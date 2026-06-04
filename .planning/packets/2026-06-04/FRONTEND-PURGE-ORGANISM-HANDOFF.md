@@ -100,3 +100,37 @@ IS the live overlay (ws_bus + CI mascot-audit). Keep it. The organism uses it.
 `cd tauri/ui && npm run build && npm test` · `npm run codegen:ipc` after schema edits ·
 `npm run test:e2e:mascot` for the organism receipt · `uv run pytest -q <paths>` for Python ·
 `vibemix-grounding-review` skill before shipping co-host/learn/tutor wiring.
+
+## SESSION 2 UPDATE (2026-06-04 cont.) — closed 2 open items + 1 build-fix
+- **`6538cf51` fix(build):** the tsc gate (`npm run build`) had been RED since
+  `5a7bdb05` — `tests/mascot/browser-organism-probe.pw.ts` is in the tsc include
+  surface and imported `pngjs` (no types) + indexed a `Buffer` under
+  noUncheckedIndexedAccess. vitest + the Playwright runner both skip full-project
+  tsc, so it rode in unseen. Fixed with an ambient `pngjs` decl + `?? 0` floor.
+  **Lesson: run `npx tsc --noEmit` (not just vitest) before claiming build-green.**
+- **`68a2f4d6` OPEN ITEM #4 DONE — settings trust-rail purge.** Stripped the
+  "How Sven listens" board + 4 trust cells + 2 deferred-notes + dead CSS from
+  `src/settings/SettingsDrawer.ts` (handoff path was STALE: it's `src/settings/`
+  not `src/session/`), pruned the 8 `settings.trust*`/`*.deferred-note`
+  contract wires + purposes, deleted 3 obsolete specs. The "group rose dots"
+  half of #4 was already gone (`46ead19e`). Drawer opens straight on PERSONA;
+  by-eye verified on `?dev=session-mock`. 437 deletions, atomic.
+- **`dc7f69e4` OPEN ITEM #3 DONE — knob needle.** Not a missing-element build:
+  the index marker already existed + rotated, it was just indistinct (same thin
+  currentColor as the dial). Classed each rotary marker `.knob-indicator`
+  (110 markers, 10 SVGs) → bolder round-cap pointer + eased group-rotate.
+  Stays currentColor → lights rose ONLY on the taught knob (cue-color path),
+  never a splatter. ACCENT CORRECTION: rose `--brand`, NOT the stale
+  frontend-enforcement amber (DESIGN.md "Forged Obsidian Chrome" supersedes v5).
+  `_generic` is labeled-zone (no knobs) → untouched. By-eye proven on learn.html.
+- **OPEN ITEM #5 typeset = KAAN DECISION, not shipped.** Verified `--type-step-N`
+  is library-local (9 uses in library.css only), so the sub-1.25 ratio is not a
+  global violation; DESIGN.md's hierarchy is deliberately axis-driven (tight
+  sizes), so forcing ≥1.25 would fight the just-rebuilt Crate. The real work
+  (Saira→Geist, the documented Phase-1b target) is hard-gated: WOFF2 vendor +
+  `design-slop-gate` ALLOWED_FONTS amend + a PRODUCT.md override + wordmark
+  licensing (NHG is trial). No clean blind win — left for Kaan's font call.
+- **Still open (unchanged):** #1 git-bundle (`87d0f7bc`), #2 organism rig
+  verification (Kaan's rig), the SVG `_generic` and the static-dial-tick polish
+  (a future enhancement; the pointer ships without printed dial ticks — up=center
+  reads by convention).
