@@ -1,0 +1,3447 @@
+{
+  "claim_gate": {
+    "evaluation_complete_rows": 0,
+    "final_precision_recall_claim_allowed": false,
+    "min_required_rows": 50,
+    "reason": "needs_50_complete_holdout_rows_for_final_claim"
+  },
+  "comparison": null,
+  "generated_at": "2026-06-04T11:16:17+00:00",
+  "git_head": "ff5015e5b1668054355d30907cc2101821d90779",
+  "label_set": {
+    "calibration_rows": 0,
+    "calibration_strategy": null,
+    "complete_rows": 0,
+    "enough_complete_eval_rows": false,
+    "evaluation_complete_rows": 0,
+    "evaluation_rows": 0,
+    "hook": "create eval/private/library/auto_tag_labels.jsonl with track_id + mood/texture/instrument tags",
+    "min_required_rows": 50,
+    "path": "/Users/ozai/projects/dj-set-ai/eval/private/library/auto_tag_labels.jsonl",
+    "pending_rows": 0,
+    "status": "missing",
+    "unknown_tags": {},
+    "usable_rows": 0
+  },
+  "label_template": {
+    "path": ".planning/eval-runs/library-auto-tags-claim-gate-20260604/auto_tag_label_template.jsonl",
+    "private_path_written": "/tmp/vibemix-auto-tag-private-review-claim-gate.jsonl",
+    "row_count": 64,
+    "rows": [
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.026478,
+            "reason": "accepted",
+            "runner_up_score": 0.527903,
+            "runner_up_tag": "bassline",
+            "score": 0.554382,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.104122,
+            "reason": "accepted",
+            "runner_up_score": 0.503005,
+            "runner_up_tag": "hypnotic",
+            "score": 0.607127,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.018261,
+            "reason": "accepted",
+            "runner_up_score": 0.497613,
+            "runner_up_tag": "percussive",
+            "score": 0.515874,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:039030678757825e"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.007038,
+            "reason": "tie_margin",
+            "runner_up_score": 0.495062,
+            "runner_up_tag": "acid_synth",
+            "score": 0.5021,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.039795,
+            "reason": "accepted",
+            "runner_up_score": 0.504955,
+            "runner_up_tag": "hypnotic",
+            "score": 0.54475,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.001425,
+            "reason": "tie_margin",
+            "runner_up_score": 0.468024,
+            "runner_up_tag": "percussive",
+            "score": 0.469449,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:000e62e62ec60bdd"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.024322,
+            "reason": "accepted",
+            "runner_up_score": 0.377216,
+            "runner_up_tag": "guitar",
+            "score": 0.401537,
+            "tag": "bassline",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.005145,
+            "reason": "tie_margin",
+            "runner_up_score": 0.517829,
+            "runner_up_tag": "hypnotic",
+            "score": 0.522974,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.001904,
+            "reason": "tie_margin",
+            "runner_up_score": 0.414125,
+            "runner_up_tag": "polished",
+            "score": 0.41603,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:021ab63321fbeb33"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.024664,
+            "reason": "accepted",
+            "runner_up_score": 0.510441,
+            "runner_up_tag": "acid_synth",
+            "score": 0.535105,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.027083,
+            "reason": "accepted",
+            "runner_up_score": 0.561552,
+            "runner_up_tag": "hypnotic",
+            "score": 0.588635,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.031938,
+            "reason": "accepted",
+            "runner_up_score": 0.448215,
+            "runner_up_tag": "distorted",
+            "score": 0.480153,
+            "tag": "percussive",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:069af44d4b4060ea"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.048813,
+            "reason": "accepted",
+            "runner_up_score": 0.300231,
+            "runner_up_tag": "bassline",
+            "score": 0.349045,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.119282,
+            "reason": "accepted",
+            "runner_up_score": 0.262342,
+            "runner_up_tag": "hypnotic",
+            "score": 0.381624,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.022201,
+            "reason": "accepted",
+            "runner_up_score": 0.341619,
+            "runner_up_tag": "polished",
+            "score": 0.36382,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:080e7b38f74eeade"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.046622,
+            "reason": "accepted",
+            "runner_up_score": 0.334133,
+            "runner_up_tag": "bassline",
+            "score": 0.380755,
+            "tag": "drums",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.006175,
+            "reason": "tie_margin",
+            "runner_up_score": 0.319283,
+            "runner_up_tag": "euphoric",
+            "score": 0.325458,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.110111,
+            "reason": "accepted",
+            "runner_up_score": 0.307282,
+            "runner_up_tag": "polished",
+            "score": 0.417393,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:0b6720458d4f47f9"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.051535,
+            "reason": "accepted",
+            "runner_up_score": 0.445947,
+            "runner_up_tag": "acid_synth",
+            "score": 0.497482,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.001353,
+            "reason": "tie_margin",
+            "runner_up_score": 0.486929,
+            "runner_up_tag": "euphoric",
+            "score": 0.488282,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.031778,
+            "reason": "accepted",
+            "runner_up_score": 0.350886,
+            "runner_up_tag": "percussive",
+            "score": 0.382664,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:036f1f0cce812abf"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.066645,
+            "reason": "accepted",
+            "runner_up_score": 0.344495,
+            "runner_up_tag": "acid_synth",
+            "score": 0.41114,
+            "tag": "vocal",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.061735,
+            "reason": "accepted",
+            "runner_up_score": 0.376416,
+            "runner_up_tag": "dark",
+            "score": 0.438151,
+            "tag": "aggressive",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.114465,
+            "reason": "accepted",
+            "runner_up_score": 0.287499,
+            "runner_up_tag": "distorted",
+            "score": 0.401964,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:0c12e4e1fd6bb83f"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.085847,
+            "reason": "accepted",
+            "runner_up_score": 0.295372,
+            "runner_up_tag": "piano",
+            "score": 0.381219,
+            "tag": "guitar",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.031939,
+            "reason": "accepted",
+            "runner_up_score": 0.349482,
+            "runner_up_tag": "aggressive",
+            "score": 0.381422,
+            "tag": "dark",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.078029,
+            "reason": "accepted",
+            "runner_up_score": 0.117686,
+            "runner_up_tag": "airy",
+            "score": 0.195715,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:43db6cf1041ef185"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.028183,
+            "reason": "accepted",
+            "runner_up_score": 0.421049,
+            "runner_up_tag": "acid_synth",
+            "score": 0.449232,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.007008,
+            "reason": "tie_margin",
+            "runner_up_score": 0.510735,
+            "runner_up_tag": "euphoric",
+            "score": 0.517743,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.024564,
+            "reason": "accepted",
+            "runner_up_score": 0.40689,
+            "runner_up_tag": "polished",
+            "score": 0.431454,
+            "tag": "percussive",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:29c761030bf8360c"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.054779,
+            "reason": "accepted",
+            "runner_up_score": 0.302026,
+            "runner_up_tag": "bassline",
+            "score": 0.356805,
+            "tag": "drums",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.098597,
+            "reason": "accepted",
+            "runner_up_score": 0.325118,
+            "runner_up_tag": "hypnotic",
+            "score": 0.423715,
+            "tag": "aggressive",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.006181,
+            "reason": "tie_margin",
+            "runner_up_score": 0.26452,
+            "runner_up_tag": "raw",
+            "score": 0.270701,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:1f290acbdd388aea"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.034521,
+            "reason": "accepted",
+            "runner_up_score": 0.428687,
+            "runner_up_tag": "acid_synth",
+            "score": 0.463208,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.033615,
+            "reason": "accepted",
+            "runner_up_score": 0.514623,
+            "runner_up_tag": "euphoric",
+            "score": 0.548238,
+            "tag": "hypnotic",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.00967,
+            "reason": "tie_margin",
+            "runner_up_score": 0.426189,
+            "runner_up_tag": "airy",
+            "score": 0.435859,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:2371192d75589811"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.038994,
+            "reason": "accepted",
+            "runner_up_score": 0.310694,
+            "runner_up_tag": "drums",
+            "score": 0.349689,
+            "tag": "bassline",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.009522,
+            "reason": "tie_margin",
+            "runner_up_score": 0.404424,
+            "runner_up_tag": "aggressive",
+            "score": 0.413946,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.01964,
+            "reason": "accepted",
+            "runner_up_score": 0.325849,
+            "runner_up_tag": "percussive",
+            "score": 0.345489,
+            "tag": "raw",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:0fb2fecabaaf8a66"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.001994,
+            "reason": "tie_margin",
+            "runner_up_score": 0.304353,
+            "runner_up_tag": "drums",
+            "score": 0.306347,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.0592,
+            "reason": "accepted",
+            "runner_up_score": 0.28299,
+            "runner_up_tag": "aggressive",
+            "score": 0.34219,
+            "tag": "dark",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.075207,
+            "reason": "accepted",
+            "runner_up_score": 0.115293,
+            "runner_up_tag": "percussive",
+            "score": 0.190499,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:21afa9434311294e"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.064039,
+            "reason": "accepted",
+            "runner_up_score": 0.273592,
+            "runner_up_tag": "piano",
+            "score": 0.337632,
+            "tag": "guitar",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.029983,
+            "reason": "accepted",
+            "runner_up_score": 0.461443,
+            "runner_up_tag": "tense",
+            "score": 0.491426,
+            "tag": "dreamy",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.039082,
+            "reason": "accepted",
+            "runner_up_score": 0.369542,
+            "runner_up_tag": "atmospheric",
+            "score": 0.408624,
+            "tag": "raw",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:53eeaac15dc29004"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.039975,
+            "reason": "accepted",
+            "runner_up_score": 0.230204,
+            "runner_up_tag": "pads",
+            "score": 0.27018,
+            "tag": "drums",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.026067,
+            "reason": "accepted",
+            "runner_up_score": 0.277034,
+            "runner_up_tag": "euphoric",
+            "score": 0.303101,
+            "tag": "hypnotic",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.019795,
+            "reason": "accepted",
+            "runner_up_score": 0.277755,
+            "runner_up_tag": "polished",
+            "score": 0.29755,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:232a0aac5ba8ec47"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.019888,
+            "reason": "accepted",
+            "runner_up_score": 0.280843,
+            "runner_up_tag": "bassline",
+            "score": 0.300731,
+            "tag": "drums",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.021552,
+            "reason": "accepted",
+            "runner_up_score": 0.329213,
+            "runner_up_tag": "euphoric",
+            "score": 0.350766,
+            "tag": "hypnotic",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.035634,
+            "reason": "accepted",
+            "runner_up_score": 0.304793,
+            "runner_up_tag": "polished",
+            "score": 0.340427,
+            "tag": "percussive",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:405fb2006de99d24"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.029893,
+            "reason": "accepted",
+            "runner_up_score": 0.251413,
+            "runner_up_tag": "bassline",
+            "score": 0.281306,
+            "tag": "guitar",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.010529,
+            "reason": "tie_margin",
+            "runner_up_score": 0.34045,
+            "runner_up_tag": "aggressive",
+            "score": 0.350979,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.025921,
+            "reason": "accepted",
+            "runner_up_score": 0.264988,
+            "runner_up_tag": "atmospheric",
+            "score": 0.290909,
+            "tag": "airy",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:6542e2450d71fd48"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.017064,
+            "reason": "accepted",
+            "runner_up_score": 0.495238,
+            "runner_up_tag": "pads",
+            "score": 0.512301,
+            "tag": "piano",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.022808,
+            "reason": "accepted",
+            "runner_up_score": 0.542509,
+            "runner_up_tag": "euphoric",
+            "score": 0.565317,
+            "tag": "tense",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.025816,
+            "reason": "accepted",
+            "runner_up_score": 0.410714,
+            "runner_up_tag": "atmospheric",
+            "score": 0.43653,
+            "tag": "airy",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:3758bf1045fb526a"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.004695,
+            "reason": "tie_margin",
+            "runner_up_score": 0.225809,
+            "runner_up_tag": "guitar",
+            "score": 0.230504,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.028904,
+            "reason": "accepted",
+            "runner_up_score": 0.249399,
+            "runner_up_tag": "hypnotic",
+            "score": 0.278304,
+            "tag": "aggressive",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.03135,
+            "reason": "accepted",
+            "runner_up_score": 0.236806,
+            "runner_up_tag": "atmospheric",
+            "score": 0.268156,
+            "tag": "metallic",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:2528310543238cfb"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.032138,
+            "reason": "accepted",
+            "runner_up_score": 0.342593,
+            "runner_up_tag": "guitar",
+            "score": 0.374731,
+            "tag": "bassline",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.035181,
+            "reason": "accepted",
+            "runner_up_score": 0.433658,
+            "runner_up_tag": "hypnotic",
+            "score": 0.468838,
+            "tag": "dark",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.016945,
+            "reason": "accepted",
+            "runner_up_score": 0.399518,
+            "runner_up_tag": "distorted",
+            "score": 0.416463,
+            "tag": "raw",
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:37ef3f2c51b07950"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.010078,
+            "reason": "tie_margin",
+            "runner_up_score": 0.305417,
+            "runner_up_tag": "piano",
+            "score": 0.315494,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.016662,
+            "reason": "accepted",
+            "runner_up_score": 0.386302,
+            "runner_up_tag": "dreamy",
+            "score": 0.402964,
+            "tag": "hypnotic",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.02148,
+            "reason": "accepted",
+            "runner_up_score": 0.318488,
+            "runner_up_tag": "airy",
+            "score": 0.339968,
+            "tag": "atmospheric",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:59de2f443c6c81d2"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.015726,
+            "reason": "accepted",
+            "runner_up_score": 0.165668,
+            "runner_up_tag": "acid_synth",
+            "score": 0.181394,
+            "tag": "vocal",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.003932,
+            "reason": "tie_margin",
+            "runner_up_score": 0.258308,
+            "runner_up_tag": "tense",
+            "score": 0.26224,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.034962,
+            "reason": "accepted",
+            "runner_up_score": 0.208909,
+            "runner_up_tag": "percussive",
+            "score": 0.243871,
+            "tag": "atmospheric",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:1dd578b876c879d6"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.009492,
+            "reason": "tie_margin",
+            "runner_up_score": 0.287406,
+            "runner_up_tag": "piano",
+            "score": 0.296898,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.002558,
+            "reason": "tie_margin",
+            "runner_up_score": 0.245628,
+            "runner_up_tag": "dreamy",
+            "score": 0.248187,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.056344,
+            "reason": "accepted",
+            "runner_up_score": 0.302839,
+            "runner_up_tag": "atmospheric",
+            "score": 0.359183,
+            "tag": "warm",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:41fb359475d2a355"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.001468,
+            "reason": "tie_margin",
+            "runner_up_score": 0.551557,
+            "runner_up_tag": "acid_synth",
+            "score": 0.553025,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.080029,
+            "reason": "accepted",
+            "runner_up_score": 0.486417,
+            "runner_up_tag": "dark",
+            "score": 0.566446,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.016616,
+            "reason": "accepted",
+            "runner_up_score": 0.496034,
+            "runner_up_tag": "distorted",
+            "score": 0.51265,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:05b7cebb505a50e9"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.046953,
+            "reason": "accepted",
+            "runner_up_score": 0.504875,
+            "runner_up_tag": "acid_synth",
+            "score": 0.551828,
+            "tag": "piano",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.016041,
+            "reason": "accepted",
+            "runner_up_score": 0.512684,
+            "runner_up_tag": "aggressive",
+            "score": 0.528725,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.010142,
+            "reason": "tie_margin",
+            "runner_up_score": 0.384235,
+            "runner_up_tag": "distorted",
+            "score": 0.394378,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:0b3f8426dce43071"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.001826,
+            "reason": "tie_margin",
+            "runner_up_score": 0.500168,
+            "runner_up_tag": "piano",
+            "score": 0.501994,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.005694,
+            "reason": "tie_margin",
+            "runner_up_score": 0.524031,
+            "runner_up_tag": "tense",
+            "score": 0.529724,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.002296,
+            "reason": "tie_margin",
+            "runner_up_score": 0.424098,
+            "runner_up_tag": "distorted",
+            "score": 0.426393,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:0e26fa5ca0f7d3f3"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.035805,
+            "reason": "accepted",
+            "runner_up_score": 0.452008,
+            "runner_up_tag": "piano",
+            "score": 0.487813,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.015423,
+            "reason": "accepted",
+            "runner_up_score": 0.503341,
+            "runner_up_tag": "tense",
+            "score": 0.518764,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.022981,
+            "reason": "accepted",
+            "runner_up_score": 0.420306,
+            "runner_up_tag": "polished",
+            "score": 0.443287,
+            "tag": "percussive",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:3ee4d2438994fc22"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.073271,
+            "reason": "accepted",
+            "runner_up_score": 0.467827,
+            "runner_up_tag": "piano",
+            "score": 0.541098,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.135098,
+            "reason": "accepted",
+            "runner_up_score": 0.437689,
+            "runner_up_tag": "hypnotic",
+            "score": 0.572787,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.01842,
+            "reason": "accepted",
+            "runner_up_score": 0.474783,
+            "runner_up_tag": "polished",
+            "score": 0.493203,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:0ce38787dff069e2"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.053595,
+            "reason": "accepted",
+            "runner_up_score": 0.328335,
+            "runner_up_tag": "pads",
+            "score": 0.381931,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.014992,
+            "reason": "tie_margin",
+            "runner_up_score": 0.462389,
+            "runner_up_tag": "dark",
+            "score": 0.477381,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.039792,
+            "reason": "accepted",
+            "runner_up_score": 0.385737,
+            "runner_up_tag": "polished",
+            "score": 0.425529,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:293e9eaa51b8f1cc"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.040239,
+            "reason": "accepted",
+            "runner_up_score": 0.460512,
+            "runner_up_tag": "bassline",
+            "score": 0.500751,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.002678,
+            "reason": "tie_margin",
+            "runner_up_score": 0.522002,
+            "runner_up_tag": "hypnotic",
+            "score": 0.52468,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.055706,
+            "reason": "accepted",
+            "runner_up_score": 0.404499,
+            "runner_up_tag": "percussive",
+            "score": 0.460205,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:109a958609ad4288"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.050738,
+            "reason": "accepted",
+            "runner_up_score": 0.230815,
+            "runner_up_tag": "pads",
+            "score": 0.281552,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.082242,
+            "reason": "accepted",
+            "runner_up_score": 0.372713,
+            "runner_up_tag": "hypnotic",
+            "score": 0.454955,
+            "tag": "aggressive",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.058781,
+            "reason": "accepted",
+            "runner_up_score": 0.272271,
+            "runner_up_tag": "distorted",
+            "score": 0.331052,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:2273c3a60df2a75e"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.008785,
+            "reason": "tie_margin",
+            "runner_up_score": 0.337914,
+            "runner_up_tag": "vocal",
+            "score": 0.346699,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.082617,
+            "reason": "accepted",
+            "runner_up_score": 0.466484,
+            "runner_up_tag": "aggressive",
+            "score": 0.549102,
+            "tag": "dark",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.016837,
+            "reason": "accepted",
+            "runner_up_score": 0.354059,
+            "runner_up_tag": "percussive",
+            "score": 0.370896,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:78ff8b5af37f4e1a"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.042656,
+            "reason": "accepted",
+            "runner_up_score": 0.441656,
+            "runner_up_tag": "acid_synth",
+            "score": 0.484312,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.011049,
+            "reason": "tie_margin",
+            "runner_up_score": 0.504346,
+            "runner_up_tag": "tense",
+            "score": 0.515396,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.030306,
+            "reason": "accepted",
+            "runner_up_score": 0.414335,
+            "runner_up_tag": "airy",
+            "score": 0.444641,
+            "tag": "percussive",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:62a79354a786a565"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.000249,
+            "reason": "tie_margin",
+            "runner_up_score": 0.344325,
+            "runner_up_tag": "drums",
+            "score": 0.344574,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.075036,
+            "reason": "accepted",
+            "runner_up_score": 0.305821,
+            "runner_up_tag": "hypnotic",
+            "score": 0.380857,
+            "tag": "aggressive",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.014478,
+            "reason": "tie_margin",
+            "runner_up_score": 0.342239,
+            "runner_up_tag": "percussive",
+            "score": 0.356717,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:38715245eb73f691"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.00542,
+            "reason": "tie_margin",
+            "runner_up_score": 0.179279,
+            "runner_up_tag": "acid_synth",
+            "score": 0.184699,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.04881,
+            "reason": "accepted",
+            "runner_up_score": 0.258505,
+            "runner_up_tag": "tense",
+            "score": 0.307314,
+            "tag": "hypnotic",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.010962,
+            "reason": "tie_margin",
+            "runner_up_score": 0.172512,
+            "runner_up_tag": "polished",
+            "score": 0.183474,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:5ea7b67594ea630b"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.029806,
+            "reason": "accepted",
+            "runner_up_score": 0.298958,
+            "runner_up_tag": "vocal",
+            "score": 0.328764,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.005124,
+            "reason": "tie_margin",
+            "runner_up_score": 0.361052,
+            "runner_up_tag": "hypnotic",
+            "score": 0.366176,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.021385,
+            "reason": "accepted",
+            "runner_up_score": 0.338316,
+            "runner_up_tag": "distorted",
+            "score": 0.3597,
+            "tag": "raw",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:330b58fb19ff2074"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.006202,
+            "reason": "tie_margin",
+            "runner_up_score": 0.330798,
+            "runner_up_tag": "pads",
+            "score": 0.337,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.059526,
+            "reason": "accepted",
+            "runner_up_score": 0.456846,
+            "runner_up_tag": "dreamy",
+            "score": 0.516373,
+            "tag": "dark",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.015933,
+            "reason": "accepted",
+            "runner_up_score": 0.353529,
+            "runner_up_tag": "polished",
+            "score": 0.369462,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:680d73340238fbe0"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.081389,
+            "reason": "accepted",
+            "runner_up_score": 0.318866,
+            "runner_up_tag": "piano",
+            "score": 0.400256,
+            "tag": "guitar",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.041723,
+            "reason": "accepted",
+            "runner_up_score": 0.292833,
+            "runner_up_tag": "dark",
+            "score": 0.334557,
+            "tag": "dreamy",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.080152,
+            "reason": "accepted",
+            "runner_up_score": 0.258287,
+            "runner_up_tag": "atmospheric",
+            "score": 0.338438,
+            "tag": "raw",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:8a4591d6af152d42"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.056475,
+            "reason": "accepted",
+            "runner_up_score": 0.35153,
+            "runner_up_tag": "bassline",
+            "score": 0.408005,
+            "tag": "drums",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.086704,
+            "reason": "accepted",
+            "runner_up_score": 0.316982,
+            "runner_up_tag": "euphoric",
+            "score": 0.403686,
+            "tag": "hypnotic",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.037839,
+            "reason": "accepted",
+            "runner_up_score": 0.360283,
+            "runner_up_tag": "percussive",
+            "score": 0.398122,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:7805fe49e4f12823"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.035835,
+            "reason": "accepted",
+            "runner_up_score": 0.405873,
+            "runner_up_tag": "acid_synth",
+            "score": 0.441707,
+            "tag": "bassline",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.041544,
+            "reason": "accepted",
+            "runner_up_score": 0.518787,
+            "runner_up_tag": "tense",
+            "score": 0.560331,
+            "tag": "hypnotic",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.016642,
+            "reason": "accepted",
+            "runner_up_score": 0.434443,
+            "runner_up_tag": "polished",
+            "score": 0.451085,
+            "tag": "percussive",
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:41b6f481a2067a40"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.03656,
+            "reason": "accepted",
+            "runner_up_score": 0.4494,
+            "runner_up_tag": "piano",
+            "score": 0.485959,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.010115,
+            "reason": "tie_margin",
+            "runner_up_score": 0.522744,
+            "runner_up_tag": "tense",
+            "score": 0.532859,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.025807,
+            "reason": "accepted",
+            "runner_up_score": 0.446645,
+            "runner_up_tag": "percussive",
+            "score": 0.472453,
+            "tag": "airy",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:b6744a1300fdaf4d"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.06695,
+            "reason": "accepted",
+            "runner_up_score": 0.349697,
+            "runner_up_tag": "piano",
+            "score": 0.416647,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.042789,
+            "reason": "accepted",
+            "runner_up_score": 0.436167,
+            "runner_up_tag": "hypnotic",
+            "score": 0.478956,
+            "tag": "tense",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.034671,
+            "reason": "accepted",
+            "runner_up_score": 0.332817,
+            "runner_up_tag": "atmospheric",
+            "score": 0.367488,
+            "tag": "airy",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:3e70f10102ab1d1c"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.061748,
+            "reason": "accepted",
+            "runner_up_score": 0.507808,
+            "runner_up_tag": "bassline",
+            "score": 0.569556,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.072695,
+            "reason": "accepted",
+            "runner_up_score": 0.502765,
+            "runner_up_tag": "aggressive",
+            "score": 0.57546,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.083927,
+            "reason": "accepted",
+            "runner_up_score": 0.479015,
+            "runner_up_tag": "distorted",
+            "score": 0.562942,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:06e217cb5b4d49a9"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.009875,
+            "reason": "tie_margin",
+            "runner_up_score": 0.558833,
+            "runner_up_tag": "acid_synth",
+            "score": 0.568708,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.101149,
+            "reason": "accepted",
+            "runner_up_score": 0.525885,
+            "runner_up_tag": "hypnotic",
+            "score": 0.627035,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.008379,
+            "reason": "tie_margin",
+            "runner_up_score": 0.48685,
+            "runner_up_tag": "percussive",
+            "score": 0.495229,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:0cde010c05663d3f"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.068305,
+            "reason": "accepted",
+            "runner_up_score": 0.443086,
+            "runner_up_tag": "acid_synth",
+            "score": 0.511391,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.003887,
+            "reason": "tie_margin",
+            "runner_up_score": 0.513866,
+            "runner_up_tag": "hypnotic",
+            "score": 0.517753,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.003061,
+            "reason": "tie_margin",
+            "runner_up_score": 0.390985,
+            "runner_up_tag": "airy",
+            "score": 0.394046,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:10f1cd31ec06163d"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.036053,
+            "reason": "accepted",
+            "runner_up_score": 0.387225,
+            "runner_up_tag": "piano",
+            "score": 0.423278,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.022279,
+            "reason": "accepted",
+            "runner_up_score": 0.448742,
+            "runner_up_tag": "hypnotic",
+            "score": 0.471021,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.050158,
+            "reason": "accepted",
+            "runner_up_score": 0.390496,
+            "runner_up_tag": "airy",
+            "score": 0.440654,
+            "tag": "percussive",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:4090678846f29b35"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.064913,
+            "reason": "accepted",
+            "runner_up_score": 0.149299,
+            "runner_up_tag": "piano",
+            "score": 0.214212,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.159866,
+            "reason": "accepted",
+            "runner_up_score": 0.25952,
+            "runner_up_tag": "dark",
+            "score": 0.419385,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.020977,
+            "reason": "accepted",
+            "runner_up_score": 0.303324,
+            "runner_up_tag": "percussive",
+            "score": 0.324301,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:1a65e598b15b9b31"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.007639,
+            "reason": "tie_margin",
+            "runner_up_score": 0.322767,
+            "runner_up_tag": "acid_synth",
+            "score": 0.330406,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.005388,
+            "reason": "tie_margin",
+            "runner_up_score": 0.385774,
+            "runner_up_tag": "euphoric",
+            "score": 0.391162,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.045019,
+            "reason": "accepted",
+            "runner_up_score": 0.374156,
+            "runner_up_tag": "percussive",
+            "score": 0.419175,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:37672723564a838e"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.042006,
+            "reason": "accepted",
+            "runner_up_score": 0.219772,
+            "runner_up_tag": "vocal",
+            "score": 0.261778,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.007812,
+            "reason": "tie_margin",
+            "runner_up_score": 0.302426,
+            "runner_up_tag": "hypnotic",
+            "score": 0.310239,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.015715,
+            "reason": "accepted",
+            "runner_up_score": 0.25123,
+            "runner_up_tag": "distorted",
+            "score": 0.266945,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:198dc7b6e2341087"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.029059,
+            "reason": "accepted",
+            "runner_up_score": 0.479501,
+            "runner_up_tag": "vocal",
+            "score": 0.50856,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.063154,
+            "reason": "accepted",
+            "runner_up_score": 0.488688,
+            "runner_up_tag": "euphoric",
+            "score": 0.551842,
+            "tag": "aggressive",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.061789,
+            "reason": "accepted",
+            "runner_up_score": 0.392464,
+            "runner_up_tag": "distorted",
+            "score": 0.454253,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:403243ca494e5c6c"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.034832,
+            "reason": "accepted",
+            "runner_up_score": 0.267479,
+            "runner_up_tag": "vocal",
+            "score": 0.302311,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.059332,
+            "reason": "accepted",
+            "runner_up_score": 0.466152,
+            "runner_up_tag": "euphoric",
+            "score": 0.525484,
+            "tag": "dark",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.146429,
+            "reason": "accepted",
+            "runner_up_score": 0.309361,
+            "runner_up_tag": "distorted",
+            "score": 0.45579,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:7db263701a1001a5"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.042656,
+            "reason": "accepted",
+            "runner_up_score": 0.441656,
+            "runner_up_tag": "acid_synth",
+            "score": 0.484312,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.011049,
+            "reason": "tie_margin",
+            "runner_up_score": 0.504346,
+            "runner_up_tag": "tense",
+            "score": 0.515396,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.030306,
+            "reason": "accepted",
+            "runner_up_score": 0.414335,
+            "runner_up_tag": "airy",
+            "score": 0.444641,
+            "tag": "percussive",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:65ac7977fb46c314"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.082218,
+            "reason": "accepted",
+            "runner_up_score": 0.220449,
+            "runner_up_tag": "bassline",
+            "score": 0.302667,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.037471,
+            "reason": "accepted",
+            "runner_up_score": 0.32954,
+            "runner_up_tag": "euphoric",
+            "score": 0.367011,
+            "tag": "aggressive",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.005871,
+            "reason": "tie_margin",
+            "runner_up_score": 0.255568,
+            "runner_up_tag": "distorted",
+            "score": 0.261438,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:afc3fad556a9d0e3"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.013137,
+            "reason": "tie_margin",
+            "runner_up_score": 0.305593,
+            "runner_up_tag": "bassline",
+            "score": 0.318729,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.034352,
+            "reason": "accepted",
+            "runner_up_score": 0.338773,
+            "runner_up_tag": "euphoric",
+            "score": 0.373125,
+            "tag": "hypnotic",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.014699,
+            "reason": "tie_margin",
+            "runner_up_score": 0.327696,
+            "runner_up_tag": "polished",
+            "score": 0.342395,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:8e3d8b4f897671f4"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.029798,
+            "reason": "accepted",
+            "runner_up_score": 0.298952,
+            "runner_up_tag": "vocal",
+            "score": 0.32875,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.005127,
+            "reason": "tie_margin",
+            "runner_up_score": 0.361039,
+            "runner_up_tag": "hypnotic",
+            "score": 0.366166,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.021385,
+            "reason": "accepted",
+            "runner_up_score": 0.338309,
+            "runner_up_tag": "distorted",
+            "score": 0.359694,
+            "tag": "raw",
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:a897da060e966ce0"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.042836,
+            "reason": "accepted",
+            "runner_up_score": 0.374247,
+            "runner_up_tag": "bassline",
+            "score": 0.417083,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.108144,
+            "reason": "accepted",
+            "runner_up_score": 0.463297,
+            "runner_up_tag": "aggressive",
+            "score": 0.571441,
+            "tag": "dark",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.089595,
+            "reason": "accepted",
+            "runner_up_score": 0.424329,
+            "runner_up_tag": "raw",
+            "score": 0.513924,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:99cdc940b1591e54"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.055112,
+            "reason": "accepted",
+            "runner_up_score": 0.298555,
+            "runner_up_tag": "acid_synth",
+            "score": 0.353667,
+            "tag": "vocal",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.029395,
+            "reason": "accepted",
+            "runner_up_score": 0.342458,
+            "runner_up_tag": "aggressive",
+            "score": 0.371853,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.257106,
+            "reason": "accepted",
+            "runner_up_score": 0.158857,
+            "runner_up_tag": "percussive",
+            "score": 0.415963,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:09ce370fe33d2145"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.048719,
+            "reason": "accepted",
+            "runner_up_score": 0.287239,
+            "runner_up_tag": "bassline",
+            "score": 0.335958,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.03026,
+            "reason": "accepted",
+            "runner_up_score": 0.271891,
+            "runner_up_tag": "aggressive",
+            "score": 0.302151,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.000567,
+            "reason": "tie_margin",
+            "runner_up_score": 0.270217,
+            "runner_up_tag": "polished",
+            "score": 0.270784,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:0f32e61604f29be4"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.025669,
+            "reason": "accepted",
+            "runner_up_score": 0.300346,
+            "runner_up_tag": "piano",
+            "score": 0.326016,
+            "tag": "guitar",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.007754,
+            "reason": "tie_margin",
+            "runner_up_score": 0.348416,
+            "runner_up_tag": "aggressive",
+            "score": 0.35617,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": false,
+            "margin": 0.003353,
+            "reason": "tie_margin",
+            "runner_up_score": 0.30434,
+            "runner_up_tag": "percussive",
+            "score": 0.307693,
+            "tag": null,
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:1bd96c08fdb473a6"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": false,
+            "margin": 0.011212,
+            "reason": "tie_margin",
+            "runner_up_score": 0.43398,
+            "runner_up_tag": "bassline",
+            "score": 0.445192,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.106346,
+            "reason": "accepted",
+            "runner_up_score": 0.447738,
+            "runner_up_tag": "hypnotic",
+            "score": 0.554084,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.016966,
+            "reason": "accepted",
+            "runner_up_score": 0.473626,
+            "runner_up_tag": "polished",
+            "score": 0.490592,
+            "tag": "percussive",
+            "threshold": 0.18
+          }
+        },
+        "split": "calibration",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:56fd7a73e7415d5d"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.022632,
+            "reason": "accepted",
+            "runner_up_score": 0.453999,
+            "runner_up_tag": "pads",
+            "score": 0.476631,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": true,
+            "margin": 0.109108,
+            "reason": "accepted",
+            "runner_up_score": 0.433271,
+            "runner_up_tag": "tense",
+            "score": 0.542379,
+            "tag": "euphoric",
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.016304,
+            "reason": "accepted",
+            "runner_up_score": 0.450319,
+            "runner_up_tag": "polished",
+            "score": 0.466623,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:1c55f8a571fd39b3"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.020294,
+            "reason": "accepted",
+            "runner_up_score": 0.287528,
+            "runner_up_tag": "bassline",
+            "score": 0.307822,
+            "tag": "pads",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.00038,
+            "reason": "tie_margin",
+            "runner_up_score": 0.396976,
+            "runner_up_tag": "tense",
+            "score": 0.397355,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.086676,
+            "reason": "accepted",
+            "runner_up_score": 0.296312,
+            "runner_up_tag": "atmospheric",
+            "score": 0.382987,
+            "tag": "distorted",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:4547de99dc593f88"
+      },
+      {
+        "label_status": "todo",
+        "prediction_context": {
+          "instrument": {
+            "accepted": true,
+            "margin": 0.040239,
+            "reason": "accepted",
+            "runner_up_score": 0.460512,
+            "runner_up_tag": "bassline",
+            "score": 0.500751,
+            "tag": "acid_synth",
+            "threshold": 0.18
+          },
+          "mood": {
+            "accepted": false,
+            "margin": 0.002678,
+            "reason": "tie_margin",
+            "runner_up_score": 0.522002,
+            "runner_up_tag": "hypnotic",
+            "score": 0.52468,
+            "tag": null,
+            "threshold": 0.18
+          },
+          "texture": {
+            "accepted": true,
+            "margin": 0.055706,
+            "reason": "accepted",
+            "runner_up_score": 0.404499,
+            "runner_up_tag": "percussive",
+            "score": 0.460205,
+            "tag": "polished",
+            "threshold": 0.18
+          }
+        },
+        "split": "holdout",
+        "tags": {
+          "instrument": [],
+          "mood": [],
+          "texture": []
+        },
+        "track_id": "folder:279c7b839929a049"
+      }
+    ],
+    "safety": "label_status=todo rows are skipped until a reviewer marks them complete",
+    "status": "needed"
+  },
+  "margin": 0.015,
+  "modes": {
+    "bare": {
+      "example_predictions": [
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:000e62e62ec60bdd"
+        },
+        {
+          "abstained": [
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "dark"
+            ]
+          },
+          "track_id": "folder:021ab63321fbeb33"
+        },
+        {
+          "abstained": [
+            "mood"
+          ],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:036f1f0cce812abf"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:039030678757825e"
+        },
+        {
+          "abstained": [
+            "instrument",
+            "texture"
+          ],
+          "tags": {
+            "mood": [
+              "aggressive"
+            ]
+          },
+          "track_id": "folder:05b7cebb505a50e9"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "hypnotic"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:069af44d4b4060ea"
+        },
+        {
+          "abstained": [
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "aggressive"
+            ]
+          },
+          "track_id": "folder:06e217cb5b4d49a9"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "distorted"
+            ]
+          },
+          "track_id": "folder:080e7b38f74eeade"
+        },
+        {
+          "abstained": [
+            "mood"
+          ],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "texture": [
+              "raw"
+            ]
+          },
+          "track_id": "folder:09ce370fe33d2145"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "dreamy"
+            ],
+            "texture": [
+              "airy"
+            ]
+          },
+          "track_id": "folder:0a264e38914844c0"
+        },
+        {
+          "abstained": [
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "aggressive"
+            ]
+          },
+          "track_id": "folder:0a9b8a90864b9227"
+        },
+        {
+          "abstained": [
+            "mood"
+          ],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:0b3f8426dce43071"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "drums"
+            ],
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "distorted"
+            ]
+          },
+          "track_id": "folder:0b6720458d4f47f9"
+        },
+        {
+          "abstained": [
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "aggressive"
+            ]
+          },
+          "track_id": "folder:0bec2166640da6e7"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "dreamy"
+            ],
+            "texture": [
+              "airy"
+            ]
+          },
+          "track_id": "folder:0c12e4e1fd6bb83f"
+        },
+        {
+          "abstained": [
+            "instrument"
+          ],
+          "tags": {
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "warm"
+            ]
+          },
+          "track_id": "folder:0cde010c05663d3f"
+        }
+      ],
+      "metrics": null,
+      "prediction_summary": {
+        "categories": {
+          "instrument": {
+            "abstained": 36,
+            "abstention_rate": 0.131868,
+            "accepted": 237,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 141,
+                "tag": "vocal"
+              },
+              {
+                "count": 60,
+                "tag": "acid_synth"
+              },
+              {
+                "count": 26,
+                "tag": "drums"
+              },
+              {
+                "count": 5,
+                "tag": "bassline"
+              },
+              {
+                "count": 3,
+                "tag": "piano"
+              },
+              {
+                "count": 2,
+                "tag": "pads"
+              }
+            ]
+          },
+          "mood": {
+            "abstained": 75,
+            "abstention_rate": 0.274725,
+            "accepted": 198,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 111,
+                "tag": "aggressive"
+              },
+              {
+                "count": 30,
+                "tag": "hypnotic"
+              },
+              {
+                "count": 22,
+                "tag": "dark"
+              },
+              {
+                "count": 17,
+                "tag": "tense"
+              },
+              {
+                "count": 14,
+                "tag": "dreamy"
+              },
+              {
+                "count": 4,
+                "tag": "euphoric"
+              }
+            ]
+          },
+          "texture": {
+            "abstained": 109,
+            "abstention_rate": 0.399267,
+            "accepted": 164,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 64,
+                "tag": "warm"
+              },
+              {
+                "count": 35,
+                "tag": "airy"
+              },
+              {
+                "count": 27,
+                "tag": "distorted"
+              },
+              {
+                "count": 21,
+                "tag": "polished"
+              },
+              {
+                "count": 11,
+                "tag": "raw"
+              },
+              {
+                "count": 4,
+                "tag": "atmospheric"
+              },
+              {
+                "count": 2,
+                "tag": "percussive"
+              }
+            ]
+          }
+        },
+        "track_count": 273
+      },
+      "thresholds": {
+        "instrument": 0.18,
+        "mood": 0.18,
+        "texture": 0.18
+      }
+    },
+    "template": {
+      "example_predictions": [
+        {
+          "abstained": [
+            "instrument",
+            "texture"
+          ],
+          "tags": {
+            "mood": [
+              "euphoric"
+            ]
+          },
+          "track_id": "folder:000e62e62ec60bdd"
+        },
+        {
+          "abstained": [
+            "mood",
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "bassline"
+            ]
+          },
+          "track_id": "folder:021ab63321fbeb33"
+        },
+        {
+          "abstained": [
+            "mood"
+          ],
+          "tags": {
+            "instrument": [
+              "pads"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:036f1f0cce812abf"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:039030678757825e"
+        },
+        {
+          "abstained": [
+            "instrument"
+          ],
+          "tags": {
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:05b7cebb505a50e9"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "pads"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "percussive"
+            ]
+          },
+          "track_id": "folder:069af44d4b4060ea"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:06e217cb5b4d49a9"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "distorted"
+            ]
+          },
+          "track_id": "folder:080e7b38f74eeade"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:09ce370fe33d2145"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:0a264e38914844c0"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:0a9b8a90864b9227"
+        },
+        {
+          "abstained": [
+            "texture"
+          ],
+          "tags": {
+            "instrument": [
+              "piano"
+            ],
+            "mood": [
+              "euphoric"
+            ]
+          },
+          "track_id": "folder:0b3f8426dce43071"
+        },
+        {
+          "abstained": [
+            "mood"
+          ],
+          "tags": {
+            "instrument": [
+              "drums"
+            ],
+            "texture": [
+              "distorted"
+            ]
+          },
+          "track_id": "folder:0b6720458d4f47f9"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "acid_synth"
+            ],
+            "mood": [
+              "euphoric"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:0bec2166640da6e7"
+        },
+        {
+          "abstained": [],
+          "tags": {
+            "instrument": [
+              "vocal"
+            ],
+            "mood": [
+              "aggressive"
+            ],
+            "texture": [
+              "polished"
+            ]
+          },
+          "track_id": "folder:0c12e4e1fd6bb83f"
+        },
+        {
+          "abstained": [
+            "instrument",
+            "texture"
+          ],
+          "tags": {
+            "mood": [
+              "euphoric"
+            ]
+          },
+          "track_id": "folder:0cde010c05663d3f"
+        }
+      ],
+      "metrics": null,
+      "prediction_summary": {
+        "categories": {
+          "instrument": {
+            "abstained": 68,
+            "abstention_rate": 0.249084,
+            "accepted": 205,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 125,
+                "tag": "acid_synth"
+              },
+              {
+                "count": 32,
+                "tag": "pads"
+              },
+              {
+                "count": 21,
+                "tag": "piano"
+              },
+              {
+                "count": 10,
+                "tag": "vocal"
+              },
+              {
+                "count": 7,
+                "tag": "bassline"
+              },
+              {
+                "count": 5,
+                "tag": "drums"
+              },
+              {
+                "count": 5,
+                "tag": "guitar"
+              }
+            ]
+          },
+          "mood": {
+            "abstained": 59,
+            "abstention_rate": 0.216117,
+            "accepted": 214,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 173,
+                "tag": "euphoric"
+              },
+              {
+                "count": 15,
+                "tag": "aggressive"
+              },
+              {
+                "count": 12,
+                "tag": "dark"
+              },
+              {
+                "count": 10,
+                "tag": "hypnotic"
+              },
+              {
+                "count": 2,
+                "tag": "tense"
+              },
+              {
+                "count": 2,
+                "tag": "dreamy"
+              }
+            ]
+          },
+          "texture": {
+            "abstained": 76,
+            "abstention_rate": 0.278388,
+            "accepted": 197,
+            "evaluated": 273,
+            "top_tags": [
+              {
+                "count": 122,
+                "tag": "polished"
+              },
+              {
+                "count": 30,
+                "tag": "distorted"
+              },
+              {
+                "count": 29,
+                "tag": "percussive"
+              },
+              {
+                "count": 8,
+                "tag": "raw"
+              },
+              {
+                "count": 4,
+                "tag": "airy"
+              },
+              {
+                "count": 2,
+                "tag": "atmospheric"
+              },
+              {
+                "count": 1,
+                "tag": "metallic"
+              },
+              {
+                "count": 1,
+                "tag": "warm"
+              }
+            ]
+          }
+        },
+        "track_count": 273
+      },
+      "thresholds": {
+        "instrument": 0.18,
+        "mood": 0.18,
+        "texture": 0.18
+      }
+    }
+  },
+  "notes": {
+    "cached_audio_vectors_only": true,
+    "honest_caveat": "precision/recall and template-vs-bare claims require the private hand-labeled auto_tag_labels.jsonl set",
+    "no_accuracy_claim_without_labels": true,
+    "no_audio_decode": true,
+    "no_final_accuracy_claim_without_min_labels": true,
+    "no_torch_or_librosa": true
+  },
+  "prompt_bank": {
+    "categories": [
+      "mood",
+      "texture",
+      "instrument"
+    ],
+    "modes": [
+      "bare",
+      "template"
+    ],
+    "prompt_count": 22
+  },
+  "schema": "library_auto_tags_bench_v1",
+  "status": "unproven_no_hand_labels",
+  "store": {
+    "backend": "SqliteVecStore",
+    "embedded_tracks": 273,
+    "snapshot_hash": "361bbfa12fab41de2743fca9cfbdb2148aad6db31b9e012e8374e2aa75f37e90"
+  }
+}
