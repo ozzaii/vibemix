@@ -509,3 +509,48 @@ def test_private_label_template_rows_add_review_context_without_changing_labels(
         "folder": "Hard Techno",
         "filename": "track-one.mp3",
     }
+
+
+def test_private_label_template_out_refuses_to_overwrite_without_force(
+    tmp_path: Path, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    private_out = tmp_path / "auto_tag_labels.jsonl"
+    private_out.write_text("keep me\n", encoding="utf-8")
+    monkeypatch.setattr(
+        lat,
+        "_load_store",
+        lambda: (
+            ["t1"],
+            np.asarray([[1.0, 0.0, 0.0]], dtype=np.float32),
+            "FakeStore",
+            "snap",
+        ),
+    )
+    monkeypatch.setattr(lat, "ClapEngine", lambda: _FakeEngine())
+    monkeypatch.setattr(lat, "_load_track_contexts", lambda ids: {})
+
+    rc = lat.main(
+        [
+            "--out",
+            str(tmp_path / "report.json"),
+            "--private-label-template-out",
+            str(private_out),
+        ]
+    )
+
+    assert rc == 3
+    assert private_out.read_text(encoding="utf-8") == "keep me\n"
+    assert "--force-private-label-template" in capsys.readouterr().err
+
+    rc = lat.main(
+        [
+            "--out",
+            str(tmp_path / "report-force.json"),
+            "--private-label-template-out",
+            str(private_out),
+            "--force-private-label-template",
+        ]
+    )
+
+    assert rc == 0
+    assert "keep me" not in private_out.read_text(encoding="utf-8")

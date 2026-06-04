@@ -772,6 +772,11 @@ def main(argv: list[str] | None = None) -> int:
             "keep it under eval/private/ and do not commit it"
         ),
     )
+    parser.add_argument(
+        "--force-private-label-template",
+        action="store_true",
+        help="overwrite --private-label-template-out when it already exists",
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
         "--require-labels",
@@ -824,6 +829,17 @@ def main(argv: list[str] | None = None) -> int:
         )
         report["label_template"]["path"] = str(template_path)
         if args.private_label_template_out is not None:
+            if (
+                args.private_label_template_out.exists()
+                and not args.force_private_label_template
+            ):
+                print(
+                    "private label template exists; pass "
+                    "--force-private-label-template to overwrite: "
+                    f"{args.private_label_template_out}",
+                    file=sys.stderr,
+                )
+                return 3
             private_rows = build_private_label_template_rows(template_rows)
             args.private_label_template_out.parent.mkdir(parents=True, exist_ok=True)
             args.private_label_template_out.write_text(
