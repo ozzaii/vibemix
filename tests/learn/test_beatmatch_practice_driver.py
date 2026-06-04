@@ -64,6 +64,25 @@ def test_driver_practice_deck_renders_audible_audio() -> None:
     assert float(np.sqrt(np.mean(np.square(out)))) > 0.01
 
 
+def test_driver_waveform_payload_uses_bundled_demo_sections() -> None:
+    driver = BeatmatchPracticeDriver()
+
+    payload = driver.waveform_payload()
+
+    assert payload["sample_rate"] == 44_100
+    assert sorted(payload["decks"]) == ["A", "B"]
+    for deck in payload["decks"].values():
+        assert deck["duration_s"] >= 29.0
+        assert len(deck["peaks"]) > 100
+        assert max(max(peak) for peak in deck["peaks"]) > 0
+        assert {cue["label"] for cue in deck["cues"]} == {
+            "intro",
+            "drop",
+            "breakdown",
+            "outro",
+        }
+
+
 def test_eq_swap_action_filters_audio_without_arming_beatmatch_grade() -> None:
     neutral = BeatmatchPracticeDriver()
     cut = BeatmatchPracticeDriver()

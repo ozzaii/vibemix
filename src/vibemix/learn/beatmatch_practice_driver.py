@@ -11,6 +11,9 @@ grade through ``learn.practice_loop``.
 
 from __future__ import annotations
 
+import wave
+from importlib.resources import as_file, files
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -27,6 +30,8 @@ _TEMPO_CC_RATE_SPAN = 640.0
 _PRACTICE_LESSONS = frozenset({"L2.01", "L2.02"})
 _EQ_PRACTICE_LESSONS = frozenset({"L2.04", "L2.05"})
 _MIXER_CONTROLS = frozenset({"eq_hi", "eq_mid", "eq_low", "filter", "vol"})
+_ASSET_PACKAGE = "vibemix.learn.assets.band_exemplars"
+_DEMO_LOOP_BEATS = 64
 
 
 def _deck_from_midi(midi: dict[str, Any]) -> str:
@@ -65,7 +70,7 @@ def _practice_loop(*, bass_hz: float, hat_hz: float = 6_500.0) -> np.ndarray:
     """Build a small self-authored practice loop with kick, bass, and hats."""
 
     beat_s = 60.0 / _PRACTICE_BPM
-    n_beats = 64
+    n_beats = _DEMO_LOOP_BEATS
     n_frames = round(_SAMPLE_RATE * beat_s * n_beats)
     t = np.arange(n_frames, dtype=np.float32) / float(_SAMPLE_RATE)
     beat_phase = np.mod(t, beat_s)
@@ -80,12 +85,131 @@ def _practice_loop(*, bass_hz: float, hat_hz: float = 6_500.0) -> np.ndarray:
     return np.column_stack([mono, mono]).astype(np.float32)
 
 
+def _read_wav_stereo(path: Path) -> tuple[np.ndarray, int]:
+    """Read a bundled PCM WAV into ``(frames, 2)`` float32 samples."""
+
+    with wave.open(str(path), "rb") as wf:
+        channels = int(wf.getnchannels())
+        sample_width = int(wf.getsampwidth())
+        sample_rate = int(wf.getframerate())
+        frames = int(wf.getnframes())
+        raw = wf.readframes(frames)
+    if sample_width == 1:
+        samples = (np.frombuffer(raw, dtype=np.uint8).astype(np.float32) - 128.0) / 128.0
+    elif sample_width == 2:
+        samples = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
+    elif sample_width == 4:
+        samples = np.frombuffer(raw, dtype="<i4").astype(np.float32) / 2147483648.0
+    else:
+        raise ValueError(f"unsupported WAV sample width: {sample_width}")
+    if channels <= 0:
+        raise ValueError("WAV has no channels")
+    samples = samples.reshape(-1, channels)
+    if channels == 1:
+        samples = np.column_stack([samples[:, 0], samples[:, 0]])
+    elif channels > 2:
+        samples = samples[:, :2]
+    return samples.astype(np.float32, copy=False), sample_rate
+
+
+def _resample_linear(samples: np.ndarray, *, src_sr: int, dst_sr: int) -> np.ndarray:
+    """Small deterministic resampler for bundled fallback loops."""
+
+    if src_sr == dst_sr:
+        return samples.astype(np.float32, copy=False)
+    if samples.size == 0:
+        return samples.astype(np.float32, copy=False)
+    target_n = max(1, round(samples.shape[0] * float(dst_sr) / float(src_sr)))
+    src_x = np.linspace(0.0, samples.shape[0] - 1, samples.shape[0], dtype=np.float64)
+    dst_x = np.linspace(0.0, samples.shape[0] - 1, target_n, dtype=np.float64)
+    left = np.interp(dst_x, src_x, samples[:, 0])
+    right = np.interp(dst_x, src_x, samples[:, 1])
+    return np.column_stack([left, right]).astype(np.float32)
+
+
+def _load_packaged_band_loop(rel_path: str) -> np.ndarray:
+    resource = files(_ASSET_PACKAGE).joinpath(rel_path)
+    with as_file(resource) as path:
+        samples, sample_rate = _read_wav_stereo(path)
+    return _resample_linear(samples, src_sr=sample_rate, dst_sr=_SAMPLE_RATE)
+
+
+def _tile_to_frames(samples: np.ndarray, frames: int) -> np.ndarray:
+    if samples.shape[0] <= 0:
+        raise ValueError("cannot tile an empty loop")
+    repeats = int(np.ceil(frames / float(samples.shape[0])))
+    return np.tile(samples, (repeats, 1))[:frames].astype(np.float32, copy=False)
+
+
+def _packaged_demo_loop(*, bass_hz: float, deck: str) -> np.ndarray:
+    """Build a 64-beat demo track from bundled Apache-2.0 Learn loops.
+
+    The generated kick/bass loop remains underneath so the L2.01 kill criterion
+    stays literal: the beginner always hears kicks. The packaged band exemplars
+    give L1.13 a real, bundled waveform with visible section changes.
+    """
+
+    base = _practice_loop(bass_hz=bass_hz)
+    target_frames = base.shape[0]
+    try:
+        low = _tile_to_frames(
+            _load_packaged_band_loop("low/vibemix_internal_low_bass_gate.wav"),
+            target_frames,
+        )
+        mid = _tile_to_frames(
+            _load_packaged_band_loop("mid/vibemix_internal_mid_chord_body.wav"),
+            target_frames,
+        )
+        high = _tile_to_frames(
+            _load_packaged_band_loop("high/vibemix_internal_high_hat_air.wav"),
+            target_frames,
+        )
+        sub = _tile_to_frames(
+            _load_packaged_band_loop("sub/vibemix_internal_sub_pulse.wav"),
+            target_frames,
+        )
+    except Exception:
+        return base
+
+    beat_frames = round(_SAMPLE_RATE * 60.0 / _PRACTICE_BPM)
+    if deck.upper() == "B":
+        low = np.roll(low, beat_frames, axis=0)
+        mid = np.roll(mid, beat_frames * 2, axis=0)
+        high = np.roll(high, beat_frames // 2, axis=0)
+    quarter = max(1, target_frames // 4)
+    section_gain = np.ones((target_frames, 1), dtype=np.float32)
+    section_gain[2 * quarter : 3 * quarter] = 0.34
+    section_gain[3 * quarter :] = 0.72
+    layered = (
+        0.58 * base
+        + 0.22 * low * section_gain
+        + 0.18 * mid * section_gain
+        + 0.16 * high
+        + 0.10 * sub
+    )
+    peak = float(np.max(np.abs(layered))) if layered.size else 0.0
+    if peak > 0.0:
+        layered *= 0.82 / max(0.82, peak)
+    return layered.astype(np.float32, copy=False)
+
+
+def _demo_cues() -> list[dict[str, float | str]]:
+    """Author-visible waveform bands for intro/drop/breakdown scanning."""
+
+    return [
+        {"label": "intro", "start_s": 0.0, "end_s": 7.5},
+        {"label": "drop", "start_s": 7.5, "end_s": 15.0},
+        {"label": "breakdown", "start_s": 15.0, "end_s": 22.5},
+        {"label": "outro", "start_s": 22.5, "end_s": 30.0},
+    ]
+
+
 class BeatmatchPracticeDriver:
     """Convert authored Learn beatmatch actions into owned-deck snapshots."""
 
     def __init__(self) -> None:
-        src_a = _practice_loop(bass_hz=82.0)
-        src_b = _practice_loop(bass_hz=98.0)
+        src_a = _packaged_demo_loop(bass_hz=82.0, deck="A")
+        src_b = _packaged_demo_loop(bass_hz=98.0, deck="B")
         self._deck = MiniDeck(
             src_a,
             src_b,
@@ -100,21 +224,13 @@ class BeatmatchPracticeDriver:
                 "bpm": _PRACTICE_BPM,
                 "duration_s": float(src_a.shape[0]) / float(_SAMPLE_RATE),
                 "peaks": compute_three_band_peaks(src_a, sample_rate=_SAMPLE_RATE),
-                "cues": [
-                    {"label": "intro", "start_s": 0.0, "end_s": 7.5},
-                    {"label": "drop", "start_s": 7.5, "end_s": 15.0},
-                    {"label": "outro", "start_s": 22.5, "end_s": 30.0},
-                ],
+                "cues": _demo_cues(),
             },
             "B": {
                 "bpm": _PRACTICE_BPM,
                 "duration_s": float(src_b.shape[0]) / float(_SAMPLE_RATE),
                 "peaks": compute_three_band_peaks(src_b, sample_rate=_SAMPLE_RATE),
-                "cues": [
-                    {"label": "intro", "start_s": 0.0, "end_s": 7.5},
-                    {"label": "drop", "start_s": 7.5, "end_s": 15.0},
-                    {"label": "outro", "start_s": 22.5, "end_s": 30.0},
-                ],
+                "cues": _demo_cues(),
             },
         }
         self._grid_a = BeatGrid(
