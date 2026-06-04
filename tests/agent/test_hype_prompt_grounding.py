@@ -6,7 +6,7 @@ state, never a generic template:
 
 - build_system_instruction(skill, 'hype') returns the HYPE_* cell for
   beginner / intermediate / pro (three distinct, non-empty cells); the
-  intermediate cell is the v4-grounded one (a stable v4 substring).
+  intermediate cell is the landed Sven coach identity (stable Sven substrings).
 - AICoach.build_prompt(Event('PHASE', state)) embeds the grounded evidence_line
   (real rms/bpm/bands from the MusicState) + event=PHASE + the PHASE task tail.
 - The load-bearing 'no phase= field' anti-hallucination invariant holds — the
@@ -57,11 +57,13 @@ def test_hype_cells_per_skill_are_nonempty_and_distinct():
 
 
 def test_intermediate_hype_cell_is_v4_grounded():
-    """The intermediate HYPE cell is the v4-tuned, load-bearing one — assert a
-    stable v4 substring ('friend in his studio') rather than the whole body, so
-    the test survives appended grammar/DSL blocks but pins the v4 IP."""
+    """The intermediate HYPE cell is the landed Sven coach identity — assert
+    stable coaching substrings rather than the whole body, so the test survives
+    appended grammar/DSL blocks but pins the Sven IP."""
     intermediate = build_system_instruction("intermediate", "hype")
-    assert "friend in his studio" in intermediate
+    assert "riding shotgun in the booth" in intermediate
+    assert "COACH THE FORWARD, NOT THE NOW" in intermediate
+    assert "one move, one read, or one forward-nudge" in intermediate
 
 
 # =========================================================================== #

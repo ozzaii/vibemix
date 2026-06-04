@@ -21,6 +21,7 @@ from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
 from vibemix.agent.dj_cohost import (
+    COACH_AUDIO_SECONDS,
     _build_attached_audio_context_clause,
     _build_recall_query_context,
 )
@@ -28,6 +29,7 @@ from vibemix.audio import INPUT_SR_TARGET, AudioBuffer
 from vibemix.prompts.matrix import AUDIO_VIBE_CONTRACT_BLOCK, TTS_TAGS
 from vibemix.runtime.speak_gate import event_speak_fingerprint
 from vibemix.state import AICoach, Event, MusicState
+from vibemix.state.deck_context import GEMINI_AUDIO_TOKENS_PER_SECOND
 from vibemix.state.deck_state import DeckState, DeckTrack
 
 # ---------- helpers ----------
@@ -850,7 +852,11 @@ def test_llm_node_attaches_configured_deck_audio_parts_on_mix_move(mocker, tmp_p
     assert "rule=grounded_verdict_allowed" in prompt_text
     assert "deck_audio_parts=attached_configured_deck_pair_refs" in prompt_text
     assert "part_order=P1,P2,P3" in prompt_text
-    assert "model_audio_tokens_est=384" in prompt_text
+    bounded_p1_context_seconds = min(COACH_AUDIO_SECONDS, 30.0)
+    expected_prompt_audio_tokens = round(
+        (bounded_p1_context_seconds + 6.0) * GEMINI_AUDIO_TOKENS_PER_SECOND
+    )
+    assert f"model_audio_tokens_est={expected_prompt_audio_tokens}" in prompt_text
     assert "deckA_audio=P2" in prompt_text
     assert "deckB_audio=P3" in prompt_text
     assert "deckA_activity=active" in prompt_text
@@ -883,7 +889,10 @@ def test_llm_node_attaches_configured_deck_audio_parts_on_mix_move(mocker, tmp_p
     assert attached[-1]["event"] == "MIX_MOVE"
     assert attached[-1]["labels"] == "P2+P3"
     invokes = [fields for kind, fields in recorder.events if kind == "llm_invoke"]
-    assert invokes[-1]["audio_tokens_est"] == 384
+    expected_invoke_audio_tokens = round(
+        (COACH_AUDIO_SECONDS + 6.0) * GEMINI_AUDIO_TOKENS_PER_SECOND
+    )
+    assert invokes[-1]["audio_tokens_est"] == expected_invoke_audio_tokens
     assert attached[-1]["activity"] == "A:active+B:active"
 
 
@@ -1060,7 +1069,9 @@ def test_llm_node_03b_places_deck_audio_map_next_to_audio_part(mocker, tmp_path)
     assert "P1=live_global_mix" in prompt_text
     assert "P1_model_heard=true" in prompt_text
     assert "P1_runtime_observed=true" in prompt_text
-    assert "P1_span=-6.0..0.0" in prompt_text
+    bounded_p1_context_seconds = min(COACH_AUDIO_SECONDS, 30.0)
+    assert f"P1_span=-{bounded_p1_context_seconds:.1f}..0.0" in prompt_text
+    assert f"Attached: P1 = last {COACH_AUDIO_SECONDS:.0f}s" in prompt_text
     assert "P1_deck_audio=global_mix_not_stems" in prompt_text
     assert "rule=part_labels_not_outcome_verdict" in prompt_text
     assert "deck_lanes_context[" in prompt_text
@@ -1084,7 +1095,7 @@ def test_llm_node_03b_places_deck_audio_map_next_to_audio_part(mocker, tmp_path)
     assert "P1=master_global_mix" in prompt_text
     assert "P1_heard=true" in prompt_text
     assert "timeline=past_action_future" in prompt_text
-    assert "pre=-6.0..-1.0" in prompt_text
+    assert f"pre=-{bounded_p1_context_seconds:.1f}..-1.0" in prompt_text
     assert "current=-1.0..0.0" in prompt_text
     assert "action=-1.0..0.0" in prompt_text
     assert "move_anchor=A_low:_flat_to_killed@-1.5s:inside_P1" in prompt_text
