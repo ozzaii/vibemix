@@ -853,6 +853,35 @@ describe("SessionLayout", () => {
     );
   });
 
+  it("warns that speaker output alone is not BlackHole capture proof", () => {
+    const root = host();
+    const state = defaultState();
+    state.status.livekit = "ok";
+    state.status.gemini = "ok";
+    state.status.midi = 1;
+    state.status.screen = "unavailable";
+    state.status.captureDevice = "BlackHole 16ch";
+    state.timecode.bpm = null;
+    state.meters.music = { rms: 0, peak: 0 };
+
+    mountSessionLayout(root, state);
+
+    expect(root.textContent).toContain(
+      "BlackHole 16ch silent · Send DJ app to a Multi-Output/Aggregate that includes BlackHole; speaker output alone is not proof.",
+    );
+    expect(root.textContent).toContain(
+      "BlackHole 16ch is silent. Send DJ app to a Multi-Output/Aggregate that includes BlackHole; speaker output alone is not proof.",
+    );
+
+    const bpm = root.querySelector<HTMLElement>(".vmx-read__num");
+    expect(bpm?.getAttribute("title")).toBe(
+      "BPM waits for audio from BlackHole 16ch; speaker output alone is not capture proof.",
+    );
+    expect(bpm?.getAttribute("aria-label")).toBe(
+      "BPM waits for audio from BlackHole 16ch; speaker output alone is not capture proof.",
+    );
+  });
+
   it("warns that FLX4 speaker audio is not capture proof", () => {
     const root = host();
     const state = defaultState();

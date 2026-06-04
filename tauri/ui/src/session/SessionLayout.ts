@@ -1604,10 +1604,14 @@ function captureRouteInstruction(captureDevice?: string | null): string {
   if (device === "eqmac export") {
     return "Send DJ app to Multi-Output (eqMac), not speaker only.";
   }
-  if (device.includes("blackhole")) {
-    return "Send DJ app to BlackHole or an aggregate that includes it.";
+  if (isBlackHoleCaptureDevice(device)) {
+    return "Send DJ app to a Multi-Output/Aggregate that includes BlackHole; speaker output alone is not proof.";
   }
   return "Route DJ output into capture.";
+}
+
+function isBlackHoleCaptureDevice(device: string): boolean {
+  return device.includes("blackhole");
 }
 
 function isControllerCaptureDevice(device: string): boolean {
@@ -1627,6 +1631,9 @@ function bpmWaitingTitle(
   if (musicSignalActive(music)) return "BPM is not locked yet.";
   if (isControllerCaptureDevice(device.toLowerCase())) {
     return `BPM waits for master capture. ${device} is not hearing the master.`;
+  }
+  if (isBlackHoleCaptureDevice(device.toLowerCase())) {
+    return `BPM waits for audio from ${device}; speaker output alone is not capture proof.`;
   }
   return `BPM waits for audio from ${device}.`;
 }
