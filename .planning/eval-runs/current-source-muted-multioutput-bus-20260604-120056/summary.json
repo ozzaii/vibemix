@@ -1,0 +1,19 @@
+{
+  "session": "20260604-120056",
+  "head": "a1f55508",
+  "muted_env": {
+    "VIBEMIX_LOCAL_TTS": "0",
+    "VIBEMIX_ENABLE_MIC": "0",
+    "VIBEMIX_INPUT_DEVICE": "BlackHole 2ch",
+    "VIBEMIX_DEV_SIDECAR": "1"
+  },
+  "observed_console": {
+    "input": "listening to BlackHole 2ch @ 48000Hz (2ch) -> audio_buf + clean_audio_buf",
+    "tts": "AI voice output muted; stream not opened; MOSS local TTS disabled",
+    "music_rms_range": "0.018-0.034 live console samples",
+    "voice_rms": "0.000 live console samples",
+    "midi": "DDJ-FLX4 profile=pioneer_ddj_flx4",
+    "bus": "127.0.0.1:8765 listener active during probe"
+  },
+  "result": "current source hears Rekordbox Multi-Output via BlackHole 2ch without voice output"
+}
