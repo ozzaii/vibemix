@@ -1,0 +1,58 @@
+export const meta = {
+  name: 'wire-backend',
+  description: 'Wire-everything BACKEND audit (many agents), led by the VOICE/MOSS misconfiguration. Traces every engine to its live call-site and produces BACKEND-WIRING-EXIT-MAP.md = the exact wire per orphaned engine, routed to the owning Codex lane.',
+  phases: [
+    { title: 'Audit', detail: '11 parallel slices: VOICE/MOSS (lead), Sven brain orphans, coach prompt-composition, library/cue, learn engine, audio/route-doctor, model_router, proxy/democratization backend, memory/debrief->profile, events/telemetry, intel scorers' },
+    { title: 'Synthesis', detail: 'read ALL packets, write BACKEND-WIRING-EXIT-MAP.md (VOICE first) + per-lane exact wires + NEEDS-CLARIFICATION' },
+  ],
+}
+
+const CTX = `vibemix = a commercial AI DJ co-host in the ship endgame. Quality bar: "real DJ friend in your ear, no AI slop"; grounding is law (nothing un-caused reaches the human). BUILT-BUT-DARK: engine ~70-80% real, the human-facing last layer dark/ungrounded. Fix = WIRING not building: for each finding give THE EXACT WIRE (the one change, file:line -> file:line). 3 proof tiers: SRC (green tests) != PKG (signed DMG at HEAD) != LIVE (a real user hears a grounded line). test-passing-but-dark = 0. Read-only: code + git + codegraph + committed packets; do NOT launch the sidecar (one socket 127.0.0.1:8765). Cardinal invariants: single-writer MusicState; citation grounding (every citation resolves in EvidenceRegistry, un-cited strips to ack-bank); trust-the-audio; idle != fault; A1 practice audio never over a live set. Read FIRST, build on, do not re-derive: .planning/packets/2026-06-04/SHIP-DRIVE.md + SHIP-FINISH-PLAN.md + SHIP-READINESS-2026-06-04.md; .planning/packets/2026-06-03/WIRE-THE-GOLD-MASTER-BACKLOG.md + GOLD-WIRING-MAP.md + LEARN-UX-REALITY.md; project memory on narrator->coach orphaned gold + learn reality diagnosis. Backend island = src/vibemix/** python (agent, state/coach, prompts, intel, library, learn, audio, platform, llm, memory, debrief) + scripts/** + PyInstaller specs. Builders must NOT rush to exit at test-green; the exit is by-ear in the real app. Use codegraph callers/0-caller heavily to find orphans.`
+
+phase('Audit')
+
+const audits = await parallel([
+  () => agent(`Slice 1 - THE VOICE PATH (LEAD - the founder's live concern: "I still hear Sven/MOSS, the new voice never plays"). ${CTX}
+SEED (already verified, confirm + extend): build_tts_chain (src/vibemix/agent/tts_chain.py:36) defaults engine to MOSS; Chatterbox-Turbo only when env VIBEMIX_TTS_ENGINE=chatterbox (line 53); chatterbox_tts.py exists; live call-sites = __main__.py:1607 and :1621 via _build_tts_chain_or_mute. THE MISCONFIG: (a) the GUI launch strips env (launchd) so the flag is unreachable from a normal app launch -> always MOSS; (b) no config.json / settings path selects the engine, only env; (c) the Technologic (Daft Punk) streak/combo robot voice was handed off but has ZERO code (grep technologic/streak_voice/combo_voice = none). Trace the FULL chain end-to-end (engine select -> chatterbox_available/local_tts -> the live agent), the config.json convergence path (does the sidecar read engine choice from config.json which the GUI CAN write, vs env which it cannot?), and the warm-voice-swap retarget (recent commit 7d58e0e1). Produce THE EXACT WIRES: (1) make the chosen voice engine reachable from a normal/packaged launch (read engine from config.json that Settings writes, not env-only) + a sane default decision; (2) land the Technologic streak voice on the streak/combo surface (where streak fires -> robot voice render), grounded to a cited streak event; (3) confirm the voice only speaks on grounded/cited events (no slop). Also check: does the streak even count an executed transition or a self-applauding suggestion grade (PILL-FAFO)? Output "## V VOICE" = the root-cause chain + each exact wire + which lane owns it.`, { label: 'be:voice', phase: 'Audit' }),
+  () => agent(`Slice 2 - SVEN live-brain orphans (narrator->coach). ${CTX}
+The diagnosis: the DJ intelligence is built+tested but ORPHANED from the live brain so the co-host only narrates. Use codegraph to find intel/decision/claim/scorer/taste modules with NO path into the live coach prompt (0 callers from agent/state/coach). For each orphan: file:line + the exact call-site to wire it into coach.py / dj_cohost.py so a real claim reaches a spoken grounded line. Output "## S2 sven-orphans".`, { label: 'be:sven-orphans', phase: 'Audit' }),
+  () => agent(`Slice 3 - coach.py prompt-composition completeness. ${CTX}
+Per docs/PROMPT-COMPOSITION.md (EventType x evidence-fields x citation-sources x recall x diet x cooldown): for each EventType, is every evidence field that the engine BUILDS actually entering the live prompt, or built-but-dropped? Output "## S3 prompt-composition" the dropped fields + the wire.`, { label: 'be:prompt', phase: 'Audit' }),
+  () => agent(`Slice 4 - LIBRARY / CUE engine wiring. ${CTX}
+cue_landing.py (CueSet/LandedCue/land + provenance), Viber auto-cue-on-export (toolset.py ~990), CLAP embeddings, CUE-DETR producer, auto_crate, export paths. Which are built but have no live call-site / no shipped surface? Confirm the provenance guard (auto cues never masquerade as DJ; VM name prefix). The auto_crate stop-reason whitelist gate (test_no_seen_relaxation) status. Output "## S4 library-cue" orphans + exact wires.`, { label: 'be:library', phase: 'Audit' }),
+  () => agent(`Slice 5 - LEARN engine wiring (the teaching loop). ${CTX}
+SEED: the teaching loop closes only ~1.5/5 stages; the beatmatch grade is computed then DISCARDED (no IPC carries it, runtime.py ~2088); MiniDeck.render_block 0 callers; two_deck_player audibility + the A1 guard (practice audio NEVER over a live set). For each: the computed value + where it dies + the exact wire to carry grade/audio/lock-meter to the IPC bus (so the frontend lane can render it). Honor A1. Output "## S5 learn-engine".`, { label: 'be:learn', phase: 'Audit' }),
+  () => agent(`Slice 6 - AUDIO / route-doctor / capture (the keystone enabler). ${CTX}
+The route-doctor must DETERMINISTICALLY resolve BlackHole 2ch-vs-16ch and name ONE master device (it currently flips between runs). Trace auto_master_recommendation + the capture path + native-rate master/mic capture. Output "## S6 audio-doctor" the non-determinism root cause + the exact fix + the capture-readiness wire so a live keystone capture cannot land on a coin-flip device.`, { label: 'be:audio', phase: 'Audit' }),
+  () => agent(`Slice 7 - model_router resolution completeness. ${CTX}
+Every model used (Sven Gemini brain, any judge, voice/TTS engine ids, embeddings) must resolve via llm/model_router (config-driven, zero hardcoded literals, CI grep-gated). Find any model literal or any role that bypasses the router (especially the new voice engines). Output "## S7 model-router" the gaps + wires.`, { label: 'be:model-router', phase: 'Audit' }),
+  () => agent(`Slice 8 - PROXY / DEMOCRATIZATION backend. ${CTX}
+The fresh-user reaches the brain via an in-GUI key field (Frontend) -> a BACKEND handler that persists the key (keychain/.env, never logged, never committed) OR via the hosted proxy (api.altidus.world, /register, JWT, cost caps). Does the persist-key handler exist? Does proxy mode resolve? Are credits/keys present (note if unknown)? Output "## S8 democratization-backend" the handler to add (name it for the Frontend handshake) + proxy status.`, { label: 'be:democratization', phase: 'Audit' }),
+  () => agent(`Slice 9 - MEMORY/recall + DEBRIEF->PROFILE + taste loop. ${CTX}
+memory.db recall (gated VIBEMIX_RECALL_ENABLED), debrief -> long-term DJ profile, taste_model -> persona. Built-but-unwired loops? Output "## S9 memory-profile" wires.`, { label: 'be:memory', phase: 'Audit' }),
+  () => agent(`Slice 10 - EVENTS / telemetry / event_detector. ${CTX}
+event_detector emits typed events (TRACK_CHANGE/PHASE/LAYER_ARRIVAL/MIX_MOVE/HEARTBEAT...). Are any event types detected but never consumed by a reaction/voice/UI path? events.jsonl structured events emitted + read? Output "## S10 events" dark event types + wires.`, { label: 'be:events', phase: 'Audit' }),
+  () => agent(`Slice 11 - INTEL scorers surfaced. ${CTX}
+intel/ (transition_scorer, taste_model, transition_judge, eq_move_model, profile_projection, decision_runtime). Which scorer OUTPUTS are computed but never reach a human surface (voice line, pill, debrief)? The Judge tempo/bass discards (LEARN-ARMY) = free skills. Output "## S11 intel-surfaced" computed->surface wires.`, { label: 'be:intel', phase: 'Audit' }),
+])
+
+const A = audits.map((x, i) => x || `(backend slice ${i + 1} failed)`).join('\n\n')
+
+phase('Synthesis')
+
+const report = await agent(`Write .planning/packets/2026-06-04/BACKEND-WIRING-EXIT-MAP.md for the vibemix backend Codex lanes (library / learn / sven / keystone). FIRST read every relevant packet in .planning/packets/2026-06-04/ and .planning/packets/2026-06-03/ plus docs/PROMPT-COMPOSITION.md so you build on owned decisions. Synthesize the 11 audit slices into THE perfect backend wiring exit-path. Lead with VOICE (the founder's live concern).
+
+Sections:
+1. "## VOICE - why the new voice never plays + the exact fix" - the root-cause chain and the precise wires (engine reachable from a normal launch via config.json not env-only; the Technologic streak voice landed + grounded; voice speaks only on cited events). State the default-engine decision needed from Kaan if any.
+2. "## The exit, in one paragraph" - what "fully wired backend" means, blunt.
+3. "## Wiring exit-map" - a table: engine/value | computed source (file:line) | where it dies | THE EXACT WIRE (file:line -> file:line) | owning lane (library/learn/sven/keystone) | proof (by-ear/by-bus). Order by ship-leverage.
+4. "## Paste-ready /goal blocks per lane" - one disjoint block per owning lane (library / learn / sven / keystone+packaging), each naming its island + proof + the SHARED LAW (one tree, git add exact paths never -A, IPC = Frontend-only, socket 8765 one, commit -s Kaan Ozkan <rahipdotaci@gmail.com>, do NOT rush to exit at test-green - prove by-ear in the real app + grounding-review every new co-host line, commit each piece the instant it is green+proven).
+5. "## NEEDS-CLARIFICATION" - only genuine ambiguities that block an exact wire (esp. the voice default-engine call). If none, "none".
+
+Evidence only, no invented numbers. Anti-slop: no em-dashes, active voice, specific. Do NOT commit. After writing, return a tight ~14-line chat summary: the VOICE root-cause + fix in 3 lines, the count of orphaned engines, the top wires per lane, and any NEEDS-CLARIFICATION.
+
+--- AUDIT SLICES ---
+${A}
+---`, { label: 'be:synthesis', phase: 'Synthesis' })
+
+return report
