@@ -8,7 +8,7 @@
  *   1. state-machine: the "build" mode label / run-label / echo widening +
  *      setBrief / setCurve immutability (pure).
  *   2. api.ts dev-fallback: libraryBuildSet resolves the real DEV_BUILD sample
- *      (exported set) when invoke() is unavailable — never throws, never masks.
+ *      through the keyless AutoCrate frontdoor when invoke() is unavailable.
  *   3. a jsdom render path that drives the REAL index.ts renderBuildSet (via
  *      mountLibrary → runBuildSet): the numbered set, the rationale, the export
  *      receipt (shown only when export_path is present), the curve-picker
@@ -95,7 +95,7 @@ describe("build — api dev fallback (no Tauri bridge)", () => {
 // ── Real renderBuildSet path (via mountLibrary) ──────────────────────────────
 // renderBuildSet is module-private in index.ts, so we exercise it through its
 // only public entry — mountLibrary → run() → runBuildSet() → renderBuildSet().
-// We mock ./api.js so libraryBuildSet returns a controlled payload; the other
+// We mock ./api.js so libraryBuildSet returns a controlled AutoCrate payload; the other
 // api fns are stubbed inert so mount/status work stays offline and deterministic.
 
 const buildMock = vi.fn<(brief: string, curve: string) => Promise<BuildSetResult>>();
@@ -505,7 +505,7 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(buildMock).toHaveBeenLastCalledWith(expect.any(String), "after_hours");
   });
 
-  it("does not auto-run Codex set prep just by opening build mode", async () => {
+  it("does not auto-run AutoCrate just by opening build mode", async () => {
     buildMock.mockResolvedValue(DEV_FALLBACK.build);
     vi.resetModules();
     doMockApi();
@@ -546,11 +546,11 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("0 in set");
   });
 
-  it("renders Codex setup terminals as a no-set state with the setup hint", async () => {
+  it("renders AutoCrate setup errors as a no-set state with the setup hint", async () => {
     const setupNeeded: BuildSetResult = {
       name: "warehouse",
-      stop_reason: "codex_not_installed",
-      rationale: "Codex CLI not found. Install it and run codex login.",
+      stop_reason: "setup_error",
+      rationale: "No library cache. Drag a Rekordbox XML onto Settings first.",
       count: 0,
       tracks: [],
       export_path: null,
@@ -559,13 +559,13 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     const results = document.getElementById("vmx-lib-results") as HTMLElement;
     expect(results.querySelector(".vmx-lib-error")).toBeNull();
     expect(results.querySelector(".vmx-lib-empty")?.textContent).toContain(
-      "codex_not_installed",
+      "setup_error",
     );
     expect(results.querySelector(".vmx-lib-agent-failure")?.textContent).toContain(
-      "codex login",
+      "Import or embed the library first",
     );
     expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
-      "set-prep agent cannot start",
+      "AutoCrate could not open the indexed library cache",
     );
   });
 

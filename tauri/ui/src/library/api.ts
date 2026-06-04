@@ -8,7 +8,7 @@
  *   invoke("library_search",  { query, k })       -> SearchResult
  *   invoke("library_similar", { seed,  k })       -> SearchResult   (same shape)
  *   invoke("library_chat", { message, history, liveContext }) -> LibraryChatResult
- *   invoke("library_build_set", { brief, curve }) -> BuildSetResult
+ *   invoke("library_auto_crate", { query, curve, nSlots }) -> BuildSetResult
  *   invoke("library_cue_folder", { path, exportFormat, out, name, maxCues })
  *        -> LibraryCueResult
  *   invoke("library_stats")                        -> LibraryStats
@@ -207,7 +207,7 @@ export interface CurateResult {
  *  wire values the agent's CLI accepts; mirrors EnergyCurve in state-machine. */
 export type EnergyCurve = "opener" | "peak_time" | "after_hours" | "festival";
 
-/** Result of a set-prep run (`library build-set <brief> --curve <c> --export
+/** Result of a set-prep run (`library auto-crate <query> --curve <c> --export
  *  rekordbox --json`, mapped by the Rust bridge). Same shape as CurateResult
  *  plus `export_path` — the Rekordbox XML the agent wrote when it exported
  *  (`null` when it never did, e.g. an empty/failed run). `stop_reason` may be
@@ -1757,13 +1757,16 @@ export function normalizeCurateResult(
   return result;
 }
 
-export function normalizeBuildSetResult(value: unknown): BuildSetResult {
-  const root = asRecord(value, "library_build_set");
+export function normalizeBuildSetResult(
+  value: unknown,
+  label = "library_build_set",
+): BuildSetResult {
+  const root = asRecord(value, label);
   return {
-    ...normalizeCurateResult(root, "library_build_set"),
+    ...normalizeCurateResult(root, label),
     export_path: asNullableString(
       root.export_path,
-      "library_build_set.export_path",
+      `${label}.export_path`,
     ),
   };
 }
@@ -2591,20 +2594,32 @@ export async function libraryCurate(theme: string): Promise<CurateResult> {
   );
 }
 
-/** Brief + energy curve → Viber set-prep agent: a discovered + sequenced set,
- *  auto-exported to Rekordbox XML (`export_path` on the result). One-shot; the
- *  same propagate-don't-mask discipline as curate (a real backend error throws;
- *  a no-key run returns stop_reason "max_iters" with no tracks, surfaced honestly). */
-export async function libraryBuildSet(
-  brief: string,
+/** Query + energy curve → AutoCrate deterministic set prep: a discovered +
+ *  sequenced set, auto-exported to Rekordbox XML (`export_path` on the result).
+ *  Keyless by design: this GUI frontdoor does not require Codex login or a
+ *  shell bridge. Same propagate-don't-mask discipline as curate. */
+export async function libraryAutoCrate(
+  query: string,
   curve: EnergyCurve,
+  nSlots = 6,
 ): Promise<BuildSetResult> {
   const invoke = await getInvoke();
   if (!invoke) return DEV_BUILD; // no Tauri (plain vite / jsdom) → demo data
   // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
   return normalizeBuildSetResult(
-    await invoke<unknown>("library_build_set", { brief, curve }),
+    await invoke<unknown>("library_auto_crate", { query, curve, nSlots }),
+    "library_auto_crate",
   );
+}
+
+/** Back-compat client name for the build surface. The shipped GUI now uses the
+ *  keyless AutoCrate frontdoor above; keep this export so existing render tests
+ *  and old imports still exercise the same production path. */
+export async function libraryBuildSet(
+  brief: string,
+  curve: EnergyCurve,
+): Promise<BuildSetResult> {
+  return libraryAutoCrate(brief, curve);
 }
 
 /** Folder → auto-cued Rekordbox XML/M3U8. GUI-safe export path only: this never

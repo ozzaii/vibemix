@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 
 import {
   DEV_FALLBACK,
+  libraryAutoCrate,
   libraryBuildSet,
   libraryChat,
   libraryCueFolder,
@@ -32,7 +33,9 @@ import {
 } from "./api.js";
 
 afterEach(() => {
+  vi.doUnmock("@tauri-apps/api/core");
   vi.doUnmock("@tauri-apps/api/event");
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -161,6 +164,13 @@ describe("dev fallback (no Tauri bridge)", () => {
     expect(r.export_path).toMatch(/\.xml$/);
     // honest meta — no fabricated human title/artist on the flat-id rows.
     expect(r.tracks[0]?.meta).toMatch(/^track /);
+  });
+
+  it("libraryAutoCrate returns the same DEV_BUILD exported set without Tauri", async () => {
+    const r = await libraryAutoCrate("warehouse opener", "peak_time", 4);
+    expect(r.tracks).toHaveLength(6);
+    expect(r.stop_reason).toBe("exported");
+    expect(r.export_path).toMatch(/\.xml$/);
   });
 
   it("libraryCueFolder returns the DEV_CUE export receipt", async () => {
@@ -1302,6 +1312,33 @@ describe("runtime response normalizers", () => {
     });
     expect(build.question).toBe("Which direction should I take this?");
     expect(build.choices).toEqual(["Hypnotic", "Peak-time"]);
+  });
+
+  it("libraryAutoCrate invokes the keyless Rust command with slot count", async () => {
+    const invoke = vi.fn(async (_cmd: string, _args?: Record<string, unknown>) => ({
+      name: "Warehouse",
+      rationale: "AutoCrate picked a grounded four-track arc.",
+      stop_reason: "exported",
+      tracks: [
+        { track_id: "t1", title: "t1", meta: "track t1" },
+        { track_id: "t2", title: "t2", meta: "track t2" },
+      ],
+      count: 2,
+      export_path: "/tmp/warehouse.xml",
+    }));
+    vi.doMock("@tauri-apps/api/core", () => ({ invoke }));
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+    vi.resetModules();
+
+    const { libraryAutoCrate: freshLibraryAutoCrate } = await import("./api.js");
+    const result = await freshLibraryAutoCrate("warehouse opener", "peak_time", 4);
+
+    expect(invoke).toHaveBeenCalledWith("library_auto_crate", {
+      query: "warehouse opener",
+      curve: "peak_time",
+      nSlots: 4,
+    });
+    expect(result.export_path).toBe("/tmp/warehouse.xml");
   });
 
   it("normalizes stats and models, including install result files", () => {

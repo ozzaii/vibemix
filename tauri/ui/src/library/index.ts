@@ -11,7 +11,7 @@
  *   - similar  seed (drop a file or keep the current) → librarySimilar → results + scope
  *   - ingest   folder + strategy → libraryEmbedFolder → progress bar + live log + running €
  *   - curate   theme → libraryCurate → numbered set + notes
- *   - build    brief + curve → libraryBuildSet → ordered set + Rekordbox export
+ *   - build    brief + curve → libraryBuildSet → AutoCrate set + Rekordbox export
  *   - cue      folder + format → libraryCueFolder → portable cue export receipt
  *   - chat     message + history → libraryChat → reply, tools, artifacts
  *
@@ -221,11 +221,45 @@ const AGENT_FAILURE_COPY: Record<string, AgentFailureCopy> = {
   },
 };
 
-function agentFailureCopy(stopReason: string): AgentFailureCopy {
+const AUTO_CRATE_FAILURE_COPY: Record<string, AgentFailureCopy> = {
+  no_intent: {
+    title: "AutoCrate needs a brief",
+    detail: "The set builder needs a query or reference track before it can choose real tracks.",
+    next: "Write one concrete direction, then run Build a Set again.",
+  },
+  setup_error: {
+    title: "Library setup needed",
+    detail: "AutoCrate could not open the indexed library cache.",
+    next: "Import or embed the library first, then run the same brief again.",
+  },
+  no_pool: {
+    title: "No playable pool",
+    detail: "Discovery returned no grounded candidates for this brief.",
+    next: "Broaden the vibe, remove narrow BPM limits, or embed more playable tracks.",
+  },
+  no_sequence: {
+    title: "No clean order",
+    detail: "AutoCrate found candidates, but could not trust an ordered sequence.",
+    next: "Ask for fewer slots or use a simpler energy curve.",
+  },
+  export_error: {
+    title: "Export failed",
+    detail: "AutoCrate chose tracks, but Rekordbox XML was not written.",
+    next: "Check the export folder, then retry the same set.",
+  },
+};
+
+function agentFailureCopy(stopReason: string, mode: AgentFailureMode): AgentFailureCopy {
+  if (mode === "build" && AUTO_CRATE_FAILURE_COPY[stopReason]) {
+    return AUTO_CRATE_FAILURE_COPY[stopReason];
+  }
   return (
     AGENT_FAILURE_COPY[stopReason] ?? {
       title: "No trusted set yet",
-      detail: "Viber did not return a grounded set from this run.",
+      detail:
+        mode === "build"
+          ? "AutoCrate did not return a grounded set from this run."
+          : "Viber did not return a grounded set from this run.",
       next: "Try a narrower brief, or run Search first and reuse the strongest terms.",
     }
   );
@@ -235,7 +269,7 @@ function agentFailureMarkup(
   result: CurateResult,
   mode: AgentFailureMode,
 ): string {
-  const copy = agentFailureCopy(result.stop_reason);
+  const copy = agentFailureCopy(result.stop_reason, mode);
   const artifactLine =
     mode === "build"
       ? "No Rekordbox XML was written."
@@ -243,7 +277,7 @@ function agentFailureMarkup(
   const rawDetail = (result.rationale || "").trim();
   const detail = rawDetail || copy.detail;
   return `<div class="vmx-lib-empty vmx-lib-agent-failure">
-    <div class="vmx-lib-empty-kicker">Viber stopped</div>
+    <div class="vmx-lib-empty-kicker">${mode === "build" ? "Set prep stopped" : "Viber stopped"}</div>
     <div class="vmx-lib-agent-failure-title">${esc(copy.title)}</div>
     <div class="vmx-lib-agent-failure-detail">${esc(detail)}</div>
     <div class="vmx-lib-agent-failure-receipt">
@@ -255,7 +289,7 @@ function agentFailureMarkup(
 }
 
 function renderAgentFailureRationale(result: CurateResult, mode: AgentFailureMode): void {
-  const copy = agentFailureCopy(result.stop_reason);
+  const copy = agentFailureCopy(result.stop_reason, mode);
   $("vmx-lib-rationale-body").textContent = copy.detail;
   $("vmx-lib-rationale-meta").textContent =
     `${mode === "build" ? "no export" : "no playlist"} · ${result.stop_reason}`;
@@ -678,14 +712,12 @@ function renderBuildSet(result: BuildSetResult): void {
   $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;
 }
 
-/** Working state while the set-prep agent discovers + sequences the set (it can
- *  take several seconds — the current app default runs the local Codex MCP
- *  tool loop). Skeleton rows + a "building" note so
- *  the surface never reads as hung. Replaced wholesale by
- *  renderBuildSet / renderError when the run lands. */
+/** Working state while AutoCrate discovers + sequences the set. Skeleton rows +
+ *  a "building" note keep the surface alive while the deterministic engine runs.
+ *  Replaced wholesale by renderBuildSet / renderError when the run lands. */
 function renderBuildSetLoading(brief: string): void {
   $("vmx-lib-rationale-body").textContent = `Building a set for "${brief}"…`;
-  $("vmx-lib-rationale-meta").textContent = "set-prep · working";
+  $("vmx-lib-rationale-meta").textContent = "autocrate · working";
   $("vmx-lib-export").style.display = "none";
   const el = $("vmx-lib-results");
   el.innerHTML = "";
