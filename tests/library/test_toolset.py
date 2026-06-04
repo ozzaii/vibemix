@@ -78,6 +78,7 @@ def test_mcp_product_surface_does_not_expose_gemini_youtube_tool(monkeypatch) ->
 
     assert "search_vibe" in registered
     assert "discover_pool" in registered
+    assert "inspect_candidates" in registered
     assert "get_track_sections" in registered
     assert "transition_slate" in registered
     assert "compile_musical_context" in registered
@@ -228,6 +229,31 @@ def test_features_camelot_is_deterministic(toolset):
     toolset._library.tracks["t099"] = _make_track("t099", key="Am")
     out = toolset.get_track_features({"track_id": "t099"})
     assert out["key"] == "8A"  # Am → 8A
+
+
+def test_inspect_candidates_batches_seen_tracks_and_errors_unseen(toolset, monkeypatch):
+    _stub_search(monkeypatch, ["t000", "t001"])
+    monkeypatch.setattr(
+        toolset,
+        "get_track_energy",
+        lambda args: {"track_id": args["track_id"], "energy": 71, "breakdown": "steady"},
+    )
+    toolset.search_vibe({"query": "fast hardgroove", "k": 2})
+
+    out = toolset.inspect_candidates({"track_ids": ["t000", "GHOST", "t001"]})
+
+    assert out["track_ids"] == ["t000", "t001"]
+    assert out["limit"] == tool_mod.MAX_INSPECT_CANDIDATES
+    assert out["truncated"] is False
+    assert len(out["candidates"]) == 3
+    first = out["candidates"][0]
+    assert first["features"]["track_id"] == "t000"
+    assert first["features"]["key"] == "8A"
+    assert first["sections"]
+    assert first["energy"] == {"energy": 71, "breakdown": "steady"}
+    assert out["candidates"][1]["track_id"] == "GHOST"
+    assert "rejected: track_id was never returned" in out["candidates"][1]["error"]
+    assert out["candidates"][2]["features"]["track_id"] == "t001"
 
 
 def test_dispatch_errors_never_raise(toolset):
