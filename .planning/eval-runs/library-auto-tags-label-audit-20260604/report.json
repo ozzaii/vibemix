@@ -1,0 +1,28 @@
+{
+  "calibration_rows": 0,
+  "calibration_strategy": null,
+  "complete_rows": 0,
+  "enough_complete_eval_rows": false,
+  "evaluation_complete_rows": 0,
+  "evaluation_rows": 0,
+  "generated_at": "2026-06-04T11:11:37+00:00",
+  "git_head": "bdc6ea489ff4dd3374242b07aa703a8dccf18f1f",
+  "label_status": "missing",
+  "min_required_rows": 50,
+  "missing_category_counts": {
+    "instrument": 0,
+    "mood": 0,
+    "texture": 0
+  },
+  "next_action": "complete eval/private/library/auto_tag_labels.jsonl rows for mood, texture, and instrument",
+  "path": "/Users/ozai/projects/dj-set-ai/eval/private/library/auto_tag_labels.jsonl",
+  "pending_rows": 0,
+  "required_categories": [
+    "mood",
+    "texture",
+    "instrument"
+  ],
+  "schema": "library_auto_tags_bench_v1_label_audit_v1",
+  "unknown_tags": {},
+  "usable_rows": 0
+}
