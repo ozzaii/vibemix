@@ -1,0 +1,241 @@
+{
+  "cue_grade_tutor_speak_count": 1,
+  "cue_grade_tutor_speaks": [
+    {
+      "monotonic": 26408.283407083,
+      "payload": {
+        "citations": [
+          "[ev:CUE_PLACEMENT_GRADED@65.840]"
+        ],
+        "data_state": "hint",
+        "text": "nice - that hot cue landed on the drop.",
+        "tts_marker": "L2.10.cue_grade"
+      },
+      "ts": "2026-06-04T11:34:53.190785+00:00",
+      "type": "ipc.learn.tutor_speak"
+    }
+  ],
+  "events_excerpt_count": 7,
+  "events_jsonl": "/Users/ozai/Library/Application Support/vibemix/recordings/20260604-143346/events.jsonl",
+  "final_progress_state": {
+    "action": "snapshot",
+    "progress": {
+      "course_2_unlocked": true,
+      "course_3_unlocked": false,
+      "courses": {
+        "course_2_transitions": {}
+      },
+      "lessons": {
+        "L2.10": {
+          "completed": true,
+          "completed_at": "2026-06-04T11:34:54Z",
+          "demonstrated": true,
+          "last_practice_source": "hardware",
+          "practice_sources": {
+            "hardware": 1,
+            "screen": 0
+          },
+          "strikes_used": 0
+        }
+      },
+      "schema_version": 2,
+      "skill_wall": [
+        {
+          "competent": false,
+          "first_mastered_at": null,
+          "learn_fill": 0.0,
+          "live_proof_count": 0,
+          "mastered": false,
+          "skill_id": "deck_control",
+          "stage": "locked",
+          "what_remains": "Finish the lessons to reach Competent"
+        },
+        {
+          "competent": false,
+          "first_mastered_at": null,
+          "learn_fill": 0.0,
+          "live_proof_count": 0,
+          "mastered": false,
+          "skill_id": "beatmatching",
+          "stage": "locked",
+          "what_remains": "Finish the lessons to reach Competent"
+        },
+        {
+          "competent": false,
+          "first_mastered_at": null,
+          "learn_fill": 0.0,
+          "live_proof_count": 0,
+          "mastered": false,
+          "skill_id": "eq_mixing",
+          "stage": "locked",
+          "what_remains": "Finish the lessons to reach Competent"
+        },
+        {
+          "competent": false,
+          "first_mastered_at": null,
+          "learn_fill": 0.0,
+          "live_proof_count": 0,
+          "mastered": false,
+          "skill_id": "harmonic_mixing",
+          "stage": "locked",
+          "what_remains": "Finish the lessons to reach Competent"
+        },
+        {
+          "competent": false,
+          "first_mastered_at": null,
+          "learn_fill": 0.0,
+          "live_proof_count": 0,
+          "mastered": false,
+          "skill_id": "transitions",
+          "stage": "locked",
+          "what_remains": "Finish the lessons to reach Competent"
+        },
+        {
+          "competent": false,
+          "first_mastered_at": null,
+          "learn_fill": 0.0769,
+          "live_proof_count": 0,
+          "mastered": false,
+          "skill_id": "phrasing_performance",
+          "stage": "locked",
+          "what_remains": "Finish the lessons to reach Competent"
+        }
+      ],
+      "skills": {
+        "beatmatching": {
+          "first_mastered_at": null,
+          "live_proof_count": 0,
+          "mastered": false
+        },
+        "deck_control": {
+          "first_mastered_at": null,
+          "live_proof_count": 0,
+          "mastered": false
+        },
+        "eq_mixing": {
+          "first_mastered_at": null,
+          "live_proof_count": 0,
+          "mastered": false
+        },
+        "harmonic_mixing": {
+          "first_mastered_at": null,
+          "live_proof_count": 0,
+          "mastered": false
+        },
+        "phrasing_performance": {
+          "first_mastered_at": null,
+          "live_proof_count": 0,
+          "mastered": false
+        },
+        "transitions": {
+          "first_mastered_at": null,
+          "live_proof_count": 0,
+          "mastered": false
+        }
+      }
+    },
+    "was_recovered": false
+  },
+  "head": "5a7bdb05",
+  "learn_frame_types": [
+    "ipc.learn.lesson_loaded",
+    "ipc.learn.progress_state",
+    "ipc.learn.highlight",
+    "ipc.learn.teaching_focus",
+    "ipc.learn.tutor_speak",
+    "ipc.learn.tutor_speak",
+    "ipc.learn.waveform_ready",
+    "ipc.learn.controller_detected",
+    "ipc.learn.midi_position",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.tutor_speak",
+    "ipc.learn.advance",
+    "ipc.learn.teaching_focus",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.complete_lesson",
+    "ipc.learn.progress_state"
+  ],
+  "loaded_l210": true,
+  "missed_ticks": [],
+  "playhead_tick_count": 59,
+  "pre_press_cue_grade_tutor_speak_count": 0,
+  "press_info": {
+    "delay_after_trigger_s": 0.013843537414966356,
+    "sent": true,
+    "sent_at_monotonic": 26408.162428583,
+    "strategy": "live_tick_window",
+    "trigger_tick": {
+      "b_frame": 330139.5,
+      "b_position_s": 7.486156462585034,
+      "error_frames_at_tick": -610.5,
+      "error_s_at_tick": -0.013843537414966356,
+      "recv_monotonic": 26408.147765333,
+      "target_frame": 330750.0,
+      "target_s": 7.5
+    }
+  },
+  "press_sent": true,
+  "run_dir": ".planning/eval-runs/learn-l210-cue-playhead-proof-20260604-5a7bdb05",
+  "source_note": "Captured from 5a7bdb05 plus the Learn runtime/test diff committed with this artifact.",
+  "started_lesson": "L2.10",
+  "target_frame": 330750.0,
+  "target_s": 7.5,
+  "waveform_ready_count": 1
+}

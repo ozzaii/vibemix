@@ -85,6 +85,8 @@ from statemachine import State, StateMachine
 from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import DeckState
 from vibemix.learn.cue_practice import (
+    CUE_PLACEMENT_EVIDENCE_SOURCE,
+    CUE_PLACEMENT_GRADED_EVENT,
     CuePlacementPracticeResult,
     grade_owned_cue_placement_attempt,
     grade_owned_cue_placement_state,
@@ -1216,7 +1218,11 @@ class LessonRuntime(StateMachine):
         if self._cue_placement_practice_action_recorder is None:
             return
         timed_midi = dict(midi)
-        timed_midi.setdefault("action_elapsed_s", self._lesson_elapsed_s())
+        cue_frame = self._cue_placement_playhead_frame()
+        if cue_frame is not None:
+            timed_midi.setdefault("cue_frame", cue_frame)
+        else:
+            timed_midi.setdefault("action_elapsed_s", self._lesson_elapsed_s())
         try:
             should_grade = self._cue_placement_practice_action_recorder(
                 self._learn.current_lesson_id,
@@ -1233,7 +1239,38 @@ class LessonRuntime(StateMachine):
         if not should_grade:
             return
         self._cue_placement_practice_lock_active = False
-        self._grade_cue_placement_practice_tick()
+        self._emit_live_cue_placement_grade(self._grade_cue_placement_practice_tick())
+
+    def _cue_placement_playhead_frame(self) -> float | None:
+        """Return deck B's owned practice playhead frame, when available."""
+
+        if self._playhead_payload_loader is None:
+            return None
+        try:
+            payload = self._playhead_payload_loader()
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] cue placement playhead lookup failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return None
+        if not isinstance(payload, dict):
+            return None
+        decks = payload.get("decks")
+        if not isinstance(decks, dict):
+            return None
+        deck_b = decks.get("B")
+        if not isinstance(deck_b, dict):
+            return None
+        try:
+            frame = float(deck_b.get("frame"))
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(frame) or frame < 0.0:
+            return None
+        return frame
 
     def on_skip(self, **_kwargs: Any) -> None:
         self._last_was_match = False
@@ -2006,6 +2043,37 @@ class LessonRuntime(StateMachine):
             self._last_beatmatch_live_grade_signature = None
             return
         self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
+
+    def _emit_live_cue_placement_grade(
+        self, result: CuePlacementPracticeResult | None
+    ) -> None:
+        """Voice the cited cue-placement result only after a real graded edge."""
+
+        if result is None or result.event is None:
+            return
+        citation = (
+            f"[{CUE_PLACEMENT_EVIDENCE_SOURCE}:"
+            f"{CUE_PLACEMENT_GRADED_EVENT}@{result.t_session:.3f}]"
+        )
+        text = "nice - that hot cue landed on the drop."
+        if result.grade.verdict == "beat_locked":
+            text = "nice - that hot cue landed on the beat."
+        lesson_id = self._learn.current_lesson_id or "learn"
+        try:
+            speak = LearnTutorSpeak.make(
+                text=text,
+                tts_marker=f"{lesson_id}.cue_grade",
+                citations=(citation,),
+                data_state="hint",
+            ).to_dict()
+            self._emit_tutor_speak(speak)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] cue placement live grade emit failed: {exc!r}",
+                file=sys.stderr,
+            )
 
     def _grade_cue_placement_practice_tick(self) -> CuePlacementPracticeResult | None:
         """Grade the optional owned-deck cue-placement lane on a lock edge.

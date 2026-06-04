@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import DeckState
 from vibemix.coach.citation_linter import CitationLinter
+from vibemix.learn.cue_placement_practice_driver import CuePlacementPracticeDriver
 from vibemix.learn.progress import LearnProgress
 from vibemix.learn.runtime import (
     BeatmatchPracticeSnapshot,
@@ -924,6 +925,7 @@ def test_matched_cue_action_records_and_grades_immediately(monkeypatch) -> None:
     grid = _beat_grid()
     target = grid.beat_at(16)
     registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
     events: list[tuple[str, dict]] = []
     recorded: list[tuple[str | None, dict]] = []
     armed = False
@@ -943,7 +945,7 @@ def test_matched_cue_action_records_and_grades_immediately(monkeypatch) -> None:
         learn_state=LearnState(),
         midi_mirror=MagicMock(name="midi_mirror"),
         controller_state=MagicMock(name="controller_state"),
-        ipc_router=MagicMock(name="ipc_router"),
+        ipc_router=ipc,
         progress_store=progress,
         evidence_registry=registry,
         evidence_clock=lambda: 73.5,
@@ -966,6 +968,11 @@ def test_matched_cue_action_records_and_grades_immediately(monkeypatch) -> None:
         controller_id="pioneer_ddj_flx4",
     )
     runtime.send("begin")
+    assert not any(
+        call.args[0].get("type") == "ipc.learn.tutor_speak"
+        and call.args[0].get("payload", {}).get("tts_marker") == "L2.10.cue_grade"
+        for call in ipc.emit.call_args_list
+    )
     runtime.send("ack_action", midi=midi)
 
     assert len(recorded) == 1
@@ -978,6 +985,86 @@ def test_matched_cue_action_records_and_grades_immediately(monkeypatch) -> None:
     assert progress.skills["phrasing_performance"]["live_proof_count"] == 1
     assert progress in saved
     assert any(kind == "learn_cue_placement_practice_graded" for kind, _fields in events)
+    cue_grade_speaks = [
+        call.args[0]
+        for call in ipc.emit.call_args_list
+        if call.args[0].get("type") == "ipc.learn.tutor_speak"
+        and call.args[0].get("payload", {}).get("tts_marker") == "L2.10.cue_grade"
+    ]
+    assert len(cue_grade_speaks) == 1
+    cue_grade_payload = cue_grade_speaks[0]["payload"]
+    assert cue_grade_payload["text"] == "nice - that hot cue landed on the drop."
+    assert cue_grade_payload["citations"] == ["[ev:CUE_PLACEMENT_GRADED@73.500]"]
+
+
+def test_cue_placement_practice_uses_deck_playhead_not_lesson_elapsed(monkeypatch) -> None:
+    """A delayed hot-cue press grades from deck B's playhead frame, not wall time."""
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_phrasing_competent(progress)
+    driver = CuePlacementPracticeDriver()
+    grid = _beat_grid()
+    target = grid.beat_at(16)
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    recorded: list[dict] = []
+
+    def record_action(lesson_id: str | None, midi: dict) -> bool:
+        recorded.append(dict(midi))
+        return driver.record_action(lesson_id, midi)
+
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 81.25,
+        cue_placement_practice_loader=driver.snapshot,
+        cue_placement_practice_action_recorder=record_action,
+        playhead_payload_loader=lambda: {
+            "sample_rate": _SR,
+            "decks": {
+                "A": {"frame": 0.0, "position_s": 0.0, "bpm": 128.0},
+                "B": {
+                    "frame": target,
+                    "position_s": target / _SR,
+                    "bpm": 128.0,
+                },
+            },
+        },
+    )
+
+    runtime.send(
+        "load",
+        lesson_id="L2.10",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    runtime._learn.lesson_started_at -= 999.0
+    runtime.send(
+        "ack_action",
+        midi={
+            "type": "button",
+            "control": "hotcue",
+            "deck": "B",
+            "direction": "down",
+            "source": "midi",
+        },
+    )
+
+    assert len(recorded) == 1
+    assert recorded[0]["cue_frame"] == target
+    assert "action_elapsed_s" not in recorded[0]
+    assert registry.has("ev", "CUE_PLACEMENT_GRADED", 81.25, tol=1.0)
+    assert any(
+        call.args[0].get("type") == "ipc.learn.tutor_speak"
+        and call.args[0].get("payload", {}).get("citations")
+        == ["[ev:CUE_PLACEMENT_GRADED@81.250]"]
+        for call in ipc.emit.call_args_list
+    )
 
 
 def test_cue_placement_practice_rearms_after_wrong_drop(monkeypatch) -> None:

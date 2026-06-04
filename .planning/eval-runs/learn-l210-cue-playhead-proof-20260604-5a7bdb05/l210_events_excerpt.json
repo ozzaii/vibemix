@@ -1,0 +1,215 @@
+[
+  {
+    "citations": [],
+    "course_id": "course_2_transitions",
+    "data_state": "active",
+    "kind": "learn_tutor_speak",
+    "lesson_id": "L2.10",
+    "step_id": "L2.10.practice",
+    "t": 58.346,
+    "text": "hot cues are jump points you can hit at any time. cue 1 is usually the first kick; cue 2 is usually the breakdown entry.",
+    "tts_marker": "L210.beat0"
+  },
+  {
+    "artifacts": {},
+    "citation": {
+      "action": "emit",
+      "count": 0,
+      "reason": null,
+      "valid": false
+    },
+    "direction": "assistant",
+    "engine": "learn_tutor",
+    "event": "learn_tutor_speak",
+    "extra": {
+      "citations": [],
+      "course_id": "course_2_transitions",
+      "data_state": "active",
+      "lesson_id": "L2.10",
+      "source": "learn_runtime",
+      "step_id": "L2.10.practice",
+      "teaching_loop": null,
+      "tts_marker": "L210.beat0"
+    },
+    "kind": "ai_message",
+    "latency_s": null,
+    "message": "hot cues are jump points you can hit at any time. cue 1 is usually the first kick; cue 2 is usually the breakdown entry.",
+    "message_chars": 120,
+    "model": null,
+    "move_grades": [],
+    "moves": {},
+    "prompt_chars": null,
+    "provider": "authored_fixture",
+    "response_chars": 120,
+    "response_id": "learn:learn_runtime:course_2_transitions:L2.10:L2.10.practice:L210.beat0",
+    "schema_version": 1,
+    "stop_reason": "authored_fixture",
+    "suppression": null,
+    "surface": "learn",
+    "t": 58.347,
+    "tool_trace": [],
+    "tools_used": [],
+    "ts_iso": "2026-06-04T14:34:44.818+03:00"
+  },
+  {
+    "citations": [
+      "[screen:hotcue:B]"
+    ],
+    "course_id": "course_2_transitions",
+    "data_state": "active",
+    "kind": "learn_tutor_speak",
+    "lesson_id": "L2.10",
+    "step_id": "L2.10.practice",
+    "t": 58.349,
+    "text": "press hot cue 2 on deck b to enter on the breakdown: the deck jumps straight to it.",
+    "tts_marker": "L210.beat1"
+  },
+  {
+    "artifacts": {},
+    "citation": {
+      "action": "emit",
+      "count": 1,
+      "reason": null,
+      "valid": true
+    },
+    "direction": "assistant",
+    "engine": "learn_tutor",
+    "event": "learn_tutor_speak",
+    "extra": {
+      "citations": [
+        "[screen:hotcue:B]"
+      ],
+      "course_id": "course_2_transitions",
+      "data_state": "active",
+      "lesson_id": "L2.10",
+      "source": "learn_runtime",
+      "step_id": "L2.10.practice",
+      "teaching_loop": {
+        "observation": {
+          "backstage_lenses": [
+            "evidence_registry",
+            "controller_state"
+          ],
+          "control_id": "hotcue:B",
+          "input_surfaces": [
+            "hardware",
+            "screen"
+          ],
+          "kind": "practice",
+          "lesson_id": "L2.10",
+          "step_id": "L2.10.practice",
+          "strikes_used": 0
+        },
+        "route_path": "learn_tutor",
+        "stages": [
+          "observe",
+          "decide",
+          "teach",
+          "verify",
+          "adapt"
+        ],
+        "turn_kind": "teach",
+        "verification": {
+          "control": "hotcue",
+          "deck": "B",
+          "direction": "down",
+          "input_surfaces": [
+            "hardware",
+            "screen"
+          ],
+          "kind": "button_press",
+          "min_delta": 0,
+          "observable_control_ids": [
+            "hotcue:B"
+          ]
+        }
+      },
+      "tts_marker": "L210.beat1"
+    },
+    "kind": "ai_message",
+    "latency_s": null,
+    "message": "press hot cue 2 on deck b to enter on the breakdown: the deck jumps straight to it.",
+    "message_chars": 83,
+    "model": null,
+    "move_grades": [],
+    "moves": {},
+    "prompt_chars": null,
+    "provider": "authored_fixture",
+    "response_chars": 83,
+    "response_id": "learn:learn_runtime:course_2_transitions:L2.10:L2.10.practice:L210.beat1",
+    "schema_version": 1,
+    "stop_reason": "authored_fixture",
+    "suppression": null,
+    "surface": "learn",
+    "t": 58.349,
+    "tool_trace": [],
+    "tools_used": [],
+    "ts_iso": "2026-06-04T14:34:44.821+03:00"
+  },
+  {
+    "course_id": "course_2_transitions",
+    "credited": [],
+    "evidence_time": 65.83981919288635,
+    "kind": "learn_cue_placement_practice_graded",
+    "lesson_id": "L2.10",
+    "step_id": "L2.10.practice",
+    "t": 66.719,
+    "verdict": "drop_locked"
+  },
+  {
+    "citations": [
+      "[ev:CUE_PLACEMENT_GRADED@65.840]"
+    ],
+    "course_id": "course_2_transitions",
+    "data_state": "hint",
+    "kind": "learn_tutor_speak",
+    "lesson_id": "L2.10",
+    "step_id": "L2.10.practice",
+    "t": 66.721,
+    "text": "nice - that hot cue landed on the drop.",
+    "tts_marker": "L2.10.cue_grade"
+  },
+  {
+    "artifacts": {},
+    "citation": {
+      "action": "emit",
+      "count": 1,
+      "reason": null,
+      "valid": true
+    },
+    "direction": "assistant",
+    "engine": "learn_tutor",
+    "event": "learn_tutor_speak",
+    "extra": {
+      "citations": [
+        "[ev:CUE_PLACEMENT_GRADED@65.840]"
+      ],
+      "course_id": "course_2_transitions",
+      "data_state": "hint",
+      "lesson_id": "L2.10",
+      "source": "learn_runtime",
+      "step_id": "L2.10.practice",
+      "teaching_loop": null,
+      "tts_marker": "L2.10.cue_grade"
+    },
+    "kind": "ai_message",
+    "latency_s": null,
+    "message": "nice - that hot cue landed on the drop.",
+    "message_chars": 39,
+    "model": null,
+    "move_grades": [],
+    "moves": {},
+    "prompt_chars": null,
+    "provider": "authored_fixture",
+    "response_chars": 39,
+    "response_id": "learn:learn_runtime:course_2_transitions:L2.10:L2.10.practice:L2.10.cue_grade",
+    "schema_version": 1,
+    "stop_reason": "authored_fixture",
+    "suppression": null,
+    "surface": "learn",
+    "t": 66.721,
+    "tool_trace": [],
+    "tools_used": [],
+    "ts_iso": "2026-06-04T14:34:53.192+03:00"
+  }
+]
