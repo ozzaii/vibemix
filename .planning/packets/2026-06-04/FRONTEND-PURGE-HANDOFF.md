@@ -5,6 +5,30 @@ Goal: Crate → full-bleed Viber agentic chat (real `library://viber-tool` strea
 strip ALL telemetry/defensive-copy off user surfaces. Spec: `GOAL-frontend.md` +
 `UX-CRITIQUE-IMPECCABLE.md` (both in `.planning/packets/2026-06-04/`).
 
+## UPDATE — mandate expanded (Stop hook) + more landed
+The lane now also owns: (B) three Crate fixes on the sibling's `918839a0` rebuild
+— B1 kill desktop dead-space (center the conversation; the left-rail-vs-centered
+tension reads "unfinished"); B2 remove the redundant VIBER mode tab beside SEND
+(one SEND; VIBER is the title); **B3 already DONE** (starter chips pre-fill + run +
+hide rail, test-enforced `chat.test.ts:589` — no change). (C) organism phase-2:
+add `ipc.learn.teaching_focus {control_id,deck,band,phase}` + `control_rect` schema
+section (run `npm run codegen:ipc` + ipc-wiring-checker), wire dissolve→stream-to-
+control→glow→reform + EQ-knob needle rotation; organism animates ONLY on real
+signals (voice RMS, beat, teaching focus, MIDI) — random dots = fail; verify on the
+real rig by eye. B1/B2 + C need the RUNNING app (`VIBEMIX_DEV_SIDECAR=1`), not guessing.
+
+Landed since first handoff (all `-s`, surviving): `2b654c44` session made-by-bravoh ·
+`12b4e919` session AI-COHOST strip · `b756abe5` debrief telemetry · `980558ec` ear-test
+gate · `fa52a00a` drills title · `37956f5d` debrief session-id · `0106a6f0` pill idle-dot ·
+`cba060c2` session Sven→co-host · `0357195a` session a11y (aria-live + cite chip).
+
+REMAINING after this: debrief bravoh-waitlist toggle; session hero coupled removals
+(`vmx-modebar` — DOM+handle+`setModePickerActive`+`session.mode-picker` contract wire;
+`vmx-idle-proof` grid — interface+DOM+CSS+`session.idle-proof*` wires+the 'sven' cell;
+`vmx-claim-policy` GUARD/RED); `vmx-voice::before` (DEFERRED — judgment call, may flatten
+the slab, needs by-eye); pill gamification (XP/LV/combo/feedback/cue-confidence/backup —
+deep data+contract+test coupling); learn-window; type scale; then B1/B2 + C on the rig.
+
 ## SHARED LAW (proven the hard way — obey or lose work)
 - Commits survive; **UNCOMMITTED work gets WIPED** when a sibling session's git op
   resets the tree (my ~20min settings purge was wiped this way). So: finish a
