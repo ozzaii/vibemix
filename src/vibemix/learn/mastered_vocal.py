@@ -16,8 +16,8 @@ Anti-slop contract:
     not-mastered→mastered FLIP. Already-mastered (a 4th/5th demo) is silent;
     Competent / partial fill is silent. Fire-once is by construction: only the
     flip is non-None, so a re-call after the flip returns ``None``.
-  * Final tone is a KAAN-ACTION ear-pass (``§EARNED-MASTERED-VOCAL-EAR``): real
-    friend marking a genuinely-earned moment, not a scripted reward chime.
+  * Final tone is a KAAN-ACTION ear-pass (``§EARNED-MASTERED-VOCAL-EAR``): a
+    factual cited-proof receipt, not a scripted reward chime.
 
 Import-light by design (stdlib + a single fixture read) so it can sit on the
 ``learn/`` island and be called from the live credit site without dragging in the
@@ -34,7 +34,7 @@ _FIXTURE = Path(__file__).resolve().parent / "vocals" / "mastered_vocals.json"
 # reaction loop). The fixture is the single source on disk; this only guards a
 # packaging accident.
 _FALLBACK: dict[str, str] = {
-    "_default": "That one was real, and it was yours. You earned that in a live set.",
+    "_default": "This skill is mastered from cited practice proofs.",
 }
 
 

@@ -15,6 +15,7 @@ from pathlib import Path
 from scripts.launch.check_no_tutor_slop import TUTOR_SLOP_BLOCKLIST
 
 from vibemix.learn.mastered_vocal import (
+    _FALLBACK,
     MASTERED_VOCALS,
     mastered_unlock_line,
 )
@@ -64,6 +65,13 @@ def test_unknown_skill_falls_back_to_default_line():
     line = mastered_unlock_line("not_a_real_skill", was_mastered=False, now_mastered=True)
     assert line == MASTERED_VOCALS["_default"]
     assert isinstance(line, str) and line.strip()
+
+
+def test_packaging_fallback_keeps_the_same_factual_tone():
+    line = _FALLBACK["_default"]
+    assert "cited" in line.lower()
+    for tok in ("earned", "for real", "yours", "by you", "by your"):
+        assert tok not in line.lower()
 
 
 def test_every_vocal_line_passes_the_tutor_slop_blocklist():
