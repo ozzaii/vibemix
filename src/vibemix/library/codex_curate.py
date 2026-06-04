@@ -1227,11 +1227,18 @@ def _infer_bpm_range(text: str) -> tuple[float | None, float | None]:
     return (min(lo, hi), max(lo, hi))
 
 
-def _auto_crate_tool_trace(tool_trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _auto_crate_tool_trace(
+    tool_trace: list[dict[str, Any]], *, after_partial_tools: bool = False
+) -> list[dict[str, Any]]:
+    timeout_arg = (
+        "timed out after partial library tools; using auto_crate"
+        if after_partial_tools
+        else "timed out before library tools; using auto_crate"
+    )
     rows = [
         {
             "name": "codex_exec",
-            "arg": "timed out before library tools; using auto_crate",
+            "arg": timeout_arg,
             "ok": False,
         }
     ]
@@ -1252,6 +1259,7 @@ def _build_set_auto_crate_timeout_fallback(
     name: str | None,
     n_slots: int | None,
     export: bool,
+    after_partial_tools: bool = False,
 ) -> CodexCurateResult:
     from vibemix.library.auto_crate import build_auto_crate
 
@@ -1267,19 +1275,29 @@ def _build_set_auto_crate_timeout_fallback(
         bpm_max=bpm_max,
     )
     if result.stop_reason not in {"created", "exported"}:
+        timeout_context = (
+            "after partial library tools"
+            if after_partial_tools
+            else "before using tools"
+        )
         return CodexCurateResult(
             theme=brief,
             stop_reason="timeout",
             error=(
-                "Codex did not finish before using tools, and auto-crate fallback "
+                f"Codex did not finish {timeout_context}, and auto-crate fallback "
                 f"could not build a set: {result.error or result.stop_reason}"
             ),
         )
 
     playlist = result.playlist or {}
+    timeout_context = (
+        "timed out after partial library tools"
+        if after_partial_tools
+        else "did not reach the library tools in time"
+    )
     rationale = (
-        "Codex did not reach the library tools in time, so Viber used the grounded "
-        f"auto-crate engine instead. {result.rationale}"
+        f"Codex {timeout_context}, so Viber used the grounded auto-crate engine "
+        f"instead. {result.rationale}"
     )
     return CodexCurateResult(
         theme=brief,
@@ -1427,21 +1445,15 @@ def build_set_with_codex(
             )
         except subprocess.TimeoutExpired:
             _tape_stop()
-            if not _read_tool_event_trace(tool_events_path):
-                return _finish(
-                    _build_set_auto_crate_timeout_fallback(
-                        brief,
-                        curve=curve,
-                        name=name,
-                        n_slots=n_slots,
-                        export=export,
-                    )
-                )
+            tool_events = _read_tool_event_trace(tool_events_path)
             return _finish(
-                CodexCurateResult(
-                    theme=brief,
-                    stop_reason="timeout",
-                    error=f"Codex did not finish within {timeout_s:.0f}s.",
+                _build_set_auto_crate_timeout_fallback(
+                    brief,
+                    curve=curve,
+                    name=name,
+                    n_slots=n_slots,
+                    export=export,
+                    after_partial_tools=bool(tool_events),
                 )
             )
         finally:
@@ -4064,7 +4076,9 @@ class CodexChatResult:
         return out
 
 
-def _chat_set_prep_timeout_fallback(message: str) -> CodexChatResult | None:
+def _chat_set_prep_timeout_fallback(
+    message: str, *, after_partial_tools: bool = False
+) -> CodexChatResult | None:
     if not _SET_PREP_FALLBACK_RE.search(message):
         return None
 
@@ -4084,14 +4098,21 @@ def _chat_set_prep_timeout_fallback(message: str) -> CodexChatResult | None:
     if result.stop_reason not in {"created", "exported"}:
         return None
 
+    timeout_context = (
+        "timed out after partial library tools"
+        if after_partial_tools
+        else "did not reach the library tools in time"
+    )
     reply = (
-        "Codex did not reach the library tools in time, so I used the grounded "
-        f"auto-crate engine and made a draft instead. {result.rationale}"
+        f"Codex {timeout_context}, so I used the grounded auto-crate engine and "
+        f"made a draft instead. {result.rationale}"
     )
     return CodexChatResult(
         reply=reply,
         tools_used=["auto_crate"],
-        tool_trace=_auto_crate_tool_trace(result.tool_trace),
+        tool_trace=_auto_crate_tool_trace(
+            result.tool_trace, after_partial_tools=after_partial_tools
+        ),
         track_ids=list(result.track_ids),
         playlist=result.playlist,
         export_path=result.export_path,
@@ -4100,7 +4121,7 @@ def _chat_set_prep_timeout_fallback(message: str) -> CodexChatResult | None:
 
 
 def _chat_candidate_timeout_fallback(
-    message: str, library: RekordboxLibrary
+    message: str, library: RekordboxLibrary, *, after_partial_tools: bool = False
 ) -> CodexChatResult | None:
     if not _CANDIDATE_FALLBACK_RE.search(message):
         return None
@@ -4122,10 +4143,15 @@ def _chat_candidate_timeout_fallback(
             discover_args["bpm_max"] = bpm_max
 
         discovered = toolset.dispatch("discover_pool", discover_args)
+        timeout_arg = (
+            "timed out after partial library tools; using direct discovery"
+            if after_partial_tools
+            else "timed out before library tools; using direct discovery"
+        )
         trace = [
             {
                 "name": "codex_exec",
-                "arg": "timed out before library tools; using direct discovery",
+                "arg": timeout_arg,
                 "ok": False,
             },
             _direct_tool_trace_row("discover_pool", discovered),
@@ -4227,9 +4253,13 @@ def _candidate_fallback_reply(candidates: list[Any]) -> str:
     )
 
 
-def _chat_timeout_fallback(message: str, library: RekordboxLibrary) -> CodexChatResult | None:
-    return _chat_set_prep_timeout_fallback(message) or _chat_candidate_timeout_fallback(
-        message, library
+def _chat_timeout_fallback(
+    message: str, library: RekordboxLibrary, *, after_partial_tools: bool = False
+) -> CodexChatResult | None:
+    return _chat_set_prep_timeout_fallback(
+        message, after_partial_tools=after_partial_tools
+    ) or _chat_candidate_timeout_fallback(
+        message, library, after_partial_tools=after_partial_tools
     )
 
 
@@ -4385,10 +4415,12 @@ def chat_with_codex(
             )
         except subprocess.TimeoutExpired:
             _tape_stop()
-            if not _read_tool_event_trace(tool_events_path):
-                fallback = _chat_timeout_fallback(message, library)
-                if fallback is not None:
-                    return _finish(fallback)
+            tool_events = _read_tool_event_trace(tool_events_path)
+            fallback = _chat_timeout_fallback(
+                message, library, after_partial_tools=bool(tool_events)
+            )
+            if fallback is not None:
+                return _finish(fallback)
             return _finish(
                 CodexChatResult(
                     stop_reason="timeout",
