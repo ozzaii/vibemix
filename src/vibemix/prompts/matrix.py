@@ -968,7 +968,7 @@ def build_system_instruction(
         include_tag_dsl: Plan 41-04 LAT-05 — when True (default), the
             :data:`TTS_TAG_DSL_BLOCK` (Gemini 3.1 Flash TTS expressivity
             tags) is appended after the fail-soft fragment. Legacy Gemini-TTS
-            and non-live callers can keep the default; live MOSS-only co-host
+            and non-live callers can keep the default; live Chatterbox-only co-host
             calls now suppress it. When False the block is suppressed — used by
             ``vibemix.agent.persona`` together with
             ``include_citation_grammar=False`` /
@@ -976,10 +976,10 @@ def build_system_instruction(
             v4-byte-identity invariant on ``SYSTEM_INSTRUCTION``.
         include_audio_vibe_contract: When ``None`` (default), mirrors
             ``include_tag_dsl`` for backward compatibility with byte-identity
-            callers. Live MOSS-only co-host calls can pass ``True`` while
+            callers. Live Chatterbox-only co-host calls can pass ``True`` while
             suppressing the obsolete Gemini-TTS delivery-tag DSL.
         include_coach_closing: When ``None`` (default), mirrors
-            ``include_tag_dsl`` for backward compatibility. Live MOSS-only
+            ``include_tag_dsl`` for backward compatibility. Live Chatterbox-only
             coach calls can pass ``True`` so the professional-coach closing
             survives even when delivery tags are disabled.
         coaching_aim_skill: Optional Learn skill id whose fixed phrase is
@@ -1050,7 +1050,7 @@ def build_system_instruction(
     # with its own ``\n\n`` separator (matches CITATION_GRAMMAR_BLOCK
     # pattern) so it lands after the fail-soft fragment with the same
     # paragraph break. Default-on for backward-compatible prompt builders;
-    # live MOSS-only co-host calls opt out and keep the audio-vibe contract.
+    # live Chatterbox-only co-host calls opt out and keep the audio-vibe contract.
     if include_tag_dsl:
         # Coach mode gets the calm-only tag set (no [excited]/[fast]) so the
         # delivery never reads as hype; hype mode keeps the full 6-tag DSL.
@@ -1064,7 +1064,7 @@ def build_system_instruction(
     # Kaan: "eqları seslendirebilir ... tam bir professional coach olmalı, ne
     # hakkında konuşacağına o karar verecek." Trust the model's judgment over
     # the rules; let it name EQs/filters/moves when a real pro would. Defaults
-    # stay tied to include_tag_dsl for byte-identity callers; live MOSS-only
+    # stay tied to include_tag_dsl for byte-identity callers; live Chatterbox-only
     # calls can keep this closing while suppressing obsolete delivery tags.
     if mode_norm == "coach" and include_coach_closing:
         body = body + COACH_CLOSING_BLOCK

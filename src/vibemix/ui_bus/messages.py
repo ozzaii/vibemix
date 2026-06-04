@@ -1630,7 +1630,7 @@ class SessionOverlayHighlight:
 # invokes ``open_debrief_window`` with a ``deep_link`` payload.
 #
 # Anti-slop product principle made visible (LAUNCH-02 §6.2 white-space):
-# every reaction can carry on-screen receipts without making MOSS read
+# every reaction can carry on-screen receipts without making the voice path read
 # bracket atoms aloud or putting implementation tokens in the transcript.
 
 
