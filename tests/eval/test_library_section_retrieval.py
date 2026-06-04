@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 import numpy as np
-from scripts.eval.library_section_retrieval import _balanced_ids, _rank_same_label
+from scripts.eval.library_section_retrieval import (
+    _balanced_ids,
+    _blend_metrics,
+    _query_split,
+    _rank_same_label,
+)
 
 
 def _unit_rows(rows: list[list[float]]) -> dict[str, np.ndarray]:
@@ -49,3 +54,55 @@ def test_balanced_ids_caps_large_labels() -> None:
     out = _balanced_ids(ids, labels, max_tracks=5, max_per_label=2)
 
     assert out == ["a1", "b1", "c1", "a2", "b2"]
+
+
+def test_query_split_uses_deterministic_calibration_holdout() -> None:
+    split = _query_split([f"t{i}" for i in range(10)])
+
+    assert split["calibration"] == ["t0", "t5"]
+    assert split["holdout"] == ["t1", "t2", "t3", "t4", "t6", "t7", "t8", "t9"]
+
+
+def test_section_aware_blend_can_choose_nonzero_alpha_on_holdout() -> None:
+    ids = [f"a{i}" for i in range(5)] + [f"b{i}" for i in range(5)]
+    labels = {tid: tid[0] for tid in ids}
+    # Whole vectors are mostly right, but the section vectors fix the holdout
+    # pair order. The calibration split sees the same pattern and selects a
+    # nonzero alpha; holdout then beats alpha=0.
+    whole = {
+        "a0": np.asarray([1.0, 0.0], dtype=np.float32),
+        "a1": np.asarray([0.2, 0.98], dtype=np.float32),
+        "a2": np.asarray([0.1, 0.99], dtype=np.float32),
+        "a3": np.asarray([0.2, 0.98], dtype=np.float32),
+        "a4": np.asarray([0.1, 0.99], dtype=np.float32),
+        "b0": np.asarray([0.0, 1.0], dtype=np.float32),
+        "b1": np.asarray([1.0, 0.0], dtype=np.float32),
+        "b2": np.asarray([0.99, 0.1], dtype=np.float32),
+        "b3": np.asarray([1.0, 0.0], dtype=np.float32),
+        "b4": np.asarray([0.99, 0.1], dtype=np.float32),
+    }
+    section = {
+        tid: (
+            np.asarray([1.0, 0.0], dtype=np.float32)
+            if tid.startswith("a")
+            else np.asarray([0.0, 1.0], dtype=np.float32)
+        )
+        for tid in ids
+    }
+
+    out = _blend_metrics(
+        section_query_vectors=section,
+        section_candidate_vectors=section,
+        whole_query_vectors=whole,
+        whole_candidate_vectors=whole,
+        labels=labels,
+        k_values=(1,),
+        alpha_grid=(0.0, 0.5, 1.0),
+    )
+
+    assert out["calibration"]["best_alpha"] > 0.0
+    assert out["holdout"]["section_aware_beats_whole"] is True
+    assert (
+        out["holdout"]["section_aware_blend"]["precision_at_k"]["1"]
+        > out["holdout"]["whole_baseline"]["precision_at_k"]["1"]
+    )

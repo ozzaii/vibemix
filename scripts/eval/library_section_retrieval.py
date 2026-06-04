@@ -54,6 +54,7 @@ SCHEMA = "library_section_retrieval_bench_v1"
 DEFAULT_K = (1, 3, 5)
 DEFAULT_MAX_TRACKS = 40
 DEFAULT_MAX_PER_LABEL = 12
+DEFAULT_BLEND_ALPHA_GRID = tuple(round(i / 20, 2) for i in range(21))
 
 
 def _parse_k_values(raw: str) -> tuple[int, ...]:
@@ -229,6 +230,174 @@ def _rank_same_label(
     }
 
 
+def _query_split(ids: Sequence[str]) -> dict[str, list[str]]:
+    sorted_ids = sorted(str(tid) for tid in ids)
+    if len(sorted_ids) < 5:
+        return {"calibration": sorted_ids, "holdout": sorted_ids}
+    calibration = [tid for i, tid in enumerate(sorted_ids) if i % 5 == 0]
+    holdout = [tid for tid in sorted_ids if tid not in set(calibration)]
+    return {"calibration": calibration, "holdout": holdout}
+
+
+def _rank_blended_same_label(
+    query_ids: Sequence[str],
+    candidate_ids: Sequence[str],
+    *,
+    section_query_vectors: Mapping[str, np.ndarray],
+    section_candidate_vectors: Mapping[str, np.ndarray],
+    whole_query_vectors: Mapping[str, np.ndarray],
+    whole_candidate_vectors: Mapping[str, np.ndarray],
+    labels: Mapping[str, str],
+    alpha: float,
+    k_values: Sequence[int],
+) -> dict[str, Any]:
+    """Same-label retrieval for a section-aware blend.
+
+    ``alpha=0`` is the whole-track baseline; ``alpha=1`` is pure section
+    outro→intro. Nonzero alpha proves section vectors add signal only if it
+    improves held-out ranking over alpha=0.
+    """
+    precision_hits = {int(k): 0.0 for k in k_values}
+    any_hits = {int(k): 0 for k in k_values}
+    rr_sum = 0.0
+    scored = 0
+    for qid in query_ids:
+        if qid not in labels:
+            continue
+        relevant = {cid for cid in candidate_ids if cid != qid and labels.get(cid) == labels[qid]}
+        if not relevant:
+            continue
+        ranked = sorted(
+            (
+                (
+                    cid,
+                    float(
+                        alpha
+                        * (
+                            np.asarray(section_query_vectors[qid], dtype=np.float32)
+                            @ np.asarray(section_candidate_vectors[cid], dtype=np.float32)
+                        )
+                        + (1.0 - alpha)
+                        * (
+                            np.asarray(whole_query_vectors[qid], dtype=np.float32)
+                            @ np.asarray(whole_candidate_vectors[cid], dtype=np.float32)
+                        )
+                    ),
+                )
+                for cid in candidate_ids
+                if cid != qid
+                and cid in labels
+                and cid in section_candidate_vectors
+                and cid in whole_candidate_vectors
+            ),
+            key=lambda item: (-item[1], item[0]),
+        )
+        if not ranked:
+            continue
+        ranked_ids = [cid for cid, _score in ranked]
+        scored += 1
+        first_relevant_rank = next(
+            (rank for rank, cid in enumerate(ranked_ids, start=1) if cid in relevant),
+            None,
+        )
+        if first_relevant_rank is not None:
+            rr_sum += 1.0 / first_relevant_rank
+        for raw_k in k_values:
+            k = int(raw_k)
+            top = ranked_ids[: min(k, len(ranked_ids))]
+            if not top:
+                continue
+            rel_count = sum(1 for cid in top if cid in relevant)
+            precision_hits[k] += rel_count / len(top)
+            if rel_count:
+                any_hits[k] += 1
+
+    return {
+        "precision_at_k": {
+            str(k): round(precision_hits[k] / scored, 6) if scored else 0.0
+            for k in sorted(precision_hits)
+        },
+        "hit_at_k": {
+            str(k): round(any_hits[k] / scored, 6) if scored else 0.0
+            for k in sorted(any_hits)
+        },
+        "mrr": round(rr_sum / scored, 6) if scored else 0.0,
+        "queries": scored,
+    }
+
+
+def _blend_metrics(
+    *,
+    section_query_vectors: Mapping[str, np.ndarray],
+    section_candidate_vectors: Mapping[str, np.ndarray],
+    whole_query_vectors: Mapping[str, np.ndarray],
+    whole_candidate_vectors: Mapping[str, np.ndarray],
+    labels: Mapping[str, str],
+    k_values: Sequence[int],
+    alpha_grid: Sequence[float] = DEFAULT_BLEND_ALPHA_GRID,
+) -> dict[str, Any]:
+    candidate_ids = sorted(
+        set(section_candidate_vectors)
+        & set(whole_candidate_vectors)
+        & set(section_query_vectors)
+        & set(whole_query_vectors)
+        & set(labels)
+    )
+    split = _query_split(candidate_ids)
+
+    def score(query_ids: Sequence[str], alpha: float) -> dict[str, Any]:
+        return _rank_blended_same_label(
+            query_ids,
+            candidate_ids,
+            section_query_vectors=section_query_vectors,
+            section_candidate_vectors=section_candidate_vectors,
+            whole_query_vectors=whole_query_vectors,
+            whole_candidate_vectors=whole_candidate_vectors,
+            labels=labels,
+            alpha=alpha,
+            k_values=k_values,
+        )
+
+    calibration_scores = {str(alpha): score(split["calibration"], alpha) for alpha in alpha_grid}
+
+    def sort_key(alpha: float) -> tuple[float, float, float, float]:
+        metrics = calibration_scores[str(alpha)]
+        return (
+            float(metrics["precision_at_k"].get("1", 0.0)),
+            float(metrics["mrr"]),
+            float(metrics["precision_at_k"].get("3", 0.0)),
+            -float(alpha),
+        )
+
+    best_alpha = max((float(a) for a in alpha_grid), key=sort_key)
+    holdout_blend = score(split["holdout"], best_alpha)
+    holdout_whole = score(split["holdout"], 0.0)
+    holdout_section = score(split["holdout"], 1.0)
+    delta = round(
+        float(holdout_blend["precision_at_k"].get("1", 0.0))
+        - float(holdout_whole["precision_at_k"].get("1", 0.0)),
+        6,
+    )
+    return {
+        "alpha_grid": [float(alpha) for alpha in alpha_grid],
+        "calibration": {
+            "queries": len(split["calibration"]),
+            "best_alpha": best_alpha,
+            "best": calibration_scores[str(best_alpha)],
+            "whole_baseline": calibration_scores["0.0"],
+            "pure_section": calibration_scores["1.0"],
+        },
+        "holdout": {
+            "queries": len(split["holdout"]),
+            "section_aware_blend": holdout_blend,
+            "whole_baseline": holdout_whole,
+            "pure_section": holdout_section,
+            "precision_at_1_delta_vs_whole": delta,
+            "section_aware_beats_whole": best_alpha > 0.0 and delta > 0.0,
+        },
+    }
+
+
 def _center_query_and_candidates(
     query_vectors: Mapping[str, np.ndarray],
     candidate_vectors: Mapping[str, np.ndarray],
@@ -294,15 +463,26 @@ def _compare_modes(
         labels,
         k_values=k_values,
     )
-    primary_section = float(section_centered["precision_at_k"].get("1", 0.0))
-    primary_whole = float(whole_centered["precision_at_k"].get("1", 0.0))
+    section_aware = _blend_metrics(
+        section_query_vectors=centered_outros,
+        section_candidate_vectors=centered_intros,
+        whole_query_vectors=centered_whole_queries,
+        whole_candidate_vectors=centered_whole_candidates,
+        labels=labels,
+        k_values=k_values,
+    )
+    holdout = section_aware["holdout"]
+    primary_section = float(
+        holdout["section_aware_blend"]["precision_at_k"].get("1", 0.0)
+    )
+    primary_whole = float(holdout["whole_baseline"]["precision_at_k"].get("1", 0.0))
     primary_delta = round(primary_section - primary_whole, 6)
     return {
-        "primary_metric": "centered_precision_at_1",
+        "primary_metric": "holdout_centered_section_aware_precision_at_1",
         "primary_section_value": primary_section,
         "primary_whole_value": primary_whole,
         "primary_delta": primary_delta,
-        "section_beats_whole": primary_delta > 0.0,
+        "section_beats_whole": section_aware["holdout"]["section_aware_beats_whole"],
         "raw": {
             "section_outro_to_intro": section_raw,
             "whole_track_baseline": whole_raw,
@@ -322,6 +502,7 @@ def _compare_modes(
                 6,
             ),
         },
+        "section_aware": section_aware,
     }
 
 
@@ -448,8 +629,10 @@ def run_bench(
             "section_mode": "query=outro section vector, candidates=intro section vectors",
             "whole_baseline": "query=whole-track vector, candidates=whole-track vectors",
             "primary_metric": (
-                "mean-centered precision@1 because the product chooses one next intro candidate; "
-                "raw and p@3/p@5 remain in the artifact as caveats"
+                "held-out mean-centered precision@1 for a section-aware blend. "
+                "alpha=0 is the whole-track baseline; alpha=1 is pure section. "
+                "The alpha is selected on a deterministic calibration split, then "
+                "reported on holdout; raw/pure-section p@k remain as caveats."
             ),
             "no_owner_input": True,
         },
