@@ -202,6 +202,18 @@ def test_event_skill_map_credits_real_events() -> None:
     assert credited == []
 
 
+def test_recovery_drill_recovered_credits_transitions() -> None:
+    """An owned-deck recovery bailout is a cited transition-control demo."""
+
+    progress = _competent_progress("transitions")
+    ev = _event("RECOVERY_DRILL_RECOVERED", t=39.0)
+
+    credited = _recognize(ev, citation_check=_cited, progress=progress, now=_NOW)
+
+    assert credited == ["transitions"]
+    assert _count(progress, "transitions") == 1
+
+
 def test_learn_control_practice_event_credits_only_matched_allowed_skills() -> None:
     """Matched Learn control receipts credit deck_control/eq_mixing, not arbitrary skills."""
 

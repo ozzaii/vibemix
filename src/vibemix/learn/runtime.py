@@ -78,6 +78,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 from statemachine import State, StateMachine
@@ -118,6 +119,7 @@ from vibemix.learn.practice_loop import (
     grade_owned_beatmatch_state,
     is_creditable_locked_grade,
 )
+from vibemix.learn.skill_recognizer import recognize
 from vibemix.learn.state import LearnState
 from vibemix.learn.teaching_loop import (
     TeachingTurn,
@@ -1541,6 +1543,7 @@ class LessonRuntime(StateMachine):
         )
         self._mark_progress_practice_source(midi)
         citation = None
+        credited: tuple[str, ...] = ()
         if self._evidence_registry is not None:
             self._record_evidence(
                 source=BEATMATCH_EVIDENCE_SOURCE,
@@ -1551,6 +1554,41 @@ class LessonRuntime(StateMachine):
                 f"[{BEATMATCH_EVIDENCE_SOURCE}:{_RECOVERY_DRILL_RECOVERED_EVENT}@"
                 f"{evidence_time:.3f}]"
             )
+            credited = tuple(
+                recognize(
+                    SimpleNamespace(
+                        type=_RECOVERY_DRILL_RECOVERED_EVENT,
+                        extra={
+                            "drill": getattr(drill, "drill", ""),
+                            "deck": problem_deck,
+                            "bailout": bailout_label,
+                        },
+                    ),
+                    citation_check=lambda source, key, t: self._evidence_registry.has(
+                        source,
+                        key,
+                        t,
+                        tol=1.0,
+                    ),
+                    progress=self._progress,
+                    now=datetime.now(UTC).isoformat(),
+                    event_t=evidence_time,
+                )
+            )
+            if credited:
+                try:
+                    from vibemix.learn.progress import LearnProgress, save_progress
+
+                    if isinstance(self._progress, LearnProgress):
+                        save_progress(self._progress)
+                except Exception as exc:  # pragma: no cover - defensive
+                    import sys
+
+                    print(
+                        f"[learn.runtime] recovery drill progress save failed: {exc!r}",
+                        file=sys.stderr,
+                    )
+                self._emit_progress_snapshot()
         self._log_session_event(
             "learn_recovery_drill_recovered",
             lesson_id=self._learn.current_lesson_id or "",
@@ -1560,6 +1598,7 @@ class LessonRuntime(StateMachine):
             deck=problem_deck,
             bailout=bailout_label,
             evidence_time=evidence_time,
+            credited=list(credited),
         )
         citations = (citation,) if citation is not None else ()
         try:

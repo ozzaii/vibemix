@@ -1,0 +1,292 @@
+{
+  "current_source": true,
+  "learn_frames": [
+    {
+      "payload": {
+        "controller_id": "pioneer_ddj_flx4",
+        "course_id": "course_3_play_mode",
+        "lesson_id": "L3.05",
+        "progress_dots": [
+          {
+            "lesson_id": "L3.01",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L3.02",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L3.03",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L3.04",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L3.05",
+            "status": "current"
+          },
+          {
+            "lesson_id": "L3.06",
+            "status": "pending"
+          }
+        ],
+        "title": "recovery drills"
+      },
+      "ts": "2026-06-04T13:05:55.880743+00:00",
+      "type": "ipc.learn.lesson_loaded"
+    },
+    {
+      "payload": {
+        "action": "snapshot",
+        "transitions": {
+          "first_mastered_at": null,
+          "live_proof_count": 0,
+          "mastered": false
+        },
+        "transitions_wall": {
+          "competent": true,
+          "first_mastered_at": null,
+          "learn_fill": 1.0,
+          "live_proof_count": 0,
+          "mastered": false,
+          "skill_id": "transitions",
+          "stage": "competent",
+          "what_remains": "3 more cited live demos to Master"
+        }
+      },
+      "ts": "2026-06-04T13:05:55.883387+00:00",
+      "type": "ipc.learn.progress_state"
+    },
+    {
+      "payload": {
+        "annotation": "",
+        "control_id": "lesson_continue",
+        "cue_color": "amber",
+        "cue_shape": "pulse-ring",
+        "deck": "",
+        "expected_action": {
+          "control": "lesson_continue",
+          "deck": "",
+          "direction": "down",
+          "min_delta": 0,
+          "type": "button"
+        }
+      },
+      "ts": "2026-06-04T13:05:55.886220+00:00",
+      "type": "ipc.learn.highlight"
+    },
+    {
+      "payload": {
+        "band": null,
+        "control_id": "lesson_continue",
+        "deck": "",
+        "phase": "focus"
+      },
+      "ts": "2026-06-04T13:05:55.888268+00:00",
+      "type": "ipc.learn.teaching_focus"
+    },
+    {
+      "payload": {
+        "citations": [
+          "[screen:lesson_continue]"
+        ],
+        "data_state": "active",
+        "teaching_loop": {
+          "observation": {
+            "backstage_lenses": [
+              "evidence_registry",
+              "live_audio",
+              "cue_section_lookahead",
+              "library_suggestions",
+              "session_state",
+              "recovery_drill"
+            ],
+            "control_id": "lesson_continue",
+            "input_surfaces": [
+              "screen"
+            ],
+            "kind": "practice",
+            "lesson_id": "L3.05",
+            "step_id": "L3.05.beat.0",
+            "strikes_used": 0
+          },
+          "route_path": "learn_tutor",
+          "stages": [
+            "observe",
+            "decide",
+            "teach",
+            "verify",
+            "adapt"
+          ],
+          "turn_kind": "teach",
+          "verification": {
+            "control": "lesson_continue",
+            "deck": "",
+            "direction": "down",
+            "input_surfaces": [
+              "screen"
+            ],
+            "kind": "button_press",
+            "min_delta": 0,
+            "observable_control_ids": [
+              "lesson_continue"
+            ]
+          }
+        },
+        "text": "i'm going to introduce two problems into your mix, one drill at a time.",
+        "tts_marker": "L305.beat0"
+      },
+      "ts": "2026-06-04T13:05:55.890946+00:00",
+      "type": "ipc.learn.tutor_speak"
+    },
+    {
+      "payload": {
+        "deck_count": 2,
+        "sample_rate": 44100
+      },
+      "ts": "2026-06-04T13:05:55.894849+00:00",
+      "type": "ipc.learn.waveform_ready"
+    },
+    {
+      "payload": {
+        "citation": "[ev:RECOVERY_DRILL_ARMED@52.505]",
+        "phase_error_beats": 0.0,
+        "score": 0.0,
+        "verdict": "tempo_off"
+      },
+      "ts": "2026-06-04T13:05:55.957322+00:00",
+      "type": "ipc.learn.live_grade"
+    },
+    {
+      "payload": {
+        "citations": [
+          "[ev:RECOVERY_DRILL_ARMED@52.505]"
+        ],
+        "data_state": "hint",
+        "text": "I pitched deck B up into the clash - hear that pull, then bail out clean.",
+        "tts_marker": "L3.05.grade"
+      },
+      "ts": "2026-06-04T13:05:55.960027+00:00",
+      "type": "ipc.learn.tutor_speak"
+    },
+    {
+      "payload": {
+        "decks": {
+          "A": {
+            "bpm": 128.0,
+            "frame": 0.0,
+            "position_s": 0.0
+          },
+          "B": {
+            "bpm": 138.24,
+            "frame": 0.0,
+            "position_s": 0.0
+          }
+        },
+        "sample_rate": 44100
+      },
+      "ts": "2026-06-04T13:05:55.968718+00:00",
+      "type": "ipc.learn.playhead_tick"
+    },
+    {
+      "payload": {
+        "citations": [
+          "[ev:RECOVERY_DRILL_ARMED@52.505]"
+        ],
+        "data_state": "hint",
+        "text": "That move does not get deck B out. Use echo-out, sweep deck B's filter, pull its volume down, or cut the crossfader away.",
+        "tts_marker": "L3.05.recovery_hint"
+      },
+      "ts": "2026-06-04T13:05:55.976323+00:00",
+      "type": "ipc.learn.tutor_speak"
+    },
+    {
+      "payload": {
+        "action": "snapshot",
+        "transitions": {
+          "first_mastered_at": null,
+          "live_proof_count": 1,
+          "mastered": false
+        },
+        "transitions_wall": {
+          "competent": true,
+          "first_mastered_at": null,
+          "learn_fill": 1.0,
+          "live_proof_count": 1,
+          "mastered": false,
+          "skill_id": "transitions",
+          "stage": "competent",
+          "what_remains": "2 more cited live demos to Master"
+        }
+      },
+      "ts": "2026-06-04T13:05:55.981077+00:00",
+      "type": "ipc.learn.progress_state"
+    }
+  ],
+  "progress_path": "/tmp/vibemix-recovery-credit-progress.json",
+  "recovery_event": {
+    "bailout": "deck B filter sweep",
+    "course_id": "course_3_play_mode",
+    "credited": [
+      "transitions"
+    ],
+    "deck": "B",
+    "drill": "key_clash",
+    "evidence_time": 52.5278582572937,
+    "kind": "learn_recovery_drill_recovered",
+    "lesson_id": "L3.05",
+    "step_id": "L3.05.beat.0",
+    "t": 53.647
+  },
+  "run": "learn-recovery-credit-current-20260604",
+  "sent": {
+    "good_ack": {
+      "payload": {
+        "control_id": "filter:B",
+        "direction": "up",
+        "prev_value": 64,
+        "source": "click",
+        "value": 96
+      },
+      "ts": "2026-06-04T13:05:55.855674+00:00",
+      "type": "ipc.learn.ack"
+    },
+    "start_lesson": {
+      "payload": {
+        "lesson_id": "L3.05",
+        "level": "replay"
+      },
+      "ts": "2026-06-04T13:05:55.855476+00:00",
+      "type": "ipc.learn.start_lesson"
+    },
+    "wrong_ack": {
+      "payload": {
+        "control_id": "eq_hi:B",
+        "direction": "up",
+        "prev_value": 64,
+        "source": "click",
+        "value": 110
+      },
+      "ts": "2026-06-04T13:05:55.855671+00:00",
+      "type": "ipc.learn.ack"
+    }
+  },
+  "session_after": "/Users/ozai/Library/Application Support/vibemix/recordings/20260604-160502",
+  "session_before": "/Users/ozai/Library/Application Support/vibemix/recordings/20260604-160502",
+  "summary": {
+    "good_ack_sent": true,
+    "hint_seen_after_wrong_ack": true,
+    "lesson_loaded_l305": true,
+    "progress_live_proof_count": 1,
+    "recovery_event_bailout": "deck B filter sweep",
+    "recovery_event_credited": [
+      "transitions"
+    ],
+    "recovery_event_logged": true,
+    "skill_wall_stage": "competent",
+    "wrong_ack_sent": true
+  },
+  "timestamp": "2026-06-04T13:06:06.509396+00:00"
+}

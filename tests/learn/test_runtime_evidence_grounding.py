@@ -692,7 +692,8 @@ def test_recovery_drill_bailout_actions_give_meaningful_credit(monkeypatch) -> N
     driver = BeatmatchPracticeDriver()
     registry = EvidenceRegistry()
     events: list[tuple[str, dict]] = []
-    progress = LearnProgress(course_3_unlocked=True)
+    progress = LearnProgress()
+    _make_skill_competent(progress, "transitions")
     runtime = LessonRuntime(
         learn_state=LearnState(),
         midi_mirror=MagicMock(name="midi_mirror"),
@@ -734,6 +735,7 @@ def test_recovery_drill_bailout_actions_give_meaningful_credit(monkeypatch) -> N
     )
     assert hint["citations"] == ["[ev:RECOVERY_DRILL_ARMED@72.500]"]
     assert not registry.has("ev", "RECOVERY_DRILL_RECOVERED", 72.5, tol=1.0)
+    assert progress.skills["transitions"]["live_proof_count"] == 0
 
     handled = runtime.handle_recovery_drill_ack(
         {
@@ -751,6 +753,7 @@ def test_recovery_drill_bailout_actions_give_meaningful_credit(monkeypatch) -> N
     assert runtime.current_state.id == "awaiting_action"
     assert runtime.current_step_id == "L3.05.beat.1"
     assert registry.has("ev", "RECOVERY_DRILL_RECOVERED", 72.5, tol=1.0)
+    assert progress.skills["transitions"]["live_proof_count"] == 1
     tutor_texts = [payload["text"] for payload in _tutor_speak_payloads(runtime._ipc)]
     assert (
         "Good - that filter sweep pulls deck B out, so deck A reads clean."
@@ -760,6 +763,7 @@ def test_recovery_drill_bailout_actions_give_meaningful_credit(monkeypatch) -> N
         fields for kind, fields in events if kind == "learn_recovery_drill_recovered"
     ]
     assert recovery_events[-1]["bailout"] == "deck B filter sweep"
+    assert recovery_events[-1]["credited"] == ["transitions"]
 
     handled = runtime.handle_recovery_drill_ack(
         {
@@ -788,6 +792,8 @@ def test_recovery_drill_bailout_actions_give_meaningful_credit(monkeypatch) -> N
         fields for kind, fields in events if kind == "learn_recovery_drill_recovered"
     ]
     assert recovery_events[-1]["bailout"] == "deck B volume cut"
+    assert recovery_events[-1]["credited"] == ["transitions"]
+    assert progress.skills["transitions"]["live_proof_count"] == 2
 
 
 def test_live_beatmatch_grade_voices_drift_without_fabricated_citation() -> None:

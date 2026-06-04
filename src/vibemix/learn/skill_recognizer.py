@@ -79,6 +79,7 @@ EVENT_SKILL_MAP: dict[str, tuple[str, ...]] = {
     "LAYER_ARRIVAL": ("transitions",),  # a layer/element arrival = a transition
     "PHASE": ("phrasing_performance",),  # a phase change = phrase-locked play
     "PHRASE_BOUNDARY": ("phrasing_performance",),  # the genre-chain variant
+    "RECOVERY_DRILL_RECOVERED": ("transitions",),  # owned-deck bailout recovered
 }
 
 # MIX_MOVE move-label substrings → the skill each significance class credits.
@@ -103,9 +104,13 @@ _MIX_MOVE_DECK_SUBSTRINGS: tuple[str, ...] = ("_play→", "xfader")
 #     resolved in ``_candidate_skills`` and credited under the MAST-03 gate.
 #   - beatmatching: ``learn.practice_loop`` now owns the measured two-deck
 #     producer. It calls the Beatmatch Judge, writes the matching
-#     ``("ev", "BEATMATCH_GRADED", t_session)`` receipt, and only then runs this
-#     recognizer branch. Any future skill that lacks a citable producer belongs
-#     here until the producer ships.
+#     ``("ev", "BEATMATCH_GRADED", t_session)`` receipt, and only then runs the
+#     recognizer branch.
+#   - transitions: recovery drills write ``RECOVERY_DRILL_RECOVERED`` only after a
+#     student removes the injected problem deck from the owned MiniDeck mix.
+#     Transition Judge verdicts may still credit the same skill for live sets.
+# Any future skill that lacks a citable producer belongs here until the producer
+# ships.
 _HONEST_UNCREDITABLE_V11: tuple[str, ...] = ()
 
 
