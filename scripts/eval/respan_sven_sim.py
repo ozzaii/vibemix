@@ -251,6 +251,11 @@ def main() -> int:
     ap.add_argument("--no-log", action="store_true")
     ap.add_argument("--out", default=None)
     ap.add_argument(
+        "--match-live-persona",
+        action="store_true",
+        help="include the citation grammar block so the sim matches DJCoHostAgent's live prompt",
+    )
+    ap.add_argument(
         "--heartbeat-session",
         default=None,
         help="also run respan_sven_heartbeat_judge.py --apply-current-gate on this recording",
@@ -259,8 +264,17 @@ def main() -> int:
     args = ap.parse_args()
 
     # The live coach persona (the current build): intermediate/hype cell = SVEN_COACH_IDENTITY.
+    include_citation_grammar = bool(args.match_live_persona)
     persona = build_system_instruction(
-        "intermediate", "hype", include_tag_dsl=False, include_citation_grammar=False,
+        "intermediate",
+        "hype",
+        include_tag_dsl=False,
+        include_citation_grammar=include_citation_grammar,
+    )
+    print(
+        "persona: "
+        f"match_live_persona={args.match_live_persona} "
+        f"include_citation_grammar={include_citation_grammar}",
     )
 
     key = None
@@ -307,7 +321,13 @@ def main() -> int:
                 "prompt_messages": [{"role": "user", "content": user}],
                 "completion_message": {"role": "assistant", "content": line},
                 "category": "sven-sim-20260603", "custom_identifier": sc["name"],
-                "metadata": {"event": sc["event"], "gate": gate.verdict, **{d: scores.get(d) for d in DIMS}},
+                "metadata": {
+                    "event": sc["event"],
+                    "gate": gate.verdict,
+                    "match_live_persona": args.match_live_persona,
+                    "include_citation_grammar": include_citation_grammar,
+                    **{d: scores.get(d) for d in DIMS},
+                },
             }, key)
         results.append(row)
 
@@ -319,7 +339,19 @@ def main() -> int:
     print(f"gate routing: {gate_ok}/{len(results)} matched expectation")
     if args.out:
         with open(args.out, "w") as f:
-            json.dump({"results": results}, f, indent=2, ensure_ascii=False)
+            json.dump(
+                {
+                    "config": {
+                        "model": MODEL,
+                        "match_live_persona": args.match_live_persona,
+                        "include_citation_grammar": include_citation_grammar,
+                    },
+                    "results": results,
+                },
+                f,
+                indent=2,
+                ensure_ascii=False,
+            )
         print(f"-> wrote {args.out}", file=sys.stderr)
     if args.heartbeat_session:
         return _run_heartbeat_judge(
