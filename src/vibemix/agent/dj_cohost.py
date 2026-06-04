@@ -1877,7 +1877,7 @@ class DJCoHostAgent(Agent):
             await self._cache.invalidate()
         return True
 
-    def _push_transcript(self, text: str) -> None:
+    def _push_transcript(self, text: str, *, ts: str | None = None) -> None:
         """Best-effort push of a spoken AI line onto the snapshot sink.
 
         Called next to each ``_ai_text_history.append`` (the spoken-text
@@ -1887,7 +1887,10 @@ class DJCoHostAgent(Agent):
         if self._transcript_sink is None:
             return
         try:
-            self._transcript_sink.append(text)
+            if ts:
+                self._transcript_sink.append({"text": text, "ts": ts})
+            else:
+                self._transcript_sink.append(text)
         except Exception:
             pass
 
@@ -3592,6 +3595,7 @@ class DJCoHostAgent(Agent):
             citation_lint_valid: bool | None = None
             citation_lint_reason: str | None = None
             citation_lint_missing_payload: list[list[str]] | None = None
+            pending_transcript_text: str | None = None
 
             # Plan 41-04 — cancel-with-silence-pad on speculative-emit failure.
             # When ``head_yielded`` is True AND the post-stream gate fails
@@ -3838,7 +3842,7 @@ class DJCoHostAgent(Agent):
                                 set_s_at_event=ev_set_seconds,
                                 event=ev,
                             )
-                            self._push_transcript(audience_stripped[:140])
+                            pending_transcript_text = audience_stripped[:140]
                         else:
                             print("[ai_text] <empty> (skip TTS)", flush=True)
                     else:
@@ -3891,7 +3895,7 @@ class DJCoHostAgent(Agent):
                                     set_s_at_event=ev_set_seconds,
                                     event=ev,
                                 )
-                                self._push_transcript(audience_stripped[:140])
+                                pending_transcript_text = audience_stripped[:140]
                             else:
                                 print("[ai_text] <empty> (skip TTS)", flush=True)
                         # Invalid — consult the one-shot bypass before stripping.
@@ -3934,7 +3938,7 @@ class DJCoHostAgent(Agent):
                                     set_s_at_event=ev_set_seconds,
                                     event=ev,
                                 )
-                                self._push_transcript(audience_stripped[:140])
+                                pending_transcript_text = audience_stripped[:140]
                         else:
                             # Strip path — no chunks yielded. Pre-recorded
                             # ack substitution is retired (English placeholder
@@ -3993,7 +3997,7 @@ class DJCoHostAgent(Agent):
                             set_s_at_event=ev_set_seconds,
                             event=ev,
                         )
-                        self._push_transcript(audience_stripped[:140])
+                        pending_transcript_text = audience_stripped[:140]
                     else:
                         print("[ai_text] <empty> (skip TTS)", flush=True)
                     # Legacy path = no linter wired; treat as if citation_action
@@ -4055,6 +4059,29 @@ class DJCoHostAgent(Agent):
                 except Exception:
                     pass
 
+            reaction_msg_dict: dict[str, Any] | None = None
+            reaction_msg_ts: str | None = None
+            reaction_strip: list[dict] = []
+            if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
+                try:
+                    reaction_strip = (
+                        _build_citation_strip(
+                            reaction_text=spoken_text,
+                            registry=self._registry,
+                        )
+                        if self._registry is not None
+                        else []
+                    )
+                    reaction_msg = SessionCohostReaction.make(
+                        text=audience_text,
+                        event_id=ev_tag,
+                        citation_strip=reaction_strip,
+                    )
+                    reaction_msg_dict = reaction_msg.to_dict()
+                    reaction_msg_ts = str(reaction_msg_dict.get("ts") or "") or None
+                except Exception as e:
+                    print(f"\n[cohost-reaction build err] {e}", file=sys.stderr)
+
             # ---- Plan 24-02 — overlay-highlight publish ----
             # Fire once per [screen:<element>] citation IFF:
             #   1. ipc_bus is wired (sidecar publish path enabled).
@@ -4098,78 +4125,30 @@ class DJCoHostAgent(Agent):
             # logged + swallowed; the LLM response path must NEVER crash on
             # the launch-marketing surface (T-18-04-03-style mitigation).
             if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
-                try:
-                    strip = (
-                        _build_citation_strip(
-                            reaction_text=spoken_text,
-                            registry=self._registry,
-                        )
-                        if self._registry is not None
-                        else []
-                    )
-                    reaction_msg = SessionCohostReaction.make(
-                        text=audience_text,
-                        event_id=ev_tag,
-                        citation_strip=strip,
-                    )
-                    await self._ipc_bus.emit(reaction_msg.to_dict())
-                except Exception as e:
-                    print(f"\n[cohost-reaction publish err] {e}", file=sys.stderr)
-                else:
-                    # Phase 66 (COPILOT-02) — arm the recall-callback cooldown
-                    # ONLY when the chip reached the audience. The ``else:``
-                    # branch runs iff the try body completed without raising —
-                    # i.e. ``_ipc_bus.emit(...)`` returned cleanly. A bus-emit
-                    # failure jumps to the except above and this arm never runs;
-                    # this is the strict semantic locked in CONTEXT.md Area 1
-                    # Q3 + RESEARCH §Pitfall 2 + §Open Q5: cooldown reflects
-                    # "a recall callback REACHED the audience", not "a recall
-                    # callback was MERELY ATTEMPTED". One-way (arm only); no
-                    # reset path — the wall-clock progression naturally drains
-                    # the 120s window. Inner narrow try/except is defense in
-                    # depth: a fault in ``chip.get`` (e.g. a future wire-format
-                    # change) must not propagate and crash the turn — the
-                    # outer ``else:`` placement already guarantees this code
-                    # only runs on a clean bus emit, but the inner wrapper
-                    # matches the project idiom (Pattern B in 66-PATTERNS.md).
+                if reaction_msg_dict is not None:
                     try:
-                        if any(chip.get("event_id", "").startswith("recall:") for chip in strip):
-                            self._last_recall_callback_at = time.time()
-                    except Exception as _e:
-                        print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
+                        await self._ipc_bus.emit(reaction_msg_dict)
+                    except Exception as e:
+                        print(f"\n[cohost-reaction publish err] {e}", file=sys.stderr)
+                    else:
+                        # Arm recall cooldown only when the chip reached the UI.
+                        try:
+                            if any(
+                                chip.get("event_id", "").startswith("recall:")
+                                for chip in reaction_strip
+                            ):
+                                self._last_recall_callback_at = time.time()
+                        except Exception as _e:
+                            print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
             elif self._ipc_bus is None and citation_action in ("emit", "bypass"):
                 # Phase 66 (COPILOT-02) — bus-less arm path. When ``_ipc_bus`` is
                 # None (test contexts that don't wire the UI broadcast surface,
                 # or production agents that skip the IPC bus) the chip surface
                 # never publishes, but the AUDIO surface still delivered the
                 # reaction to the audience via the TTS chunks (citation_action
-                # in {emit, bypass} = "user heard the text"). The strict
-                # "REACHED the audience" semantic locked in CONTEXT.md Area 1
-                # Q3 still applies here: the audience heard the recall callback
-                # via audio even though no chip was broadcast.
-                #
-                # Phase 66 review CR-01 — mirror the bus path's STRUCTURAL filter.
-                # Previously this arm used ``parse_citations(full_text)`` raw,
-                # which arms on ANY ``("recall", <body>)`` atom found — INCLUDING
-                # a FABRICATED ``[recall:<unregistered>]`` that the one-shot
-                # bypass let through after the linter said invalid. The bus
-                # path correctly uses ``_build_citation_strip`` which ONLY counts
-                # atoms that resolve in the registry, so a fabricated recall id
-                # under bypass NEVER reaches the audience as a registered chip
-                # and never arms there. The two paths MUST yield the same
-                # arm/no-arm decision per the "REACHED the audience" semantic.
-                # Reuse the same lens here. The flag-OFF guard up-front (recall
-                # disabled or no registry) closes a secondary leak: today the
-                # outer condition only checks ``citation_action`` + bus-None, so
-                # if a future flag-OFF code path ever emitted a ``[recall:...]``
-                # atom this arm would fire with no recall service in play. The
-                # explicit ``_recall_enabled`` / ``_registry is None`` guards
-                # make the arm spec-correct under every state.
-                # Best-effort try/except so a parse failure cannot crash the
-                # turn (project Pattern B).
-                if not self._recall_enabled or self._registry is None:
-                    pass  # feature OFF or no registry — never arm without backing state
-                else:
+                # emit/bypass). Reuse the same grounded-strip lens as the bus
+                # path so fabricated recall atoms never arm cooldown.
+                if self._recall_enabled and self._registry is not None:
                     try:
                         strip = _build_citation_strip(
                             reaction_text=spoken_text,
@@ -4179,6 +4158,9 @@ class DJCoHostAgent(Agent):
                             self._last_recall_callback_at = time.time()
                     except Exception as _e:
                         print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
+
+            if pending_transcript_text:
+                self._push_transcript(pending_transcript_text, ts=reaction_msg_ts)
 
             # ---- Per-invocation dump (always written, even on suppression) ----
             response_path = invoke_dir / "response.txt"

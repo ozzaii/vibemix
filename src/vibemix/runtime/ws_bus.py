@@ -778,10 +778,13 @@ def _build_session_snapshot(
     if transcript_buf is not None and transcript_buf:
         drained: list[TranscriptLine] = []
         while transcript_buf and len(drained) < _TRANSCRIPT_DRAIN_CAP:
-            text = transcript_buf.popleft()
-            drained.append(
-                TranscriptLine(role="ai", text=str(text), ts=_now_iso())  # type: ignore[arg-type]
-            )
+            item = transcript_buf.popleft()
+            ts = _now_iso()
+            text = item
+            if isinstance(item, dict):
+                text = item.get("text", "")
+                ts = str(item.get("ts") or ts)
+            drained.append(TranscriptLine(role="ai", text=str(text), ts=ts))
         transcript_delta = tuple(drained)
 
     # MIDI ribbon — drain moves observed since the last snapshot. The real

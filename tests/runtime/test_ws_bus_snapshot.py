@@ -258,6 +258,19 @@ def test_transcript_delta_drains_sink():
     assert msg2["payload"]["transcript_delta"] == []
 
 
+def test_transcript_delta_preserves_sink_timestamp():
+    shared_ts = "2026-06-04T12:00:00+00:00"
+    sink: deque = deque([{"text": "yo that drop", "ts": shared_ts}])
+    msg = _build_session_snapshot(
+        _FakeLevels(0.3, 0.0, 0.0),
+        _fake_state(),
+        transcript_buf=sink,
+    )
+    validate_message(msg)
+    lines = msg["payload"]["transcript_delta"]
+    assert lines == [{"role": "ai", "text": "yo that drop", "ts": shared_ts}]
+
+
 def test_midi_ribbon_drains_moves_since():
     class _FakeController:
         def __init__(self) -> None:

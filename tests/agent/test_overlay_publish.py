@@ -28,6 +28,7 @@ emit path has its own dedicated coverage in
 from __future__ import annotations
 
 import asyncio
+import collections
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +36,10 @@ from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
 from vibemix.coach import CitationLinter, StrippedRateTracker
+from vibemix.runtime.ws_bus import _build_session_snapshot
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState
+from vibemix.state.deck_context import LiveClaimGuardResult
+from vibemix.ui_bus.validator import validate_message
 
 # --------------------------------------------------------------------------
 # Helpers (mirror tests/agent/test_dj_cohost_linter.py)
@@ -87,6 +91,18 @@ def _cohost_reactions_only(bus: _FakeIpcBus) -> list[dict]:
     return [e for e in bus.emits if e.get("type") == "ipc.session.cohost-reaction"]
 
 
+class _FakeLevels:
+    def snapshot(self) -> dict[str, float]:
+        return {
+            "music": 0.3,
+            "voice": 0.0,
+            "mic": 0.0,
+            "music_peak": 0.3,
+            "voice_peak": 0.0,
+            "mic_peak": 0.0,
+        }
+
+
 def _build_state() -> MusicState:
     s = MusicState()
     s.audible = True
@@ -106,6 +122,7 @@ def _build_agent(
     registry: EvidenceRegistry | None = None,
     wired: bool = False,
     ipc_bus: _FakeIpcBus | None = None,
+    transcript_sink: collections.deque | None = None,
 ):
     """Build the agent. wired=True enables the citation linter chokepoint
     (Plan 20-01); ipc_bus, if non-None, enables the overlay publish path."""
@@ -131,6 +148,8 @@ def _build_agent(
         kwargs["playback"] = mocker.MagicMock()
     if ipc_bus is not None:
         kwargs["ipc_bus"] = ipc_bus
+    if transcript_sink is not None:
+        kwargs["transcript_sink"] = transcript_sink
 
     agent = DJCoHostAgent(**kwargs)
     return agent, genai_client, recorder, state
@@ -206,6 +225,52 @@ def test_wired_valid_publishes_overlay(mocker, tmp_path) -> None:
     assert len(reactions) == 1
     assert reactions[0]["payload"]["text"] == "nice move"
     assert reactions[0]["payload"]["citation_strip"] == []
+
+
+def test_cited_reaction_transcript_delta_shares_reaction_ts(mocker, tmp_path) -> None:
+    """The live UI joins transcript lines to citation chips by exact wire ts."""
+    registry = EvidenceRegistry()
+    registry.write("ev", "KICK_SWAP", 45.2)
+    registry.write("ev", "KICK_SWAP@45.2", 45.2)
+    bus = _FakeIpcBus()
+    transcript_sink: collections.deque = collections.deque()
+    agent, gen, _, state = _build_agent(
+        mocker,
+        tmp_path,
+        registry=registry,
+        wired=True,
+        ipc_bus=bus,
+        transcript_sink=transcript_sink,
+    )
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    mocker.patch(
+        "vibemix.agent.dj_cohost.apply_live_claim_guard",
+        side_effect=lambda text, *_a, **_kw: LiveClaimGuardResult(text=text),
+    )
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["tight kick swap [ev:KICK_SWAP@45.2]"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive(agent)
+
+    reactions = _cohost_reactions_only(bus)
+    assert len(reactions) == 1
+    reaction = reactions[0]
+    assert reaction["payload"]["citation_strip"][0]["event_id"] == "ev:KICK_SWAP@45.2"
+
+    snapshot = _build_session_snapshot(
+        _FakeLevels(),
+        state,
+        transcript_buf=transcript_sink,
+    )
+    validate_message(snapshot)
+    lines = snapshot["payload"]["transcript_delta"]
+    assert len(lines) == 1
+    assert lines[0]["text"] == "tight kick swap"
+    assert lines[0]["ts"] == reaction["ts"]
 
 
 # --------------------------------------------------------------------------
