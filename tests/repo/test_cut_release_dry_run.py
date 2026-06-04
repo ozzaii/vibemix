@@ -3,7 +3,7 @@
 
 Invokes ``bash scripts/launch/cut_release.sh --dry-run v0.1.0-rc1`` against the
 real tree and asserts:
-    - exit code 0 (everything-but-the-signature is ready),
+    - exit code 0 (local artifact preflight is wired),
     - the signature stub log line appears,
     - the DRY-RUN GREEN summary appears,
     - the KAAN-gated Gate 2b wired-but-pending line appears (it has no real
@@ -61,7 +61,7 @@ def test_dry_run_stubs_signature_gate(dry_run):
 
 @pytest.mark.cli
 def test_dry_run_prints_green_summary(dry_run):
-    assert "DRY-RUN GREEN — everything but the signature is ready" in dry_run.stdout, (
+    assert "DRY-RUN GREEN: local artifact preflight passed" in dry_run.stdout, (
         "the success path must print the DRY-RUN GREEN summary"
     )
     # The summary must enumerate the real-cut blockers.

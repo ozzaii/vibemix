@@ -34,8 +34,9 @@
 # --dry-run (Phase 58 / REL-03): stubs ONLY the EXTERNAL signature gate
 # (Gate 2 drops --require-signed) and treats the KAAN-gated Gate 2b/6b as
 # PASS-for-dry-run with a loud wired-but-pending log. Every other gate runs
-# for real. Exits 0 = "everything but the signature is ready." A real
-# (non-dry-run) cut still FAILS Gate 2/2b/6b without the real inputs.
+# for real. Exits 0 = local artifact preflight wiring passed with the
+# explicitly stubbed external/human gates still pending. A real (non-dry-run)
+# cut still FAILS Gate 2/2b/6b without the real inputs.
 #
 # HARD GUARD: even with `--really` / `--real` / `--dry-run`, this script
 # NEVER invokes `gh release create` autonomously. That's the load-bearing
@@ -232,7 +233,7 @@ if [[ "${FAIL}" -ne 0 ]]; then
 fi
 
 if [[ "${DRY_RUN}" -eq 1 ]]; then
-  echo "  DRY-RUN GREEN — everything but the signature is ready. Real cut blocked only on: [Apple Dev Agreement, SignPath cert, 54/55 ear-pass, E2E walk]."
+  echo "  DRY-RUN GREEN: local artifact preflight passed with signature/E2E/ear gates stubbed where noted. Real cut still blocked on: [Apple Dev Agreement, SignPath cert, 54/55 ear-pass, E2E walk]."
   echo
 fi
 echo "  ALL GATES PASS — Kaan, run the following:"
